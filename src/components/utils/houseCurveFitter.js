@@ -12,7 +12,7 @@ import {
 } from "@/components/utils/designEqCalibration";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
-import { houseCurveP19Level, calculateAllSeatMetrics, runSingleStart, compareHouseCurveMetrics } from "@/components/utils/houseCurveFitterCore";
+import { houseCurveP19Level, calculateAllSeatMetrics, runSingleStart, compareHouseCurveMetrics, createHouseCurveOperationCounts } from "@/components/utils/houseCurveFitterCore";
 import { createHouseCurveEvaluationMemo } from "@/components/utils/houseCurveEvaluationMemo";
 import { prepareBankValidation } from "@/components/utils/preparedBankValidation";
 import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
@@ -138,6 +138,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const preparedBankValidation = reuseExactEvaluations
     ? prepareBankValidation(bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb)
     : null;
+  const sharedOperationCounts = createHouseCurveOperationCounts();
   const evaluationOptions = { reuseExactEvaluations, memo: evaluationMemo, preparedBankValidation, protectedNullRegions, canonicalTargetCurve, correctionStartHz, correctionEndHz };
   const startA = runSingleStart([], objectiveSeats, bankRaw, fitStartHz, fitEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationOptions);
   let startB = startA;
@@ -175,6 +176,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
       filters, metrics: finalMetrics, seatBaselineMetrics: pairedSeatBaselineMetrics,
       seats: objectiveSeats, bankRaw, fitStartHz, fitEndHz, anchorDb, activeSubs, usableLfHz,
       requestedSystemOutputDb, profile, protectedNullRegions, canonicalTargetCurve,
+      evaluationMemo, preparedBankValidation, operationCounts: sharedOperationCounts,
     });
     bankEvalCount += pairedRefinement.bankEvaluationCount;
     if (!pairedRefinement.changed) {
@@ -191,12 +193,13 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     protectedNullRegions, activeSubs, usableLfHz, requestedSystemOutputDb,
     assessmentStartHz, assessmentEndHz, correctionStartHz, correctionEndHz,
     profile, priorIterationTrace: selected.trace || [],
+    preparedBankValidation, operationCounts: sharedOperationCounts,
   });
   bankEvalCount += residualCleanup.bankEvaluationCount;
   if (residualCleanup.changed) {
     filters = residualCleanup.filters;
     finalMetrics = calculateAllSeatMetrics(
-      objectiveSeats, filters, fitStartHz, fitEndHz, anchorDb, null, null,
+      objectiveSeats, filters, fitStartHz, fitEndHz, anchorDb, sharedOperationCounts, evaluationMemo,
       { protectedNullRegions, canonicalTargetCurve },
     );
     operations += residualCleanup.acceptedOperationCount;
@@ -206,6 +209,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     filters, rawCurve: rspRaw, targetCurve: canonicalTargetCurve, protectedNullRegions,
     assessmentStartHz, assessmentEndHz, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb,
     profile, objectiveSeats, fitStartHz, fitEndHz, anchorDb,
+    evaluationMemo, preparedBankValidation, operationCounts: sharedOperationCounts,
   });
   if (legalPeakRefinement.changed) {
     filters = legalPeakRefinement.filters;
@@ -217,6 +221,9 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     Object.entries(start.operationCounts || {}).forEach(([key, value]) => { totals[key] = (totals[key] || 0) + value; });
     return totals;
   }, {});
+  Object.entries(sharedOperationCounts).forEach(([key, value]) => {
+    operationCounts[key] = (operationCounts[key] || 0) + value;
+  });
   operationCounts.residualCleanupAcceptedOperations = residualCleanup.acceptedOperationCount;
   operationCounts.residualCleanupBankEvaluations = residualCleanup.bankEvaluationCount;
 
