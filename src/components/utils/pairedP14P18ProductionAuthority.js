@@ -213,6 +213,7 @@ function buildSourceResult(activeSubs, transfers, sourceDiagnostics) {
       amplifierLimitDb: numberOrNull(source.amplifierLimitDb),
       transferRangeHz: source.transferRangeHz,
       productRangeHz: source.productRangeHz,
+      approvedRangeCompletion: source.approvedRangeCompletion || null,
       capabilityCurve: cleanCurve(source.capabilityCurve),
     })),
   };
