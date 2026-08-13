@@ -12,7 +12,10 @@ import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferIn
 import { validateInstances, bassInputAdapter, normaliseLegacySubwoofers } from "@/components/utils/subwooferInstanceMigration";
 import { migrateP12Mode, P12_MODE_MINIMUM, P12_MODE_RECOMMENDED } from "@/components/utils/p12ModeAuthority";
 import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuthority";
-import { enforceRspPriority } from "@/components/utils/seatPriorityAuthority";
+// seatPriorityAuthority helpers are intentionally NOT imported here.
+// RSP priority enforcement is performed atomically at the single final
+// RSP-setting commit (RoomDesigner isPrimary normalisation effect), not via
+// a broad AppState guard effect. See Stage A1 priority reload fix.
 
 // Stage 2: Restore canonical subwoofer instances from a local autosave payload.
 // Four-way logic:
@@ -86,10 +89,14 @@ const enforceOnePrimary = (seats, dims, mlpBasis = "front") => {
     const primaries = seatsWithFlags.filter(s => s.isPrimary);
     const rspId = primaries.length > 0 ? primaries[0].id : seatsWithFlags[0].id;
     const collapsed = seatsWithFlags.map(s => ({ ...s, isPrimary: s.id === rspId }));
-    // The RSP seat must always resolve to Primary priority.
-    return enforceRspPriority(collapsed);
+    // NOTE: RSP *priority* is NOT enforced here. enforceOnePrimary may be
+    // called on intermediate hydration states where isPrimary is transient;
+    // promoting a transient RSP would corrupt a stored non-RSP Secondary
+    // priority. Priority is enforced atomically at the final RSP-setting
+    // commit (RoomDesigner isPrimary normalisation effect).
+    return collapsed;
   } catch {
-    return enforceRspPriority(seats.map((s, i) => ({ ...s, isPrimary: i === 0 })));
+    return seats.map((s, i) => ({ ...s, isPrimary: i === 0 }));
   }
 };
 
@@ -859,20 +866,13 @@ function useDesignerState() {
     }
   }, [seatingPositions, roomDims?.widthM, roomDims?.lengthM, mlpBasis, mlpOverride]);
 
-  // ── RSP PRIORITY ENFORCEMENT ─────────────────────────────────────────────
-  // The Reference Seating Position (the seat with isPrimary === true) must
-  // always resolve to Primary priority. This effect is a data-level guard:
-  // it only ever sets priority="primary" on the isPrimary seat — it never
-  // changes isPrimary, seat coordinates, or geometry. Idempotent (returns the
-  // same array ref when no change is needed) so it cannot loop.
-  useEffect(() => {
-    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return;
-    const enforced = enforceRspPriority(seatingPositions);
-    if (enforced !== seatingPositions) {
-      setSeatingPositions(enforced);
-    }
-  }, [seatingPositions, setSeatingPositions]);
-  // ── END RSP PRIORITY ENFORCEMENT ───────────────────────────────────────────
+  // RSP PRIORITY ENFORCEMENT — removed (Stage A1 priority reload fix).
+  // The previous broad guard effect ran enforceRspPriority on every
+  // seatingPositions change, including during project hydration when the
+  // isPrimary flag is transient. That promoted a temporary RSP and corrupted
+  // stored non-RSP Secondary priorities. RSP priority is now enforced
+  // atomically at the single final RSP-setting commit (RoomDesigner isPrimary
+  // normalisation effect), which is gated to skip until hydration completes.
 
   const setGlobalSurroundModel = useCallback((model) => {
     if (globalThis.__B44_LOGS) console.log('[AppState] setGlobalSurroundModel', { model });
