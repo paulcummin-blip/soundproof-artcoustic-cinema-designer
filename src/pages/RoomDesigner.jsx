@@ -822,6 +822,9 @@ function RoomDesignerWithState() {
   // ✅ analysisResult uses internal overlay calculation (no props needed)
   const analysisResult = useRP22AnalysisEngine({
     diagnosticOwner: "room-designer-authority",
+    // P14–P20 are owned by BassBackgroundAnalysisOwner and its workers.
+    // Do not run the retired synchronous bass simulator in this geometry pass.
+    includeBassAnalysis: false,
     placedSpeakers: _effectivePlacedSpeakers,
     visiblePlanSpeakers: _effectiveVisiblePlanSpeakers,
     seatingPositions: seats,
