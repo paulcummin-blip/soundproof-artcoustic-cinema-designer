@@ -399,7 +399,7 @@ const EMPTY_SEAT_RESPONSES = Object.freeze([]);
 
 export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, dolbyLayout, visiblePlanSpeakers, includeBassAnalysis = true, diagnosticOwner = "unknown/unattributed" }) => {
   // Report consumers disable this calculation path and present only the completed bass authority.
-  const liveSeatResponses = useSeatResponses();
+  const liveSeatResponses = useSeatResponses(includeBassAnalysis);
   const seatResponses = includeBassAnalysis ? liveSeatResponses : EMPTY_SEAT_RESPONSES;
   // Active subwoofer models — used to enforce the product LF boost guard in the
   // RP22 Design EQ stage (applyDesignEqCurve). We take the MOST restrictive
