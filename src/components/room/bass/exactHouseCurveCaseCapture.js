@@ -35,6 +35,10 @@ export function buildExactHouseCurveCaseCapture(inputs) {
   const before = serializeSplCurve(rspRawCurve);
   const after = serializeSplCurve(candidate?.finalPostEqCurve);
   const aggregateEqResponse = serializeEqCurve(candidate?.combinedEqCurve);
+  const maximumAvailableAfterEq = serializeSplCurve(candidate?.maximumSplCurveAfterEq);
+  const globalTrimDb = Number.isFinite(candidate?.operatingLevelOffsetDb)
+    ? Number(candidate.operatingLevelOffsetDb)
+    : Number.isFinite(candidate?.globalTrimDb) ? Number(candidate.globalTrimDb) : 0;
   const targetAnchorDb = Number.isFinite(candidate?.requestedTargetSpl) ? candidate.requestedTargetSpl : null;
   const startHz = candidate?.assessmentStartHz ?? null;
   const endHz = candidate?.assessmentEndHz ?? null;
@@ -54,8 +58,8 @@ export function buildExactHouseCurveCaseCapture(inputs) {
   const selectedFilterBank = candidate?.generatedFilterBank || result?.selectedFilters || [];
   const content = {
     frequencyGrid: before.map((point) => point.frequency), before, after,
-    target: productionHouseCurveTarget, aggregateEqResponse, selectedFilterBank,
-    products: selectedModels, assessment,
+    target: productionHouseCurveTarget, aggregateEqResponse, maximumAvailableAfterEq,
+    globalTrimDb, selectedFilterBank, products: selectedModels, assessment,
   };
   const productionCandidateId = result?.productionCandidateId || result?.selectedCandidateId || candidate?.candidateId || null;
   const contractCandidateId = contract?.selectedCandidateId || null;
@@ -63,7 +67,7 @@ export function buildExactHouseCurveCaseCapture(inputs) {
   const contractFilterBankSignature = contract?.provenance?.filterBankSignature || null;
   const capture = {
     captureType: "exact-live-house-curve-production-case",
-    captureVersion: 2,
+    captureVersion: 3,
     capturedAt: new Date().toISOString(),
     caseFingerprint: contentFingerprint(content),
     calibrationFingerprint: contract?.fingerprints?.calibration || lifecycle?.currentCalibrationFingerprint || null,
@@ -74,7 +78,8 @@ export function buildExactHouseCurveCaseCapture(inputs) {
     },
     graphSeries: { rspBeforeEq: graphBefore, rspAfterEq: graphAfter, absoluteHouseCurveTarget: graphTarget },
     aggregateEqResponse,
-    aggregateEqSource: "selectedCandidate.combinedEqCurve ({frequency, spl}; spl is aggregate gain dB)",
+    maximumAvailableAfterEq,
+    aggregateEqSource: "selectedCandidate.combinedEqCurve plus selectedCandidate.operatingLevelOffsetDb, capped by selectedCandidate.maximumSplCurveAfterEq",
     productionHouseCurveTarget,
     graphHouseCurveTarget,
     fitterHouseCurveTarget,
@@ -93,7 +98,7 @@ export function buildExactHouseCurveCaseCapture(inputs) {
       capabilityAndHeadroom: content.frequencyGrid.map((frequency) => ({ frequency, ...getSourceDomainBoostAllowance({ frequency, requestedBoostDb: 6, activeSubs, usableLfHz, requestedSystemOutputDb: targetAnchorDb }) })),
     },
     rp22Definitions: getRp22BassOperatingDefinitions(),
-    globalTrimDb: Number.isFinite(candidate?.globalTrimDb) ? candidate.globalTrimDb : null,
+    globalTrimDb,
     selectedFilterBank,
     protectedNullRegions: candidate?.houseCurveDiagnostics?.protectedNullRegions || [],
     protectedNullDiagnostics: { blockedResiduals: candidate?.blockedResiduals || [], worstResiduals: candidate?.designEqWorstResidualDiagnostics || [] },
