@@ -140,7 +140,7 @@ function fixture_matchesFlatSourceProduction() {
   // Run the production engine directly with the SAME flat 94 dB source curve
   const prodRsp = simulateBassResponseRewCore(
     TEST_ROOM, TEST_RSP, sub, FLAT_SOURCE,
-    { ...TEST_PHYSICS, freqMinHz: 20, freqMaxHz: 200, smoothing: "none" }
+    { ...TEST_PHYSICS, freqMinHz: 15, freqMaxHz: 200, smoothing: "none" }
   );
 
   const normRsp = normalized.rspCurve;
