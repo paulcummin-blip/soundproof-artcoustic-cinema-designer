@@ -675,7 +675,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
 // and pass them via options.precomputedModes, avoiding redundant work.
 // Backward-compatible: if precomputedModes is not provided, the engine calls
 // this internally exactly as before.
-export function computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMaxHz, evaluationFMaxHz, axialQ, surfaceAbsorption, enableModes, options = {} }) {
+export function computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMaxHz, evaluationFMaxHz, axialQ, surfaceAbsorption, enableModes, options = /** @type {any} */ ({}) }) {
   if (!enableModes) return [];
   return computeRoomModesLocal({
     widthM,
@@ -1127,7 +1127,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       // Reflection phase is pure propagation/time-of-flight only.
       // Phase jitter was removed after parity audit showed it shallowed the 40 Hz null and shifted its centre.
       // disableReflectionPhaseJitter flag is preserved for reference but no longer alters output.
-      const phaseJitter = 0; // eslint-disable-line no-unused-vars
+      const phaseJitter = 0;
       const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
 
       // __TEMP_REW_PARITY_TEST_REFLECTION_COHERENCE__
@@ -1927,6 +1927,7 @@ export function simulateBassResponseRewParityField(roomDims, seatPos, sub, subPr
       roomDims: { widthM, lengthM, heightM },
       surfaceAbsorption,
       f0: mode.freq,
+      mode,
     });
     return { ...mode, qValue: Math.max(1, Math.min(baseQ, absorptionQ)) };
   });
