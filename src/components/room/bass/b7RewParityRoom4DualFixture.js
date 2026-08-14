@@ -183,9 +183,9 @@ export function runB7RewRoom4DualFixture(
 export function runB7RewRoom4DualModeBankMatrix() {
   const cases = [
     { id: "default", overrides: {} },
-    { id: "q_0p7", overrides: { abGlobalQScale: 0.7 } },
-    { id: "q_1p3", overrides: { abGlobalQScale: 1.3 } },
-    { id: "without_multiplicity", overrides: { abApplyModeMultiplicity: false } },
+    { id: "q_1p5", overrides: { abGlobalQScale: 1.5 } },
+    { id: "q_1p8", overrides: { abGlobalQScale: 1.8 } },
+    { id: "q_2p2", overrides: { abGlobalQScale: 2.2 } },
   ];
   return cases.map(({ id, overrides }) => {
     const report = runB7RewRoom4DualFixture(overrides);
