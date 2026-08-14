@@ -309,6 +309,6 @@ export function runB7RewCandidateMatrix() {
   });
 }
 
-if (typeof process !== "undefined" && process?.env?.B7_REW_FIXTURE === "1") {
+if (globalThis.process?.env?.B7_REW_FIXTURE === "1") {
   console.log(JSON.stringify(runB7RewCandidateMatrix(), null, 2));
 }
