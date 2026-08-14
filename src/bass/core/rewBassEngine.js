@@ -195,8 +195,8 @@ function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, m
     // proves the corrected basis across more than one room.
     const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
     const modeMultiplicity = applyModeMultiplicity ? Math.pow(2, activeAxes) : 1;
-    // Optional convergence weight for diagnostic mode banks. Production mode
-    // banks omit this field and therefore remain exactly unity-weighted.
+    // The corrected production bank supplies a raised-cosine convergence
+    // weight above the evaluated band; legacy banks remain unity-weighted.
     const spectralWeight = Number.isFinite(Number(mode.abSpectralWeight))
       ? Math.max(0, Math.min(1, Number(mode.abSpectralWeight)))
       : 1;
@@ -675,7 +675,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
 // and pass them via options.precomputedModes, avoiding redundant work.
 // Backward-compatible: if precomputedModes is not provided, the engine calls
 // this internally exactly as before.
-export function computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMaxHz, axialQ, surfaceAbsorption, enableModes, options = {} }) {
+export function computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMaxHz, evaluationFMaxHz, axialQ, surfaceAbsorption, enableModes, options = {} }) {
   if (!enableModes) return [];
   return computeRoomModesLocal({
     widthM,
@@ -723,7 +723,21 @@ export function computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMax
       const softCap = smoothSoftQCap(mode.freq);
       finalQValue = Math.max(1, Math.min(absorptionQ, softCap));
     }
-    return { ...mode, qValue: finalQValue };
+    let abSpectralWeight = 1;
+    const usesAbConvergenceWindow =
+      qStrategy === 'ab_corrected' &&
+      options?.abDisableSpectralConvergenceWindow !== true &&
+      Number.isFinite(Number(evaluationFMaxHz)) &&
+      Number(modeGenerationFMaxHz) > Number(evaluationFMaxHz);
+    if (usesAbConvergenceWindow && mode.freq > Number(evaluationFMaxHz)) {
+      const taperSpanHz = Number(modeGenerationFMaxHz) - Number(evaluationFMaxHz);
+      const taperPosition = Math.max(
+        0,
+        Math.min(1, (mode.freq - Number(evaluationFMaxHz)) / Math.max(taperSpanHz, 1e-6)),
+      );
+      abSpectralWeight = 0.5 * (1 + Math.cos(Math.PI * taperPosition));
+    }
+    return { ...mode, qValue: finalQValue, abSpectralWeight };
   });
 }
 
@@ -743,12 +757,25 @@ export function prepareModeBank(roomDims, options = {}) {
   const axialQOption = Number(options?.axialQ);
   const axialQ = Number.isFinite(axialQOption) ? axialQOption : 8.0;
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
-  const freqMaxHz = options?.freqMaxHz;
+  const freqMaxHz = Number(options?.freqMaxHz);
+  const usesAbConvergenceWindow =
+    options?.qStrategy === 'ab_corrected' &&
+    options?.abDisableSpectralConvergenceWindow !== true;
   const modeGenerationFMaxHz = Number.isFinite(Number(options?.modeGenerationFMaxHz))
     ? Number(options.modeGenerationFMaxHz)
-    : freqMaxHz;
+    : (usesAbConvergenceWindow ? freqMaxHz * 3 : freqMaxHz);
 
-  return computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMaxHz, axialQ, surfaceAbsorption, enableModes, options });
+  return computeModesWithQ({
+    widthM,
+    lengthM,
+    heightM,
+    modeGenerationFMaxHz,
+    evaluationFMaxHz: freqMaxHz,
+    axialQ,
+    surfaceAbsorption,
+    enableModes,
+    options,
+  });
 }
 
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
@@ -972,19 +999,31 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       )
     : [];
 
-  // __DIAGNOSTIC_MODE_GENERATION_FMAX__ — decouples the mode-generation ceiling from the
-  // evaluated frequency-axis ceiling (freqMaxHz). Defaults to freqMaxHz when not supplied,
-  // so production callers (which never pass this) are completely unaffected. Diagnostic
-  // panels that evaluate a single narrow frequency window (freqMaxHz = target + 0.01) pass
-  // this separately (e.g. 200 Hz) so higher-frequency modes can still contribute their
-  // resonant tails at the evaluated frequency, matching the production graph's mode set.
+  // A finite modal Green's-function sum needs corrections from modes above
+  // the displayed band. For the corrected Allen–Berkley path, generate through
+  // 3x the evaluated ceiling and apply a raised-cosine spectral convergence
+  // window above the evaluated band. This removes hard-cutoff oscillation while
+  // leaving every in-band mode at full weight.
+  const usesAbConvergenceWindow =
+    options?.qStrategy === 'ab_corrected' &&
+    options?.abDisableSpectralConvergenceWindow !== true;
   const modeGenerationFMaxHz = Number.isFinite(Number(options?.modeGenerationFMaxHz))
     ? Number(options.modeGenerationFMaxHz)
-    : freqMaxHz;
+    : (usesAbConvergenceWindow ? Number(freqMaxHz) * 3 : freqMaxHz);
 
   const modes = Array.isArray(options?.precomputedModes)
     ? options.precomputedModes
-    : computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMaxHz, axialQ, surfaceAbsorption, enableModes, options });
+    : computeModesWithQ({
+        widthM,
+        lengthM,
+        heightM,
+        modeGenerationFMaxHz,
+        evaluationFMaxHz: Number(freqMaxHz),
+        axialQ,
+        surfaceAbsorption,
+        enableModes,
+        options,
+      });
 
   const stepDebugRows = [];
   const wholeCurveDebugCandidates = new Map();
