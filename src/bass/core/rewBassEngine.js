@@ -157,7 +157,7 @@ function rewModalBandwidthQ(freqHz, absorptionQ, bandwidthScale) {
 // are untouched. Uses Allen & Berkley (1979) Appendix A Eq. A2 dimensional Green's function
 // form (k_r² − k² real part, k·k_r/Q imaginary part, 1/V room-volume normalisation) instead of
 // the legacy 1−β² normalised resonant transfer function. Matches Case 065 / Case 071 variant B.
-function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, modalSourceAmplitude1m, delayMs, polarity, captureContributions = false) {
+function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, modalSourceAmplitude1m, delayMs, polarity, captureContributions = false, applyModeMultiplicity = false) {
   const { widthM, lengthM, heightM } = dims;
   const contributions = [];
   const roomVolumeM3 = widthM * lengthM * heightM;
@@ -179,7 +179,14 @@ function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, m
     const imagDen = (k * kr) / Math.max(mode.qValue, 1e-6);
     const denomSq = realDen * realDen + imagDen * imagDen;
 
-    const gain = modalSourceAmplitude1m * combinedCoupling * (1 / roomVolumeM3);
+    // Allen–Berkley Eq. A2 sums signed mode indices. This engine stores
+    // only the non-negative cosine modes, so the equivalent signed-mode
+    // multiplicity is 2 for each non-zero axis: axial ×2, tangential ×4,
+    // oblique ×8. Kept behind an explicit B7 option until reference validation
+    // proves the corrected basis across more than one room.
+    const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
+    const modeMultiplicity = applyModeMultiplicity ? Math.pow(2, activeAxes) : 1;
+    const gain = modalSourceAmplitude1m * combinedCoupling * modeMultiplicity * (1 / roomVolumeM3);
     const contribRe = gain * (realDen / denomSq);
     const contribIm = gain * (-imagDen / denomSq);
 
@@ -187,7 +194,7 @@ function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, m
     const tunedIm = (contribRe * tuningSin) + (contribIm * tuningCos);
     modalSumRe += tunedRe;
     modalSumIm += tunedIm;
-    if (captureContributions) contributions.push({ nx: mode.nx, ny: mode.ny, nz: mode.nz, type: mode.type, f0: mode.freq, q: mode.qValue, sourceCoupling, receiverCoupling, combinedCoupling, gain, reBeforeScale: contribRe, imBeforeScale: contribIm, tunedRe, tunedIm });
+    if (captureContributions) contributions.push({ nx: mode.nx, ny: mode.ny, nz: mode.nz, type: mode.type, f0: mode.freq, q: mode.qValue, sourceCoupling, receiverCoupling, combinedCoupling, modeMultiplicity, gain, reBeforeScale: contribRe, imBeforeScale: contribIm, tunedRe, tunedIm });
   });
 
   return { modalSumRe, modalSumIm, contributions };
@@ -1208,14 +1215,19 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         // whose natural frequency lies in the 70–120 Hz band only. All other modes retain their
         // original Q. Direct path, reflections, source curve, geometry, smoothing, modal
         // frequencies, and graph rendering are untouched.
+        const requestedMidbandQScale = Number(options?.abMidbandQScale);
+        const abMidbandQScale = Number.isFinite(requestedMidbandQScale)
+          ? Math.max(0.25, Math.min(4, requestedMidbandQScale))
+          : 1.5;
         const abModes = modes.map((mode) => {
           const inMidBand = mode.freq >= 70 && mode.freq <= 120;
-          if (!inMidBand) return mode;
-          return { ...mode, qValue: mode.qValue * 1.5 };
+          if (!inMidBand || abMidbandQScale === 1) return mode;
+          return { ...mode, qValue: mode.qValue * abMidbandQScale };
         });
         const abResult = abCorrectedModalTransferLocal(
           frequencyHz, abModes, source, seat, { widthM, lengthM, heightM },
-          abSourceUnit, source.tuning.delayMs, source.tuning.polarity, captureThisFrequency
+          abSourceUnit, source.tuning.delayMs, source.tuning.polarity, captureThisFrequency,
+          options?.abApplyModeMultiplicity === true
         );
         // __CANDIDATE_AB_SQRT_V_RECONCILIATION__ (Case 082 Variant B, 2026-07-07)
         // Experimental only — gated strictly behind qStrategy === 'ab_corrected'. Production
