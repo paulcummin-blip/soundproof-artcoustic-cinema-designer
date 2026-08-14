@@ -210,8 +210,9 @@ export function runB7RewDampingModelShootout() {
 }
 
 if (globalThis.process?.env?.B7_REW_DAMPING_SHOOTOUT === "1") {
-  console.log(JSON.stringify({
-    candidates: runB7RewDampingModelShootout(),
-    boundaryGeometrySweep: runB7RewRoom2BoundaryGeometrySweep(),
-  }, null, 2));
+  console.log(JSON.stringify(runB7RewDampingModelShootout(), null, 2));
+}
+
+if (globalThis.process?.env?.B7_REW_BOUNDARY_GEOMETRY === "1") {
+  console.log(JSON.stringify(runB7RewRoom2BoundaryGeometrySweep(), null, 2));
 }
