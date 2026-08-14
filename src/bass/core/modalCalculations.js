@@ -127,6 +127,43 @@ export function estimateModeQLocal({ roomDims, surfaceAbsorption, f0, mode }) {
   return Math.max(1, Math.min(80, qSabine));
 }
 
+// Rectangular-room boundary-loss Q for the Allen–Berkley complete-field
+// solver. Surface absorption is an energy coefficient, so each wall's
+// pressure reflection magnitude is sqrt(1 - alpha). A modal plane-wave
+// component encounters each opposing wall pair at a rate set by its
+// directional wave number. This preserves room-size, mode-order and
+// per-surface absorption dependence without an empirical global Q cap.
+export function estimateModeQBoundaryLossLocal({ roomDims, surfaceAbsorption, mode }) {
+  const widthM = Math.max(1e-6, Number(roomDims?.widthM) || 0);
+  const lengthM = Math.max(1e-6, Number(roomDims?.lengthM) || 0);
+  const heightM = Math.max(1e-6, Number(roomDims?.heightM) || 0);
+  const clampAlpha = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+  const sa = surfaceAbsorption || {};
+
+  const pressureReflection = (alpha) =>
+    Math.sqrt(Math.max(1e-12, 1 - clampAlpha(alpha)));
+  const pairLoss = (alphaA, alphaB) =>
+    -Math.log(Math.max(
+      1e-12,
+      pressureReflection(alphaA) * pressureReflection(alphaB),
+    ));
+
+  const kx = Math.max(0, Number(mode?.nx) || 0) * Math.PI / widthM;
+  const ky = Math.max(0, Number(mode?.ny) || 0) * Math.PI / lengthM;
+  const kz = Math.max(0, Number(mode?.nz) || 0) * Math.PI / heightM;
+  const kSquared = kx * kx + ky * ky + kz * kz;
+
+  if (kSquared <= 0) return 1;
+
+  const decayTerm =
+    (Math.abs(kx) * pairLoss(sa.left ?? 0.3, sa.right ?? 0.3) / widthM) +
+    (Math.abs(ky) * pairLoss(sa.front ?? 0.3, sa.back ?? 0.3) / lengthM) +
+    (Math.abs(kz) * pairLoss(sa.floor ?? 0.3, sa.ceiling ?? 0.3) / heightM);
+
+  const qBoundaryLoss = kSquared / Math.max(decayTerm, 1e-12);
+  return Math.max(1, Math.min(80, qBoundaryLoss));
+}
+
 export function modeShapeValueLocal(mode, x, y, z, roomDims) {
   const widthM  = Math.max(1e-6, Number(roomDims?.widthM)  || 0);
   const lengthM = Math.max(1e-6, Number(roomDims?.lengthM) || 0);
