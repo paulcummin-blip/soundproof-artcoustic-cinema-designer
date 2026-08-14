@@ -195,7 +195,12 @@ function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, m
     // proves the corrected basis across more than one room.
     const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
     const modeMultiplicity = applyModeMultiplicity ? Math.pow(2, activeAxes) : 1;
-    const gain = modalSourceAmplitude1m * combinedCoupling * modeMultiplicity * (1 / roomVolumeM3);
+    // Optional convergence weight for diagnostic mode banks. Production mode
+    // banks omit this field and therefore remain exactly unity-weighted.
+    const spectralWeight = Number.isFinite(Number(mode.abSpectralWeight))
+      ? Math.max(0, Math.min(1, Number(mode.abSpectralWeight)))
+      : 1;
+    const gain = modalSourceAmplitude1m * combinedCoupling * modeMultiplicity * spectralWeight * (1 / roomVolumeM3);
     const contribRe = gain * (realDen / denomSq);
     const contribIm = gain * (-imagDen / denomSq);
 
