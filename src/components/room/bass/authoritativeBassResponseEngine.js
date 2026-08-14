@@ -36,7 +36,7 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
           })
         : rawSourceCurve;
       const parityFullField = physics.rewSourceCurveMode === "flat_rew_reference" && physics.rewParityFieldMode === "full_field";
-      const fieldReflections = qStrategyOverride === "ab_corrected" ? true
+      const fieldReflections = qStrategyOverride === "ab_corrected" ? false
         : parityFullField ? false
         : ["modes_only", "direct_plus_modes"].includes(physics.rewParityFieldMode) ? false
         : physics.rewParityFieldMode === "reflections_only" ? true
@@ -84,6 +84,11 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
             debugModalPhaseConvention: "normal",
             mute68HzAxialMode: physics.mute68HzAxialMode,
             debugDisableModalContribution: physics.debugDisableModalContribution,
+            rewSourceCurveMode: physics.rewSourceCurveMode,
+            rewParityFieldMode: qStrategyOverride === "ab_corrected" ? "modes_only" : physics.rewParityFieldMode,
+            abApplyModeMultiplicity: qStrategyOverride === "ab_corrected",
+            roomIsSealed: qStrategyOverride === "ab_corrected",
+            abMidbandQScale: 1,
             overrideConstantAxialQ: physics.overrideConstantAxialQ,
             overrideAbsorptionAxialQ: physics.overrideAbsorptionAxialQ,
             debugMode200Multiplier: physics.debugMode200Multiplier,
