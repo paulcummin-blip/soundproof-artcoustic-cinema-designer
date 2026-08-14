@@ -114,30 +114,29 @@ export function runB7RewRoom3GeometrySweep() {
   const reference = B7_REW_ROOM3_CASE;
   const offsets = [-reference.coordinateToleranceM, 0, reference.coordinateToleranceM];
   const rows = [];
-  offsets.forEach((sourceXDelta) => offsets.forEach((sourceZDelta) =>
-    offsets.forEach((rspXDelta) => offsets.forEach((rspYDelta) => {
-      const source = {
-        ...reference.source,
-        x: reference.source.x + sourceXDelta,
-        z: reference.source.z + sourceZDelta,
-      };
-      const rspPosition = {
-        ...reference.rspPosition,
-        x: reference.rspPosition.x + rspXDelta,
-        y: reference.rspPosition.y + rspYDelta,
-      };
-      const report = runB7RewRoom3Fixture({}, { source, rspPosition });
-      rows.push({
-        sourceXDelta,
-        sourceZDelta,
-        rspXDelta,
-        rspYDelta,
-        distanceM: report.distanceM,
-        distanceErrorM: report.distanceErrorM,
-        shapeRmsDb: report.shapeRmsDb,
-        shapeMaxDb: report.shapeMaxDb,
-      });
-    }))));
+  // Sweep the two plan-axis coordinates that dominate both the visible
+  // screenshot uncertainty and the reported source distance. Keep source
+  // height/RSP width fixed so this remains a bounded uncertainty check rather
+  // than a response-optimisation search.
+  offsets.forEach((sourceXDelta) => offsets.forEach((rspYDelta) => {
+    const source = {
+      ...reference.source,
+      x: reference.source.x + sourceXDelta,
+    };
+    const rspPosition = {
+      ...reference.rspPosition,
+      y: reference.rspPosition.y + rspYDelta,
+    };
+    const report = runB7RewRoom3Fixture({}, { source, rspPosition });
+    rows.push({
+      sourceXDelta,
+      rspYDelta,
+      distanceM: report.distanceM,
+      distanceErrorM: report.distanceErrorM,
+      shapeRmsDb: report.shapeRmsDb,
+      shapeMaxDb: report.shapeMaxDb,
+    });
+  }));
   return {
     count: rows.length,
     minShapeRmsDb: Math.min(...rows.map((row) => row.shapeRmsDb)),
