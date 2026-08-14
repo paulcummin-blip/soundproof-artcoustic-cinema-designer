@@ -84,7 +84,7 @@ function buildGlobalEyringModes(reference) {
 // Boundary-encounter decay for a rectangular standing wave. Each axis loses
 // pressure according to the two wall reflection coefficients encountered per
 // round trip, weighted by the mode's directional wave-number component.
-function buildBoundaryReflectionModes(reference) {
+export function buildBoundaryReflectionModes(reference) {
   const { widthM, lengthM, heightM } = reference.roomDims;
   const sa = reference.surfaceAbsorption;
   const pairLoss = {
@@ -144,6 +144,48 @@ function summarize(report) {
   };
 }
 
+export function runB7RewRoom2BoundaryGeometrySweep() {
+  const modes = buildBoundaryReflectionModes(B7_REW_ROOM2_CASE);
+  const offsets = [-0.05, 0, 0.05];
+  const rows = [];
+  offsets.forEach((sourceYDelta) => offsets.forEach((sourceZDelta) => offsets.forEach((rspYDelta) => {
+    const source = {
+      ...B7_REW_ROOM2_CASE.source,
+      y: B7_REW_ROOM2_CASE.source.y + sourceYDelta,
+      z: B7_REW_ROOM2_CASE.source.z + sourceZDelta,
+    };
+    const rspPosition = {
+      ...B7_REW_ROOM2_CASE.rspPosition,
+      y: B7_REW_ROOM2_CASE.rspPosition.y + rspYDelta,
+    };
+    const report = runB7RewRoom2Fixture(
+      { precomputedModes: modes },
+      { source, rspPosition },
+    );
+    rows.push({
+      sourceYDelta,
+      sourceZDelta,
+      rspYDelta,
+      distanceM: report.distanceM,
+      distanceErrorM: report.distanceErrorM,
+      shapeRmsDb: report.shapeRmsDb,
+      shapeMaxDb: report.shapeMaxDb,
+      delta40Db: report.rows.find((row) => row.hz === 40)?.shapeDeltaDb,
+      delta92p8Db: report.rows.find((row) => row.hz === 92.8)?.shapeDeltaDb,
+    });
+  })));
+  const distanceConsistentRows = rows.filter(
+    (row) => Math.abs(row.distanceErrorM) <= B7_REW_ROOM2_CASE.coordinateToleranceM,
+  );
+  const byRms = [...distanceConsistentRows].sort((a, b) => a.shapeRmsDb - b.shapeRmsDb);
+  return {
+    count: rows.length,
+    distanceConsistentCount: distanceConsistentRows.length,
+    bestDistanceConsistent: byRms.slice(0, 8),
+    worstDistanceConsistent: byRms.slice(-3),
+  };
+}
+
 export function runB7RewDampingModelShootout() {
   return CANDIDATES.map((candidate) => {
     const room1Modes = candidate.buildModes?.(B7_REW_REFERENCE_CASE);
@@ -168,5 +210,8 @@ export function runB7RewDampingModelShootout() {
 }
 
 if (globalThis.process?.env?.B7_REW_DAMPING_SHOOTOUT === "1") {
-  console.log(JSON.stringify(runB7RewDampingModelShootout(), null, 2));
+  console.log(JSON.stringify({
+    candidates: runB7RewDampingModelShootout(),
+    boundaryGeometrySweep: runB7RewRoom2BoundaryGeometrySweep(),
+  }, null, 2));
 }
