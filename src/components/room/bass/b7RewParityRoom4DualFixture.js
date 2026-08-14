@@ -180,6 +180,32 @@ export function runB7RewRoom4DualFixture(
   };
 }
 
+export function runB7RewRoom4DualModeBankMatrix() {
+  const cases = [
+    { id: "default", overrides: {} },
+    ...[200, 300, 400, 500, 800, 1000, 1200].map((modeGenerationFMaxHz) => ({
+      id: `bank_${modeGenerationFMaxHz}`,
+      overrides: { modeGenerationFMaxHz },
+    })),
+    { id: "bank_600_no_window", overrides: { modeGenerationFMaxHz: 600, abDisableSpectralConvergenceWindow: true } },
+    { id: "bank_1000_no_window", overrides: { modeGenerationFMaxHz: 1000, abDisableSpectralConvergenceWindow: true } },
+  ];
+  return cases.map(({ id, overrides }) => {
+    const report = runB7RewRoom4DualFixture(overrides);
+    return {
+      id,
+      unalignedShapeRmsDb: report.unaligned.shapeRmsDb,
+      unalignedShapeMaxDb: report.unaligned.shapeMaxDb,
+      alignedShapeRmsDb: report.aligned.shapeRmsDb,
+      alignedShapeMaxDb: report.aligned.shapeMaxDb,
+    };
+  });
+}
+
+if (globalThis.process?.env?.B7_REW_ROOM4_DUAL_MATRIX === "1") {
+  console.log(JSON.stringify(runB7RewRoom4DualModeBankMatrix(), null, 2));
+}
+
 if (globalThis.process?.env?.B7_REW_ROOM4_DUAL_SCORE === "1") {
   const report = runB7RewRoom4DualFixture();
   const compactState = (state) => ({
