@@ -142,8 +142,20 @@ export function runB7RewCandidateMatrix() {
       overrides: { rewParityFieldMode: "direct_plus_modes", enableReflections: false },
     },
     {
-      id: "ab_modes_only",
-      overrides: { rewParityFieldMode: "modes_only", enableReflections: false },
+      id: "ab_modes_only_200hz_bank",
+      overrides: { rewParityFieldMode: "modes_only", enableReflections: false, modeGenerationFMaxHz: 200 },
+    },
+    {
+      id: "ab_modes_only_300hz_bank",
+      overrides: { rewParityFieldMode: "modes_only", enableReflections: false, modeGenerationFMaxHz: 300 },
+    },
+    {
+      id: "ab_modes_only_500hz_bank",
+      overrides: { rewParityFieldMode: "modes_only", enableReflections: false, modeGenerationFMaxHz: 500 },
+    },
+    {
+      id: "ab_modes_only_1000hz_bank",
+      overrides: { rewParityFieldMode: "modes_only", enableReflections: false, modeGenerationFMaxHz: 1000 },
     },
   ];
   return candidates.map(({ id, overrides }) => {
