@@ -212,6 +212,34 @@ export function runB7RewRoom2BoundaryCommonShiftSweep() {
   });
 }
 
+export function runB7RewModeBankConvergenceSweep() {
+  return [125, 150, 175, 200, 225, 250, 275, 300, 350, 400, 500, 650, 800, 1000].map(
+    (modeGenerationFMaxHz) => {
+      const overrides = { modeGenerationFMaxHz };
+      const room1 = runB7RewReferenceFixture(
+        overrides,
+        REW_SOURCE_CURVES.flat_rew_reference,
+      );
+      const room2 = runB7RewRoom2Fixture(overrides);
+      return {
+        modeGenerationFMaxHz,
+        room1: {
+          shapeRmsDb: room1.shapeRmsDb,
+          shapeMaxDb: room1.shapeMaxDb,
+        },
+        room2: {
+          shapeRmsDb: room2.shapeRmsDb,
+          shapeMaxDb: room2.shapeMaxDb,
+        },
+        combinedShapeRmsDb: Math.sqrt(
+          (room1.shapeRmsDb ** 2 + room2.shapeRmsDb ** 2) / 2,
+        ),
+        worstShapeMaxDb: Math.max(room1.shapeMaxDb, room2.shapeMaxDb),
+      };
+    },
+  );
+}
+
 export function runB7RewDampingModelShootout() {
   return CANDIDATES.map((candidate) => {
     const room1Modes = candidate.buildModes?.(B7_REW_REFERENCE_CASE);
@@ -237,6 +265,10 @@ export function runB7RewDampingModelShootout() {
 
 if (globalThis.process?.env?.B7_REW_DAMPING_SHOOTOUT === "1") {
   console.log(JSON.stringify(runB7RewDampingModelShootout(), null, 2));
+}
+
+if (globalThis.process?.env?.B7_REW_MODE_BANK_SWEEP === "1") {
+  console.log(JSON.stringify(runB7RewModeBankConvergenceSweep(), null, 2));
 }
 
 if (globalThis.process?.env?.B7_REW_BOUNDARY_GEOMETRY === "1") {
