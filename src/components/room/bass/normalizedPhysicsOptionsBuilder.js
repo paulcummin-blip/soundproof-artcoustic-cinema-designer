@@ -11,7 +11,9 @@
 //   debugModalPhaseConvention: 'normal', debugModalHSign: 'normal',
 //   rewParityModalMagnitudeScale: 1.0.
 //
-// enableReflections follows the same ab_corrected override as the production path.
+// Allen–Berkley is the complete room field. The corrected path therefore
+// disables the separate image field and uses the sealed-room zero mode plus
+// the signed cosine-mode multiplicity validated by the B7 REW fixture.
 //
 // Phase 2B two-stage: buildPreviewPhysicsOptions() produces the interactive-preview
 // physics — identical to the refinement physics except enableReflections is forced
@@ -23,7 +25,7 @@ export function buildNormalizedPhysicsOptions(params) {
   const p = params || {};
   return {
     surfaceAbsorption: p.surfaceAbsorption,
-    enableReflections: p.qStrategy === "ab_corrected" ? true : p.enableRewCoreReflections,
+    enableReflections: p.qStrategy === "ab_corrected" ? false : p.enableRewCoreReflections,
     enableModes: true,
     roomDamping: p.roomDamping,
     axialQ: p.axialQ,
@@ -39,7 +41,11 @@ export function buildNormalizedPhysicsOptions(params) {
     disableModalPropagationPhase: true,
     mute68HzAxialMode: p.mute68HzAxialMode,
     debugDisableModalContribution: p.debugDisableModalContribution,
-    rewParityFieldMode: p.rewParityFieldMode,
+    rewSourceCurveMode: "flat_rew_reference",
+    rewParityFieldMode: p.qStrategy === "ab_corrected" ? "modes_only" : p.rewParityFieldMode,
+    abApplyModeMultiplicity: p.qStrategy === "ab_corrected",
+    roomIsSealed: p.qStrategy === "ab_corrected",
+    abMidbandQScale: 1,
     overrideConstantAxialQ: p.overrideConstantAxialQ,
     overrideAbsorptionAxialQ: p.overrideAbsorptionAxialQ,
     debugMode200Multiplier: p.debugMode200Multiplier,
