@@ -174,6 +174,38 @@ export function runB7RewCandidateMatrix() {
       },
     },
     {
+      id: "ab_modes_only_sealed_no_midband_q_boost",
+      overrides: {
+        rewParityFieldMode: "modes_only",
+        enableReflections: false,
+        modeGenerationFMaxHz: 200,
+        roomIsSealed: true,
+        abMidbandQScale: 1,
+      },
+    },
+    {
+      id: "ab_modes_only_sealed_multiplicity_no_midband_q_boost",
+      overrides: {
+        rewParityFieldMode: "modes_only",
+        enableReflections: false,
+        modeGenerationFMaxHz: 200,
+        roomIsSealed: true,
+        abApplyModeMultiplicity: true,
+        abMidbandQScale: 1,
+      },
+    },
+    ...[0.4, 0.6, 0.8, 1, 1.2, 1.5].map((abGlobalQScale) => ({
+      id: `ab_modes_only_sealed_q_${abGlobalQScale.toFixed(1)}`,
+      overrides: {
+        rewParityFieldMode: "modes_only",
+        enableReflections: false,
+        modeGenerationFMaxHz: 200,
+        roomIsSealed: true,
+        abMidbandQScale: 1,
+        abGlobalQScale,
+      },
+    })),
+    {
       id: "ab_modes_only_300hz_bank",
       overrides: { rewParityFieldMode: "modes_only", enableReflections: false, modeGenerationFMaxHz: 300 },
     },
