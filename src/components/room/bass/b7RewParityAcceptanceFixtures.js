@@ -6,6 +6,7 @@ import {
   scoreB7Markers,
 } from "./b7RewParityReferenceFixture";
 import { runB7RewRoom2Fixture } from "./b7RewParityRoom2Fixture";
+import { runB7RewRoom3Fixture } from "./b7RewParityRoom3Fixture";
 
 function runReferenceParityFixture() {
   const reference = B7_REW_REFERENCE_CASE;
@@ -101,6 +102,31 @@ function runRoom2ParityFixture() {
   };
 }
 
+function runRoom3ParityFixture() {
+  const report = runB7RewRoom3Fixture();
+  const passed =
+    Math.abs(report.distanceErrorM) <= 0.01 &&
+    report.shapeRmsDb <= 2 &&
+    report.shapeMaxDb <= 3;
+  return {
+    name: "B7 REW 7.56x3.85x2.95 rear-left single-sub parity",
+    passed,
+    provisional: true,
+    reason: "Third independent screenshot room; retain provisional status until the 5–6 room suite passes.",
+    distanceM: report.distanceM,
+    distanceErrorM: report.distanceErrorM,
+    shapeRmsDb: report.shapeRmsDb,
+    shapeMaxDb: report.shapeMaxDb,
+    meanDeltaDb: report.meanDeltaDb,
+    rows: report.rows.map(({ hz, db, predictedDb, shapeDeltaDb }) => ({
+      hz,
+      rewDb: db,
+      predictedDb,
+      shapeDeltaDb,
+    })),
+  };
+}
+
 function runEffectiveArrivalAlignmentFixture() {
   const rsp = { x: 0, y: 0, z: 0 };
   const distancesM = [2.75, 2.73, 2.00, 2.04];
@@ -135,6 +161,7 @@ export function runB7RewParityAcceptanceFixtures() {
   const results = [
     runReferenceParityFixture(),
     runRoom2ParityFixture(),
+    runRoom3ParityFixture(),
     runEffectiveArrivalAlignmentFixture(),
   ];
   return {
