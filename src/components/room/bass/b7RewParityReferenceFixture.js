@@ -108,8 +108,15 @@ function scoreMarkers(markers, freqsHz, splDb) {
   };
 }
 
-export function runB7RewReferenceFixture(optionOverrides = {}, sourceCurve = REW_SOURCE_CURVES.rew20HzPorted) {
-  const reference = B7_REW_REFERENCE_CASE;
+export function runB7RewReferenceFixture(optionOverrides = {}, sourceCurve = REW_SOURCE_CURVES.rew20HzPorted, referenceOverrides = {}) {
+  const reference = {
+    ...B7_REW_REFERENCE_CASE,
+    ...referenceOverrides,
+    roomDims: referenceOverrides.roomDims || B7_REW_REFERENCE_CASE.roomDims,
+    rspPosition: referenceOverrides.rspPosition || B7_REW_REFERENCE_CASE.rspPosition,
+    source: referenceOverrides.source || B7_REW_REFERENCE_CASE.source,
+    markers: referenceOverrides.markers || B7_REW_REFERENCE_CASE.markers,
+  };
   const result = simulateBassResponseRewCore(
     reference.roomDims,
     reference.rspPosition,
@@ -128,6 +135,47 @@ export function runB7RewReferenceFixture(optionOverrides = {}, sourceCurve = REW
     distanceM,
     distanceErrorM: distanceM - reference.reportedSourceDistanceM,
     ...scoreMarkers(reference.markers, result.freqsHz, result.splDbRaw),
+  };
+}
+
+export function runB7GeometryToleranceSweep() {
+  const base = B7_REW_REFERENCE_CASE.source;
+  const flatSource = REW_SOURCE_CURVES.flat_rew_reference;
+  const correctedOptions = {
+    rewParityFieldMode: "modes_only",
+    enableReflections: false,
+    roomIsSealed: true,
+    abApplyModeMultiplicity: true,
+    abMidbandQScale: 1,
+  };
+  const offsets = [-0.03, 0, 0.03];
+  const rows = [];
+  offsets.forEach((dx) => offsets.forEach((dy) => offsets.forEach((dz) => {
+    const source = {
+      ...base,
+      x: base.x + dx,
+      y: base.y + dy,
+      z: base.z + dz,
+    };
+    const report = runB7RewReferenceFixture(correctedOptions, flatSource, { source });
+    rows.push({
+      dx,
+      dy,
+      dz,
+      distanceM: report.distanceM,
+      shapeRmsDb: report.shapeRmsDb,
+      shapeMaxDb: report.shapeMaxDb,
+      meanDeltaDb: report.meanDeltaDb,
+    });
+  })));
+  return {
+    count: rows.length,
+    minShapeRmsDb: Math.min(...rows.map((row) => row.shapeRmsDb)),
+    maxShapeRmsDb: Math.max(...rows.map((row) => row.shapeRmsDb)),
+    maxShapeErrorDb: Math.max(...rows.map((row) => row.shapeMaxDb)),
+    minDistanceM: Math.min(...rows.map((row) => row.distanceM)),
+    maxDistanceM: Math.max(...rows.map((row) => row.distanceM)),
+    rows,
   };
 }
 
