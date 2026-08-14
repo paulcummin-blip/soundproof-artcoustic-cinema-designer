@@ -147,6 +147,41 @@ export function runB7RewRoom2GeometrySweep() {
   };
 }
 
+export function runB7RewRoom2LateralSweep() {
+  const reference = B7_REW_ROOM2_CASE;
+  const offsets = [-0.03, 0, 0.03];
+  const sourceZValues = [0.18, 0.21, 0.24];
+  const rows = [];
+  offsets.forEach((sourceXDelta) => offsets.forEach((rspXDelta) => sourceZValues.forEach((sourceZ) => {
+    const source = {
+      ...reference.source,
+      x: reference.source.x + sourceXDelta,
+      z: sourceZ,
+    };
+    const rspPosition = {
+      ...reference.rspPosition,
+      x: reference.rspPosition.x + rspXDelta,
+    };
+    const report = runB7RewRoom2Fixture({}, { source, rspPosition });
+    rows.push({
+      sourceXDelta,
+      rspXDelta,
+      sourceZ,
+      distanceM: report.distanceM,
+      shapeRmsDb: report.shapeRmsDb,
+      shapeMaxDb: report.shapeMaxDb,
+      meanDeltaDb: report.meanDeltaDb,
+    });
+  })));
+  return {
+    count: rows.length,
+    minShapeRmsDb: Math.min(...rows.map((row) => row.shapeRmsDb)),
+    maxShapeRmsDb: Math.max(...rows.map((row) => row.shapeRmsDb)),
+    maxShapeErrorDb: Math.max(...rows.map((row) => row.shapeMaxDb)),
+    rows,
+  };
+}
+
 export function runB7RewRoom2GeneralPhysicsMatrix() {
   const candidates = [
     { id: "production_corrected", overrides: {} },
@@ -192,6 +227,7 @@ if (globalThis.process?.env?.B7_REW_ROOM2 === "1") {
   console.log(JSON.stringify({
     production: runB7RewRoom2Fixture(),
     geometrySweep: runB7RewRoom2GeometrySweep(),
+    lateralSweep: runB7RewRoom2LateralSweep(),
     matrix: runB7RewRoom2GeneralPhysicsMatrix(),
   }, null, 2));
 }
