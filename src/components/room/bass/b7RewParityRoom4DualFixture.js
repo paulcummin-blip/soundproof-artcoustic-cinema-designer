@@ -103,6 +103,43 @@ function distanceM(source, rspPosition) {
   );
 }
 
+function wrapPhaseDeg(value) {
+  return ((value + 180) % 360 + 360) % 360 - 180;
+}
+
+function sampleComplexState(perSourceTransfers, targetHz) {
+  const samples = perSourceTransfers.map((source) => {
+    const point = source.points.reduce((nearest, candidate) =>
+      Math.abs(candidate.frequency - targetHz) < Math.abs(nearest.frequency - targetHz)
+        ? candidate
+        : nearest
+    );
+    return {
+      sourceId: source.sourceId,
+      frequency: point.frequency,
+      magnitudeDb: 20 * Math.log10(Math.max(1e-12, Math.hypot(point.re, point.im))),
+      phaseDeg: Math.atan2(point.im, point.re) * 180 / Math.PI,
+      re: point.re,
+      im: point.im,
+    };
+  });
+  const sumRe = samples.reduce((sum, sample) => sum + sample.re, 0);
+  const sumIm = samples.reduce((sum, sample) => sum + sample.im, 0);
+  return {
+    targetHz,
+    frequency: samples[0]?.frequency ?? null,
+    sources: samples.map(({ sourceId, magnitudeDb, phaseDeg }) => ({
+      sourceId,
+      magnitudeDb,
+      phaseDeg,
+    })),
+    relativePhaseDeg: samples.length >= 2
+      ? wrapPhaseDeg(samples[0].phaseDeg - samples[1].phaseDeg)
+      : null,
+    combinedMagnitudeDb: 20 * Math.log10(Math.max(1e-12, Math.hypot(sumRe, sumIm))),
+  };
+}
+
 function runState(reference, sources, markers, options) {
   const transfer = computeNormalizedRoomTransfer({
     roomDims: reference.roomDims,
@@ -117,6 +154,9 @@ function runState(reference, sources, markers, options) {
   return {
     status: transfer.status,
     sources,
+    phaseDiagnostics: [50, 60, 70, 80].map((hz) =>
+      sampleComplexState(transfer.perSourceRspComplexTransfers, hz)
+    ),
     ...scoreB7Markers(markers, freqsHz, splDb),
   };
 }
@@ -180,7 +220,7 @@ export function runB7RewRoom4DualFixture(
   };
 }
 
-export function runB7RewRoom4DualModeBankMatrix() {
+export function runB7RewRoom4DualDiagnosticMatrix() {
   const cases = [
     { id: "default", overrides: {} },
     { id: "q_1p5", overrides: { abGlobalQScale: 1.5 } },
@@ -199,8 +239,93 @@ export function runB7RewRoom4DualModeBankMatrix() {
   });
 }
 
+function deriveDistanceConstrainedGeometry(insetM) {
+  const reference = B7_REW_ROOM4_DUAL_CASE;
+  const sourceZ = reference.sources[0].z;
+  const rspZ = reference.rspPosition.z;
+  const verticalDeltaM = rspZ - sourceZ;
+  const [nearDistanceM, farDistanceM] = reference.reportedSourceDistancesM;
+  const nearPlanRadiusM = Math.sqrt(nearDistanceM ** 2 - verticalDeltaM ** 2);
+  const farPlanRadiusM = Math.sqrt(farDistanceM ** 2 - verticalDeltaM ** 2);
+  const nearCenter = { x: insetM, y: reference.roomDims.lengthM - insetM };
+  const farCenter = { x: reference.roomDims.widthM - insetM, y: insetM };
+  const dx = farCenter.x - nearCenter.x;
+  const dy = farCenter.y - nearCenter.y;
+  const centerDistanceM = Math.hypot(dx, dy);
+  const alongM =
+    (nearPlanRadiusM ** 2 - farPlanRadiusM ** 2 + centerDistanceM ** 2) /
+    (2 * centerDistanceM);
+  const perpendicularM = Math.sqrt(Math.max(0, nearPlanRadiusM ** 2 - alongM ** 2));
+  const baseX = nearCenter.x + alongM * dx / centerDistanceM;
+  const baseY = nearCenter.y + alongM * dy / centerDistanceM;
+  const candidates = [
+    {
+      x: baseX - dy * perpendicularM / centerDistanceM,
+      y: baseY + dx * perpendicularM / centerDistanceM,
+    },
+    {
+      x: baseX + dy * perpendicularM / centerDistanceM,
+      y: baseY - dx * perpendicularM / centerDistanceM,
+    },
+  ].filter((point) =>
+    point.x >= 0 &&
+    point.x <= reference.roomDims.widthM &&
+    point.y >= 0 &&
+    point.y <= reference.roomDims.lengthM
+  );
+  const rspPlan = candidates.reduce((best, candidate) => {
+    if (!best) return candidate;
+    const candidateError = Math.hypot(
+      candidate.x - reference.rspPosition.x,
+      candidate.y - reference.rspPosition.y,
+    );
+    const bestError = Math.hypot(
+      best.x - reference.rspPosition.x,
+      best.y - reference.rspPosition.y,
+    );
+    return candidateError < bestError ? candidate : best;
+  }, null);
+  if (!rspPlan) throw new Error(`No in-room RSP solution for inset ${insetM} m`);
+  return {
+    rspPosition: { ...reference.rspPosition, ...rspPlan },
+    sources: [
+      {
+        ...reference.sources[0],
+        ...nearCenter,
+        tuning: { ...reference.sources[0].tuning },
+      },
+      {
+        ...reference.sources[1],
+        ...farCenter,
+        tuning: { ...reference.sources[1].tuning },
+      },
+    ],
+  };
+}
+
+export function runB7RewRoom4DualGeometryRobustness() {
+  return [0.10, 0.14, 0.18].map((insetM) => {
+    const geometry = deriveDistanceConstrainedGeometry(insetM);
+    const report = runB7RewRoom4DualFixture({}, geometry);
+    return {
+      insetM,
+      rspPosition: geometry.rspPosition,
+      distancesM: report.distancesM,
+      alignmentDelayErrorMs: report.alignmentDelayErrorMs,
+      unalignedShapeRmsDb: report.unaligned.shapeRmsDb,
+      unalignedShapeMaxDb: report.unaligned.shapeMaxDb,
+      alignedShapeRmsDb: report.aligned.shapeRmsDb,
+      alignedShapeMaxDb: report.aligned.shapeMaxDb,
+    };
+  });
+}
+
 if (globalThis.process?.env?.B7_REW_ROOM4_DUAL_MATRIX === "1") {
-  console.log(JSON.stringify(runB7RewRoom4DualModeBankMatrix(), null, 2));
+  console.log(JSON.stringify(runB7RewRoom4DualDiagnosticMatrix(), null, 2));
+}
+
+if (globalThis.process?.env?.B7_REW_ROOM4_DUAL_GEOMETRY === "1") {
+  console.log(JSON.stringify(runB7RewRoom4DualGeometryRobustness(), null, 2));
 }
 
 if (globalThis.process?.env?.B7_REW_ROOM4_DUAL_SCORE === "1") {
@@ -216,6 +341,7 @@ if (globalThis.process?.env?.B7_REW_ROOM4_DUAL_SCORE === "1") {
       predictedDb,
       shapeDeltaDb,
     })),
+    phaseDiagnostics: state.phaseDiagnostics,
   });
   console.log(JSON.stringify({
     distancesM: report.distancesM,
