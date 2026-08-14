@@ -9,6 +9,7 @@ import { runB7RewRoom2Fixture } from "./b7RewParityRoom2Fixture";
 import { runB7RewRoom3Fixture } from "./b7RewParityRoom3Fixture";
 import { runB7RewRoom4DualFixture } from "./b7RewParityRoom4DualFixture";
 import { runB7RewRoom5FourSubFixture } from "./b7RewParityRoom5FourSubFixture";
+import { runB7RewRoom6FourMidpointFixture } from "./b7RewParityRoom6FourMidpointFixture";
 
 function runReferenceParityFixture() {
   const reference = B7_REW_REFERENCE_CASE;
@@ -204,10 +205,60 @@ function runRoom5FourSubParityFixture() {
     name: "B7 REW 7.2x6.3x3.2 four-corner-sub unaligned 80 Hz control",
     withinAlignmentBenefitTolerance:
       Math.abs(report.unalignedControl.alignmentBenefitErrorDb) <= 3.5,
-    nonBlockingReason: "Sound Proof's authoritative design state time-aligns and phase-aligns every sub to the RSP. This single non-aligned marker remains diagnostic evidence of residual unaligned phase-model error; it does not weaken the aligned production gate.",
+    nonBlockingReason: "Sound Proof's current authoritative design state equalises direct arrivals at the RSP. This single non-aligned marker remains diagnostic evidence of residual unaligned phase-model error; it does not weaken the aligned production gate.",
     ...report.unalignedControl,
   };
   return { alignedAcceptance, unalignedDiagnostic };
+}
+
+function runRoom6FourMidpointParityFixture() {
+  const report = runB7RewRoom6FourMidpointFixture();
+  const productionAlignmentAcceptance = {
+    name: "B7 REW 6.1x5.2x2.2 four-wall-midpoint production-alignment parity",
+    passed:
+      report.distanceErrorsM.every((errorM) => Math.abs(errorM) <= 0.01) &&
+      report.geometricAligned.status === "complete" &&
+      report.geometricAligned.shapeRmsDb <= 2 &&
+      report.geometricAligned.shapeMaxDb <= 3.5,
+    provisional: false,
+    reason: "Sixth independent screenshot room is the final multi-room gate. It deliberately scores the live geometry-only alignment path, not REW's captured delays.",
+    distancesM: report.distancesM,
+    distanceErrorsM: report.distanceErrorsM,
+    productionAlignmentDelaysMs: report.geometricAlignmentDelaysMs,
+    rewReportedAlignmentDelaysMs: report.reportedAlignmentDelaysMs,
+    alignmentDelayResidualsMs: report.alignmentDelayErrorsMs,
+    productionArrivalSpreadMs: report.geometricArrivalSpreadMs,
+    shapeRmsDb: report.geometricAligned.shapeRmsDb,
+    shapeMaxDb: report.geometricAligned.shapeMaxDb,
+    rows: report.geometricAligned.rows.map(
+      ({ hz, db, predictedDb, shapeDeltaDb }) => ({
+        hz,
+        rewDb: db,
+        predictedDb,
+        shapeDeltaDb,
+      }),
+    ),
+  };
+  const rewDelayDiagnostic = {
+    name: "B7 REW 6.1x5.2x2.2 four-wall-midpoint captured-delay diagnostic",
+    withinParityTolerance:
+      report.rewReportedAligned.status === "complete" &&
+      report.rewReportedAligned.shapeRmsDb <= 2 &&
+      report.rewReportedAligned.shapeMaxDb <= 3.5,
+    nonBlockingReason: "The unchanged room engine passes when fed REW's per-source alignment delays. This isolates the remaining mismatch to alignment-delay selection; captured REW values are diagnostic inputs and are never substituted into production.",
+    rewReportedArrivalSpreadMs: report.rewReportedArrivalSpreadMs,
+    shapeRmsDb: report.rewReportedAligned.shapeRmsDb,
+    shapeMaxDb: report.rewReportedAligned.shapeMaxDb,
+    rows: report.rewReportedAligned.rows.map(
+      ({ hz, db, predictedDb, shapeDeltaDb }) => ({
+        hz,
+        rewDb: db,
+        predictedDb,
+        shapeDeltaDb,
+      }),
+    ),
+  };
+  return { productionAlignmentAcceptance, rewDelayDiagnostic };
 }
 
 function runEffectiveArrivalAlignmentFixture() {
@@ -243,12 +294,14 @@ function runEffectiveArrivalAlignmentFixture() {
 export function runB7RewParityAcceptanceFixtures() {
   const room4Dual = runRoom4DualParityFixture();
   const room5FourSub = runRoom5FourSubParityFixture();
+  const room6FourMidpoint = runRoom6FourMidpointParityFixture();
   const results = [
     runReferenceParityFixture(),
     runRoom2ParityFixture(),
     runRoom3ParityFixture(),
     room4Dual.alignedAcceptance,
     room5FourSub.alignedAcceptance,
+    room6FourMidpoint.productionAlignmentAcceptance,
     runEffectiveArrivalAlignmentFixture(),
   ];
   return {
@@ -257,6 +310,7 @@ export function runB7RewParityAcceptanceFixtures() {
     diagnostics: [
       room4Dual.unalignedDiagnostic,
       room5FourSub.unalignedDiagnostic,
+      room6FourMidpoint.rewDelayDiagnostic,
     ],
   };
 }
