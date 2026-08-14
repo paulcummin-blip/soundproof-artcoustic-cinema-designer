@@ -788,9 +788,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   // When true: below Schroeder, image-source reflections contribute 0 (direct + modal only).
   // From Schroeder to Schroeder+40Hz, reflections fade in linearly. Above that, unchanged.
   const lfReflectionHandoffPrototype = options?.lfReflectionHandoffPrototype === true;
-  // Mode-only parity gate: suppresses direct path and image/reflection contributions
-  // when the caller is running a REW modal-only parity comparison.
-  // Does not affect normal product mode (rewSourceCurveMode !== 'flat_rew_reference').
+  // Complete-field gate: suppresses the separate direct/image field in both
+  // normalized and product-aware Allen–Berkley paths.
   // Allen–Berkley is a complete rectangular-room Green's-function field.
   // Adding a second direct/image field double-counts the same room energy and
   // fills modal nulls. The legacy additive construction remains available only
