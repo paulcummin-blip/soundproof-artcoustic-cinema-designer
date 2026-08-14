@@ -1,6 +1,7 @@
 import {
   computeRoomModesLocal,
   estimateModeQLocal,
+  estimateModeQBoundaryLossLocal,
   modeShapeValueLocal,
   resonantTransfer,
 } from './modalCalculations.js';
@@ -685,6 +686,11 @@ export function computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMax
       f0: mode.freq,
       mode,
     });
+    const boundaryLossQ = estimateModeQBoundaryLossLocal({
+      roomDims: { widthM, lengthM, heightM },
+      surfaceAbsorption,
+      mode,
+    });
     const isAxialOverride = options?.overrideConstantAxialQ === true && mode.type === 'axial';
     const isAbsorptionAxialOverride = options?.overrideAbsorptionAxialQ === true && mode.type === 'axial';
     const qStrategy = options?.qStrategy || 'production';
@@ -693,6 +699,11 @@ export function computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMax
       finalQValue = baseQ;
     } else if (isAbsorptionAxialOverride) {
       finalQValue = absorptionQ;
+    } else if (qStrategy === 'ab_corrected') {
+      // The complete Allen–Berkley field uses the modal decay implied by the
+      // actual opposing boundary reflection losses. Do not apply a universal
+      // Q cap here: it erases legitimate room-size and mode-order dependence.
+      finalQValue = boundaryLossQ;
     } else if (qStrategy === 'freq_dependent_cap') {
       const fdCap = freqDependentQCap(mode.freq);
       finalQValue = Math.max(1, Math.min(absorptionQ, fdCap));
