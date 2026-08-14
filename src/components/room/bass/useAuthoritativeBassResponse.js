@@ -52,9 +52,13 @@ export function buildAuthoritativeAutoAlignDelays({ enabled, rspPosition, frontS
       const y = Number(position.y);
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
       const z = Number.isFinite(Number(position.z)) ? Number(position.z) : 0.35;
+      const manualDelayMsRaw = Number(liveEntry?.delay ?? liveEntry?.delayMs);
+      const manualDelayMs = Number.isFinite(manualDelayMsRaw) ? manualDelayMsRaw : 0;
       arrivals.push({
         subId: `${group}-sub-${POSITION_LABELS[index] ?? index}`,
-        arrivalMs: Math.hypot(x - rspPosition.x, y - rspPosition.y, z - rspPosition.z) / 343 * 1000,
+        // Align the effective arrival, including any stored/manual delay.
+        // The auto-delay is later added to this same manual value.
+        arrivalMs: (Math.hypot(x - rspPosition.x, y - rspPosition.y, z - rspPosition.z) / 343 * 1000) + manualDelayMs,
       });
     }
   };
