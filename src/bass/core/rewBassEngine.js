@@ -157,7 +157,7 @@ function rewModalBandwidthQ(freqHz, absorptionQ, bandwidthScale) {
 // are untouched. Uses Allen & Berkley (1979) Appendix A Eq. A2 dimensional Green's function
 // form (k_r² − k² real part, k·k_r/Q imaginary part, 1/V room-volume normalisation) instead of
 // the legacy 1−β² normalised resonant transfer function. Matches Case 065 / Case 071 variant B.
-function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, modalSourceAmplitude1m, delayMs, polarity, captureContributions = false, applyModeMultiplicity = false) {
+function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, modalSourceAmplitude1m, delayMs, polarity, captureContributions = false, applyModeMultiplicity = false, roomIsSealed = false) {
   const { widthM, lengthM, heightM } = dims;
   const contributions = [];
   const roomVolumeM3 = widthM * lengthM * heightM;
@@ -169,7 +169,15 @@ function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, m
   let modalSumRe = 0;
   let modalSumIm = 0;
 
-  modes.forEach((mode) => {
+  // A sealed rectangular room includes the spatially uniform (0,0,0) term
+  // in the modal Green's function. It provides the low-frequency pressure
+  // rise below the first ordinary room mode. It is excluded for unsealed
+  // rooms and from the legacy modal path.
+  const abModes = roomIsSealed
+    ? [{ nx: 0, ny: 0, nz: 0, freq: 0, type: "zero", qValue: 1 }, ...modes]
+    : modes;
+
+  abModes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
     const receiverCoupling = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
     const combinedCoupling = sourceCoupling * receiverCoupling;
@@ -1215,19 +1223,25 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         // whose natural frequency lies in the 70–120 Hz band only. All other modes retain their
         // original Q. Direct path, reflections, source curve, geometry, smoothing, modal
         // frequencies, and graph rendering are untouched.
+        const requestedGlobalQScale = Number(options?.abGlobalQScale);
+        const abGlobalQScale = Number.isFinite(requestedGlobalQScale)
+          ? Math.max(0.25, Math.min(4, requestedGlobalQScale))
+          : 1;
         const requestedMidbandQScale = Number(options?.abMidbandQScale);
         const abMidbandQScale = Number.isFinite(requestedMidbandQScale)
           ? Math.max(0.25, Math.min(4, requestedMidbandQScale))
           : 1.5;
         const abModes = modes.map((mode) => {
           const inMidBand = mode.freq >= 70 && mode.freq <= 120;
-          if (!inMidBand || abMidbandQScale === 1) return mode;
-          return { ...mode, qValue: mode.qValue * abMidbandQScale };
+          const qScale = abGlobalQScale * (inMidBand ? abMidbandQScale : 1);
+          if (qScale === 1) return mode;
+          return { ...mode, qValue: mode.qValue * qScale };
         });
         const abResult = abCorrectedModalTransferLocal(
           frequencyHz, abModes, source, seat, { widthM, lengthM, heightM },
           abSourceUnit, source.tuning.delayMs, source.tuning.polarity, captureThisFrequency,
-          options?.abApplyModeMultiplicity === true
+          options?.abApplyModeMultiplicity === true,
+          options?.roomIsSealed === true
         );
         // __CANDIDATE_AB_SQRT_V_RECONCILIATION__ (Case 082 Variant B, 2026-07-07)
         // Experimental only — gated strictly behind qStrategy === 'ab_corrected'. Production
