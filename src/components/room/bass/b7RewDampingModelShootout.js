@@ -84,7 +84,7 @@ function buildGlobalEyringModes(reference) {
 // Boundary-encounter decay for a rectangular standing wave. Each axis loses
 // pressure according to the two wall reflection coefficients encountered per
 // round trip, weighted by the mode's directional wave-number component.
-export function buildBoundaryReflectionModes(reference) {
+export function buildBoundaryReflectionModes(reference, fMaxHz = MODE_BANK_MAX_HZ) {
   const { widthM, lengthM, heightM } = reference.roomDims;
   const sa = reference.surfaceAbsorption;
   const pairLoss = {
@@ -104,7 +104,7 @@ export function buildBoundaryReflectionModes(reference) {
 
   return computeRoomModesLocal({
     ...reference.roomDims,
-    fMax: MODE_BANK_MAX_HZ,
+    fMax: fMaxHz,
     c: SPEED_OF_SOUND_MPS,
   }).map((mode) => {
     const kx = mode.nx * Math.PI / widthM;
@@ -212,6 +212,62 @@ export function runB7RewRoom2BoundaryCommonShiftSweep() {
   });
 }
 
+function buildRaisedCosineModeBank(reference, fullWeightThroughHz, endHz) {
+  return buildBoundaryReflectionModes(reference, endHz).map((mode) => {
+    if (mode.freq <= fullWeightThroughHz) {
+      return { ...mode, abSpectralWeight: 1 };
+    }
+    const t = Math.max(
+      0,
+      Math.min(1, (mode.freq - fullWeightThroughHz) / Math.max(endHz - fullWeightThroughHz, 1)),
+    );
+    return {
+      ...mode,
+      abSpectralWeight: 0.5 * (1 + Math.cos(Math.PI * t)),
+    };
+  });
+}
+
+export function runB7RewSpectralConvergenceWindowSweep() {
+  const rows = [];
+  [150, 175, 200].forEach((fullWeightThroughHz) => {
+    [300, 400, 600, 800, 1000].forEach((endHz) => {
+      const room1Modes = buildRaisedCosineModeBank(
+        B7_REW_REFERENCE_CASE,
+        fullWeightThroughHz,
+        endHz,
+      );
+      const room2Modes = buildRaisedCosineModeBank(
+        B7_REW_ROOM2_CASE,
+        fullWeightThroughHz,
+        endHz,
+      );
+      const room1 = runB7RewReferenceFixture(
+        { precomputedModes: room1Modes },
+        REW_SOURCE_CURVES.flat_rew_reference,
+      );
+      const room2 = runB7RewRoom2Fixture({ precomputedModes: room2Modes });
+      rows.push({
+        fullWeightThroughHz,
+        endHz,
+        room1: {
+          shapeRmsDb: room1.shapeRmsDb,
+          shapeMaxDb: room1.shapeMaxDb,
+        },
+        room2: {
+          shapeRmsDb: room2.shapeRmsDb,
+          shapeMaxDb: room2.shapeMaxDb,
+        },
+        combinedShapeRmsDb: Math.sqrt(
+          (room1.shapeRmsDb ** 2 + room2.shapeRmsDb ** 2) / 2,
+        ),
+        worstShapeMaxDb: Math.max(room1.shapeMaxDb, room2.shapeMaxDb),
+      });
+    });
+  });
+  return rows;
+}
+
 export function runB7RewModeBankConvergenceSweep() {
   return [125, 150, 175, 200, 225, 250, 275, 300, 350, 400, 500, 650, 800, 1000].map(
     (modeGenerationFMaxHz) => {
@@ -269,6 +325,10 @@ if (globalThis.process?.env?.B7_REW_DAMPING_SHOOTOUT === "1") {
 
 if (globalThis.process?.env?.B7_REW_MODE_BANK_SWEEP === "1") {
   console.log(JSON.stringify(runB7RewModeBankConvergenceSweep(), null, 2));
+}
+
+if (globalThis.process?.env?.B7_REW_SPECTRAL_WINDOW_SWEEP === "1") {
+  console.log(JSON.stringify(runB7RewSpectralConvergenceWindowSweep(), null, 2));
 }
 
 if (globalThis.process?.env?.B7_REW_BOUNDARY_GEOMETRY === "1") {
