@@ -116,6 +116,6 @@ export function runB7RewParityAcceptanceFixtures() {
   };
 }
 
-if (typeof process !== "undefined" && process?.env?.B7_REW_ACCEPTANCE === "1") {
+if (globalThis.process?.env?.B7_REW_ACCEPTANCE === "1") {
   console.log(JSON.stringify(runB7RewParityAcceptanceFixtures(), null, 2));
 }
