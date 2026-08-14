@@ -7,6 +7,7 @@ import {
 } from "./b7RewParityReferenceFixture";
 import { runB7RewRoom2Fixture } from "./b7RewParityRoom2Fixture";
 import { runB7RewRoom3Fixture } from "./b7RewParityRoom3Fixture";
+import { runB7RewRoom4DualFixture } from "./b7RewParityRoom4DualFixture";
 
 function runReferenceParityFixture() {
   const reference = B7_REW_REFERENCE_CASE;
@@ -127,6 +128,50 @@ function runRoom3ParityFixture() {
   };
 }
 
+function runRoom4DualParityFixture() {
+  const report = runB7RewRoom4DualFixture();
+  const alignedAcceptance = {
+    name: "B7 REW 6.2x4.9x2.75 diagonal dual-sub aligned parity",
+    passed:
+      report.distanceErrorsM.every((errorM) => Math.abs(errorM) <= 0.01) &&
+      Math.abs(report.alignmentDelayErrorMs) <= 0.05 &&
+      report.alignedArrivalSpreadMs <= 1e-9 &&
+      report.aligned.shapeRmsDb <= 2 &&
+      report.aligned.shapeMaxDb <= 3.5,
+    provisional: true,
+    reason: "Fourth independent screenshot room and first measured dual-sub alignment case; retain provisional status until the 5–6 room suite passes.",
+    distancesM: report.distancesM,
+    distanceErrorsM: report.distanceErrorsM,
+    actualAlignmentDelaysMs: report.actualAlignmentDelaysMs,
+    alignmentDelayErrorMs: report.alignmentDelayErrorMs,
+    alignedArrivalSpreadMs: report.alignedArrivalSpreadMs,
+    shapeRmsDb: report.aligned.shapeRmsDb,
+    shapeMaxDb: report.aligned.shapeMaxDb,
+    rows: report.aligned.rows.map(({ hz, db, predictedDb, shapeDeltaDb }) => ({
+      hz,
+      rewDb: db,
+      predictedDb,
+      shapeDeltaDb,
+    })),
+  };
+  const unalignedDiagnostic = {
+    name: "B7 REW 6.2x4.9x2.75 diagonal dual-sub unaligned control",
+    withinParityTolerance:
+      report.unaligned.shapeRmsDb <= 2 &&
+      report.unaligned.shapeMaxDb <= 3.5,
+    nonBlockingReason: "Sound Proof's authoritative design state time-aligns every sub to the RSP; retain this unaligned control to expose residual phase-model error without weakening the aligned production gate.",
+    shapeRmsDb: report.unaligned.shapeRmsDb,
+    shapeMaxDb: report.unaligned.shapeMaxDb,
+    rows: report.unaligned.rows.map(({ hz, db, predictedDb, shapeDeltaDb }) => ({
+      hz,
+      rewDb: db,
+      predictedDb,
+      shapeDeltaDb,
+    })),
+  };
+  return { alignedAcceptance, unalignedDiagnostic };
+}
+
 function runEffectiveArrivalAlignmentFixture() {
   const rsp = { x: 0, y: 0, z: 0 };
   const distancesM = [2.75, 2.73, 2.00, 2.04];
@@ -158,15 +203,18 @@ function runEffectiveArrivalAlignmentFixture() {
 }
 
 export function runB7RewParityAcceptanceFixtures() {
+  const room4Dual = runRoom4DualParityFixture();
   const results = [
     runReferenceParityFixture(),
     runRoom2ParityFixture(),
     runRoom3ParityFixture(),
+    room4Dual.alignedAcceptance,
     runEffectiveArrivalAlignmentFixture(),
   ];
   return {
     passed: results.every((result) => result.passed),
     results,
+    diagnostics: [room4Dual.unalignedDiagnostic],
   };
 }
 
