@@ -80,7 +80,7 @@ function sampleDbAt(freqsHz, splDb, targetHz) {
   return splDb[lo] + (splDb[hi] - splDb[lo]) * t;
 }
 
-function scoreMarkers(markers, freqsHz, splDb) {
+export function scoreB7Markers(markers, freqsHz, splDb) {
   const sampled = markers.map((marker) => ({
     ...marker,
     predictedDb: sampleDbAt(freqsHz, splDb, marker.hz),
@@ -134,7 +134,7 @@ export function runB7RewReferenceFixture(optionOverrides = {}, sourceCurve = REW
     options: { ...BASE_OPTIONS, ...optionOverrides },
     distanceM,
     distanceErrorM: distanceM - reference.reportedSourceDistanceM,
-    ...scoreMarkers(reference.markers, result.freqsHz, result.splDbRaw),
+    ...scoreB7Markers(reference.markers, result.freqsHz, result.splDbRaw),
   };
 }
 
