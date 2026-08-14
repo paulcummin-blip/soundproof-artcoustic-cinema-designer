@@ -239,9 +239,11 @@ export function runB7RewRoom4DualDiagnosticMatrix() {
   });
 }
 
-function deriveDistanceConstrainedGeometry(insetM) {
+function deriveDistanceConstrainedGeometry(
+  insetM,
+  sourceZ = B7_REW_ROOM4_DUAL_CASE.sources[0].z,
+) {
   const reference = B7_REW_ROOM4_DUAL_CASE;
-  const sourceZ = reference.sources[0].z;
   const rspZ = reference.rspPosition.z;
   const verticalDeltaM = rspZ - sourceZ;
   const [nearDistanceM, farDistanceM] = reference.reportedSourceDistancesM;
@@ -292,32 +294,50 @@ function deriveDistanceConstrainedGeometry(insetM) {
       {
         ...reference.sources[0],
         ...nearCenter,
+        z: sourceZ,
         tuning: { ...reference.sources[0].tuning },
       },
       {
         ...reference.sources[1],
         ...farCenter,
+        z: sourceZ,
         tuning: { ...reference.sources[1].tuning },
       },
     ],
   };
 }
 
+function compactRobustnessReport(id, geometry) {
+  const report = runB7RewRoom4DualFixture({}, geometry);
+  return {
+    id,
+    rspPosition: geometry.rspPosition,
+    sourceZ: geometry.sources[0].z,
+    distancesM: report.distancesM,
+    alignmentDelayErrorMs: report.alignmentDelayErrorMs,
+    unalignedShapeRmsDb: report.unaligned.shapeRmsDb,
+    unalignedShapeMaxDb: report.unaligned.shapeMaxDb,
+    alignedShapeRmsDb: report.aligned.shapeRmsDb,
+    alignedShapeMaxDb: report.aligned.shapeMaxDb,
+  };
+}
+
 export function runB7RewRoom4DualGeometryRobustness() {
-  return [0.10, 0.14, 0.18].map((insetM) => {
-    const geometry = deriveDistanceConstrainedGeometry(insetM);
-    const report = runB7RewRoom4DualFixture({}, geometry);
-    return {
-      insetM,
-      rspPosition: geometry.rspPosition,
-      distancesM: report.distancesM,
-      alignmentDelayErrorMs: report.alignmentDelayErrorMs,
-      unalignedShapeRmsDb: report.unaligned.shapeRmsDb,
-      unalignedShapeMaxDb: report.unaligned.shapeMaxDb,
-      alignedShapeRmsDb: report.aligned.shapeRmsDb,
-      alignedShapeMaxDb: report.aligned.shapeMaxDb,
-    };
-  });
+  return [0.10, 0.14, 0.18].map((insetM) =>
+    compactRobustnessReport(
+      `inset_${insetM.toFixed(2)}`,
+      deriveDistanceConstrainedGeometry(insetM),
+    )
+  );
+}
+
+export function runB7RewRoom4DualHeightRobustness() {
+  return [0.10, 0.18, 0.26].map((sourceZ) =>
+    compactRobustnessReport(
+      `source_z_${sourceZ.toFixed(2)}`,
+      deriveDistanceConstrainedGeometry(0.14, sourceZ),
+    )
+  );
 }
 
 if (globalThis.process?.env?.B7_REW_ROOM4_DUAL_MATRIX === "1") {
@@ -326,6 +346,10 @@ if (globalThis.process?.env?.B7_REW_ROOM4_DUAL_MATRIX === "1") {
 
 if (globalThis.process?.env?.B7_REW_ROOM4_DUAL_GEOMETRY === "1") {
   console.log(JSON.stringify(runB7RewRoom4DualGeometryRobustness(), null, 2));
+}
+
+if (globalThis.process?.env?.B7_REW_ROOM4_DUAL_HEIGHT === "1") {
+  console.log(JSON.stringify(runB7RewRoom4DualHeightRobustness(), null, 2));
 }
 
 if (globalThis.process?.env?.B7_REW_ROOM4_DUAL_SCORE === "1") {
