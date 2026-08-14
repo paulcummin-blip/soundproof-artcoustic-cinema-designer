@@ -8,6 +8,7 @@ import {
 import { runB7RewRoom2Fixture } from "./b7RewParityRoom2Fixture";
 import { runB7RewRoom3Fixture } from "./b7RewParityRoom3Fixture";
 import { runB7RewRoom4DualFixture } from "./b7RewParityRoom4DualFixture";
+import { runB7RewRoom5FourSubFixture } from "./b7RewParityRoom5FourSubFixture";
 
 function runReferenceParityFixture() {
   const reference = B7_REW_REFERENCE_CASE;
@@ -172,6 +173,43 @@ function runRoom4DualParityFixture() {
   return { alignedAcceptance, unalignedDiagnostic };
 }
 
+function runRoom5FourSubParityFixture() {
+  const report = runB7RewRoom5FourSubFixture();
+  const alignedAcceptance = {
+    name: "B7 REW 7.2x6.3x3.2 four-corner-sub aligned parity",
+    passed:
+      report.distanceErrorsM.every((errorM) => Math.abs(errorM) <= 0.01) &&
+      report.alignmentDelayErrorsMs.every((errorMs) => Math.abs(errorMs) <= 0.05) &&
+      report.alignedArrivalSpreadMs <= 1e-9 &&
+      report.aligned.status === "complete" &&
+      report.aligned.shapeRmsDb <= 2 &&
+      report.aligned.shapeMaxDb <= 3.5,
+    provisional: true,
+    reason: "Fifth independent screenshot room and first measured four-sub alignment case; retain provisional status until one final independent room passes.",
+    distancesM: report.distancesM,
+    distanceErrorsM: report.distanceErrorsM,
+    actualAlignmentDelaysMs: report.actualAlignmentDelaysMs,
+    alignmentDelayErrorsMs: report.alignmentDelayErrorsMs,
+    alignedArrivalSpreadMs: report.alignedArrivalSpreadMs,
+    shapeRmsDb: report.aligned.shapeRmsDb,
+    shapeMaxDb: report.aligned.shapeMaxDb,
+    rows: report.aligned.rows.map(({ hz, db, predictedDb, shapeDeltaDb }) => ({
+      hz,
+      rewDb: db,
+      predictedDb,
+      shapeDeltaDb,
+    })),
+  };
+  const unalignedDiagnostic = {
+    name: "B7 REW 7.2x6.3x3.2 four-corner-sub unaligned 80 Hz control",
+    withinAlignmentBenefitTolerance:
+      Math.abs(report.unalignedControl.alignmentBenefitErrorDb) <= 3.5,
+    nonBlockingReason: "Sound Proof's authoritative design state time-aligns and phase-aligns every sub to the RSP. This single non-aligned marker remains diagnostic evidence of residual unaligned phase-model error; it does not weaken the aligned production gate.",
+    ...report.unalignedControl,
+  };
+  return { alignedAcceptance, unalignedDiagnostic };
+}
+
 function runEffectiveArrivalAlignmentFixture() {
   const rsp = { x: 0, y: 0, z: 0 };
   const distancesM = [2.75, 2.73, 2.00, 2.04];
@@ -204,17 +242,22 @@ function runEffectiveArrivalAlignmentFixture() {
 
 export function runB7RewParityAcceptanceFixtures() {
   const room4Dual = runRoom4DualParityFixture();
+  const room5FourSub = runRoom5FourSubParityFixture();
   const results = [
     runReferenceParityFixture(),
     runRoom2ParityFixture(),
     runRoom3ParityFixture(),
     room4Dual.alignedAcceptance,
+    room5FourSub.alignedAcceptance,
     runEffectiveArrivalAlignmentFixture(),
   ];
   return {
     passed: results.every((result) => result.passed),
     results,
-    diagnostics: [room4Dual.unalignedDiagnostic],
+    diagnostics: [
+      room4Dual.unalignedDiagnostic,
+      room5FourSub.unalignedDiagnostic,
+    ],
   };
 }
 
