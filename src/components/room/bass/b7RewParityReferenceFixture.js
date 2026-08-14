@@ -146,6 +146,34 @@ export function runB7RewCandidateMatrix() {
       overrides: { rewParityFieldMode: "modes_only", enableReflections: false, modeGenerationFMaxHz: 200 },
     },
     {
+      id: "ab_modes_only_multiplicity",
+      overrides: {
+        rewParityFieldMode: "modes_only",
+        enableReflections: false,
+        modeGenerationFMaxHz: 200,
+        abApplyModeMultiplicity: true,
+      },
+    },
+    {
+      id: "ab_modes_only_no_midband_q_boost",
+      overrides: {
+        rewParityFieldMode: "modes_only",
+        enableReflections: false,
+        modeGenerationFMaxHz: 200,
+        abMidbandQScale: 1,
+      },
+    },
+    {
+      id: "ab_modes_only_multiplicity_no_midband_q_boost",
+      overrides: {
+        rewParityFieldMode: "modes_only",
+        enableReflections: false,
+        modeGenerationFMaxHz: 200,
+        abApplyModeMultiplicity: true,
+        abMidbandQScale: 1,
+      },
+    },
+    {
       id: "ab_modes_only_300hz_bank",
       overrides: { rewParityFieldMode: "modes_only", enableReflections: false, modeGenerationFMaxHz: 300 },
     },
