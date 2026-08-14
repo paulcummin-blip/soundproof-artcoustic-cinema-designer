@@ -183,10 +183,9 @@ export function runB7RewRoom4DualFixture(
 export function runB7RewRoom4DualModeBankMatrix() {
   const cases = [
     { id: "default", overrides: {} },
-    ...[200, 300, 1000].map((modeGenerationFMaxHz) => ({
-      id: `bank_${modeGenerationFMaxHz}`,
-      overrides: { modeGenerationFMaxHz },
-    })),
+    { id: "q_0p7", overrides: { abGlobalQScale: 0.7 } },
+    { id: "q_1p3", overrides: { abGlobalQScale: 1.3 } },
+    { id: "without_multiplicity", overrides: { abApplyModeMultiplicity: false } },
   ];
   return cases.map(({ id, overrides }) => {
     const report = runB7RewRoom4DualFixture(overrides);
