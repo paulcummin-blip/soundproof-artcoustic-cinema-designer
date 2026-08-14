@@ -791,7 +791,15 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   // Mode-only parity gate: suppresses direct path and image/reflection contributions
   // when the caller is running a REW modal-only parity comparison.
   // Does not affect normal product mode (rewSourceCurveMode !== 'flat_rew_reference').
+  // Allen–Berkley is a complete rectangular-room Green's-function field.
+  // Adding a second direct/image field double-counts the same room energy and
+  // fills modal nulls. The legacy additive construction remains available only
+  // for locked historical diagnostics.
+  const usesCompleteAbRoomField =
+    options?.qStrategy === 'ab_corrected' &&
+    options?.abUseLegacyAdditiveField !== true;
   const isModeOnlyParity =
+    usesCompleteAbRoomField ||
     (options?.rewSourceCurveMode === 'flat_rew_reference' && options?.rewParityFieldMode === 'full_field') ||
     options?.rewParityFieldMode === 'modes_only';
   const disableModalPropagationPhase = rewParityModalPhase ? true : options?.disableModalPropagationPhase === true;
@@ -1230,7 +1238,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         const requestedMidbandQScale = Number(options?.abMidbandQScale);
         const abMidbandQScale = Number.isFinite(requestedMidbandQScale)
           ? Math.max(0.25, Math.min(4, requestedMidbandQScale))
-          : 1.5;
+          : 1;
         const abModes = modes.map((mode) => {
           const inMidBand = mode.freq >= 70 && mode.freq <= 120;
           const qScale = abGlobalQScale * (inMidBand ? abMidbandQScale : 1);
@@ -1240,8 +1248,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         const abResult = abCorrectedModalTransferLocal(
           frequencyHz, abModes, source, seat, { widthM, lengthM, heightM },
           abSourceUnit, source.tuning.delayMs, source.tuning.polarity, captureThisFrequency,
-          options?.abApplyModeMultiplicity === true,
-          options?.roomIsSealed === true
+          options?.abApplyModeMultiplicity !== false,
+          options?.roomIsSealed !== false
         );
         // __CANDIDATE_AB_SQRT_V_RECONCILIATION__ (Case 082 Variant B, 2026-07-07)
         // Experimental only — gated strictly behind qStrategy === 'ab_corrected'. Production
