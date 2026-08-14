@@ -223,6 +223,16 @@ export function runB7RewRoom2GeneralPhysicsMatrix() {
   });
 }
 
+if (globalThis.process?.env?.B7_REW_ROOM2_SCORE === "1") {
+  const report = runB7RewRoom2Fixture();
+  console.log(JSON.stringify({
+    shapeRmsDb: report.shapeRmsDb,
+    shapeMaxDb: report.shapeMaxDb,
+    meanDeltaDb: report.meanDeltaDb,
+    rows: report.rows.map(({ hz, shapeDeltaDb }) => ({ hz, shapeDeltaDb })),
+  }, null, 2));
+}
+
 if (globalThis.process?.env?.B7_REW_ROOM2 === "1") {
   console.log(JSON.stringify({
     production: runB7RewRoom2Fixture(),
