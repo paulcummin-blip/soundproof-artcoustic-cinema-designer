@@ -33,21 +33,25 @@ export function alignSubsToRSP(sources, rspPosition) {
     const dz = (sub.z ?? 0) - rsp.z;
     const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
     const arrivalTime = distance / SPEED_OF_SOUND;
+    const manualDelayMsRaw = Number(sub.tuning?.delayMs);
+    const manualDelayMs = Number.isFinite(manualDelayMsRaw) ? manualDelayMsRaw : 0;
     
     return {
       sub,
       distance,
-      arrivalTime
+      arrivalTime,
+      manualDelayMs,
+      effectiveArrivalMs: (arrivalTime * 1000) + manualDelayMs,
     };
   });
 
-  // Find furthest sub (latest arrival) - REW-standard alignment
-  const maxArrivalTime = Math.max(...subDistances.map(s => s.arrivalTime));
+  // Find the latest effective arrival, including stored/manual delay.
+  const maxEffectiveArrivalMs = Math.max(...subDistances.map(s => s.effectiveArrivalMs));
 
-  // Apply alignment delays (delay closer subs to match the furthest)
-  return subDistances.map(({ sub, arrivalTime }) => {
-    const userDelayMs = sub.tuning?.delayMs || 0;
-    const alignmentDelayMs = (maxArrivalTime - arrivalTime) * 1000;
+  // Apply only the additional delay needed to match the latest effective arrival.
+  return subDistances.map(({ sub, manualDelayMs, effectiveArrivalMs }) => {
+    const userDelayMs = manualDelayMs;
+    const alignmentDelayMs = maxEffectiveArrivalMs - effectiveArrivalMs;
     
     return {
       ...sub,
