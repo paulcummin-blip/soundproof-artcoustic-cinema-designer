@@ -182,16 +182,41 @@ export function runB7GeometryToleranceSweep() {
 export function runB7RewCandidateMatrix() {
   const candidates = [
     {
-      id: "active_ab_direct_images_modes",
-      overrides: { rewParityFieldMode: "direct_plus_reflections_and_modes", enableReflections: true },
+      id: "legacy_ab_direct_images_modes",
+      overrides: {
+        rewParityFieldMode: "direct_plus_reflections_and_modes",
+        enableReflections: true,
+        abUseLegacyAdditiveField: true,
+        abApplyModeMultiplicity: false,
+        roomIsSealed: false,
+        abMidbandQScale: 1.5,
+      },
     },
     {
-      id: "ab_direct_modes",
-      overrides: { rewParityFieldMode: "direct_plus_modes", enableReflections: false },
+      id: "legacy_ab_direct_modes",
+      overrides: {
+        rewParityFieldMode: "direct_plus_modes",
+        enableReflections: false,
+        abUseLegacyAdditiveField: true,
+        abApplyModeMultiplicity: false,
+        roomIsSealed: false,
+        abMidbandQScale: 1.5,
+      },
     },
     {
-      id: "ab_modes_only_200hz_bank",
-      overrides: { rewParityFieldMode: "modes_only", enableReflections: false, modeGenerationFMaxHz: 200 },
+      id: "legacy_ab_modes_only_200hz_bank",
+      overrides: {
+        rewParityFieldMode: "modes_only",
+        enableReflections: false,
+        modeGenerationFMaxHz: 200,
+        abApplyModeMultiplicity: false,
+        roomIsSealed: false,
+        abMidbandQScale: 1.5,
+      },
+    },
+    {
+      id: "corrected_ab_defaults",
+      overrides: {},
     },
     {
       id: "ab_modes_only_multiplicity",
