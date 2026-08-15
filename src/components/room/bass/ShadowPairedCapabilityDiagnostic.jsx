@@ -31,7 +31,7 @@ export default function ShadowPairedCapabilityDiagnostic({ result, activeSubs, n
       <span>Shadow paired P14: <strong>{shadow.pairedP14Grade || "—"}</strong></span>
       <span>Shadow paired P18: <strong>{shadow.pairedP18Grade || "—"}</strong></span>
       <span>Target basis: <strong>{shadow.targetBasis === "recommended" ? "Recommended" : "Minimum"}</strong></span>
-      <span>EQ headroom cost: <strong>{fmt(shadow.eqHeadroomCostDb, " dB")}</strong></span>
+      <span>Global EQ capability penalty: <strong>{fmt(shadow.eqHeadroomCostDb, " dB")}</strong></span>
       {[15, 18, 25, 30].map((frequency) => <span key={frequency}>Delivered @ {frequency} Hz: <strong>{fmt(shadow.deliveredAtFrequencies?.[frequency], " dBC")}</strong></span>)}
       <span>Worst capability: <strong>{fmt(shadow.worstCapabilityDb, " dBC")}</strong></span>
       <span>Worst frequency: <strong>{fmt(shadow.worstFrequencyHz, " Hz")}</strong></span>
@@ -43,7 +43,7 @@ export default function ShadowPairedCapabilityDiagnostic({ result, activeSubs, n
     {shadow.reason && <div className="mt-2 font-mono text-[10px] text-amber-800">{shadow.reason}</div>}
     <div className="mt-1 font-mono text-[9px] text-slate-500">Heuristic cause attribution is diagnostic only. Severe narrow-null threshold: {shadow.method?.severeNullDepthDb ?? 10} dB.</div>
     {chartData.length > 0 && <div className="mt-2 h-52 rounded border border-violet-200 bg-white p-2">
-      <div className="mb-1 flex gap-4 font-mono text-[9px] text-slate-600"><span className="text-slate-700">Raw capability</span><span className="text-violet-700">Post-EQ capability</span><span className="text-rose-700">Paired envelope</span></div>
+      <div className="mb-1 flex gap-4 font-mono text-[9px] text-slate-600"><span className="text-slate-700">Raw capability</span><span className="text-violet-700">Fixed product + room capability</span><span className="text-rose-700">Paired envelope</span></div>
       <ResponsiveContainer width="100%" height="90%">
         <LineChart data={chartData}><XAxis dataKey="frequency" type="number" domain={[15, 120]} tickCount={8} tick={{ fontSize: 9 }} /><YAxis domain={["auto", "auto"]} tick={{ fontSize: 9 }} width={38} /><Tooltip formatter={(value) => fmt(value, " dB")} labelFormatter={(value) => `${fmt(Number(value), " Hz")}`} /><Line dataKey="raw" stroke="#334155" dot={false} strokeWidth={1.5} /><Line dataKey="postEq" stroke="#7c3aed" dot={false} strokeWidth={1.5} /><Line dataKey="target" stroke="#be123c" dot={false} strokeDasharray="4 3" strokeWidth={1.5} /></LineChart>
       </ResponsiveContainer>
