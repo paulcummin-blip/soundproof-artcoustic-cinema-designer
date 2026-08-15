@@ -46,6 +46,17 @@ export function runExactHouseCurveCaptureFixtures() {
   const emptyEqInputs = fixtureInputs();
   emptyEqInputs.result = { ...emptyEqInputs.result, selectedCandidate: { ...emptyEqInputs.result.selectedCandidate, combinedEqCurve: [] } };
   const emptyEq = buildExactHouseCurveCaseCapture(emptyEqInputs);
+  const clippedInputs = fixtureInputs();
+  const clippedCandidate = clippedInputs.result.selectedCandidate;
+  const clippedTarget = clippedCandidate.productionHouseCurveTarget.map((point, index) => ({
+    ...point,
+    spl: Math.min(point.spl, clippedCandidate.maximumSplCurveAfterEq[index].spl),
+  }));
+  clippedInputs.result = { ...clippedInputs.result, selectedCandidate: { ...clippedCandidate, fitterHouseCurveTarget: clippedTarget } };
+  const clipped = buildExactHouseCurveCaseCapture(clippedInputs);
+  const mismatchedTargetInputs = fixtureInputs();
+  mismatchedTargetInputs.result = { ...mismatchedTargetInputs.result, selectedCandidate: { ...mismatchedTargetInputs.result.selectedCandidate, fitterHouseCurveTarget: curve([104, 104, 104]) } };
+  const mismatchedTarget = buildExactHouseCurveCaseCapture(mismatchedTargetInputs);
   const fallbackInputs = fixtureInputs();
   fallbackInputs.result = { ...fallbackInputs.result, selectedCandidate: { ...fallbackInputs.result.selectedCandidate, fitterHouseCurveTarget: null } };
   const fallback = buildExactHouseCurveCaseCapture(fallbackInputs);
@@ -60,6 +71,8 @@ export function runExactHouseCurveCaptureFixtures() {
     ["Candidate identity pass", capture.captureValidation.identityPass && capture.captureValidation.valid],
     ["Identity mismatch rejection", !mismatch.captureValidation.valid && !mismatch.captureValidation.identityPass],
     ["Empty aggregate EQ rejection", !emptyEq.captureValidation.valid && emptyEq.captureValidation.failures.some((failure) => failure.includes("aggregate EQ is empty"))],
+    ["Capability-clipped fitter target accepted", clipped.captureValidation.valid],
+    ["Arbitrary fitter target drift rejected", !mismatchedTarget.captureValidation.valid && mismatchedTarget.captureValidation.failures.some((failure) => failure.includes("capability-clipped"))],
     ["Reconstructed target rejection", !fallback.captureValidation.valid && fallback.targetSource === "reconstructed-fallback"],
     ["Stable content fingerprint", capture.caseFingerprint === repeated.caseFingerprint],
     ["P14–P20 parity", !capture.captureValidation.failures.some((failure) => failure.includes("P14–P20"))],
