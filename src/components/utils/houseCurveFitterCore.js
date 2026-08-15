@@ -222,7 +222,19 @@ function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEnd
       ];
       if (!segment.length) return discovered;
       const worstPoint = segment.reduce((worst, point) => Math.abs(point.deviationDb) > Math.abs(worst.deviationDb) ? point : worst);
-      const candidatePoints = [worstPoint, segment[0], segment.at(-1)].filter((point, index, values) =>
+      // A high target can make the global worst residual an unreachable valley.
+      // Still surface every material local peak/valley so safe cuts and locally
+      // reachable boosts are not hidden by that larger capability shortfall.
+      const localExtrema = segment.filter((point, index) => {
+        const previous = segment[index - 1]?.deviationDb;
+        const next = segment[index + 1]?.deviationDb;
+        const peak = point.deviationDb >= peakThresholdDb
+          && point.deviationDb >= (previous ?? -Infinity) && point.deviationDb >= (next ?? -Infinity);
+        const valley = point.deviationDb <= -valleyThresholdDb
+          && point.deviationDb <= (previous ?? Infinity) && point.deviationDb <= (next ?? Infinity);
+        return peak || valley;
+      });
+      const candidatePoints = [worstPoint, segment[0], segment.at(-1), ...localExtrema].filter((point, index, values) =>
         values.findIndex((candidate) => candidate.frequency === point.frequency) === index);
       for (const candidatePoint of candidatePoints) {
         const thresholdDb = candidatePoint.deviationDb >= 0 ? peakThresholdDb : valleyThresholdDb;
