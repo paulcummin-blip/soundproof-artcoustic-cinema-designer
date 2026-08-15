@@ -11,12 +11,32 @@ function outsideProtectedNulls(frequency, regions) {
 }
 
 function rankingMetrics(curve, candidate, protectedNullRegions) {
-  const points = applyBassSmoothing(curve || [], "third")
+  const maximumCurve = Array.isArray(candidate?.maximumSplCurveBeforeEq)
+    ? applyBassSmoothing(candidate.maximumSplCurveBeforeEq, "third")
+    : [];
+  const hasMaximumEnvelope = maximumCurve.length > 0;
+  const assessedPoints = applyBassSmoothing(curve || [], "third")
     .filter((point) => point.frequency >= candidate.correctionStartHz && point.frequency <= candidate.correctionEndHz)
-    .filter((point) => outsideProtectedNulls(point.frequency, protectedNullRegions))
-    .map((point) => point.spl - interpolateCanonicalTarget(candidate.productionHouseCurveTarget, point.frequency))
+    .filter((point) => outsideProtectedNulls(point.frequency, protectedNullRegions));
+  const points = assessedPoints
+    .map((point) => {
+      const targetSpl = interpolateCanonicalTarget(candidate.productionHouseCurveTarget, point.frequency);
+      const residualDb = point.spl - targetSpl;
+      const maximumSpl = hasMaximumEnvelope ? interpolateCurveSpl(maximumCurve, point.frequency) : null;
+      // A below-target residual is not an EQ-fit error when the fixed product +
+      // room capability envelope cannot reach the target there. Keep positive
+      // residuals and reachable deficits in the objective so useful cuts and
+      // permitted local boosts still compete normally.
+      if (Number.isFinite(residualDb) && residualDb < 0
+        && Number.isFinite(maximumSpl) && maximumSpl < targetSpl - 0.05) return null;
+      return residualDb;
+    })
     .filter(Number.isFinite);
-  if (!points.length) return { maximumAbsoluteResidualDb: null, rmsResidualDb: null, meanAbsoluteResidualDb: null };
+  if (!points.length) {
+    return assessedPoints.length
+      ? { maximumAbsoluteResidualDb: 0, rmsResidualDb: 0, meanAbsoluteResidualDb: 0 }
+      : { maximumAbsoluteResidualDb: null, rmsResidualDb: null, meanAbsoluteResidualDb: null };
+  }
   return {
     maximumAbsoluteResidualDb: Math.max(...points.map(Math.abs)),
     rmsResidualDb: Math.sqrt(points.reduce((sum, value) => sum + value ** 2, 0) / points.length),
