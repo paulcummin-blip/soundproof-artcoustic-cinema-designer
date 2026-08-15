@@ -89,6 +89,6 @@ export function runSubwooferProductIntegrationFixtures() {
   ));
 
   const cuts = authority("sub4-12", 2, [{ frequency: 15, spl: -6 }, { frequency: 120, spl: -2 }]);
-  checks.push(check("Cuts do not consume global maximum SPL headroom", 0, cuts.eqHeadroom.maximumPositiveEqCostDb, cuts.eqHeadroom.maximumPositiveEqCostDb === 0));
+  checks.push(check("Cut-only operating EQ leaves maximum capability unchanged", "unchanged envelope; 0 dB global cost", cuts.eqHeadroom.maximumPositiveEqCostDb, cuts.eqHeadroom.maximumPositiveEqCostDb === 0 && Math.abs(noEq25 - at(cuts.curves.postEqDeliveredCurve, 25)) < 1e-9 && Math.abs(noEq50 - at(cuts.curves.postEqDeliveredCurve, 50)) < 1e-9));
   return { checks, passed: checks.filter((item) => item.passed).length, total: checks.length, allPassed: checks.every((item) => item.passed) };
 }
