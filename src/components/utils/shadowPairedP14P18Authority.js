@@ -187,17 +187,19 @@ export function assessShadowPairedP14P18({ activeSubs = [], perSourceComplexTran
   }
   if (!rawDeliveredCurve.length) return { status: "INCOMPLETE DATA", reason: "No shared product-and-transfer frequency range is available.", targetBasis: basis, levelResults: [] };
 
-  const maximumPositiveEqDb = rawDeliveredCurve.reduce((maximum, point) => {
-    const eqValue = interpolateInRange(combinedEqCurve, point.frequency, "spl");
-    return Math.max(maximum, finite(eqValue) ? Number(eqValue) : 0);
-  }, 0);
   const postEqDeliveredCurve = rawDeliveredCurve.map((point) => {
     const eqResponseDb = interpolateInRange(combinedEqCurve, point.frequency, "spl");
-    const appliedEqResponseDb = finite(eqResponseDb) ? Number(eqResponseDb) : 0;
+    const requestedEqResponseDb = finite(eqResponseDb) ? Number(eqResponseDb) : 0;
+    // rawDeliveredCurve is already the maximum product-plus-room capability
+    // envelope. Positive EQ can spend local operating-level margin up to this
+    // fixed ceiling; it cannot raise the ceiling and must not impose a global
+    // trim elsewhere. Negative EQ genuinely reduces available output locally.
+    const appliedEqResponseDb = Math.min(0, requestedEqResponseDb);
     return {
       frequency: point.frequency,
-      spl: point.spl + appliedEqResponseDb - maximumPositiveEqDb,
-      positiveEqCostDb: maximumPositiveEqDb,
+      spl: point.spl + appliedEqResponseDb,
+      positiveEqCostDb: 0,
+      requestedEqResponseDb,
       eqResponseDb: appliedEqResponseDb,
     };
   });
