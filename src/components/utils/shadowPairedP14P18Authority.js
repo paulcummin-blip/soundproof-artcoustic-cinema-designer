@@ -137,7 +137,7 @@ function heuristicCauses({ worstFrequency, rawCurve, postEqCurve, sourceDiagnost
   return causes.length ? causes : ["no single cause identified"];
 }
 
-export function assessShadowPairedP14P18({ activeSubs = [], perSourceComplexTransfers = [], combinedEqCurve = [], targetBasis = "minimum", upperFrequencyHz = 120 } = {}) {
+export function assessShadowPairedP14P18({ activeSubs = [], perSourceComplexTransfers = [], targetBasis = "minimum", upperFrequencyHz = 120 } = {}) {
   const basis = normalizeP14TargetBasis(targetBasis);
   const transfers = Array.isArray(perSourceComplexTransfers) ? perSourceComplexTransfers : [];
   const mapping = validateSourceMapping(activeSubs, transfers);
@@ -187,22 +187,15 @@ export function assessShadowPairedP14P18({ activeSubs = [], perSourceComplexTran
   }
   if (!rawDeliveredCurve.length) return { status: "INCOMPLETE DATA", reason: "No shared product-and-transfer frequency range is available.", targetBasis: basis, levelResults: [] };
 
-  const postEqDeliveredCurve = rawDeliveredCurve.map((point) => {
-    const eqResponseDb = interpolateInRange(combinedEqCurve, point.frequency, "spl");
-    const requestedEqResponseDb = finite(eqResponseDb) ? Number(eqResponseDb) : 0;
-    // rawDeliveredCurve is already the maximum product-plus-room capability
-    // envelope. Positive EQ can spend local operating-level margin up to this
-    // fixed ceiling; it cannot raise the ceiling and must not impose a global
-    // trim elsewhere. Negative EQ genuinely reduces available output locally.
-    const appliedEqResponseDb = Math.min(0, requestedEqResponseDb);
-    return {
-      frequency: point.frequency,
-      spl: point.spl + appliedEqResponseDb,
-      positiveEqCostDb: 0,
-      requestedEqResponseDb,
-      eqResponseDb: appliedEqResponseDb,
-    };
-  });
+  // The product-plus-room capability envelope is independent of the
+  // operating-level EQ bank. EQ shapes the requested response toward the house
+  // curve and is capped by this envelope elsewhere in the canonical optimiser;
+  // it must not move the maximum-capability authority itself.
+  const postEqDeliveredCurve = rawDeliveredCurve.map((point) => ({
+    frequency: point.frequency,
+    spl: point.spl,
+    positiveEqCostDb: 0,
+  }));
   const smoothedDeliveredCurve = smoothThirdOctavePowerMean(postEqDeliveredCurve);
   const thresholds = p14ThresholdsForBasis(basis);
   const levelResults = LEVELS_DESC.map((level) => {
