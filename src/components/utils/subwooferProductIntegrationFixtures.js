@@ -80,15 +80,15 @@ export function runSubwooferProductIntegrationFixtures() {
   const noEq50 = at(noEq.curves.postEqDeliveredCurve, 50);
   const boost25AvailableAt50 = at(boost25.curves.postEqDeliveredCurve, 50);
   checks.push(check(
-    "+6 dB at 25 Hz consumes 6 dB of global headroom",
-    "boosted frequency unchanged; unboosted capability -6 dB",
+    "+6 dB at 25 Hz spends only local operating margin and leaves the capability envelope fixed",
+    "boosted and unboosted maximum capability unchanged; 0 dB global cost",
     { boostedFrequencyDeltaDb: noEq25 - boost25Available, unboostedFrequencyDeltaDb: noEq50 - boost25AvailableAt50, costDb: boost25.eqHeadroom.maximumPositiveEqCostDb },
     Math.abs(noEq25 - boost25Available) < 1e-9
-      && Math.abs((noEq50 - boost25AvailableAt50) - 6) < 1e-9
-      && boost25.eqHeadroom.maximumPositiveEqCostDb === 6,
+      && Math.abs(noEq50 - boost25AvailableAt50) < 1e-9
+      && boost25.eqHeadroom.maximumPositiveEqCostDb === 0,
   ));
 
   const cuts = authority("sub4-12", 2, [{ frequency: 15, spl: -6 }, { frequency: 120, spl: -2 }]);
-  checks.push(check("Cuts do not consume maximum SPL headroom", 0, cuts.eqHeadroom.maximumPositiveEqCostDb, cuts.eqHeadroom.maximumPositiveEqCostDb === 0));
+  checks.push(check("Cuts do not consume global maximum SPL headroom", 0, cuts.eqHeadroom.maximumPositiveEqCostDb, cuts.eqHeadroom.maximumPositiveEqCostDb === 0));
   return { checks, passed: checks.filter((item) => item.passed).length, total: checks.length, allPassed: checks.every((item) => item.passed) };
 }
