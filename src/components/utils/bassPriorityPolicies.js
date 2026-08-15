@@ -152,12 +152,17 @@ export function rankBassCandidates(pool, mode) {
   const canonicalMode = normalizeBassPriorityMode(mode);
   const bankValid = Array.isArray(pool) ? pool.filter(isBankAndBandValid) : [];
   const houseCurveMode = canonicalMode === BASS_PRIORITY_MODES.HOUSE_CURVE_ACCURACY;
-  // Profile names and achieved grades cannot exclude a physically valid candidate.
   // Standard, Accuracy and House Curve candidates all compete against one target.
-  const eligible = bankValid;
+  // Identity is a safety fallback, not a competing optimisation strategy: allowing
+  // it into the acoustic ranking can select "no EQ" merely because it has not yet
+  // cut any peaks. Use it only when no physically credible EQ bank exists.
+  const eqEligible = bankValid.filter((candidate) => candidate?.designEqFitProfile !== "identity");
+  const eligible = eqEligible.length ? eqEligible : bankValid;
   const balancedFallbackDominanceApplied = false;
   const dominatedCandidateCount = 0;
-  const eligibilityGroup = bankValid.length ? "bank_valid_fixed_house_curve_objective" : "no_bank_and_band_valid_candidates";
+  const eligibilityGroup = eqEligible.length
+    ? "bank_valid_eq_fixed_house_curve_objective"
+    : bankValid.length ? "identity_fallback_only" : "no_bank_and_band_valid_candidates";
   const rankedEligible = [...eligible].sort((a, b) => compareRanked(a, b, canonicalMode));
   const selected = rankedEligible[0] || null;
   const signature = selected ? stableCandidateSignature(selected) : null;
