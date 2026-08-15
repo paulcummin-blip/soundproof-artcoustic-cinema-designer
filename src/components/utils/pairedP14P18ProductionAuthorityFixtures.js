@@ -101,7 +101,7 @@ function runEqFixtures() {
   return [
     check("Positive EQ leaves the fixed product-plus-room capability envelope unchanged", curveEqual(noEq.curves.postEqDeliveredCurve, boost80.curves.postEqDeliveredCurve) && boost80.eqHeadroom.maximumPositiveEqCostDb === 0, "unchanged envelope; 0 dB global cost", boost80.eqHeadroom.maximumPositiveEqCostDb),
     check("Positive EQ above 120 Hz leaves capability unchanged", boost150.eqHeadroom.maximumPositiveEqCostDb === 0 && curveEqual(noEq.curves.postEqDeliveredCurve, boost150.curves.postEqDeliveredCurve), "unchanged envelope; 0 dB global cost", boost150.eqHeadroom.maximumPositiveEqCostDb),
-    check("Cut-only EQ consumes no global headroom", cuts.eqHeadroom.maximumPositiveEqCostDb === 0, "0 dB", cuts.eqHeadroom.maximumPositiveEqCostDb),
+    check("Cut-only operating EQ leaves maximum capability unchanged", cuts.eqHeadroom.maximumPositiveEqCostDb === 0 && curveEqual(noEq.curves.postEqDeliveredCurve, cuts.curves.postEqDeliveredCurve), "unchanged envelope; 0 dB global cost", cuts.eqHeadroom.maximumPositiveEqCostDb),
   ];
 }
 
