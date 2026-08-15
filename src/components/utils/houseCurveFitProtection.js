@@ -187,22 +187,29 @@ export function isProtectedSmoothedFrequency(frequency, regions, smoothingWidthO
 }
 
 const NEAR_TARGET_INFLUENCE_THRESHOLD_DB = 0.25;
+const CAPABILITY_ANCHORED_TARGET_FLOOR_DB = -1;
 
 export function evaluateNearTargetProtection(baselinePoints, candidatePoints, maximumResidualImprovementDb, protectedNullRegions = []) {
   const candidateByFrequency = new Map((candidatePoints || []).map((point) => [point.frequency, point]));
   const violations = [];
   for (const before of baselinePoints || []) {
-    if (isProtectedSmoothedFrequency(before.frequency, protectedNullRegions) || Math.abs(before.deviationDb) > 1) continue;
+    if (isProtectedSmoothedFrequency(before.frequency, protectedNullRegions)) continue;
     const after = candidateByFrequency.get(before.frequency);
     if (!after) continue;
-    // Only evaluate frequencies materially influenced by this candidate.
-    // A cut at 50 Hz must not be rejected because an unrelated near-target
-    // point at 80 Hz happened to cross ±3 dB for an unrelated reason.
+    // The capability-anchored baseline is at or above the requested house curve
+    // wherever the safe product-plus-room envelope can meet it. A peak cut may
+    // approach that target, but it must not manufacture a new trough beneath it.
+    // Where the baseline is already below target, never make the genuine physical
+    // shortfall worse. Boost trials move upward and are unaffected by this guard.
     const changeDb = Math.abs(after.deviationDb - before.deviationDb);
     if (changeDb < NEAR_TARGET_INFLUENCE_THRESHOLD_DB) continue;
-    const afterAbs = Math.abs(after.deviationDb);
+    const permittedFloorDb = Math.min(CAPABILITY_ANCHORED_TARGET_FLOOR_DB, before.deviationDb);
+    const worsenedBelowFloor = after.deviationDb < permittedFloorDb - 0.05
+      && after.deviationDb < before.deviationDb - NEAR_TARGET_INFLUENCE_THRESHOLD_DB;
     let reason = null;
-    if (afterAbs > 3 + 1e-9) reason = `influenced near-target point exceeded ±3 dB while maximum residual improved ${maximumResidualImprovementDb.toFixed(2)} dB`;
+    if (worsenedBelowFloor) {
+      reason = `candidate manufactured an avoidable below-target trough (${after.deviationDb.toFixed(2)} dB; floor ${permittedFloorDb.toFixed(2)} dB) while maximum residual improved ${maximumResidualImprovementDb.toFixed(2)} dB`;
+    }
     if (reason) violations.push({ frequency: before.frequency, beforeResidualDb: before.deviationDb, afterResidualDb: after.deviationDb, reason });
   }
   return { passed: violations.length === 0, violations };
