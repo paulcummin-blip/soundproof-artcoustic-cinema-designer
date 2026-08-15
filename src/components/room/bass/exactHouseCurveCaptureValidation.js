@@ -80,7 +80,19 @@ export function validateExactHouseCurveCapture(capture, live) {
     }));
     if (maximumError > 1e-9) failures.push("after-EQ reconstruction error is " + maximumError + " dB");
   }
-  if (!sameCurve(targets[0], targets[1], "spl") || !sameCurve(targets[0], targets[2], "spl")) failures.push("production, graph and fitter targets differ");
+  const graphMatchesProductionTarget = sameCurve(targets[0], targets[1], "spl");
+  const fitterMatchesProductionTarget = sameCurve(targets[0], targets[2], "spl");
+  const fitterMatchesCapabilityClippedTarget = targets[0].length === targets[2].length
+    && sameFrequencyGrid(targets[0], targets[2])
+    && sameFrequencyGrid(targets[0], maximumAvailableAfterEq)
+    && targets[0].every((point, index) => close(
+      targets[2][index]?.spl,
+      Math.min(point.spl, maximumAvailableAfterEq[index]?.spl),
+    ));
+  if (!graphMatchesProductionTarget) failures.push("production and graph targets differ");
+  if (!fitterMatchesProductionTarget && !fitterMatchesCapabilityClippedTarget) {
+    failures.push("fitter target is neither the official target nor its capability-clipped form");
+  }
   const assessmentTargets = targets[0].filter((point) => point.frequency >= capture.assessment.startHz && point.frequency <= capture.assessment.endHz);
   if (!assessmentTargets.length || !assessmentTargets.every((point) => finite(point.spl))) failures.push("target is incomplete in the assessment band");
   if (capture.targetSource !== "exact-live-authority") failures.push("target authority is reconstructed fallback");
