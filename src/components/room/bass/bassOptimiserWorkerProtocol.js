@@ -1,6 +1,6 @@
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
 export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v21-b7-rew-room-field";
-export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v28-capability-anchored-target-floor";
+export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v29-capability-anchored-intermediate-floor";
 export const BASS_RESULT_SCHEMA_VERSION = 19;
 export const BASS_OPTIMISER_POOL_PROPERTY = "pool";
 
