@@ -33,7 +33,6 @@ const RMS_EPSILON_DB = 0.01;
 const CUT_INFLUENCE_THRESHOLD_DB = 0.25;
 const CUT_PEAK_REDUCTION_DB = 0.5;
 const CUT_AREA_REDUCTION_DB = 0.01;
-const CUT_RMS_TOLERANCE_DB = 0.01;
 
 // P19 level from max abs deviation: L4 <=2, L3 <=3, L2 <=4, L1 <=5, else FAIL (0).
 export function houseCurveP19Level(deviationDb) {
@@ -366,8 +365,12 @@ function evaluateCutInfluenceAcceptance(currentMetrics, trialMetrics, protectedN
   if (!inInfluence) return false;
   const peakReduced = currentMaxPositive - trialMaxPositive >= CUT_PEAK_REDUCTION_DB;
   const areaReduced = trialPositiveArea < currentPositiveArea - CUT_AREA_REDUCTION_DB;
-  const rmsImproved = (currentMetrics.rspRmsDeviationDb ?? Infinity) - (trialMetrics.rspRmsDeviationDb ?? -Infinity) > CUT_RMS_TOLERANCE_DB;
-  return peakReduced && areaReduced && rmsImproved;
+  // When the requested target exceeds the fixed product-plus-room envelope at
+  // other frequencies, a useful local cut can make the all-band RMS worse even
+  // though it correctly removes an avoidable peak. Do not let those physically
+  // unreachable deficits veto a safe cut. Seat-regression and bank-safety gates
+  // still run after this local acceptance check.
+  return peakReduced && areaReduced;
 }
 
 export function createHouseCurveOperationCounts() {
