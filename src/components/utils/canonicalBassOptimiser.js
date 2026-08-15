@@ -76,25 +76,16 @@ function applyMaximumSplSafetyMargin(curve) {
   }));
 }
 
-function maximumPositiveEqDb(correction, startHz, endHz) {
-  return (Array.isArray(correction) ? correction : []).reduce((maximum, point) => {
-    const frequency = Number(point?.frequency);
-    const value = Number(point?.spl);
-    if (!Number.isFinite(frequency) || !Number.isFinite(value)
-      || frequency < startHz || frequency > endHz) return maximum;
-    return Math.max(maximum, value);
-  }, 0);
-}
-
-function buildMaximumSplCurveAfterEq(maximumBeforeEq, correction, domains) {
-  const globalEqTrimDb = maximumPositiveEqDb(
-    correction, domains.correctionStartHz, domains.correctionEndHz,
-  );
+function buildMaximumSplCurveAfterEq(maximumBeforeEq) {
+  // Product capability combined with the room transfer is a fixed, frequency-
+  // dependent ceiling. Positive EQ may spend the local margin between the
+  // operating response and this ceiling, but it must not lower every other
+  // frequency by the largest boost in the bank. Cuts reduce the requested
+  // operating response; the capability envelope itself does not move.
   return {
-    globalEqTrimDb,
+    globalEqTrimDb: 0,
     curve: (Array.isArray(maximumBeforeEq) ? maximumBeforeEq : []).map((point) => ({
-      frequency: point.frequency,
-      spl: point.spl + interpolateCorrection(correction, point.frequency) - globalEqTrimDb,
+      ...point,
     })),
   };
 }
@@ -231,14 +222,13 @@ function buildCanonicalCandidate({
 }) {
   const requestedPreEqCurve = (levelNormalisedRawCurve || []).map((point) => ({ ...point }));
   const achievedPreEqCurve = capCurveToEnvelope(requestedPreEqCurve, maximumSplCurveBeforeEq);
-  const maximumAfterEq = buildMaximumSplCurveAfterEq(
-    maximumSplCurveBeforeEq, eq.combinedEqCurve, domains,
-  );
+  const maximumAfterEq = buildMaximumSplCurveAfterEq(maximumSplCurveBeforeEq);
   const unconstrainedPostEqCurve = (eq.curve || []).map((point) => ({ ...point }));
   const finalPostEqCurve = capCurveToEnvelope(unconstrainedPostEqCurve, maximumAfterEq.curve);
-  // Candidate authority must judge the response that can actually be delivered
-  // after product/output caps and the global gain reserve required by positive
-  // EQ. The fitter's unconstrained curve remains diagnostic-only.
+  // Candidate authority judges the response that can actually be delivered.
+  // The fitter's requested curve may use local positive EQ up to the fixed
+  // product-plus-room ceiling; anything above that ceiling is capability
+  // limited. The fitter's unconstrained curve remains diagnostic-only.
   const achievedPeakBoostViolations = findAggregatePeakBoostViolations(
     achievedPreEqCurve, finalPostEqCurve, targetCurve,
   );
@@ -256,9 +246,7 @@ function buildCanonicalCandidate({
     .map((seat) => ({
       seatId: seat.seatId,
       isPrimary: !!seat.isPrimary,
-      responseData: buildMaximumSplCurveAfterEq(
-        seat.responseData, eq.combinedEqCurve, domains,
-      ).curve,
+      responseData: buildMaximumSplCurveAfterEq(seat.responseData).curve,
     }));
   const maximumSeatById = new Map(maximumPerSeatAfterEqCurves.map((seat) => [seat.seatId, seat]));
   const perSeatPostEqCurves = requestedPerSeatPostEqCurves.map((seat) => ({
