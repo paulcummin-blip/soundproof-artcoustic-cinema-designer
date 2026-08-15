@@ -44,6 +44,8 @@ const houseCurveMaxError = (candidate) => finiteOr(
   candidate?.houseCurveRankingMaxResidualDb ?? candidate?.rspObjectiveMaxDeviationDb,
   Number.MAX_SAFE_INTEGER,
 );
+const avoidableTargetShortfallMax = (candidate) => finiteOr(candidate?.avoidableTargetShortfallMaxDb, 0);
+const avoidableTargetShortfallRms = (candidate) => finiteOr(candidate?.avoidableTargetShortfallRmsDb, 0);
 const eqCost = (candidate) => (candidate?.generatedFilterBank || []).reduce((sum, filter) => (
   filter?.enabled && Number.isFinite(filter.gainDb) ? sum + Math.abs(filter.gainDb) : sum
 ), 0);
@@ -113,11 +115,15 @@ export function isBankAndBandValid(candidate) {
 
 const isAllL1 = (candidate) => candidate?.allAtLeastL1 === true && levels(candidate).every((score) => score >= 1);
 
-// Every mode ranks against the same response-anchored canonical house-curve shape.
-// Compliance grades and designer intent are deliberately absent from this tuple.
+// Every mode ranks against the same fixed RP22 house-curve target. First avoid
+// any below-target response where the safe product-plus-room envelope proves
+// the target is physically available; then minimise ordinary symmetric error.
+// Compliance grades remain diagnostic-only and do not enter the tuple.
 export function rankingTupleForMode(candidate, mode) {
   normalizeBassPriorityMode(mode);
   return [
+    lowerScore(avoidableTargetShortfallMax(candidate)),
+    lowerScore(avoidableTargetShortfallRms(candidate)),
     lowerScore(houseCurveRmsError(candidate)),
     lowerScore(houseCurveMaxError(candidate)),
     lowerScore(candidate?.houseCurveRankingMeanAbsoluteResidualDb ?? candidate?.rspMeanAbsoluteResidualDb),
@@ -133,7 +139,7 @@ function compareRanked(a, b, mode) {
   const canonicalMode = normalizeBassPriorityMode(mode);
   const aTuple = rankingTupleForMode(a, canonicalMode);
   const bTuple = rankingTupleForMode(b, canonicalMode);
-  const acousticMetricCount = 4;
+  const acousticMetricCount = 6;
   for (let i = 0; i < Math.max(aTuple.length, bTuple.length); i++) {
     const difference = (bTuple[i] ?? -Number.MAX_SAFE_INTEGER) - (aTuple[i] ?? -Number.MAX_SAFE_INTEGER);
     if (i < acousticMetricCount && Math.abs(difference) <= DOMINANCE_DB_TOLERANCE) continue;
@@ -179,6 +185,8 @@ export function rankBassCandidates(pool, mode) {
       preEqHouseCurveErrorDb: candidate?.preEqHouseCurveErrorDb ?? null,
       postEqHouseCurveErrorDb: houseCurveRmsError(candidate),
       maximumPostEqHouseCurveDeviationDb: houseCurveMaxError(candidate),
+      avoidableTargetShortfallMaxDb: avoidableTargetShortfallMax(candidate),
+      avoidableTargetShortfallRmsDb: avoidableTargetShortfallRms(candidate),
       eqCostDb: eqCost(candidate),
       physicalEqAuthorityPassed: candidate?.physicalEqAuthorityPassed !== false,
       physicalAuthorityViolations: candidate?.physicalAuthorityViolations || [],
@@ -207,7 +215,7 @@ export function rankBassCandidates(pool, mode) {
           ? `${canonicalMode}: generated house_curve candidate won the raw RSP maximum, RMS and mean-absolute residual ranking outside protected nulls.`
           : `${canonicalMode}: ${selected.designEqFitProfile || "standard"} beat house_curve on measured raw residual metrics (${selected.houseCurveRankingMaxResidualDb?.toFixed?.(2) ?? "—"}/${selected.houseCurveRankingRmsResidualDb?.toFixed?.(2) ?? "—"} dB vs ${houseCurveCandidate.houseCurveRankingMaxResidualDb?.toFixed?.(2) ?? "—"}/${houseCurveCandidate.houseCurveRankingRmsResidualDb?.toFixed?.(2) ?? "—"} dB).`
         : `${canonicalMode}: ERROR — no compatible generated house_curve candidate was available; no legacy accuracy fallback was accepted.`
-      : `${canonicalMode}: best match to the response-anchored canonical house curve after physical EQ validation; compliance grades were excluded from selection.`
+      : `${canonicalMode}: best capability-anchored match to the fixed house curve after physical EQ validation; avoidable below-target shortfall was minimised before symmetric residual error.`
     : `${canonicalMode}: no bank-valid candidate with a valid assessment band was available.`;
   return {
     selected,
