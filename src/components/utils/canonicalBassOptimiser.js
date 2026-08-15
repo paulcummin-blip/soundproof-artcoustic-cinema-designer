@@ -419,6 +419,11 @@ export function generateCanonicalCandidatePool({
     correctionStartHz: rawCurve[0].frequency, correctionEndHz: rawCurve.at(-1).frequency,
   });
   const targetShape = targetCurve.map((point) => ({ frequency: point.frequency, offsetDb: point.spl - verticalOffsetDb }));
+  // The fitting objective is the requested house curve clipped only by the
+  // fixed product-plus-room capability envelope. This lets the bank pull every
+  // reachable region to the house curve while leaving genuine capability
+  // shortfalls visible. Official RP22 scoring continues to use targetCurve,
+  // never this constrained fitting target.
   // Resolve seat curves before computing the operating-level offset.
   const seats = (Array.isArray(perSeatRawCurves) ? perSeatRawCurves : [])
     .filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
@@ -430,6 +435,13 @@ export function generateCanonicalCandidatePool({
     ...seat,
     responseData: applyMaximumSplSafetyMargin(seat.responseData),
   }));
+  const capabilityConstrainedFitTarget = targetCurve.map((point) => {
+    const maximumSpl = interpolateCorrection(maximumSplCurveBeforeEq, point.frequency);
+    return {
+      ...point,
+      spl: Number.isFinite(maximumSpl) ? Math.min(point.spl, maximumSpl) : point.spl,
+    };
+  });
   // ── Source output before and after global trim ──
   // baseRequestedSystemOutputDb is the configured LFE output level (the level
   // the headroom calculation subtracts from the manufacturer capability curve).
@@ -501,7 +513,7 @@ export function generateCanonicalCandidatePool({
   const fitOptions = (profile, initialFilters = []) => ({
     targetAnchorDb: verticalOffsetDb,
     p14TargetDb: Number(selectedP14TargetDb),
-    canonicalTargetCurve: targetCurve,
+    canonicalTargetCurve: capabilityConstrainedFitTarget,
     protectedNullRegions,
     fitProfile: profile,
     assessmentStartHz: domains.correctionStartHz,
