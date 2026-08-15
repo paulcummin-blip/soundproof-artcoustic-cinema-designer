@@ -187,7 +187,7 @@ export function isProtectedSmoothedFrequency(frequency, regions, smoothingWidthO
 }
 
 const NEAR_TARGET_INFLUENCE_THRESHOLD_DB = 0.25;
-const CAPABILITY_ANCHORED_TARGET_FLOOR_DB = -1;
+const CAPABILITY_ANCHORED_INTERMEDIATE_FLOOR_DB = -5;
 
 export function evaluateNearTargetProtection(baselinePoints, candidatePoints, maximumResidualImprovementDb, protectedNullRegions = []) {
   const candidateByFrequency = new Map((candidatePoints || []).map((point) => [point.frequency, point]));
@@ -196,14 +196,15 @@ export function evaluateNearTargetProtection(baselinePoints, candidatePoints, ma
     if (isProtectedSmoothedFrequency(before.frequency, protectedNullRegions)) continue;
     const after = candidateByFrequency.get(before.frequency);
     if (!after) continue;
-    // The capability-anchored baseline is at or above the requested house curve
-    // wherever the safe product-plus-room envelope can meet it. A peak cut may
-    // approach that target, but it must not manufacture a new trough beneath it.
-    // Where the baseline is already below target, never make the genuine physical
-    // shortfall worse. Boost trials move upward and are unaffected by this guard.
+    // This guard applies to each intermediate greedy-fit step, not the completed
+    // candidate. Allow a bounded temporary undershoot so a broad peak cut can be
+    // followed by a compensating boost; a strict target floor here prevents every
+    // multi-filter solution from starting. Final candidate ranking separately
+    // minimises avoidable below-target shortfall wherever the capability envelope
+    // proves the target is available.
     const changeDb = Math.abs(after.deviationDb - before.deviationDb);
     if (changeDb < NEAR_TARGET_INFLUENCE_THRESHOLD_DB) continue;
-    const permittedFloorDb = Math.min(CAPABILITY_ANCHORED_TARGET_FLOOR_DB, before.deviationDb);
+    const permittedFloorDb = Math.min(CAPABILITY_ANCHORED_INTERMEDIATE_FLOOR_DB, before.deviationDb);
     const worsenedBelowFloor = after.deviationDb < permittedFloorDb - 0.05
       && after.deviationDb < before.deviationDb - NEAR_TARGET_INFLUENCE_THRESHOLD_DB;
     let reason = null;
