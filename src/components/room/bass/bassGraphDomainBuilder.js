@@ -77,8 +77,8 @@ function buildMaximumSplSeries(finalResponse, smoothingMode) {
   return {
     id: "maximum-spl-after-eq",
     kind: "maximum-spl",
-    label: "Maximum available SPL after EQ headroom",
-    tooltipLabel: "Maximum available SPL after EQ headroom",
+    label: "Maximum product + room capability",
+    tooltipLabel: "Fixed maximum product + room capability",
     color: "#B45309",
     strokeWidth: 2,
     strokeDasharray: "2 4",
