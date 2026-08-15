@@ -98,14 +98,10 @@ function runEqFixtures() {
   const boost80 = production({ combinedEqCurve: [{ frequency: 15, spl: 0 }, { frequency: 79, spl: 0 }, { frequency: 80, spl: 3 }, { frequency: 81, spl: 0 }, { frequency: 120, spl: 0 }] });
   const boost150 = production({ combinedEqCurve: [{ frequency: 15, spl: 0 }, { frequency: 120, spl: 0 }, { frequency: 150, spl: 6 }] });
   const cuts = production({ combinedEqCurve: [{ frequency: 15, spl: -4 }, { frequency: 120, spl: -4 }] });
-  const rawUnboosted = boost80.curves.rawDeliveredCurve.filter((point) => point.frequency < 79).at(-1);
-  const postUnboosted = boost80.curves.postEqDeliveredCurve.find((point) => Math.abs(point.frequency - rawUnboosted.frequency) < 1e-9);
-  const raw80 = boost80.curves.rawDeliveredCurve.find((point) => Math.abs(point.frequency - 80) < 1e-9);
-  const post80 = boost80.curves.postEqDeliveredCurve.find((point) => Math.abs(point.frequency - 80) < 1e-9);
   return [
-    check("Positive EQ consumes global headroom while preserving maximum at the boosted frequency", Math.abs(raw80.spl - post80.spl) < 1e-9 && Math.abs((rawUnboosted.spl - postUnboosted.spl) - 3) < 1e-9 && boost80.eqHeadroom.maximumPositiveEqCostDb === 3, "3 dB global trim; boosted frequency unchanged", boost80.eqHeadroom.maximumPositiveEqCostDb),
-    check("Positive EQ above 120 Hz consumes no capability", boost150.eqHeadroom.maximumPositiveEqCostDb === 0 && curveEqual(noEq.curves.postEqDeliveredCurve, boost150.curves.postEqDeliveredCurve), "0 dB", boost150.eqHeadroom.maximumPositiveEqCostDb),
-    check("Cut-only EQ consumes no headroom", cuts.eqHeadroom.maximumPositiveEqCostDb === 0, "0 dB", cuts.eqHeadroom.maximumPositiveEqCostDb),
+    check("Positive EQ leaves the fixed product-plus-room capability envelope unchanged", curveEqual(noEq.curves.postEqDeliveredCurve, boost80.curves.postEqDeliveredCurve) && boost80.eqHeadroom.maximumPositiveEqCostDb === 0, "unchanged envelope; 0 dB global cost", boost80.eqHeadroom.maximumPositiveEqCostDb),
+    check("Positive EQ above 120 Hz leaves capability unchanged", boost150.eqHeadroom.maximumPositiveEqCostDb === 0 && curveEqual(noEq.curves.postEqDeliveredCurve, boost150.curves.postEqDeliveredCurve), "unchanged envelope; 0 dB global cost", boost150.eqHeadroom.maximumPositiveEqCostDb),
+    check("Cut-only EQ consumes no global headroom", cuts.eqHeadroom.maximumPositiveEqCostDb === 0, "0 dB", cuts.eqHeadroom.maximumPositiveEqCostDb),
   ];
 }
 
