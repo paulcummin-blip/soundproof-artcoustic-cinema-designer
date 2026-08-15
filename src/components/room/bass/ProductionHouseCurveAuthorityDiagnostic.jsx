@@ -1,7 +1,6 @@
 import React from "react";
 import { applyBassSmoothing } from "./bassGraphSmoothing";
 import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
-import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { interpolateCurve } from "./candidateConsistency";
 
 const PROBES = [20, 30, 34, 40, 50, 60, 75, 100, 120];
@@ -15,12 +14,17 @@ function residualMetrics(curve, target, startHz, endHz, protectedNulls) {
   return values.length ? { rms: Math.sqrt(values.reduce((sum, value) => sum + value ** 2, 0) / values.length), max: Math.max(...values.map(Math.abs)) } : { rms: null, max: null };
 }
 
-export default function ProductionHouseCurveAuthorityDiagnostic({ result, rspRawCurve, activeSubs, usableLfHz }) {
+export default function ProductionHouseCurveAuthorityDiagnostic({ result, rspRawCurve }) {
   const candidate = result?.selectedCandidate;
   if (!candidate) return null;
   const target = candidate.productionHouseCurveTarget || [];
-  const before = rspRawCurve || [];
+  // The pre-EQ operating response is the authoritative raw RSP plus the
+  // captured operating trim, already capped to the fixed product + room
+  // envelope by the optimiser. Do not display the untrimmed raw registry/room
+  // response as though it were the operating response.
+  const before = candidate.rspBeforePeqAtOperatingLevel || rspRawCurve || [];
   const after = candidate.finalPostEqCurve || [];
+  const maximum = candidate.maximumSplCurveAfterEq || candidate.maximumSplCurveBeforeEq || [];
   const eq = candidate.combinedEqCurve || [];
   const nulls = candidate.houseCurveDiagnostics?.protectedNullRegions || [];
   const correctionStart = candidate.correctionStartHz;
@@ -39,13 +43,13 @@ export default function ProductionHouseCurveAuthorityDiagnostic({ result, rspRaw
     </div>
     {nulls.map((region) => <div className="mt-1 font-mono text-amber-900" key={region.centreFrequencyHz}>Protected {fmt(region.startHz)}–{fmt(region.endHz)} Hz: {region.reason}</div>)}
     <div className="mt-2 overflow-x-auto"><table className="min-w-[1000px] font-mono text-[10px] text-slate-700">
-      <thead><tr>{["Hz", "Before", "Target", "Required", "Applied EQ", "After", "After residual", "Protected", "Product-limited"].map((label) => <th className="px-2 py-1 text-right" key={label}>{label}</th>)}</tr></thead>
+      <thead><tr>{["Hz", "Before", "Target", "Max capability", "Required", "Applied EQ", "After", "After residual", "Protected", "Capability-limited"].map((label) => <th className="px-2 py-1 text-right" key={label}>{label}</th>)}</tr></thead>
       <tbody>{probes.map((frequency) => {
         const responseBefore = interpolateCurve(before, frequency); const targetSpl = interpolateCanonicalTarget(target, frequency);
-        const appliedEq = interpolateCurve(eq, frequency); const responseAfter = interpolateCurve(after, frequency);
-        const protectedRegion = protectedAt(frequency, nulls); const allowance = getSourceDomainBoostAllowance({ frequency, requestedBoostDb: Math.max(0, appliedEq || 0), activeSubs, usableLfHz, requestedSystemOutputDb: candidate.requestedTargetSpl });
-        const productLimited = (appliedEq || 0) > 0 && Number.isFinite(allowance?.allowedBoostDb) && appliedEq > allowance.allowedBoostDb + 0.05;
-        return <tr className="border-t border-violet-200" key={frequency}>{[frequency, responseBefore, targetSpl, requiredCorrectionDb(targetSpl, responseBefore), appliedEq, responseAfter, responseAfter - targetSpl].map((value, index) => <td className="px-2 py-1 text-right" key={index}>{fmt(value)}</td>)}<td className="px-2 py-1 text-right">{protectedRegion ? "Yes" : "No"}</td><td className="px-2 py-1 text-right">{productLimited ? "Yes" : "No"}</td></tr>;
+        const maximumSpl = interpolateCurve(maximum, frequency); const appliedEq = interpolateCurve(eq, frequency); const responseAfter = interpolateCurve(after, frequency);
+        const protectedRegion = protectedAt(frequency, nulls);
+        const capabilityLimited = Number.isFinite(maximumSpl) && Number.isFinite(targetSpl) && maximumSpl < targetSpl - 0.05;
+        return <tr className="border-t border-violet-200" key={frequency}>{[frequency, responseBefore, targetSpl, maximumSpl, requiredCorrectionDb(targetSpl, responseBefore), appliedEq, responseAfter, responseAfter - targetSpl].map((value, index) => <td className="px-2 py-1 text-right" key={index}>{fmt(value)}</td>)}<td className="px-2 py-1 text-right">{protectedRegion ? "Yes" : "No"}</td><td className="px-2 py-1 text-right">{capabilityLimited ? "Yes" : "No"}</td></tr>;
       })}</tbody>
     </table></div>
   </details>;
