@@ -13,7 +13,8 @@ import {
 } from "@/components/utils/houseCurveTargetAuthority";
 import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
 import { findAggregatePeakBoostViolations } from "@/components/utils/designEqPhysicsAuthority";
-import { normaliseHouseCurveToP14Total, requiredP14ExtensionHz } from "@/components/utils/p14HouseCurveNormalisation";
+import { normaliseHouseCurveToP14Total } from "@/components/utils/p14HouseCurveNormalisation";
+import { p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getCurrentSystemSourceOutput, getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { salvagePartialBank, buildSalvageEqResult } from "@/components/utils/designEqPartialBankSalvage";
@@ -371,6 +372,7 @@ export function generateCanonicalCandidatePool({
   correctionEndHz = 200, perSeatRawCurves = [], collectDiagnostics = false,
   onProgress = null, reuseExactHouseCurveEvaluations = true,
   selectedP14TargetDb = 109, p14TargetBasis = "minimum", p14TargetLevel = 1,
+  p18TargetBasis = p14TargetBasis, selectedP18RequiredExtensionHz = null,
   perSourceComplexTransfers = [], normalizedTransferFingerprint = null,
   calibrationFingerprint = null,
 } = {}) {
@@ -394,7 +396,9 @@ export function generateCanonicalCandidatePool({
   // shape, P18/P19 results, or fitter failure.
   const houseCurveShape = [15, 20, 25, 31.5, 40, 50, 63, 80, 100, 120, 150, 200, 400]
     .map((f) => ({ frequency: f, offsetDb: artcousticHouseCurveOffsetAt(f) }));
-  const requiredExtensionHz = requiredP14ExtensionHz(p14TargetBasis, p14TargetLevel);
+  const requiredExtensionHz = Number.isFinite(Number(selectedP18RequiredExtensionHz))
+    ? Number(selectedP18RequiredExtensionHz)
+    : p18ThresholdHzForLevel(p18TargetBasis, p14TargetLevel);
   const p14Normalisation = normaliseHouseCurveToP14Total({
     houseCurveShape,
     selectedP14TargetDb: Number(selectedP14TargetDb),
