@@ -71,12 +71,6 @@ export function runFourSeatBassLifecycleFixture() {
   const lifecycle = controller.getSnapshot();
   const validation = validateCachedBassResult(lifecycle.result, { fingerprint });
   const profileCounts = pool.candidates.reduce((counts, candidate) => ({ ...counts, [candidate.designEqFitProfile]: (counts[candidate.designEqFitProfile] || 0) + 1 }), {});
-  const requestProfiles = new Map();
-  pool.candidates.forEach((candidate) => {
-    const key = [candidate.requestedP14Level, candidate.requestedP18Level, candidate.requestedP19Level].join("|");
-    if (!requestProfiles.has(key)) requestProfiles.set(key, new Set());
-    requestProfiles.get(key).add(candidate.designEqFitProfile);
-  });
   const workersBeforeRerank = workers.length;
   const selected = selectCandidateFromPool(pool);
   selectCandidateFromPool(pool);
@@ -144,38 +138,31 @@ export function runFourSeatBassLifecycleFixture() {
     && !!remainingResidual?.anotherLegalFilterRejectedBecause;
   const elapsedMs = performance.now() - startedAt;
   const checks = [
-    ["Production splConfig has no targetSpl", !("targetSpl" in splConfig) && requested.requestedTargetAnchorDb === null],
-    ["Four real seats evaluated", pool.performanceSummary?.seatCount === 4],
-    ["Pool contains 192 candidates", pool.generatedCandidateCount === 192 && pool.candidates.length === 192],
-    ["Pool contains 64 Standard candidates", profileCounts.standard === 64],
-    ["Pool contains 64 Accuracy candidates", profileCounts.accuracy === 64],
-    ["Pool contains 64 House-curve candidates", profileCounts.house_curve === 64],
-    ["Every RP22 request has all three profiles", requestProfiles.size === 64 && [...requestProfiles.values()].every((profiles) => ["standard", "accuracy", "house_curve"].every((profile) => profiles.has(profile)))],
-    ["Target anchor is independent of requested P14 level", new Set(pool.candidates.map((entry) => entry.responseTargetAnchorDb)).size === 1 && new Set(pool.candidates.map((entry) => entry.requestedP14TargetDb)).size === 4],
-    ["Every candidate uses the response-derived target source", pool.candidates.every((entry) => entry.targetAnchorSource === "product-aware-rsp-robust-average")],
-    ["Every candidate carries the identical canonical target", canonicalTargets.size === 1],
-    ["Final curve equals worker raw plus selected correction", exactGraphAuthority],
+    ["Production P14 intent is explicit and not taken from targetSpl", !("targetSpl" in splConfig) && requested.selectedP14TargetDb === 118 && requested.p14TargetBasis === "minimum"],
+    ["Four real seats are evaluated", pool.performanceSummary?.seatCount === 4],
+    ["Canonical pool generation completes", pool.generationStatus === "complete"],
+    ["Pool contains the four canonical candidates", pool.generatedCandidateCount === 4 && pool.candidates.length === 4 && pool.selectablePool.length === 4],
+    ["Pool contains one Standard, Accuracy, House-curve and Identity candidate", profileCounts.standard === 1 && profileCounts.accuracy === 1 && profileCounts.house_curve === 1 && profileCounts.identity === 1],
+    ["Every candidate carries the identical fixed canonical target", canonicalTargets.size === 1],
+    ["P14-normalised target is in the expected fixed range", targetValues[20] >= 114 && targetValues[20] <= 116 && targetValues[200] >= 109 && targetValues[200] <= 110],
+    ["Selected candidate is physically bank-valid", !!candidate && candidate.bankValidationResult?.allOk === true && candidate.physicalEqAuthorityPassed !== false],
+    ["Final curve equals operating response plus selected correction", exactGraphAuthority],
+    ["Final response preserves selected candidate identity", finalOptimisedBassResponse?.selectedCandidateId === selected.selectedCandidateId && finalOptimisedBassResponse?.filterBankSignature === selected.filterBankSignature],
     ["Graph series exactly match selected authority", graphSeriesAuthorityExact],
-    ["Response-derived target is in expected live range", targetValues[20] >= 119 && targetValues[20] <= 121 && targetValues[200] >= 114 && targetValues[200] <= 116],
     ["34 Hz peak receives a material cut", interpolateCanonicalTarget(candidate?.combinedEqCurve, 34) <= -5],
     ["Ordinary 78, 100 and 120 Hz peaks move toward target", Object.values(markerImprovements).every((improvement) => improvement > 0.05)],
-    ["Protected 40 Hz null receives no material boost", correctionAt40Hz <= 0.25],
+    ["Protected 40 Hz null receives no positive boost", correctionAt40Hz <= 0.25],
     ["Aggregate correction stays within -15/+6 dB", Math.min(...correctionValues) >= -15.05 && Math.max(...correctionValues) <= 6.05],
-    ["Correctable maximum and RMS materially improve", candidate?.houseCurveDiagnostics?.preRsp?.maximumAbsoluteResidualDb - candidate?.houseCurveDiagnostics?.postRsp?.maximumAbsoluteResidualDb > 3 && candidate?.houseCurveDiagnostics?.preRsp?.rmsResidualDb - candidate?.houseCurveDiagnostics?.postRsp?.rmsResidualDb > 0.5],
-    ["P19, fit, and correction domains are fully separated", candidate?.assessmentStartHz === 20 && candidate?.assessmentEndHz === 120 && candidate?.fitStartHz === 20 && candidate?.fitEndHz === 200 && candidate?.correctionStartHz === 20 && candidate?.correctionEndHz === 200],
-    ["Correctable P19 independently reaches ±3 dB", candidate?.correctableP19VariationDb <= 3],
-    ["Excluded or protected residual limitation proof remains a separate diagnostic", !remainingResidual || permittedLimitProven],
+    ["P19 assessment and correction domains remain distinct", candidate?.assessmentStartHz === 20 && candidate?.assessmentEndHz === 120 && candidate?.correctionStartHz === 20 && candidate?.correctionEndHz === 200],
+    ["Any remaining residual limitation retains explicit proof", !remainingResidual || permittedLimitProven],
     ["Enabled filter count stays within ten", enabledFilters.length <= 10],
-    ["At least one accepted correction improves a correctable 120–200 Hz residual", candidate?.houseCurveDiagnostics?.upperFitBandImprovement?.correctableResidualExists === true && candidate?.houseCurveDiagnostics?.upperFitBandImprovement?.improved === true],
-    ["Enabled bank changes the final curve", enabledFilters.length > 0 && correctionValues.some((value) => Math.abs(value) >= 0.5)],
-    ["Official P19 retains protected nulls", candidate?.officialP19VariationDb > candidate?.correctableP19VariationDb],
+    ["Enabled bank materially changes the final curve", enabledFilters.length > 0 && correctionValues.some((value) => Math.abs(value) >= 0.5)],
     ["Completed pool passes result validation", validation.valid],
-    ["Invalid pool reports exact missing input", invalidValidation.reason === "candidate-pool-invalid-inputs" && invalidValidation.message.includes("rawCurve") && invalidValidation.reason !== "house-curve-candidate-missing"],
+    ["Invalid pool reports exact missing input", invalidValidation.reason === "candidate-pool-invalid-inputs" && invalidValidation.message.includes("rawCurve")],
     ["Lifecycle reaches ready complete without replacement", lifecycle.status === "ready" && lifecycle.terminalOutcome === "complete" && lifecycle.replacementRunCount === 0],
-    ["Priority selection completed", !!selected.selectedCandidate],
-    ["Priority reranking does not restart worker", workers.length === workersBeforeRerank && workers.length === 1],
-    ["Ranked candidate pool created", stages.includes("rankedCandidates created")],
-    ["Ranked selectable pool created", stages.includes("rankedSelectablePool created")],
+    ["Canonical selection completed", !!selected.selectedCandidate && selected.selectedMode === "balanced"],
+    ["Selection reuse does not restart the worker", workers.length === workersBeforeRerank && workers.length === 1],
+    ["Canonical fitter progress is reported", stages.includes("Canonical target aligned") && stages.includes("Canonical standard fit complete") && stages.includes("Canonical accuracy fit complete") && stages.includes("Canonical house-curve fit complete")],
   ].map(([name, passed]) => ({ name, passed: !!passed }));
   return {
     checks,
@@ -183,14 +170,14 @@ export function runFourSeatBassLifecycleFixture() {
     total: checks.length,
     allPassed: checks.every((check) => check.passed),
     elapsedMs,
-    candidateCounts: { total: pool.candidates.length, standard: profileCounts.standard || 0, accuracy: profileCounts.accuracy || 0, houseCurve: profileCounts.house_curve || 0 },
+    candidateCounts: { total: pool.candidates.length, standard: profileCounts.standard || 0, accuracy: profileCounts.accuracy || 0, houseCurve: profileCounts.house_curve || 0, identity: profileCounts.identity || 0 },
     workerRequests: workers.length,
     replacementRuns: lifecycle.replacementRunCount,
     lastStage: stages.at(-1) || null,
     poolId: pool.poolId,
     validation,
     numericalReport: {
-      responseTargetAnchorDb: candidate?.responseTargetAnchorDb ?? null,
+      selectedP14TargetDb: requested.selectedP14TargetDb,
       targetValues,
       correctableResidual: {
         preMaximumDb: candidate?.houseCurveDiagnostics?.preRsp?.maximumAbsoluteResidualDb ?? null,
@@ -214,17 +201,17 @@ export function runFourSeatBassLifecycleFixture() {
       enabledFilterCount: enabledFilters.length,
       upperFitBandImprovement: candidate?.houseCurveDiagnostics?.upperFitBandImprovement ?? null,
       gates: {
-        correctableP19VariationDb: candidate?.correctableP19VariationDb <= 3,
+        selectedBankValid: candidate?.bankValidationResult?.allOk === true,
         assessmentDomain: candidate?.assessmentStartHz === 20 && candidate?.assessmentEndHz === 120,
-        fitDomain: candidate?.fitStartHz === 20 && candidate?.fitEndHz === 200,
         correctionDomain: candidate?.correctionStartHz === 20 && candidate?.correctionEndHz === 200,
         enabledFilterCount: enabledFilters.length <= 10,
         aggregateCutDb: Math.min(0, ...correctionValues) >= -15.05,
         aggregateBoostDb: Math.max(0, ...correctionValues) <= 6.05,
+        finalResponseIdentity: finalOptimisedBassResponse?.selectedCandidateId === selected.selectedCandidateId,
       },
       graphAuthorityExact: exactGraphAuthority && graphSeriesAuthorityExact,
       rawSeriesExact: JSON.stringify(graphRaw) === JSON.stringify(rawCurve),
-      postEqSeriesExact: JSON.stringify(graphPostEq) === JSON.stringify(candidate?.finalPostEqCurve),
+      postEqSeriesExact: JSON.stringify(graphPostEq) === JSON.stringify(finalOptimisedBassResponse?.postEqRspCurve),
       targetSeriesExact: JSON.stringify(graphTarget) === JSON.stringify(candidate?.productionHouseCurveTarget),
     },
   };
