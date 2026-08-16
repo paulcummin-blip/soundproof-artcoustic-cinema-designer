@@ -1,6 +1,7 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { calculateDesignEqCurve } from "@/components/utils/designEqCalibration";
 import { getSystemSourceCapability } from "@/components/utils/subwooferCapability";
+import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 
 const P14_TARGETS = [
   { level: "L1", value: 1, spl: 114, extensionHz: 30 },
@@ -8,7 +9,6 @@ const P14_TARGETS = [
   { level: "L3", value: 3, spl: 120, extensionHz: 18 },
   { level: "L4", value: 4, spl: 123, extensionHz: 15 },
 ];
-const P19_TOLERANCES = [5, 4, 3, 2];
 const isNumber = (value) => Number.isFinite(Number(value));
 
 function median(values) {
@@ -42,10 +42,6 @@ function houseOffset(frequency) {
 
 function levelForP14(value) {
   return [...P14_TARGETS].reverse().find((target) => value >= target.spl)?.value || 0;
-}
-
-function levelForP19(variationDb) {
-  return P19_TOLERANCES.findIndex((tolerance) => variationDb <= tolerance) + 1 || 0;
 }
 
 function levelLabel(value) {
@@ -99,8 +95,8 @@ function buildCandidate({ rawCurve, activeSubs, usableLfHz, transitionHz, target
   const achievedP14Level = isNumber(achievedP14Db) ? levelForP14(achievedP14Db) : 0;
   const p18 = extensionResult(smoothed);
   const p19Band = smoothed.filter((point) => point.frequency >= 15 && point.frequency <= transitionHz);
-  const p19VariationDb = p19Band.length ? Math.max(...p19Band.map((point) => Math.abs(point.spl - (target.spl + houseOffset(point.frequency))))) : null;
-  const achievedP19Level = isNumber(p19VariationDb) ? levelForP19(p19VariationDb) : 0;
+  const p19VariationDb = p19Band.length ? Math.max(...p19Band.map((point) => Math.abs(point.spl - (target.spl + houseOffset(point.frequency))))) / 2 : null;
+  const achievedP19Level = houseCurveP19Level(p19VariationDb);
   const allAtLeastL1 = achievedP14Level >= 1 && p18.level >= 1 && achievedP19Level >= 1;
   const rejectionReason = allAtLeastL1 ? null : [
     achievedP14Level < 1 && "P14 cannot maintain 114 dB through the L1 bass range",
