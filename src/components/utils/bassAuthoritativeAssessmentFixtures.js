@@ -87,8 +87,8 @@ export function runBassAuthoritativeAssessmentFixtures() {
   const splCandidate = fixtureCandidate("spl", 4, changedRspCurve, seatA);
   const accuracyCandidate = fixtureCandidate("accuracy", 2, rsp, seatB);
   const pool = stampPoolAuthority({ candidates: [splCandidate, accuracyCandidate], selectablePool: [splCandidate, accuracyCandidate], poolId: "assessment-fixture", performanceSummary: {} });
-  const splSelection = selectCandidateFromPool(pool, "spl");
-  const accuracySelection = selectCandidateFromPool(pool, "house_curve_accuracy");
+  const splSelection = selectCandidateFromPool(pool);
+  const accuracySelection = selectCandidateFromPool(pool);
   check("8. Canonical selection is mode-independent and retains exact candidate assessments", splSelection.selectedCandidateId === accuracySelection.selectedCandidateId && splSelection.selectedMode === "balanced" && accuracySelection.selectedMode === "balanced" && Number.isFinite(splSelection.selectedCandidate.officialP19VariationDb) && Number.isFinite(splSelection.selectedCandidate.achievedP20VariationDb));
   check("9. Selected candidate and filter bank share canonical identity", splSelection.productionCandidateId === splSelection.selectedCandidateId && splSelection.selectedByMode?.balanced?.candidateId === splSelection.selectedCandidateId && splSelection.filterBankSignature === splSelection.selectedCandidate.filterBankSignature);
 
