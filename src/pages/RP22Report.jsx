@@ -382,6 +382,7 @@ function RP22ReportInner() {
     const reportP12Mode = app?.p12Mode || "minimum";
     const reportP13Mode = app?.splConfig?.p13Mode || "minimum";
     const reportP14Mode = completedBassPresentation.parameters.p14.targetBasis || app?.splConfig?.p14Mode || "minimum";
+    const reportP18Mode = completedBassPresentation.parameters.p18.targetBasis || app?.splConfig?.p18Mode || "minimum";
 
     const cleanAspectLabel = (v) => {
         const s = String(v ?? "").trim();
@@ -826,11 +827,12 @@ function RP22ReportInner() {
             reportP12Mode,
             reportP13Mode,
             reportP14Mode,
+            reportP18Mode,
             hasFrontWides,
             placedSpeakers,
         });
         return buildArtcousticDesignRatingAuthority(input);
-    }, [showDesignRating, seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, hasFrontWides, placedSpeakers]);
+    }, [showDesignRating, seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers]);
 
     const roomDesignRating = React.useMemo(() => {
         if (!designRatingAuthority) return null;
