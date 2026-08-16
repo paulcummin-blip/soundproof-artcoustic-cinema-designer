@@ -1,13 +1,11 @@
 import { getApprovedContinuousSplDb, getApprovedFrequencyRangeHz, getSubwooferCurve, normaliseModelKey } from "@/components/models/speakers/registry";
 import { p14ThresholdsForBasis, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { smoothThirdOctavePowerMean } from "@/components/utils/thirdOctavePowerMean";
+import { P18_THRESHOLDS_BY_BASIS } from "@/components/utils/p18ExtensionAuthority";
 
-export const SHADOW_P18_FREQUENCIES_BY_BASIS = Object.freeze({
-  minimum: Object.freeze({ L1: 35, L2: 30, L3: 20, L4: 18 }),
-  recommended: Object.freeze({ L1: 30, L2: 25, L3: 18, L4: 15 }),
-});
-// Legacy export retained for diagnostic consumers that do not supply a basis.
-export const SHADOW_P18_FREQUENCIES = SHADOW_P18_FREQUENCIES_BY_BASIS.recommended;
+// Backward-compatible diagnostic aliases sourced from the single P18 authority.
+export const SHADOW_P18_FREQUENCIES_BY_BASIS = P18_THRESHOLDS_BY_BASIS;
+export const SHADOW_P18_FREQUENCIES = P18_THRESHOLDS_BY_BASIS.recommended;
 export const SHADOW_SEVERE_NULL_DEPTH_DB = 10;
 const LEVELS_DESC = ["L4", "L3", "L2", "L1"];
 const REFERENCE_SOURCE_DB = 94;
