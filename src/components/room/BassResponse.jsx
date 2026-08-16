@@ -32,6 +32,7 @@ import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/final
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
 import BassCurveVisibilityControls, { DEFAULT_BASS_CURVE_VISIBILITY } from "@/components/room/bass/BassCurveVisibilityControls";
 import { buildRp22GraphMarkers } from "@/components/room/bass/rp22GraphMarkers";
+import Rp22GraphMarkerKey from "@/components/room/bass/Rp22GraphMarkerKey";
 import P14PresentationHeader from "@/components/room/bass/P14PresentationHeader";
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
 import CopyEqForensicTraceButton from "@/components/room/bass/CopyEqForensicTraceButton";
@@ -725,7 +726,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           onChange={setCurveVisibility}
         />
 
-        <div className="mt-4">
+        <Rp22GraphMarkerKey markers={rp22GraphMarkers} />
+
+        <div className="mt-2">
           {visibleMultiSeries.length > 0 ? (
             <BassGraph
               multiSeries={visibleMultiSeries}
