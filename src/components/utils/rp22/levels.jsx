@@ -62,8 +62,9 @@ export function levelP17_wsFR(dB) {
 }
 
 export function floorP20Deviation(dB) {
-  // Sound Proof 0.5 dB design precision — favourable floor for ±dB deviation.
-  return Number.isFinite(dB) ? Math.floor(dB * 2) / 2 : null;
+  // RP22 P20 is reported as a whole-number ±dB value. Preserve the
+  // favourable floor so any value below ±5 dB remains within the ±4 dB band.
+  return Number.isFinite(dB) ? Math.floor(dB) : null;
 }
 
 export function formatP20Deviation(dB) {
