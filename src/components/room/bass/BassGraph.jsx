@@ -366,13 +366,6 @@ export default function BassGraph({
                         stroke="#2563EB"
                         strokeOpacity={0.2}
                         strokeDasharray="3 5"
-                        label={{
-                          value: `P19 / P20 assessment band · ${Math.round(rp22Markers.p19StartHz)}–${Math.round(rp22Markers.p19EndHz)} Hz`,
-                          position: "insideTopLeft",
-                          fill: "#475569",
-                          fontSize: 9,
-                          className: "font-body",
-                        }}
                       />
                     )}
                     {Number.isFinite(rp22Markers?.p18FrequencyHz) && (
@@ -381,13 +374,6 @@ export default function BassGraph({
                         stroke="#2563EB"
                         strokeWidth={1.5}
                         strokeDasharray="5 4"
-                        label={{
-                          value: `P18 extension · ${Number(rp22Markers.p18FrequencyHz).toFixed(0)} Hz`,
-                          position: "insideTopLeft",
-                          fill: "#1D4ED8",
-                          fontSize: 9,
-                          className: "font-body",
-                        }}
                       />
                     )}
                     {Number.isFinite(rp22Markers?.p19WorstFrequencyHz) && (
@@ -396,13 +382,6 @@ export default function BassGraph({
                         stroke="#B45309"
                         strokeWidth={1.25}
                         strokeDasharray="3 4"
-                        label={{
-                          value: `P19 worst · ${Number(rp22Markers.p19WorstFrequencyHz).toFixed(0)} Hz`,
-                          position: "insideTopRight",
-                          fill: "#92400E",
-                          fontSize: 9,
-                          className: "font-body",
-                        }}
                       />
                     )}
                     {Number.isFinite(rp22Markers?.p20WorstFrequencyHz) && (
@@ -411,13 +390,6 @@ export default function BassGraph({
                         stroke="#7C3AED"
                         strokeWidth={1.25}
                         strokeDasharray="3 4"
-                        label={{
-                          value: `P20 worst${rp22Markers.p20WorstSeatId ? ` · ${rp22Markers.p20WorstSeatId}` : ""} · ${Number(rp22Markers.p20WorstFrequencyHz).toFixed(0)} Hz`,
-                          position: "insideBottomRight",
-                          fill: "#6D28D9",
-                          fontSize: 9,
-                          className: "font-body",
-                        }}
                       />
                     )}
 
