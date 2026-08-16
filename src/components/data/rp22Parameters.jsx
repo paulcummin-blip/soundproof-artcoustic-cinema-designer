@@ -179,7 +179,12 @@ const RAW = [
     name: "In-room bass extension -3 dB cut off frequency point",
     description: "In-room predicted -3 dB bass extension frequency with no perceptible distortion or audible mechanical resonances at the specified minimum SPL according to performance parameter 14… To include speaker coupling, boundary and room gain.",
     unit: "Hz",
+    // Recommended row retained as the legacy flat thresholds shape.
     thresholds: { L1: 30, L2: 25, L3: 18, L4: 15 },
+    thresholdsByBasis: {
+      minimum: { L1: 35, L2: 30, L3: 20, L4: 18 },
+      recommended: { L1: 30, L2: 25, L3: 18, L4: 15 }
+    },
     metric: "Min.",
     scope: "Room"
   },
