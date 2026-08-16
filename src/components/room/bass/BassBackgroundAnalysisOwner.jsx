@@ -97,7 +97,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     p14TargetBasis: requested.p14TargetBasis,
     p14TargetLevel: requested.requestedLevel,
     selectedP14RequiredExtensionHz: requested.selectedP14RequiredExtensionHz,
-  }), [cacheKey, fingerprints, OPTIMISER_VERSION_SIGNATURE, requested.selectedP14TargetDb, requested.p14TargetBasis, requested.requestedLevel, requested.selectedP14RequiredExtensionHz]);
+    p18TargetBasis: requested.p18TargetBasis,
+    selectedP18RequiredExtensionHz: requested.selectedP18RequiredExtensionHz,
+  }), [cacheKey, fingerprints, OPTIMISER_VERSION_SIGNATURE, requested.selectedP14TargetDb, requested.p14TargetBasis, requested.requestedLevel, requested.selectedP14RequiredExtensionHz, requested.p18TargetBasis, requested.selectedP18RequiredExtensionHz]);
   useEffect(() => {
     if (isDragging || !fingerprints) return; // Defer during drag; skip when analysis is blocked
     controller.ensureProtocolCompatibility(BASS_OPTIMISER_VERSIONS);
@@ -147,6 +149,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       activeSubs: sources,
       usableLfHz: designEqSystemLimits.usableLfHz,
       p14TargetBasis: requested.p14TargetBasis,
+      p18TargetBasis: requested.p18TargetBasis,
       requestedLevel: requested.requestedLevel,
     });
     const selectedCandidate = authority ? { ...selected.selectedCandidate, ...authority } : selected.selectedCandidate;
@@ -224,12 +227,15 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         p14TargetBasis: result?.p14TargetBasis ?? null,
         selectedP14Level: Number.isFinite(result?.selectedP14Level) ? result.selectedP14Level : null,
         requiredExtensionHz: Number.isFinite(result?.requiredExtensionHz) ? result.requiredExtensionHz : null,
+        p18TargetBasis: result?.p18TargetBasis ?? null,
       },
       requestedP14Identity: {
         selectedP14TargetDb: requested.selectedP14TargetDb,
         p14TargetBasis: requested.p14TargetBasis,
         p14TargetLevel: requested.requestedLevel,
         selectedP14RequiredExtensionHz: requested.selectedP14RequiredExtensionHz,
+        p18TargetBasis: requested.p18TargetBasis,
+        selectedP18RequiredExtensionHz: requested.selectedP18RequiredExtensionHz,
       },
     });
     return {
@@ -243,7 +249,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       canonicalMetricAuthority: canonicalMetricAuthorityResult.authority,
       canonicalMetricDiagnostics: canonicalMetricAuthorityResult.diagnostics,
     };
-  }, [selectionAttempt.result, cacheKey, lifecycle.resultFingerprint, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.requestedLevel, requested.selectedP14TargetDb, requested.selectedP14RequiredExtensionHz, scopeId]);
+  }, [selectionAttempt.result, cacheKey, lifecycle.resultFingerprint, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.p18TargetBasis, requested.requestedLevel, requested.selectedP14TargetDb, requested.selectedP14RequiredExtensionHz, requested.selectedP18RequiredExtensionHz, scopeId]);
   // Record candidate-selection-accepted only after the pool contains a valid
   // selectable result. Guard with a Set so unrelated React renders do not
   // overwrite or duplicate the stage for the same token.
