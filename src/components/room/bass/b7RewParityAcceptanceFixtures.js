@@ -43,7 +43,6 @@ function runReferenceParityFixture() {
     seatingPositions: [],
     subsForSimulation: [reference.source],
     physicsOptions,
-    pointsPerOctave: 96,
   });
   const freqsHz = transfer.rspCurve.map((point) => point.frequency);
   const splDb = transfer.rspCurve.map((point) => point.spl);
