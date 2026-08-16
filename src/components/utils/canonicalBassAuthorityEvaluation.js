@@ -12,7 +12,8 @@ import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/co
 import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { buildPostEqBassCapabilityOutcome } from "@/components/utils/postEqBassCapabilityOutcome";
-import { assessP18AgainstRequiredExtension, requiredP14ExtensionHz, buildBassTargetWarning } from "@/components/utils/bassDesignPhilosophyAuthority";
+import { assessP18AgainstRequiredExtension, buildBassTargetWarning } from "@/components/utils/bassDesignPhilosophyAuthority";
+import { assessP18Extension, normalizeP18TargetBasis, p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
 
 function buildPositionAwareP14Capability({
   canonicalResult,
@@ -84,14 +85,16 @@ export function evaluateCanonicalBassAuthority({
   activeSubs = [],
   usableLfHz = null,
   p14TargetBasis = "minimum",
+  p18TargetBasis = "minimum",
   requestedLevel = 4,
 } = {}) {
   if (!canonicalResult?.selectedCandidateId || !canonicalResult.canonicalPostEqRsp?.length) return null;
 
-  const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
+  const selectedP18TargetBasis = normalizeP18TargetBasis(p18TargetBasis);
+  const definitions = getRp22BassOperatingDefinitions(p14TargetBasis, selectedP18TargetBasis);
   const requested = definitions.find((definition) => definition.value === requestedLevel) || definitions.at(-1);
   const selectedTargetDb = requested?.p14TargetDb ?? null;
-  const requiredExtensionHz = requiredP14ExtensionHz(p14TargetBasis, requestedLevel);
+  const requiredExtensionHz = p18ThresholdHzForLevel(selectedP18TargetBasis, requestedLevel);
   const positiveEqDemandCurve = (canonicalResult.positiveEqDemandCurve || []).map((point) => ({
     frequency: point.frequency,
     spl: Number(point.demandDb ?? point.spl) || 0,
@@ -164,12 +167,17 @@ export function evaluateCanonicalBassAuthority({
       : (extensionShapePass === false ? "target-relative-extension-shortfall" : null),
   } : null;
   const achievedP18FrequencyHz = extensionAssessment?.achievedExtensionHz ?? null;
-  const achievedP18Level = requestedP18Pass === true ? requestedLevel : 0;
+  const independentP18Assessment = assessP18Extension(achievedP18FrequencyHz, selectedP18TargetBasis);
+  // Extension only earns a level when it is available at the selected P14 output.
+  const achievedP18Level = requestedP14Pass === true ? (independentP18Assessment.level ?? 0) : 0;
   const p18 = extensionAssessment ? {
     ...extensionAssessment,
+    ...independentP18Assessment,
     value: achievedP18FrequencyHz,
     level: achievedP18Level > 0 ? `L${achievedP18Level}` : null,
-    source: "selected-p14-conditional-target-relative-rsp-extension",
+    targetBasis: selectedP18TargetBasis,
+    qualifiedAtSelectedP14Output: requestedP14Pass === true,
+    source: "selected-p14-output-target-relative-rsp-extension-one-third-octave",
   } : null;
   const postEqCapabilityAssessment = buildPostEqBassCapabilityOutcome({
     authority: { selectedTargetBasis: p14TargetBasis },
@@ -213,7 +221,13 @@ export function evaluateCanonicalBassAuthority({
     headroomConsumedByEqDb: p14?.headroomConsumedByEqDb ?? null,
     p14CapabilityDetails: p14,
     p14TargetBasis,
+    p18TargetBasis: selectedP18TargetBasis,
+    selectedP18TargetBasis,
+    selectedP18RequiredExtensionHz: requiredExtensionHz,
     achievedP18FrequencyHz,
+    achievedP18DesignHz: independentP18Assessment.designHz,
+    p18PerformanceBand: independentP18Assessment.performanceBand,
+    p18PerformanceMultiplier: independentP18Assessment.performanceMultiplier,
     achievedP18Level,
     p18AchievedAuthority: p18 ? {
       ...p18,
