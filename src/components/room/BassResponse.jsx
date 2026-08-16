@@ -18,7 +18,6 @@ import BassResultsSummary from "@/components/room/bass/BassResultsSummary";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import DesignEqLimitStatus from "@/components/room/bass/DesignEqLimitStatus";
 import BassTargetLevelControl from "@/components/room/bass/BassTargetLevelControl";
 import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 import { buildNormalizedSeries } from "@/components/room/bass/normalizedSeriesBuilder";
@@ -31,6 +30,8 @@ import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedN
 import ProtectedNullNotice from "@/components/room/bass/ProtectedNullNotice";
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
+import BassCurveVisibilityControls, { DEFAULT_BASS_CURVE_VISIBILITY } from "@/components/room/bass/BassCurveVisibilityControls";
+import { buildRp22GraphMarkers } from "@/components/room/bass/rp22GraphMarkers";
 import P14PresentationHeader from "@/components/room/bass/P14PresentationHeader";
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
 import CopyEqForensicTraceButton from "@/components/room/bass/CopyEqForensicTraceButton";
@@ -175,14 +176,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
   // Presentation-only state. Production response inputs and physics are owned by the room-scoped authority.
   const [isDraggingSub, setIsDraggingSub] = useState(false);
-  const [houseCurveOverride, setHouseCurveOverride] = useState(null);
-  const showHouseCurve = houseCurveOverride ?? !!designEqEnabled;
   const [overlayProduction, setOverlayProduction] = useState(false);
   const [showRsp, setShowRsp] = useState(true);
   const [showRealSeatOverlays, setShowRealSeatOverlays] = useState(false);
-  // EQ response overlay toggles — control visibility of raw and post-EQ traces
-  const [showRawResponse, setShowRawResponse] = useState(true);
-  const [showOptimisedResponse, setShowOptimisedResponse] = useState(true);
+  const [curveVisibility, setCurveVisibility] = useState(DEFAULT_BASS_CURVE_VISIBILITY);
+
+  // Design EQ is part of the authoritative bass assessment path. It is fixed on;
+  // the graph controls below change presentation only and never change RP22 results.
+  useEffect(() => {
+    if (!designEqEnabled) setDesignEqEnabled(true);
+  }, [designEqEnabled, setDesignEqEnabled]);
   // Historical physics investigations are intentionally opt-in. They include
   // dozens of retired simulations and must never block live geometry/product
   // changes merely because current engineering receipts are enabled.
@@ -368,22 +371,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   }), [finalBassResponse?.canonicalHouseCurveShape, selectedP14TargetDb, selectedP14RequiredExtensionHz]);
 
   const multiSeriesForGraph = useMemo(() => buildBassGraphSeries({
-    designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,
+    designEqEnabled, showHouseCurve: true, normalizedSeries, rspRawCurve, optimisationResult,
     hasMatchingDetailedResult: hasValidDetailedResult, multiSeries, selectedSeatIds, showRealSeatOverlays,
     smoothingMode: bassSmoothingMode, overlayProductionSeries, showRewOverlay, rewOverlaySeries,
     operatingLevelOffsetDb,
-  }), [designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,
+  }), [designEqEnabled, normalizedSeries, rspRawCurve, optimisationResult,
     hasValidDetailedResult, multiSeries, selectedSeatIds, showRealSeatOverlays, bassSmoothingMode,
     overlayProductionSeries, showRewOverlay, rewOverlaySeries, operatingLevelOffsetDb]);
 
-  const visibleMultiSeries = useMemo(() => {
-    if (!designEqEnabled) return multiSeriesForGraph;
-    return multiSeriesForGraph.filter((series) => {
-      if (series.kind === "raw") return showRawResponse;
-      if (series.kind === "post-eq") return showOptimisedResponse;
-      return true;
-    });
-  }, [multiSeriesForGraph, designEqEnabled, showRawResponse, showOptimisedResponse]);
+  const visibleMultiSeries = useMemo(() => multiSeriesForGraph.filter((series) => {
+    if (series.kind === "room-response") return curveVisibility.room;
+    if (series.kind === "product-maximum") return curveVisibility.product;
+    if (series.kind === "maximum-spl") return curveVisibility.combined;
+    if (series.kind === "house-curve" || series.kind === "normalized-target") return curveVisibility.house;
+    if (series.kind === "post-eq" || series.kind === "real-seat-overlay") return curveVisibility.finalEq;
+    if (series.kind === "raw") return false;
+    return true;
+  }), [multiSeriesForGraph, curveVisibility]);
+
+  const rp22GraphMarkers = useMemo(
+    () => buildRp22GraphMarkers(finalBassResponse),
+    [finalBassResponse]
+  );
 
   // C6.1A/C6.1B2: Graph boundary hash check — compare the ACTUAL rendered-series
   // source identity metadata (embedded by bassGraphDomainBuilder) with the
@@ -654,23 +663,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               </div>
             )}
             <BassTargetLevelControl disabled={detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"} />
-            <DesignEqLimitStatus enabled={designEqEnabled} onChange={setDesignEqEnabled} priorityMode={optimiserPriorityMode} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Show house curve:</span>
-              <Switch checked={showHouseCurve} onCheckedChange={setHouseCurveOverride} />
-            </div>
-            {designEqEnabled && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#625143', fontFamily: 'monospace', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={showRawResponse} onChange={(e) => setShowRawResponse(e.target.checked)} style={{ cursor: 'pointer' }} />
-                  Before EQ
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#625143', fontFamily: 'monospace', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={showOptimisedResponse} onChange={(e) => setShowOptimisedResponse(e.target.checked)} style={{ cursor: 'pointer' }} />
-                  After EQ
-                </label>
-              </div>
-            )}
             {designEqEnabled && Array.isArray(seatingPositions) && seatingPositions.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Show real-seat overlays:</span>
@@ -728,38 +720,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           onSelectAll={selectAllSeats}
         />
 
-        {/* Fixed curve key — derived from series metadata so the key, graph and tooltip cannot drift apart */}
-        {visibleMultiSeries.length > 0 && (() => {
-          const primaryCurves = visibleMultiSeries.filter(s => s.kind === "raw" || s.kind === "post-eq" || s.kind === "maximum-spl" || s.kind === "house-curve" || s.kind === "normalized-target");
-          const realSeatOverlays = visibleMultiSeries.filter(s => s.kind === "real-seat-overlay");
-          if (primaryCurves.length === 0) return null;
-          return (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 18px", marginBottom: 8, padding: "6px 10px", background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 6 }}>
-              {primaryCurves.map(s => (
-                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <svg width="32" height="8" style={{ flexShrink: 0 }}>
-                    <line x1="0" y1="4" x2="32" y2="4" stroke={s.color} strokeWidth={s.strokeWidth ?? 2} strokeDasharray={s.strokeDasharray} opacity={s.strokeOpacity ?? 1} />
-                  </svg>
-                  <span style={{ fontSize: 10, color: "#1B1A1A", fontFamily: "monospace" }}>{s.label}</span>
-                </div>
-              ))}
-              {realSeatOverlays.length > 0 && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 10, borderLeft: "1px solid #DCDBD6" }}>
-                  <span style={{ fontSize: 10, color: "#8B7F76", fontFamily: "monospace" }}>Real-seat overlays:</span>
-                  {realSeatOverlays.map(s => (
-                    <span key={s.id} style={{ fontSize: 10, color: s.color, fontFamily: "monospace" }}>{s.id}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        <BassCurveVisibilityControls
+          visibility={curveVisibility}
+          onChange={setCurveVisibility}
+        />
 
         <div className="mt-4">
           {visibleMultiSeries.length > 0 ? (
             <BassGraph
               multiSeries={visibleMultiSeries}
-              responseData={(designEqEnabled ? visibleMultiSeries.find((series) => series.id.endsWith("-eq")) : visibleMultiSeries[0])?.data ?? []}
+              responseData={(visibleMultiSeries.find((series) => series.kind === "post-eq") || visibleMultiSeries[0])?.data ?? []}
               schroederFrequency={schroederFrequency}
               rp22Levels={[]}
               toggles={{}}
@@ -777,6 +747,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               renderToken={qStrategy}
               p14TotalDb={p14PresentationData.targetDb}
               operatingLevelOffsetDb={operatingLevelOffsetDb}
+              rp22Markers={rp22GraphMarkers}
             />
           ) : (
             <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>
