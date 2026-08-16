@@ -1,4 +1,5 @@
 import React from "react";
+import { formatP19Deviation } from "@/components/utils/rp22/levels";
 
 const formatDb = (value, digits = 1) =>
   Number.isFinite(value) ? Number(value).toFixed(digits) : "—";
@@ -81,7 +82,7 @@ export default function P14PresentationHeader({
       {p19Available && (
         <div style={cardStyle}>
           <div style={titleStyle}>P19 Response Fit</div>
-          <div style={valueStyle(p19Pass ? "#213428" : "#b45309")}>±{formatDb(p19Variation)} dB</div>
+          <div style={valueStyle(p19Pass ? "#213428" : "#b45309")}>{formatP19Deviation(p19Variation)}</div>
           <div style={subtitleStyle(p19Pass ? "#213428" : "#b45309")}>{p19Pass ? "PASS" : "FAIL"}</div>
           <div style={captionStyle}>Response deviation from house target</div>
         </div>
