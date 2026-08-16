@@ -1128,6 +1128,8 @@ function useDesignerState() {
         radiationMode: autosaveConfig.radiationMode || 'half-space',
         p13Mode: autosaveConfig.p13Mode || 'minimum',
         p14Mode: autosaveConfig.p14Mode || 'minimum', bassTargetLevel: autosaveConfig.bassTargetLevel || 1, selectedP14TargetBasis: autosaveConfig.selectedP14TargetBasis || autosaveConfig.p14Mode || 'minimum', selectedP14Level: autosaveConfig.selectedP14Level || autosaveConfig.bassTargetLevel || 1,
+        p18Mode: autosaveConfig.p18Mode || autosaveConfig.selectedP18TargetBasis || 'minimum',
+        selectedP18TargetBasis: autosaveConfig.selectedP18TargetBasis || autosaveConfig.p18Mode || 'minimum',
         perRole: autosaveConfig.perRole || {},
         // Separate L/R and centre heights for center_only soundbar override mode
         lcrHeightM: autosaveConfig.lcrHeightM,
@@ -1723,7 +1725,14 @@ function useDesignerState() {
       setSubwoofers(restored.subwoofers);
       setSubwooferInstancesStatus(restored.status);
       setSubwooferInstanceMigrationState(restored.migration);
-      if (p.splConfig && typeof p.splConfig === "object") setSplConfig(p.splConfig);
+      if (p.splConfig && typeof p.splConfig === "object") {
+        setSplConfig((previous) => ({
+          ...previous,
+          ...p.splConfig,
+          p18Mode: p.splConfig.p18Mode || p.splConfig.selectedP18TargetBasis || 'minimum',
+          selectedP18TargetBasis: p.splConfig.selectedP18TargetBasis || p.splConfig.p18Mode || 'minimum',
+        }));
+      }
       if (typeof p.screenHeight === "number") setScreenHeight(p.screenHeight);
       if (typeof p.seatingRows === "number") setSeatingRows(p.seatingRows);
       if (typeof p.seatsPerRow === "number") setSeatsPerRow(p.seatsPerRow);
@@ -1966,6 +1975,7 @@ function useDesignerState() {
       radiationMode: 'half-space',
       p13Mode: 'minimum',
       p14Mode: 'minimum', bassTargetLevel: 1, selectedP14TargetBasis: 'minimum', selectedP14Level: 1,
+      p18Mode: 'minimum', selectedP18TargetBasis: 'minimum',
       perRole: {}
     });
 
