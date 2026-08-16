@@ -751,7 +751,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             />
           ) : (
             <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>
-              No bass data yet. Add at least one subwoofer and one seat.
+              {multiSeriesForGraph.length > 0
+                ? "No graph layers selected. Turn on a layer above to inspect the response."
+                : "No bass data yet. Add at least one subwoofer and one seat."}
             </div>
           )}
         </div>
