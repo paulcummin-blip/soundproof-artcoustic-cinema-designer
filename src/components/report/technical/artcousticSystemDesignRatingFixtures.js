@@ -1377,6 +1377,55 @@ function fixtureAR() {
   return makeResult("AR: Screen omitted when unavailable", failed.length === 0, `Failed: ${failed.join(", ")}`);
 }
 
+// AS. P18 six-band physical achievement scoring and P14 output gate
+function fixtureAS() {
+  const checks = [];
+  const expected = [
+    [36, "FAIL", -5, -60],
+    [35.99, "L1", 2, 24],
+    [30, "L2", 4, 48],
+    [25, "L2", 6, 72],
+    [20, "L3", 8, 96],
+    [18, "L4", 10, 120],
+    [15, "L4", 12, 144],
+  ];
+  for (const [rawValue, level, multiplier, points] of expected) {
+    const authority = buildArtcousticDesignRatingAuthority({
+      seats: [],
+      p18: { rawValue, verified: true, mode: "minimum", qualified: true },
+    });
+    const rating = calculateRoomDesignRating(authority);
+    const contribution = rating.contributions.find((item) => item.key === "p18");
+    checks.push([`P18 ${rawValue} level ${level}`, contribution?.resultLevel === level]);
+    checks.push([`P18 ${rawValue} multiplier ${multiplier}`, contribution?.multiplier === multiplier]);
+    checks.push([`P18 ${rawValue} points ${points}`, contribution?.earnedPoints === points]);
+  }
+
+  const shared30Min = buildArtcousticDesignRatingAuthority({ seats: [], p18: { rawValue: 30, verified: true, mode: "minimum", qualified: true } }).parameters.p18;
+  const shared30Rec = buildArtcousticDesignRatingAuthority({ seats: [], p18: { rawValue: 30, verified: true, mode: "recommended", qualified: true } }).parameters.p18;
+  const shared18Min = buildArtcousticDesignRatingAuthority({ seats: [], p18: { rawValue: 18, verified: true, mode: "minimum", qualified: true } }).parameters.p18;
+  const shared18Rec = buildArtcousticDesignRatingAuthority({ seats: [], p18: { rawValue: 18, verified: true, mode: "recommended", qualified: true } }).parameters.p18;
+  checks.push(["30 Hz same score across modes", shared30Min.multiplier === 4 && shared30Rec.multiplier === 4]);
+  checks.push(["30 Hz mode levels differ correctly", shared30Min.level === "L2" && shared30Rec.level === "L1"]);
+  checks.push(["18 Hz same score across modes", shared18Min.multiplier === 10 && shared18Rec.multiplier === 10]);
+  checks.push(["18 Hz mode levels differ correctly", shared18Min.level === "L4" && shared18Rec.level === "L3"]);
+
+  const gated = buildArtcousticDesignRatingAuthority({ seats: [], p18: { rawValue: 15, verified: true, mode: "recommended", qualified: false } });
+  checks.push(["P18 fails when selected P14 output is not qualified", gated.parameters.p18.level === "FAIL" && gated.parameters.p18.multiplier === -5]);
+
+  const top = calculateRoomDesignRating(buildArtcousticDesignRatingAuthority({
+    seats: [],
+    p14: { rawValue: 200, verified: true, mode: "recommended" },
+    p18: { rawValue: 15, verified: true, mode: "recommended", qualified: true },
+  })).contributions;
+  const p14 = top.find((item) => item.key === "p14");
+  const p18 = top.find((item) => item.key === "p18");
+  checks.push(["P18 Recommended L4 is highest single contribution", p18?.earnedPoints === 144 && p18.earnedPoints > p14?.earnedPoints]);
+
+  const failed = checks.filter(([, passed]) => !passed).map(([label]) => label);
+  return makeResult("AS: P18 six-band achievement scoring", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Runner
 // ═══════════════════════════════════════════════════════════════
@@ -1427,6 +1476,7 @@ export function runAllFixtures() {
     fixtureAP(),
     fixtureAQ(),
     fixtureAR(),
+    fixtureAS(),
   ];
   const allPassed = fixtures.every((f) => f.passed);
   return { allPassed, results: fixtures };
