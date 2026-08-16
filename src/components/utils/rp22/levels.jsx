@@ -61,6 +61,27 @@ export function levelP17_wsFR(dB) {
   return { level: 'L2', ok: true };
 }
 
+export function floorP19Deviation(dB) {
+  // RP22 P19 is reported as a whole-number symmetric ±dB value. Preserve
+  // the favourable floor: values below ±3/4/5/6 remain in L4/L3/L2/L1.
+  return Number.isFinite(dB) ? Math.floor(dB) : null;
+}
+
+export function formatP19Deviation(dB) {
+  const floored = floorP19Deviation(dB);
+  return floored == null ? '—' : `±${floored} dB`;
+}
+
+export function levelP19_lfResponse(dB) {
+  const floored = floorP19Deviation(dB);
+  if (floored == null) return { level: 'N/A', ok: false };
+  if (floored <= 2) return { level: 'L4', ok: true };
+  if (floored <= 3) return { level: 'L3', ok: true };
+  if (floored <= 4) return { level: 'L2', ok: true };
+  if (floored <= 5) return { level: 'L1', ok: true };
+  return { level: 'FAIL', ok: false };
+}
+
 export function floorP20Deviation(dB) {
   // RP22 P20 is reported as a whole-number ±dB value. Preserve the
   // favourable floor so any value below ±5 dB remains within the ±4 dB band.
