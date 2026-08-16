@@ -84,15 +84,22 @@ export default function BassGraph({
   rewStyleMode = false,
   yDomain,
   xDomain = null,
-  yMin,
-  yMax,
+  yMin = null,
+  yMax = null,
   showAxialOnly = false,
   refDb = 85,
   disableHighlight = false,
   renderToken = '',
   p14TotalDb = null,
   operatingLevelOffsetDb = 0,
-  rp22Markers = {}
+  rp22Markers = {
+    p18FrequencyHz: null,
+    p19StartHz: null,
+    p19EndHz: null,
+    p19WorstFrequencyHz: null,
+    p20WorstFrequencyHz: null,
+    p20WorstSeatId: null,
+  }
 }) {
     // Multi-series: merge all series data into one keyed chartData array
     const isMulti = rewStyleMode && Array.isArray(multiSeries) && multiSeries.length > 0;
