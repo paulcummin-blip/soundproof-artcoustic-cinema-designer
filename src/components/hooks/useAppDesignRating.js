@@ -116,6 +116,7 @@ export function useAppDesignRating({
   const reportP12Mode = appState?.p12Mode || 'minimum';
   const reportP13Mode = appState?.splConfig?.p13Mode || 'minimum';
   const reportP14Mode = completedBassPresentation?.parameters?.p14?.targetBasis || appState?.splConfig?.p14Mode || 'minimum';
+  const reportP18Mode = completedBassPresentation?.parameters?.p18?.targetBasis || appState?.splConfig?.p18Mode || 'minimum';
 
   const hasFrontWides = useMemo(() => {
     return (Array.isArray(placedSpeakers) ? placedSpeakers : []).some((s) => {
@@ -140,6 +141,7 @@ export function useAppDesignRating({
         reportP12Mode,
         reportP13Mode,
         reportP14Mode,
+        reportP18Mode,
         hasFrontWides,
         placedSpeakers,
       });
@@ -172,7 +174,7 @@ export function useAppDesignRating({
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;
     }
-  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, hasFrontWides, placedSpeakers]);
+  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers]);
 
   return roomRating;
 }
