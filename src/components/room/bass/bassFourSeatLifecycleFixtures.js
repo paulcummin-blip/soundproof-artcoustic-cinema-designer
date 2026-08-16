@@ -9,15 +9,15 @@ import { buildBassGraphSeries } from "./bassGraphDomainBuilder";
 import { buildFinalOptimisedBassResponse } from "./finalOptimisedBassResponse";
 
 class FixtureClock {
-  constructor() { this.time = 0; this.jobs = []; }
+  constructor() { this.time = 0; this.jobs = []; this.nextJobId = 1; }
   now = () => this.time;
-  setTimer = (fn, delay) => { const job = { fn, at: this.time + delay, cancelled: false }; this.jobs.push(job); return job; };
-  clearTimer = (job) => { if (job) job.cancelled = true; };
+  setTimer = (fn, delay) => { const job = { id: this.nextJobId++, fn, at: this.time + delay, cancelled: false }; this.jobs.push(job); return job.id; };
+  clearTimer = (jobId) => { const job = this.jobs.find((entry) => entry.id === jobId); if (job) job.cancelled = true; };
   tick(ms) { this.time += ms; this.jobs.filter((job) => !job.cancelled && job.at <= this.time).forEach((job) => { job.cancelled = true; job.fn(); }); }
 }
 
 class ProductionFixtureWorker {
-  constructor(registry) { this.terminated = false; registry.push(this); }
+  constructor(registry) { this.terminated = false; this.onmessage = null; this.request = null; registry.push(this); }
   postMessage(message) { this.request = message; }
   terminate() { this.terminated = true; }
   complete(pool) {
@@ -102,9 +102,16 @@ export function runFourSeatBassLifecycleFixture() {
   const graphSeries = buildBassGraphSeries({
     designEqEnabled: true,
     showHouseCurve: true,
+    normalizedSeries: null,
     rspRawCurve: rawCurve,
     optimisationResult: graphOptimisationResult,
     hasMatchingDetailedResult: true,
+    multiSeries: [],
+    selectedSeatIds: [],
+    showRealSeatOverlays: false,
+    overlayProductionSeries: null,
+    showRewOverlay: false,
+    rewOverlaySeries: null,
     smoothingMode: "none",
   });
   const graphRaw = graphSeries.find((series) => series.kind === "raw")?.data;
