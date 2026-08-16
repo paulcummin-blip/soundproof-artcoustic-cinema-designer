@@ -37,6 +37,7 @@ import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp2
 import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 import { formatP14RecommendedDetail, formatP14TargetBasisDetail, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { buildBassTargetViews } from "@/components/room/bass/bassTargetViews";
+import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
 
 // ---------------------------------------------------------------------------
 // Adapter helpers
@@ -276,9 +277,11 @@ export function adaptCurrentBassOptimisationResult({
   responseDomain = null,
   backgroundLifecycle = null,
   p14TargetBasis = "minimum",
+  p18TargetBasis = "minimum",
   selectedP14Level = 4,
   selectedP14TargetDb = null,
   selectedP14RequiredExtensionHz = null,
+  selectedP18RequiredExtensionHz = null,
   collectDiagnostics = false,
   metricPublication = null,
 } = {}) {
@@ -491,20 +494,30 @@ export function adaptCurrentBassOptimisationResult({
     p14CapabilitySource,
   };
 
-  // P18 — final selected-candidate authority is achieved post-EQ room extension.
+  // P18 — independently grade the precise 1/3-octave-smoothed -3 dB point.
+  // The favourable whole-Hz floor is applied only by the P18 authority.
   const authorityP18 = finalResponse?.finalSeatVariationData?.p18;
-  const p18Level = typeof authorityP18?.level === "number"
-    ? authorityP18.level
-    : selectedCandidate
-      ? (typeof selectedCandidate.achievedP18Level === "number" ? selectedCandidate.achievedP18Level : parseLegacyLevel(optimisationResult?.achievedP18Level))
-      : parseLegacyLevel(optimisationResult?.achievedP18Level);
   const p18Value = Number.isFinite(authorityP18?.extensionHz)
     ? authorityP18.extensionHz
     : Number.isFinite(selectedCandidate?.achievedP18FrequencyHz) ? selectedCandidate.achievedP18FrequencyHz : (Number.isFinite(optimisationResult?.achievedP18FrequencyHz) ? optimisationResult.achievedP18FrequencyHz : null);
-  contract.productAnalysis.parameters.p18 = createBassParameterResult({
-    parameter: PARAM_P18, status: paramStatus(p18Level != null), level: p18Level, value: p18Value,
-    unit: "Hz", passedL1: p18Level != null ? p18Level >= 1 : null, isStale,
-  });
+  const selectedP18TargetBasis = normalizeP18TargetBasis(p18TargetBasis);
+  const p18Assessment = assessP18Extension(p18Value, selectedP18TargetBasis);
+  const p18Qualified = selectedCandidate?.p18AchievedAuthority?.qualifiedAtSelectedP14Output
+    ?? selectedCandidate?.requestedP14Pass
+    ?? true;
+  const p18Level = p18Qualified ? p18Assessment.level : 0;
+  contract.productAnalysis.parameters.p18 = {
+    ...createBassParameterResult({
+      parameter: PARAM_P18, status: paramStatus(p18Assessment.level != null), level: p18Level, value: p18Value,
+      unit: "Hz", passedL1: p18Qualified && p18Level != null ? p18Level >= 1 : false, isStale,
+      targetBasis: selectedP18TargetBasis,
+      targetBasisDetail: formatP18TargetBasisDetail(selectedP18TargetBasis),
+    }),
+    designHz: p18Assessment.designHz,
+    performanceBand: p18Assessment.performanceBand,
+    performanceMultiplier: p18Assessment.performanceMultiplier,
+    qualifiedAtSelectedP14Output: p18Qualified,
+  };
 
   // P19
   const authorityP19 = finalResponse?.finalSeatVariationData?.p19;
@@ -549,12 +562,16 @@ export function adaptCurrentBassOptimisationResult({
   }
 
   // Build both target interpretations from the same selected candidate and acoustic result.
-  contract.bassTargets = buildBassTargetViews(contract.productAnalysis.parameters, contract.selectedCandidate);
+  contract.bassTargets = buildBassTargetViews(contract.productAnalysis.parameters, contract.selectedCandidate, selectedP18TargetBasis);
   contract.selectedTargetBasis = normalizeP14TargetBasis(p14TargetBasis);
   contract.selectedP14TargetBasis = contract.selectedTargetBasis;
   contract.selectedP14Level = p14SelectedLevel;
   contract.selectedP14TargetDb = requestedTargetDb;
   contract.selectedP14RequiredExtensionHz = Number.isFinite(selectedP14RequiredExtensionHz) ? selectedP14RequiredExtensionHz : null;
+  contract.selectedP18TargetBasis = selectedP18TargetBasis;
+  contract.selectedP18RequiredExtensionHz = Number.isFinite(selectedP18RequiredExtensionHz)
+    ? selectedP18RequiredExtensionHz
+    : (Number.isFinite(selectedP14RequiredExtensionHz) ? selectedP14RequiredExtensionHz : null);
   const selectedTarget = contract.bassTargets[contract.selectedTargetBasis];
   contract.productAnalysis.parameters = {
     p14: selectedTarget.p14,
