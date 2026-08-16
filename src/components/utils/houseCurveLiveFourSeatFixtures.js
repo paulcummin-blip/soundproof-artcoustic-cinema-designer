@@ -1,6 +1,7 @@
 import { buildCurveFromBank, evaluateProvisionalBankLimits, peakingEqResponseDb } from "@/components/utils/designEqCalibration";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { buildBassGraphSeries } from "@/components/room/bass/bassGraphDomainBuilder";
+import { buildFinalOptimisedBassResponse } from "@/components/room/bass/finalOptimisedBassResponse";
 import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { stableBankSignature } from "@/components/utils/houseCurveEvaluationMemo";
@@ -122,15 +123,28 @@ export function runHouseCurveLiveFourSeatFixtures() {
   const bankLimits = evaluateProvisionalBankLimits(enabledFilters, fixture.rawCurve, [{ modelKey: "SUB2-12" }], 20, ANCHOR_DB, { maximumCutDb: 15, maximumAggregateBoostDb: 6 });
   const filterBankSignature = stableBankSignature(enabledFilters);
   const candidateId = "live-four-seat-house-curve-regression";
+  const graphCandidate = {
+    candidateId,
+    generatedFilterBank: enabledFilters,
+    filterBankSignature,
+    finalPostEqCurve: result.curve,
+    rawResponseCurve: fixture.rawCurve,
+    productionHouseCurveTarget: fixture.canonicalTargetCurve,
+    correctionStartHz: 20,
+    correctionEndHz: 200,
+  };
+  const graphSelection = {
+    selectedCandidateId: candidateId,
+    filterBankSignature,
+    selectedCandidate: graphCandidate,
+  };
   const graphSeries = buildBassGraphSeries({
     designEqEnabled: true,
     showHouseCurve: true,
     rspRawCurve: fixture.rawCurve,
     optimisationResult: {
-      selectedCandidateId: candidateId,
-      filterBankSignature,
-      finalPostEqCurve: result.curve,
-      selectedCandidate: { productionHouseCurveTarget: fixture.canonicalTargetCurve, correctionStartHz: 20, correctionEndHz: 200 },
+      ...graphSelection,
+      finalOptimisedBassResponse: buildFinalOptimisedBassResponse({ optimisationResult: graphSelection }),
     },
     hasMatchingDetailedResult: true,
     smoothingMode: "none",
