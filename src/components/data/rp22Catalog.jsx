@@ -210,9 +210,14 @@ export const RP22_CATALOG = deepFreeze({
     unit: "Hz",
     scope: "Room",
     direction: "min (lower is better)",
+    // Recommended row retained as the legacy flat levels shape.
     levels: { L1: 30, L2: 25, L3: 18, L4: 15 },
+    levelsByBasis: {
+      minimum: { L1: 35, L2: 30, L3: 20, L4: 18 },
+      recommended: { L1: 30, L2: 25, L3: 18, L4: 15 }
+    },
     notes:
-      "In-room predicted -3dB bass extension with no perceptible distortion or resonances at the specified SPL of Parameter 14. Includes coupling, boundary and room gain."
+      "In-room predicted -3 dB bass extension at the selected Parameter 14 operating SPL. Uses the RSP response, coupling, boundary and room gain; reporting applies favourable whole-Hz flooring."
   },
   "19": {
     number: 19,
