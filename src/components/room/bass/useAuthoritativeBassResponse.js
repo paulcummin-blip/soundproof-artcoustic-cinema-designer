@@ -330,6 +330,8 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     p14TargetBasis: requested.p14TargetBasis,
     p14TargetLevel: requested.requestedLevel,
     selectedP14RequiredExtensionHz: requested.selectedP14RequiredExtensionHz,
+    p18TargetBasis: requested.p18TargetBasis,
+    selectedP18RequiredExtensionHz: requested.selectedP18RequiredExtensionHz,
   }), [roomDims, sources, rspPosition, seatingPositions, surfaceAbsorption, roomDamping, axialQ,
     modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale,
     enableRewCoreReflections, rewSourceCurveMode, qStrategy, rewModalBandwidthScale,
@@ -346,7 +348,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       calibration: computeCalibrationFingerprint(fingerprintInputs),
     };
   }, [fingerprintInputs, analysisBlocked]);
-  const payload = useMemo(() => ({ rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, perSeatRawCurves, selectedP14TargetDb: requested.selectedP14TargetDb, p14TargetBasis: requested.p14TargetBasis, p14TargetLevel: requested.requestedLevel }), [rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, perSeatRawCurves, requested.selectedP14TargetDb, requested.p14TargetBasis, requested.requestedLevel]);
+  const payload = useMemo(() => ({ rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, perSeatRawCurves, selectedP14TargetDb: requested.selectedP14TargetDb, p14TargetBasis: requested.p14TargetBasis, p14TargetLevel: requested.requestedLevel, p18TargetBasis: requested.p18TargetBasis, selectedP18RequiredExtensionHz: requested.selectedP18RequiredExtensionHz }), [rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, perSeatRawCurves, requested.selectedP14TargetDb, requested.p14TargetBasis, requested.requestedLevel, requested.p18TargetBasis, requested.selectedP18RequiredExtensionHz]);
   const inputsValid = !!rspPosition && seatingPositions.length > 0 && rspRawCurve.length > 0 && sources.length > 0 && [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM].every((value) => Number(value) > 0);
   const blockedReason = analysisBlocked
     ? (instanceStatus === INSTANCE_STATUS.ERROR ? "subwoofer_instance_error" : "subwoofer_instances_uninitialised")
