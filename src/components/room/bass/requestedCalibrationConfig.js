@@ -5,7 +5,7 @@
 import { DESIGN_EQ_FIT_PROFILES } from "@/components/utils/designEqCalibration";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { resolveRequestedRp22HouseCurveTarget } from "@/components/utils/requestedRp22HouseCurveAuthority";
-import { requiredP14ExtensionHz } from "@/components/utils/p14HouseCurveNormalisation";
+import { normalizeP18TargetBasis, p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
 
 // The sorted set of fit profiles actually evaluated by the optimiser.
 // Derived from the same exported DESIGN_EQ_FIT_PROFILES used by
@@ -34,8 +34,10 @@ export function deriveRequestedCalibrationConfig({
   const transitionHz = Number.isFinite(optimisationTransitionHz) ? optimisationTransitionHz : null;
   const usableLfHz = Number.isFinite(designEqSystemLimits?.usableLfHz) ? designEqSystemLimits.usableLfHz : null;
   const p14TargetBasis = splConfig?.selectedP14TargetBasis === "recommended" ? "recommended" : "minimum";
+  const p18TargetBasis = normalizeP18TargetBasis(splConfig?.selectedP18TargetBasis || splConfig?.p18Mode);
   const requestedLevel = Math.max(1, Math.min(4, Math.round(Number(splConfig?.selectedP14Level) || 4)));
-  const target = resolveRequestedRp22HouseCurveTarget(getRp22BassOperatingDefinitions(p14TargetBasis), requestedLevel);
+  const target = resolveRequestedRp22HouseCurveTarget(getRp22BassOperatingDefinitions(p14TargetBasis, p18TargetBasis), requestedLevel);
+  const selectedP18RequiredExtensionHz = p18ThresholdHzForLevel(p18TargetBasis, requestedLevel);
   const targetSpl = target.targetAnchorDb;
 
   return {
@@ -44,7 +46,11 @@ export function deriveRequestedCalibrationConfig({
     selectedP14TargetBasis: p14TargetBasis,
     selectedP14Level: requestedLevel,
     selectedP14TargetDb: targetSpl,
-    selectedP14RequiredExtensionHz: requiredP14ExtensionHz(p14TargetBasis, requestedLevel),
+    p18TargetBasis,
+    selectedP18TargetBasis: p18TargetBasis,
+    selectedP18RequiredExtensionHz,
+    // Compatibility alias: extension is now selected independently by P18 basis.
+    selectedP14RequiredExtensionHz: selectedP18RequiredExtensionHz,
     requestedAssessmentStartHz: null,
     // Assessment end / transition — real input to generateCandidatePool.
     requestedAssessmentEndHz: transitionHz,
