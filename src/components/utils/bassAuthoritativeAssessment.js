@@ -96,7 +96,7 @@ export function computeOfficialP20Assessment({ rspPostEqCurve, perSeatPostEqCurv
       return {
         seatId: seat.seatId,
         variationDbRaw,
-        totalSeatToRspDifferenceDbRaw: variationDbRaw * 2,
+        totalSeatToRspDifferenceDbRaw: Number(variationDbRaw) * 2,
         displayVariationDb,
         level: p20LevelFromDisplayVariation(displayVariationDb),
         worstFrequencyHz,
