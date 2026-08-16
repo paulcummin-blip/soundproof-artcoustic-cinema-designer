@@ -176,7 +176,7 @@ export function formatParameterResult(result) {
 // 3. Versioned contract factory
 // ---------------------------------------------------------------------------
 
-export const BASS_ANALYSIS_CONTRACT_VERSION = 5;
+export const BASS_ANALYSIS_CONTRACT_VERSION = 6;
 
 export function createBassAnalysisResult() {
   return {
@@ -260,6 +260,8 @@ export function createBassAnalysisResult() {
     selectedP14Level: 4,
     selectedP14TargetDb: 118,
     selectedP14RequiredExtensionHz: null,
+    selectedP18TargetBasis: "minimum",
+    selectedP18RequiredExtensionHz: null,
     bassTargets: {
       minimum: null,
       recommended: null,
