@@ -47,7 +47,7 @@ export function useBassAnalysisContract({
   requestedAssessmentStartHz, requestedAssessmentEndHz,
   requestedTargetAnchorDb, requestedFitProfile,
   selectedP14TargetBasis, selectedP14Level, selectedP14TargetDb,
-  selectedP14RequiredExtensionHz,
+  selectedP14RequiredExtensionHz, selectedP18TargetBasis, selectedP18RequiredExtensionHz,
   requestedOutputDb, requestedUsableLfHz,
   // Phase 2A: The sorted set of fit profiles the optimiser actually
   // evaluates, with their real named constraints. Derived from
@@ -125,6 +125,8 @@ export function useBassAnalysisContract({
     p14TargetBasis: selectedP14TargetBasis,
     p14TargetLevel: selectedP14Level,
     selectedP14RequiredExtensionHz: Number.isFinite(selectedP14RequiredExtensionHz) ? selectedP14RequiredExtensionHz : null,
+    p18TargetBasis: selectedP18TargetBasis,
+    selectedP18RequiredExtensionHz: Number.isFinite(selectedP18RequiredExtensionHz) ? selectedP18RequiredExtensionHz : null,
   }), [roomDims, rspPosition, seatingPositions, subsForSimulation, surfaceAbsorption,
     roomDamping, axialQ, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend,
     modalStorageMode, propagationPhaseScale, enableRewCoreReflections, rewSourceCurveMode,
@@ -139,7 +141,8 @@ export function useBassAnalysisContract({
     liveRequestedOutputDb, liveUsableLfHz,
     requestedAssessmentStartHz, requestedAssessmentEndHz, requestedTargetAnchorDb,
     requestedFitProfile, requestedOutputDb, requestedUsableLfHz, evaluatedProfiles,
-    selectedP14TargetDb, selectedP14TargetBasis, selectedP14Level, selectedP14RequiredExtensionHz]);
+    selectedP14TargetDb, selectedP14TargetBasis, selectedP14Level, selectedP14RequiredExtensionHz,
+    selectedP18TargetBasis, selectedP18RequiredExtensionHz]);
 
   const contractGeometryFp = useMemo(() => computeGeometryFingerprint(contractFingerprintInputs), [contractFingerprintInputs]);
   const contractProductFp = useMemo(() => computeProductFingerprint(contractFingerprintInputs), [contractFingerprintInputs]);
@@ -166,16 +169,19 @@ export function useBassAnalysisContract({
     responseDomain: contractResponseDomain,
     backgroundLifecycle,
     p14TargetBasis: selectedP14TargetBasis,
+    p18TargetBasis: selectedP18TargetBasis,
     selectedP14Level,
     selectedP14TargetDb,
     selectedP14RequiredExtensionHz,
+    selectedP18RequiredExtensionHz,
     collectDiagnostics,
     metricPublication,
   }), [optimisationResult, detailedStatus, detailedProgress, detailedElapsedMs,
     rspRawCurve, perSeatRawCurves, designEqSystemLimits, subsForSimulation,
     optimiserPriorityMode, contractGeometryFp, contractProductFp, contractCalibrationFp,
     contractResponseDomain, fingerprintsOverride, backgroundLifecycle,
-    selectedP14TargetBasis, selectedP14Level, selectedP14TargetDb, selectedP14RequiredExtensionHz, collectDiagnostics, metricPublication]);
+    selectedP14TargetBasis, selectedP14Level, selectedP14TargetDb, selectedP14RequiredExtensionHz,
+    selectedP18TargetBasis, selectedP18RequiredExtensionHz, collectDiagnostics, metricPublication]);
 
   return bassAnalysisContract;
 }
