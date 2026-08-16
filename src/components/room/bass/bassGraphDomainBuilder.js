@@ -9,6 +9,76 @@ const shiftCurve = (curve, offsetDb) => (curve || []).map((point) => ({
   spl: Number.isFinite(point?.spl) ? point.spl + offsetDb : point?.spl,
 }));
 
+const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
+
+const cleanCurve = (curve) => (Array.isArray(curve) ? curve : [])
+  .filter((point) => finite(point?.frequency) && finite(point?.spl))
+  .map((point) => ({ frequency: Number(point.frequency), spl: Number(point.spl) }))
+  .sort((left, right) => left.frequency - right.frequency);
+
+const interpolateCurve = (curve, frequency) => {
+  if (!curve.length || frequency < curve[0].frequency || frequency > curve[curve.length - 1].frequency) return null;
+  if (frequency === curve[0].frequency) return curve[0].spl;
+  if (frequency === curve[curve.length - 1].frequency) return curve[curve.length - 1].spl;
+  const upperIndex = curve.findIndex((point) => point.frequency >= frequency);
+  if (upperIndex <= 0) return curve[0].spl;
+  const low = curve[upperIndex - 1];
+  const high = curve[upperIndex];
+  const ratio = (frequency - low.frequency) / (high.frequency - low.frequency);
+  return low.spl + (high.spl - low.spl) * ratio;
+};
+
+function buildRoomResponseSeries(normalizedSeries, smoothingMode) {
+  if (!normalizedSeries?.data?.length) return null;
+  return {
+    id: "room-response",
+    kind: "room-response",
+    label: "Room response · 94 dB reference",
+    tooltipLabel: "Product-independent room response · 94 dB flat-source reference",
+    color: "#7C3AED",
+    strokeWidth: 1.75,
+    strokeDasharray: "5 4",
+    data: applyBassSmoothing(normalizedSeries.data, smoothingMode),
+  };
+}
+
+export function buildProductMaximumSplSeries(optimisationResult, smoothingMode = "none") {
+  const diagnostics = optimisationResult?.selectedCandidate?.pairedP14P18Authority?.sources?.sourceDiagnostics;
+  const sourceCurves = (Array.isArray(diagnostics) ? diagnostics : [])
+    .map((source) => cleanCurve(source?.capabilityCurve))
+    .filter((curve) => curve.length >= 2);
+  if (!sourceCurves.length) return null;
+
+  const sharedStartHz = Math.max(...sourceCurves.map((curve) => curve[0].frequency));
+  const sharedEndHz = Math.min(...sourceCurves.map((curve) => curve[curve.length - 1].frequency));
+  if (!finite(sharedStartHz) || !finite(sharedEndHz) || sharedEndHz <= sharedStartHz) return null;
+
+  const frequencies = [...new Set(sourceCurves
+    .flatMap((curve) => curve.map((point) => point.frequency))
+    .filter((frequency) => frequency >= sharedStartHz && frequency <= sharedEndHz))]
+    .sort((left, right) => left - right);
+  const productMaximum = frequencies.map((frequency) => {
+    const sourceValues = sourceCurves.map((curve) => interpolateCurve(curve, frequency));
+    if (sourceValues.some((value) => !finite(value))) return null;
+    return {
+      frequency,
+      spl: 10 * Math.log10(sourceValues.reduce((sum, value) => sum + Math.pow(10, Number(value) / 10), 0)),
+    };
+  }).filter(Boolean);
+  if (!productMaximum.length) return null;
+
+  return {
+    id: "product-maximum",
+    kind: "product-maximum",
+    label: "Subwoofer maximum · before room",
+    tooltipLabel: "Power-summed maximum product capability · room excluded",
+    color: "#2563EB",
+    strokeWidth: 2,
+    strokeDasharray: "8 4",
+    data: applyBassSmoothing(productMaximum, smoothingMode),
+  };
+}
+
 const rawRspSeries = (rspRawCurve, smoothingMode) => ({
   id: "rsp-raw",
   kind: "raw",
@@ -116,6 +186,8 @@ export function buildBassGraphSeries({
       : (hasStoredBlueCurve
         ? [{ id: "rsp-raw", kind: "raw", label: "Physical RSP before EQ", tooltipLabel: "Product-aware physical RSP before EQ", color: "#64748B", strokeWidth: 1.75, strokeDasharray: "6 4", data: applyBassSmoothing(storedRspBeforePeq, smoothingMode) }]
         : (rspRawCurve.length ? [rawRspSeries(rspRawCurve, smoothingMode)] : []));
+    const roomResponse = buildRoomResponseSeries(normalizedSeries, smoothingMode);
+    if (roomResponse) series.push(roomResponse);
     if (hasMatchingDetailedResult && finalResponse?.postEqRspCurve?.length) {
       if (seatValidationActive) {
         series.push(...selectedRawSeats.map((seat, index) => {
@@ -155,6 +227,8 @@ export function buildBassGraphSeries({
             color: multiSeries.find((item) => item.id === seat.seatId)?.color || ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"][index % 6],
             strokeWidth: 1.25, strokeOpacity: 0.5, data: applyBassSmoothing(seat.responseData, smoothingMode) })));
       }
+      const productMaximum = buildProductMaximumSplSeries(optimisationResult, smoothingMode);
+      if (productMaximum) series.push(productMaximum);
       const target = showHouseCurve ? buildAbsoluteHouseCurveSeries(optimisationResult) : null;
       if (target) series.push(target);
       const maximumSpl = buildMaximumSplSeries(finalResponse, smoothingMode);
