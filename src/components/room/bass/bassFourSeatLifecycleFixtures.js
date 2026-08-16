@@ -59,12 +59,12 @@ export function runFourSeatBassLifecycleFixture() {
   const fingerprint = "four-seat-production-no-global-target";
   const identity = { ...BASS_OPTIMISER_VERSIONS, fingerprint, calibrationFingerprint: fingerprint, canonicalPriorityMode: "all-canonical-priorities" };
   const controller = new BassBackgroundAnalysisController({
-    workerFactory: () => new ProductionFixtureWorker(workers),
     debounceMs: 1,
     now: clock.now,
     setTimer: clock.setTimer,
     clearTimer: clock.clearTimer,
   });
+  controller.workerFactory = () => new ProductionFixtureWorker(workers);
   controller.updateInputs({ valid: true, fingerprint, payload: { rawCurve, perSeatRawCurves, activeSubs: [{ modelKey: "SUB2-12" }, { modelKey: "SUB2-12" }], selectedP14TargetDb: requested.selectedP14TargetDb, p14TargetBasis: requested.p14TargetBasis, p14TargetLevel: requested.requestedLevel }, identity });
   clock.tick(1);
   workers[0].complete(pool);
