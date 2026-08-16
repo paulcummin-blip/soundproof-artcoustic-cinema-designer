@@ -12,7 +12,7 @@ import { applyBassSmoothing } from '../room/bass/bassGraphSmoothing';
 import { applyDesignEqCurve, calculateDesignEqCurve } from "@/components/utils/designEqCalibration";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { getSpeakerModelMeta, getSubwooferCurve } from "@/components/models/speakers/registry";
-import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
+import { levelP19_lfResponse, levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 export { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 
@@ -139,7 +139,7 @@ export function computeP18InRoomF3({ freqsHz, splDb, targetDb, minHz = 10, maxHz
   return { f3Hz: f3, details: { refDb, cutoffDb, samples: freqsHz.length } };
 }
 
-// P19 — max absolute deviation of splDb from targetDb below Schroeder freq.
+// P19 — symmetric ± half of the maximum full response-to-target difference below Schroeder freq.
 export function computeP19DeviationBelowSchroeder({ freqsHz, splDb, targetDb, schroederHz }) {
   if (!Array.isArray(freqsHz) || !Array.isArray(splDb) || freqsHz.length === 0) {
     return { resultDb: null, details: { samples: 0 } };
@@ -160,7 +160,11 @@ export function computeP19DeviationBelowSchroeder({ freqsHz, splDb, targetDb, sc
     if (d > maxDev) maxDev = d;
     used++;
   }
-  return { resultDb: used > 0 ? maxDev : null, details: { schroederHz, samples: used } };
+  return {
+    resultDb: used > 0 ? maxDev / 2 : null,
+    totalDifferenceDbRaw: used > 0 ? maxDev : null,
+    details: { schroederHz, samples: used },
+  };
 }
 
 export function computeTransitionFrequencyHz(roomDims, rt60 = 0.4) {
@@ -414,19 +418,16 @@ export function computeParam19Deviation(rspResponse, transitionHz) {
     const d = Math.abs(below[i].spl - refDb);
     if (d > rawMaxDev) rawMaxDev = d;
   }
-  // Sound Proof 0.5 dB favourable floor — remove previous Math.ceil (which was
-  // the OPPOSITE of favourable). Group C ±dB deviation parameter.
-  const maxDev = resolveRp22DesignValue(19, Math.abs(rawMaxDev));
-
-  let level = "FAIL";
-  if (maxDev <= 2) level = "L4";
-  else if (maxDev <= 3) level = "L3";
-  else if (maxDev <= 4) level = "L2";
-  else if (maxDev <= 5) level = "L1";
+  // Convert the full response-to-target gap to the RP22 symmetric ± value,
+  // then apply the agreed whole-dB favourable floor for grading and display.
+  const variationDbRaw = Math.abs(rawMaxDev) / 2;
+  const maxDev = resolveRp22DesignValue(19, variationDbRaw);
+  const level = levelP19_lfResponse(variationDbRaw).level;
 
   return {
     maxDevDb: maxDev,
-    rawMaxDev: rawMaxDev,
+    rawMaxDev: variationDbRaw,
+    totalDifferenceDbRaw: rawMaxDev,
     targetDb: refDb,
     transitionHz,
     level,
