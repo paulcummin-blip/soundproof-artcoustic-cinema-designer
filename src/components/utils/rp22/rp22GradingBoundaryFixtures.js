@@ -1,8 +1,11 @@
 import {
+  floorP19Deviation,
   floorP20Deviation,
+  formatP19Deviation,
   formatP20Deviation,
   getP21PresetResult,
   levelP17_wsFR,
+  levelP19_lfResponse,
   levelP20_lfConsistency,
   levelP21_earlyReflections,
 } from "@/components/utils/rp22/levels";
@@ -23,6 +26,19 @@ export function runRp22GradingBoundaryFixtures() {
   expect("P17 exact L3 boundary", levelP17_wsFR, 3, "L3");
   [3.1, 11.3, 1000000].forEach((value) => expect(`P17 worse value ${value}`, levelP17_wsFR, value, "L2"));
   check("No finite P17 result produces L1 or FAIL", [-100, 0, 1.5, 1.6, 3, 3.1, 1000000].every((value) => ["L4", "L3", "L2"].includes(levelP17_wsFR(value).level)));
+
+  const p19Cases = [
+    [1.9, 1, "L4"], [2.0, 2, "L4"], [2.9, 2, "L4"],
+    [3.0, 3, "L3"], [3.9, 3, "L3"],
+    [4.0, 4, "L2"], [4.9, 4, "L2"],
+    [5.0, 5, "L1"], [5.9, 5, "L1"],
+  ];
+  p19Cases.forEach(([value, floored, level]) => {
+    expect(`P19 ${value} grades from floor`, levelP19_lfResponse, value, level);
+    check(`P19 ${value} displays ±${floored} dB`, floorP19Deviation(value) === floored && formatP19Deviation(value) === `±${floored} dB`);
+  });
+  const p19Fail = levelP19_lfResponse(6);
+  check("P19 exact ±6 dB is FAIL", p19Fail.level === "FAIL" && p19Fail.ok === false);
 
   const p20Cases = [
     [1.9, 1, "L4"], [2.0, 2, "L4"], [2.9, 2, "L4"],
@@ -60,7 +76,7 @@ export function runRp22GradingBoundaryFixtures() {
     .forEach(([value, level]) => expect(`P21 ${value}`, levelP21_earlyReflections, value, level));
   check("No finite P21 result produces FAIL", [-100, -12, -11.9, -10, -9.9, -8, -7.9, 0, 100].every((value) => levelP21_earlyReflections(value).level !== "FAIL"));
   check("Non-applicable P21 preset remains N/A", getP21PresetResult("l1").level === "N/A" && getP21PresetResult("l1").value === null);
-  const expectedValues = [1.5, 2.1, 3, 3.1, 11.3, 1000000, ...p20Cases.map(([value]) => value), -12, -11.9, -10, -9.9, -8, -7.9, 0];
+  const expectedValues = [1.5, 2.1, 3, 3.1, 11.3, 1000000, ...p19Cases.map(([value]) => value), ...p20Cases.map(([value]) => value), -12, -11.9, -10, -9.9, -8, -7.9, 0];
   check("Grading preserves every measured value", JSON.stringify(observedValues) === JSON.stringify(expectedValues));
 
   const passed = checks.filter((item) => item.passed).length;
