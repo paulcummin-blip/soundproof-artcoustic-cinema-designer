@@ -141,12 +141,19 @@ export function runHouseCurveLiveFourSeatFixtures() {
   const graphSeries = buildBassGraphSeries({
     designEqEnabled: true,
     showHouseCurve: true,
+    normalizedSeries: null,
     rspRawCurve: fixture.rawCurve,
     optimisationResult: {
       ...graphSelection,
       finalOptimisedBassResponse: buildFinalOptimisedBassResponse({ optimisationResult: graphSelection }),
     },
     hasMatchingDetailedResult: true,
+    multiSeries: [],
+    selectedSeatIds: [],
+    showRealSeatOverlays: false,
+    overlayProductionSeries: null,
+    showRewOverlay: false,
+    rewOverlaySeries: null,
     smoothingMode: "none",
   });
   const graphPostEq = graphSeries.find((series) => series.kind === "post-eq");
