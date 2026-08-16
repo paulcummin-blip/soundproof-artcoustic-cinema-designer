@@ -145,9 +145,9 @@ function fixtureB() {
   const b8 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p16: { s1: 6, s2: 6 } });
   checks.push(["P16 6dB→FAIL", getSeatLevel(b8, "p16", "s1") === "FAIL"]);
 
-  // P18 verified, worse than L1 (30 Hz — above 30 = worse)
-  const b9 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p18: { rawValue: 35, verified: true } });
-  checks.push(["P18 35Hz verified→FAIL", getRoomLevel(b9, "p18") === "FAIL"]);
+  // P18 verified, 36 Hz or more is worse than Minimum L1.
+  const b9 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p18: { rawValue: 36, verified: true, mode: "minimum" } });
+  checks.push(["P18 36Hz verified→FAIL", getRoomLevel(b9, "p18") === "FAIL"]);
 
   // P19 verified, worse than L1 (5 dB)
   const b10 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p19: { s1: { rawValue: 6, verified: true }, s2: { rawValue: 6, verified: true } } });
@@ -690,10 +690,10 @@ function fixtureS() {
   checks.push(["Status COMPLETE", rating.status === "COMPLETE"]);
   // Coverage 100% — all applicable (scored) params are assessed
   checks.push(["Coverage 100%", approx(rating.coveragePercent, 100, 0.01)]);
-  // applicableWeight = scorable total = 116 (with P2 weight 7)
-  checks.push(["applicableWeight=116", rating.applicableWeight === 116]);
-  // assessedWeight = 116 (all scored)
-  checks.push(["assessedWeight=116", rating.assessedWeight === 116]);
+  // applicableWeight = scorable total = 121 (P18 weight 12).
+  checks.push(["applicableWeight=121", rating.applicableWeight === 121]);
+  // assessedWeight = 121 (all scored)
+  checks.push(["assessedWeight=121", rating.assessedWeight === 121]);
   // hasProvisional is true (diagnostic) but status is not PROVISIONAL
   checks.push(["hasProvisional diagnostic", rating.hasProvisional === true]);
   checks.push(["Status not PROVISIONAL", rating.status !== "PROVISIONAL"]);
