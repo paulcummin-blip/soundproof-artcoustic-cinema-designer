@@ -91,7 +91,8 @@ export default function BassGraph({
   disableHighlight = false,
   renderToken = '',
   p14TotalDb = null,
-  operatingLevelOffsetDb = 0
+  operatingLevelOffsetDb = 0,
+  rp22Markers = {}
 }) {
     // Multi-series: merge all series data into one keyed chartData array
     const isMulti = rewStyleMode && Array.isArray(multiSeries) && multiSeries.length > 0;
@@ -274,14 +275,26 @@ export default function BassGraph({
     }
     const chartRenderKey = `${isMulti ? 'multi' : 'single'}_rows${_rowCount}|${renderToken}|${_splSample}`;
 
-    // Draw post-EQ first and raw second so the dotted before-EQ reference
-    // remains visible wherever the two RSP curves overlap.
+    // Presentation order follows the acoustic signal path. Reference layers
+    // render first; the final EQ response renders last so target tracking remains
+    // visible when curves overlap.
     const renderedMultiSeries = React.useMemo(() => {
       if (!Array.isArray(multiSeries)) return [];
-      const postEq = multiSeries.find((series) => series.id === 'rsp-eq');
-      const raw = multiSeries.find((series) => series.id === 'rsp-raw');
-      const remaining = multiSeries.filter((series) => series.id !== 'rsp-eq' && series.id !== 'rsp-raw');
-      return [postEq, raw, ...remaining].filter(Boolean);
+      const orderByKind = {
+        "room-response": 10,
+        "product-maximum": 20,
+        "maximum-spl": 30,
+        raw: 40,
+        "house-curve": 50,
+        "normalized-target": 50,
+        "post-eq": 60,
+        "real-seat-overlay": 70,
+      };
+      return multiSeries
+        .map((series, index) => ({ series, index }))
+        .sort((left, right) => (orderByKind[left.series.kind] ?? 45) - (orderByKind[right.series.kind] ?? 45)
+          || left.index - right.index)
+        .map(({ series }) => series);
     }, [multiSeries]);
 
     return (
@@ -330,6 +343,75 @@ export default function BassGraph({
                             stroke="#4A230F" 
                             strokeDasharray="4 4"
                         />
+                    )}
+
+                    {/* RP22 calculation markers. P19 and P20 share the same
+                        1/3-octave assessment band; their worst-frequency lines
+                        show the exact points that set the displayed results. */}
+                    {Number.isFinite(rp22Markers?.p19StartHz)
+                      && Number.isFinite(rp22Markers?.p19EndHz)
+                      && rp22Markers.p19EndHz > rp22Markers.p19StartHz && (
+                      <ReferenceArea
+                        x1={rp22Markers.p19StartHz}
+                        x2={rp22Markers.p19EndHz}
+                        fill="#2563EB"
+                        fillOpacity={0.018}
+                        stroke="#2563EB"
+                        strokeOpacity={0.2}
+                        strokeDasharray="3 5"
+                        label={{
+                          value: `P19 / P20 assessment band · ${Math.round(rp22Markers.p19StartHz)}–${Math.round(rp22Markers.p19EndHz)} Hz`,
+                          position: "insideTopLeft",
+                          fill: "#475569",
+                          fontSize: 9,
+                          className: "font-body",
+                        }}
+                      />
+                    )}
+                    {Number.isFinite(rp22Markers?.p18FrequencyHz) && (
+                      <ReferenceLine
+                        x={rp22Markers.p18FrequencyHz}
+                        stroke="#2563EB"
+                        strokeWidth={1.5}
+                        strokeDasharray="5 4"
+                        label={{
+                          value: `P18 extension · ${Number(rp22Markers.p18FrequencyHz).toFixed(0)} Hz`,
+                          position: "insideTopLeft",
+                          fill: "#1D4ED8",
+                          fontSize: 9,
+                          className: "font-body",
+                        }}
+                      />
+                    )}
+                    {Number.isFinite(rp22Markers?.p19WorstFrequencyHz) && (
+                      <ReferenceLine
+                        x={rp22Markers.p19WorstFrequencyHz}
+                        stroke="#B45309"
+                        strokeWidth={1.25}
+                        strokeDasharray="3 4"
+                        label={{
+                          value: `P19 worst · ${Number(rp22Markers.p19WorstFrequencyHz).toFixed(0)} Hz`,
+                          position: "insideTopRight",
+                          fill: "#92400E",
+                          fontSize: 9,
+                          className: "font-body",
+                        }}
+                      />
+                    )}
+                    {Number.isFinite(rp22Markers?.p20WorstFrequencyHz) && (
+                      <ReferenceLine
+                        x={rp22Markers.p20WorstFrequencyHz}
+                        stroke="#7C3AED"
+                        strokeWidth={1.25}
+                        strokeDasharray="3 4"
+                        label={{
+                          value: `P20 worst${rp22Markers.p20WorstSeatId ? ` · ${rp22Markers.p20WorstSeatId}` : ""} · ${Number(rp22Markers.p20WorstFrequencyHz).toFixed(0)} Hz`,
+                          position: "insideBottomRight",
+                          fill: "#6D28D9",
+                          fontSize: 9,
+                          className: "font-body",
+                        }}
+                      />
                     )}
 
                     <ProtectedNullOverlay annotations={protectedNullAnnotations} />
