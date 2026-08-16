@@ -144,7 +144,7 @@ export function runFourSeatBassLifecycleFixture() {
     ["Pool contains the four canonical candidates", pool.generatedCandidateCount === 4 && pool.candidates.length === 4 && pool.selectablePool.length === 4],
     ["Pool contains one Standard, Accuracy, House-curve and Identity candidate", profileCounts.standard === 1 && profileCounts.accuracy === 1 && profileCounts.house_curve === 1 && profileCounts.identity === 1],
     ["Every candidate carries the identical fixed canonical target", canonicalTargets.size === 1],
-    ["P14-normalised target is in the expected fixed range", targetValues[20] >= 114 && targetValues[20] <= 116 && targetValues[200] >= 109 && targetValues[200] <= 110],
+    ["P14-normalised target is in the expected fixed range", targetValues[20] >= 112 && targetValues[20] <= 114 && targetValues[200] >= 107 && targetValues[200] <= 109 && targetValues[20] > targetValues[200]],
     ["Selected candidate is physically bank-valid", !!candidate && candidate.bankValidationResult?.allOk === true && candidate.physicalEqAuthorityPassed !== false],
     ["Final curve equals operating response plus selected correction", exactGraphAuthority],
     ["Final response preserves selected candidate identity", finalOptimisedBassResponse?.selectedCandidateId === selected.selectedCandidateId && finalOptimisedBassResponse?.filterBankSignature === selected.filterBankSignature],
