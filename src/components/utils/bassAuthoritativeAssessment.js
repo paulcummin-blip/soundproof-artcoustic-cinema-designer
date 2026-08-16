@@ -83,9 +83,11 @@ export function computeOfficialP20Assessment({ rspPostEqCurve, perSeatPostEqCurv
         const seatSpl = curveValueAt(seatCurve, rspPoint.frequency);
         if (!finite(rspPoint.spl) || !finite(seatSpl)) return;
         comparisonPointCount += 1;
-        const difference = Math.abs(seatSpl - rspPoint.spl);
-        if (variationDbRaw == null || difference > variationDbRaw) {
-          variationDbRaw = difference;
+        // RP22 expresses the total seat-to-RSP difference as a symmetric
+        // ±dB tolerance. An 8 dB total difference is therefore ±4 dB.
+        const variation = Math.abs(seatSpl - rspPoint.spl) / 2;
+        if (variationDbRaw == null || variation > variationDbRaw) {
+          variationDbRaw = variation;
           worstFrequencyHz = rspPoint.frequency;
         }
       });
@@ -94,6 +96,7 @@ export function computeOfficialP20Assessment({ rspPostEqCurve, perSeatPostEqCurv
       return {
         seatId: seat.seatId,
         variationDbRaw,
+        totalSeatToRspDifferenceDbRaw: variationDbRaw * 2,
         displayVariationDb,
         level: p20LevelFromDisplayVariation(displayVariationDb),
         worstFrequencyHz,
