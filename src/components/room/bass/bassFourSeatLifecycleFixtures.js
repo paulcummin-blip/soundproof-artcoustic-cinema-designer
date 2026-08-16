@@ -6,6 +6,7 @@ import { validateCachedBassResult } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, createCompleteMessage } from "./bassOptimiserWorkerProtocol";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 import { buildBassGraphSeries } from "./bassGraphDomainBuilder";
+import { buildFinalOptimisedBassResponse } from "./finalOptimisedBassResponse";
 
 class FixtureClock {
   constructor() { this.time = 0; this.jobs = []; }
@@ -25,6 +26,8 @@ class ProductionFixtureWorker {
       this.request.fingerprint,
       pool,
       { ...this.request.identity, ...BASS_OPTIMISER_VERSIONS, poolId: pool.poolId },
+      this.request.diagnosticToken,
+      this.request.collectDiagnostics,
     ) });
   }
 }
@@ -45,7 +48,9 @@ export function runFourSeatBassLifecycleFixture() {
     activeSubs: [{ modelKey: "SUB2-12" }, { modelKey: "SUB2-12" }],
     usableLfHz: 20,
     transitionHz: 120,
-    targetAnchorDb: requested.requestedTargetAnchorDb,
+    selectedP14TargetDb: requested.selectedP14TargetDb,
+    p14TargetBasis: requested.p14TargetBasis,
+    p14TargetLevel: requested.requestedLevel,
     onProgress: (progress) => stages.push(progress.phase),
   });
 
@@ -60,7 +65,7 @@ export function runFourSeatBassLifecycleFixture() {
     setTimer: clock.setTimer,
     clearTimer: clock.clearTimer,
   });
-  controller.updateInputs({ valid: true, fingerprint, payload: { rawCurve, perSeatRawCurves, activeSubs: [{ modelKey: "SUB2-12" }, { modelKey: "SUB2-12" }], targetAnchorDb: null }, identity });
+  controller.updateInputs({ valid: true, fingerprint, payload: { rawCurve, perSeatRawCurves, activeSubs: [{ modelKey: "SUB2-12" }, { modelKey: "SUB2-12" }], selectedP14TargetDb: requested.selectedP14TargetDb, p14TargetBasis: requested.p14TargetBasis, p14TargetLevel: requested.requestedLevel }, identity });
   clock.tick(1);
   workers[0].complete(pool);
   const lifecycle = controller.getSnapshot();
@@ -73,8 +78,8 @@ export function runFourSeatBassLifecycleFixture() {
     requestProfiles.get(key).add(candidate.designEqFitProfile);
   });
   const workersBeforeRerank = workers.length;
-  const selected = selectCandidateFromPool(pool, "house_curve_accuracy");
-  selectCandidateFromPool(pool, "depth");
+  const selected = selectCandidateFromPool(pool);
+  selectCandidateFromPool(pool);
   const invalidPool = generateCandidatePool({ rawCurve: [], activeSubs: [{ modelKey: "SUB2-12" }] });
   const invalidFingerprint = "four-seat-invalid-input-reporting";
   const invalidValidation = validateCachedBassResult({
@@ -84,21 +89,27 @@ export function runFourSeatBassLifecycleFixture() {
     pool: invalidPool,
   }, { fingerprint: invalidFingerprint });
   const candidate = selected.selectedCandidate;
+  const finalOptimisedBassResponse = buildFinalOptimisedBassResponse({ optimisationResult: selected });
+  const graphOptimisationResult = {
+    ...selected,
+    selectedP14TargetDb: requested.selectedP14TargetDb,
+    finalOptimisedBassResponse,
+  };
   const enabledFilters = (candidate?.generatedFilterBank || []).filter((filter) => filter.enabled);
   const canonicalTargets = new Set(pool.candidates.map((entry) => JSON.stringify(entry.productionHouseCurveTarget)));
   const targetValues = Object.fromEntries([20, 30, 40, 80, 120, 200].map((frequency) => [frequency, interpolateCanonicalTarget(candidate?.productionHouseCurveTarget, frequency)]));
   const exactGraphAuthority = candidate?.finalPostEqCurve?.every((point, index) => {
-    const raw = rawCurve[index];
+    const operating = candidate.requestedPreEqOperatingCurve[index];
     const correction = candidate.combinedEqCurve[index];
-    return raw?.frequency === point.frequency && correction?.frequency === point.frequency
-      && Math.abs(point.spl - (raw.spl + correction.spl)) < 1e-9;
+    return operating?.frequency === point.frequency && correction?.frequency === point.frequency
+      && Math.abs(point.spl - (operating.spl + correction.spl)) < 1e-9;
   });
   const correctionValues = candidate?.combinedEqCurve?.map((point) => point.spl) || [];
   const graphSeries = buildBassGraphSeries({
     designEqEnabled: true,
     showHouseCurve: true,
     rspRawCurve: rawCurve,
-    optimisationResult: selected,
+    optimisationResult: graphOptimisationResult,
     hasMatchingDetailedResult: true,
     smoothingMode: "none",
   });
@@ -106,7 +117,7 @@ export function runFourSeatBassLifecycleFixture() {
   const graphPostEq = graphSeries.find((series) => series.kind === "post-eq")?.data;
   const graphTarget = graphSeries.find((series) => series.kind === "house-curve")?.data;
   const graphSeriesAuthorityExact = JSON.stringify(graphRaw) === JSON.stringify(rawCurve)
-    && JSON.stringify(graphPostEq) === JSON.stringify(candidate?.finalPostEqCurve)
+    && JSON.stringify(graphPostEq) === JSON.stringify(finalOptimisedBassResponse?.postEqRspCurve)
     && JSON.stringify(graphTarget) === JSON.stringify(candidate?.productionHouseCurveTarget);
   const residualMagnitudeAt = (curve, frequency) => Math.abs(
     interpolateCanonicalTarget(curve, frequency) - interpolateCanonicalTarget(candidate.productionHouseCurveTarget, frequency)
