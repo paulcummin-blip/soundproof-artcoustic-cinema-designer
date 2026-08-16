@@ -4,6 +4,7 @@ import {
   gradeP14Minimum,
   gradeP14Recommended,
 } from "@/components/utils/p14CapabilityAuthority";
+import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
 
 const cloneParameter = (parameter) => ({ ...(parameter || {}) });
 
@@ -15,8 +16,12 @@ function achievedLevel(parameters) {
   return levels.length ? Math.min(...levels) : null;
 }
 
-function buildTarget(parameters, basis, selectedCandidate) {
+function buildTarget(parameters, basis, selectedCandidate, p18TargetBasis) {
   const p14Base = cloneParameter(parameters?.p14);
+  const p18Base = cloneParameter(parameters?.p18);
+  const selectedP18Basis = normalizeP18TargetBasis(p18TargetBasis);
+  const p18Assessment = assessP18Extension(p18Base.value, selectedP18Basis);
+  const p18Qualified = p18Base.qualifiedAtSelectedP14Output !== false;
   const p14Level = Number.isFinite(p14Base.value)
     ? (basis === "recommended" ? gradeP14Recommended(p14Base.value) : gradeP14Minimum(p14Base.value))
     : p14Base.level;
@@ -28,7 +33,17 @@ function buildTarget(parameters, basis, selectedCandidate) {
       targetBasis: basis,
       targetBasisDetail: formatP14TargetBasisDetail(basis),
     },
-    p18: cloneParameter(parameters?.p18),
+    p18: {
+      ...p18Base,
+      level: p18Qualified ? p18Assessment.level : 0,
+      passedL1: p18Qualified && p18Assessment.level != null ? p18Assessment.level >= 1 : false,
+      targetBasis: selectedP18Basis,
+      targetBasisDetail: formatP18TargetBasisDetail(selectedP18Basis),
+      designHz: p18Assessment.designHz,
+      performanceBand: p18Assessment.performanceBand,
+      performanceMultiplier: p18Assessment.performanceMultiplier,
+      qualifiedAtSelectedP14Output: p18Qualified,
+    },
     p19: cloneParameter(parameters?.p19),
     p20: cloneParameter(parameters?.p20),
   };
@@ -60,9 +75,9 @@ function buildTarget(parameters, basis, selectedCandidate) {
   return { ...targetParameters, achievedLevel: achievedLevel(targetParameters), designRecommendation: recommendation };
 }
 
-export function buildBassTargetViews(parameters, selectedCandidate) {
+export function buildBassTargetViews(parameters, selectedCandidate, p18TargetBasis = "minimum") {
   return {
-    minimum: buildTarget(parameters, "minimum", selectedCandidate),
-    recommended: buildTarget(parameters, "recommended", selectedCandidate),
+    minimum: buildTarget(parameters, "minimum", selectedCandidate, p18TargetBasis),
+    recommended: buildTarget(parameters, "recommended", selectedCandidate, p18TargetBasis),
   };
 }
