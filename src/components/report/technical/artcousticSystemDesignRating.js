@@ -389,7 +389,7 @@ function scoreRoomParam(key, input) {
     default: return { state: "provisional", level: null, multiplier: null, reason: "unknown-room-param" };
   }
 
-  return { state: "scored", level: scored.level, multiplier: multiplierForLevel(scored.level), reason: null };
+  return { state: "scored", level: scored.level, multiplier: scored.multiplier ?? multiplierForLevel(scored.level), reason: null };
 }
 
 /**
