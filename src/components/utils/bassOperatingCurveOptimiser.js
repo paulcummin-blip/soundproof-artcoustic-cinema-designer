@@ -1,5 +1,6 @@
 import { calculateDesignEqCurve } from "@/components/utils/designEqCalibration";
 import { computeParam14LfeCapability, computeParam18BassExtension, computeP19DeviationBelowSchroeder } from "@/components/utils/rp22BassMetrics";
+import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 import { getSystemSourceCapability } from "@/components/utils/subwooferCapability";
 
 const LEVELS = ["L1", "L2", "L3", "L4"];
@@ -90,7 +91,7 @@ function buildCandidate({ rawCurve, activeSubs, usableLfHz, transitionHz, operat
   const achievedP18Level = levelValue(p18?.level);
   const achievedP18FrequencyHz = p18?.value ?? null;
   const achievedP19VariationDb = p19?.resultDb ?? null;
-  const achievedP19Level = achievedP19VariationDb == null ? 0 : achievedP19VariationDb <= 2 ? 4 : achievedP19VariationDb <= 3 ? 3 : achievedP19VariationDb <= 4 ? 2 : achievedP19VariationDb <= 5 ? 1 : 0;
+  const achievedP19Level = houseCurveP19Level(achievedP19VariationDb);
   const allAtLeastL1 = achievedP14Level >= 1 && achievedP18Level >= 1 && achievedP19Level >= 1;
   const rejectionReason = [
     achievedP14Level < 1 && "P14 is below 114 dB",
