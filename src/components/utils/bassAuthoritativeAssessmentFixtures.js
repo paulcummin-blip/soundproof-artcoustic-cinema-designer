@@ -72,6 +72,13 @@ export function runBassAuthoritativeAssessmentFixtures() {
   const severeSeatNull = assess(rsp, [{ seatId: "seat-null", responseData: curve([100, 100, 100, 65, 100, 100, 100, 100, 100]) }]);
   check("6. Non-RSP null affects P20 not P19", severeSeatNull.p20.worstSeat.variationDbRaw > baseline.p20.worstSeat.variationDbRaw && severeSeatNull.p19.variationDbRaw === baseline.p19.variationDbRaw);
 
+  const eightDbDifference = assess(flat(100), [{ seatId: "seat-eight-db", responseData: flat(92) }]);
+  const belowTenDbDifference = assess(flat(100), [{ seatId: "seat-below-ten-db", responseData: flat(90.1) }]);
+  const tenDbDifference = assess(flat(100), [{ seatId: "seat-ten-db", responseData: flat(90) }]);
+  check("6a. Eight dB total difference reports ±4 dB L2", eightDbDifference.p20.worstSeat.variationDbRaw === 4 && eightDbDifference.p20.worstSeat.displayVariationDb === 4 && eightDbDifference.p20.worstSeat.level === 2);
+  check("6b. Difference below ten dB floors to ±4 dB L2", Math.abs(belowTenDbDifference.p20.worstSeat.variationDbRaw - 4.95) < 1e-9 && belowTenDbDifference.p20.worstSeat.displayVariationDb === 4 && belowTenDbDifference.p20.worstSeat.level === 2);
+  check("6c. Ten dB total difference reports ±5 dB L1", tenDbDifference.p20.worstSeat.variationDbRaw === 5 && tenDbDifference.p20.worstSeat.displayVariationDb === 5 && tenDbDifference.p20.worstSeat.level === 1);
+
   const severeRsp = curve([100, 100, 100, 65, 100, 100, 100, 100, 100]);
   const officialNull = computeOfficialP19Assessment({ rspPostEqCurve: severeRsp, canonicalTargetCurve: TARGET, ...BAND });
   const correctableNull = computeCorrectableP19Diagnostic({ rspPostEqCurve: severeRsp, canonicalTargetCurve: TARGET, protectedNullRegions: [{ startHz: 31, endHz: 50 }], ...BAND });
