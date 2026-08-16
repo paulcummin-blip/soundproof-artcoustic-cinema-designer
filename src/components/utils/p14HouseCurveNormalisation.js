@@ -1,11 +1,8 @@
+import { p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
+
 const THIRD_OCTAVE_CENTRES_HZ = Object.freeze([
   16, 20, 25, 31.5, 40, 50, 63, 80, 100,
 ]);
-
-const REQUIRED_EXTENSION_HZ = Object.freeze({
-  minimum: Object.freeze({ 1: 35, 2: 30, 3: 20, 4: 18 }),
-  recommended: Object.freeze({ 1: 30, 2: 25, 3: 18, 4: 15 }),
-});
 
 const pointValue = (point) => Number(point?.spl ?? point?.offsetDb ?? point?.db);
 
@@ -32,9 +29,7 @@ export function cWeightingCorrectionDb(frequencyHz) {
 }
 
 export function requiredP14ExtensionHz(targetBasis, level) {
-  const basis = targetBasis === "recommended" ? "recommended" : "minimum";
-  const selectedLevel = Math.max(1, Math.min(4, Math.round(Number(level) || 4)));
-  return REQUIRED_EXTENSION_HZ[basis][selectedLevel];
+  return p18ThresholdHzForLevel(targetBasis, level);
 }
 
 export function normaliseHouseCurveToP14Total({
