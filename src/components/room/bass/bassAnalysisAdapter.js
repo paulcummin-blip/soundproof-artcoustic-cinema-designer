@@ -157,8 +157,8 @@ function buildCandidateRef(candidate, collectDiagnostics = false) {
     p20Available: !!candidate.p20Available,
     perSeatP19Results: (Array.isArray(candidate.perSeatMetrics) ? candidate.perSeatMetrics : []).map((seat) => ({
       seatId: seat?.seatId ?? null,
-      variationDbRaw: Number.isFinite(seat?.maxAbsDeviationDb) ? seat.maxAbsDeviationDb : null,
-      level: Number.isFinite(seat?.maxAbsDeviationDb) ? houseCurveP19Level(seat.maxAbsDeviationDb) : null,
+      variationDbRaw: Number.isFinite(seat?.maxAbsDeviationDb) ? seat.maxAbsDeviationDb / 2 : null,
+      level: Number.isFinite(seat?.maxAbsDeviationDb) ? houseCurveP19Level(seat.maxAbsDeviationDb / 2) : null,
       worstFrequencyHz: Number.isFinite(seat?.worstFrequencyHz) ? seat.worstFrequencyHz : null,
     })),
     perSeatDiagnostics: (Array.isArray(candidate.perSeatMetrics) ? candidate.perSeatMetrics : []).map((seat) => ({
