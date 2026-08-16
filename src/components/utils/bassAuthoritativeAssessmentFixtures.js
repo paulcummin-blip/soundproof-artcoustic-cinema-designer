@@ -5,6 +5,7 @@ import {
 } from "@/components/utils/bassAuthoritativeAssessment";
 import { stampPoolAuthority } from "@/components/room/bass/bassResultAuthority";
 import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
+import { computeP19DeviationBelowSchroeder } from "@/components/utils/rp22BassMetrics";
 
 const FREQUENCIES = [20, 25, 31.5, 40, 50, 63, 80, 100, 120];
 const curve = (values) => FREQUENCIES.map((frequency, index) => ({ frequency, spl: values[index] }));
@@ -88,13 +89,16 @@ export function runBassAuthoritativeAssessmentFixtures() {
   check("6f. P19 ten dB total is ±5 dB L1", tenDbP19.p19.variationDbRaw === 5 && tenDbP19.p19.displayVariationDb === 5 && tenDbP19.p19.level === 1);
   check("6g. P19 below twelve dB total floors to ±5 dB L1", Math.abs(belowTwelveDbP19.p19.variationDbRaw - 5.95) < 1e-9 && belowTwelveDbP19.p19.displayVariationDb === 5 && belowTwelveDbP19.p19.level === 1);
   check("6h. P19 twelve dB total is ±6 dB FAIL", twelveDbP19.p19.variationDbRaw === 6 && twelveDbP19.p19.displayVariationDb === 6 && twelveDbP19.p19.level === 0);
+  const legacyP19BelowFail = computeP19DeviationBelowSchroeder({ freqsHz: [20, 40], splDb: [100, 111.9], targetDb: [100, 100], schroederHz: 120 });
+  const legacyP19Fail = computeP19DeviationBelowSchroeder({ freqsHz: [20, 40], splDb: [100, 112], targetDb: [100, 100], schroederHz: 120 });
+  check("6i. Shared legacy P19 metric uses the same symmetric half-gap", Math.abs(legacyP19BelowFail.resultDb - 5.95) < 1e-9 && legacyP19Fail.resultDb === 6 && legacyP19Fail.totalDifferenceDbRaw === 12);
 
   const eightDbDifference = assess(flat(100), [{ seatId: "seat-eight-db", responseData: flat(92) }]);
   const belowTenDbDifference = assess(flat(100), [{ seatId: "seat-below-ten-db", responseData: flat(90.1) }]);
   const tenDbDifference = assess(flat(100), [{ seatId: "seat-ten-db", responseData: flat(90) }]);
-  check("6i. P20 eight dB total difference reports ±4 dB L2", eightDbDifference.p20.worstSeat.variationDbRaw === 4 && eightDbDifference.p20.worstSeat.displayVariationDb === 4 && eightDbDifference.p20.worstSeat.level === 2);
-  check("6j. P20 difference below ten dB floors to ±4 dB L2", Math.abs(belowTenDbDifference.p20.worstSeat.variationDbRaw - 4.95) < 1e-9 && belowTenDbDifference.p20.worstSeat.displayVariationDb === 4 && belowTenDbDifference.p20.worstSeat.level === 2);
-  check("6k. P20 ten dB total difference reports ±5 dB L1", tenDbDifference.p20.worstSeat.variationDbRaw === 5 && tenDbDifference.p20.worstSeat.displayVariationDb === 5 && tenDbDifference.p20.worstSeat.level === 1);
+  check("6j. P20 eight dB total difference reports ±4 dB L2", eightDbDifference.p20.worstSeat.variationDbRaw === 4 && eightDbDifference.p20.worstSeat.displayVariationDb === 4 && eightDbDifference.p20.worstSeat.level === 2);
+  check("6k. P20 difference below ten dB floors to ±4 dB L2", Math.abs(belowTenDbDifference.p20.worstSeat.variationDbRaw - 4.95) < 1e-9 && belowTenDbDifference.p20.worstSeat.displayVariationDb === 4 && belowTenDbDifference.p20.worstSeat.level === 2);
+  check("6l. P20 ten dB total difference reports ±5 dB L1", tenDbDifference.p20.worstSeat.variationDbRaw === 5 && tenDbDifference.p20.worstSeat.displayVariationDb === 5 && tenDbDifference.p20.worstSeat.level === 1);
 
   const severeRsp = curve([100, 100, 100, 65, 100, 100, 100, 100, 100]);
   const officialNull = computeOfficialP19Assessment({ rspPostEqCurve: severeRsp, canonicalTargetCurve: TARGET, ...BAND });
