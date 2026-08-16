@@ -478,7 +478,7 @@ export function computeParam20SeatConsistency({ rspResponse, perSeatResponses, t
       }
     }
     const isRsp = rspSeatId != null && String(entry.seatId) === String(rspSeatId);
-    const dev = isRsp ? 0 : maxDev;
+    const dev = isRsp ? 0 : maxDev / 2;
     const designDev = resolveRp22DesignValue(20, dev);
     perSeat.push({
       seatId: entry.seatId,
@@ -486,6 +486,7 @@ export function computeParam20SeatConsistency({ rspResponse, perSeatResponses, t
       isRsp,
       deviationDb: designDev,
       deviationDbRaw: dev,
+      totalSeatToRspDifferenceDbRaw: isRsp ? 0 : maxDev,
       level: levelForDeviation(designDev),
     });
   }
