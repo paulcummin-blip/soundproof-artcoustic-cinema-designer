@@ -52,7 +52,7 @@ function maximumTargetDeviation(curve, targetCurve, excludedRegions = []) {
   const displayVariationDb = floorP19Deviation(variationDbRaw);
   return {
     variationDbRaw,
-    totalRspToTargetDifferenceDbRaw: variationDbRaw == null ? null : variationDbRaw * 2,
+    totalRspToTargetDifferenceDbRaw: variationDbRaw == null ? null : Number(variationDbRaw) * 2,
     displayVariationDb,
     level: displayVariationDb == null ? null : (numericRp22Level(levelP19_lfResponse(displayVariationDb)) ?? 0),
     worstFrequencyHz,
