@@ -34,6 +34,7 @@ import {
 import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 import gradeP1Distance from "@/components/utils/rp22/p1LevelAuthority";
 import { isAuthoritativeBassContract } from "@/components/room/bass/completedBassResultPersistence";
+import { assessP18Extension } from "@/components/utils/p18ExtensionAuthority";
 
 // ═══════════════════════════════════════════════════════════════
 // Fixed V1 constants
@@ -43,7 +44,7 @@ import { isAuthoritativeBassContract } from "@/components/room/bass/completedBas
 export const PARAM_WEIGHTS = Object.freeze({
   p1: 6, p2: 7, p3: 3, p4: 5, p5: 6, p6: 5, p7: 4,
   p8: 2, p9: 5, p10: 5, p11: 4, p12: 8, p13: 7, p14: 9,
-  p15: 3, p16: 5, p17: 5, p18: 7, p19: 9, p20: 9, p21: 3,
+  p15: 3, p16: 5, p17: 5, p18: 12, p19: 9, p20: 9, p21: 3,
   screen: 7,
 });
 
@@ -317,9 +318,12 @@ function scoreP17(rawValue) {
   return applyMapper(rawValue, levelP17_wsFR, false); // L1=null open-ended → no FAIL
 }
 
-function scoreP18(rawValue) {
-  const cat = RP22_CATALOG["18"];
-  return applyCatalogThresholds(rawValue, cat.levels, cat.direction); // lower Hz better, L1=30 bounded → can FAIL
+function scoreP18(rawValue, mode) {
+  const assessment = assessP18Extension(rawValue, mode || "minimum");
+  return {
+    level: assessment.levelLabel || "FAIL",
+    multiplier: assessment.performanceMultiplier,
+  };
 }
 
 function scoreP19(rawValue) {
@@ -369,6 +373,9 @@ function scoreRoomParam(key, input) {
   }
 
   const mode = typeof input === "object" && input ? input.mode : null;
+  if (key === "p18" && input?.qualified === false) {
+    return { state: "scored", level: "FAIL", multiplier: LEVEL_MULTIPLIERS.FAIL, reason: "not-qualified-at-selected-p14-output" };
+  }
   let scored;
 
   switch (key) {
@@ -378,7 +385,7 @@ function scoreRoomParam(key, input) {
     case "p12": scored = scoreP12(norm.rawValue, mode); break;
     case "p13": scored = scoreP13(norm.rawValue, mode); break;
     case "p14": scored = scoreP14(norm.rawValue, mode); break;
-    case "p18": scored = scoreP18(norm.rawValue); break;
+    case "p18": scored = scoreP18(norm.rawValue, mode); break;
     default: return { state: "provisional", level: null, multiplier: null, reason: "unknown-room-param" };
   }
 
