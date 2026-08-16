@@ -3,6 +3,7 @@
 // (A/B/C/D) at probe frequencies. Does NOT recalculate, rerank, or modify anything.
 
 import { peakingEqResponseDb } from "@/components/utils/designEqCalibration";
+import { formatP19Deviation } from "@/components/utils/rp22/levels";
 
 export const PROBE_FREQS = [29.75, 39.14, 77.16, 101.52];
 export const CONSISTENCY_TOLERANCE_DB = 0.05;
@@ -117,9 +118,9 @@ export function buildVisibleConditionReport({ result, rspRawCurve }) {
   const p19Pass = p19Level && p19Level !== "FAIL" && p19Level !== "L0";
   rows.push({
     test: "Official RSP P19",
-    expected: "Pass (≤ ±3.0 dB, L1+)",
-    actual: `${p19Pass ? p19Level : "FAIL"} (±${Number.isFinite(p19Var) ? p19Var.toFixed(1) : "—"} dB)`,
-    delta: p19Pass ? "0" : `${Number.isFinite(p19Var) ? (p19Var - 3.0).toFixed(1) : "—"} dB over L1 threshold`,
+    expected: "L1+ below ±6 dB after whole-dB floor",
+    actual: `${p19Pass ? p19Level : "FAIL"} (${Number.isFinite(p19Var) ? formatP19Deviation(p19Var) : "—"})`,
+    delta: p19Pass ? "0" : `${Number.isFinite(p19Var) ? Math.max(0, p19Var - 6).toFixed(1) : "—"} dB beyond the fail boundary`,
     severity: p19Pass ? "info" : "high",
     nextTest: "Confirm RSP P19 is computed from result.finalPostEqCurve vs house-curve target, not from a different curve",
   });
