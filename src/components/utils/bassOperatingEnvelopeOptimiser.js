@@ -5,7 +5,7 @@ import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOper
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { selectCandidateFromPool } from "@/components/utils/bassCandidatePoolSelection";
 import { calculateHouseCurveEqCurve } from "@/components/utils/houseCurveFitter";
-import { calculateAllSeatMetricsFromCorrected } from "@/components/utils/houseCurveFitterCore";
+import { calculateAllSeatMetricsFromCorrected, houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 import { summarizeCoreOperations } from "@/components/utils/bassOptimiserPerformance";
 import { annotateCandidatePoolForHouseCurveRanking } from "@/components/utils/houseCurveCandidateRankingMetrics";
 import { stampPoolAuthority } from "@/components/room/bass/bassResultAuthority";
@@ -65,12 +65,13 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
 
   // Candidate-specific P19 diagnostics are derived from the fixed request without re-running EQ.
   const candidateRequestedP19ToleranceDb = request.p19.p19ToleranceDb;
+  const candidateRequestedP19FullDifferenceCeilingDb = 2 * (candidateRequestedP19ToleranceDb + 1);
   const candidateWorstResidualDiagnostics = Array.isArray(eq.worstResidualDiagnostics)
     ? eq.worstResidualDiagnostics.map((diag) => {
         const signedResidualDb = diag.signedResidualDb;
         const remainingPointBoostDb = diag.remainingPointBoostDb;
         const requiredBoostToP19ToleranceDb = signedResidualDb < 0
-          ? Math.max(0, Math.abs(signedResidualDb) - candidateRequestedP19ToleranceDb)
+          ? Math.max(0, Math.abs(signedResidualDb) - candidateRequestedP19FullDifferenceCeilingDb + 1e-6)
           : 0;
         const p19ToleranceCapabilityLimited = signedResidualDb < 0
           && requiredBoostToP19ToleranceDb > remainingPointBoostDb;
@@ -105,7 +106,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
   const achievedP14MinimumLevel = p14?.minimumLevel ?? 0;
   const achievedP14RecommendedLevel = p14?.recommendedLevel ?? 0;
   const achievedP19VariationDb = officialP19.variationDbRaw;
-  const achievedP19Level = levelFromValue(achievedP19VariationDb, definitions, "p19ToleranceDb", true);
+  const achievedP19Level = houseCurveP19Level(achievedP19VariationDb);
 
   // Apply the same RSP-calibrated EQ bank to every real seat; no per-seat re-fitting.
   const candidateTargetAnchorDb = targetAnchorDb;
@@ -135,7 +136,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
       worstRealSeatHouseCurveSeatId = seat.seatId;
     }
   }
-  worstRealSeatHouseCurveLevel = levelFromValue(worstRealSeatHouseCurveVariationDb, definitions, "p19ToleranceDb", true);
+  worstRealSeatHouseCurveLevel = houseCurveP19Level(worstRealSeatHouseCurveVariationDb);
   const p18 = computeParam18AchievedExtension({
     rspPostEqCurve: finalPostEqCurve, perSeatPostEqCurves, activeSubs,
     configuredUsableLfHz: usableLfHz, p14TargetBasis,
