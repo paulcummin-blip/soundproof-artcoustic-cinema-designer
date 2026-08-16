@@ -91,8 +91,8 @@ export function assessLayoutResult(layout, transferResult, directReferenceResult
     transferEfficiencyClass: efficiency.transferEfficiencyClass,
     perSeat,
   };
-  metrics.p19Level = rspOnly ? null : houseCurveP19Level(metrics.meanSeatVariationDb);
-  metrics.p20Level = rspOnly ? null : numericRp22Level(levelP20_lfConsistency(metrics.worstSeatVariationDb));
+  metrics.p19Level = rspOnly ? null : houseCurveP19Level(metrics.meanSeatVariationDb / 2);
+  metrics.p20Level = rspOnly ? null : numericRp22Level(levelP20_lfConsistency(metrics.worstSeatVariationDb / 2));
   metrics.combinedConsistencyLevel = (metrics.p19Level || 0) + (metrics.p20Level || 0);
   metrics.placementGrade = gradeLayout(metrics, rspOnly);
   metrics.overallGrade = metrics.placementGrade;
