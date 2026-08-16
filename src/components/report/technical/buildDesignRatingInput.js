@@ -74,6 +74,7 @@ function isMetricNa(metric) {
  * @param {string} params.reportP12Mode             - "minimum" | "recommended"
  * @param {string} params.reportP13Mode             - "minimum" | "recommended"
  * @param {string} params.reportP14Mode             - "minimum" | "recommended"
+ * @param {string} params.reportP18Mode             - "minimum" | "recommended"
  * @param {boolean} params.hasFrontWides            - Whether layout includes front wide speakers
  * @returns {Object} Input for buildArtcousticDesignRatingAuthority()
  */
@@ -86,6 +87,7 @@ export function buildDesignRatingInput({
   reportP12Mode = "minimum",
   reportP13Mode = "minimum",
   reportP14Mode = "minimum",
+  reportP18Mode = "minimum",
   hasFrontWides = false,
   placedSpeakers = [],
 }) {
@@ -144,7 +146,12 @@ export function buildDesignRatingInput({
   const p18Raw = completedBassPresentation?.parameters?.p18?.rawValue;
   const p18 =
     bassVerified && isNum(p18Raw)
-      ? { rawValue: p18Raw, verified: true }
+      ? {
+          rawValue: p18Raw,
+          verified: true,
+          mode: reportP18Mode,
+          qualified: completedBassPresentation?.parameters?.p18?.qualifiedAtSelectedP14Output !== false,
+        }
       : null;
 
   // ── Seat-scope parameters ─────────────────────────────────────────
