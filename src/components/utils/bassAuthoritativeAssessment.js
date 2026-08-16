@@ -1,6 +1,7 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { isReferenceSeatIdentity } from "@/components/room/bass/normalizedRoomInputAdapters";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
+import { floorP19Deviation, levelP19_lfResponse, numericRp22Level } from "@/components/utils/rp22/levels";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
@@ -40,13 +41,22 @@ function maximumTargetDeviation(curve, targetCurve, excludedRegions = []) {
     if (excludedRegions.some((region) => point.frequency >= region.startHz && point.frequency <= region.endHz)) return;
     const targetSpl = interpolateCanonicalTarget(targetCurve, point.frequency);
     if (!finite(targetSpl)) return;
-    const deviation = Math.abs(point.spl - targetSpl);
+    // RP22 publishes the full response-to-target gap as a symmetric ±dB
+    // tolerance. A 10 dB total gap is therefore ±5 dB.
+    const deviation = Math.abs(point.spl - targetSpl) / 2;
     if (variationDbRaw == null || deviation > variationDbRaw) {
       variationDbRaw = deviation;
       worstFrequencyHz = point.frequency;
     }
   });
-  return { variationDbRaw, worstFrequencyHz };
+  const displayVariationDb = floorP19Deviation(variationDbRaw);
+  return {
+    variationDbRaw,
+    totalRspToTargetDifferenceDbRaw: variationDbRaw == null ? null : variationDbRaw * 2,
+    displayVariationDb,
+    level: displayVariationDb == null ? null : (numericRp22Level(levelP19_lfResponse(displayVariationDb)) ?? 0),
+    worstFrequencyHz,
+  };
 }
 
 export function computeOfficialP19Assessment({ rspPostEqCurve, canonicalTargetCurve, assessmentStartHz, assessmentEndHz }) {
