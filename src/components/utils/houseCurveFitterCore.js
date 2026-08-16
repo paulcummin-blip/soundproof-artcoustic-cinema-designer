@@ -19,6 +19,7 @@ import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/u
 import { evaluateSeatRegressionTolerance } from "@/components/utils/houseCurveSeatRegressionTolerance";
 import { classifyEqCorrectionRegion, curveSplAt, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
 import { compareHouseCurveMetrics } from "@/components/utils/houseCurveMetricComparison";
+import { levelP19_lfResponse, numericRp22Level } from "@/components/utils/rp22/levels";
 
 export { compareHouseCurveMetrics };
 
@@ -34,14 +35,11 @@ const CUT_INFLUENCE_THRESHOLD_DB = 0.25;
 const CUT_PEAK_REDUCTION_DB = 0.5;
 const CUT_AREA_REDUCTION_DB = 0.01;
 
-// P19 level from max abs deviation: L4 <=2, L3 <=3, L2 <=4, L1 <=5, else FAIL (0).
-export function houseCurveP19Level(deviationDb) {
-  if (!isNumber(deviationDb)) return 0;
-  if (deviationDb <= 2) return 4;
-  if (deviationDb <= 3) return 3;
-  if (deviationDb <= 4) return 2;
-  if (deviationDb <= 5) return 1;
-  return 0;
+// P19 level from the authoritative symmetric ± variation. Whole-dB
+// favourable flooring is applied before the ±2/3/4/5 boundaries.
+export function houseCurveP19Level(variationDb) {
+  if (!isNumber(variationDb)) return 0;
+  return numericRp22Level(levelP19_lfResponse(Number(variationDb))) ?? 0;
 }
 
 // Calculate per-seat house-curve deviation metrics from an already-corrected curve.
@@ -122,7 +120,7 @@ function summarizeSeatMetrics(seatMetrics, protectedNullRegions = []) {
     seatMetrics,
     worstSeatId: worstSeat.seatId,
     worstSeatMaxDeviationDb: worstSeat.objectiveMaxAbsDeviationDb,
-    worstSeatP19Level: houseCurveP19Level(worstSeat.objectiveMaxAbsDeviationDb),
+    worstSeatP19Level: houseCurveP19Level(worstSeat.objectiveMaxAbsDeviationDb / 2),
     meanSeatMaxDeviationDb: constrainedSeats.reduce((sum, metric) => sum + metric.objectiveMaxAbsDeviationDb, 0) / constrainedSeats.length,
     rmsSeatTargetErrorDb: Math.sqrt(constrainedSeats.reduce((sum, metric) => sum + metric.objectiveRmsDeviationDb ** 2, 0) / constrainedSeats.length),
     rspMaxDeviationDb,
