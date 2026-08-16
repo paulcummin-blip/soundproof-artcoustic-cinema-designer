@@ -43,6 +43,15 @@ function buildP14Fields(parameter) {
   };
 }
 
+function buildP18Fields(parameter) {
+  return {
+    designHz: Number.isFinite(parameter?.designHz) ? parameter.designHz : null,
+    performanceBand: Number.isFinite(parameter?.performanceBand) ? parameter.performanceBand : null,
+    performanceMultiplier: Number.isFinite(parameter?.performanceMultiplier) ? parameter.performanceMultiplier : null,
+    qualifiedAtSelectedP14Output: parameter?.qualifiedAtSelectedP14Output !== false,
+  };
+}
+
 export function formatAuthoritativeBassParameter(completedBassAuthority, key, errorMessage = null) {
   const { contract, publicationVerified, publicationRejectionReason } = resolvePublicationState(completedBassAuthority);
   const safeErrorMessage = typeof errorMessage === "string" && errorMessage.trim() ? errorMessage : null;
@@ -78,11 +87,12 @@ export function formatAuthoritativeBassParameter(completedBassAuthority, key, er
       // Raw diagnostic values retained (not erased)
       rawValue,
       rawLevel: parameter?.level ?? null,
-      detail: key === "p14" ? parameter?.targetBasisDetail : null,
-      targetBasis: key === "p14" ? parameter?.targetBasis : null,
-      targetBasisLabel: key === "p14" ? (parameter?.targetBasis === "recommended" ? "Recommended" : "Minimum") : null,
+      detail: key === "p14" || key === "p18" ? parameter?.targetBasisDetail : null,
+      targetBasis: key === "p14" || key === "p18" ? parameter?.targetBasis : null,
+      targetBasisLabel: key === "p14" || key === "p18" ? (parameter?.targetBasis === "recommended" ? "Recommended" : "Minimum") : null,
     };
     if (key === "p14") Object.assign(result, buildP14Fields(parameter));
+    if (key === "p18") Object.assign(result, buildP18Fields(parameter));
     return result;
   }
 
@@ -104,11 +114,12 @@ export function formatAuthoritativeBassParameter(completedBassAuthority, key, er
     isAuthoritative: true,
     publicationRejectionReason: null,
     rawValue: Number(parameter.value),
-    detail: key === "p14" ? parameter.targetBasisDetail : null,
-    targetBasis: key === "p14" ? parameter.targetBasis : null,
-    targetBasisLabel: key === "p14" ? (parameter.targetBasis === "recommended" ? "Recommended" : "Minimum") : null,
+    detail: key === "p14" || key === "p18" ? parameter.targetBasisDetail : null,
+    targetBasis: key === "p14" || key === "p18" ? parameter.targetBasis : null,
+    targetBasisLabel: key === "p14" || key === "p18" ? (parameter.targetBasis === "recommended" ? "Recommended" : "Minimum") : null,
   };
   if (key === "p14") Object.assign(result, buildP14Fields(parameter));
+  if (key === "p18") Object.assign(result, buildP18Fields(parameter));
   return result;
 }
 
