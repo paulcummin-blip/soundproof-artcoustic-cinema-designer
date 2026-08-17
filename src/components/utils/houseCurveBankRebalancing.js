@@ -392,6 +392,15 @@ export function rebalanceBroadValleyBank({
     .slice(0, 20).forEach(addToVerificationPool);
   preliminary.filter((candidate) => candidate.adjustedShoulderCount >= 2)
     .slice(0, 15).forEach(addToVerificationPool);
+  // Do not let a low raw-maximum sort hide banks that make materially better
+  // use of legal boost in a broad correctable valley. These candidates still
+  // have to pass aggregate limits, protected-null checks, P19 grade and real-seat
+  // verification below.
+  [...preliminary]
+    .sort((left, right) => right.valleyImprovementDb - left.valleyImprovementDb
+      || right.centreCorrectionIncreaseDb - left.centreCorrectionIncreaseDb
+      || left.quality.rms - right.quality.rms)
+    .slice(0, 20).forEach(addToVerificationPool);
 
   const verifiedCandidates = [];
   for (const candidate of verificationPool.slice(0, 55)) {
