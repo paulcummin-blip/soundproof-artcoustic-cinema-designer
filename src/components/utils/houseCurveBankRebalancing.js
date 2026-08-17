@@ -418,6 +418,9 @@ export function rebalanceBroadValleyBank({
           usesRepurposedCompanion: !!replacementCompanion
             && proposed[replacementCompanion.index]?.reason
               === "Joint broad-valley rebalance: repurpose weak slot for overlapping peak control",
+          usesAppendedCompanion: proposed.length > current.length
+            && proposed.some((filter) => filter.reason
+              === "Joint broad-valley rebalance: add overlapping shoulder cut"),
           adjustedShoulderCount: shoulderCuts.reduce((count, shoulderCut) =>
             count + (Math.abs(
               proposed[shoulderCut.index].gainDb - current[shoulderCut.index].gainDb,
@@ -456,6 +459,8 @@ export function rebalanceBroadValleyBank({
   preliminary.slice(0, 20).forEach(addToVerificationPool);
   preliminary.filter((candidate) => candidate.usesRepurposedCompanion)
     .slice(0, 20).forEach(addToVerificationPool);
+  preliminary.filter((candidate) => candidate.usesAppendedCompanion)
+    .slice(0, 30).forEach(addToVerificationPool);
   preliminary.filter((candidate) => candidate.adjustedShoulderCount >= 2)
     .slice(0, 15).forEach(addToVerificationPool);
   // Do not let a low raw-maximum sort hide banks that make materially better
@@ -514,6 +519,7 @@ export function rebalanceBroadValleyBank({
       absoluteRspRmsSafe,
       shapeAndLevelSafe,
       usesRepurposedCompanion: candidate.usesRepurposedCompanion,
+      usesAppendedCompanion: candidate.usesAppendedCompanion,
       adjustedShoulderCount: candidate.adjustedShoulderCount,
       bankLimits: candidate.limits,
       filterSignature: signature(candidate.filters),
