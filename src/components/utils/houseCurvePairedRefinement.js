@@ -4,6 +4,7 @@ import { isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitPr
 import { evaluatePreparedBankLimits } from "@/components/utils/preparedBankValidation";
 
 const Q_VALUES = [6, 8, 10];
+const BROAD_VALLEY_MAX_Q = 4;
 const GAIN_SCALES = [0.25, 0.5, 0.75, 1];
 const PROTECTED_EDGE_GUARD_OCTAVES = 1 / 24;
 
@@ -12,6 +13,33 @@ function boostWouldSpillIntoProtectedNull(frequency, protectedNullRegions) {
     frequency >= region.startHz / 2 ** PROTECTED_EDGE_GUARD_OCTAVES
     && frequency <= region.endHz * 2 ** PROTECTED_EDGE_GUARD_OCTAVES
   ));
+}
+
+function broadValleyQValues(points, valley) {
+  const centreIndex = points.findIndex((point) => point.frequency === valley?.frequency);
+  if (centreIndex <= 0 || centreIndex >= points.length - 1) return { qValues: Q_VALUES, region: null };
+  const isLocalPeak = (index) => index > 0 && index < points.length - 1
+    && points[index].deviationDb >= points[index - 1].deviationDb
+    && points[index].deviationDb >= points[index + 1].deviationDb;
+  let leftPeak = null;
+  let rightPeak = null;
+  for (let index = centreIndex - 1; index > 0; index--) {
+    if (isLocalPeak(index)) { leftPeak = points[index]; break; }
+  }
+  for (let index = centreIndex + 1; index < points.length - 1; index++) {
+    if (isLocalPeak(index)) { rightPeak = points[index]; break; }
+  }
+  if (!leftPeak || !rightPeak || rightPeak.frequency <= leftPeak.frequency) return { qValues: Q_VALUES, region: null };
+  const widthOctaves = Math.log2(rightPeak.frequency / leftPeak.frequency);
+  if (widthOctaves < 1 / 3) return { qValues: Q_VALUES, region: null };
+  const baseQ = Math.max(0.5, Math.min(BROAD_VALLEY_MAX_Q,
+    valley.frequency / Math.max(1, rightPeak.frequency - leftPeak.frequency)));
+  const qValues = [...new Set([baseQ * 0.65, baseQ, Math.min(BROAD_VALLEY_MAX_Q, baseQ * 1.25)]
+    .map((value) => Number(Math.max(0.5, Math.min(BROAD_VALLEY_MAX_Q, value)).toFixed(4))))];
+  return {
+    qValues,
+    region: { startHz: leftPeak.frequency, endHz: rightPeak.frequency, widthOctaves },
+  };
 }
 
 function realSeatsRemainConstrained(baseline, after, protectedNullRegions) {
@@ -45,13 +73,18 @@ export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetri
   let bestFilters = filters;
   let bestMetrics = metrics;
   let bankEvaluationCount = 0;
+  const boostRegion = broadValleyQValues(points, valley);
 
-  for (const cutQ of Q_VALUES) for (const boostQ of Q_VALUES) {
+  for (const cutQ of Q_VALUES) for (const boostQ of boostRegion.qValues) {
     for (const cutScale of GAIN_SCALES) for (const boostScale of GAIN_SCALES) {
       const cut = { band: filters.length + 1, enabled: true, type: "Peak", frequencyHz: peak.frequency,
         gainDb: -Math.min(15, peak.deviationDb * cutScale), Q: cutQ, reason: "Joint refinement of opposing correctable residuals" };
       const requestedBoost = { band: filters.length + 2, enabled: true, type: "Peak", frequencyHz: valley.frequency,
-        gainDb: Math.min(6, Math.abs(valley.deviationDb) * boostScale), Q: boostQ, reason: "Joint refinement of opposing correctable residuals" };
+        gainDb: Math.min(6, Math.abs(valley.deviationDb) * boostScale), Q: boostQ,
+        ...(boostRegion.region || {}),
+        reason: boostRegion.region
+          ? "Joint broad-valley refinement of opposing correctable residuals"
+          : "Joint refinement of opposing correctable residuals" };
       const boost = limitBoostForCapability(requestedBoost, activeSubs, usableLfHz, requestedSystemOutputDb);
       if (boost.gainDb <= 0.1) continue;
       const proposed = [...filters, cut, boost];
@@ -86,6 +119,13 @@ export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetri
     changed: bestFilters !== filters,
     bankEvaluationCount,
     limitation: bestFilters === filters ? "no legal pair improved the 20–200 Hz maximum or RMS within equivalence tolerances" : null,
-    diagnostic: { peakFrequencyHz: peak.frequency, peakResidualDb: peak.deviationDb, valleyFrequencyHz: valley.frequency, valleyResidualDb: valley.deviationDb },
+    diagnostic: {
+      peakFrequencyHz: peak.frequency,
+      peakResidualDb: peak.deviationDb,
+      valleyFrequencyHz: valley.frequency,
+      valleyResidualDb: valley.deviationDb,
+      valleyRegion: boostRegion.region,
+      boostQValues: boostRegion.qValues,
+    },
   };
 }
