@@ -82,7 +82,9 @@ export function runBassFixedTargetValidationFixtures() {
   const boostedProtectedNull = nullResult.filters.some((filter) => filter.enabled && filter.gainDb > 0
     && protectedNulls.some((region) => filter.frequencyHz >= region.startHz && filter.frequencyHz <= region.endHz));
 
-  const weakFailureIsExplicit = oneSubCapability.failureMessage === "Requested RP22 Level 4 target not achieved. Increase subwoofer capacity.";
+  const weakFailureIsExplicit = oneSubCapability.passesRequestedLevel === false
+    && oneSubCapability.limitingParameter === "P14"
+    && oneSubCapability.failureMessage === "L4 P14 output was not achieved; P14 capability reached L1.";
   return [
     { test: "Target independence L1–L4", expected: "Identical shape; rising SPL offset only", actual: { targetShapesMatch, targetOffsetsRise, anchorsDb: levelTargets.map((entry) => entry.designTarget.targetAnchorDb) }, delta: targetShapesMatch && targetOffsetsRise ? 0 : 1, severity: targetShapesMatch && targetOffsetsRise ? "PASS" : "CRITICAL", nextTest: "Live L1–L4 graph overlay" },
     { test: "Hardware independence", expected: "Identical L4 target; achieved capability changes", actual: { targetIsInvariant, oneSub: oneSubCapability.achievedP14LevelLabel, fourSubs: fourSubCapability.achievedP14LevelLabel }, delta: targetIsInvariant && oneSubCapability.achievedP14Level !== fourSubCapability.achievedP14Level ? 0 : 1, severity: targetIsInvariant && oneSubCapability.achievedP14Level !== fourSubCapability.achievedP14Level ? "PASS" : "CRITICAL", nextTest: "Live hardware swap" },
