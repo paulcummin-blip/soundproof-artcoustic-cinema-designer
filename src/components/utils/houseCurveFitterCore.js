@@ -190,18 +190,17 @@ function enclosingBroadValley(segment, candidatePoint) {
   if (!Array.isArray(segment) || candidatePoint?.deviationDb >= 0) return null;
   const centreIndex = segment.findIndex((point) => point.frequency === candidatePoint.frequency);
   if (centreIndex <= 0 || centreIndex >= segment.length - 1) return null;
-  const isLocalPeak = (index) => index > 0 && index < segment.length - 1
-    && segment[index].deviationDb >= segment[index - 1].deviationDb
-    && segment[index].deviationDb >= segment[index + 1].deviationDb;
-  let leftPeak = null;
-  let rightPeak = null;
-  for (let index = centreIndex - 1; index > 0; index--) {
-    if (isLocalPeak(index)) { leftPeak = segment[index]; break; }
-  }
-  for (let index = centreIndex + 1; index < segment.length - 1; index++) {
-    if (isLocalPeak(index)) { rightPeak = segment[index]; break; }
-  }
-  if (!leftPeak || !rightPeak || rightPeak.frequency <= leftPeak.frequency) return null;
+  const halfOctave = 2 ** 0.5;
+  const leftPeak = segment
+    .filter((point) => point.frequency >= candidatePoint.frequency / halfOctave && point.frequency < candidatePoint.frequency)
+    .reduce((best, point) => !best || point.deviationDb > best.deviationDb ? point : best, null);
+  const rightPeak = segment
+    .filter((point) => point.frequency > candidatePoint.frequency && point.frequency <= candidatePoint.frequency * halfOctave)
+    .reduce((best, point) => !best || point.deviationDb > best.deviationDb ? point : best, null);
+  const hasMaterialShoulders = leftPeak && rightPeak
+    && leftPeak.deviationDb >= candidatePoint.deviationDb + 2
+    && rightPeak.deviationDb >= candidatePoint.deviationDb + 2;
+  if (!hasMaterialShoulders || rightPeak.frequency <= leftPeak.frequency) return null;
   const widthOctaves = Math.log2(rightPeak.frequency / leftPeak.frequency);
   return widthOctaves >= 1 / 3
     ? { startHz: leftPeak.frequency, endHz: rightPeak.frequency, widthOctaves }
