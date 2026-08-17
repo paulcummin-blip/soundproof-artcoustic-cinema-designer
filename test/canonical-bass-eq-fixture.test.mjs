@@ -1,6 +1,8 @@
 import { runCanonicalBassEqFixtures } from "../src/components/room/bass/canonicalBassEqFixtures.js";
+import { runBassOptimiserCompatibilityFixtures } from "../src/components/room/bass/bassOptimiserCompatibilityFixtures.js";
 
 const result = runCanonicalBassEqFixtures();
+const compatibility = runBassOptimiserCompatibilityFixtures();
 const failed = result.checks.filter((check) => !check.passed);
 
 console.log(JSON.stringify({
@@ -15,8 +17,9 @@ console.log(JSON.stringify({
   physicalValidationPassed: result.physicalValidationPassed,
   aggregateBoostWithinLimit: result.aggregateBoostWithinLimit,
   aggregateCutWithinLimit: result.aggregateCutWithinLimit,
+  cacheCompatibility: compatibility,
 }, null, 2));
 
-if (failed.length || !result.physicalValidationPassed || !result.aggregateBoostWithinLimit || !result.aggregateCutWithinLimit) {
+if (failed.length || !result.physicalValidationPassed || !result.aggregateBoostWithinLimit || !result.aggregateCutWithinLimit || !compatibility.allPassed) {
   process.exitCode = 1;
 }
