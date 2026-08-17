@@ -69,8 +69,19 @@ function summariseCandidate(selected, targetDb) {
   const samples = SAMPLE_FREQUENCIES.map((frequency) => {
     const post = nearest(finalCurve, frequency);
     const targetSpl = interpolateCanonicalTarget(target, post.frequency);
+    const sampleSpl = (curve) => Array.isArray(curve) && curve.length ? nearest(curve, post.frequency).spl : null;
     return {
       frequencyHz: post.frequency,
+      targetSpl,
+      rawPhysicalSpl: sampleSpl(candidate.rawResponseCurve),
+      requestedPreEqSpl: sampleSpl(candidate.requestedPreEqOperatingCurve),
+      achievedPreEqSpl: sampleSpl(candidate.rspBeforePeqAtOperatingLevel),
+      combinedEqDb: sampleSpl(candidate.combinedEqCurve),
+      unconstrainedPostEqSpl: sampleSpl(candidate.unconstrainedPostEqCurve),
+      maximumUsableInRoomSpl: sampleSpl(candidate.maximumSplCurveAfterEq),
+      productOperatingEnvelopeSpl: sampleSpl(candidate.productOperatingEnvelopeCurve),
+      finalPostEqSpl: post.spl,
+      capabilityLimited: post.capabilityLimited === true,
       residualDb: post.spl - targetSpl,
     };
   });
