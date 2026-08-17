@@ -472,21 +472,21 @@ export function generateCanonicalCandidatePool({
   );
 
   // ── Fixed house target: P14-normalised global vertical offset ──
-  // The Artcoustic house-curve shape is shifted vertically by exactly one
-  // global offset so that the complete applicable curve C-weighted power-sums
-  // to the selected P14 target (e.g. 109 dBC for Minimum L1). This offset is
-  // computed once and never changes during fitting — it is not moved by the
-  // product model, subwoofer quantity, available headroom, current response
-  // shape, P18/P19 results, or fitter failure.
+  // P14 is the user's fixed total-LFE output request. Its 20–120 Hz
+  // normalisation is independent of the P18 extension grade eventually achieved
+  // at that output. P18 may improve when P14 is lowered and retreat when P14 is
+  // raised; it must never move the P14 target or redefine the P14 integration
+  // band.
   const houseCurveShape = [15, 20, 25, 31.5, 40, 50, 63, 80, 100, 120, 150, 200, 400]
     .map((f) => ({ frequency: f, offsetDb: artcousticHouseCurveOffsetAt(f) }));
   const requiredExtensionHz = Number.isFinite(Number(selectedP18RequiredExtensionHz))
     ? Number(selectedP18RequiredExtensionHz)
     : p18ThresholdHzForLevel(p18TargetBasis, p14TargetLevel);
+  const p14AssessmentStartHz = 20;
   const p14Normalisation = normaliseHouseCurveToP14Total({
     houseCurveShape,
     selectedP14TargetDb: Number(selectedP14TargetDb),
-    requiredExtensionHz,
+    requiredExtensionHz: p14AssessmentStartHz,
     upperLfeHz: 120,
   });
   let verticalOffsetDb = p14Normalisation?.operatingCurveOffsetDb;
