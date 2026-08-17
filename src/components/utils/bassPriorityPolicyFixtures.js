@@ -183,5 +183,33 @@ export function runBassPriorityPolicyFixtures() {
   results.p31AchievedLevelIsDiagnosticOnly = rankingTupleForMode(candidateA, "balanced")
     .every((value, index) => value === rankingTupleForMode({ ...candidateA, achievedP14Level: 4, achievedP18Level: 4, achievedP19Level: 4 }, "balanced")[index]);
 
+  // Regression: a high-output one-filter result with no below-target shortfall
+  // must not beat a genuine multi-band fit that is materially closer to target.
+  const levelShiftOnly = candidate("level-shift-only", 2, 2, 1, {
+    filters: [{ enabled: true, frequencyHz: 68.8, gainDb: -15, Q: 0.67 }],
+  });
+  levelShiftOnly.houseCurveRankingRmsResidualDb = 8.32;
+  levelShiftOnly.houseCurveRankingMaxResidualDb = 17.6;
+  levelShiftOnly.houseCurveRankingMeanAbsoluteResidualDb = 7.8;
+  levelShiftOnly.avoidableTargetShortfallMaxDb = 0;
+  levelShiftOnly.avoidableTargetShortfallRmsDb = 0;
+  const multiBandFit = candidate("multi-band-target-fit", 2, 2, 4, {
+    filters: [
+      { enabled: true, frequencyHz: 65.9, gainDb: -13, Q: 1.9 },
+      { enabled: true, frequencyHz: 79.5, gainDb: -5.8, Q: 4 },
+      { enabled: true, frequencyHz: 118.3, gainDb: 3.2, Q: 6 },
+      { enabled: true, frequencyHz: 151.2, gainDb: -7.3, Q: 10 },
+    ],
+  });
+  multiBandFit.houseCurveRankingRmsResidualDb = 2.52;
+  multiBandFit.houseCurveRankingMaxResidualDb = 5;
+  multiBandFit.houseCurveRankingMeanAbsoluteResidualDb = 2.1;
+  multiBandFit.avoidableTargetShortfallMaxDb = 1;
+  multiBandFit.avoidableTargetShortfallRmsDb = 0.25;
+  results.p32MultiBandTargetFitBeatsLevelShiftOnly = rankBassCandidates(
+    [levelShiftOnly, multiBandFit],
+    "balanced",
+  ).selected === multiBandFit;
+
   return results;
 }
