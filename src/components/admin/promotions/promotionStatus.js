@@ -226,22 +226,43 @@ export function buildPromotionSummary(promo, allAccounts) {
 }
 
 /**
+ * Canonical mapping between Commercial Control Centre group keys (camelCase)
+ * and Account.dealer_group / Promotion.target_dealer_group enum values.
+ *
+ * This is the SINGLE shared mapping — all group-key comparisons must go
+ * through here, never ad-hoc string comparisons.
+ */
+export const GROUP_KEY_TO_DEALER_GROUP = {
+  premiumPartners: "PREMIUM_PARTNER",
+  richerSounds: "RICHER_SOUNDS",
+  otherDealers: "OTHER_DEALER",
+  distributors: "INTERNATIONAL",
+  internalTest: "INTERNAL",
+};
+
+const DEALER_GROUP_TO_GROUP_KEY = Object.fromEntries(
+  Object.entries(GROUP_KEY_TO_DEALER_GROUP).map(([k, v]) => [v, k])
+);
+
+/**
  * Determine if a promotion belongs to a given dealer group section.
  * Used to place promotions under the correct group heading.
+ *
+ * Uses the canonical GROUP_KEY_TO_DEALER_GROUP mapping so that
+ * Promotion.target_dealer_group (e.g. "PREMIUM_PARTNER") is correctly
+ * compared against the Control Centre groupKey (e.g. "premiumPartners").
  */
 export function promotionBelongsToGroup(promotion, groupKey, allAccounts) {
   if (!promotion) return false;
   if (promotion.target_scope === "ALL_DEALER_GROUP") {
-    return promotion.target_dealer_group === groupKey;
+    return promotion.target_dealer_group === GROUP_KEY_TO_DEALER_GROUP[groupKey];
   }
   if (promotion.target_scope === "SINGLE_ACCOUNT") {
     const target = allAccounts?.find((a) => a.id === promotion.target_account_id);
     if (!target) return false;
-    if (target.dealer_group === "PREMIUM_PARTNER") return groupKey === "premiumPartners";
-    if (target.dealer_group === "RICHER_SOUNDS") return groupKey === "richerSounds";
-    if (target.dealer_group === "OTHER_DEALER") return groupKey === "otherDealers";
-    if (target.dealer_group === "INTERNATIONAL" || target.account_type === "distributor")
-      return groupKey === "distributors";
+    const mapped = DEALER_GROUP_TO_GROUP_KEY[target.dealer_group];
+    if (mapped) return groupKey === mapped;
+    if (target.account_type === "distributor") return groupKey === "distributors";
     return groupKey === "internalTest";
   }
   return false;

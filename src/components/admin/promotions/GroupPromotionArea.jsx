@@ -77,6 +77,25 @@ export default function GroupPromotionArea({
     return map;
   }, [activePromotions, promotionUsage, allAccounts]);
 
+  // Detect overlapping live promotions: same promotion_type + overlapping dates.
+  // Admin-only warning — does not block or auto-resolve.
+  const hasOverlap = useMemo(() => {
+    if (activePromotions.length < 2) return false;
+    for (let i = 0; i < activePromotions.length; i++) {
+      for (let j = i + 1; j < activePromotions.length; j++) {
+        const a = activePromotions[i];
+        const b = activePromotions[j];
+        if (a.promotion_type !== b.promotion_type) continue;
+        const aStart = new Date(a.starts_at).getTime();
+        const aEnd = new Date(a.ends_at).getTime();
+        const bStart = new Date(b.starts_at).getTime();
+        const bEnd = new Date(b.ends_at).getTime();
+        if (aStart < bEnd && bStart < aEnd) return true;
+      }
+    }
+    return false;
+  }, [activePromotions]);
+
   function handleCreate() {
     setEditPromotion(null);
     setFormOpen(true);
@@ -145,6 +164,18 @@ export default function GroupPromotionArea({
           </div>
         );
       })}
+
+      {/* Overlap warning — admin-only, does not block */}
+      {hasOverlap && (
+        <div style={{
+          padding: "6px 12px", marginBottom: 8,
+          borderLeft: `3px solid ${BRAND.amber}`,
+          background: "#F3F0EB", borderRadius: 4,
+          fontSize: 11, color: BRAND.amber, fontWeight: 600,
+        }}>
+          Multiple live promotions overlap for this group
+        </div>
+      )}
 
       {/* Create Promotion — always visible (admin may schedule future promos) */}
       <div style={{ marginBottom: 12 }}>
