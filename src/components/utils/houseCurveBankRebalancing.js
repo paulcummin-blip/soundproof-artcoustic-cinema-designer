@@ -4,7 +4,7 @@ import {
   normaliseCurve,
   peakingEqResponseDb,
 } from "@/components/utils/designEqCalibration";
-import { calculateAllSeatMetrics } from "@/components/utils/houseCurveFitterCore";
+import { calculateAllSeatMetrics, houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 import { evaluatePreparedBankLimits } from "@/components/utils/preparedBankValidation";
@@ -269,18 +269,58 @@ export function rebalanceBroadValleyBank({
     || left.quality.meanAbsolute - right.quality.meanAbsolute
     || left.activity - right.activity);
 
+  const verification = {
+    testedBanks: 0,
+    missingMetrics: 0,
+    realSeatUnsafe: 0,
+    rspLevelRegression: 0,
+    rspRmsWorsening: 0,
+    samples: [],
+  };
   let winner = null;
   for (const candidate of preliminary.slice(0, 30)) {
+    verification.testedBanks += 1;
     const metrics = calculateAllSeatMetrics(
       objectiveSeats, candidate.filters, fitStartHz, fitEndHz, anchorDb,
       operationCounts, evaluationMemo,
       { protectedNullRegions, canonicalTargetCurve: targetCurve },
     );
-    if (!metrics || !realSeatsSafe(baselineMetrics, metrics)) continue;
-    if (Number.isFinite(baselineMetrics?.rspMaxDeviationDb)
-      && metrics.rspMaxDeviationDb > baselineMetrics.rspMaxDeviationDb + 0.1) continue;
-    if (Number.isFinite(baselineMetrics?.rspRmsDeviationDb)
-      && metrics.rspRmsDeviationDb > baselineMetrics.rspRmsDeviationDb + 0.1) continue;
+    const realSeatSafe = !!metrics && realSeatsSafe(baselineMetrics, metrics);
+    const baselineRspLevel = Number.isFinite(baselineMetrics?.rspMaxDeviationDb)
+      ? houseCurveP19Level(baselineMetrics.rspMaxDeviationDb) : null;
+    const candidateRspLevel = Number.isFinite(metrics?.rspMaxDeviationDb)
+      ? houseCurveP19Level(metrics.rspMaxDeviationDb) : null;
+    const rspLevelSafe = baselineRspLevel === null || candidateRspLevel >= baselineRspLevel;
+    const rspRmsSafe = !Number.isFinite(baselineMetrics?.rspRmsDeviationDb)
+      || metrics.rspRmsDeviationDb <= baselineMetrics.rspRmsDeviationDb + 0.1;
+    if (verification.samples.length < 8) verification.samples.push({
+      rawMaximumResidualDb: candidate.quality.maximum,
+      rawRmsResidualDb: candidate.quality.rms,
+      valleyImprovementDb: candidate.valleyImprovementDb,
+      realSeatSafe,
+      baselineRspMaxDeviationDb: baselineMetrics?.rspMaxDeviationDb ?? null,
+      candidateRspMaxDeviationDb: metrics?.rspMaxDeviationDb ?? null,
+      baselineRspLevel,
+      candidateRspLevel,
+      baselineRspRmsDeviationDb: baselineMetrics?.rspRmsDeviationDb ?? null,
+      candidateRspRmsDeviationDb: metrics?.rspRmsDeviationDb ?? null,
+    });
+    if (!metrics) {
+      verification.missingMetrics += 1;
+      continue;
+    }
+    if (!realSeatSafe) {
+      verification.realSeatUnsafe += 1;
+      continue;
+    }
+    if (!rspLevelSafe) {
+      verification.rspLevelRegression += 1;
+      continue;
+    }
+    if (!rspRmsSafe) {
+      verification.rspRmsWorsening += 1;
+      continue;
+    }
     winner = { ...candidate, metrics };
     break;
   }
@@ -295,6 +335,7 @@ export function rebalanceBroadValleyBank({
         ? "no legal joint broad-valley bank improved the response"
         : "no broad unprotected modal valley required rebalancing",
       diagnostics,
+      verification,
       selected: null,
     };
   }
@@ -306,6 +347,7 @@ export function rebalanceBroadValleyBank({
     bankEvaluationCount,
     reason: `joint broad-valley bank rebalanced around ${winner.region.centre.frequency.toFixed(1)} Hz`,
     diagnostics,
+    verification,
     selected: {
       startHz: winner.region.startHz,
       endHz: winner.region.endHz,
