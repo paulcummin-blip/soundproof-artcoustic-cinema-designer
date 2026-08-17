@@ -53,6 +53,8 @@ self.onmessage = (e) => {
       selectedP14TargetDb: payload?.selectedP14TargetDb ?? 109,
       p14TargetBasis: payload?.p14TargetBasis ?? "minimum",
       p14TargetLevel: payload?.p14TargetLevel ?? 1,
+      p18TargetBasis: payload?.p18TargetBasis ?? payload?.p14TargetBasis ?? "minimum",
+      selectedP18RequiredExtensionHz: payload?.selectedP18RequiredExtensionHz ?? null,
       collectDiagnostics: requestedCollectDiagnostics,
       onProgress: (progress) => {
         self.postMessage(createProgressMessage(requestId, fingerprint, progress, identity, diagnosticToken || null, requestedCollectDiagnostics));
