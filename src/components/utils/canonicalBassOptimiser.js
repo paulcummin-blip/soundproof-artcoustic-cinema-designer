@@ -24,6 +24,7 @@ import { buildPairedP14P18CandidateSummary } from "@/components/utils/pairedP14P
 
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
+const PRODUCT_EXTENSION_REFERENCE_TOLERANCE_DB = 1.5;
 const OPERATING_WINDOW_MAX_BOOST_DB = DESIGN_EQ_FIT_PROFILES.accuracy.maximumAggregateBoostDb;
 const OPERATING_WINDOW_MAX_CUT_DB = DESIGN_EQ_FIT_PROFILES.accuracy.maximumCutDb;
 
@@ -196,7 +197,7 @@ export function buildProductOperatingEnvelope({
 } = {}) {
   if (!Array.isArray(frequencyGrid) || !frequencyGrid.length || !activeSubs.length
     || !Number.isFinite(Number(selectedOperatingOutputDb))) {
-    return { curve: [], p14CapabilityDb: null, operatingHeadroomDb: null, referenceCapabilityDb: null };
+    return { curve: [], p14CapabilityDb: null, operatingMarginDb: null, operatingHeadroomDb: null, p14ShortfallDb: null, referenceCapabilityDb: null, extensionBandEndHz: null };
   }
   const productP14 = assessP14Capability({
     activeSubs,
@@ -207,9 +208,14 @@ export function buildProductOperatingEnvelope({
     targetBasis,
   });
   const p14CapabilityDb = Number(productP14?.p14CapabilityDb ?? productP14?.value);
-  const operatingHeadroomDb = Number.isFinite(p14CapabilityDb)
-    ? Math.max(0, p14CapabilityDb - Number(selectedOperatingOutputDb))
+  // Keep the signed operating margin. Clamping an impossible P14 request to
+  // zero headroom would make the response look merely "at the limit" instead
+  // of exposing the actual output shortfall.
+  const operatingMarginDb = Number.isFinite(p14CapabilityDb)
+    ? p14CapabilityDb - Number(selectedOperatingOutputDb)
     : 0;
+  const operatingHeadroomDb = Math.max(0, operatingMarginDb);
+  const p14ShortfallDb = Math.max(0, -operatingMarginDb);
   const capabilities = frequencyGrid.map((frequency) => ({
     frequency: Number(frequency),
     capabilityDb: getSystemSourceCapability(activeSubs, Number(frequency)),
@@ -219,25 +225,36 @@ export function buildProductOperatingEnvelope({
     ? Math.max(...referencePoints.map((point) => point.capabilityDb))
     : null;
   if (!Number.isFinite(referenceCapabilityDb)) {
-    return { curve: [], p14CapabilityDb, operatingHeadroomDb, referenceCapabilityDb: null };
+    return { curve: [], p14CapabilityDb, operatingMarginDb, operatingHeadroomDb, p14ShortfallDb, referenceCapabilityDb: null, extensionBandEndHz: null };
   }
+  const extensionEntry = capabilities.find((point) =>
+    point.capabilityDb >= referenceCapabilityDb - PRODUCT_EXTENSION_REFERENCE_TOLERANCE_DB
+  );
+  const extensionBandEndHz = extensionEntry?.frequency ?? capabilities.at(-1)?.frequency ?? null;
   const curve = capabilities.map((point) => {
     const targetSpl = interpolateCorrection(targetCurve, point.frequency);
-    const relativeProductLimitDb = point.capabilityDb - referenceCapabilityDb
-      + operatingHeadroomDb - MAXIMUM_SPL_SAFETY_MARGIN_DB;
+    const productRelativeCapabilityDb = point.capabilityDb - referenceCapabilityDb;
+    const relativeProductLimitDb = productRelativeCapabilityDb
+      + operatingMarginDb - MAXIMUM_SPL_SAFETY_MARGIN_DB;
     return {
       frequency: point.frequency,
       spl: Number.isFinite(targetSpl) ? targetSpl + relativeProductLimitDb : point.capabilityDb,
       productCapabilityDb: point.capabilityDb,
+      productRelativeCapabilityDb,
       relativeProductLimitDb,
+      extensionEnvelopeApplies: point.frequency <= extensionBandEndHz,
+      extensionBandEndHz,
     };
   });
   return {
     curve,
     p14CapabilityDb,
+    operatingMarginDb,
     operatingHeadroomDb,
+    p14ShortfallDb,
     referenceCapabilityDb,
-    authority: "power-summed-product-output-envelope-at-selected-p14",
+    extensionBandEndHz,
+    authority: "power-summed-product-extension-envelope-at-selected-p14",
   };
 }
 
@@ -245,8 +262,14 @@ function capCurveToProductOperatingEnvelope(requestedCurve, productEnvelope) {
   if (!Array.isArray(productEnvelope) || !productEnvelope.length) {
     return (Array.isArray(requestedCurve) ? requestedCurve : []).map((point) => ({ ...point }));
   }
+  const extensionBandEndHz = Number(productEnvelope.find((point) => Number.isFinite(point?.extensionBandEndHz))?.extensionBandEndHz);
   return (Array.isArray(requestedCurve) ? requestedCurve : []).map((point) => {
-    if (!Number.isFinite(point?.frequency) || point.frequency > 120) return { ...point };
+    // The product-only envelope governs broad LF extension. It must not erase
+    // ordinary room peaks in the correction band; those remain present and
+    // must be reduced by the real EQ bank.
+    if (!Number.isFinite(point?.frequency)
+      || !Number.isFinite(extensionBandEndHz)
+      || point.frequency > extensionBandEndHz) return { ...point };
     const productLimitSpl = interpolateCorrection(productEnvelope, point.frequency);
     if (!Number.isFinite(productLimitSpl) || !Number.isFinite(point?.spl)) return { ...point };
     return {
@@ -288,7 +311,11 @@ function capabilityLimitedRegions(curve) {
   const close = () => {
     if (!current.length) return;
     const worst = current.reduce((result, point) => {
-      const shortfallDb = point.requestedSpl - point.maximumSpl;
+      const effectiveMaximumSpl = Math.min(
+        Number.isFinite(point.maximumSpl) ? point.maximumSpl : Infinity,
+        Number.isFinite(point.productOperatingLimitSpl) ? point.productOperatingLimitSpl : Infinity,
+      );
+      const shortfallDb = point.requestedSpl - effectiveMaximumSpl;
       return !result || shortfallDb > result.shortfallDb
         ? { frequencyHz: point.frequency, shortfallDb }
         : result;
@@ -457,7 +484,10 @@ function buildCanonicalCandidate({
     maximumSplCurveAfterEq: maximumAfterEq.curve.map((point) => ({ ...point })),
     productOperatingEnvelopeCurve: productOperatingEnvelope.curve.map((point) => ({ ...point })),
     productOperatingEnvelopeAuthority: productOperatingEnvelope.authority || null,
+    productOperatingMarginDb: productOperatingEnvelope.operatingMarginDb,
     productOperatingHeadroomDb: productOperatingEnvelope.operatingHeadroomDb,
+    productOperatingShortfallDb: productOperatingEnvelope.p14ShortfallDb,
+    productExtensionBandEndHz: productOperatingEnvelope.extensionBandEndHz,
     productOperatingReferenceCapabilityDb: productOperatingEnvelope.referenceCapabilityDb,
     maximumSplSafetyMarginDb: MAXIMUM_SPL_SAFETY_MARGIN_DB,
     maximumSplGlobalEqTrimDb: maximumAfterEq.globalEqTrimDb,
