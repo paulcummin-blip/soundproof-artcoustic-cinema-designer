@@ -401,10 +401,15 @@ export function rebalanceBroadValleyBank({
           - valleyDeficit(points, region);
         const centreCorrectionIncreaseDb = correctionAt(centreHz, proposed)
           - correctionAt(centreHz, current);
+        // This is only a cheap unsmoothed pre-screen. A split peak bank can
+        // trade a little more raw shoulder error for a much better 1/3-octave
+        // result, so leave the authoritative P19/RMS/real-seat gate below to
+        // make the final decision. Retain broad bounds to avoid wasting work
+        // on clearly destructive candidates.
         if (valleyImprovementDb < MIN_IMPROVEMENT_DB
           || centreCorrectionIncreaseDb < MIN_IMPROVEMENT_DB
-          || candidateQuality.maximum > baselineQuality.maximum + 0.25
-          || candidateQuality.rms > baselineQuality.rms + 0.1) continue;
+          || candidateQuality.maximum > baselineQuality.maximum + 6
+          || candidateQuality.rms > baselineQuality.rms + 2) continue;
         diagnostic.acceptedBanks += 1;
         preliminary.push({
           filters: proposed, region, quality: candidateQuality, limits,
