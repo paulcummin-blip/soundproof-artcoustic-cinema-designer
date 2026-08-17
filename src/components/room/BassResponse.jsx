@@ -348,8 +348,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     finalOptimisedBassAuthorityMatches(optimisationResult?.finalOptimisedBassResponse) && rspRawCurve.length > 0;
   const selectedP14TargetDb = authoritative.requested?.selectedP14TargetDb;
   const selectedP18TargetBasis = authoritative.requested?.selectedP18TargetBasis || splConfig?.selectedP18TargetBasis || "minimum";
-  const selectedP14RequiredExtensionHz = authoritative.requested?.selectedP18RequiredExtensionHz
-    ?? authoritative.requested?.selectedP14RequiredExtensionHz;
+  const selectedP18RequiredExtensionHz = authoritative.requested?.selectedP18RequiredExtensionHz;
   const finalBassResponse = optimisationResult?.finalOptimisedBassResponse;
   const canonicalVerticalOffsetDb = finalBassResponse?.canonicalVerticalOffsetDb;
   const p14HouseCurveNormalisation = useMemo(() => normaliseHouseCurveToP14Total({
@@ -775,9 +774,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           <span style={{ fontSize: 11, fontWeight: 600, color: '#213428', fontFamily: 'monospace' }}>
             P14 target: {p14PresentationData.basis === "recommended" ? "Recommended" : "Minimum"} L{Math.max(1, Math.min(4, Math.round(p14PresentationData.levelNum)))} · {Math.round(p14PresentationData.targetDb)} dBC total
           </span>
-          {Number.isFinite(selectedP14RequiredExtensionHz) && (
+          {Number.isFinite(selectedP18RequiredExtensionHz) && (
             <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace', marginLeft: 16 }}>
-              P18 target: {selectedP18TargetBasis === "recommended" ? "Recommended" : "Minimum"} · {selectedP14RequiredExtensionHz} Hz
+              P18: independently graded at this P14 output · {selectedP18TargetBasis === "recommended" ? "Recommended" : "Minimum"} L1 boundary {selectedP18RequiredExtensionHz} Hz
             </span>
           )}
         </div>}
