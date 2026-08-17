@@ -22,6 +22,8 @@ const CustomTooltip = ({ active, payload, label, series = [], operatingLevelOffs
     const raw = visibleSeries.find((item) => item.kind === "raw");
     const postEq = visibleSeries.find((item) => item.kind === "post-eq");
     const houseCurve = visibleSeries.find((item) => item.kind === "house-curve");
+    const productMaximum = visibleSeries.find((item) => item.kind === "product-maximum");
+    const productMaximumValue = productMaximum ? row[`spl_${productMaximum.id}`] : null;
     const rawValue = raw ? row[`spl_${raw.id}`] : null;
     const postEqValue = postEq ? row[`spl_${postEq.id}`] : null;
     const houseCurveValue = houseCurve ? row[`spl_${houseCurve.id}`] : null;
@@ -41,7 +43,37 @@ const CustomTooltip = ({ active, payload, label, series = [], operatingLevelOffs
             {visibleSeries.length > 1
                 ? visibleSeries.map((item) => {
                     const value = row[`spl_${item.id}`];
-                    return hasFiniteValue(value) ? <p key={item.id} style={{ color: item.color }}>{item.tooltipLabel || item.label || item.id}: {Number(value).toFixed(1)} dB</p> : null;
+                    if (!hasFiniteValue(value)) return null;
+                    if (item.kind === "room-response" && hasFiniteValue(item.systemPowerReferenceDb)) {
+                      const roomLayoutContributionDb = Number(value) - Number(item.systemPowerReferenceDb);
+                      return (
+                        <React.Fragment key={item.id}>
+                          <p style={{ color: item.color }}>{item.tooltipLabel || item.label || item.id}: {Number(value).toFixed(1)} dB</p>
+                          <p style={{ color: item.color }}>
+                            Room / layout contribution vs {Number(item.systemPowerReferenceDb).toFixed(1)} dB power-summed flat-system reference: {roomLayoutContributionDb >= 0 ? "+" : ""}{roomLayoutContributionDb.toFixed(1)} dB
+                          </p>
+                        </React.Fragment>
+                      );
+                    }
+                    if (item.kind === "maximum-spl") {
+                      const safetyMarginDb = hasFiniteValue(item.safetyMarginDb) ? Number(item.safetyMarginDb) : 0;
+                      const rawInRoomMaximumDb = Number(value) + safetyMarginDb;
+                      const roomLayoutEffectDb = hasFiniteValue(productMaximumValue)
+                        ? rawInRoomMaximumDb - Number(productMaximumValue)
+                        : null;
+                      return (
+                        <React.Fragment key={item.id}>
+                          <p style={{ color: item.color }}>{item.tooltipLabel || item.label || item.id}: {Number(value).toFixed(1)} dB</p>
+                          <p style={{ color: item.color }}>Raw product + room maximum before reserve: {rawInRoomMaximumDb.toFixed(1)} dB</p>
+                          {hasFiniteValue(roomLayoutEffectDb) && (
+                            <p style={{ color: item.color }}>
+                              Room / layout effect on product maximum: {roomLayoutEffectDb >= 0 ? "+" : ""}{Number(roomLayoutEffectDb).toFixed(1)} dB
+                            </p>
+                          )}
+                        </React.Fragment>
+                      );
+                    }
+                    return <p key={item.id} style={{ color: item.color }}>{item.tooltipLabel || item.label || item.id}: {Number(value).toFixed(1)} dB</p>;
                   })
                 : hasFiniteValue(fallbackValue) && <p className="text-[#213428]">SPL: {Number(fallbackValue).toFixed(1)} dB</p>}
             {hasFiniteValue(rawSimulatedDb) && <p className="text-[#3E4349]">Raw simulated RSP: {Number(rawSimulatedDb).toFixed(1)} dB</p>}
