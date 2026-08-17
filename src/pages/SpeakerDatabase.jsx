@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { artcousticSpeakers } from "@/components/data/speakerData";
 import { SpeakerAPI } from "@/components/net/api";
@@ -15,12 +14,21 @@ import {
   Download,
   Loader2
 } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
+import { useProductPriceMap } from "@/components/pricing/useProductPriceMap";
+import { normaliseModelKey } from "@/components/models/speakers/registry";
+import AdminPriceEdit from "@/components/speakers/AdminPriceEdit";
 
 export default function SpeakerDatabasePage() {
   // UI filters
   const [selectedType, setSelectedType] = useState('all');
   const [selectedModel, setSelectedModel] = useState('all');
   const [search, setSearch] = useState('');
+
+  // Auth + canonical price authority (ProductPrice)
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const { priceMap, refetch: refetchPrices } = useProductPriceMap();
 
   // Data state
   const [serverSpeakers, setServerSpeakers] = useState(null); // null => fallback to local
@@ -311,12 +319,30 @@ export default function SpeakerDatabasePage() {
                       {speaker.horizontal_dispersion_angle}° H / {speaker.vertical_dispersion_angle}° V
                     </span>
                   </div>
-                  {speaker.price && (
-                    <div className="flex justify-between">
-                      <span className="text-[#3E4349]">Price:</span>
-                      <span className="text-[#1B1A1A] font-medium">£{Number(speaker.price).toLocaleString()}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const sku = normaliseModelKey(speaker.model);
+                    const priceRec = priceMap?.get(sku);
+                    const canonicalPrice = (priceRec && priceRec.price_ex_vat != null) ? Number(priceRec.price_ex_vat) : null;
+                    const displayPrice = canonicalPrice != null ? canonicalPrice : (speaker.price != null ? Number(speaker.price) : null);
+                    if (displayPrice == null) return null;
+                    return (
+                      <div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[#3E4349]">Price:</span>
+                          <span className="text-[#1B1A1A] font-medium">£{Number(displayPrice).toLocaleString()}</span>
+                        </div>
+                        {isAdmin && (
+                          <AdminPriceEdit
+                            sku={sku}
+                            modelLabel={speaker.model}
+                            speakerType={speaker.type}
+                            currentPrice={canonicalPrice}
+                            onSaved={() => refetchPrices()}
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 {speaker.description && (
                   <div className="mt-3 pt-3 border-t border-[#DCDBD6]">
@@ -337,18 +363,6 @@ export default function SpeakerDatabasePage() {
         )}
       </div>
 
-      {/* Book a Demo Button */}
-      <div className="mt-12 mb-20 text-center">
-        <a
-          href="https://calendly.com/solutes-impish-0i/artcoustic-showroom"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Button size="lg" className="bg-green-600 hover:bg-green-500 text-white font-body">
-            Book a Demo
-          </Button>
-        </a>
-      </div>
     </div>
   );
 }

@@ -287,6 +287,23 @@ export default function Layout({ children, currentPageName }) {
                 </div>
 
                 </div>
+
+                {/* Book a Demo — all authenticated users, independent of commercial state */}
+                <a
+                  href="https://calendly.com/solutes-impish-0i/artcoustic-showroom"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block mx-3 mb-4 px-3 py-2 rounded-md text-sm text-center transition-all duration-200 hover:shadow-md hover:-translate-y-[1px]"
+                  style={{
+                    background: '#213428',
+                    color: '#FFFFFF',
+                    fontFamily: 'Didact Gothic, sans-serif',
+                    fontWeight: 600,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  Book a Demo
+                </a>
                 </nav>
 
                 {(() => {

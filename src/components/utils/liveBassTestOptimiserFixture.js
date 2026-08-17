@@ -101,7 +101,7 @@ function summariseCandidate(selected, targetDb) {
     filters: filters.map((filter) => ({
       frequencyHz: filter.frequencyHz,
       gainDb: filter.gainDb,
-      q: filter.q,
+      q: filter.q ?? filter.Q,
     })),
     bankLimits: candidate.aggregateBankLimits || null,
     rawMaximumResidualDb: candidate.houseCurveDiagnostics?.broadValleyRebalance?.selected?.maximumResidualAfterDb
@@ -109,7 +109,17 @@ function summariseCandidate(selected, targetDb) {
       ?? null,
     rmsResidualDb: candidate.fitMetrics?.rmsResidualDb ?? null,
     shapeRmsResidualDb: candidate.fitMetrics?.shapeRmsResidualDb ?? null,
-    broadValleyRebalance: candidate.houseCurveDiagnostics?.broadValleyRebalance || null,
+    broadValleyRebalance: candidate.houseCurveDiagnostics?.broadValleyRebalance ? {
+      changed: candidate.houseCurveDiagnostics.broadValleyRebalance.changed,
+      reason: candidate.houseCurveDiagnostics.broadValleyRebalance.reason,
+      selected: candidate.houseCurveDiagnostics.broadValleyRebalance.selected,
+      verification: candidate.houseCurveDiagnostics.broadValleyRebalance.verification ? {
+        testedBanks: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.testedBanks,
+        realSeatUnsafe: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.realSeatUnsafe,
+        rspLevelRegression: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.rspLevelRegression,
+        rspRmsWorsening: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.rspRmsWorsening,
+      } : null,
+    } : null,
     samples,
   };
 }
