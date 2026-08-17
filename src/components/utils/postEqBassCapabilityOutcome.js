@@ -3,8 +3,9 @@ const finiteLevel = (value) => Number.isFinite(Number(value))
   : null;
 
 // P18 required-extension assessment from bassDesignPhilosophyAuthority.
-// When provided, P18 pass/fail is determined against the required extension
-// at the selected operating level — never by walking to a lower winning level.
+// P14 is the only user-selected numbered target. P18 is independently graded
+// from the achieved extension at that P14 operating level; this assessment only
+// determines whether P18 reaches the selected basis' L1 floor.
 export function buildPostEqBassCapabilityOutcome({
   authority, requestedLevel, targetAnchorDb, scalarP14,
   achievedP18Level, achievedP18FrequencyHz,
@@ -25,10 +26,11 @@ export function buildPostEqBassCapabilityOutcome({
     ?? scalarP14?.level;
   const p14Level = authorityAchievedValue == null ? 0 : finiteLevel(authorityAchievedValue) ?? 0;
   const p18RequiredPass = p18RequiredExtensionAssessment?.passes;
-  const p18Pass = p18RequiredPass != null ? p18RequiredPass : (finiteLevel(achievedP18Level) >= requested);
+  const independentP18Level = finiteLevel(achievedP18Level) ?? 0;
+  const p18Pass = p18RequiredPass != null ? p18RequiredPass : independentP18Level >= 1;
   const parameterLevels = {
     P14: finiteLevel(p14Level),
-    P18: p18RequiredPass != null ? (p18Pass ? requested : 0) : finiteLevel(achievedP18Level),
+    P18: independentP18Level,
     P19: finiteLevel(achievedP19Level),
     ...(p20Available ? { P20: finiteLevel(achievedP20Level) } : {}),
   };
@@ -95,7 +97,7 @@ export function buildPostEqBassCapabilityOutcome({
     failureMessage: p14Failed
       ? `${requestedLabel} P14 output was not achieved; P14 capability reached ${achievedLabel || "below L1"}.`
       : p18Failed
-        ? `P14 output achieved at ${requestedLabel}; P18 extension was not achieved at that operating level.`
+        ? `P14 output achieved at ${requestedLabel}; P18 did not reach the selected basis' Level 1 boundary at that operating level.`
         : null,
     authorityComplete: !!pairedComplete || scalarComplete,
     authoritySource: pairedComplete ? "position-aware-post-eq-design-authority" : "post-eq-product-capability-authority",
