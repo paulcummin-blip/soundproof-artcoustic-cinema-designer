@@ -24,10 +24,14 @@ const BRAND = {
  * - promotionUsage: PromotionUsage[] (all)
  */
 export default function AccountPromotionNote({ account, promotions, promotionUsage }) {
+  // Only ALL_DEALER_GROUP promotions are shown here as a general eligibility note.
+  // SINGLE_ACCOUNT promotions are shown in the dedicated TargetedPromotionPanel
+  // on the AccountDashboard, not here.
   const activePromo = useMemo(() => {
     if (!promotions || !account) return null;
     return promotions.find(p =>
       p.promotion_type === "UNLIMITED_PRO_PROJECTS" &&
+      p.target_scope === "ALL_DEALER_GROUP" &&
       isEffective(p) &&
       matchesTarget(p, account)
     ) || null;

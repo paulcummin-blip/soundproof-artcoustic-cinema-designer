@@ -44,10 +44,15 @@ export default function GroupPromotionArea({
   const [endConfirm, setEndConfirm] = useState(null);
   const [ending, setEnding] = useState(false);
 
-  // Promotions belonging to this group
+  // Promotions belonging to this group — ALL_DEALER_GROUP only.
+  // SINGLE_ACCOUNT promotions are NOT group-wide; they appear on the
+  // target account's AccountDashboard instead.
   const groupPromotions = useMemo(() => {
     if (!promotions) return [];
-    return promotions.filter(p => promotionBelongsToGroup(p, groupKey, allAccounts));
+    return promotions.filter(p =>
+      p.target_scope === "ALL_DEALER_GROUP" &&
+      promotionBelongsToGroup(p, groupKey, allAccounts)
+    );
   }, [promotions, groupKey, allAccounts]);
 
   // All currently-effective (active) promotions — may be more than one.

@@ -7,6 +7,7 @@ import { aggregateTurnoverForYear } from "@/lib/commercial/commercialOverview";
 import CommercialSummaryCard from "@/components/admin/commercial/CommercialSummaryCard";
 import AccountStatusActions from "@/components/admin/commercial/AccountStatusActions";
 import AccountPromotionNote from "@/components/admin/promotions/AccountPromotionNote";
+import TargetedPromotionPanel from "@/components/admin/promotions/TargetedPromotionPanel";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -100,6 +101,7 @@ export default function AccountDashboard() {
   const [promotionUsage, setPromotionUsage] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+  const [promoRefreshKey, setPromoRefreshKey] = useState(0);
 
   const CALENDAR_YEAR = new Date().getFullYear();
 
@@ -138,7 +140,11 @@ export default function AccountDashboard() {
 
     load();
     return () => { mounted = false; };
-  }, [isAdmin, accountId]);
+  }, [isAdmin, accountId, promoRefreshKey]);
+
+  function handlePromotionsChanged() {
+    setPromoRefreshKey(k => k + 1);
+  }
 
   if (isLoadingAuth) {
     return <div style={{ padding: 48, textAlign: "center", color: BRAND.subtext }}>Checking access…</div>;
@@ -231,11 +237,20 @@ export default function AccountDashboard() {
             </div>
           </div>
 
-          {/* Active promotion note (admin-only) */}
+          {/* Active promotion note — group-wide (ALL_DEALER_GROUP) eligibility */}
           <AccountPromotionNote
             account={account}
             promotions={promotions}
             promotionUsage={promotionUsage}
+          />
+
+          {/* Targeted promotion — SINGLE_ACCOUNT promotions for this account */}
+          <TargetedPromotionPanel
+            account={account}
+            promotions={promotions}
+            promotionUsage={promotionUsage}
+            allAccounts={account ? [account] : []}
+            onPromotionsChanged={handlePromotionsChanged}
           />
 
           {/* Commercial summary */}

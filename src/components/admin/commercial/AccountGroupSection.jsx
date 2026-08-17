@@ -201,6 +201,19 @@ export default function AccountGroupSection({
     return map;
   }, [groupKey, promotions, promotionUsage, allAccounts]);
 
+  // Set of account IDs in this group that have an active SINGLE_ACCOUNT promotion.
+  // Shown as a small restrained marker beside the dealer name — not a new column.
+  const targetedPromoAccountIds = useMemo(() => {
+    const set = new Set();
+    if (!promotions) return set;
+    for (const p of promotions) {
+      if (p.target_scope !== "SINGLE_ACCOUNT") continue;
+      if (!isEffective(p)) continue;
+      set.add(p.target_account_id);
+    }
+    return set;
+  }, [promotions]);
+
   const ctx = useMemo(() => ({ turnoverMap, capacityMap, projectMap, promoUsageMap }), [turnoverMap, capacityMap, projectMap, promoUsageMap]);
 
   const sortedAccounts = useMemo(() => {
@@ -351,8 +364,20 @@ export default function AccountGroupSection({
                     onMouseEnter={e => e.currentTarget.style.background = "rgb(248 248 247)"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                   >
-                    <div style={{ fontWeight: 600, fontSize: 13, color: BRAND.text }}>
-                      {acc.name || "—"}
+                    <div style={{ fontWeight: 600, fontSize: 13, color: BRAND.text, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span>{acc.name || "—"}</span>
+                      {targetedPromoAccountIds.has(acc.id) && (
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, color: BRAND.green,
+                          padding: "2px 6px", borderRadius: 4,
+                          border: `1px solid ${BRAND.green}`,
+                          background: "transparent",
+                          letterSpacing: "0.04em", textTransform: "uppercase",
+                          whiteSpace: "nowrap",
+                        }}>
+                          Targeted Promo
+                        </span>
+                      )}
                     </div>
                     <div style={{ color: BRAND.subtext, fontFamily: "monospace", fontSize: 12 }}>
                       {formatGbp(turnover)}
@@ -417,8 +442,20 @@ export default function AccountGroupSection({
                     onMouseEnter={e => e.currentTarget.style.background = "rgb(248 248 247)"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                   >
-                    <div style={{ fontWeight: 600, fontSize: 13, color: BRAND.text }}>
-                      {acc.name || "—"}
+                    <div style={{ fontWeight: 600, fontSize: 13, color: BRAND.text, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span>{acc.name || "—"}</span>
+                      {targetedPromoAccountIds.has(acc.id) && (
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, color: BRAND.green,
+                          padding: "2px 6px", borderRadius: 4,
+                          border: `1px solid ${BRAND.green}`,
+                          background: "transparent",
+                          letterSpacing: "0.04em", textTransform: "uppercase",
+                          whiteSpace: "nowrap",
+                        }}>
+                          Targeted Promo
+                        </span>
+                      )}
                     </div>
                     <div style={{ color: BRAND.subtext, textTransform: "capitalize" }}>
                       {acc.account_type || "—"}
