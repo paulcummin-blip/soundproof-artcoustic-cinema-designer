@@ -115,18 +115,19 @@ export function isBankAndBandValid(candidate) {
 
 const isAllL1 = (candidate) => candidate?.allAtLeastL1 === true && levels(candidate).every((score) => score >= 1);
 
-// Every mode ranks against the same fixed RP22 house-curve target. First avoid
-// any below-target response where the safe product-plus-room envelope proves
-// the target is physically available; then minimise ordinary symmetric error.
-// Compliance grades remain diagnostic-only and do not enter the tuple.
+// Every mode ranks against the same fixed RP22 house-curve target. Symmetric
+// target accuracy is the primary acoustic objective: a genuine multi-band fit
+// must beat a level-shifted response that merely stays above target. Reachable
+// below-target shortfall remains an explicit secondary penalty. Compliance
+// grades remain diagnostic-only and do not enter the tuple.
 export function rankingTupleForMode(candidate, mode) {
   normalizeBassPriorityMode(mode);
   return [
-    lowerScore(avoidableTargetShortfallMax(candidate)),
-    lowerScore(avoidableTargetShortfallRms(candidate)),
     lowerScore(houseCurveRmsError(candidate)),
     lowerScore(houseCurveMaxError(candidate)),
     lowerScore(candidate?.houseCurveRankingMeanAbsoluteResidualDb ?? candidate?.rspMeanAbsoluteResidualDb),
+    lowerScore(avoidableTargetShortfallMax(candidate)),
+    lowerScore(avoidableTargetShortfallRms(candidate)),
     lowerScore(Math.abs(finiteOr(candidate?.rspMeanSignedResidualDb, Number.MAX_SAFE_INTEGER))),
     lowerScore(worstSeatDeviation(candidate)),
     lowerScore(meanSeatDeviation(candidate)),
@@ -220,7 +221,7 @@ export function rankBassCandidates(pool, mode) {
           ? `${canonicalMode}: generated house_curve candidate won the raw RSP maximum, RMS and mean-absolute residual ranking outside protected nulls.`
           : `${canonicalMode}: ${selected.designEqFitProfile || "standard"} beat house_curve on measured raw residual metrics (${selected.houseCurveRankingMaxResidualDb?.toFixed?.(2) ?? "—"}/${selected.houseCurveRankingRmsResidualDb?.toFixed?.(2) ?? "—"} dB vs ${houseCurveCandidate.houseCurveRankingMaxResidualDb?.toFixed?.(2) ?? "—"}/${houseCurveCandidate.houseCurveRankingRmsResidualDb?.toFixed?.(2) ?? "—"} dB).`
         : `${canonicalMode}: ERROR — no compatible generated house_curve candidate was available; no legacy accuracy fallback was accepted.`
-      : `${canonicalMode}: best capability-anchored match to the fixed house curve after physical EQ validation; avoidable below-target shortfall was minimised before symmetric residual error.`
+      : `${canonicalMode}: closest symmetric match to the fixed house curve after physical EQ validation; reachable below-target shortfall was then used as a secondary penalty.`
     : `${canonicalMode}: no bank-valid candidate with a valid assessment band was available.`;
   return {
     selected,
