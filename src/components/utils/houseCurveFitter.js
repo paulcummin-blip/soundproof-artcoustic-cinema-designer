@@ -19,6 +19,7 @@ import { identifyProtectedNullRegions, isProtectedSmoothedFrequency } from "@/co
 import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
 import { refineOpposingResidualPair } from "@/components/utils/houseCurvePairedRefinement";
 import { runProfessionalResidualCleanup } from "@/components/utils/houseCurveResidualCleanup";
+import { rebalanceBroadValleyBank } from "@/components/utils/houseCurveBankRebalancing";
 import { refineLegalUnprotectedPeak } from "@/components/utils/houseCurveLegalPeakRefinement";
 import { buildFilterDecisionDiagnostics, classifyEqCorrectionRegion, findAggregatePeakBoostViolations, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
 
@@ -204,6 +205,20 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     );
     operations += residualCleanup.acceptedOperationCount;
     stopReason = `${stopReason}; accepted ${residualCleanup.acceptedOperationCount} high-resolution residual-cleanup operation(s)`;
+  }
+  const broadValleyRebalance = rebalanceBroadValleyBank({
+    filters, rawCurve: rspRaw, targetCurve: canonicalTargetCurve, protectedNullRegions,
+    objectiveSeats, currentMetrics: finalMetrics, fitStartHz, fitEndHz,
+    correctionStartHz, correctionEndHz, anchorDb, bankRaw, activeSubs, usableLfHz,
+    requestedSystemOutputDb, profile, evaluationMemo, preparedBankValidation,
+    operationCounts: sharedOperationCounts,
+  });
+  bankEvalCount += broadValleyRebalance.bankEvaluationCount;
+  if (broadValleyRebalance.changed) {
+    filters = broadValleyRebalance.filters;
+    finalMetrics = broadValleyRebalance.metrics;
+    operations += 1;
+    stopReason = `${stopReason}; ${broadValleyRebalance.reason}`;
   }
   const legalPeakRefinement = refineLegalUnprotectedPeak({
     filters, rawCurve: rspRaw, targetCurve: canonicalTargetCurve, protectedNullRegions,
