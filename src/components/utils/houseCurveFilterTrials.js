@@ -32,6 +32,8 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
     return { trials, productLimited: false, authority };
   }
   const isPeak = authority.classification === "Peak";
+  const isBroadValley = !isPeak && Number.isFinite(region.widthOctaves) && region.widthOctaves >= 1 / 3;
+  const broadValleyMaxQ = 4;
   const maximumCutDb = profile.maximumCutDb;
   const maximumAggregateBoostDb = profile.maximumAggregateBoostDb;
   const requestedGainDb = isPeak
@@ -41,7 +43,8 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
   const baseCandidate = {
     band: filters.length + 1, enabled: true, type: "Peak",
     frequencyHz: region.centrePoint.frequency, gainDb: requestedGainDb,
-    Q: qForRegion(region), startHz: region.startHz, endHz: region.endHz,
+    Q: isBroadValley ? Math.min(broadValleyMaxQ, qForRegion(region)) : qForRegion(region),
+    startHz: region.startHz, endHz: region.endHz, widthOctaves: region.widthOctaves,
     classification: authority.classification,
     expectedAction: authority.expectedAction,
     beforeEqSpl: region.rawSpl,
@@ -51,7 +54,9 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
   const physicalAction = validatePhysicalEqAction(authority.classification, baseCandidate.gainDb);
   const productLimited = Math.abs(baseCandidate.gainDb) <= 0.1 || !physicalAction.passed;
   const gainScales = [1, 0.75, 0.5];
-  const rawQValues = [baseCandidate.Q * 0.65, baseCandidate.Q, 4, 5, 6, 7, 8, 10];
+  const rawQValues = isBroadValley
+    ? [baseCandidate.Q * 0.65, baseCandidate.Q, Math.min(broadValleyMaxQ, baseCandidate.Q * 1.25)]
+    : [baseCandidate.Q * 0.65, baseCandidate.Q, 4, 5, 6, 7, 8, 10];
   const qValues = [...new Map(rawQValues.map((q) => {
     const value = Math.max(0.5, Math.min(10, q));
     return [value.toFixed(4), value];
@@ -85,15 +90,16 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
       for (const gainScale of gainScales) {
         for (const qScale of [0.75, 1, 1.5]) {
           const refit = { ...baseCandidate, band: existing.band, gainDb: baseCandidate.gainDb * gainScale,
-            Q: Math.max(0.5, Math.min(10, baseCandidate.Q * qScale)), reason: "Joint centre/gain/Q refit of occupied region" };
+            Q: Math.max(0.5, Math.min(isBroadValley ? broadValleyMaxQ : 10, baseCandidate.Q * qScale)),
+            reason: isBroadValley ? "Joint broad-valley centre/gain/Q refit" : "Joint centre/gain/Q refit of occupied region" };
           trials.push({ action: "refit", filter: refit, replacedFilterIndex: index, scalableIndex: index });
         }
         const proposedGain = existing.gainDb + baseCandidate.gainDb * gainScale;
         const gainDb = existing.gainDb > 0 ? Math.min(maximumAggregateBoostDb, proposedGain) : Math.max(-maximumCutDb, proposedGain);
         if (Math.abs(gainDb - existing.gainDb) > 0.1) trials.push({ action: "revise", filter: { ...existing, gainDb }, replacedFilterIndex: index, scalableIndex: index });
       }
-      for (const multiplier of [0.5, 0.75, 1.5, 2, 3]) {
-        const Q = Math.max(0.5, Math.min(10, existing.Q * multiplier));
+      for (const multiplier of isBroadValley ? [0.5, 0.75, 1] : [0.5, 0.75, 1.5, 2, 3]) {
+        const Q = Math.max(0.5, Math.min(isBroadValley ? broadValleyMaxQ : 10, existing.Q * multiplier));
         if (Math.abs(Q - existing.Q) > 0.1) trials.push({ action: "reviseQ", filter: { ...existing, Q }, replacedFilterIndex: index, scalableIndex: index });
       }
     } else if (existingSign !== correctionSign) {
@@ -109,7 +115,8 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
   if (!productLimited && mergeIndices.length >= 2) {
     for (const qScale of [0.75, 1, 1.5]) {
       const merged = { ...baseCandidate, band: Math.min(...mergeIndices.map((index) => filters[index].band || index + 1)),
-        Q: Math.max(0.5, Math.min(10, baseCandidate.Q * qScale)), reason: "Merged overlapping filters and jointly refit region" };
+        Q: Math.max(0.5, Math.min(isBroadValley ? broadValleyMaxQ : 10, baseCandidate.Q * qScale)),
+        reason: isBroadValley ? "Merged overlapping filters into broad-valley refit" : "Merged overlapping filters and jointly refit region" };
       trials.push({ action: "merge", filter: merged, mergedFilterIndices: mergeIndices, scalableIndex: filters.length - mergeIndices.length });
     }
   }
