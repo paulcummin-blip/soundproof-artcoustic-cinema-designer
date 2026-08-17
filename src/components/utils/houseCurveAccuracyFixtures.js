@@ -34,20 +34,30 @@ function residualAt(curve, frequency) {
 }
 
 export function runCredibleValleyFixture() {
+  // A 100–135 Hz depression is roughly 0.43 octave wide: it is a broad,
+  // correctable valley, not the short sharp cancellation notch protected
+  // by the raw-null authority.
   const rawCurve = frequencies.map((frequency) => ({
     frequency,
-    spl: 100 + artcousticHouseCurveOffsetAt(frequency) + gaussian(frequency, 80, 15, -7),
+    spl: 100 + artcousticHouseCurveOffsetAt(frequency) + gaussian(frequency, 117.5, 18, -9),
   }));
   const result = calculateHouseCurveEqCurve(rawCurve, [], 35, [{ modelKey: "SUB2-12" }], {
     targetAnchorDb: 100, requestedSystemOutputDb: 100,
-    assessmentStartHz: 20, assessmentEndHz: 120,
+    assessmentStartHz: 20, assessmentEndHz: 160,
   });
+  const correctionAt = (frequency) => result.combinedEqCurve.reduce((nearest, point) =>
+    Math.abs(point.frequency - frequency) < Math.abs(nearest.frequency - frequency) ? point : nearest).spl;
   return {
     filters: result.filters.filter((filter) => filter.enabled),
     bankLimits: result.bankLimits,
     pre: result.houseCurveDiagnostics.preRsp,
     post: result.houseCurveDiagnostics.postRsp,
     protectedNullRegions: result.houseCurveDiagnostics.protectedNullRegions,
+    correctionDb: {
+      lowerShoulder: correctionAt(102),
+      centre: correctionAt(117.5),
+      upperShoulder: correctionAt(133),
+    },
   };
 }
 
@@ -104,6 +114,10 @@ export function runHouseCurveAccuracyFixtures() {
     ["Credible broad valley uses available boost", valley.bankLimits.maxAggregateBoostDb >= 3 && valley.bankLimits.maxAggregateBoostDb <= 6.05],
     ["Valley correction respects product headroom", valley.bankLimits.sourceDomainHeadroomOk && valley.bankLimits.allOk],
     ["Valley maximum and RMS residual improve", valley.post.maximumAbsoluteResidualDb < valley.pre.maximumAbsoluteResidualDb && valley.post.rmsResidualDb < valley.pre.rmsResidualDb],
+    ["100–135 Hz valley receives a broad filter", valley.filters.some((filter) => filter.gainDb > 0.5
+      && filter.frequencyHz >= 100 && filter.frequencyHz <= 135 && filter.Q <= 4.05)],
+    ["Broad-valley correction reaches both shoulders", valley.correctionDb.lowerShoulder >= 1.5
+      && valley.correctionDb.upperShoulder >= 1.5 && valley.correctionDb.centre <= 6.05],
     ["Overlapping valley filters are consolidated", valley.filters.length <= 2],
     ["Robust anchor resists one sharp peak", Number.isFinite(derivedAnchor) && Math.abs(peakAnchor - derivedAnchor) < 0.5],
     ["Robust anchor resists one protected deep null", Number.isFinite(derivedAnchor) && Math.abs(nullAnchor - derivedAnchor) < 0.5],
