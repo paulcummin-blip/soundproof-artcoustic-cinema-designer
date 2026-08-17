@@ -131,6 +131,8 @@ function summariseCandidate(selected, targetDb) {
         realSeatUnsafe: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.realSeatUnsafe,
         rspLevelRegression: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.rspLevelRegression,
         rspRmsWorsening: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.rspRmsWorsening,
+        bestValleySample: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.bestValleySample,
+        bestRepurposedSample: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.bestRepurposedSample,
         samples: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.samples,
       } : null,
     } : null,
