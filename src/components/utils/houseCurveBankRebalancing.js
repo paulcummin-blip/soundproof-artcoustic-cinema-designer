@@ -253,6 +253,13 @@ export function rebalanceBroadValleyBank({
         );
         const candidateQuality = quality(points);
         if (!candidateQuality) continue;
+        const shoulderWorsened = shoulders.some((shoulder) => {
+          const candidatePoint = points.reduce((nearest, point) =>
+            Math.abs(point.frequency - shoulder.frequency) < Math.abs(nearest.frequency - shoulder.frequency)
+              ? point : nearest);
+          return candidatePoint.residualDb > shoulder.residualDb + 0.25;
+        });
+        if (shoulderWorsened) continue;
         const valleyImprovementDb = valleyDeficit(baselinePoints, region)
           - valleyDeficit(points, region);
         const centreCorrectionIncreaseDb = correctionAt(centreHz, proposed)
