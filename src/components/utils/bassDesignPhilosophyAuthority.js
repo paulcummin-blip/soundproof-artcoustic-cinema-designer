@@ -135,10 +135,12 @@ export function assessP18AgainstRequiredExtension({
           : null;
       })
       .filter(Boolean);
-    const startIndex = usableLfHz == null
-      ? 0
-      : residual.findIndex((point) => point.frequency >= usableLfHz);
-    if (startIndex < 0) return null;
+    // Do not clamp the in-room result to the product's nominal -6 dB usable-LF
+    // figure. That rating remains a diagnostic and a capability input, but room
+    // gain plus unused output headroom can legitimately move the in-room -3 dB
+    // point lower at a modest P14 target. The measured post-EQ curve is the P18
+    // authority; product limits already constrain the curve and permitted boost.
+    const startIndex = 0;
 
     for (let index = startIndex; index < residual.length; index += 1) {
       const point = residual[index];
@@ -155,7 +157,7 @@ export function assessP18AgainstRequiredExtension({
         const ratio = (-3 - previous.residualDb) / (point.residualDb - previous.residualDb);
         crossingHz = previous.frequency + (point.frequency - previous.frequency) * ratio;
       }
-      return usableLfHz == null ? crossingHz : Math.max(usableLfHz, crossingHz);
+      return crossingHz;
     }
     return null;
   }
