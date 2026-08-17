@@ -229,10 +229,13 @@ export function rebalanceBroadValleyBank({
       : [1.5, 2, 2.5, 3];
     const shoulderDeltas = shoulderCut ? [0, -1, -2, -3, -4] : [0];
 
+    const additionalBoostModes = boostIndexes.length && current.length < MAX_FILTERS
+      ? [false, true] : [false];
     for (const blockerVariant of blockerVariants) for (const boostAddition of boostAdditions) {
       for (const boostQ of boostQValues) for (const shoulderDelta of shoulderDeltas) {
+        for (const useAdditionalBoost of additionalBoostModes) {
         let proposed = blockerVariant.map((filter) => ({ ...filter }));
-        if (boostIndexes.length) {
+        if (boostIndexes.length && !useAdditionalBoost) {
           const totalGain = boostIndexes.reduce((sum, index) =>
             sum + Math.max(0, proposed[index].gainDb), 0);
           boostIndexes.forEach((index) => {
@@ -252,9 +255,11 @@ export function rebalanceBroadValleyBank({
           if (proposed.length >= MAX_FILTERS) continue;
           proposed.push({
             band: proposed.length + 1, enabled: true, type: "Peak",
-            frequencyHz: centreHz, gainDb: boostAddition, Q: boostQ,
+            frequencyHz: centreHz,
+            gainDb: boostIndexes.length ? boostAddition + 2 : boostAddition,
+            Q: boostQ,
             startHz: region.startHz, endHz: region.endHz,
-            reason: "Joint broad-valley rebalance: use available source-domain boost",
+            reason: "Joint broad-valley rebalance: use available aggregate source-domain boost",
           });
         }
         if (shoulderCut && shoulderDelta < 0) {
@@ -300,6 +305,7 @@ export function rebalanceBroadValleyBank({
           valleyImprovementDb, centreCorrectionIncreaseDb,
           activity: proposed.reduce((sum, filter) => sum + Math.abs(filter.gainDb || 0), 0),
         });
+        }
       }
     }
   }
