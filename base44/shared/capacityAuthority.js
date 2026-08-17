@@ -36,3 +36,18 @@ export async function findActivationEntry(base44, projectId) {
   });
   return (Array.isArray(entries) && entries.length > 0) ? entries[0] : null;
 }
+
+/**
+ * Checks whether a cleanup REVERSAL ledger entry already exists for a project.
+ * Prevents double-credit-restoration during cleanup retries (idempotency guard).
+ * @param {object} base44 - service-role base44 client
+ * @param {string} projectId
+ * @returns {Promise<object|null>} existing reversal ledger entry or null
+ */
+export async function findCleanupReversalEntry(base44, projectId) {
+  if (!projectId) return null;
+  const entries = await base44.entities.CapacityLedger.filter({
+    idempotency_key: `incomplete_cleanup_reversal:${projectId}`
+  });
+  return (Array.isArray(entries) && entries.length > 0) ? entries[0] : null;
+}

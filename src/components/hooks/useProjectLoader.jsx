@@ -81,6 +81,9 @@ appState, // Pass appState directly for setters
   const [loadState, setLoadState] = useState({ phase: "idle", error: null, name: null });
   const [autosaveStatus, setAutosaveStatus] = useState("idle");
   const hydratedRoomDimsProjectIdRef = useRef(null);
+  // Tracks the loaded project's room_dimensions_edited flag so serializeProject
+  // never resets it to false. Set during loadProject, cleared on project switch.
+  const loadedRoomDimensionsEditedRef = useRef(false);
 
   // SHARED PAYLOAD BUILDER — single source of truth for both autosave and manual save.
   // Both paths must use this function so their signatures are always identical.
@@ -133,6 +136,7 @@ appState, // Pass appState directly for setters
       viewingPriority: appState?.viewingPriority,
       acousticTreatmentEnabled: appState?.acousticTreatmentEnabled,
       selectedAbfuserQty: appState?.selectedAbfuserQty,
+      existingRoomDimensionsEdited: loadedRoomDimensionsEditedRef.current,
     });
     return projectData;
   }, [
@@ -222,6 +226,9 @@ appState, // Pass appState directly for setters
       if (globalThis.__B44_LOGS) console.log('[RD] loadProject result', { projectIdState, id: p?.id, name: p?.name });
       hydrateFromProject(p);
       setProjectNameState(p?.name || "Project"); // Update internal projectName state
+      // Capture the loaded room_dimensions_edited flag so the autosave path
+      // never resets it to false. Defaults to false for pre-feature projects.
+      loadedRoomDimensionsEditedRef.current = p?.room_dimensions_edited === true;
       setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
 
       // Stamp the loaded signature using the same serializeProject() shape that
@@ -314,6 +321,7 @@ appState, // Pass appState directly for setters
           manualRspY_m: (() => { const v = Number(p?.manual_rsp_y_m); return Number.isFinite(v) ? v : null; })(),
           acousticTreatmentEnabled: !!p?.acoustic_treatment_enabled,
           selectedAbfuserQty: (() => { const v = Number(p?.selected_abfuser_qty); return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0; })(),
+          existingRoomDimensionsEdited: p?.room_dimensions_edited === true,
         });
         delete loadedProjectData.name;
         delete loadedProjectData.client_name;

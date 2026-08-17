@@ -8,6 +8,7 @@
 
 import { migrateP12Mode } from "@/components/utils/p12ModeAuthority";
 import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuthority";
+import { resolveRoomDimensionsEdited } from "@/components/utils/roomDimensionsEditedAuthority";
 
 // Helper: safely parse JSON strings or return native types unchanged
 function safeParseJson(value) {
@@ -116,6 +117,10 @@ export function serializeProject(input = {}) {
     acousticTreatmentEnabled = false,
     selectedAbfuserQty = 0,
     abfuserQtySource = "recommended",
+
+    // room_dimensions_edited authority — the existing stored flag.
+    // Passed by the save path so serializeProject never resets it to false.
+    existingRoomDimensionsEdited = false,
   } = input;
 
   // Normalised room dims (support legacy dimensions as a fallback)
@@ -308,5 +313,15 @@ export function serializeProject(input = {}) {
     acoustic_treatment_enabled: !!acousticTreatmentEnabled,
     selected_abfuser_qty: acousticTreatmentEnabled ? (Math.max(0, Math.floor(Number(selectedAbfuserQty) || 0))) : 0,
     abfuser_qty_source: acousticTreatmentEnabled ? (abfuserQtySource || "recommended") : "recommended",
+
+    // room_dimensions_edited — write-once-true flag.
+    // True if already true on the stored project OR current dims differ from
+    // the generic 4.5 × 6.0 × 2.4 m hydration defaults. Never reset to false.
+    room_dimensions_edited: resolveRoomDimensionsEdited(
+      existingRoomDimensionsEdited,
+      widthM,
+      lengthM,
+      heightM
+    ),
   };
 }

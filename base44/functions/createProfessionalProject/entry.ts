@@ -58,6 +58,15 @@ export default async function(req) {
     // Legitimate new-project input fields passed through from the browser.
     // Backend-authoritative fields (account_id, commercial_tier, etc.) are NOT
     // accepted from the client.
+    // room_dimensions_edited: true if the user deliberately supplied real room
+    // dimensions at creation. False if dimensions were left null (the Room
+    // Designer will hydrate generic 4.5×6.0×2.4 defaults, but that does NOT
+    // count as a genuine edit). This flag is the authority for the 7-day
+    // incomplete-project cleanup rule.
+    const suppliedDims = (body.room_length != null && Number.isFinite(Number(body.room_length)))
+      || (body.room_width != null && Number.isFinite(Number(body.room_width)))
+      || (body.room_height != null && Number.isFinite(Number(body.room_height)));
+
     const projectFields = {
       name: projectName,
       client_name: body.client_name || '',
@@ -70,6 +79,7 @@ export default async function(req) {
       amplifier_power: body.amplifier_power ?? null,
       notes: body.notes || '',
       acoustic_treatment_enabled: body.acoustic_treatment_enabled ?? false,
+      room_dimensions_edited: !!suppliedDims,
     };
 
     // ── 3a. Admin bypass: unrestricted internal/support use ──

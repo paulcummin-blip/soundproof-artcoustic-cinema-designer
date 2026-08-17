@@ -1,0 +1,102 @@
+{
+  "name": "ProjectCleanupLog",
+  "type": "object",
+  "description": "Permanent per-project audit log for the 7-day incomplete-project auto-cleanup rule. One row per Project deleted by the cleanup rule. Stores a snapshot of the project's key fields before deletion. Admin-only. Remains after the Project record is deleted.",
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "description": "ID of the Account that owned the cleaned project."
+    },
+    "project_id": {
+      "type": "string",
+      "description": "ID of the Project that was cleaned (deleted). Snapshot \u2014 the Project record no longer exists."
+    },
+    "project_name": {
+      "type": "string",
+      "description": "Snapshot of the project name at cleanup time."
+    },
+    "client_name": {
+      "type": "string",
+      "description": "Snapshot of the client name at cleanup time.",
+      "nullable": true
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Snapshot of the project's original created_date."
+    },
+    "cleaned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the project was cleaned (deleted)."
+    },
+    "commercial_tier": {
+      "type": "string",
+      "description": "Snapshot of the project's commercial_tier (e.g. PROFESSIONAL, INTERNAL)."
+    },
+    "commercial_source": {
+      "type": "string",
+      "description": "Snapshot of the project's commercial_source (e.g. PROMOTION, PILOT, TRIAL, PURCHASED).",
+      "nullable": true
+    },
+    "promotion_id": {
+      "type": "string",
+      "description": "Snapshot of the promotion_id if the project was promotional. Null for normal capacity-funded projects.",
+      "nullable": true
+    },
+    "room_dimensions_edited": {
+      "type": "boolean",
+      "description": "Snapshot of the project's room_dimensions_edited flag at cleanup time."
+    },
+    "cleanup_reason": {
+      "type": "string",
+      "description": "Reason the project was cleaned. Currently always INCOMPLETE_AFTER_7_DAYS."
+    },
+    "cleanup_reasons_detail": {
+      "type": "string",
+      "description": "Comma-separated list of specific reasons (NAME_INCOMPLETE, CLIENT_INCOMPLETE, GENERIC_ROOM_UNCHANGED). A project may have more than one reason."
+    },
+    "credit_restored": {
+      "type": "boolean",
+      "description": "True if a REVERSAL ledger entry was appended to restore the dealer's credit. False for promotional projects (no credit was consumed)."
+    },
+    "original_activation_ledger_entry_id": {
+      "type": "string",
+      "description": "ID of the original PROJECT_ACTIVATION CapacityLedger entry that was reversed. Null for promotional projects (no activation entry exists).",
+      "nullable": true
+    },
+    "reversal_ledger_entry_id": {
+      "type": "string",
+      "description": "ID of the REVERSAL CapacityLedger entry that restored the credit. Null for promotional projects.",
+      "nullable": true
+    }
+  },
+  "required": [
+    "account_id",
+    "project_id",
+    "cleaned_at",
+    "cleanup_reason"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

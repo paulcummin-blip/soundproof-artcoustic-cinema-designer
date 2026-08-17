@@ -1,7 +1,7 @@
 {
   "name": "PromotionUsage",
   "type": "object",
-  "description": "One row per promotional Professional Project created. Canonical engagement tracking \u2014 not an aggregate counter. Every promotional project is traceable to the promotion that created it. Backend/service-role creates records; dealers have no create/update/delete authority.",
+  "description": "One row per promotional Professional Project created. Canonical engagement tracking \u2014 not an aggregate counter. Every promotional project is traceable to the promotion that created it. Backend/service-role creates records; dealers have no create/update/delete authority. Survives project deletion \u2014 usage_status transitions to AUTO_CLEANED_INCOMPLETE when the linked project is auto-cleaned, preserving the audit/engagement record.",
   "properties": {
     "promotion_id": {
       "type": "string",
@@ -13,7 +13,7 @@
     },
     "project_id": {
       "type": "string",
-      "description": "The Professional Project created. Links to Project.id. Natural idempotency anchor \u2014 one PromotionUsage per project_id."
+      "description": "The Professional Project created. Links to Project.id. Natural idempotency anchor \u2014 one PromotionUsage per project_id. The project may be deleted by the 7-day cleanup rule; this record remains as the permanent engagement/abuse audit."
     },
     "promotion_type": {
       "type": "string",
@@ -23,6 +23,26 @@
       "type": "string",
       "format": "date-time",
       "description": "Timestamp of promotional creation (mirrors Project.professional_activated_date)."
+    },
+    "usage_status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE_PROJECT",
+        "AUTO_CLEANED_INCOMPLETE"
+      ],
+      "default": "ACTIVE_PROJECT",
+      "description": "Lifecycle status of the promotional usage. ACTIVE_PROJECT = the linked Project still exists. AUTO_CLEANED_INCOMPLETE = the linked Project was auto-cleaned by the 7-day incomplete-project rule. The PromotionUsage record itself is never deleted."
+    },
+    "project_cleaned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the linked Project was auto-cleaned. Null while the project is active.",
+      "nullable": true
+    },
+    "cleanup_reason": {
+      "type": "string",
+      "description": "Reason the linked Project was auto-cleaned (e.g. INCOMPLETE_AFTER_7_DAYS). Null while the project is active.",
+      "nullable": true
     }
   },
   "required": [
