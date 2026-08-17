@@ -5,6 +5,9 @@ import { bassInputAdapter } from "@/components/utils/subwooferInstanceMigration"
 import { generateCandidatePool, selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
 import { buildCurveSignature } from "@/components/room/bass/bassResultAuthority";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
+import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
+import { assessP18AgainstRequiredExtension } from "@/components/utils/bassDesignPhilosophyAuthority";
+import { assessP18Extension } from "@/components/utils/p18ExtensionAuthority";
 
 const ROOM = Object.freeze({ widthM: 5, lengthM: 5, heightM: 2.4 });
 const RSP = Object.freeze({ id: "rsp", x: 2.5, y: 2.59, z: 1.2 });
@@ -41,6 +44,28 @@ function summariseCandidate(selected, targetDb) {
   if (!candidate) return { targetDb, selected: false };
   const target = candidate.productionHouseCurveTarget || [];
   const finalCurve = candidate.finalPostEqCurve || [];
+  const p18 = assessP18AgainstRequiredExtension({
+    rspPostEqCurve: finalCurve,
+    canonicalTargetCurve: target,
+    perSeatPostEqCurves: candidate.perSeatPostEqCurves || [],
+    selectedP14TargetDb: targetDb,
+    requiredExtensionHz: 35,
+    p18CutoffDb: 3,
+    configuredUsableLfHz: 20,
+  });
+  const p18Grade = assessP18Extension(p18?.achievedExtensionHz, "minimum");
+  const p19 = computeOfficialP19Assessment({
+    rspPostEqCurve: finalCurve,
+    canonicalTargetCurve: target,
+    assessmentStartHz: candidate.assessmentStartHz,
+    assessmentEndHz: candidate.assessmentEndHz,
+  });
+  const p20 = computeOfficialP20Assessment({
+    rspPostEqCurve: finalCurve,
+    perSeatPostEqCurves: candidate.perSeatPostEqCurves || [],
+    assessmentStartHz: candidate.assessmentStartHz,
+    assessmentEndHz: candidate.assessmentEndHz,
+  });
   const samples = SAMPLE_FREQUENCIES.map((frequency) => {
     const post = nearest(finalCurve, frequency);
     const targetSpl = interpolateCanonicalTarget(target, post.frequency);
@@ -49,16 +74,41 @@ function summariseCandidate(selected, targetDb) {
       residualDb: post.spl - targetSpl,
     };
   });
+  const filters = (candidate.generatedFilterBank || []).filter((filter) => filter?.enabled);
+  const p14AvailableDb = Number.isFinite(candidate.productOperatingMarginDb)
+    ? targetDb + candidate.productOperatingMarginDb
+    : null;
   return {
     targetDb,
     selected: true,
     candidateId: candidate.candidateId,
     profile: candidate.designEqFitProfile,
-    p14Db: candidate.achievedP14Db,
-    p18Hz: candidate.achievedP18FrequencyHz,
-    p19Db: candidate.achievedP19VariationDb,
-    p20Db: candidate.achievedP20VariationDb,
+    p14AvailableDb,
+    p14MarginDb: candidate.productOperatingMarginDb,
+    p14Pass: Number.isFinite(candidate.productOperatingMarginDb)
+      ? candidate.productOperatingMarginDb >= 0
+      : null,
+    p18Hz: p18?.achievedExtensionHz ?? null,
+    p18Level: p18Grade.level,
+    p19Db: p19?.variationDbRaw ?? null,
+    p19DisplayDb: p19?.displayVariationDb ?? null,
+    p19Level: p19?.level ?? null,
+    p20Db: p20?.worstSeat?.variationDbRaw ?? null,
+    p20DisplayDb: p20?.worstSeat?.displayVariationDb ?? null,
+    p20Level: p20?.worstSeat?.level ?? null,
     filterSignature: candidate.filterBankSignature,
+    filterCount: filters.length,
+    filters: filters.map((filter) => ({
+      frequencyHz: filter.frequencyHz,
+      gainDb: filter.gainDb,
+      q: filter.q,
+    })),
+    bankLimits: candidate.aggregateBankLimits || null,
+    rawMaximumResidualDb: candidate.houseCurveDiagnostics?.broadValleyRebalance?.selected?.maximumResidualAfterDb
+      ?? candidate.fitMetrics?.maximumResidualDb
+      ?? null,
+    rmsResidualDb: candidate.fitMetrics?.rmsResidualDb ?? null,
+    shapeRmsResidualDb: candidate.fitMetrics?.shapeRmsResidualDb ?? null,
     broadValleyRebalance: candidate.houseCurveDiagnostics?.broadValleyRebalance || null,
     samples,
   };
