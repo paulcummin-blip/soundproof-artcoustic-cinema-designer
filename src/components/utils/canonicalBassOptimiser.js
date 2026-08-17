@@ -762,7 +762,7 @@ export function generateCanonicalCandidatePool({
     perSeatRawCurves: levelNormalisedSeats, perSeatMaximumSplCurves,
     eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
     baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
-    selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs,
+    selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis,
   }));
 
   // ── Partial-bank salvage ──
@@ -830,7 +830,7 @@ export function generateCanonicalCandidatePool({
         eq: sanitisedEq, domains, targetCurve, targetShape,
         verticalOffsetDb, protectedNullRegions,
         baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
-        selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs,
+        selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis,
       }));
     }
     if (salvage.cutOnlyFilters.length > 0 && salvage.cutOnlyBankLimits.allOk) {
@@ -851,7 +851,7 @@ export function generateCanonicalCandidatePool({
         eq: cutOnlyEq, domains, targetCurve, targetShape,
         verticalOffsetDb, protectedNullRegions,
         baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
-        selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs,
+        selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis,
       }));
     }
   }
@@ -899,7 +899,7 @@ export function generateCanonicalCandidatePool({
     perSeatRawCurves: levelNormalisedSeats, perSeatMaximumSplCurves,
     eq: identityEq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
     baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
-    selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs,
+    selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis,
   });
   const candidates = annotateCandidatePoolForHouseCurveRanking([...eqCandidates, ...salvagedCandidates, identityCandidate]);
   const __canonicalTrace__ = {
