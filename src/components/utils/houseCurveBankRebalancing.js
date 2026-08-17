@@ -421,6 +421,8 @@ export function rebalanceBroadValleyBank({
           usesAppendedCompanion: proposed.length > current.length
             && proposed.some((filter) => filter.reason
               === "Joint broad-valley rebalance: add overlapping shoulder cut"),
+          addsBroadValleyBoost: proposed.some((filter) => filter.reason
+            === "Joint broad-valley rebalance: use available aggregate source-domain boost"),
           adjustedShoulderCount: shoulderCuts.reduce((count, shoulderCut) =>
             count + (Math.abs(
               proposed[shoulderCut.index].gainDb - current[shoulderCut.index].gainDb,
@@ -448,6 +450,7 @@ export function rebalanceBroadValleyBank({
     bestValleySample: null,
     bestRepurposedSample: null,
     bestAppendedSample: null,
+    bestAppendedCutOnlySample: null,
   };
   const verificationPool = [];
   const verificationSignatures = new Set();
@@ -521,6 +524,7 @@ export function rebalanceBroadValleyBank({
       shapeAndLevelSafe,
       usesRepurposedCompanion: candidate.usesRepurposedCompanion,
       usesAppendedCompanion: candidate.usesAppendedCompanion,
+      addsBroadValleyBoost: candidate.addsBroadValleyBoost,
       adjustedShoulderCount: candidate.adjustedShoulderCount,
       bankLimits: candidate.limits,
       filterSignature: signature(candidate.filters),
@@ -537,6 +541,11 @@ export function rebalanceBroadValleyBank({
     if (candidate.usesAppendedCompanion && (!verification.bestAppendedSample
       || verificationSample.valleyImprovementDb > verification.bestAppendedSample.valleyImprovementDb)) {
       verification.bestAppendedSample = verificationSample;
+    }
+    if (candidate.usesAppendedCompanion && !candidate.addsBroadValleyBoost
+      && (!verification.bestAppendedCutOnlySample
+        || verificationSample.valleyImprovementDb > verification.bestAppendedCutOnlySample.valleyImprovementDb)) {
+      verification.bestAppendedCutOnlySample = verificationSample;
     }
     if (!metrics) {
       verification.missingMetrics += 1;
