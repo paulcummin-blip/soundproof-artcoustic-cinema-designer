@@ -378,6 +378,8 @@ export function rebalanceBroadValleyBank({
     rspLevelRegression: 0,
     rspRmsWorsening: 0,
     samples: [],
+    bestValleySample: null,
+    bestRepurposedSample: null,
   };
   const verificationPool = [];
   const verificationSignatures = new Set();
@@ -427,11 +429,14 @@ export function rebalanceBroadValleyBank({
       && Math.abs((metrics.rspMeanSignedResidualDb ?? 0)
         - (baselineMetrics.rspMeanSignedResidualDb ?? 0)) <= 1.25;
     const rspRmsSafe = absoluteRspRmsSafe || shapeAndLevelSafe;
-    if (verification.samples.length < 8) verification.samples.push({
+    const verificationSample = {
       rawMaximumResidualDb: candidate.quality.maximum,
       rawRmsResidualDb: candidate.quality.rms,
       valleyImprovementDb: candidate.valleyImprovementDb,
+      centreCorrectionIncreaseDb: candidate.centreCorrectionIncreaseDb,
       realSeatSafe,
+      rspLevelSafe,
+      rspRmsSafe,
       baselineRspMaxDeviationDb: baselineMetrics?.rspMaxDeviationDb ?? null,
       candidateRspMaxDeviationDb: metrics?.rspMaxDeviationDb ?? null,
       baselineRspLevel,
@@ -446,8 +451,18 @@ export function rebalanceBroadValleyBank({
       shapeAndLevelSafe,
       usesRepurposedCompanion: candidate.usesRepurposedCompanion,
       adjustedShoulderCount: candidate.adjustedShoulderCount,
+      bankLimits: candidate.limits,
       filterSignature: signature(candidate.filters),
-    });
+    };
+    if (verification.samples.length < 8) verification.samples.push(verificationSample);
+    if (!verification.bestValleySample
+      || verificationSample.valleyImprovementDb > verification.bestValleySample.valleyImprovementDb) {
+      verification.bestValleySample = verificationSample;
+    }
+    if (candidate.usesRepurposedCompanion && (!verification.bestRepurposedSample
+      || verificationSample.valleyImprovementDb > verification.bestRepurposedSample.valleyImprovementDb)) {
+      verification.bestRepurposedSample = verificationSample;
+    }
     if (!metrics) {
       verification.missingMetrics += 1;
       continue;
