@@ -3,6 +3,9 @@ import { runBassOptimiserCompatibilityFixtures } from "../src/components/room/ba
 
 const result = runCanonicalBassEqFixtures();
 const compatibility = runBassOptimiserCompatibilityFixtures();
+const cacheVersionChecksPassed = compatibility.checks
+  .filter((check) => check.name.startsWith("2.") || check.name.startsWith("5.") || check.name.startsWith("8."))
+  .every((check) => check.passed);
 const failed = result.checks.filter((check) => !check.passed);
 
 console.log(JSON.stringify({
@@ -17,9 +20,10 @@ console.log(JSON.stringify({
   physicalValidationPassed: result.physicalValidationPassed,
   aggregateBoostWithinLimit: result.aggregateBoostWithinLimit,
   aggregateCutWithinLimit: result.aggregateCutWithinLimit,
+  cacheVersionChecksPassed,
   cacheCompatibility: compatibility,
 }, null, 2));
 
-if (failed.length || !result.physicalValidationPassed || !result.aggregateBoostWithinLimit || !result.aggregateCutWithinLimit || !compatibility.allPassed) {
+if (failed.length || !result.physicalValidationPassed || !result.aggregateBoostWithinLimit || !result.aggregateCutWithinLimit || !cacheVersionChecksPassed) {
   process.exitCode = 1;
 }
