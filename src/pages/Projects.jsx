@@ -924,31 +924,33 @@ export default function ProjectsPage() {
         <h1 style={{ margin: 0, fontSize: 28, color: BRAND.text }}>Projects</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {showCapacityIndicator && promotionEffective && !promoLoading && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 10,
-                  border: `1px solid ${BRAND.border}`,
-                  background: "#F3F0EB",
-                  fontSize: 13,
-                  color: BRAND.subtext,
-                  whiteSpace: "nowrap",
-                  lineHeight: 1.35,
-                }}
-                title={promoMessage || ''}
-              >
-                <div style={{ fontWeight: 700, color: "#213428", fontSize: 12, letterSpacing: "0.02em" }}>
-                  {promoHeadline || 'Premium Partner Promotion'}
+            <div
+              style={{
+                padding: "8px 14px",
+                borderRadius: 10,
+                border: `1px solid #213428`,
+                borderLeft: "3px solid #213428",
+                background: "#F3F0EB",
+                lineHeight: 1.35,
+                maxWidth: 320,
+              }}
+            >
+              <div style={{ fontSize: 9, fontWeight: 700, color: "#213428", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                Promotion Live
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.text, marginTop: 2 }}>
+                {promoHeadline || 'Unlimited Professional Projects'}
+              </div>
+              <div style={{ fontSize: 11, color: BRAND.subtext }}>
+                {`Unlimited Professional Projects until ${formatPromotionEndDate(promoEndsAt)}`}
+              </div>
+              {promoMessage && (
+                <div style={{ fontSize: 10, color: BRAND.subtext, marginTop: 2, lineHeight: 1.3 }}>
+                  {promoMessage}
                 </div>
-                <div style={{ fontSize: 11, color: BRAND.subtext }}>
-                  {promoMessage
-                    ? (promoMessage.length > 60 ? promoMessage.slice(0, 57) + '…' : promoMessage)
-                    : `Unlimited Professional Projects until ${formatPromotionEndDate(promoEndsAt)}`}
-                </div>
-                <div style={{ fontSize: 11, color: BRAND.subtext }}>
-                  <strong style={{ color: BRAND.text }}>{capacityLoading ? '…' : professionalCapacity}</strong> banked
-                </div>
+              )}
+              <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 2 }}>
+                <strong style={{ color: BRAND.text }}>{capacityLoading ? '…' : professionalCapacity}</strong> banked
               </div>
             </div>
           )}

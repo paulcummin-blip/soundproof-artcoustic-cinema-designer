@@ -50,13 +50,17 @@ export default function PurchaseProjects() {
           style={{
             padding: 20,
             background: "#FFFFFF",
-            border: "1px solid #DCDBD6",
+            border: "1px solid #213428",
+            borderLeft: "3px solid #213428",
             borderRadius: 12,
             marginBottom: 24,
             maxWidth: 640,
           }}
         >
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#213428", marginBottom: 8 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#213428", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+            Promotion Live
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1B1A1A", marginBottom: 8 }}>
             Unlimited Professional Project access
           </div>
           <div style={{ fontSize: 14, color: "#3E4349", lineHeight: 1.5 }}>
