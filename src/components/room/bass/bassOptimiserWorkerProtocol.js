@@ -1,5 +1,5 @@
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
-export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v22-correction-window-anchor";
+export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v23-full-band-operating-window";
 export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v35-capability-clipped-fit-target";
 export const BASS_RESULT_SCHEMA_VERSION = 22;
 export const BASS_OPTIMISER_POOL_PROPERTY = "pool";
