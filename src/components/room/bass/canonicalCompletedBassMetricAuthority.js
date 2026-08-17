@@ -441,7 +441,11 @@ export function buildCanonicalCompletedBassMetricAuthority({
     p18Input: {
       canonicalPostEqRsp: postEqRsp,
       assessmentBand: { ...ASSESSMENT_BAND },
-      requiredExtensionHz: requestedNorm.selectedP14RequiredExtensionHz,
+      // P18 is independently graded at the selected P14 output. Its L1 floor
+      // is carried by the completed P18 authority, never borrowed from P14.
+      requiredExtensionHz: isFiniteNum(finalOptimisedBassResponse?.finalSeatVariationData?.p18?.authority?.requiredExtensionHz)
+        ? Number(finalOptimisedBassResponse.finalSeatVariationData.p18.authority.requiredExtensionHz)
+        : null,
     },
     p19Input: {
       canonicalPostEqRsp: postEqRsp,
