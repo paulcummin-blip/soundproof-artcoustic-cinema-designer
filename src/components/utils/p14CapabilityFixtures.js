@@ -1,4 +1,5 @@
 import { assessP14Capability, combinedApprovedP14Capability, formatP14Capability, gradeP14Minimum, gradeP14Recommended } from "./p14CapabilityAuthority.js";
+import { buildPositionAwareP14Capability } from "./canonicalBassAuthorityEvaluation.js";
 import { computeP18InRoomF3, computeParam18ProductExtension, computeP19DeviationBelowSchroeder } from "./rp22BassMetrics.jsx";
 
 const subs = (modelKey, count) => Array.from({ length: count }, (_, index) => ({ id: `${modelKey}-${index + 1}`, modelKey }));
@@ -35,6 +36,31 @@ export function runP14CapabilityFixtures() {
     check(`${modelKey.toUpperCase()} two-sub power sum`, 3.0103, two.rawCapabilityDb - one.rawCapabilityDb, Math.abs((two.rawCapabilityDb - one.rawCapabilityDb) - 3.0103) < 0.001);
     check(`${modelKey.toUpperCase()} four-sub power sum`, 6.0206, four.rawCapabilityDb - one.rawCapabilityDb, Math.abs((four.rawCapabilityDb - one.rawCapabilityDb) - 6.0206) < 0.001);
   });
+
+  const fourSub2Product = results["sub2-12-4"];
+  const deliberatelyInflatedRoomEnvelope = [15, 20, 30, 40, 60, 80, 100, 120]
+    .map((frequency) => ({ frequency, spl: 130 }));
+  const boundedFourSub2 = buildPositionAwareP14Capability({
+    canonicalResult: {
+      maximumSplCurveAfterEq: deliberatelyInflatedRoomEnvelope,
+      maximumSplCurveBeforeEq: deliberatelyInflatedRoomEnvelope,
+    },
+    productDiagnostic: fourSub2Product,
+    targetBasis: "recommended",
+    requiredExtensionHz: 15,
+  });
+  check(
+    "Room-envelope integration cannot inflate four SUB2-12s above the approved product ceiling",
+    fourSub2Product.value,
+    boundedFourSub2.value,
+    Math.abs(boundedFourSub2.value - fourSub2Product.value) < 1e-9 && boundedFourSub2.productCeilingApplied,
+  );
+  check(
+    "Four SUB2-12s cannot claim Recommended L4 P14",
+    "≤ L3",
+    boundedFourSub2.recommendedLevel,
+    boundedFourSub2.recommendedLevel <= 3,
+  );
 
   const sub2Low = pointAt(results["sub2-12-1"].capabilityCurve, 20)?.rawCapabilityDb;
   const sub4Low = pointAt(results["sub4-12-1"].capabilityCurve, 20)?.rawCapabilityDb;
