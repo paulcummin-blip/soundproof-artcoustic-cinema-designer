@@ -15,6 +15,7 @@ import { identifyProtectedNullRegions, isProtectedSmoothedFrequency } from "@/co
 import { findAggregatePeakBoostViolations } from "@/components/utils/designEqPhysicsAuthority";
 import { normaliseHouseCurveToP14Total } from "@/components/utils/p14HouseCurveNormalisation";
 import { p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
+import { assessP14Capability } from "@/components/utils/p14CapabilityAuthority";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getCurrentSystemSourceOutput, getSystemSourceCapability, getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { salvagePartialBank, buildSalvageEqResult } from "@/components/utils/designEqPartialBankSalvage";
@@ -185,6 +186,74 @@ function capCurveToEnvelope(requestedCurve, maximumCurve) {
       requestedSpl,
       maximumSpl,
       capabilityLimited: requestedSpl > maximumSpl + 0.05,
+    };
+  });
+}
+
+export function buildProductOperatingEnvelope({
+  frequencyGrid = [], targetCurve = [], activeSubs = [], combinedEqCurve = [],
+  selectedOperatingOutputDb = null, targetBasis = "minimum",
+} = {}) {
+  if (!Array.isArray(frequencyGrid) || !frequencyGrid.length || !activeSubs.length
+    || !Number.isFinite(Number(selectedOperatingOutputDb))) {
+    return { curve: [], p14CapabilityDb: null, operatingHeadroomDb: null, referenceCapabilityDb: null };
+  }
+  const productP14 = assessP14Capability({
+    activeSubs,
+    combinedEqCurve: (combinedEqCurve || []).map((point) => ({
+      frequency: point.frequency,
+      spl: Math.max(0, Number(point?.spl) || 0),
+    })),
+    targetBasis,
+  });
+  const p14CapabilityDb = Number(productP14?.p14CapabilityDb ?? productP14?.value);
+  const operatingHeadroomDb = Number.isFinite(p14CapabilityDb)
+    ? Math.max(0, p14CapabilityDb - Number(selectedOperatingOutputDb))
+    : 0;
+  const capabilities = frequencyGrid.map((frequency) => ({
+    frequency: Number(frequency),
+    capabilityDb: getSystemSourceCapability(activeSubs, Number(frequency)),
+  })).filter((point) => Number.isFinite(point.frequency) && Number.isFinite(point.capabilityDb));
+  const referencePoints = capabilities.filter((point) => point.frequency >= 30 && point.frequency <= 120);
+  const referenceCapabilityDb = referencePoints.length
+    ? Math.max(...referencePoints.map((point) => point.capabilityDb))
+    : null;
+  if (!Number.isFinite(referenceCapabilityDb)) {
+    return { curve: [], p14CapabilityDb, operatingHeadroomDb, referenceCapabilityDb: null };
+  }
+  const curve = capabilities.map((point) => {
+    const targetSpl = interpolateCorrection(targetCurve, point.frequency);
+    const relativeProductLimitDb = point.capabilityDb - referenceCapabilityDb + operatingHeadroomDb;
+    return {
+      frequency: point.frequency,
+      spl: Number.isFinite(targetSpl) ? targetSpl + relativeProductLimitDb : point.capabilityDb,
+      productCapabilityDb: point.capabilityDb,
+      relativeProductLimitDb,
+    };
+  });
+  return {
+    curve,
+    p14CapabilityDb,
+    operatingHeadroomDb,
+    referenceCapabilityDb,
+    authority: "power-summed-product-output-envelope-at-selected-p14",
+  };
+}
+
+function capCurveToProductOperatingEnvelope(requestedCurve, productEnvelope) {
+  if (!Array.isArray(productEnvelope) || !productEnvelope.length) {
+    return (Array.isArray(requestedCurve) ? requestedCurve : []).map((point) => ({ ...point }));
+  }
+  return (Array.isArray(requestedCurve) ? requestedCurve : []).map((point) => {
+    if (!Number.isFinite(point?.frequency) || point.frequency > 120) return { ...point };
+    const productLimitSpl = interpolateCorrection(productEnvelope, point.frequency);
+    if (!Number.isFinite(productLimitSpl) || !Number.isFinite(point?.spl)) return { ...point };
+    return {
+      ...point,
+      requestedSpl: Number.isFinite(point.requestedSpl) ? point.requestedSpl : point.spl,
+      productOperatingLimitSpl,
+      spl: Math.min(point.spl, productLimitSpl),
+      capabilityLimited: point.capabilityLimited === true || point.spl > productLimitSpl + 0.05,
     };
   });
 }
