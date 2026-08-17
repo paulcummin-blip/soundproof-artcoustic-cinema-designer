@@ -475,8 +475,10 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     lfCapabilityProtection: null,
     houseCurveDiagnostics: {
       preRsp: selected.baselineRspMetrics,
-      officialP19VariationDb: rspMaxDev,
-      correctableP19VariationDb: rspCorrectableMaxDev,
+      officialP19VariationDb: Number.isFinite(rspMaxDev) ? rspMaxDev / 2 : null,
+      correctableP19VariationDb: Number.isFinite(rspCorrectableMaxDev) ? rspCorrectableMaxDev / 2 : null,
+      officialP19TotalDifferenceDb: rspMaxDev,
+      correctableP19TotalDifferenceDb: rspCorrectableMaxDev,
       assessmentStartHz,
       assessmentEndHz,
       fitStartHz,
