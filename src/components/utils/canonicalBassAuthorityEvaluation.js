@@ -15,7 +15,7 @@ import { buildPostEqBassCapabilityOutcome } from "@/components/utils/postEqBassC
 import { assessP18AgainstRequiredExtension, buildBassTargetWarning } from "@/components/utils/bassDesignPhilosophyAuthority";
 import { assessP18Extension, normalizeP18TargetBasis, p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
 
-function buildPositionAwareP14Capability({
+export function buildPositionAwareP14Capability({
   canonicalResult,
   productDiagnostic,
   targetBasis,
@@ -23,18 +23,38 @@ function buildPositionAwareP14Capability({
 }) {
   const maximumAfterEq = canonicalResult?.maximumSplCurveAfterEq || [];
   const maximumBeforeEq = canonicalResult?.maximumSplCurveBeforeEq || [];
-  const deliveredDbC = integrateRawResponseLevelDbC({
+  const positionAwareEnvelopeDbC = integrateRawResponseLevelDbC({
     rawCurve: maximumAfterEq,
     lowerHz: requiredExtensionHz,
     upperHz: 120,
   });
-  if (!Number.isFinite(deliveredDbC)) return productDiagnostic;
+  if (!Number.isFinite(positionAwareEnvelopeDbC)) return productDiagnostic;
 
-  const beforeEqDbC = integrateRawResponseLevelDbC({
+  const positionAwareEnvelopeBeforeEqDbC = integrateRawResponseLevelDbC({
     rawCurve: maximumBeforeEq,
     lowerHz: requiredExtensionHz,
     upperHz: 120,
   });
+  const approvedProductDbC = Number(productDiagnostic?.p14CapabilityDb ?? productDiagnostic?.value);
+  const approvedProductBeforeEqDbC = Number(
+    productDiagnostic?.productCapabilityBeforeEqDb ?? productDiagnostic?.rawCapabilityDb,
+  );
+
+  // A maximum-continuous SPL trace is an alternative-frequency capability
+  // envelope, not simultaneous broadband energy. Integrating every maximum
+  // point lets room peaks be counted repeatedly and can inflate four 120 dB
+  // continuous SUB2-12s to an impossible 135+ dBC. Room/placement modelling
+  // may reduce the available result, but it must never raise the published P14
+  // authority above the approved frequency-weighted product ceiling.
+  const capabilityDbC = Number.isFinite(approvedProductDbC)
+    ? Math.min(positionAwareEnvelopeDbC, approvedProductDbC)
+    : positionAwareEnvelopeDbC;
+  const beforeEqDbC = Number.isFinite(approvedProductBeforeEqDbC)
+    ? Math.min(positionAwareEnvelopeBeforeEqDbC, approvedProductBeforeEqDbC)
+    : positionAwareEnvelopeBeforeEqDbC;
+  const productCeilingApplied = Number.isFinite(approvedProductDbC)
+    && approvedProductDbC < positionAwareEnvelopeDbC - 1e-9;
+
   const basis = normalizeP14TargetBasis(targetBasis);
   const assessmentPoints = maximumAfterEq.filter((point) =>
     Number.isFinite(point?.frequency)
@@ -42,40 +62,53 @@ function buildPositionAwareP14Capability({
     && point.frequency >= requiredExtensionHz
     && point.frequency <= 120
   );
-  const limitingPoint = assessmentPoints.reduce((lowest, point) =>
+  const positionAwareLimitingPoint = assessmentPoints.reduce((lowest, point) =>
     !lowest || point.spl < lowest.spl ? point : lowest, null);
-  const headroomConsumedByEqDb = Number.isFinite(beforeEqDbC)
-    ? Math.max(0, beforeEqDbC - deliveredDbC)
-    : productDiagnostic?.headroomConsumedByEqDb ?? null;
+  const headroomConsumedByEqDb = productCeilingApplied
+    ? productDiagnostic?.headroomConsumedByEqDb ?? productDiagnostic?.eqHeadroomConsumedDb ?? null
+    : Number.isFinite(beforeEqDbC)
+      ? Math.max(0, beforeEqDbC - capabilityDbC)
+      : productDiagnostic?.headroomConsumedByEqDb ?? null;
+  const capabilityCurve = productCeilingApplied && Array.isArray(productDiagnostic?.capabilityCurve)
+    ? productDiagnostic.capabilityCurve
+    : maximumAfterEq.map((point) => ({
+        frequency: point.frequency,
+        rawCapabilityDb: null,
+        positiveEqBoostDb: null,
+        remainingCapabilityDb: point.spl,
+      }));
 
   return {
     ...(productDiagnostic || {}),
-    p14CapabilityDb: deliveredDbC,
-    value: deliveredDbC,
-    formatted: formatP14Capability(deliveredDbC),
-    level: gradeP14ForBasis(deliveredDbC, basis),
+    p14CapabilityDb: capabilityDbC,
+    value: capabilityDbC,
+    formatted: formatP14Capability(capabilityDbC),
+    level: gradeP14ForBasis(capabilityDbC, basis),
     targetBasis: basis,
     targetBasisLabel: formatP14BasisLabel(basis),
-    minimumLevel: gradeP14Minimum(deliveredDbC),
-    recommendedLevel: gradeP14Recommended(deliveredDbC),
+    minimumLevel: gradeP14Minimum(capabilityDbC),
+    recommendedLevel: gradeP14Recommended(capabilityDbC),
     rawCapabilityDb: beforeEqDbC,
-    productCapabilityBeforeEqDb: beforeEqDbC,
-    capabilityRemainingAfterEqDb: deliveredDbC,
+    productCapabilityBeforeEqDb: approvedProductBeforeEqDbC,
+    capabilityRemainingAfterEqDb: capabilityDbC,
     eqHeadroomConsumedDb: headroomConsumedByEqDb,
     headroomConsumedByEqDb,
-    limitingFrequency: limitingPoint?.frequency ?? null,
-    capabilityCurve: maximumAfterEq.map((point) => ({
-      frequency: point.frequency,
-      rawCapabilityDb: null,
-      positiveEqBoostDb: null,
-      remainingCapabilityDb: point.spl,
-    })),
+    limitingFrequency: productCeilingApplied
+      ? productDiagnostic?.limitingFrequency ?? null
+      : positionAwareLimitingPoint?.frequency ?? null,
+    capabilityCurve,
     requiredExtensionHz,
     positionAware: true,
     includesRoomGeometry: true,
     includesProductFrequencyResponse: true,
     includesProductOutputLimit: true,
-    source: "position-aware-authoritative-engine-maximum-spl-envelope-post-eq",
+    productCeilingApplied,
+    approvedProductCapabilityDbC: Number.isFinite(approvedProductDbC) ? approvedProductDbC : null,
+    positionAwareEnvelopeCapabilityDbC,
+    positionAwareEnvelopeBeforeEqDbC,
+    source: productCeilingApplied
+      ? "position-aware-envelope-bounded-by-approved-product-capability"
+      : "position-aware-authoritative-engine-maximum-spl-envelope-post-eq",
     productOnlyDiagnostic: productDiagnostic || null,
   };
 }
