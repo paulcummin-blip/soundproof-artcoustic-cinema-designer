@@ -79,16 +79,25 @@ export const HOUSE_CURVE_P19_END_HZ = 120;
 export const HOUSE_CURVE_CORRECTION_START_HZ = 20;
 export const HOUSE_CURVE_CORRECTION_END_HZ = 200;
 
-export function resolveHouseCurveDomains(frequencyGrid, configuredCorrectionEndHz) {
+export function resolveHouseCurveDomains(
+  frequencyGrid,
+  configuredCorrectionEndHz,
+  configuredTransitionHz = HOUSE_CURVE_P19_END_HZ,
+) {
   const finite = (frequencyGrid || []).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
   const availableStartHz = finite[0] ?? null;
   const availableEndHz = finite.at(-1) ?? null;
   const correctionStartHz = Math.max(HOUSE_CURVE_CORRECTION_START_HZ, availableStartHz ?? HOUSE_CURVE_CORRECTION_START_HZ);
   const requestedEnd = Number.isFinite(configuredCorrectionEndHz) ? configuredCorrectionEndHz : availableEndHz;
   const correctionEndHz = Math.min(requestedEnd ?? HOUSE_CURVE_P19_END_HZ, availableEndHz ?? requestedEnd ?? HOUSE_CURVE_P19_END_HZ);
+  const requestedTransitionHz = Number.isFinite(Number(configuredTransitionHz)) && Number(configuredTransitionHz) > 0
+    ? Number(configuredTransitionHz)
+    : HOUSE_CURVE_P19_END_HZ;
   return {
     p19StartHz: Math.max(HOUSE_CURVE_P19_START_HZ, availableStartHz ?? HOUSE_CURVE_P19_START_HZ),
-    p19EndHz: Math.min(HOUSE_CURVE_P19_END_HZ, availableEndHz ?? HOUSE_CURVE_P19_END_HZ),
+    // RP22 P19/P20 end at the room's calculated transition (Schroeder)
+    // frequency. The 200 Hz PEQ correction limit is a separate domain.
+    p19EndHz: Math.min(requestedTransitionHz, availableEndHz ?? requestedTransitionHz),
     correctionStartHz,
     correctionEndHz,
   };
