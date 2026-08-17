@@ -76,16 +76,12 @@ function valleyDeficit(points, region) {
     : 0;
 }
 
-function shoulderPeaks(points, region) {
-  const best = (candidates) => candidates
-    .sort((left, right) => right.residualDb - left.residualDb)[0];
-  const left = best(points.filter((point) => !point.protected
-    && point.frequency >= region.startHz / 2 ** 0.5
-    && point.frequency < region.startHz));
-  const right = best(points.filter((point) => !point.protected
-    && point.frequency > region.endHz
-    && point.frequency <= region.endHz * 2 ** 0.35));
-  return [left, right].filter((point) => (point?.residualDb ?? 0) >= 2);
+function shoulderPeak(points, region) {
+  const candidates = points.filter((point) => !point.protected && (
+    (point.frequency >= region.startHz / 2 ** 0.5 && point.frequency < region.startHz)
+    || (point.frequency > region.endHz && point.frequency <= region.endHz * 2 ** 0.35)
+  )).sort((left, right) => right.residualDb - left.residualDb);
+  return (candidates[0]?.residualDb ?? 0) >= 2 ? candidates[0] : null;
 }
 
 function realSeatsSafe(before, after) {
@@ -147,18 +143,14 @@ export function rebalanceBroadValleyBank({
         && Math.abs(Math.log2(centreHz / entry.filter.frequencyHz)) <= 0.5)
       .sort((left, right) => right.contributionDb - left.contributionDb)
       .map((entry) => entry.index);
-    const shoulders = shoulderPeaks(baselinePoints, region);
-    const shoulderCuts = shoulders.map((shoulder) => {
-      const match = current
-        .map((filter, index) => ({
-          filter, index, shoulder,
-          distance: Math.abs(Math.log2(shoulder.frequency / filter.frequencyHz)),
-        }))
-        .filter((entry) => entry.filter.gainDb < -0.1 && entry.distance <= 0.3)
-        .sort((left, right) => left.distance - right.distance)[0];
-      return match || null;
-    }).filter((entry, index, entries) =>
-      entry && entries.findIndex((candidate) => candidate?.index === entry.index) === index);
+    const shoulder = shoulderPeak(baselinePoints, region);
+    const shoulderCut = shoulder ? current
+      .map((filter, index) => ({
+        filter, index,
+        distance: Math.abs(Math.log2(shoulder.frequency / filter.frequencyHz)),
+      }))
+      .filter((entry) => entry.filter.gainDb < -0.1 && entry.distance <= 0.3)
+      .sort((left, right) => left.distance - right.distance)[0] : null;
     const diagnostic = {
       startHz: region.startHz,
       endHz: region.endHz,
@@ -172,7 +164,7 @@ export function rebalanceBroadValleyBank({
         Q: blocker.filter.Q,
         contributionDb: blocker.contributionDb,
       } : null,
-      shoulderFrequenciesHz: shoulders.map((shoulder) => shoulder.frequency),
+      shoulderFrequencyHz: shoulder?.frequency ?? null,
       evaluatedBanks: 0,
       legalBanks: 0,
       acceptedBanks: 0,
@@ -188,7 +180,7 @@ export function rebalanceBroadValleyBank({
       ? [...new Set([current[boostIndexes[0]].Q, 1.5, 2, 2.5, 3]
         .map((value) => Number(clamp(value, 0.5, 4).toFixed(4))))]
       : [1.5, 2, 2.5, 3];
-    const shoulderDeltas = shoulderCuts.length ? [0, -1, -2, -3, -4] : [0];
+    const shoulderDeltas = shoulderCut ? [0, -1, -2, -3, -4] : [0];
 
     for (const blockerQ of blockerQValues) for (const boostAddition of boostAdditions) {
       for (const boostQ of boostQValues) for (const shoulderDelta of shoulderDeltas) {
@@ -223,17 +215,16 @@ export function rebalanceBroadValleyBank({
             reason: "Joint broad-valley rebalance: use available source-domain boost",
           });
         }
-        if (shoulderDelta < 0) {
-          shoulderCuts.forEach(({ index, shoulder }) => {
-            proposed[index] = {
-              ...proposed[index],
-              frequencyHz: proposed[index].frequencyHz
-                + (shoulder.frequency - proposed[index].frequencyHz) * 0.5,
-              gainDb: clamp(proposed[index].gainDb + shoulderDelta, -15, 0),
-              Q: clamp(Math.max(proposed[index].Q, 8), 0.5, 10),
-              reason: "Joint broad-valley rebalance: retain adjacent peak control",
-            };
-          });
+        if (shoulderCut && shoulderDelta < 0) {
+          const index = shoulderCut.index;
+          proposed[index] = {
+            ...proposed[index],
+            frequencyHz: proposed[index].frequencyHz
+              + (shoulder.frequency - proposed[index].frequencyHz) * 0.5,
+            gainDb: clamp(proposed[index].gainDb + shoulderDelta, -15, 0),
+            Q: clamp(Math.max(proposed[index].Q, 8), 0.5, 10),
+            reason: "Joint broad-valley rebalance: retain adjacent peak control",
+          };
         }
         const candidateSignature = signature(proposed);
         if (seen.has(candidateSignature)) continue;
@@ -253,13 +244,6 @@ export function rebalanceBroadValleyBank({
         );
         const candidateQuality = quality(points);
         if (!candidateQuality) continue;
-        const shoulderWorsened = shoulders.some((shoulder) => {
-          const candidatePoint = points.reduce((nearest, point) =>
-            Math.abs(point.frequency - shoulder.frequency) < Math.abs(nearest.frequency - shoulder.frequency)
-              ? point : nearest);
-          return candidatePoint.residualDb > shoulder.residualDb + 0.25;
-        });
-        if (shoulderWorsened) continue;
         const valleyImprovementDb = valleyDeficit(baselinePoints, region)
           - valleyDeficit(points, region);
         const centreCorrectionIncreaseDb = correctionAt(centreHz, proposed)
