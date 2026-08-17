@@ -104,7 +104,7 @@ export function buildPositionAwareP14Capability({
     includesProductOutputLimit: true,
     productCeilingApplied,
     approvedProductCapabilityDbC: Number.isFinite(approvedProductDbC) ? approvedProductDbC : null,
-    positionAwareEnvelopeCapabilityDbC,
+    positionAwareEnvelopeCapabilityDbC: positionAwareEnvelopeDbC,
     positionAwareEnvelopeBeforeEqDbC,
     source: productCeilingApplied
       ? "position-aware-envelope-bounded-by-approved-product-capability"
