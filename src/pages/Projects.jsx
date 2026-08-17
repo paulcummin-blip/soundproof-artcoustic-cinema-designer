@@ -8,6 +8,8 @@ import ManageStatusesDialog from "@/components/projects/ManageStatusesDialog";
 import { useProjectStatuses } from "@/components/projects/useProjectStatuses";
 import { normalizeStatusId, getStatusColor } from "@/components/projects/statusDefaults";
 import { useProjectsSortPreference } from "@/components/projects/useProjectsSortPreference";
+import { useAuth } from "@/lib/AuthContext";
+import { useProfessionalCapacity } from "@/lib/commercial/useProfessionalCapacity";
 
 // Build lookup maps from the shared label arrays
 const dolbyLabelMap = Object.fromEntries(dolbyConfigs.map(c => [c.value, c.label]));
@@ -112,6 +114,10 @@ function fieldStyle() {
 // ---- Component ----
 export default function ProjectsPage() {
   const projectActions = useProjectActions();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const { available: professionalCapacity, loading: capacityLoading, refresh: refreshCapacity } = useProfessionalCapacity(user?.account_id, isAdmin);
+  const showCapacityIndicator = !isAdmin && !!user?.account_id;
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -306,6 +312,7 @@ export default function ProjectsPage() {
     setProjects((arr) => [p, ...arr]);
     setCreated(p);
     window.setTimeout(() => setCreated(null), 4000);
+    refreshCapacity && refreshCapacity();
   }
 
   function handleProjectUpdated(updated) {
@@ -826,21 +833,28 @@ export default function ProjectsPage() {
         }}
       >
         <h1 style={{ margin: 0, fontSize: 28, color: BRAND.text }}>Projects</h1>
-        <button
-          type="button"
-          onClick={openDialog}
-          style={{
-            padding: "13px 20px",
-            borderRadius: 10,
-            border: `1px solid ${BRAND.border}`,
-            background: BRAND.btn,
-            color: BRAND.btnText,
-            cursor: "pointer",
-            fontSize: 18,
-          }}
-        >
-          + New Project
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {showCapacityIndicator && (
+            <div style={{ fontSize: 13, color: BRAND.subtext, whiteSpace: "nowrap" }}>
+              Professional Projects: <strong style={{ color: BRAND.text }}>{capacityLoading ? '…' : professionalCapacity}</strong> available
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={openDialog}
+            style={{
+              padding: "13px 20px",
+              borderRadius: 10,
+              border: `1px solid ${BRAND.border}`,
+              background: BRAND.btn,
+              color: BRAND.btnText,
+              cursor: "pointer",
+              fontSize: 18,
+            }}
+          >
+            + New Project
+          </button>
+        </div>
       </div>
 
       {/* Controls */}

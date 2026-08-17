@@ -11,7 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Project } from "@/entities/Project";
+import { base44 } from "@/api/base44Client";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import CreateProjectStatusPanel from "@/components/projects/CreateProjectStatusPanel";
 import { useProjectStatuses } from "@/components/projects/useProjectStatuses";
 import { normalizeStatusId } from "@/components/projects/statusDefaults";
 
@@ -60,9 +63,12 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
   const { activeStatuses } = useProjectStatuses();
 
   const [formData, setFormData] = useState(EMPTY_FORM);
+  const [createStatus, setCreateStatus] = useState(null);
+  const navigate = useNavigate();
 
   // When editProject changes (or dialog opens), populate form
   useEffect(() => {
+    setCreateStatus(null);
     if (isEditMode && editProject) {
       setFormData({
         name: editProject.name || "",
@@ -107,18 +113,40 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
         onProjectUpdated && onProjectUpdated(updated);
         onOpenChange(false);
       } else {
-        if (!user?.account_id) {
-          alert("Your Sound Proof account has not yet been linked to an organisation. Please contact Sound Proof support.");
-          return;
+        setCreateStatus('SUBMITTING');
+        try {
+          const res = await base44.functions.invoke('createProfessionalProject', {
+            name: payload.name,
+            client_name: payload.client_name,
+            project_status: payload.project_status,
+            room_length: payload.room_length,
+            room_width: payload.room_width,
+            room_height: payload.room_height,
+            dolby_config: payload.dolby_config,
+            target_spl: payload.target_spl,
+            amplifier_power: payload.amplifier_power,
+            notes: payload.notes,
+            acoustic_treatment_enabled: true,
+          });
+          const result = res.data;
+          if (result.status === 'SUCCESS') {
+            setFormData(EMPTY_FORM);
+            setCreateStatus(null);
+            onProjectCreated && onProjectCreated(result.project);
+            onOpenChange(false);
+          } else {
+            setCreateStatus(result.status || 'CREATION_FAILED');
+          }
+        } catch (err) {
+          const result = err?.response?.data;
+          if (result?.status === 'OUT_OF_CAPACITY') {
+            setCreateStatus('OUT_OF_CAPACITY');
+          } else if (result?.status === 'ACCOUNT_NOT_LINKED') {
+            setCreateStatus('ACCOUNT_NOT_LINKED');
+          } else {
+            setCreateStatus('CREATION_FAILED');
+          }
         }
-        const created = await Project.create({
-          ...payload,
-          account_id: user.account_id,
-          acoustic_treatment_enabled: true,
-        });
-        setFormData(EMPTY_FORM);
-        onProjectCreated && onProjectCreated(created);
-        onOpenChange(false);
       }
     } catch (error) {
       console.error("Failed to save project:", error);
@@ -133,6 +161,21 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
           <DialogTitle className="text-xl font-bold font-header">{isEditMode ? "Edit Cinema Project" : "Create New Cinema Project"}</DialogTitle>
         </DialogHeader>
         
+        {createStatus && createStatus !== 'SUBMITTING' ? (
+          <CreateProjectStatusPanel
+            status={createStatus}
+            onPurchaseProjects={() => {
+              setCreateStatus(null);
+              onOpenChange(false);
+              navigate('/PurchaseProjects');
+            }}
+            onRetry={() => setCreateStatus(null)}
+            onClose={() => {
+              setCreateStatus(null);
+              onOpenChange(false);
+            }}
+          />
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-6 font-body">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
@@ -266,14 +309,15 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
             </Button>
             <Button
               type="submit"
-              disabled={!formData.name}
+              disabled={!formData.name || createStatus === 'SUBMITTING'}
               className="hover:bg-[#3E4349]"
               style={{ backgroundColor: "#1B1A1A", color: "#FFFFFF" }}
             >
-              {isEditMode ? "Save Changes" : "Create Project"}
+              {createStatus === 'SUBMITTING' ? "Creating..." : isEditMode ? "Save Changes" : "Create Project"}
             </Button>
           </div>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

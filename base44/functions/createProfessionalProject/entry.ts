@@ -51,6 +51,23 @@ export default async function(req) {
     }
     const projectName = (body.name && String(body.name).trim()) || 'Untitled Professional Project';
 
+    // Legitimate new-project input fields passed through from the browser.
+    // Backend-authoritative fields (account_id, commercial_tier, etc.) are NOT
+    // accepted from the client.
+    const projectFields = {
+      name: projectName,
+      client_name: body.client_name || '',
+      project_status: body.project_status || 'Prospective',
+      room_length: body.room_length ?? null,
+      room_width: body.room_width ?? null,
+      room_height: body.room_height ?? null,
+      dolby_config: body.dolby_config || null,
+      target_spl: body.target_spl ?? null,
+      amplifier_power: body.amplifier_power ?? null,
+      notes: body.notes || '',
+      acoustic_treatment_enabled: body.acoustic_treatment_enabled ?? false,
+    };
+
     // ── 3. Check available capacity from ledger SUM ──
     const available = await getAvailableCapacity(base44.asServiceRole, accountId);
     if (available <= 0) {
@@ -66,13 +83,12 @@ export default async function(req) {
     let project = null;
     try {
       project = await base44.asServiceRole.entities.Project.create({
-        name: projectName,
+        ...projectFields,
         account_id: accountId,
         commercial_tier: 'PROFESSIONAL',
         professional_activated_date: nowIso,
         commercial_source: 'PILOT',
         lifecycle_status: 'Draft',
-        project_status: 'Prospective'
       });
     } catch (createErr) {
       return Response.json({
@@ -144,15 +160,7 @@ export default async function(req) {
     const remaining = await getAvailableCapacity(base44.asServiceRole, accountId);
     return Response.json({
       status: 'SUCCESS',
-      project: {
-        id: project.id,
-        name: project.name,
-        account_id: project.account_id,
-        commercial_tier: 'PROFESSIONAL',
-        professional_activated_date: nowIso,
-        commercial_source: 'PILOT',
-        activation_ledger_entry_id: ledgerEntry.id
-      },
+      project: project,
       capacity_before: available,
       capacity_after: remaining,
       ledger_entry: {
