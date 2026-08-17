@@ -232,11 +232,28 @@ export function rebalanceBroadValleyBank({
     });
     if (effectiveCompanion) {
       const lowerShoulder = shoulders.find((shoulder) => shoulder.side === "lower");
-      const splitFrequencyHz = replacementCompanion
-        ? Math.sqrt(blocker.filter.frequencyHz
-          * (lowerShoulder?.frequency ?? region.startHz))
-        : Math.sqrt(blocker.filter.frequencyHz * effectiveCompanion.filter.frequencyHz);
-      const splitPresets = [
+      const upperShoulder = shoulders.find((shoulder) => shoulder.side === "upper");
+      // A genuinely weak slot is more valuable on the opposite shoulder of the
+      // broad valley than beside the original low-frequency peak cut. The old
+      // split placed the spare filter near the lower shoulder even when an
+      // existing high-Q cut already controlled it, leaving the upper shoulder
+      // untouched and forcing the valley boost to remain artificially small.
+      const splitFrequencyHz = replacementCompanion && upperShoulder
+        ? upperShoulder.frequency
+        : replacementCompanion
+          ? Math.sqrt(blocker.filter.frequencyHz
+            * (lowerShoulder?.frequency ?? region.startHz))
+          : Math.sqrt(blocker.filter.frequencyHz * effectiveCompanion.filter.frequencyHz);
+      const splitPresets = replacementCompanion && upperShoulder ? [
+        [-14, 2, -2, 8],
+        [-14, 2, -4, 8],
+        [-13, 2.5, -4, 10],
+        [-13, 2.5, -6, 10],
+        [-12, 3, -6, 8],
+        [-12, 3, -8, 10],
+        [-11, 3.5, -8, 10],
+        [-10, 4, -10, 10],
+      ] : [
         [-14, 2, -2, 3],
         [-13, 2.5, -3, 3],
         [-12, 3, -4, 3],
