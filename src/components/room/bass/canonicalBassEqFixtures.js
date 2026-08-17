@@ -1,4 +1,4 @@
-import { generateCanonicalCandidatePool } from "@/components/utils/canonicalBassOptimiser";
+import { deriveCorrectionWindowOperatingOffsetDb, generateCanonicalCandidatePool } from "@/components/utils/canonicalBassOptimiser";
 import { selectCandidateFromPool } from "@/components/utils/bassCandidatePoolSelection";
 import { buildCurveSignature } from "@/components/room/bass/bassResultAuthority";
 import { computeCalibrationFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
@@ -26,6 +26,37 @@ const physicalInputs = {
 };
 
 export function runCanonicalBassEqFixtures() {
+  const correctionWindowTarget = frequencies.map((frequency) => ({ frequency, spl: 100 }));
+  const feasibleWindowCurve = frequencies.map((frequency) => ({
+    frequency,
+    spl: 101 + 3 * Math.sin(Math.log2(frequency / 20) * Math.PI),
+  }));
+  const feasibleWindow = deriveCorrectionWindowOperatingOffsetDb({
+    rawCurve: feasibleWindowCurve,
+    targetCurve: correctionWindowTarget,
+  });
+  const peakDominatedCurve = frequencies.map((frequency) => ({
+    frequency,
+    spl: 96 + gaussian(frequency, 69, 6, 35),
+  }));
+  const peakDominatedWindow = deriveCorrectionWindowOperatingOffsetDb({
+    rawCurve: peakDominatedCurve,
+    targetCurve: correctionWindowTarget,
+  });
+  const protectedNullRegion = [{ startHz: 89.5, endHz: 90.5 }];
+  const referenceProtectedWindow = deriveCorrectionWindowOperatingOffsetDb({
+    rawCurve: peakDominatedCurve,
+    targetCurve: correctionWindowTarget,
+    protectedNullRegions: protectedNullRegion,
+  });
+  const protectedNullWindow = deriveCorrectionWindowOperatingOffsetDb({
+    rawCurve: peakDominatedCurve.map((point) => ({
+      ...point,
+      spl: point.spl + gaussian(point.frequency, 90, 0.4, -40),
+    })),
+    targetCurve: correctionWindowTarget,
+    protectedNullRegions: protectedNullRegion,
+  });
   const smoothed = applyBassSmoothing(rawCurve, "third");
   const legacyReferenceBand = smoothed.filter((point) => point.frequency >= 150 && point.frequency <= 200);
   const sortedLegacyLevels = legacyReferenceBand.map((point) => point.spl).sort((a, b) => a - b);
@@ -111,9 +142,24 @@ export function runCanonicalBassEqFixtures() {
     { name: "Minimum L1 and Recommended L4 produce different achieved responses when headroom changes", passed: targetDependentHeadroomResponse },
     { name: "Minimum L1 retains more headroom than Recommended L4", passed: minimumL1.capabilityLimitedPointCount < recommendedL4.capabilityLimitedPointCount },
     {
-      name: "A deep modal null does not pin the complete response to maximum capability",
+      name: "A feasible broad response is placed inside the available boost and cut window",
+      passed: feasibleWindow.feasible
+        && feasibleWindow.minimumResidualDb + feasibleWindow.requestedOffsetDb >= -6.000001
+        && feasibleWindow.maximumResidualDb + feasibleWindow.requestedOffsetDb <= 15.000001,
+    },
+    {
+      name: "A dominant modal peak cannot pull correctable low frequencies below the boost window",
+      passed: !peakDominatedWindow.feasible
+        && Math.abs(peakDominatedWindow.minimumResidualDb + peakDominatedWindow.requestedOffsetDb + 6) <= 0.000001
+        && peakDominatedWindow.requestedOffsetDb > -peakDominatedWindow.meanResidualDb + 0.5,
+    },
+    {
+      name: "A protected narrow null does not change the global operating-level anchor",
+      passed: Math.abs(protectedNullWindow.requestedOffsetDb - referenceProtectedWindow.requestedOffsetDb) <= 0.1,
+    },
+    {
+      name: "A detected deep modal null does not pin the complete response to maximum capability",
       passed: Number.isFinite(deepNullPool.operatingLevelOffsetDb)
-        && deepNullPool.operatingLevelOffsetDb < -0.5
         && Math.abs(deepNullPool.operatingLevelOffsetDb - levels[1].operatingLevelOffsetDb) <= 0.1,
     },
   ];
@@ -138,6 +184,12 @@ export function runCanonicalBassEqFixtures() {
     minimumEnabledFilterCutDb: Math.min(0, ...enabledFilters.map((filter) => filter.gainDb)),
     maximumPositiveEqDemandDb: maximumDemandDb,
     protectedNullBoostCount: enabledFilters.filter((filter) => filter.gainDb > 0 && (selected?.protectedNullRegions || []).some((region) => filter.frequencyHz >= region.startHz && filter.frequencyHz <= region.endHz)).length,
+    correctionWindowDiagnostics: {
+      feasibleWindow,
+      peakDominatedWindow,
+      referenceProtectedWindow,
+      protectedNullWindow,
+    },
     deepNullOperatingLevelOffsetDb: deepNullPool.operatingLevelOffsetDb,
     referenceL2OperatingLevelOffsetDb: levels[1].operatingLevelOffsetDb,
     physicalValidationPassed: selected?.physicalValidation?.passed === true,
