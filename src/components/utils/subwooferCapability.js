@@ -1,4 +1,4 @@
-import { MODELS, getSubwooferCurve, normaliseModelKey } from "@/components/models/speakers/registry";
+import { MODELS, getApprovedFrequencyRangeHz, getSubwooferCurve, normaliseModelKey } from "@/components/models/speakers/registry";
 
 const isFiniteNumber = (value) => Number.isFinite(Number(value));
 const isPositivePower = (value) => value !== null
@@ -114,8 +114,36 @@ export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, act
   const availableHeadroomDb = isFiniteNumber(systemCapabilityDb) && isFiniteNumber(currentSystemSourceOutputDb)
     ? systemCapabilityDb - currentSystemSourceOutputDb : null;
   const normalAllowedBoostDb = availableHeadroomDb == null ? Math.min(requested, maxBoostDb) : Math.max(0, Math.min(requested, maxBoostDb, availableHeadroomDb));
-  const lf = isFiniteNumber(usableLfHz) ? Number(usableLfHz) : null;
-  const rampFraction = lf == null ? 1 : Number(frequency) >= lf ? 1 : 0;
+  const evaluationHz = Number(frequency);
+  const sourceCoverage = (activeSubs || []).map((sub) => {
+    const modelKey = getModelKey(sub);
+    const curve = getSubwooferCurve(modelKey) || [];
+    const curveFrequencies = curve.map((point) => Number(point?.hz ?? point?.frequency)).filter(Number.isFinite);
+    const approvedRange = getApprovedFrequencyRangeHz(modelKey);
+    const lowerHz = curveFrequencies.length ? Math.min(...curveFrequencies) : Number(approvedRange?.[0]);
+    const upperHz = Math.max(
+      curveFrequencies.length ? Math.max(...curveFrequencies) : -Infinity,
+      Number.isFinite(Number(approvedRange?.[1])) ? Number(approvedRange[1]) : -Infinity,
+    );
+    return {
+      modelKey,
+      lowerHz: Number.isFinite(lowerHz) ? lowerHz : null,
+      upperHz: Number.isFinite(upperHz) ? upperHz : null,
+      covered: Number.isFinite(evaluationHz)
+        && Number.isFinite(lowerHz)
+        && Number.isFinite(upperHz)
+        && evaluationHz >= lowerHz
+        && evaluationHz <= upperHz,
+    };
+  });
+  // The approved usable-LF (-6 dB) point is not a brick wall. At lower P14
+  // operating levels, the frequency-dependent product curve can retain enough
+  // headroom for safe correction below that point. The actual capability curve
+  // and +6 dB bank limit remain authoritative; correction is blocked only
+  // outside the available engineering/approved frequency coverage.
+  const frequencyCoveredByProducts = sourceCoverage.length > 0
+    && sourceCoverage.every((source) => source.covered);
+  const rampFraction = frequencyCoveredByProducts ? 1 : 0;
   return {
     systemCapabilityDb,
     amplifierAuthority,
@@ -123,6 +151,9 @@ export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, act
     availableHeadroomDb,
     headroomDb: availableHeadroomDb,
     requestedBoostDb: requested,
+    usableLfHz: isFiniteNumber(usableLfHz) ? Number(usableLfHz) : null,
+    sourceCoverage,
+    frequencyCoveredByProducts,
     lfRampFraction: rampFraction,
     lfRampLimitDb: normalAllowedBoostDb * rampFraction,
     allowedBoostDb: normalAllowedBoostDb * rampFraction,
