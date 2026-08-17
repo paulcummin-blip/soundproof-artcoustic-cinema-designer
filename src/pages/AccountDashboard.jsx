@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { normalizeStatusId, getStatusLabel } from "@/components/projects/statusDefaults";
+import { aggregateCapacityBreakdown } from "@/lib/commercial/capacityService";
+import { aggregateTurnoverForYear } from "@/lib/commercial/commercialOverview";
+import CommercialSummaryCard from "@/components/admin/commercial/CommercialSummaryCard";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -89,8 +92,12 @@ export default function AccountDashboard() {
 
   const [account, setAccount] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [breakdown, setBreakdown] = useState(null);
+  const [turnover, setTurnover] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+
+  const CALENDAR_YEAR = new Date().getFullYear();
 
   useEffect(() => {
     if (!isAdmin || !accountId) return;
@@ -101,14 +108,18 @@ export default function AccountDashboard() {
         setLoading(true);
         setLoadError(null);
 
-        const [accountList, projectList] = await Promise.all([
+        const [accountList, projectList, ledgerEntries, turnoverRecords] = await Promise.all([
           base44.entities.Account.filter({ id: accountId }),
           base44.entities.Project.filter({ account_id: accountId }),
+          base44.entities.CapacityLedger.filter({ account_id: accountId }, "-created_date", 1000),
+          base44.entities.TurnoverRecord.filter({ account_id: accountId }),
         ]);
 
         if (mounted) {
           setAccount((accountList || [])[0] || null);
           setProjects(projectList || []);
+          setBreakdown(aggregateCapacityBreakdown(ledgerEntries || []));
+          setTurnover(aggregateTurnoverForYear(turnoverRecords, accountId, CALENDAR_YEAR));
         }
       } catch (err) {
         if (mounted) setLoadError(err?.message || "Failed to load account");
@@ -211,6 +222,15 @@ export default function AccountDashboard() {
               </div>
             </div>
           </div>
+
+          {/* Commercial summary */}
+          <CommercialSummaryCard
+            account={account}
+            breakdown={breakdown}
+            turnover={turnover}
+            projectCount={projects.length}
+            calendarYear={CALENDAR_YEAR}
+          />
 
           {/* Projects table */}
           <div style={{ marginBottom: 12, fontSize: 13, fontWeight: 700, color: BRAND.text }}>

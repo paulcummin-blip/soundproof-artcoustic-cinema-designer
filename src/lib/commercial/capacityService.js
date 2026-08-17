@@ -49,3 +49,91 @@ export async function getAvailableProfessionalProjects(accountId) {
 export function buildIdempotencyKey(type, ...parts) {
   return [type, ...parts].join(":");
 }
+
+/**
+ * Empty breakdown shape (used when no ledger entries exist).
+ */
+function emptyBreakdown() {
+  return {
+    purchased: 0,
+    rewarded: 0,
+    promotional: 0,
+    distributorAllocated: 0,
+    adminGranted: 0,
+    trial: 0,
+    internal: 0,
+    consumed: 0,
+    remaining: 0,
+  };
+}
+
+/**
+ * Aggregate a pre-fetched array of CapacityLedger entries into a per-type
+ * breakdown for a single account. Pure function — no API calls.
+ *
+ * - consumed is ABS(SUM(PROJECT_ACTIVATION delta)) — presented as positive.
+ * - remaining is the raw canonical SUM(all delta).
+ * - DISTRIBUTOR_RECLAIM and REVERSAL contribute to remaining but have no
+ *   dedicated breakdown bucket (they are rare correction entries).
+ *
+ * @param {Array} entries - CapacityLedger records for one account.
+ * @returns {object} Breakdown object.
+ */
+export function aggregateCapacityBreakdown(entries) {
+  const b = emptyBreakdown();
+  if (!Array.isArray(entries) || entries.length === 0) return b;
+
+  for (const e of entries) {
+    const delta = Number.isFinite(Number(e?.delta)) ? Number(e.delta) : 0;
+    switch (e?.transaction_type) {
+      case "PURCHASED":
+        b.purchased += delta;
+        break;
+      case "UK_TURNOVER_REWARD":
+        b.rewarded += delta;
+        break;
+      case "PROMOTIONAL":
+        b.promotional += delta;
+        break;
+      case "DISTRIBUTOR_ALLOCATION":
+        b.distributorAllocated += delta;
+        break;
+      case "ADMIN_GRANT":
+        b.adminGranted += delta;
+        break;
+      case "TRIAL":
+        b.trial += delta;
+        break;
+      case "INTERNAL":
+        b.internal += delta;
+        break;
+      case "PROJECT_ACTIVATION":
+        b.consumed += delta; // negative in ledger
+        break;
+      // DISTRIBUTOR_RECLAIM, REVERSAL — included in remaining only
+      default:
+        break;
+    }
+    b.remaining += delta;
+  }
+
+  b.consumed = Math.abs(b.consumed);
+  return b;
+}
+
+/**
+ * Get the full capacity breakdown for a single account.
+ * Fetches CapacityLedger entries and aggregates by transaction_type.
+ *
+ * @param {string} accountId
+ * @returns {Promise<object>} Breakdown object (purchased, rewarded, ..., remaining).
+ */
+export async function getCapacityBreakdown(accountId) {
+  if (!accountId) return emptyBreakdown();
+  const entries = await base44.entities.CapacityLedger.filter(
+    { account_id: accountId },
+    "-created_date",
+    1000
+  );
+  return aggregateCapacityBreakdown(entries);
+}

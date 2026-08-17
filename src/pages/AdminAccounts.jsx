@@ -1,6 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
+import {
+  buildTurnoverMap,
+  buildProjectActivityMap,
+  buildCapacityBreakdownMap,
+  groupAccountsByCommercialSection,
+} from "@/lib/commercial/commercialOverview";
+import AccountGroupSection from "@/components/admin/commercial/AccountGroupSection";
+import DiagnosticsPanel from "@/components/admin/commercial/DiagnosticsPanel";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -13,65 +21,7 @@ const BRAND = {
   green: "#213428",
   amber: "#625143",
   red: "#B23A3A",
-  blue: "#2C5AA0",
 };
-
-const STATUS_COLORS = {
-  active: "#213428",
-  inactive: "#3E4349",
-  trial: "#625143",
-  suspended: "#B23A3A",
-};
-
-const TYPE_LABELS = {
-  dealer: "Dealer",
-  client: "Client",
-  admin: "Admin",
-  demo: "Demo",
-};
-
-function StatusPill({ value }) {
-  const color = STATUS_COLORS[value] || BRAND.subtext;
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 6,
-      padding: "4px 10px", borderRadius: 999,
-      border: `1px solid ${BRAND.border}`,
-      background: BRAND.card, fontSize: 12, fontWeight: 600, color,
-    }}>
-      <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-      {value ? value.charAt(0).toUpperCase() + value.slice(1) : "—"}
-    </span>
-  );
-}
-
-function formatDate(val) {
-  if (!val) return "—";
-  try {
-    return new Date(val).toLocaleDateString("en-GB", {
-      day: "2-digit", month: "short", year: "numeric",
-    });
-  } catch {
-    return "—";
-  }
-}
-
-function DiagField({ label, value, highlight, ok, warn }) {
-  let color = BRAND.subtext;
-  if (highlight) color = "#2C5AA0";
-  if (ok) color = "#213428";
-  if (warn && value > 0) color = "#B23A3A";
-  return (
-    <div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 13, fontWeight: 600, color, fontFamily: typeof value === "string" && value.length > 20 ? "monospace" : "inherit" }}>
-        {value !== null && value !== undefined ? String(value) : <span style={{ color: "#B23A3A" }}>null</span>}
-      </div>
-    </div>
-  );
-}
 
 export default function AdminAccountsPage() {
   const { user, isLoadingAuth, checkAppState } = useAuth();
@@ -79,17 +29,28 @@ export default function AdminAccountsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
-  // Diagnostics state
+  // Commercial data
+  const [turnoverMap, setTurnoverMap] = useState(new Map());
+  const [capacityMap, setCapacityMap] = useState(new Map());
+  const [projectMap, setProjectMap] = useState(new Map());
+
+  // Diagnostics state (retained, moved behind collapsible)
   const [diagProjects, setDiagProjects] = useState([]);
   const [diagTotalAccounts, setDiagTotalAccounts] = useState(null);
   const [diagLoading, setDiagLoading] = useState(true);
-
-  // Setup action state
   const [setupRunning, setSetupRunning] = useState(false);
-  const [setupMessage, setSetupMessage] = useState(null); // { type: "success"|"error", text }
-  const [localUser, setLocalUser] = useState(null); // updated user after setup
+  const [setupMessage, setSetupMessage] = useState(null);
+  const [localUser, setLocalUser] = useState(null);
 
   const isAdmin = user?.role === "admin";
+  const effectiveUser = localUser || user;
+
+  const showSetupButton = isAdmin
+    && !diagLoading
+    && !effectiveUser?.account_id
+    && diagTotalAccounts === 0;
+
+  const CALENDAR_YEAR = new Date().getFullYear();
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -99,14 +60,24 @@ export default function AdminAccountsPage() {
       try {
         setLoading(true);
         setLoadError(null);
-        const [accountData, projectData] = await Promise.all([
-          base44.entities.Account.list("-created_date", 200),
-          base44.entities.Project.list("-created_date", 500),
+
+        // Fetch all data in parallel — 4 API calls, not 75+
+        const [accountData, projectData, ledgerData, turnoverData] = await Promise.all([
+          base44.entities.Account.list("-created_date", 500),
+          base44.entities.Project.list("-created_date", 1000),
+          base44.entities.CapacityLedger.list("-created_date", 2000),
+          base44.entities.TurnoverRecord.list("-created_date", 500),
         ]);
+
         if (mounted) {
           setAccounts(accountData || []);
           setDiagTotalAccounts((accountData || []).length);
           setDiagProjects(projectData || []);
+
+          // Build derived maps
+          setTurnoverMap(buildTurnoverMap(turnoverData, CALENDAR_YEAR));
+          setProjectMap(buildProjectActivityMap(projectData));
+          setCapacityMap(buildCapacityBreakdownMap(ledgerData));
         }
       } catch (err) {
         if (mounted) setLoadError(err?.message || "Failed to load accounts");
@@ -122,19 +93,10 @@ export default function AdminAccountsPage() {
     return () => { mounted = false; };
   }, [isAdmin]);
 
-  // Derived: use localUser (post-setup) if available, else auth user
-  const effectiveUser = localUser || user;
-
-  const showSetupButton = isAdmin
-    && !diagLoading
-    && !effectiveUser?.account_id
-    && diagTotalAccounts === 0;
-
   async function handleCreateAdminAccount() {
     setSetupRunning(true);
     setSetupMessage(null);
     try {
-      // 1. Create Account record
       const newAccount = await base44.entities.Account.create({
         name: "Sound Proof Admin Account",
         status: "active",
@@ -143,16 +105,13 @@ export default function AdminAccountsPage() {
         notes: `Auto-created admin account for ${effectiveUser?.email || "unknown"} during initial system setup.`,
       });
 
-      // 2. Update current User record
       await base44.auth.updateMe({
         account_id: newAccount.id,
         account_role: "admin",
       });
 
-      // 3. Refresh global AuthContext so useAuth().user gets account_id
       await checkAppState?.();
 
-      // 4. Refresh diagnostics
       const [accountData, projectData] = await Promise.all([
         base44.entities.Account.list("-created_date", 200),
         base44.entities.Project.list("-created_date", 500),
@@ -160,11 +119,9 @@ export default function AdminAccountsPage() {
       setAccounts(accountData || []);
       setDiagTotalAccounts((accountData || []).length);
       setDiagProjects(projectData || []);
-
-      // Update local user snapshot so UI reflects new account_id immediately
       setLocalUser({ ...effectiveUser, account_id: newAccount.id, account_role: "admin" });
 
-      setSetupMessage({ type: "success", text: `Account created (id: ${newAccount.id}). User account_id updated. Diagnostics refreshed.` });
+      setSetupMessage({ type: "success", text: `Account created (id: ${newAccount.id}). User account_id updated.` });
     } catch (err) {
       setSetupMessage({ type: "error", text: err?.message || "Setup failed." });
     } finally {
@@ -172,7 +129,6 @@ export default function AdminAccountsPage() {
     }
   }
 
-  // Loading auth state
   if (isLoadingAuth) {
     return (
       <div style={{ padding: 48, textAlign: "center", color: BRAND.subtext }}>
@@ -181,7 +137,6 @@ export default function AdminAccountsPage() {
     );
   }
 
-  // Access denied for non-admins
   if (!isAdmin) {
     return (
       <div style={{
@@ -202,14 +157,19 @@ export default function AdminAccountsPage() {
     );
   }
 
+  // Group accounts by commercial section
+  const groups = groupAccountsByCommercialSection(accounts);
+  const premiumCount = groups.premiumPartners.length;
+  const totalAccounts = accounts.length;
+
   return (
     <div style={{ padding: 24, background: BRAND.bg, minHeight: "100vh", color: BRAND.text }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 26, color: BRAND.text }}>Accounts</h1>
+          <h1 style={{ margin: 0, fontSize: 26, color: BRAND.text }}>Commercial Control Centre</h1>
           <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-            All client and dealer accounts
+            Dealer accounts, Professional Projects, turnover and activity
           </div>
         </div>
         <div style={{
@@ -221,139 +181,62 @@ export default function AdminAccountsPage() {
         </div>
       </div>
 
-      {/* ── Account Ownership Diagnostics ── */}
+      {/* Headline count */}
       <div style={{
-        marginBottom: 24, padding: 20,
-        background: "#fffbe6", border: "1px solid #e6d88a",
+        marginBottom: 24, padding: "16px 20px",
+        background: BRAND.card, border: `1px solid ${BRAND.border}`,
         borderRadius: 12,
+        display: "flex", alignItems: "center", gap: 32, flexWrap: "wrap",
       }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#625143", marginBottom: 14, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-          🔍 Account Ownership Diagnostics (temporary)
-        </div>
-
-        {/* Current User */}
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Current User</div>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-            <DiagField label="Email" value={effectiveUser?.email} />
-            <DiagField label="Role" value={effectiveUser?.role} />
-            <DiagField label="account_id" value={effectiveUser?.account_id} highlight />
-          </div>
-        </div>
-
-        <div style={{ height: 1, background: "#e6d88a", marginBottom: 14 }} />
-
-        {/* Counts */}
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Totals</div>
-          {diagLoading ? (
-            <span style={{ fontSize: 13, color: BRAND.subtext }}>Loading…</span>
-          ) : (
-            <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-              <DiagField label="Total Accounts" value={diagTotalAccounts} />
-              <DiagField label="Total Projects" value={diagProjects.length} />
-              <DiagField label="Projects WITH account_id" value={diagProjects.filter(p => p.account_id).length} ok />
-              <DiagField label="Projects WITHOUT account_id" value={diagProjects.filter(p => !p.account_id).length} warn />
-            </div>
-          )}
-        </div>
-
-        {/* Setup action */}
-        {showSetupButton && (
-          <div style={{ marginTop: 16, marginBottom: 4 }}>
-            <div style={{ height: 1, background: "#e6d88a", marginBottom: 14 }} />
-            <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
-              Initial Setup
-            </div>
-            <button
-              onClick={handleCreateAdminAccount}
-              disabled={setupRunning}
-              style={{
-                padding: "10px 20px", borderRadius: 10,
-                background: setupRunning ? "#888" : "#213428",
-                color: "#fff", border: "none",
-                fontSize: 14, fontWeight: 700, cursor: setupRunning ? "not-allowed" : "pointer",
-              }}
-            >
-              {setupRunning ? "Setting up…" : "Create Sound Proof Admin Account"}
-            </button>
-          </div>
-        )}
-        {setupMessage && (
-          <div style={{
-            marginTop: 10, padding: "10px 14px", borderRadius: 8,
-            background: setupMessage.type === "success" ? "#eafaf1" : "#fdecea",
-            border: `1px solid ${setupMessage.type === "success" ? "#a3d9b1" : "#f5c6cb"}`,
-            color: setupMessage.type === "success" ? "#213428" : BRAND.red,
-            fontSize: 13, fontWeight: 500,
-          }}>
-            {setupMessage.type === "success" ? "✅ " : "❌ "}{setupMessage.text}
-          </div>
-        )}
-
-        <div style={{ height: 1, background: "#e6d88a", marginBottom: 14, marginTop: setupMessage || showSetupButton ? 14 : 0 }} />
-
-        {/* Recent Projects */}
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Most Recent 5 Projects</div>
-          {diagLoading ? (
-            <span style={{ fontSize: 13, color: BRAND.subtext }}>Loading…</span>
-          ) : (
-            <div style={{
-              background: BRAND.card, border: `1px solid ${BRAND.border}`, borderRadius: 8, overflow: "hidden",
-            }}>
-              <div style={{
-                display: "grid", gridTemplateColumns: "2fr 2fr 2fr 1.5fr",
-                padding: "8px 12px",
-                background: "rgb(244 243 241)",
-                borderBottom: `1px solid ${BRAND.border}`,
-                fontSize: 10, fontWeight: 700, color: BRAND.subtext,
-                letterSpacing: "0.06em", textTransform: "uppercase",
-              }}>
-                <div>Project Name</div>
-                <div>created_by_id</div>
-                <div>account_id</div>
-                <div>Created</div>
-              </div>
-              {diagProjects.slice(0, 5).map((p, i) => (
-                <div key={p.id} style={{
-                  display: "grid", gridTemplateColumns: "2fr 2fr 2fr 1.5fr",
-                  padding: "10px 12px",
-                  borderBottom: i < 4 ? `1px solid ${BRAND.border}` : "none",
-                  fontSize: 12,
-                }}>
-                  <div style={{ fontWeight: 600, color: BRAND.text }}>{p.name || "—"}</div>
-                  <div style={{ color: BRAND.subtext, fontFamily: "monospace", fontSize: 11 }}>{p.created_by_id || "—"}</div>
-                  <div style={{
-                    fontFamily: "monospace", fontSize: 11,
-                    color: p.account_id ? "#213428" : BRAND.red,
-                    fontWeight: p.account_id ? 600 : 400,
-                  }}>
-                    {p.account_id || "null"}
-                  </div>
-                  <div style={{ color: BRAND.subtext }}>{formatDate(p.created_date)}</div>
-                </div>
-              ))}
-              {diagProjects.length === 0 && (
-                <div style={{ padding: "16px 12px", color: BRAND.subtext, fontSize: 13 }}>No projects found.</div>
-              )}
-            </div>
-          )}
+          <div style={{
+            fontSize: 11, fontWeight: 700, color: BRAND.subtext,
+            textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4,
+          }}>
+            Premium Partners
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: BRAND.green }}>
+            {premiumCount}
+          </div>
+        </div>
+        <div style={{ height: 40, width: 1, background: BRAND.border }} />
+        <div>
+          <div style={{
+            fontSize: 11, fontWeight: 700, color: BRAND.subtext,
+            textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4,
+          }}>
+            Total Accounts
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: BRAND.text }}>
+            {totalAccounts}
+          </div>
         </div>
       </div>
 
-      {/* Content */}
+      {/* Collapsible diagnostics */}
+      <DiagnosticsPanel
+        effectiveUser={effectiveUser}
+        diagTotalAccounts={diagTotalAccounts}
+        diagProjects={diagProjects}
+        diagLoading={diagLoading}
+        showSetupButton={showSetupButton}
+        setupRunning={setupRunning}
+        onSetup={handleCreateAdminAccount}
+        setupMessage={setupMessage}
+      />
+
+      {/* Commercial sections */}
       {loading ? (
         <div style={{
-          marginTop: 16, padding: 32, textAlign: "center",
+          padding: 32, textAlign: "center",
           border: `1px dashed ${BRAND.border}`, borderRadius: 12,
           background: BRAND.card, color: BRAND.subtext, fontSize: 15,
         }}>
-          Loading accounts…
+          Loading commercial data…
         </div>
       ) : loadError ? (
         <div style={{
-          marginTop: 16, padding: 32, textAlign: "center",
+          padding: 32, textAlign: "center",
           border: `1px dashed ${BRAND.border}`, borderRadius: 12,
           background: BRAND.card, color: BRAND.red, fontSize: 15,
         }}>
@@ -369,111 +252,99 @@ export default function AdminAccountsPage() {
             </button>
           </div>
         </div>
-      ) : accounts.length === 0 ? (
-        <div style={{
-          marginTop: 16, padding: 48, textAlign: "center",
-          border: `1px dashed ${BRAND.border}`, borderRadius: 12,
-          background: BRAND.card, color: BRAND.subtext,
-          display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-        }}>
-          <div style={{ fontSize: 36 }}>🏢</div>
-          <div style={{ fontSize: 17, fontWeight: 700, color: BRAND.text }}>No accounts yet</div>
-          <div style={{ fontSize: 13 }}>Accounts will appear here once created.</div>
-        </div>
       ) : (
-        <div style={{
-          background: BRAND.card, border: `1px solid ${BRAND.border}`,
-          borderRadius: 12, overflow: "hidden",
-        }}>
-          {/* Table header */}
+        <>
+          {/* UK ACCOUNTS */}
           <div style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1fr 1fr 2fr 1fr 80px 70px",
-            gap: 0,
-            padding: "10px 16px",
-            background: "rgb(244 243 241)",
-            borderBottom: `1px solid ${BRAND.border}`,
-            fontSize: 11, fontWeight: 700, color: BRAND.subtext,
-            letterSpacing: "0.06em", textTransform: "uppercase",
+            fontSize: 13, fontWeight: 700, color: BRAND.subtext,
+            textTransform: "uppercase", letterSpacing: "0.08em",
+            marginBottom: 16, paddingBottom: 8,
+            borderBottom: `2px solid ${BRAND.border}`,
           }}>
-            <div>Account Name</div>
-            <div>Type</div>
-            <div>Status</div>
-            <div>Contact Email</div>
-            <div>Last Access</div>
-            <div style={{ textAlign: "right" }}>Projects</div>
-            <div></div>
+            UK Accounts
           </div>
 
-          {/* Table rows */}
-          {accounts.map((acc, i) => (
-            <div
-              key={acc.id}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "2fr 1fr 1fr 2fr 1fr 80px 70px",
-                gap: 0,
-                padding: "14px 16px",
-                borderBottom: i < accounts.length - 1 ? `1px solid ${BRAND.border}` : "none",
-                alignItems: "center",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = "rgb(248 248 247)"}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-            >
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14, color: BRAND.text }}>
-                  {acc.name || "—"}
-                </div>
-                {acc.notes && (
-                  <div style={{
-                    fontSize: 11, color: BRAND.subtext, marginTop: 2,
-                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 240,
-                  }}>
-                    {acc.notes}
-                  </div>
-                )}
-              </div>
-              <div style={{ fontSize: 13, color: BRAND.subtext }}>
-                {TYPE_LABELS[acc.account_type] || acc.account_type || "—"}
-              </div>
-              <div>
-                <StatusPill value={acc.status} />
-              </div>
-              <div style={{ fontSize: 13, color: BRAND.subtext }}>
-                {acc.contact_email || "—"}
-              </div>
-              <div style={{ fontSize: 13, color: BRAND.subtext }}>
-                {formatDate(acc.last_access_at)}
-              </div>
-              <div style={{ textAlign: "right", fontSize: 14, fontWeight: 700, color: BRAND.text }}>
-                {diagProjects.filter(p => p.account_id === acc.id).length}
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <a
-                  href={`/admin/accounts/${acc.id}`}
-                  style={{
-                    display: "inline-block",
-                    padding: "5px 10px", borderRadius: 8,
-                    border: `1px solid ${BRAND.border}`,
-                    background: BRAND.card, color: BRAND.text,
-                    fontSize: 12, fontWeight: 600, textDecoration: "none",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  View →
-                </a>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+          <AccountGroupSection
+            title="Premium Partners"
+            subtitle={`${premiumCount} account${premiumCount !== 1 ? "s" : ""}`}
+            accounts={groups.premiumPartners}
+            turnoverMap={turnoverMap}
+            capacityMap={capacityMap}
+            projectMap={projectMap}
+            emptyMessage="No Premium Partner accounts found."
+            accentColor="#213428"
+          />
 
-      {/* Summary footer */}
-      {!loading && !loadError && accounts.length > 0 && (
-        <div style={{ marginTop: 12, fontSize: 12, color: BRAND.subtext, textAlign: "right" }}>
-          {accounts.length} account{accounts.length !== 1 ? "s" : ""} total
-        </div>
+          <AccountGroupSection
+            title="Richer Sounds"
+            subtitle="Partner Portal accounts — not yet imported"
+            accounts={groups.richerSounds}
+            turnoverMap={turnoverMap}
+            capacityMap={capacityMap}
+            projectMap={projectMap}
+            emptyMessage="Not yet imported. Richer Sounds accounts will appear here when the Partner Portal import is configured."
+            accentColor="#2C5AA0"
+          />
+
+          <AccountGroupSection
+            title="Other Dealers"
+            subtitle="UK dealers — purchase Professional Projects normally"
+            accounts={groups.otherDealers}
+            turnoverMap={turnoverMap}
+            capacityMap={capacityMap}
+            projectMap={projectMap}
+            emptyMessage="No other dealer accounts yet."
+            accentColor="#625143"
+          />
+
+          {/* INTERNATIONAL */}
+          <div style={{
+            fontSize: 13, fontWeight: 700, color: BRAND.subtext,
+            textTransform: "uppercase", letterSpacing: "0.08em",
+            marginBottom: 16, marginTop: 8, paddingBottom: 8,
+            borderBottom: `2px solid ${BRAND.border}`,
+          }}>
+            International
+          </div>
+
+          <AccountGroupSection
+            title="Distributors"
+            subtitle="International distributor accounts"
+            accounts={groups.distributors}
+            turnoverMap={turnoverMap}
+            capacityMap={capacityMap}
+            projectMap={projectMap}
+            emptyMessage="No international distributor accounts yet."
+            accentColor="#2C5AA0"
+            showCommercialColumns={false}
+          />
+
+          {/* INTERNAL / TEST */}
+          {(groups.internalTest?.length || 0) > 0 && (
+            <>
+              <div style={{
+                fontSize: 13, fontWeight: 700, color: BRAND.subtext,
+                textTransform: "uppercase", letterSpacing: "0.08em",
+                marginBottom: 16, marginTop: 8, paddingBottom: 8,
+                borderBottom: `2px solid ${BRAND.border}`,
+              }}>
+                Internal / Test
+              </div>
+
+              <AccountGroupSection
+                title="Internal & Test Accounts"
+                subtitle="Sound Proof admin and test accounts"
+                accounts={groups.internalTest}
+                turnoverMap={turnoverMap}
+                capacityMap={capacityMap}
+                projectMap={projectMap}
+                emptyMessage="No internal or test accounts."
+                accentColor="#3E4349"
+                showCommercialColumns={false}
+              />
+            </>
+          )}
+        </>
       )}
     </div>
   );

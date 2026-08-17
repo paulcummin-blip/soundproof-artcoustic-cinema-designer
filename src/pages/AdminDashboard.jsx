@@ -57,8 +57,8 @@ export default function AdminDashboard() {
 
   const cards = [
     {
-      title: "Users & Accounts",
-      description: "Manage client and dealer accounts, roles and access.",
+      title: "Commercial Control Centre",
+      description: "Dealer accounts, Professional Projects, turnover and activity.",
       status: "Healthy",
       count: accountCount !== null ? `${accountCount} account${accountCount !== 1 ? "s" : ""}` : "—",
       href: "/admin/accounts",
@@ -113,8 +113,8 @@ export default function AdminDashboard() {
       href: "/admin/billing",
     },
     {
-      title: "Project Licensing",
-      description: "Commercial licensing infrastructure. Internal users only — not yet enforced.",
+      title: "Legacy Licensing",
+      description: "Legacy per-user licensing infrastructure. Superseded by the Commercial Control Centre.",
       status: "Setup Required",
       count: "Feature flag OFF",
       href: "/admin/project-licensing",
