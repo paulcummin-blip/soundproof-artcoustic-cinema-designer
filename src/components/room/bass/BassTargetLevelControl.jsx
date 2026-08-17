@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useAppState } from "@/components/AppStateProvider";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
-import { p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
+import { formatP18TargetBasisDetail } from "@/components/utils/p18ExtensionAuthority";
 
 export default function BassTargetLevelControl({ disabled = false }) {
   const appState = useAppState();
@@ -10,7 +10,6 @@ export default function BassTargetLevelControl({ disabled = false }) {
   const selectedP18Basis = config.selectedP18TargetBasis === "recommended" ? "recommended" : "minimum";
   const selectedLevel = Math.max(1, Math.min(4, Number(config.selectedP14Level) || 4));
   const selectedTarget = getRp22BassOperatingDefinitions(selectedBasis, selectedP18Basis).find(({ value }) => value === selectedLevel);
-  const selectedP18Hz = p18ThresholdHzForLevel(selectedP18Basis, selectedLevel);
   const selectTarget = (basis, level) => appState?.updateGlobalSpl?.({ p14Mode: basis, selectedP14TargetBasis: basis, selectedP14Level: level });
   const selectP18Basis = (basis) => appState?.updateGlobalSpl?.({ p18Mode: basis, selectedP18TargetBasis: basis });
 
@@ -39,8 +38,11 @@ export default function BassTargetLevelControl({ disabled = false }) {
         className="h-7 px-2 text-xs capitalize"
         disabled={disabled}
         onClick={() => selectP18Basis(basis)}
-      >{basis} · L{selectedLevel} ≤ {p18ThresholdHzForLevel(basis, selectedLevel)} Hz</Button>)}
+      >{basis} grading</Button>)}
     </div>
-    <span className="text-xs text-muted-foreground">P18 target: <strong className="text-foreground capitalize">{selectedP18Basis} L{selectedLevel} · ≤ {selectedP18Hz} Hz at selected P14 output</strong></span>
+    <span className="text-xs text-muted-foreground">
+      P18 is graded independently from the achieved −3 dB point at the selected P14 output.
+      <strong className="ml-1 text-foreground">{formatP18TargetBasisDetail(selectedP18Basis)}</strong>
+    </span>
   </div>;
 }
