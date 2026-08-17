@@ -227,10 +227,17 @@ export function buildProductOperatingEnvelope({
   if (!Number.isFinite(referenceCapabilityDb)) {
     return { curve: [], p14CapabilityDb, operatingMarginDb, operatingHeadroomDb, p14ShortfallDb, referenceCapabilityDb: null, extensionBandEndHz: null };
   }
-  const extensionEntry = capabilities.find((point) =>
-    point.capabilityDb >= referenceCapabilityDb - PRODUCT_EXTENSION_REFERENCE_TOLERANCE_DB
-  );
-  const extensionBandEndHz = extensionEntry?.frequency ?? capabilities.at(-1)?.frequency ?? null;
+  const extensionThresholdDb = referenceCapabilityDb - PRODUCT_EXTENSION_REFERENCE_TOLERANCE_DB;
+  const extensionEntryIndex = capabilities.findIndex((point) => point.capabilityDb >= extensionThresholdDb);
+  const extensionEntry = extensionEntryIndex >= 0 ? capabilities[extensionEntryIndex] : null;
+  const extensionPrevious = extensionEntryIndex > 0 ? capabilities[extensionEntryIndex - 1] : null;
+  const extensionBandEndHz = extensionEntry && extensionPrevious
+    ? extensionPrevious.frequency + (extensionEntry.frequency - extensionPrevious.frequency)
+      * Math.max(0, Math.min(1,
+        (extensionThresholdDb - extensionPrevious.capabilityDb)
+          / Math.max(1e-9, extensionEntry.capabilityDb - extensionPrevious.capabilityDb),
+      ))
+    : extensionEntry?.frequency ?? capabilities.at(-1)?.frequency ?? null;
   const curve = capabilities.map((point) => {
     const targetSpl = interpolateCorrection(targetCurve, point.frequency);
     const productRelativeCapabilityDb = point.capabilityDb - referenceCapabilityDb;
