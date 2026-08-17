@@ -11,9 +11,9 @@ import {
   deriveProductionEqVerticalAnchor,
   resolveHouseCurveDomains,
 } from "@/components/utils/houseCurveTargetAuthority";
-import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
+import { identifyProtectedNullRegions, isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { findAggregatePeakBoostViolations } from "@/components/utils/designEqPhysicsAuthority";
-import { normaliseHouseCurveToP14Total, integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
+import { normaliseHouseCurveToP14Total } from "@/components/utils/p14HouseCurveNormalisation";
 import { p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getCurrentSystemSourceOutput, getSystemSourceCapability, getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
@@ -23,6 +23,8 @@ import { buildPairedP14P18CandidateSummary } from "@/components/utils/pairedP14P
 
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
+const OPERATING_WINDOW_MAX_BOOST_DB = DESIGN_EQ_FIT_PROFILES.accuracy.maximumAggregateBoostDb;
+const OPERATING_WINDOW_MAX_CUT_DB = DESIGN_EQ_FIT_PROFILES.accuracy.maximumCutDb;
 
 /**
  * Apply the global calibration gain before PEQ, as a target-following
@@ -58,6 +60,65 @@ function interpolateCorrection(curve, frequency) {
   const high = curve[upperIndex];
   const ratio = (frequency - low.frequency) / (high.frequency - low.frequency);
   return low.spl + (high.spl - low.spl) * ratio;
+}
+
+export function deriveCorrectionWindowOperatingOffsetDb({
+  rawCurve = [], targetCurve = [], assessmentStartHz = 20, assessmentEndHz = 120,
+  protectedNullRegions = [], maximumAggregateBoostDb = OPERATING_WINDOW_MAX_BOOST_DB,
+  maximumCutDb = OPERATING_WINDOW_MAX_CUT_DB,
+} = {}) {
+  const smoothedRawCurve = applyBassSmoothing(rawCurve, "third");
+  const correctablePoints = smoothedRawCurve
+    .filter((point) => Number.isFinite(point?.frequency) && Number.isFinite(point?.spl)
+      && point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz
+      && !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions))
+    .map((point) => ({
+      frequency: point.frequency,
+      residualDb: point.spl - interpolateCorrection(targetCurve, point.frequency),
+    }))
+    .filter((point) => Number.isFinite(point.residualDb));
+  if (!correctablePoints.length) {
+    return {
+      requestedOffsetDb: 0,
+      selectionMode: "no-correctable-points",
+      feasible: false,
+      pointCount: 0,
+      minimumResidualDb: null,
+      maximumResidualDb: null,
+      meanResidualDb: null,
+      lowerOffsetBoundDb: null,
+      upperOffsetBoundDb: null,
+    };
+  }
+  const residuals = correctablePoints.map((point) => point.residualDb);
+  const minimumResidualDb = Math.min(...residuals);
+  const maximumResidualDb = Math.max(...residuals);
+  const meanResidualDb = residuals.reduce((sum, residual) => sum + residual, 0) / residuals.length;
+  const lowerOffsetBoundDb = -Math.max(0, maximumAggregateBoostDb) - minimumResidualDb;
+  const upperOffsetBoundDb = Math.max(0, maximumCutDb) - maximumResidualDb;
+  const meanAlignedOffsetDb = -meanResidualDb;
+  const feasible = lowerOffsetBoundDb <= upperOffsetBoundDb;
+  // When the response span fits inside the available +6 / -15 dB PEQ window,
+  // centre it on the target without asking the filter bank for an impossible
+  // boost or cut. If it cannot fit, protect correctable below-target output:
+  // place the lowest broad region at the maximum safe boost boundary and leave
+  // any remaining peak excess visible for the cut bank and diagnostics.
+  const requestedOffsetDb = feasible
+    ? Math.min(upperOffsetBoundDb, Math.max(lowerOffsetBoundDb, meanAlignedOffsetDb))
+    : lowerOffsetBoundDb;
+  return {
+    requestedOffsetDb,
+    selectionMode: feasible ? "mean-aligned-within-correction-window" : "low-frequency-shortfall-priority",
+    feasible,
+    pointCount: correctablePoints.length,
+    minimumResidualDb,
+    maximumResidualDb,
+    meanResidualDb,
+    lowerOffsetBoundDb,
+    upperOffsetBoundDb,
+    maximumAggregateBoostDb,
+    maximumCutDb,
+  };
 }
 
 function applyBankToSeats(seats, correction) {
@@ -454,20 +515,24 @@ export function generateCanonicalCandidatePool({
   // Falls back to 114 dB when no tuning is configured on the sub objects.
   const baseRequestedSystemOutputDb = getCurrentSystemSourceOutput(activeSubs);
   // ── Target-following global calibration level ──
-  // First place the physical RSP at the selected P14 operating target using
-  // the same C-weighted third-octave integration as the house target. This is
-  // the global gain/trim stage used by real room-correction processors; it is
-  // not a PEQ filter and does not consume a filter slot or aggregate cut.
-  // A deep modal null must remain visible and protected, but it must not pin
-  // the entire response to maximum product capability.
-  const rawIntegratedLevelDbC = integrateRawResponseLevelDbC({
+  // Align the one-third-octave-smoothed RSP with the fixed house target across
+  // the RP22 P19 band. The operating trim and the PEQ bank form one correction
+  // window: the broad response is placed where the available +6 dB boost and
+  // -15 dB cut can reach the target. A C-weighted power-total anchor is not
+  // suitable here because one modal peak can pull the whole response down.
+  // Narrow cancellation nulls remain visible and are excluded from this anchor.
+  const preliminaryProtectedNullRegions = identifyProtectedNullRegions(
+    rawCurve, domains.correctionStartHz, domains.correctionEndHz, verticalOffsetDb,
+    activeSubs, usableLfHz, null, targetCurve,
+  );
+  const operatingLevelWindowDiagnostics = deriveCorrectionWindowOperatingOffsetDb({
     rawCurve,
-    lowerHz: requiredExtensionHz,
-    upperHz: 120,
+    targetCurve,
+    assessmentStartHz: domains.p19StartHz,
+    assessmentEndHz: domains.p19EndHz,
+    protectedNullRegions: preliminaryProtectedNullRegions,
   });
-  const requestedOperatingLevelOffsetDb = Number.isFinite(rawIntegratedLevelDbC)
-    ? Number(selectedP14TargetDb) - rawIntegratedLevelDbC
-    : 0;
+  const requestedOperatingLevelOffsetDb = operatingLevelWindowDiagnostics.requestedOffsetDb;
   // Attenuation applies completely. Positive global gain is permitted only
   // within the least available source-domain headroom across the P14 band.
   const appliedOperatingLevelOffsetDb = clampPositiveOperatingOffset(
@@ -476,6 +541,8 @@ export function generateCanonicalCandidatePool({
     baseRequestedSystemOutputDb,
     requiredExtensionHz,
   );
+  operatingLevelWindowDiagnostics.appliedOffsetDb = appliedOperatingLevelOffsetDb;
+  operatingLevelWindowDiagnostics.positiveHeadroomLimited = appliedOperatingLevelOffsetDb < requestedOperatingLevelOffsetDb - 0.05;
   // The operating source output after global trim — this is the level the PEQ
   // headroom calculation must use (NOT the pre-trim base output).
   const operatingSystemOutputDb = Number.isFinite(baseRequestedSystemOutputDb)
@@ -805,6 +872,7 @@ export function generateCanonicalCandidatePool({
     operatingSystemOutputDb,
     selectedOperatingOutputDb,
     operatingOutputDiagnostics,
+    operatingLevelWindowDiagnostics,
     canonicalHouseCurveShape: targetShape,
     canonicalTargetCurve: targetCurve,
     protectedNullRegions,
