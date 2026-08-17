@@ -14,8 +14,11 @@ export function buildRp22GraphMarkers(finalBassResponse) {
     }, null);
 
   return {
+    // P18 is published at favourable whole-Hz resolution. Put the
+    // marker on the same authoritative design value used by the pill and
+    // grading, while retaining the precise crossing in the authority payload.
     p18FrequencyHz: finite(seatVariation?.p18?.extensionHz)
-      ? Number(seatVariation.p18.extensionHz)
+      ? Math.floor(Number(seatVariation.p18.extensionHz))
       : null,
     p19StartHz: finite(finalBassResponse?.assessmentStartHz)
       ? Number(finalBassResponse.assessmentStartHz)
