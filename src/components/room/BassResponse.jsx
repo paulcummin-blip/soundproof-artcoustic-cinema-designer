@@ -355,9 +355,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const p14HouseCurveNormalisation = useMemo(() => normaliseHouseCurveToP14Total({
     houseCurveShape: finalBassResponse?.canonicalHouseCurveShape,
     selectedP14TargetDb,
-    requiredExtensionHz: selectedP14RequiredExtensionHz,
+    requiredExtensionHz: 20,
     upperLfeHz: 120,
-  }), [finalBassResponse?.canonicalHouseCurveShape, selectedP14TargetDb, selectedP14RequiredExtensionHz]);
+  }), [finalBassResponse?.canonicalHouseCurveShape, selectedP14TargetDb]);
   const operatingLevelOffsetDb = Number.isFinite(finalBassResponse?.operatingLevelOffsetDb)
     ? finalBassResponse.operatingLevelOffsetDb
     : (Number.isFinite(p14HouseCurveNormalisation?.operatingCurveOffsetDb) && Number.isFinite(canonicalVerticalOffsetDb)
@@ -369,9 +369,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const p14IntegrationDiagnostic = useMemo(() => diagnoseHouseCurveP14Integration({
     houseCurveShape: finalBassResponse?.canonicalHouseCurveShape,
     selectedP14TargetDb,
-    requiredExtensionHz: selectedP14RequiredExtensionHz,
+    requiredExtensionHz: 20,
     upperLfeHz: 120,
-  }), [finalBassResponse?.canonicalHouseCurveShape, selectedP14TargetDb, selectedP14RequiredExtensionHz]);
+  }), [finalBassResponse?.canonicalHouseCurveShape, selectedP14TargetDb]);
 
   const multiSeriesForGraph = useMemo(() => buildBassGraphSeries({
     designEqEnabled, showHouseCurve: true, normalizedSeries, rspRawCurve, optimisationResult,
