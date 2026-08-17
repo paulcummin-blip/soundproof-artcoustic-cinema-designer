@@ -690,10 +690,10 @@ function fixtureS() {
   checks.push(["Status COMPLETE", rating.status === "COMPLETE"]);
   // Coverage 100% — all applicable (scored) params are assessed
   checks.push(["Coverage 100%", approx(rating.coveragePercent, 100, 0.01)]);
-  // applicableWeight = scorable total = 121 (P18 weight 12).
-  checks.push(["applicableWeight=121", rating.applicableWeight === 121]);
-  // assessedWeight = 121 (all scored)
-  checks.push(["assessedWeight=121", rating.assessedWeight === 121]);
+  // applicableWeight = scorable total = 122 (P18 weight 12, P2 weight 8).
+  checks.push(["applicableWeight=122", rating.applicableWeight === 122]);
+  // assessedWeight = 122 (all scored)
+  checks.push(["assessedWeight=122", rating.assessedWeight === 122]);
   // hasProvisional is true (diagnostic) but status is not PROVISIONAL
   checks.push(["hasProvisional diagnostic", rating.hasProvisional === true]);
   checks.push(["Status not PROVISIONAL", rating.status !== "PROVISIONAL"]);
@@ -869,26 +869,26 @@ function fixtureW() {
 function fixtureX() {
   const checks = [];
 
-  checks.push(["PARAM_WEIGHTS.p2 = 7", PARAM_WEIGHTS.p2 === 7]);
+  checks.push(["PARAM_WEIGHTS.p2 = 8", PARAM_WEIGHTS.p2 === 8]);
 
-  // P2 = L4 → contribution = 12 * 7 = 84
+  // P2 = L4 → contribution = 12 * 8 = 96
   const authL4 = buildArtcousticDesignRatingAuthority({
     seats: SEAT_LIST,
     p2: { rawValue: 15 }, // L4
   });
   const ratingL4 = calculateRoomDesignRating(authL4);
-  checks.push(["P2 L4 actual = 84", approx(ratingL4.actualPoints, 84, 0.1)]);
-  checks.push(["P2 L4 max = 84", approx(ratingL4.maximumAvailablePoints, 84, 0.1)]);
+  checks.push(["P2 L4 actual = 96", approx(ratingL4.actualPoints, 96, 0.1)]);
+  checks.push(["P2 L4 max = 96", approx(ratingL4.maximumAvailablePoints, 96, 0.1)]);
   checks.push(["P2 L4 % = 100", approx(ratingL4.rawPercentage, 100, 0.01)]);
 
-  // P2 = L1 → contribution = 2 * 7 = 14
+  // P2 = L1 → contribution = 2 * 8 = 16
   const authL1 = buildArtcousticDesignRatingAuthority({
     seats: SEAT_LIST,
     p2: { rawValue: 5 }, // L1
   });
   const ratingL1 = calculateRoomDesignRating(authL1);
-  checks.push(["P2 L1 actual = 14", approx(ratingL1.actualPoints, 14, 0.1)]);
-  checks.push(["P2 L1 max = 84", approx(ratingL1.maximumAvailablePoints, 84, 0.1)]);
+  checks.push(["P2 L1 actual = 16", approx(ratingL1.actualPoints, 16, 0.1)]);
+  checks.push(["P2 L1 max = 96", approx(ratingL1.maximumAvailablePoints, 96, 0.1)]);
   checks.push(["P2 L1 % ≈ 16.67", approx(ratingL1.rawPercentage, 16.67, 0.5)]);
 
   const failed = checks.filter(([, v]) => !v).map(([label]) => label);

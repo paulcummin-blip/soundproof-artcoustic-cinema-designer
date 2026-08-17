@@ -42,7 +42,7 @@ import { assessP18Extension } from "@/components/utils/p18ExtensionAuthority";
 
 /** Fixed V1 importance weights per parameter. */
 export const PARAM_WEIGHTS = Object.freeze({
-  p1: 6, p2: 7, p3: 3, p4: 5, p5: 6, p6: 5, p7: 4,
+  p1: 6, p2: 8, p3: 3, p4: 5, p5: 6, p6: 5, p7: 4,
   p8: 2, p9: 5, p10: 5, p11: 4, p12: 8, p13: 7, p14: 9,
   p15: 3, p16: 5, p17: 5, p18: 12, p19: 9, p20: 9, p21: 3,
   screen: 7,
