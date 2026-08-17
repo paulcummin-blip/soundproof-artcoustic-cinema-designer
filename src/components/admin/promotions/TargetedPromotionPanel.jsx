@@ -120,6 +120,11 @@ export default function TargetedPromotionPanel({
             <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.text }}>
               {promo.headline || promo.name || "Promotion"}
             </div>
+            {promo.name && (
+              <div style={{ fontSize: 10, color: BRAND.subtext, opacity: 0.7, marginTop: 2, fontStyle: "italic" }}>
+                Internal: {promo.name}
+              </div>
+            )}
             <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 4 }}>
               {formatDate(promo.starts_at)} → {formatDate(promo.ends_at)}
             </div>

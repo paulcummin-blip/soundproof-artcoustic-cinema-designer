@@ -91,6 +91,13 @@ export default function PromotionCard({
         {headline}
       </div>
 
+      {/* Internal name — admin-only, disambiguates identical headlines */}
+      {promotion.name && (
+        <div style={{ fontSize: 10, color: BRAND.subtext, opacity: 0.7, marginBottom: 2, fontStyle: "italic" }}>
+          Internal: {promotion.name}
+        </div>
+      )}
+
       {/* Date range */}
       <div style={{ fontSize: 12, color: BRAND.subtext, marginBottom: 4 }}>
         {dateRange}
