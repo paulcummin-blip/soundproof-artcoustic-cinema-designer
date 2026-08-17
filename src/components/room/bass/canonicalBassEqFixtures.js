@@ -57,6 +57,34 @@ export function runCanonicalBassEqFixtures() {
     targetCurve: correctionWindowTarget,
     protectedNullRegions: protectedNullRegion,
   });
+  // Reproduces the failure visible in the live tooltip: strong response inside
+  // P19, a useful room-created valley around 125 Hz, then peaks near 138/154 Hz.
+  // A 20–120-only anchor sacrifices the 125 Hz output; a full-band physical
+  // anchor keeps it within the +6 dB PEQ window and leaves the peaks for cuts.
+  const upperCorrectionBandPattern = frequencies.map((frequency) => ({
+    frequency,
+    spl: 118.7
+      + gaussian(frequency, 125, 3, -20.3)
+      + gaussian(frequency, 138, 3, 15)
+      + gaussian(frequency, 154, 4, 8),
+  }));
+  const p19OnlyOperatingWindow = deriveCorrectionWindowOperatingOffsetDb({
+    rawCurve: upperCorrectionBandPattern,
+    targetCurve: correctionWindowTarget,
+    assessmentStartHz: 20,
+    assessmentEndHz: 120,
+    assessmentSmoothing: "none",
+  });
+  const fullBandOperatingWindow = deriveCorrectionWindowOperatingOffsetDb({
+    rawCurve: upperCorrectionBandPattern,
+    targetCurve: correctionWindowTarget,
+    assessmentStartHz: 20,
+    assessmentEndHz: 200,
+    assessmentSmoothing: "none",
+  });
+  const raw125ResidualDb = upperCorrectionBandPattern.find((point) => point.frequency === 125).spl - 100;
+  const p19OnlyBestCase125ResidualDb = raw125ResidualDb + p19OnlyOperatingWindow.requestedOffsetDb + 6;
+  const fullBandBestCase125ResidualDb = raw125ResidualDb + fullBandOperatingWindow.requestedOffsetDb + 6;
   const smoothed = applyBassSmoothing(rawCurve, "third");
   const legacyReferenceBand = smoothed.filter((point) => point.frequency >= 150 && point.frequency <= 200);
   const sortedLegacyLevels = legacyReferenceBand.map((point) => point.spl).sort((a, b) => a - b);
@@ -158,6 +186,18 @@ export function runCanonicalBassEqFixtures() {
       passed: Math.abs(protectedNullWindow.requestedOffsetDb - referenceProtectedWindow.requestedOffsetDb) <= 0.1,
     },
     {
+      name: "The operating gain covers the complete 20–200 Hz correction band without RP22 smoothing",
+      passed: fullBandOperatingWindow.assessmentStartHz === 20
+        && fullBandOperatingWindow.assessmentEndHz === 200
+        && fullBandOperatingWindow.assessmentSmoothing === "none",
+    },
+    {
+      name: "A useful 125 Hz room valley is not sacrificed by a 20–120-only operating trim",
+      passed: fullBandOperatingWindow.requestedOffsetDb > p19OnlyOperatingWindow.requestedOffsetDb + 10
+        && fullBandBestCase125ResidualDb >= -0.05
+        && p19OnlyBestCase125ResidualDb < -10,
+    },
+    {
       name: "A detected deep modal null does not pin the complete response to maximum capability",
       passed: Number.isFinite(deepNullPool.operatingLevelOffsetDb)
         && Math.abs(deepNullPool.operatingLevelOffsetDb - levels[1].operatingLevelOffsetDb) <= 0.1,
@@ -189,6 +229,10 @@ export function runCanonicalBassEqFixtures() {
       peakDominatedWindow,
       referenceProtectedWindow,
       protectedNullWindow,
+      p19OnlyOperatingWindow,
+      fullBandOperatingWindow,
+      p19OnlyBestCase125ResidualDb,
+      fullBandBestCase125ResidualDb,
     },
     deepNullOperatingLevelOffsetDb: deepNullPool.operatingLevelOffsetDb,
     referenceL2OperatingLevelOffsetDb: levels[1].operatingLevelOffsetDb,
