@@ -187,12 +187,15 @@ export default function AccountGroupSection({
   const promoUsageMap = useMemo(() => {
     const map = new Map();
     if (!groupKey || !promotions || !promotionUsage) return map;
-    const activePromo = promotions
-      .filter(p => promotionBelongsToGroup(p, groupKey, allAccounts))
-      .find(p => isEffective(p));
-    if (!activePromo) return map;
+    const activeIds = new Set(
+      promotions
+        .filter(p => promotionBelongsToGroup(p, groupKey, allAccounts))
+        .filter(p => isEffective(p))
+        .map(p => p.id)
+    );
+    if (activeIds.size === 0) return map;
     for (const u of promotionUsage) {
-      if (u.promotion_id !== activePromo.id) continue;
+      if (!activeIds.has(u.promotion_id)) continue;
       map.set(u.account_id, (map.get(u.account_id) || 0) + 1);
     }
     return map;

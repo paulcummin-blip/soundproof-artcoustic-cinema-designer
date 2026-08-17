@@ -4,8 +4,6 @@ import {
   isoToDisplayDate,
   isoToEndDisplayDate,
   PROMOTION_TYPE_LABELS,
-  TARGET_SCOPE_LABELS,
-  DEALER_GROUP_LABELS,
 } from "./promotionStatus";
 
 const BRAND = {
@@ -16,35 +14,22 @@ const BRAND = {
   green: "#213428",
   amber: "#625143",
   red: "#B23A3A",
-  blue: "#2C5AA0",
 };
 
-const STATUS_COLORS = {
-  Active: "#213428",
-  Scheduled: "#2C5AA0",
-  Draft: "#625143",
-  Expired: "#3E4349",
-  Cancelled: "#B23A3A",
-};
-
-function StatusBadge({ status }) {
-  const color = STATUS_COLORS[status] || BRAND.subtext;
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 5,
-      padding: "3px 8px", borderRadius: 999,
-      border: `1px solid ${BRAND.border}`,
-      background: BRAND.card, fontSize: 10, fontWeight: 700, color,
-      textTransform: "uppercase", letterSpacing: "0.04em",
-    }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: color }} />
-      {status}
-    </span>
-  );
-}
+// Max message length to display inline — longer messages are omitted to
+// keep the group overview clean.
+const MAX_MESSAGE_LEN = 140;
 
 /**
- * Compact promotion card shown under a dealer-group heading.
+ * Compact live-promotion summary shown under a dealer-group heading.
+ *
+ * Layout (P2.1C):
+ *   PROMOTION LIVE
+ *   Unlimited Professional Projects
+ *   17 Aug 2026 → 31 Dec 2026
+ *   [message if short enough]
+ *   Eligible 25 · Used 0 · Promo Projects 0
+ *   Edit · View Usage · End Early
  *
  * Props:
  * - promotion: Promotion record
@@ -68,119 +53,96 @@ export default function PromotionCard({
   const status = deriveDisplayStatus(promotion);
   const canEndEarly = status === "Active" || status === "Scheduled";
 
+  // Dealer-facing headline, falling back to the promotion-type label.
+  const headline = promotion.headline || PROMOTION_TYPE_LABELS[promotion.promotion_type] || "Promotion";
+
+  // Date range with → arrow (London timezone, inclusive end date).
+  const dateRange = `${isoToDisplayDate(promotion.starts_at)} → ${isoToEndDisplayDate(promotion.ends_at)}`;
+
+  // Message — only if short enough to remain clean.
+  const rawMessage = (promotion.message || "").trim();
+  const showMessage = rawMessage && rawMessage.length <= MAX_MESSAGE_LEN;
+  const messageText = showMessage
+    ? (rawMessage.length > MAX_MESSAGE_LEN - 3
+        ? rawMessage.slice(0, MAX_MESSAGE_LEN - 3) + "…"
+        : rawMessage)
+    : null;
+
   return (
     <div style={{
       background: BRAND.card,
       border: `1px solid ${BRAND.border}`,
-      borderRadius: 10,
-      padding: "14px 18px",
-      marginBottom: 12,
+      borderLeft: `3px solid ${BRAND.green}`,
+      borderRadius: 8,
+      padding: "10px 14px",
+      marginBottom: 8,
     }}>
-      {/* Header row */}
+      {/* Status label */}
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        flexWrap: "wrap", gap: 8, marginBottom: 10,
+        fontSize: 9, fontWeight: 700, color: BRAND.green,
+        textTransform: "uppercase", letterSpacing: "0.08em",
+        marginBottom: 4,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{
-            fontSize: 10, fontWeight: 700, color: BRAND.subtext,
-            textTransform: "uppercase", letterSpacing: "0.06em",
-          }}>
-            {status === "Active" ? "Active Promotion" : "Promotion"}
-          </span>
-          <StatusBadge status={status} />
-        </div>
+        Promotion Live
       </div>
 
-      {/* Title + dates */}
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.text }}>
-          {PROMOTION_TYPE_LABELS[promotion.promotion_type] || promotion.promotion_type}
-        </div>
-        <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 4, display: "flex", gap: 16, flexWrap: "wrap" }}>
-          <span>From: <strong style={{ color: BRAND.text }}>{isoToDisplayDate(promotion.starts_at)}</strong></span>
-          <span>To: <strong style={{ color: BRAND.text }}>{isoToEndDisplayDate(promotion.ends_at)}</strong></span>
-        </div>
+      {/* Headline */}
+      <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.text, marginBottom: 2 }}>
+        {headline}
       </div>
 
-      {/* Target info */}
-      <div style={{ fontSize: 11, color: BRAND.subtext, marginBottom: 10 }}>
-        Target: {TARGET_SCOPE_LABELS[promotion.target_scope] || promotion.target_scope}
-        {promotion.target_scope === "ALL_DEALER_GROUP" && promotion.target_dealer_group
-          ? ` — ${DEALER_GROUP_LABELS[promotion.target_dealer_group] || promotion.target_dealer_group}`
-          : ""}
+      {/* Date range */}
+      <div style={{ fontSize: 12, color: BRAND.subtext, marginBottom: 4 }}>
+        {dateRange}
       </div>
 
-      {/* Stats row */}
-      <div style={{
-        display: "flex", gap: 24, flexWrap: "wrap",
-        paddingTop: 10, borderTop: `1px solid ${BRAND.border}`,
-        marginBottom: 10,
-      }}>
-        <div>
-          <div style={{ fontSize: 9, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Eligible accounts
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.text }}>
-            {eligibleCount}
-          </div>
+      {/* Message (only if short) */}
+      {messageText && (
+        <div style={{ fontSize: 11, color: BRAND.subtext, marginBottom: 4, lineHeight: 1.4 }}>
+          {messageText}
         </div>
-        <div>
-          <div style={{ fontSize: 9, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Accounts used
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.text }}>
-            {accountsUsedCount}
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 9, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Promo projects created
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.green }}>
-            {usageCount}
-          </div>
-        </div>
+      )}
+
+      {/* Usage summary — one line */}
+      <div style={{ fontSize: 11, color: BRAND.subtext, marginBottom: 6 }}>
+        Eligible <strong style={{ color: BRAND.text }}>{eligibleCount}</strong>
+        {" · "}Used <strong style={{ color: BRAND.text }}>{accountsUsedCount}</strong>
+        {" · "}Promo Projects <strong style={{ color: BRAND.green }}>{usageCount}</strong>
       </div>
 
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button
-          onClick={onEdit}
-          style={{
-            padding: "6px 12px", borderRadius: 8,
-            border: `1px solid ${BRAND.border}`,
-            background: BRAND.card, color: BRAND.text,
-            fontSize: 12, fontWeight: 600, cursor: "pointer",
-          }}
-        >
-          Edit
-        </button>
-        <button
-          onClick={onViewUsage}
-          style={{
-            padding: "6px 12px", borderRadius: 8,
-            border: `1px solid ${BRAND.border}`,
-            background: BRAND.card, color: BRAND.text,
-            fontSize: 12, fontWeight: 600, cursor: "pointer",
-          }}
-        >
-          View Usage
-        </button>
+      {/* Inline actions */}
+      <div style={{ fontSize: 11, display: "flex", gap: 6, alignItems: "center" }}>
+        <ActionLink onClick={onEdit} label="Edit" />
+        <Separator />
+        <ActionLink onClick={onViewUsage} label="View Usage" />
         {canEndEarly && (
-          <button
-            onClick={onEndEarly}
-            style={{
-              padding: "6px 12px", borderRadius: 8,
-              border: `1px solid ${BRAND.red}`,
-              background: "transparent", color: BRAND.red,
-              fontSize: 12, fontWeight: 600, cursor: "pointer",
-            }}
-          >
-            End Early
-          </button>
+          <>
+            <Separator />
+            <ActionLink onClick={onEndEarly} label="End Early" color={BRAND.red} />
+          </>
         )}
       </div>
     </div>
   );
+}
+
+function ActionLink({ onClick, label, color }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: 0, border: "none", background: "transparent",
+        color: color || BRAND.blue, fontSize: 11, fontWeight: 600,
+        cursor: "pointer", textDecoration: "none",
+      }}
+      onMouseEnter={e => { e.currentTarget.style.textDecoration = "underline"; }}
+      onMouseLeave={e => { e.currentTarget.style.textDecoration = "none"; }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function Separator() {
+  return <span style={{ color: BRAND.border, fontSize: 11 }}>·</span>;
 }
