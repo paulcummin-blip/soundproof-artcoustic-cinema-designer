@@ -163,6 +163,7 @@ export function rebalanceBroadValleyBank({
         Q: blocker.filter.Q,
         contributionDb: blocker.contributionDb,
       } : null,
+      blockerCompanion: null,
       shoulderFrequencyHz: shoulder?.frequency ?? null,
       evaluatedBanks: 0,
       legalBanks: 0,
@@ -171,9 +172,56 @@ export function rebalanceBroadValleyBank({
     diagnostics.push(diagnostic);
     if (!blocker || blocker.filter.Q >= 8) continue;
 
-    const blockerQValues = [...new Set([1.25, 1.5, 2, 2.5, 3].map((scale) =>
+    const blockerQValues = [...new Set([1.25, 1.5, 2, 2.5, 3, 4].map((scale) =>
       Number(clamp(blocker.filter.Q * scale, blocker.filter.Q + 0.2, 10).toFixed(4))
     ))];
+    const blockerCompanion = current
+      .map((filter, index) => ({
+        filter, index,
+        distance: Math.abs(Math.log2(filter.frequencyHz / blocker.filter.frequencyHz)),
+      }))
+      .filter((entry) => entry.index !== blocker.index
+        && entry.filter.gainDb < -0.1
+        && entry.distance <= 0.35)
+      .sort((left, right) => left.distance - right.distance)[0] || null;
+    diagnostic.blockerCompanion = blockerCompanion ? {
+      index: blockerCompanion.index,
+      frequencyHz: blockerCompanion.filter.frequencyHz,
+      gainDb: blockerCompanion.filter.gainDb,
+      Q: blockerCompanion.filter.Q,
+    } : null;
+    const blockerVariants = blockerQValues.map((blockerQ) => {
+      const variant = current.map((filter) => ({ ...filter }));
+      variant[blocker.index] = {
+        ...variant[blocker.index], Q: blockerQ,
+        reason: "Joint broad-valley rebalance: narrow remote peak-cut tail",
+      };
+      return variant;
+    });
+    if (blockerCompanion) {
+      const splitFrequencyHz = Math.sqrt(
+        blocker.filter.frequencyHz * blockerCompanion.filter.frequencyHz,
+      );
+      for (const primaryGainDb of [-12, -10, -8]) {
+        for (const primaryQ of [2, 3, 4]) {
+          for (const companionGainDb of [-3, -5, -7]) {
+            for (const companionQ of [2, 3, 4]) {
+              const variant = current.map((filter) => ({ ...filter }));
+              variant[blocker.index] = {
+                ...variant[blocker.index], gainDb: primaryGainDb, Q: primaryQ,
+                reason: "Joint broad-valley rebalance: split saturated broad peak cut",
+              };
+              variant[blockerCompanion.index] = {
+                ...variant[blockerCompanion.index],
+                frequencyHz: splitFrequencyHz, gainDb: companionGainDb, Q: companionQ,
+                reason: "Joint broad-valley rebalance: preserve peak control without remote tail",
+              };
+              blockerVariants.push(variant);
+            }
+          }
+        }
+      }
+    }
     const boostAdditions = boostIndexes.length ? [0, 1, 2, 3, 4] : [2, 3, 4, 5, 6];
     const boostQValues = boostIndexes.length
       ? [...new Set([current[boostIndexes[0]].Q, 1.5, 2, 2.5, 3]
@@ -181,14 +229,9 @@ export function rebalanceBroadValleyBank({
       : [1.5, 2, 2.5, 3];
     const shoulderDeltas = shoulderCut ? [0, -1, -2, -3, -4] : [0];
 
-    for (const blockerQ of blockerQValues) for (const boostAddition of boostAdditions) {
+    for (const blockerVariant of blockerVariants) for (const boostAddition of boostAdditions) {
       for (const boostQ of boostQValues) for (const shoulderDelta of shoulderDeltas) {
-        let proposed = current.map((filter) => ({ ...filter }));
-        proposed[blocker.index] = {
-          ...proposed[blocker.index],
-          Q: blockerQ,
-          reason: "Joint broad-valley rebalance: narrow remote peak-cut tail",
-        };
+        let proposed = blockerVariant.map((filter) => ({ ...filter }));
         if (boostIndexes.length) {
           const totalGain = boostIndexes.reduce((sum, index) =>
             sum + Math.max(0, proposed[index].gainDb), 0);
@@ -290,8 +333,15 @@ export function rebalanceBroadValleyBank({
     const candidateRspLevel = Number.isFinite(metrics?.rspMaxDeviationDb)
       ? houseCurveP19Level(metrics.rspMaxDeviationDb) : null;
     const rspLevelSafe = baselineRspLevel === null || candidateRspLevel >= baselineRspLevel;
-    const rspRmsSafe = !Number.isFinite(baselineMetrics?.rspRmsDeviationDb)
+    const absoluteRspRmsSafe = !Number.isFinite(baselineMetrics?.rspRmsDeviationDb)
       || metrics.rspRmsDeviationDb <= baselineMetrics.rspRmsDeviationDb + 0.1;
+    const shapeAndLevelSafe = Number.isFinite(baselineMetrics?.rspShapeRmsDeviationDb)
+      && Number.isFinite(metrics?.rspShapeRmsDeviationDb)
+      && metrics.rspShapeRmsDeviationDb <= baselineMetrics.rspShapeRmsDeviationDb - 0.1
+      && metrics.rspMaxDeviationDb <= baselineMetrics.rspMaxDeviationDb + 0.5
+      && Math.abs((metrics.rspMeanSignedResidualDb ?? 0)
+        - (baselineMetrics.rspMeanSignedResidualDb ?? 0)) <= 1.25;
+    const rspRmsSafe = absoluteRspRmsSafe || shapeAndLevelSafe;
     if (verification.samples.length < 8) verification.samples.push({
       rawMaximumResidualDb: candidate.quality.maximum,
       rawRmsResidualDb: candidate.quality.rms,
@@ -307,6 +357,8 @@ export function rebalanceBroadValleyBank({
       candidateRspMeanSignedResidualDb: metrics?.rspMeanSignedResidualDb ?? null,
       baselineRspShapeRmsDeviationDb: baselineMetrics?.rspShapeRmsDeviationDb ?? null,
       candidateRspShapeRmsDeviationDb: metrics?.rspShapeRmsDeviationDb ?? null,
+      absoluteRspRmsSafe,
+      shapeAndLevelSafe,
       filterSignature: signature(candidate.filters),
     });
     if (!metrics) {
