@@ -181,6 +181,38 @@ export function runLiveBassTestOptimiserFixture(requestedTargets = [109, 115, 12
     });
     return summariseCandidate(selectCandidateFromPool(pool), targetDb);
   });
+  const byTarget = Object.fromEntries(cases.map((item) => [item.targetDb, item]));
+  const hasComparisonSet = [109, 115, 123].every((targetDb) => byTarget[targetDb]);
+  const checks = hasComparisonSet ? [
+    {
+      name: "109, 115 and 123 dBC produce distinct room-derived filter banks",
+      passed: new Set([byTarget[109].filterSignature, byTarget[115].filterSignature, byTarget[123].filterSignature]).size === 3,
+    },
+    {
+      name: "All selected banks stay within the ten-filter and aggregate transfer limits",
+      passed: cases.every((item) => item.filterCount <= 10 && item.bankLimits?.allOk === true),
+    },
+    {
+      name: "Product capability remains setup-specific rather than target-dependent",
+      passed: Math.max(...cases.map((item) => item.p14AvailableDb)) - Math.min(...cases.map((item) => item.p14AvailableDb)) < 0.1,
+    },
+    {
+      name: "P14 passes at 109 and 115 dBC but fails above the product envelope at 123 dBC",
+      passed: byTarget[109].p14Pass === true && byTarget[115].p14Pass === true && byTarget[123].p14Pass === false,
+    },
+    {
+      name: "Achieved P18 extension worsens as selected P14 output rises",
+      passed: byTarget[109].p18Hz < byTarget[115].p18Hz && byTarget[115].p18Hz < byTarget[123].p18Hz,
+    },
+    {
+      name: "P18 is not awarded when the selected P14 operating level itself fails",
+      passed: byTarget[123].p18IndependentLevel > 0 && byTarget[123].p18Level === 0,
+    },
+    {
+      name: "P19 fit degrades materially near and beyond the product envelope",
+      passed: byTarget[123].p19Db > byTarget[115].p19Db && byTarget[123].p19Level === 0,
+    },
+  ] : [];
   return {
     rawCurveSignature: buildCurveSignature(rspRawCurve),
     expectedLiveRawCurveSignature: "curve:360:9ce9f140",
@@ -189,5 +221,7 @@ export function runLiveBassTestOptimiserFixture(requestedTargets = [109, 115, 12
     autoAlignDelays,
     transitionHz,
     cases,
+    checks,
+    allPassed: hasComparisonSet ? checks.every((item) => item.passed) : null,
   };
 }
