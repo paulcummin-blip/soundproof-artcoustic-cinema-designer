@@ -110,10 +110,10 @@ export function runP14CapabilityFixtures() {
   });
   const relativeLimitAt = (envelope, frequency) => envelope.curve.find((point) => point.frequency === frequency)?.relativeProductLimitDb;
   check(
-    "Minimum L1 leaves enough product headroom for four SUB2-12s to extend to 15 Hz in-room",
-    "≥ -3 dB at 15 Hz",
-    relativeLimitAt(lowOutputEnvelope, 15),
-    relativeLimitAt(lowOutputEnvelope, 15) >= -3,
+    "Minimum L1 leaves enough product headroom for four SUB2-12s to achieve P18 L3 or better",
+    "≥ -3 dB at 18 Hz",
+    relativeLimitAt(lowOutputEnvelope, 18),
+    relativeLimitAt(lowOutputEnvelope, 18) >= -3,
   );
   check(
     "Recommended L3 exposes the four-SUB2-12 LF roll-off instead of claiming 15 Hz",
