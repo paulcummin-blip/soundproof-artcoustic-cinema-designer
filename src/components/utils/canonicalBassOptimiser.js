@@ -109,15 +109,17 @@ export function deriveCorrectionWindowOperatingOffsetDb({
   const feasible = lowerOffsetBoundDb <= upperOffsetBoundDb;
   // When the response span fits inside the available +6 / -15 dB PEQ window,
   // centre it on the target without asking the filter bank for an impossible
-  // boost or cut. If it cannot fit, protect correctable below-target output:
-  // place the lowest broad region at the maximum safe boost boundary and leave
-  // any remaining peak excess visible for the cut bank and diagnostics.
+  // boost or cut. If it cannot fit, place the response halfway between the two
+  // incompatible bounds. This minimises the worst remaining error after the
+  // maximum safe boost and cut, rather than preserving every valley at the cost
+  // of leaving large peaks and turning the result into a level-only adjustment.
+  const balancedInfeasibleOffsetDb = (lowerOffsetBoundDb + upperOffsetBoundDb) / 2;
   const requestedOffsetDb = feasible
     ? Math.min(upperOffsetBoundDb, Math.max(lowerOffsetBoundDb, meanAlignedOffsetDb))
-    : lowerOffsetBoundDb;
+    : balancedInfeasibleOffsetDb;
   return {
     requestedOffsetDb,
-    selectionMode: feasible ? "mean-aligned-within-correction-window" : "low-frequency-shortfall-priority",
+    selectionMode: feasible ? "mean-aligned-within-correction-window" : "balanced-unreachable-residual",
     feasible,
     pointCount: correctablePoints.length,
     minimumResidualDb,
@@ -125,6 +127,9 @@ export function deriveCorrectionWindowOperatingOffsetDb({
     meanResidualDb,
     lowerOffsetBoundDb,
     upperOffsetBoundDb,
+    balancedInfeasibleOffsetDb,
+    irreducibleShortfallDb: feasible ? 0 : Math.max(0, lowerOffsetBoundDb - requestedOffsetDb),
+    irreducibleExcessDb: feasible ? 0 : Math.max(0, requestedOffsetDb - upperOffsetBoundDb),
     maximumAggregateBoostDb,
     maximumCutDb,
     assessmentStartHz,
