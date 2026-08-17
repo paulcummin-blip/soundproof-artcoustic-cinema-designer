@@ -28,13 +28,25 @@ const interpolateCurve = (curve, frequency) => {
   return low.spl + (high.spl - low.spl) * ratio;
 };
 
-function buildRoomResponseSeries(normalizedSeries, smoothingMode) {
+function buildRoomResponseSeries(normalizedSeries, smoothingMode, optimisationResult) {
   if (!normalizedSeries?.data?.length) return null;
+  const sourceDiagnostics = optimisationResult?.selectedCandidate?.pairedP14P18Authority?.sources?.sourceDiagnostics;
+  const selectedLayout = optimisationResult?.finalOptimisedBassResponse?.selectedSubwooferLayout;
+  const sourceCount = Math.max(
+    1,
+    Array.isArray(sourceDiagnostics) && sourceDiagnostics.length
+      ? sourceDiagnostics.length
+      : (Array.isArray(selectedLayout) && selectedLayout.length ? selectedLayout.length : 1),
+  );
+  const systemPowerReferenceDb = NORMALIZED_ROOM_REFERENCE_DB + 10 * Math.log10(sourceCount);
   return {
     id: "room-response",
     kind: "room-response",
-    label: "Room response · 94 dB reference",
-    tooltipLabel: "Product-independent room response · 94 dB flat-source reference",
+    label: "Room / layout response · reference only",
+    tooltipLabel: `Room / layout response · ${sourceCount} flat 94 dB source${sourceCount === 1 ? "" : "s"}`,
+    referenceDb: NORMALIZED_ROOM_REFERENCE_DB,
+    sourceCount,
+    systemPowerReferenceDb,
     color: "#7C3AED",
     strokeWidth: 1.75,
     strokeDasharray: "5 4",
@@ -144,11 +156,15 @@ export function buildAbsoluteHouseCurveSeries(optimisationResult) {
 function buildMaximumSplSeries(finalResponse, smoothingMode) {
   const curve = finalResponse?.maximumSplCurveAfterEq;
   if (!Array.isArray(curve) || !curve.length) return null;
+  const safetyMarginDb = Number.isFinite(Number(finalResponse?.maximumSplSafetyMarginDb))
+    ? Number(finalResponse.maximumSplSafetyMarginDb)
+    : 0;
   return {
     id: "maximum-spl-after-eq",
     kind: "maximum-spl",
-    label: "Maximum product + room capability",
-    tooltipLabel: "Fixed maximum product + room capability",
+    label: `Usable in-room maximum · ${safetyMarginDb.toFixed(0)} dB reserve`,
+    tooltipLabel: `Usable in-room maximum · product + room/layout − ${safetyMarginDb.toFixed(0)} dB reserve`,
+    safetyMarginDb,
     color: "#B45309",
     strokeWidth: 2,
     strokeDasharray: "2 4",
@@ -186,7 +202,7 @@ export function buildBassGraphSeries({
       : (hasStoredBlueCurve
         ? [{ id: "rsp-raw", kind: "raw", label: "Physical RSP before EQ", tooltipLabel: "Product-aware physical RSP before EQ", color: "#64748B", strokeWidth: 1.75, strokeDasharray: "6 4", data: applyBassSmoothing(storedRspBeforePeq, smoothingMode) }]
         : (rspRawCurve.length ? [rawRspSeries(rspRawCurve, smoothingMode)] : []));
-    const roomResponse = buildRoomResponseSeries(normalizedSeries, smoothingMode);
+    const roomResponse = buildRoomResponseSeries(normalizedSeries, smoothingMode, optimisationResult);
     if (roomResponse) series.push(roomResponse);
     if (hasMatchingDetailedResult && finalResponse?.postEqRspCurve?.length) {
       if (seatValidationActive) {
