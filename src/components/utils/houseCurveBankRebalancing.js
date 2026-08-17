@@ -230,6 +230,44 @@ export function rebalanceBroadValleyBank({
       };
       return variant;
     });
+    if (!effectiveCompanion && current.length < MAX_FILTERS) {
+      const lowerShoulder = shoulders.find((shoulder) => shoulder.side === "lower");
+      const appendedFrequencyHz = lowerShoulder?.frequency
+        ?? Math.sqrt(blocker.filter.frequencyHz * region.startHz);
+      // MiniDSP-style overlapping PEQ: replace one saturated low-Q cut with
+      // two narrower cuts at the actual residual peaks. This preserves peak
+      // attenuation while removing far less level from the following broad
+      // valley than the original filter tail.
+      const appendedSplitPresets = [
+        [-13, 2.5, -3, 4],
+        [-12, 3, -4, 4],
+        [-11, 3.5, -5, 5],
+        [-10, 4, -6, 5],
+        [-9, 4.5, -7, 6],
+        [-8, 5, -8, 6],
+      ];
+      for (const [primaryGainDb, primaryQ, companionGainDb, companionQ] of appendedSplitPresets) {
+        const variant = current.map((filter) => ({ ...filter }));
+        variant[blocker.index] = {
+          ...variant[blocker.index], gainDb: primaryGainDb, Q: primaryQ,
+          reason: "Joint broad-valley rebalance: narrow saturated peak cut",
+        };
+        variant.push({
+          band: variant.length + 1, enabled: true, type: "Peak",
+          frequencyHz: appendedFrequencyHz, gainDb: companionGainDb, Q: companionQ,
+          reason: "Joint broad-valley rebalance: add overlapping shoulder cut",
+        });
+        blockerVariants.push(variant);
+      }
+      diagnostic.blockerCompanion = {
+        index: current.length,
+        frequencyHz: appendedFrequencyHz,
+        gainDb: null,
+        Q: null,
+        appended: true,
+        repurposed: false,
+      };
+    }
     if (effectiveCompanion) {
       const lowerShoulder = shoulders.find((shoulder) => shoulder.side === "lower");
       const upperShoulder = shoulders.find((shoulder) => shoulder.side === "upper");
