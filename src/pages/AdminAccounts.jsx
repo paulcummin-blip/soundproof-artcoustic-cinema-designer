@@ -34,6 +34,11 @@ export default function AdminAccountsPage() {
   const [capacityMap, setCapacityMap] = useState(new Map());
   const [projectMap, setProjectMap] = useState(new Map());
 
+  // Promotions
+  const [promotions, setPromotions] = useState([]);
+  const [promotionUsage, setPromotionUsage] = useState([]);
+  const [promoRefreshKey, setPromoRefreshKey] = useState(0);
+
   // Diagnostics state (retained, moved behind collapsible)
   const [diagProjects, setDiagProjects] = useState([]);
   const [diagTotalAccounts, setDiagTotalAccounts] = useState(null);
@@ -61,12 +66,14 @@ export default function AdminAccountsPage() {
         setLoading(true);
         setLoadError(null);
 
-        // Fetch all data in parallel — 4 API calls, not 75+
-        const [accountData, projectData, ledgerData, turnoverData] = await Promise.all([
+        // Fetch all data in parallel — 6 API calls
+        const [accountData, projectData, ledgerData, turnoverData, promoData, promoUsageData] = await Promise.all([
           base44.entities.Account.list("-created_date", 500),
           base44.entities.Project.list("-created_date", 1000),
           base44.entities.CapacityLedger.list("-created_date", 2000),
           base44.entities.TurnoverRecord.list("-created_date", 500),
+          base44.entities.Promotion.list("-created_date", 200),
+          base44.entities.PromotionUsage.list("-created_date", 500),
         ]);
 
         if (mounted) {
@@ -78,6 +85,8 @@ export default function AdminAccountsPage() {
           setTurnoverMap(buildTurnoverMap(turnoverData, CALENDAR_YEAR));
           setProjectMap(buildProjectActivityMap(projectData));
           setCapacityMap(buildCapacityBreakdownMap(ledgerData));
+          setPromotions(promoData || []);
+          setPromotionUsage(promoUsageData || []);
         }
       } catch (err) {
         if (mounted) setLoadError(err?.message || "Failed to load accounts");
@@ -91,7 +100,11 @@ export default function AdminAccountsPage() {
 
     load();
     return () => { mounted = false; };
-  }, [isAdmin]);
+  }, [isAdmin, promoRefreshKey]);
+
+  function handlePromotionsChanged() {
+    setPromoRefreshKey(k => k + 1);
+  }
 
   async function handleCreateAdminAccount() {
     setSetupRunning(true);
@@ -273,6 +286,11 @@ export default function AdminAccountsPage() {
             projectMap={projectMap}
             emptyMessage="No Premium Partner accounts found."
             accentColor="#213428"
+            groupKey="premiumPartners"
+            promotions={promotions}
+            promotionUsage={promotionUsage}
+            allAccounts={accounts}
+            onPromotionsChanged={handlePromotionsChanged}
           />
 
           <AccountGroupSection
@@ -284,6 +302,11 @@ export default function AdminAccountsPage() {
             projectMap={projectMap}
             emptyMessage="Not yet imported. Richer Sounds accounts will appear here when the Partner Portal import is configured."
             accentColor="#2C5AA0"
+            groupKey="richerSounds"
+            promotions={promotions}
+            promotionUsage={promotionUsage}
+            allAccounts={accounts}
+            onPromotionsChanged={handlePromotionsChanged}
           />
 
           <AccountGroupSection
@@ -295,6 +318,11 @@ export default function AdminAccountsPage() {
             projectMap={projectMap}
             emptyMessage="No other dealer accounts yet."
             accentColor="#625143"
+            groupKey="otherDealers"
+            promotions={promotions}
+            promotionUsage={promotionUsage}
+            allAccounts={accounts}
+            onPromotionsChanged={handlePromotionsChanged}
           />
 
           {/* INTERNATIONAL */}
@@ -317,6 +345,11 @@ export default function AdminAccountsPage() {
             emptyMessage="No international distributor accounts yet."
             accentColor="#2C5AA0"
             showCommercialColumns={false}
+            groupKey="distributors"
+            promotions={promotions}
+            promotionUsage={promotionUsage}
+            allAccounts={accounts}
+            onPromotionsChanged={handlePromotionsChanged}
           />
 
           {/* INTERNAL / TEST */}
@@ -341,6 +374,11 @@ export default function AdminAccountsPage() {
                 emptyMessage="No internal or test accounts."
                 accentColor="#3E4349"
                 showCommercialColumns={false}
+                groupKey="internalTest"
+                promotions={promotions}
+                promotionUsage={promotionUsage}
+                allAccounts={accounts}
+                onPromotionsChanged={handlePromotionsChanged}
               />
             </>
           )}

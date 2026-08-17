@@ -6,6 +6,7 @@ import { aggregateCapacityBreakdown } from "@/lib/commercial/capacityService";
 import { aggregateTurnoverForYear } from "@/lib/commercial/commercialOverview";
 import CommercialSummaryCard from "@/components/admin/commercial/CommercialSummaryCard";
 import AccountStatusActions from "@/components/admin/commercial/AccountStatusActions";
+import AccountPromotionNote from "@/components/admin/promotions/AccountPromotionNote";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -95,6 +96,8 @@ export default function AccountDashboard() {
   const [projects, setProjects] = useState([]);
   const [breakdown, setBreakdown] = useState(null);
   const [turnover, setTurnover] = useState(null);
+  const [promotions, setPromotions] = useState([]);
+  const [promotionUsage, setPromotionUsage] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
@@ -109,11 +112,13 @@ export default function AccountDashboard() {
         setLoading(true);
         setLoadError(null);
 
-        const [accountList, projectList, ledgerEntries, turnoverRecords] = await Promise.all([
+        const [accountList, projectList, ledgerEntries, turnoverRecords, promoList, promoUsageList] = await Promise.all([
           base44.entities.Account.filter({ id: accountId }),
           base44.entities.Project.filter({ account_id: accountId }),
           base44.entities.CapacityLedger.filter({ account_id: accountId }, "-created_date", 1000),
           base44.entities.TurnoverRecord.filter({ account_id: accountId }),
+          base44.entities.Promotion.list("-created_date", 200),
+          base44.entities.PromotionUsage.filter({ account_id: accountId }),
         ]);
 
         if (mounted) {
@@ -121,6 +126,8 @@ export default function AccountDashboard() {
           setProjects(projectList || []);
           setBreakdown(aggregateCapacityBreakdown(ledgerEntries || []));
           setTurnover(aggregateTurnoverForYear(turnoverRecords, accountId, CALENDAR_YEAR));
+          setPromotions(promoList || []);
+          setPromotionUsage(promoUsageList || []);
         }
       } catch (err) {
         if (mounted) setLoadError(err?.message || "Failed to load account");
@@ -223,6 +230,13 @@ export default function AccountDashboard() {
               </div>
             </div>
           </div>
+
+          {/* Active promotion note (admin-only) */}
+          <AccountPromotionNote
+            account={account}
+            promotions={promotions}
+            promotionUsage={promotionUsage}
+          />
 
           {/* Commercial summary */}
           <CommercialSummaryCard

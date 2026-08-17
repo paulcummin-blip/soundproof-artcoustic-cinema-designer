@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { computeLastActivity } from "@/lib/commercial/commercialOverview";
+import GroupPromotionArea from "@/components/admin/promotions/GroupPromotionArea";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -161,6 +162,12 @@ export default function AccountGroupSection({
   emptyMessage,
   showCommercialColumns = true,
   accentColor = "#213428",
+  // Promotion props
+  groupKey = null,
+  promotions = [],
+  promotionUsage = [],
+  allAccounts = [],
+  onPromotionsChanged = null,
 }) {
   const count = accounts?.length || 0;
 
@@ -222,6 +229,17 @@ export default function AccountGroupSection({
           {count}
         </div>
       </div>
+
+      {/* Promotion area — between heading and table */}
+      {groupKey && (
+        <GroupPromotionArea
+          groupKey={groupKey}
+          promotions={promotions}
+          promotionUsage={promotionUsage}
+          allAccounts={allAccounts}
+          onPromotionsChanged={onPromotionsChanged}
+        />
+      )}
 
       {count === 0 ? (
         <div style={{
