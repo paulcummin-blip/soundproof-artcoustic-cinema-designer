@@ -351,6 +351,13 @@ export function rebalanceBroadValleyBank({
           filters: proposed, region, quality: candidateQuality, limits,
           valleyImprovementDb, centreCorrectionIncreaseDb,
           activity: proposed.reduce((sum, filter) => sum + Math.abs(filter.gainDb || 0), 0),
+          usesRepurposedCompanion: !!replacementCompanion
+            && proposed[replacementCompanion.index]?.reason
+              === "Joint broad-valley rebalance: repurpose weak slot for overlapping peak control",
+          adjustedShoulderCount: shoulderCuts.reduce((count, shoulderCut) =>
+            count + (Math.abs(
+              proposed[shoulderCut.index].gainDb - current[shoulderCut.index].gainDb,
+            ) >= 0.5 ? 1 : 0), 0),
         });
         }
       }
@@ -372,8 +379,22 @@ export function rebalanceBroadValleyBank({
     rspRmsWorsening: 0,
     samples: [],
   };
+  const verificationPool = [];
+  const verificationSignatures = new Set();
+  const addToVerificationPool = (candidate) => {
+    const candidateSignature = signature(candidate.filters);
+    if (verificationSignatures.has(candidateSignature)) return;
+    verificationSignatures.add(candidateSignature);
+    verificationPool.push(candidate);
+  };
+  preliminary.slice(0, 20).forEach(addToVerificationPool);
+  preliminary.filter((candidate) => candidate.usesRepurposedCompanion)
+    .slice(0, 20).forEach(addToVerificationPool);
+  preliminary.filter((candidate) => candidate.adjustedShoulderCount >= 2)
+    .slice(0, 15).forEach(addToVerificationPool);
+
   const verifiedCandidates = [];
-  for (const candidate of preliminary.slice(0, 30)) {
+  for (const candidate of verificationPool.slice(0, 55)) {
     verification.testedBanks += 1;
     const metrics = calculateAllSeatMetrics(
       objectiveSeats, candidate.filters, fitStartHz, fitEndHz, anchorDb,
@@ -412,6 +433,8 @@ export function rebalanceBroadValleyBank({
       candidateRspShapeRmsDeviationDb: metrics?.rspShapeRmsDeviationDb ?? null,
       absoluteRspRmsSafe,
       shapeAndLevelSafe,
+      usesRepurposedCompanion: candidate.usesRepurposedCompanion,
+      adjustedShoulderCount: candidate.adjustedShoulderCount,
       filterSignature: signature(candidate.filters),
     });
     if (!metrics) {
