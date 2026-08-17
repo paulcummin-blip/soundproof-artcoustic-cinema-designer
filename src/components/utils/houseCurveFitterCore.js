@@ -186,6 +186,28 @@ export function calculateAllSeatMetrics(seats, filters, assessmentStartHz, asses
   return writeExactMemo(memo?.metrics, metricsKey, summarizeSeatMetrics(seatMetrics, qualityOptions.protectedNullRegions), memo?.enabled);
 }
 
+function enclosingBroadValley(segment, candidatePoint) {
+  if (!Array.isArray(segment) || candidatePoint?.deviationDb >= 0) return null;
+  const centreIndex = segment.findIndex((point) => point.frequency === candidatePoint.frequency);
+  if (centreIndex <= 0 || centreIndex >= segment.length - 1) return null;
+  const isLocalPeak = (index) => index > 0 && index < segment.length - 1
+    && segment[index].deviationDb >= segment[index - 1].deviationDb
+    && segment[index].deviationDb >= segment[index + 1].deviationDb;
+  let leftPeak = null;
+  let rightPeak = null;
+  for (let index = centreIndex - 1; index > 0; index--) {
+    if (isLocalPeak(index)) { leftPeak = segment[index]; break; }
+  }
+  for (let index = centreIndex + 1; index < segment.length - 1; index++) {
+    if (isLocalPeak(index)) { rightPeak = segment[index]; break; }
+  }
+  if (!leftPeak || !rightPeak || rightPeak.frequency <= leftPeak.frequency) return null;
+  const widthOctaves = Math.log2(rightPeak.frequency / leftPeak.frequency);
+  return widthOctaves >= 1 / 3
+    ? { startHz: leftPeak.frequency, endHz: rightPeak.frequency, widthOctaves }
+    : null;
+}
+
 // Find ALL broad residual regions across all seats, sorted by severity (descending).
 // Each region is seat-specific so trials can be generated per-seat while the shared
 // bank is evaluated across all seats.
@@ -238,10 +260,15 @@ function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEnd
         const thresholdDb = candidatePoint.deviationDb >= 0 ? peakThresholdDb : valleyThresholdDb;
         const represented = discovered.some((region) => Math.abs(Math.log2(region.centrePoint.frequency / candidatePoint.frequency)) <= 1 / 24);
         if (!represented && Math.abs(candidatePoint.deviationDb) >= thresholdDb) {
+          const enclosingValley = enclosingBroadValley(segment, candidatePoint);
           discovered.push({
             kind: candidatePoint.deviationDb >= 0 ? "peak" : "valley",
-            startHz: candidatePoint.frequency / 2 ** (1 / 12),
-            endHz: candidatePoint.frequency * 2 ** (1 / 12),
+            startHz: enclosingValley?.startHz ?? candidatePoint.frequency / 2 ** (1 / 12),
+            endHz: enclosingValley?.endHz ?? candidatePoint.frequency * 2 ** (1 / 12),
+            ...(enclosingValley ? {
+              widthOctaves: enclosingValley.widthOctaves,
+              regionBasis: "nearest-smoothed-peak-boundaries",
+            } : {}),
             centrePoint: candidatePoint,
             severityDb: Math.abs(candidatePoint.deviationDb),
           });
