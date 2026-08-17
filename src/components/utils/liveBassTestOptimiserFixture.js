@@ -1,6 +1,6 @@
 import { simulateAuthoritativeBassResponse } from "@/components/room/bass/authoritativeBassResponseEngine";
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from "@/components/room/bass/bassPhysicsDefaults";
-import { buildAuthoritativeBassSources, buildAuthoritativeResponseCurves } from "@/components/room/bass/useAuthoritativeBassResponse";
+import { buildAuthoritativeAutoAlignDelays, buildAuthoritativeBassSources, buildAuthoritativeResponseCurves } from "@/components/room/bass/useAuthoritativeBassResponse";
 import { bassInputAdapter } from "@/components/utils/subwooferInstanceMigration";
 import { generateCandidatePool, selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
 import { buildCurveSignature } from "@/components/room/bass/bassResultAuthority";
@@ -71,12 +71,22 @@ export function runLiveBassTestOptimiserFixture() {
   });
   const frontSubsLive = adapted.filter((item) => item.legacyGroup === "front");
   const rearSubsLive = adapted.filter((item) => item.legacyGroup === "rear");
+  const frontSubsCfg = { orientation: "vertical" };
+  const rearSubsCfg = { orientation: "vertical" };
+  const autoAlignDelays = buildAuthoritativeAutoAlignDelays({
+    enabled: true,
+    rspPosition: RSP,
+    frontSubsLive,
+    rearSubsLive,
+    frontSubsCfg,
+    rearSubsCfg,
+  });
   const sources = buildAuthoritativeBassSources({
     frontSubsLive,
     rearSubsLive,
-    frontSubsCfg: { orientation: "vertical" },
-    rearSubsCfg: { orientation: "vertical" },
-    autoAlignDelays: {},
+    frontSubsCfg,
+    rearSubsCfg,
+    autoAlignDelays,
   });
   const simulation = simulateAuthoritativeBassResponse({
     roomDims: ROOM,
@@ -112,6 +122,7 @@ export function runLiveBassTestOptimiserFixture() {
     expectedLiveRawCurveSignature: "curve:360:9ce9f140",
     rawSignatureMatchesLive: buildCurveSignature(rspRawCurve) === "curve:360:9ce9f140",
     sourceCount: sources.length,
+    autoAlignDelays,
     transitionHz,
     cases,
   };
