@@ -65,7 +65,19 @@
     "read": {
       "$or": [
         {
-          "id": "{{user.data.account_id}}"
+          "$and": [
+            {
+              "id": "{{user.data.account_id}}"
+            },
+            {
+              "id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            }
+          ]
         },
         {
           "user_condition": {
