@@ -18,18 +18,17 @@ function boostWouldSpillIntoProtectedNull(frequency, protectedNullRegions) {
 function broadValleyQValues(points, valley) {
   const centreIndex = points.findIndex((point) => point.frequency === valley?.frequency);
   if (centreIndex <= 0 || centreIndex >= points.length - 1) return { qValues: Q_VALUES, region: null };
-  const isLocalPeak = (index) => index > 0 && index < points.length - 1
-    && points[index].deviationDb >= points[index - 1].deviationDb
-    && points[index].deviationDb >= points[index + 1].deviationDb;
-  let leftPeak = null;
-  let rightPeak = null;
-  for (let index = centreIndex - 1; index > 0; index--) {
-    if (isLocalPeak(index)) { leftPeak = points[index]; break; }
-  }
-  for (let index = centreIndex + 1; index < points.length - 1; index++) {
-    if (isLocalPeak(index)) { rightPeak = points[index]; break; }
-  }
-  if (!leftPeak || !rightPeak || rightPeak.frequency <= leftPeak.frequency) return { qValues: Q_VALUES, region: null };
+  const halfOctave = 2 ** 0.5;
+  const leftPeak = points
+    .filter((point) => point.frequency >= valley.frequency / halfOctave && point.frequency < valley.frequency)
+    .reduce((best, point) => !best || point.deviationDb > best.deviationDb ? point : best, null);
+  const rightPeak = points
+    .filter((point) => point.frequency > valley.frequency && point.frequency <= valley.frequency * halfOctave)
+    .reduce((best, point) => !best || point.deviationDb > best.deviationDb ? point : best, null);
+  const hasMaterialShoulders = leftPeak && rightPeak
+    && leftPeak.deviationDb >= valley.deviationDb + 2
+    && rightPeak.deviationDb >= valley.deviationDb + 2;
+  if (!hasMaterialShoulders || rightPeak.frequency <= leftPeak.frequency) return { qValues: Q_VALUES, region: null };
   const widthOctaves = Math.log2(rightPeak.frequency / leftPeak.frequency);
   if (widthOctaves < 1 / 3) return { qValues: Q_VALUES, region: null };
   const baseQ = Math.max(0.5, Math.min(BROAD_VALLEY_MAX_Q,
