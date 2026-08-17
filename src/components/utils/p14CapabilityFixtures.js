@@ -121,6 +121,28 @@ export function runP14CapabilityFixtures() {
     `${relativeLimitAt(highOutputEnvelope, 25)}/${relativeLimitAt(highOutputEnvelope, 30)}`,
     relativeLimitAt(highOutputEnvelope, 25) < -3 && relativeLimitAt(highOutputEnvelope, 30) >= -3,
   );
+  check(
+    "Product extension envelope stops before ordinary room-mode EQ frequencies",
+    "< 34 Hz",
+    highOutputEnvelope.extensionBandEndHz,
+    highOutputEnvelope.extensionBandEndHz < 34,
+  );
+
+  const impossibleSingleSubL3 = buildProductOperatingEnvelope({
+    frequencyGrid: p18FrequencyGrid,
+    targetCurve: flatP18Target,
+    activeSubs: subs("sub2-12", 1),
+    selectedOperatingOutputDb: 120,
+    targetBasis: "recommended",
+  });
+  check(
+    "A single SUB2-12 exposes an impossible Recommended L3 P14 demand as a signed shortfall",
+    "> 0 dB shortfall",
+    impossibleSingleSubL3.p14ShortfallDb,
+    impossibleSingleSubL3.operatingMarginDb < 0
+      && impossibleSingleSubL3.operatingHeadroomDb === 0
+      && impossibleSingleSubL3.p14ShortfallDb > 0,
+  );
 
   const sub2Low = pointAt(results["sub2-12-1"].capabilityCurve, 20)?.rawCapabilityDb;
   const sub4Low = pointAt(results["sub4-12-1"].capabilityCurve, 20)?.rawCapabilityDb;
