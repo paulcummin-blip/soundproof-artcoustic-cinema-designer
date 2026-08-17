@@ -1,5 +1,4 @@
 import {
-  buildCurveFromBank,
   evaluateProvisionalBankLimits,
   normaliseCurve,
   peakingEqResponseDb,
@@ -304,6 +303,11 @@ export function rebalanceBroadValleyBank({
       candidateRspLevel,
       baselineRspRmsDeviationDb: baselineMetrics?.rspRmsDeviationDb ?? null,
       candidateRspRmsDeviationDb: metrics?.rspRmsDeviationDb ?? null,
+      baselineRspMeanSignedResidualDb: baselineMetrics?.rspMeanSignedResidualDb ?? null,
+      candidateRspMeanSignedResidualDb: metrics?.rspMeanSignedResidualDb ?? null,
+      baselineRspShapeRmsDeviationDb: baselineMetrics?.rspShapeRmsDeviationDb ?? null,
+      candidateRspShapeRmsDeviationDb: metrics?.rspShapeRmsDeviationDb ?? null,
+      filterSignature: signature(candidate.filters),
     });
     if (!metrics) {
       verification.missingMetrics += 1;
