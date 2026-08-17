@@ -508,6 +508,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
         reason: broadValleyRebalance.reason,
         selected: broadValleyRebalance.selected,
         diagnostics: broadValleyRebalance.diagnostics,
+        verification: broadValleyRebalance.verification,
       },
       postRsp: {
         maximumAbsoluteResidualDb: finalMetrics?.rspMaxDeviationDb ?? null,
