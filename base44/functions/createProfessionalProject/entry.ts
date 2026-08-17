@@ -34,8 +34,11 @@ export default async function(req) {
     const userRecords = await base44.asServiceRole.entities.User.filter({ id: user.id });
     const authoritativeUser = (Array.isArray(userRecords) && userRecords.length > 0) ? userRecords[0] : null;
     const accountId = authoritativeUser?.account_id || null;
+    const userRole = authoritativeUser?.role || user?.role || 'user';
+    const isAdmin = userRole === 'admin';
 
-    if (!accountId || accountId === '') {
+    // Non-admin users must have an account_id linked; admins are unrestricted.
+    if (!isAdmin && (!accountId || accountId === '')) {
       return Response.json({
         status: 'ACCOUNT_NOT_LINKED',
         message: 'Your user account is not linked to an organisation. Contact your administrator.'
@@ -67,6 +70,31 @@ export default async function(req) {
       notes: body.notes || '',
       acoustic_treatment_enabled: body.acoustic_treatment_enabled ?? false,
     };
+
+    // ── 3a. Admin bypass: unrestricted internal/support use ──
+    if (isAdmin) {
+      let adminProject = null;
+      try {
+        adminProject = await base44.asServiceRole.entities.Project.create({
+          ...projectFields,
+          account_id: accountId || null,
+          commercial_tier: 'INTERNAL',
+          lifecycle_status: 'Draft',
+        });
+      } catch (createErr) {
+        return Response.json({
+          status: 'CREATION_FAILED',
+          message: 'Unable to create the project. Please try again.'
+        }, { status: 500 });
+      }
+      return Response.json({
+        status: 'SUCCESS',
+        project: adminProject,
+        capacity_before: null,
+        capacity_after: null,
+        ledger_entry: null
+      }, { status: 201 });
+    }
 
     // ── 3. Check available capacity from ledger SUM ──
     const available = await getAvailableCapacity(base44.asServiceRole, accountId);

@@ -251,7 +251,7 @@ function capCurveToProductOperatingEnvelope(requestedCurve, productEnvelope) {
     return {
       ...point,
       requestedSpl: Number.isFinite(point.requestedSpl) ? point.requestedSpl : point.spl,
-      productOperatingLimitSpl,
+      productOperatingLimitSpl: productLimitSpl,
       spl: Math.min(point.spl, productLimitSpl),
       capabilityLimited: point.capabilityLimited === true || point.spl > productLimitSpl + 0.05,
     };
