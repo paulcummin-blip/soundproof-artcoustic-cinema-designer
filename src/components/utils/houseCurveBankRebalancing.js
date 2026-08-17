@@ -447,6 +447,7 @@ export function rebalanceBroadValleyBank({
     samples: [],
     bestValleySample: null,
     bestRepurposedSample: null,
+    bestAppendedSample: null,
   };
   const verificationPool = [];
   const verificationSignatures = new Set();
@@ -532,6 +533,10 @@ export function rebalanceBroadValleyBank({
     if (candidate.usesRepurposedCompanion && (!verification.bestRepurposedSample
       || verificationSample.valleyImprovementDb > verification.bestRepurposedSample.valleyImprovementDb)) {
       verification.bestRepurposedSample = verificationSample;
+    }
+    if (candidate.usesAppendedCompanion && (!verification.bestAppendedSample
+      || verificationSample.valleyImprovementDb > verification.bestAppendedSample.valleyImprovementDb)) {
+      verification.bestAppendedSample = verificationSample;
     }
     if (!metrics) {
       verification.missingMetrics += 1;
