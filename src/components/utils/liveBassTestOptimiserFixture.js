@@ -64,7 +64,7 @@ function summariseCandidate(selected, targetDb) {
   };
 }
 
-export function runLiveBassTestOptimiserFixture() {
+export function runLiveBassTestOptimiserFixture(requestedTargets = [109, 115, 123]) {
   const adapted = bassInputAdapter(INSTANCES, {
     frontOrientation: "vertical",
     rearOrientation: "vertical",
@@ -102,7 +102,8 @@ export function runLiveBassTestOptimiserFixture() {
     { targetDb: 109, basis: "minimum", level: 1 },
     { targetDb: 115, basis: "minimum", level: 3 },
     { targetDb: 123, basis: "recommended", level: 4 },
-  ].map(({ targetDb, basis, level }) => {
+  ].filter(({ targetDb }) => requestedTargets.includes(targetDb))
+    .map(({ targetDb, basis, level }) => {
     const pool = generateCandidatePool({
       rawCurve: rspRawCurve,
       perSeatRawCurves,
