@@ -325,7 +325,7 @@ export function rebalanceBroadValleyBank({
     rspRmsWorsening: 0,
     samples: [],
   };
-  let winner = null;
+  const verifiedCandidates = [];
   for (const candidate of preliminary.slice(0, 30)) {
     verification.testedBanks += 1;
     const metrics = calculateAllSeatMetrics(
@@ -383,9 +383,16 @@ export function rebalanceBroadValleyBank({
       verification.rspRmsWorsening += 1;
       continue;
     }
-    winner = { ...candidate, metrics };
-    break;
+    verifiedCandidates.push({ ...candidate, metrics });
   }
+  verifiedCandidates.sort((left, right) =>
+    houseCurveP19Level(right.metrics.rspMaxDeviationDb)
+      - houseCurveP19Level(left.metrics.rspMaxDeviationDb)
+    || left.metrics.rspMaxDeviationDb - right.metrics.rspMaxDeviationDb
+    || left.metrics.rspShapeRmsDeviationDb - right.metrics.rspShapeRmsDeviationDb
+    || left.quality.maximum - right.quality.maximum
+    || right.valleyImprovementDb - left.valleyImprovementDb);
+  const winner = verifiedCandidates[0] || null;
 
   if (!winner) {
     return {
