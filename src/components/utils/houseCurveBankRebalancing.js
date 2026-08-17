@@ -403,7 +403,7 @@ export function rebalanceBroadValleyBank({
     .slice(0, 20).forEach(addToVerificationPool);
 
   const verifiedCandidates = [];
-  for (const candidate of verificationPool.slice(0, 55)) {
+  for (const candidate of verificationPool.slice(0, 75)) {
     verification.testedBanks += 1;
     const metrics = calculateAllSeatMetrics(
       objectiveSeats, candidate.filters, fitStartHz, fitEndHz, anchorDb,
