@@ -23,6 +23,11 @@ import {
   normalizeLevel,
   LEVEL_TEXT_COLORS,
 } from "@/components/designreview/needsAttentionAuthority";
+import {
+  getRoomDesignRatingDesignation,
+  getDesignRatingSupportingSentence,
+  getDesignPerformanceIndex,
+} from "@/components/report/technical/designRatingPresentation";
 
 const COLORS = {
   bg: "transparent",
@@ -100,11 +105,10 @@ function formatPoints(earned, maximum) {
 // ── Sub-components ───────────────────────────────────────────────────
 
 function RatingCard({ rating }) {
-  const pct = rating?.displayPercentage != null ? Math.round(rating.displayPercentage) : null;
-  const total =
-    rating?.actualPoints != null && rating?.maximumAvailablePoints != null
-      ? `${Math.round(rating.actualPoints * 100) / 100} / ${Math.round(rating.maximumAvailablePoints * 100) / 100}`
-      : "—";
+  const isNotAssessed = !rating || rating.status === "NOT_ASSESSED";
+  const designation = isNotAssessed ? null : getRoomDesignRatingDesignation(rating);
+  const supportingSentence = isNotAssessed ? null : getDesignRatingSupportingSentence(rating);
+  const index = isNotAssessed ? null : getDesignPerformanceIndex(rating);
 
   return (
     <div
@@ -134,40 +138,42 @@ function RatingCard({ rating }) {
         </div>
         <div
           style={{
-            fontSize: 36,
+            fontSize: 28,
             fontWeight: 400,
             color: COLORS.primary,
             fontFamily: FONT_HEADING,
-            lineHeight: 1,
+            lineHeight: 1.1,
           }}
         >
-          {pct != null ? `${pct}%` : "NOT ASSESSED"}
+          {designation || "NOT ASSESSED"}
         </div>
-      </div>
-      <div style={{ textAlign: "right" }}>
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            color: COLORS.secondary,
-            letterSpacing: "0.1em",
-            fontFamily: FONT_BODY,
-            marginBottom: 6,
-          }}
-        >
-          TOTAL SCORE
-        </div>
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 400,
-            color: COLORS.primary,
-            fontFamily: FONT_HEADING,
-            lineHeight: 1,
-          }}
-        >
-          {total}
-        </div>
+        {supportingSentence && (
+          <div
+            style={{
+              fontSize: 11,
+              color: COLORS.body,
+              fontFamily: FONT_BODY,
+              lineHeight: 1.4,
+              marginTop: 4,
+            }}
+          >
+            {supportingSentence}
+          </div>
+        )}
+        {index != null && (
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: COLORS.secondary,
+              fontFamily: FONT_BODY,
+              marginTop: 4,
+              letterSpacing: "0.03em",
+            }}
+          >
+            Design Performance Index {index}
+          </div>
+        )}
       </div>
     </div>
   );

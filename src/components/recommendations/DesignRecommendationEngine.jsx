@@ -269,7 +269,7 @@ function CandidateRatingEvaluator({
     candidate,
     onResult,
     rating?.status,
-    rating?.displayPercentage,
+    rating?.designPerformanceIndex,
     rating?.actualPoints,
     rating?.maximumAvailablePoints,
     rating?.coveragePercent,
@@ -395,7 +395,7 @@ export default function DesignRecommendationEngine({
       if (
         current &&
         current.rating?.status === rating?.status &&
-        current.rating?.displayPercentage === rating?.displayPercentage &&
+        current.rating?.designPerformanceIndex === rating?.designPerformanceIndex &&
         current.rating?.actualPoints === rating?.actualPoints &&
         current.rating?.maximumAvailablePoints === rating?.maximumAvailablePoints
       ) {

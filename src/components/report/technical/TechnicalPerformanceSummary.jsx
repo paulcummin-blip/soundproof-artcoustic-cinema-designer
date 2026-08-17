@@ -182,7 +182,7 @@ function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designR
             DESIGN RATING{" "}
             {designRating.status === "NOT_ASSESSED"
               ? "NOT ASSESSED"
-              : `Index ${getDesignPerformanceIndex(designRating.displayPercentage) ?? "—"}`}
+              : `Index ${getDesignPerformanceIndex(designRating) ?? "—"}`}
           </div>
 
         </div>
@@ -342,7 +342,7 @@ export default function TechnicalPerformanceSummary({
                   marginTop: "2mm",
                   letterSpacing: "0.03em",
                 }}>
-                  Design Performance Index {getDesignPerformanceIndex(roomDesignRating.displayPercentage) ?? "—"}
+                  Design Performance Index {getDesignPerformanceIndex(roomDesignRating) ?? "—"}
                 </div>
               </>
             )}

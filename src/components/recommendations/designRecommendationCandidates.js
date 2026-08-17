@@ -603,7 +603,7 @@ export function rankDesignRecommendations({
   evaluatedCandidates = [],
   viewingContext = null,
 }) {
-  const baselinePct = Number(baselineRating?.displayPercentage);
+  const baselineIndex = Number(baselineRating?.designPerformanceIndex);
   const baselinePoints = Number(baselineRating?.actualPoints);
 
   // Stage E2: Best-practice candidates have a separate eligibility path.
@@ -615,7 +615,7 @@ export function rankDesignRecommendations({
     .filter((entry) => entry?.candidate?.kind === "best-practice")
     .map((entry) => {
       const rating = entry.rating;
-      const hasValidRating = rating && Number.isFinite(Number(rating?.displayPercentage));
+      const hasValidRating = rating && Number.isFinite(Number(rating?.designPerformanceIndex));
       const allLevelChanges = hasValidRating
         ? getParameterLevelChanges(baselineRating, rating)
         : [];
@@ -631,14 +631,14 @@ export function rankDesignRecommendations({
     })
     .slice(0, 2);
 
-  if (!finite(baselinePct)) return { improvements: [], savings: [], bestPractice, evaluatedCount: evaluatedCandidates.length };
+  if (!finite(baselineIndex)) return { improvements: [], savings: [], bestPractice, evaluatedCount: evaluatedCandidates.length };
 
   const evaluated = evaluatedCandidates
-    .filter((entry) => entry?.candidate && finite(entry?.rating?.displayPercentage))
+    .filter((entry) => entry?.candidate && finite(entry?.rating?.designPerformanceIndex))
     .map((entry) => {
-      const nextPct = Number(entry.rating.displayPercentage);
+      const nextIndex = Number(entry.rating.designPerformanceIndex);
       const nextPoints = Number(entry.rating.actualPoints);
-      const scoreDelta = nextPct - baselinePct;
+      const scoreDelta = nextIndex - baselineIndex;
       const scoreDeltaPoints = finite(nextPoints) && finite(baselinePoints) ? nextPoints - baselinePoints : null;
       const costDelta = finite(entry.candidate.costDeltaExVat) ? Number(entry.candidate.costDeltaExVat) : null;
 
@@ -662,8 +662,8 @@ export function rankDesignRecommendations({
       return {
         ...entry.candidate,
         rating: entry.rating,
-        currentPercentage: baselinePct,
-        newPercentage: nextPct,
+        currentPercentage: baselineIndex,
+        newPercentage: nextIndex,
         scoreDelta,
         scoreDeltaPoints,
         costDeltaExVat: costDelta,

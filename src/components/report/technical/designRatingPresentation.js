@@ -29,6 +29,21 @@
 
 const FAIL_LABEL = "Design Improvement Recommended";
 
+// ── Overall room designation bands (additive Design Performance Index) ─────
+// These bands apply to the overall room Design Performance Index only.
+// Category cards retain their own percentage-based bands (INDEX_BANDS below).
+// Kept in ONE shared helper so they can be calibrated against real projects.
+const OVERALL_INDEX_BANDS = [
+  { min: 120, label: "Exceptional Performance" },
+  { min: 95, label: "Reference Performance" },
+  { min: 80, label: "Excellent Performance" },
+  { min: 60, label: "High Performance" },
+  { min: 0, label: "Good Performance" },
+];
+
+// ── Category card bands (percentage-based, unchanged) ──────────────────────
+// Used by getCategorySummaries for Spatial Resolution, Dynamic Range and
+// Timbre Matching. These are NOT used for the overall room designation.
 const INDEX_BANDS = [
   { min: 80, label: "Exceptional Performance" },
   { min: 70, label: "Reference Performance" },
@@ -38,8 +53,9 @@ const INDEX_BANDS = [
 ];
 
 /**
- * Pure Design Performance Index → band mapping (no failure logic).
- * Used for category summaries and as the index fallback for the room.
+ * Pure Design Performance Index → band mapping for CATEGORY cards only.
+ * Uses the legacy percentage-based bands. The overall room designation
+ * uses getOverallDesignationFromIndex() via getRoomDesignRatingDesignation().
  * @param {number|null|undefined} displayPercentage
  * @returns {string|null}
  */
@@ -53,15 +69,43 @@ export function getDesignRatingDesignation(displayPercentage) {
 }
 
 /**
- * The rounded numerical value exposed as the "Design Performance Index".
+ * Map an additive Design Performance Index to the overall room designation.
+ * @param {number|null|undefined} index
+ * @returns {string|null}
+ */
+function getOverallDesignationFromIndex(index) {
+  const v = Number(index);
+  if (!Number.isFinite(v)) return null;
+  for (const band of OVERALL_INDEX_BANDS) {
+    if (v >= band.min) return band.label;
+  }
+  return "Good Performance";
+}
+
+/**
+ * The additive Design Performance Index: round(actualPoints / 10), clamped ≥ 0.
+ * Accepts either a rating object (preferred) or a legacy number.
  * Never displayed with a % symbol, /100, or "out of 100" wording.
- * @param {number|null|undefined} displayPercentage
+ * @param {Object|number|null|undefined} roomDesignRatingOrValue
  * @returns {number|null}
  */
-export function getDesignPerformanceIndex(displayPercentage) {
-  const v = Number(displayPercentage);
+export function getDesignPerformanceIndex(roomDesignRatingOrValue) {
+  if (roomDesignRatingOrValue == null) return null;
+  // Rating object (preferred path)
+  if (typeof roomDesignRatingOrValue === "object") {
+    if (Number.isFinite(roomDesignRatingOrValue.designPerformanceIndex)) {
+      return Math.max(0, Math.round(roomDesignRatingOrValue.designPerformanceIndex));
+    }
+    const actualPoints = Number(roomDesignRatingOrValue.actualPoints);
+    if (Number.isFinite(actualPoints)) {
+      return Math.max(0, Math.round(actualPoints / 10));
+    }
+    return null;
+  }
+  // Legacy number fallback
+  const v = Number(roomDesignRatingOrValue);
   if (!Number.isFinite(v)) return null;
-  return Math.round(v);
+  return Math.max(0, Math.round(v));
 }
 
 // ── Level parsing / aggregation ─────────────────────────────────────────────
@@ -125,14 +169,15 @@ function aggregateLevelProfile(contributions) {
 /**
  * Resolve the overall room designation.
  * FAIL-driven: any genuine FAIL → "Design Improvement Recommended".
- * Otherwise the Design Performance Index maps to the six bands.
+ * Otherwise the additive Design Performance Index maps to the overall bands.
  * @param {Object|null|undefined} roomDesignRating
  * @returns {string|null}
  */
 export function getRoomDesignRatingDesignation(roomDesignRating) {
   if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED") return null;
   if (hasFailResult(roomDesignRating.contributions)) return FAIL_LABEL;
-  return getDesignRatingDesignation(roomDesignRating.displayPercentage);
+  const index = getDesignPerformanceIndex(roomDesignRating);
+  return getOverallDesignationFromIndex(index);
 }
 
 // ── Category grouping (matches TechnicalAsdrScorecard CATEGORY_GROUPS) ──────
@@ -364,13 +409,14 @@ export function getDesignRatingSupportingSentence(roomDesignRating) {
 /**
  * Format a recommendation comparison line as
  * "Design Performance Index {from} → {to}".
- * @param {number} fromPct
- * @param {number} toPct
+ * Accepts rating objects or legacy numeric values.
+ * @param {Object|number} fromRating
+ * @param {Object|number} toRating
  * @returns {string|null}
  */
-export function formatDesignIndexComparison(fromPct, toPct) {
-  const from = getDesignPerformanceIndex(fromPct);
-  const to = getDesignPerformanceIndex(toPct);
+export function formatDesignIndexComparison(fromRating, toRating) {
+  const from = getDesignPerformanceIndex(fromRating);
+  const to = getDesignPerformanceIndex(toRating);
   if (from == null || to == null) return null;
   return `Design Performance Index ${from} → ${to}`;
 }

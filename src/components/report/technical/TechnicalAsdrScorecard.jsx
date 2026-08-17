@@ -54,14 +54,6 @@ function formatPoints(earned, maximum) {
   return `${e} / ${m}`;
 }
 
-/** Format the total score line. */
-function formatTotal(rating) {
-  if (!rating || rating.status === "NOT_ASSESSED") return null;
-  const a = Math.round(rating.actualPoints * 100) / 100;
-  const m = Math.round(rating.maximumAvailablePoints * 100) / 100;
-  return `${a} / ${m}`;
-}
-
 /** Get the parameter label for a contribution. */
 function getParamLabel(contrib) {
   if (contrib.key === "screen") return "Screen / Viewing Geometry";
@@ -167,10 +159,9 @@ export default function TechnicalAsdrScorecard({
   }
 
   const contributions = roomDesignRating.contributions || [];
-  const total = formatTotal(roomDesignRating);
   const designation = getRoomDesignRatingDesignation(roomDesignRating);
   const supportingSentence = getDesignRatingSupportingSentence(roomDesignRating);
-  const index = getDesignPerformanceIndex(roomDesignRating?.displayPercentage);
+  const index = getDesignPerformanceIndex(roomDesignRating);
 
   // Group contributions by category
   const grouped = {};
@@ -288,31 +279,6 @@ export default function TechnicalAsdrScorecard({
               letterSpacing: "0.03em",
             }}>
               Design Performance Index {index ?? "—"}
-            </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div
-              style={{
-                fontSize: "8pt",
-                fontWeight: 700,
-                color: COLORS.secondary,
-                letterSpacing: "0.1em",
-                fontFamily: FONT_BODY,
-                marginBottom: "2mm",
-              }}
-            >
-              TOTAL SCORE
-            </div>
-            <div
-              style={{
-                fontSize: "16pt",
-                fontWeight: 400,
-                color: COLORS.primary,
-                fontFamily: FONT_HEADING,
-                lineHeight: 1,
-              }}
-            >
-              {total || "—"}
             </div>
           </div>
         </div>

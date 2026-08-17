@@ -242,7 +242,7 @@ export default function DesignRatingSummary({
   const displayPct = pct != null ? Math.round(pct) : null;
   const designation = rating ? getRoomDesignRatingDesignation(rating) : null;
   const supportingSentence = rating ? getDesignRatingSupportingSentence(rating) : null;
-  const index = rating ? getDesignPerformanceIndex(rating.displayPercentage) : null;
+  const index = rating ? getDesignPerformanceIndex(rating) : null;
   const categories = rating ? getCategorySummaries(rating) : [];
   const isNotAssessed = status === 'NOT_ASSESSED';
   const orderedRecommendations = applyRecommendationDisplayOrder(recommendations);

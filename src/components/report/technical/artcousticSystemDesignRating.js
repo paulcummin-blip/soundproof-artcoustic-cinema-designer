@@ -621,6 +621,12 @@ export function calculateRoomDesignRating(authority) {
     ? (assessedWeight / applicableWeight) * 100
     : 0;
 
+  // Additive Design Performance Index: round(actualPoints / 10), clamped ≥ 0.
+  // This is the authoritative scoring value — NOT a percentage of maximum.
+  // maximumAvailablePoints remains for diagnostics only and must not influence
+  // the index, designation, or client-facing presentation.
+  const designPerformanceIndex = Math.max(0, Math.round(actualPoints / 10));
+
   const status = maximumAvailablePoints === 0
     ? "NOT_ASSESSED"
     : "COMPLETE";
@@ -629,6 +635,7 @@ export function calculateRoomDesignRating(authority) {
     status,
     rawPercentage,
     displayPercentage,
+    designPerformanceIndex,
     actualPoints,
     maximumAvailablePoints,
     applicableWeight,
@@ -706,6 +713,9 @@ export function calculateSeatDesignRating(authority, seatId) {
     ? (assessedWeight / applicableWeight) * 100
     : 0;
 
+  // Additive Seat Index: round(seat actualPoints / 10), clamped ≥ 0.
+  const designPerformanceIndex = Math.max(0, Math.round(actualPoints / 10));
+
   const status = maximumAvailablePoints === 0
     ? "NOT_ASSESSED"
     : "COMPLETE";
@@ -715,6 +725,7 @@ export function calculateSeatDesignRating(authority, seatId) {
     status,
     rawPercentage,
     displayPercentage,
+    designPerformanceIndex,
     actualPoints,
     maximumAvailablePoints,
     applicableWeight,
