@@ -38,7 +38,7 @@ export function useEffectivePromotion() {
     try {
       setLoading(true);
       const res = await base44.functions.invoke('getEffectivePromotion', {});
-      const data = res || {};
+      const data = res?.data || {};
       setState({
         isEffective: !!data.is_effective,
         promotionType: data.promotion_type || null,
