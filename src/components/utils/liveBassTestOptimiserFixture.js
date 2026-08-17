@@ -133,6 +133,7 @@ function summariseCandidate(selected, targetDb) {
         rspRmsWorsening: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.rspRmsWorsening,
         bestValleySample: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.bestValleySample,
         bestRepurposedSample: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.bestRepurposedSample,
+        bestAppendedSample: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.bestAppendedSample,
         samples: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.samples,
       } : null,
     } : null,
