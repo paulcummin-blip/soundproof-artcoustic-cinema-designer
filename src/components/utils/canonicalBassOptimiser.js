@@ -63,12 +63,18 @@ function interpolateCorrection(curve, frequency) {
 }
 
 export function deriveCorrectionWindowOperatingOffsetDb({
-  rawCurve = [], targetCurve = [], assessmentStartHz = 20, assessmentEndHz = 120,
+  rawCurve = [], targetCurve = [], assessmentStartHz = 20, assessmentEndHz = 200,
   protectedNullRegions = [], maximumAggregateBoostDb = OPERATING_WINDOW_MAX_BOOST_DB,
-  maximumCutDb = OPERATING_WINDOW_MAX_CUT_DB,
+  maximumCutDb = OPERATING_WINDOW_MAX_CUT_DB, assessmentSmoothing = "third",
 } = {}) {
-  const smoothedRawCurve = applyBassSmoothing(rawCurve, "third");
-  const correctablePoints = smoothedRawCurve
+  // RP22 P19/P20 grading is always one-third-octave smoothed, but this helper
+  // also places the physical operating curve before PEQ. In that use, assess
+  // the unsmoothed correction band so a useful room-created dip is not pulled
+  // down simply because neighbouring peaks dominate a fractional-octave average.
+  const assessmentCurve = assessmentSmoothing === "none"
+    ? (Array.isArray(rawCurve) ? rawCurve : []).map((point) => ({ ...point }))
+    : applyBassSmoothing(rawCurve, assessmentSmoothing);
+  const correctablePoints = assessmentCurve
     .filter((point) => Number.isFinite(point?.frequency) && Number.isFinite(point?.spl)
       && point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz
       && !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions))
@@ -88,6 +94,9 @@ export function deriveCorrectionWindowOperatingOffsetDb({
       meanResidualDb: null,
       lowerOffsetBoundDb: null,
       upperOffsetBoundDb: null,
+      assessmentStartHz,
+      assessmentEndHz,
+      assessmentSmoothing,
     };
   }
   const residuals = correctablePoints.map((point) => point.residualDb);
@@ -118,6 +127,9 @@ export function deriveCorrectionWindowOperatingOffsetDb({
     upperOffsetBoundDb,
     maximumAggregateBoostDb,
     maximumCutDb,
+    assessmentStartHz,
+    assessmentEndHz,
+    assessmentSmoothing,
   };
 }
 
@@ -515,11 +527,12 @@ export function generateCanonicalCandidatePool({
   // Falls back to 114 dB when no tuning is configured on the sub objects.
   const baseRequestedSystemOutputDb = getCurrentSystemSourceOutput(activeSubs);
   // ── Target-following global calibration level ──
-  // Align the one-third-octave-smoothed RSP with the fixed house target across
-  // the RP22 P19 band. The operating trim and the PEQ bank form one correction
-  // window: the broad response is placed where the available +6 dB boost and
-  // -15 dB cut can reach the target. A C-weighted power-total anchor is not
-  // suitable here because one modal peak can pull the whole response down.
+  // Place the physical RSP against the fixed house target across the complete
+  // 20–200 Hz correction band. The operating trim and PEQ bank form one
+  // correction window: every non-protected local dip must remain reachable by
+  // the available +6 dB boost while peaks are left for the -15 dB cut bank.
+  // This operating decision is deliberately unsmoothed; one-third-octave
+  // smoothing remains the separate authority for RP22 P19/P20 grading.
   // Narrow cancellation nulls remain visible and are excluded from this anchor.
   const preliminaryProtectedNullRegions = identifyProtectedNullRegions(
     rawCurve, domains.correctionStartHz, domains.correctionEndHz, verticalOffsetDb,
@@ -528,9 +541,10 @@ export function generateCanonicalCandidatePool({
   const operatingLevelWindowDiagnostics = deriveCorrectionWindowOperatingOffsetDb({
     rawCurve,
     targetCurve,
-    assessmentStartHz: domains.p19StartHz,
-    assessmentEndHz: domains.p19EndHz,
+    assessmentStartHz: domains.correctionStartHz,
+    assessmentEndHz: domains.correctionEndHz,
     protectedNullRegions: preliminaryProtectedNullRegions,
+    assessmentSmoothing: "none",
   });
   const requestedOperatingLevelOffsetDb = operatingLevelWindowDiagnostics.requestedOffsetDb;
   // Attenuation applies completely. Positive global gain is permitted only
