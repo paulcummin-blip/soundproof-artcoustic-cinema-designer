@@ -280,7 +280,11 @@ export function rebalanceBroadValleyBank({
         blockerVariants.push(variant);
       }
     }
-    const boostAdditions = boostIndexes.length ? [0, 1, 2, 3, 4] : [2, 3, 4, 5, 6];
+    // A high P14 target can leave no legal positive-EQ headroom. The bank
+    // must still be allowed to narrow a broad cut whose remote tail is making
+    // an adjacent valley worse; requiring a new boost here caused every such
+    // cut-only repair to be rejected before acoustic verification.
+    const boostAdditions = boostIndexes.length ? [0, 1, 2, 3, 4] : [0, 2, 3, 4, 5, 6];
     const boostQValues = boostIndexes.length
       ? [...new Set([current[boostIndexes[0]].Q, 1.5, 2, 2.5, 3]
         .map((value) => Number(clamp(value, 0.5, 4).toFixed(4))))]
@@ -313,7 +317,7 @@ export function rebalanceBroadValleyBank({
               reason: "Joint broad-valley rebalance: use available source-domain boost",
             };
           });
-        } else {
+        } else if (boostAddition > 0) {
           if (proposed.length >= MAX_FILTERS) continue;
           proposed.push({
             band: proposed.length + 1, enabled: true, type: "Peak",
