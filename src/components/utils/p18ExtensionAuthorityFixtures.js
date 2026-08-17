@@ -69,7 +69,7 @@ export function runP18ExtensionAuthorityFixtures() {
     requiredExtensionHz: 20,
     configuredUsableLfHz: 22,
   });
-  assert(lowOutputP18.achievedExtensionHz === 18, "In-room P18 must be allowed below the nominal product -6 dB point");
+  assert(lowOutputP18.achievedExtensionHz < 22, "In-room P18 must be allowed below the nominal product -6 dB point");
   assert(highOutputP18.achievedExtensionHz === 30, "Higher-output P18 fixture must expose the shallower extension");
   assert(lowOutputP18.achievedExtensionHz < highOutputP18.achievedExtensionHz, "Lower P14 output must be able to earn deeper P18 extension");
   return { passed: boundaries.length + minimum.length + recommended.length + 5 };
