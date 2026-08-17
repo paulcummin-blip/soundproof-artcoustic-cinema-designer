@@ -460,7 +460,11 @@ export function generateCanonicalCandidatePool({
 
   const nowMs = () => typeof performance !== "undefined" ? performance.now() : Date.now();
   const startedAt = nowMs();
-  const domains = resolveHouseCurveDomains(rawCurve.map((point) => point.frequency), correctionEndHz);
+  const domains = resolveHouseCurveDomains(
+    rawCurve.map((point) => point.frequency),
+    correctionEndHz,
+    transitionHz,
+  );
 
   // ── Fixed house target: P14-normalised global vertical offset ──
   // The Artcoustic house-curve shape is shifted vertically by exactly one
