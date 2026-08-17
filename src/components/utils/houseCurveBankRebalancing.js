@@ -262,5 +262,62 @@ export function rebalanceBroadValleyBank({
     }
   }
 
-__SELECT_WINNER__
+  preliminary.sort((left, right) =>
+    left.quality.maximum - right.quality.maximum
+    || left.quality.rms - right.quality.rms
+    || right.valleyImprovementDb - left.valleyImprovementDb
+    || left.quality.meanAbsolute - right.quality.meanAbsolute
+    || left.activity - right.activity);
+
+  let winner = null;
+  for (const candidate of preliminary.slice(0, 30)) {
+    const metrics = calculateAllSeatMetrics(
+      objectiveSeats, candidate.filters, fitStartHz, fitEndHz, anchorDb,
+      operationCounts, evaluationMemo,
+      { protectedNullRegions, canonicalTargetCurve: targetCurve },
+    );
+    if (!metrics || !realSeatsSafe(baselineMetrics, metrics)) continue;
+    if (Number.isFinite(baselineMetrics?.rspMaxDeviationDb)
+      && metrics.rspMaxDeviationDb > baselineMetrics.rspMaxDeviationDb + 0.1) continue;
+    if (Number.isFinite(baselineMetrics?.rspRmsDeviationDb)
+      && metrics.rspRmsDeviationDb > baselineMetrics.rspRmsDeviationDb + 0.1) continue;
+    winner = { ...candidate, metrics };
+    break;
+  }
+
+  if (!winner) {
+    return {
+      filters: current,
+      metrics: baselineMetrics,
+      changed: false,
+      bankEvaluationCount,
+      reason: valleys.length
+        ? "no legal joint broad-valley bank improved the response"
+        : "no broad unprotected modal valley required rebalancing",
+      diagnostics,
+      selected: null,
+    };
+  }
+
+  return {
+    filters: winner.filters,
+    metrics: winner.metrics,
+    changed: true,
+    bankEvaluationCount,
+    reason: `joint broad-valley bank rebalanced around ${winner.region.centre.frequency.toFixed(1)} Hz`,
+    diagnostics,
+    selected: {
+      startHz: winner.region.startHz,
+      endHz: winner.region.endHz,
+      centreFrequencyHz: winner.region.centre.frequency,
+      valleyImprovementDb: winner.valleyImprovementDb,
+      centreCorrectionIncreaseDb: winner.centreCorrectionIncreaseDb,
+      maximumResidualBeforeDb: baselineQuality.maximum,
+      maximumResidualAfterDb: winner.quality.maximum,
+      rmsResidualBeforeDb: baselineQuality.rms,
+      rmsResidualAfterDb: winner.quality.rms,
+      bankLimits: winner.limits,
+    },
+  };
+}
 
