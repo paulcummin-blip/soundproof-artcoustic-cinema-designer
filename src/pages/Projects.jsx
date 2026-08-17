@@ -11,6 +11,7 @@ import { useProjectsSortPreference } from "@/components/projects/useProjectsSort
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { useProfessionalCapacity } from "@/lib/commercial/useProfessionalCapacity";
+import { useEffectivePromotion, formatPromotionEndDate } from "@/lib/commercial/useEffectivePromotion";
 import { getAgeDays, formatAge, isAgeReviewDue } from "@/components/utils/projectAge";
 import AgeReviewDialog from "@/components/projects/AgeReviewDialog";
 
@@ -122,6 +123,7 @@ export default function ProjectsPage() {
   const isAdmin = user?.role === "admin";
   const { available: professionalCapacity, loading: capacityLoading, refresh: refreshCapacity } = useProfessionalCapacity(user?.account_id, isAdmin);
   const showCapacityIndicator = !isAdmin && !!user?.account_id;
+  const { isEffective: promotionEffective, headline: promoHeadline, message: promoMessage, endsAt: promoEndsAt, loading: promoLoading, refresh: refreshPromotion } = useEffectivePromotion();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -384,6 +386,7 @@ export default function ProjectsPage() {
     setCreated(p);
     window.setTimeout(() => setCreated(null), 4000);
     refreshCapacity && refreshCapacity();
+    refreshPromotion && refreshPromotion();
   }
 
   function handleProjectUpdated(updated) {
@@ -920,12 +923,41 @@ export default function ProjectsPage() {
       >
         <h1 style={{ margin: 0, fontSize: 28, color: BRAND.text }}>Projects</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {showCapacityIndicator && (
+          {showCapacityIndicator && promotionEffective && !promoLoading && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 10,
+                  border: `1px solid ${BRAND.border}`,
+                  background: "#F3F0EB",
+                  fontSize: 13,
+                  color: BRAND.subtext,
+                  whiteSpace: "nowrap",
+                  lineHeight: 1.35,
+                }}
+                title={promoMessage || ''}
+              >
+                <div style={{ fontWeight: 700, color: "#213428", fontSize: 12, letterSpacing: "0.02em" }}>
+                  {promoHeadline || 'Premium Partner Promotion'}
+                </div>
+                <div style={{ fontSize: 11, color: BRAND.subtext }}>
+                  {promoMessage
+                    ? (promoMessage.length > 60 ? promoMessage.slice(0, 57) + '…' : promoMessage)
+                    : `Unlimited Professional Projects until ${formatPromotionEndDate(promoEndsAt)}`}
+                </div>
+                <div style={{ fontSize: 11, color: BRAND.subtext }}>
+                  <strong style={{ color: BRAND.text }}>{capacityLoading ? '…' : professionalCapacity}</strong> banked
+                </div>
+              </div>
+            </div>
+          )}
+          {showCapacityIndicator && (!promotionEffective || promoLoading) && (
             <div style={{ fontSize: 13, color: BRAND.subtext, whiteSpace: "nowrap" }}>
               Professional Projects: <strong style={{ color: BRAND.text }}>{capacityLoading ? '…' : professionalCapacity}</strong> available
             </div>
           )}
-          {showCapacityIndicator && (
+          {showCapacityIndicator && !promotionEffective && (
             <button
               type="button"
               onClick={() => navigate('/PurchaseProjects')}
