@@ -385,7 +385,12 @@
     },
     "commercial_source": {
       "type": "string",
-      "description": "Source of the commercial classification (e.g. 'TRIAL', 'PURCHASED', 'UK_TURNOVER_REWARD', 'DISTRIBUTOR_ALLOCATION', 'ADMIN_GRANT'). Informational \u2014 mirrors the ledger transaction type that granted the capacity consumed by this project."
+      "description": "Source of the commercial classification (e.g. 'TRIAL', 'PURCHASED', 'UK_TURNOVER_REWARD', 'DISTRIBUTOR_ALLOCATION', 'ADMIN_GRANT', 'PROMOTION'). Informational \u2014 mirrors the ledger transaction type that granted the capacity consumed by this project. 'PROMOTION' indicates the project was created under an active UNLIMITED_PRO_PROJECTS promotion and consumed no banked capacity."
+    },
+    "promotion_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "ID of the Promotion that entitled this project's creation. Null for normal capacity-consumed projects. Set only when the project was created under an active UNLIMITED_PRO_PROJECTS promotion. Promotional projects have commercial_tier=PROFESSIONAL, commercial_source='PROMOTION', activation_ledger_entry_id=null (no PROJECT_ACTIVATION ledger entry)."
     },
     "metrics_last_opened": {
       "type": "string",

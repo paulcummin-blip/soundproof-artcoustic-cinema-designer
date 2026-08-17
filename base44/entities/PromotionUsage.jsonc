@@ -1,0 +1,57 @@
+{
+  "name": "PromotionUsage",
+  "type": "object",
+  "description": "One row per promotional Professional Project created. Canonical engagement tracking \u2014 not an aggregate counter. Every promotional project is traceable to the promotion that created it. Backend/service-role creates records; dealers have no create/update/delete authority.",
+  "properties": {
+    "promotion_id": {
+      "type": "string",
+      "description": "ID of the Promotion that entitled this creation."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Account that created the project under the promotion."
+    },
+    "project_id": {
+      "type": "string",
+      "description": "The Professional Project created. Links to Project.id. Natural idempotency anchor \u2014 one PromotionUsage per project_id."
+    },
+    "promotion_type": {
+      "type": "string",
+      "description": "Snapshot of Promotion.promotion_type at usage time (denormalised for fast reporting without joins)."
+    },
+    "used_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of promotional creation (mirrors Project.professional_activated_date)."
+    }
+  },
+  "required": [
+    "promotion_id",
+    "account_id",
+    "project_id",
+    "promotion_type",
+    "used_at"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

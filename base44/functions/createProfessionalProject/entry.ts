@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { getAvailableCapacity, findActivationEntry } from '../../shared/capacityAuthority.js';
+import { findEffectivePromotion } from '../../shared/promotionAuthority.js';
 
 /**
  * B3A Trusted backend authority for Professional Project creation.
@@ -90,6 +91,112 @@ export default async function(req) {
       return Response.json({
         status: 'SUCCESS',
         project: adminProject,
+        capacity_before: null,
+        capacity_after: null,
+        ledger_entry: null
+      }, { status: 201 });
+    }
+
+    // ── 3b. Resolve Account (service role) for promotion eligibility ──
+    // Account status is already enforced at the auth layer (recordAccountAccess
+    // blocks suspended/inactive users). This is a defence-in-depth check.
+    let account = null;
+    try {
+      const accountRecords = await base44.asServiceRole.entities.Account.filter({ id: accountId });
+      account = (Array.isArray(accountRecords) && accountRecords.length > 0) ? accountRecords[0] : null;
+    } catch (_acctErr) {
+      // If we can't resolve the account, fall through to normal capacity path.
+    }
+
+    // Defence-in-depth: only ACTIVE accounts may create projects under a promotion.
+    // (Suspended/inactive are already blocked at auth, but this guards against
+    // edge cases where account status changed mid-session.)
+    const accountIsActive = account && account.status === 'active';
+
+    // ── 3c. Check for an effective UNLIMITED_PRO_PROJECTS promotion ──
+    let effectivePromotion = null;
+    if (accountIsActive) {
+      try {
+        effectivePromotion = await findEffectivePromotion(base44.asServiceRole, account);
+      } catch (_promoErr) {
+        // If promotion check fails, fall through to normal capacity path.
+        effectivePromotion = null;
+      }
+    }
+
+    // ── 3d. PROMOTIONAL PATH: free project, no capacity consumption ──
+    if (effectivePromotion && effectivePromotion.promotion_type === 'UNLIMITED_PRO_PROJECTS') {
+      const promoNowIso = new Date().toISOString();
+
+      // Create the promotional Professional Project
+      let promoProject = null;
+      try {
+        promoProject = await base44.asServiceRole.entities.Project.create({
+          ...projectFields,
+          account_id: accountId,
+          commercial_tier: 'PROFESSIONAL',
+          commercial_source: 'PROMOTION',
+          promotion_id: effectivePromotion.id,
+          professional_activated_date: promoNowIso,
+          activation_ledger_entry_id: null,
+          lifecycle_status: 'Draft',
+        });
+      } catch (createErr) {
+        return Response.json({
+          status: 'CREATION_FAILED',
+          message: 'Unable to create the project. Please try again.'
+        }, { status: 500 });
+      }
+
+      // Create exactly one PromotionUsage row (idempotent by project_id)
+      let usageEntry = null;
+      let usageError = null;
+      try {
+        // Idempotency: check if a usage row already exists for this project
+        const existingUsage = await base44.asServiceRole.entities.PromotionUsage.filter({ project_id: promoProject.id });
+        if (Array.isArray(existingUsage) && existingUsage.length > 0) {
+          usageEntry = existingUsage[0];
+        } else {
+          usageEntry = await base44.asServiceRole.entities.PromotionUsage.create({
+            promotion_id: effectivePromotion.id,
+            account_id: accountId,
+            project_id: promoProject.id,
+            promotion_type: 'UNLIMITED_PRO_PROJECTS',
+            used_at: promoNowIso,
+          });
+        }
+      } catch (err) {
+        usageError = err;
+      }
+
+      // Failure safety: if PromotionUsage failed, rollback the project
+      if (usageError || !usageEntry) {
+        try {
+          await base44.asServiceRole.entities.Project.delete(promoProject.id);
+        } catch (_rollbackErr) {
+          return Response.json({
+            status: 'CREATION_FAILED',
+            message: 'Project creation failed during promotion tracking. Please contact support.',
+            project_id: promoProject.id,
+            rollback: 'FAILED — orphan promotional project may exist',
+            detail: 'PromotionUsage creation failed and project rollback also failed.'
+          }, { status: 500 });
+        }
+        return Response.json({
+          status: 'CREATION_FAILED',
+          message: 'Project creation failed during promotion tracking. No capacity was consumed.',
+          rollback: 'SUCCESS — project deleted'
+        }, { status: 500 });
+      }
+
+      // Success — no ledger entry, no capacity consumption
+      return Response.json({
+        status: 'SUCCESS',
+        project: promoProject,
+        promotion: {
+          id: effectivePromotion.id,
+          promotion_type: 'UNLIMITED_PRO_PROJECTS'
+        },
         capacity_before: null,
         capacity_after: null,
         ledger_entry: null

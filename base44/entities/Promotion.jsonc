@@ -1,0 +1,119 @@
+{
+  "name": "Promotion",
+  "type": "object",
+  "description": "Canonical commercial promotion. Admin-controlled; eligibility resolved server-side at project-creation time. Effective entitlement = status==='ACTIVE' && now >= starts_at && now < ends_at && target matches. No cron required for expiry \u2014 pure date evaluation.",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Internal admin name for this promotion."
+    },
+    "headline": {
+      "type": "string",
+      "description": "Short dealer-facing headline shown in promotion banners."
+    },
+    "message": {
+      "type": "string",
+      "description": "Longer dealer-facing message explaining the promotion."
+    },
+    "promotion_type": {
+      "type": "string",
+      "enum": [
+        "UNLIMITED_PRO_PROJECTS",
+        "DISCOUNT_PERCENT",
+        "BONUS_PROJECTS"
+      ],
+      "description": "UNLIMITED_PRO_PROJECTS = free project creation, no ledger consumption. DISCOUNT_PERCENT = alters purchase pricing (future). BONUS_PROJECTS = grants N credits (future)."
+    },
+    "target_scope": {
+      "type": "string",
+      "enum": [
+        "ALL_DEALER_GROUP",
+        "SINGLE_ACCOUNT",
+        "DISTRIBUTOR_DOWNSTREAM"
+      ],
+      "description": "ALL_DEALER_GROUP = all accounts with matching dealer_group. SINGLE_ACCOUNT = one specific account. DISTRIBUTOR_DOWNSTREAM = all dealers under a distributor (future)."
+    },
+    "target_dealer_group": {
+      "type": "string",
+      "enum": [
+        "PREMIUM_PARTNER",
+        "RICHER_SOUNDS",
+        "OTHER_DEALER",
+        "INTERNATIONAL",
+        "INTERNAL"
+      ],
+      "nullable": true,
+      "description": "Used when target_scope=ALL_DEALER_GROUP. Null otherwise."
+    },
+    "target_account_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Used when target_scope=SINGLE_ACCOUNT. Null otherwise."
+    },
+    "target_distributor_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Used when target_scope=DISTRIBUTOR_DOWNSTREAM. Matches Account.parent_account_id on child dealers. Null otherwise."
+    },
+    "starts_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Entitlement begins (inclusive). ISO-8601 UTC."
+    },
+    "ends_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Entitlement ends (exclusive). e.g. 2027-01-01T00:00:00Z for '31 Dec 2026 23:59 Europe/London'."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "ACTIVE",
+        "CANCELLED"
+      ],
+      "default": "DRAFT",
+      "description": "DRAFT = not yet published. ACTIVE = published; effective only if now is within date range. CANCELLED = ended early by admin. No ENDED/SCHEDULED \u2014 date evaluation handles natural expiry."
+    },
+    "discount_percent": {
+      "type": "number",
+      "nullable": true,
+      "description": "For DISCOUNT_PERCENT (future). Null for UNLIMITED_PRO_PROJECTS."
+    },
+    "bonus_projects": {
+      "type": "number",
+      "nullable": true,
+      "description": "For BONUS_PROJECTS (future). Null for UNLIMITED_PRO_PROJECTS."
+    }
+  },
+  "required": [
+    "name",
+    "promotion_type",
+    "target_scope",
+    "starts_at",
+    "ends_at",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
