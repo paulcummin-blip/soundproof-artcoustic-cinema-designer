@@ -607,7 +607,7 @@ export function generateCanonicalCandidatePool({
     .map((f) => ({ frequency: f, offsetDb: artcousticHouseCurveOffsetAt(f) }));
   const requiredExtensionHz = Number.isFinite(Number(selectedP18RequiredExtensionHz))
     ? Number(selectedP18RequiredExtensionHz)
-    : p18ThresholdHzForLevel(p18TargetBasis, p14TargetLevel);
+    : p18ThresholdHzForLevel(p18TargetBasis, 1);
   const p14AssessmentStartHz = 20;
   const p14Normalisation = normaliseHouseCurveToP14Total({
     houseCurveShape,
