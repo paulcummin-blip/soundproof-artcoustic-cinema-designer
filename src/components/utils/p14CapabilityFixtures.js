@@ -1,5 +1,6 @@
 import { assessP14Capability, combinedApprovedP14Capability, formatP14Capability, gradeP14Minimum, gradeP14Recommended } from "./p14CapabilityAuthority.js";
 import { buildPositionAwareP14Capability } from "./canonicalBassAuthorityEvaluation.js";
+import { buildProductOperatingEnvelope } from "./canonicalBassOptimiser.js";
 import { getSourceDomainBoostAllowance } from "./subwooferCapability.js";
 import { computeP18InRoomF3, computeParam18ProductExtension, computeP19DeviationBelowSchroeder } from "./rp22BassMetrics.jsx";
 
@@ -89,6 +90,36 @@ export function runP14CapabilityFixtures() {
     "< low-output allowance",
     highOutput20HzBoost.allowedBoostDb,
     highOutput20HzBoost.allowedBoostDb < lowOutput20HzBoost.allowedBoostDb - 1,
+  );
+
+  const p18FrequencyGrid = [15, 18, 20, 22, 25, 30, 40, 80, 120];
+  const flatP18Target = p18FrequencyGrid.map((frequency) => ({ frequency, spl: 100 }));
+  const lowOutputEnvelope = buildProductOperatingEnvelope({
+    frequencyGrid: p18FrequencyGrid,
+    targetCurve: flatP18Target,
+    activeSubs: subs("sub2-12", 4),
+    selectedOperatingOutputDb: 109,
+    targetBasis: "minimum",
+  });
+  const highOutputEnvelope = buildProductOperatingEnvelope({
+    frequencyGrid: p18FrequencyGrid,
+    targetCurve: flatP18Target,
+    activeSubs: subs("sub2-12", 4),
+    selectedOperatingOutputDb: 120,
+    targetBasis: "recommended",
+  });
+  const relativeLimitAt = (envelope, frequency) => envelope.curve.find((point) => point.frequency === frequency)?.relativeProductLimitDb;
+  check(
+    "Minimum L1 leaves enough product headroom for four SUB2-12s to extend to 15 Hz in-room",
+    "≥ -3 dB at 15 Hz",
+    relativeLimitAt(lowOutputEnvelope, 15),
+    relativeLimitAt(lowOutputEnvelope, 15) >= -3,
+  );
+  check(
+    "Recommended L3 exposes the four-SUB2-12 LF roll-off instead of claiming 15 Hz",
+    "< -3 dB at 25 Hz and ≥ -3 dB at 30 Hz",
+    `${relativeLimitAt(highOutputEnvelope, 25)}/${relativeLimitAt(highOutputEnvelope, 30)}`,
+    relativeLimitAt(highOutputEnvelope, 25) < -3 && relativeLimitAt(highOutputEnvelope, 30) >= -3,
   );
 
   const sub2Low = pointAt(results["sub2-12-1"].capabilityCurve, 20)?.rawCapabilityDb;
