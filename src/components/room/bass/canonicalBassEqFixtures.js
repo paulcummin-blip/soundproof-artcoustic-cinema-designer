@@ -151,7 +151,7 @@ export function runCanonicalBassEqFixtures() {
       name: "A dominant modal peak cannot pull correctable low frequencies below the boost window",
       passed: !peakDominatedWindow.feasible
         && Math.abs(peakDominatedWindow.minimumResidualDb + peakDominatedWindow.requestedOffsetDb + 6) <= 0.000001
-        && peakDominatedWindow.requestedOffsetDb > -peakDominatedWindow.meanResidualDb + 0.5,
+        && peakDominatedWindow.requestedOffsetDb > peakDominatedWindow.upperOffsetBoundDb,
     },
     {
       name: "A protected narrow null does not change the global operating-level anchor",
