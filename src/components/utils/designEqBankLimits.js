@@ -32,7 +32,14 @@ export function createDesignEqBankEvaluationContext(raw, activeSubs, usableLfHz,
         maxBoostDb: 6,
         requestedSystemOutputDb,
       });
-      return Math.max(0, Math.min(6, allowance.allowedBoostDb));
+      // A product trace defines headroom only inside its approved coverage.
+      // Outside that range the capability is unknown, not zero. A broad PEQ
+      // centred inside the correction band can retain a small harmless tail
+      // above the approved trace; that tail must remain governed by the +6 dB
+      // aggregate rule instead of collapsing the entire filter toward 0 dB.
+      return allowance.frequencyCoveredByProducts
+        ? Math.max(0, Math.min(6, allowance.allowedBoostDb))
+        : null;
     }),
     filterResponses: new Map(),
     bankLimitResults: new Map(),
@@ -161,17 +168,22 @@ export function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLf
     } else {
       aggregateDb = aggregateResponseDbAt(point.frequency, filters);
     }
+    const sourceAllowance = prepared ? null : getSourceDomainBoostAllowance({
+      frequency: point.frequency,
+      requestedBoostDb: 6,
+      activeSubs,
+      usableLfHz,
+      maxBoostDb: 6,
+      requestedSystemOutputDb,
+    });
     const permittedBoostDb = prepared
       ? prepared.permittedBoostDb[pointIndex]
-      : Math.max(0, Math.min(6, getSourceDomainBoostAllowance({
-          frequency: point.frequency,
-          requestedBoostDb: 6,
-          activeSubs,
-          usableLfHz,
-          maxBoostDb: 6,
-          requestedSystemOutputDb,
-        }).allowedBoostDb));
-    limitingPermittedBoostDb = Math.min(limitingPermittedBoostDb, permittedBoostDb);
+      : sourceAllowance.frequencyCoveredByProducts
+        ? Math.max(0, Math.min(6, sourceAllowance.allowedBoostDb))
+        : null;
+    if (Number.isFinite(permittedBoostDb)) {
+      limitingPermittedBoostDb = Math.min(limitingPermittedBoostDb, permittedBoostDb);
+    }
     if (aggregateDb > maxAggregateBoostDb) {
       maxAggregateBoostDb = aggregateDb;
       maxAggregateBoostHz = point.frequency;
@@ -181,7 +193,7 @@ export function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLf
       maxAggregateCutHz = point.frequency;
     }
     if (aggregateDb > maximumAggregateBoostDb) boostLimitOk = false;
-    if (aggregateDb > permittedBoostDb + 0.05) sourceDomainHeadroomOk = false;
+    if (Number.isFinite(permittedBoostDb) && aggregateDb > permittedBoostDb + 0.05) sourceDomainHeadroomOk = false;
     if (aggregateDb < aggregateCutFloorDb) cutLimitOk = false;
   }
   const result = {
