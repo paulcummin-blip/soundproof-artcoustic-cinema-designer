@@ -1,3 +1,4 @@
+import { assessP18AgainstRequiredExtension } from "@/components/utils/bassDesignPhilosophyAuthority";
 import {
   assessP18Extension,
   gradeP18ForBasis,
@@ -43,5 +44,33 @@ export function runP18ExtensionAuthorityFixtures() {
 
   assert(p18PerformanceMultiplier(30) === 4, "30 Hz must use shared physical score");
   assert(p18PerformanceMultiplier(18) === 10, "18 Hz must use shared physical score");
-  return { passed: boundaries.length + minimum.length + recommended.length + 2 };
+
+  const extensionFrequencies = [15, 18, 20, 22, 25, 30, 40, 60, 80, 100, 120];
+  const targetCurve = extensionFrequencies.map((frequency) => ({ frequency, spl: 100 }));
+  const lowOutputCurve = extensionFrequencies.map((frequency) => ({
+    frequency,
+    spl: frequency < 18 ? 95 : frequency === 18 ? 97 : 100,
+  }));
+  const highOutputCurve = extensionFrequencies.map((frequency) => ({
+    frequency,
+    spl: frequency < 25 ? 92 : frequency === 25 ? 95 : frequency === 30 ? 97 : 100,
+  }));
+  const lowOutputP18 = assessP18AgainstRequiredExtension({
+    rspPostEqCurve: lowOutputCurve,
+    canonicalTargetCurve: targetCurve,
+    selectedP14TargetDb: 109,
+    requiredExtensionHz: 20,
+    configuredUsableLfHz: 22,
+  });
+  const highOutputP18 = assessP18AgainstRequiredExtension({
+    rspPostEqCurve: highOutputCurve,
+    canonicalTargetCurve: targetCurve,
+    selectedP14TargetDb: 120,
+    requiredExtensionHz: 20,
+    configuredUsableLfHz: 22,
+  });
+  assert(lowOutputP18.achievedExtensionHz === 18, "In-room P18 must be allowed below the nominal product -6 dB point");
+  assert(highOutputP18.achievedExtensionHz === 30, "Higher-output P18 fixture must expose the shallower extension");
+  assert(lowOutputP18.achievedExtensionHz < highOutputP18.achievedExtensionHz, "Lower P14 output must be able to earn deeper P18 extension");
+  return { passed: boundaries.length + minimum.length + recommended.length + 5 };
 }
