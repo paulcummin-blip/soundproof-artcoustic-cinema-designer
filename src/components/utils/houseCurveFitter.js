@@ -241,6 +241,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   });
   operationCounts.residualCleanupAcceptedOperations = residualCleanup.acceptedOperationCount;
   operationCounts.residualCleanupBankEvaluations = residualCleanup.bankEvaluationCount;
+  operationCounts.broadValleyRebalanceAcceptedOperations = broadValleyRebalance.changed ? 1 : 0;
+  operationCounts.broadValleyRebalanceBankEvaluations = broadValleyRebalance.bankEvaluationCount;
 
   // Final bank validation — must pass all hard limits. If it fails (safety net),
   // revert to the Standard seed (or empty) and recalculate metrics.
@@ -500,6 +502,12 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
         diagnostics: residualCleanup.diagnostics,
         finalQuality: residualCleanup.finalQuality,
         limits: residualCleanup.limits,
+      },
+      broadValleyRebalance: {
+        changed: broadValleyRebalance.changed,
+        reason: broadValleyRebalance.reason,
+        selected: broadValleyRebalance.selected,
+        diagnostics: broadValleyRebalance.diagnostics,
       },
       postRsp: {
         maximumAbsoluteResidualDb: finalMetrics?.rspMaxDeviationDb ?? null,
