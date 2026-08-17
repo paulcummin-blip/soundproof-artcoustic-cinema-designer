@@ -1,5 +1,6 @@
 import { assessP14Capability, combinedApprovedP14Capability, formatP14Capability, gradeP14Minimum, gradeP14Recommended } from "./p14CapabilityAuthority.js";
 import { buildPositionAwareP14Capability } from "./canonicalBassAuthorityEvaluation.js";
+import { getSourceDomainBoostAllowance } from "./subwooferCapability.js";
 import { computeP18InRoomF3, computeParam18ProductExtension, computeP19DeviationBelowSchroeder } from "./rp22BassMetrics.jsx";
 
 const subs = (modelKey, count) => Array.from({ length: count }, (_, index) => ({ id: `${modelKey}-${index + 1}`, modelKey }));
@@ -60,6 +61,34 @@ export function runP14CapabilityFixtures() {
     "≤ L3",
     boundedFourSub2.recommendedLevel,
     boundedFourSub2.recommendedLevel <= 3,
+  );
+
+  const lowOutput20HzBoost = getSourceDomainBoostAllowance({
+    frequency: 20,
+    requestedBoostDb: 6,
+    activeSubs: subs("sub2-12", 4),
+    usableLfHz: 22,
+    requestedSystemOutputDb: 109,
+  });
+  const highOutput20HzBoost = getSourceDomainBoostAllowance({
+    frequency: 20,
+    requestedBoostDb: 6,
+    activeSubs: subs("sub2-12", 4),
+    usableLfHz: 22,
+    requestedSystemOutputDb: 120,
+  });
+  check(
+    "Low P14 output may use safe product-aware boost below the nominal -6 dB point",
+    6,
+    lowOutput20HzBoost.allowedBoostDb,
+    Math.abs(lowOutput20HzBoost.allowedBoostDb - 6) < 1e-9
+      && lowOutput20HzBoost.frequencyCoveredByProducts,
+  );
+  check(
+    "Higher P14 output leaves less safe 20 Hz boost headroom",
+    "< low-output allowance",
+    highOutput20HzBoost.allowedBoostDb,
+    highOutput20HzBoost.allowedBoostDb < lowOutput20HzBoost.allowedBoostDb - 1,
   );
 
   const sub2Low = pointAt(results["sub2-12-1"].capabilityCurve, 20)?.rawCapabilityDb;
