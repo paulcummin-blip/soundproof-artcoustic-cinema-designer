@@ -338,6 +338,9 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
           && Math.log2(Math.max(trial.regionCentreHz, worstFrequencyHz) / Math.min(trial.regionCentreHz, worstFrequencyHz)) <= 1 / 6
           && !trial.accepted && trial.rejectionReason)
     : [];
+  const protectedBoundaryDistanceText = Number.isFinite(nearestProtectedBoundaryDistanceHz)
+    ? `${nearestProtectedBoundaryDistanceHz.toFixed(3)} Hz`
+    : "unknown distance";
   const remainingWorstCorrectableResidual = {
     frequencyHz: worstFrequencyHz,
     signedResidualDb,
@@ -360,7 +363,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     anotherLegalFilterRejectedBecause: remainingResidualLimit === "cut-limited"
       ? `required additional cut ${Math.abs(requiredCorrectionAtWorstDb).toFixed(3)} dB exceeds remaining aggregate cut headroom ${remainingAggregateCutHeadroomDb.toFixed(3)} dB`
       : remainingResidualLimit === "high-resolution-conflict-limited"
-        ? `1/3-octave residual ${signedResidualDb.toFixed(3)} dB requires ${requiredCorrectionAtWorstDb.toFixed(3)} dB, but the high-resolution residual is ${highResolutionResidualAtWorstDb.toFixed(3)} dB and requires ${(-highResolutionResidualAtWorstDb).toFixed(3)} dB; opposite correction signs at ${nearestProtectedBoundaryDistanceHz.toFixed(3)} Hz from a protected-null boundary, with ${remainingAggregateCutHeadroomDb.toFixed(3)} dB aggregate cut headroom, Q ≤ 10 and ${filters.filter((filter) => filter.enabled).length}/10 filters enabled`
+        ? `1/3-octave residual ${signedResidualDb.toFixed(3)} dB requires ${requiredCorrectionAtWorstDb.toFixed(3)} dB, but the high-resolution residual is ${highResolutionResidualAtWorstDb.toFixed(3)} dB and requires ${(-highResolutionResidualAtWorstDb).toFixed(3)} dB; opposite correction signs at ${protectedBoundaryDistanceText} from a protected-null boundary, with ${remainingAggregateCutHeadroomDb.toFixed(3)} dB aggregate cut headroom, Q ≤ 10 and ${filters.filter((filter) => filter.enabled).length}/10 filters enabled`
         : nearestRejectedTrials.at(-1)?.rejectionReason ?? stopReason,
   };
   const candidateDecision = (trial) => ({
