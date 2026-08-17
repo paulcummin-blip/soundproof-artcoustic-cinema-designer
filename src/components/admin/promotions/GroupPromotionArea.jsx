@@ -136,6 +136,7 @@ export default function GroupPromotionArea({
           open={formOpen}
           promotion={null}
           allAccounts={allAccounts}
+          allPromotions={promotions}
           usageCount={0}
           onSaved={handleFormSaved}
           onClose={handleFormClose}
@@ -193,6 +194,7 @@ export default function GroupPromotionArea({
         open={formOpen}
         promotion={editPromotion}
         allAccounts={allAccounts}
+        allPromotions={promotions}
         usageCount={editPromotion
           ? (promotionUsage || []).filter(u => u.promotion_id === editPromotion.id).length
           : 0}

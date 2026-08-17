@@ -250,6 +250,60 @@ export default function PromotionFormDialog({
           </div>
         )}
 
+        {/* Template selector — create mode only */}
+        {!isEdit && templatePromotions.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Start from existing promotion</label>
+            <select
+              style={inputStyle}
+              value={templateId}
+              onChange={e => {
+                const selected = templatePromotions.find(p => p.id === e.target.value);
+                applyTemplate(selected || null);
+              }}
+            >
+              <option value="">New Promotion (blank)</option>
+              {templatePromotions.map(p => (
+                <option key={p.id} value={p.id}>
+                  {buildPromotionSummary(p, allAccounts)}
+                </option>
+              ))}
+            </select>
+
+            {/* Compact read-only summary of the selected template */}
+            {templateId && (() => {
+              const tpl = templatePromotions.find(p => p.id === templateId);
+              if (!tpl) return null;
+              const status = deriveDisplayStatus(tpl);
+              let targetLabel = "—";
+              if (tpl.target_scope === "ALL_DEALER_GROUP") {
+                targetLabel = DEALER_GROUP_LABELS[tpl.target_dealer_group] || tpl.target_dealer_group || "—";
+              } else if (tpl.target_scope === "SINGLE_ACCOUNT") {
+                const acct = (allAccounts || []).find(a => a.id === tpl.target_account_id);
+                targetLabel = acct?.name || "Single Account";
+              }
+              return (
+                <div style={{
+                  marginTop: 8, padding: "8px 10px",
+                  background: "rgb(244 243 241)",
+                  border: `1px solid ${BRAND.border}`,
+                  borderRadius: 8, fontSize: 11, color: BRAND.subtext,
+                }}>
+                  <div style={{ fontWeight: 600, color: BRAND.text, marginBottom: 2 }}>
+                    Template: {tpl.name || "—"}
+                  </div>
+                  <div>Target: {targetLabel}</div>
+                  <div>Dates: {formatDateRange(tpl.starts_at, tpl.ends_at)}</div>
+                  <div>Source status: {status} (copy defaults to Draft)</div>
+                </div>
+              );
+            })()}
+            <div style={{ fontSize: 10, color: BRAND.subtext, marginTop: 4 }}>
+              Prefills the form from the selected promotion. The original is never modified.
+            </div>
+          </div>
+        )}
+
         {/* Fields */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
