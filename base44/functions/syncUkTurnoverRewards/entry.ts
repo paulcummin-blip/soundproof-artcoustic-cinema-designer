@@ -22,10 +22,11 @@ export default async function(req: Request): Promise<Response> {
     // ── Secrets check ──
     const bridgeUrl = secrets.get("PARTNER_PORTAL_TURNOVER_URL");
     const bridgeKey = secrets.get("PARTNER_PORTAL_TURNOVER_API_KEY");
-    if (!bridgeUrl || !bridgeKey) {
+    const anonKey = secrets.get("PARTNER_PORTAL_SUPABASE_ANON_KEY");
+    if (!bridgeUrl || !bridgeKey || !anonKey) {
       return Response.json({
         status: 'SECRETS_MISSING',
-        message: 'PARTNER_PORTAL_TURNOVER_URL and PARTNER_PORTAL_TURNOVER_API_KEY must be configured before running the sync. Set them in dashboard settings → environment variables.',
+        message: 'PARTNER_PORTAL_TURNOVER_URL, PARTNER_PORTAL_TURNOVER_API_KEY, and PARTNER_PORTAL_SUPABASE_ANON_KEY must be configured before running the sync.',
         dry_run: dryRun
       }, { status: 503 });
     }
@@ -52,14 +53,17 @@ export default async function(req: Request): Promise<Response> {
     let dealerRows: any[];
     let sourceLastUpdated: string | null = null;
     try {
-      const url = new URL(bridgeUrl);
-      url.searchParams.set('year', String(calendarYear));
-      const res = await fetch(url.toString(), {
+      const res = await fetch(bridgeUrl, {
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${bridgeKey}`,
-          'x-api-key': bridgeKey,
+          'apikey': anonKey,
+          'Authorization': `Bearer ${anonKey}`,
           'Content-Type': 'application/json'
         },
+        body: JSON.stringify({
+          p_api_key: bridgeKey,
+          p_calendar_year: calendarYear
+        }),
         signal: AbortSignal.timeout(15000)
       });
       if (!res.ok) {
