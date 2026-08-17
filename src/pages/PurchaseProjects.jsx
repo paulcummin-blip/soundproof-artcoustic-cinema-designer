@@ -1,19 +1,21 @@
-// PurchaseProjects — pilot placeholder for the future Stripe checkout entry point.
+// PurchaseProjects — always-available entry point for buying additional
+// Professional Project capacity.
 //
-// Displays the three intended product packs without prices or payment.
-// Directs pilot users to contact Sound Proof for additional Professional Projects.
+// Payment is NOT live yet. Selecting a pack reveals a pilot notice and does
+// NOT create CapacityLedger records or alter the dealer balance.
 
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const PACKS = [
-  { count: 5, label: "5 Professional Projects" },
-  { count: 20, label: "20 Professional Projects" },
-  { count: 100, label: "100 Professional Projects" },
+  { count: 5, price: "£50" },
+  { count: 20, price: "£180" },
+  { count: 100, price: "£750" },
 ];
 
 export default function PurchaseProjects() {
   const navigate = useNavigate();
+  const [selectedPack, setSelectedPack] = useState(null);
 
   return (
     <div
@@ -25,16 +27,16 @@ export default function PurchaseProjects() {
       }}
     >
       <h1 style={{ fontSize: 28, marginBottom: 8, color: "#1B1A1A" }}>
-        Purchase Professional Projects
+        Professional Projects
       </h1>
-      <p style={{ color: "#3E4349", marginBottom: 24, fontSize: 14 }}>
-        Online purchasing is being prepared.
+      <p style={{ color: "#3E4349", marginBottom: 28, fontSize: 14, maxWidth: 640 }}>
+        Professional Projects permanently unlock the full Sound Proof professional feature set for that cinema project and do not expire.
       </p>
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
           gap: 16,
           marginBottom: 24,
         }}
@@ -46,18 +48,55 @@ export default function PurchaseProjects() {
               background: "#FFFFFF",
               border: "1px solid #DCDBD6",
               borderRadius: 12,
-              padding: 20,
+              padding: 24,
+              display: "flex",
+              flexDirection: "column",
+              gap: 20,
             }}
           >
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#1B1A1A" }}>
-              {pack.label}
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#1B1A1A" }}>
+              {pack.count} Professional Projects
             </div>
-            <div style={{ fontSize: 13, color: "#3E4349", marginTop: 8 }}>
-              Pricing available soon.
+            <div style={{ fontSize: 24, fontWeight: 700, color: "#1B1A1A" }}>
+              {pack.price}
             </div>
+            <button
+              type="button"
+              onClick={() => setSelectedPack(pack.count)}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 8,
+                border: "1px solid #DCDBD6",
+                background: "#F3F2EE",
+                color: "#6E6A62",
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+            >
+              Purchase
+            </button>
           </div>
         ))}
       </div>
+
+      {selectedPack && (
+        <div
+          style={{
+            padding: 16,
+            background: "#FFFFFF",
+            border: "1px solid #DCDBD6",
+            borderRadius: 10,
+            fontSize: 14,
+            color: "#3E4349",
+            marginBottom: 20,
+            maxWidth: 640,
+          }}
+        >
+          Online purchasing is being prepared.
+          <br />
+          Please contact Sound Proof if you need additional Professional Projects during the pilot.
+        </div>
+      )}
 
       <div
         style={{
@@ -65,13 +104,13 @@ export default function PurchaseProjects() {
           background: "#FFFFFF",
           border: "1px solid #DCDBD6",
           borderRadius: 10,
-          fontSize: 14,
+          fontSize: 13,
           color: "#3E4349",
-          marginBottom: 20,
+          marginBottom: 24,
+          maxWidth: 640,
         }}
       >
-        For additional Professional Projects during the pilot, please contact
-        Sound Proof.
+        Professional Projects may also be added to eligible Artcoustic dealer accounts through the Sound Proof rewards programme.
       </div>
 
       <button
@@ -87,7 +126,7 @@ export default function PurchaseProjects() {
           fontSize: 14,
         }}
       >
-        Return to Projects
+        Back to Projects
       </button>
     </div>
   );

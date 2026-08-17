@@ -8,6 +8,7 @@ import ManageStatusesDialog from "@/components/projects/ManageStatusesDialog";
 import { useProjectStatuses } from "@/components/projects/useProjectStatuses";
 import { normalizeStatusId, getStatusColor } from "@/components/projects/statusDefaults";
 import { useProjectsSortPreference } from "@/components/projects/useProjectsSortPreference";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { useProfessionalCapacity } from "@/lib/commercial/useProfessionalCapacity";
 
@@ -114,6 +115,7 @@ function fieldStyle() {
 // ---- Component ----
 export default function ProjectsPage() {
   const projectActions = useProjectActions();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const { available: professionalCapacity, loading: capacityLoading, refresh: refreshCapacity } = useProfessionalCapacity(user?.account_id, isAdmin);
@@ -838,6 +840,24 @@ export default function ProjectsPage() {
             <div style={{ fontSize: 13, color: BRAND.subtext, whiteSpace: "nowrap" }}>
               Professional Projects: <strong style={{ color: BRAND.text }}>{capacityLoading ? '…' : professionalCapacity}</strong> available
             </div>
+          )}
+          {showCapacityIndicator && (
+            <button
+              type="button"
+              onClick={() => navigate('/PurchaseProjects')}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 10,
+                border: `1px solid ${BRAND.border}`,
+                background: BRAND.card,
+                color: BRAND.subtext,
+                cursor: "pointer",
+                fontSize: 13,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Buy Projects
+            </button>
           )}
           <button
             type="button"
