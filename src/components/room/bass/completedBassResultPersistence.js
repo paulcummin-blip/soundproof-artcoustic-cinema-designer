@@ -76,7 +76,7 @@ export function compactCompletedBassContract(contract) {
     requestedP14TargetDb: Number.isFinite(contract.selectedP14TargetDb) ? contract.selectedP14TargetDb : null,
     requestedP14Basis: contract.selectedP14TargetBasis || null,
     requestedP14Level: Number.isFinite(contract.selectedP14Level) ? contract.selectedP14Level : null,
-    requestedP18ExtensionHz: Number.isFinite(contract.selectedP14RequiredExtensionHz) ? contract.selectedP14RequiredExtensionHz : null,
+    requestedP18ExtensionHz: Number.isFinite(contract.selectedP18RequiredExtensionHz) ? contract.selectedP18RequiredExtensionHz : null,
     metricPublication: contract.metricPublication || null,
     provenance: contract.provenance || {},
   };
