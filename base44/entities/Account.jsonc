@@ -25,12 +25,23 @@
       "type": "string",
       "enum": [
         "dealer",
+        "distributor",
         "client",
         "admin",
-        "demo"
+        "demo",
+        "internal"
       ],
       "default": "dealer",
-      "description": "Account type"
+      "description": "Account type. distributor = international distributor that allocates capacity to child dealer accounts; internal = Sound Proof internal organisation."
+    },
+    "parent_account_id": {
+      "type": "string",
+      "description": "ID of the parent Account. For dealer accounts under an international distributor, this is the distributor Account.id. UK dealers may have no parent (null).",
+      "nullable": true
+    },
+    "territory": {
+      "type": "string",
+      "description": "Territory code for this account (e.g. UK, IE, IN, DE, AU, US). Free-form string to allow future territories without schema changes."
     },
     "notes": {
       "type": "string",

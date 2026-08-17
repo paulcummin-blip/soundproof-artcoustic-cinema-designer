@@ -1,0 +1,64 @@
+{
+  "name": "CapacityLedger",
+  "type": "object",
+  "description": "Append-only commercial ledger for Professional Project capacity. The single commercial authority \u2014 available capacity for an account = SUM(valid CapacityLedger.delta) for that account. Do not subtract project counts separately; PROJECT_ACTIVATION entries already carry delta=-1. Normal application operation must never update or delete ledger records; corrections are made via REVERSAL entries.",
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "description": "ID of the Account whose capacity changes by this transaction."
+    },
+    "transaction_type": {
+      "type": "string",
+      "enum": [
+        "TRIAL",
+        "PURCHASED",
+        "UK_TURNOVER_REWARD",
+        "DISTRIBUTOR_ALLOCATION",
+        "DISTRIBUTOR_RECLAIM",
+        "PROMOTIONAL",
+        "ADMIN_GRANT",
+        "INTERNAL",
+        "PROJECT_ACTIVATION",
+        "REVERSAL"
+      ],
+      "description": "Type of capacity transaction. TRIAL/PURCHASED/UK_TURNOVER_REWARD/PROMOTIONAL/ADMIN_GRANT/INTERNAL = credits (positive delta). PROJECT_ACTIVATION = consumption (delta=-1). DISTRIBUTOR_ALLOCATION/RECLAIM = paired transfers between distributor and dealer. REVERSAL = corrects a prior entry."
+    },
+    "delta": {
+      "type": "number",
+      "description": "Signed capacity change. Positive = credit (adds capacity). Negative = consumption or reclaim. e.g. TRIAL +5, PURCHASED +20, PROJECT_ACTIVATION -1."
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "Unique deduplication key per transaction. Format examples: 'trial:{account_id}', 'activation:{project_id}', 'uk_turnover:{account_id}:{calendar_year}:{milestone_value}', '{transfer_id}:SOURCE', '{transfer_id}:TARGET'. Prevents double-crediting on re-sync."
+    },
+    "transfer_id": {
+      "type": "string",
+      "description": "Shared UUID linking paired distributor transfer entries (allocation: distributor delta=-N, dealer delta=+N). Null for non-transfer transactions.",
+      "nullable": true
+    },
+    "source_system": {
+      "type": "string",
+      "description": "Originating system (e.g. 'SOUND_PROOF', 'ARTCOUSTIC_PARTNER_PORTAL', 'ADMIN_PANEL')."
+    },
+    "source_ref": {
+      "type": "object",
+      "description": "Structured reference to the source record. For distributor transfers: { distributor_account_id, target_account_id }. For turnover rewards: { turnover_record_id, milestone_value_gbp }. For activations: { project_id }.",
+      "properties": {}
+    },
+    "reason": {
+      "type": "string",
+      "description": "Human-readable reason for this transaction (e.g. 'Trial credit', 'UK turnover reward \u00a310k milestone', 'Distributor allocation to Dealer A', 'Project activation')."
+    },
+    "reversal_of": {
+      "type": "string",
+      "description": "ID of the CapacityLedger record this REVERSAL entry corrects. Null for non-reversal entries.",
+      "nullable": true
+    }
+  },
+  "required": [
+    "account_id",
+    "transaction_type",
+    "delta",
+    "idempotency_key"
+  ]
+}

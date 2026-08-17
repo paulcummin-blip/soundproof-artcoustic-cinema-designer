@@ -1,0 +1,50 @@
+{
+  "name": "TurnoverRecord",
+  "type": "object",
+  "description": "Informational source data for an account's eligible turnover, synced from an external system (e.g. Artcoustic Partner Portal). This is NOT the commercial credit authority \u2014 CapacityLedger remains the authority. TurnoverRecords are used to determine which turnover milestones have been reached and should be rewarded.",
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "description": "ID of the Sound Proof Account this turnover record belongs to."
+    },
+    "external_account_link_id": {
+      "type": "string",
+      "description": "ID of the ExternalAccountLink this turnover was synced from."
+    },
+    "calendar_year": {
+      "type": "number",
+      "description": "Calendar year this turnover record applies to (e.g. 2026)."
+    },
+    "eligible_turnover_gbp": {
+      "type": "number",
+      "description": "Eligible turnover converted to GBP. This is the value used to determine milestone thresholds."
+    },
+    "source_currency": {
+      "type": "string",
+      "description": "Original currency code of the source turnover (e.g. 'GBP', 'EUR', 'INR')."
+    },
+    "source_turnover": {
+      "type": "number",
+      "description": "Original turnover amount in the source currency, before GBP conversion."
+    },
+    "source_system": {
+      "type": "string",
+      "description": "External system this record was synced from (e.g. 'ARTCOUSTIC_PARTNER_PORTAL')."
+    },
+    "source_last_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the external system last updated this turnover figure."
+    },
+    "sync_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this record was synced into Sound Proof."
+    }
+  },
+  "required": [
+    "account_id",
+    "calendar_year",
+    "eligible_turnover_gbp"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "TurnoverMilestone",
+  "type": "object",
+  "description": "Represents one actual turnover threshold reached by an account (e.g. \u00a310,000, \u00a320,000, \u00a330,000). Each milestone corresponds to a CapacityLedger reward entry. Future UK rule: each \u00a310,000 threshold = +5 Professional Projects. Automated awarding is NOT implemented in Stage B1.",
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "description": "ID of the Sound Proof Account this milestone belongs to."
+    },
+    "calendar_year": {
+      "type": "number",
+      "description": "Calendar year this milestone was reached (e.g. 2026)."
+    },
+    "milestone_value_gbp": {
+      "type": "number",
+      "description": "The actual turnover threshold in GBP (e.g. 10000, 20000, 30000)."
+    },
+    "reward_projects": {
+      "type": "number",
+      "description": "Number of Professional Projects awarded for reaching this milestone (e.g. 5)."
+    },
+    "reward_ledger_entry_id": {
+      "type": "string",
+      "description": "ID of the CapacityLedger record that credited the reward for this milestone. Null if not yet awarded.",
+      "nullable": true
+    },
+    "source_turnover_gbp": {
+      "type": "number",
+      "description": "The actual eligible turnover in GBP at the time this milestone was recorded (may exceed the milestone value)."
+    }
+  },
+  "required": [
+    "account_id",
+    "calendar_year",
+    "milestone_value_gbp",
+    "reward_projects"
+  ]
+}

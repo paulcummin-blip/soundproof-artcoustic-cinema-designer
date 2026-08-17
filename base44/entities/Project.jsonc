@@ -355,6 +355,32 @@
       "default": "Draft",
       "description": "Informational project lifecycle stage for future licensing. Not enforced anywhere yet \u2014 existing projects remain fully editable regardless of value."
     },
+    "commercial_tier": {
+      "type": "string",
+      "enum": [
+        "UNCLASSIFIED",
+        "FREE",
+        "PROFESSIONAL",
+        "INTERNAL"
+      ],
+      "default": "UNCLASSIFIED",
+      "description": "Commercial classification of this project. UNCLASSIFIED = existing/pre-B1 projects (no change in behaviour). FREE / PROFESSIONAL / INTERNAL assigned by future commercial enforcement. Not enforced in Stage B1 \u2014 projects remain fully editable regardless of value."
+    },
+    "professional_activated_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this project was activated as a Professional project (consumed capacity via PROJECT_ACTIVATION ledger entry). Null = not yet activated. Not set automatically in Stage B1.",
+      "nullable": true
+    },
+    "activation_ledger_entry_id": {
+      "type": "string",
+      "description": "ID of the CapacityLedger record that activated this project (delta=-1). Null = not yet activated. Links the project to its commercial consumption record.",
+      "nullable": true
+    },
+    "commercial_source": {
+      "type": "string",
+      "description": "Source of the commercial classification (e.g. 'TRIAL', 'PURCHASED', 'UK_TURNOVER_REWARD', 'DISTRIBUTOR_ALLOCATION', 'ADMIN_GRANT'). Informational \u2014 mirrors the ledger transaction type that granted the capacity consumed by this project."
+    },
     "metrics_last_opened": {
       "type": "string",
       "format": "date-time",

@@ -1,0 +1,40 @@
+{
+  "name": "AccountMembership",
+  "type": "object",
+  "description": "Canonical many-to-many membership linking users to accounts with a per-relationship role. Supports users belonging to multiple organisations (e.g. a distributor manager linked to both the distributor account and multiple dealer accounts). User.account_id remains the primary/default organisation pointer for backward compatibility; AccountMembership is the architecture for future multi-account relationships.",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "ID of the User who is a member of this account."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "ID of the Account this membership links to."
+    },
+    "membership_role": {
+      "type": "string",
+      "enum": [
+        "distributor_admin",
+        "dealer_admin",
+        "designer",
+        "viewer",
+        "internal_admin"
+      ],
+      "description": "Role of this user within this account. distributor_admin = manages distributor pool and allocations; dealer_admin = manages dealer's users and views capacity; designer = engineering access; viewer = read-only; internal_admin = Sound Proof internal staff."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "suspended"
+      ],
+      "default": "active",
+      "description": "Membership status. Suspended memberships block access to that account but do not delete the relationship."
+    }
+  },
+  "required": [
+    "user_id",
+    "account_id",
+    "membership_role"
+  ]
+}

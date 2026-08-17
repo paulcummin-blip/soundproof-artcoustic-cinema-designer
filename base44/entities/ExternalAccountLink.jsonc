@@ -1,0 +1,41 @@
+{
+  "name": "ExternalAccountLink",
+  "type": "object",
+  "description": "Links a Sound Proof Account to one or more external ledger/trading accounts (e.g. Artcoustic Partner Portal). Supports 1:N \u2014 one Sound Proof account can have multiple external trading accounts. Required for businesses with multiple trading accounts.",
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "description": "ID of the Sound Proof Account this external link belongs to."
+    },
+    "source_system": {
+      "type": "string",
+      "description": "External system identifier (e.g. 'ARTCOUSTIC_PARTNER_PORTAL')."
+    },
+    "external_account_number": {
+      "type": "string",
+      "description": "Account number/key in the external system. Used for turnover sync matching."
+    },
+    "external_account_name": {
+      "type": "string",
+      "description": "Display name of the external account."
+    },
+    "currency": {
+      "type": "string",
+      "description": "Currency code of the external account (e.g. 'GBP', 'EUR', 'INR', 'USD')."
+    },
+    "territory": {
+      "type": "string",
+      "description": "Territory code of the external account (e.g. 'UK', 'IE', 'IN', 'DE', 'AU', 'US')."
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Inactive links are retained for historical reference but excluded from new turnover sync."
+    }
+  },
+  "required": [
+    "account_id",
+    "source_system",
+    "external_account_number"
+  ]
+}
