@@ -64,7 +64,34 @@ export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetri
   if (boostWouldSpillIntoProtectedNull(valley.frequency, protectedNullRegions)) {
     return { filters, metrics, changed: false, bankEvaluationCount: 0, diagnostic: { valleyFrequencyHz: valley.frequency }, limitation: "valley boost rejected because its filter would spill into a protected cancellation region" };
   }
-  if (enabledFilterCount > 8) return { filters, metrics, changed: false, bankEvaluationCount: 0, diagnostic: null, limitation: "ten-filter ceiling left no room for a paired operation" };
+  const replacementPairs = [];
+  if (enabledFilterCount > 8) {
+    const replaceable = filters
+      .map((filter, index) => ({
+        filter,
+        index,
+        activity: Math.abs(filter.gainDb || 0),
+        outsideAssessment: filter.frequencyHz > fitEndHz,
+      }))
+      .filter((entry) => entry.filter.enabled
+        && entry.filter.frequencyHz >= Math.max(40, Number(usableLfHz || 20) * 1.25))
+      .sort((left, right) =>
+        Number(right.outsideAssessment) - Number(left.outsideAssessment)
+        || left.activity - right.activity)
+      .slice(0, 4);
+    for (let left = 0; left < replaceable.length; left++) {
+      for (let right = left + 1; right < replaceable.length; right++) {
+        replacementPairs.push([replaceable[left], replaceable[right]]);
+      }
+    }
+    if (!replacementPairs.length) {
+      return {
+        filters, metrics, changed: false, bankEvaluationCount: 0,
+        diagnostic: { peakFrequencyHz: peak.frequency, valleyFrequencyHz: valley.frequency },
+        limitation: "ten-filter ceiling had no safe pair of non-low-frequency slots to repurpose",
+      };
+    }
+  }
   const fittingToleranceDb = Number.isFinite(profile?.fittingToleranceDb) ? profile.fittingToleranceDb : 1;
   if (Math.max(peak.deviationDb, Math.abs(valley.deviationDb)) <= fittingToleranceDb) {
     return { filters, metrics, changed: false, bankEvaluationCount: 0, diagnostic: null, limitation: `fit residual already within ${fittingToleranceDb} dB` };
@@ -86,29 +113,47 @@ export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetri
           : "Joint refinement of opposing correctable residuals" };
       const boost = limitBoostForCapability(requestedBoost, activeSubs, usableLfHz, requestedSystemOutputDb);
       if (boost.gainDb <= 0.1) continue;
-      const proposed = [...filters, cut, boost];
-      const limits = preparedBankValidation
-        ? evaluatePreparedBankLimits(preparedBankValidation, proposed, profile, operationCounts)
-        : evaluateProvisionalBankLimits(proposed, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
-      bankEvaluationCount++;
-      if (!limits.allOk) continue;
-      const candidateMetrics = calculateAllSeatMetrics(
-        seats, proposed, fitStartHz, fitEndHz, anchorDb, operationCounts, evaluationMemo,
-        { protectedNullRegions, canonicalTargetCurve },
-      );
-      if (!candidateMetrics) continue;
-      if (!realSeatsRemainConstrained(seatBaselineMetrics, candidateMetrics, protectedNullRegions)) continue;
-      const maxImprovementDb = bestMetrics.rspMaxDeviationDb - candidateMetrics.rspMaxDeviationDb;
-      const rmsImprovementDb = bestMetrics.rspRmsDeviationDb - candidateMetrics.rspRmsDeviationDb;
-      if (maxImprovementDb + 0.35 * rmsImprovementDb <= 0.01) continue;
-      const maxImproved = maxImprovementDb > 0.05;
-      const rmsImproved = rmsImprovementDb > 0.01;
-      const maxNotWorse = candidateMetrics.rspMaxDeviationDb <= bestMetrics.rspMaxDeviationDb + 0.05;
-      const rmsNotWorse = candidateMetrics.rspRmsDeviationDb <= bestMetrics.rspRmsDeviationDb + 0.01;
-      if (!((maxImproved && rmsNotWorse) || (rmsImproved && maxNotWorse))) continue;
-      if (compareHouseCurveMetrics(candidateMetrics, bestMetrics) < 0) {
-        bestFilters = proposed;
-        bestMetrics = candidateMetrics;
+      const proposedBanks = enabledFilterCount <= 8
+        ? [[...filters, cut, boost]]
+        : replacementPairs.map(([cutSlot, boostSlot]) => filters.map((filter, index) => {
+          if (index === cutSlot.index) return {
+            ...cut,
+            band: filter.band,
+            reason: "Joint refinement: repurposed weak slot for residual peak cut",
+          };
+          if (index === boostSlot.index) return {
+            ...boost,
+            band: filter.band,
+            reason: boostRegion.region
+              ? "Joint broad-valley refinement: repurposed weak slot for residual boost"
+              : "Joint refinement: repurposed weak slot for residual boost",
+          };
+          return { ...filter };
+        }));
+      for (const proposed of proposedBanks) {
+        const limits = preparedBankValidation
+          ? evaluatePreparedBankLimits(preparedBankValidation, proposed, profile, operationCounts)
+          : evaluateProvisionalBankLimits(proposed, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+        bankEvaluationCount++;
+        if (!limits.allOk) continue;
+        const candidateMetrics = calculateAllSeatMetrics(
+          seats, proposed, fitStartHz, fitEndHz, anchorDb, operationCounts, evaluationMemo,
+          { protectedNullRegions, canonicalTargetCurve },
+        );
+        if (!candidateMetrics) continue;
+        if (!realSeatsRemainConstrained(seatBaselineMetrics, candidateMetrics, protectedNullRegions)) continue;
+        const maxImprovementDb = bestMetrics.rspMaxDeviationDb - candidateMetrics.rspMaxDeviationDb;
+        const rmsImprovementDb = bestMetrics.rspRmsDeviationDb - candidateMetrics.rspRmsDeviationDb;
+        if (maxImprovementDb + 0.35 * rmsImprovementDb <= 0.01) continue;
+        const maxImproved = maxImprovementDb > 0.05;
+        const rmsImproved = rmsImprovementDb > 0.01;
+        const maxNotWorse = candidateMetrics.rspMaxDeviationDb <= bestMetrics.rspMaxDeviationDb + 0.05;
+        const rmsNotWorse = candidateMetrics.rspRmsDeviationDb <= bestMetrics.rspRmsDeviationDb + 0.01;
+        if (!((maxImproved && rmsNotWorse) || (rmsImproved && maxNotWorse))) continue;
+        if (compareHouseCurveMetrics(candidateMetrics, bestMetrics) < 0) {
+          bestFilters = proposed;
+          bestMetrics = candidateMetrics;
+        }
       }
     }
   }
@@ -125,6 +170,8 @@ export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetri
       valleyResidualDb: valley.deviationDb,
       valleyRegion: boostRegion.region,
       boostQValues: boostRegion.qValues,
+      replacementPairCount: replacementPairs.length,
+      repurposedExistingSlots: enabledFilterCount > 8,
     },
   };
 }
