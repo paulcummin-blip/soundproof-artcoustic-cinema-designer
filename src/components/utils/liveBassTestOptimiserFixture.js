@@ -89,7 +89,10 @@ function summariseCandidate(selected, targetDb) {
       ? candidate.productOperatingMarginDb >= 0
       : null,
     p18Hz: p18?.achievedExtensionHz ?? null,
-    p18Level: p18Grade.level,
+    p18IndependentLevel: p18Grade.level,
+    p18Level: Number.isFinite(candidate.productOperatingMarginDb) && candidate.productOperatingMarginDb >= 0
+      ? p18Grade.level
+      : 0,
     p19Db: p19?.variationDbRaw ?? null,
     p19DisplayDb: p19?.displayVariationDb ?? null,
     p19Level: p19?.level ?? null,
