@@ -1,0 +1,48 @@
+{
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "30 3 * * *",
+      "one_time_date": null,
+      "timezone": "Europe/London",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "name": "Daily UK Turnover Reward Sync",
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "daily_uk_turnover_sync",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "sync_turnover": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "syncUkTurnoverRewards",
+            "args": {
+              "dry_run": false,
+              "calendar_year": "${ now | strftime(\"%Y\") | tonumber }"
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Sync UK turnover rewards",
+            "description": "Fetch Partner Portal turnover, award milestones"
+          }
+        }
+      }
+    ]
+  },
+  "description": "Daily sync of UK Premium Partner turnover from the Artcoustic Partner Portal bridge. Awards +5 Professional Project capacity for every \u00a310k eligible turnover milestone reached. Runs at 03:30 London time, after the Partner Portal source sync at 02:00. Calendar year is computed dynamically from the current date, so it rolls over automatically on 1 January each year. If the bridge is unavailable, the sync is marked FAILED and retried the next day \u2014 no credits are awarded or removed on failure."
+}
