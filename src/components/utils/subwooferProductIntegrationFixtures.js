@@ -43,7 +43,7 @@ export function runSubwooferProductIntegrationFixtures() {
   checks.push(check("Each SUB4-12 is individually limited by its 1000 W amplifier", "-1.46 dB per cabinet", fourSub4Amp.sourceAuthorities.map((source) => source.deratingDb), fourSub4Amp.sourceAuthorities.every((source) => Math.abs(source.deratingDb + 1.46128) < 0.001)));
   const oneSub4At50 = getSystemSourceCapability(subs("sub4-12", 1), 50);
   const fourSub4At50 = getSystemSourceCapability(subs("sub4-12", 4), 50);
-  checks.push(check("Four co-located SUB4-12 retain coherent quantity gain", "+12.04 dB", fourSub4At50 - oneSub4At50, Math.abs((fourSub4At50 - oneSub4At50) - 20 * Math.log10(4)) < 0.001));
+  checks.push(check("Four SUB4-12 use the approved power-summed product quantity gain", "+6.02 dB", fourSub4At50 - oneSub4At50, Math.abs((fourSub4At50 - oneSub4At50) - 10 * Math.log10(4)) < 0.001));
 
   const oneSub2 = authority("sub2-12", 1);
   const twoSub2 = authority("sub2-12", 2);
