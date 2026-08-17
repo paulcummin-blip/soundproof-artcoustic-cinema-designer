@@ -64,6 +64,33 @@ export function useEffectivePromotion() {
     refresh();
   }, [refresh]);
 
+  // Poll for admin "End Early" cancellations — a lightweight periodic re-fetch
+  // so the dealer UI reflects status changes without requiring a page refresh.
+  useEffect(() => {
+    const POLL_MS = 60000; // 60 seconds
+    const id = setInterval(refresh, POLL_MS);
+    return () => clearInterval(id);
+  }, [refresh]);
+
+  // Instant expiry timer — when an effective promotion is showing, schedule a
+  // refresh at the exact ends_at boundary so the UI switches to the normal
+  // "Buy Projects" state immediately without a manual page refresh.
+  useEffect(() => {
+    if (!state.isEffective || !state.endsAt) return;
+    const endMs = new Date(state.endsAt).getTime();
+    if (!Number.isFinite(endMs)) return;
+    const delay = endMs - Date.now();
+    // If already past the boundary, refresh immediately.
+    if (delay <= 0) {
+      refresh();
+      return;
+    }
+    // Cap at ~24h to avoid huge setTimeout values; the poll will also catch it.
+    const cappedDelay = Math.min(delay, 24 * 60 * 60 * 1000);
+    const id = setTimeout(refresh, cappedDelay);
+    return () => clearTimeout(id);
+  }, [state.isEffective, state.endsAt, refresh]);
+
   return { ...state, loading, refresh };
 }
 
