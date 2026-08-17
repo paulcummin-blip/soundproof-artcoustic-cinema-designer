@@ -15,6 +15,10 @@ const logGrid = (ppo) => {
   return [...new Set([...values.filter((frequency) => frequency <= 120), 18, 25, 30, 80, 100, 120])].sort((a, b) => a - b);
 };
 const unityTransfer = (sourceId, frequencies = logGrid(48)) => ({ sourceId, points: frequencies.map((frequency) => ({ frequency, re: REF_AMPLITUDE, im: 0 })) });
+const gainTransfer = (sourceId, gainDb, frequencies = logGrid(48)) => {
+  const scale = Math.pow(10, Number(gainDb) / 20);
+  return { sourceId, points: frequencies.map((frequency) => ({ frequency, re: REF_AMPLITUDE * scale, im: 0 })) };
+};
 const flatCapability = (id, db = 120) => ({ id, modelKey: "synthetic", shadowCapabilityCurve: [{ frequency: 15, spl: db }, { frequency: 120, spl: db }] });
 const valueAt = (curve, frequency) => curve.find((point) => Math.abs(point.frequency - frequency) < 1e-9)?.spl ?? null;
 const check = (name, expected, actual, tolerance = 0.01) => ({ name, expected, actual, delta: Number.isFinite(actual) ? actual - expected : null, passed: Number.isFinite(actual) && Math.abs(actual - expected) <= tolerance });
@@ -31,6 +35,8 @@ export const SHADOW_FIXTURE_LAYOUTS = Object.freeze([
 function runSyntheticAuthorityFixtures() {
   const frequencies = logGrid(48);
   const single = assessShadowPairedP14P18({ activeSubs: [flatCapability("s1")], perSourceComplexTransfers: [unityTransfer("s1", frequencies)] });
+  const roomPeakPlus6 = assessShadowPairedP14P18({ activeSubs: [flatCapability("s1")], perSourceComplexTransfers: [gainTransfer("s1", 6, frequencies)] });
+  const shallowNullMinus3 = assessShadowPairedP14P18({ activeSubs: [flatCapability("s1")], perSourceComplexTransfers: [gainTransfer("s1", -3, frequencies)] });
   const two = assessShadowPairedP14P18({ activeSubs: [flatCapability("s1"), flatCapability("s2")], perSourceComplexTransfers: [unityTransfer("s1", frequencies), unityTransfer("s2", frequencies)] });
   const fourSubs = ["s1", "s2", "s3", "s4"].map((id) => flatCapability(id));
   const four = assessShadowPairedP14P18({ activeSubs: fourSubs, perSourceComplexTransfers: fourSubs.map((item) => unityTransfer(item.id, frequencies)) });
@@ -42,9 +48,11 @@ function runSyntheticAuthorityFixtures() {
   const l4SevereRegion = narrowSevere.levelResults.find((level) => level.level === "L4")?.unsmoothedUnderTargetRegions?.find((region) => region.severe);
   const productDelta30 = valueAt(shaped.rawDeliveredCurve, 30) - valueAt(single.rawDeliveredCurve, 30);
   return {
-    single, two, four, shaped,
+    single, roomPeakPlus6, shallowNullMinus3, two, four, shaped,
     checks: [
       check("Unity transfer delivers flat product capability", 120, valueAt(single.rawDeliveredCurve, 80)),
+      check("A +6 dB room peak raises a 120 dB product maximum to 126 dB", 126, valueAt(roomPeakPlus6.rawDeliveredCurve, 80)),
+      check("A -3 dB shallow room null lowers a 120 dB product maximum to 117 dB", 117, valueAt(shallowNullMinus3.rawDeliveredCurve, 80)),
       check("Two co-located unity transfers", 126.0206, valueAt(two.rawDeliveredCurve, 80)),
       check("Four co-located unity transfers", 132.0412, valueAt(four.rawDeliveredCurve, 80)),
       check("Product response applied once at 30 Hz", -6, productDelta30),
