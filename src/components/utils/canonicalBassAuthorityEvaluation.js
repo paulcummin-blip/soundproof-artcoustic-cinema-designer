@@ -127,7 +127,11 @@ export function evaluateCanonicalBassAuthority({
   const definitions = getRp22BassOperatingDefinitions(p14TargetBasis, selectedP18TargetBasis);
   const requested = definitions.find((definition) => definition.value === requestedLevel) || definitions.at(-1);
   const selectedTargetDb = requested?.p14TargetDb ?? null;
-  const requiredExtensionHz = p18ThresholdHzForLevel(selectedP18TargetBasis, requestedLevel);
+  const p14AssessmentStartHz = 20;
+  // P18 is not forced to the same numbered level as P14. Measure the achieved
+  // -3 dB point at the selected P14 output, then grade it independently. The
+  // selected Min./Rec. basis contributes only its L1 pass/fail boundary here.
+  const requiredExtensionHz = p18ThresholdHzForLevel(selectedP18TargetBasis, 1);
   const positiveEqDemandCurve = (canonicalResult.positiveEqDemandCurve || []).map((point) => ({
     frequency: point.frequency,
     spl: Number(point.demandDb ?? point.spl) || 0,
@@ -144,7 +148,7 @@ export function evaluateCanonicalBassAuthority({
     canonicalResult,
     productDiagnostic: productP14Diagnostic,
     targetBasis: p14TargetBasis,
-    requiredExtensionHz,
+    requiredExtensionHz: p14AssessmentStartHz,
   });
   const achievedP14Db = p14?.value ?? null;
   const achievedP14Level = p14?.level ?? 0;
@@ -173,9 +177,9 @@ export function evaluateCanonicalBassAuthority({
   const requestedP14Pass = Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb)
     ? achievedP14Db >= selectedTargetDb
     : null;
-  // P18: assess the fixed post-EQ design against the required extension at the
-  // selected operating level. Do not lower the operating level or shorten the
-  // target curve to create a pass.
+  // P18: find the achieved extension from the fixed post-EQ design at the
+  // selected P14 operating level. The required boundary below is only the L1
+  // floor for the chosen P18 basis; the achieved L1–L4 grade is independent.
   const extensionAssessment = assessP18AgainstRequiredExtension({
     rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
     canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
@@ -239,6 +243,7 @@ export function evaluateCanonicalBassAuthority({
     selectedP14TargetBasis: p14TargetBasis,
     selectedP14Level: requestedLevel,
     selectedP14TargetDb: selectedTargetDb,
+    selectedP14RequiredExtensionHz: p14AssessmentStartHz,
     availableP14CapabilityDb: achievedP14Db,
     requestedP14Pass,
     p14MarginDb: Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb) ? achievedP14Db - selectedTargetDb : null,
