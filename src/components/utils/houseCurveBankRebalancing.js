@@ -204,11 +204,23 @@ export function rebalanceBroadValleyBank({
         && entry.filter.gainDb < -0.1
         && entry.distance <= 0.35)
       .sort((left, right) => left.distance - right.distance)[0] || null;
-    diagnostic.blockerCompanion = blockerCompanion ? {
-      index: blockerCompanion.index,
-      frequencyHz: blockerCompanion.filter.frequencyHz,
-      gainDb: blockerCompanion.filter.gainDb,
-      Q: blockerCompanion.filter.Q,
+    const replacementCompanion = blockerCompanion ? null : current
+      .map((filter, index) => ({
+        filter, index,
+        activity: Math.abs(filter.gainDb || 0),
+        outsideAssessment: filter.frequencyHz > fitEndHz,
+      }))
+      .filter((entry) => entry.index !== blocker.index && entry.activity <= 1.5)
+      .sort((left, right) =>
+        Number(right.outsideAssessment) - Number(left.outsideAssessment)
+        || left.activity - right.activity)[0] || null;
+    const effectiveCompanion = blockerCompanion || replacementCompanion;
+    diagnostic.blockerCompanion = effectiveCompanion ? {
+      index: effectiveCompanion.index,
+      frequencyHz: effectiveCompanion.filter.frequencyHz,
+      gainDb: effectiveCompanion.filter.gainDb,
+      Q: effectiveCompanion.filter.Q,
+      repurposed: !!replacementCompanion,
     } : null;
     const blockerVariants = blockerQValues.map((blockerQ) => {
       const variant = current.map((filter) => ({ ...filter }));
@@ -218,28 +230,37 @@ export function rebalanceBroadValleyBank({
       };
       return variant;
     });
-    if (blockerCompanion) {
-      const splitFrequencyHz = Math.sqrt(
-        blocker.filter.frequencyHz * blockerCompanion.filter.frequencyHz,
-      );
-      for (const primaryGainDb of [-12, -10, -8]) {
-        for (const primaryQ of [2, 3, 4]) {
-          for (const companionGainDb of [-3, -5, -7]) {
-            for (const companionQ of [2, 3, 4]) {
-              const variant = current.map((filter) => ({ ...filter }));
-              variant[blocker.index] = {
-                ...variant[blocker.index], gainDb: primaryGainDb, Q: primaryQ,
-                reason: "Joint broad-valley rebalance: split saturated broad peak cut",
-              };
-              variant[blockerCompanion.index] = {
-                ...variant[blockerCompanion.index],
-                frequencyHz: splitFrequencyHz, gainDb: companionGainDb, Q: companionQ,
-                reason: "Joint broad-valley rebalance: preserve peak control without remote tail",
-              };
-              blockerVariants.push(variant);
-            }
-          }
-        }
+    if (effectiveCompanion) {
+      const lowerShoulder = shoulders.find((shoulder) => shoulder.side === "lower");
+      const splitFrequencyHz = replacementCompanion
+        ? Math.sqrt(blocker.filter.frequencyHz
+          * (lowerShoulder?.frequency ?? region.startHz))
+        : Math.sqrt(blocker.filter.frequencyHz * effectiveCompanion.filter.frequencyHz);
+      const splitPresets = [
+        [-14, 2, -2, 3],
+        [-13, 2.5, -3, 3],
+        [-12, 3, -4, 3],
+        [-11, 3.5, -5, 3],
+        [-10, 4, -6, 3],
+        [-9, 4, -7, 4],
+        [-12, 4, -4, 4],
+        [-10, 5, -6, 4],
+      ];
+      for (const [primaryGainDb, primaryQ, companionGainDb, companionQ] of splitPresets) {
+        const variant = current.map((filter) => ({ ...filter }));
+        variant[blocker.index] = {
+          ...variant[blocker.index], gainDb: primaryGainDb, Q: primaryQ,
+          reason: "Joint broad-valley rebalance: split saturated broad peak cut",
+        };
+        variant[effectiveCompanion.index] = {
+          ...variant[effectiveCompanion.index],
+          enabled: true, type: "Peak",
+          frequencyHz: splitFrequencyHz, gainDb: companionGainDb, Q: companionQ,
+          reason: replacementCompanion
+            ? "Joint broad-valley rebalance: repurpose weak slot for overlapping peak control"
+            : "Joint broad-valley rebalance: preserve peak control without remote tail",
+        };
+        blockerVariants.push(variant);
       }
     }
     const boostAdditions = boostIndexes.length ? [0, 1, 2, 3, 4] : [2, 3, 4, 5, 6];
