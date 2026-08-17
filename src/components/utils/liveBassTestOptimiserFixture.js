@@ -125,11 +125,13 @@ function summariseCandidate(selected, targetDb) {
       changed: candidate.houseCurveDiagnostics.broadValleyRebalance.changed,
       reason: candidate.houseCurveDiagnostics.broadValleyRebalance.reason,
       selected: candidate.houseCurveDiagnostics.broadValleyRebalance.selected,
+      diagnostics: candidate.houseCurveDiagnostics.broadValleyRebalance.diagnostics,
       verification: candidate.houseCurveDiagnostics.broadValleyRebalance.verification ? {
         testedBanks: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.testedBanks,
         realSeatUnsafe: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.realSeatUnsafe,
         rspLevelRegression: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.rspLevelRegression,
         rspRmsWorsening: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.rspRmsWorsening,
+        samples: candidate.houseCurveDiagnostics.broadValleyRebalance.verification.samples,
       } : null,
     } : null,
     samples,
