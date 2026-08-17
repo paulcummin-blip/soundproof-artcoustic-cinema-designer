@@ -71,10 +71,13 @@ function residualRegions(points, protectedNullRegions) {
   const finish = () => {
     if (!current.length) return;
     const centre = current.reduce((worst, point) => Math.abs(point.residualDb) > Math.abs(worst.residualDb) ? point : worst);
+    const startHz = current[0].frequency;
+    const endHz = current.at(-1).frequency;
     regions.push({
       kind: centre.residualDb > 0 ? "peak" : "valley",
-      startHz: current[0].frequency,
-      endHz: current.at(-1).frequency,
+      startHz,
+      endHz,
+      widthOctaves: startHz > 0 && endHz > startHz ? Math.log2(endHz / startHz) : 0,
       centre,
       protectedNullOverlap: currentProtected,
     });
@@ -147,7 +150,13 @@ function proposedBanks(region, filters, activeSubs, usableLfHz, requestedSystemO
   const isCut = requiredDb < 0;
   const requestedDb = isCut ? Math.max(-15, requiredDb) : Math.min(6, requiredDb);
   const gains = [1, 0.9, 0.75, 0.5, 0.25];
-  const qValues = [10, 8, 6, 5, 4, 3, 2];
+  const isBroadValley = !isCut && Number.isFinite(region.widthOctaves) && region.widthOctaves >= 1 / 3;
+  const regionBandwidthHz = Math.max(1, region.endHz - region.startHz);
+  const baseRegionQ = clamp(region.centre.frequency / regionBandwidthHz, 0.5, 10);
+  const qValues = isBroadValley
+    ? [...new Set([baseRegionQ * 0.65, baseRegionQ, Math.min(4, baseRegionQ * 1.25)]
+      .map((value) => Number(clamp(value, 0.5, 4).toFixed(4))))]
+    : [10, 8, 6, 5, 4, 3, 2];
   const trials = [];
   if (filters.length < MAX_FILTERS) {
     for (const gainScale of gains) for (const Q of qValues) {
@@ -158,7 +167,10 @@ function proposedBanks(region, filters, activeSubs, usableLfHz, requestedSystemO
         frequencyHz: region.centre.frequency,
         gainDb: requestedDb * gainScale,
         Q,
-        reason: "Professional high-resolution residual cleanup",
+        reason: isBroadValley
+          ? "Professional broad-valley residual correction"
+          : "Professional high-resolution residual cleanup",
+        widthOctaves: region.widthOctaves,
       };
       if (filter.gainDb > 0) {
         const halfWidth = region.centre.frequency / (2 * Q);
@@ -173,7 +185,8 @@ function proposedBanks(region, filters, activeSubs, usableLfHz, requestedSystemO
     .forEach((overlap) => {
       const existing = filters[overlap.index];
       const frequencyCandidates = [existing.frequencyHz, region.centre.frequency];
-      for (const frequencyHz of frequencyCandidates) for (const gainScale of gains) for (const Q of [MAX_Q, existing.Q]) {
+      const refinementQValues = isBroadValley ? qValues : [MAX_Q, existing.Q];
+      for (const frequencyHz of frequencyCandidates) for (const gainScale of gains) for (const Q of refinementQValues) {
         const gainDb = clamp(existing.gainDb + requiredDb * gainScale, -15, 6);
         const unchanged = Math.abs(gainDb - existing.gainDb) <= 0.05
           && Math.abs(frequencyHz - existing.frequencyHz) <= 0.01
@@ -450,11 +463,11 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
       if (outcome.accepted) accepted.push({ trial, outcome, attempt });
     }
     accepted.sort((left, right) =>
-      Math.abs(left.outcome.candidateCentre.residualDb) - Math.abs(right.outcome.candidateCentre.residualDb)
-      || left.outcome.candidateQuality.maximumAbsoluteResidualDb - right.outcome.candidateQuality.maximumAbsoluteResidualDb
+      left.outcome.candidateQuality.maximumAbsoluteResidualDb - right.outcome.candidateQuality.maximumAbsoluteResidualDb
       || left.outcome.candidateQuality.rmsResidualDb - right.outcome.candidateQuality.rmsResidualDb
+      || Math.abs(left.outcome.candidateCentre.residualDb) - Math.abs(right.outcome.candidateCentre.residualDb)
       || left.trial.filters.length - right.trial.filters.length
-      || right.trial.filter.Q - left.trial.filter.Q);
+      || left.trial.filter.Q - right.trial.filter.Q);
     if (!accepted.length) {
       diagnostic.finalDisposition = diagnostic.attempts.length ? "all-cleanup-trials-rejected" : "no-legal-filter-operation-generated";
       continue;
