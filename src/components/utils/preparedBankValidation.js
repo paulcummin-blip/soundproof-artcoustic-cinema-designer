@@ -9,9 +9,15 @@ export function prepareBankValidation(raw, activeSubs, usableLfHz, requestedSyst
   const frequencies = (raw || [])
     .filter((point) => point.frequency >= 20 && point.frequency <= 200)
     .map((point) => point.frequency);
-  const permittedBoostDb = frequencies.map((frequency) => getSourceDomainBoostAllowance({
-    frequency, requestedBoostDb: 6, activeSubs, usableLfHz, maxBoostDb: 6, requestedSystemOutputDb,
-  }).allowedBoostDb);
+  const permittedBoostDb = frequencies.map((frequency) => {
+    const allowance = getSourceDomainBoostAllowance({
+      frequency, requestedBoostDb: 6, activeSubs, usableLfHz, maxBoostDb: 6, requestedSystemOutputDb,
+    });
+    // Unknown capability beyond the approved product trace is not a zero-dB
+    // boost ceiling. Ignore source-domain gating there while retaining the
+    // complete-bank +6 dB aggregate ceiling.
+    return allowance.frequencyCoveredByProducts ? allowance.allowedBoostDb : null;
+  });
   return {
     frequencies,
     permittedBoostDb,
@@ -74,12 +80,13 @@ export function evaluatePreparedBankLimits(context, filters, profile, operationC
       maxAggregateCutHz = frequency;
     }
     if (aggregateDb > maximumAggregateBoostDb) boostLimitOk = false;
-    if (aggregateDb > context.permittedBoostDb[pointIndex] + 0.05) sourceDomainHeadroomOk = false;
+    const permittedBoostDb = context.permittedBoostDb[pointIndex];
+    if (Number.isFinite(permittedBoostDb) && aggregateDb > permittedBoostDb + 0.05) sourceDomainHeadroomOk = false;
     if (aggregateDb < aggregateCutFloorDb) cutLimitOk = false;
   }
-  const limitingPermittedBoostDb = maxAggregateBoostIndex >= 0
-    ? context.permittedBoostDb[maxAggregateBoostIndex]
-    : 6;
+  const limitingPermittedBoostDb = context.permittedBoostDb
+    .filter(Number.isFinite)
+    .reduce((minimum, value) => Math.min(minimum, value), 6);
   const result = {
     maxAggregateBoostDb, maxAggregateBoostHz, maxAggregateCutDb, maxAggregateCutHz,
     limitingPermittedBoostDb, boostLimitOk, cutLimitOk, sourceDomainHeadroomOk,
