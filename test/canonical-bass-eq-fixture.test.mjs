@@ -8,6 +8,7 @@ console.log(JSON.stringify({
   total: result.total,
   allPassed: result.allPassed,
   checks: result.checks,
+  correctionWindowDiagnostics: result.correctionWindowDiagnostics,
   deepNullOperatingLevelOffsetDb: result.deepNullOperatingLevelOffsetDb,
   referenceL2OperatingLevelOffsetDb: result.referenceL2OperatingLevelOffsetDb,
   protectedNullBoostCount: result.protectedNullBoostCount,
