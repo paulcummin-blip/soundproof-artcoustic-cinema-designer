@@ -61,6 +61,32 @@ export function runCredibleValleyFixture() {
   };
 }
 
+export function runPeakBoundedBroadValleyFixture() {
+  // Reproduces the live failure mode: a deep valley sits between two much
+  // higher shoulders, but its below-target span alone is narrower than one
+  // third octave. The peak-to-peak basin is broad and must not be refitted
+  // later with hard-coded Q6/Q8/Q10 boosts.
+  const rawCurve = frequencies.map((frequency) => ({
+    frequency,
+    spl: 100 + artcousticHouseCurveOffsetAt(frequency)
+      + gaussian(frequency, 97, 7, 12)
+      + gaussian(frequency, 137, 7, 12)
+      + gaussian(frequency, 121, 4, -28),
+  }));
+  const result = calculateHouseCurveEqCurve(rawCurve, [], 35, [{ modelKey: "SUB2-12" }], {
+    targetAnchorDb: 100,
+    requestedSystemOutputDb: 100,
+    assessmentStartHz: 20,
+    assessmentEndHz: 163,
+  });
+  return {
+    filters: result.filters.filter((filter) => filter.enabled),
+    pre: result.houseCurveDiagnostics.preRsp,
+    post: result.houseCurveDiagnostics.postRsp,
+    protectedNullRegions: result.houseCurveDiagnostics.protectedNullRegions,
+  };
+}
+
 export function runHouseCurveAccuracyFixtures() {
   const { rawCurve, perSeatRawCurves } = buildHouseCurveAccuracyReference();
   const startedAt = performance.now();
@@ -86,6 +112,9 @@ export function runHouseCurveAccuracyFixtures() {
   const mergeTrials = trials.trials.filter((trial) => trial.action === "merge");
   const refitTrials = trials.trials.filter((trial) => trial.action === "refit");
   const valley = runCredibleValleyFixture();
+  const peakBoundedValley = runPeakBoundedBroadValleyFixture();
+  const peakBoundedValleyBoosts = peakBoundedValley.filters.filter((filter) => filter.gainDb > 0.5
+    && filter.frequencyHz >= 100 && filter.frequencyHz <= 135);
   const derivedAnchor = deriveResponseAnchoredTarget({ rawCurve, usableLfHz: 20 });
   const sharpPeakCurve = rawCurve.map((point) => ({ ...point, spl: point.spl + gaussian(point.frequency, 62, 0.45, 30) }));
   const deepNullCurve = rawCurve.map((point) => ({ ...point, spl: point.spl + gaussian(point.frequency, 62, 0.45, -40) }));
@@ -119,6 +148,12 @@ export function runHouseCurveAccuracyFixtures() {
     ["Broad-valley correction reaches both shoulders", valley.correctionDb.lowerShoulder >= 1.5
       && valley.correctionDb.upperShoulder >= 1.5 && valley.correctionDb.centre <= 6.05],
     ["Overlapping valley filters are consolidated", valley.filters.length <= 2],
+    ["Peak-bounded broad valley rejects late Q6/Q8/Q10 boosts", peakBoundedValleyBoosts.length > 0
+      && peakBoundedValleyBoosts.every((filter) => filter.Q <= 4.05)
+      && peakBoundedValleyBoosts.some((filter) => filter.reason.includes("broad-valley"))],
+    ["Peak-bounded broad valley materially improves RMS", peakBoundedValley.post.rmsResidualDb
+      < peakBoundedValley.pre.rmsResidualDb - 1],
+    ["Peak-bounded broad valley is not protected as a narrow null", peakBoundedValley.protectedNullRegions.length === 0],
     ["Robust anchor resists one sharp peak", Number.isFinite(derivedAnchor) && Math.abs(peakAnchor - derivedAnchor) < 0.5],
     ["Robust anchor resists one protected deep null", Number.isFinite(derivedAnchor) && Math.abs(nullAnchor - derivedAnchor) < 0.5],
     ["Broad non-null valley remains correctable", valley.filters.some((filter) => filter.gainDb > 0.5) && valley.protectedNullRegions.length === 0],
