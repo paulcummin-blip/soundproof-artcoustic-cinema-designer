@@ -13,10 +13,10 @@ import {
 } from "@/components/utils/houseCurveTargetAuthority";
 import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
 import { findAggregatePeakBoostViolations } from "@/components/utils/designEqPhysicsAuthority";
-import { normaliseHouseCurveToP14Total } from "@/components/utils/p14HouseCurveNormalisation";
+import { normaliseHouseCurveToP14Total, integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
 import { p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
-import { getCurrentSystemSourceOutput, getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
+import { getCurrentSystemSourceOutput, getSystemSourceCapability, getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { salvagePartialBank, buildSalvageEqResult } from "@/components/utils/designEqPartialBankSalvage";
 import { calculatePairedP14P18ProductionAuthority } from "@/components/utils/pairedP14P18ProductionAuthority";
 import { buildPairedP14P18CandidateSummary } from "@/components/utils/pairedP14P18CandidateSummary";
@@ -25,26 +25,28 @@ const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.ac
 const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
 
 /**
- * Place the safe, product-plus-room capability envelope at the requested
- * house curve without inventing boost authority.
- *
- * If the complete assessment band has surplus output, a single negative trim
- * lowers the envelope until its weakest point touches the target. If any
- * frequency is already below target, retain the maximum safe level (0 dB
- * additional trim) so the shortfall remains visible and the fitter can only
- * cut the regions that genuinely have capability.
+ * Apply the global calibration gain before PEQ, as a target-following
+ * processor such as Dirac or ARC would. Attenuation is always safe. A
+ * positive calibration gain is limited by the least available source-domain
+ * headroom in the requested P14 operating band.
  */
-function deriveCapabilityAnchoredTrimDb(maximumCurve, targetCurve, startHz, endHz) {
-  const bandPoints = (Array.isArray(maximumCurve) ? maximumCurve : [])
-    .filter((point) => Number.isFinite(point?.frequency) && Number.isFinite(point?.spl)
-      && point.frequency >= startHz && point.frequency <= endHz);
-  if (!bandPoints.length || !Array.isArray(targetCurve) || !targetCurve.length) return 0;
-  const minimumSurplusDb = bandPoints.reduce((minimum, point) => {
-    const targetSpl = interpolateCorrection(targetCurve, point.frequency);
-    return Number.isFinite(targetSpl) ? Math.min(minimum, point.spl - targetSpl) : minimum;
-  }, Infinity);
-  if (!Number.isFinite(minimumSurplusDb) || minimumSurplusDb <= 0) return 0;
-  return -minimumSurplusDb;
+function clampPositiveOperatingOffset(requestedOffsetDb, activeSubs, baseRequestedSystemOutputDb, requiredExtensionHz) {
+  if (!Number.isFinite(requestedOffsetDb)) return 0;
+  if (requestedOffsetDb <= 0) return requestedOffsetDb;
+  if (!Number.isFinite(baseRequestedSystemOutputDb)) return 0;
+  const bandFrequencies = [20, 25, 31.5, 40, 50, 63, 80, 100, 120]
+    .filter((frequency) => frequency >= requiredExtensionHz && frequency <= 120);
+  let maximumSafePositiveOffsetDb = Infinity;
+  for (const frequency of bandFrequencies) {
+    const capabilityDb = getSystemSourceCapability(activeSubs, frequency);
+    if (!Number.isFinite(capabilityDb)) continue;
+    maximumSafePositiveOffsetDb = Math.min(
+      maximumSafePositiveOffsetDb,
+      capabilityDb - baseRequestedSystemOutputDb,
+    );
+  }
+  if (!Number.isFinite(maximumSafePositiveOffsetDb) || maximumSafePositiveOffsetDb <= 0) return 0;
+  return Math.min(requestedOffsetDb, maximumSafePositiveOffsetDb);
 }
 
 function interpolateCorrection(curve, frequency) {
@@ -451,19 +453,29 @@ export function generateCanonicalCandidatePool({
   // the headroom calculation subtracts from the manufacturer capability curve).
   // Falls back to 114 dB when no tuning is configured on the sub objects.
   const baseRequestedSystemOutputDb = getCurrentSystemSourceOutput(activeSubs);
-  // ── Capability-anchored operating level ──
-  // The house curve is already normalised to the selected P14 total. Start from
-  // the safe product-plus-room capability envelope and pull it down to that
-  // fixed target. Do not first normalise the rippled room response by integrated
-  // SPL: that can manufacture broad below-target regions and force unnecessary
-  // boost-heavy banks. The safety margin is part of the total offset from the
-  // authoritative raw maximum; any additional trim applies only when the whole
-  // P14 assessment band has surplus capability.
-  const capabilityAnchoredTrimDb = deriveCapabilityAnchoredTrimDb(
-    maximumSplCurveBeforeEq, targetCurve, requiredExtensionHz, 120,
+  // ── Target-following global calibration level ──
+  // First place the physical RSP at the selected P14 operating target using
+  // the same C-weighted third-octave integration as the house target. This is
+  // the global gain/trim stage used by real room-correction processors; it is
+  // not a PEQ filter and does not consume a filter slot or aggregate cut.
+  // A deep modal null must remain visible and protected, but it must not pin
+  // the entire response to maximum product capability.
+  const rawIntegratedLevelDbC = integrateRawResponseLevelDbC({
+    rawCurve,
+    lowerHz: requiredExtensionHz,
+    upperHz: 120,
+  });
+  const requestedOperatingLevelOffsetDb = Number.isFinite(rawIntegratedLevelDbC)
+    ? Number(selectedP14TargetDb) - rawIntegratedLevelDbC
+    : 0;
+  // Attenuation applies completely. Positive global gain is permitted only
+  // within the least available source-domain headroom across the P14 band.
+  const appliedOperatingLevelOffsetDb = clampPositiveOperatingOffset(
+    requestedOperatingLevelOffsetDb,
+    activeSubs,
+    baseRequestedSystemOutputDb,
+    requiredExtensionHz,
   );
-  const requestedOperatingLevelOffsetDb = -MAXIMUM_SPL_SAFETY_MARGIN_DB + capabilityAnchoredTrimDb;
-  const appliedOperatingLevelOffsetDb = requestedOperatingLevelOffsetDb;
   // The operating source output after global trim — this is the level the PEQ
   // headroom calculation must use (NOT the pre-trim base output).
   const operatingSystemOutputDb = Number.isFinite(baseRequestedSystemOutputDb)
