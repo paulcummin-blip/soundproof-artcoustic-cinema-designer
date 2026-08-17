@@ -34,6 +34,17 @@
       "default": "dealer",
       "description": "Account type. distributor = international distributor that allocates capacity to child dealer accounts; internal = Sound Proof internal organisation."
     },
+    "dealer_group": {
+      "type": "string",
+      "enum": [
+        "PREMIUM_PARTNER",
+        "RICHER_SOUNDS",
+        "OTHER_DEALER",
+        "INTERNATIONAL",
+        "INTERNAL"
+      ],
+      "description": "Commercial grouping for Admin presentation (Premium Partners, Richer Sounds, Other Dealers, International, Internal). Separate from account_type which describes the organisation role (dealer/distributor/etc)."
+    },
     "parent_account_id": {
       "type": "string",
       "description": "ID of the parent Account. For dealer accounts under an international distributor, this is the distributor Account.id. UK dealers may have no parent (null).",
