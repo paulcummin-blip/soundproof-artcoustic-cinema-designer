@@ -23,6 +23,7 @@ console.log(JSON.stringify({
       rspLevelRegression: candidate.broadValleyRebalance.verification.rspLevelRegression,
       rspRmsWorsening: candidate.broadValleyRebalance.verification.rspRmsWorsening,
       bestValleySample: candidate.broadValleyRebalance.verification.bestValleySample,
+      bestAppendedSample: candidate.broadValleyRebalance.verification.bestAppendedSample,
     } : null,
   },
 }, null, 2));
