@@ -158,26 +158,52 @@ function proposedBanks(region, filters, activeSubs, usableLfHz, requestedSystemO
       .map((value) => Number(clamp(value, 0.5, 4).toFixed(4))))]
     : [10, 8, 6, 5, 4, 3, 2];
   const trials = [];
+  const targetFilters = [];
+  for (const gainScale of gains) for (const Q of qValues) {
+    let filter = {
+      band: filters.length + 1,
+      enabled: true,
+      type: "Peak",
+      frequencyHz: region.centre.frequency,
+      gainDb: requestedDb * gainScale,
+      Q,
+      reason: isBroadValley
+        ? "Professional broad-valley residual correction"
+        : "Professional high-resolution residual cleanup",
+      widthOctaves: region.widthOctaves,
+    };
+    if (filter.gainDb > 0) {
+      const halfWidth = region.centre.frequency / (2 * Q);
+      filter = limitBoostForCapability({ ...filter, startHz: filter.frequencyHz - halfWidth, endHz: filter.frequencyHz + halfWidth }, activeSubs, usableLfHz, requestedSystemOutputDb);
+    }
+    if (Math.abs(filter.gainDb) > 0.1) targetFilters.push(filter);
+  }
   if (filters.length < MAX_FILTERS) {
-    for (const gainScale of gains) for (const Q of qValues) {
-      let filter = {
-        band: filters.length + 1,
-        enabled: true,
-        type: "Peak",
-        frequencyHz: region.centre.frequency,
-        gainDb: requestedDb * gainScale,
-        Q,
-        reason: isBroadValley
-          ? "Professional broad-valley residual correction"
-          : "Professional high-resolution residual cleanup",
-        widthOctaves: region.widthOctaves,
-      };
-      if (filter.gainDb > 0) {
-        const halfWidth = region.centre.frequency / (2 * Q);
-        filter = limitBoostForCapability({ ...filter, startHz: filter.frequencyHz - halfWidth, endHz: filter.frequencyHz + halfWidth }, activeSubs, usableLfHz, requestedSystemOutputDb);
-      }
-      if (Math.abs(filter.gainDb) <= 0.1 || isNearDuplicate(filter, filters) || countSameSignFiltersInRegion(filter, filters) >= 2) continue;
+    for (const filter of targetFilters) {
+      if (isNearDuplicate(filter, filters) || countSameSignFiltersInRegion(filter, filters) >= 3) continue;
       trials.push({ action: "append", changedFilterIndex: filters.length, filter, filters: [...filters, filter] });
+    }
+  }
+  const replaceableIndexes = filters
+    .map((filter, index) => ({ filter, index, activity: Math.abs(filter.gainDb || 0) }))
+    .filter((entry) => entry.activity <= 3.5)
+    .sort((left, right) => left.activity - right.activity)
+    .slice(0, 4)
+    .map((entry) => entry.index);
+  for (const replacementIndex of replaceableIndexes) {
+    const withoutReplaced = filters.filter((_, index) => index !== replacementIndex);
+    for (const targetFilter of targetFilters) {
+      const filter = {
+        ...targetFilter,
+        band: filters[replacementIndex].band,
+        reason: isBroadValley
+          ? "Professional broad-valley filter-slot replacement"
+          : "Professional high-resolution filter-slot replacement",
+      };
+      if (isNearDuplicate(filter, withoutReplaced)
+        || countSameSignFiltersInRegion(filter, withoutReplaced) >= 3) continue;
+      const next = filters.map((candidate, index) => index === replacementIndex ? filter : candidate);
+      trials.push({ action: "replace", changedFilterIndex: replacementIndex, filter, filters: next });
     }
   }
   overlappingFilters(region.centre.frequency, filters)
