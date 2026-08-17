@@ -107,9 +107,13 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
         onProjectUpdated && onProjectUpdated(updated);
         onOpenChange(false);
       } else {
+        if (!user?.account_id) {
+          alert("Your Sound Proof account has not yet been linked to an organisation. Please contact Sound Proof support.");
+          return;
+        }
         const created = await Project.create({
           ...payload,
-          account_id: user?.account_id || null,
+          account_id: user.account_id,
           acoustic_treatment_enabled: true,
         });
         setFormData(EMPTY_FORM);
