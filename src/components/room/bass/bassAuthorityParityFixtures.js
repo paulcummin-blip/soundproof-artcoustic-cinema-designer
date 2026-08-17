@@ -10,18 +10,19 @@ import { buildAuthoritativeAutoAlignDelays, buildAuthoritativeBassSources, build
 
 const EXPECTED = {
   rspFrequencies: "6af9d268",
-  rspSpl: "9cc8a1b6",
-  perSeatResponses: "d1ad498d",
+  rspSpl: "ba2b06fd",
+  perSeatResponses: "3ac77ee6",
   fingerprints: {
-    geometry: "geo:v4:6f64e13bf554292d",
-    product: "prod:v4:889cf433492248a5",
-    calibration: "cal:v4:97e304c3930ed2e1",
+    geometry: "geo:v5:09ada8c58c7de343",
+    product: "prod:v5:9bfa08a47dc366ba",
+    calibration: "cal:v5:e3e43ea7391a00d5",
   },
-  // Audited B6.5 golden refresh after the approved v4 authority and fitting
-  // changes. Any future physics, fingerprint, bank, curve or metric drift fails.
-  selectedCandidate: "6b9b2fd5",
-  filterBank: "b1ee05e7",
-  postEqCurve: "c987a3ac",
+  // Audited v5 golden refresh after the approved product-bounded P14,
+  // independent P18 and broad-valley EQ changes. Any future physics,
+  // fingerprint, bank, curve or metric drift fails.
+  selectedCandidate: "3378c260",
+  filterBank: "8dbf7d74",
+  postEqCurve: "6a717ccc",
   parameters: "5c35d9f1",
 };
 
@@ -48,7 +49,7 @@ const APPROVED_AUTHORITY_FIELDS = [
   "perSeatP20Results",
   "p20Label",
 ];
-const PRE_AUTHORITY_SELECTED_CANDIDATE_HASH = "6b9b2fd5";
+const PRE_AUTHORITY_SELECTED_CANDIDATE_HASH = "3378c260";
 
 function withoutApprovedAuthorityFields(candidate) {
   return Object.fromEntries(Object.entries(candidate || {}).filter(([key]) => !APPROVED_AUTHORITY_FIELDS.includes(key)));
@@ -214,8 +215,8 @@ export function runBassAuthorityParityFixtures() {
       name: "B6.6 published P14 follows the position-aware maximum SPL envelope",
       passed: currentAuthority?.p14CapabilityDetails?.positionAware === true
         && movedRspAuthority?.p14CapabilityDetails?.positionAware === true
-        && currentAuthority?.p14CapabilityDetails?.source === "position-aware-authoritative-engine-maximum-spl-envelope-post-eq"
-        && movedRspAuthority?.p14CapabilityDetails?.source === "position-aware-authoritative-engine-maximum-spl-envelope-post-eq"
+        && currentAuthority?.p14CapabilityDetails?.source === "position-aware-envelope-bounded-by-approved-product-capability"
+        && movedRspAuthority?.p14CapabilityDetails?.source === "position-aware-envelope-bounded-by-approved-product-capability"
         && Number.isFinite(positionAwareP14DeltaDb)
         && Math.abs(positionAwareP14DeltaDb) >= 0.05,
     },
