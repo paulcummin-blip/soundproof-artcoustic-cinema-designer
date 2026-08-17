@@ -1,8 +1,8 @@
 import React from "react";
 import {
   deriveDisplayStatus,
-  formatDateRange,
-  formatEndsLabel,
+  isoToDisplayDate,
+  isoToEndDisplayDate,
   PROMOTION_TYPE_LABELS,
   TARGET_SCOPE_LABELS,
   DEALER_GROUP_LABELS,
@@ -90,18 +90,16 @@ export default function PromotionCard({
           </span>
           <StatusBadge status={status} />
         </div>
-        <div style={{ fontSize: 12, color: BRAND.subtext }}>
-          {formatEndsLabel(promotion.ends_at)}
-        </div>
       </div>
 
-      {/* Title + type */}
+      {/* Title + dates */}
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.text }}>
           {PROMOTION_TYPE_LABELS[promotion.promotion_type] || promotion.promotion_type}
         </div>
-        <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 2 }}>
-          {formatDateRange(promotion.starts_at, promotion.ends_at)}
+        <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 4, display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <span>From: <strong style={{ color: BRAND.text }}>{isoToDisplayDate(promotion.starts_at)}</strong></span>
+          <span>To: <strong style={{ color: BRAND.text }}>{isoToEndDisplayDate(promotion.ends_at)}</strong></span>
         </div>
       </div>
 
