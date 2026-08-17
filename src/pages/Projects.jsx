@@ -11,6 +11,8 @@ import { useProjectsSortPreference } from "@/components/projects/useProjectsSort
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { useProfessionalCapacity } from "@/lib/commercial/useProfessionalCapacity";
+import { getAgeDays, formatAge, isAgeReviewDue } from "@/components/utils/projectAge";
+import AgeReviewDialog from "@/components/projects/AgeReviewDialog";
 
 // Build lookup maps from the shared label arrays
 const dolbyLabelMap = Object.fromEntries(dolbyConfigs.map(c => [c.value, c.label]));
@@ -127,6 +129,9 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [sortKey, setSortKey] = useState("recent");
   const [manageOpen, setManageOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [ageReviewProject, setAgeReviewProject] = useState(null);
+  const ageReviewShownThisSession = useRef(false);
 
   // Per-user sort preference (persisted to the signed-in user's profile)
   const { savedSort, loaded: sortPrefLoaded, persistSort } = useProjectsSortPreference();
@@ -197,6 +202,8 @@ export default function ProjectsPage() {
                 createdAt: Number.isFinite(new Date(p.created_date).getTime())
                   ? new Date(p.created_date).getTime()
                   : Date.now(),
+                lifecycleStatus: p.lifecycle_status || "Draft",
+                lastAgeReviewedAt: p.last_age_reviewed_at || null,
                 spl_config: (() => { return safeJson(p.spl_config) || {}; })(),
                 p12_mode: (() => { const c = safeJson(p.spl_config) || {}; return c.p12_mode || null; })(),
                 p12_level: (() => { const c = safeJson(p.spl_config) || {}; return c.p12_level ?? null; })(),
@@ -255,7 +262,14 @@ export default function ProjectsPage() {
   const list = useMemo(() => {
     let items = projects.slice();
 
-    // filter
+    // filter — archived projects are excluded from the active list
+    // unless the user explicitly toggles "Show Archived"
+    items = items.filter((p) => {
+      const isArchived = p.lifecycleStatus === "Archived";
+      return showArchived ? isArchived : !isArchived;
+    });
+
+    // filter by status
     items = items.filter((p) => matchesStatus(p, statusFilter));
 
     // search — project name only (case-insensitive, partial, trimmed)
@@ -288,6 +302,59 @@ export default function ProjectsPage() {
     return m;
   }, [projects]);
 
+  // ---- Age review (200-day) ----
+  useEffect(() => {
+    if (loading || ageReviewProject || ageReviewShownThisSession.current) return;
+    const due = projects.find((p) => {
+      if (p.lifecycleStatus === "Archived") return false;
+      const ageDays = getAgeDays(p.createdAt);
+      return isAgeReviewDue(ageDays, p.lastAgeReviewedAt);
+    });
+    if (due) {
+      setAgeReviewProject(due);
+      ageReviewShownThisSession.current = true;
+    }
+  }, [loading, projects, ageReviewProject]);
+
+  async function handleAgeKeepLive() {
+    if (!ageReviewProject) return;
+    const nowIso = new Date().toISOString();
+    try {
+      await base44.entities.Project.update(ageReviewProject.id, {
+        last_age_reviewed_at: nowIso,
+      });
+      setProjects((arr) =>
+        arr.map((p) =>
+          p.id === ageReviewProject.id
+            ? { ...p, lastAgeReviewedAt: nowIso }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error("[Projects] Failed to stamp age review:", err);
+    }
+    setAgeReviewProject(null);
+  }
+
+  async function handleAgeArchive() {
+    if (!ageReviewProject) return;
+    try {
+      await base44.entities.Project.update(ageReviewProject.id, {
+        lifecycle_status: "Archived",
+      });
+      setProjects((arr) =>
+        arr.map((p) =>
+          p.id === ageReviewProject.id
+            ? { ...p, lifecycleStatus: "Archived" }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error("[Projects] Failed to archive project:", err);
+    }
+    setAgeReviewProject(null);
+  }
+
   // ---- UI bits ----
   function openDialog() {
     // New project — use canonical NewProjectDialog
@@ -308,6 +375,8 @@ export default function ProjectsPage() {
       amplifier_power: newProject.amplifier_power ?? null,
       notes: newProject.notes || "",
       createdAt: new Date(newProject.created_date).getTime(),
+      lifecycleStatus: newProject.lifecycle_status || "Draft",
+      lastAgeReviewedAt: newProject.last_age_reviewed_at || null,
       lcrModel: null, surroundModel: null, heightModel: null,
       subModel: null, subCount: null, screenSizeInches: null, seats: null,
     };
@@ -385,6 +454,8 @@ export default function ProjectsPage() {
           roomWidth: newProject.room_width,
           roomHeight: newProject.room_height,
           createdAt: new Date(newProject.created_date).getTime(),
+          lifecycleStatus: newProject.lifecycle_status || "Draft",
+          lastAgeReviewedAt: newProject.last_age_reviewed_at || null,
           lcrModel: null,
           surroundModel: null,
           heightModel: null,
@@ -679,6 +750,19 @@ export default function ProjectsPage() {
             </div>
           )}
 
+          {(() => {
+            const ageDays = getAgeDays(p.createdAt);
+            if (ageDays == null) return null;
+            const isOld = ageDays >= 100;
+            return (
+              <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 6 }}>
+                <span style={{ fontWeight: isOld ? 700 : 400 }}>
+                  {formatAge(ageDays)}
+                </span>
+              </div>
+            );
+          })()}
+
           <div
             style={{
               marginTop: 10,
@@ -964,6 +1048,24 @@ export default function ProjectsPage() {
           <option value="project_az">Project A–Z</option>
           <option value="project_za">Project Z–A</option>
         </select>
+
+        <button
+          type="button"
+          onClick={() => setShowArchived((v) => !v)}
+          style={{
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: `1px solid ${BRAND.border}`,
+            background: showArchived ? BRAND.btn : BRAND.card,
+            color: showArchived ? BRAND.btnText : BRAND.text,
+            fontSize: 14,
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+          title="Toggle archived projects"
+        >
+          {showArchived ? "Show Active" : "Show Archived"}
+        </button>
       </div>
 
       {/* Created banner */}
@@ -1261,6 +1363,16 @@ export default function ProjectsPage() {
           </div>
         </div>
       )}
+
+      <AgeReviewDialog
+        open={!!ageReviewProject}
+        projectName={ageReviewProject?.name}
+        ageDays={ageReviewProject ? getAgeDays(ageReviewProject.createdAt) : null}
+        brand={BRAND}
+        onKeepLive={handleAgeKeepLive}
+        onArchive={handleAgeArchive}
+        onCancel={() => setAgeReviewProject(null)}
+      />
     </div>
   );
 }

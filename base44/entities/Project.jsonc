@@ -353,7 +353,13 @@
         "Archived"
       ],
       "default": "Draft",
-      "description": "Informational project lifecycle stage for future licensing. Not enforced anywhere yet \u2014 existing projects remain fully editable regardless of value."
+      "description": "Project lifecycle stage. Archived projects are excluded from the active Projects list but remain fully visible to admin and retain all data, Professional Project status, and CapacityLedger entries."
+    },
+    "last_age_reviewed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the last 200-day age review confirmation (Keep Live). Used to suppress repeat review prompts until 100 further days have elapsed. Null = no prior review.",
+      "nullable": true
     },
     "commercial_tier": {
       "type": "string",
