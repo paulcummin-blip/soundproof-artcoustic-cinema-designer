@@ -37,7 +37,12 @@ export function deriveRequestedCalibrationConfig({
   const p18TargetBasis = normalizeP18TargetBasis(splConfig?.selectedP18TargetBasis || splConfig?.p18Mode);
   const requestedLevel = Math.max(1, Math.min(4, Math.round(Number(splConfig?.selectedP14Level) || 4)));
   const target = resolveRequestedRp22HouseCurveTarget(getRp22BassOperatingDefinitions(p14TargetBasis, p18TargetBasis), requestedLevel);
-  const selectedP18RequiredExtensionHz = p18ThresholdHzForLevel(p18TargetBasis, requestedLevel);
+  // P14 and P18 are independent RP22 parameters. P14 is the user's fixed
+  // 20–120 Hz SPL demand; it does not silently request the same numbered P18
+  // level. P18 is graded from the extension actually delivered at that P14
+  // operating output. The only P18 requirement carried here is the selected
+  // basis' L1 floor, used to distinguish a real P18 FAIL from an achieved level.
+  const selectedP18RequiredExtensionHz = p18ThresholdHzForLevel(p18TargetBasis, 1);
   const targetSpl = target.targetAnchorDb;
 
   return {
@@ -49,8 +54,9 @@ export function deriveRequestedCalibrationConfig({
     p18TargetBasis,
     selectedP18TargetBasis: p18TargetBasis,
     selectedP18RequiredExtensionHz,
-    // Compatibility alias: extension is now selected independently by P18 basis.
-    selectedP14RequiredExtensionHz: selectedP18RequiredExtensionHz,
+    // P14 always uses the fixed RP22 LFE assessment band. This identity must
+    // never inherit a P18 extension threshold.
+    selectedP14RequiredExtensionHz: 20,
     requestedAssessmentStartHz: null,
     // Assessment end / transition — real input to generateCandidatePool.
     requestedAssessmentEndHz: transitionHz,
