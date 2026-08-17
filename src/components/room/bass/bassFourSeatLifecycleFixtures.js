@@ -93,10 +93,14 @@ export function runFourSeatBassLifecycleFixture() {
   const canonicalTargets = new Set(pool.candidates.map((entry) => JSON.stringify(entry.productionHouseCurveTarget)));
   const targetValues = Object.fromEntries([20, 30, 40, 80, 120, 200].map((frequency) => [frequency, interpolateCanonicalTarget(candidate?.productionHouseCurveTarget, frequency)]));
   const exactGraphAuthority = candidate?.finalPostEqCurve?.every((point, index) => {
-    const operating = candidate.requestedPreEqOperatingCurve[index];
-    const correction = candidate.combinedEqCurve[index];
-    return operating?.frequency === point.frequency && correction?.frequency === point.frequency
-      && Math.abs(point.spl - (operating.spl + correction.spl)) < 1e-9;
+    const unconstrained = candidate.unconstrainedPostEqCurve[index];
+    if (unconstrained?.frequency !== point.frequency) return false;
+    const expected = Math.min(
+      unconstrained.spl,
+      Number.isFinite(point.maximumSpl) ? point.maximumSpl : Infinity,
+      Number.isFinite(point.productOperatingLimitSpl) ? point.productOperatingLimitSpl : Infinity,
+    );
+    return Math.abs(point.spl - expected) < 1e-9;
   });
   const correctionValues = candidate?.combinedEqCurve?.map((point) => point.spl) || [];
   const graphSeries = buildBassGraphSeries({
@@ -153,7 +157,7 @@ export function runFourSeatBassLifecycleFixture() {
     ["Every candidate carries the identical fixed canonical target", canonicalTargets.size === 1],
     ["P14-normalised target is in the expected fixed range", targetValues[20] >= 112 && targetValues[20] <= 114 && targetValues[200] >= 107 && targetValues[200] <= 109 && targetValues[20] > targetValues[200]],
     ["Selected candidate is physically bank-valid", !!candidate && candidate.bankValidationResult?.allOk === true && candidate.physicalEqAuthorityPassed !== false],
-    ["Final curve equals operating response plus selected correction", exactGraphAuthority],
+    ["Final curve equals requested EQ response capped only by physical room/product envelopes", exactGraphAuthority],
     ["Final response preserves selected candidate identity", finalOptimisedBassResponse?.selectedCandidateId === selected.selectedCandidateId && finalOptimisedBassResponse?.filterBankSignature === selected.filterBankSignature],
     ["Graph series exactly match selected authority", graphSeriesAuthorityExact],
     ["34 Hz peak receives a material cut", interpolateCanonicalTarget(candidate?.combinedEqCurve, 34) <= -5],
