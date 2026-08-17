@@ -6,7 +6,7 @@ const isPositivePower = (value) => value !== null
   && value !== ""
   && Number.isFinite(Number(value))
   && Number(value) > 0;
-const dbToPressure = (db) => Math.pow(10, Number(db) / 20);
+const dbToPower = (db) => Math.pow(10, Number(db) / 10);
 
 export const DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W = 1000;
 
@@ -90,10 +90,16 @@ export function getSystemSourceCapability(activeSubs, frequency, amplifierPowerP
   const amplifier = getPerSubwooferAmplifierAuthority(activeSubs, amplifierPowerPerSubW);
   const levels = (activeSubs || []).map((sub) => interpolateCapabilityCurve(getSubwooferCurve(getModelKey(sub)), frequency));
   if (!levels.length || levels.some((level) => !isFiniteNumber(level))) return null;
-  return 20 * Math.log10(levels.reduce((sum, level, index) => {
+  // Product capability is a power-summed source-domain ceiling. Coherent
+  // pressure summation belongs to the position-aware room transfer, where
+  // phase and path length are explicit. Treating every cabinet as co-located
+  // and perfectly coherent here granted four cabinets +12 dB instead of the
+  // approved +6 dB quantity gain, creating false LF headroom for P18 and EQ.
+  const summedPower = levels.reduce((sum, level, index) => {
     const deratingDb = amplifier.sourceAuthorities[index]?.deratingDb ?? 0;
-    return sum + dbToPressure(level + deratingDb);
-  }, 0));
+    return sum + dbToPower(level + deratingDb);
+  }, 0);
+  return 10 * Math.log10(summedPower);
 }
 
 export function getCurrentSystemSourceOutput(activeSubs) {
