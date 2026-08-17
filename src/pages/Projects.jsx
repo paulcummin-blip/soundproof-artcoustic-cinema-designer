@@ -950,7 +950,7 @@ export default function ProjectsPage() {
                 </div>
               )}
               <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 2 }}>
-                <strong style={{ color: BRAND.text }}>{capacityLoading ? '…' : professionalCapacity}</strong> banked
+                Banked Professional Projects: <strong style={{ color: BRAND.text }}>{capacityLoading ? '…' : professionalCapacity}</strong>
               </div>
             </div>
           )}
