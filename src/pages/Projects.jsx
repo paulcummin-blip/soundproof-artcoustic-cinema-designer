@@ -121,8 +121,8 @@ export default function ProjectsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const { available: professionalCapacity, loading: capacityLoading, refresh: refreshCapacity } = useProfessionalCapacity(user?.account_id, isAdmin);
-  const showCapacityIndicator = !isAdmin && !!user?.account_id;
+  const { available: professionalCapacity, status: capacityStatus, loading: capacityLoading, refresh: refreshCapacity } = useProfessionalCapacity();
+  const showCapacityIndicator = capacityStatus === 'OK';
   const { isEffective: promotionEffective, headline: promoHeadline, message: promoMessage, endsAt: promoEndsAt, loading: promoLoading, refresh: refreshPromotion } = useEffectivePromotion();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);

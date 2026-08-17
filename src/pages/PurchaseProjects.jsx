@@ -24,9 +24,9 @@ export default function PurchaseProjects() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const { isEffective: promotionEffective, endsAt: promoEndsAt } = useEffectivePromotion();
-  const { available: bankedCapacity, loading: capacityLoading } = useProfessionalCapacity(user?.account_id, isAdmin);
+  const { available: bankedCapacity, status: capacityStatus, loading: capacityLoading } = useProfessionalCapacity();
 
-  const showPromotionMessage = !isAdmin && promotionEffective;
+  const showPromotionMessage = capacityStatus === 'OK' && promotionEffective;
 
   return (
     <div

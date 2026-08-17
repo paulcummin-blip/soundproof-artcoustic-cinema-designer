@@ -29,7 +29,7 @@ import PriceSummary from "@/components/pricing/PriceSummary";
 import DesignRatingSummary from "@/components/pricing/DesignRatingSummary";
 import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAuth } from "@/lib/AuthContext";
-import { useEffectivePromotion } from "@/lib/commercial/useEffectivePromotion";
+
 
 const menuItems = [
   { title: "Projects", url: "/Projects", icon: Layers3 },
@@ -42,8 +42,6 @@ export default function Layout({ children, currentPageName }) {
   const activeProjectId = useActiveProjectId();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const { isEffective: promotionEffective, headline: promoHeadline } = useEffectivePromotion();
-  const showSidebarPromo = !isAdmin && promotionEffective;
   
   // Price summary state (read from window.__ROOM_DESIGNER_PRICE__ set by RoomDesigner)
   const [priceSummary, setPriceSummary] = React.useState({
@@ -288,25 +286,6 @@ export default function Layout({ children, currentPageName }) {
                   )}
                 </div>
 
-                {/* P3: Compact promotion note — only when an effective unlimited promotion applies */}
-                {showSidebarPromo && (
-                  <div style={{
-                    marginTop: 8,
-                    marginLeft: 12,
-                    marginRight: 12,
-                    padding: "6px 10px",
-                    borderLeft: "3px solid #213428",
-                    background: "#F3F0EB",
-                    borderRadius: 4,
-                  }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#213428" }}>
-                      Promotion active
-                    </div>
-                    <div style={{ fontSize: 11, color: "#3E4349", marginTop: 2 }}>
-                      {promoHeadline || "Unlimited Professional Projects"}
-                    </div>
-                  </div>
-                )}
                 </div>
                 </nav>
 
