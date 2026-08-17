@@ -24,6 +24,7 @@ console.log(JSON.stringify({
       rspRmsWorsening: candidate.broadValleyRebalance.verification.rspRmsWorsening,
       bestValleySample: candidate.broadValleyRebalance.verification.bestValleySample,
       bestAppendedSample: candidate.broadValleyRebalance.verification.bestAppendedSample,
+      bestAppendedCutOnlySample: candidate.broadValleyRebalance.verification.bestAppendedCutOnlySample,
     } : null,
   },
 }, null, 2));
