@@ -223,7 +223,8 @@ export function buildProductOperatingEnvelope({
   }
   const curve = capabilities.map((point) => {
     const targetSpl = interpolateCorrection(targetCurve, point.frequency);
-    const relativeProductLimitDb = point.capabilityDb - referenceCapabilityDb + operatingHeadroomDb;
+    const relativeProductLimitDb = point.capabilityDb - referenceCapabilityDb
+      + operatingHeadroomDb - MAXIMUM_SPL_SAFETY_MARGIN_DB;
     return {
       frequency: point.frequency,
       spl: Number.isFinite(targetSpl) ? targetSpl + relativeProductLimitDb : point.capabilityDb,
