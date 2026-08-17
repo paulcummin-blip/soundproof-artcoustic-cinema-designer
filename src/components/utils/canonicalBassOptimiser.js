@@ -368,13 +368,25 @@ function buildCanonicalCandidate({
   perSeatRawCurves, perSeatMaximumSplCurves, eq, domains, targetCurve, targetShape,
   verticalOffsetDb, protectedNullRegions, baseRequestedSystemOutputDb,
   operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb,
-  operatingOutputDiagnostics, pairedAuthorityInputs,
+  operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis,
 }) {
   const requestedPreEqCurve = (levelNormalisedRawCurve || []).map((point) => ({ ...point }));
   const achievedPreEqCurve = capCurveToEnvelope(requestedPreEqCurve, maximumSplCurveBeforeEq);
   const maximumAfterEq = buildMaximumSplCurveAfterEq(maximumSplCurveBeforeEq);
   const unconstrainedPostEqCurve = (eq.curve || []).map((point) => ({ ...point }));
-  const finalPostEqCurve = capCurveToEnvelope(unconstrainedPostEqCurve, maximumAfterEq.curve);
+  const productOperatingEnvelope = buildProductOperatingEnvelope({
+    frequencyGrid: unconstrainedPostEqCurve.map((point) => point.frequency),
+    targetCurve,
+    activeSubs,
+    combinedEqCurve: eq.combinedEqCurve || [],
+    selectedOperatingOutputDb,
+    targetBasis: p14TargetBasis,
+  });
+  const roomEnvelopeLimitedPostEqCurve = capCurveToEnvelope(unconstrainedPostEqCurve, maximumAfterEq.curve);
+  const finalPostEqCurve = capCurveToProductOperatingEnvelope(
+    roomEnvelopeLimitedPostEqCurve,
+    productOperatingEnvelope.curve,
+  );
   // Candidate authority judges the response that can actually be delivered.
   // The fitter's requested curve may use local positive EQ up to the fixed
   // product-plus-room ceiling; anything above that ceiling is capability
@@ -401,9 +413,12 @@ function buildCanonicalCandidate({
   const maximumSeatById = new Map(maximumPerSeatAfterEqCurves.map((seat) => [seat.seatId, seat]));
   const perSeatPostEqCurves = requestedPerSeatPostEqCurves.map((seat) => ({
     ...seat,
-    responseData: capCurveToEnvelope(
-      seat.responseData,
-      maximumSeatById.get(seat.seatId)?.responseData || [],
+    responseData: capCurveToProductOperatingEnvelope(
+      capCurveToEnvelope(
+        seat.responseData,
+        maximumSeatById.get(seat.seatId)?.responseData || [],
+      ),
+      productOperatingEnvelope.curve,
     ),
   }));
   const seatsForMetrics = perSeatPostEqCurves.length
@@ -439,6 +454,10 @@ function buildCanonicalCandidate({
     rawResponseCurve: rawCurve.map((point) => ({ ...point })),
     maximumSplCurveBeforeEq: (maximumSplCurveBeforeEq || []).map((point) => ({ ...point })),
     maximumSplCurveAfterEq: maximumAfterEq.curve.map((point) => ({ ...point })),
+    productOperatingEnvelopeCurve: productOperatingEnvelope.curve.map((point) => ({ ...point })),
+    productOperatingEnvelopeAuthority: productOperatingEnvelope.authority || null,
+    productOperatingHeadroomDb: productOperatingEnvelope.operatingHeadroomDb,
+    productOperatingReferenceCapabilityDb: productOperatingEnvelope.referenceCapabilityDb,
     maximumSplSafetyMarginDb: MAXIMUM_SPL_SAFETY_MARGIN_DB,
     maximumSplGlobalEqTrimDb: maximumAfterEq.globalEqTrimDb,
     maximumSplAuthority: {
