@@ -1,6 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { computeLastActivity } from "@/lib/commercial/commercialOverview";
 import GroupPromotionArea from "@/components/admin/promotions/GroupPromotionArea";
+import {
+  isEffective,
+  promotionBelongsToGroup,
+} from "@/components/admin/promotions/promotionStatus";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -74,6 +78,8 @@ const COLUMNS = [
     getSortValue: (a, ctx) => ctx.capacityMap?.get(a.id)?.remaining ?? null },
   { key: "projects", label: "Projects", align: "right",
     getSortValue: (a, ctx) => ctx.projectMap?.get(a.id)?.count ?? 0 },
+  { key: "promoProjects", label: "Promo Projects", align: "right",
+    getSortValue: (a, ctx) => ctx.promoUsageMap?.get(a.id) ?? 0 },
   { key: "lastActivity", label: "Last Activity", align: "left",
     getSortValue: (a, ctx) => {
       const p = ctx.projectMap?.get(a.id);
@@ -174,7 +180,25 @@ export default function AccountGroupSection({
   const [sortKey, setSortKey] = useState("dealer");
   const [sortDir, setSortDir] = useState("asc");
 
-  const ctx = useMemo(() => ({ turnoverMap, capacityMap, projectMap }), [turnoverMap, capacityMap, projectMap]);
+  // Build per-account promo usage map for the CURRENT active promotion in this group.
+  // Authority: PromotionUsage records — not Project count, not CapacityLedger.
+  // Promo Projects is a usage/engagement metric that persists even if the
+  // underlying Project is later cleaned up (abuse-monitoring rule).
+  const promoUsageMap = useMemo(() => {
+    const map = new Map();
+    if (!groupKey || !promotions || !promotionUsage) return map;
+    const activePromo = promotions
+      .filter(p => promotionBelongsToGroup(p, groupKey, allAccounts))
+      .find(p => isEffective(p));
+    if (!activePromo) return map;
+    for (const u of promotionUsage) {
+      if (u.promotion_id !== activePromo.id) continue;
+      map.set(u.account_id, (map.get(u.account_id) || 0) + 1);
+    }
+    return map;
+  }, [groupKey, promotions, promotionUsage, allAccounts]);
+
+  const ctx = useMemo(() => ({ turnoverMap, capacityMap, projectMap, promoUsageMap }), [turnoverMap, capacityMap, projectMap, promoUsageMap]);
 
   const sortedAccounts = useMemo(() => {
     if (!accounts || accounts.length === 0) return [];
@@ -188,14 +212,14 @@ export default function AccountGroupSection({
       setSortDir(prev => prev === "asc" ? "desc" : "asc");
     } else {
       setSortKey(key);
-      const isNumericOrDate = ["turnover", "rewarded", "purchased", "used", "available", "projects", "lastActivity"].includes(key);
+      const isNumericOrDate = ["turnover", "rewarded", "purchased", "used", "available", "projects", "promoProjects", "lastActivity"].includes(key);
       setSortDir(isNumericOrDate ? "desc" : "asc");
     }
   }
 
   // Wider Projects (0.9fr) and Last Activity (1.3fr) with explicit padding
   // for clear visual separation between the two columns.
-  const commercialGrid = "1.8fr 1fr 0.7fr 0.7fr 0.7fr 0.7fr 0.9fr 1.3fr 0.7fr 70px";
+  const commercialGrid = "1.8fr 1fr 0.7fr 0.7fr 0.7fr 0.7fr 0.9fr 0.8fr 1.3fr 0.7fr 70px";
   const simpleGrid = "2fr 1fr 1fr 1fr 70px";
 
   // Explicit padding to create breathing room between Projects and Last Activity
@@ -264,7 +288,7 @@ export default function AccountGroupSection({
               borderBottom: `1px solid ${BRAND.border}`,
               fontSize: 10, fontWeight: 700, color: BRAND.subtext,
               letterSpacing: "0.05em", textTransform: "uppercase",
-              minWidth: 1180,
+              minWidth: 1240,
             }}>
               {COLUMNS.map((col, idx) => {
                 const isProjects = col.key === "projects";
@@ -344,6 +368,9 @@ export default function AccountGroupSection({
                     </div>
                     <div style={{ textAlign: "right", color: BRAND.subtext, ...projectsCellPadding }}>
                       {proj.count}
+                    </div>
+                    <div style={{ textAlign: "right", fontWeight: 600, color: BRAND.green }}>
+                      {promoUsageMap.get(acc.id) || 0}
                     </div>
                     <div style={{ color: BRAND.subtext, fontSize: 11, whiteSpace: "nowrap", ...lastActivityCellPadding }}>
                       {formatDate(lastActivity)}
