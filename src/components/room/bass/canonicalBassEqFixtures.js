@@ -181,10 +181,11 @@ export function runCanonicalBassEqFixtures() {
         && feasibleWindow.maximumResidualDb + feasibleWindow.requestedOffsetDb <= 15.000001,
     },
     {
-      name: "A dominant modal peak cannot pull correctable low frequencies below the boost window",
+      name: "An infeasible response is balanced between the maximum safe boost and cut",
       passed: !peakDominatedWindow.feasible
-        && Math.abs(peakDominatedWindow.minimumResidualDb + peakDominatedWindow.requestedOffsetDb + 6) <= 0.000001
-        && peakDominatedWindow.requestedOffsetDb > peakDominatedWindow.upperOffsetBoundDb,
+        && peakDominatedWindow.selectionMode === "balanced-unreachable-residual"
+        && Math.abs(peakDominatedWindow.requestedOffsetDb - peakDominatedWindow.balancedInfeasibleOffsetDb) <= 0.000001
+        && Math.abs(peakDominatedWindow.irreducibleShortfallDb - peakDominatedWindow.irreducibleExcessDb) <= 0.000001,
     },
     {
       name: "A protected narrow null does not change the global operating-level anchor",
@@ -197,10 +198,11 @@ export function runCanonicalBassEqFixtures() {
         && fullBandOperatingWindow.assessmentSmoothing === "none",
     },
     {
-      name: "A useful 125 Hz room valley is not sacrificed by a 20–120-only operating trim",
-      passed: fullBandOperatingWindow.requestedOffsetDb > p19OnlyOperatingWindow.requestedOffsetDb + 10
-        && fullBandBestCase125ResidualDb >= -0.05
-        && p19OnlyBestCase125ResidualDb < -10,
+      name: "A useful 125 Hz room valley is balanced against the remaining broad peak excess",
+      passed: fullBandOperatingWindow.requestedOffsetDb > p19OnlyOperatingWindow.requestedOffsetDb + 5
+        && p19OnlyBestCase125ResidualDb < -10
+        && fullBandBestCase125ResidualDb > p19OnlyBestCase125ResidualDb + 5
+        && Math.abs(fullBandOperatingWindow.irreducibleShortfallDb - fullBandOperatingWindow.irreducibleExcessDb) <= 0.000001,
     },
     {
       name: "A detected deep modal null does not pin the complete response to maximum capability",
