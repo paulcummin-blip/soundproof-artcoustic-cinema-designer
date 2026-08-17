@@ -20,7 +20,7 @@ const physicalInputs = {
   rawCurve,
   activeSubs: [{ id: "sub-1", modelKey: "SUB2-12" }],
   usableLfHz: 20,
-  transitionHz: 120,
+  transitionHz: 163.3,
   correctionEndHz: 200,
   perSeatRawCurves: [seatCurve("seat-1", -0.6), seatCurve("seat-2", 0.8)],
 };
@@ -114,7 +114,7 @@ export function runCanonicalBassEqFixtures() {
       seatingPositions: [{ id: "seat-1", x: 1.5, y: 3, z: 1.2 }, { id: "seat-2", x: 2.5, y: 3, z: 1.2 }],
       sources: [{ id: "sub-1", modelKey: "SUB2-12", x: 1, y: 0.5, z: 0.3 }],
       houseCurveFingerprint: "artcoustic-shape-v1", eqConstraints: { maxBoostDb: 6, maxCutDb: 15 },
-      assessmentStartHz: 20, assessmentEndHz: 200, optimisationTransitionHz: 120, usableLfHz: 20,
+      assessmentStartHz: 20, assessmentEndHz: 200, optimisationTransitionHz: 163.3, usableLfHz: 20,
       selectedP14TargetDb: requestedTargetSplDb,
       p14TargetBasis: targetBasis,
       p14TargetLevel: requestedLevel,
@@ -131,6 +131,7 @@ export function runCanonicalBassEqFixtures() {
       canonicalTargetShapeSignature: buildCurveSignature((candidate?.canonicalHouseCurveShape || []).map((point) => ({ frequency: point.frequency, spl: point.offsetDb }))),
       canonicalVerticalOffsetDb: candidate?.canonicalVerticalOffsetDb ?? null,
       operatingLevelOffsetDb: pool.operatingLevelOffsetDb ?? null,
+      assessmentEndHz: candidate?.assessmentEndHz ?? null,
       capabilityLimitedPointCount: candidate?.capabilityLimitedPointCount ?? null,
       matchesPreviousProductionAnchor: candidate?.canonicalVerticalOffsetDb === previousProductionAnchorDb,
     };
@@ -169,6 +170,10 @@ export function runCanonicalBassEqFixtures() {
     { name: "Target identity participates in the calibration fingerprint", passed: targetIdentityChanges },
     { name: "Minimum L1 and Recommended L4 produce different achieved responses when headroom changes", passed: targetDependentHeadroomResponse },
     { name: "Minimum L1 retains more headroom than Recommended L4", passed: minimumL1.capabilityLimitedPointCount < recommendedL4.capabilityLimitedPointCount },
+    {
+      name: "P19/P20 candidate assessment ends at the calculated transition frequency",
+      passed: levels.every((entry) => Math.abs(entry.assessmentEndHz - physicalInputs.transitionHz) <= 0.000001),
+    },
     {
       name: "A feasible broad response is placed inside the available boost and cut window",
       passed: feasibleWindow.feasible
