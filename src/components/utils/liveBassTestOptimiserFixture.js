@@ -90,9 +90,7 @@ function summariseCandidate(selected, targetDb) {
       : null,
     p18Hz: p18?.achievedExtensionHz ?? null,
     p18IndependentLevel: p18Grade.level,
-    p18Level: Number.isFinite(candidate.productOperatingMarginDb) && candidate.productOperatingMarginDb >= 0
-      ? p18Grade.level
-      : 0,
+    p18Level: p18Grade.level,
     p19Db: p19?.variationDbRaw ?? null,
     p19DisplayDb: p19?.displayVariationDb ?? null,
     p19Level: p19?.level ?? null,
@@ -205,8 +203,8 @@ export function runLiveBassTestOptimiserFixture(requestedTargets = [109, 115, 12
       passed: byTarget[109].p18Hz < byTarget[115].p18Hz && byTarget[115].p18Hz < byTarget[123].p18Hz,
     },
     {
-      name: "P18 is not awarded when the selected P14 operating level itself fails",
-      passed: byTarget[123].p18IndependentLevel > 0 && byTarget[123].p18Level === 0,
+      name: "P18 remains independently graded when P14 itself fails",
+      passed: byTarget[123].p18IndependentLevel === 2 && byTarget[123].p18Level === 2,
     },
     {
       name: "P19 fit degrades materially near and beyond the product envelope",
