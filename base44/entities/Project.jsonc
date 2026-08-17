@@ -443,7 +443,19 @@
     "read": {
       "$or": [
         {
-          "data.account_id": "{{user.data.account_id}}"
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            }
+          ]
         },
         {
           "user_condition": {
@@ -455,7 +467,19 @@
     "create": {
       "$or": [
         {
-          "data.account_id": "{{user.data.account_id}}"
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            }
+          ]
         },
         {
           "user_condition": {
@@ -467,7 +491,19 @@
     "update": {
       "$or": [
         {
-          "data.account_id": "{{user.data.account_id}}"
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            }
+          ]
         },
         {
           "user_condition": {
@@ -479,7 +515,19 @@
     "delete": {
       "$or": [
         {
-          "data.account_id": "{{user.data.account_id}}"
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            }
+          ]
         },
         {
           "user_condition": {
