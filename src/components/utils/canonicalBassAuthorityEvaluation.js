@@ -190,31 +190,31 @@ export function evaluateCanonicalBassAuthority({
     configuredUsableLfHz: usableLfHz,
   });
   const extensionShapePass = extensionAssessment?.passes ?? null;
-  const requestedP18Pass = requestedP14Pass == null || extensionShapePass == null
-    ? null
-    : requestedP14Pass && extensionShapePass;
+  // P18 is independently graded from the achieved -3 dB point at the selected
+  // operating output. A P14 shortfall must not erase a physically achieved P18
+  // result: the combined P14 + P18 envelope may fail, while P18 still publishes
+  // its own RP22 level.
+  const requestedP18Pass = extensionShapePass;
   const p18RequiredExtensionAssessment = extensionAssessment ? {
     ...extensionAssessment,
     extensionShapePass,
     p14CapabilityPass: requestedP14Pass,
-    conditionalOnP14: true,
+    conditionalOnP14: false,
     passes: requestedP18Pass,
-    failureReason: requestedP14Pass === false
-      ? "p14-capability-below-selected-target"
-      : (extensionShapePass === false ? "target-relative-extension-shortfall" : null),
+    failureReason: extensionShapePass === false ? "target-relative-extension-shortfall" : null,
   } : null;
   const achievedP18FrequencyHz = extensionAssessment?.achievedExtensionHz ?? null;
   const independentP18Assessment = assessP18Extension(achievedP18FrequencyHz, selectedP18TargetBasis);
-  // Extension only earns a level when it is available at the selected P14 output.
-  const achievedP18Level = requestedP14Pass === true ? (independentP18Assessment.level ?? 0) : 0;
+  const achievedP18Level = independentP18Assessment.level ?? 0;
   const p18 = extensionAssessment ? {
     ...extensionAssessment,
     ...independentP18Assessment,
     value: achievedP18FrequencyHz,
     level: achievedP18Level > 0 ? `L${achievedP18Level}` : null,
     targetBasis: selectedP18TargetBasis,
-    qualifiedAtSelectedP14Output: requestedP14Pass === true,
-    source: "selected-p14-output-target-relative-rsp-extension-one-third-octave",
+    gradedIndependentlyFromP14: true,
+    p14CapabilityPass: requestedP14Pass,
+    source: "selected-output-target-relative-rsp-extension-one-third-octave",
   } : null;
   const postEqCapabilityAssessment = buildPostEqBassCapabilityOutcome({
     authority: { selectedTargetBasis: p14TargetBasis },
