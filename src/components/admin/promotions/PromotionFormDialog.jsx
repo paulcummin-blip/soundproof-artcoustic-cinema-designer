@@ -7,6 +7,10 @@ import {
   isoToEndDateInput,
   DEALER_GROUP_OPTIONS,
   PROMOTION_TYPE_LABELS,
+  buildPromotionSummary,
+  deriveDisplayStatus,
+  formatDateRange,
+  DEALER_GROUP_LABELS,
 } from "./promotionStatus";
 
 const BRAND = {
@@ -48,6 +52,7 @@ export default function PromotionFormDialog({
   open,
   promotion,
   allAccounts,
+  allPromotions,
   usageCount,
   onSaved,
   onClose,
@@ -55,6 +60,7 @@ export default function PromotionFormDialog({
   const isEdit = !!promotion;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [templateId, setTemplateId] = useState("");
 
   const [name, setName] = useState("");
   const [headline, setHeadline] = useState("");
@@ -71,8 +77,50 @@ export default function PromotionFormDialog({
   const [origTargetScope, setOrigTargetScope] = useState(null);
   const [origPromotionType, setOrigPromotionType] = useState(null);
 
+  // Sorted template promotions (all statuses, most recent first by created_date)
+  const templatePromotions = useMemo(() => {
+    if (!allPromotions || !Array.isArray(allPromotions)) return [];
+    return [...allPromotions].sort((a, b) => {
+      const aDate = a.created_date ? new Date(a.created_date).getTime() : 0;
+      const bDate = b.created_date ? new Date(b.created_date).getTime() : 0;
+      return bDate - aDate;
+    });
+  }, [allPromotions]);
+
+  // Apply a template: prefill the form from an existing promotion.
+  // This is a template only — the source record is never modified.
+  function applyTemplate(sourcePromo) {
+    if (!sourcePromo) {
+      setTemplateId("");
+      setName("");
+      setHeadline("");
+      setMessage("");
+      setPromotionType("UNLIMITED_PRO_PROJECTS");
+      setTargetScope("ALL_DEALER_GROUP");
+      setTargetDealerGroup("PREMIUM_PARTNER");
+      setTargetAccountId("");
+      setStartDate("");
+      setEndDate("");
+      setStatus("DRAFT");
+      return;
+    }
+    setTemplateId(sourcePromo.id);
+    setName((sourcePromo.name || "Promotion") + " — Copy");
+    setHeadline(sourcePromo.headline || "");
+    setMessage(sourcePromo.message || "");
+    setPromotionType(sourcePromo.promotion_type || "UNLIMITED_PRO_PROJECTS");
+    setTargetScope(sourcePromo.target_scope || "ALL_DEALER_GROUP");
+    setTargetDealerGroup(sourcePromo.target_dealer_group || "PREMIUM_PARTNER");
+    setTargetAccountId(sourcePromo.target_account_id || "");
+    setStartDate(isoToStartDateInput(sourcePromo.starts_at));
+    setEndDate(isoToEndDateInput(sourcePromo.ends_at));
+    // Copied promotions always default to DRAFT — never auto-activate.
+    setStatus("DRAFT");
+  }
+
   useEffect(() => {
     if (!open) return;
+    setTemplateId("");
     if (promotion) {
       setName(promotion.name || "");
       setHeadline(promotion.headline || "");

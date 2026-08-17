@@ -200,6 +200,32 @@ export function getEligibleAccounts(accounts, promotion) {
 }
 
 /**
+ * Build a compact one-line summary for a promotion, suitable for dropdown
+ * option labels in the template selector.
+ * Format: "Unlimited Professional Projects — Premium Partners — 17 Aug 2026 – 31 Dec 2026 (Active)"
+ *
+ * @param {object} promo - Promotion record
+ * @param {Array} [allAccounts] - Account[] for resolving single-account target names
+ * @returns {string}
+ */
+export function buildPromotionSummary(promo, allAccounts) {
+  if (!promo) return "";
+  const typeLabel = PROMOTION_TYPE_LABELS[promo.promotion_type] || promo.promotion_type || "Promotion";
+  let targetLabel = "—";
+  if (promo.target_scope === "ALL_DEALER_GROUP") {
+    targetLabel = DEALER_GROUP_LABELS[promo.target_dealer_group] || promo.target_dealer_group || "—";
+  } else if (promo.target_scope === "SINGLE_ACCOUNT") {
+    const acct = allAccounts?.find((a) => a.id === promo.target_account_id);
+    targetLabel = acct?.name || "Single Account";
+  } else if (promo.target_scope === "DISTRIBUTOR_DOWNSTREAM") {
+    targetLabel = "Distributor Downstream";
+  }
+  const dateRange = formatDateRange(promo.starts_at, promo.ends_at);
+  const status = deriveDisplayStatus(promo);
+  return `${typeLabel} — ${targetLabel} — ${dateRange} (${status})`;
+}
+
+/**
  * Determine if a promotion belongs to a given dealer group section.
  * Used to place promotions under the correct group heading.
  */
