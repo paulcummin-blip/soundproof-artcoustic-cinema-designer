@@ -71,6 +71,26 @@ export function buildProjectActivityMap(projects) {
 }
 
 /**
+ * Compute the most recent meaningful activity for an account.
+ * Returns MAX(Account.last_access_at, latest Project.updated_date) or null.
+ * Caller displays "—" when null is returned — do not fabricate dates
+ * merely because the Account was bootstrapped.
+ */
+export function computeLastActivity(projectMapEntry, account) {
+  const projectLast = projectMapEntry?.lastActivity || null;
+  const accountLast = account?.last_access_at || null;
+  if (!projectLast && !accountLast) return null;
+  if (!projectLast) return accountLast;
+  if (!accountLast) return projectLast;
+  try {
+    return new Date(projectLast).getTime() >= new Date(accountLast).getTime()
+      ? projectLast : accountLast;
+  } catch {
+    return projectLast || accountLast || null;
+  }
+}
+
+/**
  * Build a Map of account_id → aggregated CapacityLedger breakdown.
  */
 export function buildCapacityBreakdownMap(ledgerEntries) {

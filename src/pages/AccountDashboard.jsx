@@ -5,6 +5,7 @@ import { normalizeStatusId, getStatusLabel } from "@/components/projects/statusD
 import { aggregateCapacityBreakdown } from "@/lib/commercial/capacityService";
 import { aggregateTurnoverForYear } from "@/lib/commercial/commercialOverview";
 import CommercialSummaryCard from "@/components/admin/commercial/CommercialSummaryCard";
+import AccountStatusActions from "@/components/admin/commercial/AccountStatusActions";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -230,6 +231,12 @@ export default function AccountDashboard() {
             turnover={turnover}
             projectCount={projects.length}
             calendarYear={CALENDAR_YEAR}
+          />
+
+          {/* Admin status controls */}
+          <AccountStatusActions
+            account={account}
+            onStatusChanged={(updated) => setAccount(updated)}
           />
 
           {/* Projects table */}

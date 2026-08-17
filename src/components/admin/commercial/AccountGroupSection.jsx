@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { computeLastActivity } from "@/lib/commercial/commercialOverview";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -54,7 +55,6 @@ function formatGbp(val) {
 }
 
 // ---- Sortable column definitions ----
-// Each column: key, label, align, getSortValue(account, ctx) => number|string|date-string|null
 const COLUMNS = [
   { key: "dealer", label: "Dealer", align: "left",
     getSortValue: (a) => (a.name || "").toLowerCase() },
@@ -72,21 +72,17 @@ const COLUMNS = [
   { key: "available", label: "Available", align: "right",
     getSortValue: (a, ctx) => ctx.capacityMap?.get(a.id)?.remaining ?? null },
   { key: "projects", label: "Projects", align: "right",
-    getSortValue: (a, ctx) => {
-      const p = ctx.projectMap?.get(a.id);
-      return p?.count ?? 0;
-    } },
+    getSortValue: (a, ctx) => ctx.projectMap?.get(a.id)?.count ?? 0 },
   { key: "lastActivity", label: "Last Activity", align: "left",
     getSortValue: (a, ctx) => {
       const p = ctx.projectMap?.get(a.id);
-      const v = p?.lastActivity || a.last_access_at || null;
-      return v; // ISO string or null
+      return computeLastActivity(p, a);
     } },
   { key: "status", label: "Status", align: "left",
     getSortValue: (a) => (a.status || "").toLowerCase() },
 ];
 
-// Comparator that always places missing/null values last, regardless of direction.
+// Comparator — missing values always sort last, regardless of direction.
 function makeComparator(sortKey, sortDir, ctx) {
   const col = COLUMNS.find(c => c.key === sortKey);
   if (!col) return null;
@@ -99,47 +95,35 @@ function makeComparator(sortKey, sortDir, ctx) {
     const aMissing = av === null || av === undefined || av === "";
     const bMissing = bv === null || bv === undefined || bv === "";
 
-    // Missing always last, regardless of direction.
     if (aMissing && bMissing) return 0;
     if (aMissing) return 1;
     if (bMissing) return -1;
 
     if (isDate) {
-      const at = new Date(av).getTime();
-      const bt = new Date(bv).getTime();
-      return (at - bt) * dir;
+      return (new Date(av).getTime() - new Date(bv).getTime()) * dir;
     }
     if (typeof av === "number" && typeof bv === "number") {
       return (av - bv) * dir;
     }
-    // String compare
     return String(av).localeCompare(String(bv)) * dir;
   };
 }
 
-// Understated sort indicator
+// Simple text-style sort indicator: - ^ v
 function SortIndicator({ active, dir }) {
-  if (!active) {
-    return (
-      <span style={{
-        marginLeft: 4, fontSize: 8, color: BRAND.border,
-        lineHeight: 1, display: "inline-block", verticalAlign: "middle",
-      }}>
-        ↕
-      </span>
-    );
-  }
+  const glyph = !active ? "-" : dir === "desc" ? "v" : "^";
   return (
     <span style={{
-      marginLeft: 4, fontSize: 8, color: BRAND.subtext,
+      marginLeft: 4, fontSize: 9, fontWeight: 600,
+      color: active ? BRAND.subtext : BRAND.border,
       lineHeight: 1, display: "inline-block", verticalAlign: "middle",
     }}>
-      {dir === "desc" ? "▼" : "▲"}
+      {glyph}
     </span>
   );
 }
 
-function SortableHeader({ col, active, dir, onClick }) {
+function SortableHeader({ col, active, dir, onClick, style }) {
   return (
     <div
       onClick={onClick}
@@ -149,6 +133,7 @@ function SortableHeader({ col, active, dir, onClick }) {
         textAlign: col.align,
         transition: "color 0.12s",
         whiteSpace: "nowrap",
+        ...style,
       }}
       onMouseEnter={e => { e.currentTarget.style.color = BRAND.text; }}
       onMouseLeave={e => { e.currentTarget.style.color = ""; }}
@@ -163,15 +148,8 @@ function SortableHeader({ col, active, dir, onClick }) {
  * Reusable commercial account group section for the Commercial Control Centre.
  *
  * Props:
- * - title: string (e.g. "Premium Partners")
- * - subtitle: string (optional, e.g. "25 accounts")
- * - accounts: Account[]
- * - turnoverMap: Map<account_id, number>
- * - capacityMap: Map<account_id, breakdown>
- * - projectMap: Map<account_id, { count, lastActivity }>
- * - emptyMessage: string (shown when accounts is empty)
- * - showCommercialColumns: boolean (default true) — whether to show capacity/turnover columns
- * - accentColor: string (left border accent)
+ * - title, subtitle, accounts, turnoverMap, capacityMap, projectMap
+ * - emptyMessage, showCommercialColumns, accentColor
  */
 export default function AccountGroupSection({
   title,
@@ -186,7 +164,6 @@ export default function AccountGroupSection({
 }) {
   const count = accounts?.length || 0;
 
-  // Sort state — default Dealer A–Z
   const [sortKey, setSortKey] = useState("dealer");
   const [sortDir, setSortDir] = useState("asc");
 
@@ -204,15 +181,19 @@ export default function AccountGroupSection({
       setSortDir(prev => prev === "asc" ? "desc" : "asc");
     } else {
       setSortKey(key);
-      // Sensible default direction per column type
       const isNumericOrDate = ["turnover", "rewarded", "purchased", "used", "available", "projects", "lastActivity"].includes(key);
       setSortDir(isNumericOrDate ? "desc" : "asc");
     }
   }
 
-  // Wider Projects (0.95fr) and Last Activity (1.15fr) for clear separation
-  const commercialGrid = "1.8fr 1fr 0.7fr 0.7fr 0.7fr 0.7fr 0.95fr 1.15fr 0.7fr 70px";
+  // Wider Projects (0.9fr) and Last Activity (1.3fr) with explicit padding
+  // for clear visual separation between the two columns.
+  const commercialGrid = "1.8fr 1fr 0.7fr 0.7fr 0.7fr 0.7fr 0.9fr 1.3fr 0.7fr 70px";
   const simpleGrid = "2fr 1fr 1fr 1fr 70px";
+
+  // Explicit padding to create breathing room between Projects and Last Activity
+  const projectsCellPadding = { paddingRight: 28 };
+  const lastActivityCellPadding = { paddingLeft: 20 };
 
   return (
     <div style={{ marginBottom: 28 }}>
@@ -265,17 +246,24 @@ export default function AccountGroupSection({
               borderBottom: `1px solid ${BRAND.border}`,
               fontSize: 10, fontWeight: 700, color: BRAND.subtext,
               letterSpacing: "0.05em", textTransform: "uppercase",
-              minWidth: 1120,
+              minWidth: 1180,
             }}>
-              {COLUMNS.map(col => (
-                <SortableHeader
-                  key={col.key}
-                  col={col}
-                  active={sortKey === col.key}
-                  dir={sortDir}
-                  onClick={() => handleSort(col.key)}
-                />
-              ))}
+              {COLUMNS.map((col, idx) => {
+                const isProjects = col.key === "projects";
+                const isLastActivity = col.key === "lastActivity";
+                const extraStyle = isProjects ? projectsCellPadding
+                  : isLastActivity ? lastActivityCellPadding : {};
+                return (
+                  <SortableHeader
+                    key={col.key}
+                    col={col}
+                    active={sortKey === col.key}
+                    dir={sortDir}
+                    onClick={() => handleSort(col.key)}
+                    style={extraStyle}
+                  />
+                );
+              })}
               <div></div>
             </div>
           ) : (
@@ -302,7 +290,7 @@ export default function AccountGroupSection({
                 const cap = capacityMap?.get(acc.id) || null;
                 const turnover = turnoverMap?.get(acc.id);
                 const proj = projectMap?.get(acc.id) || { count: 0, lastActivity: null };
-                const lastActivity = proj.lastActivity || acc.last_access_at || null;
+                const lastActivity = computeLastActivity(proj, acc);
 
                 return (
                   <div
@@ -312,7 +300,7 @@ export default function AccountGroupSection({
                       gridTemplateColumns: commercialGrid,
                       padding: "12px 14px",
                       borderBottom: i < count - 1 ? `1px solid ${BRAND.border}` : "none",
-                      fontSize: 12, alignItems: "center", minWidth: 1120,
+                      fontSize: 12, alignItems: "center", minWidth: 1180,
                       transition: "background 0.15s",
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = "rgb(248 248 247)"}
@@ -336,10 +324,10 @@ export default function AccountGroupSection({
                     <div style={{ textAlign: "right", fontWeight: 700, color: BRAND.text }}>
                       {cap?.remaining ?? 0}
                     </div>
-                    <div style={{ textAlign: "right", color: BRAND.subtext }}>
+                    <div style={{ textAlign: "right", color: BRAND.subtext, ...projectsCellPadding }}>
                       {proj.count}
                     </div>
-                    <div style={{ color: BRAND.subtext, fontSize: 11, whiteSpace: "nowrap" }}>
+                    <div style={{ color: BRAND.subtext, fontSize: 11, whiteSpace: "nowrap", ...lastActivityCellPadding }}>
                       {formatDate(lastActivity)}
                     </div>
                     <div>
@@ -365,7 +353,7 @@ export default function AccountGroupSection({
               })
             : sortedAccounts.map((acc, i) => {
                 const proj = projectMap?.get(acc.id) || { count: 0, lastActivity: null };
-                const lastActivity = proj.lastActivity || acc.last_access_at || null;
+                const lastActivity = computeLastActivity(proj, acc);
 
                 return (
                   <div

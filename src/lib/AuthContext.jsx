@@ -92,6 +92,28 @@ export const AuthProvider = ({ children }) => {
       // Now check if the user is authenticated
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
+
+      // Check account status for non-admin users (suspended = blocked,
+      // inactive = transition to active + record access).
+      if (currentUser?.role !== 'admin') {
+        try {
+          const res = await base44.functions.invoke('recordAccountAccess', {});
+          if (res?.data?.status === 'suspended') {
+            setUser(currentUser);
+            setAuthError({
+              type: 'account_suspended',
+              message: 'Sound Proof access suspended'
+            });
+            setIsAuthenticated(false);
+            setIsLoadingAuth(false);
+            return;
+          }
+        } catch (err) {
+          // Non-critical — don't block login on function failure.
+          console.error('recordAccountAccess failed:', err);
+        }
+      }
+
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
