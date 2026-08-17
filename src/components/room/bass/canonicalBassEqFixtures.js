@@ -71,6 +71,7 @@ export function runCanonicalBassEqFixtures() {
       postEqResponseSignature: candidate?.postEqCurveSignature ?? null,
       canonicalTargetShapeSignature: buildCurveSignature((candidate?.canonicalHouseCurveShape || []).map((point) => ({ frequency: point.frequency, spl: point.offsetDb }))),
       canonicalVerticalOffsetDb: candidate?.canonicalVerticalOffsetDb ?? null,
+      operatingLevelOffsetDb: pool.operatingLevelOffsetDb ?? null,
       capabilityLimitedPointCount: candidate?.capabilityLimitedPointCount ?? null,
       matchesPreviousProductionAnchor: candidate?.canonicalVerticalOffsetDb === previousProductionAnchorDb,
     };
@@ -88,6 +89,16 @@ export function runCanonicalBassEqFixtures() {
     ...physicalInputs,
     rawCurve: rawCurve.map((point) => ({ ...point, spl: point.spl + gaussian(point.frequency, 36, 5, 3) })),
   });
+  const deepNullPool = generateCanonicalCandidatePool({
+    ...physicalInputs,
+    rawCurve: rawCurve.map((point) => ({
+      ...point,
+      spl: point.spl + gaussian(point.frequency, 119, 1.2, -35),
+    })),
+    selectedP14TargetDb: 112,
+    p14TargetBasis: "minimum",
+    p14TargetLevel: 2,
+  });
   const moved = selectCandidateFromPool(movedPool).selectedCandidate;
   const selected = selectCandidateFromPool(generateCanonicalCandidatePool(physicalInputs)).selectedCandidate;
   const enabledFilters = (selected?.generatedFilterBank || []).filter((filter) => filter?.enabled);
@@ -99,6 +110,12 @@ export function runCanonicalBassEqFixtures() {
     { name: "Target identity participates in the calibration fingerprint", passed: targetIdentityChanges },
     { name: "Minimum L1 and Recommended L4 produce different achieved responses when headroom changes", passed: targetDependentHeadroomResponse },
     { name: "Minimum L1 retains more headroom than Recommended L4", passed: minimumL1.capabilityLimitedPointCount < recommendedL4.capabilityLimitedPointCount },
+    {
+      name: "A deep modal null does not pin the complete response to maximum capability",
+      passed: Number.isFinite(deepNullPool.operatingLevelOffsetDb)
+        && deepNullPool.operatingLevelOffsetDb < -0.5
+        && Math.abs(deepNullPool.operatingLevelOffsetDb - levels[1].operatingLevelOffsetDb) <= 0.1,
+    },
   ];
   return {
     levels,
@@ -121,6 +138,8 @@ export function runCanonicalBassEqFixtures() {
     minimumEnabledFilterCutDb: Math.min(0, ...enabledFilters.map((filter) => filter.gainDb)),
     maximumPositiveEqDemandDb: maximumDemandDb,
     protectedNullBoostCount: enabledFilters.filter((filter) => filter.gainDb > 0 && (selected?.protectedNullRegions || []).some((region) => filter.frequencyHz >= region.startHz && filter.frequencyHz <= region.endHz)).length,
+    deepNullOperatingLevelOffsetDb: deepNullPool.operatingLevelOffsetDb,
+    referenceL2OperatingLevelOffsetDb: levels[1].operatingLevelOffsetDb,
     physicalValidationPassed: selected?.physicalValidation?.passed === true,
     aggregateBoostWithinLimit: Number(limits?.maxAggregateBoostDb) <= 6.05,
     aggregateCutWithinLimit: Number(limits?.maxAggregateCutDb) >= -15.05,
