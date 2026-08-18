@@ -94,16 +94,21 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics, integratedL
         </CardTitle>
       </CardHeader>
       <CardContent className="px-3 pb-3">
-        <div className="text-lg font-bold" style={{ color: '#1B1A1A' }}>
-          {formatDb(finalSplDb)}
-        </div>
-        {isOutputLimited && (
-          <div className="text-xs mt-0.5" style={{ color: '#b08060' }}>
-            Output limited by speaker
-          </div>
-        )}
-        {!speaker?.position && !isFlankingRole && (
+        {!isFlankingRole && !speaker?.model ? (
+          <div className="text-xs text-[#625143] mt-1">Select LCR model</div>
+        ) : !isFlankingRole && !speaker?.position ? (
           <div className="text-xs text-[#625143] mt-1">Not placed</div>
+        ) : (
+          <>
+            <div className="text-lg font-bold" style={{ color: '#1B1A1A' }}>
+              {formatDb(finalSplDb)}
+            </div>
+            {isOutputLimited && (
+              <div className="text-xs mt-0.5" style={{ color: '#b08060' }}>
+                Output limited by speaker
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

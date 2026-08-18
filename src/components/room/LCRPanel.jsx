@@ -13,6 +13,16 @@ import LcrSplCard from '@/components/speakers/LcrSplCard';
 import { calculateLcrAcousticCentreBand, formatHeightM } from '@/components/utils/acoustics/acousticCentreBand';
 import { calculateTvFrontStageHeightGuidance } from '@/components/utils/acoustics/tvFrontStageHeightGuidance';
 import { P12_MODE_RECOMMENDED } from '@/components/utils/p12ModeAuthority';
+import { Switch } from '@/components/ui/switch';
+import LcrAcousticCentreGuidanceCard from '@/components/room/LcrAcousticCentreGuidanceCard';
+import {
+  CENTER_ONLY_SOUNDBAR_LABELS,
+  INTEGRATED_LCR_SOUNDBAR_LABELS,
+  buildRoleMap,
+  hasFrontLcrSubClash,
+  resolveSoundbarMeta,
+  buildFrontStageSeed,
+} from '@/components/room/lcrFrontStageSeed';
 
 const P12_THRESHOLDS_REC = { L1: 102, L2: 105, L3: 108, L4: 111 };
 const P12_THRESHOLDS_MIN = { L1: 99, L2: 102, L3: 105, L4: 108 };
@@ -47,189 +57,6 @@ function RP22LevelPill({ parameter, level, label }) {
   );
 }
 
-function buildRoleMap(list) {
-  const m = new Map();
-  (Array.isArray(list) ? list : []).forEach((s) => {
-    const raw = String(s.role || '').toUpperCase();
-    const canon = getCanonicalRole(raw);
-    m.set(raw, s);
-    m.set(canon, s);
-  });
-  return m;
-}
-
-function rectsOverlap(a, b) {
-  return a.left < b.right && a.right > b.left && a.bottom < b.top && a.top > b.bottom;
-}
-
-function hasFrontLcrSubClash({ speakers, frontSubs, frontSubsCfg }) {
-  const lcrRoles = new Set(['FL', 'FC', 'FR', 'FCL', 'FCR']);
-  const lcrRects = (Array.isArray(speakers) ? speakers : [])
-    .filter((speaker) => lcrRoles.has(getCanonicalRole(speaker?.role)))
-    .map((speaker) => {
-      const x = Number(speaker?.position?.x);
-      const z = Number(speaker?.position?.z);
-      const meta = getSpeakerModelMeta(speaker?.model);
-      const width = Number(meta?.widthM);
-      const height = Number(meta?.heightM);
-      if (![x, z, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
-      return { left: x - width / 2, right: x + width / 2, bottom: z - height / 2, top: z + height / 2 };
-    })
-    .filter(Boolean);
-
-  const frontSubRects = (Array.isArray(frontSubs) ? frontSubs : [])
-    .filter((sub) => sub?.group === 'front' || String(sub?.role || '').toUpperCase().startsWith('SUBF'))
-    .map((sub) => {
-      const x = Number.isFinite(Number(sub?.position?.x)) ? Number(sub.position.x) : Number(sub?.x);
-      const bottom = Number.isFinite(Number(sub?.bottomHeightM))
-        ? Number(sub.bottomHeightM)
-        : Number.isFinite(Number(frontSubsCfg?.bottomHeightM))
-          ? Number(frontSubsCfg.bottomHeightM)
-          : 0.05;
-      const model = sub?.model || frontSubsCfg?.model;
-      const orientation = sub?.orientation || frontSubsCfg?.orientation;
-      const meta = getSpeakerModelMeta(model, orientation);
-      const width = Number(meta?.widthM);
-      const height = Number(meta?.heightM);
-      if (![x, bottom, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
-      return { left: x - width / 2, right: x + width / 2, bottom, top: bottom + height };
-    })
-    .filter(Boolean);
-
-  if (lcrRects.length === 0 || frontSubRects.length === 0) return false;
-  return lcrRects.some((lcrRect) => frontSubRects.some((subRect) => rectsOverlap(lcrRect, subRect)));
-}
-
-const CENTER_ONLY_SOUNDBAR_LABELS = ['C-1', 'C4-1', 'Multi (Mono)', 'HSPL (Mono)'];
-const INTEGRATED_LCR_SOUNDBAR_LABELS = ['Multi (LCR)', 'HSPL (LCR)'];
-
-function resolveSoundbarMeta(modelLabel, screen) {
-  const tvPresetKey = screen?.tvPresetKey || null;
-  return getSpeakerModelMeta(modelLabel, tvPresetKey);
-}
-
-function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabel, dimensions, screen, splConfig, setSpeakers }) {
-  setSpeakers(prev => {
-    const list = Array.isArray(prev) ? prev : [];
-    const by = buildRoleMap(list);
-
-    const isCentreLike = (role) => {
-      const r = String(role || '').trim().toUpperCase();
-      return r === 'FC' || r === 'C' || r === 'CENTER' || r === 'CENTRE';
-    };
-    const LCR_ROLES_SET = new Set(['FL', 'FR']);
-    const filtered = list.filter(s => {
-      const canon = getCanonicalRole(s.role);
-      return !LCR_ROLES_SET.has(canon) && !isCentreLike(String(s.role || '').trim().toUpperCase());
-    });
-
-    const roomW = Number(dimensions?.width ?? dimensions?.widthM) || 4.5;
-    const roomH = Number(dimensions?.height ?? dimensions?.heightM) || 2.8;
-    const screenHeightFromFloorM = Number(screen?.heightFromFloorM) || 0.5;
-    const visibleWidthInches = Number(screen?.visibleWidthInches) || 100;
-    const aspectRatio = String(screen?.aspectRatio || '16:9');
-    const [arW, arH] = aspectRatio.split(':').map(Number);
-    const ratio = (arW && arH) ? arW / arH : 16 / 9;
-    const viewableWidthM = visibleWidthInches * 0.0254;
-    const viewableHeightM = viewableWidthM / ratio;
-    const screenBottomM = screenHeightFromFloorM;
-
-    const defaultY = 0.20;
-    const lcrHeightM = Number(splConfig?.lcrHeightM);
-    const lcrLRHeightM = Number(splConfig?.lcrLRHeightM);
-    const defaultZ = Number.isFinite(lcrHeightM) ? lcrHeightM : roomH * 0.5;
-    // In center_only mode, L/R use their own stored height if available
-    const defaultLRZ = (frontStageMode === 'center_only' && Number.isFinite(lcrLRHeightM))
-      ? lcrLRHeightM
-      : defaultZ;
-    const spread = Math.min(1.2, roomW * 0.22);
-    const midX = roomW / 2;
-
-    const FL = by.get('FL') || { role: 'FL', id: 'FL-1', draggable: true };
-    const FC = by.get('FC') || { role: 'FC', id: 'FC-1', draggable: true };
-    const FR = by.get('FR') || { role: 'FR', id: 'FR-1', draggable: true };
-
-    const soundbarLabel = soundbarModelLabel || null;
-    const soundbarMeta = soundbarLabel ? resolveSoundbarMeta(soundbarLabel, screen) : null;
-    const soundbarHeightM = Number(soundbarMeta?.heightM) || 0;
-    const soundbarCenterZ = soundbarMeta
-      ? Math.max(soundbarHeightM / 2, screenBottomM - 0.02 - (soundbarHeightM / 2))
-      : defaultZ;
-
-    if (frontStageMode === 'integrated_lcr' && soundbarLabel) {
-      return [
-        ...filtered,
-        {
-          ...FC,
-          role: 'FC',
-          id: FC.id || 'FC-1',
-          model: soundbarLabel,
-          position: { x: midX, y: defaultY, z: defaultZ },
-          rotation: FC.rotation || { x: 0, y: 0, z: 0 },
-        },
-      ];
-    }
-
-    if (frontStageMode === 'center_only' && soundbarLabel) {
-      return [
-        ...filtered,
-        {
-          ...FL,
-          role: 'FL',
-          id: FL.id || 'FL-1',
-          model: baseModelLabel,
-          position: { ...(FL.position || { x: midX - spread, y: defaultY, z: defaultLRZ }), z: defaultLRZ },
-          rotation: FL.rotation || { x: 0, y: 0, z: 0 },
-        },
-        {
-          ...FC,
-          role: 'FC',
-          id: FC.id || 'FC-1',
-          model: soundbarLabel,
-          position: { x: midX, y: defaultY, z: defaultZ },
-          rotation: FC.rotation || { x: 0, y: 0, z: 0 },
-        },
-        {
-          ...FR,
-          role: 'FR',
-          id: FR.id || 'FR-1',
-          model: baseModelLabel,
-          position: { ...(FR.position || { x: midX + spread, y: defaultY, z: defaultLRZ }), z: defaultLRZ },
-          rotation: FR.rotation || { x: 0, y: 0, z: 0 },
-        },
-      ];
-    }
-
-    return [
-      ...filtered,
-      {
-        ...FL,
-        role: 'FL',
-        id: FL.id || 'FL-1',
-        model: baseModelLabel,
-        position: { x: midX - spread, y: defaultY, z: defaultZ },
-        rotation: FL.rotation || { x: 0, y: 0, z: 0 },
-      },
-      {
-        ...FC,
-        role: 'FC',
-        id: FC.id || 'FC-1',
-        model: baseModelLabel,
-        position: { x: midX, y: defaultY, z: defaultZ },
-        rotation: FC.rotation || { x: 0, y: 0, z: 0 },
-      },
-      {
-        ...FR,
-        role: 'FR',
-        id: FR.id || 'FR-1',
-        model: baseModelLabel,
-        position: { x: midX + spread, y: defaultY, z: defaultZ },
-        rotation: FR.rotation || { x: 0, y: 0, z: 0 },
-      },
-    ];
-  });
-}
-
 export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics, onP12Update }) {
   const appState = useAppState();
   const { speakerSystem, splConfig = {}, updateGlobalSpl, seatingPositions, screen, frontSubsCfg, subwoofers } = appState || {};
@@ -262,14 +89,14 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         const m = getByRole(role)?.model;
         if (m && standardLcrOptions.some(opt => opt.label === m)) return m;
       }
-      return standardLcrOptions[0]?.label || '';
+      return '';
     }
 
     for (const r of LCR_CANONICAL_ROLES) {
       const m = getByRole(r)?.model;
       if (m && standardLcrOptions.some(opt => opt.label === m)) return m;
     }
-    return standardLcrOptions[0]?.label || '';
+    return '';
   }, [getByRole, LCR_CANONICAL_ROLES, standardLcrOptions]);
 
   const lastP12SentRef = useRef(null);
@@ -332,6 +159,18 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     : roomH * 0.5;
   const clampLcrHeight = useCallback((value) => Math.max(0.2, Math.min(roomH - 0.2, value)), [roomH]);
 
+  // LCR acoustic-centre height: auto-follow the recommended value by default;
+  // a manual override lets the designer lock a custom height.
+  // Legacy projects (no explicit flag) preserve a saved height as manual so
+  // existing completed projects are not silently re-steered; new projects with
+  // no saved height default to auto-follow.
+  const hasSavedLcrHeight = Number.isFinite(Number(splConfig?.lcrHeightM));
+  const lcrHeightManual = splConfig?.lcrHeightManual === true
+    ? true
+    : splConfig?.lcrHeightManual === false
+      ? false
+      : hasSavedLcrHeight;
+
   const [lcrModel, setLcrModel] = useState(initialModel);
   const [frontStageMode, setFrontStageMode] = useState(derivedFrontStageMode);
   const [soundbarModel, setSoundbarModel] = useState(derivedSoundbarModel);
@@ -353,11 +192,8 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     setLcrPowerInputValue(String(splConfig?.lcrW || 100));
   }, [splConfig?.lcrW]);
 
-  useEffect(() => {
-    const stored = Number(splConfig?.lcrHeightM);
-    const next = clampLcrHeight(Number.isFinite(stored) ? stored : defaultLcrHeightM);
-    setLcrHeightInputValue(String(Number(next.toFixed(2))));
-  }, [splConfig?.lcrHeightM, defaultLcrHeightM, clampLcrHeight]);
+  // LCR height sync is handled by the auto-follow effect below (after the
+  // recommended-height memo and placed-height updaters are defined).
 
   useEffect(() => {
     // Prefer saved lcrLRHeightM, fall back to actual FL speaker z, then default
@@ -495,25 +331,33 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     soundbarModel,
   ]);
 
-  // First-initialisation only: seed LCR height to acoustic-centre ideal when no saved value exists.
-  useEffect(() => {
-    if (hasInitialisedLcrIdealHeightRef.current) return;
-    if (!acousticCentreGuidance?.isValid) return;
-    if (!Number.isFinite(acousticCentreGuidance.idealHeightM)) return;
-    if (Number.isFinite(Number(splConfig?.lcrHeightM))) return; // saved/user value exists — do not overwrite
+  // Recommended acoustic-centre height (auto-follow target). Uses the active
+  // guidance authority (projector acoustic-centre band or TV front-stage guide)
+  // so it stays correct for every front-stage mode.
+  const recommendedLcrHeightM = useMemo(() => {
+    const ideal = Number(activeHeightGuidance?.idealHeightM);
+    return Number.isFinite(ideal) ? clampLcrHeight(ideal) : clampLcrHeight(defaultLcrHeightM);
+  }, [activeHeightGuidance?.idealHeightM, clampLcrHeight, defaultLcrHeightM]);
 
-    const ideal = Number(acousticCentreGuidance.idealHeightM);
-    setLcrHeightInputValue(String(Number(ideal.toFixed(2))));
-    updateGlobalSpl?.({ lcrHeightM: ideal });
-    updatePlacedLcrHeight(ideal);
-    hasInitialisedLcrIdealHeightRef.current = true;
-  }, [
-    acousticCentreGuidance?.isValid,
-    acousticCentreGuidance?.idealHeightM,
-    splConfig?.lcrHeightM,
-    updateGlobalSpl,
-    updatePlacedLcrHeight,
-  ]);
+  // LCR height authority:
+  // - Auto (default): lock to recommendedLcrHeightM; update splConfig + placed
+  //   speakers whenever the recommendation changes (room/screen/seating edits).
+  // - Manual: follow the saved splConfig.lcrHeightM value; do not auto-reset.
+  useEffect(() => {
+    if (lcrHeightManual) {
+      const stored = Number.isFinite(Number(splConfig?.lcrHeightM)) ? Number(splConfig.lcrHeightM) : recommendedLcrHeightM;
+      const next = clampLcrHeight(stored);
+      setLcrHeightInputValue(String(Number(next.toFixed(2))));
+      return;
+    }
+    const target = recommendedLcrHeightM;
+    setLcrHeightInputValue(String(Number(target.toFixed(2))));
+    const stored = Number(splConfig?.lcrHeightM);
+    if (!Number.isFinite(stored) || Math.abs(stored - target) > 0.005) {
+      updateGlobalSpl?.({ lcrHeightM: target, lcrHeightManual: false });
+      updatePlacedLcrHeight?.(target);
+    }
+  }, [lcrHeightManual, recommendedLcrHeightM, splConfig?.lcrHeightM, clampLcrHeight, updateGlobalSpl, updatePlacedLcrHeight]);
 
   const handleLcrHeightChange = useCallback((e) => {
     const newValue = e.target.value;
@@ -538,6 +382,22 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     updatePlacedLcrHeight(clamped);
   }, [clampLcrHeight, defaultLcrHeightM, splConfig?.lcrHeightM, updateGlobalSpl, updatePlacedLcrHeight]);
 
+  const onToggleLcrHeightManual = useCallback((nextManual) => {
+    if (nextManual) {
+      // Entering manual: freeze the current effective height as the manual value.
+      const current = Number(lcrHeightInputValue);
+      const clamped = clampLcrHeight(Number.isFinite(current) ? current : recommendedLcrHeightM);
+      updateGlobalSpl?.({ lcrHeightManual: true, lcrHeightM: clamped });
+      setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
+    } else {
+      // Leaving manual: reset to the current recommended acoustic-centre height.
+      const target = recommendedLcrHeightM;
+      updateGlobalSpl?.({ lcrHeightManual: false, lcrHeightM: target });
+      updatePlacedLcrHeight?.(target);
+      setLcrHeightInputValue(String(Number(target.toFixed(2))));
+    }
+  }, [lcrHeightInputValue, recommendedLcrHeightM, clampLcrHeight, updateGlobalSpl, updatePlacedLcrHeight]);
+
   const applyFrontStage = useCallback((nextBaseModel, nextMode, nextSoundbarModel) => {
     buildFrontStageSeed({
       baseModelLabel: nextBaseModel,
@@ -555,6 +415,20 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     setLcrModel(modelLabel);
     applyFrontStage(modelLabel, frontStageMode, soundbarModel);
   }, [standardLcrOptions, applyFrontStage, frontStageMode, soundbarModel]);
+
+  // Clear the LCR model — remove the model from all LCR speakers and return
+  // the selector to its placeholder state. No hidden fallback remains.
+  const onClearLcrModel = useCallback(() => {
+    setLcrModel('');
+    const lcrRoleSet = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
+    setSpeakers?.((prev) => (Array.isArray(prev) ? prev.map((s) => {
+      const role = getCanonicalRole(s?.role);
+      if (!lcrRoleSet.has(role)) return s;
+      const next = { ...s };
+      delete next.model;
+      return next;
+    }) : prev));
+  }, [setSpeakers]);
 
   const onChooseFrontStageMode = useCallback((mode) => {
     const nextMode = mode || 'standard';
@@ -587,20 +461,23 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   
   return (
     <div className="space-y-2 p-2">
+      {/* ── Model ── */}
       <Label htmlFor="lcr-model" className="text-[#3E4349] font-medium">LCR Model</Label>
-      <Select value={lcrModel || undefined} onValueChange={onChooseModel} disabled={disabled}>
+      <Select value={lcrModel || undefined} onValueChange={(val) => { if (val === '__none__') onClearLcrModel(); else onChooseModel(val); }} disabled={disabled}>
         <SelectTrigger id="lcr-model" className="w-full h-10 px-3 py-2 mt-1 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
           <span className="text-2xl font-semibold" style={{ color: '#213428' }}>
             {frontStageMode === 'integrated_lcr' ? '-' : (lcrModel ? (getSpeakerModelMeta(lcrModel)?.label || lcrModel) : 'Select LCR model')}
           </span>
         </SelectTrigger>
         <SelectContent className="bg-white border-[#DCDBD6]">
+          {lcrModel && <SelectItem value="__none__" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#9B9890' }}>— Clear selection —</SelectItem>}
           {standardLcrOptions.map(model => (
             <SelectItem key={model.key} value={model.label} className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>{model.label}</SelectItem>
           ))}
         </SelectContent>
       </Select>
 
+      {/* ── Front Stage ── */}
       <div className="space-y-2 mt-4">
         <Label htmlFor="front-stage-mode" className="text-[#3E4349] font-medium">Front Stage</Label>
         <Select value={frontStageMode} onValueChange={onChooseFrontStageMode} disabled={disabled}>
@@ -644,6 +521,90 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         Angle to MLP: <span className="font-semibold text-[#1B1A1A]">{Math.round(lcrAngleDeg)}°</span>
       </p>
 
+      {/* ── Acoustic Centre Height ── */}
+      <div className="space-y-2 mt-4">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-[#625143]">
+            {frontStageMode === 'center_only' ? 'Centre soundbar height (to middle of speaker)' : 'LCR height from floor (to middle of speaker)'}
+          </Label>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[#625143]">
+              {lcrHeightManual ? 'Manual override' : `Auto: ${formatHeightM(recommendedLcrHeightM)} recommended`}
+            </span>
+            <Switch
+              checked={lcrHeightManual}
+              onCheckedChange={onToggleLcrHeightManual}
+              disabled={disabled}
+            />
+          </div>
+        </div>
+        {frontStageMode === 'center_only' ? (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label className="text-[11px] text-[#625143]">Left / Right height from floor (to middle of speaker)</Label>
+              <StepperInput
+                value={Number(lrHeightInputValue) || 0}
+                step={0.01}
+                min={0.2}
+                max={roomH - 0.2}
+                disabled={disabled}
+                onChange={(val) => {
+                  const clamped = clampLcrHeight(val);
+                  setLrHeightInputValue(String(Number(clamped.toFixed(2))));
+                  updateGlobalSpl?.({ lcrLRHeightM: clamped });
+                  updatePlacedLRHeight(clamped);
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[11px] text-[#625143]">Centre soundbar height from floor (to middle of speaker)</Label>
+              <StepperInput
+                value={Number(lcrHeightInputValue) || 0}
+                step={0.01}
+                min={0.2}
+                max={roomH - 0.2}
+                disabled={disabled || !lcrHeightManual}
+                onChange={(val) => {
+                  if (!lcrHeightManual) return;
+                  const clamped = clampLcrHeight(val);
+                  setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
+                  updateGlobalSpl?.({ lcrHeightM: clamped });
+                  updatePlacedFCHeight(clamped);
+                }}
+              />
+            </div>
+            {hasLcrSubClash && (
+              <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
+            )}
+          </div>
+        ) : (
+          <>
+            <StepperInput
+              value={Number(lcrHeightInputValue) || 0}
+              step={0.01}
+              min={0.2}
+              max={roomH - 0.2}
+              disabled={disabled || !lcrHeightManual}
+              onChange={(val) => {
+                if (!lcrHeightManual) return;
+                const clamped = clampLcrHeight(val);
+                setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
+                updateGlobalSpl?.({ lcrHeightM: clamped });
+                updatePlacedLcrHeight(clamped);
+              }}
+            />
+            {hasLcrSubClash && (
+              <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
+            )}
+          </>
+        )}
+      </div>
+
+      {frontStageMode !== 'center_only' && (
+        <LcrAcousticCentreGuidanceCard guidance={activeHeightGuidance} />
+      )}
+
+      {/* ── SPL @ RSP ── */}
       <div className="mt-4">
         <Label className="text-xs text-[#625143] mb-2 block">SPL @ RSP</Label>
         <div className="grid grid-cols-3 gap-3">
@@ -659,6 +620,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         </div>
       </div>
 
+      {/* ── Amplifier Power ── */}
       <div className="space-y-2 mt-4">
         <Label className="text-xs text-[#625143]">Amplifier Power (LCR)</Label>
         <div className="relative">
@@ -678,114 +640,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         </div>
       </div>
 
-      {frontStageMode === 'center_only' ? (
-        <div className="space-y-3 mt-4">
-          <div className="space-y-2">
-            <Label className="text-xs text-[#625143]">Left / Right height from floor (to middle of speaker)</Label>
-            <StepperInput
-              value={Number(lrHeightInputValue) || 0}
-              step={0.01}
-              min={0.2}
-              max={roomH - 0.2}
-              disabled={disabled}
-              onChange={(val) => {
-                const clamped = clampLcrHeight(val);
-                setLrHeightInputValue(String(Number(clamped.toFixed(2))));
-                updateGlobalSpl?.({ lcrLRHeightM: clamped });
-                updatePlacedLRHeight(clamped);
-              }}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-xs text-[#625143]">Centre soundbar height from floor (to middle of speaker)</Label>
-            <StepperInput
-              value={Number(lcrHeightInputValue) || 0}
-              step={0.01}
-              min={0.2}
-              max={roomH - 0.2}
-              disabled={disabled}
-              onChange={(val) => {
-                const clamped = clampLcrHeight(val);
-                setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
-                updateGlobalSpl?.({ lcrHeightM: clamped });
-                updatePlacedFCHeight(clamped);
-              }}
-            />
-          </div>
-          {hasLcrSubClash && (
-            <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-2 mt-4">
-          <Label className="text-xs text-[#625143]">LCR height from floor (to middle of speaker)</Label>
-          <StepperInput
-            value={Number(lcrHeightInputValue) || 0}
-            step={0.01}
-            min={0.2}
-            max={roomH - 0.2}
-            disabled={disabled}
-            onChange={(val) => {
-              const clamped = clampLcrHeight(val);
-              setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
-              updateGlobalSpl?.({ lcrHeightM: clamped });
-              updatePlacedLcrHeight(clamped);
-            }}
-          />
-          {hasLcrSubClash && (
-            <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
-          )}
-        </div>
-      )}
-
-      {frontStageMode !== 'center_only' && activeHeightGuidance?.isValid && (() => {
-        const { status, minHeightM, maxHeightM, idealHeightM, currentAcousticCentreM, placementOffsetM, mode } = activeHeightGuidance;
-        const statusColor = status === 'ideal' ? '#2d7a4f' : status === 'below' || status === 'above' ? '#b45309' : '#6b7280';
-        const statusLabel = status === 'ideal' ? 'Ideal' : status === 'below' ? 'Below range' : status === 'above' ? 'Above range' : 'Unknown';
-        const guidanceTitle = mode === 'tv_soundbar'
-          ? 'TV SOUNDBAR HEIGHT GUIDANCE'
-          : mode === 'tv_separate_lcr'
-            ? 'TV L/R HEIGHT GUIDANCE'
-            : 'ACOUSTIC CENTRE GUIDANCE';
-        return (
-          <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#F8F8F7', border: '1px solid #E6E4DD' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#625143', marginBottom: 5, letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-              {guidanceTitle}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 10px' }}>
-              <span style={{ fontSize: 11, color: '#888' }}>Current</span>
-              <span style={{ fontSize: 11, color: '#1B1A1A', fontWeight: 600 }}>
-                {currentAcousticCentreM !== null ? formatHeightM(currentAcousticCentreM) : '—'}
-              </span>
-              {mode === 'tv_soundbar' ? (
-                <>
-                  <span style={{ fontSize: 11, color: '#888' }}>Fixed position</span>
-                  <span style={{ fontSize: 11, color: '#1B1A1A' }}>{formatHeightM(idealHeightM)}</span>
-                  <span style={{ fontSize: 11, color: '#888' }}>Offset below TV</span>
-                  <span style={{ fontSize: 11, color: '#1B1A1A' }}>{formatHeightM(placementOffsetM)}</span>
-                </>
-              ) : mode === 'tv_separate_lcr' ? (
-                <>
-                  <span style={{ fontSize: 11, color: '#888' }}>TV image centre</span>
-                  <span style={{ fontSize: 11, color: '#1B1A1A' }}>{formatHeightM(idealHeightM)}</span>
-                </>
-              ) : (
-                <>
-                  <span style={{ fontSize: 11, color: '#888' }}>Range</span>
-                  <span style={{ fontSize: 11, color: '#1B1A1A' }}>
-                    {formatHeightM(minHeightM)} – {formatHeightM(maxHeightM)}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#888' }}>Ideal</span>
-                  <span style={{ fontSize: 11, color: '#1B1A1A' }}>{formatHeightM(idealHeightM)}</span>
-                </>
-              )}
-              <span style={{ fontSize: 11, color: '#888' }}>Status</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: statusColor }}>{statusLabel}</span>
-            </div>
-          </div>
-        );
-      })()}
-
+      {/* ── RP22 P12 ── */}
       <div className="space-y-2 mt-4">
         <Label className="text-xs text-[#625143]">Parameter 12. Screen speakers SPL capability at RSP</Label>
         <div className="flex gap-2">

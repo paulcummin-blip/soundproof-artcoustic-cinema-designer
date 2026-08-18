@@ -87,12 +87,12 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
           {safeCount === 0 ? "Model (disabled — set quantity first)" : "Model"}
         </Label>
         <Select
-          value={safeModel}
+          value={safeCount === 0 ? "" : safeModel}
           disabled={disabled || safeCount === 0}
           onValueChange={(val) => commit({ model: val })}
         >
           <SelectTrigger className="h-10 bg-white border-[#DCDBD6] text-2xl font-semibold text-[#213428]">
-            <SelectValue placeholder="Choose model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
+            <SelectValue placeholder="Select subwoofer model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
           </SelectTrigger>
           <SelectContent>
             {SUB_MODELS.map(m => (
