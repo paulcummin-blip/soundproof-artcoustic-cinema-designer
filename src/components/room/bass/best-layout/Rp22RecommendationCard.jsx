@@ -2,7 +2,11 @@ import React from "react";
 import { Check, Loader2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const levelText = (level) => Number.isFinite(level) ? (level > 0 ? `L${level}` : "FAIL") : "—";
+function expectedBenefit(sourceCount) {
+  if (sourceCount === 1) return "More even bass distribution across the listening area.";
+  if (sourceCount === 2) return "Improved modal smoothing and more consistent bass across seats.";
+  return "Greater modal averaging and improved seat-to-seat bass consistency.";
+}
 
 export default function Rp22RecommendationCard({ title, layout, onClick, onApply, isApplied, isRecalculating, applying, applyError, unsupported }) {
   if (!layout) return null;
@@ -16,17 +20,9 @@ export default function Rp22RecommendationCard({ title, layout, onClick, onApply
             <div className="mt-1 text-sm font-semibold text-[#1B1A1A]">{layout.name}</div>
             <div className="mt-0.5 text-[11px] text-[#625143]">{m.sourceCount} subwoofers · {layout.placementMode}</div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-semibold text-[#213428]">{m.placementGrade}</span>
-            <ChevronRight className="h-4 w-4 text-[#625143]" />
-          </div>
+          <ChevronRight className="h-4 w-4 text-[#625143]" />
         </div>
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
-          <span><b>Predicted P19</b> {levelText(m.p19Level)}</span>
-          <span><b>Predicted P20</b> {levelText(m.p20Level)}</span>
-          <span>{m.worstSeatVariationDb.toFixed(1)} dB predicted variation</span>
-        </div>
-        <p className="mt-2 text-[10px] leading-relaxed text-[#8A7B6A]">Predicted from the placement model. Apply this layout to recalculate the bass response.</p>
+        <p className="mt-3 text-[11px] leading-relaxed text-[#625143]">{expectedBenefit(m.sourceCount)}</p>
       </button>
 
       {unsupported && (
@@ -52,7 +48,7 @@ export default function Rp22RecommendationCard({ title, layout, onClick, onApply
 
       {!isApplied && !unsupported && (
         <Button type="button" size="sm" className="mt-3 w-full bg-[#213428] text-white hover:bg-[#3E4349]" onClick={(e) => { e.stopPropagation(); onApply?.(layout); }} disabled={applying}>
-          {applying ? "Applying…" : "Apply recommended positions"}
+          {applying ? "Applying…" : "Apply layout"}
         </Button>
       )}
     </div>

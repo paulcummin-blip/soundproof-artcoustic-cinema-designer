@@ -115,8 +115,8 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
   return (
     <div className="mt-4 space-y-3 rounded-lg border-2 border-[#213428] bg-[#F3F1EC] p-4">
       <div>
-        <h5 className="text-[14px] font-semibold text-[#1B1A1A]">RP22 Subwoofer Placement Recommendations</h5>
-        <p className="mt-1 text-[11px] text-[#625143]">Based on recognised RP22 placement patterns and predicted room response. Apply a layout to recalculate the bass response.</p>
+        <h5 className="text-[14px] font-semibold text-[#1B1A1A]">Subwoofer Placement Guide</h5>
+        <p className="mt-1 text-[11px] text-[#625143]">Based on RP22 positional-optimisation guidance and recognised multi-subwoofer placement research.</p>
       </div>
       <CurrentLayout layout={currentLayout} isRecalculating={isRecalculating} />
       {currentQuantityBest && (
@@ -135,7 +135,7 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
       {!currentQuantityBest && <Unavailable title="Improved placement with existing quantity" />}
       {upgradeBest && (
         <Rp22RecommendationCard
-          title="Recommended RP22 upgrade layout"
+          title="Recommended multi-sub layout"
           layout={upgradeBest}
           onClick={openDialog}
           onApply={apply}
@@ -146,7 +146,7 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
           unsupported={upgradeUnsupported}
         />
       )}
-      {!upgradeBest && <Unavailable title="Recommended RP22 upgrade layout" message="No higher recognised subwoofer quantity is available." />}
+      {!upgradeBest && <Unavailable title="Recommended multi-sub layout" message="No higher recognised subwoofer quantity is available." />}
       {previous && <Button type="button" size="sm" variant="outline" onClick={undo}>Undo recommended positions</Button>}
       <Rp22LayoutPlanDialog
         open={Boolean(selected)}
@@ -166,22 +166,19 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
 function CurrentLayout({ layout, isRecalculating }) {
   const metrics = layout.metrics;
   const authority = metrics?.responseAuthority;
-  // Determine label: Recalculating > Current (canonical match) > Predicted
-  const p19Label = isRecalculating ? "Recalculating" : authority === "final-post-eq" ? "Current P19" : "Predicted P19";
-  const p20Label = isRecalculating ? "Recalculating" : authority === "final-post-eq" ? "Current P20" : "Predicted P20";
+  const hasCanonical = authority === "final-post-eq";
+  const p19Value = isRecalculating ? "…" : hasCanonical ? levelText(metrics.p19Level) : "—";
+  const p20Value = isRecalculating ? "…" : hasCanonical ? levelText(metrics.p20Level) : "—";
   return (
     <div className="rounded-lg border border-[#D9D5CE] bg-white/70 p-4">
       <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Current subwoofer layout</div>
-      <div className="mt-1 flex items-center justify-between">
-        <div>
-          <div className="text-sm font-semibold text-[#1B1A1A]">Current positions</div>
-          <div className="text-[11px] text-[#625143]">{metrics.sourceCount} {metrics.sourceCount === 1 ? "subwoofer" : "subwoofers"}</div>
-        </div>
-        <span className="text-2xl font-semibold text-[#213428]">{metrics.placementGrade}</span>
+      <div className="mt-1">
+        <div className="text-sm font-semibold text-[#1B1A1A]">Current positions</div>
+        <div className="text-[11px] text-[#625143]">{metrics.sourceCount} {metrics.sourceCount === 1 ? "subwoofer" : "subwoofers"}</div>
       </div>
       <div className="mt-3 flex gap-5 text-xs">
-        <span><b>{p19Label}</b> {isRecalculating ? "…" : levelText(metrics.p19Level)}</span>
-        <span><b>{p20Label}</b> {isRecalculating ? "…" : levelText(metrics.p20Level)}</span>
+        <span><b>P19</b> {p19Value}</span>
+        <span><b>P20</b> {p20Value}</span>
       </div>
       {isRecalculating && <p className="mt-1 text-[10px] text-[#625143]">Recalculating bass response…</p>}
     </div>
