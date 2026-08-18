@@ -2,7 +2,7 @@ import React from "react";
 import { Label } from "@/components/ui/Label";
 import { Input } from "@/components/ui/input";
 import { useAppState } from "@/components/AppStateProvider";
-import SpeakerPositionsControl from "@/components/room/SpeakerPositionsControl";
+import PlanDisplayToggle from "@/components/room/PlanDisplayToggle";
 
 const roundToCm = (num) => {
   if (!Number.isFinite(num)) return null;
@@ -86,6 +86,29 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
     }));
   };
 
+  // Mutual exclusivity: only one of Room Dimensions / Speaker Positions can be ON.
+  // Both use the same overlays store; functional updates compose safely.
+  const handleRoomDimsToggle = (next) => {
+    if (!setOverlays) return;
+    setOverlays((prev) => ({ ...(prev || {}), ROOM_DIMS: next }));
+    if (next) onSpeakerPositionsViewChange("off");
+  };
+
+  const handleSpeakerPositionsToggle = (next) => {
+    const nextView = next ? "plan" : "off";
+    if (next && setOverlays) {
+      setOverlays((prev) => ({ ...(prev || {}), ROOM_DIMS: false }));
+    }
+    onSpeakerPositionsViewChange(nextView);
+  };
+
+  // Normalise legacy state where both were ON: prefer Room Dimensions.
+  React.useEffect(() => {
+    if (overlays?.ROOM_DIMS && speakerPositionsView === "plan") {
+      onSpeakerPositionsViewChange("off");
+    }
+  }, [overlays?.ROOM_DIMS, speakerPositionsView, onSpeakerPositionsViewChange]);
+
   const inputStyle = {
     border: "1px solid #DCDBD6",
     borderRadius: "10px",
@@ -151,57 +174,18 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
         />
       </div>
 
-      <div
-        style={{
-          marginTop: 12,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <span style={{ fontSize: 13, color: "#3E4349" }}>
-          Show room dimensions on plan
-        </span>
-        <button
-          type="button"
-          onClick={() => {
-            if (!setOverlays) return;
-            const on = !!overlays?.ROOM_DIMS;
-            setOverlays({ ...(overlays || {}), ROOM_DIMS: !on });
-          }}
-          style={{
-            position: "relative",
-            width: 54,
-            height: 30,
-            borderRadius: 999,
-            border: "1px solid #DCDBD6",
-            padding: 0,
-            background: overlays?.ROOM_DIMS ? "#213428" : "#FFFFFF",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: overlays?.ROOM_DIMS ? "flex-end" : "flex-start",
-            cursor: "pointer",
-            transition: "background 120ms ease, justify-content 120ms ease",
-          }}
-          aria-pressed={overlays?.ROOM_DIMS ? "true" : "false"}
-        >
-          <span
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: "999px",
-              margin: "0 3px",
-              background: "#FFFFFF",
-              boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
-            }}
-          />
-        </button>
-      </div>
+      <PlanDisplayToggle
+        label="Show room dimensions on plan"
+        checked={!!overlays?.ROOM_DIMS}
+        onChange={handleRoomDimsToggle}
+        disabled={disabled}
+      />
 
-      <SpeakerPositionsControl
-        value={speakerPositionsView}
-        onChange={onSpeakerPositionsViewChange}
+      <PlanDisplayToggle
+        label="Speaker Positions"
+        checked={speakerPositionsView === "plan"}
+        onChange={handleSpeakerPositionsToggle}
+        disabled={disabled}
       />
 
       {roomDims.widthM > 0 && roomDims.lengthM > 0 && roomDims.heightM > 0 && (
