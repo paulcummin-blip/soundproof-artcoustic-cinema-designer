@@ -14,7 +14,8 @@ import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThree
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 import BackgroundAnalysisControls from "@/components/room/bass/BackgroundAnalysisControls";
 import BassEngineeringDetails from "@/components/room/bass/BassEngineeringDetails";
-import BassResultsSummary from "@/components/room/bass/BassResultsSummary";
+import BassResultCards from "@/components/room/bass/BassResultCards";
+import BassDesignRecommendation from "@/components/room/bass/BassDesignRecommendation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -33,7 +34,6 @@ import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeC
 import BassCurveVisibilityControls, { DEFAULT_BASS_CURVE_VISIBILITY } from "@/components/room/bass/BassCurveVisibilityControls";
 import { buildRp22GraphMarkers } from "@/components/room/bass/rp22GraphMarkers";
 import Rp22GraphMarkerKey from "@/components/room/bass/Rp22GraphMarkerKey";
-import P14PresentationHeader from "@/components/room/bass/P14PresentationHeader";
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
 import CopyEqForensicTraceButton from "@/components/room/bass/CopyEqForensicTraceButton";
 import EqDiscoveryAuditPanel from "@/components/room/bass/EqDiscoveryAuditPanel";
@@ -554,14 +554,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         </div>
       )}
 
-      {/* Designer Metrics moved below the graph to keep the top summary clean */}
+      {/* 1. Bass Target Settings — always visible at the top (select P14 target before results are meaningful) */}
+      <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#FFFFFF", padding: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#1B1A1A", marginBottom: 8 }}>Bass Target Settings</div>
+        <BassTargetLevelControl disabled={detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"} />
+      </div>
 
       <div className="flex flex-wrap gap-2 text-xs">
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Room: {dimsTxt}</Badge>
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Subs: {totalSubCount}</Badge>
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
       </div>
-      <BassResultsSummary />
+
+      {/* 2. P14/P18/P19/P20 result cards — replace long thin bars */}
+      <BassResultCards />
+
+      {/* 3. Primary limitation + Recommended improvement */}
+      <BassDesignRecommendation recommendation={sharedBassResults.contract?.designRecommendation} />
       
       {(subWarnings?.front?.length > 0 || subWarnings?.rear?.length > 0) && (
         <Alert className="border border-[#C1B6AD] bg-[#F8F8F7] text-[#3E4349]">
@@ -674,14 +683,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
 
 
-        <P14PresentationHeader
-          selectedP14TargetDb={p14PresentationData.targetDb}
-          selectedP14Level={p14PresentationData.levelNum}
-          selectedP14TargetBasis={p14PresentationData.basis}
-          availableP14CapabilityDb={p14PresentationData.availableCapability}
-          achievedP19VariationDb={p14PresentationData.p19Variation}
-          achievedP19Level={p14PresentationData.p19Level}
-        />
+        {/* P14 presentation header removed from default view — values shown in result cards above */}
 
         <SeatResponseScopeControls
           rspPosition={rspPosition}
@@ -741,19 +743,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
           {graphStatusText}
         </div>
-        {p14PresentationData.targetDb != null && <div style={{ marginTop: 6, padding: '4px 10px', background: '#F8F8F7', border: '1px solid #DCDBD6', borderRadius: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#213428', fontFamily: 'monospace' }}>
-            P14 target: {p14PresentationData.basis === "recommended" ? "Recommended" : "Minimum"} L{Math.max(1, Math.min(4, Math.round(p14PresentationData.levelNum)))} · {Math.round(p14PresentationData.targetDb)} dBC total
-          </span>
-          {Number.isFinite(selectedP18RequiredExtensionHz) && (
-            <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace', marginLeft: 16 }}>
-              P18: independently graded at this P14 output · {selectedP18TargetBasis === "recommended" ? "Recommended" : "Minimum"} L1 boundary {selectedP18RequiredExtensionHz} Hz
-            </span>
-          )}
-        </div>}
-        {p14PresentationData.targetDb != null && <div style={{ fontSize: 10, color: '#625143', fontFamily: 'monospace', marginTop: 4, fontStyle: 'italic' }}>
-          The shaped target integrates to {Math.round(p14PresentationData.targetDb)} dBC total. Individual frequencies are not required to reach {Math.round(p14PresentationData.targetDb)} dB.
-        </div>}
+        {/* P14 target inline summary removed — target is shown in Bass Target Settings above */}
         {includeDiagnostics && p14IntegrationDiagnostic && p14IntegrationDiagnostic.integratedCWeightedDb != null && (() => {
           const err = Math.abs(p14IntegrationDiagnostic.errorDb || 0);
           const pass = err <= 0.05;
@@ -929,12 +919,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         </div>
       )}
 
-      {/* Bass Target Settings — secondary panel, kept near the graph but out of the top summary */}
-      <CollapsiblePanel title="Bass Target Settings" defaultOpen={false}>
-        <div className="pt-3">
-          <BassTargetLevelControl disabled={detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"} />
-        </div>
-      </CollapsiblePanel>
+      {/* Bass Target Settings moved to the top of the section — always visible */}
 
       {/* ── EQ Discovery Audit — engineering-only, below the Bass Response graph ── */}
       {includeDiagnostics && <EqDiscoveryAuditPanel />}
@@ -1121,8 +1106,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         </div>
       </CollapsiblePanel>
 
-      {/* Advanced Subwoofer Tuning — calibration review only, collapsed by default */}
-      <CollapsiblePanel title="Advanced Subwoofer Tuning" defaultOpen={false}>
+      {/* Advanced Subwoofer Tuning — expert/calibration only, hidden from the normal designer view */}
+      {includeDiagnostics && <CollapsiblePanel title="Advanced Subwoofer Tuning" defaultOpen={false}>
         <div className="pt-3 space-y-4">
           <p className="text-[11px] text-[#625143]">For calibration review only. Sound Proof automatically time-aligns subwoofers for the design simulation.</p>
           {totalSubCount > 0 && (
@@ -1171,7 +1156,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             </div>
           )}
         </div>
-      </CollapsiblePanel>
+      </CollapsiblePanel>}
 
     </div>
   );
