@@ -174,7 +174,7 @@ function aggregateLevelProfile(contributions) {
  * @returns {string|null}
  */
 export function getRoomDesignRatingDesignation(roomDesignRating) {
-  if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED") return null;
+  if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED" || roomDesignRating.status === "NOT_CONFIGURED") return null;
   if (hasFailResult(roomDesignRating.contributions)) return FAIL_LABEL;
   const index = getDesignPerformanceIndex(roomDesignRating);
   return getOverallDesignationFromIndex(index);
@@ -258,7 +258,7 @@ function worstLevelFromResultLevel(resultLevel) {
  * @returns {Array<{label, designation, index}>}
  */
 export function getCategorySummaries(roomDesignRating) {
-  if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED") return [];
+  if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED" || roomDesignRating.status === "NOT_CONFIGURED") return [];
   const contributions = roomDesignRating.contributions || [];
 
   const groups = {};
@@ -324,7 +324,7 @@ function qualifier(weighted, total) {
  * @returns {string|null}
  */
 export function getDesignRatingSupportingSentence(roomDesignRating) {
-  if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED") return null;
+  if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED" || roomDesignRating.status === "NOT_CONFIGURED") return null;
   const contributions = roomDesignRating.contributions || [];
   if (contributions.length === 0) return null;
 

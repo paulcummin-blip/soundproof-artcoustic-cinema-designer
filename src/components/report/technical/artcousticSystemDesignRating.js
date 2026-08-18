@@ -540,7 +540,8 @@ export function buildArtcousticDesignRatingAuthority(input) {
  * @param {Object} authority - Authority map from buildArtcousticDesignRatingAuthority
  * @returns {{ status, rawPercentage, displayPercentage, actualPoints, maximumAvailablePoints, applicableWeight, assessedWeight, coveragePercent, hasProvisional }}
  */
-export function calculateRoomDesignRating(authority) {
+function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
+  const seatIdSet = new Set(Array.isArray(scopeSeatIds) ? scopeSeatIds : []);
   let actualPoints = 0;
   let maximumAvailablePoints = 0;
   let applicableWeight = 0;
@@ -578,10 +579,18 @@ export function calculateRoomDesignRating(authority) {
       // Extract mode from the original input stored on the authority parameter
       mode = param.mode || null;
     } else {
-      // seat-scope: average multipliers across applicable seats
-      const seatIds = authority?.seatIds || [];
-      const seatValues = Object.values(param.seats || {});
-      const applicableSeats = seatValues.filter((s) => s.state !== "na");
+      // seat-scope: average multipliers across applicable seats IN SCOPE.
+      // The scope filter happens HERE — before averaging and distribution —
+      // so Primary/Secondary/All scopes see only their seat subsets.
+      // Filtering only authority.seatIds is NOT sufficient; param.seats must
+      // be filtered by scopeSeatIds before averaging and buildSeatDistribution.
+      const scopedSeatIds = (authority?.seatIds || []).filter((id) => seatIdSet.has(id));
+      const applicableSeats = [];
+      for (const id of scopedSeatIds) {
+        const sa = param.seats?.[id];
+        if (!sa || sa.state === "na") continue;
+        applicableSeats.push(sa);
+      }
       if (applicableSeats.length === 0) continue;
       if (applicableSeats.some((s) => s.state === "provisional")) {
         hasProvisional = true; // diagnostic only
@@ -589,7 +598,7 @@ export function calculateRoomDesignRating(authority) {
       }
       const sum = applicableSeats.reduce((acc, s) => acc + (s.multiplier ?? 0), 0);
       multiplier = sum / applicableSeats.length;
-      resultLevel = buildSeatDistribution(param.seats, seatIds);
+      resultLevel = buildSeatDistribution(param.seats, scopedSeatIds);
     }
 
     const earnedPoints = multiplier * weight;
@@ -644,6 +653,57 @@ export function calculateRoomDesignRating(authority) {
     hasProvisional,
     contributions,
   };
+}
+
+/**
+ * Calculate the room Artcoustic System Design Rating across ALL seats.
+ *
+ * This is the existing production path. It delegates to the shared internal
+ * core using every authoritative seat ID, preserving exact numerical
+ * behaviour for all current consumers (scorecard, sidebar, recommendations).
+ *
+ * @param {Object} authority - Authority map from buildArtcousticDesignRatingAuthority
+ * @returns {Object} room rating (All Seating)
+ */
+export function calculateRoomDesignRating(authority) {
+  const allSeatIds = authority?.seatIds || [];
+  return calculateRoomDesignRatingCore(authority, allSeatIds);
+}
+
+/**
+ * Calculate a scoped room Artcoustic System Design Rating.
+ *
+ * Same shared core as calculateRoomDesignRating, but restricts seat-scope
+ * parameter averaging and distribution to the supplied seat subset.
+ * Room-scope parameters are identical across all scopes (they have no seat
+ * dependency). Only seat-scope parameters change when the seat set changes.
+ *
+ * Returns status: "NOT_CONFIGURED" when scopeSeatIds is empty, so the
+ * presentation layer can show "not configured" instead of a misleading
+ * room-parameters-only partial score.
+ *
+ * @param {Object} authority - Authority map from buildArtcousticDesignRatingAuthority
+ * @param {string[]} scopeSeatIds - Seat IDs in this scope (Primary / Secondary / All)
+ * @returns {Object} scoped room rating
+ */
+export function calculateScopedRoomDesignRating(authority, scopeSeatIds) {
+  const ids = Array.isArray(scopeSeatIds) ? scopeSeatIds.filter(Boolean) : [];
+  if (ids.length === 0) {
+    return {
+      status: "NOT_CONFIGURED",
+      rawPercentage: null,
+      displayPercentage: null,
+      designPerformanceIndex: null,
+      actualPoints: null,
+      maximumAvailablePoints: null,
+      applicableWeight: null,
+      assessedWeight: null,
+      coveragePercent: null,
+      hasProvisional: null,
+      contributions: [],
+    };
+  }
+  return calculateRoomDesignRatingCore(authority, ids);
 }
 
 /**

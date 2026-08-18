@@ -21,8 +21,10 @@ import { buildDesignRatingInput } from '@/components/report/technical/buildDesig
 import {
   buildArtcousticDesignRatingAuthority,
   calculateRoomDesignRating,
+  calculateScopedRoomDesignRating,
 } from '@/components/report/technical/artcousticSystemDesignRating';
 import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
+import { getPrimarySeats, getSecondarySeats } from '@/components/utils/seatPriorityAuthority';
 
 // Map numeric RP22 parameter IDs to the string keys expected by buildDesignRatingInput
 const SEAT_PARAM_KEY_MAP = {
@@ -148,6 +150,20 @@ export function useAppDesignRating({
       const authority = buildArtcousticDesignRatingAuthority(input);
       const rating = calculateRoomDesignRating(authority);
 
+      // Three scoped ratings from the SAME shared authority. All Seating is
+      // the same authoritative result as the top-level rating. Primary and
+      // Secondary average only their seat subsets. Secondary with zero seats
+      // returns NOT_CONFIGURED. No second authority build; no duplicated
+      // scoring logic — calculateScopedRoomDesignRating delegates to the same
+      // internal core as calculateRoomDesignRating.
+      const primarySeatIds = getPrimarySeats(seats).map((s) => s.id).filter(Boolean);
+      const secondarySeatIds = getSecondarySeats(seats).map((s) => s.id).filter(Boolean);
+      const scopedRatings = {
+        primary: calculateScopedRoomDesignRating(authority, primarySeatIds),
+        secondary: calculateScopedRoomDesignRating(authority, secondarySeatIds),
+        all: rating,
+      };
+
       // Stage B: expose per-seat levels + P12/P13 raw for RSP reach classification.
       // No formula change — reuses the authority's already-computed per-seat levels
       // and the analysisResult raw values. ASDR percentage/weights/thresholds are
@@ -169,7 +185,7 @@ export function useAppDesignRating({
         ? Number(analysisResult.gradedParameters.primary[13].value)
         : null;
 
-      return { ...rating, seatLevels, p12RawDb, p13RawDb };
+      return { ...rating, seatLevels, p12RawDb, p13RawDb, scopedRatings };
     } catch (e) {
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;
