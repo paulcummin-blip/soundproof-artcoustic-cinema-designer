@@ -28,6 +28,7 @@ export default function BassResultsSummary({ compact = false, showPriority = tru
     <BassCapabilitySummary
       capability={shared.contract?.selectedCandidate?.postEqCapabilityAssessment}
       targetWarning={shared.contract?.selectedCandidate?.targetWarning}
+      p14Parameter={shared.contract?.productAnalysis?.parameters?.p14}
     />
     <BassDesignRecommendation recommendation={shared.contract?.designRecommendation} />
   </div>;

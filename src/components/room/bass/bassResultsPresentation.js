@@ -53,10 +53,13 @@ function readyPill(key, parameter, result) {
   const value = formatBassParameterValue(key, parameter.value);
   if (key === "p14") {
     const basis = parameter.targetBasis === "recommended" ? "Recommended" : "Minimum";
+    const basisAbbrev = basis === "Recommended" ? "Rec" : "Min";
     const selectedLevel = parameter.selectedLevel || Math.max(1, parameter.level || 1);
     const outcome = parameter.pass === false ? "FAIL" : parameter.pass === true ? "PASS" : "—";
-    const resultText = `${basis} L${selectedLevel}${value ? ` · ${value}` : ""} · ${outcome}`;
-    return { label: "P14 Bass SPL", resultText, text: `P14 Bass SPL ${resultText}`, level: outcome === "FAIL" ? "FAIL" : `L${selectedLevel}` };
+    const achievedGrade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;
+    const resultText = `${achievedGrade}${value ? ` · ${value}` : ""}`;
+    const detail = `Target: ${basisAbbrev} L${selectedLevel} · ${outcome}`;
+    return { label: "P14 Bass SPL", resultText, text: `P14 Bass SPL ${resultText}`, level: outcome === "FAIL" ? "FAIL" : achievedGrade, detail };
   }
   return {
     label,
