@@ -103,9 +103,16 @@ function getStatusColorLocal(status, statuses) {
 function buildSystemSummary(p, dolbyLabelMap) {
   if (!p.dolby_config) return "";
   const label = dolbyLabelMap[p.dolby_config] || p.dolby_config;
-  // Existing labels look like "5.1.4 Atmos"; normalise to "Dolby Atmos 5.1.4".
-  const match = label.match(/^(\d+(?:\.\d+)*)\s*Atmos$/i);
-  return match ? `Dolby Atmos ${match[1]}` : label;
+  // Labels may carry RP22 fragments (e.g. "7.1.4 Atmos — P2 - L2").
+  // Extract just the format number + "Atmos" and normalise to
+  // "Dolby Atmos 7.1.4", discarding any trailing RP22/result text.
+  const match = label.match(/^(\d+(?:\.\d+)*)\s*Atmos/i);
+  if (match) return `Dolby Atmos ${match[1]}`;
+  // Non-Atmos surround formats (e.g. "5.1 Surround — P2 - L1")
+  const surroundMatch = label.match(/^(\d+(?:\.\d+)*)\s*Surround/i);
+  if (surroundMatch) return `${surroundMatch[1]} Surround`;
+  // Fallback: strip any RP22-level fragments from the raw label
+  return label.replace(/\s*[—-]\s*(P\d+|L[1-4]|Minimum|Recommended|Rec)\b.*$/i, "").trim();
 }
 
 // Build the supporting detail line from existing project data.
