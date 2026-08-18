@@ -1,5 +1,6 @@
 // components/pricing/DesignRatingSummary.jsx
-import React from 'react';
+import React, { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { formatViewingRecommendationSummary } from '@/components/recommendations/viewingRecommendationPresentation';
 import {
   formatP12P13Consequences,
@@ -227,6 +228,60 @@ function RecommendationGroup({ title, items, emptyText, mode }) {
 }
 
 /**
+ * Collapsible recommendation group for the "Improve the Design" section.
+ * Collapsed by default so the primary ASDR information stays visually dominant.
+ * Hidden entirely when there are no recommendations (no empty expandable panel).
+ * UI-only state — not persisted to the project.
+ */
+function CollapsibleRecommendationGroup({ title, items, mode }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (!items || items.length === 0) return null;
+
+  const count = items.length;
+  const countLabel = count === 1 ? '1 recommendation' : `${count} recommendations`;
+
+  return (
+    <section style={{ marginTop: 12 }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((v) => !v)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          fontSize: 9,
+          fontWeight: 800,
+          letterSpacing: '0.07em',
+          color: '#625143',
+          textAlign: 'left',
+        }}
+      >
+        <span>{title} · {countLabel}</span>
+        <ChevronDown
+          style={{
+            width: 12,
+            height: 12,
+            color: '#625143',
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 150ms ease',
+            flexShrink: 0,
+          }}
+        />
+      </button>
+      {isOpen && (
+        items.map((item) => <RecommendationRow key={item.id} item={item} mode={mode} />)
+      )}
+    </section>
+  );
+}
+
+/**
  * Compact Artcoustic System Design Rating and evaluated decision support.
  * Recommendations are results from canonical RP22/SPL/ASDR scenario re-runs.
  */
@@ -317,11 +372,10 @@ export default function DesignRatingSummary({
               <div style={{ marginTop: 8, fontSize: 8.5, lineHeight: 1.4, color: '#8A867D' }}>
                 Each option is evaluated independently. Combining changes may produce a different result and should be re-evaluated.
               </div>
-              <RecommendationGroup
-                title="IMPROVE THE DESIGN"
+              <CollapsibleRecommendationGroup
+                title="Improve the Design"
                 items={improvements}
                 mode="improvement"
-                emptyText="No material improvement identified."
               />
               <RecommendationGroup
                 title="SIMPLIFY THE DESIGN"
