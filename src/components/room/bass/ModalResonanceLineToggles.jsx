@@ -6,7 +6,7 @@ export default function ModalResonanceLineToggles({ show, onShowChange, toggles,
   return <div className="mt-2 border-t border-border pt-2">
     <div className="flex items-center gap-2 text-xs font-medium text-foreground">
       <Switch id="show-room-modes" checked={show} onCheckedChange={onShowChange} />
-      <label htmlFor="show-room-modes">Show room modes</label>
+      <label htmlFor="show-room-modes">Show Mode Frequencies</label>
     </div>
     {show && <div className="mt-2 flex flex-wrap gap-3">
       {Object.entries(ROOM_MODE_STYLES).map(([key, style]) => <label key={key} className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">

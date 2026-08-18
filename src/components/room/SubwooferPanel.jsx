@@ -326,9 +326,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
             <div className="rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h5 className="text-[14px] font-semibold text-[#1B1A1A]">Show Room Modes</h5>
+                  <h5 className="text-[14px] font-semibold text-[#1B1A1A]">Show Room Mode Guide</h5>
                   <p className="text-[11px] text-[#625143] leading-relaxed mt-1">
-                    Shows predicted low-frequency cancellation zones on the room plan.
+                    Shows the approximate node positions of the first axial room modes. These are design guides, not predicted bass nulls.
                   </p>
                 </div>
                 <Switch
@@ -336,6 +336,22 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   onCheckedChange={(checked) => appState?.setShowRoomModesOverlay?.(checked)}
                 />
               </div>
+
+              {appState?.showRoomModesOverlay && (
+                <div className="mt-3 rounded-lg border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3">
+                  <h6 className="text-[12px] font-semibold text-[#1B1A1A] mb-1.5">Understanding Room Modes</h6>
+                  <p className="text-[11px] text-[#625143] leading-relaxed mb-2">
+                    Room modes are natural low-frequency pressure patterns created by the room dimensions. The shaded guides show positions that may be more sensitive to individual axial modes. They do not mean that every seat within these areas will experience a bass null.
+                  </p>
+                  <p className="text-[11px] text-[#625143] leading-relaxed mb-2">
+                    The final bass response is determined by the combination of all active subwoofers, their positions, the seating positions and the interaction of multiple room modes. Use this guide alongside the predicted bass response when comparing layouts.
+                  </p>
+                  <p className="text-[11px] font-medium text-[#1B1A1A] leading-relaxed mb-0.5">Design principle:</p>
+                  <p className="text-[11px] text-[#625143] leading-relaxed">
+                    Multiple subwoofers in complementary locations can significantly improve bass consistency across the seating area. Deep cancellations are normally addressed through subwoofer or seating placement rather than large EQ boosts.
+                  </p>
+                </div>
+              )}
             </div>
 
             <BestSubLayoutGuide

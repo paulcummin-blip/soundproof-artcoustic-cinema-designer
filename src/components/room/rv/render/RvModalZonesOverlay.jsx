@@ -1,82 +1,40 @@
 import React from "react";
 
-const STRONG_FILL = "#4A230F";
-const MEDIUM_FILL = "#625143";
-const CONTOUR_STROKE = "#213428";
+// Diagnostic overlay: approximate node lines of the first three axial room modes.
+// This is a spatial design guide only — it does NOT derive from, feed, or alter the
+// bass simulation, P18/P19/P20, sub/seat grading, EQ, or any saved coordinates.
+// See SubwooferPanel "Show Room Mode Guide" + "Understanding Room Modes" context.
 
+const SPEED_OF_SOUND = 343; // m/s
+
+// Neutral, non-warning palette. Reads as a reference overlay, not a prohibited zone.
+const BAND_FILL = "#8A8F95";        // cool neutral grey
+const CENTER_LINE_STROKE = "#5B6470"; // darker neutral grey-blue
+
+// Normalized interior node positions for axial orders 1–3 in a rectangular room.
+// f_n = n * c / (2 * L); node lines fall at k/n for k = 1 .. n-1.
 const AXIAL_BANDS = [
-  { position: 0.5, width: 0.08, kind: "strong" },
-  { position: 0.25, width: 0.06, kind: "medium" },
-  { position: 0.75, width: 0.06, kind: "medium" },
-  { position: 1 / 6, width: 0.045, kind: "medium" },
-  { position: 0.5, width: 0.045, kind: "soft" },
-  { position: 5 / 6, width: 0.045, kind: "medium" },
+  { position: 0.5,    width: 0.07, order: 1 },
+  { position: 0.25,   width: 0.05, order: 2 },
+  { position: 0.75,   width: 0.05, order: 2 },
+  { position: 1 / 6,  width: 0.04, order: 3 },
+  { position: 0.5,    width: 0.04, order: 3 },
+  { position: 5 / 6,  width: 0.04, order: 3 },
 ];
+
+function ordinalLabel(n) {
+  if (n === 1) return "1st order";
+  if (n === 2) return "2nd order";
+  if (n === 3) return "3rd order";
+  return `${n}th order`;
+}
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
 }
 
-function getSubAxisPosition(sub, axisLength, axis) {
-  const value = Number(sub?.position?.[axis]);
-  if (!(Number.isFinite(value) && axisLength > 0)) return null;
-  return clamp01(value / axisLength);
-}
-
-function getBandExcitation(subPositions, bandPosition, bandWidth) {
-  if (!Array.isArray(subPositions) || subPositions.length === 0) return 0.35;
-
-  const halfWidth = bandWidth / 2;
-  const values = subPositions
-    .map((position) => {
-      if (!Number.isFinite(position)) return null;
-      const distance = Math.abs(position - bandPosition);
-      const normalized = distance / Math.max(halfWidth, 0.001);
-      if (normalized <= 1) {
-        return 1;
-      }
-      if (normalized <= 2.4) {
-        return Math.max(0, 1 - ((normalized - 1) / 1.4));
-      }
-      return 0;
-    })
-    .filter((value) => value !== null);
-
-  if (values.length === 0) return 0.35;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function getFillForKind(kind) {
-  if (kind === "strong") return STRONG_FILL;
-  return MEDIUM_FILL;
-}
-
-function getBandOpacity(kind, excitation) {
-  const softExcitation = clamp01(excitation);
-
-  if (kind === "strong") {
-    return 0.06 + softExcitation * 0.12;
-  }
-
-  if (kind === "soft") {
-    return 0.02 + softExcitation * 0.04;
-  }
-
-  return 0.025 + softExcitation * 0.075;
-}
-
-function getContourOpacity(excitation) {
-  return 0.05 + clamp01(excitation) * 0.16;
-}
-
 const SEAT_HALF_WIDTH_M = 0.30;
 const SEAT_FRONT_BACK_TOLERANCE_M = 0.15;
-
-function getSeatAxisPosition(seat, axisLength, axis) {
-  const value = Number(seat?.[axis] ?? seat?.position?.[axis]);
-  if (!(Number.isFinite(value) && axisLength > 0)) return null;
-  return clamp01(value / axisLength);
-}
 
 function getSeatBandIntersectionFactor(seatingPositions, bandPosition, bandWidth, axisLength, axis) {
   if (!Array.isArray(seatingPositions) || seatingPositions.length === 0 || !(axisLength > 0)) return 0;
@@ -104,13 +62,18 @@ function getSeatBandIntersectionFactor(seatingPositions, bandPosition, bandWidth
   return Math.max(...intersections);
 }
 
-function getCombinedBandEmphasis(excitation, seatIntersection) {
-  const safeExcitation = clamp01(excitation);
-  const safeSeatIntersection = clamp01(seatIntersection);
-  return clamp01((safeExcitation * 0.7) + (safeSeatIntersection * 0.45));
+function axialFrequencyHz(order, dimensionM) {
+  if (!(Number(dimensionM) > 0) || !(order > 0)) return null;
+  const f = (order * SPEED_OF_SOUND) / (2 * Number(dimensionM));
+  return Number.isFinite(f) ? Math.round(f) : null;
 }
 
-export default function RvModalZonesOverlay({ widthM, lengthM, toPx, subwoofers = [], seatingPositions = [] }) {
+function bandBaseOpacity(order) {
+  // Light, neutral. 1st-order (single centre node) slightly more visible than higher orders.
+  return order === 1 ? 0.05 : 0.035;
+}
+
+export default function RvModalZonesOverlay({ widthM, lengthM, toPx, seatingPositions = [] }) {
   if (!(Number(widthM) > 0) || !(Number(lengthM) > 0) || typeof toPx !== "function") {
     return null;
   }
@@ -122,81 +85,80 @@ export default function RvModalZonesOverlay({ widthM, lengthM, toPx, subwoofers 
   const roomWidthPx = Math.abs(x1 - x0);
   const roomHeightPx = Math.abs(y1 - y0);
 
-  const xPositions = Array.isArray(subwoofers)
-    ? subwoofers.map((sub) => getSubAxisPosition(sub, Number(widthM), "x")).filter(Number.isFinite)
-    : [];
-  const yPositions = Array.isArray(subwoofers)
-    ? subwoofers.map((sub) => getSubAxisPosition(sub, Number(lengthM), "y")).filter(Number.isFinite)
-    : [];
+  const renderBand = (band, axis, dimensionPx, crossAxisPx, dimensionM, originX, originY) => {
+    const center = axis === "x"
+      ? originX + dimensionPx * clamp01(band.position)
+      : originY + dimensionPx * clamp01(band.position);
+    const bandThickness = dimensionPx * band.width;
 
-  const widthCenterExcitation = getBandExcitation(xPositions, 0.5, 0.08);
-  const lengthCenterExcitation = getBandExcitation(yPositions, 0.5, 0.08);
-  const widthCenterSeatIntersection = getSeatBandIntersectionFactor(seatingPositions, 0.5, 0.08, Number(widthM), "x");
-  const lengthCenterSeatIntersection = getSeatBandIntersectionFactor(seatingPositions, 0.5, 0.08, Number(lengthM), "y");
-  const widthCenterEmphasis = getCombinedBandEmphasis(widthCenterExcitation, widthCenterSeatIntersection);
-  const lengthCenterEmphasis = getCombinedBandEmphasis(lengthCenterExcitation, lengthCenterSeatIntersection);
+    // Seat proximity is a very subtle context hint only — never enough to read as a warning.
+    const seatIntersection = getSeatBandIntersectionFactor(
+      seatingPositions, band.position, band.width, Number(dimensionM), axis
+    );
+    const opacity = clamp01(bandBaseOpacity(band.order) + seatIntersection * 0.025);
+
+    const freqHz = axialFrequencyHz(band.order, Number(dimensionM));
+    const axisLabel = axis === "x" ? "Width" : "Length";
+    const tooltip = freqHz != null
+      ? `${axisLabel} axial mode — ${ordinalLabel(band.order)} · ${freqHz} Hz`
+      : `${axisLabel} axial mode — ${ordinalLabel(band.order)}`;
+
+    if (axis === "x") {
+      return (
+        <g key={`width-band-${band.position}-${band.order}`}>
+          <rect
+            x={center - bandThickness / 2}
+            y={top}
+            width={bandThickness}
+            height={roomHeightPx}
+            fill={BAND_FILL}
+            opacity={opacity}
+          />
+          <line
+            x1={center}
+            y1={top}
+            x2={center}
+            y2={top + roomHeightPx}
+            stroke={CENTER_LINE_STROKE}
+            strokeOpacity={0.18}
+            strokeWidth={1}
+            strokeDasharray="6 6"
+          >
+            <title>{tooltip}</title>
+          </line>
+        </g>
+      );
+    }
+    return (
+      <g key={`length-band-${band.position}-${band.order}`}>
+        <rect
+          x={left}
+          y={center - bandThickness / 2}
+          width={roomWidthPx}
+          height={bandThickness}
+          fill={BAND_FILL}
+          opacity={opacity}
+        />
+        <line
+          x1={left}
+          y1={center}
+          x2={left + roomWidthPx}
+          y2={center}
+          stroke={CENTER_LINE_STROKE}
+          strokeOpacity={0.18}
+          strokeWidth={1}
+          strokeDasharray="6 6"
+        >
+          <title>{tooltip}</title>
+        </line>
+      </g>
+    );
+  };
 
   return (
     <g data-layer="modal-zones-overlay" pointerEvents="none">
-      {AXIAL_BANDS.map((band, index) => {
-        const xCenter = left + roomWidthPx * clamp01(band.position);
-        const bandWidth = roomWidthPx * band.width;
-        const excitation = getBandExcitation(xPositions, band.position, band.width);
-        const seatIntersection = getSeatBandIntersectionFactor(seatingPositions, band.position, band.width, Number(widthM), "x");
-        const emphasis = getCombinedBandEmphasis(excitation, seatIntersection);
-        return (
-          <rect
-            key={`width-band-${index}`}
-            x={xCenter - bandWidth / 2}
-            y={top}
-            width={bandWidth}
-            height={roomHeightPx}
-            fill={getFillForKind(band.kind)}
-            opacity={getBandOpacity(band.kind, emphasis)}
-          />
-        );
-      })}
-
-      {AXIAL_BANDS.map((band, index) => {
-        const yCenter = top + roomHeightPx * clamp01(band.position);
-        const bandHeight = roomHeightPx * band.width;
-        const excitation = getBandExcitation(yPositions, band.position, band.width);
-        const seatIntersection = getSeatBandIntersectionFactor(seatingPositions, band.position, band.width, Number(lengthM), "y");
-        const emphasis = getCombinedBandEmphasis(excitation, seatIntersection);
-        return (
-          <rect
-            key={`length-band-${index}`}
-            x={left}
-            y={yCenter - bandHeight / 2}
-            width={roomWidthPx}
-            height={bandHeight}
-            fill={getFillForKind(band.kind)}
-            opacity={getBandOpacity(band.kind, emphasis)}
-          />
-        );
-      })}
-
-      <line
-        x1={left + roomWidthPx * 0.5}
-        y1={top}
-        x2={left + roomWidthPx * 0.5}
-        y2={top + roomHeightPx}
-        stroke={CONTOUR_STROKE}
-        strokeOpacity={getContourOpacity(widthCenterEmphasis)}
-        strokeWidth={1.5}
-        strokeDasharray="8 8"
-      />
-
-      <line
-        x1={left}
-        y1={top + roomHeightPx * 0.5}
-        x2={left + roomWidthPx}
-        y2={top + roomHeightPx * 0.5}
-        stroke={CONTOUR_STROKE}
-        strokeOpacity={getContourOpacity(lengthCenterEmphasis)}
-        strokeWidth={1.5}
-        strokeDasharray="8 8"
-      />
+      {AXIAL_BANDS.map((band) => renderBand(band, "x", roomWidthPx, roomHeightPx, widthM, left, top))}
+      {AXIAL_BANDS.map((band) => renderBand(band, "y", roomHeightPx, roomWidthPx, lengthM, top, left))}
     </g>
   );
 }

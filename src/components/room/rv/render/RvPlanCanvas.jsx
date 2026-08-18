@@ -376,10 +376,6 @@ export default function RvPlanCanvas({
                 lengthM={lengthM}
                 toPx={toPx}
                 seatingPositions={seatingPositions}
-                subwoofers={[
-                  ...(frontLive || []),
-                  ...(rearLive || [])
-                ]}
               />
             )}
 
