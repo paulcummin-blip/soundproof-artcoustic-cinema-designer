@@ -206,11 +206,14 @@ function RoomDesignerWithState() {
   const _sevenBedLayoutType = appState?.sevenBedLayoutType;
   const _overlays = appState?.overlays;
   const _setOverlays = appState?.setOverlays;
-  const speakerPositionsView = ['off', 'plan', 'table', 'both'].includes(_overlays?.SPEAKER_POSITIONS_VIEW)
-    ? _overlays.SPEAKER_POSITIONS_VIEW
+  // Speaker Positions is now an On/Off toggle (Plan View only).
+  // Migrate legacy values: 'plan'/'both' -> 'plan' (On); 'off'/'table'/other -> 'off' (Off).
+  const rawSpeakerPositionsView = _overlays?.SPEAKER_POSITIONS_VIEW;
+  const speakerPositionsView = rawSpeakerPositionsView === 'plan' || rawSpeakerPositionsView === 'both'
+    ? 'plan'
     : 'off';
   const setSpeakerPositionsView = useCallback((nextView) => {
-    if (!_setOverlays || !['off', 'plan', 'table', 'both'].includes(nextView)) return;
+    if (!_setOverlays || (nextView !== 'off' && nextView !== 'plan')) return;
     _setOverlays((previous) => ({ ...(previous || {}), SPEAKER_POSITIONS_VIEW: nextView }));
   }, [_setOverlays]);
   const _frontSubsCfg = appState?.frontSubsCfg;
