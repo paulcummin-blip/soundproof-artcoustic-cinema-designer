@@ -461,41 +461,44 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   
   return (
     <div className="space-y-2 p-2">
-      {/* ── Model ── */}
-      <Label htmlFor="lcr-model" className="text-[#3E4349] font-medium">LCR Model</Label>
-      <Select value={lcrModel || undefined} onValueChange={(val) => { if (val === '__none__') onClearLcrModel(); else onChooseModel(val); }} disabled={disabled}>
-        <SelectTrigger id="lcr-model" className="w-full h-10 px-3 py-2 mt-1 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
-          <span className="text-2xl font-semibold" style={{ color: '#213428' }}>
-            {frontStageMode === 'integrated_lcr' ? '-' : (lcrModel ? (getSpeakerModelMeta(lcrModel)?.label || lcrModel) : 'Select LCR model')}
-          </span>
-        </SelectTrigger>
-        <SelectContent className="bg-white border-[#DCDBD6]">
-          {lcrModel && <SelectItem value="__none__" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#9B9890' }}>— Clear selection —</SelectItem>}
-          {standardLcrOptions.map(model => (
-            <SelectItem key={model.key} value={model.label} className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>{model.label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {/* ── LCR Model + Front Stage — side by side on desktop, stack on narrow screens ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+        <div className="space-y-1">
+          <Label htmlFor="lcr-model" className="text-[#3E4349] font-medium">LCR Model</Label>
+          <Select value={lcrModel || undefined} onValueChange={(val) => { if (val === '__none__') onClearLcrModel(); else onChooseModel(val); }} disabled={disabled}>
+            <SelectTrigger id="lcr-model" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
+              <span className="text-2xl font-semibold" style={{ color: '#213428' }}>
+                {frontStageMode === 'integrated_lcr' ? '-' : (lcrModel ? (getSpeakerModelMeta(lcrModel)?.label || lcrModel) : 'Select LCR model')}
+              </span>
+            </SelectTrigger>
+            <SelectContent className="bg-white border-[#DCDBD6]">
+              {lcrModel && <SelectItem value="__none__" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#9B9890' }}>— Clear selection —</SelectItem>}
+              {standardLcrOptions.map(model => (
+                <SelectItem key={model.key} value={model.label} className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>{model.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      {/* ── Front Stage ── */}
-      <div className="space-y-2 mt-4">
-        <Label htmlFor="front-stage-mode" className="text-[#3E4349] font-medium">Front Stage</Label>
-        <Select value={frontStageMode} onValueChange={onChooseFrontStageMode} disabled={disabled}>
-          <SelectTrigger id="front-stage-mode" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
-            <span className="text-base font-semibold" style={{ color: '#213428' }}>
-              {frontStageMode === 'integrated_lcr' ? 'Integrated LCR soundbar' : frontStageMode === 'center_only' ? 'Center-only soundbar override' : 'Separate LCR speakers'}
-            </span>
-          </SelectTrigger>
-          <SelectContent className="bg-white border-[#DCDBD6]">
-            <SelectItem value="standard" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Separate LCR speakers</SelectItem>
-            <SelectItem value="center_only" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Center-only soundbar override</SelectItem>
-            <SelectItem value="integrated_lcr" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Integrated LCR soundbar</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="space-y-1">
+          <Label htmlFor="front-stage-mode" className="text-[#3E4349] font-medium">Front Stage</Label>
+          <Select value={frontStageMode} onValueChange={onChooseFrontStageMode} disabled={disabled}>
+            <SelectTrigger id="front-stage-mode" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
+              <span className="text-base font-semibold" style={{ color: '#213428' }}>
+                {frontStageMode === 'integrated_lcr' ? 'Integrated LCR soundbar' : frontStageMode === 'center_only' ? 'Center-only soundbar override' : 'Separate LCR speakers'}
+              </span>
+            </SelectTrigger>
+            <SelectContent className="bg-white border-[#DCDBD6]">
+              <SelectItem value="standard" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Separate LCR speakers</SelectItem>
+              <SelectItem value="center_only" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Center-only soundbar override</SelectItem>
+              <SelectItem value="integrated_lcr" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Integrated LCR soundbar</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {frontStageMode !== 'standard' && (
-        <div className="space-y-2 mt-4">
+        <div className="space-y-1 mt-3">
           <Label htmlFor="front-stage-soundbar" className="text-[#3E4349] font-medium">Soundbar Model</Label>
           <Select value={soundbarModel || undefined} onValueChange={onChooseSoundbarModel} disabled={disabled}>
             <SelectTrigger id="front-stage-soundbar" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
@@ -517,8 +520,8 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         </div>
       )}
 
-      <p className="text-xs text-[#625143] mt-1">
-        Angle to MLP: <span className="font-semibold text-[#1B1A1A]">{Math.round(lcrAngleDeg)}°</span>
+      <p className="text-[11px] text-[#8B7F76] mt-2">
+        Angle to MLP: <span className="font-medium text-[#625143]">{Math.round(lcrAngleDeg)}°</span>
       </p>
 
       {/* ── Acoustic Centre Height — compact card, left-aligned, not full width ── */}
