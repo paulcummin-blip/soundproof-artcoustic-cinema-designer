@@ -502,21 +502,22 @@ export function adaptCurrentBassOptimisationResult({
     : Number.isFinite(selectedCandidate?.achievedP18FrequencyHz) ? selectedCandidate.achievedP18FrequencyHz : (Number.isFinite(optimisationResult?.achievedP18FrequencyHz) ? optimisationResult.achievedP18FrequencyHz : null);
   const selectedP18TargetBasis = normalizeP18TargetBasis(p18TargetBasis);
   const p18Assessment = assessP18Extension(p18Value, selectedP18TargetBasis);
-  const p18Qualified = selectedCandidate?.p18AchievedAuthority?.qualifiedAtSelectedP14Output
-    ?? selectedCandidate?.requestedP14Pass
-    ?? true;
-  const p18Level = p18Qualified ? p18Assessment.level : 0;
+  // P18 remains an independent achieved extension result even when the selected
+  // P14 request is above the product envelope. A P14 miss must not erase a valid
+  // 1/3-octave-smoothed -3 dB crossing (for example 30.65 Hz → 30 Hz → Min L2).
+  const p18ResultAvailable = p18Assessment.level != null;
+  const p18Level = p18Assessment.level;
   contract.productAnalysis.parameters.p18 = {
     ...createBassParameterResult({
-      parameter: PARAM_P18, status: paramStatus(p18Assessment.level != null), level: p18Level, value: p18Value,
-      unit: "Hz", passedL1: p18Qualified && p18Level != null ? p18Level >= 1 : false, isStale,
+      parameter: PARAM_P18, status: paramStatus(p18ResultAvailable), level: p18Level, value: p18Value,
+      unit: "Hz", passedL1: p18Level != null ? p18Level >= 1 : false, isStale,
       targetBasis: selectedP18TargetBasis,
       targetBasisDetail: formatP18TargetBasisDetail(selectedP18TargetBasis),
     }),
     designHz: p18Assessment.designHz,
     performanceBand: p18Assessment.performanceBand,
     performanceMultiplier: p18Assessment.performanceMultiplier,
-    qualifiedAtSelectedP14Output: p18Qualified,
+    qualifiedAtSelectedP14Output: p18ResultAvailable,
   };
 
   // P19
