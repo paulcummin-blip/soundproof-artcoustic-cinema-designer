@@ -172,7 +172,7 @@ export default function SubwooferInstanceList({ appState }) {
     return (
       <div className="mt-4 border-t border-[#DCDBD6] pt-3">
         <h5 className="text-[13px] font-semibold text-[#1B1A1A] mb-1">Instances</h5>
-        <p className="text-[11px] text-[#625143] italic">No subwoofer instances.</p>
+        <p className="text-[11px] text-[#625143] italic">No subwoofer instances yet.</p>
       </div>
     );
   }

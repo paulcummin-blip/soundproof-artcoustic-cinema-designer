@@ -77,6 +77,14 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
     return Number.isFinite(widthM) && Number.isFinite(y) ? { x: widthM / 2, y, z: 1.2 } : null;
   }, [appState?.mlp, appState?.mlpY_m, roomDimensions]);
 
+  // No hidden fallback model: bass results only render once a subwoofer model
+  // is genuinely selected and enabled. Until then show a quiet waiting state
+  // instead of premature P14/P18/P19/P20 pills.
+  const hasActiveSubModel = useMemo(() => {
+    const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
+    return instances.some((i) => i?.enabled !== false && i?.model);
+  }, [appState?.subwooferInstances]);
+
   return (
     <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
       <div className="rounded-none border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-4">
@@ -84,7 +92,14 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
           <BassTargetLevelControl disabled={disabled} />
         </div>
         <div className="mb-3">
-          <BassResultsSummary />
+          {hasActiveSubModel ? (
+            <BassResultsSummary />
+          ) : (
+            <div className="rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
+              <p className="text-[12px] font-medium text-[#1B1A1A]">Waiting for subwoofer selection</p>
+              <p className="mt-1 text-[11px] text-[#625143]">Select a subwoofer model and quantity to calculate bass performance.</p>
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-12 gap-x-4 gap-y-3">
           <div className="col-span-12 md:col-span-6">

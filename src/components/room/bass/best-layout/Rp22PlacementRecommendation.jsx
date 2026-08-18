@@ -34,7 +34,7 @@ function traceSubs(label, subs) {
   console.groupEnd();
 }
 
-export default function Rp22PlacementRecommendation({ roomDims, currentLayout, currentQuantityBest, upgradeBest, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, isRecalculating, currentSubs, subwooferInstances, commitInstances, hasCanonicalInstances }) {
+export default function Rp22PlacementRecommendation({ roomDims, currentLayout, best1, best2, best4, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, isRecalculating, currentSubs, subwooferInstances, commitInstances, hasCanonicalInstances }) {
   const [selected, setSelected] = useState(null);
   // previous stores the COMPLETE prior canonical instance array for undo,
   // not only CFG. Restore with one canonical-first commit. Preserve disabled
@@ -107,10 +107,24 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
   };
 
   const openDialog = (layout) => { setApplyError(null); setSelected(layout); };
-  const currentQuantityApplied = isLayoutApplied(currentQuantityBest);
-  const upgradeApplied = isLayoutApplied(upgradeBest);
-  const currentQuantityUnsupported = hasUnsupportedPlacement(currentQuantityBest);
-  const upgradeUnsupported = hasUnsupportedPlacement(upgradeBest);
+
+  const renderOption = (title, applyLabel, layout) => {
+    if (!layout) return <Unavailable title={title} message="No recognised layout of this quantity is available for the current room." />;
+    return (
+      <Rp22RecommendationCard
+        title={title}
+        applyLabel={applyLabel}
+        layout={layout}
+        onClick={openDialog}
+        onApply={apply}
+        isApplied={isLayoutApplied(layout)}
+        isRecalculating={isLayoutApplied(layout) && isRecalculating}
+        applying={applying}
+        applyError={isLayoutApplied(layout) ? null : applyError}
+        unsupported={hasUnsupportedPlacement(layout)}
+      />
+    );
+  };
 
   return (
     <div className="mt-4 space-y-3 rounded-lg border-2 border-[#213428] bg-[#F3F1EC] p-4">
@@ -118,35 +132,10 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
         <h5 className="text-[14px] font-semibold text-[#1B1A1A]">Subwoofer Placement Guide</h5>
         <p className="mt-1 text-[11px] text-[#625143]">Based on RP22 positional-optimisation guidance and recognised multi-subwoofer placement research.</p>
       </div>
-      <CurrentLayout layout={currentLayout} isRecalculating={isRecalculating} />
-      {currentQuantityBest && (
-        <Rp22RecommendationCard
-          title="Improved placement with existing quantity"
-          layout={currentQuantityBest}
-          onClick={openDialog}
-          onApply={apply}
-          isApplied={currentQuantityApplied}
-          isRecalculating={currentQuantityApplied && isRecalculating}
-          applying={applying}
-          applyError={currentQuantityApplied ? null : applyError}
-          unsupported={currentQuantityUnsupported}
-        />
-      )}
-      {!currentQuantityBest && <Unavailable title="Improved placement with existing quantity" />}
-      {upgradeBest && (
-        <Rp22RecommendationCard
-          title="Recommended multi-sub layout"
-          layout={upgradeBest}
-          onClick={openDialog}
-          onApply={apply}
-          isApplied={upgradeApplied}
-          isRecalculating={upgradeApplied && isRecalculating}
-          applying={applying}
-          applyError={upgradeApplied ? null : applyError}
-          unsupported={upgradeUnsupported}
-        />
-      )}
-      {!upgradeBest && <Unavailable title="Recommended multi-sub layout" message="No higher recognised subwoofer quantity is available." />}
+      {currentLayout && <CurrentLayout layout={currentLayout} isRecalculating={isRecalculating} />}
+      {renderOption("Best 1-sub layout", "Apply 1-sub layout", best1)}
+      {renderOption("Best 2-sub layout", "Apply 2-sub layout", best2)}
+      {renderOption("Best 4-sub layout", "Apply 4-sub layout", best4)}
       {previous && <Button type="button" size="sm" variant="outline" onClick={undo}>Undo recommended positions</Button>}
       <Rp22LayoutPlanDialog
         open={Boolean(selected)}

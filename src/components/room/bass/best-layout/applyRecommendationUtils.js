@@ -128,7 +128,10 @@ export function buildMergedPositions(existingPositions, recommendedSourcesForGro
 export function buildAppliedConfigs(layout, frontSubsCfg, rearSubsCfg) {
   const frontSources = layout.sources.filter((s) => s.placement === "front");
   const rearSources = layout.sources.filter((s) => s.placement === "rear");
-  const activeModel = frontSubsCfg?.model || rearSubsCfg?.model || "SUB2-12";
+  // No hidden fallback model — preserve the selected model only. When no
+  // model is selected, positions are still applied but the model stays empty
+  // so bass/P14 do not calculate from a hidden default product.
+  const activeModel = frontSubsCfg?.model || rearSubsCfg?.model || null;
 
   const frontPositions = buildMergedPositions(frontSubsCfg?.positions, frontSources);
   const rearPositions = buildMergedPositions(rearSubsCfg?.positions, rearSources);
@@ -252,7 +255,7 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
     // Phase 4: Create new instances only if disabled were exhausted
     const newInstances = [];
     if (sourceIdx < sortedSources.length) {
-      const model = String(cfg?.model || "SUB2-12").trim();
+      const model = String(cfg?.model || "").trim();
       for (let i = sourceIdx; i < sortedSources.length; i++) {
         const rec = sortedSources[i];
         newInstances.push({
