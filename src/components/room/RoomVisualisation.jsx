@@ -1212,10 +1212,41 @@ const byId = useEntitiesById({
 
   // Room element drag info (structured, only visible during roomElement drag)
   const [roomElementDragInfo, setRoomElementDragInfo] = useState(null);
+  const [projectorDragInfo, setProjectorDragInfo] = useState(null);
+  const [seatDragInfo, setSeatDragInfo] = useState(null);
 
   useEffect(() => {
     if (dragType !== 'roomElement') setRoomElementDragInfo(null);
   }, [dragType]);
+
+  useEffect(() => {
+    if (dragType !== 'projector') setProjectorDragInfo(null);
+  }, [dragType]);
+
+  // Seat drag guides — computed from draftSeatsRef on every seatDragTick.
+  // Shows nearest side wall + nearest front/back wall for the dragged seat.
+  useEffect(() => {
+    if (dragType !== 'seat') { setSeatDragInfo(null); return; }
+    const seats = draftSeatsRef?.current;
+    if (!Array.isArray(seats)) return;
+    const draggedSeat = seats.find(s => String(s.id) === String(draggedItemId));
+    if (!draggedSeat) return;
+    const sx = Number(draggedSeat.x ?? draggedSeat.position?.x ?? 0);
+    const sy = Number(draggedSeat.y ?? draggedSeat.position?.y ?? 0);
+    if (!Number.isFinite(sx) || !Number.isFinite(sy)) return;
+    const distLeft = sx;
+    const distRight = Math.max(0, widthM - sx);
+    const distFront = sy;
+    const distRear = Math.max(0, lengthM - sy);
+    setSeatDragInfo({
+      visible: true,
+      x: sx, y: sy, widthM, lengthM,
+      side: distLeft < distRight ? 'left' : 'right',
+      sideDist: Math.min(distLeft, distRight),
+      vert: distFront < distRear ? 'front' : 'rear',
+      vertDist: Math.min(distFront, distRear),
+    });
+  }, [seatDragTick, dragType, draggedItemId, widthM, lengthM, draftSeatsRef]);
 
   // Room Element drag — wall-constrained movement, updates pos_m + drag info live
   const handleRoomElementDrag = useCallback((elementId, canvasPos) => {
@@ -1261,12 +1292,24 @@ const byId = useEntitiesById({
     const bodyD = Number(projEl?.body_depth_m) || 0.517;
     const halfD = bodyD / 2;
     const clampedY = Math.max(halfD, Math.min(lengthM - halfD, rawY));
+
+    // Live drag guides from lens centre to all four walls
+    const lensX = Number(projEl?.x_lens_m) || (widthM / 2);
+    setProjectorDragInfo({
+      visible: true,
+      x: lensX, y: clampedY, widthM, lengthM,
+      distLeft: lensX,
+      distRight: Math.max(0, widthM - lensX),
+      distFront: clampedY,
+      distRear: Math.max(0, lengthM - clampedY),
+    });
+
     onSetRoomElements(prev =>
       (Array.isArray(prev) ? prev : []).map(el =>
         el?.type === 'projector' ? { ...el, y_lens_m: clampedY } : el
       )
     );
-  }, [onSetRoomElements, canvasToRoom, roomElements, lengthM]);
+  }, [onSetRoomElements, canvasToRoom, roomElements, lengthM, widthM]);
 
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
@@ -2225,6 +2268,8 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         isPostDrag={!dragging && showLiveImpactCard}
         liveImpactMode={liveImpactMode}
         roomElementDragInfo={roomElementDragInfo}
+        projectorDragInfo={projectorDragInfo}
+        seatDragInfo={seatDragInfo}
         mlpDragInfo={mlpDragInfo}
         dragType={dragType}
         isSeatSnapping={isSeatSnapping}

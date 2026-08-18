@@ -19,6 +19,7 @@ import RvSpeakerTooltip from "@/components/room/rv/render/RvSpeakerTooltip";
 import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 import RvRoomElementDragDims from "@/components/room/rv/render/RvRoomElementDragDims";
 import RvMlpDragDims from "@/components/room/rv/render/RvMlpDragDims";
+import RvProjectorDragDims from "@/components/room/rv/render/RvProjectorDragDims";
 import RvSubSymmetryGuide from "@/components/room/rv/render/RvSubSymmetryGuide";
 import RvSubCoordinateGuide from "@/components/room/rv/render/RvSubCoordinateGuide";
 import { getSubRotationDeg } from "@/components/room/rv/utils/subWallOrientation";
@@ -160,6 +161,8 @@ export default function RvPlanCanvas({
   onDismissCard,
   isPostDrag = false,
   roomElementDragInfo,
+  projectorDragInfo,
+  seatDragInfo,
   mlpDragInfo,
   dragType,
   mlpGrabbed,
@@ -693,6 +696,30 @@ export default function RvPlanCanvas({
                 dragInfo={roomElementDragInfo}
                 widthM={widthM}
                 lengthM={lengthM}
+                scale={scale}
+                meterToCanvasX={meterToCanvasX}
+                meterToCanvasY={meterToCanvasY}
+                svgW={svgWSafe}
+                svgH={svgHSafe}
+              />
+            )}
+
+            {/* Projector drag dimensions — all four wall distances */}
+            {dragType === 'projector' && projectorDragInfo?.visible && (
+              <RvProjectorDragDims
+                dragInfo={projectorDragInfo}
+                scale={scale}
+                meterToCanvasX={meterToCanvasX}
+                meterToCanvasY={meterToCanvasY}
+                svgW={svgWSafe}
+                svgH={svgHSafe}
+              />
+            )}
+
+            {/* Seat drag dimensions — nearest side wall + nearest front/back wall */}
+            {dragType === 'seat' && seatDragInfo?.visible && (
+              <RvMlpDragDims
+                dragInfo={seatDragInfo}
                 scale={scale}
                 meterToCanvasX={meterToCanvasX}
                 meterToCanvasY={meterToCanvasY}
