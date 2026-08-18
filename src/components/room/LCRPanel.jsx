@@ -460,115 +460,138 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   }, [soundbarOptions, applyFrontStage, lcrModel, frontStageMode]);
   
   return (
-    <div className="space-y-2 p-2">
-      {/* ── LCR Model + Front Stage — side by side on desktop, stack on narrow screens ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-        <div className="space-y-1">
-          <Label htmlFor="lcr-model" className="text-[#3E4349] font-medium">LCR Model</Label>
-          <Select value={lcrModel || undefined} onValueChange={(val) => { if (val === '__none__') onClearLcrModel(); else onChooseModel(val); }} disabled={disabled}>
-            <SelectTrigger id="lcr-model" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
-              <span className="text-2xl font-semibold" style={{ color: '#213428' }}>
-                {frontStageMode === 'integrated_lcr' ? '-' : (lcrModel ? (getSpeakerModelMeta(lcrModel)?.label || lcrModel) : 'Select LCR model')}
-              </span>
-            </SelectTrigger>
-            <SelectContent className="bg-white border-[#DCDBD6]">
-              {lcrModel && <SelectItem value="__none__" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#9B9890' }}>— Clear selection —</SelectItem>}
-              {standardLcrOptions.map(model => (
-                <SelectItem key={model.key} value={model.label} className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>{model.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+    <div className="p-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* ── Left column: configuration and height ── */}
+        <div className="space-y-3">
+          {/* LCR Model + Front Stage — side by side on desktop, stack on narrow screens */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="lcr-model" className="text-[#3E4349] font-medium">LCR Model</Label>
+              <Select value={lcrModel || undefined} onValueChange={(val) => { if (val === '__none__') onClearLcrModel(); else onChooseModel(val); }} disabled={disabled}>
+                <SelectTrigger id="lcr-model" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
+                  <span className="text-2xl font-semibold" style={{ color: '#213428' }}>
+                    {frontStageMode === 'integrated_lcr' ? '-' : (lcrModel ? (getSpeakerModelMeta(lcrModel)?.label || lcrModel) : 'Select LCR model')}
+                  </span>
+                </SelectTrigger>
+                <SelectContent className="bg-white border-[#DCDBD6]">
+                  {lcrModel && <SelectItem value="__none__" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#9B9890' }}>— Clear selection —</SelectItem>}
+                  {standardLcrOptions.map(model => (
+                    <SelectItem key={model.key} value={model.label} className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>{model.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="front-stage-mode" className="text-[#3E4349] font-medium">Front Stage</Label>
-          <Select value={frontStageMode} onValueChange={onChooseFrontStageMode} disabled={disabled}>
-            <SelectTrigger id="front-stage-mode" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
-              <span className="text-base font-semibold" style={{ color: '#213428' }}>
-                {frontStageMode === 'integrated_lcr' ? 'Integrated LCR soundbar' : frontStageMode === 'center_only' ? 'Center-only soundbar override' : 'Separate LCR speakers'}
-              </span>
-            </SelectTrigger>
-            <SelectContent className="bg-white border-[#DCDBD6]">
-              <SelectItem value="standard" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Separate LCR speakers</SelectItem>
-              <SelectItem value="center_only" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Center-only soundbar override</SelectItem>
-              <SelectItem value="integrated_lcr" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Integrated LCR soundbar</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {frontStageMode !== 'standard' && (
-        <div className="space-y-1 mt-3">
-          <Label htmlFor="front-stage-soundbar" className="text-[#3E4349] font-medium">Soundbar Model</Label>
-          <Select value={soundbarModel || undefined} onValueChange={onChooseSoundbarModel} disabled={disabled}>
-            <SelectTrigger id="front-stage-soundbar" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
-              <span className="text-base font-semibold" style={{ color: '#213428' }}>
-                {soundbarModel ? (getSpeakerModelMeta(soundbarModel)?.label || soundbarModel) : 'Select soundbar model'}
-              </span>
-            </SelectTrigger>
-            <SelectContent className="bg-white border-[#DCDBD6]">
-              {soundbarOptions
-                .filter((model) => frontStageMode === 'center_only'
-                  ? CENTER_ONLY_SOUNDBAR_LABELS.includes(model.label)
-                  : INTEGRATED_LCR_SOUNDBAR_LABELS.includes(model.label)
-                )
-                .map(model => (
-                  <SelectItem key={model.key} value={model.label} className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>{model.label}</SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      <p className="text-[11px] text-[#8B7F76] mt-2">
-        Angle to MLP: <span className="font-medium text-[#625143]">{Math.round(lcrAngleDeg)}°</span>
-      </p>
-
-      {/* ── Acoustic Centre Height — compact card, left-aligned, not full width ── */}
-      <div className="mt-4" style={{ maxWidth: 600 }}>
-        <div className="rounded-lg border border-[#DCDBD6] bg-[#F8F8F7]">
-          {/* Header: title left, manual override toggle right */}
-          <div className="flex items-center justify-between px-4 pt-3 pb-2 gap-3">
-            <div className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#625143]">Acoustic Centre Height</div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-[#625143]">Manual override</span>
-              <Switch
-                checked={lcrHeightManual}
-                onCheckedChange={onToggleLcrHeightManual}
-                disabled={disabled}
-              />
+            <div className="space-y-1">
+              <Label htmlFor="front-stage-mode" className="text-[#3E4349] font-medium">Front Stage</Label>
+              <Select value={frontStageMode} onValueChange={onChooseFrontStageMode} disabled={disabled}>
+                <SelectTrigger id="front-stage-mode" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
+                  <span className="text-base font-semibold" style={{ color: '#213428' }}>
+                    {frontStageMode === 'integrated_lcr' ? 'Integrated LCR soundbar' : frontStageMode === 'center_only' ? 'Center-only soundbar override' : 'Separate LCR speakers'}
+                  </span>
+                </SelectTrigger>
+                <SelectContent className="bg-white border-[#DCDBD6]">
+                  <SelectItem value="standard" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Separate LCR speakers</SelectItem>
+                  <SelectItem value="center_only" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Center-only soundbar override</SelectItem>
+                  <SelectItem value="integrated_lcr" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Integrated LCR soundbar</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-          {/* Content */}
-          <div className="px-4 pb-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs text-[#625143]">
-                {frontStageMode === 'center_only' ? 'Centre soundbar height (to middle of speaker)' : 'LCR height from floor (to middle of speaker)'}
-              </Label>
-              <span className="text-[11px] text-[#625143]">
-                {lcrHeightManual ? 'Manual' : `Auto: ${formatHeightM(recommendedLcrHeightM)}`}
-              </span>
+
+          {frontStageMode !== 'standard' && (
+            <div className="space-y-1">
+              <Label htmlFor="front-stage-soundbar" className="text-[#3E4349] font-medium">Soundbar Model</Label>
+              <Select value={soundbarModel || undefined} onValueChange={onChooseSoundbarModel} disabled={disabled}>
+                <SelectTrigger id="front-stage-soundbar" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
+                  <span className="text-base font-semibold" style={{ color: '#213428' }}>
+                    {soundbarModel ? (getSpeakerModelMeta(soundbarModel)?.label || soundbarModel) : 'Select soundbar model'}
+                  </span>
+                </SelectTrigger>
+                <SelectContent className="bg-white border-[#DCDBD6]">
+                  {soundbarOptions
+                    .filter((model) => frontStageMode === 'center_only'
+                      ? CENTER_ONLY_SOUNDBAR_LABELS.includes(model.label)
+                      : INTEGRATED_LCR_SOUNDBAR_LABELS.includes(model.label)
+                    )
+                    .map(model => (
+                      <SelectItem key={model.key} value={model.label} className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>{model.label}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </div>
-            {frontStageMode === 'center_only' ? (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label className="text-[11px] text-[#625143]">Left / Right height from floor (to middle of speaker)</Label>
-                  <StepperInput
-                    value={Number(lrHeightInputValue) || 0}
-                    step={0.01}
-                    min={0.2}
-                    max={roomH - 0.2}
-                    disabled={disabled}
-                    onChange={(val) => {
-                      const clamped = clampLcrHeight(val);
-                      setLrHeightInputValue(String(Number(clamped.toFixed(2))));
-                      updateGlobalSpl?.({ lcrLRHeightM: clamped });
-                      updatePlacedLRHeight(clamped);
-                    }}
-                  />
+          )}
+
+          <p className="text-[11px] text-[#8B7F76]">
+            Angle to MLP: <span className="font-medium text-[#625143]">{Math.round(lcrAngleDeg)}°</span>
+          </p>
+
+          {/* ── Acoustic Centre Height — compact card ── */}
+          <div className="rounded-lg border border-[#DCDBD6] bg-[#F8F8F7]">
+            {/* Header: title left, manual override toggle right */}
+            <div className="flex items-center justify-between px-4 pt-3 pb-2 gap-3">
+              <div className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#625143]">Acoustic Centre Height</div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-[#625143]">Manual override</span>
+                <Switch
+                  checked={lcrHeightManual}
+                  onCheckedChange={onToggleLcrHeightManual}
+                  disabled={disabled}
+                />
+              </div>
+            </div>
+            {/* Content */}
+            <div className="px-4 pb-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-[#625143]">
+                  {frontStageMode === 'center_only' ? 'Centre soundbar height (to middle of speaker)' : 'LCR height from floor (to middle of speaker)'}
+                </Label>
+                <span className="text-[11px] text-[#625143]">
+                  {lcrHeightManual ? 'Manual' : `Auto: ${formatHeightM(recommendedLcrHeightM)}`}
+                </span>
+              </div>
+              {frontStageMode === 'center_only' ? (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label className="text-[11px] text-[#625143]">Left / Right height from floor (to middle of speaker)</Label>
+                    <StepperInput
+                      value={Number(lrHeightInputValue) || 0}
+                      step={0.01}
+                      min={0.2}
+                      max={roomH - 0.2}
+                      disabled={disabled}
+                      onChange={(val) => {
+                        const clamped = clampLcrHeight(val);
+                        setLrHeightInputValue(String(Number(clamped.toFixed(2))));
+                        updateGlobalSpl?.({ lcrLRHeightM: clamped });
+                        updatePlacedLRHeight(clamped);
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[11px] text-[#625143]">Centre soundbar height from floor (to middle of speaker)</Label>
+                    <StepperInput
+                      value={Number(lcrHeightInputValue) || 0}
+                      step={0.01}
+                      min={0.2}
+                      max={roomH - 0.2}
+                      disabled={disabled || !lcrHeightManual}
+                      onChange={(val) => {
+                        if (!lcrHeightManual) return;
+                        const clamped = clampLcrHeight(val);
+                        setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
+                        updateGlobalSpl?.({ lcrHeightM: clamped });
+                        updatePlacedFCHeight(clamped);
+                      }}
+                    />
+                  </div>
+                  {hasLcrSubClash && (
+                    <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[11px] text-[#625143]">Centre soundbar height from floor (to middle of speaker)</Label>
+              ) : (
+                <>
                   <StepperInput
                     value={Number(lcrHeightInputValue) || 0}
                     step={0.01}
@@ -580,120 +603,102 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
                       const clamped = clampLcrHeight(val);
                       setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
                       updateGlobalSpl?.({ lcrHeightM: clamped });
-                      updatePlacedFCHeight(clamped);
+                      updatePlacedLcrHeight(clamped);
                     }}
                   />
-                </div>
-                {hasLcrSubClash && (
-                  <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
-                )}
-              </div>
-            ) : (
-              <>
-                <StepperInput
-                  value={Number(lcrHeightInputValue) || 0}
-                  step={0.01}
-                  min={0.2}
-                  max={roomH - 0.2}
-                  disabled={disabled || !lcrHeightManual}
-                  onChange={(val) => {
-                    if (!lcrHeightManual) return;
-                    const clamped = clampLcrHeight(val);
-                    setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
-                    updateGlobalSpl?.({ lcrHeightM: clamped });
-                    updatePlacedLcrHeight(clamped);
-                  }}
+                  {hasLcrSubClash && (
+                    <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
+                  )}
+                </>
+              )}
+              {frontStageMode !== 'center_only' && (
+                <LcrAcousticCentreGuidanceCard guidance={activeHeightGuidance} />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Right column: performance ── */}
+        <div className="space-y-3">
+          {/* SPL @ RSP */}
+          <div>
+            <Label className="text-xs text-[#625143] mb-2 block">SPL @ RSP</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {lcrRoles.map((role) => (
+                <LcrSplCard
+                  key={role}
+                  role={role}
+                  label={role === 'FL' ? 'Left' : role === 'FC' ? 'Center' : 'Right'}
+                  allSeatSplMetrics={allSeatSplMetrics}
+                  integratedLcrMode={derivedFrontStageMode === 'integrated_lcr'}
                 />
-                {hasLcrSubClash && (
-                  <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
-                )}
-              </>
-            )}
-            {frontStageMode !== 'center_only' && (
-              <LcrAcousticCentreGuidanceCard guidance={activeHeightGuidance} />
+              ))}
+            </div>
+          </div>
+
+          {/* Amplifier Power */}
+          <div className="space-y-2">
+            <Label className="text-xs text-[#625143]">Amplifier Power (LCR)</Label>
+            <div className="relative">
+              <Input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={lcrPowerInputValue}
+                onChange={handleLcrPowerChange}
+                onBlur={handleLcrPowerBlur}
+                disabled={disabled}
+                className="pr-8"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
+                W
+              </span>
+            </div>
+          </div>
+
+          {/* RP22 P12 */}
+          <div className="space-y-2">
+            <Label className="text-xs text-[#625143]">Parameter 12. Screen speakers SPL capability at RSP</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={p12ActiveMode === 'minimum' ? 'default' : 'outline'}
+                className={
+                  p12ActiveMode === 'minimum'
+                    ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                    : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+                }
+                onClick={() => appState?.setP12Mode?.('minimum')}
+                disabled={disabled}
+              >
+                Minimum
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={p12ActiveMode === P12_MODE_RECOMMENDED ? 'default' : 'outline'}
+                className={
+                  p12ActiveMode === P12_MODE_RECOMMENDED
+                    ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                    : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+                }
+                onClick={() => appState?.setP12Mode?.(P12_MODE_RECOMMENDED)}
+                disabled={disabled}
+              >
+                Recommended
+              </Button>
+            </div>
+            {p12Computed && (
+              <RP22LevelPill
+                parameter="P12"
+                level={p12Computed.level}
+                label="RP22 P12"
+              />
             )}
           </div>
         </div>
       </div>
-
-      {/* ── SPL @ RSP ── */}
-      <div className="mt-4">
-        <Label className="text-xs text-[#625143] mb-2 block">SPL @ RSP</Label>
-        <div className="grid grid-cols-3 gap-3">
-          {lcrRoles.map((role) => (
-            <LcrSplCard
-              key={role}
-              role={role}
-              label={role === 'FL' ? 'Left' : role === 'FC' ? 'Center' : 'Right'}
-              allSeatSplMetrics={allSeatSplMetrics}
-              integratedLcrMode={derivedFrontStageMode === 'integrated_lcr'}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* ── Amplifier Power ── */}
-      <div className="space-y-2 mt-4">
-        <Label className="text-xs text-[#625143]">Amplifier Power (LCR)</Label>
-        <div className="relative">
-          <Input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={lcrPowerInputValue}
-            onChange={handleLcrPowerChange}
-            onBlur={handleLcrPowerBlur}
-            disabled={disabled}
-            className="pr-8"
-          />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
-            W
-          </span>
-        </div>
-      </div>
-
-      {/* ── RP22 P12 ── */}
-      <div className="space-y-2 mt-4">
-        <Label className="text-xs text-[#625143]">Parameter 12. Screen speakers SPL capability at RSP</Label>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={p12ActiveMode === 'minimum' ? 'default' : 'outline'}
-            className={
-              p12ActiveMode === 'minimum'
-                ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
-                : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
-            }
-            onClick={() => appState?.setP12Mode?.('minimum')}
-            disabled={disabled}
-          >
-            Minimum
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={p12ActiveMode === P12_MODE_RECOMMENDED ? 'default' : 'outline'}
-            className={
-              p12ActiveMode === P12_MODE_RECOMMENDED
-                ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
-                : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
-            }
-            onClick={() => appState?.setP12Mode?.(P12_MODE_RECOMMENDED)}
-            disabled={disabled}
-          >
-            Recommended
-          </Button>
-        </div>
-      </div>
-
-      {p12Computed && (
-        <RP22LevelPill
-          parameter="P12"
-          level={p12Computed.level}
-          label="RP22 P12"
-        />
-      )}
     </div>
   );
 }
