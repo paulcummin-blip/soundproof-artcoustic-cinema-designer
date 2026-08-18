@@ -521,88 +521,97 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         Angle to MLP: <span className="font-semibold text-[#1B1A1A]">{Math.round(lcrAngleDeg)}°</span>
       </p>
 
-      {/* ── Acoustic Centre Height ── */}
-      <div className="space-y-2 mt-4">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs text-[#625143]">
-            {frontStageMode === 'center_only' ? 'Centre soundbar height (to middle of speaker)' : 'LCR height from floor (to middle of speaker)'}
-          </Label>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-[#625143]">
-              {lcrHeightManual ? 'Manual override' : `Auto: ${formatHeightM(recommendedLcrHeightM)} recommended`}
-            </span>
-            <Switch
-              checked={lcrHeightManual}
-              onCheckedChange={onToggleLcrHeightManual}
-              disabled={disabled}
-            />
+      {/* ── Acoustic Centre Height — compact card, left-aligned, not full width ── */}
+      <div className="mt-4" style={{ maxWidth: 600 }}>
+        <div className="rounded-lg border border-[#DCDBD6] bg-[#F8F8F7]">
+          {/* Header: title left, manual override toggle right */}
+          <div className="flex items-center justify-between px-4 pt-3 pb-2 gap-3">
+            <div className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#625143]">Acoustic Centre Height</div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-[#625143]">Manual override</span>
+              <Switch
+                checked={lcrHeightManual}
+                onCheckedChange={onToggleLcrHeightManual}
+                disabled={disabled}
+              />
+            </div>
+          </div>
+          {/* Content */}
+          <div className="px-4 pb-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-[#625143]">
+                {frontStageMode === 'center_only' ? 'Centre soundbar height (to middle of speaker)' : 'LCR height from floor (to middle of speaker)'}
+              </Label>
+              <span className="text-[11px] text-[#625143]">
+                {lcrHeightManual ? 'Manual' : `Auto: ${formatHeightM(recommendedLcrHeightM)}`}
+              </span>
+            </div>
+            {frontStageMode === 'center_only' ? (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label className="text-[11px] text-[#625143]">Left / Right height from floor (to middle of speaker)</Label>
+                  <StepperInput
+                    value={Number(lrHeightInputValue) || 0}
+                    step={0.01}
+                    min={0.2}
+                    max={roomH - 0.2}
+                    disabled={disabled}
+                    onChange={(val) => {
+                      const clamped = clampLcrHeight(val);
+                      setLrHeightInputValue(String(Number(clamped.toFixed(2))));
+                      updateGlobalSpl?.({ lcrLRHeightM: clamped });
+                      updatePlacedLRHeight(clamped);
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[11px] text-[#625143]">Centre soundbar height from floor (to middle of speaker)</Label>
+                  <StepperInput
+                    value={Number(lcrHeightInputValue) || 0}
+                    step={0.01}
+                    min={0.2}
+                    max={roomH - 0.2}
+                    disabled={disabled || !lcrHeightManual}
+                    onChange={(val) => {
+                      if (!lcrHeightManual) return;
+                      const clamped = clampLcrHeight(val);
+                      setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
+                      updateGlobalSpl?.({ lcrHeightM: clamped });
+                      updatePlacedFCHeight(clamped);
+                    }}
+                  />
+                </div>
+                {hasLcrSubClash && (
+                  <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
+                )}
+              </div>
+            ) : (
+              <>
+                <StepperInput
+                  value={Number(lcrHeightInputValue) || 0}
+                  step={0.01}
+                  min={0.2}
+                  max={roomH - 0.2}
+                  disabled={disabled || !lcrHeightManual}
+                  onChange={(val) => {
+                    if (!lcrHeightManual) return;
+                    const clamped = clampLcrHeight(val);
+                    setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
+                    updateGlobalSpl?.({ lcrHeightM: clamped });
+                    updatePlacedLcrHeight(clamped);
+                  }}
+                />
+                {hasLcrSubClash && (
+                  <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
+                )}
+              </>
+            )}
+            {frontStageMode !== 'center_only' && (
+              <LcrAcousticCentreGuidanceCard guidance={activeHeightGuidance} />
+            )}
           </div>
         </div>
-        {frontStageMode === 'center_only' ? (
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label className="text-[11px] text-[#625143]">Left / Right height from floor (to middle of speaker)</Label>
-              <StepperInput
-                value={Number(lrHeightInputValue) || 0}
-                step={0.01}
-                min={0.2}
-                max={roomH - 0.2}
-                disabled={disabled}
-                onChange={(val) => {
-                  const clamped = clampLcrHeight(val);
-                  setLrHeightInputValue(String(Number(clamped.toFixed(2))));
-                  updateGlobalSpl?.({ lcrLRHeightM: clamped });
-                  updatePlacedLRHeight(clamped);
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-[11px] text-[#625143]">Centre soundbar height from floor (to middle of speaker)</Label>
-              <StepperInput
-                value={Number(lcrHeightInputValue) || 0}
-                step={0.01}
-                min={0.2}
-                max={roomH - 0.2}
-                disabled={disabled || !lcrHeightManual}
-                onChange={(val) => {
-                  if (!lcrHeightManual) return;
-                  const clamped = clampLcrHeight(val);
-                  setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
-                  updateGlobalSpl?.({ lcrHeightM: clamped });
-                  updatePlacedFCHeight(clamped);
-                }}
-              />
-            </div>
-            {hasLcrSubClash && (
-              <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
-            )}
-          </div>
-        ) : (
-          <>
-            <StepperInput
-              value={Number(lcrHeightInputValue) || 0}
-              step={0.01}
-              min={0.2}
-              max={roomH - 0.2}
-              disabled={disabled || !lcrHeightManual}
-              onChange={(val) => {
-                if (!lcrHeightManual) return;
-                const clamped = clampLcrHeight(val);
-                setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
-                updateGlobalSpl?.({ lcrHeightM: clamped });
-                updatePlacedLcrHeight(clamped);
-              }}
-            />
-            {hasLcrSubClash && (
-              <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
-            )}
-          </>
-        )}
       </div>
-
-      {frontStageMode !== 'center_only' && (
-        <LcrAcousticCentreGuidanceCard guidance={activeHeightGuidance} />
-      )}
 
       {/* ── SPL @ RSP ── */}
       <div className="mt-4">
