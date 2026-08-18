@@ -226,7 +226,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         selectedP14TargetDb: Number.isFinite(result?.selectedP14TargetDb) ? result.selectedP14TargetDb : null,
         p14TargetBasis: result?.p14TargetBasis ?? null,
         selectedP14Level: Number.isFinite(result?.selectedP14Level) ? result.selectedP14Level : null,
-        requiredExtensionHz: Number.isFinite(result?.requiredExtensionHz) ? result.requiredExtensionHz : null,
+        selectedP14RequiredExtensionHz: Number.isFinite(result?.selectedP14RequiredExtensionHz) ? result.selectedP14RequiredExtensionHz : null,
         p18TargetBasis: result?.p18TargetBasis ?? null,
       },
       requestedP14Identity: {
