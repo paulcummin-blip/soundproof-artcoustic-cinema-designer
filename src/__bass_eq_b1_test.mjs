@@ -177,8 +177,23 @@ const p6b = generateCanonicalCandidatePool({
 const c6b = selectCandidateFromPool(p6b).selectedCandidate;
 const f6b = fb(c6b);
 
+// ─── TEST 8: Regression — broad valley centred at 195 Hz (above approved range) ───
+const rc8 = frequencies.map(f => ({
+  frequency: f,
+  spl: 112 + 3 * Math.log10(120 / f) + gaussian(f, 195, 12, -5),
+}));
+const p8 = generateCanonicalCandidatePool({
+  rawCurve: rc8, activeSubs: [{ id: "sub-1", modelKey: "SUB2-12" }],
+  usableLfHz: 20, transitionHz: 163.3, correctionEndHz: 200,
+  perSeatRawCurves: [{ seatId: "s1", responseData: rc8.map(p => ({ ...p })) }],
+  selectedP14TargetDb: 109, p14TargetBasis: "minimum", p14TargetLevel: 1,
+});
+const c8 = selectCandidateFromPool(p8).selectedCandidate;
+const f8 = fb(c8);
+const boostAboveRange8 = f8.filter(f => f.gain > 0.1 && f.freq > 170);
+
 // ─── TEST 7: Safety — aggregate across all tests ───
-const allFilters = [...f1, ...f2, ...f3, ...f4, ...f5L1, ...f5L4, ...f6a, ...f6b];
+const allFilters = [...f1, ...f2, ...f3, ...f4, ...f5L1, ...f5L4, ...f6a, ...f6b, ...f8];
 const maxBoost = Math.max(0, ...allFilters.map(f => f.gain));
 const maxCut = Math.min(0, ...allFilters.map(f => f.gain));
 
@@ -250,7 +265,18 @@ const result = {
     maxCutDb: Math.round(maxCut * 100) / 100,
     boostWithinLimit: maxBoost <= 6.05,
     cutWithinLimit: maxCut >= -15.05,
-    allPhysPass: [c1, c2, c3, c4, c5L1, c5L4, c6a, c6b].every(c => c.physicalValidation?.passed === true),
+    allPhysPass: [c1, c2, c3, c4, c5L1, c5L4, c6a, c6b, c8].every(c => c.physicalValidation?.passed === true),
+  },
+  test8: {
+    filters: f8,
+    boostAboveRangeCount: boostAboveRange8.length,
+    boostAboveRange: boostAboveRange8,
+    valley195: { before: val(c8.rspBeforePeqAtOperatingLevel, 195), after: val(c8.finalPostEqCurve, 195), target: val(c8.productionHouseCurveTarget, 195) },
+    physPass: c8.physicalValidation?.passed,
+    envelopeExceedances: envelopeExceedances(c8.finalPostEqCurve, c8.productOperatingEnvelopeCurve),
+    protectedNullBoostViolations: protectedNullBoostViolations(c8.rspBeforePeqAtOperatingLevel, c8.finalPostEqCurve, c8.protectedNullRegions),
+    perSeatEnvelopeExceedances: perSeatEnvelopeExceedances(c8.perSeatPostEqCurves, c8.productOperatingEnvelopeCurve),
+    maxBoostDb: Math.max(0, ...f8.map(f => f.gain)),
   },
   safetyAssertions: {
     finalPostEqLeEnvelope: [
@@ -262,6 +288,7 @@ const result = {
       ...envelopeExceedances(c5L4.finalPostEqCurve, c5L4.productOperatingEnvelopeCurve),
       ...envelopeExceedances(c6a.finalPostEqCurve, c6a.productOperatingEnvelopeCurve),
       ...envelopeExceedances(c6b.finalPostEqCurve, c6b.productOperatingEnvelopeCurve),
+      ...envelopeExceedances(c8.finalPostEqCurve, c8.productOperatingEnvelopeCurve),
     ],
     protectedNullBoostLeAllowed: [
       ...protectedNullBoostViolations(c1.rspBeforePeqAtOperatingLevel, c1.finalPostEqCurve, c1.protectedNullRegions),
