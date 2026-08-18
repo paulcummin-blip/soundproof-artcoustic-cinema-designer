@@ -122,6 +122,7 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
         applying={applying}
         applyError={isLayoutApplied(layout) ? null : applyError}
         unsupported={hasUnsupportedPlacement(layout)}
+        currentMetrics={currentLayout?.metrics}
       />
     );
   };
