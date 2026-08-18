@@ -1,125 +1,126 @@
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 
-// Restrained Sound Proof brand intro animation.
-// Plays once per browser session on first app load: the logo appears
-// large and centred, then animates smoothly into its sidebar position.
-// Respects prefers-reduced-motion (quick fade only, no movement).
+// Sound Proof brand intro animation.
+// Plays once per browser session: the logo appears large and centred,
+// holds still for 2s, then moves smoothly to the sidebar position over 3s.
+// Total ~5s. The overlay is removed only after the animation completes.
+//
+// Respects prefers-reduced-motion (brief fade, no movement) — but only
+// when the media query actually matches; never suppresses for normal users.
+//
+// DEBUG / TESTING:
+//   - Call window.__resetSoundProofIntro() from the console, then reload.
+//   - Or append ?resetIntro to the URL and reload.
+// Either clears the session flag so the animation replays.
 
 const LOGO_URL =
   "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg";
-const STORAGE_KEY = "sp_brand_intro_played";
+const STORAGE_KEY = "soundproof_intro_played_v2";
 
-// Smooth, calm easing — no bounce.
-const EASE = [0.4, 0.0, 0.2, 1];
+// Expose a debug reset helper on window so it can be called from the console.
+if (typeof window !== "undefined" && !window.__resetSoundProofIntro) {
+  window.__resetSoundProofIntro = () => {
+    try { sessionStorage.removeItem(STORAGE_KEY); } catch (_) {}
+    try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+    // eslint-disable-next-line no-console
+    console.log("[SoundProof Intro] Session flag cleared. Reload to replay.");
+  };
+}
+
+// Safe sessionStorage helpers — never throw even in sandboxed iframes.
+function hasPlayed() {
+  try { return !!sessionStorage.getItem(STORAGE_KEY); } catch (_) { return false; }
+}
+function markPlayed() {
+  try { sessionStorage.setItem(STORAGE_KEY, "1"); } catch (_) {}
+}
 
 export default function BrandIntroOverlay() {
   const [show, setShow] = useState(false);
+  // Stages: hold → move → fade → done
+  const [stage, setStage] = useState("hold");
   const [reducedMotion, setReducedMotion] = useState(false);
   const [geometry, setGeometry] = useState(null);
 
   useEffect(() => {
+    // Debug: ?resetIntro clears the flag so the animation replays on reload.
     try {
-      if (sessionStorage.getItem(STORAGE_KEY)) return; // already played
-      sessionStorage.setItem(STORAGE_KEY, "1");
+      if (new URLSearchParams(window.location.search).get("resetIntro") !== null) {
+        try { sessionStorage.removeItem(STORAGE_KEY); } catch (_) {}
+      }
+    } catch (_) {}
 
-      const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-      setReducedMotion(mq.matches);
+    if (hasPlayed()) return;
+    markPlayed();
 
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      // Start large and centred so the brand clearly registers before moving.
-      const startW = Math.min(480, Math.max(280, vw - 80));
-      setGeometry({
-        start: {
-          left: Math.round((vw - startW) / 2),
-          top: Math.round((vh - startW * 0.3) / 2),
-          width: startW,
-        },
-        end: { left: 16, top: 16, width: 300 },
-      });
-      setShow(true);
-    } catch (_e) {
-      // sessionStorage unavailable — skip intro silently
+    // Only skip movement when the media query genuinely matches.
+    try {
+      setReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    } catch (_) {
+      setReducedMotion(false);
     }
+
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // Start large and centred so the brand clearly registers.
+    const startW = Math.min(480, Math.max(280, vw - 80));
+    setGeometry({
+      start: {
+        left: Math.round((vw - startW) / 2),
+        top: Math.round((vh - startW * 0.3) / 2),
+        width: startW,
+      },
+      // Matches the sidebar logo position (p-4 padding = 16px, width 300).
+      end: { left: 16, top: 16, width: 300 },
+    });
+    setShow(true);
   }, []);
 
-  if (!show || !geometry) return null;
+  useEffect(() => {
+    if (!show) return;
+    const timers = [];
+    if (reducedMotion) {
+      // Reduced motion: show logo briefly, fade out, no movement.
+      timers.push(setTimeout(() => setStage("fade"), 800));
+      timers.push(setTimeout(() => setStage("done"), 1200));
+    } else {
+      // 0–2s: hold centred. 2–5s: move to sidebar. 4.7–5s: fade. 5s: done.
+      timers.push(setTimeout(() => setStage("move"), 2000));
+      timers.push(setTimeout(() => setStage("fade"), 4700));
+      timers.push(setTimeout(() => setStage("done"), 5000));
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [show, reducedMotion]);
 
-  const handleComplete = () => setShow(false);
-
-  // Reduced motion: no movement, just a quick fade.
-  if (reducedMotion) {
-    return (
-      <motion.div
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "#FFFFFF",
-          zIndex: 9999,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-        initial={{ opacity: 1 }}
-        animate={{ opacity: 0 }}
-        transition={{ duration: 0.4, ease: "easeInOut" }}
-        onAnimationComplete={handleComplete}
-      >
-        <img
-          src={LOGO_URL}
-          alt="Sound Proof"
-          style={{ width: 300, display: "block", objectFit: "contain" }}
-        />
-      </motion.div>
-    );
-  }
+  if (!show || stage === "done" || !geometry) return null;
 
   const { start, end } = geometry;
-
-  // Total ~5s: fade in (0.3s) → hold still (2s) → move to sidebar (2.7s)
-  const TOTAL = 5.0;
-  const FADE_IN = 0.3;
-  const HOLD = 2.0;
-  // times are fractions of TOTAL
-  const tFadeIn = FADE_IN / TOTAL;           // 0.06
-  const tHoldEnd = (FADE_IN + HOLD) / TOTAL; // 0.46
+  const atEnd = stage === "move" || stage === "fade";
 
   return (
-    <motion.div
+    <div
       style={{
         position: "fixed",
         inset: 0,
         background: "#FFFFFF",
-        zIndex: 9999,
-        pointerEvents: "none",
+        zIndex: 99999,
+        opacity: stage === "fade" ? 0 : 1,
+        transition: "opacity 0.3s ease",
       }}
-      initial={{ opacity: 1 }}
-      animate={{ opacity: [1, 1, 0] }}
-      transition={{
-        duration: TOTAL,
-        times: [0, 0.94, 1],
-        ease: "easeInOut",
-      }}
-      onAnimationComplete={handleComplete}
     >
-      <motion.img
+      <img
         src={LOGO_URL}
         alt="Sound Proof"
-        style={{ position: "absolute", objectFit: "contain" }}
-        initial={{ ...start, opacity: 0 }}
-        animate={{
-          left: [start.left, start.left, start.left, end.left],
-          top: [start.top, start.top, start.top, end.top],
-          width: [start.width, start.width, start.width, end.width],
-          opacity: [0, 1, 1, 1],
-        }}
-        transition={{
-          duration: TOTAL,
-          times: [0, tFadeIn, tHoldEnd, 1],
-          ease: EASE,
+        style={{
+          position: "absolute",
+          objectFit: "contain",
+          left: atEnd ? end.left : start.left,
+          top: atEnd ? end.top : start.top,
+          width: atEnd ? end.width : start.width,
+          transition:
+            "left 3s cubic-bezier(0.4,0,0.2,1), top 3s cubic-bezier(0.4,0,0.2,1), width 3s cubic-bezier(0.4,0,0.2,1)",
         }}
       />
-    </motion.div>
+    </div>
   );
 }
