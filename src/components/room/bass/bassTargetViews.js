@@ -21,7 +21,7 @@ function buildTarget(parameters, basis, selectedCandidate, p18TargetBasis) {
   const p18Base = cloneParameter(parameters?.p18);
   const selectedP18Basis = normalizeP18TargetBasis(p18TargetBasis);
   const p18Assessment = assessP18Extension(p18Base.value, selectedP18Basis);
-  const p18Qualified = p18Base.qualifiedAtSelectedP14Output !== false;
+  const p18ResultAvailable = p18Assessment.level != null;
   const p14Level = Number.isFinite(p14Base.value)
     ? (basis === "recommended" ? gradeP14Recommended(p14Base.value) : gradeP14Minimum(p14Base.value))
     : p14Base.level;
@@ -35,14 +35,14 @@ function buildTarget(parameters, basis, selectedCandidate, p18TargetBasis) {
     },
     p18: {
       ...p18Base,
-      level: p18Qualified ? p18Assessment.level : 0,
-      passedL1: p18Qualified && p18Assessment.level != null ? p18Assessment.level >= 1 : false,
+      level: p18Assessment.level,
+      passedL1: p18Assessment.level != null ? p18Assessment.level >= 1 : false,
       targetBasis: selectedP18Basis,
       targetBasisDetail: formatP18TargetBasisDetail(selectedP18Basis),
       designHz: p18Assessment.designHz,
       performanceBand: p18Assessment.performanceBand,
       performanceMultiplier: p18Assessment.performanceMultiplier,
-      qualifiedAtSelectedP14Output: p18Qualified,
+      qualifiedAtSelectedP14Output: p18ResultAvailable,
     },
     p19: cloneParameter(parameters?.p19),
     p20: cloneParameter(parameters?.p20),
