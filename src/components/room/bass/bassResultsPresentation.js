@@ -55,11 +55,19 @@ function readyPill(key, parameter, result) {
     const basis = parameter.targetBasis === "recommended" ? "Recommended" : "Minimum";
     const basisAbbrev = basis === "Recommended" ? "Rec" : "Min";
     const selectedLevel = parameter.selectedLevel || Math.max(1, parameter.level || 1);
-    const outcome = parameter.pass === false ? "FAIL" : parameter.pass === true ? "PASS" : "—";
+
+    // RULE 1: target achieved → P14 result = selected target level (design operating point).
+    // Do not promote P14 above the selected level due to unused SPL capability.
+    if (parameter.pass === true) {
+      const resultText = `${basis} L${selectedLevel} · PASS`;
+      return { label: "P14 Bass SPL", resultText, text: `P14 Bass SPL ${resultText}`, level: `L${selectedLevel}`, detail: null };
+    }
+
+    // RULE 2: target not achieved → P14 result = highest achievable level + FAIL.
     const achievedGrade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;
-    const resultText = `${achievedGrade}${value ? ` · ${value}` : ""}`;
-    const detail = `Target: ${basisAbbrev} L${selectedLevel} · ${outcome}`;
-    return { label: "P14 Bass SPL", resultText, text: `P14 Bass SPL ${resultText}`, level: outcome === "FAIL" ? "FAIL" : achievedGrade, detail };
+    const resultText = `${achievedGrade} · FAIL`;
+    const detail = `Target: ${basisAbbrev} L${selectedLevel}`;
+    return { label: "P14 Bass SPL", resultText, text: `P14 Bass SPL ${resultText}`, level: "FAIL", detail };
   }
   return {
     label,

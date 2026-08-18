@@ -8,13 +8,14 @@ export default function BassCapabilitySummary({ capability, targetWarning, p14Pa
   const target = Number.isFinite(targetDb) ? `${basis} ${capability?.requested?.level || "—"} · ${targetDb} dBC` : "—";
   const availableDb = capability?.maximumAvailableSplAfterEqDb;
 
-  // Achieved result — derived from the same authoritative P14 parameter used by
-  // the pills. No second target state; this reads the existing analysis output.
-  const achievedLevel = p14Parameter?.level;
-  const achievedGrade = achievedLevel === 0 ? "FAIL" : (achievedLevel > 0 ? `L${achievedLevel}` : "—");
-  const achievedPass = p14Parameter?.pass;
-  const outcome = achievedPass === false ? "FAIL" : achievedPass === true ? "PASS" : "—";
-  const achievedResult = achievedGrade !== "—" ? `${achievedGrade} ${basis} · ${outcome}` : "—";
+  // P14 design operating point (RULE 1/2): when the selected target is achieved,
+  // the design result is the selected level (not the capability level). Only when
+  // the target cannot be achieved does the result fall to the highest achievable level.
+  const pass = p14Parameter?.pass;
+  const designLevel = pass === true ? p14Parameter?.selectedLevel : p14Parameter?.level;
+  const designGrade = designLevel === 0 ? "FAIL" : (designLevel > 0 ? `L${designLevel}` : "—");
+  const outcome = pass === false ? "FAIL" : pass === true ? "PASS" : "—";
+  const achievedResult = designGrade !== "—" ? `${designGrade} ${basis} · ${outcome}` : "—";
 
   return <div className="mt-2 rounded-md border border-border bg-card p-3 text-xs">
     {capability && <>

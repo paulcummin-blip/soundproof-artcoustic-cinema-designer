@@ -118,7 +118,21 @@ export function formatAuthoritativeBassParameter(completedBassAuthority, key, er
     targetBasis: key === "p14" || key === "p18" ? parameter.targetBasis : null,
     targetBasisLabel: key === "p14" || key === "p18" ? (parameter.targetBasis === "recommended" ? "Recommended" : "Minimum") : null,
   };
-  if (key === "p14") Object.assign(result, buildP14Fields(parameter));
+  if (key === "p14") {
+    Object.assign(result, buildP14Fields(parameter));
+    // P14 design operating point: when the selected target is achieved, the
+    // design level is the selected level (RULE 1). Do not promote P14 above
+    // the selected level due to unused SPL capability. Only when the target
+    // cannot be achieved does the design level fall to the highest achievable
+    // level (RULE 2). This feeds both the report level and the scoring rawValue.
+    if (parameter.pass === true && parameter.selectedLevel != null) {
+      result.level = levelLabel(parameter.selectedLevel);
+      if (Number.isFinite(parameter.requestedTargetDb)) {
+        result.rawValue = Number(parameter.requestedTargetDb);
+        result.valueText = formatBassParameterValue(key, parameter.requestedTargetDb);
+      }
+    }
+  }
   if (key === "p18") Object.assign(result, buildP18Fields(parameter));
   return result;
 }
