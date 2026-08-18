@@ -12,6 +12,7 @@ import { buildComplianceBassPresentation } from "@/components/room/bass/bassComp
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 import { resolveParamThresholds, resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
+import ComplianceParameterMatrix from "@/components/rp22/ComplianceParameterMatrix";
 
 /* ---------- Helpers */
 
@@ -737,6 +738,180 @@ export default function RP22CompliancePanel({
     return "—";
   }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation]);
 
+  // Full per-parameter detail card (title, description, achieved, scope, thresholds,
+  // per-seat pills, notes, debug). Rendered only when a matrix row is expanded.
+  // Lifted verbatim from the previous always-on card stack — no logic changed.
+  const renderParamDetailCard = (p) => {
+    const lvl = p.id === 20 ? bassPresentation.parameters.p20.level : getHudLevelForParam(p);
+    const achievedValue = p.id === 20 ? bassPresentation.parameters.p20.valueText : getHudValueForParam(p);
+    const isSeatScope = String(p.scope || "").toLowerCase() === "seat";
+    const resolvedParam = (p.id === 12 || p.id === 13 || p.id === 14)
+      ? { ...p, thresholds: resolveParamThresholds(p, p12Mode, p13Mode, p14Mode) }
+      : p;
+    const targetBasisNote =
+      (p.id === 12 || p.id === 13)
+        ? (() => {
+            const v = analysisResult?.gradedParameters?.primary?.[p.id]?.value;
+            const dual = resolveP12P13DualLevels(p.id, v);
+            return dual ? `Minimum ${dual.minimum} · Recommended ${dual.recommended}` : null;
+          })()
+        : p.id === 14 ? bassPresentation.parameters.p14.detail :
+      p.id === 18 ? "Official room result from the completed authoritative bass analysis." :
+      p.id === 19 ? "Official RSP-versus-target result from the completed authoritative bass analysis." :
+      null;
+    const debugMetric = String(reportSource).startsWith("seat:")
+      ? (() => {
+          const seatId = String(reportSource).split(":")[1];
+          const snap =
+            seatSnapshotsById?.[seatId] ||
+            seatSnapshotsById?.["mlp"] ||
+            (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) ||
+            (seatId === "mlp" ? analysisResult?.perSeatRp22?.["mlp"] : null) ||
+            null;
+          return snap?.rp22?.[`p${p.id}`] || null;
+        })()
+      : null;
+    const debugText = getMetricDebugText(p.id, debugMetric);
+
+    return (
+      <div key={p.id} style={card}>
+        <div style={head}>
+          <div style={{ ...title, display: "flex", alignItems: "center", gap: 6 }}>
+            {[19, 20].includes(p.id) ? (
+              <BassRp22ParameterTooltip parameterKey={`p${p.id}`}>
+                <span className="cursor-help underline decoration-dotted underline-offset-2">P{p.id}</span>
+              </BassRp22ParameterTooltip>
+            ) : <span>{p.id}. {p.title}</span>}
+            {debugText ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={`Debug info for parameter ${p.id}`}
+                      style={{
+                        border: "1px solid #C1B6AD",
+                        background: "#F6F3EE",
+                        color: "#625143",
+                        borderRadius: 9999,
+                        width: 18,
+                        height: 18,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        lineHeight: 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "help",
+                        flex: "0 0 auto",
+                      }}
+                    >
+                      i
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    align="start"
+                    className="max-w-[420px] whitespace-pre-wrap break-words rounded-md border border-[#C1B6AD] bg-white px-3 py-2 text-[#1B1A1A] shadow-lg"
+                  >
+                    <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace", fontSize: 11, lineHeight: 1.5 }}>
+                      {debugText}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : null}
+          </div>
+          <div style={{ ...sub, display: "flex", gap: 8, alignItems: "center" }}>
+            <span>{p.short}</span>
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "#3E4349" }}>
+              SCOPE: <strong>{p.scope.toUpperCase()}</strong>
+            </span>
+          </div>
+          {/* Achieved value line */}
+          <div style={{ fontSize: 11, color: "#1B1A1A", marginTop: 6, fontWeight: 600 }}>
+            {isSeatScope ? "Achieved (RSP): " : "Achieved: "}
+            <span style={{ color: "#213428" }}>{achievedValue}</span>
+          </div>
+          {targetBasisNote && (
+            <div style={{ fontSize: 10, color: "#9B8E82", marginTop: 4, fontStyle: "italic" }}>
+              {targetBasisNote}
+            </div>
+          )}
+        </div>
+
+        <div style={body}>
+          <div style={{ ...row, marginTop: 0 }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <span style={{ fontSize: 12, color: "#625143" }}>
+                {isSeatScope ? "Per-seat levels" : "Level"}
+              </span>
+            </div>
+            {(() => {
+              // ROOM scope: use same pill as HUD + RP22 Report
+              if (!isSeatScope) {
+                return <RP22GradingPill level={lvl} />;
+              }
+
+              // SEAT scope: NO overall pill, only per-seat pill grid
+              return (
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  {renderSeatPillGridForParam(p.id)}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* thresholds grid */}
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #F0EFEA" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                textAlign: "center",
+                gap: 8,
+              }}
+            >
+              {["L4", "L3", "L2", "L1"].map((k) => {
+                const trg = resolvedParam.thresholds[k];
+                const isEq = resolvedParam.thresholds.direction === "=";
+                return (
+                  <div key={k} style={{ fontSize: 11 }}>
+                    <div style={{ fontWeight: 700, color: "#3E4349" }}>{k}</div>
+                    <div
+                      style={{
+                        color: "#625143",
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
+                      }}
+                    >
+                      {trg == null
+                        ? "–"
+                        : isEq
+                        ? String(trg)
+                        : `${fmtIneq(resolvedParam.thresholds.direction)} ${trg}${
+                            resolvedParam.unit === "°"
+                              ? "°"
+                              : resolvedParam.unit === "Hz"
+                              ? " Hz"
+                              : resolvedParam.unit === "± dB" || resolvedParam.unit === "dB"
+                              ? " dB"
+                              : resolvedParam.unit === "dB SPL (C)"
+                              ? " dBC"
+                              : resolvedParam.unit === "m"
+                              ? " m"
+                              : ""
+                          }`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div>
       {/* RP23 Screen Size Guide */}
@@ -761,179 +936,13 @@ export default function RP22CompliancePanel({
         </div>
       </div>
 
-      {/* RP22 Parameters (1–21) */}
-      <div style={{ display: "grid", gap: 12 }}>
-        {RP22_PARAMS.map((p) => {
-          const lvl = p.id === 20 ? bassPresentation.parameters.p20.level : getHudLevelForParam(p);
-          const achievedValue = p.id === 20 ? bassPresentation.parameters.p20.valueText : getHudValueForParam(p);
-          const isSeatScope = String(p.scope || "").toLowerCase() === "seat";
-          const resolvedParam = (p.id === 12 || p.id === 13 || p.id === 14)
-            ? { ...p, thresholds: resolveParamThresholds(p, p12Mode, p13Mode, p14Mode) }
-            : p;
-          const targetBasisNote =
-            (p.id === 12 || p.id === 13)
-              ? (() => {
-                  const v = analysisResult?.gradedParameters?.primary?.[p.id]?.value;
-                  const dual = resolveP12P13DualLevels(p.id, v);
-                  return dual ? `Minimum ${dual.minimum} · Recommended ${dual.recommended}` : null;
-                })()
-              : p.id === 14 ? bassPresentation.parameters.p14.detail :
-            p.id === 18 ? "Official room result from the completed authoritative bass analysis." :
-            p.id === 19 ? "Official RSP-versus-target result from the completed authoritative bass analysis." :
-            null;
-          const debugMetric = String(reportSource).startsWith("seat:")
-            ? (() => {
-                const seatId = String(reportSource).split(":")[1];
-                const snap =
-                  seatSnapshotsById?.[seatId] ||
-                  seatSnapshotsById?.["mlp"] ||
-                  (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) ||
-                  (seatId === "mlp" ? analysisResult?.perSeatRp22?.["mlp"] : null) ||
-                  null;
-                return snap?.rp22?.[`p${p.id}`] || null;
-              })()
-            : null;
-          const debugText = getMetricDebugText(p.id, debugMetric);
-
-          return (
-            <div key={p.id} style={card}>
-              <div style={head}>
-                <div style={{ ...title, display: "flex", alignItems: "center", gap: 6 }}>
-                  {[19, 20].includes(p.id) ? (
-                    <BassRp22ParameterTooltip parameterKey={`p${p.id}`}>
-                      <span className="cursor-help underline decoration-dotted underline-offset-2">P{p.id}</span>
-                    </BassRp22ParameterTooltip>
-                  ) : <span>{p.id}. {p.title}</span>}
-                  {debugText ? (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            aria-label={`Debug info for parameter ${p.id}`}
-                            style={{
-                              border: "1px solid #C1B6AD",
-                              background: "#F6F3EE",
-                              color: "#625143",
-                              borderRadius: 9999,
-                              width: 18,
-                              height: 18,
-                              fontSize: 11,
-                              fontWeight: 700,
-                              lineHeight: 1,
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              cursor: "help",
-                              flex: "0 0 auto",
-                            }}
-                          >
-                            i
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent
-                          side="top"
-                          align="start"
-                          className="max-w-[420px] whitespace-pre-wrap break-words rounded-md border border-[#C1B6AD] bg-white px-3 py-2 text-[#1B1A1A] shadow-lg"
-                        >
-                          <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace", fontSize: 11, lineHeight: 1.5 }}>
-                            {debugText}
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ) : null}
-                </div>
-                <div style={{ ...sub, display: "flex", gap: 8, alignItems: "center" }}>
-                  <span>{p.short}</span>
-                  <span style={{ marginLeft: "auto", fontSize: 11, color: "#3E4349" }}>
-                    SCOPE: <strong>{p.scope.toUpperCase()}</strong>
-                  </span>
-                </div>
-                {/* Achieved value line */}
-                <div style={{ fontSize: 11, color: "#1B1A1A", marginTop: 6, fontWeight: 600 }}>
-                  {isSeatScope ? "Achieved (RSP): " : "Achieved: "}
-                  <span style={{ color: "#213428" }}>{achievedValue}</span>
-                </div>
-                {targetBasisNote && (
-                  <div style={{ fontSize: 10, color: "#9B8E82", marginTop: 4, fontStyle: "italic" }}>
-                    {targetBasisNote}
-                  </div>
-                )}
-              </div>
-
-              <div style={body}>
-                <div style={{ ...row, marginTop: 0 }}>
-                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "#625143" }}>
-                      {isSeatScope ? "Per-seat levels" : "Level"}
-                    </span>
-                  </div>
-                  {(() => {
-                    // ROOM scope: use same pill as HUD + RP22 Report
-                    if (!isSeatScope) {
-                      return <RP22GradingPill level={lvl} />;
-                    }
-
-                    // SEAT scope: NO overall pill, only per-seat pill grid
-                    return (
-                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                        {renderSeatPillGridForParam(p.id)}
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* thresholds grid */}
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #F0EFEA" }}>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(4, 1fr)",
-                      textAlign: "center",
-                      gap: 8,
-                    }}
-                  >
-                    {["L4", "L3", "L2", "L1"].map((k) => {
-                      const trg = resolvedParam.thresholds[k];
-                      const isEq = resolvedParam.thresholds.direction === "=";
-                      return (
-                        <div key={k} style={{ fontSize: 11 }}>
-                          <div style={{ fontWeight: 700, color: "#3E4349" }}>{k}</div>
-                          <div
-                            style={{
-                              color: "#625143",
-                              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
-                            }}
-                          >
-                            {trg == null
-                              ? "–"
-                              : isEq
-                              ? String(trg)
-                              : `${fmtIneq(resolvedParam.thresholds.direction)} ${trg}${
-                                  resolvedParam.unit === "°"
-                                    ? "°"
-                                    : resolvedParam.unit === "Hz"
-                                    ? " Hz"
-                                    : resolvedParam.unit === "± dB" || resolvedParam.unit === "dB"
-                                    ? " dB"
-                                    : resolvedParam.unit === "dB SPL (C)"
-                                    ? " dBC"
-                                    : resolvedParam.unit === "m"
-                                    ? " m"
-                                    : ""
-                                }`}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* RP22 Parameters (1–21) — compact matrix with expandable detail */}
+      <ComplianceParameterMatrix
+        parameters={RP22_PARAMS}
+        getLevelForParam={getHudLevelForParam}
+        getValueForParam={getHudValueForParam}
+        renderDetailCard={renderParamDetailCard}
+      />
     </div>
   );
 }
