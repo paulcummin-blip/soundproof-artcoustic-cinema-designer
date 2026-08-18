@@ -487,5 +487,36 @@ export function runContractFixtures() {
     results.adapterFingerprintsStructuredCloneSafe = validation.safe && cloneOk;
   }
 
+  // F7. A selected P14 miss cannot erase an independently achieved P18 grade.
+  {
+    const adapted = adaptCurrentBassOptimisationResult({
+      detailedStatus: "COMPLETE",
+      optimisationResult: {
+        selectedCandidate: {
+          achievedP14Level: 3,
+          achievedP14Db: 121.5,
+          availableP14CapabilityDb: 121.5,
+          selectedP14TargetDb: 123,
+          requestedP14Pass: false,
+          achievedP18Level: 2,
+          achievedP18FrequencyHz: 30.65,
+          generatedFilterBank: [],
+        },
+        poolId: "independent-p18-pool",
+      },
+      selectedP14TargetDb: 123,
+      p14TargetBasis: "recommended",
+      p18TargetBasis: "minimum",
+      perSeatRawCurves: [],
+    });
+    const p18 = adapted.productAnalysis.parameters.p18;
+    results.independentP18SurvivesP14Miss =
+      adapted.productAnalysis.parameters.p14.pass === false
+      && p18.level === 2
+      && p18.value === 30.65
+      && p18.designHz === 30
+      && p18.passedL1 === true;
+  }
+
   return results;
 }
