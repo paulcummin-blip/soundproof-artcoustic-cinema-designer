@@ -14,6 +14,7 @@ import { useProfessionalCapacity } from "@/lib/commercial/useProfessionalCapacit
 import { useEffectivePromotion, formatPromotionEndDate } from "@/lib/commercial/useEffectivePromotion";
 import { getAgeDays, formatAge, isAgeReviewDue } from "@/components/utils/projectAge";
 import AgeReviewDialog from "@/components/projects/AgeReviewDialog";
+import ProjectCardPrototype from "@/components/projects/ProjectCardPrototype";
 
 // Build lookup maps from the shared label arrays
 const dolbyLabelMap = Object.fromEntries(dolbyConfigs.map(c => [c.value, c.label]));
@@ -1218,11 +1219,27 @@ export default function ProjectsPage() {
             }}
           >
             {list.map((p) => (
-              <ProjectCard
-                key={p.id}
-                p={p}
-                onEdit={handleEditProject}
-              />
+              p.name === "Bass Test" ? (
+                <ProjectCardPrototype
+                  key={p.id}
+                  p={p}
+                  onEdit={handleEditProject}
+                  statuses={statuses}
+                  activeStatuses={activeStatuses}
+                  dolbyLabelMap={dolbyLabelMap}
+                  projectActions={projectActions}
+                  startHoldDelete={startHoldDelete}
+                  cancelHoldDelete={cancelHoldDelete}
+                  holdProgress={holdProgress}
+                  setProjects={setProjects}
+                />
+              ) : (
+                <ProjectCard
+                  key={p.id}
+                  p={p}
+                  onEdit={handleEditProject}
+                />
+              )
             ))}
           </div>
         </SegmentBoundary>
