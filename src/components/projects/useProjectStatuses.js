@@ -102,6 +102,15 @@ export function useProjectStatuses() {
     );
   }, []);
 
+  const recolorStatus = useCallback(async (id, newColor) => {
+    if (!newColor) return;
+    const updated = await base44.entities.ProjectStatus.update(id, { color: newColor });
+    setStatuses((arr) =>
+      sortStatuses(arr.map((s) => (s.id === id ? { ...s, color: updated.color } : s)))
+    );
+    return updated;
+  }, []);
+
   const reorderStatuses = useCallback(async (orderedIds) => {
     // orderedIds: array of ProjectStatus record .id values in desired order
     await Promise.all(
@@ -145,6 +154,7 @@ export function useProjectStatuses() {
     reload: load,
     addStatus,
     renameStatus,
+    recolorStatus,
     reorderStatuses,
     archiveStatus,
     unarchiveStatus,

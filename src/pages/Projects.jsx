@@ -151,7 +151,7 @@ export default function ProjectsPage() {
     statuses, activeStatuses, archivedStatuses,
     loading: statusesLoading,
     reload: reloadStatuses,
-    addStatus, renameStatus, reorderStatuses, archiveStatus, unarchiveStatus,
+    addStatus, renameStatus, recolorStatus, reorderStatuses, archiveStatus, unarchiveStatus,
   } = useProjectStatuses();
 
   // New Project dialog state (canonical NewProjectDialog)
@@ -1003,6 +1003,7 @@ export default function ProjectsPage() {
         archivedStatuses={archivedStatuses}
         onAdd={addStatus}
         onRename={renameStatus}
+        onRecolor={recolorStatus}
         onReorder={reorderStatuses}
         onArchive={archiveStatus}
         onUnarchive={unarchiveStatus}

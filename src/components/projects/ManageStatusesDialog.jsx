@@ -11,6 +11,7 @@ export default function ManageStatusesDialog({
   archivedStatuses,
   onAdd,
   onRename,
+  onRecolor,
   onReorder,
   onArchive,
   onUnarchive,
@@ -81,6 +82,15 @@ export default function ManageStatusesDialog({
       setEditLabel("");
     } catch (e) {
       setError(e?.message || "Failed to rename status");
+    }
+  };
+
+  const handleColorChange = async (id, newColor) => {
+    try {
+      setError(null);
+      await onRecolor(id, newColor);
+    } catch (e) {
+      setError(e?.message || "Failed to update status colour");
     }
   };
 
@@ -177,15 +187,36 @@ export default function ManageStatusesDialog({
                 background: "#FAFAF8",
               }}
             >
-              <span
+              <label
                 style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: 7,
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  border: "1px solid #DCDBD6",
                   background: s.color || "#625143",
                   flexShrink: 0,
+                  cursor: "pointer",
+                  position: "relative",
+                  overflow: "hidden",
                 }}
-              />
+                title="Click to change colour"
+              >
+                <input
+                  type="color"
+                  value={s.color || "#625143"}
+                  onChange={(e) => handleColorChange(s.id, e.target.value)}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    opacity: 0,
+                    cursor: "pointer",
+                    border: "none",
+                    padding: 0,
+                  }}
+                />
+              </label>
               {editingId === s.id ? (
                 <>
                   <input
@@ -349,9 +380,36 @@ export default function ManageStatusesDialog({
                     opacity: 0.75,
                   }}
                 >
-                  <span
-                    style={{ width: 14, height: 14, borderRadius: 7, background: s.color || "#625143" }}
-                  />
+                  <label
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 6,
+                      border: "1px solid #DCDBD6",
+                      background: s.color || "#625143",
+                      flexShrink: 0,
+                      cursor: "pointer",
+                      position: "relative",
+                      overflow: "hidden",
+                    }}
+                    title="Click to change colour"
+                  >
+                    <input
+                      type="color"
+                      value={s.color || "#625143"}
+                      onChange={(e) => handleColorChange(s.id, e.target.value)}
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        opacity: 0,
+                        cursor: "pointer",
+                        border: "none",
+                        padding: 0,
+                      }}
+                    />
+                  </label>
                   <span style={{ flex: 1, fontSize: 14 }}>{s.label}</span>
                   <button onClick={() => onUnarchive(s.id)} style={{ ...btnBase }}>
                     Restore

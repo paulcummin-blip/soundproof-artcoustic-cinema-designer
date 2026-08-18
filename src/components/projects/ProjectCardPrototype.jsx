@@ -113,7 +113,10 @@ export default function ProjectCardPrototype({
   }
 
   const statusColor = getStatusColorLocal(localStatus, statuses);
-  const isLive = normalizeStatusId(localStatus) === "live";
+  const isCompleted = normalizeStatusId(localStatus) === "completed";
+  // For very light status colours (e.g. Completed soft grey), use a darker
+  // readable text variant so the pill label stays legible on white.
+  const pillTextColor = isCompleted ? "#625143" : statusColor;
 
   const systemSummary = buildSystemSummary(p, dolbyLabelMap);
   const supportingDetail = buildSupportingDetail(p);
@@ -138,12 +141,12 @@ export default function ProjectCardPrototype({
         e.currentTarget.style.borderColor = BRAND.border;
       }}
     >
-      {/* Thin top accent line — dark green for Live, neutral otherwise */}
+      {/* Thin top accent line — uses the status colour for all statuses */}
       <div
         style={{
           height: 3,
           width: "100%",
-          background: isLive ? BRAND.accent : "transparent",
+          background: statusColor,
         }}
       />
 
@@ -222,15 +225,15 @@ export default function ProjectCardPrototype({
               alignItems: "center",
               padding: "4px 28px 4px 12px",
               borderRadius: 999,
-              border: `1px solid ${isLive ? BRAND.accent : BRAND.btnGhostBorder}`,
-              background: isLive ? "#FFFFFF" : BRAND.btnGhost,
+              border: `1px solid ${statusColor}`,
+              background: "#FFFFFF",
               fontSize: 12,
               fontWeight: 600,
-              color: isLive ? BRAND.accent : BRAND.subtext,
+              color: pillTextColor,
               cursor: "pointer",
               appearance: "none",
               WebkitAppearance: "none",
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='${isLive ? "%23213428" : "%238B8378"}' d='M5 7L1 3h8z'/%3E%3C/svg%3E")`,
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='${encodeURIComponent(pillTextColor)}' d='M5 7L1 3h8z'/%3E%3C/svg%3E")`,
               backgroundRepeat: "no-repeat",
               backgroundPosition: "right 10px center",
               opacity: isSaving ? 0.6 : 1,
