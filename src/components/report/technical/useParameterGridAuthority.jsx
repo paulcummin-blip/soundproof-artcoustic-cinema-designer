@@ -24,6 +24,8 @@ import {
 } from "@/components/report/technical/roomParameterLevelAuthority";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
+import { useActiveProjectId } from "@/components/state/project-session";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import { formatAuthoritativeP20Result, p20LevelText } from "@/components/room/bass/p20SeatPresentation";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
@@ -124,14 +126,11 @@ export function useParameterGridAuthority({
   contributionsByKey = null,
 }) {
   const appState = useAppState();
+  const activeProjectId = useActiveProjectId();
+  const projectBassAuthority = useCompletedBassAuthority(activeProjectId || "free");
   const sharedBassResults = useOptionalSharedBassResults();
-  const resolvedBassAuthority = React.useMemo(() => bassAuthority || (sharedBassResults ? {
-    contract: sharedBassResults?.contract || null,
-    authoritative: false,
-    publicationRejectionReason: null,
-    errorMessage: sharedBassResults?.detailedError || null,
-  } : null), [bassAuthority, sharedBassResults]);
-  const resolvedBassError = bassErrorMessage || sharedBassResults?.detailedError || null;
+  const resolvedBassAuthority = React.useMemo(() => bassAuthority || projectBassAuthority || null, [bassAuthority, projectBassAuthority]);
+  const resolvedBassError = bassErrorMessage || projectBassAuthority?.errorMessage || sharedBassResults?.detailedError || null;
   const bassPresentation = React.useMemo(() => buildComplianceBassPresentation({ completedBassAuthority: resolvedBassAuthority }, resolvedBassError), [resolvedBassAuthority, resolvedBassError]);
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";

@@ -7,8 +7,9 @@ import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
-import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
+import { useActiveProjectId } from "@/components/state/project-session";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 import { resolveParamThresholds, resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
@@ -237,13 +238,8 @@ export default function RP22CompliancePanel({
   freeMoveLcr = false,
 }) {
   const appState = useAppState();
-  const bassResults = useOptionalSharedBassResults();
-  const bassAuthority = React.useMemo(() => bassResults ? {
-    contract: bassResults?.contract || null,
-    authoritative: false,
-    publicationRejectionReason: null,
-    errorMessage: bassResults?.detailedError || null,
-  } : null, [bassResults]);
+  const activeProjectId = useActiveProjectId();
+  const bassAuthority = useCompletedBassAuthority(activeProjectId || "free");
   const bassPresentation = React.useMemo(() => buildComplianceBassPresentation({ completedBassAuthority: bassAuthority }), [bassAuthority]);
   const selectedP20Results = bassPresentation.perSeatP20Results;
   const p12Mode = appState?.p12Mode || "minimum";
