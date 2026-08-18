@@ -332,15 +332,28 @@ export function getCategoryAchievedSummaries(roomDesignRating) {
       const screenContrib = data.contribs.find((c) => c.key === "screen");
       const worst = screenContrib ? worstLevelFromResultLevel(screenContrib.resultLevel) : null;
       if (!worst) return { label: g.label, lines: [] };
-      const descriptor = SCREEN_LEVEL_DESCRIPTOR[worst] ?? null;
       const rp23Line = worst === "FAIL" ? "RP23 FAIL" : `RP23 Level ${levelNum(worst)}`;
+      const descriptor = worst === "FAIL"
+        ? "Improvement Required"
+        : (SCREEN_LEVEL_DESCRIPTOR[worst] ?? null);
       return {
         label: g.label,
         lines: descriptor ? [`${rp23Line} · ${descriptor}`] : [rp23Line],
       };
     }
-    // Aggregate weighted level profile for the category.
-    const profile = { L4: 0, L3: 0, L2: 0, L1: 0, FAIL: 0 };
+    // Count genuine FAIL parameters in this category. A FAIL dominates the
+    // summary — positive headline wording must never hide a FAIL.
+    let failCount = 0;
+    for (const c of data.contribs) {
+      const counts = parseLevelCounts(c.resultLevel);
+      if ((counts.FAIL || 0) > 0) failCount++;
+    }
+    if (failCount > 0) {
+      const failLine = failCount === 1 ? "1 parameter FAIL" : `${failCount} parameters FAIL`;
+      return { label: g.label, lines: ["Improvement Required", failLine] };
+    }
+    // No FAIL: describe the dominant achieved profile + lowest result.
+    const profile = { L4: 0, L3: 0, L2: 0, L1: 0 };
     for (const c of data.contribs) {
       const w = Number(c.effectiveWeight) || 1;
       const counts = parseLevelCounts(c.resultLevel);
@@ -350,7 +363,6 @@ export function getCategoryAchievedSummaries(roomDesignRating) {
     }
     const total = profile.L4 + profile.L3 + profile.L2 + profile.L1;
     if (total <= 0) {
-      if (profile.FAIL > 0) return { label: g.label, lines: ["Design Improvement Recommended"] };
       return { label: g.label, lines: [] };
     }
     const achieved = [
@@ -367,18 +379,25 @@ export function getCategoryAchievedSummaries(roomDesignRating) {
       && Math.abs(levelNum(dom.key) - levelNum(second.key)) === 1;
 
     const lines = [];
-    if (balanced) {
+    const allSame = achieved.length === 1;
+    if (allSame) {
+      lines.push(`Level ${levelNum(dom.key)} throughout`);
+    } else if (balanced) {
       const a = Math.min(levelNum(dom.key), levelNum(second.key));
       const b = Math.max(levelNum(dom.key), levelNum(second.key));
       lines.push(`Predominantly Level ${a}–${b}`);
-    } else if (dom.key === "L4" && dom.w / total >= 0.6) {
-      lines.push("Level 4 capability");
     } else {
       lines.push(`Predominantly Level ${levelNum(dom.key)}`);
     }
-    // Highlight significant L4 presence when L4 is not the dominant level.
-    if (dom.key !== "L4" && profile.L4 > 0 && profile.L4 / total >= 0.15) {
-      lines.push("Multiple Level 4 results");
+    // Show lowest result when it falls below the dominant/balanced range.
+    if (!allSame) {
+      const lowest = achieved[achieved.length - 1];
+      const floor = balanced
+        ? Math.min(levelNum(dom.key), levelNum(second.key))
+        : levelNum(dom.key);
+      if (levelNum(lowest.key) < floor) {
+        lines.push(`Lowest result: ${lowest.key}`);
+      }
     }
     return { label: g.label, lines };
   });
@@ -415,12 +434,28 @@ export function getDesignRatingSupportingSentence(roomDesignRating) {
   const contributions = roomDesignRating.contributions || [];
   if (contributions.length === 0) return null;
 
+  // Count genuine FAIL parameters across all contributions.
+  let failCount = 0;
+  for (const c of contributions) {
+    const counts = parseLevelCounts(c.resultLevel);
+    if ((counts.FAIL || 0) > 0) failCount++;
+  }
+
   const profile = aggregateLevelProfile(contributions);
   const total = profile.L4 + profile.L3 + profile.L2 + profile.L1;
 
   // No achieved levels at all — everything failed.
   if (total <= 0) {
     return "Design improvement recommended across multiple parameters";
+  }
+
+  // FAIL-aware sentence: some parameters failed but overall performance is
+  // strong. This makes "Design Improvement Recommended" understandable even
+  // when the Design Performance Index is otherwise high.
+  if (failCount > 0) {
+    const paramWord = failCount === 1 ? "parameter" : "parameters";
+    const verb = failCount === 1 ? "requires" : "require";
+    return `Strong overall performance, but ${failCount} ${paramWord} ${verb} correction.`;
   }
 
   const achieved = [
