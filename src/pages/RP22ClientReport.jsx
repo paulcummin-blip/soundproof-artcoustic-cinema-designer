@@ -41,8 +41,11 @@ import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
 import { useAppState } from "@/components/AppStateProvider";
-import { buildRp22SeatCoverageSentence } from "@/components/utils/rp22SeatCoverageSentence";
+import { buildRp22SeatCoverageResult } from "@/components/utils/rp22SeatCoverageSentence";
 import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
+import { buildLightweightSeatHudById } from "@/components/hooks/useAppDesignRating";
+import { buildDesignRatingInput } from "@/components/report/technical/buildDesignRatingInput";
+import { buildArtcousticDesignRatingAuthority } from "@/components/report/technical/artcousticSystemDesignRating";
 
 export default function RP22ClientReport() {
   const navigate = useNavigate();
@@ -79,6 +82,7 @@ export default function RP22ClientReport() {
     seatingPositions,
     placedSpeakers,
     analysisResult,
+    completedBassAuthority,
     bassPresentation,
     allSeatSplMetrics,
   } = authority;
@@ -86,33 +90,55 @@ export default function RP22ClientReport() {
   // ── Design Summary (static intro — pure selector, no analysis) ──
   const highlights = useMemo(() => selectClientDesignHighlights(), []);
 
-  // ── RP22 seating-coverage summary sentence (shared helper) ──
-  // Visual Report intentionally excludes RP22 parameters from its pages, so
-  // allParametersReportable is always false → "currently assessed" wording.
-  // The sentence reuses canonical per-seat RP22 results plus the user's
-  // independent Primary / Secondary classification — no recalculation.
-  const realSeatIds = useMemo(
-    () => (Array.isArray(seatingPositions) ? seatingPositions.map((s) => s.id).filter(Boolean) : []),
-    [seatingPositions]
-  );
-  const primarySeatIds = useMemo(
-    () => (Array.isArray(seatingPositions)
-      ? seatingPositions
-          .filter((seat) => resolveSeatPriority(seat) === "primary")
-          .map((seat) => seat.id)
-          .filter(Boolean)
-      : []),
-    [seatingPositions]
-  );
-  const coverageSentence = useMemo(
-    () => buildRp22SeatCoverageSentence({
-      analysisResult,
-      realSeatIds,
-      primarySeatIds,
-      allParametersReportable: false,
+  // ── RP22 seating-coverage floor (strict, NOT ASDR) ──
+  // Uses the SAME canonical param authority as the Technical Report
+  // (buildArtcousticDesignRatingAuthority), built from the same canonical
+  // inputs. The floor is the highest RP22 Level for which every assessed
+  // applicable parameter passes that Level across every Primary seat (and
+  // every seat for ALL_SEAT_FLOOR). Room-scoped params are included.
+  // allParametersAuthoritative is derived from the authority's param states.
+  const reportP14Mode = bassPresentation?.parameters?.p14?.targetBasis || appState?.splConfig?.p14Mode || "minimum";
+  const reportP18Mode = bassPresentation?.parameters?.p18?.targetBasis || appState?.splConfig?.p18Mode || "minimum";
+  const completedP19Result = completedBassAuthority?.contract?.productAnalysis?.parameters?.p19 || null;
+  const completedP19Results = completedBassAuthority?.contract?.selectedCandidate?.perSeatP19Results || [];
+  const completedP20Results = bassPresentation?.perSeatP20Results || [];
+  const hasFrontWides = useMemo(
+    () => (Array.isArray(placedSpeakers) ? placedSpeakers : []).some((s) => {
+      const r = String(s?.role || "").toUpperCase();
+      return r === "LW" || r === "RW";
     }),
-    [analysisResult, realSeatIds, primarySeatIds]
+    [placedSpeakers]
   );
+  const coverageParamAuthority = useMemo(() => {
+    try {
+      const reportSeatHudById = buildLightweightSeatHudById(
+        seatingPositions, analysisResult, rsp,
+        completedP19Result, completedP19Results, completedP20Results
+      );
+      const input = buildDesignRatingInput({
+        seats: seatingPositions,
+        analysisResult,
+        reportSeatHudById,
+        completedBassAuthority,
+        completedBassPresentation: bassPresentation,
+        reportP12Mode: p12Mode,
+        reportP13Mode: p13Mode,
+        reportP14Mode,
+        reportP18Mode,
+        hasFrontWides,
+        placedSpeakers,
+      });
+      const authority = buildArtcousticDesignRatingAuthority(input);
+      return authority?.parameters || null;
+    } catch (e) {
+      return null;
+    }
+  }, [seatingPositions, analysisResult, rsp, completedBassAuthority, bassPresentation, p12Mode, p13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers]);
+  const coverageResult = useMemo(
+    () => buildRp22SeatCoverageResult({ paramAuthority: coverageParamAuthority, seats: seatingPositions }),
+    [coverageParamAuthority, seatingPositions]
+  );
+  const coverageSentence = coverageResult?.statement || null;
 
   // ── Published recommendations (from Room Designer ASDR engine) ──
   // Read from the shared window store populated by DesignRecommendationEngine.

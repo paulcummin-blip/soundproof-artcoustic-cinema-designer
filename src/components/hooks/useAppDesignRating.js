@@ -36,8 +36,12 @@ const SEAT_PARAM_KEY_MAP = {
 /**
  * Build a lightweight reportSeatHudById from analysisResult.perSeatRp22.
  * Maps numeric RP22 keys to string keys and computes rp23 viewing angles.
+ *
+ * Exported so the Visual Report (RP22ClientReport) can build the same
+ * param authority for the RP22 seating-coverage floor without duplicating
+ * the seat-HUD mapping logic.
  */
-function buildLightweightSeatHudById(seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results) {
+export function buildLightweightSeatHudById(seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results) {
   const out = {};
   const perSeatRp22 = analysisResult?.perSeatRp22;
   const perSeatRp23 = analysisResult?.perSeatRp23;

@@ -62,7 +62,7 @@ import { subscribeAsdrVisibility, getAsdrVisibility } from '@/components/state/a
 import DesignRecommendationEngine from '@/components/recommendations/DesignRecommendationEngine';
 import { useAuth } from '@/lib/AuthContext';
 import { DEFAULT_TERRITORY, getTerritoryConfig } from '@/components/pricing/territoryConfig';
-import { buildRp22SeatCoverageSentence, resolveAllParametersReportable } from '@/components/utils/rp22SeatCoverageSentence';
+import { buildRp22SeatCoverageResult } from '@/components/utils/rp22SeatCoverageSentence';
 import { resolveSeatPriority, getPrimarySeats, getSecondarySeats } from '@/components/utils/seatPriorityAuthority';
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 
@@ -777,41 +777,6 @@ function RP22ReportInner() {
         return out;
     }, [seats, reportSeatHudById]);
 
-    // ── RP22 seating-coverage summary sentence (shared helper) ──────────────
-    // Reuses the canonical per-seat RP22 results plus the user's independent
-    // Primary / Secondary classification. No RP22 parameter is recalculated.
-    // allParametersReportable auto-detects bass authority from the existing
-    // bass presentation — when bass becomes authoritative, the stronger
-    // "across every parameter" wording activates automatically.
-    const realSeatIdsForCoverage = React.useMemo(
-        () => safeArray(seats).map(s => s?.id).filter(Boolean),
-        [seats]
-    );
-    const primarySeatIdsForCoverage = React.useMemo(
-        () => safeArray(seats)
-            .filter(s => resolveSeatPriority(s) === 'primary')
-            .map(s => s?.id)
-            .filter(Boolean),
-        [seats]
-    );
-    const allParametersReportable = React.useMemo(
-        () => resolveAllParametersReportable(completedBassPresentation),
-        [completedBassPresentation]
-    );
-    const coverageSentence = React.useMemo(
-        () => buildRp22SeatCoverageSentence({
-            analysisResult,
-            realSeatIds: realSeatIdsForCoverage,
-            primarySeatIds: primarySeatIdsForCoverage,
-            allParametersReportable,
-        }),
-        [analysisResult, realSeatIdsForCoverage, primarySeatIdsForCoverage, allParametersReportable]
-    );
-
-    // ── Artcoustic System Design Rating ────────────────────────────────────
-    // Wires Page 3 into the approved Stage B adapter. The UI layer supplies
-    // ONLY existing canonical authority inputs — no thresholds, FAIL rules,
-    // or bass scoring are reimplemented. The adapter is the sole scoring authority.
     const hasFrontWides = React.useMemo(() => {
         return placedSpeakers.some(s => {
             const r = String(s?.role || '').toUpperCase();
@@ -819,6 +784,47 @@ function RP22ReportInner() {
         });
     }, [placedSpeakers]);
 
+    // ── RP22 seating-coverage floor (strict, NOT ASDR) ─────────────────────
+    // Uses the SAME canonical param authority as the ASDR scoring path
+    // (buildArtcousticDesignRatingAuthority), but is NOT gated by ASDR
+    // visibility and is NOT an averaged score. The floor is the highest RP22
+    // Level for which every assessed applicable parameter passes that Level
+    // across every Primary seat (and every seat for ALL_SEAT_FLOOR).
+    // Room-scoped params are included — the room result must also pass.
+    // allParametersAuthoritative is derived from the authority's param states,
+    // not a separate bass-only check.
+    const coverageParamAuthority = React.useMemo(() => {
+        try {
+            const input = buildDesignRatingInput({
+                seats,
+                analysisResult,
+                reportSeatHudById,
+                completedBassAuthority,
+                completedBassPresentation,
+                reportP12Mode,
+                reportP13Mode,
+                reportP14Mode,
+                reportP18Mode,
+                hasFrontWides,
+                placedSpeakers,
+            });
+            const authority = buildArtcousticDesignRatingAuthority(input);
+            return authority?.parameters || null;
+        } catch (e) {
+            return null;
+        }
+    }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers]);
+
+    const coverageResult = React.useMemo(
+        () => buildRp22SeatCoverageResult({ paramAuthority: coverageParamAuthority, seats }),
+        [coverageParamAuthority, seats]
+    );
+    const coverageSentence = coverageResult?.statement || null;
+
+    // ── Artcoustic System Design Rating ────────────────────────────────────
+    // Wires Page 3 into the approved Stage B adapter. The UI layer supplies
+    // ONLY existing canonical authority inputs — no thresholds, FAIL rules,
+    // or bass scoring are reimplemented. The adapter is the sole scoring authority.
     const designRatingAuthority = React.useMemo(() => {
         if (!showDesignRating) return null;
         const input = buildDesignRatingInput({

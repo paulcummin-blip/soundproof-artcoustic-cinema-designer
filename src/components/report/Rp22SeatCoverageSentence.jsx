@@ -2,12 +2,13 @@
  * Rp22SeatCoverageSentence
  * ------------------------
  * Presentational component for the shared RP22 seating-coverage summary
- * sentence. Renders the sentence produced by buildRp22SeatCoverageSentence.
+ * sentence. Renders the sentence produced by buildRp22SeatCoverageResult.
  *
  * Used by both the Technical Report and the Visual Report to ensure
  * identical wording and styling for the same project.
  *
  * Visually secondary to the main project title/result but clearly readable.
+ * One line where possible, maximum two lines at normal report width.
  */
 
 import React from "react";
@@ -16,10 +17,10 @@ const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
 
 function renderSentenceWithBoldLevels(sentence) {
   return String(sentence)
-    .split(/(Below Level 1|Level [1-4])/g)
+    .split(/(Level [1-4])/g)
     .filter(Boolean)
     .map((part, index) =>
-      /^(?:Below Level 1|Level [1-4])$/.test(part)
+      /^Level [1-4]$/.test(part)
         ? <strong key={index} style={{ fontWeight: 700, color: "#1B1A1A" }}>{part}</strong>
         : <span key={index}>{part}</span>
     );
