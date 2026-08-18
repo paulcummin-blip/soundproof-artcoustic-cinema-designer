@@ -42,7 +42,8 @@ export default function Layout({ children, currentPageName }) {
   const activeProjectId = useActiveProjectId();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  
+  const [dealerAccountUrl, setDealerAccountUrl] = React.useState(null);
+
   // Price summary state (read from window.__ROOM_DESIGNER_PRICE__ set by RoomDesigner)
   const [priceSummary, setPriceSummary] = React.useState({
     showPrices: false,
@@ -145,6 +146,40 @@ export default function Layout({ children, currentPageName }) {
   useEffect(() => {
     log.debug(`[Layout] Page: ${currentPageName}`);
   }, [currentPageName]);
+
+  // Dealer navigation is resolved server-side from the authenticated user's
+  // authoritative Sound Proof account. Central Admin never requests or sees it.
+  React.useEffect(() => {
+    let cancelled = false;
+
+    if (!user || isAdmin) {
+      setDealerAccountUrl(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    (async () => {
+      try {
+        const response = await base44.functions.invoke('resolveDealerAccountNavigation', {});
+        const data = response?.data || {};
+        if (!cancelled) {
+          setDealerAccountUrl(
+            data.eligible === true && typeof data.url === 'string'
+              ? data.url
+              : null,
+          );
+        }
+      } catch {
+        // Optional navigation fails closed: ambiguity or backend failure hides it.
+        if (!cancelled) setDealerAccountUrl(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, isAdmin]);
 
   return (
     <SafeBootErrorBoundary>
@@ -285,6 +320,23 @@ export default function Layout({ children, currentPageName }) {
                     "No active project"
                   )}
                 </div>
+
+                {dealerAccountUrl && !isAdmin && (
+                  <a
+                    href={dealerAccountUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mx-3 mt-1 text-xs underline underline-offset-2 hover:no-underline"
+                    style={{
+                      color: '#213428',
+                      fontFamily: 'Didact Gothic, sans-serif',
+                      fontWeight: 600,
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    Dealer Account →
+                  </a>
+                )}
 
                 </div>
 
