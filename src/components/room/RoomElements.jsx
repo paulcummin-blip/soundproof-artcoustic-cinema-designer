@@ -158,15 +158,30 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
     return 'rear';
   };
 
+  // Shared report-style typography (matches Room Dimensions section)
+  const groupTitleStyle = {
+    fontSize: "11px",
+    fontWeight: 600,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: "#625143",
+    marginBottom: "10px",
+  };
+  const fieldLabelClassName = "block mb-1.5 text-xs text-[#6B7280]";
+  const helperTextStyle = {
+    fontSize: "10px",
+    color: "#9CA3AF",
+    marginTop: "4px",
+  };
+
   return (
     <div className="space-y-4 font-body">
-      {/* CREATE CONTROLS — side-by-side, whole-card clickable */}
-      <div className="grid grid-cols-2 gap-[18px] mt-3 mb-4">
-        {/* CREATE ROOM ELEMENT — warm taupe/brown */}
+      {/* CREATE CONTROLS — light neutral, consistent height */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 mb-4">
         <button
           type="button"
           onClick={addDoor}
-          className="group flex items-center justify-between rounded-lg border px-3 py-[22px] text-left transition-all duration-150 border-[#C4B5A8] bg-[rgba(98,81,67,0.06)] hover:bg-[rgba(98,81,67,0.1)] hover:border-[#625143] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#625143] focus-visible:ring-offset-1 active:translate-y-[1px]"
+          className="group flex items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-all duration-150 border-[#DCDBD6] bg-white hover:bg-[#F9F8F6] hover:border-[#C4B5A8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#625143] focus-visible:ring-offset-1 active:translate-y-[1px]"
           aria-label="Create Room Element"
         >
           <span className="text-xs font-semibold" style={{ color: '#625143', letterSpacing: 0.3 }}>
@@ -175,11 +190,10 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
           <Plus className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" style={{ color: '#625143' }} />
         </button>
 
-        {/* CREATE PROJECTOR — dark muted green */}
         <button
           type="button"
           onClick={addProjector}
-          className="group flex items-center justify-between rounded-lg border px-3 py-[22px] text-left transition-all duration-150 border-[#7A9B8C] bg-[rgba(33,52,40,0.06)] hover:bg-[rgba(33,52,40,0.1)] hover:border-[#213428] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428] focus-visible:ring-offset-1 active:translate-y-[1px]"
+          className="group flex items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-all duration-150 border-[#DCDBD6] bg-white hover:bg-[#F9F8F6] hover:border-[#7A9B8C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428] focus-visible:ring-offset-1 active:translate-y-[1px]"
           aria-label="Create Projector"
           title="Add Projector"
         >
@@ -199,40 +213,34 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
               key={element.id}
               className="rounded-lg border p-4"
               style={{
-                borderColor: element?.type === 'projector' ? '#7A9B8C' : '#C4B5A8',
-                background: element?.type === 'projector' ? 'rgba(33, 52, 40, 0.05)' : 'rgba(98, 81, 67, 0.05)',
+                borderColor: '#DCDBD6',
+                background: '#FFFFFF',
                 borderLeftWidth: 3,
-                borderLeftColor: element?.type === 'projector' ? '#213428' : '#625143',
+                borderLeftColor: element?.type === 'projector' ? '#7A9B8C' : '#C4B5A8',
               }}
             >
               <div className="flex justify-between items-center mb-3">
-                <div>
-                  <div className="text-sm font-medium" style={{ color: element?.type === 'projector' ? '#213428' : '#625143' }}>
-                    {element?.label || 'Element'}
-                  </div>
+                <div className="text-sm font-medium" style={{ color: element?.type === 'projector' ? '#213428' : '#625143' }}>
+                  {element?.label || 'Element'}
                 </div>
 
                 <button
                   type="button"
                   onClick={() => removeElement(element.id)}
-                  className="px-2 py-1 rounded-md"
-                  style={{
-                    border: '1px solid #DCDBD6',
-                    background: '#FFFFFF',
-                    color: '#1B1A1A',
-                  }}
+                  className="p-1.5 rounded-md transition-colors hover:bg-[#F3F2EF]"
+                  style={{ color: '#9CA3AF' }}
                   aria-label="Remove element"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
 
               {/* PROJECTOR LAYOUT */}
               {element?.type === 'projector' ? (
                 <>
-                  {/* Row 1: Label */}
+                  {/* Label */}
                   <div className="mb-3">
-                    <Label className="text-[#3E4349]">Label</Label>
+                    <Label className={fieldLabelClassName}>Label</Label>
                     <Input
                       type="text"
                       value={element?.label ?? ''}
@@ -242,11 +250,11 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                     />
                   </div>
 
-                  {/* Row 2: Lens position */}
-                  <div className="text-[10px] font-semibold mb-1" style={{ color: '#625143', letterSpacing: 0.3 }}>LENS CENTRE (m)</div>
+                  {/* Lens Centre */}
+                  <div style={groupTitleStyle}>Lens Centre (m)</div>
                   <div className="grid grid-cols-3 gap-3 mb-3">
                     <div>
-                      <Label className="text-[#3E4349]">Lens X (m)</Label>
+                      <Label className={fieldLabelClassName}>Lens X (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -255,19 +263,15 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                         placeholder="—"
                       />
-                      <div className="flex items-center justify-between text-[10px] mt-1" style={{ color: '#625143' }}>
+                      <div className="flex items-center justify-between" style={helperTextStyle}>
                         <span>From left wall</span>
                         <button
                           type="button"
-                          className="text-[10px] underline hover:opacity-80"
+                          className="underline hover:opacity-80"
                           onClick={() => {
                             const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
-                            const bodyW = Number(element?.body_width_m ?? 0) || 0;
-
                             if (!roomW) return;
-
-                            const centeredX = (roomW / 2);
-                            updateElement(element.id, 'x_lens_m', centeredX);
+                            updateElement(element.id, 'x_lens_m', roomW / 2);
                           }}
                         >
                           Centre
@@ -275,7 +279,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       </div>
                     </div>
                     <div>
-                      <Label className="text-[#3E4349]">Lens Y (m)</Label>
+                      <Label className={fieldLabelClassName}>Lens Y (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -284,10 +288,10 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                         placeholder="—"
                       />
-                      <div className="text-[10px] mt-1" style={{ color: '#625143' }}>From front wall</div>
+                      <div style={helperTextStyle}>From front wall</div>
                     </div>
                     <div>
-                      <Label className="text-[#3E4349]">Lens Z (m)</Label>
+                      <Label className={fieldLabelClassName}>Lens Z (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -296,15 +300,15 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                         placeholder="—"
                       />
-                      <div className="text-[10px] mt-1" style={{ color: '#625143' }}>Height from floor</div>
+                      <div style={helperTextStyle}>Height from floor</div>
                     </div>
                   </div>
 
-                  {/* Row 3: Body dimensions */}
-                  <div className="text-[10px] font-semibold mb-1" style={{ color: '#625143', letterSpacing: 0.3 }}>BODY DIMENSIONS (m)</div>
+                  {/* Body Dimensions */}
+                  <div style={groupTitleStyle}>Body Dimensions (m)</div>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <Label className="text-[#3E4349]">Body Width (m)</Label>
+                      <Label className={fieldLabelClassName}>Body Width (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -315,7 +319,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       />
                     </div>
                     <div>
-                      <Label className="text-[#3E4349]">Body Height (m)</Label>
+                      <Label className={fieldLabelClassName}>Body Height (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -326,7 +330,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       />
                     </div>
                     <div>
-                      <Label className="text-[#3E4349]">Body Depth (m)</Label>
+                      <Label className={fieldLabelClassName}>Body Depth (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -340,54 +344,52 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                 </>
               ) : (
                 /* NON-PROJECTOR layout */
-                <div className="grid grid-cols-2 gap-3">
-                  {/* WALL */}
-                  <div>
-                    <Label className="text-[#3E4349]">Wall</Label>
-                    <Select
-                      value={wall}
-                      onValueChange={(value) => updateElement(element.id, 'wall', value)}
-                      modal={false}
-                    >
-                      <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper" sideOffset={6} className="z-[70]">
-                        <SelectItem value="front">Front</SelectItem>
-                        <SelectItem value="rear">Rear</SelectItem>
-                        <SelectItem value="left">Left</SelectItem>
-                        <SelectItem value="right">Right</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
-                      Screen is always on the Front wall.
+                <div className="space-y-3">
+                  {/* Placement: Wall + Length */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className={fieldLabelClassName}>Wall</Label>
+                      <Select
+                        value={wall}
+                        onValueChange={(value) => updateElement(element.id, 'wall', value)}
+                        modal={false}
+                      >
+                        <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent position="popper" sideOffset={6} className="z-[70]">
+                          <SelectItem value="front">Front</SelectItem>
+                          <SelectItem value="rear">Rear</SelectItem>
+                          <SelectItem value="left">Left</SelectItem>
+                          <SelectItem value="right">Right</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div style={helperTextStyle}>Screen is always on the Front wall.</div>
+                    </div>
+
+                    <div>
+                      <Label className={fieldLabelClassName}>Length (m)</Label>
+                      <StepperInput
+                        value={Number(element?.length_m) || 0.9}
+                        step={0.01}
+                        min={0.05}
+                        onChange={(newLen) => {
+                          const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
+                          const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
+                          const wallLen = isFrontOrRear ? roomW : roomL;
+                          const posM = Number(element?.pos_m ?? element?.x_m ?? element?.y_m ?? 0) || 0;
+                          const maxPos = wallLen > 0 ? Math.max(0, wallLen - newLen) : posM;
+                          const clampedPos = Math.min(posM, maxPos);
+                          const next = { ...element, length_m: newLen, pos_m: clampedPos };
+                          onChange((elements || []).map(el => el.id === element.id ? next : el));
+                        }}
+                      />
                     </div>
                   </div>
 
-                  {/* LENGTH — stepper */}
+                  {/* Label */}
                   <div>
-                    <Label className="text-[#3E4349]">Length (m)</Label>
-                    <StepperInput
-                      value={Number(element?.length_m) || 0.9}
-                      step={0.01}
-                      min={0.05}
-                      onChange={(newLen) => {
-                        // Keep pos_m clamped so element stays in room when length grows
-                        const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
-                        const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
-                        const wallLen = isFrontOrRear ? roomW : roomL;
-                        const posM = Number(element?.pos_m ?? element?.x_m ?? element?.y_m ?? 0) || 0;
-                        const maxPos = wallLen > 0 ? Math.max(0, wallLen - newLen) : posM;
-                        const clampedPos = Math.min(posM, maxPos);
-                        const next = { ...element, length_m: newLen, pos_m: clampedPos };
-                        onChange((elements || []).map(el => el.id === element.id ? next : el));
-                      }}
-                    />
-                  </div>
-
-                  {/* LABEL — spans both columns */}
-                  <div className="col-span-2">
-                    <Label className="text-[#3E4349]">Label</Label>
+                    <Label className={fieldLabelClassName}>Label</Label>
                     <Input
                       type="text"
                       value={element?.label ?? ''}
@@ -397,99 +399,103 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                     />
                   </div>
 
-                  {/* VERTICAL DIMENSIONS */}
-                  {(() => {
-                    const roomH = Number(roomDims?.heightM ?? roomDims?.height ?? 2.8) || 2.8;
-                    const elH = Number(element?.height) || 2.1;
-                    const elZ = Number(element?.z_position) || 0;
-                    const maxZ = Math.max(0, roomH - elH);
-                    const maxH = Math.max(0.05, roomH - elZ);
-                    return (
-                      <>
-                        <div>
-                          <Label className="text-[#3E4349]">Height from Floor (m)</Label>
-                          <StepperInput
-                            value={elZ}
-                            step={0.01}
-                            min={0}
-                            max={maxZ}
-                            onChange={(val) => updateElement(element.id, 'z_position', Math.max(0, Math.min(val, maxZ)))}
-                          />
-                          <div className="text-[10px] mt-1" style={{ color: '#625143' }}>Bottom of element AFF</div>
-                        </div>
-                        <div>
-                          <Label className="text-[#3E4349]">Element Height (m)</Label>
-                          <StepperInput
-                            value={elH}
-                            step={0.01}
-                            min={0.05}
-                            max={maxH}
-                            onChange={(val) => updateElement(element.id, 'height', Math.max(0.05, Math.min(val, maxH)))}
-                          />
-                          <div className="text-[10px] mt-1" style={{ color: '#625143' }}>Opening height</div>
-                        </div>
-                      </>
-                    );
-                  })()}
+                  {/* Dimensions: Height from Floor + Element Height */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {(() => {
+                      const roomH = Number(roomDims?.heightM ?? roomDims?.height ?? 2.8) || 2.8;
+                      const elH = Number(element?.height) || 2.1;
+                      const elZ = Number(element?.z_position) || 0;
+                      const maxZ = Math.max(0, roomH - elH);
+                      const maxH = Math.max(0.05, roomH - elZ);
+                      return (
+                        <>
+                          <div>
+                            <Label className={fieldLabelClassName}>Height from Floor (m)</Label>
+                            <StepperInput
+                              value={elZ}
+                              step={0.01}
+                              min={0}
+                              max={maxZ}
+                              onChange={(val) => updateElement(element.id, 'z_position', Math.max(0, Math.min(val, maxZ)))}
+                            />
+                            <div style={helperTextStyle}>Bottom of element AFF</div>
+                          </div>
+                          <div>
+                            <Label className={fieldLabelClassName}>Element Height (m)</Label>
+                            <StepperInput
+                              value={elH}
+                              step={0.01}
+                              min={0.05}
+                              max={maxH}
+                              onChange={(val) => updateElement(element.id, 'height', Math.max(0.05, Math.min(val, maxH)))}
+                            />
+                            <div style={helperTextStyle}>Opening height</div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
 
-                  {/* DUAL DISTANCE — editable steppers */}
-                  {(() => {
-                    const posM = Number(element?.pos_m ?? element?.x_m ?? element?.y_m ?? 0) || 0;
-                    const elLen = Number(element?.length_m) || 0.9;
-                    const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
-                    const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
-                    const wallLen = isFrontOrRear ? roomW : roomL;
-                    const distA = wallLen > 0 ? Math.max(0, posM) : 0;
-                    const distB = wallLen > 0 ? Math.max(0, wallLen - posM - elLen) : 0;
-                    const maxDistA = wallLen > 0 ? Math.max(0, wallLen - elLen) : 0;
-                    const labelA = isFrontOrRear ? 'Left Distance' : 'Front Distance';
-                    const labelB = isFrontOrRear ? 'Right Distance' : 'Rear Distance';
-                    const hintA = isFrontOrRear ? 'From left wall to element edge' : 'From front wall to element edge';
-                    const hintB = isFrontOrRear ? 'From element edge to right wall' : 'From element edge to rear wall';
+                  {/* Position: Distance fields */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {(() => {
+                      const posM = Number(element?.pos_m ?? element?.x_m ?? element?.y_m ?? 0) || 0;
+                      const elLen = Number(element?.length_m) || 0.9;
+                      const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
+                      const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
+                      const wallLen = isFrontOrRear ? roomW : roomL;
+                      const distA = wallLen > 0 ? Math.max(0, posM) : 0;
+                      const distB = wallLen > 0 ? Math.max(0, wallLen - posM - elLen) : 0;
+                      const maxDistA = wallLen > 0 ? Math.max(0, wallLen - elLen) : 0;
+                      const labelA = isFrontOrRear ? 'Left Distance' : 'Front Distance';
+                      const labelB = isFrontOrRear ? 'Right Distance' : 'Rear Distance';
+                      const hintA = isFrontOrRear ? 'From left wall to element edge' : 'From front wall to element edge';
+                      const hintB = isFrontOrRear ? 'From element edge to right wall' : 'From element edge to rear wall';
 
-                    const setDistA = (newDistA) => {
-                      const clamped = Math.max(0, Math.min(newDistA, maxDistA));
-                      onChange((elements || []).map(el =>
-                        el.id === element.id ? { ...el, pos_m: clamped } : el
-                      ));
-                    };
+                      const setDistA = (newDistA) => {
+                        const clamped = Math.max(0, Math.min(newDistA, maxDistA));
+                        onChange((elements || []).map(el =>
+                          el.id === element.id ? { ...el, pos_m: clamped } : el
+                        ));
+                      };
 
-                    const setDistB = (newDistB) => {
-                      const maxDistB = Math.max(0, wallLen - elLen);
-                      const clamped = Math.max(0, Math.min(newDistB, maxDistB));
-                      const newPosM = wallLen - elLen - clamped;
-                      onChange((elements || []).map(el =>
-                        el.id === element.id ? { ...el, pos_m: Math.max(0, newPosM) } : el
-                      ));
-                    };
+                      const setDistB = (newDistB) => {
+                        const maxDistB = Math.max(0, wallLen - elLen);
+                        const clamped = Math.max(0, Math.min(newDistB, maxDistB));
+                        const newPosM = wallLen - elLen - clamped;
+                        onChange((elements || []).map(el =>
+                          el.id === element.id ? { ...el, pos_m: Math.max(0, newPosM) } : el
+                        ));
+                      };
 
-                    return (
-                      <>
-                        <div>
-                          <Label className="text-[#3E4349]">{labelA} (m)</Label>
-                          <StepperInput
-                            value={distA}
-                            step={0.01}
-                            min={0}
-                            max={maxDistA}
-                            onChange={setDistA}
-                          />
-                          <div className="text-[10px] mt-1" style={{ color: '#625143' }}>{hintA}</div>
-                        </div>
-                        <div>
-                          <Label className="text-[#3E4349]">{labelB} (m)</Label>
-                          <StepperInput
-                            value={distB}
-                            step={0.01}
-                            min={0}
-                            max={Math.max(0, wallLen - elLen)}
-                            onChange={setDistB}
-                          />
-                          <div className="text-[10px] mt-1" style={{ color: '#625143' }}>{hintB}</div>
-                        </div>
-                      </>
-                    );
-                  })()}
+                      return (
+                        <>
+                          <div>
+                            <Label className={fieldLabelClassName}>{labelA} (m)</Label>
+                            <StepperInput
+                              value={distA}
+                              step={0.01}
+                              min={0}
+                              max={maxDistA}
+                              onChange={setDistA}
+                            />
+                            <div style={helperTextStyle}>{hintA}</div>
+                          </div>
+                          <div>
+                            <Label className={fieldLabelClassName}>{labelB} (m)</Label>
+                            <StepperInput
+                              value={distB}
+                              step={0.01}
+                              min={0}
+                              max={Math.max(0, wallLen - elLen)}
+                              onChange={setDistB}
+                            />
+                            <div style={helperTextStyle}>{hintB}</div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
               )}
             </div>
