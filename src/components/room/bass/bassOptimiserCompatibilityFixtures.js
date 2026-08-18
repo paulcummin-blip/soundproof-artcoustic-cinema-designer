@@ -31,6 +31,8 @@ class FixtureWorker {
       this.request.fingerprint,
       pool,
       { ...this.request.identity, ...BASS_OPTIMISER_VERSIONS },
+      this.request.diagnosticToken || null,
+      this.request.collectDiagnostics === true,
     ) });
   }
 }
