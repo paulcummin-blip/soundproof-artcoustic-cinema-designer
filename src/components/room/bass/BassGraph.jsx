@@ -312,7 +312,10 @@ export default function BassGraph({
             _splSample += '|';
         }
     }
-    const chartRenderKey = `${isMulti ? 'multi' : 'single'}_rows${_rowCount}|${renderToken}|${_splSample}`;
+    const modeMarkerCount = (normalizedMarkers.axial?.length || 0)
+      + (normalizedMarkers.tangential?.length || 0)
+      + (normalizedMarkers.oblique?.length || 0);
+    const chartRenderKey = `${isMulti ? 'multi' : 'single'}_rows${_rowCount}|${renderToken}|${_splSample}|${showModeMarkers ? 'modes-on' : 'modes-off'}|${modeMarkerCount}`;
 
     // Presentation order follows the acoustic signal path. Reference layers
     // render first; the final EQ response renders last so target tracking remains
