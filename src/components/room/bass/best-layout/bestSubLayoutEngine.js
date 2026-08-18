@@ -5,11 +5,11 @@ import { generateBestSubLayoutCandidateSet } from "@/components/room/bass/best-l
 import { computeBestSubLayoutDirectReference } from "@/components/room/bass/best-layout/bestSubLayoutDirectReference";
 import { applyFinalOptimisedAuthorityToLayout, assessLayoutResult, compareRankedLayouts } from "@/components/room/bass/best-layout/bestSubLayoutScoring";
 
-export function runBestSubLayoutRecommendation({ roomDims, seatingPositions, rspPosition, physicsOptions, sourceHeights, roomElements, currentSubs, finalOptimisedBassResponse }) {
+export function runBestSubLayoutRecommendation({ roomDims, seatingPositions, rspPosition, physicsOptions, sourceHeights, roomElements, currentSubs, finalOptimisedBassResponse, cabinetHalfExtents }) {
   const started = performance.now();
   const realSeats = (Array.isArray(seatingPositions) ? seatingPositions : []).filter((seat) => Number.isFinite(seat?.x) && Number.isFinite(seat?.y));
   const rspOnly = realSeats.length === 0;
-  const generated = generateBestSubLayoutCandidateSet(roomDims, sourceHeights, roomElements);
+  const generated = generateBestSubLayoutCandidateSet(roomDims, sourceHeights, roomElements, cabinetHalfExtents);
   const currentSources = (Array.isArray(currentSubs) ? currentSubs : []).map((sub, index) => {
     const position = sub?.position || sub;
     const x = Number(position?.x), y = Number(position?.y), z = Number(position?.z);

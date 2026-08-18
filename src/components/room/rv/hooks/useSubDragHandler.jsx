@@ -1,6 +1,14 @@
 import { useCallback } from "react";
 import { findSymmetrySnap } from "@/components/room/rv/utils/subSymmetrySnap";
+import { findCoordinateSnap } from "@/components/room/rv/utils/subCoordinateSnap";
+import { getSubPlacementGuideCoordinates } from "@/components/room/bass/best-layout/subPlacementGuideCoordinates";
 import { deriveSubWallOrientation, subHalfExtents } from "@/components/room/rv/utils/subWallOrientation";
+
+// Magnetic snap tolerance — 8 screen pixels converted to room metres via the
+// current plan scale. Clamped so zoom extremes do not make snapping unusable.
+const SNAP_TOLERANCE_PX = 8;
+const SNAP_TOLERANCE_MIN_M = 0.02;
+const SNAP_TOLERANCE_MAX_M = 0.15;
 
 /**
  * useSubDragHandler
@@ -23,6 +31,7 @@ export function useSubDragHandler({
   draftRearSubsRef,
   setSubDragTick,
   setSubSnapState,
+  scale,
   // idleCommitTimerRef and commitDraftSubPositions intentionally omitted:
   // config is committed once on mouseup via useMouseUpHandler, not during drag.
 }) {
@@ -108,26 +117,67 @@ export function useSubDragHandler({
       return;
     }
 
+    // Stage 2B.6 — magnetic coordinate snap (wall / quarter / midpoint / corner).
+    // Runs BEFORE symmetry snap so the designer's explicit target wins.
+    // Uses the same canonical coordinate authority as the Placement Guide
+    // candidate generation (getSubPlacementGuideCoordinates), ensuring
+    // manual magnetic snaps equal Apply-Layout coordinates.
+    const toleranceM = Number.isFinite(scale) && scale > 0
+      ? Math.max(SNAP_TOLERANCE_MIN_M, Math.min(SNAP_TOLERANCE_MAX_M, SNAP_TOLERANCE_PX / scale))
+      : SNAP_TOLERANCE_MIN_M;
+
+    const guideCoordinates = getSubPlacementGuideCoordinates({
+      widthM,
+      lengthM,
+      cabinetHalfExtents: _ext,
+      wallClearance: EPS,
+    });
+
+    let coordSnap = null;
+    try {
+      if (guideCoordinates) {
+        coordSnap = findCoordinateSnap({
+          candidateX: finalX,
+          candidateY: finalY,
+          guideCoordinates,
+          toleranceM,
+        });
+      }
+    } catch (_) { /* snap is best-effort, never blocks drag */ }
+
+    if (coordSnap) {
+      finalX = coordSnap.x;
+      finalY = coordSnap.y;
+    }
+
     // Stage 2B.4 — drag-time symmetry snap assistance.
     // Snaps the dragged sub to the mirrored position of an enabled partner in
     // the same group when within threshold. No permanent lock, no linked
     // movement; the partner is never moved. Final stored coordinates remain
     // independent.
-    let snapResult = null;
-    try {
-      snapResult = findSymmetrySnap({
-        draggedSub: sub,
-        draftArray,
-        widthM,
-        lengthM,
-        candidateX: finalX,
-        candidateY: finalY,
-      });
-    } catch (_) { /* snap is best-effort, never blocks drag */ }
-    if (snapResult) {
-      finalX = snapResult.snappedX;
-      finalY = snapResult.snappedY;
+    //
+    // PRIORITY: coordinate snap wins. Symmetry snap only fires when no
+    // coordinate snap is active, so it never overrides the designer's
+    // intended midpoint/quarter/corner target.
+    let snapResult = coordSnap;
+    if (!coordSnap) {
+      try {
+        const symResult = findSymmetrySnap({
+          draggedSub: sub,
+          draftArray,
+          widthM,
+          lengthM,
+          candidateX: finalX,
+          candidateY: finalY,
+        });
+        if (symResult) {
+          finalX = symResult.snappedX;
+          finalY = symResult.snappedY;
+          snapResult = symResult;
+        }
+      } catch (_) { /* snap is best-effort, never blocks drag */ }
     }
+
     if (typeof setSubSnapState === "function") {
       setSubSnapState(snapResult);
     }
@@ -145,7 +195,7 @@ export function useSubDragHandler({
 
     // No config commit during mousemove — draft refs are the live render source.
     // commitDraftSubPositions() is called once on mouseup via useMouseUpHandler.
-  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM,
+  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, scale,
       draggedSubTypeRef, draftFrontSubsRef, draftRearSubsRef,
       setSubDragTick, setSubSnapState]);
 

@@ -1388,6 +1388,7 @@ const byId = useEntitiesById({
     draftFrontSubsRef, draftRearSubsRef,
     setSubDragTick, idleCommitTimerRef, commitDraftSubPositions,
     setSubSnapState,
+    scale,
   });
 
   // Commit draft seat positions to real state once on pointer release
@@ -1496,6 +1497,7 @@ const byId = useEntitiesById({
     onSetManualRspY_m,
     onSetManualRspX_m,
     onSetRspMode,
+    setSubSnapState,
   });
 
   // Wrap mouseup so mlpDragActiveRef is always cleared, regardless of drag type.

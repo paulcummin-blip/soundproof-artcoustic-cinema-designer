@@ -62,7 +62,7 @@ export function findSymmetrySnap({ draggedSub, draftArray, widthM, lengthM, cand
       const dist = Math.abs(candidateX - mirroredX);
       if (dist < bestDist) {
         bestDist = dist;
-        best = { snappedX: mirroredX, snappedY: candidateY, axis: "x", value: mirroredX, partnerId: partner.id };
+        best = { type: "symmetry", snappedX: mirroredX, snappedY: candidateY, axis: "x", value: mirroredX, partnerId: partner.id };
       }
     }
 
@@ -72,7 +72,7 @@ export function findSymmetrySnap({ draggedSub, draftArray, widthM, lengthM, cand
       const dist = Math.abs(candidateY - mirroredY);
       if (dist < bestDist) {
         bestDist = dist;
-        best = { snappedX: candidateX, snappedY: mirroredY, axis: "y", value: mirroredY, partnerId: partner.id };
+        best = { type: "symmetry", snappedX: candidateX, snappedY: mirroredY, axis: "y", value: mirroredY, partnerId: partner.id };
       }
     }
   }

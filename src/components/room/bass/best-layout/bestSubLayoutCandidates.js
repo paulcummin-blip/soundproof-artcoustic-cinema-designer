@@ -1,4 +1,5 @@
 import { BEST_SUB_LAYOUT_CONSTANTS as C } from "@/components/room/bass/best-layout/bestSubLayoutConstants";
+import { getSubPlacementGuideCoordinates } from "@/components/room/bass/best-layout/subPlacementGuideCoordinates";
 
 function resolveHeights(sourceHeights) {
   const frontValid = Number.isFinite(Number(sourceHeights?.front));
@@ -20,14 +21,15 @@ function candidate(id, name, placementFamily, placementMode, points, heights) {
   return { id, name, placementFamily, placementMode, sources: points.map((point, index) => source(point.x, point.y, point.placement, index, heights)) };
 }
 
-export function generateBestSubLayoutCandidateSet(roomDims, sourceHeights, roomElements = []) {
+export function generateBestSubLayoutCandidateSet(roomDims, sourceHeights, roomElements = [], cabinetHalfExtents = null) {
   const width = Number(roomDims?.widthM), length = Number(roomDims?.lengthM);
   const heights = resolveHeights(sourceHeights);
   const diagnostics = { usedHeightFallback: heights.usedHeightFallback, sourceHeightsM: { front: heights.front, rear: heights.rear } };
   if (!(width > 0) || !(length > 0)) return { candidates: [], diagnostics };
-  const inset = Math.min(C.minimumWallClearanceM, width / 4, length / 4);
-  const front = inset, rear = length - inset, left = inset, right = width - inset;
-  const q1 = width * 0.25, q3 = width * 0.75, midX = width * 0.5, midY = length * 0.5;
+  const guide = getSubPlacementGuideCoordinates({ widthM: width, lengthM: length, cabinetHalfExtents });
+  if (!guide) return { candidates: [], diagnostics };
+  const front = guide.frontY, rear = guide.rearY, left = guide.leftX, right = guide.rightX;
+  const q1 = guide.quarterX1, q3 = guide.quarterX3, midX = guide.midX, midY = guide.midY;
   const make = (id, name, family, mode, points) => candidate(id, name, family, mode, points, heights);
   const raw = [
     make("front-centre-1", "Front centre", "Front wall", "Front wall midpoint", [{ x: midX, y: front, placement: "front" }]),
@@ -56,6 +58,6 @@ export function generateBestSubLayoutCandidateSet(roomDims, sourceHeights, roomE
   return { candidates, diagnostics: { ...diagnostics, rejectedForOpenings: raw.length - candidates.length } };
 }
 
-export function generateBestSubLayoutCandidates(roomDims, sourceHeights) {
-  return generateBestSubLayoutCandidateSet(roomDims, sourceHeights).candidates;
+export function generateBestSubLayoutCandidates(roomDims, sourceHeights, cabinetHalfExtents = null) {
+  return generateBestSubLayoutCandidateSet(roomDims, sourceHeights, null, cabinetHalfExtents).candidates;
 }

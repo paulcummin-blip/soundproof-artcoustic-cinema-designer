@@ -20,6 +20,7 @@ import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 import RvRoomElementDragDims from "@/components/room/rv/render/RvRoomElementDragDims";
 import RvMlpDragDims from "@/components/room/rv/render/RvMlpDragDims";
 import RvSubSymmetryGuide from "@/components/room/rv/render/RvSubSymmetryGuide";
+import RvSubCoordinateGuide from "@/components/room/rv/render/RvSubCoordinateGuide";
 import { getSubRotationDeg } from "@/components/room/rv/utils/subWallOrientation";
 
 export default function RvPlanCanvas({
@@ -579,6 +580,17 @@ export default function RvPlanCanvas({
 
             {/* Stage 2B.4: drag-time subwoofer symmetry snap guide */}
             <RvSubSymmetryGuide
+              subSnapState={subSnapState}
+              draggedItemId={draggedItemId}
+              frontLive={frontLive}
+              rearLive={rearLive}
+              toPx={toPx}
+              widthM={widthM}
+              lengthM={lengthM}
+            />
+
+            {/* Stage 2B.6: drag-time subwoofer magnetic coordinate snap guide */}
+            <RvSubCoordinateGuide
               subSnapState={subSnapState}
               draggedItemId={draggedItemId}
               frontLive={frontLive}

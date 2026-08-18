@@ -15,7 +15,7 @@ export default function RvSubSymmetryGuide({
   widthM,
   lengthM,
 }) {
-  if (!subSnapState) return null;
+  if (!subSnapState || subSnapState.type !== "symmetry") return null;
 
   const all = [
     ...(Array.isArray(frontLive) ? frontLive : []),

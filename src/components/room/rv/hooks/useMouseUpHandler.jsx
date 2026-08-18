@@ -47,6 +47,8 @@ export function useMouseUpHandler({
   onSetManualRspY_m,
   onSetManualRspX_m,
   onSetRspMode,
+  // Sub snap guide cleanup
+  setSubSnapState,
 }) {
   const handleMouseUp = useCallback((e) => {
     // RSP marker drag: commit the final draft Y once on release.
@@ -89,7 +91,12 @@ export function useMouseUpHandler({
        }
 
        // Commit final positions immediately on release
-       commitDraftSubPositions();
+        commitDraftSubPositions();
+
+        // Clear drag-time snap guide (coordinate + symmetry)
+        if (typeof setSubSnapState === "function") {
+          setSubSnapState(null);
+        }
 
        // Snapshot final draft positions into held refs before clearing drafts
        if (draftFrontSubsRef.current) {
@@ -204,7 +211,7 @@ export function useMouseUpHandler({
     draggedSubWallRef.current = null;
     draggedSubTypeRef.current = null;
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, isDraggingSeatRef, draftSeatsRef, commitDraftSeatPositions, isDraggingSpeakerDraftRef, draftSpeakersRef, commitDraftSpeakerPositions, mlpDragInfo, onSetManualRspY_m, onSetManualRspX_m, onSetRspMode]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, isDraggingSeatRef, draftSeatsRef, commitDraftSeatPositions, isDraggingSpeakerDraftRef, draftSpeakersRef, commitDraftSpeakerPositions,     mlpDragInfo, onSetManualRspY_m, onSetManualRspX_m, onSetRspMode, setSubSnapState]);
 
   return { handleMouseUp };
 }

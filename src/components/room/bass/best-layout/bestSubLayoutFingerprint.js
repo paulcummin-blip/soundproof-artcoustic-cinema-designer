@@ -17,7 +17,7 @@ function hash64(text) {
   return hash(0x811c9dc5) + hash(0x40007a67);
 }
 
-export function computeBestSubLayoutFingerprint({ roomDims, seatingPositions, rspPosition, physicsOptions, sourceHeights, roomElements, currentSubs }) {
+export function computeBestSubLayoutFingerprint({ roomDims, seatingPositions, rspPosition, physicsOptions, sourceHeights, roomElements, currentSubs, cabinetHalfExtents }) {
   const seats = (Array.isArray(seatingPositions) ? seatingPositions : []).map((seat) => ({ x: seat?.x, y: seat?.y, z: seat?.z ?? 1.2 })).sort((a, b) => a.x - b.x || a.y - b.y || a.z - b.z);
   const canonical = {
     version: C.candidateDefinitionVersion,
@@ -31,6 +31,7 @@ export function computeBestSubLayoutFingerprint({ roomDims, seatingPositions, rs
     physics: physicsOptions || {},
     roomElements: roomElements || [],
     currentSubs: currentSubs || [],
+    cabinetHalfExtents: cabinetHalfExtents || null,
   };
   return `layout:v2:${hash64(stable(canonical))}`;
 }
