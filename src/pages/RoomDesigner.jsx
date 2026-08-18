@@ -270,7 +270,6 @@ function RoomDesignerWithState() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [freeMoveLcr, setFreeMoveLcr] = useState(false); // Free Move (LCR) toggle
   const [leftPanelView, setLeftPanelView] = useState('plan'); // 'plan' | 'front' | 'side'
-  const [rightPanelView, setRightPanelView] = useState('controls'); // 'controls' | 'isometric' | 'data'
   const [sideElevationWall, setSideElevationWall] = useState('right'); // 'left' | 'right'
   // Workspace view mode: 'split' (default) | 'plan' | 'technical'. Presentation only.
   const [viewMode, setViewMode] = useState('split');
