@@ -109,87 +109,112 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
     }
   }, [overlays?.ROOM_DIMS, speakerPositionsView, onSpeakerPositionsViewChange]);
 
-  const inputStyle = {
+  const compactInputStyle = {
     border: "1px solid #DCDBD6",
-    borderRadius: "10px",
-    padding: "10px 12px",
+    borderRadius: "8px",
+    padding: "8px 10px",
     background: disabled ? "#F3F3F3" : "#FFF",
     color: "#1B1A1A",
     fontSize: "14px",
+    width: "100%",
   };
 
+  const groupTitleStyle = {
+    fontSize: "11px",
+    fontWeight: 600,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: "#625143",
+    marginBottom: "10px",
+  };
+
+  const fieldLabelStyle = "block mb-1.5 text-xs text-[#6B7280]";
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Room Size group — three compact equal-width columns */}
       <div>
-        <Label htmlFor="room-length" className="block mb-2">Length (m)</Label>
-        <Input
-          id="room-length"
-          name="room-length-m"
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          value={draftDims.length}
-          onChange={(e) => handleDimensionChange('length', e.target.value)}
-          onBlur={() => handleDimensionBlur('length')}
-          disabled={disabled}
-          style={inputStyle}
-        />
+        <div style={groupTitleStyle}>Room Size</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <Label htmlFor="room-length" className={fieldLabelStyle}>Length (m)</Label>
+            <Input
+              id="room-length"
+              name="room-length-m"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              value={draftDims.length}
+              onChange={(e) => handleDimensionChange('length', e.target.value)}
+              onBlur={() => handleDimensionBlur('length')}
+              disabled={disabled}
+              style={compactInputStyle}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="room-width" className={fieldLabelStyle}>Width (m)</Label>
+            <Input
+              id="room-width"
+              name="room-width-m"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              value={draftDims.width}
+              onChange={(e) => handleDimensionChange('width', e.target.value)}
+              onBlur={() => handleDimensionBlur('width')}
+              disabled={disabled}
+              style={compactInputStyle}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="room-height" className={fieldLabelStyle}>Height (m)</Label>
+            <Input
+              id="room-height"
+              name="room-height-m"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              value={draftDims.height}
+              onChange={(e) => handleDimensionChange('height', e.target.value)}
+              onBlur={() => handleDimensionBlur('height')}
+              disabled={disabled}
+              style={compactInputStyle}
+            />
+          </div>
+        </div>
       </div>
 
+      {/* Plan Overlays group — matching toggle rows */}
       <div>
-        <Label htmlFor="room-width" className="block mb-2">Width (m)</Label>
-        <Input
-          id="room-width"
-          name="room-width-m"
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          value={draftDims.width}
-          onChange={(e) => handleDimensionChange('width', e.target.value)}
-          onBlur={() => handleDimensionBlur('width')}
-          disabled={disabled}
-          style={inputStyle}
-        />
+        <div style={groupTitleStyle}>Plan Overlays</div>
+        <div className="space-y-3">
+          <PlanDisplayToggle
+            label="Show room dimensions on plan"
+            checked={!!overlays?.ROOM_DIMS}
+            onChange={handleRoomDimsToggle}
+            disabled={disabled}
+          />
+
+          <PlanDisplayToggle
+            label="Speaker Positions"
+            checked={speakerPositionsView === "plan"}
+            onChange={handleSpeakerPositionsToggle}
+            disabled={disabled}
+          />
+        </div>
       </div>
 
-      <div>
-        <Label htmlFor="room-height" className="block mb-2">Height (m)</Label>
-        <Input
-          id="room-height"
-          name="room-height-m"
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          value={draftDims.height}
-          onChange={(e) => handleDimensionChange('height', e.target.value)}
-          onBlur={() => handleDimensionBlur('height')}
-          disabled={disabled}
-          style={inputStyle}
-        />
-      </div>
-
-      <PlanDisplayToggle
-        label="Show room dimensions on plan"
-        checked={!!overlays?.ROOM_DIMS}
-        onChange={handleRoomDimsToggle}
-        disabled={disabled}
-      />
-
-      <PlanDisplayToggle
-        label="Speaker Positions"
-        checked={speakerPositionsView === "plan"}
-        onChange={handleSpeakerPositionsToggle}
-        disabled={disabled}
-      />
-
+      {/* Room volume — quiet summary line */}
       {roomDims.widthM > 0 && roomDims.lengthM > 0 && roomDims.heightM > 0 && (
-        <p className="text-xs text-gray-500 italic mt-2">
+        <p style={{ fontSize: "12px", color: "#9CA3AF", fontStyle: "italic" }}>
           Room volume: {(roomDims.widthM * roomDims.lengthM * roomDims.heightM).toFixed(2)} m³
         </p>
       )}
