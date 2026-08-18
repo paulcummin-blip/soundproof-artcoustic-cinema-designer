@@ -665,35 +665,35 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               </div>
             )}
             <BassTargetLevelControl disabled={detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"} />
-            {designEqEnabled && Array.isArray(seatingPositions) && seatingPositions.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Show real-seat overlays:</span>
-                <Switch checked={showRealSeatOverlays} onCheckedChange={setShowRealSeatOverlays} />
-              </div>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Smoothing:</span>
-              <select
-                value={bassSmoothingMode}
-                onChange={e => setBassSmoothingMode(e.target.value)}
-                style={{ height: 26, borderRadius: 6, border: '1px solid #DCDBD6', background: '#F8F8F7', fontSize: 11, padding: '0 6px', color: '#1B1A1A', fontFamily: 'monospace', cursor: 'pointer' }}
-              >
-                <option value="none">None</option>
-                <option value="sixth">1/6 octave</option>
-                <option value="third">1/3 octave</option>
-              </select>
-            </div>
-            {designEqEnabled && (
-              <BackgroundAnalysisControls
-                lifecycle={detailedLifecycle}
-                onRecalculate={() => calculateDetailed?.({ collectDiagnostics: includeDiagnostics === true, force: true })}
-                disabled={!detailedInputsValid || detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"}
-                includeDiagnostics={includeDiagnostics}
-                onDiagnosticsChange={setIncludeDiagnostics}
-              />
-            )}
             {includeDiagnostics && (
               <>
+                {designEqEnabled && Array.isArray(seatingPositions) && seatingPositions.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Show real-seat overlays:</span>
+                    <Switch checked={showRealSeatOverlays} onCheckedChange={setShowRealSeatOverlays} />
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Smoothing:</span>
+                  <select
+                    value={bassSmoothingMode}
+                    onChange={e => setBassSmoothingMode(e.target.value)}
+                    style={{ height: 26, borderRadius: 6, border: '1px solid #DCDBD6', background: '#F8F8F7', fontSize: 11, padding: '0 6px', color: '#1B1A1A', fontFamily: 'monospace', cursor: 'pointer' }}
+                  >
+                    <option value="none">None</option>
+                    <option value="sixth">1/6 octave</option>
+                    <option value="third">1/3 octave</option>
+                  </select>
+                </div>
+                {designEqEnabled && (
+                  <BackgroundAnalysisControls
+                    lifecycle={detailedLifecycle}
+                    onRecalculate={() => calculateDetailed?.({ collectDiagnostics: includeDiagnostics === true, force: true })}
+                    disabled={!detailedInputsValid || detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"}
+                    includeDiagnostics={includeDiagnostics}
+                    onDiagnosticsChange={setIncludeDiagnostics}
+                  />
+                )}
                 <CopyLiveBassValidationButton />
                 <CopyEqForensicTraceButton />
               </>
