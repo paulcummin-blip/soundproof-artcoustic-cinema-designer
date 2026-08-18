@@ -1,7 +1,7 @@
 {
   "name": "ProjectStatus",
   "type": "object",
-  "description": "Configurable project workflow status definition, scoped to an account/workspace. Projects reference the stable status_id; the display label lives here.",
+  "description": "Configurable project workflow status definition, scoped to an account/workspace. Projects reference the stable status_id; the display label and colour live here. RLS restricts all access to the owning account \u2014 one dealer's statuses and colour customisations never leak to another.",
   "properties": {
     "status_id": {
       "type": "string",
@@ -39,5 +39,103 @@
     "status_id",
     "label",
     "account_id"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
 }

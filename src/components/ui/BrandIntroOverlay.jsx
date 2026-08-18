@@ -28,12 +28,12 @@ export default function BrandIntroOverlay() {
 
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      // Start large but not splashy; cap for small screens.
-      const startW = Math.min(380, Math.max(240, vw - 80));
+      // Start large and centred so the brand clearly registers before moving.
+      const startW = Math.min(480, Math.max(280, vw - 80));
       setGeometry({
         start: {
           left: Math.round((vw - startW) / 2),
-          top: Math.round(vh * 0.4),
+          top: Math.round((vh - startW * 0.3) / 2),
           width: startW,
         },
         end: { left: 16, top: 16, width: 300 },
