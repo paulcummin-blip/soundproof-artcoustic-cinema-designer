@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import ApiBadge from "@/components/ui/ApiBadge";
+import BrandIntroOverlay from "@/components/ui/BrandIntroOverlay";
 import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
 import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
@@ -188,6 +189,7 @@ export default function Layout({ children, currentPageName }) {
     <SafeBootErrorBoundary>
       <ToastProvider>
         <AppStateProvider>
+        <BrandIntroOverlay />
         <div className="flex min-h-screen w-full bg-brand-background">
           <aside className="w-64 border-r border-brand-border bg-brand-sidebar-bg flex flex-col">
             <div className="p-4">
