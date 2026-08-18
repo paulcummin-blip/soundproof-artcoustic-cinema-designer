@@ -1442,6 +1442,9 @@ function SpeakerPlacementImpl(props) {
       </CollapsiblePanel>
 
       <CollapsiblePanel title="Surround Channels" defaultOpen={false}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Left column: configuration and mounting */}
+        <div className="space-y-3">
         {!isNineBed && is7xBed && ( 
           <div className="mb-4 p-3 rounded-lg border border-[#E6E4DD] bg-[#F8F8F7]">
             <div className="flex items-center justify-between">
@@ -1494,9 +1497,11 @@ function SpeakerPlacementImpl(props) {
           autoSurroundHeight={computeAutoSurroundHeight(seatingPositions, Number(effectiveDims?.height ?? effectiveDims?.heightM) || 2.8)}
           roomHeight={Number(effectiveDims?.height ?? effectiveDims?.heightM) || 2.8}
         />
+        </div>
 
-        {/* NEW: Surround SPL @ RSP strip */}
-        <div className="mt-4">
+        {/* Right column: performance */}
+        <div className="space-y-3">
+        <div>
           <SurroundSplStrip
             allSeatSplMetrics={allSeatSplMetrics}
             mlpSeat={mlpSeat}
@@ -1624,6 +1629,8 @@ function SpeakerPlacementImpl(props) {
               />
             );
           })()}
+        </div>
+        </div>
         </div>
       </CollapsiblePanel>
 
