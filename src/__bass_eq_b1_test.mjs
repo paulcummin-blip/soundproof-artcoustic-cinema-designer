@@ -1,5 +1,6 @@
 import { register } from 'node:module';
 import { pathToFileURL } from 'node:url';
+import { writeFileSync } from 'node:fs';
 
 // Register the @/ alias loader before importing source files.
 register(pathToFileURL('./src/__bass_eq_b1_loader.mjs').href);
@@ -10,11 +11,13 @@ const { selectCandidateFromPool } = await import('./components/utils/bassCandida
 const frequencies = Array.from({ length: 181 }, (_, i) => 20 + i);
 const gaussian = (f, c, w, g) => g * Math.exp(-0.5 * ((f - c) / w) ** 2);
 
+// FIX: filter objects store Q as an uppercase property (f.Q), not f.q.
+// The previous harness read f.q (undefined), producing null Q values.
 function fb(c) {
   return (c?.generatedFilterBank || []).filter(f => f?.enabled).map(f => ({
     freq: Math.round(f.frequencyHz * 10) / 10,
     gain: Math.round(f.gainDb * 100) / 100,
-    q: Math.round(f.q * 100) / 100,
+    q: Math.round((f.Q ?? f.q) * 100) / 100,
   }));
 }
 function dev(curve, target) {
@@ -31,6 +34,45 @@ function dev(curve, target) {
 }
 function val(c, freq) {
   return c?.find(p => p.frequency === freq)?.spl ?? null;
+}
+// Safety assertion helpers: final post-EQ must not exceed product operating
+// envelope at any frequency; protected nulls must not be boosted; per-seat
+// post-EQ must not exceed the per-seat product operating envelope.
+function envelopeExceedances(finalCurve, envelopeCurve) {
+  const out = [];
+  for (const p of (Array.isArray(finalCurve) ? finalCurve : [])) {
+    const env = envelopeCurve?.find(e => e.frequency === p.frequency);
+    if (!env) continue;
+    if (Number.isFinite(p.spl) && Number.isFinite(env.spl) && p.spl > env.spl + 0.05) {
+      out.push({ frequency: p.frequency, finalSpl: Math.round(p.spl * 100) / 100, envelopeSpl: Math.round(env.spl * 100) / 100, excessDb: Math.round((p.spl - env.spl) * 100) / 100 });
+    }
+  }
+  return out;
+}
+function protectedNullBoostViolations(beforeCurve, afterCurve, protectedNulls) {
+  const out = [];
+  for (const p of (Array.isArray(afterCurve) ? afterCurve : [])) {
+    const region = (Array.isArray(protectedNulls) ? protectedNulls : []).find(r => p.frequency >= r.startHz && p.frequency <= r.endHz);
+    if (!region) continue;
+    const before = beforeCurve?.find(b => b.frequency === p.frequency)?.spl;
+    if (!Number.isFinite(before) || !Number.isFinite(p.spl)) continue;
+    const boost = p.spl - before;
+    if (boost > 0.05) out.push({ frequency: p.frequency, beforeSpl: Math.round(before * 100) / 100, afterSpl: Math.round(p.spl * 100) / 100, boostDb: Math.round(boost * 100) / 100 });
+  }
+  return out;
+}
+function perSeatEnvelopeExceedances(perSeatPostEq, envelopeCurve) {
+  const out = [];
+  for (const seat of (Array.isArray(perSeatPostEq) ? perSeatPostEq : [])) {
+    for (const p of (Array.isArray(seat?.responseData) ? seat.responseData : [])) {
+      const env = envelopeCurve?.find(e => e.frequency === p.frequency);
+      if (!env) continue;
+      if (Number.isFinite(p.spl) && Number.isFinite(env.spl) && p.spl > env.spl + 0.05) {
+        out.push({ seatId: seat.seatId, frequency: p.frequency, finalSpl: Math.round(p.spl * 100) / 100, envelopeSpl: Math.round(env.spl * 100) / 100, excessDb: Math.round((p.spl - env.spl) * 100) / 100 });
+      }
+    }
+  }
+  return out;
 }
 
 // ─── TEST 1: Current room — deep null ~118 Hz, broad peak 42 Hz, broad dip 73 Hz ───
@@ -150,12 +192,22 @@ const result = {
     protectedNulls: (c1.protectedNullRegions || []).map(r => ({ start: r.startHz, end: r.endHz, depth: r.depthDb })),
     physPass: c1.physicalValidation?.passed,
     bankLimits: c1.aggregateBankLimits,
+    envelopeExceedances: envelopeExceedances(c1.finalPostEqCurve, c1.productOperatingEnvelopeCurve),
+    protectedNullBoostViolations: protectedNullBoostViolations(c1.rspBeforePeqAtOperatingLevel, c1.finalPostEqCurve, c1.protectedNullRegions),
+    perSeatEnvelopeExceedances: perSeatEnvelopeExceedances(c1.perSeatPostEqCurves, c1.productOperatingEnvelopeCurve),
+    maxBoostDb: Math.max(0, ...f1.map(f => f.gain)),
+    maxCutDb: Math.min(0, ...f1.map(f => f.gain)),
+    p14HeadroomDb: c1.productOperatingHeadroomDb,
   },
   test2: {
     filters: f2,
     dip80: { before: val(c2.rspBeforePeqAtOperatingLevel, 80), after: val(c2.finalPostEqCurve, 80), target: val(c2.productionHouseCurveTarget, 80) },
     protNullCount: (c2.protectedNullRegions || []).length,
     physPass: c2.physicalValidation?.passed,
+    envelopeExceedances: envelopeExceedances(c2.finalPostEqCurve, c2.productOperatingEnvelopeCurve),
+    protectedNullBoostViolations: protectedNullBoostViolations(c2.rspBeforePeqAtOperatingLevel, c2.finalPostEqCurve, c2.protectedNullRegions),
+    perSeatEnvelopeExceedances: perSeatEnvelopeExceedances(c2.perSeatPostEqCurves, c2.productOperatingEnvelopeCurve),
+    maxBoostDb: Math.max(0, ...f2.map(f => f.gain)),
   },
   test3: {
     filters: f3,
@@ -163,6 +215,9 @@ const result = {
     protNulls: pn3.map(r => ({ start: r.startHz, end: r.endHz, depth: r.depthDb })),
     boostInNullCount: boostInNull3.length,
     physPass: c3.physicalValidation?.passed,
+    envelopeExceedances: envelopeExceedances(c3.finalPostEqCurve, c3.productOperatingEnvelopeCurve),
+    protectedNullBoostViolations: protectedNullBoostViolations(c3.rspBeforePeqAtOperatingLevel, c3.finalPostEqCurve, c3.protectedNullRegions),
+    perSeatEnvelopeExceedances: perSeatEnvelopeExceedances(c3.perSeatPostEqCurves, c3.productOperatingEnvelopeCurve),
   },
   test4: {
     filters: f4,
@@ -170,16 +225,25 @@ const result = {
     capRegions: (c4.capabilityLimitedRegions || []).map(r => ({ start: r.startHz, end: r.endHz, worst: r.worstFrequencyHz, shortfall: r.maximumShortfallDb })),
     freq60: { target: val(c4.productionHouseCurveTarget, 60), before: val(c4.rspBeforePeqAtOperatingLevel, 60), after: val(c4.finalPostEqCurve, 60), envelope: val(c4.productOperatingEnvelopeCurve, 60) },
     physPass: c4.physicalValidation?.passed,
+    envelopeExceedances: envelopeExceedances(c4.finalPostEqCurve, c4.productOperatingEnvelopeCurve),
+    protectedNullBoostViolations: protectedNullBoostViolations(c4.rspBeforePeqAtOperatingLevel, c4.finalPostEqCurve, c4.protectedNullRegions),
+    perSeatEnvelopeExceedances: perSeatEnvelopeExceedances(c4.perSeatPostEqCurves, c4.productOperatingEnvelopeCurve),
+    p14HeadroomDb: c4.productOperatingHeadroomDb,
+    p14ShortfallDb: c4.productOperatingShortfallDb,
   },
   test5: {
-    L1: { filters: f5L1, capLimitedPts: c5L1.capabilityLimitedPointCount, headroomDb: c5L1.productOperatingHeadroomDb, bankLimits: c5L1.aggregateBankLimits },
-    L4: { filters: f5L4, capLimitedPts: c5L4.capabilityLimitedPointCount, headroomDb: c5L4.productOperatingHeadroomDb, bankLimits: c5L4.aggregateBankLimits },
+    L1: { filters: f5L1, capLimitedPts: c5L1.capabilityLimitedPointCount, headroomDb: c5L1.productOperatingHeadroomDb, bankLimits: c5L1.aggregateBankLimits, maxBoostDb: Math.max(0, ...f5L1.map(f => f.gain)), maxCutDb: Math.min(0, ...f5L1.map(f => f.gain)) },
+    L4: { filters: f5L4, capLimitedPts: c5L4.capabilityLimitedPointCount, headroomDb: c5L4.productOperatingHeadroomDb, bankLimits: c5L4.aggregateBankLimits, maxBoostDb: Math.max(0, ...f5L4.map(f => f.gain)), maxCutDb: Math.min(0, ...f5L4.map(f => f.gain)) },
     filterBanksDiffer: JSON.stringify(f5L1) !== JSON.stringify(f5L4),
+    L1envelopeExceedances: envelopeExceedances(c5L1.finalPostEqCurve, c5L1.productOperatingEnvelopeCurve),
+    L4envelopeExceedances: envelopeExceedances(c5L4.finalPostEqCurve, c5L4.productOperatingEnvelopeCurve),
   },
   test6: {
     roomA: { filters: f6a, peak45before: val(c6a.rspBeforePeqAtOperatingLevel, 45), peak45after: val(c6a.finalPostEqCurve, 45), dip85before: val(c6a.rspBeforePeqAtOperatingLevel, 85), dip85after: val(c6a.finalPostEqCurve, 85) },
     roomB: { filters: f6b, dip55before: val(c6b.rspBeforePeqAtOperatingLevel, 55), dip55after: val(c6b.finalPostEqCurve, 55), peak100before: val(c6b.rspBeforePeqAtOperatingLevel, 100), peak100after: val(c6b.finalPostEqCurve, 100) },
     filterBanksDiffer: JSON.stringify(f6a) !== JSON.stringify(f6b),
+    roomAEnvelopeExceedances: envelopeExceedances(c6a.finalPostEqCurve, c6a.productOperatingEnvelopeCurve),
+    roomBEnvelopeExceedances: envelopeExceedances(c6b.finalPostEqCurve, c6b.productOperatingEnvelopeCurve),
   },
   test7: {
     maxBoostDb: Math.round(maxBoost * 100) / 100,
@@ -188,6 +252,34 @@ const result = {
     cutWithinLimit: maxCut >= -15.05,
     allPhysPass: [c1, c2, c3, c4, c5L1, c5L4, c6a, c6b].every(c => c.physicalValidation?.passed === true),
   },
+  safetyAssertions: {
+    finalPostEqLeEnvelope: [
+      ...envelopeExceedances(c1.finalPostEqCurve, c1.productOperatingEnvelopeCurve),
+      ...envelopeExceedances(c2.finalPostEqCurve, c2.productOperatingEnvelopeCurve),
+      ...envelopeExceedances(c3.finalPostEqCurve, c3.productOperatingEnvelopeCurve),
+      ...envelopeExceedances(c4.finalPostEqCurve, c4.productOperatingEnvelopeCurve),
+      ...envelopeExceedances(c5L1.finalPostEqCurve, c5L1.productOperatingEnvelopeCurve),
+      ...envelopeExceedances(c5L4.finalPostEqCurve, c5L4.productOperatingEnvelopeCurve),
+      ...envelopeExceedances(c6a.finalPostEqCurve, c6a.productOperatingEnvelopeCurve),
+      ...envelopeExceedances(c6b.finalPostEqCurve, c6b.productOperatingEnvelopeCurve),
+    ],
+    protectedNullBoostLeAllowed: [
+      ...protectedNullBoostViolations(c1.rspBeforePeqAtOperatingLevel, c1.finalPostEqCurve, c1.protectedNullRegions),
+      ...protectedNullBoostViolations(c2.rspBeforePeqAtOperatingLevel, c2.finalPostEqCurve, c2.protectedNullRegions),
+      ...protectedNullBoostViolations(c3.rspBeforePeqAtOperatingLevel, c3.finalPostEqCurve, c3.protectedNullRegions),
+      ...protectedNullBoostViolations(c4.rspBeforePeqAtOperatingLevel, c4.finalPostEqCurve, c4.protectedNullRegions),
+    ],
+    perSeatFinalPostEqLeEnvelope: [
+      ...perSeatEnvelopeExceedances(c1.perSeatPostEqCurves, c1.productOperatingEnvelopeCurve),
+      ...perSeatEnvelopeExceedances(c2.perSeatPostEqCurves, c2.productOperatingEnvelopeCurve),
+      ...perSeatEnvelopeExceedances(c3.perSeatPostEqCurves, c3.productOperatingEnvelopeCurve),
+      ...perSeatEnvelopeExceedances(c4.perSeatPostEqCurves, c4.productOperatingEnvelopeCurve),
+    ],
+  },
 };
 
-console.log(JSON.stringify(result, null, 2));
+const output = JSON.stringify(result, null, 2);
+const outPath = './src/__bass_eq_b1_results.json';
+writeFileSync(outPath, output, 'utf8');
+console.log(output);
+console.log(`\n[Saved to ${outPath}]`);
