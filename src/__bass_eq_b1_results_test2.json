@@ -1,0 +1,50 @@
+{
+  "filters": [
+    {
+      "freq": 79,
+      "gain": 2.18,
+      "q": 3.66
+    },
+    {
+      "freq": 30,
+      "gain": 1.17,
+      "q": 2.08
+    },
+    {
+      "freq": 79,
+      "gain": 0.78,
+      "q": 8.65
+    },
+    {
+      "freq": 120,
+      "gain": -1.33,
+      "q": 6
+    },
+    {
+      "freq": 20,
+      "gain": 0.19,
+      "q": 6
+    },
+    {
+      "freq": 200,
+      "gain": -1.22,
+      "q": 6
+    },
+    {
+      "freq": 80,
+      "gain": 0.16,
+      "q": 6
+    }
+  ],
+  "dip80": {
+    "before": 93.03233307056952,
+    "after": 96.09198217759757,
+    "target": 96.4026499212126
+  },
+  "protNullCount": 0,
+  "physPass": true,
+  "envelopeExceedances": [],
+  "protectedNullBoostViolations": [],
+  "perSeatEnvelopeExceedances": [],
+  "maxBoostDb": 2.18
+}

@@ -1,0 +1,2060 @@
+{
+  "filters": [
+    {
+      "freq": 42,
+      "gain": -5.23,
+      "q": 7.41
+    },
+    {
+      "freq": 72,
+      "gain": 2.74,
+      "q": 6.86
+    }
+  ],
+  "beforeDev": {
+    "maxDev": 14.71,
+    "rmsDev": 3.44
+  },
+  "afterDev": {
+    "maxDev": 14.68,
+    "rmsDev": 2.9
+  },
+  "null118": {
+    "before": 84.7377473012236,
+    "after": 84.77582935316828,
+    "target": 99.4526499212126
+  },
+  "peak42": {
+    "before": 108.52168144223062,
+    "after": 103.33601168641445
+  },
+  "dip73": {
+    "before": 96.57238458853806,
+    "after": 99.14224816512339,
+    "target": 100.60853227415377
+  },
+  "protectedNulls": [
+    {
+      "start": 116.75,
+      "end": 119.25
+    }
+  ],
+  "physPass": true,
+  "bankLimits": {
+    "maxAggregateBoostDb": 2.6618026700558777,
+    "maxAggregateBoostHz": 72,
+    "maxAggregateCutDb": -5.1856697558161695,
+    "maxAggregateCutHz": 42,
+    "boostLimitOk": true,
+    "cutLimitOk": true,
+    "sourceDomainHeadroomOk": true,
+    "allOk": true
+  },
+  "envelopeExceedances": [
+    {
+      "frequency": 93,
+      "finalSpl": 99.98,
+      "envelopeSpl": 99.84,
+      "excessDb": 0.15
+    },
+    {
+      "frequency": 94,
+      "finalSpl": 100.03,
+      "envelopeSpl": 99.74,
+      "excessDb": 0.28
+    },
+    {
+      "frequency": 95,
+      "finalSpl": 100.06,
+      "envelopeSpl": 99.65,
+      "excessDb": 0.41
+    },
+    {
+      "frequency": 96,
+      "finalSpl": 100.08,
+      "envelopeSpl": 99.55,
+      "excessDb": 0.53
+    },
+    {
+      "frequency": 97,
+      "finalSpl": 100.09,
+      "envelopeSpl": 99.45,
+      "excessDb": 0.64
+    },
+    {
+      "frequency": 98,
+      "finalSpl": 100.09,
+      "envelopeSpl": 99.35,
+      "excessDb": 0.74
+    },
+    {
+      "frequency": 99,
+      "finalSpl": 100.09,
+      "envelopeSpl": 99.25,
+      "excessDb": 0.83
+    },
+    {
+      "frequency": 100,
+      "finalSpl": 100.08,
+      "envelopeSpl": 99.15,
+      "excessDb": 0.93
+    },
+    {
+      "frequency": 101,
+      "finalSpl": 100.07,
+      "envelopeSpl": 99.13,
+      "excessDb": 0.94
+    },
+    {
+      "frequency": 102,
+      "finalSpl": 100.06,
+      "envelopeSpl": 99.1,
+      "excessDb": 0.95
+    },
+    {
+      "frequency": 103,
+      "finalSpl": 100.04,
+      "envelopeSpl": 99.08,
+      "excessDb": 0.96
+    },
+    {
+      "frequency": 104,
+      "finalSpl": 100.02,
+      "envelopeSpl": 99.05,
+      "excessDb": 0.97
+    },
+    {
+      "frequency": 105,
+      "finalSpl": 100.01,
+      "envelopeSpl": 99.03,
+      "excessDb": 0.98
+    },
+    {
+      "frequency": 106,
+      "finalSpl": 99.99,
+      "envelopeSpl": 99,
+      "excessDb": 0.98
+    },
+    {
+      "frequency": 107,
+      "finalSpl": 99.97,
+      "envelopeSpl": 98.98,
+      "excessDb": 0.99
+    },
+    {
+      "frequency": 108,
+      "finalSpl": 99.95,
+      "envelopeSpl": 98.95,
+      "excessDb": 1
+    },
+    {
+      "frequency": 109,
+      "finalSpl": 99.93,
+      "envelopeSpl": 98.93,
+      "excessDb": 1
+    },
+    {
+      "frequency": 110,
+      "finalSpl": 99.91,
+      "envelopeSpl": 98.9,
+      "excessDb": 1.01
+    },
+    {
+      "frequency": 111,
+      "finalSpl": 99.9,
+      "envelopeSpl": 98.88,
+      "excessDb": 1.02
+    },
+    {
+      "frequency": 112,
+      "finalSpl": 99.87,
+      "envelopeSpl": 98.85,
+      "excessDb": 1.02
+    },
+    {
+      "frequency": 113,
+      "finalSpl": 99.8,
+      "envelopeSpl": 98.83,
+      "excessDb": 0.97
+    },
+    {
+      "frequency": 114,
+      "finalSpl": 99.41,
+      "envelopeSpl": 98.8,
+      "excessDb": 0.61
+    },
+    {
+      "frequency": 122,
+      "finalSpl": 99.28,
+      "envelopeSpl": 98.63,
+      "excessDb": 0.65
+    },
+    {
+      "frequency": 123,
+      "finalSpl": 99.64,
+      "envelopeSpl": 98.62,
+      "excessDb": 1.01
+    },
+    {
+      "frequency": 124,
+      "finalSpl": 99.68,
+      "envelopeSpl": 98.61,
+      "excessDb": 1.06
+    },
+    {
+      "frequency": 125,
+      "finalSpl": 99.67,
+      "envelopeSpl": 98.6,
+      "excessDb": 1.06
+    },
+    {
+      "frequency": 126,
+      "finalSpl": 99.65,
+      "envelopeSpl": 98.59,
+      "excessDb": 1.06
+    },
+    {
+      "frequency": 127,
+      "finalSpl": 99.64,
+      "envelopeSpl": 98.58,
+      "excessDb": 1.05
+    },
+    {
+      "frequency": 128,
+      "finalSpl": 99.62,
+      "envelopeSpl": 98.57,
+      "excessDb": 1.05
+    },
+    {
+      "frequency": 129,
+      "finalSpl": 99.61,
+      "envelopeSpl": 98.56,
+      "excessDb": 1.04
+    },
+    {
+      "frequency": 130,
+      "finalSpl": 99.59,
+      "envelopeSpl": 98.55,
+      "excessDb": 1.04
+    },
+    {
+      "frequency": 131,
+      "finalSpl": 99.58,
+      "envelopeSpl": 98.54,
+      "excessDb": 1.03
+    },
+    {
+      "frequency": 132,
+      "finalSpl": 99.57,
+      "envelopeSpl": 98.53,
+      "excessDb": 1.03
+    },
+    {
+      "frequency": 133,
+      "finalSpl": 99.55,
+      "envelopeSpl": 98.52,
+      "excessDb": 1.03
+    },
+    {
+      "frequency": 134,
+      "finalSpl": 99.54,
+      "envelopeSpl": 98.51,
+      "excessDb": 1.02
+    },
+    {
+      "frequency": 135,
+      "finalSpl": 99.52,
+      "envelopeSpl": 98.5,
+      "excessDb": 1.02
+    },
+    {
+      "frequency": 136,
+      "finalSpl": 99.51,
+      "envelopeSpl": 98.49,
+      "excessDb": 1.02
+    },
+    {
+      "frequency": 137,
+      "finalSpl": 99.5,
+      "envelopeSpl": 98.48,
+      "excessDb": 1.01
+    },
+    {
+      "frequency": 138,
+      "finalSpl": 99.48,
+      "envelopeSpl": 98.47,
+      "excessDb": 1.01
+    },
+    {
+      "frequency": 139,
+      "finalSpl": 99.47,
+      "envelopeSpl": 98.46,
+      "excessDb": 1.01
+    },
+    {
+      "frequency": 140,
+      "finalSpl": 99.46,
+      "envelopeSpl": 98.45,
+      "excessDb": 1
+    },
+    {
+      "frequency": 141,
+      "finalSpl": 99.45,
+      "envelopeSpl": 98.44,
+      "excessDb": 1
+    },
+    {
+      "frequency": 142,
+      "finalSpl": 99.43,
+      "envelopeSpl": 98.43,
+      "excessDb": 1
+    },
+    {
+      "frequency": 143,
+      "finalSpl": 99.42,
+      "envelopeSpl": 98.42,
+      "excessDb": 1
+    },
+    {
+      "frequency": 144,
+      "finalSpl": 99.41,
+      "envelopeSpl": 98.41,
+      "excessDb": 0.99
+    },
+    {
+      "frequency": 145,
+      "finalSpl": 99.4,
+      "envelopeSpl": 98.4,
+      "excessDb": 0.99
+    },
+    {
+      "frequency": 146,
+      "finalSpl": 99.38,
+      "envelopeSpl": 98.39,
+      "excessDb": 0.99
+    },
+    {
+      "frequency": 147,
+      "finalSpl": 99.37,
+      "envelopeSpl": 98.38,
+      "excessDb": 0.99
+    },
+    {
+      "frequency": 148,
+      "finalSpl": 99.36,
+      "envelopeSpl": 98.37,
+      "excessDb": 0.98
+    },
+    {
+      "frequency": 149,
+      "finalSpl": 99.35,
+      "envelopeSpl": 98.36,
+      "excessDb": 0.98
+    },
+    {
+      "frequency": 150,
+      "finalSpl": 99.33,
+      "envelopeSpl": 98.35,
+      "excessDb": 0.98
+    },
+    {
+      "frequency": 151,
+      "finalSpl": 99.32,
+      "envelopeSpl": 98.35,
+      "excessDb": 0.98
+    },
+    {
+      "frequency": 152,
+      "finalSpl": 99.31,
+      "envelopeSpl": 98.34,
+      "excessDb": 0.97
+    },
+    {
+      "frequency": 153,
+      "finalSpl": 99.3,
+      "envelopeSpl": 98.33,
+      "excessDb": 0.97
+    },
+    {
+      "frequency": 154,
+      "finalSpl": 99.29,
+      "envelopeSpl": 98.32,
+      "excessDb": 0.96
+    },
+    {
+      "frequency": 155,
+      "finalSpl": 99.28,
+      "envelopeSpl": 98.31,
+      "excessDb": 0.96
+    },
+    {
+      "frequency": 156,
+      "finalSpl": 99.26,
+      "envelopeSpl": 98.31,
+      "excessDb": 0.96
+    },
+    {
+      "frequency": 157,
+      "finalSpl": 99.25,
+      "envelopeSpl": 98.3,
+      "excessDb": 0.95
+    },
+    {
+      "frequency": 158,
+      "finalSpl": 99.24,
+      "envelopeSpl": 98.29,
+      "excessDb": 0.95
+    },
+    {
+      "frequency": 159,
+      "finalSpl": 99.23,
+      "envelopeSpl": 98.28,
+      "excessDb": 0.95
+    },
+    {
+      "frequency": 160,
+      "finalSpl": 99.22,
+      "envelopeSpl": 98.27,
+      "excessDb": 0.94
+    },
+    {
+      "frequency": 161,
+      "finalSpl": 99.21,
+      "envelopeSpl": 98.27,
+      "excessDb": 0.94
+    },
+    {
+      "frequency": 162,
+      "finalSpl": 99.2,
+      "envelopeSpl": 98.26,
+      "excessDb": 0.94
+    },
+    {
+      "frequency": 163,
+      "finalSpl": 99.19,
+      "envelopeSpl": 98.25,
+      "excessDb": 0.94
+    },
+    {
+      "frequency": 164,
+      "finalSpl": 99.18,
+      "envelopeSpl": 98.24,
+      "excessDb": 0.93
+    },
+    {
+      "frequency": 165,
+      "finalSpl": 99.16,
+      "envelopeSpl": 98.23,
+      "excessDb": 0.93
+    },
+    {
+      "frequency": 166,
+      "finalSpl": 99.15,
+      "envelopeSpl": 98.23,
+      "excessDb": 0.93
+    },
+    {
+      "frequency": 167,
+      "finalSpl": 99.14,
+      "envelopeSpl": 98.22,
+      "excessDb": 0.92
+    },
+    {
+      "frequency": 168,
+      "finalSpl": 99.13,
+      "envelopeSpl": 98.21,
+      "excessDb": 0.92
+    },
+    {
+      "frequency": 169,
+      "finalSpl": 99.12,
+      "envelopeSpl": 98.2,
+      "excessDb": 0.92
+    },
+    {
+      "frequency": 170,
+      "finalSpl": 99.11,
+      "envelopeSpl": 98.19,
+      "excessDb": 0.92
+    },
+    {
+      "frequency": 171,
+      "finalSpl": 99.1,
+      "envelopeSpl": 98.19,
+      "excessDb": 0.91
+    },
+    {
+      "frequency": 172,
+      "finalSpl": 99.09,
+      "envelopeSpl": 98.18,
+      "excessDb": 0.91
+    },
+    {
+      "frequency": 173,
+      "finalSpl": 99.08,
+      "envelopeSpl": 98.17,
+      "excessDb": 0.91
+    },
+    {
+      "frequency": 174,
+      "finalSpl": 99.07,
+      "envelopeSpl": 98.16,
+      "excessDb": 0.91
+    },
+    {
+      "frequency": 175,
+      "finalSpl": 99.06,
+      "envelopeSpl": 98.15,
+      "excessDb": 0.91
+    },
+    {
+      "frequency": 176,
+      "finalSpl": 99.05,
+      "envelopeSpl": 98.15,
+      "excessDb": 0.9
+    },
+    {
+      "frequency": 177,
+      "finalSpl": 99.04,
+      "envelopeSpl": 98.14,
+      "excessDb": 0.9
+    },
+    {
+      "frequency": 178,
+      "finalSpl": 99.03,
+      "envelopeSpl": 98.13,
+      "excessDb": 0.9
+    },
+    {
+      "frequency": 179,
+      "finalSpl": 99.02,
+      "envelopeSpl": 98.12,
+      "excessDb": 0.9
+    },
+    {
+      "frequency": 180,
+      "finalSpl": 99.01,
+      "envelopeSpl": 98.11,
+      "excessDb": 0.9
+    },
+    {
+      "frequency": 181,
+      "finalSpl": 99,
+      "envelopeSpl": 98.11,
+      "excessDb": 0.89
+    },
+    {
+      "frequency": 182,
+      "finalSpl": 98.99,
+      "envelopeSpl": 98.1,
+      "excessDb": 0.89
+    },
+    {
+      "frequency": 183,
+      "finalSpl": 98.98,
+      "envelopeSpl": 98.09,
+      "excessDb": 0.89
+    },
+    {
+      "frequency": 184,
+      "finalSpl": 98.97,
+      "envelopeSpl": 98.08,
+      "excessDb": 0.89
+    },
+    {
+      "frequency": 185,
+      "finalSpl": 98.96,
+      "envelopeSpl": 98.07,
+      "excessDb": 0.89
+    },
+    {
+      "frequency": 186,
+      "finalSpl": 98.95,
+      "envelopeSpl": 98.07,
+      "excessDb": 0.89
+    },
+    {
+      "frequency": 187,
+      "finalSpl": 98.94,
+      "envelopeSpl": 98.06,
+      "excessDb": 0.89
+    },
+    {
+      "frequency": 188,
+      "finalSpl": 98.93,
+      "envelopeSpl": 98.05,
+      "excessDb": 0.88
+    },
+    {
+      "frequency": 189,
+      "finalSpl": 98.93,
+      "envelopeSpl": 98.04,
+      "excessDb": 0.88
+    },
+    {
+      "frequency": 190,
+      "finalSpl": 98.92,
+      "envelopeSpl": 98.03,
+      "excessDb": 0.88
+    },
+    {
+      "frequency": 191,
+      "finalSpl": 98.91,
+      "envelopeSpl": 98.03,
+      "excessDb": 0.88
+    },
+    {
+      "frequency": 192,
+      "finalSpl": 98.9,
+      "envelopeSpl": 98.02,
+      "excessDb": 0.88
+    },
+    {
+      "frequency": 193,
+      "finalSpl": 98.89,
+      "envelopeSpl": 98.01,
+      "excessDb": 0.88
+    },
+    {
+      "frequency": 194,
+      "finalSpl": 98.88,
+      "envelopeSpl": 98,
+      "excessDb": 0.88
+    },
+    {
+      "frequency": 195,
+      "finalSpl": 98.87,
+      "envelopeSpl": 97.99,
+      "excessDb": 0.88
+    },
+    {
+      "frequency": 196,
+      "finalSpl": 98.86,
+      "envelopeSpl": 97.99,
+      "excessDb": 0.87
+    },
+    {
+      "frequency": 197,
+      "finalSpl": 98.85,
+      "envelopeSpl": 97.98,
+      "excessDb": 0.87
+    },
+    {
+      "frequency": 198,
+      "finalSpl": 98.84,
+      "envelopeSpl": 97.97,
+      "excessDb": 0.87
+    },
+    {
+      "frequency": 199,
+      "finalSpl": 98.84,
+      "envelopeSpl": 97.96,
+      "excessDb": 0.87
+    },
+    {
+      "frequency": 200,
+      "finalSpl": 98.83,
+      "envelopeSpl": 97.95,
+      "excessDb": 0.87
+    }
+  ],
+  "protectedNullBoostViolations": [],
+  "perSeatEnvelopeExceedances": [
+    {
+      "seatId": "s1",
+      "frequency": 98,
+      "finalSpl": 99.49,
+      "envelopeSpl": 99.35,
+      "excessDb": 0.14
+    },
+    {
+      "seatId": "s1",
+      "frequency": 99,
+      "finalSpl": 99.49,
+      "envelopeSpl": 99.25,
+      "excessDb": 0.23
+    },
+    {
+      "seatId": "s1",
+      "frequency": 100,
+      "finalSpl": 99.48,
+      "envelopeSpl": 99.15,
+      "excessDb": 0.33
+    },
+    {
+      "seatId": "s1",
+      "frequency": 101,
+      "finalSpl": 99.47,
+      "envelopeSpl": 99.13,
+      "excessDb": 0.34
+    },
+    {
+      "seatId": "s1",
+      "frequency": 102,
+      "finalSpl": 99.46,
+      "envelopeSpl": 99.1,
+      "excessDb": 0.35
+    },
+    {
+      "seatId": "s1",
+      "frequency": 103,
+      "finalSpl": 99.44,
+      "envelopeSpl": 99.08,
+      "excessDb": 0.36
+    },
+    {
+      "seatId": "s1",
+      "frequency": 104,
+      "finalSpl": 99.42,
+      "envelopeSpl": 99.05,
+      "excessDb": 0.37
+    },
+    {
+      "seatId": "s1",
+      "frequency": 105,
+      "finalSpl": 99.41,
+      "envelopeSpl": 99.03,
+      "excessDb": 0.38
+    },
+    {
+      "seatId": "s1",
+      "frequency": 106,
+      "finalSpl": 99.39,
+      "envelopeSpl": 99,
+      "excessDb": 0.38
+    },
+    {
+      "seatId": "s1",
+      "frequency": 107,
+      "finalSpl": 99.37,
+      "envelopeSpl": 98.98,
+      "excessDb": 0.39
+    },
+    {
+      "seatId": "s1",
+      "frequency": 108,
+      "finalSpl": 99.35,
+      "envelopeSpl": 98.95,
+      "excessDb": 0.4
+    },
+    {
+      "seatId": "s1",
+      "frequency": 109,
+      "finalSpl": 99.33,
+      "envelopeSpl": 98.93,
+      "excessDb": 0.4
+    },
+    {
+      "seatId": "s1",
+      "frequency": 110,
+      "finalSpl": 99.31,
+      "envelopeSpl": 98.9,
+      "excessDb": 0.41
+    },
+    {
+      "seatId": "s1",
+      "frequency": 111,
+      "finalSpl": 99.3,
+      "envelopeSpl": 98.88,
+      "excessDb": 0.42
+    },
+    {
+      "seatId": "s1",
+      "frequency": 112,
+      "finalSpl": 99.27,
+      "envelopeSpl": 98.85,
+      "excessDb": 0.42
+    },
+    {
+      "seatId": "s1",
+      "frequency": 113,
+      "finalSpl": 99.2,
+      "envelopeSpl": 98.83,
+      "excessDb": 0.37
+    },
+    {
+      "seatId": "s1",
+      "frequency": 123,
+      "finalSpl": 99.04,
+      "envelopeSpl": 98.62,
+      "excessDb": 0.41
+    },
+    {
+      "seatId": "s1",
+      "frequency": 124,
+      "finalSpl": 99.08,
+      "envelopeSpl": 98.61,
+      "excessDb": 0.46
+    },
+    {
+      "seatId": "s1",
+      "frequency": 125,
+      "finalSpl": 99.07,
+      "envelopeSpl": 98.6,
+      "excessDb": 0.46
+    },
+    {
+      "seatId": "s1",
+      "frequency": 126,
+      "finalSpl": 99.05,
+      "envelopeSpl": 98.59,
+      "excessDb": 0.46
+    },
+    {
+      "seatId": "s1",
+      "frequency": 127,
+      "finalSpl": 99.04,
+      "envelopeSpl": 98.58,
+      "excessDb": 0.45
+    },
+    {
+      "seatId": "s1",
+      "frequency": 128,
+      "finalSpl": 99.02,
+      "envelopeSpl": 98.57,
+      "excessDb": 0.45
+    },
+    {
+      "seatId": "s1",
+      "frequency": 129,
+      "finalSpl": 99.01,
+      "envelopeSpl": 98.56,
+      "excessDb": 0.44
+    },
+    {
+      "seatId": "s1",
+      "frequency": 130,
+      "finalSpl": 98.99,
+      "envelopeSpl": 98.55,
+      "excessDb": 0.44
+    },
+    {
+      "seatId": "s1",
+      "frequency": 131,
+      "finalSpl": 98.98,
+      "envelopeSpl": 98.54,
+      "excessDb": 0.43
+    },
+    {
+      "seatId": "s1",
+      "frequency": 132,
+      "finalSpl": 98.97,
+      "envelopeSpl": 98.53,
+      "excessDb": 0.43
+    },
+    {
+      "seatId": "s1",
+      "frequency": 133,
+      "finalSpl": 98.95,
+      "envelopeSpl": 98.52,
+      "excessDb": 0.43
+    },
+    {
+      "seatId": "s1",
+      "frequency": 134,
+      "finalSpl": 98.94,
+      "envelopeSpl": 98.51,
+      "excessDb": 0.42
+    },
+    {
+      "seatId": "s1",
+      "frequency": 135,
+      "finalSpl": 98.92,
+      "envelopeSpl": 98.5,
+      "excessDb": 0.42
+    },
+    {
+      "seatId": "s1",
+      "frequency": 136,
+      "finalSpl": 98.91,
+      "envelopeSpl": 98.49,
+      "excessDb": 0.42
+    },
+    {
+      "seatId": "s1",
+      "frequency": 137,
+      "finalSpl": 98.9,
+      "envelopeSpl": 98.48,
+      "excessDb": 0.41
+    },
+    {
+      "seatId": "s1",
+      "frequency": 138,
+      "finalSpl": 98.88,
+      "envelopeSpl": 98.47,
+      "excessDb": 0.41
+    },
+    {
+      "seatId": "s1",
+      "frequency": 139,
+      "finalSpl": 98.87,
+      "envelopeSpl": 98.46,
+      "excessDb": 0.41
+    },
+    {
+      "seatId": "s1",
+      "frequency": 140,
+      "finalSpl": 98.86,
+      "envelopeSpl": 98.45,
+      "excessDb": 0.4
+    },
+    {
+      "seatId": "s1",
+      "frequency": 141,
+      "finalSpl": 98.85,
+      "envelopeSpl": 98.44,
+      "excessDb": 0.4
+    },
+    {
+      "seatId": "s1",
+      "frequency": 142,
+      "finalSpl": 98.83,
+      "envelopeSpl": 98.43,
+      "excessDb": 0.4
+    },
+    {
+      "seatId": "s1",
+      "frequency": 143,
+      "finalSpl": 98.82,
+      "envelopeSpl": 98.42,
+      "excessDb": 0.4
+    },
+    {
+      "seatId": "s1",
+      "frequency": 144,
+      "finalSpl": 98.81,
+      "envelopeSpl": 98.41,
+      "excessDb": 0.39
+    },
+    {
+      "seatId": "s1",
+      "frequency": 145,
+      "finalSpl": 98.8,
+      "envelopeSpl": 98.4,
+      "excessDb": 0.39
+    },
+    {
+      "seatId": "s1",
+      "frequency": 146,
+      "finalSpl": 98.78,
+      "envelopeSpl": 98.39,
+      "excessDb": 0.39
+    },
+    {
+      "seatId": "s1",
+      "frequency": 147,
+      "finalSpl": 98.77,
+      "envelopeSpl": 98.38,
+      "excessDb": 0.39
+    },
+    {
+      "seatId": "s1",
+      "frequency": 148,
+      "finalSpl": 98.76,
+      "envelopeSpl": 98.37,
+      "excessDb": 0.38
+    },
+    {
+      "seatId": "s1",
+      "frequency": 149,
+      "finalSpl": 98.75,
+      "envelopeSpl": 98.36,
+      "excessDb": 0.38
+    },
+    {
+      "seatId": "s1",
+      "frequency": 150,
+      "finalSpl": 98.73,
+      "envelopeSpl": 98.35,
+      "excessDb": 0.38
+    },
+    {
+      "seatId": "s1",
+      "frequency": 151,
+      "finalSpl": 98.72,
+      "envelopeSpl": 98.35,
+      "excessDb": 0.38
+    },
+    {
+      "seatId": "s1",
+      "frequency": 152,
+      "finalSpl": 98.71,
+      "envelopeSpl": 98.34,
+      "excessDb": 0.37
+    },
+    {
+      "seatId": "s1",
+      "frequency": 153,
+      "finalSpl": 98.7,
+      "envelopeSpl": 98.33,
+      "excessDb": 0.37
+    },
+    {
+      "seatId": "s1",
+      "frequency": 154,
+      "finalSpl": 98.69,
+      "envelopeSpl": 98.32,
+      "excessDb": 0.36
+    },
+    {
+      "seatId": "s1",
+      "frequency": 155,
+      "finalSpl": 98.68,
+      "envelopeSpl": 98.31,
+      "excessDb": 0.36
+    },
+    {
+      "seatId": "s1",
+      "frequency": 156,
+      "finalSpl": 98.66,
+      "envelopeSpl": 98.31,
+      "excessDb": 0.36
+    },
+    {
+      "seatId": "s1",
+      "frequency": 157,
+      "finalSpl": 98.65,
+      "envelopeSpl": 98.3,
+      "excessDb": 0.35
+    },
+    {
+      "seatId": "s1",
+      "frequency": 158,
+      "finalSpl": 98.64,
+      "envelopeSpl": 98.29,
+      "excessDb": 0.35
+    },
+    {
+      "seatId": "s1",
+      "frequency": 159,
+      "finalSpl": 98.63,
+      "envelopeSpl": 98.28,
+      "excessDb": 0.35
+    },
+    {
+      "seatId": "s1",
+      "frequency": 160,
+      "finalSpl": 98.62,
+      "envelopeSpl": 98.27,
+      "excessDb": 0.34
+    },
+    {
+      "seatId": "s1",
+      "frequency": 161,
+      "finalSpl": 98.61,
+      "envelopeSpl": 98.27,
+      "excessDb": 0.34
+    },
+    {
+      "seatId": "s1",
+      "frequency": 162,
+      "finalSpl": 98.6,
+      "envelopeSpl": 98.26,
+      "excessDb": 0.34
+    },
+    {
+      "seatId": "s1",
+      "frequency": 163,
+      "finalSpl": 98.59,
+      "envelopeSpl": 98.25,
+      "excessDb": 0.34
+    },
+    {
+      "seatId": "s1",
+      "frequency": 164,
+      "finalSpl": 98.58,
+      "envelopeSpl": 98.24,
+      "excessDb": 0.33
+    },
+    {
+      "seatId": "s1",
+      "frequency": 165,
+      "finalSpl": 98.56,
+      "envelopeSpl": 98.23,
+      "excessDb": 0.33
+    },
+    {
+      "seatId": "s1",
+      "frequency": 166,
+      "finalSpl": 98.55,
+      "envelopeSpl": 98.23,
+      "excessDb": 0.33
+    },
+    {
+      "seatId": "s1",
+      "frequency": 167,
+      "finalSpl": 98.54,
+      "envelopeSpl": 98.22,
+      "excessDb": 0.32
+    },
+    {
+      "seatId": "s1",
+      "frequency": 168,
+      "finalSpl": 98.53,
+      "envelopeSpl": 98.21,
+      "excessDb": 0.32
+    },
+    {
+      "seatId": "s1",
+      "frequency": 169,
+      "finalSpl": 98.52,
+      "envelopeSpl": 98.2,
+      "excessDb": 0.32
+    },
+    {
+      "seatId": "s1",
+      "frequency": 170,
+      "finalSpl": 98.51,
+      "envelopeSpl": 98.19,
+      "excessDb": 0.32
+    },
+    {
+      "seatId": "s1",
+      "frequency": 171,
+      "finalSpl": 98.5,
+      "envelopeSpl": 98.19,
+      "excessDb": 0.31
+    },
+    {
+      "seatId": "s1",
+      "frequency": 172,
+      "finalSpl": 98.49,
+      "envelopeSpl": 98.18,
+      "excessDb": 0.31
+    },
+    {
+      "seatId": "s1",
+      "frequency": 173,
+      "finalSpl": 98.48,
+      "envelopeSpl": 98.17,
+      "excessDb": 0.31
+    },
+    {
+      "seatId": "s1",
+      "frequency": 174,
+      "finalSpl": 98.47,
+      "envelopeSpl": 98.16,
+      "excessDb": 0.31
+    },
+    {
+      "seatId": "s1",
+      "frequency": 175,
+      "finalSpl": 98.46,
+      "envelopeSpl": 98.15,
+      "excessDb": 0.31
+    },
+    {
+      "seatId": "s1",
+      "frequency": 176,
+      "finalSpl": 98.45,
+      "envelopeSpl": 98.15,
+      "excessDb": 0.3
+    },
+    {
+      "seatId": "s1",
+      "frequency": 177,
+      "finalSpl": 98.44,
+      "envelopeSpl": 98.14,
+      "excessDb": 0.3
+    },
+    {
+      "seatId": "s1",
+      "frequency": 178,
+      "finalSpl": 98.43,
+      "envelopeSpl": 98.13,
+      "excessDb": 0.3
+    },
+    {
+      "seatId": "s1",
+      "frequency": 179,
+      "finalSpl": 98.42,
+      "envelopeSpl": 98.12,
+      "excessDb": 0.3
+    },
+    {
+      "seatId": "s1",
+      "frequency": 180,
+      "finalSpl": 98.41,
+      "envelopeSpl": 98.11,
+      "excessDb": 0.3
+    },
+    {
+      "seatId": "s1",
+      "frequency": 181,
+      "finalSpl": 98.4,
+      "envelopeSpl": 98.11,
+      "excessDb": 0.29
+    },
+    {
+      "seatId": "s1",
+      "frequency": 182,
+      "finalSpl": 98.39,
+      "envelopeSpl": 98.1,
+      "excessDb": 0.29
+    },
+    {
+      "seatId": "s1",
+      "frequency": 183,
+      "finalSpl": 98.38,
+      "envelopeSpl": 98.09,
+      "excessDb": 0.29
+    },
+    {
+      "seatId": "s1",
+      "frequency": 184,
+      "finalSpl": 98.37,
+      "envelopeSpl": 98.08,
+      "excessDb": 0.29
+    },
+    {
+      "seatId": "s1",
+      "frequency": 185,
+      "finalSpl": 98.36,
+      "envelopeSpl": 98.07,
+      "excessDb": 0.29
+    },
+    {
+      "seatId": "s1",
+      "frequency": 186,
+      "finalSpl": 98.35,
+      "envelopeSpl": 98.07,
+      "excessDb": 0.29
+    },
+    {
+      "seatId": "s1",
+      "frequency": 187,
+      "finalSpl": 98.34,
+      "envelopeSpl": 98.06,
+      "excessDb": 0.29
+    },
+    {
+      "seatId": "s1",
+      "frequency": 188,
+      "finalSpl": 98.33,
+      "envelopeSpl": 98.05,
+      "excessDb": 0.28
+    },
+    {
+      "seatId": "s1",
+      "frequency": 189,
+      "finalSpl": 98.33,
+      "envelopeSpl": 98.04,
+      "excessDb": 0.28
+    },
+    {
+      "seatId": "s1",
+      "frequency": 190,
+      "finalSpl": 98.32,
+      "envelopeSpl": 98.03,
+      "excessDb": 0.28
+    },
+    {
+      "seatId": "s1",
+      "frequency": 191,
+      "finalSpl": 98.31,
+      "envelopeSpl": 98.03,
+      "excessDb": 0.28
+    },
+    {
+      "seatId": "s1",
+      "frequency": 192,
+      "finalSpl": 98.3,
+      "envelopeSpl": 98.02,
+      "excessDb": 0.28
+    },
+    {
+      "seatId": "s1",
+      "frequency": 193,
+      "finalSpl": 98.29,
+      "envelopeSpl": 98.01,
+      "excessDb": 0.28
+    },
+    {
+      "seatId": "s1",
+      "frequency": 194,
+      "finalSpl": 98.28,
+      "envelopeSpl": 98,
+      "excessDb": 0.28
+    },
+    {
+      "seatId": "s1",
+      "frequency": 195,
+      "finalSpl": 98.27,
+      "envelopeSpl": 97.99,
+      "excessDb": 0.28
+    },
+    {
+      "seatId": "s1",
+      "frequency": 196,
+      "finalSpl": 98.26,
+      "envelopeSpl": 97.99,
+      "excessDb": 0.27
+    },
+    {
+      "seatId": "s1",
+      "frequency": 197,
+      "finalSpl": 98.25,
+      "envelopeSpl": 97.98,
+      "excessDb": 0.27
+    },
+    {
+      "seatId": "s1",
+      "frequency": 198,
+      "finalSpl": 98.24,
+      "envelopeSpl": 97.97,
+      "excessDb": 0.27
+    },
+    {
+      "seatId": "s1",
+      "frequency": 199,
+      "finalSpl": 98.24,
+      "envelopeSpl": 97.96,
+      "excessDb": 0.27
+    },
+    {
+      "seatId": "s1",
+      "frequency": 200,
+      "finalSpl": 98.23,
+      "envelopeSpl": 97.95,
+      "excessDb": 0.27
+    },
+    {
+      "seatId": "s2",
+      "frequency": 89,
+      "finalSpl": 100.46,
+      "envelopeSpl": 100.22,
+      "excessDb": 0.24
+    },
+    {
+      "seatId": "s2",
+      "frequency": 90,
+      "finalSpl": 100.56,
+      "envelopeSpl": 100.13,
+      "excessDb": 0.44
+    },
+    {
+      "seatId": "s2",
+      "frequency": 91,
+      "finalSpl": 100.65,
+      "envelopeSpl": 100.03,
+      "excessDb": 0.62
+    },
+    {
+      "seatId": "s2",
+      "frequency": 92,
+      "finalSpl": 100.73,
+      "envelopeSpl": 99.94,
+      "excessDb": 0.79
+    },
+    {
+      "seatId": "s2",
+      "frequency": 93,
+      "finalSpl": 100.78,
+      "envelopeSpl": 99.84,
+      "excessDb": 0.95
+    },
+    {
+      "seatId": "s2",
+      "frequency": 94,
+      "finalSpl": 100.83,
+      "envelopeSpl": 99.74,
+      "excessDb": 1.08
+    },
+    {
+      "seatId": "s2",
+      "frequency": 95,
+      "finalSpl": 100.86,
+      "envelopeSpl": 99.65,
+      "excessDb": 1.21
+    },
+    {
+      "seatId": "s2",
+      "frequency": 96,
+      "finalSpl": 100.88,
+      "envelopeSpl": 99.55,
+      "excessDb": 1.33
+    },
+    {
+      "seatId": "s2",
+      "frequency": 97,
+      "finalSpl": 100.89,
+      "envelopeSpl": 99.45,
+      "excessDb": 1.44
+    },
+    {
+      "seatId": "s2",
+      "frequency": 98,
+      "finalSpl": 100.89,
+      "envelopeSpl": 99.35,
+      "excessDb": 1.54
+    },
+    {
+      "seatId": "s2",
+      "frequency": 99,
+      "finalSpl": 100.89,
+      "envelopeSpl": 99.25,
+      "excessDb": 1.63
+    },
+    {
+      "seatId": "s2",
+      "frequency": 100,
+      "finalSpl": 100.88,
+      "envelopeSpl": 99.15,
+      "excessDb": 1.73
+    },
+    {
+      "seatId": "s2",
+      "frequency": 101,
+      "finalSpl": 100.87,
+      "envelopeSpl": 99.13,
+      "excessDb": 1.74
+    },
+    {
+      "seatId": "s2",
+      "frequency": 102,
+      "finalSpl": 100.86,
+      "envelopeSpl": 99.1,
+      "excessDb": 1.75
+    },
+    {
+      "seatId": "s2",
+      "frequency": 103,
+      "finalSpl": 100.84,
+      "envelopeSpl": 99.08,
+      "excessDb": 1.76
+    },
+    {
+      "seatId": "s2",
+      "frequency": 104,
+      "finalSpl": 100.82,
+      "envelopeSpl": 99.05,
+      "excessDb": 1.77
+    },
+    {
+      "seatId": "s2",
+      "frequency": 105,
+      "finalSpl": 100.81,
+      "envelopeSpl": 99.03,
+      "excessDb": 1.78
+    },
+    {
+      "seatId": "s2",
+      "frequency": 106,
+      "finalSpl": 100.79,
+      "envelopeSpl": 99,
+      "excessDb": 1.78
+    },
+    {
+      "seatId": "s2",
+      "frequency": 107,
+      "finalSpl": 100.77,
+      "envelopeSpl": 98.98,
+      "excessDb": 1.79
+    },
+    {
+      "seatId": "s2",
+      "frequency": 108,
+      "finalSpl": 100.75,
+      "envelopeSpl": 98.95,
+      "excessDb": 1.8
+    },
+    {
+      "seatId": "s2",
+      "frequency": 109,
+      "finalSpl": 100.73,
+      "envelopeSpl": 98.93,
+      "excessDb": 1.8
+    },
+    {
+      "seatId": "s2",
+      "frequency": 110,
+      "finalSpl": 100.71,
+      "envelopeSpl": 98.9,
+      "excessDb": 1.81
+    },
+    {
+      "seatId": "s2",
+      "frequency": 111,
+      "finalSpl": 100.7,
+      "envelopeSpl": 98.88,
+      "excessDb": 1.82
+    },
+    {
+      "seatId": "s2",
+      "frequency": 112,
+      "finalSpl": 100.67,
+      "envelopeSpl": 98.85,
+      "excessDb": 1.82
+    },
+    {
+      "seatId": "s2",
+      "frequency": 113,
+      "finalSpl": 100.6,
+      "envelopeSpl": 98.83,
+      "excessDb": 1.77
+    },
+    {
+      "seatId": "s2",
+      "frequency": 114,
+      "finalSpl": 100.21,
+      "envelopeSpl": 98.8,
+      "excessDb": 1.41
+    },
+    {
+      "seatId": "s2",
+      "frequency": 122,
+      "finalSpl": 100.08,
+      "envelopeSpl": 98.63,
+      "excessDb": 1.45
+    },
+    {
+      "seatId": "s2",
+      "frequency": 123,
+      "finalSpl": 100.44,
+      "envelopeSpl": 98.62,
+      "excessDb": 1.81
+    },
+    {
+      "seatId": "s2",
+      "frequency": 124,
+      "finalSpl": 100.48,
+      "envelopeSpl": 98.61,
+      "excessDb": 1.86
+    },
+    {
+      "seatId": "s2",
+      "frequency": 125,
+      "finalSpl": 100.47,
+      "envelopeSpl": 98.6,
+      "excessDb": 1.86
+    },
+    {
+      "seatId": "s2",
+      "frequency": 126,
+      "finalSpl": 100.45,
+      "envelopeSpl": 98.59,
+      "excessDb": 1.86
+    },
+    {
+      "seatId": "s2",
+      "frequency": 127,
+      "finalSpl": 100.44,
+      "envelopeSpl": 98.58,
+      "excessDb": 1.85
+    },
+    {
+      "seatId": "s2",
+      "frequency": 128,
+      "finalSpl": 100.42,
+      "envelopeSpl": 98.57,
+      "excessDb": 1.85
+    },
+    {
+      "seatId": "s2",
+      "frequency": 129,
+      "finalSpl": 100.41,
+      "envelopeSpl": 98.56,
+      "excessDb": 1.84
+    },
+    {
+      "seatId": "s2",
+      "frequency": 130,
+      "finalSpl": 100.39,
+      "envelopeSpl": 98.55,
+      "excessDb": 1.84
+    },
+    {
+      "seatId": "s2",
+      "frequency": 131,
+      "finalSpl": 100.38,
+      "envelopeSpl": 98.54,
+      "excessDb": 1.83
+    },
+    {
+      "seatId": "s2",
+      "frequency": 132,
+      "finalSpl": 100.37,
+      "envelopeSpl": 98.53,
+      "excessDb": 1.83
+    },
+    {
+      "seatId": "s2",
+      "frequency": 133,
+      "finalSpl": 100.35,
+      "envelopeSpl": 98.52,
+      "excessDb": 1.83
+    },
+    {
+      "seatId": "s2",
+      "frequency": 134,
+      "finalSpl": 100.34,
+      "envelopeSpl": 98.51,
+      "excessDb": 1.82
+    },
+    {
+      "seatId": "s2",
+      "frequency": 135,
+      "finalSpl": 100.32,
+      "envelopeSpl": 98.5,
+      "excessDb": 1.82
+    },
+    {
+      "seatId": "s2",
+      "frequency": 136,
+      "finalSpl": 100.31,
+      "envelopeSpl": 98.49,
+      "excessDb": 1.82
+    },
+    {
+      "seatId": "s2",
+      "frequency": 137,
+      "finalSpl": 100.3,
+      "envelopeSpl": 98.48,
+      "excessDb": 1.81
+    },
+    {
+      "seatId": "s2",
+      "frequency": 138,
+      "finalSpl": 100.28,
+      "envelopeSpl": 98.47,
+      "excessDb": 1.81
+    },
+    {
+      "seatId": "s2",
+      "frequency": 139,
+      "finalSpl": 100.27,
+      "envelopeSpl": 98.46,
+      "excessDb": 1.81
+    },
+    {
+      "seatId": "s2",
+      "frequency": 140,
+      "finalSpl": 100.26,
+      "envelopeSpl": 98.45,
+      "excessDb": 1.8
+    },
+    {
+      "seatId": "s2",
+      "frequency": 141,
+      "finalSpl": 100.25,
+      "envelopeSpl": 98.44,
+      "excessDb": 1.8
+    },
+    {
+      "seatId": "s2",
+      "frequency": 142,
+      "finalSpl": 100.23,
+      "envelopeSpl": 98.43,
+      "excessDb": 1.8
+    },
+    {
+      "seatId": "s2",
+      "frequency": 143,
+      "finalSpl": 100.22,
+      "envelopeSpl": 98.42,
+      "excessDb": 1.8
+    },
+    {
+      "seatId": "s2",
+      "frequency": 144,
+      "finalSpl": 100.21,
+      "envelopeSpl": 98.41,
+      "excessDb": 1.79
+    },
+    {
+      "seatId": "s2",
+      "frequency": 145,
+      "finalSpl": 100.2,
+      "envelopeSpl": 98.4,
+      "excessDb": 1.79
+    },
+    {
+      "seatId": "s2",
+      "frequency": 146,
+      "finalSpl": 100.18,
+      "envelopeSpl": 98.39,
+      "excessDb": 1.79
+    },
+    {
+      "seatId": "s2",
+      "frequency": 147,
+      "finalSpl": 100.17,
+      "envelopeSpl": 98.38,
+      "excessDb": 1.79
+    },
+    {
+      "seatId": "s2",
+      "frequency": 148,
+      "finalSpl": 100.16,
+      "envelopeSpl": 98.37,
+      "excessDb": 1.78
+    },
+    {
+      "seatId": "s2",
+      "frequency": 149,
+      "finalSpl": 100.15,
+      "envelopeSpl": 98.36,
+      "excessDb": 1.78
+    },
+    {
+      "seatId": "s2",
+      "frequency": 150,
+      "finalSpl": 100.13,
+      "envelopeSpl": 98.35,
+      "excessDb": 1.78
+    },
+    {
+      "seatId": "s2",
+      "frequency": 151,
+      "finalSpl": 100.12,
+      "envelopeSpl": 98.35,
+      "excessDb": 1.78
+    },
+    {
+      "seatId": "s2",
+      "frequency": 152,
+      "finalSpl": 100.11,
+      "envelopeSpl": 98.34,
+      "excessDb": 1.77
+    },
+    {
+      "seatId": "s2",
+      "frequency": 153,
+      "finalSpl": 100.1,
+      "envelopeSpl": 98.33,
+      "excessDb": 1.77
+    },
+    {
+      "seatId": "s2",
+      "frequency": 154,
+      "finalSpl": 100.09,
+      "envelopeSpl": 98.32,
+      "excessDb": 1.76
+    },
+    {
+      "seatId": "s2",
+      "frequency": 155,
+      "finalSpl": 100.08,
+      "envelopeSpl": 98.31,
+      "excessDb": 1.76
+    },
+    {
+      "seatId": "s2",
+      "frequency": 156,
+      "finalSpl": 100.06,
+      "envelopeSpl": 98.31,
+      "excessDb": 1.76
+    },
+    {
+      "seatId": "s2",
+      "frequency": 157,
+      "finalSpl": 100.05,
+      "envelopeSpl": 98.3,
+      "excessDb": 1.75
+    },
+    {
+      "seatId": "s2",
+      "frequency": 158,
+      "finalSpl": 100.04,
+      "envelopeSpl": 98.29,
+      "excessDb": 1.75
+    },
+    {
+      "seatId": "s2",
+      "frequency": 159,
+      "finalSpl": 100.03,
+      "envelopeSpl": 98.28,
+      "excessDb": 1.75
+    },
+    {
+      "seatId": "s2",
+      "frequency": 160,
+      "finalSpl": 100.02,
+      "envelopeSpl": 98.27,
+      "excessDb": 1.74
+    },
+    {
+      "seatId": "s2",
+      "frequency": 161,
+      "finalSpl": 100.01,
+      "envelopeSpl": 98.27,
+      "excessDb": 1.74
+    },
+    {
+      "seatId": "s2",
+      "frequency": 162,
+      "finalSpl": 100,
+      "envelopeSpl": 98.26,
+      "excessDb": 1.74
+    },
+    {
+      "seatId": "s2",
+      "frequency": 163,
+      "finalSpl": 99.99,
+      "envelopeSpl": 98.25,
+      "excessDb": 1.74
+    },
+    {
+      "seatId": "s2",
+      "frequency": 164,
+      "finalSpl": 99.98,
+      "envelopeSpl": 98.24,
+      "excessDb": 1.73
+    },
+    {
+      "seatId": "s2",
+      "frequency": 165,
+      "finalSpl": 99.96,
+      "envelopeSpl": 98.23,
+      "excessDb": 1.73
+    },
+    {
+      "seatId": "s2",
+      "frequency": 166,
+      "finalSpl": 99.95,
+      "envelopeSpl": 98.23,
+      "excessDb": 1.73
+    },
+    {
+      "seatId": "s2",
+      "frequency": 167,
+      "finalSpl": 99.94,
+      "envelopeSpl": 98.22,
+      "excessDb": 1.72
+    },
+    {
+      "seatId": "s2",
+      "frequency": 168,
+      "finalSpl": 99.93,
+      "envelopeSpl": 98.21,
+      "excessDb": 1.72
+    },
+    {
+      "seatId": "s2",
+      "frequency": 169,
+      "finalSpl": 99.92,
+      "envelopeSpl": 98.2,
+      "excessDb": 1.72
+    },
+    {
+      "seatId": "s2",
+      "frequency": 170,
+      "finalSpl": 99.91,
+      "envelopeSpl": 98.19,
+      "excessDb": 1.72
+    },
+    {
+      "seatId": "s2",
+      "frequency": 171,
+      "finalSpl": 99.9,
+      "envelopeSpl": 98.19,
+      "excessDb": 1.71
+    },
+    {
+      "seatId": "s2",
+      "frequency": 172,
+      "finalSpl": 99.89,
+      "envelopeSpl": 98.18,
+      "excessDb": 1.71
+    },
+    {
+      "seatId": "s2",
+      "frequency": 173,
+      "finalSpl": 99.88,
+      "envelopeSpl": 98.17,
+      "excessDb": 1.71
+    },
+    {
+      "seatId": "s2",
+      "frequency": 174,
+      "finalSpl": 99.87,
+      "envelopeSpl": 98.16,
+      "excessDb": 1.71
+    },
+    {
+      "seatId": "s2",
+      "frequency": 175,
+      "finalSpl": 99.86,
+      "envelopeSpl": 98.15,
+      "excessDb": 1.71
+    },
+    {
+      "seatId": "s2",
+      "frequency": 176,
+      "finalSpl": 99.85,
+      "envelopeSpl": 98.15,
+      "excessDb": 1.7
+    },
+    {
+      "seatId": "s2",
+      "frequency": 177,
+      "finalSpl": 99.84,
+      "envelopeSpl": 98.14,
+      "excessDb": 1.7
+    },
+    {
+      "seatId": "s2",
+      "frequency": 178,
+      "finalSpl": 99.83,
+      "envelopeSpl": 98.13,
+      "excessDb": 1.7
+    },
+    {
+      "seatId": "s2",
+      "frequency": 179,
+      "finalSpl": 99.82,
+      "envelopeSpl": 98.12,
+      "excessDb": 1.7
+    },
+    {
+      "seatId": "s2",
+      "frequency": 180,
+      "finalSpl": 99.81,
+      "envelopeSpl": 98.11,
+      "excessDb": 1.7
+    },
+    {
+      "seatId": "s2",
+      "frequency": 181,
+      "finalSpl": 99.8,
+      "envelopeSpl": 98.11,
+      "excessDb": 1.69
+    },
+    {
+      "seatId": "s2",
+      "frequency": 182,
+      "finalSpl": 99.79,
+      "envelopeSpl": 98.1,
+      "excessDb": 1.69
+    },
+    {
+      "seatId": "s2",
+      "frequency": 183,
+      "finalSpl": 99.78,
+      "envelopeSpl": 98.09,
+      "excessDb": 1.69
+    },
+    {
+      "seatId": "s2",
+      "frequency": 184,
+      "finalSpl": 99.77,
+      "envelopeSpl": 98.08,
+      "excessDb": 1.69
+    },
+    {
+      "seatId": "s2",
+      "frequency": 185,
+      "finalSpl": 99.76,
+      "envelopeSpl": 98.07,
+      "excessDb": 1.69
+    },
+    {
+      "seatId": "s2",
+      "frequency": 186,
+      "finalSpl": 99.75,
+      "envelopeSpl": 98.07,
+      "excessDb": 1.69
+    },
+    {
+      "seatId": "s2",
+      "frequency": 187,
+      "finalSpl": 99.74,
+      "envelopeSpl": 98.06,
+      "excessDb": 1.69
+    },
+    {
+      "seatId": "s2",
+      "frequency": 188,
+      "finalSpl": 99.73,
+      "envelopeSpl": 98.05,
+      "excessDb": 1.68
+    },
+    {
+      "seatId": "s2",
+      "frequency": 189,
+      "finalSpl": 99.73,
+      "envelopeSpl": 98.04,
+      "excessDb": 1.68
+    },
+    {
+      "seatId": "s2",
+      "frequency": 190,
+      "finalSpl": 99.72,
+      "envelopeSpl": 98.03,
+      "excessDb": 1.68
+    },
+    {
+      "seatId": "s2",
+      "frequency": 191,
+      "finalSpl": 99.71,
+      "envelopeSpl": 98.03,
+      "excessDb": 1.68
+    },
+    {
+      "seatId": "s2",
+      "frequency": 192,
+      "finalSpl": 99.7,
+      "envelopeSpl": 98.02,
+      "excessDb": 1.68
+    },
+    {
+      "seatId": "s2",
+      "frequency": 193,
+      "finalSpl": 99.69,
+      "envelopeSpl": 98.01,
+      "excessDb": 1.68
+    },
+    {
+      "seatId": "s2",
+      "frequency": 194,
+      "finalSpl": 99.68,
+      "envelopeSpl": 98,
+      "excessDb": 1.68
+    },
+    {
+      "seatId": "s2",
+      "frequency": 195,
+      "finalSpl": 99.67,
+      "envelopeSpl": 97.99,
+      "excessDb": 1.68
+    },
+    {
+      "seatId": "s2",
+      "frequency": 196,
+      "finalSpl": 99.66,
+      "envelopeSpl": 97.99,
+      "excessDb": 1.67
+    },
+    {
+      "seatId": "s2",
+      "frequency": 197,
+      "finalSpl": 99.65,
+      "envelopeSpl": 97.98,
+      "excessDb": 1.67
+    },
+    {
+      "seatId": "s2",
+      "frequency": 198,
+      "finalSpl": 99.64,
+      "envelopeSpl": 97.97,
+      "excessDb": 1.67
+    },
+    {
+      "seatId": "s2",
+      "frequency": 199,
+      "finalSpl": 99.64,
+      "envelopeSpl": 97.96,
+      "excessDb": 1.67
+    },
+    {
+      "seatId": "s2",
+      "frequency": 200,
+      "finalSpl": 99.63,
+      "envelopeSpl": 97.95,
+      "excessDb": 1.67
+    }
+  ],
+  "maxBoostDb": 2.74,
+  "maxCutDb": -5.23,
+  "p14HeadroomDb": 6.1625057229150855
+}
