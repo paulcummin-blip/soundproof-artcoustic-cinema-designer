@@ -406,7 +406,13 @@ function buildCanonicalCandidate({
   operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis,
 }) {
   const requestedPreEqCurve = (levelNormalisedRawCurve || []).map((point) => ({ ...point }));
-  const achievedPreEqCurve = capCurveToEnvelope(requestedPreEqCurve, maximumSplCurveBeforeEq);
+  // CHANGE 2 (Stage B1): The pre-EQ response IS the physical room response at
+  // the selected operating level. Do NOT cap it to (rawCurve - 2 dB) — a
+  // room-response dip is not an output-capability limit. The genuine product
+  // capability envelope is applied to the POST-EQ curve below. This also
+  // ensures violation detection (aggregate boost, protected null) compares
+  // the post-EQ curve against the real "before", not a 2 dB-lowered phantom.
+  const achievedPreEqCurve = requestedPreEqCurve.map((point) => ({ ...point }));
   const maximumAfterEq = buildMaximumSplCurveAfterEq(maximumSplCurveBeforeEq);
   const unconstrainedPostEqCurve = (eq.curve || []).map((point) => ({ ...point }));
   const productOperatingEnvelope = buildProductOperatingEnvelope({
@@ -417,9 +423,14 @@ function buildCanonicalCandidate({
     selectedOperatingOutputDb,
     targetBasis: p14TargetBasis,
   });
-  const roomEnvelopeLimitedPostEqCurve = capCurveToEnvelope(unconstrainedPostEqCurve, maximumAfterEq.curve);
+  // CHANGE 2 (Stage B1): Do NOT cap the post-EQ response to the raw room
+  // response (rawCurve - 2 dB). The post-EQ response is the physical pre-EQ
+  // response + EQ filter-bank transfer, constrained only by the genuine
+  // product operating envelope (product frequency range, max SPL capability,
+  // available headroom at the selected operating level, +6 dB aggregate
+  // boost limit, protected-null restrictions).
   const finalPostEqCurve = capCurveToProductOperatingEnvelope(
-    roomEnvelopeLimitedPostEqCurve,
+    unconstrainedPostEqCurve,
     productOperatingEnvelope.curve,
   );
   // Candidate authority judges the response that can actually be delivered.
@@ -445,14 +456,12 @@ function buildCanonicalCandidate({
       isPrimary: !!seat.isPrimary,
       responseData: buildMaximumSplCurveAfterEq(seat.responseData).curve,
     }));
-  const maximumSeatById = new Map(maximumPerSeatAfterEqCurves.map((seat) => [seat.seatId, seat]));
+  // CHANGE 2 (Stage B1): Per-seat post-EQ curves are likewise constrained
+  // only by the product operating envelope, not the raw-response ceiling.
   const perSeatPostEqCurves = requestedPerSeatPostEqCurves.map((seat) => ({
     ...seat,
     responseData: capCurveToProductOperatingEnvelope(
-      capCurveToEnvelope(
-        seat.responseData,
-        maximumSeatById.get(seat.seatId)?.responseData || [],
-      ),
+      seat.responseData,
       productOperatingEnvelope.curve,
     ),
   }));
@@ -649,13 +658,13 @@ export function generateCanonicalCandidatePool({
     ...seat,
     responseData: applyMaximumSplSafetyMargin(seat.responseData),
   }));
-  const capabilityConstrainedFitTarget = targetCurve.map((point) => {
-    const maximumSpl = interpolateCorrection(maximumSplCurveBeforeEq, point.frequency);
-    return {
-      ...point,
-      spl: Number.isFinite(maximumSpl) ? Math.min(point.spl, maximumSpl) : point.spl,
-    };
-  });
+  // CHANGE 1 (Stage B1): Fit against the real Sound Proof house target.
+  // The fitter solves residual = targetCurve(f) - currentPhysicalResponse(f).
+  // Product capability constrains whether a requested correction can be
+  // applied (via the product operating envelope and source-domain headroom
+  // checks in the candidate build), not what the desired target IS.
+  // Do NOT deform the target to follow the raw room response.
+  const capabilityConstrainedFitTarget = targetCurve.map((point) => ({ ...point }));
   // ── Source output before and after global trim ──
   // baseRequestedSystemOutputDb is the configured LFE output level (the level
   // the headroom calculation subtracts from the manufacturer capability curve).
