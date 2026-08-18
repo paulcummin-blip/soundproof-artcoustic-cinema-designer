@@ -19,7 +19,8 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
   const isFront = String(title || "").toLowerCase().includes("front");
   const screenPlaneLocked = appState?.screenPlaneLocked ?? false;
   const safeCount = Math.max(0, Math.min(4, Number(cfg?.count ?? 0)));
-  const safeModel = cfg?.model || "SUB2-12";
+  // No hidden default model — empty until the designer selects one.
+  const safeModel = cfg?.model || "";
 
   const commit = (next) => {
     if (typeof onChange !== "function") return;

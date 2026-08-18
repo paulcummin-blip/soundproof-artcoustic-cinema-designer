@@ -103,7 +103,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   }}
                 >
                   <SelectTrigger className="h-10 w-full px-3 justify-between bg-white border-[#DCDBD6]">
-                    <SelectValue placeholder="Select model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
+                    <SelectValue placeholder="Select subwoofer model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__mixed__" disabled>Mixed</SelectItem>
@@ -233,7 +233,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   }}
                 >
                   <SelectTrigger className="h-10 w-full px-3 justify-between bg-white border-[#DCDBD6]">
-                    <SelectValue placeholder="Select model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
+                    <SelectValue placeholder="Select subwoofer model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__mixed__" disabled>Mixed</SelectItem>

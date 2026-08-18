@@ -79,8 +79,8 @@ export default function SurroundsSelector({
           disabled={uiDisabled}
         >
           <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-            <span className="text-2xl font-semibold" style={{ color: "#213428" }}>
-              {getModelLabel(masterModel)}
+            <span className="text-2xl font-semibold" style={{ color: masterModel === 'off' ? '#9B9890' : "#213428" }}>
+              {masterModel === 'off' ? 'Select surround model' : getModelLabel(masterModel)}
             </span>
           </SelectTrigger>
           <SelectContent className="bg-white border-[#DCDBD6]">
@@ -189,7 +189,7 @@ export default function SurroundsSelector({
                       disabled={uiDisabled}
                     >
                       <SelectTrigger className="w-full bg-white border-[#DCDBD6] text-[#1B1A1A] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-                        <span>{getModelLabel(sideModel)}</span>
+                        <span style={{ color: sideModel === 'off' ? '#9B9890' : '#1B1A1A' }}>{sideModel === 'off' ? 'Select surround model' : getModelLabel(sideModel)}</span>
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
                      {(filteredOverrideChoices || []).map((choice) => (
@@ -236,7 +236,7 @@ export default function SurroundsSelector({
                       disabled={uiDisabled}
                     >
                       <SelectTrigger className="w-full bg-white border-[#DCDBD6] text-[#1B1A1A] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-                        <span>{getModelLabel(rearModel)}</span>
+                        <span style={{ color: rearModel === 'off' ? '#9B9890' : '#1B1A1A' }}>{rearModel === 'off' ? 'Select surround model' : getModelLabel(rearModel)}</span>
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
                      {(filteredOverrideChoices || []).map((choice) => (
@@ -283,7 +283,7 @@ export default function SurroundsSelector({
                       disabled={uiDisabled}
                     >
                       <SelectTrigger className="w-full bg-white border-[#DCDBD6] text-[#1B1A1A] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-                        <span>{getModelLabel(wideModel)}</span>
+                        <span style={{ color: wideModel === 'off' ? '#9B9890' : '#1B1A1A' }}>{wideModel === 'off' ? 'Select surround model' : getModelLabel(wideModel)}</span>
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
                      {(filteredOverrideChoices || []).map((choice) => (
