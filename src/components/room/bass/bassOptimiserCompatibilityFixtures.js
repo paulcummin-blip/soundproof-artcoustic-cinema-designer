@@ -87,7 +87,8 @@ export function runBassOptimiserCompatibilityFixtures() {
   accepted.controller.updateInputs(input());
   accepted.clock.tick(1);
   accepted.workers[0].complete(currentPool());
-  check("1. Current main thread and worker result accepted", accepted.controller.getSnapshot().status === "ready");
+  const acceptedSnapshot = accepted.controller.getSnapshot();
+  check("1. Current main thread and worker result accepted", acceptedSnapshot.status === "ready", acceptedSnapshot);
 
   const priorPool = currentPool();
   priorPool.poolVersion = previous(BASS_OPTIMISER_POOL_VERSION);
@@ -112,7 +113,7 @@ export function runBassOptimiserCompatibilityFixtures() {
   replacement.workers[0].complete(currentPool());
   const finalState = replacement.controller.getSnapshot();
   check("5. Rejected cache removed and recalculated", removed);
-  check("6. Replacement current result reaches COMPLETE", finalState.status === "ready" && finalState.terminalOutcome === "complete");
+  check("6. Replacement current result reaches COMPLETE", finalState.status === "ready" && finalState.terminalOutcome === "complete", finalState);
   check("7. Only one recalculation started", replacement.workers.length === 1);
 
   const emittedPool = generateCandidatePool({ rawCurve: [], activeSubs: [], targetAnchorDb: null });
