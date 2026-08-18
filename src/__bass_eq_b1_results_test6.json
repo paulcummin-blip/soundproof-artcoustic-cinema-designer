@@ -1,0 +1,1457 @@
+{
+  "roomA": {
+    "filters": [
+      {
+        "freq": 48,
+        "gain": -4.17,
+        "q": 6.49
+      },
+      {
+        "freq": 82,
+        "gain": 2.84,
+        "q": 3.8
+      },
+      {
+        "freq": 27,
+        "gain": 1.61,
+        "q": 2.6
+      },
+      {
+        "freq": 40,
+        "gain": -2.55,
+        "q": 8.65
+      },
+      {
+        "freq": 20,
+        "gain": 0.45,
+        "q": 5.62
+      },
+      {
+        "freq": 44,
+        "gain": -1.72,
+        "q": 10
+      },
+      {
+        "freq": 87,
+        "gain": 0.36,
+        "q": 10
+      },
+      {
+        "freq": 31,
+        "gain": 0.26,
+        "q": 10
+      }
+    ],
+    "peak45before": 107.06182322398081,
+    "peak45after": 103.00452050530467,
+    "dip85before": 97.23321516946366,
+    "dip85after": 100.10869906526443
+  },
+  "roomB": {
+    "filters": [
+      {
+        "freq": 54,
+        "gain": 2.61,
+        "q": 9
+      },
+      {
+        "freq": 99,
+        "gain": -6.77,
+        "q": 8.61
+      },
+      {
+        "freq": 54,
+        "gain": 2.43,
+        "q": 3.6
+      },
+      {
+        "freq": 30,
+        "gain": 1.42,
+        "q": 2.14
+      }
+    ],
+    "dip55before": 95.94632524433916,
+    "dip55after": 100.78442693742655,
+    "peak100before": 105.03759465225983,
+    "peak100after": 98.64174753716227
+  },
+  "filterBanksDiffer": true,
+  "roomAEnvelopeExceedances": [
+    {
+      "frequency": 87,
+      "finalSpl": 99.96,
+      "envelopeSpl": 99.82,
+      "excessDb": 0.14
+    },
+    {
+      "frequency": 88,
+      "finalSpl": 99.88,
+      "envelopeSpl": 99.67,
+      "excessDb": 0.21
+    },
+    {
+      "frequency": 89,
+      "finalSpl": 99.82,
+      "envelopeSpl": 99.57,
+      "excessDb": 0.24
+    },
+    {
+      "frequency": 90,
+      "finalSpl": 99.78,
+      "envelopeSpl": 99.48,
+      "excessDb": 0.3
+    },
+    {
+      "frequency": 91,
+      "finalSpl": 99.78,
+      "envelopeSpl": 99.38,
+      "excessDb": 0.39
+    },
+    {
+      "frequency": 92,
+      "finalSpl": 99.81,
+      "envelopeSpl": 99.29,
+      "excessDb": 0.52
+    },
+    {
+      "frequency": 93,
+      "finalSpl": 99.86,
+      "envelopeSpl": 99.19,
+      "excessDb": 0.67
+    },
+    {
+      "frequency": 94,
+      "finalSpl": 99.94,
+      "envelopeSpl": 99.09,
+      "excessDb": 0.85
+    },
+    {
+      "frequency": 95,
+      "finalSpl": 100.02,
+      "envelopeSpl": 99,
+      "excessDb": 1.03
+    },
+    {
+      "frequency": 96,
+      "finalSpl": 100.11,
+      "envelopeSpl": 98.9,
+      "excessDb": 1.21
+    },
+    {
+      "frequency": 97,
+      "finalSpl": 100.19,
+      "envelopeSpl": 98.8,
+      "excessDb": 1.39
+    },
+    {
+      "frequency": 98,
+      "finalSpl": 100.27,
+      "envelopeSpl": 98.7,
+      "excessDb": 1.56
+    },
+    {
+      "frequency": 99,
+      "finalSpl": 100.33,
+      "envelopeSpl": 98.6,
+      "excessDb": 1.72
+    },
+    {
+      "frequency": 100,
+      "finalSpl": 100.38,
+      "envelopeSpl": 98.51,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 101,
+      "finalSpl": 100.42,
+      "envelopeSpl": 98.48,
+      "excessDb": 1.93
+    },
+    {
+      "frequency": 102,
+      "finalSpl": 100.44,
+      "envelopeSpl": 98.46,
+      "excessDb": 1.98
+    },
+    {
+      "frequency": 103,
+      "finalSpl": 100.45,
+      "envelopeSpl": 98.43,
+      "excessDb": 2.02
+    },
+    {
+      "frequency": 104,
+      "finalSpl": 100.45,
+      "envelopeSpl": 98.41,
+      "excessDb": 2.05
+    },
+    {
+      "frequency": 105,
+      "finalSpl": 100.45,
+      "envelopeSpl": 98.38,
+      "excessDb": 2.07
+    },
+    {
+      "frequency": 106,
+      "finalSpl": 100.43,
+      "envelopeSpl": 98.36,
+      "excessDb": 2.08
+    },
+    {
+      "frequency": 107,
+      "finalSpl": 100.41,
+      "envelopeSpl": 98.33,
+      "excessDb": 2.08
+    },
+    {
+      "frequency": 108,
+      "finalSpl": 100.39,
+      "envelopeSpl": 98.31,
+      "excessDb": 2.08
+    },
+    {
+      "frequency": 109,
+      "finalSpl": 100.36,
+      "envelopeSpl": 98.28,
+      "excessDb": 2.08
+    },
+    {
+      "frequency": 110,
+      "finalSpl": 100.34,
+      "envelopeSpl": 98.26,
+      "excessDb": 2.08
+    },
+    {
+      "frequency": 111,
+      "finalSpl": 100.31,
+      "envelopeSpl": 98.23,
+      "excessDb": 2.08
+    },
+    {
+      "frequency": 112,
+      "finalSpl": 100.28,
+      "envelopeSpl": 98.21,
+      "excessDb": 2.07
+    },
+    {
+      "frequency": 113,
+      "finalSpl": 100.25,
+      "envelopeSpl": 98.18,
+      "excessDb": 2.07
+    },
+    {
+      "frequency": 114,
+      "finalSpl": 100.22,
+      "envelopeSpl": 98.16,
+      "excessDb": 2.07
+    },
+    {
+      "frequency": 115,
+      "finalSpl": 100.19,
+      "envelopeSpl": 98.13,
+      "excessDb": 2.06
+    },
+    {
+      "frequency": 116,
+      "finalSpl": 100.17,
+      "envelopeSpl": 98.11,
+      "excessDb": 2.06
+    },
+    {
+      "frequency": 117,
+      "finalSpl": 100.14,
+      "envelopeSpl": 98.08,
+      "excessDb": 2.06
+    },
+    {
+      "frequency": 118,
+      "finalSpl": 100.12,
+      "envelopeSpl": 98.06,
+      "excessDb": 2.06
+    },
+    {
+      "frequency": 119,
+      "finalSpl": 100.09,
+      "envelopeSpl": 98.03,
+      "excessDb": 2.06
+    },
+    {
+      "frequency": 120,
+      "finalSpl": 100.07,
+      "envelopeSpl": 98.01,
+      "excessDb": 2.06
+    },
+    {
+      "frequency": 121,
+      "finalSpl": 100.05,
+      "envelopeSpl": 98,
+      "excessDb": 2.05
+    },
+    {
+      "frequency": 122,
+      "finalSpl": 100.03,
+      "envelopeSpl": 97.99,
+      "excessDb": 2.04
+    },
+    {
+      "frequency": 123,
+      "finalSpl": 100,
+      "envelopeSpl": 97.98,
+      "excessDb": 2.03
+    },
+    {
+      "frequency": 124,
+      "finalSpl": 99.98,
+      "envelopeSpl": 97.97,
+      "excessDb": 2.02
+    },
+    {
+      "frequency": 125,
+      "finalSpl": 99.96,
+      "envelopeSpl": 97.96,
+      "excessDb": 2.01
+    },
+    {
+      "frequency": 126,
+      "finalSpl": 99.95,
+      "envelopeSpl": 97.95,
+      "excessDb": 2
+    },
+    {
+      "frequency": 127,
+      "finalSpl": 99.93,
+      "envelopeSpl": 97.94,
+      "excessDb": 1.99
+    },
+    {
+      "frequency": 128,
+      "finalSpl": 99.91,
+      "envelopeSpl": 97.93,
+      "excessDb": 1.98
+    },
+    {
+      "frequency": 129,
+      "finalSpl": 99.89,
+      "envelopeSpl": 97.92,
+      "excessDb": 1.98
+    },
+    {
+      "frequency": 130,
+      "finalSpl": 99.88,
+      "envelopeSpl": 97.91,
+      "excessDb": 1.97
+    },
+    {
+      "frequency": 131,
+      "finalSpl": 99.86,
+      "envelopeSpl": 97.9,
+      "excessDb": 1.96
+    },
+    {
+      "frequency": 132,
+      "finalSpl": 99.84,
+      "envelopeSpl": 97.89,
+      "excessDb": 1.96
+    },
+    {
+      "frequency": 133,
+      "finalSpl": 99.83,
+      "envelopeSpl": 97.88,
+      "excessDb": 1.95
+    },
+    {
+      "frequency": 134,
+      "finalSpl": 99.81,
+      "envelopeSpl": 97.87,
+      "excessDb": 1.95
+    },
+    {
+      "frequency": 135,
+      "finalSpl": 99.8,
+      "envelopeSpl": 97.86,
+      "excessDb": 1.94
+    },
+    {
+      "frequency": 136,
+      "finalSpl": 99.78,
+      "envelopeSpl": 97.85,
+      "excessDb": 1.94
+    },
+    {
+      "frequency": 137,
+      "finalSpl": 99.77,
+      "envelopeSpl": 97.84,
+      "excessDb": 1.93
+    },
+    {
+      "frequency": 138,
+      "finalSpl": 99.75,
+      "envelopeSpl": 97.83,
+      "excessDb": 1.93
+    },
+    {
+      "frequency": 139,
+      "finalSpl": 99.74,
+      "envelopeSpl": 97.82,
+      "excessDb": 1.92
+    },
+    {
+      "frequency": 140,
+      "finalSpl": 99.73,
+      "envelopeSpl": 97.81,
+      "excessDb": 1.92
+    },
+    {
+      "frequency": 141,
+      "finalSpl": 99.71,
+      "envelopeSpl": 97.8,
+      "excessDb": 1.92
+    },
+    {
+      "frequency": 142,
+      "finalSpl": 99.7,
+      "envelopeSpl": 97.79,
+      "excessDb": 1.91
+    },
+    {
+      "frequency": 143,
+      "finalSpl": 99.69,
+      "envelopeSpl": 97.78,
+      "excessDb": 1.91
+    },
+    {
+      "frequency": 144,
+      "finalSpl": 99.68,
+      "envelopeSpl": 97.77,
+      "excessDb": 1.91
+    },
+    {
+      "frequency": 145,
+      "finalSpl": 99.66,
+      "envelopeSpl": 97.76,
+      "excessDb": 1.91
+    },
+    {
+      "frequency": 146,
+      "finalSpl": 99.65,
+      "envelopeSpl": 97.75,
+      "excessDb": 1.9
+    },
+    {
+      "frequency": 147,
+      "finalSpl": 99.64,
+      "envelopeSpl": 97.74,
+      "excessDb": 1.9
+    },
+    {
+      "frequency": 148,
+      "finalSpl": 99.63,
+      "envelopeSpl": 97.73,
+      "excessDb": 1.9
+    },
+    {
+      "frequency": 149,
+      "finalSpl": 99.62,
+      "envelopeSpl": 97.72,
+      "excessDb": 1.9
+    },
+    {
+      "frequency": 150,
+      "finalSpl": 99.6,
+      "envelopeSpl": 97.71,
+      "excessDb": 1.9
+    },
+    {
+      "frequency": 151,
+      "finalSpl": 99.59,
+      "envelopeSpl": 97.7,
+      "excessDb": 1.89
+    },
+    {
+      "frequency": 152,
+      "finalSpl": 99.58,
+      "envelopeSpl": 97.69,
+      "excessDb": 1.89
+    },
+    {
+      "frequency": 153,
+      "finalSpl": 99.57,
+      "envelopeSpl": 97.68,
+      "excessDb": 1.89
+    },
+    {
+      "frequency": 154,
+      "finalSpl": 99.56,
+      "envelopeSpl": 97.67,
+      "excessDb": 1.89
+    },
+    {
+      "frequency": 155,
+      "finalSpl": 99.55,
+      "envelopeSpl": 97.67,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 156,
+      "finalSpl": 99.54,
+      "envelopeSpl": 97.66,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 157,
+      "finalSpl": 99.53,
+      "envelopeSpl": 97.65,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 158,
+      "finalSpl": 99.52,
+      "envelopeSpl": 97.64,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 159,
+      "finalSpl": 99.51,
+      "envelopeSpl": 97.63,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 160,
+      "finalSpl": 99.5,
+      "envelopeSpl": 97.63,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 161,
+      "finalSpl": 99.49,
+      "envelopeSpl": 97.62,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 162,
+      "finalSpl": 99.48,
+      "envelopeSpl": 97.61,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 163,
+      "finalSpl": 99.47,
+      "envelopeSpl": 97.6,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 164,
+      "finalSpl": 99.46,
+      "envelopeSpl": 97.59,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 165,
+      "finalSpl": 99.45,
+      "envelopeSpl": 97.59,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 166,
+      "finalSpl": 99.44,
+      "envelopeSpl": 97.58,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 167,
+      "finalSpl": 99.43,
+      "envelopeSpl": 97.57,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 168,
+      "finalSpl": 99.42,
+      "envelopeSpl": 97.56,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 169,
+      "finalSpl": 99.41,
+      "envelopeSpl": 97.55,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 170,
+      "finalSpl": 99.4,
+      "envelopeSpl": 97.55,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 171,
+      "finalSpl": 99.39,
+      "envelopeSpl": 97.54,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 172,
+      "finalSpl": 99.38,
+      "envelopeSpl": 97.53,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 173,
+      "finalSpl": 99.38,
+      "envelopeSpl": 97.52,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 174,
+      "finalSpl": 99.37,
+      "envelopeSpl": 97.51,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 175,
+      "finalSpl": 99.36,
+      "envelopeSpl": 97.51,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 176,
+      "finalSpl": 99.35,
+      "envelopeSpl": 97.5,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 177,
+      "finalSpl": 99.34,
+      "envelopeSpl": 97.49,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 178,
+      "finalSpl": 99.33,
+      "envelopeSpl": 97.48,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 179,
+      "finalSpl": 99.32,
+      "envelopeSpl": 97.47,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 180,
+      "finalSpl": 99.32,
+      "envelopeSpl": 97.47,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 181,
+      "finalSpl": 99.31,
+      "envelopeSpl": 97.46,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 182,
+      "finalSpl": 99.3,
+      "envelopeSpl": 97.45,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 183,
+      "finalSpl": 99.29,
+      "envelopeSpl": 97.44,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 184,
+      "finalSpl": 99.28,
+      "envelopeSpl": 97.43,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 185,
+      "finalSpl": 99.28,
+      "envelopeSpl": 97.43,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 186,
+      "finalSpl": 99.27,
+      "envelopeSpl": 97.42,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 187,
+      "finalSpl": 99.26,
+      "envelopeSpl": 97.41,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 188,
+      "finalSpl": 99.25,
+      "envelopeSpl": 97.4,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 189,
+      "finalSpl": 99.24,
+      "envelopeSpl": 97.39,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 190,
+      "finalSpl": 99.24,
+      "envelopeSpl": 97.39,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 191,
+      "finalSpl": 99.23,
+      "envelopeSpl": 97.38,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 192,
+      "finalSpl": 99.22,
+      "envelopeSpl": 97.37,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 193,
+      "finalSpl": 99.21,
+      "envelopeSpl": 97.36,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 194,
+      "finalSpl": 99.21,
+      "envelopeSpl": 97.35,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 195,
+      "finalSpl": 99.2,
+      "envelopeSpl": 97.35,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 196,
+      "finalSpl": 99.19,
+      "envelopeSpl": 97.34,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 197,
+      "finalSpl": 99.18,
+      "envelopeSpl": 97.33,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 198,
+      "finalSpl": 99.18,
+      "envelopeSpl": 97.32,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 199,
+      "finalSpl": 99.17,
+      "envelopeSpl": 97.31,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 200,
+      "finalSpl": 99.16,
+      "envelopeSpl": 97.31,
+      "excessDb": 1.86
+    }
+  ],
+  "roomBEnvelopeExceedances": [
+    {
+      "frequency": 84,
+      "finalSpl": 100.17,
+      "envelopeSpl": 100.12,
+      "excessDb": 0.05
+    },
+    {
+      "frequency": 85,
+      "finalSpl": 100.16,
+      "envelopeSpl": 99.95,
+      "excessDb": 0.22
+    },
+    {
+      "frequency": 86,
+      "finalSpl": 100.18,
+      "envelopeSpl": 99.77,
+      "excessDb": 0.41
+    },
+    {
+      "frequency": 87,
+      "finalSpl": 100.2,
+      "envelopeSpl": 99.59,
+      "excessDb": 0.61
+    },
+    {
+      "frequency": 88,
+      "finalSpl": 100.25,
+      "envelopeSpl": 99.44,
+      "excessDb": 0.81
+    },
+    {
+      "frequency": 89,
+      "finalSpl": 100.29,
+      "envelopeSpl": 99.34,
+      "excessDb": 0.95
+    },
+    {
+      "frequency": 90,
+      "finalSpl": 100.34,
+      "envelopeSpl": 99.25,
+      "excessDb": 1.09
+    },
+    {
+      "frequency": 91,
+      "finalSpl": 100.36,
+      "envelopeSpl": 99.15,
+      "excessDb": 1.2
+    },
+    {
+      "frequency": 92,
+      "finalSpl": 100.33,
+      "envelopeSpl": 99.06,
+      "excessDb": 1.28
+    },
+    {
+      "frequency": 93,
+      "finalSpl": 100.24,
+      "envelopeSpl": 98.96,
+      "excessDb": 1.27
+    },
+    {
+      "frequency": 94,
+      "finalSpl": 100.04,
+      "envelopeSpl": 98.87,
+      "excessDb": 1.17
+    },
+    {
+      "frequency": 95,
+      "finalSpl": 99.73,
+      "envelopeSpl": 98.77,
+      "excessDb": 0.96
+    },
+    {
+      "frequency": 96,
+      "finalSpl": 99.31,
+      "envelopeSpl": 98.67,
+      "excessDb": 0.63
+    },
+    {
+      "frequency": 97,
+      "finalSpl": 98.85,
+      "envelopeSpl": 98.57,
+      "excessDb": 0.27
+    },
+    {
+      "frequency": 100,
+      "finalSpl": 98.64,
+      "envelopeSpl": 98.28,
+      "excessDb": 0.36
+    },
+    {
+      "frequency": 101,
+      "finalSpl": 99.12,
+      "envelopeSpl": 98.25,
+      "excessDb": 0.87
+    },
+    {
+      "frequency": 102,
+      "finalSpl": 99.67,
+      "envelopeSpl": 98.23,
+      "excessDb": 1.44
+    },
+    {
+      "frequency": 103,
+      "finalSpl": 100.13,
+      "envelopeSpl": 98.2,
+      "excessDb": 1.93
+    },
+    {
+      "frequency": 104,
+      "finalSpl": 100.45,
+      "envelopeSpl": 98.18,
+      "excessDb": 2.28
+    },
+    {
+      "frequency": 105,
+      "finalSpl": 100.63,
+      "envelopeSpl": 98.15,
+      "excessDb": 2.48
+    },
+    {
+      "frequency": 106,
+      "finalSpl": 100.68,
+      "envelopeSpl": 98.13,
+      "excessDb": 2.55
+    },
+    {
+      "frequency": 107,
+      "finalSpl": 100.63,
+      "envelopeSpl": 98.1,
+      "excessDb": 2.53
+    },
+    {
+      "frequency": 108,
+      "finalSpl": 100.51,
+      "envelopeSpl": 98.08,
+      "excessDb": 2.43
+    },
+    {
+      "frequency": 109,
+      "finalSpl": 100.35,
+      "envelopeSpl": 98.05,
+      "excessDb": 2.3
+    },
+    {
+      "frequency": 110,
+      "finalSpl": 100.18,
+      "envelopeSpl": 98.03,
+      "excessDb": 2.15
+    },
+    {
+      "frequency": 111,
+      "finalSpl": 100,
+      "envelopeSpl": 98,
+      "excessDb": 2
+    },
+    {
+      "frequency": 112,
+      "finalSpl": 99.84,
+      "envelopeSpl": 97.98,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 113,
+      "finalSpl": 99.7,
+      "envelopeSpl": 97.95,
+      "excessDb": 1.75
+    },
+    {
+      "frequency": 114,
+      "finalSpl": 99.59,
+      "envelopeSpl": 97.93,
+      "excessDb": 1.66
+    },
+    {
+      "frequency": 115,
+      "finalSpl": 99.5,
+      "envelopeSpl": 97.9,
+      "excessDb": 1.59
+    },
+    {
+      "frequency": 116,
+      "finalSpl": 99.43,
+      "envelopeSpl": 97.88,
+      "excessDb": 1.55
+    },
+    {
+      "frequency": 117,
+      "finalSpl": 99.38,
+      "envelopeSpl": 97.85,
+      "excessDb": 1.53
+    },
+    {
+      "frequency": 118,
+      "finalSpl": 99.35,
+      "envelopeSpl": 97.83,
+      "excessDb": 1.53
+    },
+    {
+      "frequency": 119,
+      "finalSpl": 99.34,
+      "envelopeSpl": 97.8,
+      "excessDb": 1.54
+    },
+    {
+      "frequency": 120,
+      "finalSpl": 99.33,
+      "envelopeSpl": 97.78,
+      "excessDb": 1.56
+    },
+    {
+      "frequency": 121,
+      "finalSpl": 99.33,
+      "envelopeSpl": 97.77,
+      "excessDb": 1.57
+    },
+    {
+      "frequency": 122,
+      "finalSpl": 99.34,
+      "envelopeSpl": 97.76,
+      "excessDb": 1.58
+    },
+    {
+      "frequency": 123,
+      "finalSpl": 99.35,
+      "envelopeSpl": 97.75,
+      "excessDb": 1.6
+    },
+    {
+      "frequency": 124,
+      "finalSpl": 99.36,
+      "envelopeSpl": 97.74,
+      "excessDb": 1.62
+    },
+    {
+      "frequency": 125,
+      "finalSpl": 99.37,
+      "envelopeSpl": 97.73,
+      "excessDb": 1.64
+    },
+    {
+      "frequency": 126,
+      "finalSpl": 99.38,
+      "envelopeSpl": 97.72,
+      "excessDb": 1.66
+    },
+    {
+      "frequency": 127,
+      "finalSpl": 99.38,
+      "envelopeSpl": 97.71,
+      "excessDb": 1.68
+    },
+    {
+      "frequency": 128,
+      "finalSpl": 99.39,
+      "envelopeSpl": 97.7,
+      "excessDb": 1.69
+    },
+    {
+      "frequency": 129,
+      "finalSpl": 99.4,
+      "envelopeSpl": 97.69,
+      "excessDb": 1.71
+    },
+    {
+      "frequency": 130,
+      "finalSpl": 99.4,
+      "envelopeSpl": 97.68,
+      "excessDb": 1.72
+    },
+    {
+      "frequency": 131,
+      "finalSpl": 99.4,
+      "envelopeSpl": 97.67,
+      "excessDb": 1.73
+    },
+    {
+      "frequency": 132,
+      "finalSpl": 99.4,
+      "envelopeSpl": 97.66,
+      "excessDb": 1.75
+    },
+    {
+      "frequency": 133,
+      "finalSpl": 99.41,
+      "envelopeSpl": 97.65,
+      "excessDb": 1.76
+    },
+    {
+      "frequency": 134,
+      "finalSpl": 99.41,
+      "envelopeSpl": 97.64,
+      "excessDb": 1.77
+    },
+    {
+      "frequency": 135,
+      "finalSpl": 99.4,
+      "envelopeSpl": 97.63,
+      "excessDb": 1.78
+    },
+    {
+      "frequency": 136,
+      "finalSpl": 99.4,
+      "envelopeSpl": 97.62,
+      "excessDb": 1.79
+    },
+    {
+      "frequency": 137,
+      "finalSpl": 99.4,
+      "envelopeSpl": 97.61,
+      "excessDb": 1.79
+    },
+    {
+      "frequency": 138,
+      "finalSpl": 99.4,
+      "envelopeSpl": 97.6,
+      "excessDb": 1.8
+    },
+    {
+      "frequency": 139,
+      "finalSpl": 99.4,
+      "envelopeSpl": 97.59,
+      "excessDb": 1.81
+    },
+    {
+      "frequency": 140,
+      "finalSpl": 99.39,
+      "envelopeSpl": 97.58,
+      "excessDb": 1.81
+    },
+    {
+      "frequency": 141,
+      "finalSpl": 99.39,
+      "envelopeSpl": 97.57,
+      "excessDb": 1.82
+    },
+    {
+      "frequency": 142,
+      "finalSpl": 99.38,
+      "envelopeSpl": 97.56,
+      "excessDb": 1.83
+    },
+    {
+      "frequency": 143,
+      "finalSpl": 99.38,
+      "envelopeSpl": 97.55,
+      "excessDb": 1.83
+    },
+    {
+      "frequency": 144,
+      "finalSpl": 99.37,
+      "envelopeSpl": 97.54,
+      "excessDb": 1.84
+    },
+    {
+      "frequency": 145,
+      "finalSpl": 99.37,
+      "envelopeSpl": 97.53,
+      "excessDb": 1.84
+    },
+    {
+      "frequency": 146,
+      "finalSpl": 99.36,
+      "envelopeSpl": 97.52,
+      "excessDb": 1.84
+    },
+    {
+      "frequency": 147,
+      "finalSpl": 99.36,
+      "envelopeSpl": 97.51,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 148,
+      "finalSpl": 99.35,
+      "envelopeSpl": 97.5,
+      "excessDb": 1.85
+    },
+    {
+      "frequency": 149,
+      "finalSpl": 99.34,
+      "envelopeSpl": 97.49,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 150,
+      "finalSpl": 99.34,
+      "envelopeSpl": 97.48,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 151,
+      "finalSpl": 99.33,
+      "envelopeSpl": 97.47,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 152,
+      "finalSpl": 99.32,
+      "envelopeSpl": 97.46,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 153,
+      "finalSpl": 99.32,
+      "envelopeSpl": 97.45,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 154,
+      "finalSpl": 99.31,
+      "envelopeSpl": 97.45,
+      "excessDb": 1.86
+    },
+    {
+      "frequency": 155,
+      "finalSpl": 99.3,
+      "envelopeSpl": 97.44,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 156,
+      "finalSpl": 99.3,
+      "envelopeSpl": 97.43,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 157,
+      "finalSpl": 99.29,
+      "envelopeSpl": 97.42,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 158,
+      "finalSpl": 99.28,
+      "envelopeSpl": 97.41,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 159,
+      "finalSpl": 99.27,
+      "envelopeSpl": 97.41,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 160,
+      "finalSpl": 99.27,
+      "envelopeSpl": 97.4,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 161,
+      "finalSpl": 99.26,
+      "envelopeSpl": 97.39,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 162,
+      "finalSpl": 99.25,
+      "envelopeSpl": 97.38,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 163,
+      "finalSpl": 99.24,
+      "envelopeSpl": 97.37,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 164,
+      "finalSpl": 99.24,
+      "envelopeSpl": 97.37,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 165,
+      "finalSpl": 99.23,
+      "envelopeSpl": 97.36,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 166,
+      "finalSpl": 99.22,
+      "envelopeSpl": 97.35,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 167,
+      "finalSpl": 99.21,
+      "envelopeSpl": 97.34,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 168,
+      "finalSpl": 99.21,
+      "envelopeSpl": 97.33,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 169,
+      "finalSpl": 99.2,
+      "envelopeSpl": 97.33,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 170,
+      "finalSpl": 99.19,
+      "envelopeSpl": 97.32,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 171,
+      "finalSpl": 99.18,
+      "envelopeSpl": 97.31,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 172,
+      "finalSpl": 99.18,
+      "envelopeSpl": 97.3,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 173,
+      "finalSpl": 99.17,
+      "envelopeSpl": 97.29,
+      "excessDb": 1.87
+    },
+    {
+      "frequency": 174,
+      "finalSpl": 99.16,
+      "envelopeSpl": 97.29,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 175,
+      "finalSpl": 99.15,
+      "envelopeSpl": 97.28,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 176,
+      "finalSpl": 99.15,
+      "envelopeSpl": 97.27,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 177,
+      "finalSpl": 99.14,
+      "envelopeSpl": 97.26,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 178,
+      "finalSpl": 99.13,
+      "envelopeSpl": 97.25,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 179,
+      "finalSpl": 99.12,
+      "envelopeSpl": 97.25,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 180,
+      "finalSpl": 99.12,
+      "envelopeSpl": 97.24,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 181,
+      "finalSpl": 99.11,
+      "envelopeSpl": 97.23,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 182,
+      "finalSpl": 99.1,
+      "envelopeSpl": 97.22,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 183,
+      "finalSpl": 99.09,
+      "envelopeSpl": 97.21,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 184,
+      "finalSpl": 99.08,
+      "envelopeSpl": 97.21,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 185,
+      "finalSpl": 99.08,
+      "envelopeSpl": 97.2,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 186,
+      "finalSpl": 99.07,
+      "envelopeSpl": 97.19,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 187,
+      "finalSpl": 99.06,
+      "envelopeSpl": 97.18,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 188,
+      "finalSpl": 99.05,
+      "envelopeSpl": 97.17,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 189,
+      "finalSpl": 99.05,
+      "envelopeSpl": 97.17,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 190,
+      "finalSpl": 99.04,
+      "envelopeSpl": 97.16,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 191,
+      "finalSpl": 99.03,
+      "envelopeSpl": 97.15,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 192,
+      "finalSpl": 99.03,
+      "envelopeSpl": 97.14,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 193,
+      "finalSpl": 99.02,
+      "envelopeSpl": 97.13,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 194,
+      "finalSpl": 99.01,
+      "envelopeSpl": 97.13,
+      "excessDb": 1.88
+    },
+    {
+      "frequency": 195,
+      "finalSpl": 99,
+      "envelopeSpl": 97.12,
+      "excessDb": 1.89
+    },
+    {
+      "frequency": 196,
+      "finalSpl": 99,
+      "envelopeSpl": 97.11,
+      "excessDb": 1.89
+    },
+    {
+      "frequency": 197,
+      "finalSpl": 98.99,
+      "envelopeSpl": 97.1,
+      "excessDb": 1.89
+    },
+    {
+      "frequency": 198,
+      "finalSpl": 98.98,
+      "envelopeSpl": 97.09,
+      "excessDb": 1.89
+    },
+    {
+      "frequency": 199,
+      "finalSpl": 98.97,
+      "envelopeSpl": 97.09,
+      "excessDb": 1.89
+    },
+    {
+      "frequency": 200,
+      "finalSpl": 98.97,
+      "envelopeSpl": 97.08,
+      "excessDb": 1.89
+    }
+  ]
+}
