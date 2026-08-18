@@ -1293,15 +1293,29 @@ const byId = useEntitiesById({
     const halfD = bodyD / 2;
     const clampedY = Math.max(halfD, Math.min(lengthM - halfD, rawY));
 
-    // Live drag guides from lens centre to all four walls
+    // Live drag guides. Throw distance is measured from the projector FRONT
+    // FACE (side closest to the screen) to the SCREEN PLANE. Rear wall
+    // distance is measured from the REAR FACE to the REAR WALL. Side wall
+    // distances remain from the projector centre to the side walls.
     const lensX = Number(projEl?.x_lens_m) || (widthM / 2);
+    const screenY = Number.isFinite(Number(screenFrontPlaneM)) ? Number(screenFrontPlaneM) : 0;
+    const screenAtFront = screenY <= lengthM / 2;
+    const frontFaceY = screenAtFront ? (clampedY - halfD) : (clampedY + halfD);
+    const rearFaceY = screenAtFront ? (clampedY + halfD) : (clampedY - halfD);
+    const rearWallY = screenAtFront ? lengthM : 0;
+    const throwDist = Math.max(0, Math.abs(frontFaceY - screenY));
+    const rearWallDist = Math.max(0, Math.abs(rearFaceY - rearWallY));
     setProjectorDragInfo({
       visible: true,
       x: lensX, y: clampedY, widthM, lengthM,
       distLeft: lensX,
       distRight: Math.max(0, widthM - lensX),
-      distFront: clampedY,
-      distRear: Math.max(0, lengthM - clampedY),
+      screenY,
+      frontFaceY,
+      rearFaceY,
+      rearWallY,
+      throwDist,
+      rearWallDist,
     });
 
     onSetRoomElements(prev =>
@@ -1309,7 +1323,7 @@ const byId = useEntitiesById({
         el?.type === 'projector' ? { ...el, y_lens_m: clampedY } : el
       )
     );
-  }, [onSetRoomElements, canvasToRoom, roomElements, lengthM, widthM]);
+  }, [onSetRoomElements, canvasToRoom, roomElements, lengthM, widthM, screenFrontPlaneM]);
 
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
