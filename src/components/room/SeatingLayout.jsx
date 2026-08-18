@@ -334,7 +334,7 @@ export default function SeatingLayout({
     <div>
       <div style={groupTitleStyle}>Seating Summary</div>
       <div className="p-3 border border-[#E5E5E5] rounded-lg bg-[#FAF9F6]">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <div>
             <div className="text-[#9CA3AF] text-[11px]">Rows</div>
             <div className="text-[#1B1A1A] text-sm font-semibold">{rowCount}</div>
@@ -352,9 +352,17 @@ export default function SeatingLayout({
             <div className="text-[#1B1A1A] text-sm font-semibold">{seatPriorityCounts.secondary}</div>
           </div>
           <div>
-            <div className="text-[#9CA3AF] text-[11px]">RSP Position</div>
+            <div className="text-[#9CA3AF] text-[11px]">RSP from Screen</div>
             <div className="text-[#1B1A1A] text-sm font-semibold">
-              {rspSeat ? `${rspSeat.x.toFixed(2)}m, ${rspSeat.y.toFixed(2)}m` : '—'}
+              {Number.isFinite(effectiveRspY) && Number.isFinite(screenFrontPlaneM)
+                ? `${(effectiveRspY - screenFrontPlaneM).toFixed(2)} m`
+                : '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-[#9CA3AF] text-[11px]">RSP from Front Wall</div>
+            <div className="text-[#1B1A1A] text-sm font-semibold">
+              {Number.isFinite(effectiveRspY) ? `${effectiveRspY.toFixed(2)} m` : '—'}
             </div>
           </div>
         </div>
