@@ -27,7 +27,7 @@ import { useActiveProjectId } from "@/components/state/project-session";
 import { resolveBestSubLayoutContextId } from "@/components/room/bass/best-layout/bestSubLayoutContext";
 import { buildVisibleRoomModeMarkers } from "@/components/room/bass/roomModePresentation";
 import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedNullPresentation";
-import ProtectedNullNotice from "@/components/room/bass/ProtectedNullNotice";
+import ProtectedNullWarningSummary from "@/components/room/bass/ProtectedNullWarningSummary";
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
 import BassCurveVisibilityControls, { DEFAULT_BASS_CURVE_VISIBILITY } from "@/components/room/bass/BassCurveVisibilityControls";
@@ -40,6 +40,7 @@ import EqDiscoveryAuditPanel from "@/components/room/bass/EqDiscoveryAuditPanel"
 import Test11GentlePeakCutValidation from "@/components/room/bass/Test11GentlePeakCutValidation";
 import { normaliseHouseCurveToP14Total, diagnoseHouseCurveP14Integration } from "@/components/utils/p14HouseCurveNormalisation";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
+import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 
 const IS_DEVELOPMENT_MODE = false;
 
@@ -553,36 +554,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         </div>
       )}
 
-      {/* Fairness Summary */}
-      {simulationResults.metrics?.fairness && (
-        <div className="rounded-lg border border-[#213428] bg-[#213428]/5 p-4 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-bold text-[#213428]">Designer Metrics</div>
-            <div className="text-2xl font-bold text-[#213428]">
-              {simulationResults.metrics.fairness.score}/100
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <span className="text-[#3E4349]">Best↔Worst:</span>
-              <span className="ml-1 font-medium text-[#1B1A1A]">
-                {fmtFixed(simulationResults.metrics.fairness.spreadBestWorstDb, 1)} dB
-              </span>
-            </div>
-            <div>
-              <span className="text-[#3E4349]">Worst Null:</span>
-              <span className="ml-1 font-medium text-[#1B1A1A]">
-                {fmtFixed(simulationResults.metrics.fairness.nulls.worstNullDb, 1)} dB
-              </span>
-            </div>
-          </div>
-          {simulationResults.metrics.fairness.nulls.worstSeatId && (
-            <div className="text-xs text-[#3E4349] mt-2">
-              @ Seat {simulationResults.metrics.fairness.nulls.worstSeatId}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Designer Metrics moved below the graph to keep the top summary clean */}
 
       <div className="flex flex-wrap gap-2 text-xs">
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Room: {dimsTxt}</Badge>
@@ -664,7 +636,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 </select>
               </div>
             )}
-            <BassTargetLevelControl disabled={detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"} />
             {includeDiagnostics && (
               <>
                 {designEqEnabled && Array.isArray(seatingPositions) && seatingPositions.length > 0 && (
@@ -761,7 +732,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             </div>
           )}
         </div>
-        <ProtectedNullNotice annotations={protectedNullAnnotations} />
+        <ProtectedNullWarningSummary annotations={protectedNullAnnotations} />
 
         {/* Displayed smoothing label */}
         <div style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace', marginTop: 4 }}>
@@ -927,6 +898,44 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         />
       </div>
 
+      {/* Designer Metrics — moved below the graph to keep the top summary clean */}
+      {simulationResults.metrics?.fairness && (
+        <div className="rounded-lg border border-[#213428] bg-[#213428]/5 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-bold text-[#213428]">Designer Metrics</div>
+            <div className="text-2xl font-bold text-[#213428]">
+              {simulationResults.metrics.fairness.score}/100
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span className="text-[#3E4349]">Best↔Worst:</span>
+              <span className="ml-1 font-medium text-[#1B1A1A]">
+                {fmtFixed(simulationResults.metrics.fairness.spreadBestWorstDb, 1)} dB
+              </span>
+            </div>
+            <div>
+              <span className="text-[#3E4349]">Worst Null:</span>
+              <span className="ml-1 font-medium text-[#1B1A1A]">
+                {fmtFixed(simulationResults.metrics.fairness.nulls.worstNullDb, 1)} dB
+              </span>
+            </div>
+          </div>
+          {simulationResults.metrics.fairness.nulls.worstSeatId && (
+            <div className="text-xs text-[#3E4349] mt-2">
+              @ Seat {simulationResults.metrics.fairness.nulls.worstSeatId}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bass Target Settings — secondary panel, kept near the graph but out of the top summary */}
+      <CollapsiblePanel title="Bass Target Settings" defaultOpen={false}>
+        <div className="pt-3">
+          <BassTargetLevelControl disabled={detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"} />
+        </div>
+      </CollapsiblePanel>
+
       {/* ── EQ Discovery Audit — engineering-only, below the Bass Response graph ── */}
       {includeDiagnostics && <EqDiscoveryAuditPanel />}
 
@@ -1077,89 +1086,92 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         );
       })()}
 
-      {/* Surface Absorption Panel */}
-      <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
-        <div className="text-sm font-medium text-[#1B1A1A] mb-1">Room Acoustics</div>
-        <div className="text-xs text-[#3E4349] mb-3">Surface absorption coefficients (0.00 – 1.00). Default 0.30 = typical cinema.</div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-          {[
-            { key: 'front',   label: 'Front wall' },
-            { key: 'back',    label: 'Back wall' },
-            { key: 'left',    label: 'Left wall' },
-            { key: 'right',   label: 'Right wall' },
-            { key: 'ceiling', label: 'Ceiling' },
-            { key: 'floor',   label: 'Floor' },
-          ].map(({ key, label }) => (
-            <div key={key} className="flex items-center justify-between gap-2">
-              <Label className="text-xs text-[#3E4349] w-20 flex-shrink-0">{label}</Label>
-              <input
-                type="number"
-                min="0.00"
-                max="1.00"
-                step="0.05"
-                value={surfaceAbsorptionInputs[key]}
-                onChange={(e) => {
-                  const val = Math.max(0, Math.min(1, parseFloat(e.target.value) || 0));
-                  setSurfaceAbsorptionInputs(prev => ({ ...prev, [key]: val }));
-                }}
-                autoComplete="off"
-                inputMode="decimal"
-                className="w-16 rounded border border-[#DCDBD6] bg-white px-2 py-1 text-xs font-mono text-right text-[#1B1A1A] focus:outline-none focus:ring-1 focus:ring-[#213428]"
+      {/* Simulation Assumptions — room acoustics, useful but not the first thing a dealer needs */}
+      <CollapsiblePanel title="Simulation Assumptions" defaultOpen={false}>
+        <div className="pt-3">
+          <div className="text-xs text-[#3E4349] mb-3">Surface absorption coefficients (0.00 – 1.00). Default 0.30 = typical cinema.</div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+            {[
+              { key: 'front',   label: 'Front wall' },
+              { key: 'back',    label: 'Back wall' },
+              { key: 'left',    label: 'Left wall' },
+              { key: 'right',   label: 'Right wall' },
+              { key: 'ceiling', label: 'Ceiling' },
+              { key: 'floor',   label: 'Floor' },
+            ].map(({ key, label }) => (
+              <div key={key} className="flex items-center justify-between gap-2">
+                <Label className="text-xs text-[#3E4349] w-20 flex-shrink-0">{label}</Label>
+                <input
+                  type="number"
+                  min="0.00"
+                  max="1.00"
+                  step="0.05"
+                  value={surfaceAbsorptionInputs[key]}
+                  onChange={(e) => {
+                    const val = Math.max(0, Math.min(1, parseFloat(e.target.value) || 0));
+                    setSurfaceAbsorptionInputs(prev => ({ ...prev, [key]: val }));
+                  }}
+                  autoComplete="off"
+                  inputMode="decimal"
+                  className="w-16 rounded border border-[#DCDBD6] bg-white px-2 py-1 text-xs font-mono text-right text-[#1B1A1A] focus:outline-none focus:ring-1 focus:ring-[#213428]"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </CollapsiblePanel>
+
+      {/* Advanced Subwoofer Tuning — calibration review only, collapsed by default */}
+      <CollapsiblePanel title="Advanced Subwoofer Tuning" defaultOpen={false}>
+        <div className="pt-3 space-y-4">
+          <p className="text-[11px] text-[#625143]">For calibration review only. Sound Proof automatically time-aligns subwoofers for the design simulation.</p>
+          {totalSubCount > 0 && (
+            <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
+              <div className="text-sm font-medium text-[#1B1A1A] mb-3">Time Alignment</div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="auto-align-toggle" className="text-xs text-[#3E4349]">Auto time-align to MLP</Label>
+                  <Switch id="auto-align-toggle" checked={autoAlignEnabled} onCheckedChange={setAutoAlignEnabled} />
+                </div>
+                {autoAlignEnabled && (
+                  <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
+                    Auto alignment active.
+                  </div>
+                )}
+                {!autoAlignEnabled && (
+                  <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
+                    Manual delay controls are currently hidden.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {frontTuningInstances.length > 0 && (
+            <div>
+              <div className="text-sm font-medium text-[#1B1A1A] mb-3">Front Subwoofer Tuning</div>
+              <SubTuningControls
+                instances={frontTuningInstances}
+                groupLabel="Front"
+                showManualDelay={true}
+                onCalibrationChange={(instanceId, calibration) => compat.setInstanceCalibration(instanceId, calibration)}
               />
             </div>
-          ))}
-        </div>
-      </div>
+          )}
 
-      {/* Auto Align Controls */}
-      {totalSubCount > 0 && (
-        <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
-          <div className="text-sm font-medium text-[#1B1A1A] mb-3">Time Alignment</div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="auto-align-toggle" className="text-xs text-[#3E4349]">Auto time-align to MLP</Label>
-              <Switch id="auto-align-toggle" checked={autoAlignEnabled} onCheckedChange={setAutoAlignEnabled} />
+          {rearTuningInstances.length > 0 && (
+            <div>
+              <div className="text-sm font-medium text-[#1B1A1A] mb-3">Rear Subwoofer Tuning</div>
+              <SubTuningControls
+                instances={rearTuningInstances}
+                groupLabel="Rear"
+                showManualDelay={true}
+                onCalibrationChange={(instanceId, calibration) => compat.setInstanceCalibration(instanceId, calibration)}
+              />
             </div>
-            {autoAlignEnabled && (
-              <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
-                Auto alignment active.
-              </div>
-            )}
-            {!autoAlignEnabled && (
-              <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
-                Manual delay controls are currently hidden.
-              </div>
-            )}
-          </div>
+          )}
         </div>
-      )}
-
-      {/* Sub Tuning Controls */}
-      <div className="space-y-4">
-        {frontTuningInstances.length > 0 && (
-          <div>
-            <div className="text-sm font-medium text-[#1B1A1A] mb-3">Front Subwoofer Tuning</div>
-            <SubTuningControls
-              instances={frontTuningInstances}
-              groupLabel="Front"
-              showManualDelay={true}
-              onCalibrationChange={(instanceId, calibration) => compat.setInstanceCalibration(instanceId, calibration)}
-            />
-          </div>
-        )}
-
-        {rearTuningInstances.length > 0 && (
-          <div>
-            <div className="text-sm font-medium text-[#1B1A1A] mb-3">Rear Subwoofer Tuning</div>
-            <SubTuningControls
-              instances={rearTuningInstances}
-              groupLabel="Rear"
-              showManualDelay={true}
-              onCalibrationChange={(instanceId, calibration) => compat.setInstanceCalibration(instanceId, calibration)}
-            />
-          </div>
-        )}
-      </div>
+      </CollapsiblePanel>
 
     </div>
   );
