@@ -17,7 +17,7 @@ import {
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
 import { useActiveProjectId } from "@/components/state/project-session";
-import { publishDesignReviewHandoff } from "@/components/state/designReviewHandoff";
+import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator } from "@/components/state/designReviewHandoff";
 
 // Hooks and utils (kept eager; they are light and provide guards below)
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
@@ -1629,11 +1629,14 @@ function RoomDesignerWithState() {
 
     // Do not persist transient default/previous-project results while the next
     // project is hydrating or before every current seat joins to its result.
+    // Do not publish a pending rating — isPendingBass is the authoritative gate
+    // (false for both final and retained same-fingerprint ratings).
     if (
       !handoffProjectId ||
       loadState?.phase !== "loaded" ||
       appState?.isProjectHydrationReady !== true ||
       !appDesignRating ||
+      appDesignRating?.isPendingBass === true ||
       !hasCompleteSeatJoin ||
       !analysisCountsMatch
     ) {
@@ -1657,6 +1660,18 @@ function RoomDesignerWithState() {
       priceData: publishedPriceData,
     });
   }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState, _seatingPositions, placedSpeakers, frontSubsForRendering, rearSubsForRendering, _screen, dolbyPreset, mlpAnchorEffective, publishedPriceData, loadState?.phase, appState?.isProjectHydrationReady]);
+
+  // Publish a lightweight bass-pending indicator (NOT a rating) so the
+  // sidebar can show "Calculating bass analysis…" during initial bass
+  // settling. This does not write to __ROOM_DESIGNER_ASDR__ or localStorage.
+  React.useEffect(() => {
+    const indicatorProjectId = resolvedProjectId || projectIdState || null;
+    if (!indicatorProjectId) return;
+    publishBassPendingIndicator(indicatorProjectId, appDesignRating?.isPendingBass === true);
+    return () => {
+      clearBassPendingIndicator(indicatorProjectId);
+    };
+  }, [resolvedProjectId, projectIdState, appDesignRating?.isPendingBass]);
 
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {

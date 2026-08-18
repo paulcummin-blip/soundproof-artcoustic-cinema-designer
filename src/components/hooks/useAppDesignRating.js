@@ -14,8 +14,8 @@
  * + computed viewing angles, avoiding the expensive buildSeatHudSnapshot call.
  */
 
-import { useMemo } from 'react';
-import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
+import { useMemo, useEffect, useRef } from 'react';
+import { useCompletedBassAuthority, BASS_AUTHORITY_STATUS } from '@/components/room/bass/completedBassResultStore';
 import { buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { buildDesignRatingInput } from '@/components/report/technical/buildDesignRatingInput';
 import {
@@ -87,6 +87,50 @@ export function buildLightweightSeatHudById(seats, analysisResult, primarySeatin
 }
 
 /**
+ * Resolve the bass-authority readiness state for the current project.
+ *
+ * A rating is final only when the completed bass contract is AUTHORITATIVE
+ * and the current/result fingerprints agree. While bass is LOADING or
+ * UPDATING the rating is pending. Projects with no applicable bass
+ * configuration (UNCALCULATED / BLOCKED) settle normally. ERROR settles
+ * immediately so the rating never waits forever.
+ *
+ * @param {Object} completedBassAuthority
+ * @returns {{ ready: boolean, pending: boolean, reason: string, fingerprint: string|null }}
+ */
+export function resolveBassReadiness(completedBassAuthority) {
+  const status = completedBassAuthority?.authorityStatus;
+  const currentFp = completedBassAuthority?.currentFingerprint || null;
+  const resultFp = completedBassAuthority?.contract?.job?.resultFingerprint || null;
+
+  if (status === BASS_AUTHORITY_STATUS.AUTHORITATIVE) {
+    if (currentFp && resultFp && currentFp === resultFp) {
+      return { ready: true, pending: false, reason: 'authoritative', fingerprint: currentFp };
+    }
+    return { ready: false, pending: true, reason: 'fingerprint-mismatch', fingerprint: currentFp };
+  }
+  if (status === BASS_AUTHORITY_STATUS.NOT_VERIFIED) {
+    return { ready: false, pending: true, reason: 'not-verified', fingerprint: currentFp };
+  }
+  if (status === BASS_AUTHORITY_STATUS.LOADING) {
+    return { ready: false, pending: true, reason: 'loading', fingerprint: currentFp };
+  }
+  if (status === BASS_AUTHORITY_STATUS.UPDATING) {
+    return { ready: false, pending: true, reason: 'updating', fingerprint: currentFp };
+  }
+  if (status === BASS_AUTHORITY_STATUS.UNCALCULATED) {
+    return { ready: true, pending: false, reason: 'no-applicable-bass', fingerprint: null };
+  }
+  if (status === BASS_AUTHORITY_STATUS.BLOCKED) {
+    return { ready: true, pending: false, reason: 'blocked', fingerprint: null };
+  }
+  if (status === BASS_AUTHORITY_STATUS.ERROR) {
+    return { ready: true, pending: false, reason: 'error', fingerprint: currentFp };
+  }
+  return { ready: false, pending: true, reason: 'unknown', fingerprint: currentFp };
+}
+
+/**
  * @param {Object} params
  * @param {Object} params.appState
  * @param {Array}  params.seats
@@ -95,7 +139,7 @@ export function buildLightweightSeatHudById(seats, analysisResult, primarySeatin
  * @param {Object} params.stableDimensions
  * @param {Object} params.primarySeatingPosition
  * @param {string} params.projectId
- * @returns {{ status, displayPercentage, coveragePercent } | null}
+ * @returns {{ status, displayPercentage, coveragePercent, bassReadiness, isPendingBass, retainedFromRefresh } | null}
  */
 export function useAppDesignRating({
   appState,
@@ -196,5 +240,43 @@ export function useAppDesignRating({
     }
   }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers]);
 
-  return roomRating;
+  // ── Bass readiness gate ──
+  // A rating is final only when the completed bass contract is authoritative
+  // and belongs to the current fingerprint. While pending, the partial
+  // non-bass index must not be presented as final. If a verified
+  // same-fingerprint rating already exists (e.g. a refresh is running over
+  // the same design), it is retained until the new bass authority settles.
+  const bassReadiness = useMemo(
+    () => resolveBassReadiness(completedBassAuthority),
+    [completedBassAuthority]
+  );
+
+  const lastFinalRatingRef = useRef(null);
+
+  useEffect(() => {
+    if (bassReadiness.ready && roomRating) {
+      lastFinalRatingRef.current = {
+        fingerprint: bassReadiness.fingerprint,
+        rating: roomRating,
+      };
+    }
+  }, [bassReadiness.ready, bassReadiness.fingerprint, roomRating]);
+
+  const retainedFromRefresh = !bassReadiness.ready
+    && lastFinalRatingRef.current?.fingerprint != null
+    && bassReadiness.fingerprint != null
+    && lastFinalRatingRef.current.fingerprint === bassReadiness.fingerprint;
+
+  const effectiveRating = bassReadiness.ready
+    ? roomRating
+    : (retainedFromRefresh ? lastFinalRatingRef.current.rating : roomRating);
+
+  if (!effectiveRating) return null;
+
+  return {
+    ...effectiveRating,
+    bassReadiness,
+    isPendingBass: !bassReadiness.ready && !retainedFromRefresh,
+    retainedFromRefresh,
+  };
 }

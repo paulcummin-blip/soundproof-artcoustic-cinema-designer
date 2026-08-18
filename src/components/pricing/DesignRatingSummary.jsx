@@ -35,8 +35,35 @@ export default function DesignRatingSummary({
   showAsdr = false,
   rating = null,
   recommendations = null,
+  bassPending = false,
 }) {
   if (!showAsdr) return null;
+
+  // While bass analysis is pending and no final rating has been published
+  // yet, show a calculating state instead of a partial numeric score.
+  if (bassPending && !rating) {
+    return (
+      <div
+        style={{
+          padding: '12px 16px',
+          background: '#FFFFFF',
+          border: '1px solid #DCDBD6',
+          borderRadius: '8px',
+          margin: '0 16px 12px 16px',
+        }}
+        title="Bass analysis in progress"
+      >
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8, letterSpacing: '0.04em' }}>
+          ARTCOUSTIC SYSTEM
+          <br />
+          DESIGN RATING
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#625143' }}>
+          Calculating bass analysis…
+        </div>
+      </div>
+    );
+  }
 
   const scopedRatings = rating?.scopedRatings || null;
   const primaryRating = scopedRatings?.primary || null;

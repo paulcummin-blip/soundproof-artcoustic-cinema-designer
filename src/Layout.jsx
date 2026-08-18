@@ -22,6 +22,7 @@ import ApiBadge from "@/components/ui/ApiBadge";
 import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
 import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
+import { readBassPendingIndicator } from "@/components/state/designReviewHandoff";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
@@ -62,6 +63,7 @@ export default function Layout({ children, currentPageName }) {
   const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
   const [asdrRating, setAsdrRating] = React.useState(null);
   const [asdrRecommendations, setAsdrRecommendations] = React.useState(null);
+  const [bassPending, setBassPending] = React.useState(false);
 
   // Active project meta for sidebar (name + client)
   const [activeProjectSummary, setActiveProjectSummary] = React.useState({
@@ -138,6 +140,7 @@ export default function Layout({ children, currentPageName }) {
         setAsdrRating(window.__ROOM_DESIGNER_ASDR__.rating || null);
         setAsdrRecommendations(window.__ROOM_DESIGNER_ASDR__.recommendations || null);
       }
+      setBassPending(readBassPendingIndicator(activeProjectId));
     }, 500); // Poll every 500ms for updates
     
     return () => clearInterval(interval);
@@ -386,6 +389,7 @@ export default function Layout({ children, currentPageName }) {
                   showAsdr={showAsdr}
                   rating={asdrRating}
                   recommendations={asdrRecommendations}
+                  bassPending={bassPending}
                 />
               </div>
             )}

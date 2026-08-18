@@ -261,6 +261,9 @@ function CandidateRatingEvaluator({
 
   useEffect(() => {
     if (!rating) return;
+    // Do not publish a pending rating. Wait for the shared bass authority to
+    // settle so candidates are never evaluated against a partial baseline.
+    if (rating.isPendingBass) return;
     onResult(candidate, rating, {
       p12RawDb: Number.isFinite(Number(p12RawDb)) ? Number(p12RawDb) : null,
       p13RawDb: Number.isFinite(Number(p13RawDb)) ? Number(p13RawDb) : null,
@@ -273,13 +276,17 @@ function CandidateRatingEvaluator({
     rating?.actualPoints,
     rating?.maximumAvailablePoints,
     rating?.coveragePercent,
+    rating?.isPendingBass,
     p12RawDb,
     p13RawDb,
   ]);
 
   // A malformed or temporarily unavailable candidate must not hold the whole
   // recommendation panel in a permanent loading state. Valid results replace
-  // this settled-null marker if they become available later.
+  // this settled-null marker if they become available later. The timeout must
+  // NOT fire while bass authority is still loading — the candidate simply
+  // hasn't had a chance to produce a valid result yet. rating is non-null but
+  // pending in that case, so Boolean(rating) stays true and the timeout waits.
   useEffect(() => {
     if (rating) return undefined;
     const timeoutId = window.setTimeout(() => onResult(candidate, null), 5000);
@@ -435,25 +442,40 @@ export default function DesignRecommendationEngine({
   const pendingCount = Math.max(0, candidateCount - completedCount);
   const isSettled = candidateCount === 0 || completedCount >= candidateCount;
 
-  const recommendations = useMemo(() => ({
-    ...rankDesignRecommendations({
-      baselineRating,
-      evaluatedCandidates,
-      viewingContext,
-    }),
-    candidateCount,
-    completedCount,
-    pendingCount,
-    // isSettled: true when all candidates have terminated (valid or timeout/null)
-    // OR when there are no candidates. The export gate consumes this so the PDF
-    // cannot capture a partial shortlist or an "Evaluating…" placeholder.
-    isSettled,
-    // isEvaluating (legacy, for progressive live UI): true only BEFORE the first
-    // candidate terminates. Do NOT use for export gating — it flips false after
-    // one candidate, which is not a settled-state authority.
-    isEvaluating: candidateCount > 0 && completedCount === 0,
-    bassScenarioPolicy: "Current verified bass result held constant; subwoofer alternatives are not evaluated in V1.",
-  }), [
+  // Do not evaluate, rank, or mark recommendations settled against a pending
+  // baseline rating. The ranking and candidate evaluation wait until the
+  // shared baseline bass authority is final.
+  const baselineBassPending = baselineRating?.isPendingBass === true;
+
+  const recommendations = useMemo(() => {
+    if (baselineBassPending) {
+      return {
+        improvements: [],
+        savings: [],
+        bestPractice: [],
+        candidateCount,
+        completedCount: 0,
+        pendingCount: candidateCount,
+        isSettled: false,
+        isEvaluating: true,
+        bassScenarioPolicy: "Current verified bass result held constant; subwoofer alternatives are not evaluated in V1.",
+      };
+    }
+    return {
+      ...rankDesignRecommendations({
+        baselineRating,
+        evaluatedCandidates,
+        viewingContext,
+      }),
+      candidateCount,
+      completedCount,
+      pendingCount,
+      isSettled,
+      isEvaluating: candidateCount > 0 && completedCount === 0,
+      bassScenarioPolicy: "Current verified bass result held constant; subwoofer alternatives are not evaluated in V1.",
+    };
+  }, [
+    baselineBassPending,
     baselineRating,
     evaluatedCandidates,
     viewingContext,
@@ -488,9 +510,14 @@ export default function DesignRecommendationEngine({
     onRecommendationsChange?.(recommendations);
   }, [onRecommendationsChange, recommendations, recommendationPublicationSignature]);
 
+  // Do not mount candidate evaluators while the baseline bass authority is
+  // pending. Candidates share the same useCompletedBassAuthority(projectId),
+  // so their ratings would also be pending. Mounting them only after the
+  // baseline settles ensures every candidate uses the same verified bass
+  // result and no candidate is marked terminal by a bass-loading timeout.
   return (
     <>
-      {candidates.map((candidate) => (
+      {!baselineBassPending && candidates.map((candidate) => (
         <CandidateRatingEvaluator
           key={candidate.id}
           candidate={candidate}

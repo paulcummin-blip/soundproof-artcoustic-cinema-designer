@@ -29,11 +29,48 @@ const isFreshForProject = (snapshot, projectUpdatedAt) => {
   return publishedAtMs + PROJECT_UPDATE_GRACE_MS >= updatedAtMs;
 };
 
+const BASS_PENDING_KEY = "__ROOM_DESIGNER_BASS_PENDING__";
+
+/**
+ * Lightweight pending indicator (NOT a rating). Published to a separate
+ * window property so the sidebar can show "Calculating bass analysis…"
+ * without publishing a pending rating to __ROOM_DESIGNER_ASDR__.
+ */
+export function publishBassPendingIndicator(projectId, pending) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  if (!pid) return;
+  window[BASS_PENDING_KEY] = { projectId: pid, pending: pending === true, ts: Date.now() };
+}
+
+export function readBassPendingIndicator(projectId) {
+  if (typeof window === "undefined") return false;
+  const pid = normaliseProjectId(projectId);
+  const indicator = window[BASS_PENDING_KEY];
+  if (!indicator || normaliseProjectId(indicator.projectId) !== pid) return false;
+  return indicator.pending === true;
+}
+
+export function clearBassPendingIndicator(projectId) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  if (!pid) return;
+  const indicator = window[BASS_PENDING_KEY];
+  if (indicator && normaliseProjectId(indicator.projectId) === pid) {
+    window[BASS_PENDING_KEY] = { projectId: pid, pending: false, ts: Date.now() };
+  }
+}
+
 export function publishDesignReviewHandoff(snapshot) {
   if (typeof window === "undefined") return null;
 
   const projectId = normaliseProjectId(snapshot?.projectId);
   if (!projectId) return null;
+
+  // Do not publish a pending rating. isPendingBass is the authoritative gate:
+  // false for both final ratings and retained same-fingerprint ratings (which
+  // are valid final results from a previous calculation, held during refresh).
+  if (snapshot?.rating?.isPendingBass === true) return null;
 
   const published = {
     ...snapshot,
