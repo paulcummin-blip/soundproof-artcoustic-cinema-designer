@@ -25,6 +25,7 @@ import {
 } from '@/components/report/technical/artcousticSystemDesignRating';
 import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
 import { getPrimarySeats, getSecondarySeats } from '@/components/utils/seatPriorityAuthority';
+import { hasMinimumSystemForAsdr } from '@/components/utils/minimumSystemForAsdr';
 
 // Map numeric RP22 parameter IDs to the string keys expected by buildDesignRatingInput
 const SEAT_PARAM_KEY_MAP = {
@@ -149,6 +150,7 @@ export function useAppDesignRating({
   stableDimensions,
   primarySeatingPosition,
   projectId,
+  minimumSystemMet = true,
 }) {
   const completedBassAuthority = useCompletedBassAuthority(projectId || 'free');
   const bassErrorMessage = completedBassAuthority?.errorMessage || null;
@@ -181,6 +183,7 @@ export function useAppDesignRating({
   );
 
   const roomRating = useMemo(() => {
+    if (!minimumSystemMet) return null;
     try {
       const input = buildDesignRatingInput({
         seats,
@@ -238,7 +241,7 @@ export function useAppDesignRating({
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;
     }
-  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers]);
+  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, minimumSystemMet]);
 
   // ── Bass readiness gate ──
   // A rating is final only when the completed bass contract is authoritative
@@ -271,6 +274,7 @@ export function useAppDesignRating({
     ? roomRating
     : (retainedFromRefresh ? lastFinalRatingRef.current.rating : roomRating);
 
+  if (!minimumSystemMet) return null;
   if (!effectiveRating) return null;
 
   return {

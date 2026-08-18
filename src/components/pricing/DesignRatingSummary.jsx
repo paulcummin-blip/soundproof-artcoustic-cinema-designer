@@ -36,8 +36,36 @@ export default function DesignRatingSummary({
   rating = null,
   recommendations = null,
   bassPending = false,
+  asdrUnavailable = false,
 }) {
   if (!showAsdr) return null;
+
+  // Minimum 5.1 system not present — ASDR is unavailable. Show the message
+  // instead of calculating or showing a partial / provisional rating. This
+  // takes priority over the bass-pending and NOT ASSESSED states.
+  if (asdrUnavailable) {
+    return (
+      <div
+        style={{
+          padding: '12px 16px',
+          background: '#FFFFFF',
+          border: '1px solid #DCDBD6',
+          borderRadius: '8px',
+          margin: '0 16px 12px 16px',
+        }}
+        title="Minimum system not present"
+      >
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8, letterSpacing: '0.04em' }}>
+          ARTCOUSTIC SYSTEM
+          <br />
+          DESIGN RATING
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#625143' }}>
+          Add LCR, surrounds and subwoofer to calculate rating
+        </div>
+      </div>
+    );
+  }
 
   // While bass analysis is pending and no final rating has been published
   // yet, show a calculating state instead of a partial numeric score.

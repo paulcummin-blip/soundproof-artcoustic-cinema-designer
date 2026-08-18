@@ -61,6 +61,60 @@ export function clearBassPendingIndicator(projectId) {
   }
 }
 
+const ASDR_UNAVAILABLE_KEY = "__ROOM_DESIGNER_ASDR_UNAVAILABLE__";
+
+/**
+ * Lightweight minimum-system indicator (NOT a rating). Published to a
+ * separate window property so the sidebar can show the ASDR unavailable
+ * message before the minimum 5.1 system exists, without publishing any
+ * rating to __ROOM_DESIGNER_ASDR__.
+ */
+export function publishAsdrUnavailableIndicator(projectId, unavailable) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  if (!pid) return;
+  window[ASDR_UNAVAILABLE_KEY] = { projectId: pid, unavailable: unavailable === true, ts: Date.now() };
+}
+
+export function readAsdrUnavailableIndicator(projectId) {
+  if (typeof window === "undefined") return false;
+  const pid = normaliseProjectId(projectId);
+  const indicator = window[ASDR_UNAVAILABLE_KEY];
+  if (!indicator || normaliseProjectId(indicator.projectId) !== pid) return false;
+  return indicator.unavailable === true;
+}
+
+export function clearAsdrUnavailableIndicator(projectId) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  if (!pid) return;
+  const indicator = window[ASDR_UNAVAILABLE_KEY];
+  if (indicator && normaliseProjectId(indicator.projectId) === pid) {
+    window[ASDR_UNAVAILABLE_KEY] = { projectId: pid, unavailable: false, ts: Date.now() };
+  }
+}
+
+/**
+ * Clear any published Design Review ASDR snapshot for a project. Used when
+ * the minimum 5.1 system is not present so a partial ASDR cannot leak into
+ * Design Review via the live window property or the persistent localStorage
+ * cache.
+ */
+export function clearDesignReviewHandoff(projectId) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  if (!pid) return;
+  if (window.__ROOM_DESIGNER_ASDR__ && normaliseProjectId(window.__ROOM_DESIGNER_ASDR__.projectId) === pid) {
+    window.__ROOM_DESIGNER_ASDR__ = null;
+  }
+  try {
+    window.localStorage.removeItem(storageKey(pid));
+  } catch {
+    // Storage may be unavailable or blocked — live same-window handoff is
+    // already cleared above.
+  }
+}
+
 export function publishDesignReviewHandoff(snapshot) {
   if (typeof window === "undefined") return null;
 

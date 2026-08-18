@@ -17,7 +17,7 @@ import {
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
 import { useActiveProjectId } from "@/components/state/project-session";
-import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator } from "@/components/state/designReviewHandoff";
+import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator } from "@/components/state/designReviewHandoff";
 
 // Hooks and utils (kept eager; they are light and provide guards below)
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
@@ -71,6 +71,7 @@ import { useElevationDragHandlers } from "@/components/roomdesigner/hooks/useEle
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import { subscribeAsdrVisibility, getAsdrVisibility, setAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAppDesignRating } from "@/components/hooks/useAppDesignRating";
+import { hasMinimumSystemForAsdr } from "@/components/utils/minimumSystemForAsdr";
 import DesignRecommendationEngine from "@/components/recommendations/DesignRecommendationEngine";
 
 // Safe lazy imports that work with both named and default exports
@@ -1604,6 +1605,13 @@ function RoomDesignerWithState() {
   useSubwooferSync({ appState, stableDimensions, frontSubsCfg: _frontSubsCfg, rearSubsCfg: _rearSubsCfg });
 
   // ── Artcoustic System Design Rating (app compact card) ──
+  // Minimum 5.1 system gate: ASDR is not calculated or published until the
+  // design has an LCR stage, surrounds, and at least one subwoofer.
+  const minimumSystemMet = React.useMemo(
+    () => hasMinimumSystemForAsdr(placedSpeakers, appState),
+    [placedSpeakers, appState?.subwoofers, appState?.subwooferInstances]
+  );
+
   const appDesignRating = useAppDesignRating({
     appState,
     seats,
@@ -1612,6 +1620,7 @@ function RoomDesignerWithState() {
     stableDimensions,
     primarySeatingPosition: mlpAnchorEffective,
     projectId: resolvedProjectId || projectIdState || "free",
+    minimumSystemMet,
   });
 
   const [designRecommendations, setDesignRecommendations] = React.useState(null);
@@ -1621,6 +1630,15 @@ function RoomDesignerWithState() {
   // still does not mount another analysis or recommendation engine.
   React.useEffect(() => {
     const handoffProjectId = resolvedProjectId || projectIdState || null;
+
+    // Minimum 5.1 system gate: do not publish any ASDR snapshot to Design
+    // Review until the system has LCR, surrounds, and at least one subwoofer.
+    // Clear any previously published snapshot so a partial system cannot leak.
+    if (!minimumSystemMet) {
+      clearDesignReviewHandoff(handoffProjectId);
+      return;
+    }
+
     const currentSeats = Array.isArray(_seatingPositions) ? _seatingPositions : [];
     const perSeatResults = analysisResult?.perSeatRp22 || {};
     const hasCompleteSeatJoin =
@@ -1662,7 +1680,7 @@ function RoomDesignerWithState() {
       mlpPoint: mlpAnchorEffective,
       priceData: publishedPriceData,
     });
-  }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState, _seatingPositions, placedSpeakers, frontSubsForRendering, rearSubsForRendering, _screen, dolbyPreset, mlpAnchorEffective, publishedPriceData, loadState?.phase, appState?.isProjectHydrationReady]);
+  }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState, _seatingPositions, placedSpeakers, frontSubsForRendering, rearSubsForRendering, _screen, dolbyPreset, mlpAnchorEffective, publishedPriceData, loadState?.phase, appState?.isProjectHydrationReady, minimumSystemMet]);
 
   // Publish a lightweight bass-pending indicator (NOT a rating) so the
   // sidebar can show "Calculating bass analysis…" during initial bass
@@ -1675,6 +1693,17 @@ function RoomDesignerWithState() {
       clearBassPendingIndicator(indicatorProjectId);
     };
   }, [resolvedProjectId, projectIdState, appDesignRating?.isPendingBass]);
+
+  // Publish a lightweight ASDR-unavailable indicator (NOT a rating) so the
+  // sidebar can show the minimum-system message before any ASDR exists.
+  React.useEffect(() => {
+    const indicatorProjectId = resolvedProjectId || projectIdState || null;
+    if (!indicatorProjectId) return;
+    publishAsdrUnavailableIndicator(indicatorProjectId, !minimumSystemMet);
+    return () => {
+      clearAsdrUnavailableIndicator(indicatorProjectId);
+    };
+  }, [resolvedProjectId, projectIdState, minimumSystemMet]);
 
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {
@@ -1739,7 +1768,7 @@ function RoomDesignerWithState() {
       </AlertDialog>
 
       <BassBackgroundAnalysisOwner key={resolvedProjectId || "free"} scopeId={resolvedProjectId || "free"}>
-      {showAsdr && (
+      {showAsdr && minimumSystemMet && (
         <DesignRecommendationEngine
           key={`asdr-recommendations:${resolvedProjectId || projectIdState || "free"}`}
           appState={appState}
