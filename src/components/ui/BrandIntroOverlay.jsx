@@ -77,6 +77,14 @@ export default function BrandIntroOverlay() {
 
   const { start, end } = geometry;
 
+  // Total ~5s: fade in (0.3s) → hold still (2s) → move to sidebar (2.7s)
+  const TOTAL = 5.0;
+  const FADE_IN = 0.3;
+  const HOLD = 2.0;
+  // times are fractions of TOTAL
+  const tFadeIn = FADE_IN / TOTAL;           // 0.06
+  const tHoldEnd = (FADE_IN + HOLD) / TOTAL; // 0.46
+
   return (
     <motion.div
       style={{
@@ -89,8 +97,8 @@ export default function BrandIntroOverlay() {
       initial={{ opacity: 1 }}
       animate={{ opacity: [1, 1, 0] }}
       transition={{
-        duration: 2.2,
-        times: [0, 0.82, 1],
+        duration: TOTAL,
+        times: [0, 0.94, 1],
         ease: "easeInOut",
       }}
       onAnimationComplete={handleComplete}
@@ -100,11 +108,16 @@ export default function BrandIntroOverlay() {
         alt="Sound Proof"
         style={{ position: "absolute", objectFit: "contain" }}
         initial={{ ...start, opacity: 0 }}
-        animate={{ ...end, opacity: 1 }}
+        animate={{
+          left: [start.left, start.left, start.left, end.left],
+          top: [start.top, start.top, start.top, end.top],
+          width: [start.width, start.width, start.width, end.width],
+          opacity: [0, 1, 1, 1],
+        }}
         transition={{
-          duration: 1.8,
+          duration: TOTAL,
+          times: [0, tFadeIn, tHoldEnd, 1],
           ease: EASE,
-          opacity: { duration: 0.3, ease: "easeOut" },
         }}
       />
     </motion.div>
