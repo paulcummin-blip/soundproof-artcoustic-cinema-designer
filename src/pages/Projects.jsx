@@ -27,8 +27,8 @@ const BRAND = {
   text: "#1B1A1A",
   subtext: "#3E4349",
   border: "#DCDBD6",
-  bg: "rgb(248 248 247)",
-  card: "#FFFFFF",
+  bg: "#FFFFFF",
+  card: "#FBFAF8",
 
   green: "#2F8B57",      // Live
   amber: "#B37A2B",      // Prospective

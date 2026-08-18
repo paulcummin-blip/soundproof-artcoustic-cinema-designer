@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { getAgeDays, formatAge } from "@/components/utils/projectAge";
-import { normalizeStatusId, getStatusColor } from "@/components/projects/statusDefaults";
+import { normalizeStatusId } from "@/components/projects/statusDefaults";
 
 // Refined prototype card — lighter, calmer, more architectural.
 // Only used for the "Bass Test" project to assess the design before rollout.
@@ -32,6 +32,41 @@ function hexToRgba(hex, alpha) {
   const g = parseInt(h.substring(2, 4), 16);
   const b = parseInt(h.substring(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Determine if a hex colour is dark enough for readable white text.
+// If not, return a darkened version so the Open Project button always
+// works as a primary action with white text regardless of status colour.
+function getReadableButtonColor(hex) {
+  const h = hex.replace("#", "");
+  let r = parseInt(h.substring(0, 2), 16);
+  let g = parseInt(h.substring(2, 4), 16);
+  let b = parseInt(h.substring(4, 6), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return "#213428";
+  // Perceptual luminance (Rec. 601 weights)
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  if (lum < 0.4) return hex;
+  // Too light — darken by mixing toward black
+  const f = 0.5;
+  r = Math.round(r * f);
+  g = Math.round(g * f);
+  b = Math.round(b * f);
+  const toHex = (n) => n.toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+// Slightly darken a hex colour for hover states
+function darkenHex(hex, factor = 0.85) {
+  const h = hex.replace("#", "");
+  let r = parseInt(h.substring(0, 2), 16);
+  let g = parseInt(h.substring(2, 4), 16);
+  let b = parseInt(h.substring(4, 6), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return hex;
+  r = Math.round(r * factor);
+  g = Math.round(g * factor);
+  b = Math.round(b * factor);
+  const toHex = (n) => n.toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
 function getStatusColorLocal(status, statuses) {
@@ -80,7 +115,6 @@ export default function ProjectCardPrototype({
   setProjects,
 }) {
   const prog = holdProgress[p.id] || 0;
-  const barColor = getStatusColor(p.status, statuses);
 
   const [localStatus, setLocalStatus] = useState(p.status);
   const [statusError, setStatusError] = useState(null);
@@ -117,6 +151,10 @@ export default function ProjectCardPrototype({
   // For very light status colours (e.g. Completed soft grey), use a darker
   // readable text variant so the pill label stays legible on white.
   const pillTextColor = isCompleted ? "#625143" : statusColor;
+  // Open Project button uses the status colour, darkened if too light for
+  // readable white text, so it always reads as a clear primary action.
+  const openBtnColor = getReadableButtonColor(statusColor);
+  const openBtnHover = darkenHex(openBtnColor, 0.85);
 
   const systemSummary = buildSystemSummary(p, dolbyLabelMap);
   const supportingDetail = buildSupportingDetail(p);
@@ -281,16 +319,16 @@ export default function ProjectCardPrototype({
               flex: 1,
               padding: "8px 12px",
               borderRadius: 6,
-              border: `1px solid ${BRAND.btn}`,
-              background: BRAND.btn,
-              color: BRAND.btnText,
+              border: `1px solid ${openBtnColor}`,
+              background: openBtnColor,
+              color: "#FFFFFF",
               fontSize: 13,
               fontWeight: 500,
               cursor: "pointer",
               transition: "background 0.15s ease",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "#1A2A20"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = BRAND.btn; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = openBtnHover; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = openBtnColor; }}
           >
             Open Project
           </button>
@@ -358,7 +396,7 @@ export default function ProjectCardPrototype({
                 bottom: 0,
                 height: 2,
                 width: `${Math.round(prog * 100)}%`,
-                background: barColor,
+                background: BRAND.muted,
                 transition: "width 60ms linear",
               }}
               aria-hidden
