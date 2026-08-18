@@ -112,24 +112,6 @@ export default function ViewingAnglePanel({
 
   return (
     <div className="space-y-4">
-      {/* RSP Position Ruler Toggle */}
-      <div className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ border: '1px solid #E6E4DD', backgroundColor: '#F8F8F7' }}>
-        <Label htmlFor="mlp-ruler-toggle" className="text-sm" style={{ color: '#3E4349', cursor: 'pointer' }}>
-          RSP Position Ruler
-        </Label>
-        <Switch
-          id="mlp-ruler-toggle"
-          checked={showMlpRuler}
-          onCheckedChange={onShowMlpRulerChange}
-        />
-
-      </div>
-
-      <h3 className="text-base font-medium flex items-center gap-2 mb-4" style={{ color: '#1B1A1A' }}>
-        <Eye className="w-5 h-5" style={{ color: '#625143' }} />
-        Viewing Angle Analysis
-      </h3>
-
       {/* Row table — always shown (1 row = single row, 2+ rows = all rows) */}
       {perRowData.length >= 1 && (
         <div style={{ border: '1px solid #C1B6AD', borderRadius: 8, overflow: 'hidden' }}>
