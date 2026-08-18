@@ -18,6 +18,7 @@
 
 import React, { useMemo } from "react";
 import { MessageCircle, Headphones, ChevronUp, Waves, Zap } from "lucide-react";
+import Rp22SeatCoverageSentence from "@/components/report/Rp22SeatCoverageSentence";
 
 const ICONS = { MessageCircle, Headphones, ChevronUp, Waves, Zap };
 
@@ -88,18 +89,8 @@ export default function ClientDesignHighlights({ highlights, print, recommendati
         </div>
       )}
       {!print && coverageSentence && (
-        <div style={{
-          fontSize: 13,
-          color: "#3E4349",
-          fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-          lineHeight: 1.5,
-          marginBottom: 20,
-          padding: "10px 14px",
-          background: "#F8F8F7",
-          borderRadius: 8,
-          border: "1px solid #E6E4DD",
-        }}>
-          {coverageSentence}
+        <div style={{ marginBottom: 20 }}>
+          <Rp22SeatCoverageSentence sentence={coverageSentence} variant="screen" />
         </div>
       )}
       {grouped.map(({ category, items }) => (
