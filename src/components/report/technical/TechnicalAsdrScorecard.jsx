@@ -17,12 +17,7 @@
 
 import React from "react";
 import { getHumanTitleForParam } from "./technicalParameterMeta";
-import TechnicalAsdrRecommendations from "./TechnicalAsdrRecommendations";
-import {
-  getRoomDesignRatingDesignation,
-  getDesignRatingSupportingSentence,
-  getDesignPerformanceIndex,
-} from "./designRatingPresentation";
+import ScopedAsdrSummary from "./ScopedAsdrSummary";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -152,16 +147,13 @@ function ScorecardGroup({ label, contribs }) {
 export default function TechnicalAsdrScorecard({
   roomDesignRating,
   showDesignRating = false,
-  recommendations = null,
+  scopedRatings = null,
 }) {
   if (!showDesignRating || !roomDesignRating) {
     return null;
   }
 
   const contributions = roomDesignRating.contributions || [];
-  const designation = getRoomDesignRatingDesignation(roomDesignRating);
-  const supportingSentence = getDesignRatingSupportingSentence(roomDesignRating);
-  const index = getDesignPerformanceIndex(roomDesignRating);
 
   // Group contributions by category
   const grouped = {};
@@ -213,7 +205,7 @@ export default function TechnicalAsdrScorecard({
         </div>
       </div>
 
-      {/* ── Overall result card ── */}
+      {/* ── Overall result card — three scoped ASDR results ── */}
       <div
         className="print-avoid-break tech-asdr-rating-card"
         style={{
@@ -228,60 +220,17 @@ export default function TechnicalAsdrScorecard({
       >
         <div
           style={{
-            display: "flex",
-            alignItems: "baseline",
-            justifyContent: "space-between",
-            gap: "8mm",
+            fontSize: "8pt",
+            fontWeight: 700,
+            color: COLORS.secondary,
+            letterSpacing: "0.1em",
+            fontFamily: FONT_BODY,
+            marginBottom: "3mm",
           }}
         >
-          <div>
-            <div
-              style={{
-                fontSize: "8pt",
-                fontWeight: 700,
-                color: COLORS.secondary,
-                letterSpacing: "0.1em",
-                fontFamily: FONT_BODY,
-                marginBottom: "2mm",
-              }}
-            >
-              ARTCOUSTIC SYSTEM DESIGN RATING
-            </div>
-            <div
-              style={{
-                fontSize: "22pt",
-                fontWeight: 400,
-                color: COLORS.primary,
-                fontFamily: FONT_HEADING,
-                lineHeight: 1.1,
-              }}
-            >
-              {designation || "NOT ASSESSED"}
-            </div>
-            {supportingSentence && (
-              <div style={{
-                fontSize: "9pt",
-                color: COLORS.body,
-                fontFamily: FONT_BODY,
-                lineHeight: 1.4,
-                marginTop: "2mm",
-                maxWidth: "60mm",
-              }}>
-                {supportingSentence}
-              </div>
-            )}
-            <div style={{
-              fontSize: "9pt",
-              fontWeight: 600,
-              color: COLORS.secondary,
-              fontFamily: FONT_BODY,
-              marginTop: "2mm",
-              letterSpacing: "0.03em",
-            }}>
-              Design Performance Index {index ?? "—"}
-            </div>
-          </div>
+          ARTCOUSTIC SYSTEM DESIGN RATING
         </div>
+        <ScopedAsdrSummary scopedRatings={scopedRatings || { all: roomDesignRating }} />
       </div>
 
       {/* ── Scorecard table ── */}
@@ -326,9 +275,6 @@ export default function TechnicalAsdrScorecard({
           />
         ))}
       </div>
-
-      {/* ── Evaluated recommendations (best improvement / best cost saving) ── */}
-      <TechnicalAsdrRecommendations recommendations={recommendations} />
 
       {/* ── Client language note (proprietary disclaimer) ── */}
       <div

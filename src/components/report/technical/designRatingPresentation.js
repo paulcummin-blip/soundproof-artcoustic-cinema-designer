@@ -297,6 +297,93 @@ export function getCategorySummaries(roomDesignRating) {
   });
 }
 
+// ── Category achieved-performance summaries (Primary scope) ──────────────────
+// Derives concise achieved-performance descriptions from the scoped
+// contributions' weighted level profile. NOT percentage-based — no category
+// Design Performance Index is calculated. Used by the sidebar ASDR card to
+// present Spatial Resolution, Dynamic Range, Timbre Matching, and Screen /
+// Viewing Geometry summaries from the Primary seating scope.
+
+/**
+ * Per-category concise achieved-performance descriptions.
+ * @param {Object} roomDesignRating — a scoped rating (e.g. scopedRatings.primary)
+ * @returns {Array<{label, lines: string[]}>}
+ */
+export function getCategoryAchievedSummaries(roomDesignRating) {
+  if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED" || roomDesignRating.status === "NOT_CONFIGURED") return [];
+  const contributions = roomDesignRating.contributions || [];
+
+  const groups = {};
+  for (const c of contributions) {
+    const g = getGroupForContrib(c);
+    if (!g) continue;
+    if (!groups[g]) groups[g] = { contribs: [] };
+    groups[g].contribs.push(c);
+  }
+
+  return CATEGORY_GROUPS.map((g) => {
+    const data = groups[g.label];
+    if (!data || data.contribs.length === 0) {
+      return { label: g.label, lines: [] };
+    }
+    // Screen / Viewing Geometry: single-parameter category — read the
+    // authoritative RP23 result directly.
+    if (g.label === SCREEN_CATEGORY_LABEL) {
+      const screenContrib = data.contribs.find((c) => c.key === "screen");
+      const worst = screenContrib ? worstLevelFromResultLevel(screenContrib.resultLevel) : null;
+      if (!worst) return { label: g.label, lines: [] };
+      const descriptor = SCREEN_LEVEL_DESCRIPTOR[worst] ?? null;
+      const rp23Line = worst === "FAIL" ? "RP23 FAIL" : `RP23 Level ${levelNum(worst)}`;
+      return {
+        label: g.label,
+        lines: descriptor ? [`${rp23Line} · ${descriptor}`] : [rp23Line],
+      };
+    }
+    // Aggregate weighted level profile for the category.
+    const profile = { L4: 0, L3: 0, L2: 0, L1: 0, FAIL: 0 };
+    for (const c of data.contribs) {
+      const w = Number(c.effectiveWeight) || 1;
+      const counts = parseLevelCounts(c.resultLevel);
+      for (const [lvl, n] of Object.entries(counts)) {
+        if (profile[lvl] != null) profile[lvl] += n * w;
+      }
+    }
+    const total = profile.L4 + profile.L3 + profile.L2 + profile.L1;
+    if (total <= 0) {
+      if (profile.FAIL > 0) return { label: g.label, lines: ["Design Improvement Recommended"] };
+      return { label: g.label, lines: [] };
+    }
+    const achieved = [
+      { key: "L4", w: profile.L4 },
+      { key: "L3", w: profile.L3 },
+      { key: "L2", w: profile.L2 },
+      { key: "L1", w: profile.L1 },
+    ].filter((l) => l.w > 0).sort((a, b) => b.w - a.w);
+
+    const dom = achieved[0];
+    const second = achieved[1];
+    const balanced = second && second.w > 0 && dom.w > 0
+      && second.w / dom.w >= 0.85
+      && Math.abs(levelNum(dom.key) - levelNum(second.key)) === 1;
+
+    const lines = [];
+    if (balanced) {
+      const a = Math.min(levelNum(dom.key), levelNum(second.key));
+      const b = Math.max(levelNum(dom.key), levelNum(second.key));
+      lines.push(`Predominantly Level ${a}–${b}`);
+    } else if (dom.key === "L4" && dom.w / total >= 0.6) {
+      lines.push("Level 4 capability");
+    } else {
+      lines.push(`Predominantly Level ${levelNum(dom.key)}`);
+    }
+    // Highlight significant L4 presence when L4 is not the dominant level.
+    if (dom.key !== "L4" && profile.L4 > 0 && profile.L4 / total >= 0.15) {
+      lines.push("Multiple Level 4 results");
+    }
+    return { label: g.label, lines };
+  });
+}
+
 // ── Supporting sentence (descriptive, not mechanical) ──────────────────────
 
 function levelNum(key) {

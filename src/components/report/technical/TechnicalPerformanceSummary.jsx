@@ -17,11 +17,8 @@
 
 import React from "react";
 import TechnicalLevelBadge from "./TechnicalLevelBadge";
-import {
-  getRoomDesignRatingDesignation,
-  getDesignRatingSupportingSentence,
-  getDesignPerformanceIndex,
-} from "./designRatingPresentation";
+import { getDesignPerformanceIndex } from "./designRatingPresentation";
+import ScopedAsdrSummary from "./ScopedAsdrSummary";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -202,6 +199,7 @@ export default function TechnicalPerformanceSummary({
   showDesignRating = false,
   roomDesignRating = null,
   seatDesignRatings = null,
+  scopedRatings = null,
 }) {
   return (
     <div
@@ -289,7 +287,7 @@ export default function TechnicalPerformanceSummary({
           <LevelCountBlock level="—" count={roomLevelCounts?.unassessed ?? 0} />
         </div>
 
-        {/* Artcoustic System Design Rating — room scope */}
+        {/* Artcoustic System Design Rating — three scoped results */}
         {showDesignRating && roomDesignRating && (
           <div
             style={{
@@ -305,53 +303,17 @@ export default function TechnicalPerformanceSummary({
                 color: COLORS.secondary,
                 letterSpacing: "0.1em",
                 fontFamily: FONT_BODY,
-                marginBottom: "2mm",
+                marginBottom: "3mm",
               }}
             >
               ARTCOUSTIC SYSTEM DESIGN RATING
             </div>
-            <div
-              style={{
-                fontSize: "18pt",
-                fontWeight: 400,
-                color: COLORS.primary,
-                fontFamily: FONT_HEADING,
-                lineHeight: 1.1,
-              }}
-            >
-              {roomDesignRating.status === "NOT_ASSESSED"
-                ? "NOT ASSESSED"
-                : (getRoomDesignRatingDesignation(roomDesignRating) || "—")}
-            </div>
-            {roomDesignRating.status !== "NOT_ASSESSED" && (
-              <>
-                <div style={{
-                  fontSize: "8pt",
-                  color: COLORS.body,
-                  fontFamily: FONT_BODY,
-                  lineHeight: 1.4,
-                  marginTop: "2mm",
-                }}>
-                  {getDesignRatingSupportingSentence(roomDesignRating)}
-                </div>
-                <div style={{
-                  fontSize: "9pt",
-                  fontWeight: 600,
-                  color: COLORS.secondary,
-                  fontFamily: FONT_BODY,
-                  marginTop: "2mm",
-                  letterSpacing: "0.03em",
-                }}>
-                  Design Performance Index {getDesignPerformanceIndex(roomDesignRating) ?? "—"}
-                </div>
-              </>
-            )}
-
+            <ScopedAsdrSummary scopedRatings={scopedRatings || { all: roomDesignRating }} />
             <div
               style={{
                 fontSize: "7pt",
                 color: COLORS.label,
-                marginTop: "2mm",
+                marginTop: "3mm",
                 fontStyle: "italic",
                 fontFamily: FONT_BODY,
               }}

@@ -1,289 +1,35 @@
 // components/pricing/DesignRatingSummary.jsx
-import React, { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
-import { formatViewingRecommendationSummary } from '@/components/recommendations/viewingRecommendationPresentation';
-import {
-  formatP12P13Consequences,
-  hasAdditionalCalibrationHeadroom,
-  formatP12CapabilityLine,
-  formatP13CapabilityLine,
-  formatP12MinRecLines,
-  formatP13MinRecLines,
-  formatCapabilityReserveText,
-  formatAmplificationGuidance,
-} from '@/components/recommendations/p12RecommendationPresentation';
-import { applyRecommendationDisplayOrder } from '@/components/recommendations/recommendationDisplayOrder';
+// ------------------------------------------
+// Compact Artcoustic System Design Rating sidebar card.
+//
+// Stage C: All recommendation content has been moved to the interactive
+// Technical Report / RP22 Compliance Report page. This sidebar is now a
+// concise ASDR status summary only — no recommendations, no counts, no
+// dropdowns.
+//
+// Shows three scoped ASDR results (Primary, Secondary, All) from the
+// already-computed rating.scopedRatings, one supporting sentence derived
+// from the Primary scoped contribution profile, and four Primary-scope
+// performance summaries (Spatial Resolution, Dynamic Range, Timbre
+// Matching, Screen / Viewing Geometry).
+//
+// No recommendation generation, ranking, scoring, RP22/RP23 logic, or
+// scoped-rating authority is reimplemented here. The scopedRatings object
+// is consumed as-is from useAppDesignRating.
+
+import React from 'react';
 import {
   getRoomDesignRatingDesignation,
   getDesignRatingSupportingSentence,
   getDesignPerformanceIndex,
-  getCategorySummaries,
+  getCategoryAchievedSummaries,
 } from '@/components/report/technical/designRatingPresentation';
 
-function formatPoints(value, signed = false) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return '—';
-  const prefix = signed && number > 0 ? '+' : '';
-  return `${prefix}${number.toFixed(1)} pts`;
-}
-
-function formatLevelChanges(levelChanges) {
-  if (!Array.isArray(levelChanges) || levelChanges.length === 0) return '';
-  return levelChanges
-    .map((c) => `${c.display}: ${c.beforeLevel} → ${c.afterLevel}`)
-    .join(' · ');
-}
-
-function RecommendationRow({ item, mode }) {
-  const from = Math.round(Number(item?.currentPercentage) || 0);
-  const to = Math.round(Number(item?.newPercentage) || 0);
-  const isSaving = mode === 'saving';
-  const isLcrUpgrade = item?.kind === 'lcr' && item?.recommendationDirection === 'upgrade';
-  // P12/P13 are rendered as dual Minimum/Recommended consequences with raw dB;
-  // exclude them from the generic level-change list to avoid duplication.
-  const levelChanges = (Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [])
-    .filter((c) => c?.display !== 'P12' && c?.display !== 'P13');
-  const levelChangeText = formatLevelChanges(levelChanges);
-  const viewingText = formatViewingRecommendationSummary(item);
-  const headroomNote = hasAdditionalCalibrationHeadroom(item)
-    ? 'Provides additional calibration/EQ headroom.'
-    : null;
-
-  // LCR upgrade: structured capability presentation
-  const p12CapabilityLine = isLcrUpgrade ? formatP12CapabilityLine(item) : null;
-  const p13CapabilityLine = isLcrUpgrade ? formatP13CapabilityLine(item) : null;
-  const p12MinRec = isLcrUpgrade ? formatP12MinRecLines(item) : null;
-  const p13MinRec = isLcrUpgrade ? formatP13MinRecLines(item) : null;
-  const capabilityReserveText = isLcrUpgrade ? formatCapabilityReserveText(item) : null;
-  const amplificationText = isLcrUpgrade ? formatAmplificationGuidance(item) : null;
-
-  // Non-LCR: existing combined text
-  const p12P13Text = !isLcrUpgrade ? formatP12P13Consequences(item).join(' · ') : null;
-  const powerBeforeW = Number(item?.lcrPowerBeforeW);
-  const powerAfterW = Number(item?.lcrPowerAfterW);
-  const oldAmplifierText =
-    !isLcrUpgrade &&
-    item?.amplifierUpgradeRequired === true &&
-    Number.isFinite(powerBeforeW) &&
-    Number.isFinite(powerAfterW)
-      ? `Amplification: ${Math.round(powerBeforeW)} → ${Math.round(powerAfterW)} W/ch`
-      : null;
-
-  const combinedChangeText = isLcrUpgrade
-    ? levelChangeText
-    : [p12P13Text, levelChangeText].filter(Boolean).join(' · ');
-  const valueText = isSaving
-    ? (combinedChangeText || 'Profile preserved')
-    : (combinedChangeText || 'Profile improved');
-
-  return (
-    <div style={{ padding: '9px 0', borderTop: '1px solid #ECEAE6' }}>
-      {item?.priorityLabel && (
-        <div style={{ fontSize: 10, fontWeight: 800, color: '#9a3500', marginBottom: 3, letterSpacing: '0.04em' }}>
-          {item.priorityLabel}
-        </div>
-      )}
-      <div style={{ fontSize: 11, lineHeight: 1.35, fontWeight: 700, color: '#213428' }}>
-        {item.title}
-      </div>
-
-      {/* LCR upgrade structured presentation */}
-      {isLcrUpgrade && (
-        <>
-          {p12CapabilityLine && (
-            <div style={{ marginTop: 3, fontSize: 10, lineHeight: 1.35, color: '#213428', fontWeight: 600 }}>
-              {p12CapabilityLine}
-            </div>
-          )}
-          {p12MinRec?.minLine && (
-            <div style={{ marginTop: 2, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
-              {p12MinRec.minLine}
-            </div>
-          )}
-          {p12MinRec?.recLine && (
-            <div style={{ marginTop: 2, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
-              {p12MinRec.recLine}
-            </div>
-          )}
-          {p13CapabilityLine && (
-            <div style={{ marginTop: 3, fontSize: 10, lineHeight: 1.35, color: '#213428', fontWeight: 600 }}>
-              {p13CapabilityLine}
-            </div>
-          )}
-          {p13MinRec?.minLine && (
-            <div style={{ marginTop: 2, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
-              {p13MinRec.minLine}
-            </div>
-          )}
-          {p13MinRec?.recLine && (
-            <div style={{ marginTop: 2, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
-              {p13MinRec.recLine}
-            </div>
-          )}
-          {capabilityReserveText && (
-            <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#213428', fontWeight: 600 }}>
-              {capabilityReserveText}
-            </div>
-          )}
-          {amplificationText && (
-            <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#3E4349' }}>
-              {amplificationText}
-            </div>
-          )}
-          {levelChangeText && (
-            <div style={{ marginTop: 2, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
-              {levelChangeText}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Non-LCR value text */}
-      {!isLcrUpgrade && valueText && (
-        <div style={{ marginTop: 3, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
-          {valueText}
-        </div>
-      )}
-      {oldAmplifierText && (
-        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#3E4349' }}>
-          {oldAmplifierText}
-        </div>
-      )}
-      {headroomNote && (
-        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#625143', fontStyle: 'italic' }}>
-          {headroomNote}
-        </div>
-      )}
-      {viewingText && (
-        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: item?.viewingTradeoff ? '#9a6800' : '#625143' }}>
-          {viewingText}
-        </div>
-      )}
-      <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
-        Design Performance Index {from} → {to} · {formatPoints(item.scoreDelta, true)}
-      </div>
-      <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
-        {item.disruption} disruption · {item.confidence} confidence
-      </div>
-      {item.caveat && (
-        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B', fontStyle: 'italic' }}>
-          {item.caveat}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function BestPracticeRow({ item }) {
-  const genuineLevelChanges = (Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [])
-    .filter((c) => c?.isImproved);
-  const levelChangeText = formatLevelChanges(genuineLevelChanges);
-
-  return (
-    <div style={{ padding: '9px 0', borderTop: '1px solid #ECEAE6' }}>
-      <div style={{ fontSize: 9, fontWeight: 800, color: '#213428', marginBottom: 3, letterSpacing: '0.05em' }}>
-        {item?.recommendationClass || 'BEST-PRACTICE IMPROVEMENT'}
-      </div>
-      <div style={{ fontSize: 11, lineHeight: 1.35, fontWeight: 700, color: '#213428' }}>
-        {item.title}
-      </div>
-      <div style={{ marginTop: 3, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
-        {item.description}
-      </div>
-      {item?.technicalLine && (
-        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#625143' }}>
-          {item.technicalLine}
-        </div>
-      )}
-      {levelChangeText && (
-        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#213428', fontWeight: 600 }}>
-          {levelChangeText}
-        </div>
-      )}
-      {item.caveat && (
-        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
-          {item.caveat}
-        </div>
-      )}
-      <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
-        {item.disruption} disruption · {item.confidence} confidence
-      </div>
-    </div>
-  );
-}
-
-function RecommendationGroup({ title, items, emptyText, mode }) {
-  return (
-    <section style={{ marginTop: 12 }}>
-      <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.07em', color: '#625143' }}>
-        {title}
-      </div>
-      {items.length
-        ? items.map((item) => mode === 'best-practice'
-          ? <BestPracticeRow key={item.id} item={item} />
-          : <RecommendationRow key={item.id} item={item} mode={mode} />)
-        : <div style={{ padding: '8px 0 2px', fontSize: 10, lineHeight: 1.4, color: '#77736B' }}>{emptyText}</div>}
-    </section>
-  );
-}
-
 /**
- * Collapsible recommendation group for the "Improve the Design" section.
- * Collapsed by default so the primary ASDR information stays visually dominant.
- * Hidden entirely when there are no recommendations (no empty expandable panel).
- * UI-only state — not persisted to the project.
- */
-function CollapsibleRecommendationGroup({ title, items, mode }) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  if (!items || items.length === 0) return null;
-
-  const count = items.length;
-  const countLabel = count === 1 ? '1 recommendation' : `${count} recommendations`;
-
-  return (
-    <section style={{ marginTop: 12 }}>
-      <button
-        type="button"
-        onClick={() => setIsOpen((v) => !v)}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          cursor: 'pointer',
-          fontSize: 9,
-          fontWeight: 800,
-          letterSpacing: '0.07em',
-          color: '#625143',
-          textAlign: 'left',
-        }}
-      >
-        <span>{title} · {countLabel}</span>
-        <ChevronDown
-          style={{
-            width: 12,
-            height: 12,
-            color: '#625143',
-            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 150ms ease',
-            flexShrink: 0,
-          }}
-        />
-      </button>
-      {isOpen && (
-        items.map((item) => <RecommendationRow key={item.id} item={item} mode={mode} />)
-      )}
-    </section>
-  );
-}
-
-/**
- * Compact Artcoustic System Design Rating and evaluated decision support.
- * Recommendations are results from canonical RP22/SPL/ASDR scenario re-runs.
+ * Compact Artcoustic System Design Rating sidebar card.
+ * @param {boolean} showAsdr — whether the ASDR card is visible
+ * @param {Object|null} rating — full roomRating from useAppDesignRating (includes .scopedRatings)
+ * @param {Object|null} recommendations — unused (kept for Layout.jsx compatibility; recommendations moved to Technical Report)
  */
 export default function DesignRatingSummary({
   showAsdr = false,
@@ -292,19 +38,27 @@ export default function DesignRatingSummary({
 }) {
   if (!showAsdr) return null;
 
-  const status = rating?.status || 'NOT_ASSESSED';
-  const pct = rating?.displayPercentage;
-  const displayPct = pct != null ? Math.round(pct) : null;
-  const designation = rating ? getRoomDesignRatingDesignation(rating) : null;
-  const supportingSentence = rating ? getDesignRatingSupportingSentence(rating) : null;
-  const index = rating ? getDesignPerformanceIndex(rating) : null;
-  const categories = rating ? getCategorySummaries(rating) : [];
-  const isNotAssessed = status === 'NOT_ASSESSED';
-  const orderedRecommendations = applyRecommendationDisplayOrder(recommendations);
-  const improvements = Array.isArray(orderedRecommendations?.improvements) ? orderedRecommendations.improvements : [];
-  const savings = Array.isArray(orderedRecommendations?.savings) ? orderedRecommendations.savings : [];
-  const bestPractice = Array.isArray(orderedRecommendations?.bestPractice) ? orderedRecommendations.bestPractice : [];
-  const isEvaluating = recommendations?.isEvaluating === true;
+  const scopedRatings = rating?.scopedRatings || null;
+  const primaryRating = scopedRatings?.primary || null;
+  const secondaryRating = scopedRatings?.secondary || null;
+  const allRating = scopedRatings?.all || rating || null;
+
+  const isNotAssessed = !allRating || allRating.status === 'NOT_ASSESSED';
+
+  const primaryDesignation = primaryRating ? getRoomDesignRatingDesignation(primaryRating) : null;
+  const primaryIndex = primaryRating ? getDesignPerformanceIndex(primaryRating) : null;
+  const primarySentence = primaryRating ? getDesignRatingSupportingSentence(primaryRating) : null;
+  const primaryCategories = primaryRating ? getCategoryAchievedSummaries(primaryRating) : [];
+
+  const secondaryIsConfigured =
+    secondaryRating &&
+    secondaryRating.status !== 'NOT_ASSESSED' &&
+    secondaryRating.status !== 'NOT_CONFIGURED';
+  const secondaryDesignation = secondaryIsConfigured ? getRoomDesignRatingDesignation(secondaryRating) : null;
+  const secondaryIndex = secondaryIsConfigured ? getDesignPerformanceIndex(secondaryRating) : null;
+
+  const allDesignation = allRating ? getRoomDesignRatingDesignation(allRating) : null;
+  const allIndex = allRating ? getDesignPerformanceIndex(allRating) : null;
 
   return (
     <div
@@ -331,72 +85,80 @@ export default function DesignRatingSummary({
         </div>
       ) : (
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#213428', lineHeight: 1.2 }}>
-            {designation || '—'}
-          </div>
-          {supportingSentence && (
-            <div style={{ marginTop: 4, fontSize: 10, lineHeight: 1.4, color: '#3E4349' }}>
-              {supportingSentence}
+          {/* ── Primary Seating — strongest visual emphasis ── */}
+          <div>
+            <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Primary Seating
             </div>
-          )}
-          <div style={{ marginTop: 4, fontSize: 10, fontWeight: 600, color: '#625143', letterSpacing: '0.03em' }}>
-            Design Performance Index {index ?? '—'}
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#213428', lineHeight: 1.2, marginTop: 2 }}>
+              {primaryDesignation || '—'}
+            </div>
+            {primarySentence && (
+              <div style={{ marginTop: 4, fontSize: 10, lineHeight: 1.4, color: '#3E4349' }}>
+                {primarySentence}
+              </div>
+            )}
+            <div style={{ marginTop: 4, fontSize: 10, fontWeight: 600, color: '#625143', letterSpacing: '0.03em' }}>
+              Design Performance Index {primaryIndex ?? '—'}
+            </div>
           </div>
-          {categories.length > 0 && (
+
+          {/* ── Secondary Seating — compact ── */}
+          <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #ECEAE6' }}>
+            <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Secondary Seating
+            </div>
+            {secondaryIsConfigured ? (
+              <>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#213428', lineHeight: 1.2, marginTop: 2 }}>
+                  {secondaryDesignation || '—'}
+                </div>
+                <div style={{ marginTop: 2, fontSize: 10, fontWeight: 600, color: '#625143', letterSpacing: '0.03em' }}>
+                  Design Performance Index {secondaryIndex ?? '—'}
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#9B9890', marginTop: 2 }}>
+                Not configured
+              </div>
+            )}
+          </div>
+
+          {/* ── All Seating — compact ── */}
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #ECEAE6' }}>
+            <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              All Seating
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#213428', lineHeight: 1.2, marginTop: 2 }}>
+              {allDesignation || '—'}
+            </div>
+            <div style={{ marginTop: 2, fontSize: 10, fontWeight: 600, color: '#625143', letterSpacing: '0.03em' }}>
+              Design Performance Index {allIndex ?? '—'}
+            </div>
+          </div>
+
+          {/* ── Four performance summaries from Primary scope ── */}
+          {primaryCategories.length > 0 && (
             <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
-              {categories.map((cat) => (
+              {primaryCategories.map((cat) => (
                 <div key={cat.label} style={{ borderTop: '1px solid #ECEAE6', paddingTop: 4 }}>
                   <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                     {cat.label}
                   </div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: '#213428' }}>
-                    {cat.designation || '—'}
-                  </div>
+                  {cat.lines.length > 0 ? (
+                    cat.lines.map((line, i) => (
+                      <div key={i} style={{ fontSize: 10, fontWeight: 600, color: '#213428' }}>
+                        {line}
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ fontSize: 10, fontWeight: 600, color: '#9B9890' }}>—</div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
-      )}
-
-      {!isNotAssessed && (
-        <>
-          {isEvaluating && (
-            <div style={{ marginTop: 8, fontSize: 9, color: '#77736B' }}>
-              Evaluating low-change alternatives…
-            </div>
-          )}
-
-          {!isEvaluating && recommendations && (
-            <>
-              <div style={{ marginTop: 8, fontSize: 8.5, lineHeight: 1.4, color: '#8A867D' }}>
-                Each option is evaluated independently. Combining changes may produce a different result and should be re-evaluated.
-              </div>
-              <CollapsibleRecommendationGroup
-                title="Improve the Design"
-                items={improvements}
-                mode="improvement"
-              />
-              <RecommendationGroup
-                title="SIMPLIFY THE DESIGN"
-                items={savings}
-                mode="saving"
-                emptyText="No material simplification identified."
-              />
-              {bestPractice.length > 0 && (
-                <RecommendationGroup
-                  title="BEST-PRACTICE IMPROVEMENTS"
-                  items={bestPractice}
-                  mode="best-practice"
-                  emptyText=""
-                />
-              )}
-              <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #ECEAE6', fontSize: 8.5, lineHeight: 1.4, color: '#8A867D' }}>
-                Bass is held at the current verified result. Subwoofer alternatives will be added only when scenario re-runs are connected and trusted.
-              </div>
-            </>
-          )}
-        </>
       )}
     </div>
   );

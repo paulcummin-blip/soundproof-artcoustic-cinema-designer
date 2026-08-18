@@ -2,12 +2,13 @@
  * TechnicalAsdrRecommendations.jsx
  * --------------------------------
  * Compact "DESIGN RECOMMENDATIONS" footnote section for the ASDR Scorecard
- * page in the Technical Report.
+ * page in the Technical Report, and reused by the Design Review workspace's
+ * RecommendationsBlock.
  *
  * Consumes the SAME evaluated recommendation snapshot published by the
- * canonical DesignRecommendationEngine used in the live Room Designer (and
- * in the app sidebar's DesignRatingSummary). No recommendation logic,
- * ranking, eligibility, or candidate generation is reimplemented here.
+ * canonical DesignRecommendationEngine used in the live Room Designer. No
+ * recommendation logic, ranking, eligibility, or candidate generation is
+ * reimplemented here.
  *
  * Material-upgrade display order is resolved via the SAME
  * applyRecommendationDisplayOrder authority used by the app, so the report

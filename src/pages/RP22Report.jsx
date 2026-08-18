@@ -48,11 +48,14 @@ import { RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentati
 import TechnicalProjectOverview from '@/components/report/technical/TechnicalProjectOverview';
 import TechnicalPerformanceSummary from '@/components/report/technical/TechnicalPerformanceSummary';
 import TechnicalAsdrScorecard from '@/components/report/technical/TechnicalAsdrScorecard';
+import ScopedAsdrSummary from '@/components/report/technical/ScopedAsdrSummary';
+import TechnicalReportRecommendations from '@/components/report/technical/TechnicalReportRecommendations';
 import { resolveRoomParameterLevel, normalizeRoomLevel } from '@/components/report/technical/roomParameterLevelAuthority';
 import { buildDesignRatingInput } from '@/components/report/technical/buildDesignRatingInput';
 import {
   buildArtcousticDesignRatingAuthority,
   calculateRoomDesignRating,
+  calculateScopedRoomDesignRating,
   calculateSeatDesignRating,
 } from '@/components/report/technical/artcousticSystemDesignRating';
 import { subscribeAsdrVisibility, getAsdrVisibility } from '@/components/state/asdrVisibilityStore';
@@ -60,7 +63,7 @@ import DesignRecommendationEngine from '@/components/recommendations/DesignRecom
 import { useAuth } from '@/lib/AuthContext';
 import { DEFAULT_TERRITORY, getTerritoryConfig } from '@/components/pricing/territoryConfig';
 import { buildRp22SeatCoverageSentence, resolveAllParametersReportable } from '@/components/utils/rp22SeatCoverageSentence';
-import { resolveSeatPriority } from '@/components/utils/seatPriorityAuthority';
+import { resolveSeatPriority, getPrimarySeats, getSecondarySeats } from '@/components/utils/seatPriorityAuthority';
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 
 // --- Main component ---
@@ -835,9 +838,26 @@ function RP22ReportInner() {
     }, [showDesignRating, seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers]);
 
     const roomDesignRating = React.useMemo(() => {
-        if (!designRatingAuthority) return null;
-        return calculateRoomDesignRating(designRatingAuthority);
+      if (!designRatingAuthority) return null;
+      return calculateRoomDesignRating(designRatingAuthority);
     }, [designRatingAuthority]);
+
+    // ── Three scoped ASDR ratings from the SAME shared authority ──────────
+    // Primary and Secondary average only their seat subsets. Secondary with
+    // zero seats returns NOT_CONFIGURED. All Seating is the same authoritative
+    // result as roomDesignRating. No second authority build; no duplicated
+    // scoring logic — calculateScopedRoomDesignRating delegates to the same
+    // internal core as calculateRoomDesignRating.
+    const scopedRatings = React.useMemo(() => {
+      if (!designRatingAuthority) return null;
+      const primarySeatIds = getPrimarySeats(seats).map((s) => s.id).filter(Boolean);
+      const secondarySeatIds = getSecondarySeats(seats).map((s) => s.id).filter(Boolean);
+      return {
+        primary: calculateScopedRoomDesignRating(designRatingAuthority, primarySeatIds),
+        secondary: calculateScopedRoomDesignRating(designRatingAuthority, secondarySeatIds),
+        all: roomDesignRating,
+      };
+    }, [designRatingAuthority, seats, roomDesignRating]);
 
     // Export gate: block PDF export until the recommendation engine has settled
     // (all candidates terminated — valid rating OR timeout/null). Only applies
@@ -1368,6 +1388,28 @@ function RP22ReportInner() {
                         </CardContent>
                     </Card>
 
+                    {/* ── Screen-only scoped ASDR header ── */}
+                    {showDesignRating && scopedRatings && (
+                        <div style={{
+                            background: '#FFFFFF',
+                            border: '1px solid #DCDBD6',
+                            borderRadius: 8,
+                            padding: '20px 24px',
+                        }}>
+                            <div style={{ fontFamily: "'Futura PT Light', 'Century Gothic', sans-serif", fontSize: 16, fontWeight: 400, color: '#213428', marginBottom: 12, letterSpacing: '0.01em' }}>
+                                ARTCOUSTIC SYSTEM DESIGN RATING
+                            </div>
+                            <ScopedAsdrSummary scopedRatings={scopedRatings} />
+                            <div style={{ marginTop: 12, fontSize: 10, color: '#9B8E82', fontStyle: 'italic', fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif" }}>
+                                Sound Proof proprietary design metric. Not part of CEDIA RP22 or RP23.
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Screen-only Recommendations section (NOT in PDF) ── */}
+                    {showDesignRating && (
+                        <TechnicalReportRecommendations recommendations={designRecommendations} />
+                    )}
 
                 </div>
             </div>
@@ -1427,6 +1469,7 @@ function RP22ReportInner() {
                                     showDesignRating={showDesignRating}
                                     roomDesignRating={roomDesignRating}
                                     seatDesignRatings={seatDesignRatings}
+                                    scopedRatings={scopedRatings}
                                 />
                             </div>
 
@@ -1436,7 +1479,7 @@ function RP22ReportInner() {
                                     <TechnicalAsdrScorecard
                                         roomDesignRating={roomDesignRating}
                                         showDesignRating={showDesignRating}
-                                        recommendations={designRecommendations}
+                                        scopedRatings={scopedRatings}
                                     />
                                 </div>
                             )}
