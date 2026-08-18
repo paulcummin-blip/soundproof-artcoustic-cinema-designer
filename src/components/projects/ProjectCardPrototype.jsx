@@ -44,18 +44,14 @@ function getStatusColorLocal(status, statuses) {
 }
 
 // Build the system summary line from existing project data.
+// Shows only the system format (e.g. "Dolby Atmos 5.1.4"). No RP22 levels,
+// P2/L results, or compliance fragments — those belong in the report.
 function buildSystemSummary(p, dolbyLabelMap) {
-  const parts = [];
-  if (p.dolby_config) {
-    const label = dolbyLabelMap[p.dolby_config] || p.dolby_config;
-    parts.push(label);
-  }
-  if (p.p12_level != null) {
-    const modeLabel = p.p12_mode === "half-space" ? "Min" : p.p12_mode === "anechoic" ? "Rec" : "";
-    const p12Str = modeLabel ? `P2–L${p.p12_level} ${modeLabel}` : `P2–L${p.p12_level}`;
-    parts.push(p12Str);
-  }
-  return parts.join(" · ");
+  if (!p.dolby_config) return "";
+  const label = dolbyLabelMap[p.dolby_config] || p.dolby_config;
+  // Existing labels look like "5.1.4 Atmos"; normalise to "Dolby Atmos 5.1.4".
+  const match = label.match(/^(\d+(?:\.\d+)*)\s*Atmos$/i);
+  return match ? `Dolby Atmos ${match[1]}` : label;
 }
 
 // Build the supporting detail line from existing project data.
