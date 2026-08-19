@@ -19,12 +19,21 @@
  *
  * Overall room designation resolves in this order:
  *   1. Any contribution with FAIL  → "Design Improvement Recommended"
- *   2. Otherwise, Design Performance Index:
- *        80+        → Exceptional Performance
- *        70–79      → Reference Performance
- *        65–69      → Excellent Performance
- *        50–64      → High Performance
- *        below 50   → Good Performance
+ *   2. Otherwise, Design Performance Index maps to overall bands:
+ *        120+       → Exceptional Performance
+ *        95–119      → Reference Performance
+ *        80–94       → Excellent Performance
+ *        60–79       → High Performance
+ *        below 60    → Good Performance
+ *   3. Category ceiling: the lowest governing predominant category level
+ *      caps the headline so the index cannot overclaim relative to the
+ *      visible category summaries:
+ *        lowest L1   → maximum Good Performance
+ *        lowest L2   → maximum High Performance
+ *        lowest L3   → maximum Reference Performance
+ *        all L4      → maximum Exceptional Performance
+ *      The final designation is the lower (more conservative) of the
+ *      index-derived designation and the category ceiling.
  */
 
 const FAIL_LABEL = "Design Improvement Recommended";
@@ -40,6 +49,26 @@ const OVERALL_INDEX_BANDS = [
   { min: 60, label: "High Performance" },
   { min: 0, label: "Good Performance" },
 ];
+
+// ── Category ceiling mapping (predominant level → max headline) ───────────
+// The lowest governing predominant category level caps the qualitative
+// headline so the Design Performance Index cannot overclaim relative to
+// the visible category summaries. See getRoomDesignRatingDesignation.
+const CEILING_BY_LEVEL = {
+  L4: "Exceptional Performance",
+  L3: "Reference Performance",
+  L2: "High Performance",
+  L1: "Good Performance",
+};
+
+// Designation rank for "lower of" comparison (index designation vs ceiling).
+const DESIGNATION_RANK = {
+  "Good Performance": 0,
+  "High Performance": 1,
+  "Excellent Performance": 2,
+  "Reference Performance": 3,
+  "Exceptional Performance": 4,
+};
 
 // ── Category card bands (percentage-based, unchanged) ──────────────────────
 // Used by getCategorySummaries for Spatial Resolution, Dynamic Range and
@@ -167,9 +196,33 @@ function aggregateLevelProfile(contributions) {
 // ── Overall room designation (failure-driven) ───────────────────────────────
 
 /**
+ * Resolve the maximum permitted qualitative headline from the lowest
+ * governing predominant category level. Returns null when no categories
+ * have scored contributions (no ceiling applies).
+ * @param {Object} roomDesignRating
+ * @returns {string|null}
+ */
+function getPredominantCategoryCeiling(roomDesignRating) {
+  const governingLevels = getCategoryGoverningLevels(roomDesignRating);
+  let lowestLevel = null;
+  for (const g of governingLevels) {
+    const lvl = g.governingLevel;
+    if (!lvl || lvl === "FAIL") continue;
+    if (lowestLevel == null || levelNum(lvl) < levelNum(lowestLevel)) {
+      lowestLevel = lvl;
+    }
+  }
+  return lowestLevel ? (CEILING_BY_LEVEL[lowestLevel] ?? null) : null;
+}
+
+/**
  * Resolve the overall room designation.
+ *
  * FAIL-driven: any genuine FAIL → "Design Improvement Recommended".
- * Otherwise the additive Design Performance Index maps to the overall bands.
+ * Otherwise the additive Design Performance Index maps to the overall bands,
+ * capped by the lowest governing predominant category level so the index
+ * cannot overclaim relative to the visible category summaries.
+ *
  * @param {Object|null|undefined} roomDesignRating
  * @returns {string|null}
  */
@@ -177,7 +230,18 @@ export function getRoomDesignRatingDesignation(roomDesignRating) {
   if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED" || roomDesignRating.status === "NOT_CONFIGURED") return null;
   if (hasFailResult(roomDesignRating.contributions)) return FAIL_LABEL;
   const index = getDesignPerformanceIndex(roomDesignRating);
-  return getOverallDesignationFromIndex(index);
+  const indexDesignation = getOverallDesignationFromIndex(index);
+
+  // Category ceiling: the lowest governing predominant category level caps
+  // the qualitative headline so the index cannot overclaim relative to the
+  // visible category summaries. The final designation is the lower (more
+  // conservative) of the index-derived designation and the category ceiling.
+  const ceilingDesignation = getPredominantCategoryCeiling(roomDesignRating);
+  if (ceilingDesignation == null) return indexDesignation;
+  if (indexDesignation == null) return ceilingDesignation;
+  return DESIGNATION_RANK[ceilingDesignation] < DESIGNATION_RANK[indexDesignation]
+    ? ceilingDesignation
+    : indexDesignation;
 }
 
 // ── Category grouping (matches TechnicalAsdrScorecard CATEGORY_GROUPS) ──────
@@ -297,20 +361,22 @@ export function getCategorySummaries(roomDesignRating) {
   });
 }
 
-// ── Category achieved-performance summaries (Primary scope) ──────────────────
-// Derives concise achieved-performance descriptions from the scoped
-// contributions' weighted level profile. NOT percentage-based — no category
-// Design Performance Index is calculated. Used by the sidebar ASDR card to
-// present Spatial Resolution, Dynamic Range, Timbre Matching, and Screen /
-// Viewing Geometry summaries from the Primary seating scope.
+// ── Category profile extraction (structured) ──────────────────────────────
+// Shared internal helper that extracts the per-category weighted level
+// profile from a scoped rating's contributions. Consumed by both
+// getCategoryAchievedSummaries (display strings) and getCategoryGoverningLevels
+// (structured governing levels for the headline ceiling authority).
 
 /**
- * Per-category concise achieved-performance descriptions.
+ * Build structured per-category profile data from a scoped rating.
+ * Returns one entry per CATEGORY_GROUPS entry with:
+ *   { label, hasContribs, isScreen?, screenWorst?, hasFail?, failCount?,
+ *     noAchieved?, dom?, second?, balanced?, allSame?, lowest? }
  * @param {Object} roomDesignRating — a scoped rating (e.g. scopedRatings.primary)
- * @returns {Array<{label, lines: string[]}>}
+ * @returns {Array<Object>|null}
  */
-export function getCategoryAchievedSummaries(roomDesignRating) {
-  if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED" || roomDesignRating.status === "NOT_CONFIGURED") return [];
+function buildCategoryProfileData(roomDesignRating) {
+  if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED" || roomDesignRating.status === "NOT_CONFIGURED") return null;
   const contributions = roomDesignRating.contributions || [];
 
   const groups = {};
@@ -324,22 +390,14 @@ export function getCategoryAchievedSummaries(roomDesignRating) {
   return CATEGORY_GROUPS.map((g) => {
     const data = groups[g.label];
     if (!data || data.contribs.length === 0) {
-      return { label: g.label, lines: [] };
+      return { label: g.label, hasContribs: false };
     }
     // Screen / Viewing Geometry: single-parameter category — read the
     // authoritative RP23 result directly.
     if (g.label === SCREEN_CATEGORY_LABEL) {
       const screenContrib = data.contribs.find((c) => c.key === "screen");
       const worst = screenContrib ? worstLevelFromResultLevel(screenContrib.resultLevel) : null;
-      if (!worst) return { label: g.label, lines: [] };
-      const rp23Line = worst === "FAIL" ? "RP23 FAIL" : `RP23 Level ${levelNum(worst)}`;
-      const descriptor = worst === "FAIL"
-        ? "Improvement Required"
-        : (SCREEN_LEVEL_DESCRIPTOR[worst] ?? null);
-      return {
-        label: g.label,
-        lines: descriptor ? [`${rp23Line} · ${descriptor}`] : [rp23Line],
-      };
+      return { label: g.label, hasContribs: true, isScreen: true, screenWorst: worst };
     }
     // Count genuine FAIL parameters in this category. A FAIL dominates the
     // summary — positive headline wording must never hide a FAIL.
@@ -349,10 +407,9 @@ export function getCategoryAchievedSummaries(roomDesignRating) {
       if ((counts.FAIL || 0) > 0) failCount++;
     }
     if (failCount > 0) {
-      const failLine = failCount === 1 ? "1 parameter FAIL" : `${failCount} parameters FAIL`;
-      return { label: g.label, lines: ["Improvement Required", failLine] };
+      return { label: g.label, hasContribs: true, hasFail: true, failCount };
     }
-    // No FAIL: describe the dominant achieved profile + lowest result.
+    // No FAIL: build the weighted level profile.
     const profile = { L4: 0, L3: 0, L2: 0, L1: 0 };
     for (const c of data.contribs) {
       const w = Number(c.effectiveWeight) || 1;
@@ -363,7 +420,7 @@ export function getCategoryAchievedSummaries(roomDesignRating) {
     }
     const total = profile.L4 + profile.L3 + profile.L2 + profile.L1;
     if (total <= 0) {
-      return { label: g.label, lines: [] };
+      return { label: g.label, hasContribs: true, hasFail: false, noAchieved: true };
     }
     const achieved = [
       { key: "L4", w: profile.L4 },
@@ -377,29 +434,95 @@ export function getCategoryAchievedSummaries(roomDesignRating) {
     const balanced = second && second.w > 0 && dom.w > 0
       && second.w / dom.w >= 0.85
       && Math.abs(levelNum(dom.key) - levelNum(second.key)) === 1;
-
-    const lines = [];
     const allSame = achieved.length === 1;
-    if (allSame) {
-      lines.push(`Level ${levelNum(dom.key)} throughout`);
-    } else if (balanced) {
-      const a = Math.min(levelNum(dom.key), levelNum(second.key));
-      const b = Math.max(levelNum(dom.key), levelNum(second.key));
+    const lowest = achieved[achieved.length - 1];
+    return { label: g.label, hasContribs: true, hasFail: false, dom, second, balanced, allSame, lowest };
+  });
+}
+
+/**
+ * Structured per-category governing predominant level.
+ *
+ * Returns the lowest level that governs the category's headline ceiling.
+ * For balanced predominant ranges (e.g. "Predominantly Level 2–3"), the lower
+ * level is used as the governing floor. Returns "FAIL" if any parameter in
+ * the category has a genuine FAIL. Returns null for categories with no
+ * scored contributions.
+ *
+ * @param {Object} roomDesignRating — a scoped rating (e.g. scopedRatings.primary)
+ * @returns {Array<{label, governingLevel: string|null}>}
+ */
+export function getCategoryGoverningLevels(roomDesignRating) {
+  const profiles = buildCategoryProfileData(roomDesignRating);
+  if (!profiles) return [];
+  return profiles.map((p) => {
+    if (!p.hasContribs) return { label: p.label, governingLevel: null };
+    if (p.isScreen) return { label: p.label, governingLevel: p.screenWorst };
+    if (p.hasFail) return { label: p.label, governingLevel: "FAIL" };
+    if (p.noAchieved) return { label: p.label, governingLevel: null };
+    if (p.allSame) return { label: p.label, governingLevel: p.dom.key };
+    if (p.balanced) {
+      const lower = levelNum(p.dom.key) < levelNum(p.second.key) ? p.dom.key : p.second.key;
+      return { label: p.label, governingLevel: lower };
+    }
+    return { label: p.label, governingLevel: p.dom.key };
+  });
+}
+
+// ── Category achieved-performance summaries (Primary scope) ──────────────────
+// Derives concise achieved-performance descriptions from the scoped
+// contributions' weighted level profile. NOT percentage-based — no category
+// Design Performance Index is calculated. Used by the sidebar ASDR card to
+// present Spatial Resolution, Dynamic Range, Timbre Matching, and Screen /
+// Viewing Geometry summaries from the Primary seating scope.
+
+/**
+ * Per-category concise achieved-performance descriptions.
+ * @param {Object} roomDesignRating — a scoped rating (e.g. scopedRatings.primary)
+ * @returns {Array<{label, lines: string[]}>}
+ */
+export function getCategoryAchievedSummaries(roomDesignRating) {
+  const profiles = buildCategoryProfileData(roomDesignRating);
+  if (!profiles) return [];
+  return profiles.map((p) => {
+    if (!p.hasContribs) return { label: p.label, lines: [] };
+    if (p.isScreen) {
+      const worst = p.screenWorst;
+      if (!worst) return { label: p.label, lines: [] };
+      const rp23Line = worst === "FAIL" ? "RP23 FAIL" : `RP23 Level ${levelNum(worst)}`;
+      const descriptor = worst === "FAIL"
+        ? "Improvement Required"
+        : (SCREEN_LEVEL_DESCRIPTOR[worst] ?? null);
+      return {
+        label: p.label,
+        lines: descriptor ? [`${rp23Line} · ${descriptor}`] : [rp23Line],
+      };
+    }
+    if (p.hasFail) {
+      const failLine = p.failCount === 1 ? "1 parameter FAIL" : `${p.failCount} parameters FAIL`;
+      return { label: p.label, lines: ["Improvement Required", failLine] };
+    }
+    if (p.noAchieved) return { label: p.label, lines: [] };
+    const lines = [];
+    if (p.allSame) {
+      lines.push(`Level ${levelNum(p.dom.key)} throughout`);
+    } else if (p.balanced) {
+      const a = Math.min(levelNum(p.dom.key), levelNum(p.second.key));
+      const b = Math.max(levelNum(p.dom.key), levelNum(p.second.key));
       lines.push(`Predominantly Level ${a}–${b}`);
     } else {
-      lines.push(`Predominantly Level ${levelNum(dom.key)}`);
+      lines.push(`Predominantly Level ${levelNum(p.dom.key)}`);
     }
     // Show lowest result when it falls below the dominant/balanced range.
-    if (!allSame) {
-      const lowest = achieved[achieved.length - 1];
-      const floor = balanced
-        ? Math.min(levelNum(dom.key), levelNum(second.key))
-        : levelNum(dom.key);
-      if (levelNum(lowest.key) < floor) {
-        lines.push(`Lowest result: ${lowest.key}`);
+    if (!p.allSame) {
+      const floor = p.balanced
+        ? Math.min(levelNum(p.dom.key), levelNum(p.second.key))
+        : levelNum(p.dom.key);
+      if (levelNum(p.lowest.key) < floor) {
+        lines.push(`Lowest result: ${p.lowest.key}`);
       }
     }
-    return { label: g.label, lines };
+    return { label: p.label, lines };
   });
 }
 
