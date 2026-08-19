@@ -37,7 +37,7 @@ const labelStyle = {
 export default function InviteUserDialog({
   open,
   accounts,
-  preselectedAccountId,
+  preselectedAccountId = null,
   onInvited,
   onClose,
 }) {
