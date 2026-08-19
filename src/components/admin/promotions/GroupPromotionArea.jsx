@@ -25,7 +25,7 @@ const BRAND = {
  * Promotion management area shown between a dealer-group heading and its table.
  *
  * Props:
- * - groupKey: string (premiumPartners, richerSounds, otherDealers, distributors, internalTest)
+ * - groupKey: string (premiumPartners, richerSounds, otherDealers, distributors, internal, professional)
  * - promotions: Promotion[] (all promotions)
  * - promotionUsage: PromotionUsage[] (all usage records)
  * - allAccounts: Account[] (all accounts for eligible/usage resolution)

@@ -106,6 +106,10 @@ export default function AdminAccountsPage() {
     setPromoRefreshKey(k => k + 1);
   }
 
+  function handleAccountsChanged() {
+    setPromoRefreshKey(k => k + 1);
+  }
+
   async function handleCreateAdminAccount() {
     setSetupRunning(true);
     setSetupMessage(null);
@@ -352,36 +356,61 @@ export default function AdminAccountsPage() {
             onPromotionsChanged={handlePromotionsChanged}
           />
 
-          {/* INTERNAL / TEST */}
-          {(groups.internalTest?.length || 0) > 0 && (
-            <>
-              <div style={{
-                fontSize: 13, fontWeight: 700, color: BRAND.subtext,
-                textTransform: "uppercase", letterSpacing: "0.08em",
-                marginBottom: 16, marginTop: 8, paddingBottom: 8,
-                borderBottom: `2px solid ${BRAND.border}`,
-              }}>
-                Internal / Test
-              </div>
+          {/* INTERNAL */}
+          <div style={{
+            fontSize: 13, fontWeight: 700, color: BRAND.subtext,
+            textTransform: "uppercase", letterSpacing: "0.08em",
+            marginBottom: 16, marginTop: 8, paddingBottom: 8,
+            borderBottom: `2px solid ${BRAND.border}`,
+          }}>
+            Internal
+          </div>
 
-              <AccountGroupSection
-                title="Internal & Test Accounts"
-                subtitle="Sound Proof admin and test accounts"
-                accounts={groups.internalTest}
-                turnoverMap={turnoverMap}
-                capacityMap={capacityMap}
-                projectMap={projectMap}
-                emptyMessage="No internal or test accounts."
-                accentColor="#3E4349"
-                showCommercialColumns={false}
-                groupKey="internalTest"
-                promotions={promotions}
-                promotionUsage={promotionUsage}
-                allAccounts={accounts}
-                onPromotionsChanged={handlePromotionsChanged}
-              />
-            </>
-          )}
+          <AccountGroupSection
+            title="Internal Accounts"
+            subtitle="Sound Proof staff and development/test accounts"
+            accounts={groups.internal}
+            turnoverMap={turnoverMap}
+            capacityMap={capacityMap}
+            projectMap={projectMap}
+            emptyMessage="No internal accounts."
+            accentColor="#3E4349"
+            showCommercialColumns={false}
+            groupKey="internal"
+            promotions={promotions}
+            promotionUsage={promotionUsage}
+            allAccounts={accounts}
+            onPromotionsChanged={handlePromotionsChanged}
+            onAccountsChanged={handleAccountsChanged}
+          />
+
+          {/* PROFESSIONAL */}
+          <div style={{
+            fontSize: 13, fontWeight: 700, color: BRAND.subtext,
+            textTransform: "uppercase", letterSpacing: "0.08em",
+            marginBottom: 16, marginTop: 8, paddingBottom: 8,
+            borderBottom: `2px solid ${BRAND.border}`,
+          }}>
+            Professional
+          </div>
+
+          <AccountGroupSection
+            title="Professional Accounts"
+            subtitle="Non-dealer professional users — cinema designers and specifiers"
+            accounts={groups.professional}
+            turnoverMap={turnoverMap}
+            capacityMap={capacityMap}
+            projectMap={projectMap}
+            emptyMessage="No professional accounts yet."
+            accentColor="#625143"
+            showCommercialColumns={false}
+            groupKey="professional"
+            promotions={promotions}
+            promotionUsage={promotionUsage}
+            allAccounts={accounts}
+            onPromotionsChanged={handlePromotionsChanged}
+            onAccountsChanged={handleAccountsChanged}
+          />
         </>
       )}
     </div>

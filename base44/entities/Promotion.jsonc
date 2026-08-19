@@ -40,7 +40,8 @@
         "RICHER_SOUNDS",
         "OTHER_DEALER",
         "INTERNATIONAL",
-        "INTERNAL"
+        "INTERNAL",
+        "PROFESSIONAL"
       ],
       "nullable": true,
       "description": "Used when target_scope=ALL_DEALER_GROUP. Null otherwise."

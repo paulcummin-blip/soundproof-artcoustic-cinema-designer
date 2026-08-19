@@ -29,10 +29,11 @@
         "client",
         "admin",
         "demo",
-        "internal"
+        "internal",
+        "professional"
       ],
       "default": "dealer",
-      "description": "Account type. distributor = international distributor that allocates capacity to child dealer accounts; internal = Sound Proof internal organisation."
+      "description": "Account type. distributor = international distributor that allocates capacity to child dealer accounts; internal = Sound Proof internal organisation; professional = non-dealer professional user (cinema designers/specifiers) with Sound Proof access but no dealer page, trade pricing, or turnover tracking."
     },
     "dealer_group": {
       "type": "string",
@@ -41,9 +42,10 @@
         "RICHER_SOUNDS",
         "OTHER_DEALER",
         "INTERNATIONAL",
-        "INTERNAL"
+        "INTERNAL",
+        "PROFESSIONAL"
       ],
-      "description": "Commercial grouping for Admin presentation (Premium Partners, Richer Sounds, Other Dealers, International, Internal). Separate from account_type which describes the organisation role (dealer/distributor/etc)."
+      "description": "Commercial grouping for Admin presentation (Premium Partners, Richer Sounds, Other Dealers, International, Internal, Professional). Separate from account_type which describes the organisation role (dealer/distributor/etc)."
     },
     "parent_account_id": {
       "type": "string",

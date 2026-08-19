@@ -132,6 +132,7 @@ export const DEALER_GROUP_LABELS = {
   OTHER_DEALER: "Other Dealers",
   INTERNATIONAL: "International",
   INTERNAL: "Internal",
+  PROFESSIONAL: "Professional",
 };
 
 export const DEALER_GROUP_OPTIONS = [
@@ -139,6 +140,8 @@ export const DEALER_GROUP_OPTIONS = [
   { value: "RICHER_SOUNDS", label: "Richer Sounds" },
   { value: "OTHER_DEALER", label: "Other Dealers" },
   { value: "INTERNATIONAL", label: "International" },
+  { value: "INTERNAL", label: "Internal" },
+  { value: "PROFESSIONAL", label: "Professional" },
 ];
 
 export const TARGET_SCOPE_LABELS = {
@@ -237,7 +240,8 @@ export const GROUP_KEY_TO_DEALER_GROUP = {
   richerSounds: "RICHER_SOUNDS",
   otherDealers: "OTHER_DEALER",
   distributors: "INTERNATIONAL",
-  internalTest: "INTERNAL",
+  internal: "INTERNAL",
+  professional: "PROFESSIONAL",
 };
 
 const DEALER_GROUP_TO_GROUP_KEY = Object.fromEntries(
@@ -263,7 +267,8 @@ export function promotionBelongsToGroup(promotion, groupKey, allAccounts) {
     const mapped = DEALER_GROUP_TO_GROUP_KEY[target.dealer_group];
     if (mapped) return groupKey === mapped;
     if (target.account_type === "distributor") return groupKey === "distributors";
-    return groupKey === "internalTest";
+    if (target.account_type === "professional") return groupKey === "professional";
+    return groupKey === "internal";
   }
   return false;
 }

@@ -120,7 +120,8 @@ export function buildCapacityBreakdownMap(ledgerEntries) {
  *   richerSounds: Account[],
  *   otherDealers: Account[],
  *   distributors: Account[],
- *   internalTest: Account[],
+ *   internal: Account[],
+ *   professional: Account[],
  * }
  */
 export function groupAccountsByCommercialSection(accounts) {
@@ -129,7 +130,8 @@ export function groupAccountsByCommercialSection(accounts) {
     richerSounds: [],
     otherDealers: [],
     distributors: [],
-    internalTest: [],
+    internal: [],
+    professional: [],
   };
   if (!Array.isArray(accounts)) return groups;
   for (const a of accounts) {
@@ -143,13 +145,15 @@ export function groupAccountsByCommercialSection(accounts) {
       groups.otherDealers.push(a);
     } else if (dg === "INTERNATIONAL" || type === "distributor") {
       groups.distributors.push(a);
+    } else if (dg === "PROFESSIONAL" || type === "professional") {
+      groups.professional.push(a);
     } else if (dg === "INTERNAL" || type === "admin" || type === "internal") {
-      groups.internalTest.push(a);
+      groups.internal.push(a);
     } else if (type === "dealer" && !dg) {
-      // Ungrouped dealer accounts (e.g. test accounts) go to Internal/Test
-      groups.internalTest.push(a);
+      // Ungrouped dealer accounts (e.g. test accounts) go to Internal
+      groups.internal.push(a);
     } else {
-      groups.internalTest.push(a);
+      groups.internal.push(a);
     }
   }
   return groups;

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { computeLastActivity } from "@/lib/commercial/commercialOverview";
 import GroupPromotionArea from "@/components/admin/promotions/GroupPromotionArea";
+import AccountGroupActions from "@/components/admin/accounts/AccountGroupActions";
 import {
   isEffective,
   promotionBelongsToGroup,
@@ -174,6 +175,8 @@ export default function AccountGroupSection({
   promotionUsage = [],
   allAccounts = [],
   onPromotionsChanged = null,
+  // Account actions refresh (create account / invite user)
+  onAccountsChanged = null,
 }) {
   const count = accounts?.length || 0;
 
@@ -269,6 +272,15 @@ export default function AccountGroupSection({
           {count}
         </div>
       </div>
+
+      {/* Account actions (Internal / Professional groups) — create + invite */}
+      {(groupKey === "internal" || groupKey === "professional") && (
+        <AccountGroupActions
+          groupKey={groupKey}
+          accounts={accounts}
+          onChanged={onAccountsChanged}
+        />
+      )}
 
       {/* Promotion area — between heading and table */}
       {groupKey && (
