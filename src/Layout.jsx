@@ -15,7 +15,9 @@ import {
   Calculator,
   Layers3,
   Database,
-  Settings
+  Settings,
+  Tags,
+  UserCog
 } from "lucide-react";
 
 import ApiBadge from "@/components/ui/ApiBadge";
@@ -31,12 +33,15 @@ import PriceSummary from "@/components/pricing/PriceSummary";
 import DesignRatingSummary from "@/components/pricing/DesignRatingSummary";
 import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAuth } from "@/lib/AuthContext";
+import { hasCapability } from "@/lib/accountAccess";
 
 
 const menuItems = [
-  { title: "Projects", url: "/Projects", icon: Layers3 },
-  { title: "Room Designer", url: "/RoomDesigner", icon: Home },
-  { title: "SPL Calculator", url: "/SPLCalculator", icon: Calculator },
+  { title: "Projects", url: "/Projects", icon: Layers3, capability: "soundProof" },
+  { title: "Room Designer", url: "/RoomDesigner", icon: Home, capability: "soundProof" },
+  { title: "SPL Calculator", url: "/SPLCalculator", icon: Calculator, capability: "soundProof" },
+  { title: "Price List", url: "/PriceList", icon: Tags, capability: "priceList" },
+  { title: "Users & Permissions", url: "/account/users", icon: UserCog, capability: "manageUsers" },
 ];
 
 export default function Layout({ children, currentPageName }) {
@@ -44,6 +49,10 @@ export default function Layout({ children, currentPageName }) {
   const activeProjectId = useActiveProjectId();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const canUseSoundProof = hasCapability(user, "soundProof");
+  const canUsePriceList = hasCapability(user, "priceList");
+  const canUseCommercial = hasCapability(user, "commercial");
+  const availableMenuItems = menuItems.filter((item) => hasCapability(user, item.capability));
   const [dealerAccountUrl, setDealerAccountUrl] = React.useState(null);
 
   // Price summary state (read from window.__ROOM_DESIGNER_PRICE__ set by RoomDesigner)
@@ -163,7 +172,7 @@ export default function Layout({ children, currentPageName }) {
   React.useEffect(() => {
     let cancelled = false;
 
-    if (!user || isAdmin) {
+    if (!user || isAdmin || !canUseCommercial) {
       setDealerAccountUrl(null);
       return () => {
         cancelled = true;
@@ -190,7 +199,7 @@ export default function Layout({ children, currentPageName }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, isAdmin]);
+  }, [user?.id, isAdmin, canUseCommercial]);
 
   return (
     <SafeBootErrorBoundary>
@@ -245,7 +254,7 @@ export default function Layout({ children, currentPageName }) {
                   {(() => {
                     const currentPath = typeof window !== "undefined" ? (window.location?.pathname || "") : "";
 
-                    return menuItems.map((item) => {
+                    return availableMenuItems.map((item) => {
                       const itemPath = String(item.url || "");
                       const isActive = itemPath && (currentPath === itemPath || currentPath.startsWith(itemPath + "/"));
 
@@ -312,6 +321,7 @@ export default function Layout({ children, currentPageName }) {
                 );
               })()}
 
+              {canUseSoundProof && (
               <div className="mb-4" style={{ borderLeft: '4px solid #213428', paddingLeft: '12px', paddingTop: '6px', paddingBottom: '6px' }}>
                 <div className="text-xs font-medium text-brand-text-label mb-2 px-3" style={{ fontSize: 12, letterSpacing: '0.4px' }}>
                   Active Project
@@ -351,6 +361,7 @@ export default function Layout({ children, currentPageName }) {
                 )}
 
                 </div>
+              )}
 
                 {/* Book a Demo — all authenticated users, independent of commercial state */}
                 <a
@@ -375,7 +386,7 @@ export default function Layout({ children, currentPageName }) {
                 return null;
                 })()}
 
-            {priceSummary.showPrices && (
+            {canUsePriceList && priceSummary.showPrices && (
               <div className="p-4 border-t border-brand-border">
                 <PriceSummary
                   showPrices={priceSummary.showPrices}
@@ -392,7 +403,7 @@ export default function Layout({ children, currentPageName }) {
               </div>
             )}
 
-            {showAsdr && (
+            {canUseSoundProof && showAsdr && (
               <div className="border-t border-brand-border">
                 <DesignRatingSummary
                   showAsdr={showAsdr}
