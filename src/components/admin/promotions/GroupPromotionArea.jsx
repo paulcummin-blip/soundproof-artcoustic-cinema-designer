@@ -136,9 +136,6 @@ export default function GroupPromotionArea({
     }
   }
 
-  // Internal/test group: no promotion management
-  if (groupKey === "internalTest" && groupPromotions.length === 0) return null;
-
   return (
     <>
       {/* Active promotion summaries — vertical list (one per effective promotion) */}
