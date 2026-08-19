@@ -32,7 +32,7 @@ import { resolveSpeakerYaw } from '@/components/utils/speakerAimResolver';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import {
     getArtcousticCadBlockName,
-    emitArtcousticCadBlocks,
+    emitArtcousticCadBlockEntities,
     ARTCOUSTIC_CAD_LAYERS,
 } from '@/components/utils/cadProductBlocks';
 
@@ -514,9 +514,10 @@ function buildCadBlockRegistry(placedSpeakers, frontSubsCfg, rearSubsCfg) {
     return blocks;
 }
 
-function emitDxfBlocks(blocks) {
-    if (!blocks.size) return '';
+function emitDxfBlocks(blocks, prependEntities = '') {
+    if (!blocks.size && !prependEntities) return '';
     const out = ['0\nSECTION\n2\nBLOCKS'];
+    if (prependEntities) out.push(prependEntities);
     for (const { name, kind, fp, crossArm } of blocks.values()) {
         const layer = kind === 'speaker' ? 'SPEAKERS' : 'SUBWOOFERS';
         out.push(`0\nBLOCK\n8\n0\n2\n${name}\n70\n2\n10\n0\n20\n0\n30\n0`);
@@ -949,15 +950,14 @@ export function generateDXF({
     dxf.push('0\nENDTAB\n0\nENDSEC');
 
     // ── BLOCKS (speaker/subwoofer footprint definitions) ──────────────────────
-    // Artcoustic named product blocks are emitted first (from the reusable CAD
-    // block library), then the generic auto-generated footprint blocks for any
-    // product without a matching Artcoustic block. INSERT entities reference
-    // whichever block name applies per speaker/subwoofer.
-    const artcousticBlocksSection = emitArtcousticCadBlocks();
-    if (artcousticBlocksSection) dxf.push(artcousticBlocksSection);
-
+    // A valid DXF file must contain exactly ONE BLOCKS section. Artcoustic named
+    // product blocks (from the reusable CAD block library) and generic
+    // auto-generated footprint blocks (for products without a matching
+    // Artcoustic block) are merged into a single BLOCKS section here. INSERT
+    // entities reference whichever block name applies per speaker/subwoofer.
+    const artcousticBlockEntities = emitArtcousticCadBlockEntities();
     const cadBlocks = buildCadBlockRegistry(placedSpeakers, frontSubsCfg, rearSubsCfg);
-    const blocksSection = emitDxfBlocks(cadBlocks);
+    const blocksSection = emitDxfBlocks(cadBlocks, artcousticBlockEntities);
     if (blocksSection) dxf.push(blocksSection);
 
     // ── ENTITIES ─────────────────────────────────────────────────────────────

@@ -248,7 +248,9 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     const deriveCfgFromSubs = (subs) => {
       if (!subs.length) return null;
       const model = String(subs?.[0]?.model || "SUB2-12").trim() || "SUB2-12";
-      const positions = subs.map(s => ({ x: Number(s?.position?.x) })).filter(pos => Number.isFinite(pos.x));
+      const positions = subs
+        .map(s => ({ x: Number(s?.position?.x), y: Number(s?.position?.y) }))
+        .filter(pos => Number.isFinite(pos.x) && Number.isFinite(pos.y));
       return { model, count: subs.length, positions, tuning: [] };
     };
 

@@ -307,17 +307,27 @@ function emitProductBlock(product) {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Emit the full DXF BLOCKS section containing all Artcoustic product blocks.
- * Returns a complete `0\nSECTION\n2\nBLOCKS … 0\nENDSEC` string, or '' if empty.
+ * Emit the raw Artcoustic BLOCK … ENDBLK entity strings (no SECTION/ENDSEC
+ * wrapper). Used by cadExport.jsx to merge Artcoustic block definitions into a
+ * single BLOCKS section alongside generic fallback blocks — a valid DXF file
+ * must contain exactly one BLOCKS section.
+ * Returns the joined block-entity string, or '' if empty.
+ */
+export function emitArtcousticCadBlockEntities() {
+  if (!ARTCOUSTIC_CAD_PRODUCTS.length) return '';
+  return ARTCOUSTIC_CAD_PRODUCTS.map(emitProductBlock).join('\n');
+}
+
+/**
+ * Emit a complete DXF BLOCKS section containing all Artcoustic product blocks.
+ * Returns a `0\nSECTION\n2\nBLOCKS … 0\nENDSEC` string, or '' if empty.
+ * Kept for backward compatibility; cadExport.jsx now uses emitArtcousticCadBlockEntities
+ * to merge into a single BLOCKS section.
  */
 export function emitArtcousticCadBlocks() {
-  if (!ARTCOUSTIC_CAD_PRODUCTS.length) return '';
-  const out = ['0\nSECTION\n2\nBLOCKS'];
-  ARTCOUSTIC_CAD_PRODUCTS.forEach((product) => {
-    out.push(emitProductBlock(product));
-  });
-  out.push('0\nENDSEC');
-  return out.join('\n');
+  const entities = emitArtcousticCadBlockEntities();
+  if (!entities) return '';
+  return `0\nSECTION\n2\nBLOCKS\n${entities}\n0\nENDSEC`;
 }
 
 /**
