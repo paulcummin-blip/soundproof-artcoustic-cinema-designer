@@ -3,6 +3,7 @@ import { useAppState } from '@/components/AppStateProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
 import ParameterCard from '@/components/report/ParameterCard';
+import SeatScopedParameterCard from '@/components/report/SeatScopedParameterCard';
 import SeatComplianceSummary from '@/components/report/SeatComplianceSummary';
 import { useRP22AnalysisEngine } from '@/components/hooks/useRP22AnalysisEngine';
 import { formatSeatLabel } from '@/components/utils/seatLabel';
@@ -86,6 +87,57 @@ export default function ComplianceReportPrint() {
     
     return (minDist <= 0.05) ? closestSeat : null;
   }, [seats, mlp]);
+
+  // Build per-parameter seat results for seat-scoped parameters (P1, P4, P5, P6, P9, P10, P16, P17, P19, P20)
+  const seatScopedParamData = React.useMemo(() => {
+    return RP22_SEAT_PARAMETERS.map(param => {
+      const perSeatResults = seats.map(seat => {
+        const seatId = seat?.id || '—';
+        const tooltipData = app?.seatMetricsById?.[seatId];
+        const rp22Raw = tooltipData?.rp22 || {};
+        const isRsp = seatId === rspSeatId;
+        const isPrimary = tooltipData?.isPrimary || false;
+
+        let valueFormatted = '—';
+        let level = '—';
+
+        if (param.number === 19) {
+          const withP19 = attachAuthoritativeP19ToSeatSnapshot(
+            { rp22: rp22Raw }, seatId, isRsp,
+            completedBassContract?.productAnalysis?.parameters?.p19,
+            completedBassContract?.selectedCandidate?.perSeatP19Results,
+          );
+          const metric = withP19.rp22.p19;
+          valueFormatted = metric.formatted || '—';
+          level = metric.level || '—';
+        } else if (param.number === 20) {
+          const result = bassPresentation.perSeatP20Results.find(
+            (item) => String(item?.seatId) === String(seatId)
+          );
+          if (result && Number.isFinite(Number(result.variationDbRaw))) {
+            valueFormatted = formatAuthoritativeP20Result(result);
+            level = p20LevelText(result.level);
+          }
+        } else {
+          const metric = rp22Raw[`p${param.number}`] || rp22Raw[`P${param.number}`] || {};
+          valueFormatted = metric.formatted || metric.hudLabel || '—';
+          level = metric.level || '—';
+        }
+
+        const suffix = isRsp ? '(RSP)' : (isPrimary ? '(Primary)' : '');
+        return {
+          seatId,
+          seatLabel: formatSeatLabel(seatId),
+          suffix,
+          valueFormatted,
+          level,
+          isRsp,
+          isPrimary,
+        };
+      });
+      return { param, perSeatResults };
+    });
+  }, [seats, app?.seatMetricsById, rspSeatId, completedBassContract, bassPresentation]);
 
   // Auto-print once ready
   useEffect(() => {
@@ -213,11 +265,8 @@ export default function ComplianceReportPrint() {
               >
                 Seat Parameters
               </h2>
-              <div className="flex gap-3">
-                <RP22GradingPill level="L1" count={seatCounts.L1} />
-                <RP22GradingPill level="L2" count={seatCounts.L2} />
-                <RP22GradingPill level="L3" count={seatCounts.L3} />
-                <RP22GradingPill level="L4" count={seatCounts.L4} />
+              <div className="text-sm text-[#3E4349]" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+                Seat · Calculated · {seats.length} {seats.length === 1 ? 'seat' : 'seats'}
               </div>
             </div>
           </div>
@@ -258,68 +307,15 @@ export default function ComplianceReportPrint() {
               RP22 Parameters (Seat)
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {seats.map(seat => {
-                const seatId = seat?.id || '—';
-                const tooltipData = app?.seatMetricsById?.[seatId];
-                const rp22Raw = tooltipData?.rp22 || {};
-                const isPrimary = tooltipData?.isPrimary || false;
-
-                if (!tooltipData) return null;
-
-                const isRsp = seatId === rspSeatId;
-                const suffix = isRsp ? '(RSP)' : (isPrimary ? '(Primary)' : '(Secondary)');
-                const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
-
-                // Extract seat-specific parameters
-                const seatParamsList = RP22_SEAT_PARAMETERS.map(({ number }) => {
-                  if (number === 19) {
-                    const withP19 = attachAuthoritativeP19ToSeatSnapshot(
-                      { rp22: rp22Raw }, seatId, isRsp,
-                      completedBassContract?.productAnalysis?.parameters?.p19,
-                      completedBassContract?.selectedCandidate?.perSeatP19Results,
-                    );
-                    const metric = withP19.rp22.p19;
-                    return { num: 'P19', valueFormatted: metric.formatted, level: metric.level };
-                  }
-                  if (number === 20) {
-                    const result = bassPresentation.perSeatP20Results.find((item) => String(item?.seatId) === String(seatId));
-                    return result && Number.isFinite(Number(result.variationDbRaw))
-                      ? { num: 'P20', valueFormatted: formatAuthoritativeP20Result(result), level: p20LevelText(result.level) }
-                      : { num: 'P20', valueFormatted: '—', level: '—' };
-                  }
-                  const metric = rp22Raw[`p${number}`] || rp22Raw[`P${number}`] || {};
-                  return { num: `P${number}`, valueFormatted: metric.formatted || metric.hudLabel || '—', level: metric.level || '—' };
-                });
-
-                return (
-                  <div key={seatId} className="print-avoid-break">
-                    <Card className="border-[#E6E4DD]">
-                      <CardHeader className="pb-2">
-                        <CardTitle 
-                          className="text-sm font-semibold text-[#1B1A1A]"
-                          style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
-                        >
-                          {formatSeatLabel(seatId)}{' '}
-                          <span className="text-xs font-semibold" style={{ color: suffixColor }}>
-                            {suffix}
-                          </span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        {seatParamsList.map(param => (
-                          <div key={param.num} className="flex items-center justify-between text-xs">
-                            <span className="font-medium text-[#1B1A1A]">{param.num}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[#3E4349]">{param.valueFormatted ?? '—'}</span>
-                              <RP22GradingPill level={param.level} compact />
-                            </div>
-                          </div>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  </div>
-                );
-              })}
+              {seatScopedParamData.map(({ param, perSeatResults }) => (
+                <div key={param.id} className="print-avoid-break">
+                  <SeatScopedParameterCard
+                    param={param}
+                    perSeatResults={perSeatResults}
+                    seatCount={seats.length}
+                  />
+                </div>
+              ))}
             </div>
 
             {/* Explanatory Footer */}
