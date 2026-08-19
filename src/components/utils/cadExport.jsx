@@ -421,6 +421,102 @@ function dxfCross(layer, cx, cy, arm) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DXF R12 block / insert helpers
+// ─────────────────────────────────────────────────────────────────────────────
+// Speakers and subwoofers are emitted as INSERT references to BLOCK definitions
+// (one block per unique footprint shape). This makes each speaker/sub a single
+// selectable CAD object instead of 4 loose lines + a cross. Object metadata
+// (TYPE / MODEL / ROLE / ROTATION) is attached as XDATA on the INSERT entity,
+// readable via CAD property inspection. Geometry is identical to the previous
+// loose-line output — only the entity structure changes.
+
+const round2 = (n) => Math.round(Number(n || 0) * 100) / 100;
+
+function dxfInsert(layer, blockName, x, y, rotDeg, xdataPairs) {
+    let s = `0\nINSERT\n8\n${layer}\n2\n${blockName}\n10\n${Math.round(x)}\n20\n${Math.round(y)}\n50\n${round2(rotDeg)}`;
+    if (xdataPairs && xdataPairs.length) {
+        s += `\n1001\nSOUNDPROOF`;
+        xdataPairs.forEach(([code, val]) => { s += `\n${code}\n${val}`; });
+    }
+    return s;
+}
+
+function footprintBlockKey(kind, fp, crossArm) {
+    return `${kind}|${fp.planWidthMm}|${fp.planDepthMm}|${fp.isRound}|${fp.diameterMm}|${crossArm}`;
+}
+
+function speakerFootprintMeta(modelName, role) {
+    const wall = classifyWall(role);
+    if (wall === 'overhead') {
+        const r = getOverheadRadiusMm(modelName);
+        const d = r * 2;
+        const fp = { planWidthMm: d, planDepthMm: d, isRound: true, diameterMm: d };
+        const crossArm = Math.round(r * 0.45);
+        return { fp, crossArm, blockKey: footprintBlockKey('speaker', fp, crossArm) };
+    }
+    const fp = getSpeakerFootprintMm(modelName, role);
+    const hw = fp.planWidthMm / 2;
+    const hd = fp.planDepthMm / 2;
+    const crossArm = fp.isRound ? Math.round((fp.diameterMm / 2) * 0.45) : Math.round(Math.min(hw, hd) * 0.4);
+    return { fp, crossArm, blockKey: footprintBlockKey('speaker', fp, crossArm) };
+}
+
+function subFootprintMeta(sub) {
+    const fp = getSpeakerFootprintMm(sub.model || sub.brand_model || '', 'SUB', sub.orientation || 'vertical');
+    const hw = fp.planWidthMm / 2;
+    const hd = fp.planDepthMm / 2;
+    const crossArm = Math.round(Math.min(hw, hd) * 0.35);
+    return { fp, crossArm, blockKey: footprintBlockKey('sub', fp, crossArm) };
+}
+
+function buildCadBlockRegistry(placedSpeakers, frontSubsCfg, rearSubsCfg) {
+    const blocks = new Map();
+    let counter = 0;
+    const ensure = (kind, fp, crossArm) => {
+        const key = footprintBlockKey(kind, fp, crossArm);
+        if (!blocks.has(key)) {
+            blocks.set(key, { name: `${kind === 'speaker' ? 'SPK' : 'SUB'}_${counter++}`, kind, fp, crossArm });
+        }
+        return blocks.get(key);
+    };
+    (placedSpeakers || []).forEach(spk => {
+        const role = String(spk?.role || '').toUpperCase();
+        if (!role || role === 'LFE') return;
+        const { fp, crossArm } = speakerFootprintMeta(spk.model || spk.brand_model || '', role);
+        ensure('speaker', fp, crossArm);
+    });
+    const scanSubs = (cfg) => (cfg?.positions || []).forEach(sub => {
+        const { fp, crossArm } = subFootprintMeta(sub);
+        ensure('sub', fp, crossArm);
+    });
+    scanSubs(frontSubsCfg);
+    scanSubs(rearSubsCfg);
+    return blocks;
+}
+
+function emitDxfBlocks(blocks) {
+    if (!blocks.size) return '';
+    const out = ['0\nSECTION\n2\nBLOCKS'];
+    for (const { name, kind, fp, crossArm } of blocks.values()) {
+        const layer = kind === 'speaker' ? 'SPEAKERS' : 'SUBWOOFERS';
+        out.push(`0\nBLOCK\n8\n0\n2\n${name}\n70\n2\n10\n0\n20\n0\n30\n0`);
+        if (fp.isRound) {
+            const r = Math.round(fp.diameterMm / 2);
+            out.push(`0\nCIRCLE\n8\n${layer}\n10\n0\n20\n0\n40\n${r}`);
+            out.push(dxfCross('CABLE_POINTS', 0, 0, crossArm));
+        } else {
+            const hw = Math.round(fp.planWidthMm / 2);
+            const hd = Math.round(fp.planDepthMm / 2);
+            out.push(dxfRect(layer, -hw, -hd, fp.planWidthMm, fp.planDepthMm));
+            out.push(dxfCross('CABLE_POINTS', 0, 0, crossArm));
+        }
+        out.push('0\nENDBLK\n8\n0');
+    }
+    out.push('0\nENDSEC');
+    return out.join('\n');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SVG primitive builders
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -824,7 +920,16 @@ export function generateDXF({
     ALL_LAYERS.forEach(name => {
         dxf.push(`0\nLAYER\n2\n${name}\n70\n0\n62\n7\n6\nCONTINUOUS`);
     });
+    dxf.push('0\nENDTAB');
+    // APPID table — registers the SOUNDPROOF XDATA application name
+    dxf.push('0\nTABLE\n2\nAPPID\n70\n1');
+    dxf.push('0\nAPPID\n2\nSOUNDPROOF\n70\n0');
     dxf.push('0\nENDTAB\n0\nENDSEC');
+
+    // ── BLOCKS (speaker/subwoofer footprint definitions) ──────────────────────
+    const cadBlocks = buildCadBlockRegistry(placedSpeakers, frontSubsCfg, rearSubsCfg);
+    const blocksSection = emitDxfBlocks(cadBlocks);
+    if (blocksSection) dxf.push(blocksSection);
 
     // ── ENTITIES ─────────────────────────────────────────────────────────────
     dxf.push('0\nSECTION\n2\nENTITIES');
@@ -915,10 +1020,10 @@ export function generateDXF({
         dxf.push(dxfText('LABELS', sx + 160, sy + 40, TEXT_H, isMLP ? 'MLP' : `S${idx + 1}`));
     });
 
-    // SPEAKERS — true product footprints with rotation
-    // Rotation priority: rotation_deg → yaw_deg → 0
-    // Rotated footprints are drawn as four DXF LINE segments (closed polyline equivalent).
-    // DXF R12 does not have a native rotate-rect entity, so we rotate the four corners manually.
+    // SPEAKERS — emitted as INSERT references to footprint BLOCK definitions.
+    // Each speaker is a single selectable CAD object (block reference) with XDATA
+    // metadata (TYPE / MODEL / ROLE / ROTATION). Geometry is identical to the
+    // previous loose-line output; only the entity structure changes.
     (placedSpeakers || []).forEach(spk => {
         if (!Number.isFinite(spk?.position?.x) || !Number.isFinite(spk?.position?.y)) return;
         const role = String(spk?.role || '').toUpperCase();
@@ -945,58 +1050,38 @@ export function generateDXF({
         const cosR = Math.cos(rotRad);
         const sinR = Math.sin(rotRad);
 
-        if (wall === 'overhead') {
-            // In-ceiling speakers: true-scale round symbol from product metadata
-            const r = getOverheadRadiusMm(modelName);
-            dxf.push(`0\nCIRCLE\n8\nSPEAKERS\n10\n${spx}\n20\n${spy}\n40\n${r}`);
-            dxf.push(dxfCross('CABLE_POINTS', spx, spy, Math.round(r * 0.45)));
-            dxf.push(dxfText('LABELS', spx + r + LABEL_OFFSET, spy + 30, TEXT_H, role));
-            return;
-        }
+        const meta = speakerFootprintMeta(modelName, role);
+        const blockName = cadBlocks.get(meta.blockKey)?.name || 'SPK_0';
 
-        const { planWidthMm, planDepthMm, isRound, diameterMm } = getSpeakerFootprintMm(modelName, role);
-
-        if (isRound) {
-            // Round wall speakers: no rotation needed
-            const r = Math.round(diameterMm / 2);
-            dxf.push(`0\nCIRCLE\n8\nSPEAKERS\n10\n${spx}\n20\n${spy}\n40\n${r}`);
-            dxf.push(dxfCross('CABLE_POINTS', spx, spy, Math.round(r * 0.45)));
-            dxf.push(dxfText('LABELS', spx + r + LABEL_OFFSET, spy + 30, TEXT_H, role));
+        let insX, insY, insRot;
+        if (wall === 'overhead' || meta.fp.isRound) {
+            insX = spx; insY = spy; insRot = 0;
         } else if (rotDeg !== 0) {
-            // Rotated rectangle: compute corners, apply wall buffer, then draw
-            const hw = planWidthMm / 2;
-            const hd = planDepthMm / 2;
+            const hw = meta.fp.planWidthMm / 2;
+            const hd = meta.fp.planDepthMm / 2;
             const rawCorners = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([dx, dy]) => [
                 spx + dx * cosR - dy * sinR,
                 spy + dx * sinR + dy * cosR,
             ]);
             const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role);
-            const cx0 = spx + shiftX;
-            const cy0 = spy + shiftY;
-            // Re-compute shifted corners
-            const rotated = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([dx, dy]) => [
-                Math.round(cx0 + dx * cosR - dy * sinR),
-                Math.round(cy0 + dx * sinR + dy * cosR),
-            ]);
-            for (let i = 0; i < 4; i++) {
-                const [x1, y1] = rotated[i];
-                const [x2, y2] = rotated[(i + 1) % 4];
-                dxf.push(dxfLine('SPEAKERS', x1, y1, x2, y2));
-            }
-            dxf.push(dxfCross('CABLE_POINTS', cx0, cy0, Math.round(Math.min(hw, hd) * 0.4)));
-            dxf.push(dxfText('LABELS', cx0 + Math.round(planWidthMm / 2) + LABEL_OFFSET, cy0 + 30, TEXT_H, role));
+            insX = spx + shiftX; insY = spy + shiftY; insRot = rotDeg;
         } else {
-            // Axis-aligned: apply buffer using AABB
-            const hw = Math.round(planWidthMm / 2);
-            const hd = Math.round(planDepthMm / 2);
+            const hw = meta.fp.planWidthMm / 2;
+            const hd = meta.fp.planDepthMm / 2;
             const rawCorners = [[spx - hw, spy - hd], [spx + hw, spy - hd], [spx + hw, spy + hd], [spx - hw, spy + hd]];
             const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role);
-            const cx0 = spx + shiftX;
-            const cy0 = spy + shiftY;
-            dxf.push(dxfRect('SPEAKERS', cx0 - hw, cy0 - hd, planWidthMm, planDepthMm));
-            dxf.push(dxfCross('CABLE_POINTS', cx0, cy0, Math.round(Math.min(hw, hd) * 0.4)));
-            dxf.push(dxfText('LABELS', cx0 + hw + LABEL_OFFSET, cy0 + 30, TEXT_H, role));
+            insX = spx + shiftX; insY = spy + shiftY; insRot = 0;
         }
+
+        dxf.push(dxfInsert('SPEAKERS', blockName, insX, insY, insRot, [
+            ['1000', `TYPE=Speaker`],
+            ['1000', `MODEL=${modelName || ''}`],
+            ['1000', `ROLE=${role}`],
+            ['1040', round2(insRot)],
+        ]));
+
+        const labelOffset = meta.fp.isRound ? Math.round(meta.fp.diameterMm / 2) : Math.round(meta.fp.planWidthMm / 2);
+        dxf.push(dxfText('LABELS', insX + labelOffset + LABEL_OFFSET, insY + 30, TEXT_H, role));
     });
 
     // SUBWOOFERS — true product footprints with orientation
@@ -1005,13 +1090,14 @@ export function generateDXF({
         const sx = cx(sub.x);
         const sy = cy(sub.y);
         const label = `${prefix}${idx + 1}`;
-        const { planWidthMm, planDepthMm } = getSpeakerFootprintMm(
-            sub.model || sub.brand_model || '', 'SUB', sub.orientation || 'vertical'
-        );
-        const hw = Math.round(planWidthMm / 2);
-        const hd = Math.round(planDepthMm / 2);
-        dxf.push(dxfRect('SUBWOOFERS', sx - hw, sy - hd, planWidthMm, planDepthMm));
-        dxf.push(dxfCross('CABLE_POINTS', sx, sy, Math.round(Math.min(hw, hd) * 0.35)));
+        const meta = subFootprintMeta(sub);
+        const blockName = cadBlocks.get(meta.blockKey)?.name || 'SUB_0';
+        dxf.push(dxfInsert('SUBWOOFERS', blockName, sx, sy, 0, [
+            ['1000', `TYPE=Subwoofer`],
+            ['1000', `MODEL=${sub.model || sub.brand_model || ''}`],
+            ['1000', `ROLE=${label}`],
+        ]));
+        const hw = Math.round(meta.fp.planWidthMm / 2);
         dxf.push(dxfText('LABELS', sx + hw + LABEL_OFFSET, sy + 30, TEXT_H, label));
     };
 
