@@ -3,6 +3,7 @@ import {
   PARTNER_PORTAL_SOURCE,
   resolveDealerAccountNavigation,
 } from '../../shared/dealerNavigationAuthority.js';
+import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 
 /**
  * Read-only Sound Proof -> Partner Portal navigation resolver.
@@ -20,6 +21,13 @@ export default async function(req) {
     const base44 = createClientFromRequest(req);
     const sessionUser = await base44.auth.me();
     if (!sessionUser) {
+      return Response.json({ eligible: false });
+    }
+
+    const accessContext = await resolveAccountAccess(base44, sessionUser);
+    try {
+      assertCapability(accessContext, 'commercial');
+    } catch {
       return Response.json({ eligible: false });
     }
 
