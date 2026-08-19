@@ -21,7 +21,7 @@ export function hasCapability(user, capability) {
 }
 
 export function defaultPathForUser(user) {
-  if (isMasterAdmin(user)) return "/admin";
+  if (isMasterAdmin(user)) return "/Projects";
   if (hasCapability(user, "soundProof")) return "/Projects";
   if (hasCapability(user, "priceList")) return "/PriceList";
   if (hasCapability(user, "manageUsers")) return "/account/users";
