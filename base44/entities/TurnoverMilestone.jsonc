@@ -50,6 +50,11 @@
                   ""
                 ]
               }
+            },
+            {
+              "user_condition": {
+                "data.access_level": "FULL_ACCESS"
+              }
             }
           ]
         },
