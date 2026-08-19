@@ -16,14 +16,9 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { buildVisualReportTitle } from "@/components/report/reportPdfTitle";
 
 const PRINT_TIMEOUT_MS = 60000;
-
-function sanitiseProjectName(name) {
-  if (!name) return "Untitled";
-  const cleaned = String(name).replace(/[<>:"/\\|?*]/g, " ").trim();
-  return cleaned || "Untitled";
-}
 
 function decodeLogo(url) {
   return new Promise((resolve) => {
@@ -106,7 +101,7 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
 
       // 4. Set temporary document title
       originalTitleRef.current = document.title;
-      document.title = `Sound Proof - ${sanitiseProjectName(projectName)} - Visual Report`;
+      document.title = buildVisualReportTitle(projectName);
 
       // 5. Wait two animation frames for print layout to settle
       await new Promise((resolve) =>
