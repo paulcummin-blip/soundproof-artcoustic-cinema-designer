@@ -7,7 +7,7 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, getCompletedBassAuthority, hasAuthoritativeResult } from "./completedBassResultStore";
+import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, getCompletedBassAuthority, getCompletedBassContract, hasAuthoritativeResult } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
 import { useTargetCacheEntry, clearTargetCacheForDesign, hydrateTargetCache } from "./p14TargetCache";
@@ -145,6 +145,16 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       return; // Skip controller when cache hit — no optimiser run
     }
     if (isDragging || !fingerprints) return; // Defer during drag; skip when analysis is blocked
+    // ── Route-navigation guard ──────────────────────────────────────────
+    // When returning to Room Designer after viewing a report (Technical /
+    // Visual / Design Review), the completed bass store already holds the
+    // authoritative contract for this fingerprint. Skip the optimiser
+    // entirely — no recalculation, no worker, no lag. The fallback contract
+    // (effectiveCompletedContract below) feeds the bass graph immediately.
+    if (hasAuthoritativeResult(scopeId, cacheKey)) {
+      controller.cancelActive("authority-restored");
+      return;
+    }
     controller.ensureProtocolCompatibility(BASS_OPTIMISER_VERSIONS);
     controller.updateInputs({
       valid: inputsValid,
@@ -158,6 +168,16 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   useEffect(() => () => { controller.dispose(); scopeRef.current?.clear(); }, [controller]);
 
   const detailedStatus = LEGACY_STATUS[lifecycle.status] || "IDLE";
+  // ── Fallback: completed bass store contract ──────────────────────────
+  // When the controller is idle (route return, authority-restored skip),
+  // use the persisted authoritative contract from completedBassResultStore
+  // so the bass graph and compliance UI render immediately without waiting
+  // for a redundant optimiser run. Only used when the fingerprint matches
+  // the current calibration fingerprint — prevents stale graphs after a
+  // design change.
+  const completedContract = getCompletedBassContract(scopeId);
+  const completedFingerprint = completedContract?.job?.resultFingerprint || null;
+  const completedContractMatches = completedFingerprint && cacheKey && completedFingerprint === cacheKey;
   const matchingResult = lifecycle.status === "ready" && lifecycle.resultFingerprint === cacheKey ? lifecycle.result : null;
   const selectionAttempt = useMemo(() => {
     if (!matchingResult?.pool) return { result: null, error: null };
@@ -325,6 +345,15 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       publishCachedCompactBassContract(scopeId, cachedContract);
       return;
     }
+    // ── Authority already restored: no publish, no sync, no recalculation ──
+    // When returning from a report route, the completed bass store already
+    // holds the authoritative contract for this fingerprint. The controller
+    // is skipped (authority-restored guard above) so contract is null. Don't
+    // call syncPersistentBassAuthority with a null contract — it would
+    // needlessly rewrite the DB. The authority is already live.
+    if (!contract && fingerprints && hasAuthoritativeResult(scopeId, cacheKey)) {
+      return;
+    }
     if (!fingerprints) {
       // Subwoofer instances / project inputs may still be hydrating. Don't wipe
       // a valid hydrated authoritative result until the live fingerprint can be
@@ -386,7 +415,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // method handles same-design updates (just changes foreground target) and
   // design changes (cancels and restarts). Background results are cache-only
   // and NEVER published to the live UI.
-  const foregroundReady = cachedContract || (optimisationResult && matchingResult);
+  const foregroundReady = cachedContract || (optimisationResult && matchingResult) || completedContractMatches;
   const designContextRef = useRef(null);
   designContextRef.current = useMemo(() => ({
     payload, sources, usableLfHz: designEqSystemLimits?.usableLfHz,
@@ -411,7 +440,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     });
   }, [baseDesignFingerprint, targetKey, foregroundReady, allTargets, scopeId]);
 
-  const effectiveContract = cachedContract || contract;
-  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative });
+  const effectiveContract = cachedContract || contract || (completedContractMatches ? completedContract : null);
+  // When using the fallback completed contract (controller skipped), show
+  // COMPLETE status so the bass graph and status indicators don't flash IDLE.
+  const effectiveDetailedStatus = (effectiveContract && !cachedContract && !contract && completedContractMatches) ? "COMPLETE" : detailedStatus;
+  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

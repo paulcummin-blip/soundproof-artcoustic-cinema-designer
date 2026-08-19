@@ -294,6 +294,21 @@ export async function hydrateCompletedBassAuthority(projectId) {
     completedByFingerprint: record.completed_by_fingerprint,
   } : null;
   const next = resolvePersistedBassAuthority(key, persisted);
+
+  // ── Route-navigation guard ──────────────────────────────────────────
+  // When navigating between Room Designer and report pages (Technical
+  // Report, Visual Report, Design Review) within the same session, the
+  // in-memory authority is the most recent state. The DB may lag behind
+  // because syncPersistentBassAuthority is async. Never overwrite an
+  // authoritative in-memory result with a non-authoritative DB record
+  // (stale "updating"/"uncalculated"/null) — that would reset P14/P18/
+  // P19/P20 to blank and trigger a recalculation solely because the
+  // report route opened. The DB is only authoritative for fresh page
+  // loads / new sessions where no in-memory state exists.
+  if (current?.authoritative && current?.contract && !next?.authoritative) {
+    return current;
+  }
+
   // Ignore unchanged snapshot — don't publish a new store object or notify
   // listeners merely because a realtime callback fired. Compares canonical
   // result fingerprint + status + authority flags, not object identity.
