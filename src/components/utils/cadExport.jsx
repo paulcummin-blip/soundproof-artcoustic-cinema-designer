@@ -967,8 +967,11 @@ export function generateDXF({
     dxf.push(dxfLine('ROOM_OUTLINE', W, L, W, 0)); // right wall
     dxf.push(dxfLine('ROOM_OUTLINE', W, 0, 0, 0)); // rear wall
     dxf.push(dxfLine('ROOM_OUTLINE', 0, 0, 0, L)); // left wall
-    dxf.push(dxfText('LABELS', W / 2, L + 80, 80, 'FRONT / SCREEN WALL'));
-    dxf.push(dxfText('LABELS', W / 2, -50, 80, 'REAR WALL'));
+    // Room boundary labels — moved clear of room outline geometry
+    // FRONT / SCREEN WALL: above front wall (Y > L) with 150 mm spacing
+    dxf.push(dxfText('LABELS', W / 2 - 430, L + 150, 80, 'FRONT / SCREEN WALL'));
+    // REAR WALL: below rear wall (Y < 0); baseline at -130 so text top sits 50 mm below wall
+    dxf.push(dxfText('LABELS', W / 2 - 220, -130, 80, 'REAR WALL'));
 
     // SCREEN GEOMETRY
     const sg = resolveScreenGeomMm(screenMetrics, screenFrontPlaneM, roomW, roomL);
