@@ -11,6 +11,7 @@ import {
 
 const OCCUPIED_STATUSES = new Set(['pending', 'active']);
 const ADMIN_ROLES = new Set(['dealer_admin', 'distributor_admin', 'internal_admin']);
+const LEGACY_MEMBERSHIP_ROLES = new Set(['designer', 'viewer']);
 
 function errorResponse(code, message, status = 400) {
   return Response.json({ error: code, message }, { status });
@@ -33,9 +34,25 @@ function isMembershipAdmin(membership) {
   return membership?.is_account_admin === true || ADMIN_ROLES.has(membership?.membership_role);
 }
 
-function memberView(membership, userById) {
+function accountAdminMembershipId(memberships) {
+  const occupied = (memberships || []).filter((membership) =>
+    OCCUPIED_STATUSES.has(membership.status || 'active')
+  );
+  const explicit = occupied.find(isMembershipAdmin);
+  if (explicit) return explicit.id;
+
+  // Existing single-user accounts pre-date account administration. Their sole
+  // legacy designer/viewer seat is the primary administrator by definition.
+  if (occupied.length === 1 && LEGACY_MEMBERSHIP_ROLES.has(occupied[0]?.membership_role)) {
+    return occupied[0].id;
+  }
+  return null;
+}
+
+function memberView(membership, userById, inferredAdminId = null) {
   const linkedUser = membership?.user_id ? userById.get(membership.user_id) : null;
-  const level = isMembershipAdmin(membership)
+  const accountAdmin = isMembershipAdmin(membership) || membership?.id === inferredAdminId;
+  const level = accountAdmin
     ? ACCESS_LEVELS.FULL_ACCESS
     : normaliseAccessLevel(membership?.access_level, ACCESS_LEVELS.FULL_ACCESS);
   return {
@@ -44,8 +61,8 @@ function memberView(membership, userById) {
     email: normaliseEmail(membership.email || linkedUser?.email),
     full_name: membership.full_name || linkedUser?.full_name || null,
     access_level: level,
-    access_label: isMembershipAdmin(membership) ? 'Account Admin' : accessLabel(level),
-    is_account_admin: isMembershipAdmin(membership),
+    access_label: accountAdmin ? 'Account Admin' : accessLabel(level),
+    is_account_admin: accountAdmin,
     status: membership.status || (linkedUser ? 'active' : 'pending'),
     invited_at: membership.invited_at || null,
     accepted_at: membership.accepted_at || null,
@@ -71,8 +88,9 @@ async function loadAccountUsers(service, account) {
     service.entities.AccountUserAudit.filter({ account_id: account.id }, '-occurred_at', 100),
   ]);
   const userById = new Map((accountUsers || []).map((user) => [user.id, user]));
+  const inferredAdminId = accountAdminMembershipId(memberships || []);
   const members = (memberships || [])
-    .map((membership) => memberView(membership, userById))
+    .map((membership) => memberView(membership, userById, inferredAdminId))
     .sort((a, b) => {
       if (a.is_account_admin !== b.is_account_admin) return a.is_account_admin ? -1 : 1;
       return String(a.email).localeCompare(String(b.email));
@@ -164,9 +182,11 @@ export default async function(req) {
       }
       for (const membership of (memberships || [])) {
         if (!byAccount.has(membership.account_id)) continue;
-        byAccount.get(membership.account_id).members.push(memberView(membership, userById));
+        byAccount.get(membership.account_id).members.push(membership);
       }
       const rows = Array.from(byAccount.values()).map((row) => {
+        const inferredAdminId = accountAdminMembershipId(row.members);
+        row.members = row.members.map((membership) => memberView(membership, userById, inferredAdminId));
         row.members.sort((a, b) => {
           if (a.is_account_admin !== b.is_account_admin) return a.is_account_admin ? -1 : 1;
           return String(a.email).localeCompare(String(b.email));
@@ -193,6 +213,7 @@ export default async function(req) {
     const occupied = allMemberships.filter((membership) =>
       OCCUPIED_STATUSES.has(membership.status || 'active')
     );
+    const protectedAdminId = accountAdminMembershipId(allMemberships);
 
     if (action === 'invite') {
       const email = normaliseEmail(body.email);
@@ -205,7 +226,7 @@ export default async function(req) {
       }
 
       const makeAccountAdmin = context.isMasterAdmin && body.is_account_admin === true;
-      const existingAccountAdmin = occupied.find(isMembershipAdmin);
+      const existingAccountAdmin = occupied.find((membership) => membership.id === protectedAdminId);
       if (makeAccountAdmin && existingAccountAdmin) {
         return errorResponse('ACCOUNT_ADMIN_EXISTS', 'This account already has its primary administrator.', 409);
       }
@@ -306,7 +327,7 @@ export default async function(req) {
     }
 
     if (action === 'change_access') {
-      if (isMembershipAdmin(target)) {
+      if (isMembershipAdmin(target) || target.id === protectedAdminId) {
         return errorResponse('ACCOUNT_ADMIN_FIXED', 'The primary administrator always has Full Access.', 409);
       }
       if (!OCCUPIED_STATUSES.has(target.status || 'active')) {
@@ -364,7 +385,7 @@ export default async function(req) {
     }
 
     if (action === 'remove') {
-      if (isMembershipAdmin(target)) {
+      if (isMembershipAdmin(target) || target.id === protectedAdminId) {
         return errorResponse('ACCOUNT_ADMIN_FIXED', 'The primary account administrator cannot be removed.', 409);
       }
       if (target.user_id === context.user.id) {
