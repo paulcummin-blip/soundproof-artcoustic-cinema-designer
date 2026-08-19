@@ -35,7 +35,7 @@ export default function AccountUsersPanel({ accountId = null }) {
   const masterView = Boolean(accountId);
   const [data, setData] = useState(null);
   const [email, setEmail] = useState("");
-  const [accessLevel, setAccessLevel] = useState(ACCESS_LEVELS.FULL_ACCESS);
+  const [accessLevel, setAccessLevel] = useState(() => String(ACCESS_LEVELS.FULL_ACCESS));
   const [makeAdmin, setMakeAdmin] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
