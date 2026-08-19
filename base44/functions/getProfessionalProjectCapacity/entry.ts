@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 
 /**
  * Read-only Professional Project capacity reader.
@@ -22,6 +23,13 @@ export default async function(req) {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ status: "ACCOUNT_NOT_LINKED", available: null });
+
+    const accessContext = await resolveAccountAccess(base44, user);
+    try {
+      assertCapability(accessContext, 'commercial');
+    } catch {
+      return Response.json({ status: "FORBIDDEN", available: null }, { status: 403 });
+    }
 
     // Resolve authoritative account_id from the authenticated user record.
     const userRecords = await base44.asServiceRole.entities.User.filter({ id: user.id });
