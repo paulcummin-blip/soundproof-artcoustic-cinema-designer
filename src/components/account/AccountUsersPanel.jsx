@@ -68,6 +68,10 @@ export default function AccountUsersPanel({ accountId = null }) {
     [data],
   );
 
+  useEffect(() => {
+    if (masterView && data && !activeAdmin) setMakeAdmin(true);
+  }, [masterView, data, activeAdmin]);
+
   async function run(action, payload, successMessage) {
     setError("");
     setNotice("");
@@ -101,7 +105,7 @@ export default function AccountUsersPanel({ accountId = null }) {
       email: cleanEmail,
       access_level: makeAdmin ? ACCESS_LEVELS.FULL_ACCESS : accessLevel,
       is_account_admin: masterView && makeAdmin,
-    }, `Invitation sent to ${cleanEmail}.`);
+    }, `User access created for ${cleanEmail}.`);
 
     if (invited) {
       setEmail("");
