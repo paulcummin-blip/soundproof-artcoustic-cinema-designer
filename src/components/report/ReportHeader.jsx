@@ -93,6 +93,7 @@ export default function ReportHeader({
     };
 
     const handleExportSVG = () => {
+        if (exportDisabled) return;
         const date = new Date().toISOString().split('T')[0];
         const filename = `RP22_CAD_Overlay_RP22Report_${date}.svg`;
         const svgContent = generateSVG({
@@ -114,6 +115,7 @@ export default function ReportHeader({
     };
 
     const handleExportDXF = () => {
+        if (exportDisabled) return;
         const date = new Date().toISOString().split('T')[0];
         const filename = `RP22_CAD_Overlay_RP22Report_${date}.dxf`;
         const dxfContent = generateDXF({
@@ -201,7 +203,9 @@ export default function ReportHeader({
                     <Button
                         type="button"
                         onClick={() => setShowCadExportMenu(!showCadExportMenu)}
-                        className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] whitespace-nowrap"
+                        disabled={exportDisabled}
+                        title={exportDisabled ? "CAD export is preparing the project data. Please wait." : "Download CAD Overlay (DXF/SVG)"}
+                        className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap"
                         style={{
                             fontFamily: "Futura PT Light, Century Gothic, sans-serif",
                             backgroundColor: "#FFFFFF",
@@ -213,7 +217,7 @@ export default function ReportHeader({
                         }}
                     >
                         <Download className="w-4 h-4 mr-2" style={{ color: "#625143", flexShrink: 0 }} />
-                        Download CAD Overlay
+                        {exportDisabled ? "Preparing CAD…" : "Download CAD Overlay"}
                     </Button>
 
                     {showCadExportMenu && (
@@ -235,10 +239,25 @@ export default function ReportHeader({
                             <div style={{ fontSize: '11px', color: '#3E4349', marginBottom: '10px' }}>
                                 Plan view only • true scale • overlay use
                             </div>
+                            {exportDisabled && (
+                                <div style={{
+                                    fontSize: '11px',
+                                    color: '#625143',
+                                    marginBottom: '10px',
+                                    padding: '6px 8px',
+                                    background: '#F9F8F6',
+                                    border: '1px solid #E6E4DD',
+                                    borderRadius: '4px',
+                                    lineHeight: 1.4,
+                                }}>
+                                    CAD export is preparing the project data. Please wait.
+                                </div>
+                            )}
                             <Button
                                 type="button"
                                 onClick={handleExportSVG}
-                                className="w-full mb-2 px-4 py-2 text-sm hover:bg-[#F9F8F6]"
+                                disabled={exportDisabled}
+                                className="w-full mb-2 px-4 py-2 text-sm hover:bg-[#F9F8F6] disabled:cursor-not-allowed disabled:opacity-50"
                                 style={{
                                     fontFamily: "Futura PT Light, Century Gothic, sans-serif",
                                     backgroundColor: "#FFFFFF",
@@ -252,7 +271,8 @@ export default function ReportHeader({
                             <Button
                                 type="button"
                                 onClick={handleExportDXF}
-                                className="w-full px-4 py-2 text-sm hover:bg-[#F9F8F6]"
+                                disabled={exportDisabled}
+                                className="w-full px-4 py-2 text-sm hover:bg-[#F9F8F6] disabled:cursor-not-allowed disabled:opacity-50"
                                 style={{
                                     fontFamily: "Futura PT Light, Century Gothic, sans-serif",
                                     backgroundColor: "#FFFFFF",
