@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 
 /**
  * Records a successful Sound Proof access for the authenticated user.
@@ -19,15 +20,23 @@ export default async function(req) {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Admin users bypass account status checks entirely.
-    if (user.role === 'admin') {
+    const accessContext = await resolveAccountAccess(base44, user);
+
+    // Master admin users bypass dealer account status checks entirely.
+    if (accessContext.isMasterAdmin) {
       return Response.json({ status: 'ok', admin: true });
     }
 
-    const accountId = user.data?.account_id;
+    if (!accessContext.allowed) {
+      if (accessContext.reason === 'ACCOUNT_SUSPENDED') {
+        return Response.json({ status: 'suspended' });
+      }
+      return Response.json({ status: 'forbidden' }, { status: 403 });
+    }
+
+    const accountId = accessContext.user?.account_id;
     if (!accountId) {
-      // No account linked — nothing to record.
-      return Response.json({ status: 'ok', no_account: true });
+      return Response.json({ status: 'forbidden' }, { status: 403 });
     }
 
     // Fetch account via service role (bypasses RLS).
