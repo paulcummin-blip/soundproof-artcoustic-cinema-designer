@@ -991,13 +991,18 @@ export function generateDXF({
         // SCREEN_VIEWABLE — viewable area as inner rectangle on SCREEN_VIEWABLE layer
         dxf.push(dxfRect('SCREEN_VIEWABLE', visibleXLeftMm, screenFaceYcad - screenThickMm, visibleWidthMm, screenThickMm));
 
-        // SCREEN_LABELS
-        dxf.push(dxfText('SCREEN_LABELS', centreXmm - 200, screenFaceYcad + 80, 80, 'SCREEN'));
+        // SCREEN_LABELS — annotation block placed below the screen body
+        // (into the room, −Y from screen face) to avoid overlapping geometry.
+        const screenBottomYcad = screenFaceYcad - screenThickMm;
+
+        // Title — centered, clear spacing below screen body
+        dxf.push(dxfText('SCREEN_LABELS', centreXmm - 120, screenBottomYcad - 120, 80, 'SCREEN'));
+        // Dimension lines — stacked below title as a clean annotation block
         if (visibleWidthMm > 0) {
-            dxf.push(dxfText('SCREEN_LABELS', centreXmm - 300, screenFaceYcad - screenThickMm - 50, 70, `VIEWABLE: ${Math.round(visibleWidthMm)} mm`));
+            dxf.push(dxfText('SCREEN_LABELS', centreXmm - 300, screenBottomYcad - 240, 70, `VIEWABLE: ${Math.round(visibleWidthMm)} mm`));
         }
         if (overallWidthMm > visibleWidthMm) {
-            dxf.push(dxfText('SCREEN_LABELS', centreXmm - 300, screenFaceYcad - screenThickMm - 130, 70, `FRAME: ${Math.round(overallWidthMm)} mm`));
+            dxf.push(dxfText('SCREEN_LABELS', centreXmm - 300, screenBottomYcad - 340, 70, `FRAME: ${Math.round(overallWidthMm)} mm`));
         }
     } else if (Number.isFinite(screenFrontPlaneM)) {
         // Fallback: simple screen line
