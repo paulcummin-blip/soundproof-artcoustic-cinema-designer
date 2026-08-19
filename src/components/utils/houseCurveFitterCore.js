@@ -26,6 +26,7 @@ export { compareHouseCurveMetrics };
 const isNumber = (v) => Number.isFinite(Number(v));
 const WORST_EQUIV_DB = 0.05;
 const RMS_EPSILON_DB = 0.01;
+export const HOUSE_CURVE_MAX_OPERATIONS = 8;
 
 // Cut acceptance — cuts get a more permissive acceptance path than boosts.
 // Cuts do not consume output headroom and may be accepted when they materially
@@ -446,7 +447,10 @@ export function createHouseCurveOperationCounts() {
 export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, options = {}) {
   const peakThresholdDb = profile.peakDiscoveryThresholdDb || 1;
   const valleyThresholdDb = profile.valleyDiscoveryThresholdDb || 1;
-  const maxOperations = 30;
+  // Bound each deterministic multi-start search. Every retained operation still
+  // passes the complete physical/bank/seat validation path; this only prevents
+  // long-tail trial expansion from exhausting the preview renderer.
+  const maxOperations = HOUSE_CURVE_MAX_OPERATIONS;
   const protectedNullRegions = Array.isArray(options.protectedNullRegions) ? options.protectedNullRegions : [];
   const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : null;
   const correctionStartHz = Number.isFinite(Number(options.correctionStartHz)) ? Number(options.correctionStartHz) : assessmentStartHz;
