@@ -117,7 +117,11 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
     version: COMPLETED_BASS_CACHE_VERSION,
     instanceAuthorityVersion: INSTANCE_AUTHORITY_VERSION,
     currentFingerprint: fingerprint,
-    status: matching && !forceUpdating ? "complete" : fingerprint ? "updating" : "uncalculated",
+    // Preserve "complete" when a matching structurally-complete snapshot exists
+    // for the current fingerprint, even if forceUpdating is true (transient
+    // incomplete contract from a worker that hasn't produced a replacement yet).
+    // Only downgrade to "updating" when no matching snapshot exists.
+    status: matching ? "complete" : fingerprint ? "updating" : "uncalculated",
     completedByFingerprint: bounded,
     updatedAtMs: Date.now(),
   };

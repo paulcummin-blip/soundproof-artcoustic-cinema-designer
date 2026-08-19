@@ -157,7 +157,15 @@ export function publishCompletedBassContract(projectId, contract) {
 }
 
 export function markBassAuthorityUpdating(projectId, currentFingerprint) {
-  const previous = memoryByProject.get(projectKey(projectId)) || emptyAuthority(projectId);
+  const key = projectKey(projectId);
+  const previous = memoryByProject.get(key) || emptyAuthority(projectId);
+  // Don't wipe an authoritative result that is still valid for this fingerprint.
+  // The background optimiser may emit an incomplete contract before producing a
+  // replacement; the existing completed result remains authoritative until a
+  // genuinely different fingerprint invalidates it.
+  if (previous.authoritative && previous.contract && currentFingerprint && previous.currentFingerprint === currentFingerprint) {
+    return previous;
+  }
   setMemory(projectId, {
     ...previous,
     status: currentFingerprint ? "updating" : "uncalculated",
@@ -191,7 +199,14 @@ export function markBassAuthorityFailed(projectId, currentFingerprint, errorMess
 }
 
 export function markBassAuthorityBlocked(projectId) {
-  const previous = memoryByProject.get(projectKey(projectId)) || emptyAuthority(projectId);
+  const key = projectKey(projectId);
+  const previous = memoryByProject.get(key) || emptyAuthority(projectId);
+  // Don't wipe an authoritative result during transient hydration (e.g. subwoofer
+  // instances still hydrating). The result remains valid until a fingerprint
+  // mismatch is detected once fingerprints can be evaluated.
+  if (previous.authoritative && previous.contract) {
+    return previous;
+  }
   setMemory(projectId, {
     ...previous,
     status: "blocked",
@@ -267,6 +282,21 @@ export function getCompletedBassAuthority(projectId) {
   return memoryByProject.get(key);
 }
 export const getCompletedBassContract = (projectId) => getCompletedBassAuthority(projectId).contract;
+
+/**
+ * Check whether an authoritative completed bass result already exists in memory
+ * for this project, optionally matching a specific fingerprint.
+ *
+ * Used by BassBackgroundAnalysisOwner to avoid wiping a valid hydrated result
+ * when the background optimiser has not yet produced a replacement contract.
+ */
+export function hasAuthoritativeResult(projectId, fingerprint = null) {
+  const key = projectKey(projectId);
+  const authority = memoryByProject.get(key);
+  if (!authority || !authority.authoritative || !authority.contract) return false;
+  if (fingerprint && authority.currentFingerprint !== fingerprint) return false;
+  return true;
+}
 
 export function useCompletedBassAuthority(projectId) {
   const key = projectKey(projectId);

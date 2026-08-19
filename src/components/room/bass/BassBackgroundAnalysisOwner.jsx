@@ -7,7 +7,7 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority, getCompletedBassAuthority } from "./completedBassResultStore";
+import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority, getCompletedBassAuthority, hasAuthoritativeResult } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
@@ -278,7 +278,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const publishedContractTokensRef = useRef(new Set());
   useEffect(() => {
     if (!fingerprints) {
-      markBassAuthorityBlocked(scopeId);
+      // Subwoofer instances / project inputs may still be hydrating. Don't wipe
+      // a valid hydrated authoritative result until the live fingerprint can be
+      // evaluated and a mismatch confirmed.
+      if (!hasAuthoritativeResult(scopeId)) {
+        markBassAuthorityBlocked(scopeId);
+      }
       return;
     }
     const currentFingerprint = contract?.job?.currentJobFingerprint || cacheKey || null;
@@ -287,7 +292,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       return;
     }
     const published = publishCompletedBassContract(scopeId, contract);
-    if (!published) markBassAuthorityUpdating(scopeId, currentFingerprint);
+    if (!published && !hasAuthoritativeResult(scopeId, currentFingerprint)) {
+      markBassAuthorityUpdating(scopeId, currentFingerprint);
+    }
     syncPersistentBassAuthority(scopeId, currentFingerprint, contract);
     // Record contract-published ONLY when publishCompletedBassContract returned
     // true — not when authority is merely marked updating.
