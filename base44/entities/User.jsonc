@@ -12,7 +12,14 @@
     },
     "account_id": {
       "type": "string",
-      "description": "ID of the Account this user belongs to"
+      "description": "Authoritative primary Account id. Backend-managed.",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "account_role": {
       "type": "string",
@@ -21,7 +28,31 @@
         "account_user"
       ],
       "default": "account_user",
-      "description": "Role within the account"
+      "description": "admin identifies the single local account administrator. Backend-managed.",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
+    },
+    "access_level": {
+      "type": "string",
+      "enum": [
+        "FULL_ACCESS",
+        "SOUND_PROOF_ONLY",
+        "PRICE_LIST_ONLY"
+      ],
+      "default": "FULL_ACCESS",
+      "description": "Authoritative account access level. Backend-managed and enforced server-side.",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "app_role": {
       "type": "string",
@@ -33,7 +64,14 @@
         "Viewer"
       ],
       "default": "Designer Lite",
-      "description": "Business-level Role used by the Role & Permission Engine to determine module access"
+      "description": "Legacy business role derived from access_level for compatibility.",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "territory": {
       "type": "string",
@@ -43,7 +81,14 @@
         "IN"
       ],
       "default": "UK",
-      "description": "Pricing territory assigned to this user by an administrator. Drives the territory price list via usePriceCalculation. Null/missing resolves to UK at read time."
+      "description": "Pricing territory assigned to this user by an administrator. Drives the territory price list via usePriceCalculation. Null/missing resolves to UK at read time.",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "license_account_type": {
       "type": "string",
