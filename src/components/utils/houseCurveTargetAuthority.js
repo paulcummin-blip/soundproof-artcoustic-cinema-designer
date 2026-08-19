@@ -109,7 +109,6 @@ export function buildCanonicalAbsoluteHouseCurveTarget({ frequencyGrid, targetAn
     .map(Number)
     .filter((frequency) => Number.isFinite(frequency) && frequency >= correctionStartHz && frequency <= correctionEndHz)
     .sort((a, b) => a - b)
-    .filter((frequency, index, values) => index === 0 || frequency > values[index - 1])
     .map((frequency) => ({ frequency, spl: targetAnchorDb + artcousticHouseCurveOffsetAt(frequency) }));
 }
 
