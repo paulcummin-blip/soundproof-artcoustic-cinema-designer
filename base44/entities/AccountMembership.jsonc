@@ -1,41 +1,100 @@
 {
   "name": "AccountMembership",
   "type": "object",
-  "description": "Canonical many-to-many membership linking users to accounts with a per-relationship role. Supports users belonging to multiple organisations (e.g. a distributor manager linked to both the distributor account and multiple dealer accounts). User.account_id remains the primary/default organisation pointer for backward compatibility; AccountMembership is the architecture for future multi-account relationships.",
+  "description": "Canonical account seat and membership record. One active or pending record represents one of the account's five login seats, including the single account administrator.",
   "properties": {
     "user_id": {
       "type": "string",
-      "description": "ID of the User who is a member of this account."
+      "nullable": true,
+      "description": "Base44 User id after the invitation has produced or matched a user record."
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Normalised invited/login email. Present for pending and active seats."
+    },
+    "full_name": {
+      "type": "string",
+      "nullable": true,
+      "description": "Display name copied from the linked user when available."
     },
     "account_id": {
       "type": "string",
-      "description": "ID of the Account this membership links to."
+      "description": "Owning Account id."
     },
     "membership_role": {
       "type": "string",
       "enum": [
         "distributor_admin",
         "dealer_admin",
+        "full_access",
+        "sound_proof_only",
+        "price_list_only",
+        "internal_admin",
         "designer",
-        "viewer",
-        "internal_admin"
+        "viewer"
       ],
-      "description": "Role of this user within this account. distributor_admin = manages distributor pool and allocations; dealer_admin = manages dealer's users and views capacity; designer = engineering access; viewer = read-only; internal_admin = Sound Proof internal staff."
+      "description": "Relationship role. Legacy designer/viewer values remain readable; new dealer seats use dealer_admin/full_access/sound_proof_only/price_list_only."
+    },
+    "access_level": {
+      "type": "string",
+      "enum": [
+        "FULL_ACCESS",
+        "SOUND_PROOF_ONLY",
+        "PRICE_LIST_ONLY"
+      ],
+      "default": "FULL_ACCESS",
+      "description": "Authoritative module access for this account seat."
+    },
+    "is_account_admin": {
+      "type": "boolean",
+      "default": false,
+      "description": "True only for the account's single local administrator. The admin always has FULL_ACCESS."
     },
     "status": {
       "type": "string",
       "enum": [
+        "pending",
         "active",
-        "suspended"
+        "suspended",
+        "removed"
       ],
-      "default": "active",
-      "description": "Membership status. Suspended memberships block access to that account but do not delete the relationship."
+      "default": "pending",
+      "description": "Pending invitations and active members consume one of five seats. Removed members do not."
+    },
+    "invited_by_user_id": {
+      "type": "string",
+      "nullable": true
+    },
+    "invited_by_email": {
+      "type": "string",
+      "nullable": true
+    },
+    "invited_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+    },
+    "accepted_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+    },
+    "removed_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+    },
+    "removed_by_user_id": {
+      "type": "string",
+      "nullable": true
     }
   },
   "required": [
-    "user_id",
+    "email",
     "account_id",
-    "membership_role"
+    "membership_role",
+    "access_level"
   ],
   "rls": {
     "read": {
