@@ -253,20 +253,46 @@ export default async function(req) {
         );
       }
 
-      try {
-        await inviteThroughPlatform(base44, email);
-      } catch (inviteError) {
+      const existingUserRows = await service.entities.User.filter({ email });
+      let linkedUser = Array.isArray(existingUserRows) && existingUserRows.length > 0
+        ? existingUserRows[0]
+        : null;
+      if (linkedUser?.role === 'admin') {
         return errorResponse(
-          'INVITATION_FAILED',
-          inviteError?.message === 'INVITATION_SERVICE_UNAVAILABLE'
-            ? 'The invitation service is unavailable.'
-            : 'The email invitation could not be sent.',
-          502,
+          'PLATFORM_ADMIN_RESERVED',
+          'The Sound Proof master admin cannot occupy a dealer account seat.',
+          409,
+        );
+      }
+      if (linkedUser?.account_id && linkedUser.account_id !== account.id) {
+        return errorResponse(
+          'EMAIL_LINKED_TO_ANOTHER_ACCOUNT',
+          'That login is already linked to another account. Contact the Sound Proof master admin.',
+          409,
         );
       }
 
-      const userRows = await service.entities.User.filter({ email });
-      const linkedUser = Array.isArray(userRows) && userRows.length > 0 ? userRows[0] : null;
+      let invitationSent = false;
+      if (!linkedUser) {
+        try {
+          await inviteThroughPlatform(base44, email);
+          invitationSent = true;
+        } catch (inviteError) {
+          return errorResponse(
+            'INVITATION_FAILED',
+            inviteError?.message === 'INVITATION_SERVICE_UNAVAILABLE'
+              ? 'The invitation service is unavailable.'
+              : 'The email invitation could not be sent.',
+            502,
+          );
+        }
+
+        const invitedUserRows = await service.entities.User.filter({ email });
+        linkedUser = Array.isArray(invitedUserRows) && invitedUserRows.length > 0
+          ? invitedUserRows[0]
+          : null;
+      }
+
       const accessLevel = makeAccountAdmin ? ACCESS_LEVELS.FULL_ACCESS : requestedAccess;
       const now = new Date().toISOString();
       const removedMembership = allMemberships.find((membership) =>
@@ -280,11 +306,11 @@ export default async function(req) {
         membership_role: membershipRole(accessLevel, makeAccountAdmin),
         access_level: accessLevel,
         is_account_admin: makeAccountAdmin,
-        status: 'pending',
+        status: linkedUser?.is_verified === true ? 'active' : 'pending',
         invited_by_user_id: context.user.id,
         invited_by_email: context.user.email,
         invited_at: now,
-        accepted_at: null,
+        accepted_at: linkedUser?.is_verified === true ? now : null,
         removed_at: null,
         removed_by_user_id: null,
       };
@@ -312,6 +338,7 @@ export default async function(req) {
         details: {
           is_account_admin: makeAccountAdmin,
           membership_id: membership.id,
+          invitation_sent: invitationSent,
         },
       });
 
