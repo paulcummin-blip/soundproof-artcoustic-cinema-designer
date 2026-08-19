@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { getAvailableCapacity, findActivationEntry } from '../../shared/capacityAuthority.js';
 import { findEffectivePromotion } from '../../shared/promotionAuthority.js';
+import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 
 /**
  * B3A Trusted backend authority for Professional Project creation.
@@ -28,6 +29,16 @@ export default async function(req) {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ status: 'ACCOUNT_NOT_LINKED', error: 'Unauthorized' }, { status: 401 });
+
+    const accessContext = await resolveAccountAccess(base44, user);
+    try {
+      assertCapability(accessContext, 'soundProof');
+    } catch {
+      return Response.json({
+        status: 'FORBIDDEN',
+        message: 'Sound Proof access is not enabled for this login.'
+      }, { status: 403 });
+    }
 
     // ── 1. Resolve authoritative account_id from the authenticated user ──
     // Re-fetch as service role to get the authoritative account_id field
