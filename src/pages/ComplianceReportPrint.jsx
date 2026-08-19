@@ -53,20 +53,31 @@ export default function ComplianceReportPrint() {
 
   const seatParams = analysis?.perSeatAnalysis || {};
 
-  // Count levels
-  const roomCounts = { L1: 0, L2: 0, L3: 0, L4: 0 };
+  // Count ROOM parameter levels only (seat-scoped levels are NOT included in room compliance)
+  const roomCounts = { L1: 0, L2: 0, L3: 0, L4: 0, FAIL: 0 };
   roomParams.forEach(p => {
-    const lvl = p?.level;
-    if (lvl && roomCounts[lvl] !== undefined) roomCounts[lvl]++;
+    const authority = [14, 18].includes(p.id) ? bassPresentation.parameters[`p${p.id}`] : null;
+    const roomResult = authority
+      ? { level: authority.level }
+      : analysis?.gradedParameters?.primary?.[p.id] || null;
+    const lvl = roomResult?.level;
+    if (lvl) {
+      const key = String(lvl).toUpperCase();
+      if (roomCounts[key] !== undefined) roomCounts[key]++;
+    }
   });
 
-  const seatCounts = { L1: 0, L2: 0, L3: 0, L4: 0 };
-  Object.values(seatParams).forEach(seat => {
-    Object.values(seat || {}).forEach(param => {
-      const lvl = param?.level;
-      if (lvl && seatCounts[lvl] !== undefined) seatCounts[lvl]++;
-    });
-  });
+  // Seat results: count calculated parameters and seats evaluated (no L-level aggregation)
+  const seatCalculatedParamCount = React.useMemo(() => {
+    return RP22_SEAT_PARAMETERS.filter((param) => {
+      const perSeat = app?.seatMetricsById || {};
+      return Object.values(perSeat).some((seatData) => {
+        const rp22 = seatData?.rp22 || {};
+        const metric = rp22[`p${param.number}`] || rp22[`P${param.number}`] || {};
+        return metric?.level && metric.level !== '—' && metric.level !== 'N/A';
+      });
+    }).length;
+  }, [app?.seatMetricsById]);
 
   // Compute RSP seat
   const rspSeatId = React.useMemo(() => {
@@ -241,20 +252,21 @@ export default function ComplianceReportPrint() {
 
           {bassErrorMessage && <p className="text-sm text-[#625143] mb-4">Bass analysis unavailable</p>}
 
-          {/* Summary Counts */}
+          {/* Summary Counts — ROOM and SEAT separated */}
           <div className="space-y-6">
             <div>
               <h2 
                 className="text-lg font-semibold text-[#1B1A1A] mb-3"
                 style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
               >
-                Room Parameters
+                Room Results
               </h2>
-              <div className="flex gap-3">
-                <RP22GradingPill level="L1" count={roomCounts.L1} />
-                <RP22GradingPill level="L2" count={roomCounts.L2} />
-                <RP22GradingPill level="L3" count={roomCounts.L3} />
+              <div className="flex gap-3 flex-wrap">
                 <RP22GradingPill level="L4" count={roomCounts.L4} />
+                <RP22GradingPill level="L3" count={roomCounts.L3} />
+                <RP22GradingPill level="L2" count={roomCounts.L2} />
+                <RP22GradingPill level="L1" count={roomCounts.L1} />
+                <RP22GradingPill level="FAIL" count={roomCounts.FAIL} />
               </div>
             </div>
 
@@ -263,10 +275,11 @@ export default function ComplianceReportPrint() {
                 className="text-lg font-semibold text-[#1B1A1A] mb-3"
                 style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
               >
-                Seat Parameters
+                Seat Results
               </h2>
-              <div className="text-sm text-[#3E4349]" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-                Seat · Calculated · {seats.length} {seats.length === 1 ? 'seat' : 'seats'}
+              <div className="text-sm text-[#3E4349] space-y-1" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+                <div>Calculated parameters: {seatCalculatedParamCount}</div>
+                <div>Seats evaluated: {seats.length}</div>
               </div>
             </div>
           </div>

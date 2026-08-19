@@ -4,11 +4,15 @@ import RP22GradingPill from '@/components/ui/RP22GradingPill';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 /**
- * SeatScopedParameterCard — displays a single SEAT-scoped RP22 parameter
- * with a seat selector and an expandable per-seat detail table.
+ * SeatScopedParameterCard — displays a single SEAT-scoped RP22 parameter.
+ *
+ * The collapsed compliance row shows a neutral "SEAT" scope badge (white bg,
+ * black text, subtle border, no performance colour) — never an L1/L2/L3/L4/FAIL
+ * badge.  L-level badges appear only inside the expanded per-seat detail table
+ * and the selected-seat result block.
  *
  * Props:
- *   param           — { id, title, scope, unit, ... } from RP22_SEAT_PARAMETERS
+ *   param           — { id, number, title, short, scope, unit, ... }
  *   perSeatResults  — [{ seatId, seatLabel, suffix, valueFormatted, level, isRsp, isPrimary }, ...]
  *   seatCount       — total number of seats
  */
@@ -33,49 +37,74 @@ export default function SeatScopedParameterCard({ param, perSeatResults, seatCou
         >
           P{param.id} — {param.title}
         </CardTitle>
-        <p className="text-xs mt-1 text-[#3E4349]">
-          Scope: <strong>SEAT</strong> • {param.unit}
-        </p>
+        {param.short && (
+          <p className="text-xs mt-1 text-[#3E4349]">{param.short}</p>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
-        {/* Summary row */}
-        <div className="text-xs font-medium text-[#625143]">
-          Seat · {isCalculated ? 'Calculated' : 'Not Calculated'} · {seatCount} {seatCount === 1 ? 'seat' : 'seats'}
+        {/* Collapsed summary row — neutral SEAT badge, no performance colour */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-medium text-[#625143]">
+            Seat · {isCalculated ? 'Calculated' : 'Not Calculated'} · {seatCount} {seatCount === 1 ? 'seat' : 'seats'}
+          </div>
+          <span
+            style={{
+              border: '1px solid #D9D5CE',
+              borderRadius: '6px',
+              padding: '4px 10px',
+              fontSize: '11px',
+              fontWeight: 600,
+              background: '#FFFFFF',
+              color: '#1B1A1A',
+              whiteSpace: 'nowrap',
+              lineHeight: '1.2',
+              letterSpacing: '0.04em',
+            }}
+          >
+            SEAT
+          </span>
         </div>
 
-        {/* Seat selector */}
-        <div className="flex flex-wrap gap-1">
-          {perSeatResults.map((result, idx) => (
-            <button
-              key={result?.seatId || idx}
-              onClick={() => setSelectedIdx(idx)}
-              className={`px-2 py-1 text-xs rounded border transition-colors ${
-                idx === selectedIdx
-                  ? 'bg-[#213428] text-white border-[#213428]'
-                  : 'bg-white text-[#3E4349] border-[#DCDBD6] hover:bg-[#F0EFEA]'
-              }`}
-            >
-              {result?.seatLabel || '—'}
-            </button>
-          ))}
-        </div>
-
-        {/* Selected seat result */}
+        {/* Selected seat view */}
         {selected && (
-          <div className="flex items-center justify-between text-sm pt-2 border-t border-[#F0EFEA]">
-            <div>
-              <div className="text-xs text-[#625143]">
-                {selected.seatLabel}{selected.suffix ? ` ${selected.suffix}` : ''}
+          <div className="border-t border-[#F0EFEA] pt-3 space-y-2">
+            <div className="flex flex-wrap gap-1 print:hidden">
+              {perSeatResults.map((result, idx) => (
+                <button
+                  key={result?.seatId || idx}
+                  onClick={() => setSelectedIdx(idx)}
+                  className={`px-2 py-1 text-xs rounded border transition-colors ${
+                    idx === selectedIdx
+                      ? 'bg-[#213428] text-white border-[#213428]'
+                      : 'bg-white text-[#3E4349] border-[#DCDBD6] hover:bg-[#F0EFEA]'
+                  }`}
+                >
+                  {result?.seatLabel || '—'}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <div className="text-[#625143]">Selected seat:</div>
+                <div className="font-semibold text-[#1B1A1A]">
+                  {selected.seatLabel}{selected.suffix ? ` ${selected.suffix}` : ''}
+                </div>
               </div>
-              <div className="font-bold text-[#1B1A1A]">
-                Achieved: {selected.valueFormatted ?? '—'}
+              <div>
+                <div className="text-[#625143]">Result:</div>
+                <div className="font-semibold text-[#1B1A1A]">
+                  {selected.valueFormatted ?? '—'}
+                </div>
               </div>
             </div>
-            <RP22GradingPill level={selected.level || '—'} />
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-[#625143]">Level:</span>
+              <RP22GradingPill level={selected.level || '—'} compact />
+            </div>
           </div>
         )}
 
-        {/* Expandable per-seat detail table */}
+        {/* Expandable per-seat detail table — L badges live only here */}
         <button
           onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-1 text-xs text-[#625143] hover:text-[#1B1A1A] print:hidden"
@@ -84,28 +113,33 @@ export default function SeatScopedParameterCard({ param, perSeatResults, seatCou
           {expanded ? 'Hide' : 'Show'} all seat results
         </button>
         {expanded && (
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-[#E6E4DD]">
-                <th className="text-left py-1 text-[#625143] font-medium">Seat</th>
-                <th className="text-right py-1 text-[#625143] font-medium">Result</th>
-                <th className="text-right py-1 text-[#625143] font-medium">Level</th>
-              </tr>
-            </thead>
-            <tbody>
-              {perSeatResults.map((result, idx) => (
-                <tr key={result?.seatId || idx} className="border-b border-[#F0EFEA]">
-                  <td className="py-1 text-[#1B1A1A]">
-                    {result?.seatLabel || '—'}{result?.suffix ? ` ${result.suffix}` : ''}
-                  </td>
-                  <td className="py-1 text-right text-[#3E4349]">{result?.valueFormatted ?? '—'}</td>
-                  <td className="py-1 text-right">
-                    <RP22GradingPill level={result?.level || '—'} compact />
-                  </td>
+          <div>
+            <div className="text-xs font-semibold text-[#1B1A1A] mb-1">
+              P{param.id} Seat Results
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[#E6E4DD]">
+                  <th className="text-left py-1 text-[#625143] font-medium">Seat</th>
+                  <th className="text-right py-1 text-[#625143] font-medium">Result</th>
+                  <th className="text-right py-1 text-[#625143] font-medium">Level</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {perSeatResults.map((result, idx) => (
+                  <tr key={result?.seatId || idx} className="border-b border-[#F0EFEA]">
+                    <td className="py-1 text-[#1B1A1A]">
+                      {result?.seatLabel || '—'}{result?.suffix ? ` ${result.suffix}` : ''}
+                    </td>
+                    <td className="py-1 text-right text-[#3E4349]">{result?.valueFormatted ?? '—'}</td>
+                    <td className="py-1 text-right">
+                      <RP22GradingPill level={result?.level || '—'} compact />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </CardContent>
     </Card>
