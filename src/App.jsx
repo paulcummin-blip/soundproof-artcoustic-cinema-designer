@@ -5,7 +5,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -22,6 +22,11 @@ import AdminProductPrices from './pages/AdminProductPrices';
 import RP22ClientReport from './pages/RP22ClientReport';
 import DesignReviewPage from './pages/DesignReviewPage';
 import PurchaseProjects from './pages/PurchaseProjects';
+import PriceList from './pages/PriceList';
+import AccountUsers from './pages/AccountUsers';
+import AccessGate from '@/components/AccessGate';
+import AccessDeniedScreen from '@/components/AccessDeniedScreen';
+import { defaultPathForUser } from '@/lib/accountAccess';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -30,6 +35,11 @@ const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
   : <>{children}</>;
+
+const AccessHome = () => {
+  const { user } = useAuth();
+  return <Navigate replace to={defaultPathForUser(user)} />;
+};
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin } = useAuth();
@@ -49,36 +59,59 @@ const AuthenticatedApp = () => {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'account_suspended') {
       return <AccountSuspendedScreen />;
+    } else if (authError.type === 'access_denied') {
+      return (
+        <AccessDeniedScreen
+          title="Account access not available"
+          message={authError.message}
+        />
+      );
     } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
       navigateToLogin();
       return null;
+    } else {
+      return (
+        <AccessDeniedScreen
+          title="Sound Proof could not verify this login"
+          message={authError.message || 'Please try again or contact your account administrator.'}
+        />
+      );
     }
   }
 
-  // Render the main app
+  if (!isAuthenticated) {
+    navigateToLogin();
+    return null;
+  }
+
   return (
     <LayoutWrapper currentPageName={mainPageKey}>
       <Routes>
-        <Route path="/" element={<MainPage />} />
+        <Route path="/" element={<AccessHome />} />
         {Object.entries(Pages).map(([path, Page]) => (
-          <Route key={path} path={`/${path}`} element={<Page />} />
+          <Route
+            key={path}
+            path={`/${path}`}
+            element={<AccessGate capability="soundProof"><Page /></AccessGate>}
+          />
         ))}
-        <Route path="/RP22ClientReport" element={<RP22ClientReport />} />
-        <Route path="/DesignReview" element={<DesignReviewPage />} />
-        <Route path="/PurchaseProjects" element={<PurchaseProjects />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/admin/accounts" element={<AdminAccounts />} />
-        <Route path="/admin/accounts/:accountId" element={<AccountDashboard />} />
-        <Route path="/admin/system-health" element={<AdminSystemHealth />} />
-        <Route path="/admin/datasets" element={<AdminDatasetManager />} />
-        <Route path="/admin/project-licensing" element={<AdminProjectLicensing />} />
-        <Route path="/admin/project-licensing/:userId" element={<AdminUserLicensingDetail />} />
-        <Route path="/admin/pricing" element={<AdminPlaceholderPage title="Pricing" description="Price lists, discounts and difficulty multipliers." />} />
-        <Route path="/admin/product-prices" element={<AdminProductPrices />} />
-        <Route path="/admin/rp22-config" element={<AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." />} />
-        <Route path="/admin/audit-log" element={<AdminPlaceholderPage title="Audit Log" description="Track changes made across the platform." />} />
-        <Route path="/admin/billing" element={<AdminPlaceholderPage title="Billing" description="Subscription plans and payment configuration." />} />
+        <Route path="/RP22ClientReport" element={<AccessGate capability="soundProof"><RP22ClientReport /></AccessGate>} />
+        <Route path="/DesignReview" element={<AccessGate capability="soundProof"><DesignReviewPage /></AccessGate>} />
+        <Route path="/PurchaseProjects" element={<AccessGate capability="commercial"><PurchaseProjects /></AccessGate>} />
+        <Route path="/PriceList" element={<AccessGate capability="priceList"><PriceList /></AccessGate>} />
+        <Route path="/account/users" element={<AccessGate capability="manageUsers"><AccountUsers /></AccessGate>} />
+        <Route path="/admin" element={<AccessGate masterAdmin><AdminDashboard /></AccessGate>} />
+        <Route path="/admin/accounts" element={<AccessGate masterAdmin><AdminAccounts /></AccessGate>} />
+        <Route path="/admin/accounts/:accountId" element={<AccessGate masterAdmin><AccountDashboard /></AccessGate>} />
+        <Route path="/admin/system-health" element={<AccessGate masterAdmin><AdminSystemHealth /></AccessGate>} />
+        <Route path="/admin/datasets" element={<AccessGate masterAdmin><AdminDatasetManager /></AccessGate>} />
+        <Route path="/admin/project-licensing" element={<AccessGate masterAdmin><AdminProjectLicensing /></AccessGate>} />
+        <Route path="/admin/project-licensing/:userId" element={<AccessGate masterAdmin><AdminUserLicensingDetail /></AccessGate>} />
+        <Route path="/admin/pricing" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Pricing" description="Price lists, discounts and difficulty multipliers." /></AccessGate>} />
+        <Route path="/admin/product-prices" element={<AccessGate masterAdmin><AdminProductPrices /></AccessGate>} />
+        <Route path="/admin/rp22-config" element={<AccessGate masterAdmin><AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." /></AccessGate>} />
+        <Route path="/admin/audit-log" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Audit Log" description="Track changes made across the platform." /></AccessGate>} />
+        <Route path="/admin/billing" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Billing" description="Subscription plans and payment configuration." /></AccessGate>} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </LayoutWrapper>
