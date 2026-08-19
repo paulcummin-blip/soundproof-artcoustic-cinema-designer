@@ -78,7 +78,33 @@
     },
     "price": {
       "type": "number",
-      "description": "Speaker price"
+      "description": "Legacy speaker price. Canonical trade pricing is ProductPrice.",
+      "rls": {
+        "read": {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "data.access_level": "FULL_ACCESS"
+              }
+            },
+            {
+              "user_condition": {
+                "data.access_level": "PRICE_LIST_ONLY"
+              }
+            }
+          ]
+        },
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "description": {
       "type": "string",
