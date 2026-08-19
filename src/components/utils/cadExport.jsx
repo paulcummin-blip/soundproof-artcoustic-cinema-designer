@@ -83,6 +83,13 @@ function classifyWall(role) {
 // This offset is added to the existing calculated rotation; it does NOT
 // recalculate the aiming angle — the MLP-aim delta (insRot) is preserved on top.
 function artcousticWallOffset(wallSide) {
+    // Artcoustic blocks are native-oriented +Y = front face. In CAD space
+    // (CAD_Y = (roomL - appY) * 1000) +Y points toward the front/screen wall.
+    //   front wall → 180° (front face +Y rotates to -Y, toward the audience)
+    //   rear wall  →   0° (front face +Y already points toward the audience)
+    //   left wall  → -90° (front face +Y rotates to +X, into room)
+    //   right wall → +90° (front face +Y rotates to -X, into room)
+    if (wallSide === 'front') return 180;
     if (wallSide === 'left')  return -90;
     if (wallSide === 'right') return 90;
     return 0;
@@ -481,8 +488,8 @@ function speakerFootprintMeta(modelName, role) {
     return { fp, crossArm, blockKey: footprintBlockKey('speaker', fp, crossArm) };
 }
 
-function subFootprintMeta(sub) {
-    const fp = getSpeakerFootprintMm(sub.model || sub.brand_model || '', 'SUB', sub.orientation || 'vertical');
+function subFootprintMeta(sub, modelOverride) {
+    const fp = getSpeakerFootprintMm(sub.model || sub.brand_model || modelOverride || '', 'SUB', sub.orientation || 'vertical');
     const hw = fp.planWidthMm / 2;
     const hd = fp.planDepthMm / 2;
     const crossArm = Math.round(Math.min(hw, hd) * 0.35);
@@ -506,7 +513,7 @@ function buildCadBlockRegistry(placedSpeakers, frontSubsCfg, rearSubsCfg) {
         ensure('speaker', fp, crossArm);
     });
     const scanSubs = (cfg) => (cfg?.positions || []).forEach(sub => {
-        const { fp, crossArm } = subFootprintMeta(sub);
+        const { fp, crossArm } = subFootprintMeta(sub, cfg?.model);
         ensure('sub', fp, crossArm);
     });
     scanSubs(frontSubsCfg);
@@ -1162,27 +1169,33 @@ export function generateDXF({
     // SUBWOOFERS — true product footprints with orientation.
     // Matching Artcoustic subwoofer blocks (SUB2-12 / SUB3-12 / SUB4-12) are
     // INSERTed by name; others fall back to the generic footprint block.
-    const addDXFSub = (sub, idx, prefix) => {
+    const addDXFSub = (sub, idx, prefix, cfgModel) => {
         if (!Number.isFinite(sub?.x) || !Number.isFinite(sub?.y)) return;
         const sx = cx(sub.x);
         const sy = cy(sub.y);
         const label = `${prefix}${idx + 1}`;
-        const meta = subFootprintMeta(sub);
-        const subModel = sub.model || sub.brand_model || '';
+        const meta = subFootprintMeta(sub, cfgModel);
+        const subModel = sub.model || sub.brand_model || cfgModel || '';
         const artcousticBlockName = getArtcousticCadBlockName(subModel);
         const genericBlockName = cadBlocks.get(meta.blockKey)?.name || 'SUB_0';
         const blockName = artcousticBlockName || genericBlockName;
-        dxf.push(dxfInsert('SUBWOOFERS', blockName, sx, sy, 0, [
+        // Front subs (SUBF) face into the room toward the audience; rear subs
+        // (SUBR) face toward the front. Artcoustic sub blocks are native-oriented
+        // +Y = front face; in CAD space +Y = toward the front wall, so front-wall
+        // subs need 180° to face the audience, rear subs stay at 0°.
+        const subRot = prefix === 'SUBF' ? 180 : 0;
+        dxf.push(dxfInsert('SUBWOOFERS', blockName, sx, sy, subRot, [
             ['1000', `TYPE=Subwoofer`],
             ['1000', `MODEL=${subModel}`],
             ['1000', `ROLE=${label}`],
+            ['1040', round2(subRot)],
         ]));
         const hw = Math.round(meta.fp.planWidthMm / 2);
         dxf.push(dxfText('LABELS', sx + hw + LABEL_OFFSET, sy + 30, TEXT_H, label));
     };
 
-    if (frontSubsCfg?.positions) frontSubsCfg.positions.forEach((s, i) => addDXFSub(s, i, 'SUBF'));
-    if (rearSubsCfg?.positions)  rearSubsCfg.positions.forEach((s, i) => addDXFSub(s, i, 'SUBR'));
+    if (frontSubsCfg?.positions) frontSubsCfg.positions.forEach((s, i) => addDXFSub(s, i, 'SUBF', frontSubsCfg?.model));
+    if (rearSubsCfg?.positions)  rearSubsCfg.positions.forEach((s, i) => addDXFSub(s, i, 'SUBR', rearSubsCfg?.model));
 
     dxf.push('0\nENDSEC\n0\nEOF');
     return dxf.join('\n');
