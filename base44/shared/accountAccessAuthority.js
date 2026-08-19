@@ -198,9 +198,13 @@ export async function resolveAccountAccess(base44, sessionUser, {
   }
 
   const legacySoleMembership =
-    !membership.access_level
-    && !existingAdmin
+    !existingAdmin
     && occupiedMemberships.length === 1
+    && (
+      !membership.access_level
+      || membership.membership_role === 'designer'
+      || membership.membership_role === 'viewer'
+    )
     && (membership.user_id === authoritativeUser.id || normaliseEmail(membership.email) === email);
 
   const isAccountAdmin =
