@@ -984,10 +984,12 @@ export function generateDXF({
         }
 
         // SCREEN_FRAME — full frame width as rectangle (depth = CAD_SCREEN_DEPTH_MM)
-        dxf.push(dxfRect('SCREEN_FRAME', overallXLeftMm, screenFaceYcad, overallWidthMm, screenThickMm));
+        // Screen body extends from screen face DOWNWARD (−Y) into the room.
+        // dxfRect draws upward from y by h, so anchor at screenFaceYcad − screenThickMm.
+        dxf.push(dxfRect('SCREEN_FRAME', overallXLeftMm, screenFaceYcad - screenThickMm, overallWidthMm, screenThickMm));
 
         // SCREEN_VIEWABLE — viewable area as inner rectangle on SCREEN_VIEWABLE layer
-        dxf.push(dxfRect('SCREEN_VIEWABLE', visibleXLeftMm, screenFaceYcad, visibleWidthMm, screenThickMm));
+        dxf.push(dxfRect('SCREEN_VIEWABLE', visibleXLeftMm, screenFaceYcad - screenThickMm, visibleWidthMm, screenThickMm));
 
         // SCREEN_LABELS
         dxf.push(dxfText('SCREEN_LABELS', centreXmm - 200, screenFaceYcad + 80, 80, 'SCREEN'));
