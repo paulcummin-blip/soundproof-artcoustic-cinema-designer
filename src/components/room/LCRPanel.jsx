@@ -527,6 +527,87 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
             Angle to MLP: <span className="font-medium text-[#625143]">{Math.round(lcrAngleDeg)}°</span>
           </p>
 
+          {/* SPL @ RSP */}
+          <div>
+            <Label className="text-xs text-[#625143] mb-2 block">SPL @ RSP</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {lcrRoles.map((role) => (
+                <LcrSplCard
+                  key={role}
+                  role={role}
+                  label={role === 'FL' ? 'Left' : role === 'FC' ? 'Center' : 'Right'}
+                  allSeatSplMetrics={allSeatSplMetrics}
+                  integratedLcrMode={derivedFrontStageMode === 'integrated_lcr'}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Amplifier Power */}
+          <div className="space-y-2">
+            <Label className="text-xs text-[#625143]">Amplifier Power (LCR)</Label>
+            <div className="relative">
+              <Input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={lcrPowerInputValue}
+                onChange={handleLcrPowerChange}
+                onBlur={handleLcrPowerBlur}
+                disabled={disabled}
+                className="pr-8"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
+                W
+              </span>
+            </div>
+          </div>
+
+          {/* RP22 P12 */}
+          <div className="space-y-2">
+            <Label className="text-xs text-[#625143]">Parameter 12. Screen speakers SPL capability at RSP</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={p12ActiveMode === 'minimum' ? 'default' : 'outline'}
+                className={
+                  p12ActiveMode === 'minimum'
+                    ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                    : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+                }
+                onClick={() => appState?.setP12Mode?.('minimum')}
+                disabled={disabled}
+              >
+                Minimum
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={p12ActiveMode === P12_MODE_RECOMMENDED ? 'default' : 'outline'}
+                className={
+                  p12ActiveMode === P12_MODE_RECOMMENDED
+                    ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                    : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+                }
+                onClick={() => appState?.setP12Mode?.(P12_MODE_RECOMMENDED)}
+                disabled={disabled}
+              >
+                Recommended
+              </Button>
+            </div>
+            {p12Computed && (
+              <RP22LevelPill
+                parameter="P12"
+                level={p12Computed.level}
+                label="RP22 P12"
+              />
+            )}
+          </div>
+        </div>
+
+        {/* ── Right column: Acoustic Centre Height ── */}
+        <div className="space-y-3">
           {/* ── Acoustic Centre Height — compact card ── */}
           <div className="rounded-lg border border-[#DCDBD6] bg-[#F8F8F7]">
             {/* Header: title left, manual override toggle right */}
@@ -615,87 +696,6 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
                 <LcrAcousticCentreGuidanceCard guidance={activeHeightGuidance} />
               )}
             </div>
-          </div>
-        </div>
-
-        {/* ── Right column: performance ── */}
-        <div className="space-y-3">
-          {/* SPL @ RSP */}
-          <div>
-            <Label className="text-xs text-[#625143] mb-2 block">SPL @ RSP</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {lcrRoles.map((role) => (
-                <LcrSplCard
-                  key={role}
-                  role={role}
-                  label={role === 'FL' ? 'Left' : role === 'FC' ? 'Center' : 'Right'}
-                  allSeatSplMetrics={allSeatSplMetrics}
-                  integratedLcrMode={derivedFrontStageMode === 'integrated_lcr'}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Amplifier Power */}
-          <div className="space-y-2">
-            <Label className="text-xs text-[#625143]">Amplifier Power (LCR)</Label>
-            <div className="relative">
-              <Input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={lcrPowerInputValue}
-                onChange={handleLcrPowerChange}
-                onBlur={handleLcrPowerBlur}
-                disabled={disabled}
-                className="pr-8"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
-                W
-              </span>
-            </div>
-          </div>
-
-          {/* RP22 P12 */}
-          <div className="space-y-2">
-            <Label className="text-xs text-[#625143]">Parameter 12. Screen speakers SPL capability at RSP</Label>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={p12ActiveMode === 'minimum' ? 'default' : 'outline'}
-                className={
-                  p12ActiveMode === 'minimum'
-                    ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
-                    : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
-                }
-                onClick={() => appState?.setP12Mode?.('minimum')}
-                disabled={disabled}
-              >
-                Minimum
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={p12ActiveMode === P12_MODE_RECOMMENDED ? 'default' : 'outline'}
-                className={
-                  p12ActiveMode === P12_MODE_RECOMMENDED
-                    ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
-                    : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
-                }
-                onClick={() => appState?.setP12Mode?.(P12_MODE_RECOMMENDED)}
-                disabled={disabled}
-              >
-                Recommended
-              </Button>
-            </div>
-            {p12Computed && (
-              <RP22LevelPill
-                parameter="P12"
-                level={p12Computed.level}
-                label="RP22 P12"
-              />
-            )}
           </div>
         </div>
       </div>
