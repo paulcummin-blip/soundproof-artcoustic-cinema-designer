@@ -39,7 +39,25 @@
     "category"
   ],
   "rls": {
-    "read": {},
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.access_level": "FULL_ACCESS"
+          }
+        },
+        {
+          "user_condition": {
+            "data.access_level": "PRICE_LIST_ONLY"
+          }
+        }
+      ]
+    },
     "create": {
       "user_condition": {
         "role": "admin"
