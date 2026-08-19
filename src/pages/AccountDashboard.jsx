@@ -8,6 +8,7 @@ import CommercialSummaryCard from "@/components/admin/commercial/CommercialSumma
 import AccountStatusActions from "@/components/admin/commercial/AccountStatusActions";
 import AccountPromotionNote from "@/components/admin/promotions/AccountPromotionNote";
 import TargetedPromotionPanel from "@/components/admin/promotions/TargetedPromotionPanel";
+import AccountUsersPanel from "@/components/account/AccountUsersPanel";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -235,6 +236,12 @@ export default function AccountDashboard() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Account-local users and permissions — all changes go through the
+              tenant-aware audited backend authority. */}
+          <div style={{ marginBottom: 24 }}>
+            <AccountUsersPanel accountId={accountId} />
           </div>
 
           {/* Active promotion note — group-wide (ALL_DEALER_GROUP) eligibility */}
