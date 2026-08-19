@@ -29,8 +29,11 @@
 // ─── Block layer names (exported for layer-table registration by the consumer) ─
 export const ARTCOUSTIC_CAD_LAYERS = [
   'ARTCOUSTIC_FOOTPRINT',
+  'ARTCOUSTIC_GRILLE',
+  'ARTCOUSTIC_DRIVERS',
   'ARTCOUSTIC_CENTRE',
   'ARTCOUSTIC_FRONT_FACE',
+  'ARTCOUSTIC_ORIENTATION',
   'ARTCOUSTIC_DIMENSIONS',
   'ARTCOUSTIC_LABELS',
 ];
@@ -49,6 +52,7 @@ const ARTCOUSTIC_CAD_PRODUCTS = [
     blockName: 'ARTCOUSTIC_ARCHITECT_2_1',
     modelKey: 'architect-2-1',
     label: 'ARCHITECT 2-1',
+    productType: 'ceiling',
     isRound: true,
     diameterMm: 240,
     depthMm: 120,
@@ -59,6 +63,7 @@ const ARTCOUSTIC_CAD_PRODUCTS = [
     blockName: 'ARTCOUSTIC_EVOLVE_1_1',
     modelKey: 'evolve-1-1',
     label: 'EVOLVE 1-1',
+    productType: 'speaker',
     isRound: false,
     widthMm: 150,
     depthMm: 72,
@@ -69,6 +74,7 @@ const ARTCOUSTIC_CAD_PRODUCTS = [
     blockName: 'ARTCOUSTIC_EVOLVE_2_1',
     modelKey: 'evolve-2-1',
     label: 'EVOLVE 2-1',
+    productType: 'speaker',
     isRound: false,
     widthMm: 200,
     depthMm: 82,
@@ -79,6 +85,7 @@ const ARTCOUSTIC_CAD_PRODUCTS = [
     blockName: 'ARTCOUSTIC_SUB2_12',
     modelKey: 'sub2-12',
     label: 'SUB2-12',
+    productType: 'subwoofer',
     isRound: false,
     widthMm: 500,
     depthMm: 255,
@@ -89,6 +96,7 @@ const ARTCOUSTIC_CAD_PRODUCTS = [
     blockName: 'ARTCOUSTIC_SUB3_12',
     modelKey: 'sub3-12',
     label: 'SUB3-12',
+    productType: 'subwoofer',
     isRound: false,
     widthMm: 600,
     depthMm: 255,
@@ -99,6 +107,7 @@ const ARTCOUSTIC_CAD_PRODUCTS = [
     blockName: 'ARTCOUSTIC_SUB4_12',
     modelKey: 'sub4-12',
     label: 'SUB4-12 INFRA',
+    productType: 'subwoofer',
     isRound: false,
     widthMm: 440,
     depthMm: 270,
@@ -130,22 +139,94 @@ function dxfRect(layer, x, y, w, h) {
   ].join('\n');
 }
 
+// ─── DXF SOLID triangle (filled) ─────────────────────────────────────────────
+// DXF R12 SOLID entity: 4-point filled solid. For a triangle, pts 3 = 4.
+// Vertex order 1→2→3 traces the perimeter for correct fill rendering.
+
+function dxfSolidTriangle(layer, x1, y1, x2, y2, x3, y3) {
+  const r = Math.round;
+  return `0\nSOLID\n8\n${layer}\n10\n${r(x1)}\n20\n${r(y1)}\n11\n${r(x2)}\n21\n${r(y2)}\n12\n${r(x3)}\n22\n${r(y3)}\n13\n${r(x3)}\n23\n${r(y3)}`;
+}
+
 // ─── Front-face arrow (firing-axis indicator) ───────────────────────────────
-// Draws a line from the centre to the front-face edge midpoint, with a small
-// arrowhead, plus an "F" label. Points in the +Y direction (native front).
+// Solid filled triangle arrowhead at the front-face edge + firing-axis line
+// from the acoustic centre (insertion point) to the front face. "F" label
+// beyond the tip. Points in the +Y direction (native front).
 
 function dxfFrontFaceArrow(product) {
   const fy = product.frontFaceY;
-  const arrowSize = Math.min(12, Math.max(6, fy * 0.12));
-  const labelY = fy + 18;
+  const arrowSize = Math.min(15, Math.max(8, fy * 0.15));
+  const labelY = fy + 20;
   return [
     // Firing axis line: centre → front edge
     dxfLine('ARTCOUSTIC_FRONT_FACE', 0, 0, 0, fy),
-    // Arrowhead (two short lines forming a V at the tip)
-    dxfLine('ARTCOUSTIC_FRONT_FACE', -arrowSize, fy - arrowSize, 0, fy),
-    dxfLine('ARTCOUSTIC_FRONT_FACE', arrowSize, fy - arrowSize, 0, fy),
+    // Filled triangle arrowhead at the tip
+    dxfSolidTriangle('ARTCOUSTIC_FRONT_FACE', -arrowSize, fy - arrowSize, arrowSize, fy - arrowSize, 0, fy),
     // "F" label just beyond the front edge
     dxfText('ARTCOUSTIC_FRONT_FACE', -6, labelY, 25, 'F'),
+  ].join('\n');
+}
+
+// ─── Orientation indicator (speakers only) ──────────────────────────────────
+// Small filled triangle on the +X edge (cabinet "top" in native orientation)
+// pointing outward. Marks which side is UP when wall-mounted, disambiguating
+// speaker handedness in plan view.
+
+function dxfOrientationTriangle(product) {
+  const hw = Math.round(product.widthMm / 2);
+  const s = Math.max(8, Math.round(Math.min(product.widthMm, product.depthMm) * 0.10));
+  return dxfSolidTriangle('ARTCOUSTIC_ORIENTATION', hw, -s, hw, s, hw + Math.round(s * 1.5), 0);
+}
+
+// ─── Speaker grille + driver detail ──────────────────────────────────────────
+// Representational — driver sizes derived proportionally from cabinet footprint.
+// Woofer: large circle near the front face (+Y). Tweeter: small circle offset
+// toward +X (cabinet top), showing vertical driver layout + orientation.
+
+function dxfSpeakerDriverDetail(product) {
+  const hw = Math.round(product.widthMm / 2);
+  const hd = Math.round(product.depthMm / 2);
+  const minDim = Math.min(product.widthMm, product.depthMm);
+  const inset = Math.max(6, Math.round(minDim * 0.10));
+  const out = [];
+  // Grille outline (inset rect)
+  out.push(dxfRect('ARTCOUSTIC_GRILLE', -hw + inset, -hd + inset,
+    product.widthMm - 2 * inset, product.depthMm - 2 * inset));
+  // Woofer circle — centred, 40% of min dim, forward of centre
+  const wooferR = Math.round(minDim * 0.20);
+  const wooferY = Math.round(hd * 0.25);
+  out.push(dxfCircle('ARTCOUSTIC_DRIVERS', 0, wooferY, wooferR));
+  // Tweeter circle — offset toward +X (top), 14% of width
+  const tweeterR = Math.max(6, Math.round(product.widthMm * 0.07));
+  const tweeterX = Math.round(hw * 0.45);
+  out.push(dxfCircle('ARTCOUSTIC_DRIVERS', tweeterX, wooferY, tweeterR));
+  return out.join('\n');
+}
+
+// ─── Subwoofer driver detail ─────────────────────────────────────────────────
+// Large driver circle + outer surround ring, centred on the cabinet.
+// Representational — makes the block instantly recognisable as a subwoofer.
+
+function dxfSubwooferDriverDetail(product) {
+  const minDim = Math.min(product.widthMm, product.depthMm);
+  const driverR = Math.round(minDim * 0.28);
+  const surroundR = Math.round(driverR * 1.15);
+  return [
+    dxfCircle('ARTCOUSTIC_DRIVERS', 0, 0, surroundR),
+    dxfCircle('ARTCOUSTIC_DRIVERS', 0, 0, driverR),
+  ].join('\n');
+}
+
+// ─── Ceiling speaker grille detail ───────────────────────────────────────────
+// Concentric grille ring + centre tweeter dot. No front-face arrow (fires down).
+
+function dxfCeilingGrilleDetail(product) {
+  const r = Math.round(product.diameterMm / 2);
+  const grilleR = Math.round(r * 0.80);
+  const tweeterR = Math.max(8, Math.round(r * 0.12));
+  return [
+    dxfCircle('ARTCOUSTIC_GRILLE', 0, 0, grilleR),
+    dxfCircle('ARTCOUSTIC_DRIVERS', 0, 0, tweeterR),
   ].join('\n');
 }
 
@@ -191,17 +272,31 @@ function emitProductBlock(product) {
   // BLOCK header — 70 = 0 (normal named block, not an xref)
   out.push(`0\nBLOCK\n8\n0\n2\n${product.blockName}\n70\n0\n10\n0\n20\n0\n30\n0`);
 
+  const type = product.productType || (product.isRound ? 'ceiling' : 'speaker');
+
   if (product.isRound) {
     const r = Math.round(product.diameterMm / 2);
     out.push(dxfCircle('ARTCOUSTIC_FOOTPRINT', 0, 0, r));
+    out.push(dxfCeilingGrilleDetail(product));
   } else {
     const hw = Math.round(product.widthMm / 2);
     const hd = Math.round(product.depthMm / 2);
     out.push(dxfRect('ARTCOUSTIC_FOOTPRINT', -hw, -hd, product.widthMm, product.depthMm));
+    if (type === 'speaker') {
+      out.push(dxfSpeakerDriverDetail(product));
+      out.push(dxfOrientationTriangle(product));
+    } else if (type === 'subwoofer') {
+      out.push(dxfSubwooferDriverDetail(product));
+    }
   }
 
   out.push(dxfCentreCross(product));
-  out.push(dxfFrontFaceArrow(product));
+
+  // Front-face arrow: speakers and subwoofers only (ceiling fires downward)
+  if (type !== 'ceiling') {
+    out.push(dxfFrontFaceArrow(product));
+  }
+
   out.push(dxfDimensionText(product));
   out.push(dxfLabelText(product));
 
