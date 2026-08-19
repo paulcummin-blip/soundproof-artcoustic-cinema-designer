@@ -1,3 +1,36 @@
+export const HOUSE_CURVE_MEMO_LIMITS = Object.freeze({
+  correctedCurves: 32,
+  metricGrids: 16,
+  metrics: 32,
+});
+
+class BoundedLruMap extends Map {
+  constructor(limit) {
+    super();
+    this.limit = Math.max(1, Number(limit) || 1);
+  }
+
+  get(key) {
+    if (!super.has(key)) return undefined;
+    const value = super.get(key);
+    // Promote exact hits so the working set for the current optimisation
+    // iteration remains resident while older one-off trial banks are released.
+    super.delete(key);
+    super.set(key, value);
+    return value;
+  }
+
+  set(key, value) {
+    if (super.has(key)) super.delete(key);
+    super.set(key, value);
+    while (this.size > this.limit) {
+      const oldestKey = this.keys().next().value;
+      super.delete(oldestKey);
+    }
+    return this;
+  }
+}
+
 export function stableBankSignature(filters) {
   return JSON.stringify((filters || []).map((filter) => Object.keys(filter || {})
     .sort()
@@ -11,9 +44,9 @@ export function bankResponseSignature(filters) {
 export function createHouseCurveEvaluationMemo(enabled = true) {
   return {
     enabled,
-    correctedCurves: new Map(),
-    metricGrids: new Map(),
-    metrics: new Map(),
+    correctedCurves: new BoundedLruMap(HOUSE_CURVE_MEMO_LIMITS.correctedCurves),
+    metricGrids: new BoundedLruMap(HOUSE_CURVE_MEMO_LIMITS.metricGrids),
+    metrics: new BoundedLruMap(HOUSE_CURVE_MEMO_LIMITS.metrics),
   };
 }
 
