@@ -87,7 +87,7 @@ export default function InviteUserDialog({
         is_account_admin: permission === "ADMIN",
       });
       const account = sortedAccounts.find((item) => item.id === accountId);
-      setSuccess(`Invitation sent to ${cleanEmail} for "${account?.name || "account"}".`);
+      setSuccess(`User access created for ${cleanEmail} in "${account?.name || "account"}".`);
       onInvited?.();
     } catch (err) {
       setError(
