@@ -826,8 +826,11 @@ export default function RP22CompliancePanel({
           </div>
           {/* Achieved value line */}
           <div style={{ fontSize: 11, color: "#1B1A1A", marginTop: 6, fontWeight: 600 }}>
-            {isSeatScope ? "Achieved (RSP): " : "Achieved: "}
-            <span style={{ color: "#213428" }}>{achievedValue}</span>
+            {isSeatScope ? (
+              <span style={{ color: "#625143", fontStyle: "italic" }}>Per-seat evaluation — see individual seat results below</span>
+            ) : (
+              <>Achieved: <span style={{ color: "#213428" }}>{achievedValue}</span></>
+            )}
           </div>
           {targetBasisNote && (
             <div style={{ fontSize: 10, color: "#9B8E82", marginTop: 4, fontStyle: "italic" }}>
@@ -938,6 +941,7 @@ export default function RP22CompliancePanel({
         getLevelForParam={getHudLevelForParam}
         getValueForParam={getHudValueForParam}
         renderDetailCard={renderParamDetailCard}
+        seatCount={seats.length}
       />
     </div>
   );

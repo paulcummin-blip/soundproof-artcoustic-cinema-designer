@@ -4,6 +4,7 @@
 // or bass-readiness logic lives here.
 import React, { useState, useMemo } from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
+import SeatScopeBadge from "@/components/report/SeatScopeBadge";
 import { ChevronDown } from "lucide-react";
 
 const LEVEL_ORD = { L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0 };
@@ -37,6 +38,7 @@ export default function ComplianceParameterMatrix({
   getLevelForParam,
   getValueForParam,
   renderDetailCard,
+  seatCount = 0,
 }) {
   const [expandedId, setExpandedId] = useState(null);
 
@@ -57,7 +59,15 @@ export default function ComplianceParameterMatrix({
     let lowestOrd = null;
     let active = 0;
     let unavailable = 0;
-    rowsData.forEach(({ lvl }) => {
+    let calculatedSeatParams = 0;
+    let seatParamCount = 0;
+    rowsData.forEach(({ lvl, isSeatScope, status }) => {
+      // Seat-scoped parameters are not aggregated into room compliance totals.
+      if (isSeatScope) {
+        seatParamCount++;
+        if (status.label === "Calculated") calculatedSeatParams++;
+        return;
+      }
       const k = levelKey(lvl);
       if (k === "L4") { counts.L4++; active++; }
       else if (k === "L3") { counts.L3++; active++; }
@@ -76,7 +86,7 @@ export default function ComplianceParameterMatrix({
       lowestOrd === 2 ? "L2" :
       lowestOrd === 1 ? "L1" :
       lowestOrd === 0 ? "Below L1" : "—";
-    return { counts, lowestLabel, active, unavailable };
+    return { counts, lowestLabel, active, unavailable, calculatedSeatParams, seatParamCount };
   }, [rowsData]);
 
   return (
@@ -99,6 +109,12 @@ export default function ComplianceParameterMatrix({
           <span>Active: <strong style={{ color: "#1B1A1A" }}>{summary.active}</strong></span>
           <span>Unavailable: <strong style={{ color: "#1B1A1A" }}>{summary.unavailable}</strong></span>
         </div>
+        {summary.seatParamCount > 0 && (
+          <div style={{ display: "flex", gap: 12, marginTop: 4, fontSize: 11, color: "#625143", flexWrap: "wrap" }}>
+            <span>Calculated seat parameters: <strong style={{ color: "#1B1A1A" }}>{summary.calculatedSeatParams}</strong></span>
+            <span>Seats evaluated: <strong style={{ color: "#1B1A1A" }}>{seatCount}</strong></span>
+          </div>
+        )}
       </div>
 
       {/* 2. Compact Parameter Matrix + 3. Expandable Detail */}
@@ -136,7 +152,7 @@ export default function ComplianceParameterMatrix({
                   </div>
                 </div>
                 <div style={{ flex: "0 0 auto" }}>
-                  <RP22GradingPill level={lvl} />
+                  {isSeatScope ? <SeatScopeBadge /> : <RP22GradingPill level={lvl} />}
                 </div>
                 <div style={{ flex: "0 0 auto", color: "#625143", display: "inline-flex", alignItems: "center" }}>
                   <ChevronDown size={14} style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }} />
