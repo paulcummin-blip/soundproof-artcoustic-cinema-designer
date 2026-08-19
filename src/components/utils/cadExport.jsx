@@ -634,6 +634,7 @@ const ALL_LAYERS = [
     'SCREEN_WALL_BUILDUP',
     'SCREEN_LABELS',
     'SPEAKERS',
+    'SPEAKER_AIMING',
     'SUBWOOFERS',
     'SEATING',
     'PROJECTOR_BODY',
@@ -1058,6 +1059,11 @@ export function generateDXF({
         dxf.push(dxfText('LABELS', sx + 160, sy + 40, TEXT_H, isMLP ? 'MLP' : `S${idx + 1}`));
     });
 
+    // RSP / MLP in CAD coordinates for speaker aiming lines
+    const mlpCadX = (mlp && Number.isFinite(mlp.x)) ? cx(mlp.x) : null;
+    const mlpCadY = (mlp && Number.isFinite(mlp.y)) ? cy(mlp.y) : null;
+    const hasMlp = (mlpCadX !== null && mlpCadY !== null);
+
     // SPEAKERS — emitted as INSERT references to footprint BLOCK definitions.
     // Each speaker is a single selectable CAD object (block reference) with XDATA
     // metadata (TYPE / MODEL / ROLE / ROTATION). Geometry is identical to the
@@ -1133,6 +1139,24 @@ export function generateDXF({
 
         const labelOffset = meta.fp.isRound ? Math.round(meta.fp.diameterMm / 2) : Math.round(meta.fp.planWidthMm / 2);
         dxf.push(dxfText('LABELS', insX + labelOffset + LABEL_OFFSET, insY + 30, TEXT_H, role));
+
+        // SPEAKER_AIMING — aiming line from acoustic centre toward RSP/MLP
+        // (separate layer so it can be hidden independently; does not alter speaker geometry/rotation)
+        if (hasMlp) {
+            dxf.push(dxfLine('SPEAKER_AIMING', insX, insY, mlpCadX, mlpCadY));
+            // Compact metadata annotation block on the aiming layer
+            const metaX = insX + labelOffset + LABEL_OFFSET;
+            const metaH = 50;
+            const metaStep = 58;
+            let metaY = insY - 20;
+            dxf.push(dxfText('SPEAKER_AIMING', metaX, metaY, metaH, `MODEL=${modelName || ''}`));
+            metaY -= metaStep;
+            dxf.push(dxfText('SPEAKER_AIMING', metaX, metaY, metaH, `ROLE=${role}`));
+            metaY -= metaStep;
+            dxf.push(dxfText('SPEAKER_AIMING', metaX, metaY, metaH, `AIM TARGET: RSP`));
+            metaY -= metaStep;
+            dxf.push(dxfText('SPEAKER_AIMING', metaX, metaY, metaH, `ROTATION=${round2(finalRot)}`));
+        }
     });
 
     // SUBWOOFERS — true product footprints with orientation.
