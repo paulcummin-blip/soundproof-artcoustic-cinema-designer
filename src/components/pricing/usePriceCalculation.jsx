@@ -152,7 +152,7 @@ export function usePriceCalculation({
     user?.role === 'admin'
     || user?.access_context?.capabilities?.priceList === true;
   const priceListAvailable = hasPriceAccess && !!territoryConfig?.priceListAvailable;
-  const { priceMap, soundbarOptions, loading: priceMapLoading } = useProductPriceMap();
+  const { priceMap, soundbarOptions, loading: priceMapLoading } = useProductPriceMap(hasPriceAccess);
 
   return useMemo(() => {
     const mode = priceMode === 'exVat' ? 'exVat' : 'incVat';
