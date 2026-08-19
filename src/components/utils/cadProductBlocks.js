@@ -57,7 +57,7 @@ const ARTCOUSTIC_CAD_PRODUCTS = [
   },
   {
     blockName: 'ARTCOUSTIC_EVOLVE_1_1',
-    modelKey: 'evolve-1-1_s',
+    modelKey: 'evolve-1-1',
     label: 'EVOLVE 1-1',
     isRound: false,
     widthMm: 150,
@@ -231,7 +231,11 @@ export function emitArtcousticCadBlocks() {
  */
 export function getArtcousticCadBlockName(modelKey) {
   if (!modelKey) return null;
-  const k = String(modelKey).toLowerCase();
+  // Normalise: lowercase, strip a trailing surround suffix ('_s') so that both
+  // LCR keys (e.g. 'evolve-2-1') and surround keys (e.g. 'evolve-2-1_s') resolve
+  // to the same Artcoustic product block.
+  let k = String(modelKey).toLowerCase();
+  if (k.endsWith('_s')) k = k.slice(0, -2);
   const product = ARTCOUSTIC_CAD_PRODUCTS.find((p) => p.modelKey === k);
   return product ? product.blockName : null;
 }

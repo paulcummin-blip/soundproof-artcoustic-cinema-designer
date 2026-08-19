@@ -30,6 +30,11 @@
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { resolveSpeakerYaw } from '@/components/utils/speakerAimResolver';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
+import {
+    getArtcousticCadBlockName,
+    emitArtcousticCadBlocks,
+    ARTCOUSTIC_CAD_LAYERS,
+} from '@/components/utils/cadProductBlocks';
 
 // ─── Screen constants ──────────────────────────────────────────────────────
 // CAD_SCREEN_DEPTH_MM: minimum visible depth for the screen body rectangle in CAD.
@@ -66,6 +71,21 @@ function classifyWall(role) {
     if (r.endsWith('L') && r.startsWith('S')) return 'left';
     if (r.endsWith('R') && r.startsWith('S')) return 'right';
     return 'unknown';
+}
+
+// ─── Artcoustic native-block wall-orientation offset ──────────────────────────
+// Artcoustic product blocks are defined in NATIVE orientation: +Y = front face,
+// width = X axis. The existing generic footprint blocks for side-wall surrounds
+// are pre-axis-swapped (depth→X, width→Y) so they render wall-flat at rotation 0.
+// To render a native Artcoustic block wall-flat on a side wall, rotate it ±90°:
+//   left wall  → -90° (front face +Y rotates to +X, into room)
+//   right wall → +90° (front face +Y rotates to -X, into room)
+// This offset is added to the existing calculated rotation; it does NOT
+// recalculate the aiming angle — the MLP-aim delta (insRot) is preserved on top.
+function artcousticWallOffset(wallSide) {
+    if (wallSide === 'left')  return -90;
+    if (wallSide === 'right') return 90;
+    return 0;
 }
 
 // ─── Speaker footprint resolver ────────────────────────────────────────────
@@ -628,6 +648,7 @@ const ALL_LAYERS = [
     'CABLE_POINTS',
     'LABELS',
     'DIMENSIONS',
+    ...ARTCOUSTIC_CAD_LAYERS,
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -927,6 +948,13 @@ export function generateDXF({
     dxf.push('0\nENDTAB\n0\nENDSEC');
 
     // ── BLOCKS (speaker/subwoofer footprint definitions) ──────────────────────
+    // Artcoustic named product blocks are emitted first (from the reusable CAD
+    // block library), then the generic auto-generated footprint blocks for any
+    // product without a matching Artcoustic block. INSERT entities reference
+    // whichever block name applies per speaker/subwoofer.
+    const artcousticBlocksSection = emitArtcousticCadBlocks();
+    if (artcousticBlocksSection) dxf.push(artcousticBlocksSection);
+
     const cadBlocks = buildCadBlockRegistry(placedSpeakers, frontSubsCfg, rearSubsCfg);
     const blocksSection = emitDxfBlocks(cadBlocks);
     if (blocksSection) dxf.push(blocksSection);
@@ -1051,7 +1079,15 @@ export function generateDXF({
         const sinR = Math.sin(rotRad);
 
         const meta = speakerFootprintMeta(modelName, role);
-        const blockName = cadBlocks.get(meta.blockKey)?.name || 'SPK_0';
+
+        // Resolve a matching Artcoustic product block. When one exists, INSERT it
+        // (native orientation) with the wall-orientation offset added to the
+        // existing calculated rotation. When no match, fall back to the generic
+        // auto-generated footprint block exactly as before.
+        const artcousticBlockName = getArtcousticCadBlockName(modelName);
+        const useArtcoustic = !!artcousticBlockName;
+        const genericBlockName = cadBlocks.get(meta.blockKey)?.name || 'SPK_0';
+        const blockName = useArtcoustic ? artcousticBlockName : genericBlockName;
 
         let insX, insY, insRot;
         if (wall === 'overhead' || meta.fp.isRound) {
@@ -1073,28 +1109,38 @@ export function generateDXF({
             insX = spx + shiftX; insY = spy + shiftY; insRot = 0;
         }
 
-        dxf.push(dxfInsert('SPEAKERS', blockName, insX, insY, insRot, [
+        // Native Artcoustic blocks need the wall-orientation base rotation so the
+        // cabinet renders wall-flat on side walls. The existing calculated rotation
+        // (insRot) is preserved on top of this fixed offset.
+        const finalRot = useArtcoustic ? insRot + artcousticWallOffset(wall) : insRot;
+
+        dxf.push(dxfInsert('SPEAKERS', blockName, insX, insY, finalRot, [
             ['1000', `TYPE=Speaker`],
             ['1000', `MODEL=${modelName || ''}`],
             ['1000', `ROLE=${role}`],
-            ['1040', round2(insRot)],
+            ['1040', round2(finalRot)],
         ]));
 
         const labelOffset = meta.fp.isRound ? Math.round(meta.fp.diameterMm / 2) : Math.round(meta.fp.planWidthMm / 2);
         dxf.push(dxfText('LABELS', insX + labelOffset + LABEL_OFFSET, insY + 30, TEXT_H, role));
     });
 
-    // SUBWOOFERS — true product footprints with orientation
+    // SUBWOOFERS — true product footprints with orientation.
+    // Matching Artcoustic subwoofer blocks (SUB2-12 / SUB3-12 / SUB4-12) are
+    // INSERTed by name; others fall back to the generic footprint block.
     const addDXFSub = (sub, idx, prefix) => {
         if (!Number.isFinite(sub?.x) || !Number.isFinite(sub?.y)) return;
         const sx = cx(sub.x);
         const sy = cy(sub.y);
         const label = `${prefix}${idx + 1}`;
         const meta = subFootprintMeta(sub);
-        const blockName = cadBlocks.get(meta.blockKey)?.name || 'SUB_0';
+        const subModel = sub.model || sub.brand_model || '';
+        const artcousticBlockName = getArtcousticCadBlockName(subModel);
+        const genericBlockName = cadBlocks.get(meta.blockKey)?.name || 'SUB_0';
+        const blockName = artcousticBlockName || genericBlockName;
         dxf.push(dxfInsert('SUBWOOFERS', blockName, sx, sy, 0, [
             ['1000', `TYPE=Subwoofer`],
-            ['1000', `MODEL=${sub.model || sub.brand_model || ''}`],
+            ['1000', `MODEL=${subModel}`],
             ['1000', `ROLE=${label}`],
         ]));
         const hw = Math.round(meta.fp.planWidthMm / 2);
