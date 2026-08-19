@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { findEffectivePromotion } from '../../shared/promotionAuthority.js';
+import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 
 /**
  * P3 Dealer-facing promotion eligibility reader.
@@ -25,6 +26,13 @@ export default async function(req) {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ is_effective: false }, { status: 200 });
+
+    const accessContext = await resolveAccountAccess(base44, user);
+    try {
+      assertCapability(accessContext, 'commercial');
+    } catch {
+      return Response.json({ is_effective: false }, { status: 403 });
+    }
 
     // Resolve authoritative account_id from the authenticated user record.
     const userRecords = await base44.asServiceRole.entities.User.filter({ id: user.id });
