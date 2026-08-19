@@ -38,6 +38,16 @@ export function buildCompactContractFromWorkerResult({
   const fingerprint = workerResult.fingerprint;
   const calibrationFingerprint = workerResult.calibrationFingerprint || fingerprints?.calibration || null;
 
+  // Use target-specific fingerprints: geometry and product are design-wide
+  // (shared across all P14 targets), but calibration is target-specific.
+  // Passing the foreground calibration fingerprint here would contaminate
+  // cached contracts with the wrong calibration identity.
+  const targetFingerprints = {
+    geometry: fingerprints?.geometry ?? null,
+    product: fingerprints?.product ?? null,
+    calibration: calibrationFingerprint,
+  };
+
   // Step 1: Select candidate from pool (same as foreground)
   const selected = selectCandidateFromPool(pool);
   if (!selected) return null;
@@ -139,7 +149,7 @@ export function buildCompactContractFromWorkerResult({
     usableLfHz,
     sourceLayout: sources,
     canonicalPriorityMode: "canonical-physics-eq",
-    fingerprints,
+    fingerprints: targetFingerprints,
     responseDomain: "normalized_room_transfer",
     backgroundLifecycle: { status: "ready", resultFingerprint: fingerprint },
     p14TargetBasis: target.basis,

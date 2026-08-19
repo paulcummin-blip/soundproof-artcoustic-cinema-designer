@@ -137,7 +137,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }, [targetCacheHydrated, baseDesignFingerprint, scopeId]);
 
   useEffect(() => {
-    if (cachedContract) return; // Skip controller when cache hit — no optimiser run
+    if (cachedContract) {
+      // Cache hit — cancel any in-flight foreground worker so it doesn't
+      // compete with the background scheduler for CPU or publish a stale
+      // result after the cached contract is already live.
+      controller.cancelActive("cache-hit");
+      return; // Skip controller when cache hit — no optimiser run
+    }
     if (isDragging || !fingerprints) return; // Defer during drag; skip when analysis is blocked
     controller.ensureProtocolCompatibility(BASS_OPTIMISER_VERSIONS);
     controller.updateInputs({
