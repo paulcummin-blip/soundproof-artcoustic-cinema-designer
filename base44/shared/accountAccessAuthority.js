@@ -137,7 +137,25 @@ export async function resolveAccountAccess(base44, sessionUser, {
     return { allowed: false, reason: 'USER_DISABLED' };
   }
 
-  const accountId = String(authoritativeUser.account_id || '').trim();
+  const email = normaliseEmail(authoritativeUser.email);
+  let accountId = String(authoritativeUser.account_id || '').trim();
+  let invitationMembership = null;
+
+  // A newly invited Base44 user does not yet carry custom User fields. Resolve
+  // exactly one pending/active membership by normalised email, then bind the
+  // authoritative User record on first login. Cross-account duplicate pending
+  // seats are blocked by manageAccountUsers, and ambiguity fails closed here.
+  if (!accountId && email) {
+    const invitationRows = await service.entities.AccountMembership.filter({ email });
+    const eligibleInvitations = (invitationRows || []).filter((item) =>
+      item.status === 'pending' || item.status === 'active'
+    );
+    if (eligibleInvitations.length === 1) {
+      invitationMembership = eligibleInvitations[0];
+      accountId = String(invitationMembership.account_id || '').trim();
+    }
+  }
+
   if (!accountId) {
     return { allowed: false, reason: 'ACCOUNT_NOT_LINKED' };
   }
@@ -150,13 +168,17 @@ export async function resolveAccountAccess(base44, sessionUser, {
     return { allowed: false, reason: 'ACCOUNT_SUSPENDED', account };
   }
 
-  const email = normaliseEmail(authoritativeUser.email);
+  if (!authoritativeUser.account_id && invitationMembership) {
+    await service.entities.User.update(authoritativeUser.id, { account_id: accountId });
+    authoritativeUser.account_id = accountId;
+  }
+
   const accountMemberships = await service.entities.AccountMembership.filter({ account_id: accountId });
   const allMemberships = Array.isArray(accountMemberships) ? accountMemberships : [];
   let membership = allMemberships.find((item) =>
     item?.user_id === authoritativeUser.id
     || (normaliseEmail(item?.email) && normaliseEmail(item.email) === email)
-  ) || null;
+  ) || invitationMembership || null;
 
   const occupiedMemberships = allMemberships.filter((item) => ACTIVE_SEAT_STATUSES.has(item?.status || 'active'));
   const existingAdmin = occupiedMemberships.find((item) =>
