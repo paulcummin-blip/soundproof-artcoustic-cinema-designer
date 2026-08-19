@@ -9,6 +9,7 @@ import {
 } from "@/lib/commercial/commercialOverview";
 import AccountGroupSection from "@/components/admin/commercial/AccountGroupSection";
 import DiagnosticsPanel from "@/components/admin/commercial/DiagnosticsPanel";
+import GlobalAccountUsersOverview from "@/components/admin/accounts/GlobalAccountUsersOverview";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -229,6 +230,9 @@ export default function AdminAccountsPage() {
           </div>
         </div>
       </div>
+
+      {/* Master view across every account and login */}
+      <GlobalAccountUsersOverview refreshKey={promoRefreshKey} />
 
       {/* Collapsible diagnostics */}
       <DiagnosticsPanel
