@@ -119,7 +119,7 @@ export default function GlobalAccountUsersOverview({ refreshKey = 0 }) {
                     className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${statusStyle(member.status)}`}
                   >
                     <span className="truncate">{member.email || "Pending user"}</span>
-                    <span className="font-semibold">· {member.is_account_admin ? "Admin" : member.access_label}</span>
+                    <span className="font-semibold">· {member.is_platform_admin ? "Master Admin" : member.is_account_admin ? "Admin" : member.access_label}</span>
                   </span>
                 ))}
               </div>
