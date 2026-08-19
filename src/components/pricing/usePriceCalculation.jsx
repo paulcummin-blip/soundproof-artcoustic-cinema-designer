@@ -148,7 +148,10 @@ export function usePriceCalculation({
   const { user } = useAuth();
   const territory = user?.territory || DEFAULT_TERRITORY;
   const territoryConfig = getTerritoryConfig(territory);
-  const priceListAvailable = !!territoryConfig?.priceListAvailable;
+  const hasPriceAccess =
+    user?.role === 'admin'
+    || user?.access_context?.capabilities?.priceList === true;
+  const priceListAvailable = hasPriceAccess && !!territoryConfig?.priceListAvailable;
   const { priceMap, soundbarOptions, loading: priceMapLoading } = useProductPriceMap();
 
   return useMemo(() => {
