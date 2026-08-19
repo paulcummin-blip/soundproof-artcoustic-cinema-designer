@@ -1,7 +1,6 @@
 import React from 'react';
 import { Home, User } from 'lucide-react';
 import RP22GradingPill from '../ui/RP22GradingPill';
-import { formatSeatLabel } from '../utils/seatLabel';
 
 export default function ReportCountsDashboard({
     roomLevelCounts,
@@ -52,70 +51,33 @@ export default function ReportCountsDashboard({
                 </div>
             </div>
 
-            {/* Right: Seat parameters section */}
+            {/* Right: Seat parameters section — no L-level aggregation */}
             <div className="w-full">
                 <div className="flex items-center gap-2 mb-3">
                     <User className="w-4 h-4 text-[#213428]" />
                     <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                        Seat parameters
+                        Seat Results
                     </div>
-                    <span className="text-sm text-gray-500">({totalSeatParameters})</span>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3 w-full content-start">
-                    {seatCountsByRow.map(({ rowNum, seats }) => (
-                        <div key={rowNum} className="flex flex-col gap-3">
-                            {seats.map(({ seatId, counts, activeCount, failCount }) => { // activeCount and failCount are siblings of counts
-                                const isPrimary = analysisResult?.perSeatRp22?.[seatId]?.isPrimary === true;
-                                return (
-                                    <div
-                                        key={seatId}
-                                        className={`rounded-lg px-4 py-4 bg-white w-full min-h-[96px] flex flex-col justify-center break-inside-avoid-page page-break-inside-avoid ${
-                                            isPrimary ? 'border-[3px] border-[#213428]' : 'border-2 border-[#213428]'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between gap-2 mb-2">
-                                            <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                {formatSeatLabel(seatId)}
-                                            </div>
-                                            <div className="flex items-center gap-3 text-xs text-[#625143]">
-                                                <span>Active: {activeCount ?? 0}</span>
-                                                {(failCount ?? 0) > 0 && (
-                                                    <span className="font-semibold text-[#8B2500]">Fail: {failCount}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        {(() => {
-                                            const maxSeat = Math.max(
-                                                Number(counts?.L4 ?? 0),
-                                                Number(counts?.L3 ?? 0),
-                                                Number(counts?.L2 ?? 0),
-                                                Number(counts?.L1 ?? 0)
-                                            );
-                                            const seatIsMax = (k) => Number(counts?.[k] ?? 0) === maxSeat;
-                                            return (
-                                                <div className="flex justify-center items-center gap-3 mt-1 px-1">
-                                                    <div style={{ transform: seatIsMax('L4') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
-                                                        <RP22GradingPill level="L4" count={counts.L4} />
-                                                    </div>
-                                                    <div style={{ transform: seatIsMax('L3') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
-                                                        <RP22GradingPill level="L3" count={counts.L3} />
-                                                    </div>
-                                                    <div style={{ transform: seatIsMax('L2') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
-                                                        <RP22GradingPill level="L2" count={counts.L2} />
-                                                    </div>
-                                                    <div style={{ transform: seatIsMax('L1') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
-                                                        <RP22GradingPill level="L1" count={counts.L1} />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-                                );
-                            })}
+                {(() => {
+                    const allSeats = (seatCountsByRow || []).flatMap(r => r.seats || []);
+                    const seatsEvaluated = allSeats.length;
+                    const calculatedParams = allSeats.reduce((max, s) => Math.max(max, s.activeCount ?? 0), 0);
+                    return (
+                        <div className="border-2 border-[#213428] rounded-lg px-4 py-4 bg-white w-full max-w-[360px] min-h-[96px] flex flex-col justify-center break-inside-avoid-page page-break-inside-avoid">
+                            <div className="flex flex-col gap-2">
+                                <div className="text-sm text-[#1B1A1A]">
+                                    <span className="text-[#625143]">Calculated parameters: </span>
+                                    <span className="font-semibold">{calculatedParams}</span>
+                                </div>
+                                <div className="text-sm text-[#1B1A1A]">
+                                    <span className="text-[#625143]">Seats evaluated: </span>
+                                    <span className="font-semibold">{seatsEvaluated}</span>
+                                </div>
+                            </div>
                         </div>
-                    ))}
-                </div>
+                    );
+                })()}
             </div>
         </div>
     );

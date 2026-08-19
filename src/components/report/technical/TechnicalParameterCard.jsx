@@ -24,6 +24,7 @@
 import React from "react";
 import TechnicalLevelBadge from "./TechnicalLevelBadge";
 import TechnicalSeatGrid from "./TechnicalSeatGrid";
+import SeatScopeBadge from "../SeatScopeBadge";
 
 const HEADING_FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
 const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -208,7 +209,7 @@ export default function TechnicalParameterCard({
           border: "1px solid #EFEEEA",
         }}
       >
-        <TechnicalLevelBadge level={lvl} />
+        {isSeatScope ? <SeatScopeBadge variant="print" /> : <TechnicalLevelBadge level={lvl} />}
         <div
           style={{
             fontSize: u.fsValue,

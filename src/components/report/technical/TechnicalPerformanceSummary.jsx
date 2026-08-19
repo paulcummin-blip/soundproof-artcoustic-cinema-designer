@@ -136,28 +136,6 @@ function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designR
         Active: {activeCount ?? 0} of {seat.total ?? 0}
       </div>
 
-      {/* Level distribution */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "2mm 4mm",
-        }}
-      >
-        <LevelCountBlock level="L4" count={counts?.L4 ?? 0} />
-        <LevelCountBlock level="L3" count={counts?.L3 ?? 0} />
-        <LevelCountBlock level="L2" count={counts?.L2 ?? 0} />
-        <LevelCountBlock level="L1" count={counts?.L1 ?? 0} />
-      </div>
-
-      {/* Unassessed */}
-      <div style={{ display: "flex", alignItems: "center", gap: "3mm" }}>
-        <TechnicalLevelBadge level="—" size="small" />
-        <span style={{ fontSize: "10pt", color: COLORS.body, fontFamily: FONT_BODY }}>
-          × {(seat.total ?? 0) - (activeCount ?? 0)}
-        </span>
-      </div>
-
       {/* Design Rating — secondary to seat name, prominent enough to compare */}
       {showDesignRating && designRating && (
         <div
@@ -345,15 +323,16 @@ export default function TechnicalPerformanceSummary({
           >
             SEAT PARAMETERS
           </span>
-          <span
-            style={{
-              fontSize: "9pt",
-              color: COLORS.secondary,
-              fontFamily: FONT_BODY,
-            }}
-          >
-            {totalSeatParameters} seat-scope parameters
-          </span>
+          {(() => {
+            const allSeats = (seatCountsByRow || []).flatMap(r => r.seats || []);
+            const seatsEvaluated = allSeats.length;
+            const calculatedParams = allSeats.reduce((max, s) => Math.max(max, s.activeCount ?? 0), 0);
+            return (
+              <span style={{ fontSize: "9pt", color: COLORS.secondary, fontFamily: FONT_BODY }}>
+                {totalSeatParameters} parameters · {calculatedParams} calculated · {seatsEvaluated} seats
+              </span>
+            );
+          })()}
         </div>
 
         {(seatCountsByRow || []).map(({ rowNum, seats }) => (

@@ -1,8 +1,11 @@
 // components/rp22/RP22ComplianceParameterTile.jsx
 // Exact tile extracted from RP22CompliancePanel — do not alter appearance.
-import React from "react";
+import React, { useState } from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
+import SeatScopeBadge from "@/components/report/SeatScopeBadge";
+import { formatSeatLabel } from "@/components/utils/seatLabel";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 /* ---------- Shared style tokens (mirrored from RP22CompliancePanel) ---------- */
 const card  = { border: "1px solid #DCDBD6", background: "#fff", borderRadius: 8 };
@@ -31,8 +34,9 @@ const fmtIneq = (dir) => {
 // Pill zone min-height: supports up to 3 seat rows (each ~28px pill + 6px gap) with breathing room
 const PILL_ZONE_MIN_HEIGHT = 110;
 
-export default function RP22ComplianceParameterTile({ param, achievedValue, lvl, seatPillGrid, targetBasisNote }) {
+export default function RP22ComplianceParameterTile({ param, achievedValue, lvl, seatPillGrid, seatGridData, targetBasisNote }) {
   const isSeatScope = String(param?.scope || "").toLowerCase() === "seat";
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <div style={{ ...card, display: "flex", flexDirection: "column", minHeight: 380 }}>
@@ -64,21 +68,59 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
         )}
       </div>
 
-      {/* ── Section 2: Pill zone (fixed min-height, grows for more rows) ── */}
-      <div style={{ padding: "8px 12px 0 12px", minHeight: PILL_ZONE_MIN_HEIGHT, display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
+      {/* ── Section 2: Pill zone (room) or SEAT badge (seat-scoped) ── */}
+      <div style={{ padding: "8px 12px 0 12px", minHeight: isSeatScope ? 'auto' : PILL_ZONE_MIN_HEIGHT, display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <span style={{ fontSize: 12, color: "#625143" }}>
-            {isSeatScope ? "Per-seat levels" : "Level"}
+            {isSeatScope ? "Seat scope" : "Level"}
           </span>
           {isSeatScope ? (
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              {seatPillGrid ?? null}
-            </div>
+            <SeatScopeBadge />
           ) : (
             <RP22GradingPill level={lvl} />
           )}
         </div>
+        {isSeatScope && seatGridData && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1 text-xs text-[#625143] hover:text-[#1B1A1A] print:hidden"
+            style={{ marginTop: 8, alignSelf: "flex-start", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+          >
+            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {expanded ? "Hide" : "Show"} seat results
+          </button>
+        )}
       </div>
+
+      {/* ── Section 2b: Expandable per-seat detail (seat-scoped only) ── */}
+      {isSeatScope && expanded && seatGridData && (
+        <div style={{ padding: "8px 12px 0 12px" }}>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-[#E6E4DD]">
+                <th className="text-left py-1 text-[#625143] font-medium">Seat</th>
+                <th className="text-right py-1 text-[#625143] font-medium">Result</th>
+                <th className="text-right py-1 text-[#625143] font-medium">Level</th>
+              </tr>
+            </thead>
+            <tbody>
+              {seatGridData.flatMap(rowObj =>
+                rowObj.seats.map((seat) => (
+                  <tr key={seat.id} className="border-b border-[#F0EFEA]">
+                    <td className="py-1 text-[#1B1A1A]">
+                      {formatSeatLabel(seat.id)}{seat.isPrimary ? " (RSP)" : ""}
+                    </td>
+                    <td className="py-1 text-right text-[#3E4349]">{seat.value || "—"}</td>
+                    <td className="py-1 text-right">
+                      <RP22GradingPill level={seat.level || "—"} compact />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* ── Section 3: Threshold row — always pushed to bottom ── */}
       <div style={{ ...body, marginTop: "auto", paddingTop: 0 }}>

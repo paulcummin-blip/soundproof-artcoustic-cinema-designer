@@ -73,6 +73,7 @@ export default function RP22ReportParameterGrid({
     const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14)
       ? { ...param, thresholds: resolvedThresholds }
       : param;
+    const isSeatScope = String(param.scope || "").toLowerCase() === "seat";
     const targetBasisNote =
       (param.id === 12 || param.id === 13)
         ? (() => {
@@ -87,7 +88,7 @@ export default function RP22ReportParameterGrid({
           param={resolvedParam}
           achievedValue={getHudValueForParam(param, { isPrintVariant })}
           lvl={getHudLevelForParam(param)}
-          seatPillGrid={String(param.scope || "").toLowerCase() === "seat" ? renderSeatPillGrid(param.id) : null}
+          seatGridData={isSeatScope ? buildSeatGridData(param.id) : null}
           targetBasisNote={targetBasisNote}
         />
       </div>
