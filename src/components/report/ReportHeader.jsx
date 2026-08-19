@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useActiveProjectId } from '@/components/state/project-session';
 import { ArrowLeft, FileText, Download, Eye } from 'lucide-react';
 import { generateSVG, generateDXF, downloadTextFile } from '../utils/cadExport';
+import { isCadExportReady } from './cadExportReadiness';
 import ReportCover from './ReportCover';
 
 export default function ReportHeader({
@@ -47,6 +48,22 @@ export default function ReportHeader({
         : null;
     const sessionProjectId = useActiveProjectId();
     const activeProjectId = urlProjectId || sessionProjectId || null;
+
+    // CAD-specific readiness — blocks CAD export until all CAD source data
+    // (room dims, speakers, seating, subwoofer positions where applicable)
+    // has populated AppState. Independent of the report-level exportDisabled
+    // gate (which covers hydration/bass/recommendation status).
+    const cadReady = isCadExportReady({
+        roomDims,
+        placedSpeakers,
+        seatingPositions: seats,
+        frontSubsCfg,
+        rearSubsCfg,
+    });
+    const cadExportDisabled = exportDisabled || !cadReady;
+    const cadDisabledMessage = !cadReady
+        ? "CAD export is preparing the project data. Please wait."
+        : exportDisabledMessage;
 
     const handleBackToProject = () => {
         if (!activeProjectId) return;
@@ -93,7 +110,7 @@ export default function ReportHeader({
     };
 
     const handleExportSVG = () => {
-        if (exportDisabled) return;
+        if (cadExportDisabled) return;
         const date = new Date().toISOString().split('T')[0];
         const filename = `RP22_CAD_Overlay_RP22Report_${date}.svg`;
         const svgContent = generateSVG({
@@ -115,7 +132,7 @@ export default function ReportHeader({
     };
 
     const handleExportDXF = () => {
-        if (exportDisabled) return;
+        if (cadExportDisabled) return;
         const date = new Date().toISOString().split('T')[0];
         const filename = `RP22_CAD_Overlay_RP22Report_${date}.dxf`;
         const dxfContent = generateDXF({
@@ -203,8 +220,8 @@ export default function ReportHeader({
                     <Button
                         type="button"
                         onClick={() => setShowCadExportMenu(!showCadExportMenu)}
-                        disabled={exportDisabled}
-                        title={exportDisabled ? "CAD export is preparing the project data. Please wait." : "Download CAD Overlay (DXF/SVG)"}
+                        disabled={cadExportDisabled}
+                        title={cadExportDisabled ? "CAD export is preparing the project data. Please wait." : "Download CAD Overlay (DXF/SVG)"}
                         className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap"
                         style={{
                             fontFamily: "Futura PT Light, Century Gothic, sans-serif",
@@ -217,7 +234,7 @@ export default function ReportHeader({
                         }}
                     >
                         <Download className="w-4 h-4 mr-2" style={{ color: "#625143", flexShrink: 0 }} />
-                        {exportDisabled ? "Preparing CAD…" : "Download CAD Overlay"}
+                        {cadExportDisabled ? "Preparing CAD…" : "Download CAD Overlay"}
                     </Button>
 
                     {showCadExportMenu && (
@@ -239,7 +256,7 @@ export default function ReportHeader({
                             <div style={{ fontSize: '11px', color: '#3E4349', marginBottom: '10px' }}>
                                 Plan view only • true scale • overlay use
                             </div>
-                            {exportDisabled && (
+                            {cadExportDisabled && (
                                 <div style={{
                                     fontSize: '11px',
                                     color: '#625143',
@@ -250,13 +267,13 @@ export default function ReportHeader({
                                     borderRadius: '4px',
                                     lineHeight: 1.4,
                                 }}>
-                                    CAD export is preparing the project data. Please wait.
+                                    {cadDisabledMessage}
                                 </div>
                             )}
                             <Button
                                 type="button"
                                 onClick={handleExportSVG}
-                                disabled={exportDisabled}
+                                disabled={cadExportDisabled}
                                 className="w-full mb-2 px-4 py-2 text-sm hover:bg-[#F9F8F6] disabled:cursor-not-allowed disabled:opacity-50"
                                 style={{
                                     fontFamily: "Futura PT Light, Century Gothic, sans-serif",
@@ -271,7 +288,7 @@ export default function ReportHeader({
                             <Button
                                 type="button"
                                 onClick={handleExportDXF}
-                                disabled={exportDisabled}
+                                disabled={cadExportDisabled}
                                 className="w-full px-4 py-2 text-sm hover:bg-[#F9F8F6] disabled:cursor-not-allowed disabled:opacity-50"
                                 style={{
                                     fontFamily: "Futura PT Light, Century Gothic, sans-serif",
