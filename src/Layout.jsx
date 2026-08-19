@@ -248,7 +248,7 @@ export default function Layout({ children, currentPageName }) {
             <nav className="flex-1 px-3 py-2">
               <div className="mb-4">
                 <div className="text-xl font-bold text-[#1B1A1A] mb-4 px-3">
-                  Design Tools
+                  Navigation
                 </div>
                 <div className="space-y-1">
                   {(() => {
