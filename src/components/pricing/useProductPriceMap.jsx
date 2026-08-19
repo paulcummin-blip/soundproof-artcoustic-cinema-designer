@@ -17,7 +17,7 @@ import { base44 } from '@/api/base44Client';
  *
  * Admin edits are picked up on refetch or page refresh (staleTime expires).
  */
-export function useProductPriceMap() {
+export function useProductPriceMap(enabled = true) {
   const query = useQuery({
     queryKey: ['productPrices'],
     queryFn: async () => {
@@ -25,6 +25,7 @@ export function useProductPriceMap() {
       return response?.data?.prices || [];
     },
     staleTime: 5 * 60 * 1000,
+    enabled,
   });
 
   const { priceMap, soundbarOptions } = useMemo(() => {

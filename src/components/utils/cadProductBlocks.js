@@ -82,6 +82,17 @@ const ARTCOUSTIC_CAD_PRODUCTS = [
     frontFaceY: 41,
   },
   {
+    blockName: 'ARTCOUSTIC_Q4_3',
+    modelKey: 'q4-3',
+    label: 'Q4-3',
+    productType: 'speaker',
+    isRound: false,
+    widthMm: 280,
+    depthMm: 110,
+    heightMm: 210,
+    frontFaceY: 55, // depth/2 (driver face = +Y)
+  },
+  {
     blockName: 'ARTCOUSTIC_SUB2_12',
     modelKey: 'sub2-12',
     label: 'SUB2-12',
