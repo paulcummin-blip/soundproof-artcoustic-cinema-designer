@@ -1,7 +1,7 @@
 {
   "name": "ProductPrice",
   "type": "object",
-  "description": "Canonical editable retail price for a Sound Proof commercial product. One record per SKU. All authenticated users can READ; admin-only writes. Stage 2 will rewire usePriceCalculation to read from here.",
+  "description": "Canonical editable retail price for a Sound Proof commercial product. One record per SKU. Read access is limited to platform admins plus Full Access and Price List Only account users; writes are platform-admin only.",
   "properties": {
     "sku": {
       "type": "string",
