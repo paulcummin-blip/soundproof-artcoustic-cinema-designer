@@ -1,0 +1,72 @@
+{
+  "name": "AccountUserAudit",
+  "type": "object",
+  "description": "Append-only audit trail for invitations, access changes, removals and invitation acceptance. Written only by trusted backend functions.",
+  "properties": {
+    "account_id": {
+      "type": "string"
+    },
+    "actor_user_id": {
+      "type": "string"
+    },
+    "actor_email": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "INVITED",
+        "INVITATION_RESENT",
+        "INVITATION_ACCEPTED",
+        "ACCESS_CHANGED",
+        "REMOVED",
+        "LEGACY_ADMIN_BOOTSTRAPPED"
+      ]
+    },
+    "target_user_id": {
+      "type": "string",
+      "nullable": true
+    },
+    "target_email": {
+      "type": "string"
+    },
+    "before_access_level": {
+      "type": "string",
+      "nullable": true
+    },
+    "after_access_level": {
+      "type": "string",
+      "nullable": true
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "details": {
+      "type": "object",
+      "nullable": true
+    }
+  },
+  "required": [
+    "account_id",
+    "actor_user_id",
+    "actor_email",
+    "action",
+    "target_email",
+    "occurred_at"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": false,
+    "delete": false
+  }
+}
