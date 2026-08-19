@@ -125,17 +125,15 @@ async function loadAccountUsers(service, account) {
 }
 
 async function inviteThroughPlatform(base44, email) {
-  const serviceUsers = base44.asServiceRole?.users;
-  if (serviceUsers && typeof serviceUsers.inviteUser === 'function') {
-    return serviceUsers.inviteUser(email, 'user');
+  const response = await base44.asServiceRole.functions.invoke(
+    'sendAccountUserInvitation',
+    { email },
+  );
+  const payload = response?.data || response || {};
+  if (payload?.sent !== true) {
+    throw new Error(payload?.message || payload?.error || 'INVITATION_SERVICE_UNAVAILABLE');
   }
-  if (base44.users && typeof base44.users.inviteUser === 'function') {
-    return base44.users.inviteUser(email, 'user');
-  }
-  if (base44.auth && typeof base44.auth.inviteUser === 'function') {
-    return base44.auth.inviteUser(email, 'user');
-  }
-  throw new Error('INVITATION_SERVICE_UNAVAILABLE');
+  return payload;
 }
 
 export default async function(req) {
