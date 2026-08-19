@@ -89,17 +89,53 @@ export const AuthProvider = ({ children }) => {
 
   const checkUserAuth = async () => {
     try {
-      // Now check if the user is authenticated
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
 
-      // Check account status for non-admin users (suspended = blocked,
-      // inactive = transition to active + record access).
-      if (currentUser?.role !== 'admin') {
+      // Permissions are resolved server-side from the authoritative User,
+      // Account and AccountMembership records. Browser-supplied roles are
+      // never treated as authority.
+      let accessContext = null;
+      try {
+        const response = await base44.functions.invoke('getAccountAccessContext', {});
+        accessContext = response?.data || null;
+      } catch (accessError) {
+        const payload = accessError?.response?.data || accessError?.data || {};
+        const reason = payload?.reason || payload?.error || 'ACCESS_CONTEXT_FAILED';
+        setUser(currentUser);
+        setIsAuthenticated(false);
+        setAuthError({
+          type: reason === 'ACCOUNT_SUSPENDED' ? 'account_suspended' : 'access_denied',
+          message: payload?.message || 'This login is not linked to an active Sound Proof account.'
+        });
+        setIsLoadingAuth(false);
+        return;
+      }
+
+      if (!accessContext?.allowed) {
+        setUser(currentUser);
+        setIsAuthenticated(false);
+        setAuthError({
+          type: accessContext?.reason === 'ACCOUNT_SUSPENDED' ? 'account_suspended' : 'access_denied',
+          message: 'This login is not linked to an active Sound Proof account.'
+        });
+        setIsLoadingAuth(false);
+        return;
+      }
+
+      const effectiveUser = {
+        ...currentUser,
+        ...(accessContext.user || {}),
+        access_context: accessContext,
+      };
+
+      // Preserve the existing first-login account activation/access record.
+      // Permission resolution above remains the authority for this session.
+      if (effectiveUser.role !== 'admin') {
         try {
           const res = await base44.functions.invoke('recordAccountAccess', {});
           if (res?.data?.status === 'suspended') {
-            setUser(currentUser);
+            setUser(effectiveUser);
             setAuthError({
               type: 'account_suspended',
               message: 'Sound Proof access suspended'
@@ -109,24 +145,28 @@ export const AuthProvider = ({ children }) => {
             return;
           }
         } catch (err) {
-          // Non-critical — don't block login on function failure.
           console.error('recordAccountAccess failed:', err);
         }
       }
 
-      setUser(currentUser);
+      setUser(effectiveUser);
       setIsAuthenticated(true);
+      setAuthError(null);
       setIsLoadingAuth(false);
     } catch (error) {
       console.error('User auth check failed:', error);
       setIsLoadingAuth(false);
       setIsAuthenticated(false);
-      
-      // If user auth fails, it might be an expired token
+
       if (error.status === 401 || error.status === 403) {
         setAuthError({
           type: 'auth_required',
           message: 'Authentication required'
+        });
+      } else {
+        setAuthError({
+          type: 'unknown',
+          message: error?.message || 'Unable to verify this login.'
         });
       }
     }
