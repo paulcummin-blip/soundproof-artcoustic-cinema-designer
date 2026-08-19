@@ -176,20 +176,56 @@ export default async function(req) {
             status: account.status,
           },
           members: [],
+          accountUsers: [],
         });
       }
       for (const membership of (memberships || [])) {
         if (!byAccount.has(membership.account_id)) continue;
         byAccount.get(membership.account_id).members.push(membership);
       }
+      for (const user of (users || [])) {
+        if (!user?.account_id || !byAccount.has(user.account_id)) continue;
+        byAccount.get(user.account_id).accountUsers.push(user);
+      }
       const rows = Array.from(byAccount.values()).map((row) => {
         const inferredAdminId = accountAdminMembershipId(row.members);
         row.members = row.members.map((membership) => memberView(membership, userById, inferredAdminId));
+
+        const representedUserIds = new Set(row.members.map((member) => member.user_id).filter(Boolean));
+        const representedEmails = new Set(row.members.map((member) => normaliseEmail(member.email)).filter(Boolean));
+        for (const user of row.accountUsers) {
+          if (representedUserIds.has(user.id) || representedEmails.has(normaliseEmail(user.email))) continue;
+          const platformAdmin = user.role === 'admin';
+          const accountAdmin = platformAdmin || user.account_role === 'admin';
+          const accessLevel = accountAdmin
+            ? ACCESS_LEVELS.FULL_ACCESS
+            : normaliseAccessLevel(user.access_level, ACCESS_LEVELS.FULL_ACCESS);
+          row.members.push({
+            id: `legacy-user:${user.id}`,
+            user_id: user.id,
+            email: normaliseEmail(user.email),
+            full_name: user.full_name || null,
+            access_level: accessLevel,
+            access_label: platformAdmin ? 'Master Admin' : accountAdmin ? 'Account Admin' : accessLabel(accessLevel),
+            is_account_admin: accountAdmin,
+            is_platform_admin: platformAdmin,
+            counts_as_seat: !platformAdmin,
+            status: user.disabled === true ? 'suspended' : 'active',
+            invited_at: null,
+            accepted_at: null,
+            removed_at: null,
+            is_verified: user.is_verified === true,
+          });
+        }
+        delete row.accountUsers;
+
         row.members.sort((a, b) => {
           if (a.is_account_admin !== b.is_account_admin) return a.is_account_admin ? -1 : 1;
           return String(a.email).localeCompare(String(b.email));
         });
-        row.seats_used = row.members.filter((member) => OCCUPIED_STATUSES.has(member.status)).length;
+        row.seats_used = row.members.filter((member) =>
+          member.counts_as_seat !== false && OCCUPIED_STATUSES.has(member.status)
+        ).length;
         return row;
       });
       return Response.json({ accounts: rows, maximum_seats: MAX_ACCOUNT_SEATS });
