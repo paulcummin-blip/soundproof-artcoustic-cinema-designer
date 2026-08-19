@@ -446,6 +446,28 @@
       "default": "recommended",
       "description": "Whether selected_abfuser_qty was auto-seeded from the recommendation ('recommended') or manually set by the designer ('user'). When 'recommended', the selected quantity auto-follows recommendation changes."
     },
+    "p15_construction_level": {
+      "type": "string",
+      "enum": [
+        "standard",
+        "purpose-built",
+        "reference",
+        "studio"
+      ],
+      "default": "purpose-built",
+      "description": "Manual design estimate for P15 background noise floor. standard = NCB 26 (L1), purpose-built = NCB 22 (L2), reference = NCB 18 (L3), studio = NCB 15 (L4)."
+    },
+    "p21_early_reflection_preset": {
+      "type": "string",
+      "enum": [
+        "l1",
+        "l2",
+        "l3",
+        "l4"
+      ],
+      "default": "l3",
+      "description": "Manual design estimate for P21 early reflections. l1 = N/A, l2 = -8 dB (L2), l3 = -10 dB (L3), l4 = -12 dB (L4)."
+    },
     "room_dimensions_edited": {
       "type": "boolean",
       "default": false,

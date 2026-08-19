@@ -76,6 +76,7 @@ function RP22ReportInner() {
     const [planDimsImageDataUrl, setPlanDimsImageDataUrl] = useState(null);
     const [planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl] = useState(null);
     const [hasPrintedOnce, setHasPrintedOnce] = useState(false);
+    const [autoPrintDone, setAutoPrintDone] = useState(false);
     const [exportStatus, setExportStatus] = useState("Idle");
     const [exportDebug, setExportDebug] = useState({ isPrinting: false, planLen: 0, printReady: false });
     const [screenMetricsForPrint, setScreenMetricsForPrint] = useState(null);
@@ -303,6 +304,11 @@ function RP22ReportInner() {
     // the print pipeline once the report is hydrated and ready.
     const autoPrintRequested = searchParams.get("autoPrint") === "1";
     const autoPrintTriggeredRef = React.useRef(false);
+
+    // Preparation screen: when autoPrint=1 is present, suppress the full interactive
+    // Technical Report UI and show a neutral white preparation screen until the
+    // existing readiness conditions are satisfied and window.print() opens.
+    const isAutoPrintPreparing = autoPrintRequested && !autoPrintDone;
     useEffect(() => {
         if (!autoPrintRequested || autoPrintTriggeredRef.current) return;
         if (reportHydrating || !effectiveProjectId || reportReadyProjectId !== effectiveProjectId) return;
@@ -334,6 +340,7 @@ function RP22ReportInner() {
         const t = setTimeout(() => {
             setExportStatus("Opening PDF preview…");
             setHasPrintedOnce(true);
+            setAutoPrintDone(true);
             printLockRef.current = true;
             if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
             exportTimeoutRef.current = null;
@@ -1089,6 +1096,18 @@ function RP22ReportInner() {
     }
 
     if (!analysisResult || !analysisResult.gradedParameters) {
+        if (isAutoPrintPreparing) {
+            return (
+                <div className="min-h-screen bg-white flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-6">
+                        <div className="w-10 h-10 border-[3px] border-[#E6E4DD] border-t-[#213428] rounded-full animate-spin" />
+                        <div style={{ fontSize: 18, fontWeight: 400, color: '#213428', fontFamily: "'Futura PT Light', 'Century Gothic', sans-serif", letterSpacing: '0.01em' }}>
+                            Preparing Technical Report…
+                        </div>
+                    </div>
+                </div>
+            );
+        }
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
                 <Card className="max-w-xl mx-auto w-full">
@@ -1109,6 +1128,8 @@ function RP22ReportInner() {
         mlpSeatId: rspSeatId,
         p15ConstructionLevel: app?.p15ConstructionLevel,
         p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
+        setP15ConstructionLevelSafe: app?.setP15ConstructionLevelSafe,
+        setP21EarlyReflectionPresetSafe: app?.setP21EarlyReflectionPresetSafe,
         bassAuthority: completedBassAuthority,
         bassErrorMessage,
         contributionsByKey: showDesignRating ? asdrContributionsByKey : null,
@@ -1170,6 +1191,19 @@ function RP22ReportInner() {
 
     const planEnabled = true;
 
+    if (showLoadingReport && isAutoPrintPreparing) {
+        return (
+            <div className="min-h-screen bg-white flex items-center justify-center">
+                <div className="flex flex-col items-center gap-6">
+                    <div className="w-10 h-10 border-[3px] border-[#E6E4DD] border-t-[#213428] rounded-full animate-spin" />
+                    <div style={{ fontSize: 18, fontWeight: 400, color: '#213428', fontFamily: "'Futura PT Light', 'Century Gothic', sans-serif", letterSpacing: '0.01em' }}>
+                        Preparing Technical Report…
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return showLoadingReport ? (
         <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
             <Card className="max-w-xl mx-auto w-full">
@@ -1212,6 +1246,14 @@ function RP22ReportInner() {
                     dolbyLayout={dolbyLayout}
                 />
 
+                {isAutoPrintPreparing ? (
+                    <div className="flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 200px)', gap: 24 }}>
+                        <div className="w-10 h-10 border-[3px] border-[#E6E4DD] border-t-[#213428] rounded-full animate-spin" />
+                        <div style={{ fontSize: 18, fontWeight: 400, color: '#213428', fontFamily: "'Futura PT Light', 'Century Gothic', sans-serif", letterSpacing: '0.01em' }}>
+                            Preparing Technical Report…
+                        </div>
+                    </div>
+                ) : (
                 <div className="max-w-7xl mx-auto space-y-6">
                     <ReportHeader
                         app={app}
@@ -1287,21 +1329,14 @@ function RP22ReportInner() {
                         <Rp22SeatCoverageSentence sentence={coverageSentence} variant="screen" />
                     )}
 
-                    {/* ── Report assumptions + RP23 row + RP22 Parameters — all inside one card so widths match ── */}
+                    {/* ── RP23 row + RP22 Parameters — all inside one card so widths match ── */}
                     <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
                         <CardHeader>
                             <CardTitle className="text-[#1B1A1A] font-header">RP22 Parameters</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            {/* Assumptions + RP23 row — same inner width as the grid below */}
+                            {/* RP23 row */}
                             {(() => {
-                                const rowMap = {};
-                                seats.forEach(s => {
-                                    const match = s.id?.match(/^seat-r(\d+)-c(\d+)$/);
-                                    const rowNum = match ? parseInt(match[1], 10) : (s.rowNumber || 1);
-                                    if (!rowMap[rowNum]) rowMap[rowNum] = [];
-                                    rowMap[rowNum].push(s);
-                                });
                                 const rp23Rows = rowCentralSeats
                                     .map(seat => {
                                         const rowNum = seat.rowNumber || 1;
@@ -1309,94 +1344,53 @@ function RP22ReportInner() {
                                         return { rowNum, rp23: snap?.rp23 || null };
                                     })
                                     .filter(r => r.rp23);
+                                if (rp23Rows.length === 0) return null;
                                 return (
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                                        {/* ── Report assumptions block — 2 cols ── */}
-                                        <div style={{ gridColumn: 'span 2' }}>
-                                            <div style={{ background: '#FFFFFF', border: '1px solid #DCDBD6', borderRadius: 8, padding: '16px' }}>
-                                                <div style={{ fontSize: 15, fontWeight: 700, color: '#1B1A1A', marginBottom: 4 }}>Report assumptions</div>
-                                                <div style={{ fontSize: 12, color: '#625143', marginBottom: 16 }}>Manual estimates for non-calculated parameters</div>
-                                                {/* P15 */}
-                                                <div style={{ marginBottom: 14 }}>
-                                                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1B1A1A', marginBottom: 6 }}>P15 — Background noise floor</div>
-                                                    <select
-                                                        style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #DCDBD6', borderRadius: 6, background: '#fff', color: '#1B1A1A', cursor: 'pointer', position: 'relative', zIndex: 1 }}
-                                                        value={app?.p15ConstructionLevel || 'standard'}
-                                                        onChange={e => app?.setP15ConstructionLevelSafe?.(e.target.value)}
-                                                    >
-                                                        <option value="standard">Standard domestic room (NCB 26 · L1)</option>
-                                                        <option value="purpose-built">Purpose-built home cinema (NCB 22 · L2)</option>
-                                                        <option value="reference">Reference-grade isolated room (NCB 18 · L3)</option>
-                                                        <option value="studio">Studio / screening-room grade (NCB 15 · L4)</option>
-                                                    </select>
-                                                </div>
-                                                {/* P21 */}
-                                                <div>
-                                                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1B1A1A', marginBottom: 6 }}>P21 — Early reflections</div>
-                                                    <select
-                                                        style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #DCDBD6', borderRadius: 6, background: '#fff', color: '#1B1A1A', cursor: 'pointer', position: 'relative', zIndex: 1 }}
-                                                        value={app?.p21EarlyReflectionPreset || 'l2'}
-                                                        onChange={e => app?.setP21EarlyReflectionPresetSafe?.(e.target.value)}
-                                                    >
-                                                        <option value="l1">No estimate / not applicable (N/A)</option>
-                                                        <option value="l2">Moderately live room (−8 dB · L2)</option>
-                                                        <option value="l3">Well-balanced treated room (−10 dB · L3)</option>
-                                                        <option value="l4">Heavily optimised room (−12 dB · L4)</option>
-                                                    </select>
+                                    <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-[#1B1A1A] font-header">RP23 — Horizontal Viewing Angle</CardTitle>
+                                            <p className="text-xs text-[#625143] mt-1">Representative seat per row · target range 50°–65° (L4)</p>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-2">
+                                                {rp23Rows.map(({ rowNum, rp23 }) => (
+                                                    <div key={rowNum} className="flex items-center justify-between py-1.5 border-b border-[#F0EFEA] last:border-0">
+                                                        <span className="text-sm text-[#3E4349] font-medium">Row {rowNum}</span>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-sm font-bold text-[#1B1A1A]">{rp23.formatted || '—'}</span>
+                                                            <RP22GradingPill level={rp23.level || '—'} />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid #E8E6E1' }}>
+                                                <div style={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: 'repeat(4, 1fr)',
+                                                    textAlign: 'center',
+                                                    fontSize: 12,
+                                                    color: '#6F6B64'
+                                                }}>
+                                                    <div>
+                                                        <div style={{ fontWeight: 600 }}>L4</div>
+                                                        <div>50°–65°</div>
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: 600 }}>L3</div>
+                                                        <div>45°–70°</div>
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: 600 }}>L2</div>
+                                                        <div>40°–80°</div>
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: 600 }}>L1</div>
+                                                        <div>33°–90°</div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        {/* ── RP23 card — 1 col ── */}
-                                        <div>
-                                            {rp23Rows.length > 0 && (
-                                                <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
-                                                    <CardHeader className="pb-2">
-                                                        <CardTitle className="text-[#1B1A1A] font-header">RP23 — Horizontal Viewing Angle</CardTitle>
-                                                        <p className="text-xs text-[#625143] mt-1">Representative seat per row · target range 50°–65° (L4)</p>
-                                                    </CardHeader>
-                                                    <CardContent>
-                                                        <div className="space-y-2">
-                                                            {rp23Rows.map(({ rowNum, rp23 }) => (
-                                                                <div key={rowNum} className="flex items-center justify-between py-1.5 border-b border-[#F0EFEA] last:border-0">
-                                                                    <span className="text-sm text-[#3E4349] font-medium">Row {rowNum}</span>
-                                                                    <div className="flex items-center gap-3">
-                                                                        <span className="text-sm font-bold text-[#1B1A1A]">{rp23.formatted || '—'}</span>
-                                                                        <RP22GradingPill level={rp23.level || '—'} />
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                        <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid #E8E6E1' }}>
-                                                            <div style={{
-                                                                display: 'grid',
-                                                                gridTemplateColumns: 'repeat(4, 1fr)',
-                                                                textAlign: 'center',
-                                                                fontSize: 12,
-                                                                color: '#6F6B64'
-                                                            }}>
-                                                                <div>
-                                                                    <div style={{ fontWeight: 600 }}>L4</div>
-                                                                    <div>50°–65°</div>
-                                                                </div>
-                                                                <div>
-                                                                    <div style={{ fontWeight: 600 }}>L3</div>
-                                                                    <div>45°–70°</div>
-                                                                </div>
-                                                                <div>
-                                                                    <div style={{ fontWeight: 600 }}>L2</div>
-                                                                    <div>40°–80°</div>
-                                                                </div>
-                                                                <div>
-                                                                    <div style={{ fontWeight: 600 }}>L1</div>
-                                                                    <div>33°–90°</div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
-                                            )}
-                                        </div>
-                                    </div>
+                                        </CardContent>
+                                    </Card>
                                 );
                             })()}
 
@@ -1428,6 +1422,7 @@ function RP22ReportInner() {
                     )}
 
                 </div>
+                )}
             </div>
 
             {/* Print-only layout */}

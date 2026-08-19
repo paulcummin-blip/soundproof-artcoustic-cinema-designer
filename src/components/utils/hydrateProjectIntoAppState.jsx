@@ -539,6 +539,18 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     appState.setViewingPriority(vp);
   }
 
+  // 10e2) P15/P21 MANUAL DESIGN ESTIMATES
+  if (typeof appState?.setP15ConstructionLevelSafe === "function") {
+    const p15 = p?.p15_construction_level;
+    const P15_ALLOWED = new Set(["standard", "purpose-built", "reference", "studio"]);
+    appState.setP15ConstructionLevelSafe(P15_ALLOWED.has(p15) ? p15 : "purpose-built");
+  }
+  if (typeof appState?.setP21EarlyReflectionPresetSafe === "function") {
+    const p21 = p?.p21_early_reflection_preset;
+    const P21_ALLOWED = new Set(["l1", "l2", "l3", "l4"]);
+    appState.setP21EarlyReflectionPresetSafe(P21_ALLOWED.has(p21) ? p21 : "l3");
+  }
+
   // 10f) ACOUSTIC TREATMENT (Abfuser product selection)
   if (typeof appState?.setAcousticTreatmentEnabled === "function") {
     appState.setAcousticTreatmentEnabled(!!p?.acoustic_treatment_enabled);

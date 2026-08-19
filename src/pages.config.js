@@ -49,7 +49,6 @@
  */
 import Calculator from './pages/Calculator';
 import CinemaAgent from './pages/CinemaAgent';
-import ComplianceReportPrint from './pages/ComplianceReportPrint';
 import Home from './pages/Home';
 import PrintableReport from './pages/PrintableReport';
 import Projects from './pages/Projects';
@@ -64,7 +63,6 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "Calculator": Calculator,
     "CinemaAgent": CinemaAgent,
-    "ComplianceReportPrint": ComplianceReportPrint,
     "Home": Home,
     "PrintableReport": PrintableReport,
     "Projects": Projects,

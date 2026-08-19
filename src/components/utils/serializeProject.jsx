@@ -118,6 +118,10 @@ export function serializeProject(input = {}) {
     selectedAbfuserQty = 0,
     abfuserQtySource = "recommended",
 
+    // P15/P21 manual design estimates — persisted on the Project entity.
+    p15ConstructionLevel = "purpose-built",
+    p21EarlyReflectionPreset = "l3",
+
     // room_dimensions_edited authority — the existing stored flag.
     // Passed by the save path so serializeProject never resets it to false.
     existingRoomDimensionsEdited = false,
@@ -313,6 +317,10 @@ export function serializeProject(input = {}) {
     acoustic_treatment_enabled: !!acousticTreatmentEnabled,
     selected_abfuser_qty: acousticTreatmentEnabled ? (Math.max(0, Math.floor(Number(selectedAbfuserQty) || 0))) : 0,
     abfuser_qty_source: acousticTreatmentEnabled ? (abfuserQtySource || "recommended") : "recommended",
+
+    // P15/P21 manual design estimates
+    p15_construction_level: p15ConstructionLevel || "purpose-built",
+    p21_early_reflection_preset: p21EarlyReflectionPreset || "l3",
 
     // room_dimensions_edited — write-once-true flag.
     // True if already true on the stored project OR current dims differ from

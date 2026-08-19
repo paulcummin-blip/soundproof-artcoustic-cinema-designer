@@ -136,6 +136,8 @@ appState, // Pass appState directly for setters
       viewingPriority: appState?.viewingPriority,
       acousticTreatmentEnabled: appState?.acousticTreatmentEnabled,
       selectedAbfuserQty: appState?.selectedAbfuserQty,
+      p15ConstructionLevel: appState?.p15ConstructionLevel,
+      p21EarlyReflectionPreset: appState?.p21EarlyReflectionPreset,
       existingRoomDimensionsEdited: loadedRoomDimensionsEditedRef.current,
     });
     return projectData;
@@ -321,6 +323,8 @@ appState, // Pass appState directly for setters
           manualRspY_m: (() => { const v = Number(p?.manual_rsp_y_m); return Number.isFinite(v) ? v : null; })(),
           acousticTreatmentEnabled: !!p?.acoustic_treatment_enabled,
           selectedAbfuserQty: (() => { const v = Number(p?.selected_abfuser_qty); return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0; })(),
+          p15ConstructionLevel: p?.p15_construction_level || "purpose-built",
+          p21EarlyReflectionPreset: p?.p21_early_reflection_preset || "l3",
           existingRoomDimensionsEdited: p?.room_dimensions_edited === true,
         });
         delete loadedProjectData.name;
@@ -624,7 +628,9 @@ appState, // Pass appState directly for setters
   appState?.manualRspY_m,
   appState?.viewingPriority,
   appState?.acousticTreatmentEnabled,
-  appState?.selectedAbfuserQty]
+  appState?.selectedAbfuserQty,
+  appState?.p15ConstructionLevel,
+  appState?.p21EarlyReflectionPreset]
   );
 
   // Boot logic: run when hydrated or target changes – either load a project or initialise defaults

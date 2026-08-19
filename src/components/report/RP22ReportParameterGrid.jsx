@@ -9,6 +9,7 @@ import TechnicalParameterPage from "@/components/report/technical/TechnicalParam
 import { getCategoryForParam, getHumanTitleForParam } from "@/components/report/technical/technicalParameterMeta";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
 import { useParameterGridAuthority } from "@/components/report/technical/useParameterGridAuthority.jsx";
+import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl";
 
 /* ---------- Canonical RP22 parameter definitions ---------- */
 const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
@@ -36,6 +37,8 @@ export default function RP22ReportParameterGrid({
   mlpSeatId,
   p15ConstructionLevel,
   p21EarlyReflectionPreset,
+  setP15ConstructionLevelSafe,
+  setP21EarlyReflectionPresetSafe,
   bassAuthority = null,
   bassErrorMessage = null,
   variant = "screen",
@@ -82,6 +85,7 @@ export default function RP22ReportParameterGrid({
             return dual ? `Minimum ${dual.minimum} · Recommended ${dual.recommended}` : null;
           })()
         : param.id === 14 ? bassPresentation.parameters.p14.detail : null;
+    const isP15P21 = param.id === 15 || param.id === 21;
     return (
       <div key={param.id} className="rp22-card-wrap print-avoid-break" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
         <RP22ComplianceParameterTile
@@ -91,6 +95,14 @@ export default function RP22ReportParameterGrid({
           seatGridData={isSeatScope ? buildSeatGridData(param.id) : null}
           targetBasisNote={targetBasisNote}
         />
+        {isP15P21 && (
+          <P15P21AssumptionControl
+            paramId={param.id}
+            value={param.id === 15 ? p15ConstructionLevel : p21EarlyReflectionPreset}
+            onChange={param.id === 15 ? setP15ConstructionLevelSafe : setP21EarlyReflectionPresetSafe}
+            variant="screen"
+          />
+        )}
       </div>
     );
   };
@@ -127,19 +139,28 @@ export default function RP22ReportParameterGrid({
       rspLabel = null;
     }
 
+    const isP15P21 = param.id === 15 || param.id === 21;
     return (
-      <TechnicalParameterCard
-        key={param.id}
-        param={resolvedParam}
-        achievedValue={achievedValue}
-        lvl={lvl}
-        category={category}
-        humanTitle={humanTitle}
-        seatGridData={seatGridData}
-        targetBasisNote={targetBasisNote}
-        rspLabel={rspLabel}
-        asdrFooter={asdrFooter}
-      />
+      <div key={param.id}>
+        <TechnicalParameterCard
+          param={resolvedParam}
+          achievedValue={achievedValue}
+          lvl={lvl}
+          category={category}
+          humanTitle={humanTitle}
+          seatGridData={seatGridData}
+          targetBasisNote={targetBasisNote}
+          rspLabel={rspLabel}
+          asdrFooter={asdrFooter}
+        />
+        {isP15P21 && (
+          <P15P21AssumptionControl
+            paramId={param.id}
+            value={param.id === 15 ? p15ConstructionLevel : p21EarlyReflectionPreset}
+            variant="print"
+          />
+        )}
+      </div>
     );
   };
 

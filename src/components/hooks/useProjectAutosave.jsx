@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { serializeProject } from "@/components/utils/serializeProject";
 import { fetchApi } from "@/components/net/api";
@@ -32,6 +31,8 @@ export function useProjectAutosave(opts) {
     seatingPositions, roomElements, subwoofers,
     showZones,
     showAngles,
+    p15ConstructionLevel,
+    p21EarlyReflectionPreset,
     isHydrating, onProjectCreated, debounceMs = 800,
   } = opts || {};
 
@@ -47,11 +48,15 @@ export function useProjectAutosave(opts) {
     dolbyPreset,
     showZones,
     showAngles,
+    p15ConstructionLevel,
+    p21EarlyReflectionPreset,
   }), [
     projectName, dimensions, screen,
     seatingPositions, roomElements, subwoofers, dolbyPreset,
     showZones,
     showAngles,
+    p15ConstructionLevel,
+    p21EarlyReflectionPreset,
   ]);
 
   const hash = useMemo(() => {
