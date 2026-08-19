@@ -7,8 +7,11 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority, getCompletedBassAuthority, hasAuthoritativeResult } from "./completedBassResultStore";
+import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, getCompletedBassAuthority, hasAuthoritativeResult } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
+import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
+import { useTargetCacheEntry, clearTargetCacheForDesign, hydrateTargetCache } from "./p14TargetCache";
+import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
@@ -100,7 +103,41 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     p18TargetBasis: requested.p18TargetBasis,
     selectedP18RequiredExtensionHz: requested.selectedP18RequiredExtensionHz,
   }), [cacheKey, fingerprints, OPTIMISER_VERSION_SIGNATURE, requested.selectedP14TargetDb, requested.p14TargetBasis, requested.requestedLevel, requested.selectedP14RequiredExtensionHz, requested.p18TargetBasis, requested.selectedP18RequiredExtensionHz]);
+
+  // ── P14 target cache: base design fingerprint and target key ──────────
+  const baseDesignFingerprint = useMemo(() => {
+    if (!fingerprintInputs) return null;
+    return computeBaseDesignFingerprint(fingerprintInputs);
+  }, [fingerprintInputs]);
+
+  const targetKey = useMemo(() => {
+    if (!requested?.p14TargetBasis || !requested?.requestedLevel) return null;
+    return buildP14TargetKey(requested.p14TargetBasis, requested.requestedLevel);
+  }, [requested.p14TargetBasis, requested.requestedLevel]);
+
+  const allTargets = useMemo(() => {
+    if (!requested?.p18TargetBasis) return [];
+    return buildP14TargetCombinations(requested.p18TargetBasis);
+  }, [requested.p18TargetBasis]);
+
+  // Reactive cache lookup: returns cached compact contract for the current target, or null
+  const cachedContract = useTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey);
+
+  // Hydrate target cache from DB on mount / project change
+  const [targetCacheHydrated, setTargetCacheHydrated] = useState(false);
   useEffect(() => {
+    setTargetCacheHydrated(false);
+    hydrateTargetCache(scopeId).finally(() => setTargetCacheHydrated(true));
+  }, [scopeId]);
+
+  // Clear stale cache after hydration if the design doesn't match
+  useEffect(() => {
+    if (!targetCacheHydrated || !baseDesignFingerprint) return;
+    clearTargetCacheForDesign(scopeId, baseDesignFingerprint);
+  }, [targetCacheHydrated, baseDesignFingerprint, scopeId]);
+
+  useEffect(() => {
+    if (cachedContract) return; // Skip controller when cache hit — no optimiser run
     if (isDragging || !fingerprints) return; // Defer during drag; skip when analysis is blocked
     controller.ensureProtocolCompatibility(BASS_OPTIMISER_VERSIONS);
     controller.updateInputs({
@@ -111,7 +148,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       identity: requestIdentity,
       collectDiagnostics: false,
     });
-  }, [controller, isDragging, inputsValid, cacheKey, fingerprints, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE]);
+  }, [controller, isDragging, inputsValid, cacheKey, fingerprints, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE, cachedContract]);
   useEffect(() => () => { controller.dispose(); scopeRef.current?.clear(); }, [controller]);
 
   const detailedStatus = LEGACY_STATUS[lifecycle.status] || "IDLE";
@@ -277,6 +314,11 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   });
   const publishedContractTokensRef = useRef(new Set());
   useEffect(() => {
+    // ── Cache hit: publish cached compact contract directly, skip optimiser ──
+    if (cachedContract) {
+      publishCachedCompactBassContract(scopeId, cachedContract);
+      return;
+    }
     if (!fingerprints) {
       // Subwoofer instances / project inputs may still be hydrating. Don't wipe
       // a valid hydrated authoritative result until the live fingerprint can be
@@ -303,7 +345,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       publishedContractTokensRef.current.add(publishedToken);
       recordDiagStage(publishedToken, "contract-published", { contractAnalysisId: contract?.analysisId || null, contractFingerprint: currentFingerprint });
     }
-  }, [scopeId, cacheKey, contract, fingerprints]);
+  }, [scopeId, cacheKey, contract, fingerprints, cachedContract]);
 
   const publishedStagesRef = useRef(new Set());
   useEffect(() => {
@@ -332,6 +374,38 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     },
     [controller, cacheKey, payload, requestIdentity]
   );
-  const value = scopeRef.current.replace({ scopeId, contract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative });
+  // ── P14 target background scheduler ──────────────────────────────────
+  // After the foreground result is complete (cached or fresh), quietly
+  // precompute remaining P14 targets one at a time. The scheduler's schedule()
+  // method handles same-design updates (just changes foreground target) and
+  // design changes (cancels and restarts). Background results are cache-only
+  // and NEVER published to the live UI.
+  const foregroundReady = cachedContract || (optimisationResult && matchingResult);
+  const designContextRef = useRef(null);
+  designContextRef.current = useMemo(() => ({
+    payload, sources, usableLfHz: designEqSystemLimits?.usableLfHz,
+    rspRawCurve, perSeatRawCurves, fingerprints, fingerprintInputs,
+  }), [payload, sources, designEqSystemLimits, rspRawCurve, perSeatRawCurves, fingerprints, fingerprintInputs]);
+
+  useEffect(() => {
+    if (!baseDesignFingerprint || !targetKey) return;
+    const scheduler = getP14TargetBackgroundScheduler();
+    if (!foregroundReady || !allTargets.length) {
+      // Foreground is recalculating — cancel background work to avoid
+      // concurrent heavy calculations. Queue rebuilds when foreground completes.
+      scheduler.cancel();
+      return;
+    }
+    scheduler.schedule({
+      projectId: scopeId,
+      baseDesignFingerprint,
+      foregroundTargetKey: targetKey,
+      allTargets,
+      designContext: designContextRef.current,
+    });
+  }, [baseDesignFingerprint, targetKey, foregroundReady, allTargets, scopeId]);
+
+  const effectiveContract = cachedContract || contract;
+  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

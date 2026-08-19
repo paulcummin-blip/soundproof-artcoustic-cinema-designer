@@ -156,6 +156,33 @@ export function publishCompletedBassContract(projectId, contract) {
   return true;
 }
 
+/**
+ * Publish a cached compact contract directly as the live authority.
+ * Used when the user switches to a P14 target that has already been
+ * precomputed by the background scheduler. Skips the optimiser entirely.
+ *
+ * The compact contract must be authoritative (isAuthoritativeBassContract).
+ * This does NOT call compactCompletedBassContract — the input is already compact.
+ */
+export function publishCachedCompactBassContract(projectId, compactContract) {
+  if (!compactContract || !isAuthoritativeBassContract(compactContract)) return false;
+  const key = projectKey(projectId);
+  setMemory(key, {
+    projectId: key,
+    status: "complete",
+    authorityStatus: BASS_AUTHORITY_STATUS.AUTHORITATIVE,
+    currentFingerprint: compactContract.job?.resultFingerprint || null,
+    contract: compactContract,
+    staleContract: memoryByProject.get(key)?.contract || null,
+    errorMessage: null,
+    structurallyComplete: true,
+    authoritative: true,
+    exportable: true,
+    publicationRejectionReason: null,
+  });
+  return true;
+}
+
 export function markBassAuthorityUpdating(projectId, currentFingerprint) {
   const key = projectKey(projectId);
   const previous = memoryByProject.get(key) || emptyAuthority(projectId);

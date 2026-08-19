@@ -23,6 +23,10 @@
     "completed_by_fingerprint": {
       "type": "object",
       "description": "Bounded completed-result snapshots keyed by exact result fingerprint."
+    },
+    "target_cache": {
+      "type": "object",
+      "description": "Persistent P14 background target cache. Contains: { baseDesignFingerprint: string, targets: { targetKey -> compact authoritative bass contract } }. All 8 P14 target combinations share the same baseDesignFingerprint. Invalidated when any bass-relevant design input changes."
     }
   },
   "required": [
