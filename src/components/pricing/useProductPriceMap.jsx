@@ -21,8 +21,8 @@ export function useProductPriceMap() {
   const query = useQuery({
     queryKey: ['productPrices'],
     queryFn: async () => {
-      const list = await base44.entities.ProductPrice.list('-created_date', 500);
-      return list || [];
+      const response = await base44.functions.invoke('getAuthorizedProductPrices', {});
+      return response?.data?.prices || [];
     },
     staleTime: 5 * 60 * 1000,
   });
