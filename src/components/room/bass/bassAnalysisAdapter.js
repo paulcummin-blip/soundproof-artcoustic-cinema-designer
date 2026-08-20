@@ -38,6 +38,7 @@ import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 import { formatP14RecommendedDetail, formatP14TargetBasisDetail, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { buildBassTargetViews } from "@/components/room/bass/bassTargetViews";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
+import { isCanonicalP19Ready } from "@/components/room/bass/p19Readiness";
 
 // ---------------------------------------------------------------------------
 // Adapter helpers
@@ -520,19 +521,30 @@ export function adaptCurrentBassOptimisationResult({
     qualifiedAtSelectedP14Output: p18ResultAvailable,
   };
 
-  // P19
+  // P19 — publish only from the official assessment of the finished canonical
+  // post-EQ RSP against the finished canonical target. Candidate/legacy values
+  // are deliberately not fallbacks for readiness.
   const authorityP19 = finalResponse?.finalSeatVariationData?.p19;
-  const p19Level = typeof authorityP19?.level === "number"
-    ? authorityP19.level
-    : selectedCandidate
-      ? (typeof selectedCandidate.achievedP19Level === "number" ? selectedCandidate.achievedP19Level : parseLegacyLevel(optimisationResult?.achievedP19Level))
-      : parseLegacyLevel(optimisationResult?.achievedP19Level);
-  const p19Value = Number.isFinite(authorityP19?.variationDb)
-    ? authorityP19.variationDb
-    : Number.isFinite(selectedCandidate?.achievedP19VariationDb) ? selectedCandidate.achievedP19VariationDb : (Number.isFinite(optimisationResult?.achievedP19VariationDb) ? optimisationResult.achievedP19VariationDb : null);
+  const p19Ready = optimisationResult?.p19AssessmentReady === true
+    && isCanonicalP19Ready({
+      canonicalPostEqRsp: finalResponse?.canonicalPostEqRsp,
+      canonicalTargetCurve: finalResponse?.canonicalTargetCurve,
+      officialVariationDb: authorityP19?.variationDb,
+      officialLevel: authorityP19?.level,
+    });
+  const p19Level = p19Ready ? authorityP19.level : null;
+  const p19Value = p19Ready ? authorityP19.variationDb : null;
+  const p19Status = p19Ready
+    ? paramStatus(true)
+    : contract.job.status === "error"
+      ? PARAM_STATUS_ERROR
+      : hasResult
+        ? PARAM_STATUS_UPDATING
+        : detailedStatus === "CALCULATING" ? PARAM_STATUS_CALCULATING : PARAM_STATUS_UNCALCULATED;
   contract.productAnalysis.parameters.p19 = createBassParameterResult({
-    parameter: PARAM_P19, status: paramStatus(p19Level != null), level: p19Level, value: p19Value,
-    unit: "dB", passedL1: p19Level != null ? p19Level >= 1 : null, isStale,
+    parameter: PARAM_P19, status: p19Status, level: p19Level, value: p19Value,
+    unit: "dB", passedL1: p19Ready ? p19Level >= 1 : null, isStale,
+    reason: p19Ready ? null : "Canonical post-EQ response, target curve, or official P19 assessment is pending",
   });
 
   // P20 — not applicable without a valid non-RSP comparison result.
