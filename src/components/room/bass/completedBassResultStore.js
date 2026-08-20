@@ -406,37 +406,62 @@ export async function hydrateCompletedBassAuthority(projectId) {
   if (key === "free") return setMemory(key, { ...emptyAuthority(key), status: "uncalculated", authorityStatus: BASS_AUTHORITY_STATUS.UNCALCULATED });
   const current = memoryByProject.get(key);
   if (current?.status === "error" && current.errorMessage) return current;
-  const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
-  const record = Array.isArray(records) ? records[0] : null;
-  const persisted = record ? {
-    version: COMPLETED_BASS_CACHE_VERSION,
-    currentFingerprint: record.current_fingerprint,
-    status: record.status,
-    completedByFingerprint: record.completed_by_fingerprint,
-  } : null;
-  const next = resolvePersistedBassAuthority(key, persisted);
+  try {
+    const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
+    const record = Array.isArray(records) ? records[0] : null;
+    const persisted = record ? {
+      version: COMPLETED_BASS_CACHE_VERSION,
+      currentFingerprint: record.current_fingerprint,
+      status: record.status,
+      completedByFingerprint: record.completed_by_fingerprint,
+    } : null;
+    const next = resolvePersistedBassAuthority(key, persisted);
 
-  // ── Route-navigation guard ──────────────────────────────────────────
-  // When navigating between Room Designer and report pages (Technical
-  // Report, Visual Report, Design Review) within the same session, the
-  // in-memory authority is the most recent state. The DB may lag behind
-  // because syncPersistentBassAuthority is async. Never overwrite an
-  // authoritative in-memory result with a non-authoritative DB record
-  // (stale "updating"/"uncalculated"/null) — that would reset P14/P18/
-  // P19/P20 to blank and trigger a recalculation solely because the
-  // report route opened. The DB is only authoritative for fresh page
-  // loads / new sessions where no in-memory state exists.
-  if (current?.authoritative && current?.contract && !next?.authoritative) {
-    return current;
-  }
+    // ── Route-navigation guard ──────────────────────────────────────────
+    // When navigating between Room Designer and report pages (Technical
+    // Report, Visual Report, Design Review) within the same session, the
+    // in-memory authority is the most recent state. The DB may lag behind
+    // because syncPersistentBassAuthority is async. Never overwrite an
+    // authoritative in-memory result with a non-authoritative DB record
+    // (stale "updating"/"uncalculated"/null) — that would reset P14/P18/
+    // P19/P20 to blank and trigger a recalculation solely because the
+    // report route opened. The DB is only authoritative for fresh page
+    // loads / new sessions where no in-memory state exists.
+    if (current?.authoritative && current?.contract && !next?.authoritative) {
+      return current;
+    }
 
-  // Ignore unchanged snapshot — don't publish a new store object or notify
-  // listeners merely because a realtime callback fired. Compares canonical
-  // result fingerprint + status + authority flags, not object identity.
-  if (current && authoritySignature(current) === authoritySignature(next)) {
-    return current;
+    // Ignore unchanged snapshot — don't publish a new store object or notify
+    // listeners merely because a realtime callback fired. Compares canonical
+    // result fingerprint + status + authority flags, not object identity.
+    if (current && authoritySignature(current) === authoritySignature(next)) {
+      return current;
+    }
+    return setMemory(key, next);
+  } catch (e) {
+    // #1: Failed DB read — must not remain LOADING indefinitely. Transition
+    // to ERROR so resolveBassReadiness settles (ready: true, reason: 'error')
+    // and the foreground optimiser is allowed to run once project hydration
+    // is ready. Don't wipe an authoritative in-memory result on a transient
+    // DB error — the route-navigation guard above covers that, but this
+    // catch must also preserve it.
+    if (current?.authoritative && current?.contract) {
+      return current;
+    }
+    return setMemory(key, {
+      projectId: key,
+      status: "error",
+      authorityStatus: BASS_AUTHORITY_STATUS.ERROR,
+      currentFingerprint: current?.currentFingerprint || null,
+      contract: null,
+      staleContract: current?.contract || current?.staleContract || null,
+      errorMessage: "Bass authority hydration failed",
+      structurallyComplete: false,
+      authoritative: false,
+      exportable: false,
+      publicationRejectionReason: null,
+    });
   }
-  return setMemory(key, next);
 }
 
 export function getCompletedBassAuthority(projectId) {
