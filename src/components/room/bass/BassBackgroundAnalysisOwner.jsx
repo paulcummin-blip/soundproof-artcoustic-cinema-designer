@@ -7,7 +7,7 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract } from "./completedBassResultStore";
+import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract, bassContractMatchesRequestedP14 } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
 import { useTargetCacheEntry, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry } from "./p14TargetCache";
@@ -82,6 +82,16 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     calibrationFingerprint: fingerprints?.calibration ?? null,
   }), [basePayload, normalizedTransferReady, normalizedLive.result, normalizedLive.geometryFingerprint, fingerprints]);
   const inputsValid = baseInputsValid && normalizedTransferReady;
+  // #1: Real project hydration authority. appState.isProjectHydrationReady is
+  // set false at the start of useProjectLoader.loadProject and set true in its
+  // finally block — the single existing flag that means the current Project
+  // record has been hydrated into AppState and its persisted P14/splConfig
+  // selection is authoritative. The foreground P14 owner must not start/cancel
+  // a foreground job, restore/promote cached authority, write
+  // current_fingerprint, or start the background family scheduler while this
+  // is false (P14 target identity may still be in pre-hydration/default/
+  // transitional state).
+  const isProjectHydrationReady = !!appState?.isProjectHydrationReady;
   const sharedAuthoritative = useMemo(() => ({
     ...authoritative,
     normalizedLive,
@@ -138,6 +148,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }, [targetCacheHydrated, baseDesignFingerprint, scopeId]);
 
   useEffect(() => {
+    // #1: Do not start/cancel a foreground job or restore/promote cached
+    // authority while the project record is still hydrating. P14 target
+    // identity may be in a pre-hydration/default/transitional state.
+    if (!isProjectHydrationReady) return;
     if (cachedContract) {
       // Cache hit — cancel any in-flight foreground worker so it doesn't
       // compete with the background scheduler for CPU or publish a stale
@@ -165,7 +179,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       identity: requestIdentity,
       collectDiagnostics: false,
     });
-  }, [controller, isDragging, inputsValid, cacheKey, fingerprints, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE, cachedContract]);
+  }, [controller, isDragging, inputsValid, cacheKey, fingerprints, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE, cachedContract, isProjectHydrationReady]);
   useEffect(() => () => { controller.dispose(); scopeRef.current?.clear(); }, [controller]);
 
   const detailedStatus = LEGACY_STATUS[lifecycle.status] || "IDLE";
@@ -357,6 +371,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   });
   const publishedContractTokensRef = useRef(new Set());
   useEffect(() => {
+    // #1: Do not publish/promote/sync while the project record is still
+    // hydrating. A transient hydration target must not become current.
+    if (!isProjectHydrationReady) return;
     // ── Cache hit: publish cached compact contract directly, skip optimiser ──
     if (cachedContract) {
       // Stage 4: publish cached compact contract with full safety guards.
@@ -385,38 +402,62 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       }
       return;
     }
-    const currentFingerprint = contract?.job?.currentJobFingerprint || cacheKey || null;
+    // #2: For error/updating state transitions, use cacheKey (the current
+    // request fingerprint). Do NOT use contract.job.currentJobFingerprint —
+    // that is the controller's in-flight fingerprint and may be stale/zombie.
     if (contract?.job?.status === "error") {
-      markBassAuthorityFailed(scopeId, currentFingerprint, contract?.job?.errorMessage);
+      markBassAuthorityFailed(scopeId, cacheKey, contract?.job?.errorMessage);
       return;
     }
     const published = publishCompletedBassContract(scopeId, contract);
-    if (!published && !hasAuthoritativeResult(scopeId, currentFingerprint)) {
-      markBassAuthorityUpdating(scopeId, currentFingerprint);
+    if (!published && !hasAuthoritativeResult(scopeId, cacheKey)) {
+      markBassAuthorityUpdating(scopeId, cacheKey);
     }
-    syncPersistentBassAuthority(scopeId, currentFingerprint, contract);
-    // ── Stage 4: Foreground target bridge ───────────────────────────────
+    // ── #2: Current authority persistence invariant ──────────────────────
+    // A contract may update persisted CURRENT completed authority ONLY when
+    // ALL are true:
+    //   - contract exists and job is complete;
+    //   - contract is structurally complete (isAuthoritativeBassContract);
+    //   - contract is AUTHORITATIVE (canonical publication valid);
+    //   - contract matches CURRENT requested P14 identity;
+    //   - contract result fingerprint exactly equals CURRENT full cacheKey;
+    //   - Stage 3 graph payload is complete.
+    // Only then persist the verified contract.job.resultFingerprint as current.
+    // Never persist a controller currentJobFingerprint from a calculating/zombie
+    // lifecycle, a transient hydration target, a background target the user did
+    // not select, or cacheKey without first proving the completed contract
+    // equals it.
+    const completedContract = getCompletedBassContract(scopeId);
+    const resultFingerprint = completedContract?.job?.resultFingerprint || null;
+    const jobComplete = contract?.job?.status === "complete" || contract?.job?.status === "ready";
+    const canPersistCurrent = jobComplete
+      && isAuthoritativeBassContract(completedContract)
+      && bassContractMatchesRequestedP14(completedContract, requested)
+      && !!resultFingerprint
+      && !!cacheKey
+      && resultFingerprint === cacheKey
+      && hasGraphPayload(completedContract);
+    if (canPersistCurrent) {
+      syncPersistentBassAuthority(scopeId, resultFingerprint, completedContract);
+    }
+    // ── Stage 4 / #5: Foreground target enters family first ─────────────
     // After foreground publication succeeds, write the authoritative compact
     // contract to the 8-target family cache so the foreground target is also
     // a member of target_cache. The scheduler excludes the foreground target
     // from its background queue, so without this bridge the family would
-    // contain only 7 targets.
-    if (published && baseDesignFingerprint && targetKey) {
-      const compactContract = getCompletedBassContract(scopeId);
-      // Stage 4: only bridge to target_cache when the foreground result is
-      // canonically AUTHORITATIVE AND carries the Stage 3 graph payload.
-      if (compactContract && isAuthoritativeBassContract(compactContract) && hasGraphPayload(compactContract)) {
-        setTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey, compactContract);
-      }
+    // contain only 7 targets. Gated on canPersistCurrent so only a fully
+    // verified current foreground contract enters the family.
+    if (published && baseDesignFingerprint && targetKey && canPersistCurrent) {
+      setTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey, completedContract);
     }
     // Record contract-published ONLY when publishCompletedBassContract returned
     // true — not when authority is merely marked updating.
     const publishedToken = lifecycle?.result?.diagnosticToken || null;
     if (published && publishedToken && !publishedContractTokensRef.current.has(publishedToken)) {
       publishedContractTokensRef.current.add(publishedToken);
-      recordDiagStage(publishedToken, "contract-published", { contractAnalysisId: contract?.analysisId || null, contractFingerprint: currentFingerprint });
+      recordDiagStage(publishedToken, "contract-published", { contractAnalysisId: contract?.analysisId || null, contractFingerprint: resultFingerprint });
     }
-  }, [scopeId, cacheKey, contract, fingerprints, cachedContract]);
+  }, [scopeId, cacheKey, contract, fingerprints, cachedContract, isProjectHydrationReady, baseDesignFingerprint, targetKey]);
 
   const publishedStagesRef = useRef(new Set());
   useEffect(() => {
@@ -451,7 +492,53 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // method handles same-design updates (just changes foreground target) and
   // design changes (cancels and restarts). Background results are cache-only
   // and NEVER published to the live UI.
-  const foregroundReady = cachedContract || (optimisationResult && matchingResult) || completedContractMatches;
+  // ── #3: Strict foregroundReady ────────────────────────────────────────
+  // The P14 background family may start ONLY after the CURRENT selected
+  // foreground target is fully reusable. An old completed contract that
+  // merely matches some transient hydration fingerprint is insufficient.
+  //
+  // PATH A — EXISTING CACHED CURRENT TARGET:
+  //   project hydration complete; target_cache[currentTargetKey] exists;
+  //   correct current baseDesignFingerprint; full result fingerprint matches
+  //   CURRENT cacheKey; P14 identity matches CURRENT selection; AUTHORITATIVE;
+  //   canonical publication valid; Stage 3 graph payload complete; that same
+  //   contract has been promoted as current completed authority.
+  //
+  // PATH B — FRESH CURRENT FOREGROUND RESULT:
+  //   project hydration complete; foreground calculation completed for CURRENT
+  //   selected target; result fingerprint = CURRENT cacheKey; P14 identity =
+  //   CURRENT selection; AUTHORITATIVE; canonical publication valid; Stage 3
+  //   graph payload complete; foreground contract written successfully to
+  //   target_cache[currentTargetKey]; same fingerprint is current completed
+  //   authority.
+  //
+  // Both paths converge on the same invariant: the current foreground target
+  // must be present in target_cache as an authoritative, graph-complete
+  // contract whose fingerprint equals the current cacheKey and whose P14
+  // identity matches the current selection, AND that same contract must be
+  // the current completed authority (currentFingerprint === cacheKey).
+  const foregroundReadyPathA = isProjectHydrationReady
+    && !!cachedContract
+    && isAuthoritativeBassContract(cachedContract)
+    && hasGraphPayload(cachedContract)
+    && bassContractMatchesRequestedP14(cachedContract, requested)
+    && !!cachedContract?.job?.resultFingerprint
+    && cachedContract.job.resultFingerprint === cacheKey
+    && !!completedBassAuthority?.authoritative
+    && completedBassAuthority?.currentFingerprint === cacheKey;
+  const foregroundReadyPathB = isProjectHydrationReady
+    && !cachedContract
+    && !!optimisationResult
+    && !!matchingResult
+    && (contract?.job?.status === "complete" || contract?.job?.status === "ready")
+    && isAuthoritativeBassContract(completedContract)
+    && hasGraphPayload(completedContract)
+    && bassContractMatchesRequestedP14(completedContract, requested)
+    && !!completedContract?.job?.resultFingerprint
+    && completedContract.job.resultFingerprint === cacheKey
+    && !!completedBassAuthority?.authoritative
+    && completedBassAuthority?.currentFingerprint === cacheKey;
+  const foregroundReady = foregroundReadyPathA || foregroundReadyPathB;
   const designContextRef = useRef(null);
   designContextRef.current = useMemo(() => ({
     payload, sources, usableLfHz: designEqSystemLimits?.usableLfHz,
@@ -459,6 +546,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }), [payload, sources, designEqSystemLimits, rspRawCurve, perSeatRawCurves, fingerprints, fingerprintInputs]);
 
   useEffect(() => {
+    // #1: Do not start the background family scheduler while the project
+    // record is still hydrating.
+    if (!isProjectHydrationReady) return;
     if (!baseDesignFingerprint || !targetKey) return;
     const scheduler = getP14TargetBackgroundScheduler();
     if (!foregroundReady || !allTargets.length) {
@@ -474,12 +564,17 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       allTargets,
       designContext: designContextRef.current,
     });
-  }, [baseDesignFingerprint, targetKey, foregroundReady, allTargets, scopeId]);
+  }, [baseDesignFingerprint, targetKey, foregroundReady, allTargets, scopeId, isProjectHydrationReady]);
 
-  const effectiveContract = cachedContract || contract || (completedContractMatches ? completedContract : null);
+  // #1: While the project record is still hydrating, do not present a
+  // transitional completed contract as the effective contract — P14 target
+  // identity may still be in pre-hydration/default/transitional state.
+  const effectiveContract = isProjectHydrationReady
+    ? (cachedContract || contract || (completedContractMatches ? completedContract : null))
+    : null;
   // When using the fallback completed contract (controller skipped), show
   // COMPLETE status so the bass graph and status indicators don't flash IDLE.
-  const effectiveDetailedStatus = (effectiveContract && !cachedContract && !contract && completedContractMatches) ? "COMPLETE" : detailedStatus;
+  const effectiveDetailedStatus = (isProjectHydrationReady && effectiveContract && !cachedContract && !contract && completedContractMatches) ? "COMPLETE" : detailedStatus;
   // ── Stage 3: Finished graph restore from cached graphPayload ──────────
   // When no live optimisation result exists (controller idle after route
   // return, project reopen, or fresh session) but a matching authoritative
@@ -489,10 +584,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // Authority priority: live result takes precedence; cached graph is only
   // used when the live result is null AND the completed contract matches.
   const cachedGraphOptimisationResult = useMemo(() => {
-    if (optimisationResult || !completedContractMatches || !completedContract) return null;
+    if (!isProjectHydrationReady || optimisationResult || !completedContractMatches || !completedContract) return null;
     if (!hasGraphPayload(completedContract)) return null;
     return buildFinishedGraphOptimisationResult(completedContract);
-  }, [optimisationResult, completedContractMatches, completedContract]);
+  }, [isProjectHydrationReady, optimisationResult, completedContractMatches, completedContract]);
   const effectiveOptimisationResult = optimisationResult || cachedGraphOptimisationResult;
   const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
