@@ -18,8 +18,10 @@ import {
   bassOptimiserVersionSignature,
 } from "./bassOptimiserWorkerProtocol";
 import { computeCalibrationFingerprint } from "./bassAnalysisFingerprints";
+import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { buildCompactContractFromWorkerResult } from "./p14TargetContractBuilder";
 import { getTargetCacheEntry, setTargetCacheEntry } from "./p14TargetCache";
+import { safeConsole } from "@/components/utils/safeConsole";
 
 const createWorker = () => new Worker(
   new URL("../../utils/bassOptimiser.worker.js", import.meta.url),
@@ -94,6 +96,7 @@ export class P14TargetBackgroundScheduler {
     this.running = true;
     const target = this.queue.shift();
     this.currentTarget = target;
+    safeConsole.log("p14-bg", `target ${target.key}: starting background calculation (fingerprint ${this.currentBaseDesignFingerprint?.substring(0, 24)}...)`);
     this.runTarget(target);
   }
 
@@ -119,7 +122,12 @@ export class P14TargetBackgroundScheduler {
       p14TargetLevel: target.level,
     };
     const calibrationFingerprint = computeCalibrationFingerprint(targetFingerprintInputs);
-    const fingerprint = calibrationFingerprint;
+    // Use the SAME full cache key as the foreground path so background contracts
+    // have identical fingerprint identity (job.resultFingerprint === cacheKey).
+    // The raw calibration fingerprint alone would produce contracts with a
+    // different fingerprint format, causing completedContractMatches to fail
+    // when a cached target is promoted.
+    const fingerprint = buildBassResultCacheKey(calibrationFingerprint);
 
     const identity = {
       fingerprint,
@@ -157,8 +165,16 @@ export class P14TargetBackgroundScheduler {
 
   handleWorkerMessage(message, target, fingerprint, calibrationFingerprint) {
     if (this.cancelled) { this.terminateWorker(); return; }
-    if (message.fingerprint !== fingerprint) { this.handleWorkerError(target); return; }
-    if (message.type === "error") { this.handleWorkerError(target); return; }
+    if (message.fingerprint !== fingerprint) {
+      safeConsole.warn("p14-bg", `target ${target.key}: fingerprint mismatch (expected ${fingerprint?.substring(0, 24)}..., got ${message.fingerprint?.substring(0, 24)}...)`);
+      this.handleWorkerError(target);
+      return;
+    }
+    if (message.type === "error") {
+      safeConsole.warn("p14-bg", `target ${target.key}: worker returned error: ${message.error || "unknown"}`);
+      this.handleWorkerError(target);
+      return;
+    }
     if (message.type !== "complete") return; // ignore progress
 
     const pool = message[BASS_OPTIMISER_POOL_PROPERTY];
@@ -191,6 +207,12 @@ export class P14TargetBackgroundScheduler {
 
     if (compactContract) {
       setTargetCacheEntry(this.projectId, this.currentBaseDesignFingerprint, target.key, compactContract);
+      safeConsole.log("p14-bg", `target ${target.key}: cached successfully (fingerprint ${fingerprint?.substring(0, 24)}...)`);
+    } else {
+      // Contract build or publication validation failed. The target remains
+      // missing and eligible for a later retry — do not cache a non-authoritative
+      // contract. Log enough to identify the target and reason for dev diagnosis.
+      safeConsole.warn("p14-bg", `target ${target.key}: contract build returned null (publication validation failed)`);
     }
 
     this.terminateWorker();
@@ -198,6 +220,10 @@ export class P14TargetBackgroundScheduler {
   }
 
   handleWorkerError(target) {
+    // Worker error — the target remains missing and eligible for a later retry.
+    // Log enough to identify the target for dev diagnosis without noisy
+    // permanent user-facing diagnostics.
+    safeConsole.warn("p14-bg", `target ${target.key}: worker error, will retry on next schedule`);
     this.terminateWorker();
     this.yieldAndRunNext();
   }

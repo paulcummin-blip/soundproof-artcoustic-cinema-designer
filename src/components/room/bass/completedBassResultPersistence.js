@@ -148,7 +148,12 @@ export function bassContractMatchesRequestedP14(contract, requested) {
 export function buildPersistedBassAuthority(existing, currentFingerprint, contract = null, forceUpdating = false) {
   const previous = existing && typeof existing === "object" ? existing : {};
   const completedByFingerprint = { ...(previous.completedByFingerprint || {}) };
-  const compact = compactCompletedBassContract(contract);
+  // If the contract is already compact (has graphPayload, lacks
+  // finalOptimisedBassResponse), use it directly instead of re-compacting.
+  // Re-compacting a compact contract would lose the graphPayload because
+  // buildGraphPayload reads from finalOptimisedBassResponse which is absent.
+  const isAlreadyCompact = contract && !contract.finalOptimisedBassResponse && contract.graphPayload;
+  const compact = isAlreadyCompact ? contract : compactCompletedBassContract(contract);
   if (compact) completedByFingerprint[compact.job.resultFingerprint] = compact;
   const bounded = Object.fromEntries(Object.entries(completedByFingerprint)
     .sort(([, left], [, right]) => Number(right?.job?.completedAtMs || 0) - Number(left?.job?.completedAtMs || 0))

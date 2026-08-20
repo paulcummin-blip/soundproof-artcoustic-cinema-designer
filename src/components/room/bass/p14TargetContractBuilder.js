@@ -151,7 +151,7 @@ export function buildCompactContractFromWorkerResult({
     canonicalPriorityMode: "canonical-physics-eq",
     fingerprints: targetFingerprints,
     responseDomain: "normalized_room_transfer",
-    backgroundLifecycle: { status: "ready", resultFingerprint: fingerprint },
+    backgroundLifecycle: { status: "ready", resultFingerprint: fingerprint, currentJobFingerprint: fingerprint },
     p14TargetBasis: target.basis,
     p18TargetBasis: target.p18TargetBasis,
     selectedP14Level: target.level,

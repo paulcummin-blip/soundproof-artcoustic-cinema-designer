@@ -180,6 +180,10 @@ export function publishCachedCompactBassContract(projectId, compactContract) {
     exportable: true,
     publicationRejectionReason: null,
   });
+  // Persist the selected cached target as the current completed authority so
+  // it survives project close/reopen. Without this, the cached target
+  // promotion is memory-only and reverts to the previous authority on reopen.
+  syncCachedCompactBassAuthority(key, compactContract);
   return true;
 }
 
@@ -247,6 +251,58 @@ export function markBassAuthorityBlocked(projectId) {
     exportable: false,
     publicationRejectionReason: null,
   });
+}
+
+/**
+ * Persist a cached compact contract as the current completed authority.
+ * Used when the user switches to a precomputed P14 target — the cached
+ * compact contract becomes the current completed authority and must
+ * persist so it survives project close/reopen.
+ *
+ * Unlike syncPersistentBassAuthority, this accepts an ALREADY-compact
+ * contract and does NOT re-compact it (which would lose the graphPayload).
+ */
+export function syncCachedCompactBassAuthority(projectId, compactContract) {
+  const key = projectKey(projectId);
+  if (key === "free") return Promise.resolve(null);
+  if (!compactContract || !isAuthoritativeBassContract(compactContract)) return Promise.resolve(null);
+  const currentFingerprint = compactContract.job?.resultFingerprint || null;
+  const signature = `cached:${currentFingerprint || ""}|${compactContract.selectedCandidateId || ""}`;
+  if (syncSignatures.get(key) === signature) return writeQueues.get(key) || Promise.resolve(null);
+  syncSignatures.set(key, signature);
+  const queued = (writeQueues.get(key) || Promise.resolve()).then(async () => {
+    try {
+      const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
+      const record = Array.isArray(records) ? records[0] : null;
+      const existing = record ? {
+        version: COMPLETED_BASS_CACHE_VERSION,
+        currentFingerprint: record.current_fingerprint,
+        status: record.status,
+        completedByFingerprint: record.completed_by_fingerprint,
+      } : null;
+      // buildPersistedBassAuthority detects already-compact contracts via
+      // the graphPayload flag and uses them directly (no re-compaction).
+      const persisted = buildPersistedBassAuthority(existing, currentFingerprint, compactContract, false);
+      const payload = {
+        project_id: key,
+        current_fingerprint: persisted.currentFingerprint,
+        status: persisted.status,
+        completed_by_fingerprint: persisted.completedByFingerprint,
+      };
+      if (record?.id) await base44.entities.ProjectAnalysisCache.update(record.id, payload);
+      else await base44.entities.ProjectAnalysisCache.create(payload);
+      const resolved = resolvePersistedBassAuthority(key, persisted);
+      if (resolved?.authoritative) {
+        return setMemory(key, resolved);
+      }
+      return memoryByProject.get(key) || resolved;
+    } catch (e) {
+      // Sync failure is non-fatal — next change will retry
+      return null;
+    }
+  });
+  writeQueues.set(key, queued);
+  return queued;
 }
 
 export function syncPersistentBassAuthority(projectId, currentFingerprint, contract) {

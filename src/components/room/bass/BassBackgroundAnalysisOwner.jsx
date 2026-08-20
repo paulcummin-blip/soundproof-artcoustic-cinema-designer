@@ -7,10 +7,10 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract } from "./completedBassResultStore";
+import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
-import { useTargetCacheEntry, clearTargetCacheForDesign, hydrateTargetCache } from "./p14TargetCache";
+import { useTargetCacheEntry, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry } from "./p14TargetCache";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
@@ -390,6 +390,18 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       markBassAuthorityUpdating(scopeId, currentFingerprint);
     }
     syncPersistentBassAuthority(scopeId, currentFingerprint, contract);
+    // ── Stage 4: Foreground target bridge ───────────────────────────────
+    // After foreground publication succeeds, write the authoritative compact
+    // contract to the 8-target family cache so the foreground target is also
+    // a member of target_cache. The scheduler excludes the foreground target
+    // from its background queue, so without this bridge the family would
+    // contain only 7 targets.
+    if (published && baseDesignFingerprint && targetKey) {
+      const compactContract = getCompletedBassContract(scopeId);
+      if (compactContract && isAuthoritativeBassContract(compactContract)) {
+        setTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey, compactContract);
+      }
+    }
     // Record contract-published ONLY when publishCompletedBassContract returned
     // true — not when authority is merely marked updating.
     const publishedToken = lifecycle?.result?.diagnosticToken || null;

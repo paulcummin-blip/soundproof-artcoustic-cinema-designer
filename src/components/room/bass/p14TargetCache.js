@@ -12,6 +12,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
 import { isAuthoritativeBassContract } from "./completedBassResultPersistence";
+import { hasGraphPayload } from "./finishedGraphAdapter";
 
 const cacheByProject = new Map();
 const listeners = new Set();
@@ -41,6 +42,10 @@ export function getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey)
   if (cache.baseDesignFingerprint !== baseDesignFingerprint) return null;
   const entry = cache.targets[targetKey];
   if (!entry || !isAuthoritativeBassContract(entry)) return null;
+  // Stage 3: a reusable target must also contain the finished graph payload.
+  // Older entries (pre-Stage 3) without graphPayload are treated as cache
+  // misses so they get recalculated with the full payload.
+  if (!hasGraphPayload(entry)) return null;
   return entry;
 }
 
@@ -53,7 +58,7 @@ export function getTargetCacheProgress(projectId, baseDesignFingerprint, allTarg
   if (cache.baseDesignFingerprint !== baseDesignFingerprint) return { ready: 0, total: allTargetKeys.length };
   const ready = allTargetKeys.filter((k) => {
     const entry = cache.targets[k];
-    return entry && isAuthoritativeBassContract(entry);
+    return entry && isAuthoritativeBassContract(entry) && hasGraphPayload(entry);
   }).length;
   return { ready, total: allTargetKeys.length };
 }
