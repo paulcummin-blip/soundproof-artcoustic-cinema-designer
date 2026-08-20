@@ -24,6 +24,7 @@ function columnNumber(seat, fallback) {
 }
 
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
 
 export function formatAuthoritativeP20Result(result) {
   if (!finite(result?.variationDbRaw)) return "—";
@@ -44,6 +45,7 @@ export function buildP20SeatRows(seatingPositions = [], perSeatP20Results = []) 
       seatId: id,
       row,
       column: columnNumber(seat, index + 1),
+      priority: resolveSeatPriority(seat),
       level: result && finite(result.variationDbRaw) ? p20LevelText(result.level) : "—",
       variationDbRaw: result && finite(result.variationDbRaw) ? Number(result.variationDbRaw) : null,
       displayVariationDb: result && finite(result.variationDbRaw) ? formatAuthoritativeP20Result(result) : "—",
@@ -56,6 +58,17 @@ export function buildP20SeatRows(seatingPositions = [], perSeatP20Results = []) 
     row,
     seats: seats.sort((a, b) => a.column - b.column),
   }));
+}
+
+/**
+ * Find the best-performing Primary seat (lowest variation) from P20 per-seat rows.
+ * Uses seat-priority authority to determine which seats are Primary.
+ * If no Primary seats have results, returns null.
+ */
+export function p20BestPrimarySeat(rows = []) {
+  return rows.flatMap((row) => row.seats)
+    .filter((seat) => seat.priority === PRIMARY && seat.level !== "—" && seat.variationDbRaw != null)
+    .sort((a, b) => Math.abs(a.variationDbRaw) - Math.abs(b.variationDbRaw))[0] || null;
 }
 
 export function p20WorstSeat(rows = []) {

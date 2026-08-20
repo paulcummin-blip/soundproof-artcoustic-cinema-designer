@@ -65,6 +65,31 @@ export function computeOfficialP19Assessment({ rspPostEqCurve, canonicalTargetCu
   return { ...result, sourceCurve, label: "P19 RSP" };
 }
 
+/**
+ * Per-seat P19 assessment — same maximumTargetDeviation maths as the RSP P19,
+ * applied to each real seat's post-EQ curve versus the canonical target.
+ * Returns an array of per-seat P19 results with seatId, level, variationDbRaw.
+ */
+export function computeOfficialPerSeatP19Assessment({ perSeatPostEqCurves, canonicalTargetCurve, assessmentStartHz, assessmentEndHz }) {
+  return (Array.isArray(perSeatPostEqCurves) ? perSeatPostEqCurves : [])
+    .filter((seat) => seat?.seatId && !isReferenceSeatIdentity(seat))
+    .map((seat) => {
+      const seatCurve = smoothedAssessmentCurve(seat.responseData, assessmentStartHz, assessmentEndHz);
+      if (!seatCurve.length) return null;
+      const result = maximumTargetDeviation(seatCurve, canonicalTargetCurve);
+      if (result.variationDbRaw == null) return null;
+      return {
+        seatId: seat.seatId,
+        variationDbRaw: result.variationDbRaw,
+        totalRspToTargetDifferenceDbRaw: result.totalRspToTargetDifferenceDbRaw,
+        displayVariationDb: result.displayVariationDb,
+        level: result.level,
+        worstFrequencyHz: result.worstFrequencyHz,
+      };
+    })
+    .filter(Boolean);
+}
+
 export function computeCorrectableP19Diagnostic({ rspPostEqCurve, canonicalTargetCurve, assessmentStartHz, assessmentEndHz, protectedNullRegions = [] }) {
   const sourceCurve = smoothedAssessmentCurve(rspPostEqCurve, assessmentStartHz, assessmentEndHz);
   const result = maximumTargetDeviation(sourceCurve, canonicalTargetCurve, protectedNullRegions);

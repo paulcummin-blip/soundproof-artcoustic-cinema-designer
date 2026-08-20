@@ -145,6 +145,16 @@ export function buildComplianceBassPresentation({ completedBassAuthority }, erro
       ? completedBassAuthority.errorMessage
       : null);
   const parameters = Object.fromEntries(["p14", "p18", "p19", "p20"].map((key) => [key, formatAuthoritativeBassParameter(completedBassAuthority, key, safeErrorMessage)]));
+  // Per-seat arrays are publication-gated: only expose official-looking
+  // per-seat L1/L2/L3/L4 results when the contract is canonically published.
+  // When NOT_VERIFIED / UPDATING, return empty arrays so the UI shows a
+  // consistent non-verified state — never mixed verified/unverified per-seat.
+  const perSeatP19Results = publicationVerified && Array.isArray(contract?.selectedCandidate?.perSeatP19Results)
+    ? contract.selectedCandidate.perSeatP19Results
+    : [];
+  const perSeatP20Results = publicationVerified && Array.isArray(contract?.selectedCandidate?.perSeatP20Results)
+    ? contract.selectedCandidate.perSeatP20Results
+    : [];
   return {
     completed: isCompletedBassContract(contract),
     publicationVerified,
@@ -154,7 +164,8 @@ export function buildComplianceBassPresentation({ completedBassAuthority }, erro
     resultFingerprint: contract?.job?.resultFingerprint || null,
     selectedCandidateId: contract?.selectedCandidateId || null,
     parameters,
-    perSeatP20Results: Array.isArray(contract?.selectedCandidate?.perSeatP20Results) ? contract.selectedCandidate.perSeatP20Results : [],
+    perSeatP19Results,
+    perSeatP20Results,
   };
 }
 

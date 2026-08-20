@@ -15,6 +15,8 @@ export const emptyBassResults = () => ({
   onPriorityChange: null,
   onRetry: null,
   authoritative: null,
+  completedBassAuthority: null,
+  seatingPositions: [],
 });
 
 export function createBassResultsScope(scopeId) {

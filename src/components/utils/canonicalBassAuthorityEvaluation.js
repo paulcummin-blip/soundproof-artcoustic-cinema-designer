@@ -8,7 +8,7 @@ import {
   normalizeP14TargetBasis,
 } from "@/components/utils/p14CapabilityAuthority";
 import { integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
-import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
+import { computeOfficialP19Assessment, computeOfficialPerSeatP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { buildPostEqBassCapabilityOutcome } from "@/components/utils/postEqBassCapabilityOutcome";
@@ -162,6 +162,13 @@ export function evaluateCanonicalBassAuthority({
   });
   const achievedP19VariationDb = p19?.variationDbRaw ?? null;
   const achievedP19Level = houseCurveP19Level(achievedP19VariationDb);
+  // P19 per-seat: same deviation maths applied to each real seat's post-EQ curve.
+  const perSeatP19Results = computeOfficialPerSeatP19Assessment({
+    perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
+    canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
+    assessmentStartHz: canonicalResult.assessmentStartHz,
+    assessmentEndHz: canonicalResult.assessmentEndHz,
+  });
 
   // P20: canonical post-EQ real seats versus the canonical post-EQ RSP.
   const p20 = computeOfficialP20Assessment({
@@ -279,6 +286,7 @@ export function evaluateCanonicalBassAuthority({
     achievedP19Level,
     officialP19VariationDb: achievedP19VariationDb,
     officialP19WorstFrequencyHz: p19?.worstFrequencyHz ?? null,
+    perSeatP19Results,
     achievedP20VariationDb,
     achievedP20Level,
     worstP20SeatId: p20?.worstSeat?.seatId ?? null,

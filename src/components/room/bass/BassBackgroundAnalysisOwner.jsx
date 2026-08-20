@@ -460,6 +460,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // When using the fallback completed contract (controller skipped), show
   // COMPLETE status so the bass graph and status indicators don't flash IDLE.
   const effectiveDetailedStatus = (effectiveContract && !cachedContract && !contract && completedContractMatches) ? "COMPLETE" : detailedStatus;
-  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative });
+  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
