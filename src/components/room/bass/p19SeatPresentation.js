@@ -22,8 +22,9 @@ function columnNumber(seat, fallback) {
 }
 
 export function p19LevelText(level) {
-  const match = String(level ?? "").toUpperCase().match(/^L?([1-4])$/);
-  return match ? `L${match[1]}` : "—";
+  const match = String(level ?? "").toUpperCase().match(/^L?([0-4])$/);
+  if (!match) return "—";
+  return Number(match[1]) === 0 ? "FAIL" : `L${match[1]}`;
 }
 
 export function formatAuthoritativeP19Result(result) {
