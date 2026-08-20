@@ -359,7 +359,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   useEffect(() => {
     // ── Cache hit: publish cached compact contract directly, skip optimiser ──
     if (cachedContract) {
-      publishCachedCompactBassContract(scopeId, cachedContract);
+      // Stage 4: publish cached compact contract with full safety guards.
+      // cacheKey = buildBassResultCacheKey(calibrationFingerprint) — the
+      // expected full result fingerprint. requested = the selected P14 target
+      // identity. publishCachedCompactBassContract rejects any contract that
+      // doesn't match both, or lacks the graph payload, or isn't AUTHORITATIVE.
+      publishCachedCompactBassContract(scopeId, cachedContract, cacheKey, requested);
       return;
     }
     // ── Authority already restored: no publish, no sync, no recalculation ──
@@ -398,7 +403,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // contain only 7 targets.
     if (published && baseDesignFingerprint && targetKey) {
       const compactContract = getCompletedBassContract(scopeId);
-      if (compactContract && isAuthoritativeBassContract(compactContract)) {
+      // Stage 4: only bridge to target_cache when the foreground result is
+      // canonically AUTHORITATIVE AND carries the Stage 3 graph payload.
+      if (compactContract && isAuthoritativeBassContract(compactContract) && hasGraphPayload(compactContract)) {
         setTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey, compactContract);
       }
     }

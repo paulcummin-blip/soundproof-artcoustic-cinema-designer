@@ -69,6 +69,8 @@ export function getTargetCacheProgress(projectId, baseDesignFingerprint, allTarg
 export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey, compactContract) {
   if (!baseDesignFingerprint || !targetKey || !compactContract) return;
   if (!isAuthoritativeBassContract(compactContract)) return;
+  // Stage 3: reject contracts without the required finished graph payload.
+  if (!hasGraphPayload(compactContract)) return;
   const cache = ensureCache(projectId);
   if (cache.baseDesignFingerprint !== baseDesignFingerprint) {
     cache.baseDesignFingerprint = baseDesignFingerprint;

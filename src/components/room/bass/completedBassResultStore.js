@@ -164,14 +164,24 @@ export function publishCompletedBassContract(projectId, contract) {
  * The compact contract must be authoritative (isAuthoritativeBassContract).
  * This does NOT call compactCompletedBassContract — the input is already compact.
  */
-export function publishCachedCompactBassContract(projectId, compactContract) {
+export function publishCachedCompactBassContract(projectId, compactContract, expectedFingerprint = null, requestedP14Identity = null) {
   if (!compactContract || !isAuthoritativeBassContract(compactContract)) return false;
+  // Stage 3: cached target must contain the finished graph payload.
+  if (!compactContract?.graphPayload?.postEqRspCurve?.length) return false;
+  // Stage 4: the contract's result fingerprint must match the expected
+  // buildBassResultCacheKey(...) fingerprint for the current design + target.
+  // This implicitly verifies the base design matches (calibration fingerprint
+  // is a hash of all design inputs) and that the fingerprint format is correct.
+  const resultFingerprint = compactContract.job?.resultFingerprint || null;
+  if (expectedFingerprint && resultFingerprint !== expectedFingerprint) return false;
+  // Stage 4: the contract's P14 identity must match the selected P14 target.
+  if (requestedP14Identity && !bassContractMatchesRequestedP14(compactContract, requestedP14Identity)) return false;
   const key = projectKey(projectId);
   setMemory(key, {
     projectId: key,
     status: "complete",
     authorityStatus: BASS_AUTHORITY_STATUS.AUTHORITATIVE,
-    currentFingerprint: compactContract.job?.resultFingerprint || null,
+    currentFingerprint: resultFingerprint,
     contract: compactContract,
     staleContract: memoryByProject.get(key)?.contract || null,
     errorMessage: null,
@@ -266,6 +276,8 @@ export function syncCachedCompactBassAuthority(projectId, compactContract) {
   const key = projectKey(projectId);
   if (key === "free") return Promise.resolve(null);
   if (!compactContract || !isAuthoritativeBassContract(compactContract)) return Promise.resolve(null);
+  // Stage 3: reject contracts without the finished graph payload.
+  if (!compactContract?.graphPayload?.postEqRspCurve?.length) return Promise.resolve(null);
   const currentFingerprint = compactContract.job?.resultFingerprint || null;
   const signature = `cached:${currentFingerprint || ""}|${compactContract.selectedCandidateId || ""}`;
   if (syncSignatures.get(key) === signature) return writeQueues.get(key) || Promise.resolve(null);

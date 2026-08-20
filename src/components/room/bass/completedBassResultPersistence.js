@@ -134,15 +134,23 @@ export function compactCompletedBassContract(contract) {
  */
 export function bassContractMatchesRequestedP14(contract, requested) {
   if (!contract) return false;
-  const cDb = Number.isFinite(contract.selectedP14TargetDb) ? contract.selectedP14TargetDb : null;
-  const cBasis = contract.selectedP14TargetBasis || null;
-  const cLevel = Number.isFinite(contract.selectedP14Level) ? contract.selectedP14Level : null;
+  // Handle both full contracts (selectedP14*) and compact contracts (requestedP14*).
+  // Compact contracts store requestedP14TargetDb/requestedP14Basis/requestedP14Level
+  // instead of selectedP14*, so read both field names.
+  const cDb = Number.isFinite(contract.selectedP14TargetDb) ? contract.selectedP14TargetDb
+    : (Number.isFinite(contract.requestedP14TargetDb) ? contract.requestedP14TargetDb : null);
+  const cBasis = contract.selectedP14TargetBasis || contract.requestedP14Basis || null;
+  const cLevel = Number.isFinite(contract.selectedP14Level) ? contract.selectedP14Level
+    : (Number.isFinite(contract.requestedP14Level) ? contract.requestedP14Level : null);
   const cExtHz = Number.isFinite(contract.selectedP14RequiredExtensionHz) ? contract.selectedP14RequiredExtensionHz : null;
   const rDb = Number.isFinite(requested?.selectedP14TargetDb) ? requested.selectedP14TargetDb : null;
   const rBasis = requested?.p14TargetBasis || requested?.selectedP14TargetBasis || null;
   const rLevel = Number.isFinite(requested?.requestedLevel) ? requested.requestedLevel : (Number.isFinite(requested?.selectedP14Level) ? requested.selectedP14Level : null);
   const rExtHz = Number.isFinite(requested?.selectedP14RequiredExtensionHz) ? requested.selectedP14RequiredExtensionHz : null;
-  return cDb === rDb && cBasis === rBasis && cLevel === rLevel && cExtHz === rExtHz;
+  // Extension Hz is derived from basis+level; compact contracts don't store it
+  // explicitly. Only compare when both sides have a finite value.
+  if (cExtHz !== null && rExtHz !== null && cExtHz !== rExtHz) return false;
+  return cDb === rDb && cBasis === rBasis && cLevel === rLevel;
 }
 
 export function buildPersistedBassAuthority(existing, currentFingerprint, contract = null, forceUpdating = false) {
