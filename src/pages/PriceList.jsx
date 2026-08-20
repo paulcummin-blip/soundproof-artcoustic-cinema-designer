@@ -46,9 +46,13 @@ export default function PriceList() {
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return (records || [])
+    const visible = (records || [])
       .filter((item) => item.active !== false)
       .filter((item) => category === "All" || item.category === category)
+      // Suppress internal "(Surround)" display variants — same physical
+      // product as the base row. Internal SKUs remain available to Sound
+      // Proof for speaker-role logic, CAD mapping, and product matching.
+      .filter((item) => !/\s\(Surround\)\s*$/.test(String(item.label || "")))
       .filter((item) => !query
         || String(item.label || "").toLowerCase().includes(query)
         || String(item.sku || "").toLowerCase().includes(query))
@@ -56,6 +60,7 @@ export default function PriceList() {
         const categoryDifference = CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category);
         return categoryDifference || String(a.label || "").localeCompare(String(b.label || ""));
       });
+    return visible;
   }, [records, search, category]);
 
   return (
@@ -65,7 +70,7 @@ export default function PriceList() {
           <div>
             <h1 className="m-0 text-2xl font-bold">Price List</h1>
             <p className="mt-1 text-sm text-[#3E4349]">
-              Current {territory} retail pricing. VAT is shown separately for clarity.
+              Current {territory} retail pricing.
             </p>
           </div>
           {records && <div className="text-sm text-[#625143]">{filtered.length} products</div>}
@@ -77,7 +82,7 @@ export default function PriceList() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search product or SKU"
+              placeholder="Search product"
               className="w-full rounded-lg border border-[#DCDBD6] py-2 pl-9 pr-3 text-sm outline-none focus:border-[#213428]"
             />
           </label>
@@ -108,7 +113,6 @@ export default function PriceList() {
                   <tr>
                     <th className="px-4 py-3">Product</th>
                     <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3 text-right">Ex VAT</th>
                     <th className="px-4 py-3 text-right">Inc VAT</th>
                   </tr>
@@ -118,7 +122,6 @@ export default function PriceList() {
                     <tr key={item.id || item.sku} className="border-t border-[#E7E5E1]">
                       <td className="px-4 py-3 text-sm font-semibold">{item.label || "Unnamed product"}</td>
                       <td className="px-4 py-3 text-sm text-[#3E4349]">{item.category || "—"}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-[#625143]">{item.sku || "—"}</td>
                       <td className="px-4 py-3 text-right text-sm">{money(item.price_ex_vat)}</td>
                       <td className="px-4 py-3 text-right text-sm font-semibold">
                         {item.price_ex_vat == null ? "Price on request" : money(Number(item.price_ex_vat) * (1 + VAT_RATE))}
