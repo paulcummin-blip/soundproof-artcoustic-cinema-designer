@@ -64,6 +64,7 @@ import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandle
 import { useMlpDragHandler } from "@/components/room/rv/hooks/useMlpDragHandler";
 import RvMlpMarker from "@/components/room/rv/render/RvMlpMarker";
 import { subscribeMlpGrab, getMlpGrab, setMlpGrab } from "@/components/state/mlpGrabStore";
+import { clearSeatDragLive } from "@/components/state/seatDragLiveStore";
 import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWideAutoPlacement";
 import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls";
 import { useShiftSeatsToAngle } from "@/components/room/rv/hooks/useShiftSeatsToAngle";
@@ -1450,6 +1451,7 @@ const byId = useEntitiesById({
 
   // Commit draft seat positions to real state once on pointer release
   const commitDraftSeatPositions = useCallback(() => {
+    clearSeatDragLive();
     if (!draftSeatsRef.current || !onSetSeatingPositions) return;
     const draftSeats = draftSeatsRef.current;
     onSetSeatingPositions(draftSeats);
@@ -1577,10 +1579,10 @@ const byId = useEntitiesById({
   // Window-level drag cleanup — fires for ALL drag types when mouse is released outside the SVG
   useEffect(() => {
     const onWindowMouseUp = (e) => {
-      if (isAnyDraggingRef.current) { handleMouseUp(e); clearSeatSnap(); clearSeatDragBaseline(); }
+      if (isAnyDraggingRef.current) { handleMouseUp(e); clearSeatSnap(); clearSeatDragBaseline(); clearSeatDragLive(); }
     };
     const onWindowBlur = () => {
-      if (isAnyDraggingRef.current) { handleMouseUp({}); clearSeatSnap(); clearSeatDragBaseline(); }
+      if (isAnyDraggingRef.current) { handleMouseUp({}); clearSeatSnap(); clearSeatDragBaseline(); clearSeatDragLive(); }
     };
     window.addEventListener('mouseup', onWindowMouseUp);
     window.addEventListener('blur', onWindowBlur);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { publishSeatDragLive } from "@/components/state/seatDragLiveStore";
 
 const SEAT_MARGIN_M = 0.3;
 
@@ -60,6 +61,7 @@ export function useSeatDragHandler({
         if (!Number.isFinite(baseY)) return seat;
         return { ...seat, y: baseY + clampedDelta };
       });
+      publishSeatDragLive(draftSeatsRef.current);
       setSeatDragTick(n => n + 1);
       return;
     }
@@ -88,6 +90,7 @@ export function useSeatDragHandler({
       ...seat,
       y: Number(seat.y ?? seat.position?.y ?? 0) + deltaY,
     }));
+    publishSeatDragLive(draftSeatsRef.current);
     setSeatDragTick(n => n + 1);
   }, [canvasToRoom, lengthM, seatDragStartRef, draftSeatsRef, setSeatDragTick]);
 

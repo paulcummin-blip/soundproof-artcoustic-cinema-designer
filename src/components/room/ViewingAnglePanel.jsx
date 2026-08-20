@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useSyncExternalStore } from 'react';
 import { Eye, Ruler } from 'lucide-react';
 import { useAppState } from '@/components/AppStateProvider';
 import { calculateViewingAngle, assignRP23Level, buildPerRowViewingData } from '@/components/utils/viewingAngleUtils';
@@ -7,6 +7,7 @@ import RP22GradingPill from '../ui/RP22GradingPill';
 import { getLevelColors } from '@/components/utils/rp22Colors';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { subscribeSeatDragLive, getSeatDragLive } from '@/components/state/seatDragLiveStore';
 
 export default function ViewingAnglePanel({
   screen,
@@ -90,14 +91,23 @@ export default function ViewingAnglePanel({
   // seatingPositions triggers recompute on every drag tick via mlpOverride.
   }, [mlpOverride, mlpY_m, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio, screen?.tvPresetKey, screen?.tvWidthMm]);
 
+  // Live draft seat positions during a longitudinal seat/row drag.
+  // Pure geometry only — no bass / RP22 / ASDR recalculation is triggered.
+  // When a drag is active, the per-row table (angle, distance, RP23, balance)
+  // updates continuously from the transient pointer positions; on release the
+  // committed seatingPositions take over and match the last live preview.
+  const liveDrag = useSyncExternalStore(subscribeSeatDragLive, getSeatDragLive);
+  const liveSeats = (liveDrag?.active && Array.isArray(liveDrag?.seats)) ? liveDrag.seats : null;
+  const effectiveSeatingPositions = liveSeats || seatingPositions;
+
   // Canonical per-row analysis shared with Stage D recommendation evaluation.
   const perRowData = useMemo(
     () => buildPerRowViewingData({
-      seatingPositions,
+      seatingPositions: effectiveSeatingPositions,
       screen,
       screenFrontPlaneM,
     }),
-    [seatingPositions, screen, screenFrontPlaneM]
+    [effectiveSeatingPositions, screen, screenFrontPlaneM]
   );
 
   if (!rp23Data) {
