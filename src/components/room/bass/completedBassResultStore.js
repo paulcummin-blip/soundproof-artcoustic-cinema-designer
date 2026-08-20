@@ -45,16 +45,42 @@ function ensureProjectAuthorityState(key) {
       refCount: 0,
       hydrationInFlight: null,
       hydrationStarted: false,
+      hydrationSettled: false,
     });
   }
   return projectAuthorityState.get(key);
 }
 
+// #1: Explicit completed-bass-authority hydration-settled flag. True only
+// after hydrateCompletedBassAuthority has finished (success or fail) for the
+// current acquisition cycle. While false, LOADING must not be overwritten by
+// terminal BLOCKED/UNCALCULATED and resolveBassReadiness must keep the rating
+// pending so a provisional ASDR cannot publish before the persisted authority
+// arrives.
+function currentHydrationSettled(key) {
+  const state = projectAuthorityState.get(key);
+  return state ? state.hydrationSettled === true : false;
+}
+
+function markHydrationSettled(key) {
+  const state = ensureProjectAuthorityState(key);
+  if (state.hydrationSettled) return;
+  state.hydrationSettled = true;
+  const current = memoryByProject.get(key);
+  if (current) {
+    setMemory(key, { ...current });
+  } else {
+    notify();
+  }
+}
+
 function startProjectHydration(key) {
   const state = ensureProjectAuthorityState(key);
   if (state.hydrationInFlight) return state.hydrationInFlight;
+  state.hydrationSettled = false;
   state.hydrationInFlight = hydrateCompletedBassAuthority(key).finally(() => {
     state.hydrationInFlight = null;
+    markHydrationSettled(key);
   });
   return state.hydrationInFlight;
 }
@@ -75,6 +101,7 @@ function releaseProjectAuthority(key) {
   if (state.refCount === 0) {
     state.hydrationStarted = false;
     state.hydrationInFlight = null;
+    state.hydrationSettled = false;
   }
 }
 
@@ -93,6 +120,7 @@ function authoritySignature(a) {
     ex: a.exportable,
     pr: a.publicationRejectionReason || null,
     e: a.errorMessage || null,
+    hs: a.hydrationSettled === true,
   });
 }
 
@@ -109,6 +137,7 @@ const emptyAuthority = (projectId) => ({
   authoritative: false,
   exportable: false,
   publicationRejectionReason: null,
+  hydrationSettled: false,
 });
 
 function notify() {
@@ -118,18 +147,22 @@ function notify() {
 function setMemory(projectId, authority) {
   const key = projectKey(projectId);
   const previous = memoryByProject.get(key);
+  // Merge the current hydrationSettled flag so every stored authority object
+  // carries it and useSyncExternalStore snapshots stay referentially stable
+  // until a real state change (or the hydration-settled transition) occurs.
+  const withSettled = { ...authority, hydrationSettled: currentHydrationSettled(key) };
 
   // Publishing the same semantic authority again must be a no-op. The bass
   // owner can legitimately recompute an equivalent blocked/updating snapshot
   // during React renders; notifying every ASDR candidate for that identical
   // snapshot creates a self-sustaining rerender loop.
-  if (previous && authoritySignature(previous) === authoritySignature(authority)) {
+  if (previous && authoritySignature(previous) === authoritySignature(withSettled)) {
     return previous;
   }
 
-  memoryByProject.set(key, authority);
+  memoryByProject.set(key, withSettled);
   notify();
-  return authority;
+  return withSettled;
 }
 
 export function publishCompletedBassContract(projectId, contract) {
@@ -246,6 +279,14 @@ export function markBassAuthorityBlocked(projectId) {
   // instances still hydrating). The result remains valid until a fingerprint
   // mismatch is detected once fingerprints can be evaluated.
   if (previous.authoritative && previous.contract) {
+    return previous;
+  }
+  // #4: While persisted bass-authority hydration is still in flight, do NOT
+  // overwrite a non-authoritative LOADING state with terminal BLOCKED. A
+  // transient BLOCKED during hydration is treated as final by
+  // resolveBassReadiness, publishing a provisional ASDR before the persisted
+  // authority arrives. Keep LOADING until hydration settles.
+  if (!currentHydrationSettled(key) && previous.authorityStatus === BASS_AUTHORITY_STATUS.LOADING) {
     return previous;
   }
   setMemory(projectId, {
@@ -418,6 +459,18 @@ export function hasAuthoritativeResult(projectId, fingerprint = null) {
   if (!authority || !authority.authoritative || !authority.contract) return false;
   if (fingerprint && authority.currentFingerprint !== fingerprint) return false;
   return true;
+}
+
+/**
+ * #1: Whether persisted completed-bass-authority hydration has settled for this
+ * project. While false, LOADING is preserved (markBassAuthorityBlocked is a
+ * no-op) and resolveBassReadiness keeps BLOCKED/UNCALCULATED pending so no
+ * provisional ASDR can publish. Used by BassBackgroundAnalysisOwner to gate
+ * foreground optimiser starts until the persisted authority either restores
+ * (AUTHORITATIVE → skip) or is confirmed absent (UNCALCULATED → calculate).
+ */
+export function isBassAuthorityHydrationSettled(projectId) {
+  return currentHydrationSettled(projectKey(projectId));
 }
 
 export function useCompletedBassAuthority(projectId) {

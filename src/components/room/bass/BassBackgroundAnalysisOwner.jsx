@@ -159,6 +159,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       controller.cancelActive("cache-hit");
       return; // Skip controller when cache hit — no optimiser run
     }
+    // #1: Do not start a foreground job while persisted bass-authority
+    // hydration is still in flight. The persisted authority may restore
+    // (AUTHORITATIVE → authority-restored skip) or confirm no authority
+    // (UNCALCULATED → calculate). Starting before hydration settles wastes a
+    // worker that is cancelled the moment the persisted authority arrives.
+    if (!bassAuthorityHydrationSettled) return;
     if (isDragging || !fingerprints) return; // Defer during drag; skip when analysis is blocked
     // ── Route-navigation guard ──────────────────────────────────────────
     // When returning to Room Designer after viewing a report (Technical /
@@ -179,7 +185,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       identity: requestIdentity,
       collectDiagnostics: false,
     });
-  }, [controller, isDragging, inputsValid, cacheKey, fingerprints, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE, cachedContract, isProjectHydrationReady]);
+  }, [controller, isDragging, inputsValid, cacheKey, fingerprints, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE, cachedContract, isProjectHydrationReady, bassAuthorityHydrationSettled]);
   useEffect(() => () => { controller.dispose(); scopeRef.current?.clear(); }, [controller]);
 
   const detailedStatus = LEGACY_STATUS[lifecycle.status] || "IDLE";
@@ -199,6 +205,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const completedBassAuthority = useCompletedBassAuthority(scopeId);
   const completedContract = completedBassAuthority?.contract || null;
   const completedFingerprint = completedContract?.job?.resultFingerprint || null;
+  // #1: Persisted completed-bass-authority hydration settled flag. While false,
+  // the foreground optimiser must not start — the persisted authority may
+  // restore (AUTHORITATIVE → skip) or confirm no authority (UNCALCULATED →
+  // calculate). Starting before hydration settles wastes a worker that gets
+  // cancelled the moment the persisted authority arrives.
+  const bassAuthorityHydrationSettled = completedBassAuthority?.hydrationSettled === true;
   // A persisted completed contract may be reused as AUTHORITATIVE only when it
   // is structurally complete AND metricPublication.canonicalMetricPublicationValid
   // === true (isAuthoritativeBassContract). A NOT_VERIFIED contract with a

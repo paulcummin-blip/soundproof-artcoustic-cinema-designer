@@ -103,6 +103,12 @@ export function resolveBassReadiness(completedBassAuthority) {
   const status = completedBassAuthority?.authorityStatus;
   const currentFp = completedBassAuthority?.currentFingerprint || null;
   const resultFp = completedBassAuthority?.contract?.job?.resultFingerprint || null;
+  // #3: BLOCKED/UNCALCULATED count as settled only after persisted-authority
+  // hydration has completed and the current canonical design is genuinely
+  // proven to have no applicable bass authority. During hydration, remain
+  // pending so a provisional ASDR cannot publish before the persisted
+  // authority arrives.
+  const hydrationSettled = completedBassAuthority?.hydrationSettled === true;
 
   if (status === BASS_AUTHORITY_STATUS.AUTHORITATIVE) {
     if (currentFp && resultFp && currentFp === resultFp) {
@@ -120,9 +126,15 @@ export function resolveBassReadiness(completedBassAuthority) {
     return { ready: false, pending: true, reason: 'updating', fingerprint: currentFp };
   }
   if (status === BASS_AUTHORITY_STATUS.UNCALCULATED) {
+    if (!hydrationSettled) {
+      return { ready: false, pending: true, reason: 'hydration-loading', fingerprint: null };
+    }
     return { ready: true, pending: false, reason: 'no-applicable-bass', fingerprint: null };
   }
   if (status === BASS_AUTHORITY_STATUS.BLOCKED) {
+    if (!hydrationSettled) {
+      return { ready: false, pending: true, reason: 'hydration-loading', fingerprint: null };
+    }
     return { ready: true, pending: false, reason: 'blocked', fingerprint: null };
   }
   if (status === BASS_AUTHORITY_STATUS.ERROR) {
