@@ -167,7 +167,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   const p20Rows = isAuthoritative ? buildP20SeatRows(seatingPositions, perSeatP20Results) : [];
 
   // P19 compact: RSP + Lowest Seat
-  const p19Rsp = isAuthoritative ? p19RspResult(parameters.p19) : null;
+  const p19Rsp = isAuthoritative ? p19RspResult(contract?.productAnalysis?.parameters?.p19) : null;
   const p19Lowest = isAuthoritative ? p19LowestSeat(p19Rows) : null;
 
   // P20 compact: Best Primary + Lowest Seat
