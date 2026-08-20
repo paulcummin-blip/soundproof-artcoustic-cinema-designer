@@ -12,6 +12,7 @@ import {
   isExportableBassContract,
   resolvePersistedBassAuthority,
 } from "./completedBassResultPersistence";
+import { INSTANCE_AUTHORITY_VERSION } from "@/components/utils/subwooferInstanceMigration";
 
 export {
   BASS_AUTHORITY_STATUS,
@@ -411,6 +412,7 @@ export async function hydrateCompletedBassAuthority(projectId) {
     const record = Array.isArray(records) ? records[0] : null;
     const persisted = record ? {
       version: COMPLETED_BASS_CACHE_VERSION,
+      instanceAuthorityVersion: INSTANCE_AUTHORITY_VERSION,
       currentFingerprint: record.current_fingerprint,
       status: record.status,
       completedByFingerprint: record.completed_by_fingerprint,
