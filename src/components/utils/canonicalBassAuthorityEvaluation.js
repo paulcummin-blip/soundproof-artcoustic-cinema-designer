@@ -14,6 +14,7 @@ import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOper
 import { buildPostEqBassCapabilityOutcome } from "@/components/utils/postEqBassCapabilityOutcome";
 import { assessP18AgainstRequiredExtension, buildBassTargetWarning } from "@/components/utils/bassDesignPhilosophyAuthority";
 import { assessP18Extension, normalizeP18TargetBasis, p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
+import { isCanonicalP19Ready } from "@/components/room/bass/p19Readiness";
 
 export function buildPositionAwareP14Capability({
   canonicalResult,
@@ -160,8 +161,16 @@ export function evaluateCanonicalBassAuthority({
     assessmentStartHz: canonicalResult.assessmentStartHz,
     assessmentEndHz: canonicalResult.assessmentEndHz,
   });
-  const achievedP19VariationDb = p19?.variationDbRaw ?? null;
-  const achievedP19Level = houseCurveP19Level(achievedP19VariationDb);
+  const officialP19VariationDb = p19?.variationDbRaw ?? null;
+  const officialP19Level = houseCurveP19Level(officialP19VariationDb);
+  const p19AssessmentReady = isCanonicalP19Ready({
+    canonicalPostEqRsp: canonicalResult.canonicalPostEqRsp,
+    canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
+    officialVariationDb: officialP19VariationDb,
+    officialLevel: officialP19Level,
+  });
+  const achievedP19VariationDb = p19AssessmentReady ? officialP19VariationDb : null;
+  const achievedP19Level = p19AssessmentReady ? officialP19Level : null;
   // P19 per-seat: same deviation maths applied to each real seat's post-EQ curve.
   const perSeatP19Results = computeOfficialPerSeatP19Assessment({
     perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
@@ -284,8 +293,9 @@ export function evaluateCanonicalBassAuthority({
       : null,
     achievedP19VariationDb,
     achievedP19Level,
+    p19AssessmentReady,
     officialP19VariationDb: achievedP19VariationDb,
-    officialP19WorstFrequencyHz: p19?.worstFrequencyHz ?? null,
+    officialP19WorstFrequencyHz: p19AssessmentReady ? (p19?.worstFrequencyHz ?? null) : null,
     perSeatP19Results,
     achievedP20VariationDb,
     achievedP20Level,
