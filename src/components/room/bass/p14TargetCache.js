@@ -13,11 +13,15 @@ import { useEffect, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
 import { isAuthoritativeBassContract } from "./completedBassResultPersistence";
 import { hasGraphPayload } from "./finishedGraphAdapter";
+import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 
 const cacheByProject = new Map();
 const listeners = new Set();
 const writeQueues = new Map();
-const syncSignatures = new Map();
+const persistedSignatures = new Map();
+const persistenceTimers = new Map();
+const dirtyProjects = new Set();
+const TARGET_CACHE_WRITE_DEBOUNCE_MS = 2000;
 
 function notify() { listeners.forEach((l) => l()); }
 
@@ -46,6 +50,7 @@ export function getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey)
   // Older entries (pre-Stage 3) without graphPayload are treated as cache
   // misses so they get recalculated with the full payload.
   if (!hasGraphPayload(entry)) return null;
+  if (!hasReadyCanonicalP19Contract(entry)) return null;
   return entry;
 }
 
@@ -58,7 +63,7 @@ export function getTargetCacheProgress(projectId, baseDesignFingerprint, allTarg
   if (cache.baseDesignFingerprint !== baseDesignFingerprint) return { ready: 0, total: allTargetKeys.length };
   const ready = allTargetKeys.filter((k) => {
     const entry = cache.targets[k];
-    return entry && isAuthoritativeBassContract(entry) && hasGraphPayload(entry);
+    return entry && isAuthoritativeBassContract(entry) && hasGraphPayload(entry) && hasReadyCanonicalP19Contract(entry);
   }).length;
   return { ready, total: allTargetKeys.length };
 }
@@ -66,11 +71,14 @@ export function getTargetCacheProgress(projectId, baseDesignFingerprint, allTarg
 /**
  * Store a compact contract for a target. Resets the cache if the design changed.
  */
-export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey, compactContract) {
-  if (!baseDesignFingerprint || !targetKey || !compactContract) return;
-  if (!isAuthoritativeBassContract(compactContract)) return;
+export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey, compactContract, { deferPersistence = false } = {}) {
+  if (!baseDesignFingerprint || !targetKey || !compactContract) return false;
+  if (!isAuthoritativeBassContract(compactContract)) return false;
   // Stage 3: reject contracts without the required finished graph payload.
-  if (!hasGraphPayload(compactContract)) return;
+  if (!hasGraphPayload(compactContract)) return false;
+  // P19 readiness is part of completed-target reuse: a target without both
+  // canonical curves and a finite official result remains eligible to retry.
+  if (!hasReadyCanonicalP19Contract(compactContract)) return false;
   const cache = ensureCache(projectId);
   if (cache.baseDesignFingerprint !== baseDesignFingerprint) {
     cache.baseDesignFingerprint = baseDesignFingerprint;
@@ -78,7 +86,8 @@ export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey,
   }
   cache.targets[targetKey] = compactContract;
   notify();
-  scheduleSync(projectId);
+  scheduleSync(projectId, { deferPersistence });
+  return true;
 }
 
 /**
@@ -110,34 +119,64 @@ export async function hydrateTargetCache(projectId) {
       baseDesignFingerprint: stored.baseDesignFingerprint,
       targets: stored.targets || {},
     });
+    persistedSignatures.set(key, JSON.stringify(cacheByProject.get(key)));
     notify();
   } catch (e) {
     // Hydration failure is non-fatal — cache rebuilds from background scheduler
   }
 }
 
-function scheduleSync(projectId) {
+function scheduleSync(projectId, { deferPersistence = false } = {}) {
   const key = projectKey(projectId);
   if (key === "free") return;
-  const cache = ensureCache(projectId);
-  const signature = JSON.stringify(cache);
-  if (syncSignatures.get(key) === signature) return;
-  syncSignatures.set(key, signature);
+  dirtyProjects.add(key);
+  const previousTimer = persistenceTimers.get(key);
+  if (previousTimer != null) clearTimeout(previousTimer);
+  persistenceTimers.delete(key);
+  if (deferPersistence) return;
+  persistenceTimers.set(key, setTimeout(() => {
+    persistenceTimers.delete(key);
+    flushTargetCachePersistence(key);
+  }, TARGET_CACHE_WRITE_DEBOUNCE_MS));
+}
+
+export function flushTargetCachePersistence(projectId) {
+  const key = projectKey(projectId);
+  if (key === "free") return Promise.resolve();
+  const timer = persistenceTimers.get(key);
+  if (timer != null) clearTimeout(timer);
+  persistenceTimers.delete(key);
+  if (!dirtyProjects.has(key)) return writeQueues.get(key) || Promise.resolve();
+
+  const snapshot = JSON.parse(JSON.stringify(ensureCache(key)));
+  const signature = JSON.stringify(snapshot);
+  dirtyProjects.delete(key);
+  if (persistedSignatures.get(key) === signature) {
+    return writeQueues.get(key) || Promise.resolve();
+  }
+
   const queued = (writeQueues.get(key) || Promise.resolve()).then(async () => {
     try {
       const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
       const record = Array.isArray(records) ? records[0] : null;
-      const payload = { target_cache: cache };
+      const payload = { target_cache: snapshot };
       if (record?.id) {
         await base44.entities.ProjectAnalysisCache.update(record.id, payload);
       } else {
         await base44.entities.ProjectAnalysisCache.create({ project_id: key, ...payload });
       }
+      persistedSignatures.set(key, signature);
     } catch (e) {
-      // Sync failure is non-fatal — next change will retry
+      // Preserve the dirty marker so the next target, explicit sweep flush, or
+      // navigation cleanup retries the latest in-memory snapshot.
+      dirtyProjects.add(key);
+    }
+    if (JSON.stringify(ensureCache(key)) !== persistedSignatures.get(key)) {
+      dirtyProjects.add(key);
     }
   });
   writeQueues.set(key, queued);
+  return queued;
 }
 
 // ── React hook for reactive cache reads ──────────────────────────────────
