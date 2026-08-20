@@ -10,7 +10,7 @@ import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOp
 import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract, bassContractMatchesRequestedP14 } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
-import { useTargetCacheEntry, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry } from "./p14TargetCache";
+import { useTargetCacheEntry, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
@@ -21,6 +21,7 @@ import { buildFinishedGraphOptimisationResult, hasGraphPayload } from "./finishe
 import { evaluateCanonicalBassAuthority } from "@/components/utils/canonicalBassAuthorityEvaluation";
 import { buildCanonicalCompletedBassMetricAuthority } from "./canonicalCompletedBassMetricAuthority";
 import { buildMetricPublicationReceipt } from "./metricPublicationReceipt";
+import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -181,10 +182,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && completedFingerprint === cacheKey;
 
   useEffect(() => {
-    // #1: Do not start/cancel a foreground job or restore/promote cached
-    // authority while the project record is still hydrating. P14 target
-    // identity may be in a pre-hydration/default/transitional state.
-    if (!isProjectHydrationReady) return;
+    const scheduler = getP14TargetBackgroundScheduler();
+    // Any hydration, invalid-input, or active drag transition immediately
+    // terminates speculative work. Foreground/user work always owns the only
+    // heavy optimiser slot for this project.
+    if (!isProjectHydrationReady || isDragging || !fingerprints) {
+      scheduler.cancel();
+      return;
+    }
     if (cachedContract) {
       // Cache hit — cancel any in-flight foreground worker so it doesn't
       // compete with the background scheduler for CPU or publish a stale
@@ -197,8 +202,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // (AUTHORITATIVE → authority-restored skip) or confirm no authority
     // (UNCALCULATED → calculate). Starting before hydration settles wastes a
     // worker that is cancelled the moment the persisted authority arrives.
-    if (!bassAuthorityHydrationSettled) return;
-    if (isDragging || !fingerprints) return; // Defer during drag; skip when analysis is blocked
+    if (!bassAuthorityHydrationSettled) {
+      scheduler.cancel();
+      return;
+    }
     // ── Route-navigation guard ──────────────────────────────────────────
     // When returning to Room Designer after viewing a report (Technical /
     // Visual / Design Review), the completed bass store already holds the
@@ -209,6 +216,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       controller.cancelActive("authority-restored");
       return;
     }
+    scheduler.cancel();
     controller.ensureProtocolCompatibility(BASS_OPTIMISER_VERSIONS);
     controller.updateInputs({
       valid: inputsValid,
@@ -219,7 +227,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       collectDiagnostics: false,
     });
   }, [controller, isDragging, inputsValid, cacheKey, fingerprints, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE, cachedContract, isProjectHydrationReady, bassAuthorityHydrationSettled]);
-  useEffect(() => () => { controller.dispose(); scopeRef.current?.clear(); }, [controller]);
+  useEffect(() => () => {
+    getP14TargetBackgroundScheduler().cancel();
+    flushTargetCachePersistence(scopeId);
+    controller.dispose();
+    scopeRef.current?.clear();
+  }, [controller, scopeId]);
 
   const detailedStatus = LEGACY_STATUS[lifecycle.status] || "IDLE";
   const matchingResult = lifecycle.status === "ready" && lifecycle.resultFingerprint === cacheKey ? lifecycle.result : null;
@@ -422,6 +435,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       markBassAuthorityFailed(scopeId, cacheKey, contract?.job?.errorMessage);
       return;
     }
+    const jobComplete = contract?.job?.status === "complete" || contract?.job?.status === "ready";
+    const p19Ready = hasReadyCanonicalP19Contract(contract);
+    if (jobComplete && !p19Ready) {
+      if (!hasAuthoritativeResult(scopeId, cacheKey)) {
+        markBassAuthorityUpdating(scopeId, cacheKey);
+      }
+      return;
+    }
     const published = publishCompletedBassContract(scopeId, contract);
     if (!published && !hasAuthoritativeResult(scopeId, cacheKey)) {
       markBassAuthorityUpdating(scopeId, cacheKey);
@@ -442,8 +463,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // equals it.
     const completedContract = getCompletedBassContract(scopeId);
     const resultFingerprint = completedContract?.job?.resultFingerprint || null;
-    const jobComplete = contract?.job?.status === "complete" || contract?.job?.status === "ready";
     const canPersistCurrent = jobComplete
+      && p19Ready
       && isAuthoritativeBassContract(completedContract)
       && bassContractMatchesRequestedP14(completedContract, requested)
       && !!resultFingerprint
@@ -488,6 +509,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     ({ collectDiagnostics = false, force = true } = {}) => {
       const diagnosticToken = collectDiagnostics ? createDiagToken("manual-forced") : null;
       if (diagnosticToken) recordDiagStage(diagnosticToken, "token-created", { origin: "manual-forced", collectDiagnostics: true });
+      getP14TargetBackgroundScheduler().cancel();
       return controller.requestManual({
         fingerprint: cacheKey,
         payload,
@@ -559,11 +581,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }), [payload, sources, designEqSystemLimits, rspRawCurve, perSeatRawCurves, fingerprints, fingerprintInputs]);
 
   useEffect(() => {
-    // #1: Do not start the background family scheduler while the project
-    // record is still hydrating.
-    if (!isProjectHydrationReady) return;
-    if (!baseDesignFingerprint || !targetKey) return;
     const scheduler = getP14TargetBackgroundScheduler();
+    // Hydration and live interaction are hard pauses for speculative work.
+    if (!isProjectHydrationReady || isDragging || !baseDesignFingerprint || !targetKey) {
+      scheduler.cancel();
+      return;
+    }
     if (!foregroundReady || !allTargets.length) {
       // Foreground is recalculating — cancel background work to avoid
       // concurrent heavy calculations. Queue rebuilds when foreground completes.
@@ -577,7 +600,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       allTargets,
       designContext: designContextRef.current,
     });
-  }, [baseDesignFingerprint, targetKey, foregroundReady, allTargets, scopeId, isProjectHydrationReady]);
+  }, [baseDesignFingerprint, targetKey, foregroundReady, allTargets, scopeId, isProjectHydrationReady, isDragging]);
 
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target
