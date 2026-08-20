@@ -147,6 +147,39 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     clearTargetCacheForDesign(scopeId, baseDesignFingerprint);
   }, [targetCacheHydrated, baseDesignFingerprint, scopeId]);
 
+  // ── Fallback: completed bass store contract ──────────────────────────
+  // When the controller is idle (route return, authority-restored skip),
+  // use the persisted authoritative contract from completedBassResultStore
+  // so the bass graph and compliance UI render immediately without waiting
+  // for a redundant optimiser run. Only used when the fingerprint matches
+  // the current calibration fingerprint — prevents stale graphs after a
+  // design change.
+  // Reactive subscription to the completed bass authority store. On a fresh
+  // session reopen the persisted authoritative contract hydrates
+  // asynchronously; this hook (useSyncExternalStore) re-renders the component
+  // when hydration completes so completedContract / completedFingerprint /
+  // completedContractMatches / effectiveContract all pick up the hydrated
+  // contract without requiring a foreground optimiser run.
+  const completedBassAuthority = useCompletedBassAuthority(scopeId);
+  const completedContract = completedBassAuthority?.contract || null;
+  const completedFingerprint = completedContract?.job?.resultFingerprint || null;
+  // #1: Persisted completed-bass-authority hydration settled flag. While false,
+  // the foreground optimiser must not start — the persisted authority may
+  // restore (AUTHORITATIVE → skip) or confirm no authority (UNCALCULATED →
+  // calculate). Starting before hydration settles wastes a worker that gets
+  // cancelled the moment the persisted authority arrives.
+  const bassAuthorityHydrationSettled = completedBassAuthority?.hydrationSettled === true;
+  // A persisted completed contract may be reused as AUTHORITATIVE only when it
+  // is structurally complete AND metricPublication.canonicalMetricPublicationValid
+  // === true (isAuthoritativeBassContract). A NOT_VERIFIED contract with a
+  // matching fingerprint (e.g. old 360/320 snapshots) must NOT be treated as a
+  // matching completed result — it must not block the foreground recalculation
+  // or be displayed as COMPLETE.
+  const completedContractMatches = isAuthoritativeBassContract(completedContract)
+    && completedFingerprint
+    && cacheKey
+    && completedFingerprint === cacheKey;
+
   useEffect(() => {
     // #1: Do not start/cancel a foreground job or restore/promote cached
     // authority while the project record is still hydrating. P14 target
@@ -189,38 +222,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   useEffect(() => () => { controller.dispose(); scopeRef.current?.clear(); }, [controller]);
 
   const detailedStatus = LEGACY_STATUS[lifecycle.status] || "IDLE";
-  // ── Fallback: completed bass store contract ──────────────────────────
-  // When the controller is idle (route return, authority-restored skip),
-  // use the persisted authoritative contract from completedBassResultStore
-  // so the bass graph and compliance UI render immediately without waiting
-  // for a redundant optimiser run. Only used when the fingerprint matches
-  // the current calibration fingerprint — prevents stale graphs after a
-  // design change.
-  // Reactive subscription to the completed bass authority store. On a fresh
-  // session reopen the persisted authoritative contract hydrates
-  // asynchronously; this hook (useSyncExternalStore) re-renders the component
-  // when hydration completes so completedContract / completedFingerprint /
-  // completedContractMatches / effectiveContract all pick up the hydrated
-  // contract without requiring a foreground optimiser run.
-  const completedBassAuthority = useCompletedBassAuthority(scopeId);
-  const completedContract = completedBassAuthority?.contract || null;
-  const completedFingerprint = completedContract?.job?.resultFingerprint || null;
-  // #1: Persisted completed-bass-authority hydration settled flag. While false,
-  // the foreground optimiser must not start — the persisted authority may
-  // restore (AUTHORITATIVE → skip) or confirm no authority (UNCALCULATED →
-  // calculate). Starting before hydration settles wastes a worker that gets
-  // cancelled the moment the persisted authority arrives.
-  const bassAuthorityHydrationSettled = completedBassAuthority?.hydrationSettled === true;
-  // A persisted completed contract may be reused as AUTHORITATIVE only when it
-  // is structurally complete AND metricPublication.canonicalMetricPublicationValid
-  // === true (isAuthoritativeBassContract). A NOT_VERIFIED contract with a
-  // matching fingerprint (e.g. old 360/320 snapshots) must NOT be treated as a
-  // matching completed result — it must not block the foreground recalculation
-  // or be displayed as COMPLETE.
-  const completedContractMatches = isAuthoritativeBassContract(completedContract)
-    && completedFingerprint
-    && cacheKey
-    && completedFingerprint === cacheKey;
   const matchingResult = lifecycle.status === "ready" && lifecycle.resultFingerprint === cacheKey ? lifecycle.result : null;
   const selectionAttempt = useMemo(() => {
     if (!matchingResult?.pool) return { result: null, error: null };
