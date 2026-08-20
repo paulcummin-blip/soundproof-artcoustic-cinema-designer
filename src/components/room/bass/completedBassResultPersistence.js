@@ -55,6 +55,47 @@ export function isExportableBassContract(contract) {
 // Existing callers that only need the structural check are unaffected.
 export const isCompletedBassContract = isStructurallyCompleteBassContract;
 
+function cloneCurve(curve) {
+  return Array.isArray(curve) ? curve.map((point) => ({ ...point })) : [];
+}
+
+/**
+ * Build the minimum finished-result graph payload from a full contract.
+ *
+ * Only the curves and scalars genuinely consumed by buildBassGraphSeries are
+ * preserved. Room-engine curves (rspRawCurve, normalizedSeries, per-seat raw)
+ * are NOT persisted — they are already available from the live room engine
+ * after hydration and are identical when the fingerprint matches.
+ *
+ * Signatures (postEqCurveSignature, filterBankSignature) are NOT persisted —
+ * they are recomputed from the saved curves using the SAME canonical helpers
+ * during adapter construction (finishedGraphAdapter.js).
+ */
+function buildGraphPayload(contract) {
+  const finalResponse = contract?.finalOptimisedBassResponse;
+  if (!finalResponse?.postEqRspCurve?.length) return null;
+  const candidate = contract?.selectedCandidate;
+  return {
+    postEqRspCurve: cloneCurve(finalResponse.postEqRspCurve),
+    productionHouseCurveTarget: cloneCurve(finalResponse.canonicalTargetCurve),
+    maximumSplCurveAfterEq: cloneCurve(finalResponse.maximumSplCurveAfterEq),
+    postEqPerSeatCurves: (Array.isArray(finalResponse.postEqPerSeatCurves) ? finalResponse.postEqPerSeatCurves : [])
+      .map((seat) => ({ seatId: seat.seatId, responseData: cloneCurve(seat.responseData) }))
+      .filter((seat) => seat.seatId && seat.responseData.length),
+    eqFilterBank: (Array.isArray(finalResponse.eqFilterBank) ? finalResponse.eqFilterBank : [])
+      .map((filter) => ({ ...filter })),
+    sourceCapabilityCurves: (Array.isArray(finalResponse.sourceCapabilityCurves) ? finalResponse.sourceCapabilityCurves : [])
+      .map((curve) => cloneCurve(curve))
+      .filter((curve) => Array.isArray(curve) && curve.length >= 2),
+    selectedCandidateId: finalResponse.selectedCandidateId || contract.selectedCandidateId || null,
+    operatingLevelOffsetDb: Number.isFinite(finalResponse.operatingLevelOffsetDb) ? finalResponse.operatingLevelOffsetDb : 0,
+    maximumSplSafetyMarginDb: Number.isFinite(finalResponse.maximumSplSafetyMarginDb) ? finalResponse.maximumSplSafetyMarginDb : 0,
+    correctionStartHz: Number.isFinite(finalResponse.correctionStartHz) ? finalResponse.correctionStartHz : null,
+    correctionEndHz: Number.isFinite(finalResponse.correctionEndHz) ? finalResponse.correctionEndHz : null,
+    designEqFitProfile: candidate?.designEqFitProfile || null,
+  };
+}
+
 export function compactCompletedBassContract(contract) {
   if (!isCompletedBassContract(contract)) return null;
   return {
@@ -72,13 +113,14 @@ export function compactCompletedBassContract(contract) {
       perSeatP19Results: contract.selectedCandidate?.perSeatP19Results || [],
       perSeatP20Results: contract.selectedCandidate?.perSeatP20Results || [],
       p14TargetBasis: contract.selectedCandidate?.p14TargetBasis || contract.productAnalysis?.parameters?.p14?.targetBasis || "minimum",
-      },
+    },
     requestedP14TargetDb: Number.isFinite(contract.selectedP14TargetDb) ? contract.selectedP14TargetDb : null,
     requestedP14Basis: contract.selectedP14TargetBasis || null,
     requestedP14Level: Number.isFinite(contract.selectedP14Level) ? contract.selectedP14Level : null,
     requestedP18ExtensionHz: Number.isFinite(contract.selectedP18RequiredExtensionHz) ? contract.selectedP18RequiredExtensionHz : null,
     metricPublication: contract.metricPublication || null,
     provenance: contract.provenance || {},
+    graphPayload: buildGraphPayload(contract),
   };
 }
 

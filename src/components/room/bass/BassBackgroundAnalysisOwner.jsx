@@ -17,6 +17,7 @@ const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
 import { useNormalizedRoomTransferLive } from "./useNormalizedRoomTransferLive";
 import { buildFinalOptimisedBassResponse } from "./finalOptimisedBassResponse";
+import { buildFinishedGraphOptimisationResult, hasGraphPayload } from "./finishedGraphAdapter";
 import { evaluateCanonicalBassAuthority } from "@/components/utils/canonicalBassAuthorityEvaluation";
 import { buildCanonicalCompletedBassMetricAuthority } from "./canonicalCompletedBassMetricAuthority";
 import { buildMetricPublicationReceipt } from "./metricPublicationReceipt";
@@ -460,6 +461,20 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // When using the fallback completed contract (controller skipped), show
   // COMPLETE status so the bass graph and status indicators don't flash IDLE.
   const effectiveDetailedStatus = (effectiveContract && !cachedContract && !contract && completedContractMatches) ? "COMPLETE" : detailedStatus;
-  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions });
+  // ── Stage 3: Finished graph restore from cached graphPayload ──────────
+  // When no live optimisation result exists (controller idle after route
+  // return, project reopen, or fresh session) but a matching authoritative
+  // completed contract with a graphPayload exists, build a synthetic
+  // optimisationResult from the saved graph curves. This restores the
+  // finished graph without running the foreground optimiser.
+  // Authority priority: live result takes precedence; cached graph is only
+  // used when the live result is null AND the completed contract matches.
+  const cachedGraphOptimisationResult = useMemo(() => {
+    if (optimisationResult || !completedContractMatches || !completedContract) return null;
+    if (!hasGraphPayload(completedContract)) return null;
+    return buildFinishedGraphOptimisationResult(completedContract);
+  }, [optimisationResult, completedContractMatches, completedContract]);
+  const effectiveOptimisationResult = optimisationResult || cachedGraphOptimisationResult;
+  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

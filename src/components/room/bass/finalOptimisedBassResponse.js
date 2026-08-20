@@ -53,6 +53,11 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     maximumSplCurveBeforeEq: cloneCurve(
       candidate.maximumSplCurveBeforeEq || candidate.pairedP14P18Authority?.curves?.rawDeliveredCurve,
     ),
+    sourceCapabilityCurves: (Array.isArray(candidate.pairedP14P18Authority?.sources?.sourceDiagnostics)
+      ? candidate.pairedP14P18Authority.sources.sourceDiagnostics
+      : [])
+      .map((source) => cloneCurve(source?.capabilityCurve))
+      .filter((curve) => Array.isArray(curve) && curve.length >= 2),
     maximumSplCurveAfterEq: cloneCurve(
       candidate.maximumSplCurveAfterEq || candidate.pairedP14P18Authority?.curves?.postEqDeliveredCurve,
     ),
@@ -95,6 +100,8 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     },
     assessmentStartHz: candidate.assessmentStartHz ?? null,
     assessmentEndHz: candidate.assessmentEndHz ?? null,
+    correctionStartHz: candidate.correctionStartHz ?? null,
+    correctionEndHz: candidate.correctionEndHz ?? null,
   };
 }
 
