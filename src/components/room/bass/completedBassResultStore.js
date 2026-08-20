@@ -274,7 +274,19 @@ export function syncPersistentBassAuthority(projectId, currentFingerprint, contr
     };
     if (record?.id) await base44.entities.ProjectAnalysisCache.update(record.id, payload);
     else await base44.entities.ProjectAnalysisCache.create(payload);
-    return setMemory(key, resolvePersistedBassAuthority(key, persisted));
+    const resolved = resolvePersistedBassAuthority(key, persisted);
+    // When syncing with no new completed contract (optimiser still running),
+    // the DB may still hold an old NOT_VERIFIED snapshot that matches the
+    // current fingerprint. Don't overwrite the in-memory UPDATING state (set
+    // by markBassAuthorityUpdating) with that stale NOT_VERIFIED contract —
+    // it would re-present the old result as COMPLETE and undermine the
+    // foreground recalculation. The DB sync still happens; only the in-memory
+    // state is preserved. When a new completed contract IS being synced
+    // (optimiser just finished), always update the in-memory state.
+    if (!completed && resolved && !resolved.authoritative) {
+      return memoryByProject.get(key) || resolved;
+    }
+    return setMemory(key, resolved);
   });
   writeQueues.set(key, queued);
   return queued;

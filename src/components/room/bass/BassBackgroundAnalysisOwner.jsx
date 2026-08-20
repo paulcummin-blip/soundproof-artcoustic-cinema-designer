@@ -7,7 +7,7 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, getCompletedBassAuthority, getCompletedBassContract, hasAuthoritativeResult } from "./completedBassResultStore";
+import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, getCompletedBassAuthority, getCompletedBassContract, hasAuthoritativeResult, isAuthoritativeBassContract } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
 import { useTargetCacheEntry, clearTargetCacheForDesign, hydrateTargetCache } from "./p14TargetCache";
@@ -177,7 +177,16 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // design change.
   const completedContract = getCompletedBassContract(scopeId);
   const completedFingerprint = completedContract?.job?.resultFingerprint || null;
-  const completedContractMatches = completedFingerprint && cacheKey && completedFingerprint === cacheKey;
+  // A persisted completed contract may be reused as AUTHORITATIVE only when it
+  // is structurally complete AND metricPublication.canonicalMetricPublicationValid
+  // === true (isAuthoritativeBassContract). A NOT_VERIFIED contract with a
+  // matching fingerprint (e.g. old 360/320 snapshots) must NOT be treated as a
+  // matching completed result — it must not block the foreground recalculation
+  // or be displayed as COMPLETE.
+  const completedContractMatches = isAuthoritativeBassContract(completedContract)
+    && completedFingerprint
+    && cacheKey
+    && completedFingerprint === cacheKey;
   const matchingResult = lifecycle.status === "ready" && lifecycle.resultFingerprint === cacheKey ? lifecycle.result : null;
   const selectionAttempt = useMemo(() => {
     if (!matchingResult?.pool) return { result: null, error: null };
