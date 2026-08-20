@@ -66,6 +66,7 @@ import { buildRp22SeatCoverageResult } from '@/components/utils/rp22SeatCoverage
 import { resolveSeatPriority, getPrimarySeats, getSecondarySeats } from '@/components/utils/seatPriorityAuthority';
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
+import { resolveBassReadiness } from '@/components/hooks/useAppDesignRating';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -131,9 +132,35 @@ function RP22ReportInner() {
     const bassErrorMessage = completedBassAuthority.errorMessage || null;
     const completedBassPresentation = useMemo(() => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);
     const complianceBassExportData = useMemo(() => buildComplianceBassExportData({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);
-    const bassReportPending = completedBassAuthority.status === "loading";
+
+    // ── Bass readiness gate (reuses the SAME authority as Room Designer) ──
+    // The report must not publish any numeric ASDR, P14–P20, or seat-level
+    // bass result until the completed bass authority for the ACTIVE project
+    // is settled. This prevents the transient 81/65/69 partial rating and
+    // blank P14–P20 that appears on a cold/direct load before hydration.
+    // resolveBassReadiness is the shared gate from useAppDesignRating — when
+    // bass is applicable (subwoofers present), UNCALCULATED means "not yet
+    // computed" (pending), not "no bass" (ready).
+    const expectedProjectKey = String(effectiveProjectId || 'free');
+    const projectIdMatch = String(completedBassAuthority?.projectId || 'free') === expectedProjectKey;
+    const bassReadiness = useMemo(() => {
+        if (!projectIdMatch) return { ready: false, pending: true, reason: 'project-id-mismatch', fingerprint: null };
+        const fsc = app?.frontSubsCfg;
+        const rsc = app?.rearSubsCfg;
+        const fCount = (fsc && typeof fsc === 'object' && !Array.isArray(fsc)) ? Number(fsc?.count) || 0 : 0;
+        const rCount = (rsc && typeof rsc === 'object' && !Array.isArray(rsc)) ? Number(rsc?.count) || 0 : 0;
+        const subInstances = Array.isArray(app?.subwooferInstances) ? app.subwooferInstances : [];
+        const subs = Array.isArray(app?.subwoofers) ? app.subwoofers : [];
+        const bassApplicable = fCount > 0 || rCount > 0 || subInstances.length > 0 || subs.length > 0;
+        return resolveBassReadiness(completedBassAuthority, bassApplicable);
+    }, [completedBassAuthority, projectIdMatch, app?.frontSubsCfg, app?.rearSubsCfg, app?.subwooferInstances, app?.subwoofers]);
+    const bassReportPending = bassReadiness.pending;
     const completedP19Result = completedBassContract?.productAnalysis?.parameters?.p19 || null;
-    const completedP19Results = completedBassContract?.selectedCandidate?.perSeatP19Results || [];
+    // Use the gated presentation (publicationVerified) for per-seat P19 — same
+    // authority as P20 and the parameter grid. This ensures the HUD snapshot,
+    // the ASDR scoring input, and the expanded seat grid all consume the
+    // same completed authoritative P19 seat array.
+    const completedP19Results = completedBassPresentation.perSeatP19Results;
     const completedP20Results = completedBassPresentation.perSeatP20Results;
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
@@ -312,6 +339,7 @@ function RP22ReportInner() {
     useEffect(() => {
         if (!autoPrintRequested || autoPrintTriggeredRef.current) return;
         if (reportHydrating || !effectiveProjectId || reportReadyProjectId !== effectiveProjectId) return;
+        if (!bassReadiness.ready) return; // wait for completed bass authority
         if (isPrinting) return;
         autoPrintTriggeredRef.current = true;
         setExportStatus("Auto-printing from Design Review…");
@@ -320,7 +348,7 @@ function RP22ReportInner() {
         setPlanDimsImageDataUrl(null);
         setPlanSpeakerDimsImageDataUrl(null);
         setIsPrinting(true);
-    }, [autoPrintRequested, reportHydrating, effectiveProjectId, reportReadyProjectId, isPrinting]);
+    }, [autoPrintRequested, reportHydrating, effectiveProjectId, reportReadyProjectId, isPrinting, bassReadiness.ready]);
 
     // Mark printReady when all captures are done
     useEffect(() => {
@@ -544,7 +572,7 @@ function RP22ReportInner() {
         }
     }, [app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.aspectRatio]);
 
-    const showLoadingReport = reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId);
+    const showLoadingReport = reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId) || !bassReadiness.ready;
 
     const analysisSpeakers = useAnalysisSpeakers({
         placedSpeakers,

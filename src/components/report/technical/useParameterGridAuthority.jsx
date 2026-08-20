@@ -29,6 +29,8 @@ import { useActiveProjectId } from "@/components/state/project-session";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import { formatAuthoritativeP20Result, p20LevelText } from "@/components/room/bass/p20SeatPresentation";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
+import { p19LevelText, formatAuthoritativeP19Result, buildP19SeatRows } from "@/components/room/bass/p19SeatPresentation";
+import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
 
@@ -297,6 +299,10 @@ export function useParameterGridAuthority({
   }, [seatSnapshotsById, mlpSeatId]);
 
   const renderSeatPillGrid = React.useCallback((pId) => {
+    if (Number(pId) === 19) {
+      const p19Rows = buildP19SeatRows(seats, bassPresentation.perSeatP19Results);
+      return <P19SeatBlock rows={p19Rows} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassPresentation.parameters.p19.status} compact />;
+    }
     if (Number(pId) === 20) return <P20SeatBlock seatingPositions={seats} perSeatP20Results={bassPresentation.perSeatP20Results} compact />;
     if (!rows.length) return null;
     const pKey = `p${Number(pId)}`;
@@ -362,12 +368,32 @@ export function useParameterGridAuthority({
         ))}
       </div>
     );
-  }, [rows, denseSeatGrid, getSnapshotForSeat, bassPresentation.perSeatP20Results, seats]);
+  }, [rows, denseSeatGrid, getSnapshotForSeat, bassPresentation.perSeatP19Results, bassPresentation.perSeatP20Results, bassPresentation.publicationVerified, bassPresentation.parameters.p19.status, seats]);
 
   /* ----- Build per-seat grid data for TechnicalParameterCard ----- */
   const buildSeatGridData = React.useCallback((paramId) => {
     if (!rows.length) return null;
     const pKey = `p${Number(paramId)}`;
+
+    if (Number(paramId) === 19) {
+      return rows.map(rowObj => ({
+        row: rowObj.row,
+        seats: rowObj.seats.map((seat, idx) => {
+          const result = bassPresentation.perSeatP19Results.find(
+            item => String(item?.seatId) === String(seat?.id)
+          );
+          return {
+            id: seat?.id,
+            indexInRow: extractSeatIndexInRow(seat, idx),
+            level: result ? p19LevelText(result.level) : "—",
+            value: result && Number.isFinite(Number(result.variationDbRaw))
+              ? formatAuthoritativeP19Result(result)
+              : "—",
+            isPrimary: !!seat?.isPrimary,
+          };
+        }),
+      }));
+    }
 
     if (Number(paramId) === 20) {
       return rows.map(rowObj => ({
@@ -404,7 +430,7 @@ export function useParameterGridAuthority({
         };
       }),
     }));
-  }, [rows, getSnapshotForSeat, bassPresentation.perSeatP20Results]);
+  }, [rows, getSnapshotForSeat, bassPresentation.perSeatP19Results, bassPresentation.perSeatP20Results]);
 
   /* ----- Build ASDR footer string for a parameter card ----- */
   const buildAsdrFooter = React.useCallback((paramId) => {
