@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon } from "@/components/report/SpeakerFaceIcons";
+import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 
 // Roles displayed in front elevation
 const FRONT_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
@@ -305,6 +306,38 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     return pairs;
   }, [lcrSpeakers, subItems]);
 
+  // Screen bounding box in SVG px — for annotation collision detection
+  const screenBoxSvg = useMemo(() => {
+    const oW = (overallW / roomW) * drawW;
+    const oH = (overallH / roomH) * drawH;
+    const ox = rx(screenCenterX) - oW / 2;
+    const oy = ry(screenFloorM + screenData.h + borderM);
+    return { left: ox, top: oy, right: ox + oW, bottom: oy + oH };
+  }, [overallW, overallH, roomW, roomH, drawW, drawH, screenCenterX, screenFloorM, screenData, borderM]);
+
+  // All speaker/sub bounding boxes — for annotation collision detection
+  const allSpeakerBoxes = useMemo(() => {
+    const lcr = lcrSpeakers.map((spk, i) => {
+      const isC41 = (spk.modelKey || "").includes("c4-1");
+      const hMult = isC41 ? 1.0 : 1.20;
+      const cx = rx(spk.x);
+      const cy = ry(spk.z);
+      const sw = Math.max(12, (spk.wM / roomW) * drawW);
+      const sh = Math.max(12, (spk.hM / roomH) * drawH * hMult);
+      return { id: `lcr-${i}`, box: speakerBBox(cx, cy, sw, sh) };
+    });
+    const subs = subItems.map((sub, i) => {
+      const cx = rx(sub.x);
+      const cy = ry(sub.z);
+      const sw = Math.max(12, (sub.wM / roomW) * drawW);
+      const sh = Math.max(12, (sub.hM / roomH) * drawH);
+      return { id: `sub-${i}`, box: speakerBBox(cx, cy, sw, sh) };
+    });
+    return [...lcr, ...subs];
+  }, [lcrSpeakers, subItems, roomW, roomH, drawW, drawH]);
+
+  const roomBounds = { left: offsetX, right: offsetX + drawW, top: offsetY, bottom: offsetY + drawH };
+
   // Projector element from roomElements
   const projectorEl = useMemo(() => {
     if (!Array.isArray(roomElements)) return null;
@@ -349,7 +382,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
    * @param {number}  zM     - acoustic centre height in metres (for z= annotation)
    * @param {boolean} labelInsideBox - if true, centre label inside the shape; if false, above
    */
-  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey, labelInsideBox = false, onMouseDown }) => {
+  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey, labelInsideBox = false, labelY, onMouseDown }) => {
     const sx = cx - sw / 2;
     const sy = cy - sh / 2;
 
@@ -408,7 +441,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             {label}
           </text>
         ) : (
-          <text x={cx} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
+          <text x={cx} y={labelY ?? (sy - 10)} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
             {label}
           </text>
         )}
@@ -599,21 +632,27 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         })()}
 
         {/* LCR Speakers — via drawSpeakerFront helper */}
-        {(Array.isArray(lcrSpeakers) ? lcrSpeakers : []).map((spk) => {
-          // C4-1 is a wide flat soundbar — use exact physical dimensions, no height fudge factor
+        {(Array.isArray(lcrSpeakers) ? lcrSpeakers : []).map((spk, idx) => {
           const isC41Spk = (spk.modelKey || "").includes("c4-1");
           const hMultiplier = isC41Spk ? 1.0 : 1.20;
           const spkCx = rx(spk.x);
           const spkCy = ry(spk.z);
           const spkSw = Math.max(12, (spk.wM / roomW) * drawW);
           const spkSh = Math.max(12, (spk.hM / roomH) * drawH * hMultiplier);
-          // Dimension label: place to the right of FL, left of FR, right of FC (centre)
-          const isLeft = spk.role === 'FL';
-          const dimLabelX = isLeft ? (spkCx - spkSw / 2 - 3) : (spkCx + spkSw / 2 + 3);
-          const dimAnchor = isLeft ? 'end' : 'start';
           const heightCm = Number.isFinite(spk.z) ? Math.round(spk.z * 100) : null;
           const wCm = Number.isFinite(spk.wM) ? Math.round(spk.wM * 100) : null;
           const hCm = Number.isFinite(spk.hM) ? Math.round(spk.hM * 100) : null;
+          const heightLabel = heightCm !== null ? `H${heightCm}cm` : '';
+          const sizeLabel = (wCm !== null && hCm !== null) ? `${wCm}×${hCm}cm` : '';
+          const otherBoxes = allSpeakerBoxes.filter(b => b.id !== `lcr-${idx}`).map(b => b.box);
+          const annotation = computeSpeakerAnnotation({
+            speaker: { cx: spkCx, cy: spkCy, sw: spkSw, sh: spkSh, role: spk.role, label: spk.label },
+            screen: screenBoxSvg,
+            roomBounds,
+            otherSpeakers: otherBoxes,
+            heightLabel,
+            sizeLabel,
+          });
           return (
             <g key={spk.role}>
               {drawSpeakerFront({
@@ -628,17 +667,18 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 label: spk.label,
                 zM: spk.z,
                 modelKey: spk.modelKey ?? "",
+                labelY: annotation.label.y,
                 onMouseDown: onLcrSpeakerMoved ? (e) => handleLcrMouseDown(e, spk.role, spk.x, spk.z) : undefined,
               })}
-              {/* Dimension labels — centre height and cabinet size */}
+              {/* Dimension labels — placed outside speaker artwork via annotation layout */}
               {heightCm !== null && (
-                <text x={dimLabelX} y={spkCy - 4} textAnchor={dimAnchor} fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
-                  H{heightCm}cm
+                <text x={annotation.dim.x} y={annotation.dim.yHeight} textAnchor={annotation.dim.anchor} fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
+                  {heightLabel}
                 </text>
               )}
               {wCm !== null && hCm !== null && (
-                <text x={dimLabelX} y={spkCy + 5} textAnchor={dimAnchor} fontSize={6} fill={DIM_COLOR} opacity={0.85}>
-                  {wCm}×{hCm}cm
+                <text x={annotation.dim.x} y={annotation.dim.ySize} textAnchor={annotation.dim.anchor} fontSize={6} fill={DIM_COLOR} opacity={0.85}>
+                  {sizeLabel}
                 </text>
               )}
             </g>
@@ -654,8 +694,17 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           const subHCm = Number.isFinite(sub.z) ? Math.round(sub.z * 100) : null;
           const subWCm = Number.isFinite(sub.wM) ? Math.round(sub.wM * 100) : null;
           const subDimCm = Number.isFinite(sub.hM) ? Math.round(sub.hM * 100) : null;
-          // Place dim label to the right of each sub
-          const subDimX = subCx + subSw / 2 + 3;
+          const heightLabel = subHCm !== null ? `H${subHCm}cm` : '';
+          const sizeLabel = (subWCm !== null && subDimCm !== null) ? `${subWCm}×${subDimCm}cm` : '';
+          const otherBoxes = allSpeakerBoxes.filter(b => b.id !== `sub-${i}`).map(b => b.box);
+          const annotation = computeSpeakerAnnotation({
+            speaker: { cx: subCx, cy: subCy, sw: subSw, sh: subSh, role: 'SUB', label: sub.label },
+            screen: screenBoxSvg,
+            roomBounds,
+            otherSpeakers: otherBoxes,
+            heightLabel,
+            sizeLabel,
+          });
           return (
             <g key={`sub-${i}`}>
               {drawSpeakerFront({
@@ -673,13 +722,13 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 onMouseDown: onFrontSubMoved ? (e) => handleSubMouseDown(e, i, sub.id, sub.x, sub.z) : undefined,
               })}
               {subHCm !== null && (
-                <text x={subDimX} y={subCy - 4} textAnchor="start" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
-                  H{subHCm}cm
+                <text x={annotation.dim.x} y={annotation.dim.yHeight} textAnchor={annotation.dim.anchor} fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
+                  {heightLabel}
                 </text>
               )}
               {subWCm !== null && subDimCm !== null && (
-                <text x={subDimX} y={subCy + 5} textAnchor="start" fontSize={6} fill={DIM_COLOR} opacity={0.85}>
-                  {subWCm}×{subDimCm}cm
+                <text x={annotation.dim.x} y={annotation.dim.ySize} textAnchor={annotation.dim.anchor} fontSize={6} fill={DIM_COLOR} opacity={0.85}>
+                  {sizeLabel}
                 </text>
               )}
             </g>
