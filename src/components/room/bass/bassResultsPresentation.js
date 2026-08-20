@@ -140,7 +140,8 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  */
 export function formatOfficialBassResults(completedBassAuthority, lifecycle = null, seatingPositions = [], nowMs = Date.now()) {
   const presentation = buildComplianceBassPresentation({ completedBassAuthority });
-  const { publicationVerified, parameters, contract } = presentation;
+  const { publicationVerified, parameters } = presentation;
+  const contract = completedBassAuthority?.contract || null;
 
   const authorityStatus = completedBassAuthority?.authorityStatus || "UNCALCULATED";
   const lifecycleStatus = lifecycle?.status || "idle";
