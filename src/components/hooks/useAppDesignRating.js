@@ -99,7 +99,7 @@ export function buildLightweightSeatHudById(seats, analysisResult, primarySeatin
  * @param {Object} completedBassAuthority
  * @returns {{ ready: boolean, pending: boolean, reason: string, fingerprint: string|null }}
  */
-export function resolveBassReadiness(completedBassAuthority) {
+export function resolveBassReadiness(completedBassAuthority, bassApplicable = false) {
   const status = completedBassAuthority?.authorityStatus;
   const currentFp = completedBassAuthority?.currentFingerprint || null;
   const resultFp = completedBassAuthority?.contract?.job?.resultFingerprint || null;
@@ -128,6 +128,14 @@ export function resolveBassReadiness(completedBassAuthority) {
   if (status === BASS_AUTHORITY_STATUS.UNCALCULATED) {
     if (!hydrationSettled) {
       return { ready: false, pending: true, reason: 'hydration-loading', fingerprint: null };
+    }
+    // When the system has a subwoofer (bassApplicable), UNCALCULATED means
+    // the bass analysis has not been computed yet — NOT that bass is
+    // inapplicable. Keep pending so a provisional partial ASDR cannot
+    // publish before the foreground optimiser produces the authoritative
+    // result. Only settle when bass is genuinely inapplicable.
+    if (bassApplicable) {
+      return { ready: false, pending: true, reason: 'bass-not-yet-computed', fingerprint: null };
     }
     return { ready: true, pending: false, reason: 'no-applicable-bass', fingerprint: null };
   }
@@ -261,9 +269,26 @@ export function useAppDesignRating({
   // non-bass index must not be presented as final. If a verified
   // same-fingerprint rating already exists (e.g. a refresh is running over
   // the same design), it is retained until the new bass authority settles.
+  //
+  // bassApplicable: when the minimum 5.1 system is met (subwoofer present),
+  // UNCALCULATED means the bass analysis has not been computed yet, not that
+  // bass is inapplicable. This prevents a provisional partial ASDR from
+  // publishing during the hydration window before the foreground optimiser
+  // produces the authoritative result.
+  //
+  // projectIdMatch: the hydrated authority must belong to the active project.
+  // A mismatch (e.g. during navigation between projects) keeps the rating
+  // pending until the correct project's authority arrives.
+  const expectedProjectKey = String(projectId || 'free');
+  const projectIdMatch = String(completedBassAuthority?.projectId || 'free') === expectedProjectKey;
   const bassReadiness = useMemo(
-    () => resolveBassReadiness(completedBassAuthority),
-    [completedBassAuthority]
+    () => {
+      if (!projectIdMatch) {
+        return { ready: false, pending: true, reason: 'project-id-mismatch', fingerprint: null };
+      }
+      return resolveBassReadiness(completedBassAuthority, minimumSystemMet);
+    },
+    [completedBassAuthority, minimumSystemMet, projectIdMatch]
   );
 
   const lastFinalRatingRef = useRef(null);
