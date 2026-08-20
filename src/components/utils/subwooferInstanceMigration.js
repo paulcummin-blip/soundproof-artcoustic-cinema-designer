@@ -37,7 +37,10 @@
 import { subDimsMM } from "@/components/data/subwooferData";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
-export const INSTANCE_AUTHORITY_VERSION = 1;
+// Re-export from the dependency-free shared module so the completed-bass
+// persistence/resolver can import the authority version without pulling in
+// @/-aliased modules (keeps the resolver bare-Node testable).
+export { INSTANCE_AUTHORITY_VERSION } from "../../../base44/shared/bassAuthorityVersion.js";
 
 const SUB_WIDTH_FALLBACK_M = 0.50;
 const SUB_HEIGHT_FALLBACK_M = 0.50;

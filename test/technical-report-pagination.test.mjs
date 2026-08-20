@@ -21,7 +21,7 @@ const parameterPage = await readFile(
 
 test("ASDR recommendations stay together and the scorecard uses compact print spacing", () => {
   assert.match(recommendations, /className="tech-asdr-recommendations"/);
-  assert.match(recommendations, /className="tech-asdr-recommendation-card"/);
+  assert.match(recommendations, /className="tech-rec-columns"/);
   assert.match(scorecard, /className="tech-asdr-scorecard-row"/);
   assert.match(scorecard, /className="tech-asdr-scorecard-group"/);
   assert.match(styles, /\.tech-asdr-recommendations[\s\S]*?break-inside:\s*avoid\s*!important/);
