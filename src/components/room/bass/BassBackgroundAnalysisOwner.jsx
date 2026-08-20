@@ -7,7 +7,7 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, getCompletedBassAuthority, getCompletedBassContract, hasAuthoritativeResult, isAuthoritativeBassContract } from "./completedBassResultStore";
+import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
 import { useTargetCacheEntry, clearTargetCacheForDesign, hydrateTargetCache } from "./p14TargetCache";
@@ -175,7 +175,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // for a redundant optimiser run. Only used when the fingerprint matches
   // the current calibration fingerprint — prevents stale graphs after a
   // design change.
-  const completedContract = getCompletedBassContract(scopeId);
+  // Reactive subscription to the completed bass authority store. On a fresh
+  // session reopen the persisted authoritative contract hydrates
+  // asynchronously; this hook (useSyncExternalStore) re-renders the component
+  // when hydration completes so completedContract / completedFingerprint /
+  // completedContractMatches / effectiveContract all pick up the hydrated
+  // contract without requiring a foreground optimiser run.
+  const completedBassAuthority = useCompletedBassAuthority(scopeId);
+  const completedContract = completedBassAuthority?.contract || null;
   const completedFingerprint = completedContract?.job?.resultFingerprint || null;
   // A persisted completed contract may be reused as AUTHORITATIVE only when it
   // is structurally complete AND metricPublication.canonicalMetricPublicationValid
@@ -269,7 +276,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // stored result does not invalidate a legitimate fresh replacement.
     // Restored persisted results still validate their own persisted
     // fingerprint because it matches their completedContractFingerprint.
-    const rawPersistedFingerprint = getCompletedBassAuthority(scopeId)?.contract?.job?.resultFingerprint || null;
+    const rawPersistedFingerprint = completedFingerprint;
     const persistedCompletedFingerprint = rawPersistedFingerprint === completedContractFingerprint
       ? rawPersistedFingerprint
       : null;
@@ -321,7 +328,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       canonicalMetricAuthority: canonicalMetricAuthorityResult.authority,
       canonicalMetricDiagnostics: canonicalMetricAuthorityResult.diagnostics,
     };
-  }, [selectionAttempt.result, cacheKey, lifecycle.resultFingerprint, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.p18TargetBasis, requested.requestedLevel, requested.selectedP14TargetDb, requested.selectedP14RequiredExtensionHz, requested.selectedP18RequiredExtensionHz, scopeId]);
+  }, [selectionAttempt.result, cacheKey, lifecycle.resultFingerprint, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.p18TargetBasis, requested.requestedLevel, requested.selectedP14TargetDb, requested.selectedP14RequiredExtensionHz, requested.selectedP18RequiredExtensionHz, scopeId, completedFingerprint]);
   // Record candidate-selection-accepted only after the pool contains a valid
   // selectable result. Guard with a Set so unrelated React renders do not
   // overwrite or duplicate the stage for the same token.
