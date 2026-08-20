@@ -20,7 +20,7 @@ import {
 import { computeCalibrationFingerprint } from "./bassAnalysisFingerprints";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { buildCompactContractFromWorkerResult } from "./p14TargetContractBuilder";
-import { getTargetCacheEntry, setTargetCacheEntry } from "./p14TargetCache";
+import { getTargetCacheEntry, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
 import { safeConsole } from "@/components/utils/safeConsole";
 
 const createWorker = () => new Worker(
@@ -28,7 +28,8 @@ const createWorker = () => new Worker(
   { type: "module", name: bassOptimiserVersionSignature() },
 );
 
-const YIELD_MS = 100; // Yield between targets to keep UI responsive
+const BACKGROUND_IDLE_DELAY_MS = 1500;
+const BACKGROUND_IDLE_TIMEOUT_MS = 3000;
 
 export class P14TargetBackgroundScheduler {
   constructor() {
@@ -42,6 +43,8 @@ export class P14TargetBackgroundScheduler {
     this.designContext = null;
     this.allTargets = [];
     this.foregroundTargetKey = null;
+    this.delayHandle = null;
+    this.idleHandle = null;
   }
 
   /**
@@ -50,28 +53,26 @@ export class P14TargetBackgroundScheduler {
    * target and continues. If the design changed, cancels and restarts.
    */
   schedule({ projectId, baseDesignFingerprint, foregroundTargetKey, allTargets, designContext }) {
-    if (this.currentBaseDesignFingerprint === baseDesignFingerprint) {
-      // Same design — just update foreground target and continue
-      this.cancelled = false; // Reset in case we were paused
-      this.foregroundTargetKey = foregroundTargetKey;
-      this.projectId = projectId;
-      this.designContext = designContext;
-      this.allTargets = allTargets;
-      // Remove foreground target from queue if present
-      this.queue = this.queue.filter((t) => t.key !== foregroundTargetKey);
-      if (!this.running) this.runNext();
-      return;
+    if (this.currentBaseDesignFingerprint !== baseDesignFingerprint || this.projectId !== projectId) {
+      // Design/project changed — terminate speculative work and persist any
+      // completed targets before rebuilding the family queue.
+      this.cancel();
+      this.currentBaseDesignFingerprint = baseDesignFingerprint;
     }
-    // Design changed — cancel and restart
-    this.cancel();
+
     this.cancelled = false;
     this.projectId = projectId;
-    this.currentBaseDesignFingerprint = baseDesignFingerprint;
     this.foregroundTargetKey = foregroundTargetKey;
     this.allTargets = allTargets;
     this.designContext = designContext;
-    this.queue = allTargets.filter((t) => t.key !== foregroundTargetKey);
-    this.runNext();
+    // Always rebuild from the canonical family. Cached targets are skipped by
+    // runNext(), and the currently running target is excluded to avoid a
+    // duplicate when React republishes the same scheduling inputs.
+    this.queue = allTargets.filter((target) =>
+      target.key !== foregroundTargetKey
+      && target.key !== this.currentTarget?.key
+    );
+    if (!this.running) this.scheduleNext();
   }
 
   runNext() {
@@ -90,6 +91,8 @@ export class P14TargetBackgroundScheduler {
 
     if (this.queue.length === 0) {
       this.running = false;
+      this.currentTarget = null;
+      flushTargetCachePersistence(this.projectId);
       return;
     }
 
@@ -205,8 +208,13 @@ export class P14TargetBackgroundScheduler {
       target,
     });
 
-    if (compactContract) {
-      setTargetCacheEntry(this.projectId, this.currentBaseDesignFingerprint, target.key, compactContract);
+    if (compactContract && setTargetCacheEntry(
+      this.projectId,
+      this.currentBaseDesignFingerprint,
+      target.key,
+      compactContract,
+      { deferPersistence: true },
+    )) {
       safeConsole.log("p14-bg", `target ${target.key}: cached successfully (fingerprint ${fingerprint?.substring(0, 24)}...)`);
     } else {
       // Contract build or publication validation failed. The target remains
@@ -230,7 +238,38 @@ export class P14TargetBackgroundScheduler {
 
   yieldAndRunNext() {
     this.currentTarget = null;
-    setTimeout(() => this.runNext(), YIELD_MS);
+    this.running = false;
+    this.scheduleNext();
+  }
+
+  scheduleNext() {
+    if (this.cancelled || this.running || this.delayHandle != null || this.idleHandle != null) return;
+    // A real quiet period separates heavy jobs. Once elapsed, prefer the
+    // browser's idle scheduler so speculative work only starts when the main
+    // thread has room; the timeout prevents the family from starving forever.
+    this.delayHandle = setTimeout(() => {
+      this.delayHandle = null;
+      if (this.cancelled) return;
+      if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
+        this.idleHandle = window.requestIdleCallback(() => {
+          this.idleHandle = null;
+          this.runNext();
+        }, { timeout: BACKGROUND_IDLE_TIMEOUT_MS });
+      } else {
+        this.runNext();
+      }
+    }, BACKGROUND_IDLE_DELAY_MS);
+  }
+
+  cancelScheduledStart() {
+    if (this.delayHandle != null) {
+      clearTimeout(this.delayHandle);
+      this.delayHandle = null;
+    }
+    if (this.idleHandle != null && typeof window !== "undefined" && typeof window.cancelIdleCallback === "function") {
+      window.cancelIdleCallback(this.idleHandle);
+      this.idleHandle = null;
+    }
   }
 
   terminateWorker() {
@@ -238,11 +277,16 @@ export class P14TargetBackgroundScheduler {
   }
 
   cancel() {
+    const projectId = this.projectId;
     this.cancelled = true;
+    this.cancelScheduledStart();
     this.terminateWorker();
     this.queue = [];
     this.running = false;
     this.currentTarget = null;
+    // Completed background targets remain memory-first, then flush as one
+    // snapshot when a sweep is interrupted by foreground/user work.
+    if (projectId) flushTargetCachePersistence(projectId);
   }
 
   isRunning() { return this.running; }
