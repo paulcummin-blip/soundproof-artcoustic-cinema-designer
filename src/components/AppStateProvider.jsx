@@ -576,6 +576,11 @@ function useDesignerState() {
     }
     return [1.2, 1.5, 1.8];
   });
+  // Link ear & platform heights toggle — default ON. When linked, changing either
+  // Ear Height or Platform Height by a delta applies the same delta to the other.
+  const [linkEarPlatformHeights, setLinkEarPlatformHeights] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.linkEarPlatformHeights === "boolean") ? __autosavePayload.linkEarPlatformHeights : true
+  ));
   const [autoSeatByRP23, setAutoSeatByRP23] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.autoSeatByRP23 === "boolean") ? __autosavePayload.autoSeatByRP23 : true
   ));
@@ -1506,6 +1511,7 @@ function useDesignerState() {
       if (typeof p.sevenBedLayoutType === "string") setSevenBedLayoutType(p.sevenBedLayoutType);
       if (typeof p.extraSurroundCount === "number") _setExtraSurroundCount(p.extraSurroundCount);
       if (Array.isArray(p.rowEarHeights) && p.rowEarHeights.length > 0) setRowEarHeights(p.rowEarHeights);
+      if (typeof p.linkEarPlatformHeights === "boolean") setLinkEarPlatformHeights(p.linkEarPlatformHeights);
       if (typeof p.rsp_mode === "string") setRspMode(p.rsp_mode);
       if (p.manual_rsp_y_m !== undefined) setManualRspY_m(typeof p.manual_rsp_y_m === "number" ? p.manual_rsp_y_m : null);
       if (typeof p.viewingPriority === "string") setViewingPriority(p.viewingPriority);
@@ -1577,6 +1583,7 @@ function useDesignerState() {
       autoSeatByRP23,
       seatingBlockOffset,
       rowEarHeights,
+      linkEarPlatformHeights,
       aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP,
@@ -1745,6 +1752,7 @@ function useDesignerState() {
       if (Array.isArray(p.roomElements)) setRoomElements(normaliseRoomElements(p.roomElements));
       if (p.overlays) setOverlays(p.overlays);
       if (Array.isArray(p.rowEarHeights) && p.rowEarHeights.length > 0) setRowEarHeights(p.rowEarHeights);
+      if (typeof p.linkEarPlatformHeights === "boolean") setLinkEarPlatformHeights(p.linkEarPlatformHeights);
       if (typeof p.designEqEnabled === "boolean") setDesignEqEnabled(p.designEqEnabled);
       if (Object.prototype.hasOwnProperty.call(p, "p12Mode")) setP12Mode(p.p12Mode);
 
@@ -1803,6 +1811,7 @@ function useDesignerState() {
       autoSeatByRP23,
       seatingBlockOffset,
       rowEarHeights,
+      linkEarPlatformHeights,
       aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP,
