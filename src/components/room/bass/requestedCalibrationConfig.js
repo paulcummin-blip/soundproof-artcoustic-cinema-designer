@@ -33,9 +33,35 @@ export function deriveRequestedCalibrationConfig({
 }) {
   const transitionHz = Number.isFinite(optimisationTransitionHz) ? optimisationTransitionHz : null;
   const usableLfHz = Number.isFinite(designEqSystemLimits?.usableLfHz) ? designEqSystemLimits.usableLfHz : null;
-  const p14TargetBasis = splConfig?.selectedP14TargetBasis === "recommended" ? "recommended" : "minimum";
+  const p14TargetBasis = splConfig?.selectedP14TargetBasis === "recommended" ? "recommended"
+    : splConfig?.selectedP14TargetBasis === "minimum" ? "minimum"
+    : null;
   const p18TargetBasis = normalizeP18TargetBasis(splConfig?.selectedP18TargetBasis || splConfig?.p18Mode);
-  const requestedLevel = Math.max(1, Math.min(4, Math.round(Number(splConfig?.selectedP14Level) || 4)));
+  const requestedLevel = Number.isFinite(Number(splConfig?.selectedP14Level))
+    ? Math.max(1, Math.min(4, Math.round(Number(splConfig.selectedP14Level))))
+    : null;
+  // P14 target not yet selected — return null P14 identity. No bass optimisation
+  // runs until the user explicitly selects a P14 target.
+  if (!p14TargetBasis || !requestedLevel) {
+    return {
+      p14TargetBasis: null,
+      requestedLevel: null,
+      selectedP14TargetBasis: null,
+      selectedP14Level: null,
+      selectedP14TargetDb: null,
+      p18TargetBasis,
+      selectedP18TargetBasis: p18TargetBasis,
+      selectedP18RequiredExtensionHz: p18ThresholdHzForLevel(p18TargetBasis, 1),
+      selectedP14RequiredExtensionHz: null,
+      requestedAssessmentStartHz: null,
+      requestedAssessmentEndHz: transitionHz,
+      requestedTargetAnchorDb: null,
+      requestedFitProfile: null,
+      requestedOutputDb: null,
+      requestedUsableLfHz: usableLfHz,
+      evaluatedProfiles: deriveEvaluatedProfiles(),
+    };
+  }
   const target = resolveRequestedRp22HouseCurveTarget(getRp22BassOperatingDefinitions(p14TargetBasis, p18TargetBasis), requestedLevel);
   // P14 and P18 are independent RP22 parameters. P14 is the user's fixed
   // 20–120 Hz SPL demand; it does not silently request the same numbered P18

@@ -186,8 +186,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // Any hydration, invalid-input, or active drag transition immediately
     // terminates speculative work. Foreground/user work always owns the only
     // heavy optimiser slot for this project.
-    if (!isProjectHydrationReady || isDragging || !fingerprints) {
+    if (!isProjectHydrationReady || isDragging || !fingerprints || !targetKey) {
       scheduler.cancel();
+      controller.cancelActive("no-p14-target");
       return;
     }
     if (cachedContract) {
@@ -399,7 +400,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   useEffect(() => {
     // #1: Do not publish/promote/sync while the project record is still
     // hydrating. A transient hydration target must not become current.
-    if (!isProjectHydrationReady) return;
+    // Also gate on targetKey: no P14 target selected → no optimisation, no
+    // publish, no authority marking, no cache seeding.
+    if (!isProjectHydrationReady || !targetKey) return;
     // ── Cache hit: publish cached compact contract directly, skip optimiser ──
     if (cachedContract) {
       // Stage 4: publish cached compact contract with full safety guards.
