@@ -417,6 +417,36 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // call syncPersistentBassAuthority with a null contract — it would
     // needlessly rewrite the DB. The authority is already live.
     if (!contract && fingerprints && hasAuthoritativeResult(scopeId, cacheKey)) {
+      // ── Bridge restored authority into P14 target cache ────────────────
+      // On a fresh reopen, the completed authority hydrates from DB but the
+      // target cache may be empty (e.g. after a base-design fingerprint change
+      // cleared it). Without the foreground target in the cache,
+      // foregroundReadyPathA is false (cachedContract null) and
+      // foregroundReadyPathB is false (controller skipped → no
+      // optimisationResult). The scheduler cancels and 0/8 persists.
+      //
+      // The restored contract is already authoritative, graph-complete, and
+      // P19-ready. Seed it into the target cache so cachedContract becomes
+      // non-null on the next render, foregroundReadyPathA becomes true, and
+      // the scheduler fills the remaining seven targets. Idempotent: after
+      // seeding, cachedContract is non-null and the cache-hit branch above
+      // handles subsequent renders, so this branch is never reached again.
+      if (
+        baseDesignFingerprint
+        && targetKey
+        && bassAuthorityHydrationSettled
+        && completedBassAuthority?.authoritative
+        && completedBassAuthority?.currentFingerprint === cacheKey
+      ) {
+        const restoredContract = getCompletedBassContract(scopeId);
+        if (
+          restoredContract
+          && isAuthoritativeBassContract(restoredContract)
+          && bassContractMatchesRequestedP14(restoredContract, requested)
+        ) {
+          setTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey, restoredContract);
+        }
+      }
       return;
     }
     if (!fingerprints) {
@@ -491,7 +521,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       publishedContractTokensRef.current.add(publishedToken);
       recordDiagStage(publishedToken, "contract-published", { contractAnalysisId: contract?.analysisId || null, contractFingerprint: resultFingerprint });
     }
-  }, [scopeId, cacheKey, contract, fingerprints, cachedContract, isProjectHydrationReady, baseDesignFingerprint, targetKey]);
+  }, [scopeId, cacheKey, contract, fingerprints, cachedContract, isProjectHydrationReady, baseDesignFingerprint, targetKey, bassAuthorityHydrationSettled]);
 
   const publishedStagesRef = useRef(new Set());
   useEffect(() => {
