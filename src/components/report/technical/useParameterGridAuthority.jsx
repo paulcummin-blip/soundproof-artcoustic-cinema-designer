@@ -186,9 +186,7 @@ export function useParameterGridAuthority({
   /* ----- getHudValueForParam ----- */
   const getHudValueForParam = React.useCallback((param, opts = {}) => {
     const isPrintVariant = opts.isPrintVariant || false;
-    const MASKED_PARAM_IDS = [14, 18, 19, 20];
     const pid = Number(param?.id);
-    if (isPrintVariant && MASKED_PARAM_IDS.includes(pid)) return "–";
     if ([14, 18, 19].includes(pid)) return bassPresentation.parameters[`p${pid}`].valueText;
     if (pid === 20) return bassPresentation.parameters.p20.valueText;
     const isRoomScope = String(param?.scope || "").toLowerCase() === "room";
