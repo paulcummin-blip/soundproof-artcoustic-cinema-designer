@@ -665,3 +665,116 @@ export function formatDesignIndexComparison(fromRating, toRating) {
   if (from == null || to == null) return null;
   return `Design Performance Index ${from} → ${to}`;
 }
+
+// ── Modal achieved level (unweighted) — presentation-only ───────────────────
+// Counts each achieved level occurrence across a scope's contributions WITHOUT
+// effectiveWeight. This is the "most often achieved" level for the redesigned
+// ASDR scorecard category sections — NOT an ASDR-weighted aggregation. Does
+// NOT alter any existing ASDR maths, Design Performance Index, category
+// membership, or the weighted getCategoryAchievedSummaries/getCategoryGoverningLevels.
+
+/**
+ * Compute the unweighted level distribution and modal level(s) for a set of
+ * contributions. Each contribution's parsed level counts are summed without
+ * effectiveWeight. FAIL is tracked but never reported as a modal achieved
+ * "level"; callers surface FAIL separately via hasFail.
+ *
+ * @param {Array} contribs
+ * @returns {{ distribution: Object, modalLevels: string[], total: number, hasFail: boolean }}
+ */
+export function getModalLevelForContribs(contribs) {
+  const distribution = { L4: 0, L3: 0, L2: 0, L1: 0, FAIL: 0 };
+  if (!Array.isArray(contribs)) return { distribution, modalLevels: [], total: 0, hasFail: false };
+  for (const c of contribs) {
+    const counts = parseLevelCounts(c.resultLevel);
+    for (const [lvl, n] of Object.entries(counts)) {
+      if (distribution[lvl] != null) distribution[lvl] += n;
+    }
+  }
+  const hasFail = distribution.FAIL > 0;
+  const total = distribution.L4 + distribution.L3 + distribution.L2 + distribution.L1;
+  const achieved = [
+    { key: "L4", n: distribution.L4 },
+    { key: "L3", n: distribution.L3 },
+    { key: "L2", n: distribution.L2 },
+    { key: "L1", n: distribution.L1 },
+  ]
+    .filter((l) => l.n > 0)
+    .sort((a, b) => b.n - a.n);
+  let modalLevels = [];
+  if (achieved.length > 0) {
+    const maxN = achieved[0].n;
+    modalLevels = achieved.filter((l) => l.n === maxN).map((l) => l.key);
+    modalLevels.sort((a, b) => levelNum(a) - levelNum(b));
+  }
+  return { distribution, modalLevels, total, hasFail };
+}
+
+/**
+ * Format an array of modal level keys as a display string.
+ * ["L3"]              → "Level 3"
+ * ["L2","L3"]         → "Level 2–3"   (adjacent tie → range)
+ * ["L1","L3"]         → "Level 1 · Level 3" (non-adjacent tie → explicit)
+ * @param {string[]} modalLevels
+ * @returns {string|null}
+ */
+export function formatModalLevels(modalLevels) {
+  if (!Array.isArray(modalLevels) || modalLevels.length === 0) return null;
+  const nums = modalLevels.map(levelNum).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+  if (nums.length === 0) return null;
+  if (nums.length === 1) return `Level ${nums[0]}`;
+  const allAdjacent = nums.every((n, i) => i === 0 || n === nums[i - 1] + 1);
+  if (allAdjacent) return `Level ${nums[0]}–${nums[nums.length - 1]}`;
+  return nums.map((n) => `Level ${n}`).join(" · ");
+}
+
+/**
+ * Format a level distribution object as "3× L4 · 2× L3 · 1× L1".
+ * Only non-zero achieved levels (L4→L1) are shown; FAIL is appended when present.
+ * @param {Object} distribution
+ * @returns {string|null}
+ */
+export function formatLevelDistribution(distribution) {
+  if (!distribution) return null;
+  const parts = [];
+  for (const key of ["L4", "L3", "L2", "L1"]) {
+    const n = distribution[key];
+    if (n > 0) parts.push(`${n}× ${key}`);
+  }
+  if (distribution.FAIL > 0) parts.push(`${distribution.FAIL}× FAIL`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/**
+ * Per-category modal summaries for a scoped rating. Mirrors CATEGORY_GROUPS
+ * membership (Spatial Resolution, Dynamic Range, Timbre Matching, Screen /
+ * Viewing Geometry). For Screen / Viewing Geometry, returns the authoritative
+ * RP23 level (worst achieved) — no invented acoustic level.
+ *
+ * @param {Object} roomDesignRating — a scoped rating (e.g. scopedRatings.primary)
+ * @returns {Array<{ label, hasContribs, isScreen?, screenLevel?, modalLevels?, distribution?, total?, hasFail? }>}
+ */
+export function getCategoryModalSummaries(roomDesignRating) {
+  if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED" || roomDesignRating.status === "NOT_CONFIGURED") {
+    return CATEGORY_GROUPS.map((g) => ({ label: g.label, hasContribs: false }));
+  }
+  const contributions = roomDesignRating.contributions || [];
+  const groups = {};
+  for (const c of contributions) {
+    const g = getGroupForContrib(c);
+    if (!g) continue;
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(c);
+  }
+  return CATEGORY_GROUPS.map((g) => {
+    const contribs = groups[g.label];
+    if (!contribs || contribs.length === 0) return { label: g.label, hasContribs: false };
+    if (g.label === SCREEN_CATEGORY_LABEL) {
+      const screenContrib = contribs.find((c) => c.key === "screen");
+      const worst = screenContrib ? worstLevelFromResultLevel(screenContrib.resultLevel) : null;
+      return { label: g.label, hasContribs: true, isScreen: true, screenLevel: worst };
+    }
+    const { distribution, modalLevels, total, hasFail } = getModalLevelForContribs(contribs);
+    return { label: g.label, hasContribs: true, isScreen: false, modalLevels, distribution, total, hasFail };
+  });
+}

@@ -1,23 +1,25 @@
 /**
  * TechnicalAsdrScorecard.jsx
  * ---------------------------
- * Technical Report — ASDR Scorecard page.
+ * Technical Report — ASDR Scorecard (redesigned).
  *
- * A proprietary Sound Proof design scorecard that shows which parameters
- * contribute to the Artcoustic System Design Rating, their importance
- * weighting, achieved performance, and points earned vs maximum.
+ * Hierarchy reversed: the FOUR DESIGN CATEGORIES lead the card (Spatial
+ * Resolution, Dynamic Range, Timbre Matching, Viewing Geometry), each with
+ * a headline result and Primary / Secondary subrows. The overall seating
+ * summaries (Primary / Secondary / All with Design Performance Index) sit
+ * beneath as supporting content.
  *
- * Presentation-only: consumes the canonical `contributions` array and
- * `roomDesignRating` from calculateRoomDesignRating(). Does NOT recalculate
- * any points, weights, or levels.
- *
- * Only ACTIVE, definitively scored parameters appear. Excluded parameters
- * (N/A, provisional, V1-excluded, unverified bass) are omitted entirely.
+ * Presentation-only: consumes the canonical `roomDesignRating` and
+ * `scopedRatings` from calculateRoomDesignRating / calculateScopedRoomDesignRating.
+ * Does NOT recalculate any points, weights, levels, or category membership.
+ * The modal achieved level is an unweighted "most often achieved" count
+ * (getModalLevelForContribs) — not an ASDR-weighted aggregation.
  */
 
 import React from "react";
-import { getHumanTitleForParam } from "./technicalParameterMeta";
-import ScopedAsdrSummary from "./ScopedAsdrSummary";
+import AsdrCategorySection from "./AsdrCategorySection";
+import AsdrSeatingSummary from "./AsdrSeatingSummary";
+import { getCategoryModalSummaries } from "./designRatingPresentation";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -30,119 +32,15 @@ const COLORS = {
   secondary: "#625143",
   border: "#E6E4DD",
   borderStrong: "#D9D5CE",
-  label: "#9B8E82",
-  fail: "#8B2E2E",
 };
 
-/** Category groupings — only groups with scored parameters are shown. */
-const CATEGORY_GROUPS = [
-  { label: "SPATIAL RESOLUTION", range: [1, 11] },
-  { label: "DYNAMIC RANGE", range: [12, 15] },
-  { label: "TIMBRE MATCHING", range: [16, 21] },
-  { label: "SCREEN / VIEWING GEOMETRY", range: null }, // screen-only
+// Display labels for the four categories (index-aligned to CATEGORY_GROUPS).
+const CATEGORY_DISPLAY = [
+  "Spatial Resolution",
+  "Dynamic Range",
+  "Timbre Matching",
+  "Viewing Geometry",
 ];
-
-/** Format points for display: handle negative (FAIL) values. */
-function formatPoints(earned, maximum) {
-  const e = Math.round(earned * 100) / 100;
-  const m = Math.round(maximum * 100) / 100;
-  return `${e} / ${m}`;
-}
-
-/** Get the parameter label for a contribution. */
-function getParamLabel(contrib) {
-  if (contrib.key === "screen") return "Screen / Viewing Geometry";
-  const num = contrib.parameter;
-  return `P${num}  ${getHumanTitleForParam(num)}`;
-}
-
-/** Determine which group a contribution belongs to. */
-function getGroupForContrib(contrib) {
-  if (contrib.key === "screen") return "SCREEN / VIEWING GEOMETRY";
-  const num = contrib.parameter;
-  for (const g of CATEGORY_GROUPS) {
-    if (g.range && num >= g.range[0] && num <= g.range[1]) return g.label;
-  }
-  return null;
-}
-
-/** Render a single scorecard row. */
-function ScorecardRow({ contrib, isLast }) {
-  const isFail = contrib.resultLevel === "FAIL";
-  const resultStyle = isFail
-    ? { color: COLORS.fail, fontWeight: 700 }
-    : { color: COLORS.primary, fontWeight: 600 };
-
-  return (
-    <div
-      className="tech-asdr-scorecard-row"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 60mm 18mm 36mm",
-        alignItems: "center",
-        gap: "3mm",
-        padding: "2.2mm 4mm",
-        borderTop: isLast ? "none" : `1px solid ${COLORS.border}`,
-        fontSize: "9pt",
-        fontFamily: FONT_BODY,
-        color: COLORS.body,
-      }}
-    >
-      {/* PARAMETER */}
-      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-        {getParamLabel(contrib)}
-      </div>
-      {/* RESULT */}
-      <div style={resultStyle}>
-        {contrib.resultLevel || "—"}
-        {contrib.mode === "recommended" && (
-          <span style={{ fontSize: "7.5pt", color: COLORS.secondary, marginLeft: "2mm" }}>
-            Recommended
-          </span>
-        )}
-      </div>
-      {/* WEIGHT */}
-      <div style={{ textAlign: "center", color: COLORS.secondary }}>
-        {contrib.effectiveWeight}
-      </div>
-      {/* SCORE */}
-      <div style={{ textAlign: "right", fontWeight: 600, color: isFail ? COLORS.fail : COLORS.primary }}>
-        {formatPoints(contrib.earnedPoints, contrib.maximumPoints)}
-      </div>
-    </div>
-  );
-}
-
-/** Render a group section with header and rows. */
-function ScorecardGroup({ label, contribs }) {
-  if (!contribs || contribs.length === 0) return null;
-  return (
-    <div className="tech-asdr-scorecard-group" style={{ marginBottom: "4mm" }}>
-      <div
-        className="tech-asdr-scorecard-group-heading"
-        style={{
-          fontSize: "8pt",
-          fontWeight: 700,
-          color: COLORS.secondary,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          fontFamily: FONT_HEADING,
-          padding: "2mm 4mm",
-          borderBottom: `1px solid ${COLORS.borderStrong}`,
-        }}
-      >
-        {label}
-      </div>
-      {contribs.map((contrib, i) => (
-        <ScorecardRow
-          key={contrib.key}
-          contrib={contrib}
-          isLast={i === contribs.length - 1}
-        />
-      ))}
-    </div>
-  );
-}
 
 export default function TechnicalAsdrScorecard({
   roomDesignRating,
@@ -153,16 +51,16 @@ export default function TechnicalAsdrScorecard({
     return null;
   }
 
-  const contributions = roomDesignRating.contributions || [];
+  const scopes = scopedRatings || { all: roomDesignRating };
+  const primaryRating = scopes.primary || scopes.all;
+  const secondaryRating = scopes.secondary || null;
+  const allRating = scopes.all || roomDesignRating;
 
-  // Group contributions by category
-  const grouped = {};
-  for (const contrib of contributions) {
-    const group = getGroupForContrib(contrib);
-    if (!group) continue;
-    if (!grouped[group]) grouped[group] = [];
-    grouped[group].push(contrib);
-  }
+  const primaryCats = getCategoryModalSummaries(primaryRating);
+  const secondaryCats = secondaryRating
+    ? getCategoryModalSummaries(secondaryRating)
+    : null;
+  const allCats = getCategoryModalSummaries(allRating);
 
   return (
     <div
@@ -178,7 +76,7 @@ export default function TechnicalAsdrScorecard({
       }}
     >
       {/* ── Page heading ── */}
-      <div className="tech-asdr-scorecard-heading" style={{ marginBottom: "4mm" }}>
+      <div className="tech-asdr-scorecard-heading" style={{ marginBottom: "5mm" }}>
         <div
           style={{
             fontFamily: FONT_HEADING,
@@ -205,81 +103,47 @@ export default function TechnicalAsdrScorecard({
         </div>
       </div>
 
-      {/* ── Overall result card — three scoped ASDR results ── */}
+      {/* ── Four design categories — lead content ── */}
       <div
-        className="print-avoid-break tech-asdr-rating-card"
+        className="tech-asdr-categories"
         style={{
           background: COLORS.cardBg,
           border: `1px solid ${COLORS.border}`,
           borderRadius: 6,
           padding: "6mm 8mm",
           marginBottom: "4mm",
-          breakInside: "avoid",
-          pageBreakInside: "avoid",
         }}
       >
-        <div
-          style={{
-            fontSize: "8pt",
-            fontWeight: 700,
-            color: COLORS.secondary,
-            letterSpacing: "0.1em",
-            fontFamily: FONT_BODY,
-            marginBottom: "3mm",
-          }}
-        >
-          ARTCOUSTIC SYSTEM DESIGN RATING
-        </div>
-        <ScopedAsdrSummary scopedRatings={scopedRatings || { all: roomDesignRating }} />
-      </div>
-
-      {/* ── Scorecard table ── */}
-      <div
-        className="tech-asdr-scorecard-table"
-        style={{
-          background: COLORS.cardBg,
-          border: `1px solid ${COLORS.border}`,
-          borderRadius: 6,
-          breakInside: "auto",
-          pageBreakInside: "auto",
-        }}
-      >
-        {/* Column headers */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 60mm 18mm 36mm",
-            gap: "3mm",
-            padding: "3mm 4mm",
-            borderBottom: `1px solid ${COLORS.borderStrong}`,
-            fontSize: "7.5pt",
-            fontWeight: 700,
-            color: COLORS.secondary,
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-            fontFamily: FONT_BODY,
-          }}
-        >
-          <div>PARAMETER</div>
-          <div>RESULT</div>
-          <div style={{ textAlign: "center" }}>WEIGHT</div>
-          <div style={{ textAlign: "right" }}>SCORE</div>
-        </div>
-
-        {/* Grouped rows */}
-        {CATEGORY_GROUPS.map((group) => (
-          <ScorecardGroup
-            key={group.label}
-            label={group.label}
-            contribs={grouped[group.label]}
+        {CATEGORY_DISPLAY.map((label, i) => (
+          <AsdrCategorySection
+            key={label}
+            label={label}
+            primary={primaryCats[i]}
+            secondary={secondaryCats ? secondaryCats[i] : null}
+            all={allCats[i]}
           />
         ))}
       </div>
 
+      {/* ── Divider ── */}
+      <div
+        style={{
+          borderTop: `2px solid ${COLORS.borderStrong}`,
+          margin: "4mm 0 3mm 0",
+        }}
+      />
+
+      {/* ── Overall seating summaries (supporting) ── */}
+      <AsdrSeatingSummary
+        primary={primaryRating}
+        secondary={secondaryRating}
+        all={allRating}
+      />
+
       {/* ── Client language note (proprietary disclaimer) ── */}
       <div
         style={{
-          marginTop: "2mm",
+          marginTop: "3mm",
           fontSize: "8pt",
           color: COLORS.secondary,
           fontFamily: FONT_BODY,

@@ -19,13 +19,21 @@ const parameterPage = await readFile(
   "utf8",
 );
 
-test("ASDR recommendations stay together and the scorecard uses compact print spacing", () => {
+test("ASDR recommendations stay together and the redesigned scorecard leads with categories", () => {
   assert.match(recommendations, /className="tech-asdr-recommendations"/);
   assert.match(recommendations, /className="tech-rec-columns"/);
-  assert.match(scorecard, /className="tech-asdr-scorecard-row"/);
-  assert.match(scorecard, /className="tech-asdr-scorecard-group"/);
+  // Redesigned scorecard: four categories lead, seating summaries support
+  assert.match(scorecard, /className="tech-asdr-categories"/);
+  assert.match(scorecard, /AsdrCategorySection/);
+  assert.match(scorecard, /AsdrSeatingSummary/);
+  assert.match(scorecard, /getCategoryModalSummaries/);
+  // Old per-parameter scorecard table is gone
+  assert.doesNotMatch(scorecard, /tech-asdr-scorecard-row/);
+  assert.doesNotMatch(scorecard, /tech-asdr-scorecard-group/);
+  // Print styles keep recommendations and each category section together
   assert.match(styles, /\.tech-asdr-recommendations[\s\S]*?break-inside:\s*avoid\s*!important/);
-  assert.match(styles, /\.tech-asdr-scorecard-row[\s\S]*?padding:\s*1\.25mm 4mm\s*!important/);
+  assert.match(styles, /\.tech-asdr-category-section[\s\S]*?break-inside:\s*avoid\s*!important/);
+  assert.match(styles, /\.tech-asdr-seating-summary[\s\S]*?break-inside:\s*avoid\s*!important/);
 });
 
 test("technical parameter groups break after complete groups without phantom break-before pages", () => {

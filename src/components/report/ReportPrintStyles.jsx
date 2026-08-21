@@ -325,29 +325,20 @@ export default function ReportPrintStyles() {
                     margin-bottom: 3mm !important;
                 }
 
-                .rp22-report .tech-asdr-rating-card {
-                    padding: 4mm 6mm !important;
-                    margin-bottom: 3mm !important;
-                }
-
-                .rp22-report .tech-asdr-scorecard-table {
+                .rp22-report .tech-asdr-categories {
                     break-inside: auto !important;
                     page-break-inside: auto !important;
                 }
 
-                .rp22-report .tech-asdr-scorecard-group {
-                    margin-bottom: 2mm !important;
+                .rp22-report .tech-asdr-category-section {
+                    margin-bottom: 3mm !important;
                     break-inside: avoid !important;
                     page-break-inside: avoid !important;
                 }
 
-                .rp22-report .tech-asdr-scorecard-group-heading {
-                    padding: 1.2mm 4mm !important;
-                }
-
-                .rp22-report .tech-asdr-scorecard-row {
-                    padding: 1.25mm 4mm !important;
-                    font-size: 8.5pt !important;
+                .rp22-report .tech-asdr-seating-summary {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
                 }
 
                 .rp22-report .tech-asdr-recommendations {
