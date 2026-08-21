@@ -10,6 +10,7 @@
  */
 
 import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
+import { p18ThresholdsForBasis } from "@/components/utils/p18ExtensionAuthority";
 
 /* ---------- P12/P13/P14 mode-aware threshold resolver ---------- */
 
@@ -20,7 +21,7 @@ const P13_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 99, L2: 102, L3: 105, 
 const P14_THRESHOLDS_MINIMUM = { direction: ">=", L1: 109, L2: 112, L3: 115, L4: 118 };
 const P14_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 114, L2: 117, L3: 120, L4: 123 };
 
-export function resolveParamThresholds(param, p12Mode, p13Mode, p14Mode) {
+export function resolveParamThresholds(param, p12Mode, p13Mode, p14Mode, p18Mode) {
   if (param.id === 12) {
     return p12Mode === "recommended" ? P12_THRESHOLDS_RECOMMENDED : P12_THRESHOLDS_MINIMUM;
   }
@@ -28,6 +29,13 @@ export function resolveParamThresholds(param, p12Mode, p13Mode, p14Mode) {
     return p13Mode === "recommended" ? P13_THRESHOLDS_RECOMMENDED : P13_THRESHOLDS_MINIMUM;
   }
   if (param.id === 14) return p14Mode === "recommended" ? P14_THRESHOLDS_RECOMMENDED : P14_THRESHOLDS_MINIMUM;
+  // P18 is basis-aware: the completed bass authority grades under Minimum or Recommended.
+  // Use the same p18ThresholdsForBasis authority as the engine — never the flat legacy
+  // `levels` field (which equals the Recommended row and would mislabel a Minimum result).
+  if (param.id === 18) {
+    const basis = p18Mode === "recommended" ? "recommended" : "minimum";
+    return { ...param.thresholds, ...p18ThresholdsForBasis(basis) };
+  }
   return param.thresholds;
 }
 

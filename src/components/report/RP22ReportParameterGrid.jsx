@@ -73,7 +73,7 @@ export default function RP22ReportParameterGrid({
   /* ----- Render a single compliance tile (screen variant) ----- */
   const renderCard = (param) => {
     const resolvedThresholds = resolveThresholds(param);
-    const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14)
+    const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14 || param.id === 18)
       ? { ...param, thresholds: resolvedThresholds }
       : param;
     const isSeatScope = String(param.scope || "").toLowerCase() === "seat";
@@ -110,7 +110,7 @@ export default function RP22ReportParameterGrid({
   /* ----- Render a single redesigned Technical Report parameter card (print variant) ----- */
   const renderPrintCard = (param) => {
     const resolvedThresholds = resolveThresholds(param);
-    const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14)
+    const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14 || param.id === 18)
       ? { ...param, thresholds: resolvedThresholds }
       : param;
     const targetBasisNote =

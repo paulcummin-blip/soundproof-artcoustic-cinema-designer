@@ -137,6 +137,7 @@ export function useParameterGridAuthority({
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";
   const p14Mode = bassPresentation.parameters.p14.targetBasis || appState?.splConfig?.p14Mode || "minimum";
+  const p18Mode = bassPresentation.parameters.p18.targetBasis || appState?.splConfig?.p18Mode || "minimum";
 
   /* ----- Seat snapshot lookup ----- */
   const seatSnapshotsById = React.useMemo(() => {
@@ -454,8 +455,8 @@ export function useParameterGridAuthority({
 
   /* ----- Resolve thresholds (mode-aware) ----- */
   const resolveThresholds = React.useCallback((param) => {
-    return resolveParamThresholds(param, p12Mode, p13Mode, p14Mode);
-  }, [p12Mode, p13Mode, p14Mode]);
+    return resolveParamThresholds(param, p12Mode, p13Mode, p14Mode, p18Mode);
+  }, [p12Mode, p13Mode, p14Mode, p18Mode]);
 
   /* ----- Build P6 worst-seat presentation (same as renderPrintCard) ----- */
   const buildP6Presentation = React.useCallback(() => {

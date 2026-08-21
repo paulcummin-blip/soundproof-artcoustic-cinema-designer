@@ -29,6 +29,7 @@ import {
   levelP10_upperDelta,
   levelP16_screenFR,
   levelP17_wsFR,
+  levelP19_lfResponse,
   levelP20_lfConsistency,
 } from "@/components/utils/rp22/levels";
 import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
@@ -327,8 +328,12 @@ function scoreP18(rawValue, mode) {
 }
 
 function scoreP19(rawValue) {
-  const cat = RP22_CATALOG["19"];
-  return applyCatalogThresholds(rawValue, cat.levels, cat.direction); // ±max, L1=5 bounded → can FAIL
+  // Engine parity: the bass engine grades P19 via levelP19_lfResponse, which applies
+  // the RP22 design-value floor (Math.floor) before comparing to the ±dB bands.
+  // Re-grading the raw fractional value against the catalog levels diverges from the
+  // engine at the L2/L1 boundary (4 dB). Use the same mapper so the scorecard never
+  // contradicts the authoritative per-seat levels. L1=5 bounded → can FAIL.
+  return applyMapper(rawValue, levelP19_lfResponse, true);
 }
 
 function scoreP20(rawValue) {
