@@ -12,6 +12,7 @@ import {
 import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import { migrateP12Mode } from "@/components/utils/p12ModeAuthority";
 import { resolveVisibleWidthInches } from "@/components/hooks/useSeatingRebuild";
+import { computeEffectiveRsp } from "@/components/room/rsp/computeEffectiveRsp";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -259,8 +260,17 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       return { model, count: subs.length, positions, tuning: [] };
     };
 
-    setFrontSubsCfg(isCfgUsable(frontCfgRaw) ? frontCfgRaw : (deriveCfgFromSubs(frontSubs) || defaultInactive));
-    setRearSubsCfg(isCfgUsable(rearCfgRaw) ? rearCfgRaw : (deriveCfgFromSubs(rearSubs) || defaultInactive));
+    const frontCfg = isCfgUsable(frontCfgRaw) ? frontCfgRaw : (deriveCfgFromSubs(frontSubs) || defaultInactive);
+    const rearCfg = isCfgUsable(rearCfgRaw) ? rearCfgRaw : (deriveCfgFromSubs(rearSubs) || defaultInactive);
+    setFrontSubsCfg(frontCfg);
+    setRearSubsCfg(rearCfg);
+    // Orientation metadata for bassInputAdapter — must match the settled
+    // useSubwooferSync call (appState.frontSubsCfg/rearSubsCfg.orientation) so
+    // the first hydration-ready source centre-Z equals the later settled
+    // source centre-Z. SUB4-12 horizontal changes cabinet height/centre-Z;
+    // omitting orientation here would produce a transient R1 fingerprint.
+    const frontOrientation = frontCfg?.orientation ?? null;
+    const rearOrientation = rearCfg?.orientation ?? null;
 
     // Stage 1: Subwoofer instance migration — authority rules A/B/C.
     //
@@ -381,7 +391,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
         appState.setSubwooferInstances(rawInstances);
       }
       if (typeof appState?.setSubwoofers === "function") {
-        appState.setSubwoofers(bassInputAdapter(rawInstances));
+        appState.setSubwoofers(bassInputAdapter(rawInstances, { frontOrientation, rearOrientation }));
       }
       if (typeof appState?.setSubwooferInstancesStatus === "function") {
         appState.setSubwooferInstancesStatus(INSTANCE_STATUS.VALID);
@@ -416,7 +426,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
             appState.setSubwooferInstances(migrated);
           }
           if (typeof appState?.setSubwoofers === "function") {
-            appState.setSubwoofers(bassInputAdapter(migrated));
+            appState.setSubwoofers(bassInputAdapter(migrated, { frontOrientation, rearOrientation }));
           }
           // Authority status is VALID (instances are now canonical)
           if (typeof appState?.setSubwooferInstancesStatus === "function") {
@@ -534,6 +544,71 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   if (typeof setManualRspX_m === "function") {
     const x = Number(p?.manual_rsp_x_m);
     setManualRspX_m(Number.isFinite(x) ? x : null);
+  }
+
+  // 10d2) SYNCHRONOUS RSP DERIVATION — close the cold-hydration first-render gap.
+  // computeEffectiveRsp is the SAME pure authority used by useEffectiveRsp in
+  // Room Designer. Deriving mlpY_m / mlpX_m here (before hydration is declared
+  // ready) guarantees the first hydration-ready render carries the real RSP,
+  // so the live calibration fingerprint immediately matches the persisted
+  // authority and no transient rsp:null fingerprint can wipe restored results.
+  // Row-derived modes have no precomputed Y at hydration → fall through to
+  // null (the RoomDesigner effect still owns those — no regression).
+  if (typeof appState?.setMlpY_m === "function" || typeof appState?.setMlpX_m === "function") {
+    const rspModeHydrated = p?.rsp_mode || "auto_from_screen";
+    const manualRspYHydrated = (() => {
+      const y = Number(p?.manual_rsp_y_m);
+      return Number.isFinite(y) ? y : null;
+    })();
+    const roomWidthHydrated = (() => {
+      const rd = parseMaybe(p?.roomDims, null);
+      const w = Number(rd?.widthM ?? rd?.width) || Number(p?.room_width) || 4.5;
+      return Number.isFinite(w) ? w : 4.5;
+    })();
+    const screenFrontPlaneHydrated = (() => {
+      const sfp = Number(p?.screen_front_plane_m);
+      return Number.isFinite(sfp) ? sfp : null;
+    })();
+    const screenWidthHydratedM = (() => {
+      const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
+      if (p?.tv_preset_key && TV_KEY_TO_INCHES[p.tv_preset_key]) {
+        return TV_KEY_TO_INCHES[p.tv_preset_key] * 0.0254;
+      }
+      const vwi = Number(p?.screen_size);
+      if (Number.isFinite(vwi) && vwi > 0) return vwi * 0.0254;
+      const mw = Number(p?.manual_width_m);
+      if (Number.isFinite(mw) && mw > 0) return mw;
+      const mh = Number(p?.manual_height_m);
+      const ar = Number(p?.aspect_ratio);
+      if (Number.isFinite(mh) && mh > 0 && Number.isFinite(ar) && ar > 0) return (mh * ar);
+      return 120 * 0.0254;
+    })();
+
+    const rsp = computeEffectiveRsp({
+      rspMode: rspModeHydrated,
+      manualRspY_m: manualRspYHydrated,
+      manualRspX_m: null,
+      roomWidthM: roomWidthHydrated,
+      screenFrontPlaneM: screenFrontPlaneHydrated,
+      screenWidthM: screenWidthHydratedM,
+      currentMlpY_m: null,
+      rowDerivedRspYByMode: {},
+    });
+
+    // Only publish an AUTHORITATIVE RSP derivation — never the "Current RSP"
+    // fallback, which carries currentMlpY_m (null at hydration → 0 via
+    // Number(null)). Row-derived modes have no precomputed Y at hydration, so
+    // they fall through to the fallback and are left for the RoomDesigner
+    // effect (no regression). y > 0 mirrors buildAuthoritativeRspPosition's
+    // y<=0 rejection, so a degenerate 0 never seeds a synthetic RSP.
+    if (Number.isFinite(rsp.effectiveRspY_m) && rsp.effectiveRspY_m > 0 && rsp.rspSourceLabel !== "Current RSP") {
+      const roundedY = Math.round(rsp.effectiveRspY_m * 1000) / 1000;
+      appState?.setMlpY_m?.(roundedY);
+    }
+    if (Number.isFinite(rsp.effectiveRspX_m)) {
+      const roundedX = Math.round(rsp.effectiveRspX_m * 1000) / 1000;
+      appState?.setMlpX_m?.(roundedX);
+    }
   }
 
   // 10e) VIEWING PRIORITY (multi-row viewing intent) — project-scoped

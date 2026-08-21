@@ -12,6 +12,7 @@ import {
   DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W,
   getPerSubwooferAmplifierAuthority,
 } from "@/components/utils/subwooferCapability";
+import { buildAuthoritativeRspPosition } from "./authoritativeRspPosition";
 
 const POSITION_LABELS = ["left", "right"];
 const EMPTY_SIMULATION_RESULT = Object.freeze({
@@ -22,14 +23,11 @@ const EMPTY_SIMULATION_RESULT = Object.freeze({
 });
 const clampAbsorption = (value) => Math.max(0, Math.min(0.95, Number(value) || 0.30));
 
-export function buildAuthoritativeRspPosition(roomDims, mlpY_m, mlpX_m) {
-  const widthM = Number(roomDims?.widthM);
-  const y = Number(mlpY_m);
-  if (!Number.isFinite(widthM) || !Number.isFinite(y) || widthM <= 0 || y <= 0) return null;
-  // Stage B1: use canonical green-dot X (mlpX_m) when finite; else room centreline.
-  const x = Number.isFinite(Number(mlpX_m)) ? Number(mlpX_m) : widthM / 2;
-  return { id: "rsp", x, y, z: 1.2, __isSyntheticRsp: true };
-}
+// buildAuthoritativeRspPosition is extracted to authoritativeRspPosition.js
+// (pure, bare-Node importable) so cold-hydration regression tests can call it
+// without pulling in @/-aliased modules. Re-exported here for existing
+// importers; the imported binding is also used by the hook below.
+export { buildAuthoritativeRspPosition };
 
 function resolveSubGroup(subId, fallbackGroup) {
   if (fallbackGroup) return fallbackGroup;
