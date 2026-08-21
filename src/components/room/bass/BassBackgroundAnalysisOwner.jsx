@@ -416,10 +416,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // ── Authority already restored: no publish, no sync, no recalculation ──
     // When returning from a report route, the completed bass store already
     // holds the authoritative contract for this fingerprint. The controller
-    // is skipped (authority-restored guard above) so contract is null. Don't
-    // call syncPersistentBassAuthority with a null contract — it would
+    // is skipped (authority-restored guard above), so no foreground optimiser
+    // has run and contract.selectedCandidate is null. The shell contract object
+    // itself is still non-null (useBassAnalysisContract always returns one),
+    // so the active-result test is !contract?.selectedCandidate, not !contract.
+    // Don't call syncPersistentBassAuthority with a shell contract — it would
     // needlessly rewrite the DB. The authority is already live.
-    if (!contract && fingerprints && hasAuthoritativeResult(scopeId, cacheKey)) {
+    if (!contract?.selectedCandidate && fingerprints && hasAuthoritativeResult(scopeId, cacheKey)) {
       // ── Bridge restored authority into P14 target cache ────────────────
       // On a fresh reopen, the completed authority hydrates from DB but the
       // target cache may be empty (e.g. after a base-design fingerprint change
