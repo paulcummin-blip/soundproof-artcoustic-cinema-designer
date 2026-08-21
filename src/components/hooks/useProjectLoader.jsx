@@ -104,6 +104,7 @@ appState, // Pass appState directly for setters
       mlpBasis: appState?.mlpBasis,
       seatingBlockOffset: appState?.seatingBlockOffset,
       rowEarHeights: appState?.rowEarHeights,
+      linkEarPlatformHeights: appState?.linkEarPlatformHeights,
       placedSpeakers: appState?.speakerSystem?.placedSpeakers || placedSpeakers || [],
       roomElements,
       selectedSpeakersByRole: appState.selectedSpeakersByRole,
@@ -200,6 +201,7 @@ appState, // Pass appState directly for setters
       setExtraSurroundCount,
       setRspMode: appState?.setRspMode,
       setManualRspY_m: appState?.setManualRspY_m,
+      setLinkEarPlatformHeights: appState?.setLinkEarPlatformHeights,
     });
   }, [
   appState?.setRoomDims,
@@ -326,6 +328,7 @@ appState, // Pass appState directly for setters
           p15ConstructionLevel: p?.p15_construction_level || "purpose-built",
           p21EarlyReflectionPreset: p?.p21_early_reflection_preset || "l3",
           existingRoomDimensionsEdited: p?.room_dimensions_edited === true,
+          linkEarPlatformHeights: typeof p?.link_ear_platform_heights === "boolean" ? p.link_ear_platform_heights : true,
         });
         delete loadedProjectData.name;
         delete loadedProjectData.client_name;
@@ -630,7 +633,8 @@ appState, // Pass appState directly for setters
   appState?.acousticTreatmentEnabled,
   appState?.selectedAbfuserQty,
   appState?.p15ConstructionLevel,
-  appState?.p21EarlyReflectionPreset]
+  appState?.p21EarlyReflectionPreset,
+  appState?.linkEarPlatformHeights]
   );
 
   // Boot logic: run when hydrated or target changes – either load a project or initialise defaults

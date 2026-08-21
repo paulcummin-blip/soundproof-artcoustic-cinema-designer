@@ -2110,6 +2110,8 @@ function RoomDesignerWithState() {
             onManualRspY_mChange={appState?.setManualRspY_m}
             viewingPriority={appState?.viewingPriority ?? "balanced"}
             onViewingPriorityChange={appState?.setViewingPriority}
+            linkEarPlatformHeights={appState?.linkEarPlatformHeights ?? true}
+            onLinkEarPlatformHeightsChange={appState?.setLinkEarPlatformHeights}
             acousticTreatmentEnabled={appState?.acousticTreatmentEnabled ?? false}
             setAcousticTreatmentEnabled={appState?.setAcousticTreatmentEnabled}
             selectedAbfuserQty={appState?.selectedAbfuserQty ?? 0}

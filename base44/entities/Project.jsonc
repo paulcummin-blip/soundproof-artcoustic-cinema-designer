@@ -472,6 +472,11 @@
       "type": "boolean",
       "default": false,
       "description": "Authoritative flag indicating whether the user has deliberately supplied or changed room dimensions. Set to true at creation if real dimensions were entered, or on the first genuine room-dimension edit in the Room Designer. Once true, never reset to false \u2014 even if dimensions numerically return to the generic 4.5 \u00d7 6.0 \u00d7 2.4 m defaults. Hydration/autosave of generated defaults must NOT set this true. Used by the 7-day incomplete-project cleanup rule: a project with room_dimensions_edited !== true after 7 days qualifies for auto-cleanup."
+    },
+    "link_ear_platform_heights": {
+      "type": "boolean",
+      "default": true,
+      "description": "When true, editing Ear Height or Platform Height for a seating row applies the same delta to both, preserving their relative offset. When false, each is edited independently. Persisted per-project so the preference survives across sessions, browsers, and users."
     }
   },
   "required": [

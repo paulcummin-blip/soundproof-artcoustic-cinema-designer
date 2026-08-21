@@ -124,6 +124,9 @@ export default function RoomDesignerControlsPanel({
   // Viewing priority
   viewingPriority,
   onViewingPriorityChange,
+  // Link ear & platform heights
+  linkEarPlatformHeights,
+  onLinkEarPlatformHeightsChange,
   // Acoustic treatment
   acousticTreatmentEnabled,
   setAcousticTreatmentEnabled,
@@ -251,7 +254,9 @@ export default function RoomDesignerControlsPanel({
               manualRspY_m={manualRspY_m}
               onManualRspY_mChange={onManualRspY_mChange}
               viewingPriority={viewingPriority}
-              onViewingPriorityChange={onViewingPriorityChange} />
+              onViewingPriorityChange={onViewingPriorityChange}
+              linkEarPlatformHeights={linkEarPlatformHeights}
+              onLinkEarPlatformHeightsChange={onLinkEarPlatformHeightsChange} />
           </Suspense>
         </CollapsiblePanel>
 

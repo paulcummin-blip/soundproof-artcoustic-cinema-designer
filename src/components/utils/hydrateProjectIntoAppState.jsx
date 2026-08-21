@@ -197,6 +197,11 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   const rowEarHeights = parseMaybe(p?.row_ear_heights, []);
   if (Array.isArray(rowEarHeights) && typeof setRowEarHeights === "function") setRowEarHeights(rowEarHeights);
 
+  // 3b) LINK EAR & PLATFORM HEIGHTS — persisted per-project
+  if (typeof appState?.setLinkEarPlatformHeights === "function") {
+    appState.setLinkEarPlatformHeights(typeof p?.link_ear_platform_heights === "boolean" ? p.link_ear_platform_heights : true);
+  }
+
   // 4) OVERHEAD CONFIG
   if (typeof setOverheadGlobalModel === "function") setOverheadGlobalModel(p?.overhead_global_model || null);
   if (typeof setOverheadFrontOverride === "function") setOverheadFrontOverride(p?.overhead_front_override || null);

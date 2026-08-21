@@ -125,6 +125,9 @@ export function serializeProject(input = {}) {
     // room_dimensions_edited authority — the existing stored flag.
     // Passed by the save path so serializeProject never resets it to false.
     existingRoomDimensionsEdited = false,
+
+    // Link ear & platform heights toggle — persisted per-project.
+    linkEarPlatformHeights = true,
   } = input;
 
   // Normalised room dims (support legacy dimensions as a fallback)
@@ -331,5 +334,8 @@ export function serializeProject(input = {}) {
       lengthM,
       heightM
     ),
+
+    // Link ear & platform heights toggle — persisted per-project.
+    link_ear_platform_heights: typeof linkEarPlatformHeights === "boolean" ? linkEarPlatformHeights : true,
   };
 }

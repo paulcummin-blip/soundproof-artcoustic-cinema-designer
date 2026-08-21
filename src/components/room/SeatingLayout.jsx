@@ -97,6 +97,9 @@ export default function SeatingLayout({
   onShowMlpRulerChange,
   rowEarHeights = [],
   onRowEarHeightsChange,
+  // Link ear & platform heights
+  linkEarPlatformHeights = true,
+  onLinkEarPlatformHeightsChange,
   // RSP mode
   rspMode = "auto_from_screen",
   onRspModeChange,
@@ -451,9 +454,17 @@ export default function SeatingLayout({
                     next[idx] = clamped;
                     onRowEarHeightsChange?.(next);
                     if (typeof onSetSeatingPositions === 'function' && Array.isArray(seatingPositions)) {
-                      const updated = seatingPositions.map(seat =>
+                      let updated = seatingPositions.map(seat =>
                         seat.rowNumber === idx + 1 ? { ...seat, z: clamped } : seat
                       );
+                      // Linked: apply same delta to platform height
+                      if (linkEarPlatformHeights && idx > 0) {
+                        const delta = clamped - currentZ;
+                        const newPlatform = Math.max(0, Math.min(2.0, Math.round((currentPlatformH + delta) * 100) / 100));
+                        updated = updated.map(seat =>
+                          seat.rowNumber === idx + 1 ? { ...seat, platformHeightM: newPlatform } : seat
+                        );
+                      }
                       onSetSeatingPositions(updated);
                     }
                   }}
@@ -470,9 +481,9 @@ export default function SeatingLayout({
                     step="0.01"
                     min="0"
                     max="2.0"
-                    value={currentPlatformH}
+                    value={Number.isFinite(currentPlatformH) ? Number(currentPlatformH.toFixed(2)) : 0}
                     disabled={disabled}
-                    className="h-8 w-20 text-xs text-center"
+                    className="h-8 w-24 text-xs text-center"
                     style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}
                     onChange={(e) => {
                       if (disabled) return;
@@ -480,9 +491,21 @@ export default function SeatingLayout({
                       if (!Number.isFinite(val)) return;
                       const clamped = Math.max(0, Math.min(2.0, Math.round(val * 100) / 100));
                       if (typeof onSetSeatingPositions === 'function' && Array.isArray(seatingPositions)) {
-                        const updated = seatingPositions.map(seat =>
+                        let updated = seatingPositions.map(seat =>
                           seat.rowNumber === idx + 1 ? { ...seat, platformHeightM: clamped } : seat
                         );
+                        // Linked: apply same delta to ear height
+                        if (linkEarPlatformHeights) {
+                          const delta = clamped - currentPlatformH;
+                          const newEar = Math.max(0.1, Math.min(3.0, Math.round((currentZ + delta) * 10) / 10));
+                          updated = updated.map(seat =>
+                            seat.rowNumber === idx + 1 ? { ...seat, z: newEar } : seat
+                          );
+                          const next = [...(rowEarHeights.length ? rowEarHeights : Array.from({ length: rowCount }, (_, j) => getEarHeightForRow(j + 1)))];
+                          while (next.length < rowCount) next.push(getEarHeightForRow(next.length + 1));
+                          next[idx] = newEar;
+                          onRowEarHeightsChange?.(next);
+                        }
                         onSetSeatingPositions(updated);
                       }
                     }}
@@ -544,6 +567,16 @@ export default function SeatingLayout({
             + Add Row
           </Button>
         </div>
+      </div>
+
+      {/* Link ear & platform heights toggle */}
+      <div className="mt-3 flex items-center justify-between py-2 px-3 rounded-md" style={{ border: '1px solid #ECEAE4', backgroundColor: '#FAF9F6' }}>
+        <span className="text-sm font-medium" style={{ color: '#3E4349' }}>Link ear &amp; platform heights</span>
+        <Switch
+          checked={linkEarPlatformHeights}
+          onCheckedChange={(v) => onLinkEarPlatformHeightsChange?.(v)}
+          disabled={disabled}
+        />
       </div>
 
       {/* Seat Priority */}
