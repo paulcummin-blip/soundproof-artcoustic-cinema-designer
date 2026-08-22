@@ -13,7 +13,7 @@ import {
   RP22_BASS_METRIC_SCHEMA_VERSION,
 } from "../base44/shared/bassAuthorityVersion.js";
 
-const FINGERPRINT = "cal:v5:11129291fdd69043-schema:27-metric:2";
+const FINGERPRINT = "cal:v5:11129291fdd69043-schema:28-metric:3";
 
 function buildAuthoritativeSnapshot() {
   return {
