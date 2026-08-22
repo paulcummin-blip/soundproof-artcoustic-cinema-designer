@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
+import { INSTANCE_AUTHORITY_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "../../../../base44/shared/bassAuthorityVersion.js";
 import {
   COMPLETED_BASS_CACHE_VERSION,
   BASS_AUTHORITY_STATUS,
@@ -329,7 +330,9 @@ export function syncCachedCompactBassAuthority(projectId, compactContract) {
       const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
       const record = Array.isArray(records) ? records[0] : null;
       const existing = record ? {
-        version: COMPLETED_BASS_CACHE_VERSION,
+        version: record.completed_cache_version,
+        instanceAuthorityVersion: record.instance_authority_version,
+        metricSchemaVersion: record.metric_schema_version,
         currentFingerprint: record.current_fingerprint,
         status: record.status,
         completedByFingerprint: record.completed_by_fingerprint,
@@ -339,6 +342,9 @@ export function syncCachedCompactBassAuthority(projectId, compactContract) {
       const persisted = buildPersistedBassAuthority(existing, currentFingerprint, compactContract, false);
       const payload = {
         project_id: key,
+        completed_cache_version: COMPLETED_BASS_CACHE_VERSION,
+        instance_authority_version: INSTANCE_AUTHORITY_VERSION,
+        metric_schema_version: RP22_BASS_METRIC_SCHEMA_VERSION,
         current_fingerprint: persisted.currentFingerprint,
         status: persisted.status,
         completed_by_fingerprint: persisted.completedByFingerprint,
@@ -370,7 +376,9 @@ export function syncPersistentBassAuthority(projectId, currentFingerprint, contr
     const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
     const record = Array.isArray(records) ? records[0] : null;
     const existing = record ? {
-      version: COMPLETED_BASS_CACHE_VERSION,
+      version: record.completed_cache_version,
+      instanceAuthorityVersion: record.instance_authority_version,
+      metricSchemaVersion: record.metric_schema_version,
       currentFingerprint: record.current_fingerprint,
       status: record.status,
       completedByFingerprint: record.completed_by_fingerprint,
@@ -378,6 +386,9 @@ export function syncPersistentBassAuthority(projectId, currentFingerprint, contr
     const persisted = buildPersistedBassAuthority(existing, currentFingerprint, completed, !completed);
     const payload = {
       project_id: key,
+      completed_cache_version: COMPLETED_BASS_CACHE_VERSION,
+      instance_authority_version: INSTANCE_AUTHORITY_VERSION,
+      metric_schema_version: RP22_BASS_METRIC_SCHEMA_VERSION,
       current_fingerprint: persisted.currentFingerprint,
       status: persisted.status,
       completed_by_fingerprint: persisted.completedByFingerprint,
