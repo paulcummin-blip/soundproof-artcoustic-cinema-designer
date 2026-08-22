@@ -1,7 +1,10 @@
+import { RP22_BASS_METRIC_SCHEMA_VERSION } from "../../../../base44/shared/bassAuthorityVersion.js";
+
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
 export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v38-independent-p18-product-room-eq";
 export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v38-independent-p18-product-room-eq";
-export const BASS_RESULT_SCHEMA_VERSION = 26;
+export const BASS_RESULT_SCHEMA_VERSION = 27;
+export const BASS_METRIC_SCHEMA_VERSION = RP22_BASS_METRIC_SCHEMA_VERSION;
 export const BASS_OPTIMISER_POOL_PROPERTY = "pool";
 
 export const BASS_OPTIMISER_VERSIONS = Object.freeze({
@@ -9,6 +12,7 @@ export const BASS_OPTIMISER_VERSIONS = Object.freeze({
   poolVersion: BASS_OPTIMISER_POOL_VERSION,
   engineVersion: HOUSE_CURVE_ENGINE_VERSION,
   resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION,
+  metricSchemaVersion: BASS_METRIC_SCHEMA_VERSION,
 });
 
 export const bassOptimiserVersionSignature = (versions = BASS_OPTIMISER_VERSIONS) => [
@@ -16,15 +20,16 @@ export const bassOptimiserVersionSignature = (versions = BASS_OPTIMISER_VERSIONS
   versions.poolVersion,
   versions.engineVersion,
   versions.resultSchemaVersion,
+  versions.metricSchemaVersion,
 ].join("|");
 
 export function describeOptimiserCompatibility(expected, actual, reason = "version-mismatch") {
   const value = (item) => item == null ? "missing" : String(item);
-  return `${reason} (expected protocol=${value(expected?.protocolVersion)}, actual protocol=${value(actual?.protocolVersion)}; expected pool=${value(expected?.poolVersion)}, actual pool=${value(actual?.poolVersion)}; expected engine=${value(expected?.engineVersion)}, actual engine=${value(actual?.engineVersion)}; expected result-schema=${value(expected?.resultSchemaVersion)}, actual result-schema=${value(actual?.resultSchemaVersion)}; expected fingerprint=${value(expected?.fingerprint)}, actual fingerprint=${value(actual?.fingerprint)})`;
+  return `${reason} (expected protocol=${value(expected?.protocolVersion)}, actual protocol=${value(actual?.protocolVersion)}; expected pool=${value(expected?.poolVersion)}, actual pool=${value(actual?.poolVersion)}; expected engine=${value(expected?.engineVersion)}, actual engine=${value(actual?.engineVersion)}; expected result-schema=${value(expected?.resultSchemaVersion)}, actual result-schema=${value(actual?.resultSchemaVersion)}; expected metric-schema=${value(expected?.metricSchemaVersion)}, actual metric-schema=${value(actual?.metricSchemaVersion)}; expected fingerprint=${value(expected?.fingerprint)}, actual fingerprint=${value(actual?.fingerprint)})`;
 }
 
 export function validateOptimiserVersions(actual, expected = BASS_OPTIMISER_VERSIONS) {
-  const field = ["protocolVersion", "poolVersion", "engineVersion", "resultSchemaVersion"]
+  const field = ["protocolVersion", "poolVersion", "engineVersion", "resultSchemaVersion", "metricSchemaVersion"]
     .find((name) => actual?.[name] !== expected?.[name]);
   return field
     ? { valid: false, field, message: describeOptimiserCompatibility(expected, actual, `${field}-mismatch`) }
