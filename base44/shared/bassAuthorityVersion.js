@@ -11,4 +11,7 @@
  * Kept dependency-free so the persistence adapter/resolver is importable from
  * bare-Node regression tests (no @/ alias required).
  */
-export const INSTANCE_AUTHORITY_VERSION = 1;
+export const INSTANCE_AUTHORITY_VERSION = 2;
+export const BASS_ANALYSIS_CONTRACT_VERSION = 7;
+export const COMPLETED_BASS_CACHE_VERSION = 3;
+export const RP22_BASS_METRIC_SCHEMA_VERSION = 2;
