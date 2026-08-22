@@ -7,6 +7,18 @@
       "type": "string",
       "description": "Project identifier owning this analysis authority."
     },
+    "completed_cache_version": {
+      "type": "integer",
+      "description": "Completed authority cache envelope version."
+    },
+    "instance_authority_version": {
+      "type": "integer",
+      "description": "Completed authority instance generation."
+    },
+    "metric_schema_version": {
+      "type": "integer",
+      "description": "RP22 P19/P20 metric-definition generation."
+    },
     "current_fingerprint": {
       "type": "string",
       "description": "Exact calibration/result fingerprint currently required by the project."
@@ -26,7 +38,7 @@
     },
     "target_cache": {
       "type": "object",
-      "description": "Persistent P14 background target cache. Contains: { baseDesignFingerprint: string, targets: { targetKey -> compact authoritative bass contract } }. All 8 P14 target combinations share the same baseDesignFingerprint. Invalidated when any bass-relevant design input changes."
+      "description": "Persistent P14 background target cache. Contains: { metricSchemaVersion: number, baseDesignFingerprint: string, targets: { targetKey -> compact authoritative bass contract } }. All 8 P14 target combinations share the same baseDesignFingerprint. Invalidated when any bass-relevant design input changes."
     }
   },
   "required": [
