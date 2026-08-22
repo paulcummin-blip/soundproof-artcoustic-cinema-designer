@@ -486,12 +486,12 @@ export function rebalanceBroadValleyBank({
       { protectedNullRegions, canonicalTargetCurve: targetCurve },
     );
     const realSeatSafe = !!metrics && realSeatsSafe(baselineMetrics, metrics);
-    // rspMaxDeviationDb is the full response-to-target gap. RP22 P19 reports
-    // that gap as a symmetric ± value, so grade the half-gap at this boundary.
+    // rspMaxDeviationDb is already the direct RP22 P19 maximum absolute
+    // response-to-target deviation. Grade it without a half-gap conversion.
     const baselineRspLevel = Number.isFinite(baselineMetrics?.rspMaxDeviationDb)
-      ? houseCurveP19Level(baselineMetrics.rspMaxDeviationDb / 2) : null;
+      ? houseCurveP19Level(baselineMetrics.rspMaxDeviationDb) : null;
     const candidateRspLevel = Number.isFinite(metrics?.rspMaxDeviationDb)
-      ? houseCurveP19Level(metrics.rspMaxDeviationDb / 2) : null;
+      ? houseCurveP19Level(metrics.rspMaxDeviationDb) : null;
     const rspLevelSafe = baselineRspLevel === null || candidateRspLevel >= baselineRspLevel;
     const absoluteRspRmsSafe = !Number.isFinite(baselineMetrics?.rspRmsDeviationDb)
       || metrics.rspRmsDeviationDb <= baselineMetrics.rspRmsDeviationDb + 0.1;
@@ -566,8 +566,8 @@ export function rebalanceBroadValleyBank({
     verifiedCandidates.push({ ...candidate, metrics });
   }
   verifiedCandidates.sort((left, right) =>
-    houseCurveP19Level(right.metrics.rspMaxDeviationDb / 2)
-      - houseCurveP19Level(left.metrics.rspMaxDeviationDb / 2)
+    houseCurveP19Level(right.metrics.rspMaxDeviationDb)
+      - houseCurveP19Level(left.metrics.rspMaxDeviationDb)
     || left.metrics.rspMaxDeviationDb - right.metrics.rspMaxDeviationDb
     || left.metrics.rspShapeRmsDeviationDb - right.metrics.rspShapeRmsDeviationDb
     || left.quality.maximum - right.quality.maximum
