@@ -534,7 +534,7 @@ export default function RP22CompliancePanel({
 
   const getHudLevelForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
-    if ([14, 18, 19].includes(pid)) return bassPresentation.parameters[`p${pid}`].level;
+    if ([14, 18, 19, 20].includes(pid)) return bassPresentation.parameters[`p${pid}`].level;
     const scope = String(param?.scope || "").toLowerCase();
     const isRoomScope = scope === "room";
 
@@ -623,7 +623,7 @@ export default function RP22CompliancePanel({
 
   const getHudValueForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
-    if ([14, 18, 19].includes(pid)) return bassPresentation.parameters[`p${pid}`].valueText;
+    if ([14, 18, 19, 20].includes(pid)) return bassPresentation.parameters[`p${pid}`].valueText;
     const scope = String(param?.scope || "").toLowerCase();
     const isRoomScope = scope === "room";
 
