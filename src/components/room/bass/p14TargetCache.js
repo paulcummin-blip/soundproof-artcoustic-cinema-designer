@@ -11,6 +11,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
+import { COMPLETED_BASS_CACHE_VERSION, INSTANCE_AUTHORITY_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "../../../../base44/shared/bassAuthorityVersion.js";
 import { isAuthoritativeBassContract } from "./completedBassResultPersistence";
 import { hasGraphPayload } from "./finishedGraphAdapter";
 import { hasReadyCanonicalP19Contract } from "./p19Readiness";
@@ -30,7 +31,7 @@ function projectKey(projectId) { return String(projectId || "free"); }
 function ensureCache(projectId) {
   const key = projectKey(projectId);
   if (!cacheByProject.has(key)) {
-    cacheByProject.set(key, { baseDesignFingerprint: null, targets: {} });
+    cacheByProject.set(key, { metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, baseDesignFingerprint: null, targets: {} });
   }
   return cacheByProject.get(key);
 }
@@ -43,6 +44,7 @@ function ensureCache(projectId) {
 export function getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey) {
   if (!baseDesignFingerprint || !targetKey) return null;
   const cache = ensureCache(projectId);
+  if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION) return null;
   if (cache.baseDesignFingerprint !== baseDesignFingerprint) return null;
   const entry = cache.targets[targetKey];
   if (!entry || !isAuthoritativeBassContract(entry)) return null;
@@ -60,6 +62,7 @@ export function getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey)
 export function getTargetCacheProgress(projectId, baseDesignFingerprint, allTargetKeys) {
   if (!baseDesignFingerprint) return { ready: 0, total: allTargetKeys.length };
   const cache = ensureCache(projectId);
+  if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION) return { ready: 0, total: allTargetKeys.length };
   if (cache.baseDesignFingerprint !== baseDesignFingerprint) return { ready: 0, total: allTargetKeys.length };
   const ready = allTargetKeys.filter((k) => {
     const entry = cache.targets[k];
@@ -80,7 +83,9 @@ export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey,
   // canonical curves and a finite official result remains eligible to retry.
   if (!hasReadyCanonicalP19Contract(compactContract)) return false;
   const cache = ensureCache(projectId);
-  if (cache.baseDesignFingerprint !== baseDesignFingerprint) {
+  if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION
+    || cache.baseDesignFingerprint !== baseDesignFingerprint) {
+    cache.metricSchemaVersion = RP22_BASS_METRIC_SCHEMA_VERSION;
     cache.baseDesignFingerprint = baseDesignFingerprint;
     cache.targets = {};
   }
@@ -96,7 +101,9 @@ export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey,
  */
 export function clearTargetCacheForDesign(projectId, baseDesignFingerprint) {
   const cache = ensureCache(projectId);
-  if (cache.baseDesignFingerprint === baseDesignFingerprint) return;
+  if (cache.metricSchemaVersion === RP22_BASS_METRIC_SCHEMA_VERSION
+    && cache.baseDesignFingerprint === baseDesignFingerprint) return;
+  cache.metricSchemaVersion = RP22_BASS_METRIC_SCHEMA_VERSION;
   cache.baseDesignFingerprint = baseDesignFingerprint;
   cache.targets = {};
   notify();
@@ -114,8 +121,13 @@ export async function hydrateTargetCache(projectId) {
     const record = Array.isArray(records) ? records[0] : null;
     if (!record?.target_cache) return;
     const stored = typeof record.target_cache === 'string' ? JSON.parse(record.target_cache) : record.target_cache;
-    if (!stored || !stored.baseDesignFingerprint) return;
+    if (!stored || stored.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION || !stored.baseDesignFingerprint) {
+      cacheByProject.set(key, { metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, baseDesignFingerprint: null, targets: {} });
+      notify();
+      return;
+    }
     cacheByProject.set(key, {
+      metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
       baseDesignFingerprint: stored.baseDesignFingerprint,
       targets: stored.targets || {},
     });
@@ -159,7 +171,12 @@ export function flushTargetCachePersistence(projectId) {
     try {
       const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
       const record = Array.isArray(records) ? records[0] : null;
-      const payload = { target_cache: snapshot };
+      const payload = {
+        completed_cache_version: COMPLETED_BASS_CACHE_VERSION,
+        instance_authority_version: INSTANCE_AUTHORITY_VERSION,
+        metric_schema_version: RP22_BASS_METRIC_SCHEMA_VERSION,
+        target_cache: snapshot,
+      };
       if (record?.id) {
         await base44.entities.ProjectAnalysisCache.update(record.id, payload);
       } else {
