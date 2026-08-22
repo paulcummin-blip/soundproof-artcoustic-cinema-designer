@@ -61,6 +61,40 @@ export function clearBassPendingIndicator(projectId) {
   }
 }
 
+const P14_TARGET_UNSELECTED_KEY = "__ROOM_DESIGNER_P14_TARGET_UNSELECTED__";
+
+/**
+ * Lightweight P14-target-unselected indicator (NOT a rating). Published to a
+ * separate window property so the sidebar can show "Select Bass Target to
+ * complete design rating" when the minimum system is present but no P14
+ * target has been selected — distinct from "Calculating bass analysis…"
+ * which implies a calculation is actually running.
+ */
+export function publishP14TargetUnselectedIndicator(projectId, unselected) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  if (!pid) return;
+  window[P14_TARGET_UNSELECTED_KEY] = { projectId: pid, unselected: unselected === true, ts: Date.now() };
+}
+
+export function readP14TargetUnselectedIndicator(projectId) {
+  if (typeof window === "undefined") return false;
+  const pid = normaliseProjectId(projectId);
+  const indicator = window[P14_TARGET_UNSELECTED_KEY];
+  if (!indicator || normaliseProjectId(indicator.projectId) !== pid) return false;
+  return indicator.unselected === true;
+}
+
+export function clearP14TargetUnselectedIndicator(projectId) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  if (!pid) return;
+  const indicator = window[P14_TARGET_UNSELECTED_KEY];
+  if (indicator && normaliseProjectId(indicator.projectId) === pid) {
+    window[P14_TARGET_UNSELECTED_KEY] = { projectId: pid, unselected: false, ts: Date.now() };
+  }
+}
+
 const ASDR_UNAVAILABLE_KEY = "__ROOM_DESIGNER_ASDR_UNAVAILABLE__";
 
 /**
