@@ -328,11 +328,9 @@ function scoreP18(rawValue, mode) {
 }
 
 function scoreP19(rawValue) {
-  // Engine parity: the bass engine grades P19 via levelP19_lfResponse, which applies
-  // the RP22 design-value floor (Math.floor) before comparing to the ±dB bands.
-  // Re-grading the raw fractional value against the catalog levels diverges from the
-  // engine at the L2/L1 boundary (4 dB). Use the same mapper so the scorecard never
-  // contradicts the authoritative per-seat levels. L1=5 bounded → can FAIL.
+  // Engine parity: grade the direct maximum absolute deviation via the shared
+  // mapper. Never floor, halve, or independently re-grade the authoritative value.
+  // L1=5 is bounded, so values above 5 dB preserve FAIL.
   return applyMapper(rawValue, levelP19_lfResponse, true);
 }
 
