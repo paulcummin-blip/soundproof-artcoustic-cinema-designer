@@ -2,6 +2,7 @@ import { generateCandidatePool } from "@/components/utils/bassOperatingEnvelopeO
 import { BassAnalysisLruCache, BassBackgroundAnalysisController } from "./bassBackgroundAnalysisStore";
 import { stampPoolAuthority, validateCachedBassResult } from "./bassResultAuthority";
 import {
+  BASS_METRIC_SCHEMA_VERSION,
   BASS_OPTIMISER_POOL_VERSION,
   BASS_OPTIMISER_PROTOCOL_VERSION,
   BASS_OPTIMISER_VERSIONS,
@@ -104,6 +105,10 @@ export function runBassOptimiserCompatibilityFixtures() {
   const priorSchema = { ...currentResult(), resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION - 1 };
   const schemaValidation = validateCachedBassResult(priorSchema, { fingerprint: "compatibility-current" });
   check("4. Previous schema version rejected", !schemaValidation.valid && schemaValidation.reason === "result-schema-version-mismatch", schemaValidation.message);
+
+  const priorMetricSchema = { ...currentResult(), metricSchemaVersion: BASS_METRIC_SCHEMA_VERSION - 1 };
+  const metricValidation = validateCachedBassResult(priorMetricSchema, { fingerprint: "compatibility-current" });
+  check("4b. Previous RP22 metric schema rejected", !metricValidation.valid && metricValidation.reason === "metric-schema-version-mismatch", metricValidation.message);
 
   const cache = new BassAnalysisLruCache();
   const fingerprint = "compatibility-cache";
