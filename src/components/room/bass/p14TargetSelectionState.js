@@ -32,3 +32,21 @@ export function resolveP14TargetSelectionState(splConfig) {
   const targetKey = noP14TargetSelected ? null : `${basis}-L${level}`;
   return { noP14TargetSelected, targetKey, basis, level };
 }
+
+/**
+ * Normalise a raw P14 level value to either a valid integer 1–4 or null.
+ *
+ * CRITICAL: Number(null) === 0 and Number.isFinite(0) === true, so a naive
+ * `Number.isFinite(Number(value))` check coerces null → 0 → "valid". This
+ * helper applies an explicit null guard BEFORE numeric coercion so that
+ * null/undefined/0/NaN all remain null — never coerced to L1.
+ *
+ * Use this on every AppState initialization, hydration, and reset path
+ * for selectedP14Level.
+ */
+export function normaliseP14Level(rawLevel) {
+  if (rawLevel == null) return null;
+  const n = Number(rawLevel);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.max(1, Math.min(4, Math.round(n)));
+}

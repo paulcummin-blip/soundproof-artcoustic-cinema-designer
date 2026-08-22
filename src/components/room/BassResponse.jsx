@@ -41,6 +41,7 @@ import Test11GentlePeakCutValidation from "@/components/room/bass/Test11GentlePe
 import { normaliseHouseCurveToP14Total, diagnoseHouseCurveP14Integration } from "@/components/utils/p14HouseCurveNormalisation";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
+import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 
 const IS_DEVELOPMENT_MODE = false;
 

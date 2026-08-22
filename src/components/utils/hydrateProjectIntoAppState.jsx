@@ -13,6 +13,7 @@ import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferIn
 import { migrateP12Mode } from "@/components/utils/p12ModeAuthority";
 import { resolveVisibleWidthInches } from "@/components/hooks/useSeatingRebuild";
 import { computeEffectiveRsp } from "@/components/room/rsp/computeEffectiveRsp";
+import { normaliseP14Level } from "@/components/room/bass/p14TargetSelectionState";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -513,7 +514,13 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       lcrW: 100, surroundsW: 100, overheadsW: 100, globalPowerW: 100,
       globalEqHeadroomDb: 0, radiationMode: 'half-space', p13Mode: 'minimum', perRole: {}
     };
-    appState.setSplConfig(splCfg || defaultSplConfig);
+    // FIX 1: Preserve null P14 level — Number(null)===0 coerces to a valid
+    // level. Apply normaliseP14Level so null stays null through hydration.
+    const mergedSplCfg = splCfg || defaultSplConfig;
+    appState.setSplConfig({
+      ...mergedSplCfg,
+      selectedP14Level: normaliseP14Level(mergedSplCfg?.selectedP14Level),
+    });
   }
 
   // 10b) P12 mode/level (stored inside spl_config on the entity)

@@ -12,6 +12,7 @@ import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferIn
 import { validateInstances, bassInputAdapter, normaliseLegacySubwoofers } from "@/components/utils/subwooferInstanceMigration";
 import { migrateP12Mode, P12_MODE_MINIMUM, P12_MODE_RECOMMENDED } from "@/components/utils/p12ModeAuthority";
 import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuthority";
+import { normaliseP14Level } from "@/components/room/bass/p14TargetSelectionState";
 // Seat priority is an independent user classification. It is intentionally
 // not coupled to the acoustic RSP / legacy isPrimary authority here.
 
@@ -1132,7 +1133,7 @@ function useDesignerState() {
         globalEqHeadroomDb: autosaveConfig.globalEqHeadroomDb || 0,
         radiationMode: autosaveConfig.radiationMode || 'half-space',
         p13Mode: autosaveConfig.p13Mode || 'minimum',
-        p14Mode: autosaveConfig.p14Mode || 'minimum', bassTargetLevel: autosaveConfig.bassTargetLevel || 1, selectedP14TargetBasis: autosaveConfig.selectedP14TargetBasis ?? null, selectedP14Level: Number.isFinite(Number(autosaveConfig.selectedP14Level)) ? Number(autosaveConfig.selectedP14Level) : null,
+        p14Mode: autosaveConfig.p14Mode || 'minimum', bassTargetLevel: autosaveConfig.bassTargetLevel || 1, selectedP14TargetBasis: autosaveConfig.selectedP14TargetBasis ?? null, selectedP14Level: normaliseP14Level(autosaveConfig.selectedP14Level),
         p18Mode: autosaveConfig.p18Mode || autosaveConfig.selectedP18TargetBasis || 'minimum',
         selectedP18TargetBasis: autosaveConfig.selectedP18TargetBasis || autosaveConfig.p18Mode || 'minimum',
         perRole: autosaveConfig.perRole || {},
@@ -1739,6 +1740,8 @@ function useDesignerState() {
           ...p.splConfig,
           p18Mode: p.splConfig.p18Mode || p.splConfig.selectedP18TargetBasis || 'minimum',
           selectedP18TargetBasis: p.splConfig.selectedP18TargetBasis || p.splConfig.p18Mode || 'minimum',
+          // FIX 1: Preserve null P14 level through autosave restore.
+          selectedP14Level: normaliseP14Level(p.splConfig.selectedP14Level),
         }));
       }
       if (typeof p.screenHeight === "number") setScreenHeight(p.screenHeight);
