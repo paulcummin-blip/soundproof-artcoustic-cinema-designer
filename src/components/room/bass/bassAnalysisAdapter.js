@@ -33,7 +33,6 @@ import {
   buildCandidateSignature,
   signatureToString,
 } from "@/components/room/bass/candidateConsistency";
-import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 import { formatP14RecommendedDetail, formatP14TargetBasisDetail, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { buildBassTargetViews } from "@/components/room/bass/bassTargetViews";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
@@ -63,6 +62,15 @@ function countRealSeats(perSeatRawCurves) {
     if (s.__isSyntheticRsp) return false;
     return true;
   }).length;
+}
+
+function hasCanonicalSeatResults(results, realSeatCount) {
+  if (realSeatCount === 0) return true;
+  return Array.isArray(results)
+    && results.length === realSeatCount
+    && results.every((seat) => !!seat?.seatId
+      && Number.isFinite(Number(seat?.variationDbRaw))
+      && Number.isFinite(Number(seat?.level)));
 }
 
 // Map the detailed-calculation hook status to contract job status.
@@ -106,10 +114,8 @@ function progressToNumber(detailedProgress) {
 // Build a compact candidate reference (no large curve arrays duplicated).
 function buildCandidateRef(candidate, collectDiagnostics = false) {
   if (!candidate) return null;
-  const p20Value = Number.isFinite(candidate.achievedP20VariationDb) ? candidate.achievedP20VariationDb : null;
-  const p20Level = p20Value == null
-    ? (typeof candidate.achievedP20Level === "number" ? candidate.achievedP20Level : parseLegacyLevel(candidate.achievedP20Level))
-    : numericRp22Level(levelP20_lfConsistency(p20Value));
+  const p20Value = Number.isFinite(candidate.achievedP20VariationDb) ? Number(candidate.achievedP20VariationDb) : null;
+  const p20Level = Number.isFinite(candidate.achievedP20Level) ? Number(candidate.achievedP20Level) : null;
   return {
     id: candidate.candidateId || null,
     designEqFitProfile: candidate.designEqFitProfile || "standard",
@@ -531,6 +537,7 @@ export function adaptCurrentBassOptimisationResult({
   // are deliberately not fallbacks for readiness.
   const authorityP19 = finalResponse?.finalSeatVariationData?.p19;
   const p19Ready = optimisationResult?.p19AssessmentReady === true
+    && hasCanonicalSeatResults(selectedCandidate?.perSeatP19Results, realSeatCount)
     && isCanonicalP19Ready({
       canonicalPostEqRsp: finalResponse?.canonicalPostEqRsp,
       canonicalTargetCurve: finalResponse?.canonicalTargetCurve,
@@ -561,15 +568,15 @@ export function adaptCurrentBassOptimisationResult({
     });
   } else if (selectedCandidate && selectedCandidate.p20Available) {
     const authorityP20 = finalResponse?.finalSeatVariationData?.p20;
-    const p20Level = typeof authorityP20?.level === "number"
-      ? authorityP20.level
-      : typeof selectedCandidate.achievedP20Level === "number" ? selectedCandidate.achievedP20Level : parseLegacyLevel(selectedCandidate.achievedP20Level);
-    const p20Value = Number.isFinite(authorityP20?.variationDb)
-      ? authorityP20.variationDb
-      : Number.isFinite(selectedCandidate.achievedP20VariationDb) ? selectedCandidate.achievedP20VariationDb : null;
+    const p20Ready = Number.isFinite(authorityP20?.variationDb)
+      && Number.isFinite(authorityP20?.level)
+      && hasCanonicalSeatResults(selectedCandidate?.perSeatP20Results, realSeatCount);
+    const p20Level = p20Ready ? Number(authorityP20.level) : null;
+    const p20Value = p20Ready ? Number(authorityP20.variationDb) : null;
     contract.productAnalysis.parameters.p20 = createBassParameterResult({
-      parameter: PARAM_P20, status: paramStatus(p20Level != null), level: p20Level, value: p20Value,
-      unit: "dB", passedL1: p20Level != null ? p20Level >= 1 : null, isStale,
+      parameter: PARAM_P20, status: p20Ready ? paramStatus(true) : PARAM_STATUS_UPDATING, level: p20Level, value: p20Value,
+      unit: "dB", passedL1: p20Ready ? p20Level >= 1 : null, isStale,
+      reason: p20Ready ? null : "Canonical P20 headline or complete seat evidence is pending",
     });
   } else {
     contract.productAnalysis.parameters.p20 = createBassParameterResult({
