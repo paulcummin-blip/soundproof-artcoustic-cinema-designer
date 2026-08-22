@@ -121,7 +121,7 @@ function summarizeSeatMetrics(seatMetrics, protectedNullRegions = []) {
     seatMetrics,
     worstSeatId: worstSeat.seatId,
     worstSeatMaxDeviationDb: worstSeat.objectiveMaxAbsDeviationDb,
-    worstSeatP19Level: houseCurveP19Level(worstSeat.objectiveMaxAbsDeviationDb / 2),
+    worstSeatP19Level: houseCurveP19Level(worstSeat.objectiveMaxAbsDeviationDb),
     meanSeatMaxDeviationDb: constrainedSeats.reduce((sum, metric) => sum + metric.objectiveMaxAbsDeviationDb, 0) / constrainedSeats.length,
     rmsSeatTargetErrorDb: Math.sqrt(constrainedSeats.reduce((sum, metric) => sum + metric.objectiveRmsDeviationDb ** 2, 0) / constrainedSeats.length),
     rspMaxDeviationDb,
