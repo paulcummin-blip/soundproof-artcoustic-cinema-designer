@@ -1,4 +1,5 @@
 import {
+  BASS_METRIC_SCHEMA_VERSION,
   BASS_OPTIMISER_POOL_VERSION,
   BASS_OPTIMISER_PROTOCOL_VERSION,
   BASS_OPTIMISER_VERSIONS,
@@ -9,6 +10,7 @@ import {
 } from "./bassOptimiserWorkerProtocol";
 
 export {
+  BASS_METRIC_SCHEMA_VERSION,
   BASS_OPTIMISER_POOL_VERSION,
   BASS_OPTIMISER_PROTOCOL_VERSION,
   BASS_RESULT_SCHEMA_VERSION,
@@ -65,6 +67,7 @@ export function buildBassResultCacheKey(calibrationFingerprint) {
     `pool:${BASS_OPTIMISER_POOL_VERSION}`,
     `engine:${HOUSE_CURVE_ENGINE_VERSION}`,
     `result-schema:${BASS_RESULT_SCHEMA_VERSION}`,
+    `metric-schema:${BASS_METRIC_SCHEMA_VERSION}`,
   ].join("|");
 }
 
@@ -116,6 +119,7 @@ export function validateCachedBassResult(result, expectedIdentity = {}) {
     poolVersion: result?.poolVersion,
     engineVersion: result?.engineVersion,
     resultSchemaVersion: result?.resultSchemaVersion,
+    metricSchemaVersion: result?.metricSchemaVersion,
     fingerprint: result?.fingerprint ?? result?.identity?.fingerprint ?? null,
   };
   if (!result) return { valid: false, reason: "missing-result", message: describeOptimiserCompatibility(expected, actual, "missing-result") };
@@ -123,6 +127,7 @@ export function validateCachedBassResult(result, expectedIdentity = {}) {
   if (!resultVersions.valid) {
     const reason = resultVersions.field === "engineVersion" ? "engine-version-mismatch"
       : resultVersions.field === "resultSchemaVersion" ? "result-schema-version-mismatch"
+      : resultVersions.field === "metricSchemaVersion" ? "metric-schema-version-mismatch"
       : resultVersions.field === "poolVersion" ? "pool-version-mismatch"
       : "protocol-version-mismatch";
     return { valid: false, reason, message: describeOptimiserCompatibility(expected, actual, reason), expected, actual };
@@ -136,6 +141,7 @@ export function validateCachedBassResult(result, expectedIdentity = {}) {
     poolVersion: pool?.poolVersion,
     engineVersion: pool?.engineVersion,
     resultSchemaVersion: pool?.resultSchemaVersion,
+    metricSchemaVersion: pool?.metricSchemaVersion,
     fingerprint: actual.fingerprint,
   };
   const poolVersions = validateOptimiserVersions(poolActual, expected);
