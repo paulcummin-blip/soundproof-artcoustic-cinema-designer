@@ -67,6 +67,7 @@ import { resolveSeatPriority, getPrimarySeats, getSecondarySeats } from '@/compo
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
 import { resolveBassReadiness } from '@/components/hooks/useAppDesignRating';
+import { publishDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -232,6 +233,7 @@ function RP22ReportInner() {
                 setProjectDetails(null);
                 setReportHydrating(false);
                 setReportReadyProjectId(null);
+                setReportProjectError("Project could not be resolved for Technical Report.");
                 return;
             }
             setProjectDetails({
@@ -286,6 +288,7 @@ function RP22ReportInner() {
             setProjectDetails(null);
             setReportHydrating(false);
             setReportReadyProjectId(null);
+            setReportProjectError("Project could not be resolved for Technical Report.");
         });
 
         return () => {
