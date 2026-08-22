@@ -254,7 +254,11 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     const heavyPoolReused = lifecycle.cacheStatus === "hit";
     const baseResult = {
       ...selected,
-      ...BASS_OPTIMISER_VERSIONS,
+      protocolVersion: matchingResult.protocolVersion,
+      poolVersion: matchingResult.poolVersion,
+      engineVersion: matchingResult.engineVersion,
+      resultSchemaVersion: matchingResult.resultSchemaVersion,
+      metricSchemaVersion: matchingResult.metricSchemaVersion,
       cacheKey,
       cacheSource: lifecycle.cacheRejectionReason ? "rejected-stale" : lifecycle.cacheStatus === "hit" ? "restored" : "fresh",
       cacheRejectionReason: lifecycle.cacheRejectionReason || null,
