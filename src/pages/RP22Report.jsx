@@ -367,7 +367,10 @@ function RP22ReportInner() {
             return;
         }
         if (reportHydrating || reportReadyProjectId !== explicitProjectId) return;
-        if (!bassReadiness.ready) return; // wait for completed bass authority
+        // FIX 5: P14 unselected is a valid settled state — do not wait for a
+        // bass calculation that was never requested. Only block when bass is
+        // genuinely pending (calculation in progress or hydrating).
+        if (bassReportPending) return;
         if (isPrinting) return;
         autoPrintTriggeredRef.current = true;
         setExportStatus("Auto-printing from Design Review…");
@@ -376,7 +379,7 @@ function RP22ReportInner() {
         setPlanDimsImageDataUrl(null);
         setPlanSpeakerDimsImageDataUrl(null);
         setIsPrinting(true);
-    }, [autoPrintRequested, reportHydrating, explicitProjectId, reportReadyProjectId, isPrinting, bassReadiness.ready]);
+    }, [autoPrintRequested, reportHydrating, explicitProjectId, reportReadyProjectId, isPrinting, bassReportPending]);
 
     // Mark printReady when all captures are done
     useEffect(() => {
@@ -922,8 +925,12 @@ function RP22ReportInner() {
     // ONLY existing canonical authority inputs — no thresholds, FAIL rules,
     // or bass scoring are reimplemented. The adapter is the sole scoring authority.
     const designRatingAuthority = React.useMemo(() => {
-        if (!showDesignRating) return null;
-        const input = buildDesignRatingInput({
+    if (!showDesignRating) return null;
+    // FIX 4: Do not publish numeric ASDR when P14 target is unselected.
+    // The report may still render — bass params show "Select Bass Target"
+    // and ASDR shows "Select Bass Target to complete design rating".
+    if (p14Selection.noP14TargetSelected) return null;
+    const input = buildDesignRatingInput({
             seats,
             analysisResult,
             reportSeatHudById,

@@ -1656,11 +1656,36 @@ function RoomDesignerWithState() {
       !handoffProjectId ||
       loadState?.phase !== "loaded" ||
       appState?.isProjectHydrationReady !== true ||
-      !appDesignRating ||
-      appDesignRating?.isPendingBass === true ||
       !hasCompleteSeatJoin ||
       !analysisCountsMatch
     ) {
+      return;
+    }
+
+    // FIX 3: P14 target unselected — publish a null rating so the sidebar
+    // shows "Select Bass Target to complete design rating" instead of a
+    // partial non-bass numeric ASDR. Priority: insufficient system >
+    // P14 unselected > bass pending > final ASDR.
+    if (appDesignRating?.isP14TargetUnselected === true) {
+      publishDesignReviewHandoff({
+        projectId: handoffProjectId,
+        showAsdr,
+        rating: null,
+        recommendations: null,
+        analysisResult,
+        seatingPositions: currentSeats,
+        placedSpeakers,
+        frontSubs: frontSubsForRendering,
+        rearSubs: rearSubsForRendering,
+        screen: _screen,
+        dolbyLayout: dolbyPreset,
+        mlpPoint: mlpAnchorEffective,
+        priceData: publishedPriceData,
+      });
+      return;
+    }
+
+    if (!appDesignRating || appDesignRating?.isPendingBass === true) {
       return;
     }
 

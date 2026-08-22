@@ -73,6 +73,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   } = authoritative;
   const activeProjectId = useActiveProjectId();
   const layoutContextId = resolveBestSubLayoutContextId({ projectId: activeProjectId, roomDims });
+  const p14Selection = resolveP14TargetSelectionState(authoritative?.requested);
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
   const totalSubCount = (frontSubsCfg?.count || 0) + (rearSubsCfg?.count || 0);
   const hasNoSubs = totalSubCount === 0;
@@ -574,8 +575,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       {/* 2. P14/P18/P19/P20 result cards — replace long thin bars */}
       <BassResultCards />
 
-      {/* 3. Primary limitation + Recommended improvement */}
-      <BassDesignRecommendation recommendation={sharedBassResults.contract?.designRecommendation} />
+      {/* 3. Primary limitation + Recommended improvement — gated when P14 unselected */}
+      {p14Selection.noP14TargetSelected ? null : (
+        <BassDesignRecommendation recommendation={sharedBassResults.contract?.designRecommendation} />
+      )}
       
       {(subWarnings?.front?.length > 0 || subWarnings?.rear?.length > 0) && (
         <Alert className="border border-[#C1B6AD] bg-[#F8F8F7] text-[#3E4349]">
@@ -604,7 +607,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         </div>
       )}
 
-      {/* Bass Response Graph */}
+      {/* Bass Response Graph — gated when P14 target unselected */}
+      {p14Selection.noP14TargetSelected ? (
+        <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center" }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#625143" }}>Select Bass Target</div>
+          <div style={{ fontSize: 12, color: "#8B7F76", marginTop: 4 }}>Choose a bass target to view the response graph</div>
+        </div>
+      ) : (
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
@@ -892,6 +901,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           onToggle={toggleModalLine}
         />
       </div>
+      )}
 
       {/* Designer Metrics — moved below the graph to keep the top summary clean */}
       {simulationResults.metrics?.fairness && (
