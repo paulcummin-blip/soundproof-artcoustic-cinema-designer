@@ -34,7 +34,6 @@ import {
   signatureToString,
 } from "@/components/room/bass/candidateConsistency";
 import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
-import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 import { formatP14RecommendedDetail, formatP14TargetBasisDetail, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { buildBassTargetViews } from "@/components/room/bass/bassTargetViews";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
@@ -157,12 +156,17 @@ function buildCandidateRef(candidate, collectDiagnostics = false) {
     worstP20SeatId: candidate.worstP20SeatId ?? null,
     perSeatP20Results: Array.isArray(candidate.perSeatP20Results) ? candidate.perSeatP20Results.map((seat) => ({ ...seat })) : [],
     p20Available: !!candidate.p20Available,
-    perSeatP19Results: (Array.isArray(candidate.perSeatMetrics) ? candidate.perSeatMetrics : []).map((seat) => ({
-      seatId: seat?.seatId ?? null,
-      variationDbRaw: Number.isFinite(seat?.maxAbsDeviationDb) ? seat.maxAbsDeviationDb / 2 : null,
-      level: Number.isFinite(seat?.maxAbsDeviationDb) ? houseCurveP19Level(seat.maxAbsDeviationDb / 2) : null,
-      worstFrequencyHz: Number.isFinite(seat?.worstFrequencyHz) ? seat.worstFrequencyHz : null,
-    })),
+    // Canonical P19 seat authority is computed once by
+    // computeOfficialPerSeatP19Assessment. Do not recreate or halve it here.
+    perSeatP19Results: (Array.isArray(candidate.perSeatP19Results) ? candidate.perSeatP19Results : [])
+      .map((seat) => ({
+        seatId: seat?.seatId ?? null,
+        variationDbRaw: Number.isFinite(seat?.variationDbRaw) ? Number(seat.variationDbRaw) : null,
+        displayVariationDb: Number.isFinite(seat?.displayVariationDb) ? Number(seat.displayVariationDb) : null,
+        level: Number.isFinite(seat?.level) ? Number(seat.level) : null,
+        worstFrequencyHz: Number.isFinite(seat?.worstFrequencyHz) ? Number(seat.worstFrequencyHz) : null,
+      }))
+      .filter((seat) => seat.seatId && Number.isFinite(seat.variationDbRaw) && Number.isFinite(seat.level)),
     perSeatDiagnostics: (Array.isArray(candidate.perSeatMetrics) ? candidate.perSeatMetrics : []).map((seat) => ({
       seatId: seat?.seatId ?? null,
       maxAbsDeviationDb: Number.isFinite(seat?.maxAbsDeviationDb) ? seat.maxAbsDeviationDb : null,
