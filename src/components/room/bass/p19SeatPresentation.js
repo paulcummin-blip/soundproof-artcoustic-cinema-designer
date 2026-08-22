@@ -80,7 +80,7 @@ export function p19RspResult(parameter) {
   if (!parameter || parameter.status !== "complete" || parameter.level == null || !finite(parameter.value)) return null;
   const designVal = resolveRp22DesignValue(19, Math.abs(Number(parameter.value)));
   return {
-    level: `L${parameter.level}`,
+    level: Number(parameter.level) > 0 ? `L${parameter.level}` : "FAIL",
     value: Number(parameter.value),
     displayValue: `±${designVal} dB`,
   };
