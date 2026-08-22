@@ -91,15 +91,15 @@ export function assessLayoutResult(layout, transferResult, directReferenceResult
     transferEfficiencyClass: efficiency.transferEfficiencyClass,
     perSeat,
   };
-  metrics.p19Level = rspOnly ? null : houseCurveP19Level(metrics.meanSeatVariationDb / 2);
-  metrics.p20Level = rspOnly ? null : numericRp22Level(levelP20_lfConsistency(metrics.worstSeatVariationDb / 2));
+  metrics.p19Level = rspOnly ? null : houseCurveP19Level(metrics.meanSeatVariationDb);
+  metrics.p20Level = rspOnly ? null : numericRp22Level(levelP20_lfConsistency(metrics.worstSeatVariationDb));
   metrics.combinedConsistencyLevel = (metrics.p19Level || 0) + (metrics.p20Level || 0);
   metrics.placementGrade = gradeLayout(metrics, rspOnly);
   metrics.overallGrade = metrics.placementGrade;
   metrics.rankingScore = round(metrics.combinedConsistencyLevel * 1000000 - metrics.worstSeatVariationDb * 1000 - metrics.destructiveBroadNullCount * 100 + (metrics.worstSeatTransferEfficiencyDb ?? -100), 3);
   metrics.rankingReason = rspOnly
     ? "Provisional placement guidance based on the reference seating position."
-    : `P19 L${metrics.p19Level} and P20 L${metrics.p20Level}; recommended for bass consistency across the listening area.`;
+    : `P19 ${metrics.p19Level > 0 ? `L${metrics.p19Level}` : "FAIL"} and P20 ${metrics.p20Level > 0 ? `L${metrics.p20Level}` : "FAIL"}; pre-EQ placement estimate.`;
   return { ...layout, metrics };
 }
 
