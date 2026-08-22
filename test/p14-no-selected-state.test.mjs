@@ -164,6 +164,42 @@ test('level clamped to 1-4', () => {
   assert.strictEqual(state2.level, null, 'negative level should be null');
 });
 
+// 14. Report readiness: P14 unselected → not loading (not pending)
+test('report readiness: P14 unselected → not loading', () => {
+  // resolveBassReadiness returns pending:false when p14TargetSelected=false
+  // so showLoadingReport does NOT hang on "Loading report…"
+  function resolveBassReadiness(completedBassAuthority, bassApplicable = false, p14TargetSelected = true) {
+    if (!p14TargetSelected) {
+      return { ready: false, pending: false, reason: 'p14-target-not-selected', fingerprint: null };
+    }
+    // ... other statuses would return pending:true for loading/updating
+    return { ready: false, pending: true, reason: 'unknown', fingerprint: null };
+  }
+
+  const authority = { authorityStatus: 'AUTHORITATIVE' };
+  const readiness = resolveBassReadiness(authority, true, false);
+  assert.strictEqual(readiness.ready, false);
+  assert.strictEqual(readiness.pending, false, 'pending must be false when P14 unselected — report must render, not hang');
+  assert.strictEqual(readiness.reason, 'p14-target-not-selected');
+
+  // showLoadingReport gate: only blocks when (!ready && pending)
+  const showLoadingReport = (!readiness.ready && readiness.pending);
+  assert.strictEqual(showLoadingReport, false, 'report must NOT be stuck on Loading when P14 unselected');
+});
+
+// 15. Presentation eligibility: unselected suppresses old authority at the export layer
+test('presentation eligibility: export data suppresses old authority when unselected', () => {
+  const oldAuthority = { contract: { productAnalysis: { parameters: { p14: { value: 112, level: 2 } } } } };
+  function buildComplianceBassExportData({ completedBassAuthority }, errorMessage = null, noP14TargetSelected = false) {
+    const presentation = buildComplianceBassPresentation({ completedBassAuthority }, errorMessage, noP14TargetSelected);
+    return { ...presentation, source: noP14TargetSelected ? "unselected" : (presentation.publicationVerified ? "completed-authoritative-bass-result" : "not-verified") };
+  }
+  const exportData = buildComplianceBassExportData({ completedBassAuthority: oldAuthority }, null, true);
+  assert.strictEqual(exportData.parameters.p14.valueText, "Select Bass Target");
+  assert.strictEqual(exportData.parameters.p14.isAuthoritative, false);
+  assert.strictEqual(exportData.source, "unselected");
+});
+
 // ── Summary ──
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

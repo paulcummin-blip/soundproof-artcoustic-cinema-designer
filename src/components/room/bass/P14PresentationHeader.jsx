@@ -14,7 +14,9 @@ export default function P14PresentationHeader({
 }) {
   const targetDb = Number.isFinite(selectedP14TargetDb) ? Math.round(selectedP14TargetDb) : null;
   const basisLabel = selectedP14TargetBasis === "recommended" ? "Recommended" : "Minimum";
-  const levelNum = Math.max(1, Math.min(4, Math.round(Number(selectedP14Level) || 1)));
+  const levelNum = (Number.isFinite(Number(selectedP14Level)) && Number(selectedP14Level) > 0)
+    ? Math.max(1, Math.min(4, Math.round(Number(selectedP14Level))))
+    : null;
   const capabilityDb = Number.isFinite(availableP14CapabilityDb) ? availableP14CapabilityDb : null;
   const headroomDb = capabilityDb != null && targetDb != null ? capabilityDb - targetDb : null;
   const p19Variation = Number.isFinite(achievedP19VariationDb) ? achievedP19VariationDb : null;

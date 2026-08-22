@@ -438,7 +438,9 @@ export function adaptCurrentBassOptimisationResult({
   // `requestedTargetDb`. Fail closed: if achieved capability is missing, value
   // is null and the parameter is unavailable — the target is never substituted
   // as capability.
-  const p14SelectedLevel = Math.max(1, Math.min(4, Math.round(Number(selectedP14Level) || 4)));
+  const p14SelectedLevel = (Number.isFinite(Number(selectedP14Level)) && Number(selectedP14Level) > 0)
+    ? Math.max(1, Math.min(4, Math.round(Number(selectedP14Level))))
+    : null;
   const requestedTargetDb = Number.isFinite(selectedP14TargetDb) ? selectedP14TargetDb : selectedCandidate?.selectedP14TargetDb ?? null;
   const selectedP14TargetBasis = normalizeP14TargetBasis(p14TargetBasis);
   // C6.2C1: Capability source preference order (never falls back to requestedTargetDb):

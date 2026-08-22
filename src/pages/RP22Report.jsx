@@ -146,7 +146,7 @@ function RP22ReportInner() {
         [app?.splConfig?.selectedP14TargetBasis, app?.splConfig?.selectedP14Level]
     );
     const completedBassPresentation = useMemo(() => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage, p14Selection.noP14TargetSelected), [completedBassAuthority, bassErrorMessage, p14Selection.noP14TargetSelected]);
-    const complianceBassExportData = useMemo(() => buildComplianceBassExportData({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);
+    const complianceBassExportData = useMemo(() => buildComplianceBassExportData({ completedBassAuthority }, bassErrorMessage, p14Selection.noP14TargetSelected), [completedBassAuthority, bassErrorMessage, p14Selection.noP14TargetSelected]);
 
     // ── Bass readiness gate (reuses the SAME authority as Room Designer) ──
     // The report must not publish any numeric ASDR, P14–P20, or seat-level

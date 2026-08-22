@@ -187,8 +187,8 @@ export function buildComplianceBassPresentation({ completedBassAuthority }, erro
   };
 }
 
-export function buildComplianceBassExportData({ completedBassAuthority }, errorMessage = null) {
-  const presentation = buildComplianceBassPresentation({ completedBassAuthority }, errorMessage);
+export function buildComplianceBassExportData({ completedBassAuthority }, errorMessage = null, noP14TargetSelected = false) {
+  const presentation = buildComplianceBassPresentation({ completedBassAuthority }, errorMessage, noP14TargetSelected);
   // C6.2D1A: Removed unused destructured publication fields.
   return {
     ...presentation,
