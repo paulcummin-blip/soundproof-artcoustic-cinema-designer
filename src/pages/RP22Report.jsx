@@ -67,7 +67,7 @@ import { resolveSeatPriority, getPrimarySeats, getSecondarySeats } from '@/compo
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
 import { resolveBassReadiness } from '@/components/hooks/useAppDesignRating';
-import { publishDesignReviewHandoff } from '@/components/state/designReviewHandoff';
+import { publishDesignReviewHandoff, clearDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -180,8 +180,12 @@ function RP22ReportInner() {
             setProjectDetails(null);
             setReportHydrating(false);
             setReportReadyProjectId(null);
+            setReportProjectError("Project could not be resolved for Technical Report.");
             return;
         }
+
+        // Clear any prior error when resolving a new valid project.
+        setReportProjectError(null);
 
         // ── FAST PATH (SPA navigation from Room Designer) ──────────────────
         // If the shared AppStateProvider is already hydrated for the EXACT
@@ -944,6 +948,34 @@ function RP22ReportInner() {
         all: roomDesignRating,
       };
     }, [designRatingAuthority, seats, roomDesignRating]);
+
+    // ── Publish report ASDR to the shared sidebar handoff ─────────────────
+    // RP22Report computes its own authoritative ASDR. While the report page
+    // is mounted, publish the resolved rating into the same
+    // __ROOM_DESIGNER_ASDR__ handoff the Layout sidebar reads, so the sidebar
+    // shows the report's current project-scoped ASDR instead of a stale/null
+    // value from the unmounted Room Designer. On unmount, clear only if the
+    // handoff still belongs to this report's project — never clobber another
+    // page's newer publication.
+    React.useEffect(() => {
+      if (!explicitProjectId) return;
+      if (!showDesignRating || !roomDesignRating || !scopedRatings) return;
+
+      publishDesignReviewHandoff({
+        projectId: explicitProjectId,
+        showAsdr: showDesignRating,
+        rating: { ...roomDesignRating, scopedRatings },
+        recommendations: designRecommendations || null,
+      });
+
+      return () => {
+        if (typeof window === "undefined" || !window.__ROOM_DESIGNER_ASDR__) return;
+        const current = window.__ROOM_DESIGNER_ASDR__;
+        if (String(current.projectId || "") === String(explicitProjectId)) {
+          clearDesignReviewHandoff(explicitProjectId);
+        }
+      };
+    }, [explicitProjectId, showDesignRating, roomDesignRating, scopedRatings, designRecommendations]);
 
     // Export gate: block PDF export until the recommendation engine has settled
     // (all candidates terminated — valid rating OR timeout/null). Only applies

@@ -148,8 +148,21 @@ export default function Layout({ children, currentPageName }) {
         }
       }
       if (typeof window !== 'undefined' && window.__ROOM_DESIGNER_ASDR__) {
-        setAsdrRating(window.__ROOM_DESIGNER_ASDR__.rating || null);
-        setAsdrRecommendations(window.__ROOM_DESIGNER_ASDR__.recommendations || null);
+        const sharedAsdr = window.__ROOM_DESIGNER_ASDR__;
+        const sameProjectAsdr =
+          sharedAsdr &&
+          activeProjectId &&
+          String(sharedAsdr.projectId || '') === String(activeProjectId);
+        if (sameProjectAsdr) {
+          setAsdrRating(sharedAsdr.rating || null);
+          setAsdrRecommendations(sharedAsdr.recommendations || null);
+        } else {
+          setAsdrRating(null);
+          setAsdrRecommendations(null);
+        }
+      } else {
+        setAsdrRating(null);
+        setAsdrRecommendations(null);
       }
       setBassPending(readBassPendingIndicator(activeProjectId));
       const unavailable = readAsdrUnavailableIndicator(activeProjectId);
