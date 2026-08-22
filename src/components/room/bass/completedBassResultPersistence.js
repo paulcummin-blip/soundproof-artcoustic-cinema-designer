@@ -216,13 +216,9 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
  * Reconstruct the persisted-authority wrapper from a raw ProjectAnalysisCache
  * record. This is the exact adapter used by hydrateCompletedBassAuthority().
  *
- * Stamps the required top-level `instanceAuthorityVersion` so
- * resolvePersistedBassAuthority() accepts the wrapper on cold hydration
- * instead of rejecting it to UNCALCULATED (the defect that deadlocked the
- * direct Technical Report on "Loading report…").
- *
- * The same authority version already stored on the persisted completed
- * contract is used — no separate report-specific value is invented.
+ * Copies the record's persisted cache, instance, and RP22 metric generations.
+ * It must never stamp current versions onto an old record, because doing so
+ * would relabel stale physics as current authority.
  */
 export function buildHydratedPersistedWrapper(record) {
   if (!record) return null;
