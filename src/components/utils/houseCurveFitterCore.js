@@ -37,7 +37,7 @@ const CUT_PEAK_REDUCTION_DB = 0.5;
 const CUT_AREA_REDUCTION_DB = 0.01;
 
 // P19 level from the authoritative symmetric ± variation. Whole-dB
-// favourable flooring is applied before the ±2/3/4/5 boundaries.
+// Direct maximum-deviation grading is applied at the ±2/3/4/5 boundaries.
 export function houseCurveP19Level(variationDb) {
   if (!isNumber(variationDb)) return 0;
   return numericRp22Level(levelP19_lfResponse(Number(variationDb))) ?? 0;
