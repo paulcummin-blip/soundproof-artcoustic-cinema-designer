@@ -56,6 +56,17 @@ test("levelP19_lfResponse boundary cases around 2 / 3 / 4 / 5", async () => {
   assert.equal(levelP19_lfResponse(6.0).level, "FAIL");
 });
 
+test("P20 direct boundaries have no L1", async () => {
+  const { levelP20_lfConsistency } = await loadLevels();
+  assert.equal(levelP20_lfConsistency(2.0).level, "L4");
+  assert.equal(levelP20_lfConsistency(2.01).level, "L3");
+  assert.equal(levelP20_lfConsistency(3.0).level, "L3");
+  assert.equal(levelP20_lfConsistency(3.01).level, "L2");
+  assert.equal(levelP20_lfConsistency(4.0).level, "L2");
+  assert.equal(levelP20_lfConsistency(4.01).level, "FAIL");
+  assert.notEqual(levelP20_lfConsistency(100).level, "L1");
+});
+
 test("scoreP19 delegates to levelP19_lfResponse (engine parity wiring)", async () => {
   const src = await readFile(
     new URL("../src/components/report/technical/artcousticSystemDesignRating.js", import.meta.url),
@@ -67,6 +78,18 @@ test("scoreP19 delegates to levelP19_lfResponse (engine parity wiring)", async (
   assert.doesNotMatch(src, /function scoreP19[\s\S]*?applyCatalogThresholds\(rawValue,\s*cat\.levels/);
   // Import is present
   assert.match(src, /levelP19_lfResponse/);
+});
+
+test("scoreP20 delegates to the shared mapper and preserves FAIL", async () => {
+  const { levelP20_lfConsistency } = await loadLevels();
+  const src = await readFile(
+    new URL("../src/components/report/technical/artcousticSystemDesignRating.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(src, /function scoreP20[\s\S]*?levelP20_lfConsistency/);
+  for (const value of [2, 2.01, 3, 3.01, 4, 4.01, 10]) {
+    assert.equal(applyMapper(value, levelP20_lfConsistency, true).level, levelP20_lfConsistency(value).level);
+  }
 });
 
 test("scoreP19 output === levelP19_lfResponse for representative boundary values", async () => {
