@@ -95,7 +95,7 @@ function buildCandidate({ rawCurve, activeSubs, usableLfHz, transitionHz, target
   const achievedP14Level = isNumber(achievedP14Db) ? levelForP14(achievedP14Db) : 0;
   const p18 = extensionResult(smoothed);
   const p19Band = smoothed.filter((point) => point.frequency >= 15 && point.frequency <= transitionHz);
-  const p19VariationDb = p19Band.length ? Math.max(...p19Band.map((point) => Math.abs(point.spl - (target.spl + houseOffset(point.frequency))))) / 2 : null;
+  const p19VariationDb = p19Band.length ? Math.max(...p19Band.map((point) => Math.abs(point.spl - (target.spl + houseOffset(point.frequency))))) : null;
   const achievedP19Level = houseCurveP19Level(p19VariationDb);
   const allAtLeastL1 = achievedP14Level >= 1 && p18.level >= 1 && achievedP19Level >= 1;
   const rejectionReason = allAtLeastL1 ? null : [
