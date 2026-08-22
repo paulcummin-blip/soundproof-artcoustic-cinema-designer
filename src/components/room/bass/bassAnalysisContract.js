@@ -14,6 +14,7 @@
 // It exists alongside the current implementation and has zero visible effect.
 
 import { isValidFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
+import { BASS_ANALYSIS_CONTRACT_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "../../../../base44/shared/bassAuthorityVersion.js";
 import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 
 export { isValidFingerprint };
@@ -176,11 +177,12 @@ export function formatParameterResult(result) {
 // 3. Versioned contract factory
 // ---------------------------------------------------------------------------
 
-export const BASS_ANALYSIS_CONTRACT_VERSION = 6;
+export { BASS_ANALYSIS_CONTRACT_VERSION };
 
 export function createBassAnalysisResult() {
   return {
     version: BASS_ANALYSIS_CONTRACT_VERSION,
+    metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
     analysisId: null,
 
     fingerprints: {
@@ -203,6 +205,7 @@ export function createBassAnalysisResult() {
       cacheRejectionReason: null,
       engineVersion: null,
       resultSchemaVersion: null,
+      metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
       progress: null, // number 0–1 or null — never an object
       phase: null, // genuine worker phase text only
       message: null,
