@@ -1,6 +1,11 @@
-import { INSTANCE_AUTHORITY_VERSION } from "../../../../base44/shared/bassAuthorityVersion.js";
+import {
+  BASS_ANALYSIS_CONTRACT_VERSION,
+  COMPLETED_BASS_CACHE_VERSION,
+  INSTANCE_AUTHORITY_VERSION,
+  RP22_BASS_METRIC_SCHEMA_VERSION,
+} from "../../../../base44/shared/bassAuthorityVersion.js";
 
-export const COMPLETED_BASS_CACHE_VERSION = 2;
+export { COMPLETED_BASS_CACHE_VERSION };
 
 /**
  * Explicit authority status — distinct from job status.
@@ -22,6 +27,8 @@ export const BASS_AUTHORITY_STATUS = Object.freeze({
 export function isStructurallyCompleteBassContract(contract) {
   const status = contract?.job?.status;
   return ["ready", "complete"].includes(status)
+    && contract?.version === BASS_ANALYSIS_CONTRACT_VERSION
+    && contract?.metricSchemaVersion === RP22_BASS_METRIC_SCHEMA_VERSION
     && !!contract?.selectedCandidate
     && !!contract?.selectedCandidateId
     && !!contract?.job?.resultFingerprint
@@ -101,6 +108,7 @@ export function compactCompletedBassContract(contract) {
   return {
     version: contract.version,
     instanceAuthorityVersion: INSTANCE_AUTHORITY_VERSION,
+    metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
     analysisId: contract.analysisId,
     fingerprints: contract.fingerprints,
     job: { ...contract.job, status: "complete" },
@@ -154,7 +162,11 @@ export function bassContractMatchesRequestedP14(contract, requested) {
 }
 
 export function buildPersistedBassAuthority(existing, currentFingerprint, contract = null, forceUpdating = false) {
-  const previous = existing && typeof existing === "object" ? existing : {};
+  const compatibleExisting = existing
+    && existing.version === COMPLETED_BASS_CACHE_VERSION
+    && existing.instanceAuthorityVersion === INSTANCE_AUTHORITY_VERSION
+    && existing.metricSchemaVersion === RP22_BASS_METRIC_SCHEMA_VERSION;
+  const previous = compatibleExisting ? existing : {};
   const completedByFingerprint = { ...(previous.completedByFingerprint || {}) };
   // If the contract is already compact (has graphPayload, lacks
   // finalOptimisedBassResponse), use it directly instead of re-compacting.
@@ -171,6 +183,7 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
   return {
     version: COMPLETED_BASS_CACHE_VERSION,
     instanceAuthorityVersion: INSTANCE_AUTHORITY_VERSION,
+    metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
     currentFingerprint: fingerprint,
     // Preserve "complete" when a matching structurally-complete snapshot exists
     // for the current fingerprint, even if forceUpdating is true (transient
@@ -197,8 +210,9 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
 export function buildHydratedPersistedWrapper(record) {
   if (!record) return null;
   return {
-    version: COMPLETED_BASS_CACHE_VERSION,
-    instanceAuthorityVersion: INSTANCE_AUTHORITY_VERSION,
+    version: record.completed_cache_version,
+    instanceAuthorityVersion: record.instance_authority_version,
+    metricSchemaVersion: record.metric_schema_version,
     currentFingerprint: record.current_fingerprint,
     status: record.status,
     completedByFingerprint: record.completed_by_fingerprint,
@@ -214,8 +228,10 @@ export function buildHydratedPersistedWrapper(record) {
 export function resolvePersistedBassAuthority(projectId, persisted) {
   const state = persisted && typeof persisted === "object" ? persisted : {};
 
-  // Cache isolation: reject records without the correct authority version.
-  if (state.instanceAuthorityVersion !== INSTANCE_AUTHORITY_VERSION) {
+  // Cache isolation: reject records without the current cache, instance, and metric generations.
+  if (state.version !== COMPLETED_BASS_CACHE_VERSION
+    || state.instanceAuthorityVersion !== INSTANCE_AUTHORITY_VERSION
+    || state.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION) {
     return {
       projectId: String(projectId || "free"),
       status: "uncalculated",
@@ -237,6 +253,8 @@ export function resolvePersistedBassAuthority(projectId, persisted) {
   const validSnapshots = Object.fromEntries(
     Object.entries(snapshots).filter(
       ([, snap]) => snap?.instanceAuthorityVersion === INSTANCE_AUTHORITY_VERSION
+        && snap?.version === BASS_ANALYSIS_CONTRACT_VERSION
+        && snap?.metricSchemaVersion === RP22_BASS_METRIC_SCHEMA_VERSION
     )
   );
 
