@@ -56,7 +56,21 @@ function buildP18Fields(parameter) {
   };
 }
 
-export function formatAuthoritativeBassParameter(completedBassAuthority, key, errorMessage = null) {
+export function formatAuthoritativeBassParameter(completedBassAuthority, key, errorMessage = null, noP14TargetSelected = false) {
+  // P14 target genuinely unselected — no calculation has been requested.
+  // Show a neutral "Select Bass Target" state. Old completed authority from
+  // a previous target selection is NOT surfaced as current.
+  if (noP14TargetSelected) {
+    return {
+      key,
+      valueText: "Select Bass Target",
+      level: "—",
+      status: "unselected",
+      isAuthoritative: false,
+      publicationRejectionReason: null,
+    };
+  }
+
   const { contract, publicationVerified, publicationRejectionReason } = resolvePublicationState(completedBassAuthority);
   const safeErrorMessage = typeof errorMessage === "string" && errorMessage.trim() ? errorMessage : null;
 
@@ -141,14 +155,14 @@ export function formatAuthoritativeBassParameter(completedBassAuthority, key, er
   return result;
 }
 
-export function buildComplianceBassPresentation({ completedBassAuthority }, errorMessage = null) {
+export function buildComplianceBassPresentation({ completedBassAuthority }, errorMessage = null, noP14TargetSelected = false) {
   const { contract, publicationVerified, publicationRejectionReason } = resolvePublicationState(completedBassAuthority);
   const safeErrorMessage = typeof errorMessage === "string" && errorMessage.trim()
     ? errorMessage
     : (typeof completedBassAuthority?.errorMessage === "string" && completedBassAuthority.errorMessage.trim()
       ? completedBassAuthority.errorMessage
       : null);
-  const parameters = Object.fromEntries(["p14", "p18", "p19", "p20"].map((key) => [key, formatAuthoritativeBassParameter(completedBassAuthority, key, safeErrorMessage)]));
+  const parameters = Object.fromEntries(["p14", "p18", "p19", "p20"].map((key) => [key, formatAuthoritativeBassParameter(completedBassAuthority, key, safeErrorMessage, noP14TargetSelected)]));
   // Per-seat arrays are publication-gated: only expose official-looking
   // per-seat L1/L2/L3/L4 results when the contract is canonically published.
   // When NOT_VERIFIED / UPDATING, return empty arrays so the UI shows a

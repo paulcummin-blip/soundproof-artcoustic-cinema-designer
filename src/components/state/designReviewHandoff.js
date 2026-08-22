@@ -36,11 +36,16 @@ const BASS_PENDING_KEY = "__ROOM_DESIGNER_BASS_PENDING__";
  * window property so the sidebar can show "Calculating bass analysis…"
  * without publishing a pending rating to __ROOM_DESIGNER_ASDR__.
  */
-export function publishBassPendingIndicator(projectId, pending) {
+export function publishBassPendingIndicator(projectId, pending, p14TargetUnselected = false) {
   if (typeof window === "undefined") return;
   const pid = normaliseProjectId(projectId);
   if (!pid) return;
-  window[BASS_PENDING_KEY] = { projectId: pid, pending: pending === true, ts: Date.now() };
+  window[BASS_PENDING_KEY] = {
+    projectId: pid,
+    pending: pending === true,
+    p14TargetUnselected: p14TargetUnselected === true,
+    ts: Date.now(),
+  };
 }
 
 export function readBassPendingIndicator(projectId) {
@@ -51,47 +56,28 @@ export function readBassPendingIndicator(projectId) {
   return indicator.pending === true;
 }
 
+/**
+ * Read the P14-target-unselected flag from the SAME bass-pending indicator
+ * object. This is NOT a second indicator — it extends the existing one so
+ * the sidebar can distinguish "P14 target not selected" (neutral, no
+ * calculation running) from "bass genuinely calculating" (real foreground
+ * work in progress).
+ */
+export function readP14TargetUnselectedIndicator(projectId) {
+  if (typeof window === "undefined") return false;
+  const pid = normaliseProjectId(projectId);
+  const indicator = window[BASS_PENDING_KEY];
+  if (!indicator || normaliseProjectId(indicator.projectId) !== pid) return false;
+  return indicator.p14TargetUnselected === true;
+}
+
 export function clearBassPendingIndicator(projectId) {
   if (typeof window === "undefined") return;
   const pid = normaliseProjectId(projectId);
   if (!pid) return;
   const indicator = window[BASS_PENDING_KEY];
   if (indicator && normaliseProjectId(indicator.projectId) === pid) {
-    window[BASS_PENDING_KEY] = { projectId: pid, pending: false, ts: Date.now() };
-  }
-}
-
-const P14_TARGET_UNSELECTED_KEY = "__ROOM_DESIGNER_P14_TARGET_UNSELECTED__";
-
-/**
- * Lightweight P14-target-unselected indicator (NOT a rating). Published to a
- * separate window property so the sidebar can show "Select Bass Target to
- * complete design rating" when the minimum system is present but no P14
- * target has been selected — distinct from "Calculating bass analysis…"
- * which implies a calculation is actually running.
- */
-export function publishP14TargetUnselectedIndicator(projectId, unselected) {
-  if (typeof window === "undefined") return;
-  const pid = normaliseProjectId(projectId);
-  if (!pid) return;
-  window[P14_TARGET_UNSELECTED_KEY] = { projectId: pid, unselected: unselected === true, ts: Date.now() };
-}
-
-export function readP14TargetUnselectedIndicator(projectId) {
-  if (typeof window === "undefined") return false;
-  const pid = normaliseProjectId(projectId);
-  const indicator = window[P14_TARGET_UNSELECTED_KEY];
-  if (!indicator || normaliseProjectId(indicator.projectId) !== pid) return false;
-  return indicator.unselected === true;
-}
-
-export function clearP14TargetUnselectedIndicator(projectId) {
-  if (typeof window === "undefined") return;
-  const pid = normaliseProjectId(projectId);
-  if (!pid) return;
-  const indicator = window[P14_TARGET_UNSELECTED_KEY];
-  if (indicator && normaliseProjectId(indicator.projectId) === pid) {
-    window[P14_TARGET_UNSELECTED_KEY] = { projectId: pid, unselected: false, ts: Date.now() };
+    window[BASS_PENDING_KEY] = { projectId: pid, pending: false, p14TargetUnselected: false, ts: Date.now() };
   }
 }
 

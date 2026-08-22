@@ -26,6 +26,7 @@ import {
 import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
 import { getPrimarySeats, getSecondarySeats } from '@/components/utils/seatPriorityAuthority';
 import { hasMinimumSystemForAsdr } from '@/components/utils/minimumSystemForAsdr';
+import { resolveP14TargetSelectionState } from '@/components/room/bass/p14TargetSelectionState';
 
 // Map numeric RP22 parameter IDs to the string keys expected by buildDesignRatingInput
 const SEAT_PARAM_KEY_MAP = {
@@ -99,7 +100,7 @@ export function buildLightweightSeatHudById(seats, analysisResult, primarySeatin
  * @param {Object} completedBassAuthority
  * @returns {{ ready: boolean, pending: boolean, reason: string, fingerprint: string|null }}
  */
-export function resolveBassReadiness(completedBassAuthority, bassApplicable = false) {
+export function resolveBassReadiness(completedBassAuthority, bassApplicable = false, p14TargetSelected = true) {
   const status = completedBassAuthority?.authorityStatus;
   const currentFp = completedBassAuthority?.currentFingerprint || null;
   const resultFp = completedBassAuthority?.contract?.job?.resultFingerprint || null;
@@ -109,6 +110,15 @@ export function resolveBassReadiness(completedBassAuthority, bassApplicable = fa
   // pending so a provisional ASDR cannot publish before the persisted
   // authority arrives.
   const hydrationSettled = completedBassAuthority?.hydrationSettled === true;
+
+  // P14 target not selected — distinct from "bass not yet computed". No
+  // calculation has been requested. The rating is not pending calculation;
+  // it is waiting for the user to select a target. The outcome (not ready)
+  // is the same, but the reason lets the UI show "Select Bass Target to
+  // complete design rating" instead of "Calculating bass analysis…".
+  if (!p14TargetSelected) {
+    return { ready: false, pending: false, reason: 'p14-target-not-selected', fingerprint: null };
+  }
 
   if (status === BASS_AUTHORITY_STATUS.AUTHORITATIVE) {
     if (currentFp && resultFp && currentFp === resultFp) {
@@ -281,14 +291,18 @@ export function useAppDesignRating({
   // pending until the correct project's authority arrives.
   const expectedProjectKey = String(projectId || 'free');
   const projectIdMatch = String(completedBassAuthority?.projectId || 'free') === expectedProjectKey;
+  const p14SelectionState = useMemo(
+    () => resolveP14TargetSelectionState(appState?.splConfig),
+    [appState?.splConfig?.selectedP14TargetBasis, appState?.splConfig?.selectedP14Level]
+  );
   const bassReadiness = useMemo(
     () => {
       if (!projectIdMatch) {
         return { ready: false, pending: true, reason: 'project-id-mismatch', fingerprint: null };
       }
-      return resolveBassReadiness(completedBassAuthority, minimumSystemMet);
+      return resolveBassReadiness(completedBassAuthority, minimumSystemMet, !p14SelectionState.noP14TargetSelected);
     },
-    [completedBassAuthority, minimumSystemMet, projectIdMatch]
+    [completedBassAuthority, minimumSystemMet, projectIdMatch, p14SelectionState.noP14TargetSelected]
   );
 
   const lastFinalRatingRef = useRef(null);
@@ -314,10 +328,13 @@ export function useAppDesignRating({
   if (!minimumSystemMet) return null;
   if (!effectiveRating) return null;
 
+  const isP14TargetUnselected = bassReadiness.reason === 'p14-target-not-selected';
+
   return {
     ...effectiveRating,
     bassReadiness,
-    isPendingBass: !bassReadiness.ready && !retainedFromRefresh,
+    isPendingBass: !bassReadiness.ready && !retainedFromRefresh && !isP14TargetUnselected,
+    isP14TargetUnselected,
     retainedFromRefresh,
   };
 }

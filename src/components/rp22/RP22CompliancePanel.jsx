@@ -14,6 +14,7 @@ import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPr
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 import { resolveParamThresholds, resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import ComplianceParameterMatrix from "@/components/rp22/ComplianceParameterMatrix";
+import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 
 /* ---------- Helpers */
 

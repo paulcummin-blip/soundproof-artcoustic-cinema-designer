@@ -37,12 +37,13 @@ export default function DesignRatingSummary({
   recommendations = null,
   bassPending = false,
   asdrUnavailable = false,
+  p14TargetUnselected = false,
 }) {
   if (!showAsdr) return null;
 
   // Minimum 5.1 system not present — ASDR is unavailable. Show the message
   // instead of calculating or showing a partial / provisional rating. This
-  // takes priority over the bass-pending and NOT ASSESSED states.
+  // takes priority over the P14-unselected and bass-pending states.
   if (asdrUnavailable) {
     return (
       <div
@@ -67,8 +68,37 @@ export default function DesignRatingSummary({
     );
   }
 
-  // While bass analysis is pending and no final rating has been published
-  // yet, show a calculating state instead of a partial numeric score.
+  // P14 target not selected — the minimum system is present but no bass
+  // target has been chosen. No calculation is running. Show a neutral
+  // message instead of "Calculating bass analysis…" (which implies a real
+  // foreground optimiser is in progress).
+  if (p14TargetUnselected && !rating) {
+    return (
+      <div
+        style={{
+          padding: '12px 16px',
+          background: '#FFFFFF',
+          border: '1px solid #DCDBD6',
+          borderRadius: '8px',
+          margin: '0 16px 12px 16px',
+        }}
+        title="P14 bass target not selected"
+      >
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8, letterSpacing: '0.04em' }}>
+          ARTCOUSTIC SYSTEM
+          <br />
+          DESIGN RATING
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#625143' }}>
+          Select Bass Target to complete design rating
+        </div>
+      </div>
+    );
+  }
+
+  // While bass analysis is genuinely pending (real foreground work in
+  // progress) and no final rating has been published yet, show a
+  // calculating state instead of a partial numeric score.
   if (bassPending && !rating) {
     return (
       <div

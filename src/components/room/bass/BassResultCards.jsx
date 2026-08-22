@@ -10,6 +10,7 @@ import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
 
@@ -30,11 +31,13 @@ export default function BassResultCards() {
     return () => clearInterval(timer);
   }, [active, shared.lifecycle?.startedAtMs, shared.lifecycle?.queuedAtMs]);
 
+  const p14Selection = resolveP14TargetSelectionState(shared.authoritative?.requested);
   const formatted = formatOfficialBassResults(
     shared.completedBassAuthority,
     shared.lifecycle,
     shared.seatingPositions,
     nowMs,
+    p14Selection.noP14TargetSelected,
   );
 
   return (

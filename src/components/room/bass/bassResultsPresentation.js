@@ -138,7 +138,7 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  * @param {Array} seatingPositions - appState.seatingPositions for seat priority
  * @param {number} nowMs - current timestamp for elapsed timer
  */
-export function formatOfficialBassResults(completedBassAuthority, lifecycle = null, seatingPositions = [], nowMs = Date.now()) {
+export function formatOfficialBassResults(completedBassAuthority, lifecycle = null, seatingPositions = [], nowMs = Date.now(), noP14TargetSelected = false) {
   const presentation = buildComplianceBassPresentation({ completedBassAuthority });
   const { publicationVerified, parameters } = presentation;
   const contract = completedBassAuthority?.contract || null;
@@ -148,6 +148,48 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   const isCalculating = ["calculating", "running", "queued", "stale"].includes(lifecycleStatus);
   const timerStart = lifecycle?.startedAtMs ?? lifecycle?.queuedAtMs;
   const elapsedSeconds = secondsSince(timerStart, nowMs);
+
+  // ── UNSELECTED state — takes precedence over all other states. ──
+  // When P14 is genuinely unselected, no calculation is running, pending,
+  // or failed. Show a neutral "Select Bass Target" state — never
+  // "Calculating…", "NOT VERIFIED", or "FAIL". Old completed authority from
+  // a previous target selection is NOT surfaced as current.
+  if (noP14TargetSelected) {
+    const unselectedPill = (label) => ({
+      label,
+      resultText: "Select Bass Target",
+      text: `${label} Select Bass Target`,
+      level: "—",
+      detail: null,
+    });
+    return {
+      pills: {
+        p14: unselectedPill("P14 Bass SPL"),
+        p18: unselectedPill("P18 Extension"),
+        p19: unselectedPill("P19 Response Fit"),
+        p20: unselectedPill("P20 Seat Consistency"),
+      },
+      statusText: "Select Bass Target",
+      isReady: false,
+      isUpdating: false,
+      isNotVerified: false,
+      isUnselected: true,
+      elapsedSeconds: 0,
+      selectedMode: contract?.selectedMode || "balanced",
+      parameterValues: { p14: null, p18: null, p19: null, p20: null },
+      resultFingerprint: null,
+      selectedCandidateId: null,
+      perSeatP19Results: [],
+      perSeatP20Results: [],
+      p19Rows: [],
+      p20Rows: [],
+      p19Rsp: null,
+      p19Lowest: null,
+      p20BestPrimary: null,
+      p20Lowest: null,
+      publicationVerified: false,
+    };
+  }
 
   // Determine the display state
   const isAuthoritative = publicationVerified === true;

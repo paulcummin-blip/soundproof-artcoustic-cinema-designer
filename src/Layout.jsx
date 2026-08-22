@@ -25,7 +25,7 @@ import BrandIntroOverlay from "@/components/ui/BrandIntroOverlay";
 import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
 import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
-import { readBassPendingIndicator, readAsdrUnavailableIndicator } from "@/components/state/designReviewHandoff";
+import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUnselectedIndicator } from "@/components/state/designReviewHandoff";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
@@ -75,6 +75,7 @@ export default function Layout({ children, currentPageName }) {
   const [asdrRecommendations, setAsdrRecommendations] = React.useState(null);
   const [bassPending, setBassPending] = React.useState(false);
   const [asdrUnavailable, setAsdrUnavailable] = React.useState(false);
+  const [p14TargetUnselected, setP14TargetUnselected] = React.useState(false);
 
   // Active project meta for sidebar (name + client)
   const [activeProjectSummary, setActiveProjectSummary] = React.useState({
@@ -165,6 +166,7 @@ export default function Layout({ children, currentPageName }) {
         setAsdrRecommendations(null);
       }
       setBassPending(readBassPendingIndicator(activeProjectId));
+      setP14TargetUnselected(readP14TargetUnselectedIndicator(activeProjectId));
       const unavailable = readAsdrUnavailableIndicator(activeProjectId);
       setAsdrUnavailable(unavailable);
       if (unavailable) {
@@ -424,6 +426,7 @@ export default function Layout({ children, currentPageName }) {
                   recommendations={asdrRecommendations}
                   bassPending={bassPending}
                   asdrUnavailable={asdrUnavailable}
+                  p14TargetUnselected={p14TargetUnselected}
                 />
               </div>
             )}

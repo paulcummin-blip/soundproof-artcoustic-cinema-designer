@@ -17,7 +17,7 @@ import {
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
 import { useActiveProjectId } from "@/components/state/project-session";
-import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishP14TargetUnselectedIndicator, clearP14TargetUnselectedIndicator } from "@/components/state/designReviewHandoff";
+import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator } from "@/components/state/designReviewHandoff";
 
 // Hooks and utils (kept eager; they are light and provide guards below)
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
@@ -1688,11 +1688,15 @@ function RoomDesignerWithState() {
   React.useEffect(() => {
     const indicatorProjectId = resolvedProjectId || projectIdState || null;
     if (!indicatorProjectId) return;
-    publishBassPendingIndicator(indicatorProjectId, appDesignRating?.isPendingBass === true);
+    publishBassPendingIndicator(
+      indicatorProjectId,
+      appDesignRating?.isPendingBass === true,
+      appDesignRating?.isP14TargetUnselected === true,
+    );
     return () => {
       clearBassPendingIndicator(indicatorProjectId);
     };
-  }, [resolvedProjectId, projectIdState, appDesignRating?.isPendingBass]);
+  }, [resolvedProjectId, projectIdState, appDesignRating?.isPendingBass, appDesignRating?.isP14TargetUnselected]);
 
   // Publish a lightweight ASDR-unavailable indicator (NOT a rating) so the
   // sidebar can show the minimum-system message before any ASDR exists.

@@ -3,6 +3,7 @@ import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 
 export default function BassResultsPills({ compact = false, nowMs }) {
   const shared = useSharedBassResults();
@@ -13,11 +14,13 @@ export default function BassResultsPills({ compact = false, nowMs }) {
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [active, shared.lifecycle?.startedAtMs, shared.lifecycle?.queuedAtMs]);
+  const p14Selection = resolveP14TargetSelectionState(shared.authoritative?.requested);
   const formatted = formatOfficialBassResults(
     shared.completedBassAuthority,
     shared.lifecycle,
     shared.seatingPositions,
     nowMs ?? clock,
+    p14Selection.noP14TargetSelected,
   );
   return <div className="grid grid-cols-2 gap-1 sm:grid-cols-4" aria-label="Bass RP22 results">
     {Object.entries(formatted.pills).map(([key, pill]) => (

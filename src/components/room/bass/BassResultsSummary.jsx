@@ -4,6 +4,7 @@ import BassDesignRecommendation from "@/components/room/bass/BassDesignRecommend
 import BassCapabilitySummary from "@/components/room/bass/BassCapabilitySummary";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 
 export default function BassResultsSummary({ compact = false, showPriority = true }) {
   const shared = useSharedBassResults();
@@ -14,11 +15,13 @@ export default function BassResultsSummary({ compact = false, showPriority = tru
     const timer = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [active, shared.lifecycle?.startedAtMs, shared.lifecycle?.queuedAtMs]);
+  const p14Selection = resolveP14TargetSelectionState(shared.authoritative?.requested);
   const formatted = formatOfficialBassResults(
     shared.completedBassAuthority,
     shared.lifecycle,
     shared.seatingPositions,
     nowMs,
+    p14Selection.noP14TargetSelected,
   );
   return <div className={compact ? "space-y-1" : "rounded-lg border border-[#DCDBD6] bg-[#F8F8F7] p-2"}>
     {showPriority && <div className="mb-2 text-xs font-semibold text-[#213428]">Balanced RP22 Optimisation</div>}
