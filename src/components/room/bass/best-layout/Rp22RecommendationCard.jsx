@@ -24,10 +24,10 @@ export default function Rp22RecommendationCard({ title, layout, onClick, onApply
   const previewP20Level = m?.p20Level;
   const previewP19 = m?.rspOnly || previewP19Level == null
     ? "Prediction unavailable"
-    : `${previewP19Level > 0 ? `L${previewP19Level}` : "FAIL"} · ±${Number(m.meanSeatVariationDb / 2).toFixed(1)} dB`;
+    : `${previewP19Level > 0 ? `L${previewP19Level}` : "FAIL"} · ±${Number(m.meanSeatVariationDb).toFixed(1)} dB`;
   const previewP20 = m?.rspOnly || previewP20Level == null
     ? "Prediction unavailable"
-    : `${previewP20Level > 0 ? `L${previewP20Level}` : "FAIL"} · ±${Number(m.worstSeatVariationDb / 2).toFixed(1)} dB`;
+    : `${previewP20Level > 0 ? `L${previewP20Level}` : "FAIL"} · ±${Number(m.worstSeatVariationDb).toFixed(1)} dB`;
   return (
     <div className={`w-full rounded-lg border p-4 text-left transition ${isApplied ? "border-2 border-[#213428] bg-[#F3F1EC]" : "border border-[#D9D5CE] bg-white"} hover:border-[#213428] hover:shadow-sm`}>
       <button type="button" onClick={() => onClick(layout)} className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#213428]">
