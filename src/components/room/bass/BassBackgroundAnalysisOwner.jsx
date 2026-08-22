@@ -295,6 +295,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       poolVersion: matchingResult.poolVersion || null,
       engineVersion: matchingResult.engineVersion || null,
       resultSchemaVersion: matchingResult.resultSchemaVersion || null,
+      metricSchemaVersion: matchingResult.metricSchemaVersion || null,
     } : null;
     const finalOptimisedBassResponse = buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources });
     // C6.1B2 Gap 1: completedContractFingerprint MUST come from the completed
