@@ -108,3 +108,18 @@ test("scoreP19 preserves FAIL above the L1 band (canFail=true)", async () => {
   assert.equal(levelP19_lfResponse(6.0).level, "FAIL");
   assert.equal(applyMapper(6.0, levelP19_lfResponse, true).level, "FAIL");
 });
+
+test("Room Designer P20 compact status and value use completed bass authority", async () => {
+  const src = await readFile(
+    new URL("../src/components/rp22/RP22CompliancePanel.jsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    src,
+    /\[14, 18, 19, 20\]\.includes\(pid\)[^\n]*bassPresentation\.parameters\[`p\$\{pid\}`\]\.level/,
+  );
+  assert.match(
+    src,
+    /\[14, 18, 19, 20\]\.includes\(pid\)[^\n]*bassPresentation\.parameters\[`p\$\{pid\}`\]\.valueText/,
+  );
+});
