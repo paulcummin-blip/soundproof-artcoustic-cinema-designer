@@ -16,6 +16,7 @@ import {
   BASS_OPTIMISER_POOL_PROPERTY,
   BASS_OPTIMISER_VERSIONS,
   bassOptimiserVersionSignature,
+  validateOptimiserVersions,
 } from "./bassOptimiserWorkerProtocol";
 import { computeCalibrationFingerprint } from "./bassAnalysisFingerprints";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
@@ -179,6 +180,13 @@ export class P14TargetBackgroundScheduler {
       return;
     }
     if (message.type !== "complete") return; // ignore progress
+
+    const compatibility = validateOptimiserVersions(message, BASS_OPTIMISER_VERSIONS);
+    if (!compatibility.valid) {
+      safeConsole.warn("p14-bg", `target ${target.key}: rejected incompatible worker result (${compatibility.message})`);
+      this.handleWorkerError(target);
+      return;
+    }
 
     const pool = message[BASS_OPTIMISER_POOL_PROPERTY];
     if (!pool || !Array.isArray(pool.candidates) || pool.candidates.length === 0) {
