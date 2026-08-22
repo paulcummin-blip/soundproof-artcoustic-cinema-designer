@@ -61,45 +61,54 @@ export function levelP17_wsFR(dB) {
   return { level: 'L2', ok: true };
 }
 
+function directBassDeviation(dB) {
+  return Number.isFinite(dB) ? Number(dB) : null;
+}
+
+function formatDirectBassDeviation(dB) {
+  const direct = directBassDeviation(dB);
+  if (direct == null) return '—';
+  const rounded = Math.round(direct * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+// Backward-compatible export names. They now preserve the direct metric and
+// must not floor or otherwise improve a maximum-deviation result.
 export function floorP19Deviation(dB) {
-  // RP22 P19 is reported as a whole-number symmetric ±dB value. Preserve
-  // the favourable floor: values below ±3/4/5/6 remain in L4/L3/L2/L1.
-  return Number.isFinite(dB) ? Math.floor(dB) : null;
+  return directBassDeviation(dB);
 }
 
 export function formatP19Deviation(dB) {
-  const floored = floorP19Deviation(dB);
-  return floored == null ? '—' : `±${floored} dB`;
+  const direct = directBassDeviation(dB);
+  return direct == null ? '—' : `±${formatDirectBassDeviation(direct)} dB`;
 }
 
 export function levelP19_lfResponse(dB) {
-  const floored = floorP19Deviation(dB);
-  if (floored == null) return { level: 'N/A', ok: false };
-  if (floored <= 2) return { level: 'L4', ok: true };
-  if (floored <= 3) return { level: 'L3', ok: true };
-  if (floored <= 4) return { level: 'L2', ok: true };
-  if (floored <= 5) return { level: 'L1', ok: true };
+  const direct = directBassDeviation(dB);
+  if (direct == null) return { level: 'N/A', ok: false };
+  if (direct <= 2) return { level: 'L4', ok: true };
+  if (direct <= 3) return { level: 'L3', ok: true };
+  if (direct <= 4) return { level: 'L2', ok: true };
+  if (direct <= 5) return { level: 'L1', ok: true };
   return { level: 'FAIL', ok: false };
 }
 
 export function floorP20Deviation(dB) {
-  // RP22 P20 is reported as a whole-number ±dB value. Preserve the
-  // favourable floor so any value below ±5 dB remains within the ±4 dB band.
-  return Number.isFinite(dB) ? Math.floor(dB) : null;
+  return directBassDeviation(dB);
 }
 
 export function formatP20Deviation(dB) {
-  const floored = floorP20Deviation(dB);
-  return floored == null ? '—' : `±${floored} dB`;
+  const direct = directBassDeviation(dB);
+  return direct == null ? '—' : `±${formatDirectBassDeviation(direct)} dB`;
 }
 
 export function levelP20_lfConsistency(dB) {
-  const floored = floorP20Deviation(dB);
-  if (floored == null) return { level: 'N/A', ok: false };
-  if (floored <= 2) return { level: 'L4', ok: true };
-  if (floored <= 3) return { level: 'L3', ok: true };
-  if (floored <= 4) return { level: 'L2', ok: true };
-  // RP22 P20 does not define Level 1. >4 dB is below the RP22 L2 threshold.
+  const direct = directBassDeviation(dB);
+  if (direct == null) return { level: 'N/A', ok: false };
+  if (direct <= 2) return { level: 'L4', ok: true };
+  if (direct <= 3) return { level: 'L3', ok: true };
+  if (direct <= 4) return { level: 'L2', ok: true };
+  // RP22 P20 does not define Level 1. >4 dB is FAIL.
   return { level: 'FAIL', ok: false };
 }
 
@@ -112,7 +121,9 @@ export function levelP21_earlyReflections(dB) {
 }
 
 export function numericRp22Level(result) {
-  const match = String(result?.level || '').match(/^L([1-4])$/);
+  const label = String(result?.level || '').toUpperCase();
+  if (label === 'FAIL') return 0;
+  const match = label.match(/^L([1-4])$/);
   return match ? Number(match[1]) : null;
 }
 
