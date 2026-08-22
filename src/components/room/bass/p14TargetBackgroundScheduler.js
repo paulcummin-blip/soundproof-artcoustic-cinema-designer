@@ -196,6 +196,7 @@ export class P14TargetBackgroundScheduler {
       poolVersion: message.poolVersion,
       engineVersion: message.engineVersion,
       resultSchemaVersion: message.resultSchemaVersion,
+      metricSchemaVersion: message.metricSchemaVersion,
     };
 
     const compactContract = buildCompactContractFromWorkerResult({
