@@ -9,7 +9,7 @@
  *   - completedBassResultPersistence.js (resolver + adapter)
  *
  * Kept dependency-free so the persistence adapter/resolver is importable from
- * bare-Node regression tests (no @/ alias required).
+ * bare-Node regression tests (no application path alias required).
  */
 export const INSTANCE_AUTHORITY_VERSION = 2;
 export const BASS_ANALYSIS_CONTRACT_VERSION = 7;
