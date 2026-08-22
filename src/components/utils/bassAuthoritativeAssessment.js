@@ -1,7 +1,7 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { isReferenceSeatIdentity } from "@/components/room/bass/normalizedRoomInputAdapters";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
-import { floorP19Deviation, levelP19_lfResponse, numericRp22Level } from "@/components/utils/rp22/levels";
+import { levelP19_lfResponse, levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
@@ -49,12 +49,12 @@ function maximumTargetDeviation(curve, targetCurve, excludedRegions = []) {
       worstFrequencyHz = point.frequency;
     }
   });
-  const displayVariationDb = floorP19Deviation(variationDbRaw);
+  const displayVariationDb = variationDbRaw == null ? null : Number(variationDbRaw);
   return {
     variationDbRaw,
     totalRspToTargetDifferenceDbRaw: variationDbRaw == null ? null : Number(variationDbRaw),
     displayVariationDb,
-    level: displayVariationDb == null ? null : (numericRp22Level(levelP19_lfResponse(displayVariationDb)) ?? 0),
+    level: displayVariationDb == null ? null : numericRp22Level(levelP19_lfResponse(displayVariationDb)),
     worstFrequencyHz,
   };
 }
@@ -98,12 +98,7 @@ export function computeCorrectableP19Diagnostic({ rspPostEqCurve, canonicalTarge
 
 export function p20LevelFromDisplayVariation(displayVariationDb) {
   if (!finite(displayVariationDb)) return null;
-  if (displayVariationDb <= 2) return 4;
-  if (displayVariationDb === 3) return 3;
-  if (displayVariationDb === 4) return 2;
-  // RP22 P20 does not define Level 1. >4 dB is below the RP22 L2 threshold.
-  // Use 0 (Sound Proof FAIL convention) — never invent an RP22 L1 equivalent.
-  return 0;
+  return numericRp22Level(levelP20_lfConsistency(Number(displayVariationDb)));
 }
 
 export function computeOfficialP20Assessment({ rspPostEqCurve, perSeatPostEqCurves, assessmentStartHz, assessmentEndHz }) {
@@ -129,7 +124,7 @@ export function computeOfficialP20Assessment({ rspPostEqCurve, perSeatPostEqCurv
         }
       });
       if (comparisonPointCount === 0 || variationDbRaw == null) return null;
-      const displayVariationDb = Math.floor(variationDbRaw);
+      const displayVariationDb = Number(variationDbRaw);
       return {
         seatId: seat.seatId,
         variationDbRaw,
