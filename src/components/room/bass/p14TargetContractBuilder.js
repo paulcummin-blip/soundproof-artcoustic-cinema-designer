@@ -12,7 +12,6 @@ import { buildCanonicalCompletedBassMetricAuthority } from "./canonicalCompleted
 import { buildMetricPublicationReceipt } from "./metricPublicationReceipt";
 import { adaptCurrentBassOptimisationResult } from "./bassAnalysisAdapter";
 import { compactCompletedBassContract } from "./completedBassResultPersistence";
-import { BASS_OPTIMISER_VERSIONS } from "./bassOptimiserWorkerProtocol";
 
 /**
  * Build a compact authoritative contract from a background target worker result.
@@ -55,7 +54,11 @@ export function buildCompactContractFromWorkerResult({
   // Step 2: Build base result (same as foreground)
   const baseResult = {
     ...selected,
-    ...BASS_OPTIMISER_VERSIONS,
+    protocolVersion: workerResult.protocolVersion,
+    poolVersion: workerResult.poolVersion,
+    engineVersion: workerResult.engineVersion,
+    resultSchemaVersion: workerResult.resultSchemaVersion,
+    metricSchemaVersion: workerResult.metricSchemaVersion,
     cacheKey: fingerprint,
     calibrationFingerprint,
     heavyPoolReused: false,
