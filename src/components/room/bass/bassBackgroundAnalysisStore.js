@@ -17,7 +17,7 @@ export const BASS_BACKGROUND_CACHE_LIMIT = 3;
 export const BASS_HEARTBEAT_STALL_MS = 15000;
 export const BASS_TERMINAL_WATCHDOG_MS = 180000;
 
-const IDENTITY_FIELDS = ["fingerprint", "geometryFingerprint", "productFingerprint", "calibrationFingerprint", "protocolVersion", "poolVersion", "engineVersion", "resultSchemaVersion", "canonicalPriorityMode", "selectedP14TargetDb", "p14TargetBasis", "p14TargetLevel", "selectedP14RequiredExtensionHz", "p18TargetBasis", "selectedP18RequiredExtensionHz"];
+const IDENTITY_FIELDS = ["fingerprint", "geometryFingerprint", "productFingerprint", "calibrationFingerprint", "protocolVersion", "poolVersion", "engineVersion", "resultSchemaVersion", "metricSchemaVersion", "canonicalPriorityMode", "selectedP14TargetDb", "p14TargetBasis", "p14TargetLevel", "selectedP14RequiredExtensionHz", "p18TargetBasis", "selectedP18RequiredExtensionHz"];
 const identityMismatch = (requested, returned) => IDENTITY_FIELDS.find((field) => requested?.[field] !== returned?.[field]) || null;
 
 const nowDefault = () => Date.now();
@@ -420,6 +420,7 @@ export class BassBackgroundAnalysisController {
       poolVersion: message.poolVersion,
       engineVersion: message.engineVersion,
       resultSchemaVersion: message.resultSchemaVersion,
+      metricSchemaVersion: message.metricSchemaVersion,
       calculationTimeMs: completedAtMs - active.startedAtMs, completedAtMs,
       startedAtMs: active.startedAtMs,
       collectDiagnostics: active.collectDiagnostics === true,
