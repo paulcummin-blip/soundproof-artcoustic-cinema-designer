@@ -29,6 +29,7 @@ export function isStructurallyCompleteBassContract(contract) {
   return ["ready", "complete"].includes(status)
     && contract?.version === BASS_ANALYSIS_CONTRACT_VERSION
     && contract?.metricSchemaVersion === RP22_BASS_METRIC_SCHEMA_VERSION
+    && contract?.job?.metricSchemaVersion === RP22_BASS_METRIC_SCHEMA_VERSION
     && !!contract?.selectedCandidate
     && !!contract?.selectedCandidateId
     && !!contract?.job?.resultFingerprint
@@ -43,8 +44,24 @@ export function isStructurallyCompleteBassContract(contract) {
  * metricPublication receipt is NOT authoritative — its metrics must not be
  * published downstream.
  */
+function hasCanonicalSeatMetricAuthority(contract) {
+  const realSeatCount = Number(contract?.provenance?.realSeatCount);
+  if (!Number.isInteger(realSeatCount) || realSeatCount < 0) return false;
+  const p19Seats = contract?.selectedCandidate?.perSeatP19Results;
+  if (realSeatCount > 0 && (!Array.isArray(p19Seats)
+    || p19Seats.length !== realSeatCount
+    || p19Seats.some((seat) => !seat?.seatId || !Number.isFinite(seat?.variationDbRaw) || !Number.isFinite(seat?.level)))) return false;
+  const p20 = contract?.productAnalysis?.parameters?.p20;
+  const p20Seats = contract?.selectedCandidate?.perSeatP20Results;
+  if (p20?.status === "complete" && (!Array.isArray(p20Seats)
+    || p20Seats.length !== realSeatCount
+    || p20Seats.some((seat) => !seat?.seatId || !Number.isFinite(seat?.variationDbRaw) || !Number.isFinite(seat?.level)))) return false;
+  return true;
+}
+
 export function isAuthoritativeBassContract(contract) {
   if (!isStructurallyCompleteBassContract(contract)) return false;
+  if (!hasCanonicalSeatMetricAuthority(contract)) return false;
   const pub = contract?.metricPublication;
   return !!pub && pub.canonicalMetricPublicationValid === true;
 }
