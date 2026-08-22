@@ -18,7 +18,7 @@ export function runRp22GradingBoundaryFixtures() {
   const expect = (name, grader, value, level) => {
     const result = grader(value);
     observedValues.push(value);
-    check(name, result.level === level && result.ok === true);
+    check(name, result.level === level && result.ok === (level !== "FAIL"));
   };
 
   expect("P17 L4 boundary", levelP17_wsFR, 1.5, "L4");
@@ -28,27 +28,25 @@ export function runRp22GradingBoundaryFixtures() {
   check("No finite P17 result produces L1 or FAIL", [-100, 0, 1.5, 1.6, 3, 3.1, 1000000].every((value) => ["L4", "L3", "L2"].includes(levelP17_wsFR(value).level)));
 
   const p19Cases = [
-    [1.9, 1, "L4"], [2.0, 2, "L4"], [2.9, 2, "L4"],
-    [3.0, 3, "L3"], [3.9, 3, "L3"],
-    [4.0, 4, "L2"], [4.9, 4, "L2"],
-    [5.0, 5, "L1"], [5.9, 5, "L1"],
+    [2.0, "2", "L4"], [2.01, "2.01", "L3"],
+    [3.0, "3", "L3"], [3.01, "3.01", "L2"],
+    [4.0, "4", "L2"], [4.01, "4.01", "L1"],
+    [5.0, "5", "L1"], [5.01, "5.01", "FAIL"],
   ];
-  p19Cases.forEach(([value, floored, level]) => {
-    expect(`P19 ${value} grades from floor`, levelP19_lfResponse, value, level);
-    check(`P19 ${value} displays ±${floored} dB`, floorP19Deviation(value) === floored && formatP19Deviation(value) === `±${floored} dB`);
+  p19Cases.forEach(([value, display, level]) => {
+    expect(`P19 ${value} grades directly`, levelP19_lfResponse, value, level);
+    check(`P19 ${value} displays ±${display} dB`, floorP19Deviation(value) === value && formatP19Deviation(value) === `±${display} dB`);
   });
-  const p19Fail = levelP19_lfResponse(6);
-  check("P19 exact ±6 dB is FAIL", p19Fail.level === "FAIL" && p19Fail.ok === false);
 
   const p20Cases = [
-    [1.9, 1, "L4"], [2.0, 2, "L4"], [2.9, 2, "L4"],
-    [3.0, 3, "L3"], [3.9, 3, "L3"],
-    [4.0, 4, "L2"], [4.1, 4, "L2"], [4.9, 4, "L2"],
-    [5.0, 5, "L1"], [5.9, 5, "L1"], [11.4, 11, "L1"],
+    [2.0, "2", "L4"], [2.01, "2.01", "L3"],
+    [3.0, "3", "L3"], [3.01, "3.01", "L2"],
+    [4.0, "4", "L2"], [4.01, "4.01", "FAIL"],
+    [11.4, "11.4", "FAIL"],
   ];
-  p20Cases.forEach(([value, floored, level]) => {
-    expect(`P20 ${value} grades from floor`, levelP20_lfConsistency, value, level);
-    check(`P20 ${value} displays ±${floored} dB`, floorP20Deviation(value) === floored && formatP20Deviation(value) === `±${floored} dB`);
+  p20Cases.forEach(([value, display, level]) => {
+    expect(`P20 ${value} grades directly`, levelP20_lfConsistency, value, level);
+    check(`P20 ${value} displays ±${display} dB`, floorP20Deviation(value) === value && formatP20Deviation(value) === `±${display} dB`);
   });
   const singleSeat = adaptCurrentBassOptimisationResult({
     optimisationResult: { selectedCandidate: { p20Available: true, achievedP20Level: 1, achievedP20VariationDb: 11.3, generatedFilterBank: [] }, poolId: "single-seat" },
@@ -65,12 +63,12 @@ export function runRp22GradingBoundaryFixtures() {
     perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }],
   });
   check("P20 retains full precision internally", fullPrecision.productAnalysis.parameters.p20.value === 4.9 && fullPrecision.selectedCandidate.achievedP20VariationDb === 4.9);
-  check("P20 contract grade uses floored value", fullPrecision.productAnalysis.parameters.p20.level === 2);
+  check("P20 contract preserves direct FAIL", fullPrecision.productAnalysis.parameters.p20.level === 0);
   const p20Error = adaptCurrentBassOptimisationResult({ detailedStatus: "ERROR", perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }] });
   check("P20 genuine job error remains error", p20Error.productAnalysis.parameters.p20.status === "error");
   const p20Uncalculated = adaptCurrentBassOptimisationResult({ perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }] });
   check("P20 not calculated remains uncalculated", p20Uncalculated.productAnalysis.parameters.p20.status === "uncalculated" && p20Uncalculated.productAnalysis.parameters.p20.value === null);
-  check("No finite P20 result produces FAIL", [-100, 0, ...p20Cases.map(([value]) => value), 1000000].every((value) => levelP20_lfConsistency(value).level !== "FAIL"));
+  check("P20 has no L1 and values above 4 dB FAIL", [4.01, 11.4, 1000000].every((value) => levelP20_lfConsistency(value).level === "FAIL") && [-100, 0, 2, 3, 4].every((value) => levelP20_lfConsistency(value).level !== "L1"));
 
   [[-12, "L4"], [-11.9, "L3"], [-10, "L3"], [-9.9, "L2"], [-8, "L2"], [-7.9, "L1"], [0, "L1"]]
     .forEach(([value, level]) => expect(`P21 ${value}`, levelP21_earlyReflections, value, level));
