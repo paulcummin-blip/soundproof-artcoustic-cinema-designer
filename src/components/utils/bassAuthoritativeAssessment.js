@@ -41,9 +41,9 @@ function maximumTargetDeviation(curve, targetCurve, excludedRegions = []) {
     if (excludedRegions.some((region) => point.frequency >= region.startHz && point.frequency <= region.endHz)) return;
     const targetSpl = interpolateCanonicalTarget(targetCurve, point.frequency);
     if (!finite(targetSpl)) return;
-    // RP22 publishes the full response-to-target gap as a symmetric ±dB
-    // tolerance. A 10 dB total gap is therefore ±5 dB.
-    const deviation = Math.abs(point.spl - targetSpl) / 2;
+    // RP22 ±dB is the maximum absolute deviation from the target curve.
+    // A +4 dB peak (or -4 dB dip) is a ±4 dB result — not halved to ±2 dB.
+    const deviation = Math.abs(point.spl - targetSpl);
     if (variationDbRaw == null || deviation > variationDbRaw) {
       variationDbRaw = deviation;
       worstFrequencyHz = point.frequency;
@@ -52,7 +52,7 @@ function maximumTargetDeviation(curve, targetCurve, excludedRegions = []) {
   const displayVariationDb = floorP19Deviation(variationDbRaw);
   return {
     variationDbRaw,
-    totalRspToTargetDifferenceDbRaw: variationDbRaw == null ? null : Number(variationDbRaw) * 2,
+    totalRspToTargetDifferenceDbRaw: variationDbRaw == null ? null : Number(variationDbRaw),
     displayVariationDb,
     level: displayVariationDb == null ? null : (numericRp22Level(levelP19_lfResponse(displayVariationDb)) ?? 0),
     worstFrequencyHz,
@@ -101,7 +101,9 @@ export function p20LevelFromDisplayVariation(displayVariationDb) {
   if (displayVariationDb <= 2) return 4;
   if (displayVariationDb === 3) return 3;
   if (displayVariationDb === 4) return 2;
-  return 1;
+  // RP22 P20 does not define Level 1. >4 dB is below the RP22 L2 threshold.
+  // Use 0 (Sound Proof FAIL convention) — never invent an RP22 L1 equivalent.
+  return 0;
 }
 
 export function computeOfficialP20Assessment({ rspPostEqCurve, perSeatPostEqCurves, assessmentStartHz, assessmentEndHz }) {
@@ -118,9 +120,9 @@ export function computeOfficialP20Assessment({ rspPostEqCurve, perSeatPostEqCurv
         const seatSpl = curveValueAt(seatCurve, rspPoint.frequency);
         if (!finite(rspPoint.spl) || !finite(seatSpl)) return;
         comparisonPointCount += 1;
-        // RP22 expresses the total seat-to-RSP difference as a symmetric
-        // ±dB tolerance. An 8 dB total difference is therefore ±4 dB.
-        const variation = Math.abs(seatSpl - rspPoint.spl) / 2;
+        // RP22 ±dB is the maximum absolute seat-to-RSP deviation.
+        // An 8 dB difference is ±8 dB — not halved to ±4 dB.
+        const variation = Math.abs(seatSpl - rspPoint.spl);
         if (variationDbRaw == null || variation > variationDbRaw) {
           variationDbRaw = variation;
           worstFrequencyHz = rspPoint.frequency;
@@ -131,7 +133,7 @@ export function computeOfficialP20Assessment({ rspPostEqCurve, perSeatPostEqCurv
       return {
         seatId: seat.seatId,
         variationDbRaw,
-        totalSeatToRspDifferenceDbRaw: Number(variationDbRaw) * 2,
+        totalSeatToRspDifferenceDbRaw: Number(variationDbRaw),
         displayVariationDb,
         level: p20LevelFromDisplayVariation(displayVariationDb),
         worstFrequencyHz,

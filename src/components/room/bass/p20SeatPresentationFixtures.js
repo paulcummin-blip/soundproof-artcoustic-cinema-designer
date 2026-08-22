@@ -27,7 +27,8 @@ export function runP20SeatPresentationFixtures() {
   check("8. Before and after preserve identical positions", comparison.beforeRows.map((row) => row.seats.map((seat) => `${seat.row}:${seat.column}:${seat.seatId}`)).join("|") === comparison.afterRows.map((row) => row.seats.map((seat) => `${seat.row}:${seat.column}:${seat.seatId}`)).join("|"));
   const candidate = { perSeatP20Results: changed };
   const authoritative = buildP20SeatRows(seats, candidate.perSeatP20Results);
-  check("9. Presentation reads selected candidate perSeatP20Results", authoritative[0].seats[1].level === "L1" && authoritative[0].seats[1].source === changed[1]);
+  // RP22 P20 has no L1: legacy level 1 displays as "FAIL" (below RP22 L2 threshold)
+  check("9. Presentation reads selected candidate perSeatP20Results", authoritative[0].seats[1].level === "FAIL" && authoritative[0].seats[1].source === changed[1]);
   check("10. Canonical P20 formatter preserves numeric zero", formatAuthoritativeP20Result({ variationDbRaw: 0.2 }) === "±0 dB");
   check("11. Canonical P20 formatter floors 4.9 and preserves 5.0", formatAuthoritativeP20Result({ variationDbRaw: 4.9 }) === "±4 dB" && formatAuthoritativeP20Result({ variationDbRaw: 5.0 }) === "±5 dB");
   check("12. Numeric and formatted P20 levels never double-prefix", buildP20SeatRows(seats.slice(0, 2), [result("s1", 4, 1.2), result("s2", "L4", 1.2)])[0].seats.every((seat) => seat.level === "L4"));

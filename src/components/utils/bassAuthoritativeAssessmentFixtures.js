@@ -73,32 +73,36 @@ export function runBassAuthoritativeAssessmentFixtures() {
   const severeSeatNull = assess(rsp, [{ seatId: "seat-null", responseData: curve([100, 100, 100, 65, 100, 100, 100, 100, 100]) }]);
   check("6. Non-RSP null affects P20 not P19", severeSeatNull.p20.worstSeat.variationDbRaw > baseline.p20.worstSeat.variationDbRaw && severeSeatNull.p19.variationDbRaw === baseline.p19.variationDbRaw);
 
+  // After /2 removal: ±dB is the direct maximum absolute deviation (not halved).
+  // Curves use flat(X) vs TARGET=100, so deviation = |X - 100| directly.
+  const belowThreeDbP19 = assess(flat(102.9), []);
+  const threeDbP19 = assess(flat(103), []);
+  const belowFourDbP19 = assess(flat(103.9), []);
+  const fourDbP19 = assess(flat(104), []);
+  const belowFiveDbP19 = assess(flat(104.9), []);
+  const fiveDbP19 = assess(flat(105), []);
   const belowSixDbP19 = assess(flat(105.9), []);
   const sixDbP19 = assess(flat(106), []);
-  const belowEightDbP19 = assess(flat(107.9), []);
-  const eightDbP19 = assess(flat(108), []);
-  const belowTenDbP19 = assess(flat(109.9), []);
-  const tenDbP19 = assess(flat(110), []);
-  const belowTwelveDbP19 = assess(flat(111.9), []);
-  const twelveDbP19 = assess(flat(112), []);
-  check("6a. P19 below six dB total floors to ±2 dB L4", Math.abs(belowSixDbP19.p19.variationDbRaw - 2.95) < 1e-9 && belowSixDbP19.p19.displayVariationDb === 2 && belowSixDbP19.p19.level === 4);
-  check("6b. P19 six dB total is ±3 dB L3", sixDbP19.p19.variationDbRaw === 3 && sixDbP19.p19.displayVariationDb === 3 && sixDbP19.p19.level === 3);
-  check("6c. P19 below eight dB total floors to ±3 dB L3", Math.abs(belowEightDbP19.p19.variationDbRaw - 3.95) < 1e-9 && belowEightDbP19.p19.displayVariationDb === 3 && belowEightDbP19.p19.level === 3);
-  check("6d. P19 eight dB total is ±4 dB L2", eightDbP19.p19.variationDbRaw === 4 && eightDbP19.p19.displayVariationDb === 4 && eightDbP19.p19.level === 2);
-  check("6e. P19 below ten dB total floors to ±4 dB L2", Math.abs(belowTenDbP19.p19.variationDbRaw - 4.95) < 1e-9 && belowTenDbP19.p19.displayVariationDb === 4 && belowTenDbP19.p19.level === 2);
-  check("6f. P19 ten dB total is ±5 dB L1", tenDbP19.p19.variationDbRaw === 5 && tenDbP19.p19.displayVariationDb === 5 && tenDbP19.p19.level === 1);
-  check("6g. P19 below twelve dB total floors to ±5 dB L1", Math.abs(belowTwelveDbP19.p19.variationDbRaw - 5.95) < 1e-9 && belowTwelveDbP19.p19.displayVariationDb === 5 && belowTwelveDbP19.p19.level === 1);
-  check("6h. P19 twelve dB total is ±6 dB FAIL", twelveDbP19.p19.variationDbRaw === 6 && twelveDbP19.p19.displayVariationDb === 6 && twelveDbP19.p19.level === 0);
+  check("6a. P19 below 3 dB deviation floors to ±2 dB L4", Math.abs(belowThreeDbP19.p19.variationDbRaw - 2.9) < 1e-9 && belowThreeDbP19.p19.displayVariationDb === 2 && belowThreeDbP19.p19.level === 4);
+  check("6b. P19 3 dB deviation is ±3 dB L3", threeDbP19.p19.variationDbRaw === 3 && threeDbP19.p19.displayVariationDb === 3 && threeDbP19.p19.level === 3);
+  check("6c. P19 below 4 dB deviation floors to ±3 dB L3", Math.abs(belowFourDbP19.p19.variationDbRaw - 3.9) < 1e-9 && belowFourDbP19.p19.displayVariationDb === 3 && belowFourDbP19.p19.level === 3);
+  check("6d. P19 4 dB deviation is ±4 dB L2", fourDbP19.p19.variationDbRaw === 4 && fourDbP19.p19.displayVariationDb === 4 && fourDbP19.p19.level === 2);
+  check("6e. P19 below 5 dB deviation floors to ±4 dB L2", Math.abs(belowFiveDbP19.p19.variationDbRaw - 4.9) < 1e-9 && belowFiveDbP19.p19.displayVariationDb === 4 && belowFiveDbP19.p19.level === 2);
+  check("6f. P19 5 dB deviation is ±5 dB L1", fiveDbP19.p19.variationDbRaw === 5 && fiveDbP19.p19.displayVariationDb === 5 && fiveDbP19.p19.level === 1);
+  check("6g. P19 below 6 dB deviation floors to ±5 dB L1", Math.abs(belowSixDbP19.p19.variationDbRaw - 5.9) < 1e-9 && belowSixDbP19.p19.displayVariationDb === 5 && belowSixDbP19.p19.level === 1);
+  check("6h. P19 6 dB deviation is ±6 dB FAIL", sixDbP19.p19.variationDbRaw === 6 && sixDbP19.p19.displayVariationDb === 6 && sixDbP19.p19.level === 0);
   const legacyP19BelowFail = computeP19DeviationBelowSchroeder({ freqsHz: [20, 40], splDb: [100, 111.9], targetDb: [100, 100], schroederHz: 120 });
   const legacyP19Fail = computeP19DeviationBelowSchroeder({ freqsHz: [20, 40], splDb: [100, 112], targetDb: [100, 100], schroederHz: 120 });
   check("6i. Shared legacy P19 metric uses the same symmetric half-gap", Math.abs(legacyP19BelowFail.resultDb - 5.95) < 1e-9 && legacyP19Fail.resultDb === 6 && legacyP19Fail.totalDifferenceDbRaw === 12);
 
-  const eightDbDifference = assess(flat(100), [{ seatId: "seat-eight-db", responseData: flat(92) }]);
-  const belowTenDbDifference = assess(flat(100), [{ seatId: "seat-below-ten-db", responseData: flat(90.1) }]);
-  const tenDbDifference = assess(flat(100), [{ seatId: "seat-ten-db", responseData: flat(90) }]);
-  check("6j. P20 eight dB total difference reports ±4 dB L2", eightDbDifference.p20.worstSeat.variationDbRaw === 4 && eightDbDifference.p20.worstSeat.displayVariationDb === 4 && eightDbDifference.p20.worstSeat.level === 2);
-  check("6k. P20 difference below ten dB floors to ±4 dB L2", Math.abs(belowTenDbDifference.p20.worstSeat.variationDbRaw - 4.95) < 1e-9 && belowTenDbDifference.p20.worstSeat.displayVariationDb === 4 && belowTenDbDifference.p20.worstSeat.level === 2);
-  check("6l. P20 ten dB total difference reports ±5 dB L1", tenDbDifference.p20.worstSeat.variationDbRaw === 5 && tenDbDifference.p20.worstSeat.displayVariationDb === 5 && tenDbDifference.p20.worstSeat.level === 1);
+  // After /2 removal: ±dB is the direct max absolute seat-to-RSP deviation (not halved).
+  // P20 has no L1: >4 dB is FAIL (level 0), not L1.
+  const fourDbDifference = assess(flat(100), [{ seatId: "seat-four-db", responseData: flat(96) }]);
+  const belowFiveDbDifference = assess(flat(100), [{ seatId: "seat-below-five-db", responseData: flat(95.1) }]);
+  const fiveDbDifference = assess(flat(100), [{ seatId: "seat-five-db", responseData: flat(95) }]);
+  check("6j. P20 4 dB difference reports ±4 dB L2", fourDbDifference.p20.worstSeat.variationDbRaw === 4 && fourDbDifference.p20.worstSeat.displayVariationDb === 4 && fourDbDifference.p20.worstSeat.level === 2);
+  check("6k. P20 difference below 5 dB floors to ±4 dB L2", Math.abs(belowFiveDbDifference.p20.worstSeat.variationDbRaw - 4.9) < 1e-9 && belowFiveDbDifference.p20.worstSeat.displayVariationDb === 4 && belowFiveDbDifference.p20.worstSeat.level === 2);
+  check("6l. P20 5 dB difference reports ±5 dB FAIL (no L1)", fiveDbDifference.p20.worstSeat.variationDbRaw === 5 && fiveDbDifference.p20.worstSeat.displayVariationDb === 5 && fiveDbDifference.p20.worstSeat.level === 0);
 
   const severeRsp = curve([100, 100, 100, 65, 100, 100, 100, 100, 100]);
   const officialNull = computeOfficialP19Assessment({ rspPostEqCurve: severeRsp, canonicalTargetCurve: TARGET, ...BAND });

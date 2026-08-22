@@ -99,7 +99,8 @@ export function levelP20_lfConsistency(dB) {
   if (floored <= 2) return { level: 'L4', ok: true };
   if (floored <= 3) return { level: 'L3', ok: true };
   if (floored <= 4) return { level: 'L2', ok: true };
-  return { level: 'L1', ok: true };
+  // RP22 P20 does not define Level 1. >4 dB is below the RP22 L2 threshold.
+  return { level: 'FAIL', ok: false };
 }
 
 export function levelP21_earlyReflections(dB) {

@@ -9,7 +9,11 @@ export function isRealP20Seat(seat) {
 }
 
 export function p20LevelText(level) {
-  const match = String(level ?? "").toUpperCase().match(/^L?([1-4])$/);
+  // RP22 P20 does not define Level 1. Both 0 (new FAIL convention) and 1
+  // (legacy "below L2" bucket) display as "FAIL" — below RP22 L2 threshold.
+  const upper = String(level ?? "").toUpperCase();
+  if (level === 0 || level === 1 || upper === "FAIL" || upper === "L1") return "FAIL";
+  const match = upper.match(/^L?([2-4])$/);
   return match ? `L${match[1]}` : "—";
 }
 
@@ -71,9 +75,17 @@ export function p20BestPrimarySeat(rows = []) {
     .sort((a, b) => Math.abs(a.variationDbRaw) - Math.abs(b.variationDbRaw))[0] || null;
 }
 
+// Numeric rank for P20 level sorting: FAIL (below L2 threshold) = 0 (worst),
+// L1-L4 = 1-4, unknown = 5. RP22 P20 has no L1 — "FAIL" is the failure bucket.
+const p20LevelRank = (level) => {
+  if (level === "FAIL") return 0;
+  const match = String(level || "").match(/^L([1-4])$/);
+  return match ? Number(match[1]) : 5;
+};
+
 export function p20WorstSeat(rows = []) {
   return rows.flatMap((row) => row.seats).filter((seat) => seat.level !== "—")
-    .sort((a, b) => Number(a.level.slice(1)) - Number(b.level.slice(1))
+    .sort((a, b) => p20LevelRank(a.level) - p20LevelRank(b.level)
       || Math.abs(b.variationDbRaw) - Math.abs(a.variationDbRaw))[0] || null;
 }
 
@@ -90,8 +102,8 @@ export function buildP20BeforeAfter(seatingPositions, beforeResults, afterResult
   const after = afterRows.flatMap((row) => row.seats);
   const changedSeatIds = before.filter((seat, index) => seat.level !== after[index]?.level).map((seat) => seat.seatId);
   const deltas = before.map((seat, index) => {
-    const beforeLevel = Number(seat.level.slice(1));
-    const afterLevel = Number(after[index]?.level?.slice(1));
+    const beforeLevel = p20LevelRank(seat.level);
+    const afterLevel = p20LevelRank(after[index]?.level);
     return Number.isFinite(beforeLevel) && Number.isFinite(afterLevel) ? afterLevel - beforeLevel : null;
   }).filter((delta) => delta != null && delta !== 0);
   const upCount = deltas.filter((delta) => delta > 0).length;

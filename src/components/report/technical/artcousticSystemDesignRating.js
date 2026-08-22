@@ -337,7 +337,9 @@ function scoreP19(rawValue) {
 }
 
 function scoreP20(rawValue) {
-  return applyMapper(rawValue, levelP20_lfConsistency, false); // open-ended → no FAIL
+  // RP22 P20 has no L1: >4 dB is below the L2 threshold (FAIL). canFail=true
+  // so the FAIL level propagates instead of being silently coerced to L1.
+  return applyMapper(rawValue, levelP20_lfConsistency, true);
 }
 
 function scoreScreen(angleDeg) {
