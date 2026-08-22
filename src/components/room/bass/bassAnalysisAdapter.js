@@ -330,6 +330,7 @@ export function adaptCurrentBassOptimisationResult({
     contract.job.cacheRejectionReason = backgroundLifecycle.cacheRejectionReason || null;
     contract.job.engineVersion = optimisationResult?.engineVersion || null;
     contract.job.resultSchemaVersion = optimisationResult?.resultSchemaVersion || null;
+    contract.job.metricSchemaVersion = optimisationResult?.metricSchemaVersion || contract.metricSchemaVersion;
     contract.job.errorMessage = backgroundLifecycle.errorMessage || null;
     contract.job.previousResultStale = !!backgroundLifecycle.previousResultStale;
     contract.job.phase = backgroundLifecycle.progressStage || contract.job.phase;
