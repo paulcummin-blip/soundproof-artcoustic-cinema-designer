@@ -23,9 +23,6 @@ import {
   resolveP12P13DualLevels,
 } from "@/components/report/technical/roomParameterLevelAuthority";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
-import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
-import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
-import { useActiveProjectId } from "@/components/state/project-session";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import { formatAuthoritativeP20Result, p20LevelText } from "@/components/room/bass/p20SeatPresentation";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
@@ -128,11 +125,11 @@ export function useParameterGridAuthority({
   contributionsByKey = null,
 }) {
   const appState = useAppState();
-  const activeProjectId = useActiveProjectId();
-  const projectBassAuthority = useCompletedBassAuthority(activeProjectId || "free");
-  const sharedBassResults = useOptionalSharedBassResults();
-  const resolvedBassAuthority = React.useMemo(() => bassAuthority || projectBassAuthority || null, [bassAuthority, projectBassAuthority]);
-  const resolvedBassError = bassErrorMessage || projectBassAuthority?.errorMessage || sharedBassResults?.detailedError || null;
+  // ── Report project authority (FIX 1) ──────────────────────────────────
+  // Pure consumer of the prop-supplied bass authority. No parallel global
+  // activeProjectId subscription. Cross-project contamination is impossible.
+  const resolvedBassAuthority = React.useMemo(() => bassAuthority || null, [bassAuthority]);
+  const resolvedBassError = bassErrorMessage || null;
   const bassPresentation = React.useMemo(() => buildComplianceBassPresentation({ completedBassAuthority: resolvedBassAuthority }, resolvedBassError), [resolvedBassAuthority, resolvedBassError]);
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";

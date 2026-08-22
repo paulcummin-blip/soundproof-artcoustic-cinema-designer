@@ -103,11 +103,17 @@ function RP22ReportInner() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const activeProjectId = useActiveProjectId();
-    const effectiveProjectId =
+    // ── Report project ID authority (immutable for session, FIX 2) ────────
+    // The explicit project ID from the route/query is the SOLE authority.
+    // Global activeProjectId is NEVER used as a fallback for report data.
+    // It is retained only for the FAST PATH optimisation check and may be
+    // written for navigation convenience — but NEVER read as authority.
+    const explicitProjectId =
         routeProjectId ||
         searchParams.get("projectId") ||
         searchParams.get("id") ||
-        activeProjectId;
+        null;
+    const [reportProjectError, setReportProjectError] = useState(null);
 
     // SPA handoff: Room Designer has already run the canonical recommendation
     // candidates for this exact project. Reuse that settled authority instead
@@ -116,7 +122,7 @@ function RP22ReportInner() {
     useEffect(() => {
         const shared = typeof window !== "undefined" ? window.__ROOM_DESIGNER_ASDR__ : null;
         const sharedProjectId = String(shared?.projectId || "");
-        const requestedProjectId = String(effectiveProjectId || "free");
+        const requestedProjectId = String(explicitProjectId || "free");
         if (
             sharedProjectId === requestedProjectId &&
             shared?.recommendations?.isSettled === true
@@ -125,9 +131,9 @@ function RP22ReportInner() {
         } else {
             setDesignRecommendations(null);
         }
-    }, [effectiveProjectId]);
+    }, [explicitProjectId]);
 
-    const completedBassAuthority = useCompletedBassAuthority(effectiveProjectId || "free");
+    const completedBassAuthority = useCompletedBassAuthority(explicitProjectId || "free");
     const completedBassContract = completedBassAuthority.contract;
     const bassErrorMessage = completedBassAuthority.errorMessage || null;
     const completedBassPresentation = useMemo(() => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);
@@ -141,7 +147,7 @@ function RP22ReportInner() {
     // resolveBassReadiness is the shared gate from useAppDesignRating — when
     // bass is applicable (subwoofers present), UNCALCULATED means "not yet
     // computed" (pending), not "no bass" (ready).
-    const expectedProjectKey = String(effectiveProjectId || 'free');
+    const expectedProjectKey = String(explicitProjectId || 'free');
     const projectIdMatch = String(completedBassAuthority?.projectId || 'free') === expectedProjectKey;
     const bassReadiness = useMemo(() => {
         if (!projectIdMatch) return { ready: false, pending: true, reason: 'project-id-mismatch', fingerprint: null };
@@ -169,7 +175,7 @@ function RP22ReportInner() {
 
         if (!app) return;
 
-        if (!effectiveProjectId) {
+        if (!explicitProjectId) {
             setProjectDetails(null);
             setReportHydrating(false);
             setReportReadyProjectId(null);
@@ -185,15 +191,15 @@ function RP22ReportInner() {
         // Hard refresh fails this check (isProjectHydrationReady=false) and
         // falls through to the full fetch/hydrate path below.
         const sharedProviderReady =
-            activeProjectId === effectiveProjectId &&
+            activeProjectId === explicitProjectId &&
             app?.isProjectHydrationReady === true &&
             Number.isFinite(Number(app?.roomDims?.widthM)) &&
             Number.isFinite(Number(app?.roomDims?.lengthM));
 
         if (sharedProviderReady) {
             setReportHydrating(false);
-            setReportReadyProjectId(effectiveProjectId);
-            base44.entities.Project.filter({ id: effectiveProjectId }).then((results) => {
+            setReportReadyProjectId(explicitProjectId);
+            base44.entities.Project.filter({ id: explicitProjectId }).then((results) => {
                 if (cancelled) return;
                 const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
                 if (!p) return;
@@ -210,16 +216,16 @@ function RP22ReportInner() {
             return () => { cancelled = true; };
         }
 
-        if (reportReadyProjectId === effectiveProjectId && reportHydrating === false) {
+        if (reportReadyProjectId === explicitProjectId && reportHydrating === false) {
             return;
         }
 
-        if (reportReadyProjectId !== effectiveProjectId) {
+        if (reportReadyProjectId !== explicitProjectId) {
             setReportHydrating(true);
             setReportReadyProjectId(null);
         }
 
-        base44.entities.Project.filter({ id: effectiveProjectId }).then((results) => {
+        base44.entities.Project.filter({ id: explicitProjectId }).then((results) => {
             if (cancelled) return;
             const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
             if (!p) {
@@ -285,7 +291,7 @@ function RP22ReportInner() {
         return () => {
             cancelled = true;
         };
-    }, [effectiveProjectId]);
+    }, [explicitProjectId]);
 
     const [printReady, setPrintReady] = useState(false);
     const [debugPlanCapture, setDebugPlanCapture] = useState(false);
@@ -338,7 +344,14 @@ function RP22ReportInner() {
     const isAutoPrintPreparing = autoPrintRequested && !autoPrintDone;
     useEffect(() => {
         if (!autoPrintRequested || autoPrintTriggeredRef.current) return;
-        if (reportHydrating || !effectiveProjectId || reportReadyProjectId !== effectiveProjectId) return;
+        // FIX 3: autoPrint requires an explicit project ID. Never fall back
+        // to a globally active project. A failed PDF is preferable to a PDF
+        // for the wrong client.
+        if (!explicitProjectId) {
+            setReportProjectError("Project could not be resolved for Technical Report.");
+            return;
+        }
+        if (reportHydrating || reportReadyProjectId !== explicitProjectId) return;
         if (!bassReadiness.ready) return; // wait for completed bass authority
         if (isPrinting) return;
         autoPrintTriggeredRef.current = true;
@@ -348,24 +361,43 @@ function RP22ReportInner() {
         setPlanDimsImageDataUrl(null);
         setPlanSpeakerDimsImageDataUrl(null);
         setIsPrinting(true);
-    }, [autoPrintRequested, reportHydrating, effectiveProjectId, reportReadyProjectId, isPrinting, bassReadiness.ready]);
+    }, [autoPrintRequested, reportHydrating, explicitProjectId, reportReadyProjectId, isPrinting, bassReadiness.ready]);
 
     // Mark printReady when all captures are done
     useEffect(() => {
-        if (!isPrinting || reportHydrating || !effectiveProjectId || reportReadyProjectId !== effectiveProjectId) return;
+        if (!isPrinting || reportHydrating || !explicitProjectId || reportReadyProjectId !== explicitProjectId) return;
         if (planImageDataUrl !== null && planDimsImageDataUrl !== null && planSpeakerDimsImageDataUrl !== null) {
             setExportDebug(d => ({ ...d, printReady: true }));
             setPrintReady(true);
             setExportStatus("Capture complete — preparing print…");
             if (exportTimeoutRef.current) { clearTimeout(exportTimeoutRef.current); exportTimeoutRef.current = null; }
         }
-    }, [isPrinting, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl, reportHydrating, effectiveProjectId, reportReadyProjectId]);
+    }, [isPrinting, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl, reportHydrating, explicitProjectId, reportReadyProjectId]);
 
     // Trigger print when ready
     useEffect(() => {
         if (!isPrinting) { setHasPrintedOnce(false); printLockRef.current = false; setPrintReady(false); return; }
         if (!printReady || hasPrintedOnce || printLockRef.current) return;
         const t = setTimeout(() => {
+            // FIX 5: Project consistency guard before window.print().
+            // Assert the report is still bound to the same explicit project
+            // and the bass authority scope matches. Cancel print if any
+            // identity mismatch is detected — never substitute another project.
+            if (!explicitProjectId || reportReadyProjectId !== explicitProjectId || reportHydrating) {
+                setExportStatus("Print cancelled — project identity mismatch.");
+                setIsPrinting(false);
+                setPrintReady(false);
+                printLockRef.current = false;
+                return;
+            }
+            const bassScopeId = String(completedBassAuthority?.projectId || 'free');
+            if (bassScopeId !== String(explicitProjectId || 'free')) {
+                setExportStatus("Print cancelled — bass authority project mismatch.");
+                setIsPrinting(false);
+                setPrintReady(false);
+                printLockRef.current = false;
+                return;
+            }
             setExportStatus("Opening PDF preview…");
             setHasPrintedOnce(true);
             setAutoPrintDone(true);
@@ -572,7 +604,7 @@ function RP22ReportInner() {
         }
     }, [app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.aspectRatio]);
 
-    const showLoadingReport = reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId) || !bassReadiness.ready;
+    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || !bassReadiness.ready;
 
     const analysisSpeakers = useAnalysisSpeakers({
         placedSpeakers,
@@ -1112,6 +1144,22 @@ function RP22ReportInner() {
         };
     }, [projectDetails, exportDateLabel, exportSystemConfiguration]);
 
+    // FIX 3: If autoPrint was requested but no explicit project ID was provided,
+    // block the report entirely. Never substitute a globally active project.
+    if (reportProjectError) {
+        return (
+            <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
+                <Card className="max-w-xl mx-auto w-full">
+                    <CardHeader><CardTitle className="text-[#1B1A1A] font-header">Technical Report</CardTitle></CardHeader>
+                    <CardContent className="text-center py-10">
+                        <BarChart4 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                        <p className="text-[#3E4349]">{reportProjectError}</p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     if (!app) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
@@ -1256,7 +1304,7 @@ function RP22ReportInner() {
                     dolbyLayout={reportDolbyLayout}
                     dimensions={stableDimensions}
                     mlpPoint={primarySeatingPosition}
-                    projectId={effectiveProjectId || "free"}
+                    projectId={explicitProjectId || "free"}
                     baselineRating={roomDesignRating}
                     allowUkPricing={reportAllowUkPricing}
                     soundbarSelections={app?.soundbarSelections || null}
@@ -1311,7 +1359,7 @@ function RP22ReportInner() {
                         setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
-                        exportDisabled={reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId) || bassReportPending || recommendationsPending}
+                        exportDisabled={reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || bassReportPending || recommendationsPending}
                         exportDisabledMessage={bassReportPending ? "Bass analysis updating" : (recommendationsPending ? "Recommendations evaluating" : "Report loading")}
                         lcrAngleInfo={(() => {
                             // Compute LCR angles exactly as Plan View does:
