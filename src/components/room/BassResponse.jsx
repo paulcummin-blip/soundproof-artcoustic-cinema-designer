@@ -515,7 +515,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // marker communicate this clearly. No horizontal P14 line is drawn on the graph.
   const p14PresentationData = React.useMemo(() => {
     const basis = authoritative.requested?.p14TargetBasis || splConfig?.selectedP14TargetBasis || "minimum";
-    const levelNum = authoritative.requested?.requestedLevel || Number(splConfig?.selectedP14Level) || 1;
+    // Explicit null guard: Number(null) === 0, which would coerce to L1 via `|| 1`.
+    const rawLevel = authoritative.requested?.requestedLevel ?? splConfig?.selectedP14Level;
+    const levelNum = (Number.isFinite(Number(rawLevel)) && Number(rawLevel) > 0)
+      ? Math.max(1, Math.min(4, Math.round(Number(rawLevel))))
+      : null;
     const targetDb = Number.isFinite(selectedP14TargetDb) ? selectedP14TargetDb : null;
     const availableCapability = optimisationResult?.availableP14CapabilityDb ?? null;
     const p19Variation = optimisationResult?.achievedP19VariationDb ?? null;

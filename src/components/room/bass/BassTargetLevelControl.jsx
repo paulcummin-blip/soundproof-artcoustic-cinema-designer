@@ -10,8 +10,10 @@ export default function BassTargetLevelControl({ disabled = false }) {
     : config.selectedP14TargetBasis === "minimum" ? "minimum"
     : null;
   const selectedP18Basis = config.selectedP18TargetBasis === "recommended" ? "recommended" : "minimum";
-  const selectedLevel = Number.isFinite(Number(config.selectedP14Level))
-    ? Math.max(1, Math.min(4, Number(config.selectedP14Level)))
+  const rawLevel = config.selectedP14Level;
+  // Explicit null guard: Number(null) === 0, which Number.isFinite accepts.
+  const selectedLevel = (Number.isFinite(Number(rawLevel)) && Number(rawLevel) > 0)
+    ? Math.max(1, Math.min(4, Math.round(Number(rawLevel))))
     : null;
   const hasSelection = !!selectedBasis && !!selectedLevel;
   const selectedTarget = hasSelection ? getRp22BassOperatingDefinitions(selectedBasis, selectedP18Basis).find(({ value }) => value === selectedLevel) : null;

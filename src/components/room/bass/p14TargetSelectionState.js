@@ -22,8 +22,11 @@ export function resolveP14TargetSelectionState(splConfig) {
   const basis = splConfig?.selectedP14TargetBasis === "recommended" ? "recommended"
     : splConfig?.selectedP14TargetBasis === "minimum" ? "minimum"
     : null;
-  const level = Number.isFinite(Number(splConfig?.selectedP14Level))
-    ? Math.max(1, Math.min(4, Number(splConfig.selectedP14Level)))
+  const rawLevel = splConfig?.selectedP14Level;
+  // Explicit null guard: Number(null) === 0, which Number.isFinite accepts.
+  // A null/undefined/0/NaN level must remain null — never coerced to L1.
+  const level = (Number.isFinite(Number(rawLevel)) && Number(rawLevel) > 0)
+    ? Math.max(1, Math.min(4, Math.round(Number(rawLevel))))
     : null;
   const noP14TargetSelected = !basis || !level;
   const targetKey = noP14TargetSelected ? null : `${basis}-L${level}`;

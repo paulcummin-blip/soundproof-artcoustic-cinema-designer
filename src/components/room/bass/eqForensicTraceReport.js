@@ -272,11 +272,17 @@ function formatFinalGraphValues(trace, rawRspCurve, postEqCurve, operatingLevelO
 function formatP14Guide(splConfig, requested) {
   const lines = [sectionHeader("8. P14 GUIDE")];
   const basis = splConfig?.selectedP14TargetBasis === "recommended" ? "recommended" : "minimum";
-  const level = Math.max(1, Math.min(4, Math.round(Number(splConfig?.selectedP14Level) || 1)));
+  // Explicit null guard: Number(null) === 0, which would coerce to L1 via `|| 1`.
+  const rawLevel = splConfig?.selectedP14Level;
+  const level = (Number.isFinite(Number(rawLevel)) && Number(rawLevel) > 0)
+    ? Math.max(1, Math.min(4, Math.round(Number(rawLevel))))
+    : null;
   const targetDb = num(requested?.selectedP14TargetDb);
-  const label = `${basis === "recommended" ? "Recommended" : "Minimum"} L${level} · ${targetDb !== null ? targetDb.toFixed(0) : INCOMPLETE} dBC`;
+  const label = level !== null
+    ? `${basis === "recommended" ? "Recommended" : "Minimum"} L${level} · ${targetDb !== null ? targetDb.toFixed(0) : INCOMPLETE} dBC`
+    : INCOMPLETE;
   lines.push(`Selected P14 basis: ${basis}`);
-  lines.push(`Selected P14 level: L${level}`);
+  lines.push(`Selected P14 level: ${level !== null ? `L${level}` : INCOMPLETE}`);
   lines.push(`Selected P14 target dBC: ${targetDb !== null ? targetDb.toFixed(4) : INCOMPLETE}`);
   lines.push(`Reference-line Y value: ${targetDb !== null ? targetDb.toFixed(4) : INCOMPLETE}`);
   lines.push(`Reference-line label: ${label}`);

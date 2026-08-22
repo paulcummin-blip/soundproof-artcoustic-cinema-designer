@@ -37,8 +37,11 @@ export function deriveRequestedCalibrationConfig({
     : splConfig?.selectedP14TargetBasis === "minimum" ? "minimum"
     : null;
   const p18TargetBasis = normalizeP18TargetBasis(splConfig?.selectedP18TargetBasis || splConfig?.p18Mode);
-  const requestedLevel = Number.isFinite(Number(splConfig?.selectedP14Level))
-    ? Math.max(1, Math.min(4, Math.round(Number(splConfig.selectedP14Level))))
+  const rawP14Level = splConfig?.selectedP14Level;
+  // Explicit null guard: Number(null) === 0, which Number.isFinite accepts.
+  // A null/undefined/0/NaN level must remain null — never coerced to L1.
+  const requestedLevel = (Number.isFinite(Number(rawP14Level)) && Number(rawP14Level) > 0)
+    ? Math.max(1, Math.min(4, Math.round(Number(rawP14Level))))
     : null;
   // P14 target not yet selected — return null P14 identity. No bass optimisation
   // runs until the user explicitly selects a P14 target.

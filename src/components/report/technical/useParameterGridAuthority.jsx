@@ -23,6 +23,7 @@ import {
   resolveP12P13DualLevels,
 } from "@/components/report/technical/roomParameterLevelAuthority";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
+import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import { formatAuthoritativeP20Result, p20LevelText } from "@/components/room/bass/p20SeatPresentation";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
@@ -130,7 +131,11 @@ export function useParameterGridAuthority({
   // activeProjectId subscription. Cross-project contamination is impossible.
   const resolvedBassAuthority = React.useMemo(() => bassAuthority || null, [bassAuthority]);
   const resolvedBassError = bassErrorMessage || null;
-  const bassPresentation = React.useMemo(() => buildComplianceBassPresentation({ completedBassAuthority: resolvedBassAuthority }, resolvedBassError), [resolvedBassAuthority, resolvedBassError]);
+  const p14Selection = React.useMemo(
+    () => resolveP14TargetSelectionState(appState?.splConfig),
+    [appState?.splConfig?.selectedP14TargetBasis, appState?.splConfig?.selectedP14Level]
+  );
+  const bassPresentation = React.useMemo(() => buildComplianceBassPresentation({ completedBassAuthority: resolvedBassAuthority }, resolvedBassError, p14Selection.noP14TargetSelected), [resolvedBassAuthority, resolvedBassError, p14Selection.noP14TargetSelected]);
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";
   const p14Mode = bassPresentation.parameters.p14.targetBasis || appState?.splConfig?.p14Mode || "minimum";

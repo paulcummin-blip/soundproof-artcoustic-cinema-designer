@@ -44,6 +44,7 @@ import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '../components/utils/v
 import { getP21PresetResult, levelP21_earlyReflections } from '@/components/utils/rp22/levels';
 import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
 import { buildComplianceBassExportData, buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
+import { resolveP14TargetSelectionState } from '@/components/room/bass/p14TargetSelectionState';
 import { RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
 import TechnicalProjectOverview from '@/components/report/technical/TechnicalProjectOverview';
 import TechnicalPerformanceSummary from '@/components/report/technical/TechnicalPerformanceSummary';
@@ -137,7 +138,14 @@ function RP22ReportInner() {
     const completedBassAuthority = useCompletedBassAuthority(explicitProjectId || "free");
     const completedBassContract = completedBassAuthority.contract;
     const bassErrorMessage = completedBassAuthority.errorMessage || null;
-    const completedBassPresentation = useMemo(() => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);
+    // P14 target selection state — shared with the main-app Compliance panel.
+    // When no P14 target is selected, the report must NOT surface old
+    // completed bass authority as current. Same semantics as Room Designer.
+    const p14Selection = useMemo(
+        () => resolveP14TargetSelectionState(app?.splConfig),
+        [app?.splConfig?.selectedP14TargetBasis, app?.splConfig?.selectedP14Level]
+    );
+    const completedBassPresentation = useMemo(() => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage, p14Selection.noP14TargetSelected), [completedBassAuthority, bassErrorMessage, p14Selection.noP14TargetSelected]);
     const complianceBassExportData = useMemo(() => buildComplianceBassExportData({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);
 
     // ── Bass readiness gate (reuses the SAME authority as Room Designer) ──
@@ -159,8 +167,8 @@ function RP22ReportInner() {
         const subInstances = Array.isArray(app?.subwooferInstances) ? app.subwooferInstances : [];
         const subs = Array.isArray(app?.subwoofers) ? app.subwoofers : [];
         const bassApplicable = fCount > 0 || rCount > 0 || subInstances.length > 0 || subs.length > 0;
-        return resolveBassReadiness(completedBassAuthority, bassApplicable);
-    }, [completedBassAuthority, projectIdMatch, app?.frontSubsCfg, app?.rearSubsCfg, app?.subwooferInstances, app?.subwoofers]);
+        return resolveBassReadiness(completedBassAuthority, bassApplicable, !p14Selection.noP14TargetSelected);
+    }, [completedBassAuthority, projectIdMatch, app?.frontSubsCfg, app?.rearSubsCfg, app?.subwooferInstances, app?.subwoofers, p14Selection.noP14TargetSelected]);
     const bassReportPending = bassReadiness.pending;
     const completedP19Result = completedBassContract?.productAnalysis?.parameters?.p19 || null;
     // Use the gated presentation (publicationVerified) for per-seat P19 — same
@@ -611,7 +619,11 @@ function RP22ReportInner() {
         }
     }, [app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.aspectRatio]);
 
-    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || !bassReadiness.ready;
+    // When P14 target is unselected, bassReadiness.ready is false but pending is
+    // also false (reason: 'p14-target-not-selected'). The report must RENDER and
+    // show "Select Bass Target" for bass parameters — NOT hang on "Loading…".
+    // Only block when genuinely pending (calculation in progress or hydrating).
+    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || (!bassReadiness.ready && bassReadiness.pending);
 
     const analysisSpeakers = useAnalysisSpeakers({
         placedSpeakers,

@@ -241,7 +241,14 @@ export default function RP22CompliancePanel({
   const appState = useAppState();
   const activeProjectId = useActiveProjectId();
   const bassAuthority = useCompletedBassAuthority(activeProjectId || "free");
-  const bassPresentation = React.useMemo(() => buildComplianceBassPresentation({ completedBassAuthority: bassAuthority }), [bassAuthority]);
+  const p14Selection = React.useMemo(
+    () => resolveP14TargetSelectionState(appState?.splConfig),
+    [appState?.splConfig?.selectedP14TargetBasis, appState?.splConfig?.selectedP14Level]
+  );
+  const bassPresentation = React.useMemo(
+    () => buildComplianceBassPresentation({ completedBassAuthority: bassAuthority }, null, p14Selection.noP14TargetSelected),
+    [bassAuthority, p14Selection.noP14TargetSelected]
+  );
   const selectedP20Results = bassPresentation.perSeatP20Results;
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";
