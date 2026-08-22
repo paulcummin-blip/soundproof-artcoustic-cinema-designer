@@ -139,7 +139,7 @@ export function computeP18InRoomF3({ freqsHz, splDb, targetDb, minHz = 10, maxHz
   return { f3Hz: f3, details: { refDb, cutoffDb, samples: freqsHz.length } };
 }
 
-// P19 — symmetric ± half of the maximum full response-to-target difference below Schroeder freq.
+// P19 — direct maximum absolute response-to-target deviation below Schroeder frequency.
 export function computeP19DeviationBelowSchroeder({ freqsHz, splDb, targetDb, schroederHz }) {
   if (!Array.isArray(freqsHz) || !Array.isArray(splDb) || freqsHz.length === 0) {
     return { resultDb: null, details: { samples: 0 } };
@@ -161,7 +161,7 @@ export function computeP19DeviationBelowSchroeder({ freqsHz, splDb, targetDb, sc
     used++;
   }
   return {
-    resultDb: used > 0 ? maxDev / 2 : null,
+    resultDb: used > 0 ? maxDev : null,
     totalDifferenceDbRaw: used > 0 ? maxDev : null,
     details: { schroederHz, samples: used },
   };
@@ -418,9 +418,9 @@ export function computeParam19Deviation(rspResponse, transitionHz) {
     const d = Math.abs(below[i].spl - refDb);
     if (d > rawMaxDev) rawMaxDev = d;
   }
-  // Convert the full response-to-target gap to the RP22 symmetric ± value,
-  // then apply the agreed whole-dB favourable floor for grading and display.
-  const variationDbRaw = Math.abs(rawMaxDev) / 2;
+  // RP22 P19 is the direct maximum absolute response-to-target deviation.
+  // Preserve full precision for grading; display rounding is neutral.
+  const variationDbRaw = Math.abs(rawMaxDev);
   const maxDev = resolveRp22DesignValue(19, variationDbRaw);
   const level = levelP19_lfResponse(variationDbRaw).level;
 
@@ -478,7 +478,7 @@ export function computeParam20SeatConsistency({ rspResponse, perSeatResponses, t
       }
     }
     const isRsp = rspSeatId != null && String(entry.seatId) === String(rspSeatId);
-    const dev = isRsp ? 0 : maxDev / 2;
+    const dev = isRsp ? 0 : maxDev;
     const designDev = resolveRp22DesignValue(20, dev);
     perSeat.push({
       seatId: entry.seatId,
@@ -487,7 +487,7 @@ export function computeParam20SeatConsistency({ rspResponse, perSeatResponses, t
       deviationDb: designDev,
       deviationDbRaw: dev,
       totalSeatToRspDifferenceDbRaw: isRsp ? 0 : maxDev,
-      level: levelForDeviation(designDev),
+      level: levelForDeviation(dev),
     });
   }
   if (perSeat.length === 0) return null;
