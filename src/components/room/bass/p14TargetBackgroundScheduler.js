@@ -24,6 +24,7 @@ import { buildCompactContractFromWorkerResult } from "./p14TargetContractBuilder
 import { getTargetCacheEntry, getTargetCacheProgress, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
 import { resolveBackgroundTargetAdvance, captureTargetFailureDiagnostics, formatDiagnosticLine, createSweepDiagnostics, MAX_BACKGROUND_TARGET_RETRIES, classifyBackgroundPoolFailure, captureGenerationFailureDiagnostics, formatGenerationFailureLine } from "./p14TargetBackgroundDiagnostics";
 import { safeConsole } from "@/components/utils/safeConsole";
+import { subscribe as subscribeUserInteraction, isUserInteracting, getIdleResumeDeadline } from "@/components/state/userInteractionStore";
 
 const createWorker = () => new Worker(
   new URL("../../utils/bassOptimiser.worker.js", import.meta.url),
@@ -47,10 +48,55 @@ export class P14TargetBackgroundScheduler {
     this.foregroundTargetKey = null;
     this.delayHandle = null;
     this.idleHandle = null;
+    // Idle-only background: pending deferred completion + its idle-wait timer.
+    this.pendingCompletion = null;
+    this.completionProcessHandle = null;
     // Bounded retry + sweep diagnostic state. Reset on design/project change.
     this.retryCounts = new Map();     // targetKey -> attempt count
     this.failedTargets = new Set();   // targetKeys that exhausted retry this sweep
     this.sweepDiagnostics = createSweepDiagnostics();
+    // Subscribe once to the shared user-interaction authority. Any meaningful
+    // interaction (pointerdown, wheel, keydown, drag) pauses speculative work
+    // and resets the 3-second idle-resume timer. Hover/pointermove are ignored.
+    this._interactionUnsub = subscribeUserInteraction(() => this.onInteraction());
+  }
+
+  /**
+   * Shared user-interaction callback: pause speculative work immediately on
+   * any meaningful interaction. Preserves the queue and completed cache; only
+   * the in-flight worker is terminated. Resume is driven by scheduleNext's
+   * idle gate (3-second sustained inactivity).
+   */
+  onInteraction() {
+    if (this.cancelled) return;
+    const hasActiveWork = this.running
+      || this.delayHandle != null
+      || this.idleHandle != null
+      || !!this.pendingCompletion;
+    if (!hasActiveWork) return;
+    this.pauseForInteraction();
+  }
+
+  /**
+   * Pause speculative work without losing the queue or completed cache. The
+   * in-flight worker is terminated; scheduleNext re-arms with the idle gate so
+   * background only resumes after sustained inactivity. A held completion is
+   * re-armed to process after the new quiet period.
+   */
+  pauseForInteraction() {
+    this.cancelScheduledStart();
+    if (this.completionProcessHandle != null) {
+      clearTimeout(this.completionProcessHandle);
+      this.completionProcessHandle = null;
+    }
+    this.terminateWorker();
+    this.currentTarget = null;
+    this.running = false;
+    if (this.pendingCompletion) {
+      this.armCompletionProcessTimer();
+    } else {
+      this.scheduleNext();
+    }
   }
 
   /**
@@ -250,7 +296,81 @@ export class P14TargetBackgroundScheduler {
       metricSchemaVersion: message.metricSchemaVersion,
     };
 
-    const compactContract = buildCompactContractFromWorkerResult({
+    // Idle-only background: if the user is interacting, defer the heavy
+    // synchronous contract-construction path. Hold the completed worker
+    // result and process it once the app is genuinely idle. This avoids a
+    // worker-completion spike landing in the middle of an interaction.
+    if (isUserInteracting()) {
+      this.terminateWorker();
+      this.running = false;
+      this.currentTarget = null;
+      this.holdPendingCompletion({ workerResult, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint });
+      return;
+    }
+
+    this.processCompletedWorkerResult(workerResult, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint);
+  }
+
+  /**
+   * Hold a completed worker result pending idle processing.
+   */
+  holdPendingCompletion(pending) {
+    this.pendingCompletion = pending;
+    this.armCompletionProcessTimer();
+  }
+
+  /**
+   * Arm a timer that processes the pending completion once the app is idle
+   * (3-second sustained inactivity). Re-arms if still interacting on fire.
+   */
+  armCompletionProcessTimer() {
+    if (this.completionProcessHandle != null) clearTimeout(this.completionProcessHandle);
+    const now = Date.now();
+    const wait = Math.max(0, getIdleResumeDeadline() - now);
+    this.completionProcessHandle = setTimeout(() => {
+      this.completionProcessHandle = null;
+      this.tryProcessPendingCompletion();
+    }, wait);
+  }
+
+  /**
+   * Process the pending completion once idle. Discards if the design changed
+   * while waiting — stale background authority must never be processed.
+   */
+  tryProcessPendingCompletion() {
+    if (!this.pendingCompletion) return;
+    if (this.cancelled) { this.pendingCompletion = null; return; }
+    if (isUserInteracting()) {
+      this.armCompletionProcessTimer();
+      return;
+    }
+    const pending = this.pendingCompletion;
+    this.pendingCompletion = null;
+    if (pending.targetBaseDesignFingerprint !== this.currentBaseDesignFingerprint) {
+      safeConsole.log("p14-bg", `target ${pending.target.key}: discarded deferred result (design changed while waiting)`);
+      this.handleTargetFailure(pending.target, pending.fingerprint, pending.calibrationFingerprint, pending.targetBaseDesignFingerprint, null, 'design-changed-while-deferred');
+      return;
+    }
+    this.processCompletedWorkerResult(pending.workerResult, pending.target, pending.fingerprint, pending.calibrationFingerprint, pending.targetBaseDesignFingerprint);
+  }
+
+  /**
+   * Build, validate, compact, and cache a completed worker result. Includes
+   * development-only per-function timing instrumentation around the
+   * synchronous completion path (gated by import.meta.env.DEV).
+   */
+  processCompletedWorkerResult(workerResult, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint) {
+    const isDev = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV) === true;
+    const timings = isDev ? {} : null;
+    const time = (key, fn) => {
+      if (!timings) return fn();
+      const s = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+      const r = fn();
+      timings[key] = (timings[key] || 0) + (((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now()) - s);
+      return r;
+    };
+
+    const compactContract = time("contract", () => buildCompactContractFromWorkerResult({
       workerResult,
       sources: this.designContext.sources,
       usableLfHz: this.designContext.usableLfHz,
@@ -258,25 +378,32 @@ export class P14TargetBackgroundScheduler {
       perSeatRawCurves: this.designContext.perSeatRawCurves,
       fingerprints: this.designContext.fingerprints,
       target,
-    });
+      timings,
+    }));
 
     // Attempt insertion into the target cache.
     const insertResult = compactContract
-      ? setTargetCacheEntry(
+      ? time("cacheInsert", () => setTargetCacheEntry(
           this.projectId,
           this.currentBaseDesignFingerprint,
           target.key,
           compactContract,
           { deferPersistence: true },
-        )
+        ))
       : false;
 
     // Verify readback: the cache must return the same authoritative entry.
     // A target is complete ONLY when setTargetCacheEntry returns true AND
     // getTargetCacheEntry readback returns the authoritative contract.
     const readback = insertResult
-      ? getTargetCacheEntry(this.projectId, this.currentBaseDesignFingerprint, target.key)
+      ? time("readback", () => getTargetCacheEntry(this.projectId, this.currentBaseDesignFingerprint, target.key))
       : null;
+
+    if (isDev && timings) {
+      const keys = ["select", "finalResponse", "authority", "applyAuthority", "metricAuthority", "publication", "adapter", "compact", "graphPayload", "cacheInsert", "readback"];
+      const total = keys.reduce((sum, k) => sum + (timings[k] || 0), 0);
+      safeConsole.log("p14-bg-timing", `target ${target.key} | select:${(timings.select||0).toFixed(1)} finalResponse:${(timings.finalResponse||0).toFixed(1)} authority:${(timings.authority||0).toFixed(1)} applyAuthority:${(timings.applyAuthority||0).toFixed(1)} metricAuthority:${(timings.metricAuthority||0).toFixed(1)} publication:${(timings.publication||0).toFixed(1)} adapter:${(timings.adapter||0).toFixed(1)} compact:${(timings.compact||0).toFixed(1)} (graphPayload:${(timings.graphPayload||0).toFixed(1)}) cacheInsert:${(timings.cacheInsert||0).toFixed(1)} readback:${(timings.readback||0).toFixed(1)} total:${total.toFixed(1)} ms`);
+    }
 
     const fingerprintChanged = targetBaseDesignFingerprint !== this.currentBaseDesignFingerprint;
     const retryCount = this.retryCounts.get(target.key) || 0;
@@ -399,6 +526,19 @@ export class P14TargetBackgroundScheduler {
 
   scheduleNext() {
     if (this.cancelled || this.running || this.delayHandle != null || this.idleHandle != null) return;
+    // A completed result waiting for idle takes precedence over starting a new
+    // target — let the completion timer drive, then scheduleNext continues.
+    if (this.pendingCompletion) {
+      this.armCompletionProcessTimer();
+      return;
+    }
+    // Idle gate: after user interaction, background may only resume once
+    // IDLE_QUIET_MS (3s) of genuine inactivity has elapsed. The normal
+    // inter-target delay (BACKGROUND_IDLE_DELAY_MS) is preserved when no
+    // interaction occurred recently.
+    const now = Date.now();
+    const idleWait = Math.max(0, getIdleResumeDeadline() - now);
+    const wait = Math.max(BACKGROUND_IDLE_DELAY_MS, idleWait);
     // A real quiet period separates heavy jobs. Once elapsed, prefer the
     // browser's idle scheduler so speculative work only starts when the main
     // thread has room; the timeout prevents the family from starving forever.
@@ -413,7 +553,7 @@ export class P14TargetBackgroundScheduler {
       } else {
         this.runNext();
       }
-    }, BACKGROUND_IDLE_DELAY_MS);
+    }, wait);
   }
 
   cancelScheduledStart() {
@@ -435,6 +575,11 @@ export class P14TargetBackgroundScheduler {
     const projectId = this.projectId;
     this.cancelled = true;
     this.cancelScheduledStart();
+    if (this.completionProcessHandle != null) {
+      clearTimeout(this.completionProcessHandle);
+      this.completionProcessHandle = null;
+    }
+    this.pendingCompletion = null;
     this.terminateWorker();
     this.queue = [];
     this.running = false;

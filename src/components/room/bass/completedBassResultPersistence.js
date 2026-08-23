@@ -120,7 +120,7 @@ function buildGraphPayload(contract) {
   };
 }
 
-export function compactCompletedBassContract(contract) {
+export function compactCompletedBassContract(contract, { graphPayloadTimings = null } = {}) {
   if (!isCompletedBassContract(contract)) return null;
   return {
     version: contract.version,
@@ -145,7 +145,14 @@ export function compactCompletedBassContract(contract) {
     requestedP18ExtensionHz: Number.isFinite(contract.selectedP18RequiredExtensionHz) ? contract.selectedP18RequiredExtensionHz : null,
     metricPublication: contract.metricPublication || null,
     provenance: contract.provenance || {},
-    graphPayload: buildGraphPayload(contract),
+    graphPayload: graphPayloadTimings
+      ? (() => {
+          const s = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+          const r = buildGraphPayload(contract);
+          graphPayloadTimings.graphPayload = (((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now()) - s);
+          return r;
+        })()
+      : buildGraphPayload(contract),
   };
 }
 

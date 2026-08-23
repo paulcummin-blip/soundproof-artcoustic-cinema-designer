@@ -32,7 +32,15 @@ export function buildCompactContractFromWorkerResult({
   perSeatRawCurves,
   fingerprints,
   target,
+  timings = null,
 }) {
+  const time = (key, fn) => {
+    if (!timings) return fn();
+    const s = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+    const r = fn();
+    timings[key] = (timings[key] || 0) + (((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now()) - s);
+    return r;
+  };
   const pool = workerResult.pool;
   const fingerprint = workerResult.fingerprint;
   const calibrationFingerprint = workerResult.calibrationFingerprint || fingerprints?.calibration || null;
@@ -48,7 +56,7 @@ export function buildCompactContractFromWorkerResult({
   };
 
   // Step 1: Select candidate from pool (same as foreground)
-  const selected = selectCandidateFromPool(pool);
+  const selected = time("select", () => selectCandidateFromPool(pool));
   if (!selected) return null;
 
   // Step 2: Build base result (same as foreground)
@@ -65,20 +73,20 @@ export function buildCompactContractFromWorkerResult({
   };
 
   // Step 3: Build canonical result (same as foreground)
-  const canonicalResult = buildFinalOptimisedBassResponse({
+  const canonicalResult = time("finalResponse", () => buildFinalOptimisedBassResponse({
     optimisationResult: baseResult,
     selectedLayout: sources,
-  });
+  }));
 
   // Step 4: Evaluate canonical authority (same as foreground)
-  const authority = evaluateCanonicalBassAuthority({
+  const authority = time("authority", () => evaluateCanonicalBassAuthority({
     canonicalResult,
     activeSubs: sources,
     usableLfHz,
     p14TargetBasis: target.basis,
     p18TargetBasis: target.p18TargetBasis,
     requestedLevel: target.level,
-  });
+  }));
 
   const selectedCandidate = authority
     ? { ...selected.selectedCandidate, ...authority }
@@ -106,10 +114,10 @@ export function buildCompactContractFromWorkerResult({
   // the first call and overlays only the authority-dependent scalar fields,
   // producing a structurally identical result without the duplicate
   // curve-cloning pass.
-  const finalOptimisedBassResponse = applyAuthorityToCanonicalResult(canonicalResult, selectedCandidate);
+  const finalOptimisedBassResponse = time("applyAuthority", () => applyAuthorityToCanonicalResult(canonicalResult, selectedCandidate));
 
   // Step 6: Build canonical metric authority (same as foreground)
-  const canonicalMetricAuthorityResult = buildCanonicalCompletedBassMetricAuthority({
+  const canonicalMetricAuthorityResult = time("metricAuthority", () => buildCanonicalCompletedBassMetricAuthority({
     finalOptimisedBassResponse,
     activeRequestFingerprint: fingerprint,
     returnedWorkerFingerprint: fingerprint,
@@ -137,7 +145,7 @@ export function buildCompactContractFromWorkerResult({
       p18TargetBasis: target.p18TargetBasis,
       selectedP18RequiredExtensionHz: target.p18RequiredExtensionHz,
     },
-  });
+  }));
 
   const optimisationResult = {
     ...result,
@@ -148,10 +156,10 @@ export function buildCompactContractFromWorkerResult({
   };
 
   // Step 7: Build metric publication receipt (same as foreground)
-  const metricPublication = buildMetricPublicationReceipt(optimisationResult);
+  const metricPublication = time("publication", () => buildMetricPublicationReceipt(optimisationResult));
 
   // Step 8: Build contract via adapter (same as foreground)
-  const contract = adaptCurrentBassOptimisationResult({
+  const contract = time("adapter", () => adaptCurrentBassOptimisationResult({
     optimisationResult,
     detailedStatus: "COMPLETE",
     detailedProgress: null,
@@ -173,8 +181,8 @@ export function buildCompactContractFromWorkerResult({
     selectedP18RequiredExtensionHz: target.p18RequiredExtensionHz,
     collectDiagnostics: false,
     metricPublication,
-  });
+  }));
 
   // Step 9: Compact contract (same as foreground)
-  return compactCompletedBassContract(contract);
+  return time("compact", () => compactCompletedBassContract(contract, { graphPayloadTimings: timings }));
 }
