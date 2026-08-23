@@ -23,6 +23,8 @@ import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { buildCompactContractFromWorkerResult } from "./p14TargetContractBuilder";
 import { getTargetCacheEntry, getTargetCacheProgress, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
 import { resolveBackgroundTargetAdvance, captureTargetFailureDiagnostics, formatDiagnosticLine, createSweepDiagnostics, MAX_BACKGROUND_TARGET_RETRIES, classifyBackgroundPoolFailure, captureGenerationFailureDiagnostics, formatGenerationFailureLine } from "./p14TargetBackgroundDiagnostics";
+import { requeueInterruptedTargetOnSoftPause } from "./p14TargetSoftPauseRequeue";
+import { pushP14BgTimingRecordFromTimings } from "./p14BgTimingsBuffer";
 import { safeConsole } from "@/components/utils/safeConsole";
 import { subscribe as subscribeUserInteraction, isUserInteracting, getIdleResumeDeadline } from "@/components/state/userInteractionStore";
 
@@ -89,29 +91,37 @@ export class P14TargetBackgroundScheduler {
       clearTimeout(this.completionProcessHandle);
       this.completionProcessHandle = null;
     }
+    // SOFT pause: capture the in-flight target before terminating so it can be
+    // requeued at the FRONT (restarts first after 3s idle). HARD cancel goes
+    // through cancel() and does NOT requeue against the old fingerprint.
+    const interruptedTarget = this.currentTarget;
+    const interruptedFingerprint = this.currentBaseDesignFingerprint;
     this.terminateWorker();
     this.currentTarget = null;
     this.running = false;
     if (this.pendingCompletion) {
       this.armCompletionProcessTimer();
-    } else {
-      this.scheduleNext();
+      return;
     }
+    if (interruptedTarget) {
+      requeueInterruptedTargetOnSoftPause({
+        queue: this.queue, target: interruptedTarget,
+        targetBaseDesignFingerprint: interruptedFingerprint,
+        currentBaseDesignFingerprint: this.currentBaseDesignFingerprint,
+        projectId: this.projectId,
+        pendingCompletionTargetKey: this.pendingCompletion?.target?.key ?? null,
+      });
+    }
+    this.scheduleNext();
   }
 
-  /**
-   * Schedule background calculation of remaining targets.
-   * If the design is the same as the current run, just updates the foreground
-   * target and continues. If the design changed, cancels and restarts.
-   */
+  /** Schedule background calculation of remaining targets. Same design →
+   *  update foreground target and continue; changed design → cancel+restart. */
   schedule({ projectId, baseDesignFingerprint, foregroundTargetKey, allTargets, designContext }) {
-    if (this.currentBaseDesignFingerprint !== baseDesignFingerprint || this.projectId !== projectId) {
-      // Design/project changed — terminate speculative work and persist any
-      // completed targets before rebuilding the family queue.
-      this.cancel();
-      this.currentBaseDesignFingerprint = baseDesignFingerprint;
-      // Reset retry + sweep diagnostic state for the new design.
-      this.retryCounts.clear();
+   if (this.currentBaseDesignFingerprint !== baseDesignFingerprint || this.projectId !== projectId) {
+     this.cancel();
+     this.currentBaseDesignFingerprint = baseDesignFingerprint;
+     this.retryCounts.clear();
       this.failedTargets.clear();
       this.sweepDiagnostics = createSweepDiagnostics();
     }
@@ -354,16 +364,12 @@ export class P14TargetBackgroundScheduler {
     this.processCompletedWorkerResult(pending.workerResult, pending.target, pending.fingerprint, pending.calibrationFingerprint, pending.targetBaseDesignFingerprint);
   }
 
-  /**
-   * Build, validate, compact, and cache a completed worker result. Includes
-   * development-only per-function timing instrumentation around the
-   * synchronous completion path (gated by import.meta.env.DEV).
-   */
+  /** Build, validate, compact, and cache a completed worker result. Timings
+   *  are always collected and pushed to the preview ring buffer. */
   processCompletedWorkerResult(workerResult, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint) {
     const isDev = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV) === true;
-    const timings = isDev ? {} : null;
+    const timings = {};
     const time = (key, fn) => {
-      if (!timings) return fn();
       const s = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
       const r = fn();
       timings[key] = (timings[key] || 0) + (((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now()) - s);
@@ -399,7 +405,8 @@ export class P14TargetBackgroundScheduler {
       ? time("readback", () => getTargetCacheEntry(this.projectId, this.currentBaseDesignFingerprint, target.key))
       : null;
 
-    if (isDev && timings) {
+    pushP14BgTimingRecordFromTimings(target.key, timings);
+    if (isDev) {
       const keys = ["select", "finalResponse", "authority", "applyAuthority", "metricAuthority", "publication", "adapter", "compact", "graphPayload", "cacheInsert", "readback"];
       const total = keys.reduce((sum, k) => sum + (timings[k] || 0), 0);
       safeConsole.log("p14-bg-timing", `target ${target.key} | select:${(timings.select||0).toFixed(1)} finalResponse:${(timings.finalResponse||0).toFixed(1)} authority:${(timings.authority||0).toFixed(1)} applyAuthority:${(timings.applyAuthority||0).toFixed(1)} metricAuthority:${(timings.metricAuthority||0).toFixed(1)} publication:${(timings.publication||0).toFixed(1)} adapter:${(timings.adapter||0).toFixed(1)} compact:${(timings.compact||0).toFixed(1)} (graphPayload:${(timings.graphPayload||0).toFixed(1)}) cacheInsert:${(timings.cacheInsert||0).toFixed(1)} readback:${(timings.readback||0).toFixed(1)} total:${total.toFixed(1)} ms`);
@@ -513,12 +520,6 @@ export class P14TargetBackgroundScheduler {
       }
     }
 
-    this.currentTarget = null;
-    this.running = false;
-    this.scheduleNext();
-  }
-
-  yieldAndRunNext() {
     this.currentTarget = null;
     this.running = false;
     this.scheduleNext();
