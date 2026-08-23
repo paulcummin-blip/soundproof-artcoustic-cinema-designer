@@ -54,8 +54,7 @@ export default function BassResultCards() {
                 {CARD_TITLES[key] || pill.label}
               </span>
             </BassRp22ParameterTooltip>
-            <RP22GradingPill level={pill.level} />
-            <div className="text-[12px] font-semibold text-[#1B1A1A]">{pill.resultText}</div>
+            <RP22GradingPill level={pill.level} style={{ width: "100%" }}>{pill.resultText}</RP22GradingPill>
             {pill.detail && <div className="text-[10px] text-[#625143]">{pill.detail}</div>}
           </div>
         ))}
