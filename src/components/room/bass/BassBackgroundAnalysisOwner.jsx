@@ -12,6 +12,7 @@ import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
 import { useTargetCacheEntry, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
+import { isBackgroundInputsReady } from "./backgroundInputReadiness";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
@@ -615,6 +616,18 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && !!completedBassAuthority?.authoritative
     && completedBassAuthority?.currentFingerprint === cacheKey;
   const foregroundReady = foregroundReadyPathA || foregroundReadyPathB;
+  // ── Live background worker-input readiness ──────────────────────────
+  // Reflects the ACTUAL live payload needed by the background worker, NOT the
+  // completed foreground authority. On cold restore, foregroundReadyPathA can
+  // be true (restored authoritative Minimum L2) while the live rspRawCurve is
+  // still []. Scheduling the background family with that premature designContext
+  // sends rawCurve=[] to the worker, which correctly returns
+  // generationStatus=invalid-inputs, missingInputs=["rawCurve"].
+  // backgroundInputsReady gates scheduling until the live curve hydrates.
+  const backgroundInputsReady = useMemo(
+    () => isBackgroundInputsReady({ rspRawCurve, sources }),
+    [rspRawCurve, sources],
+  );
   const designContextRef = useRef(null);
   designContextRef.current = useMemo(() => ({
     payload, sources, usableLfHz: designEqSystemLimits?.usableLfHz,
@@ -628,9 +641,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       scheduler.cancel();
       return;
     }
-    if (!foregroundReady || !allTargets.length) {
+    if (!foregroundReady || !allTargets.length || !backgroundInputsReady) {
       // Foreground is recalculating — cancel background work to avoid
       // concurrent heavy calculations. Queue rebuilds when foreground completes.
+      // backgroundInputsReady === false means the live rspRawCurve has not yet
+      // hydrated (cold restore, design change re-simulation). Do NOT schedule
+      // with a premature designContext — the worker would receive rawCurve=[]
+      // and return invalid-inputs. Wait for the live curve, then schedule.
       scheduler.cancel();
       return;
     }
@@ -641,7 +658,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       allTargets,
       designContext: designContextRef.current,
     });
-  }, [baseDesignFingerprint, targetKey, foregroundReady, allTargets, scopeId, isProjectHydrationReady, isDragging]);
+  }, [baseDesignFingerprint, targetKey, foregroundReady, backgroundInputsReady, allTargets, scopeId, isProjectHydrationReady, isDragging]);
 
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target
