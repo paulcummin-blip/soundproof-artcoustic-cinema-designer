@@ -129,9 +129,11 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  * While calculating / updating / NOT_VERIFIED, pills show "Calculating…"
  * or "NOT VERIFIED" consistently — never preliminary live values.
  *
- * P19 and P20 are SEAT parameters:
- *   P19 compact: "RSP: Lx · ±y dB" / "Lowest Seat: Ly · ±z dB"
- *   P20 compact: "Best Primary: Lx · ±y dB" / "Lowest Seat: Ly · ±z dB"
+ * P19 and P20 are SEAT-scoped parameters:
+ *   P19 main pill: "SEAT" — per-seat results in seat grids below
+ *   P20 main pill: "SEAT" — per-seat results in seat grids below
+ *   RSP (p19Rsp) and Best Primary (p20BestPrimary) are retained as
+ *   diagnostic fields in the return value but never shown as the main pill.
  *
  * @param {object} completedBassAuthority - from useCompletedBassAuthority(scopeId)
  * @param {object} lifecycle - controller lifecycle snapshot
@@ -162,12 +164,20 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       level: "—",
       detail: null,
     });
+    // P19/P20 are SEAT-scoped — show "SEAT" neutral, not "Select Bass Target".
+    const seatPill = (label) => ({
+      label,
+      resultText: "SEAT",
+      text: `${label} SEAT`,
+      level: "—",
+      detail: null,
+    });
     return {
       pills: {
         p14: unselectedPill("P14 Bass SPL"),
         p18: unselectedPill("P18 Extension"),
-        p19: unselectedPill("P19 Response Fit"),
-        p20: unselectedPill("P20 Seat Consistency"),
+        p19: seatPill("P19 Response Fit"),
+        p20: seatPill("P20 Seat Consistency"),
       },
       statusText: "Select Bass Target",
       isReady: false,
@@ -247,51 +257,21 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P19 — seat parameter (compact: RSP + Lowest Seat)
-  if (isAuthoritative && p19Rsp) {
-    const rspText = `RSP: ${p19Rsp.level} · ${p19Rsp.displayValue}`;
-    const lowestText = p19Lowest ? `Lowest Seat: ${p19Lowest.level} · ${p19Lowest.displayVariationDb}` : null;
-    pills.p19 = {
-      label: "P19 Response Fit",
-      resultText: rspText,
-      text: `P19 Response Fit ${rspText}`,
-      level: p19Rsp.level,
-      detail: lowestText,
-    };
-  } else if (isAuthoritative) {
-    pills.p19 = { label: "P19 Response Fit", resultText: "—", text: "P19 Response Fit —", level: "—", detail: null };
+  // P19 — SEAT-scoped parameter. Main pill shows "SEAT"; per-seat results
+  // are presented in the seat grids below. RSP is retained as a diagnostic
+  // field in the return value (p19Rsp) but never as the main pill result.
+  if (isAuthoritative) {
+    pills.p19 = { label: "P19 Response Fit", resultText: "SEAT", text: "P19 Response Fit SEAT", level: "—", detail: null };
   } else {
     pills.p19 = { label: "P19 Response Fit", resultText: officialStateText(authorityStatus, isCalculating), text: `P19 Response Fit ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P20 — seat parameter (compact: Best Primary + Lowest Seat)
-  if (isAuthoritative && p20BestPrimary) {
-    const bestText = `Best Primary: ${p20BestPrimary.level} · ${p20BestPrimary.displayVariationDb}`;
-    const lowestText = p20Lowest ? `Lowest Seat: ${p20Lowest.level} · ${p20Lowest.displayVariationDb}` : null;
-    pills.p20 = {
-      label: "P20 Seat Consistency",
-      resultText: bestText,
-      text: `P20 Seat Consistency ${bestText}`,
-      level: p20BestPrimary.level,
-      detail: lowestText,
-    };
-  } else if (isAuthoritative && p20Lowest) {
-    // No Primary seats — fall back to Lowest Seat as headline
-    const lowestText = `Lowest Seat: ${p20Lowest.level} · ${p20Lowest.displayVariationDb}`;
-    pills.p20 = {
-      label: "P20 Seat Consistency",
-      resultText: lowestText,
-      text: `P20 Seat Consistency ${lowestText}`,
-      level: p20Lowest.level,
-      detail: null,
-    };
-  } else if (isAuthoritative) {
-    const p20Param = parameters.p20;
-    if (p20Param?.status === "not_applicable") {
-      pills.p20 = { label: "P20 Seat Consistency", resultText: "N/A", text: "P20 Seat Consistency N/A", level: "N/A", detail: null };
-    } else {
-      pills.p20 = { label: "P20 Seat Consistency", resultText: "—", text: "P20 Seat Consistency —", level: "—", detail: null };
-    }
+  // P20 — SEAT-scoped parameter. Main pill shows "SEAT"; per-seat results
+  // are presented in the seat grids below. Best Primary is retained as a
+  // diagnostic field in the return value (p20BestPrimary) but never as the
+  // main pill result — a "best primary" headline hides poor seats.
+  if (isAuthoritative) {
+    pills.p20 = { label: "P20 Seat Consistency", resultText: "SEAT", text: "P20 Seat Consistency SEAT", level: "—", detail: null };
   } else {
     pills.p20 = { label: "P20 Seat Consistency", resultText: officialStateText(authorityStatus, isCalculating), text: `P20 Seat Consistency ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }

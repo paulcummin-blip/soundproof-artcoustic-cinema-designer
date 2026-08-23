@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import BassResultsPills from "@/components/room/bass/BassResultsPills";
 import BassDesignRecommendation from "@/components/room/bass/BassDesignRecommendation";
 import BassCapabilitySummary from "@/components/room/bass/BassCapabilitySummary";
+import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
+import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
@@ -33,6 +35,30 @@ export default function BassResultsSummary({ compact = false, showPriority = tru
         ? <button type="button" onClick={shared.onRetry} className="font-semibold text-red-700 underline">{formatted.statusText}</button>
         : <span>{formatted.statusText}</span>}
     </div>
+    {formatted.isReady && (formatted.p19Rows.length > 0 || formatted.p20Rows.length > 0) && (
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {formatted.p19Rows.length > 0 && (
+          <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
+            <div className="mb-1 text-[11px] font-semibold text-[#213428]">P19 — All Seats</div>
+            <P19SeatBlock
+              rows={formatted.p19Rows}
+              publicationVerified={formatted.publicationVerified}
+              authorityStatus={shared.completedBassAuthority?.authorityStatus}
+            />
+          </div>
+        )}
+        {formatted.p20Rows.length > 0 && (
+          <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
+            <div className="mb-1 text-[11px] font-semibold text-[#213428]">P20 — All Seats</div>
+            <P20SeatBlock
+              rows={formatted.p20Rows}
+              publicationVerified={formatted.publicationVerified}
+              authorityStatus={shared.completedBassAuthority?.authorityStatus}
+            />
+          </div>
+        )}
+      </div>
+    )}
     {p14Selection.noP14TargetSelected ? null : (
       <>
         <BassCapabilitySummary

@@ -3,8 +3,8 @@
 // completed result (canonicalMetricPublicationValid === true) may be
 // presented as an official RP22 result. While calculating/updating, pills
 // show "Calculating…" — never preliminary live values.
-// P19 and P20 are SEAT parameters: compact shows RSP/Best Primary + Lowest
-// Seat; expanded shows all seats with Primary/Secondary distinction.
+// P19 and P20 are SEAT-scoped parameters: main pill shows "SEAT";
+// expanded seat grids below show all seats with Primary/Secondary distinction.
 import React, { useEffect, useState } from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
