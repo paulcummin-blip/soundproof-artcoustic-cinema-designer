@@ -1828,18 +1828,12 @@ function RoomDesignerWithState() {
         `}</style>
 
       <RoomDesignerHeader
-        showResetConfirm={showResetConfirm}
-        setShowResetConfirm={setShowResetConfirm}
-        isFrozen={isFrozen}
-        handleResetPositions={handleResetPositions}
         loadState={loadState}
         autosaveStatus={autosaveStatus}
         reloadProject={reloadProject}
         projectIdState={projectIdState}
         activeProjectId={activeProjectId}
         isProjectMode={isProjectMode}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
       />
 
       <ViewModeLayout
@@ -2146,6 +2140,8 @@ function RoomDesignerWithState() {
             selectedAbfuserQty={appState?.selectedAbfuserQty ?? 0}
             setSelectedAbfuserQty={appState?.setSelectedAbfuserQty}
             recommendedAbfuserQty={recommendedAbfuserQty}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
           />
         )}
       />

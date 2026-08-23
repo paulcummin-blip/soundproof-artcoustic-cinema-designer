@@ -1,22 +1,20 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, FileText, Eye } from "lucide-react";
-import ViewModeToggle from "@/components/roomdesigner/ViewModeToggle";
+import { RotateCcw, FileText, Eye, ExternalLink } from "lucide-react";
+
+// External resource — Artcoustic product CAD files (Dropbox folder).
+// Opens in a new tab; not a primary project action.
+const PRODUCT_CAD_FILES_URL =
+  "https://www.dropbox.com/scl/fo/uh8061fp2gcua4qya4vsl/AIB6tiWKiYJ1kmc1bkav8Ag?rlkey=13gap6ajvpnlgjs74u8jopctq&st=c8f27qoy&dl=0";
 
 export default function RoomDesignerHeader({
-  showResetConfirm,
-  setShowResetConfirm,
-  isFrozen,
-  handleResetPositions,
   loadState,
   autosaveStatus,
   reloadProject,
   projectIdState,
   activeProjectId,
   isProjectMode,
-  viewMode,
-  onViewModeChange,
 }) {
   const navigate = useNavigate();
 
@@ -34,21 +32,26 @@ export default function RoomDesignerHeader({
     }
   };
 
+  const handleProductCadFilesClick = () => {
+    window.open(PRODUCT_CAD_FILES_URL, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <header className="p-4 bg-white border-b border-[#DCDBD6] flex-shrink-0">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[#1B1A1A] font-header">Cinema Designer</h1>
-        
-        <div className="flex items-center" style={{ gap: '12px' }}>
-          <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
 
+        <div className="flex items-center" style={{ gap: '12px' }}>
+          {/* Resource link — secondary/light treatment, opens new tab */}
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setShowResetConfirm(true)}
-            disabled={isFrozen('speakers')}>
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Reset
+            className="font-medium whitespace-nowrap"
+            onClick={handleProductCadFilesClick}
+            style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+          >
+            <ExternalLink className="w-4 h-4 mr-2" style={{ flexShrink: 0 }} />
+            Product CAD Files
           </Button>
 
           <Button
