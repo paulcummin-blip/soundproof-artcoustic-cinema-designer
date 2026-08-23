@@ -105,6 +105,68 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
   };
 }
 
+/**
+ * Overlay authority scalar fields onto an existing canonical final response
+ * WITHOUT re-cloning the curve arrays.
+ *
+ * The first buildFinalOptimisedBassResponse call produces the canonical curve
+ * arrays (postEqRspCurve, canonicalTargetCurve, postEqPerSeatCurves,
+ * maximumSplCurveAfterEq, sourceCapabilityCurves, eqFilterBank, etc.).
+ * Authority evaluation (evaluateCanonicalBassAuthority) only changes scalar
+ * metadata — it does NOT modify any curve arrays. The previous implementation
+ * called buildFinalOptimisedBassResponse a SECOND time after merging authority
+ * onto the candidate, which re-cloned every curve array unnecessarily.
+ *
+ * This helper produces the same result as that second call by reusing the
+ * immutable curve arrays from the first call and overlaying only the
+ * authority-dependent scalar fields.
+ *
+ * Immutability contract: the curve arrays on canonicalResult are reused by
+ * reference. All downstream consumers (buildCanonicalCompletedBassMetricAuthority,
+ * buildMetricPublicationReceipt, adaptCurrentBassOptimisationResult,
+ * compactCompletedBassContract) treat them as read-only.
+ * compactCompletedBassContract clones them at the compact-contract boundary.
+ */
+export function applyAuthorityToCanonicalResult(canonicalResult, authorityBearingCandidate) {
+  if (!canonicalResult?.selectedCandidateId || !authorityBearingCandidate?.candidateId) return canonicalResult;
+  const candidate = authorityBearingCandidate;
+  return {
+    ...canonicalResult,
+    achievedP14Db: candidate.achievedP14Db ?? null,
+    achievedP14Level: candidate.achievedP14Level ?? null,
+    achievedP18FrequencyHz: candidate.achievedP18FrequencyHz ?? null,
+    achievedP18Level: candidate.achievedP18Level ?? null,
+    achievedP19VariationDb: candidate.achievedP19VariationDb ?? null,
+    achievedP19Level: candidate.achievedP19Level ?? null,
+    achievedP20VariationDb: candidate.achievedP20VariationDb ?? null,
+    achievedP20Level: candidate.achievedP20Level ?? null,
+    p14CapabilityDetails: candidate.p14CapabilityDetails || null,
+    postEqCapabilityAssessment: candidate.postEqCapabilityAssessment || null,
+    finalSeatVariationData: {
+      p18: {
+        candidateId: candidate.candidateId,
+        level: candidate.achievedP18Level ?? null,
+        extensionHz: candidate.achievedP18FrequencyHz ?? null,
+        authority: candidate.p18AchievedAuthority || null,
+      },
+      p19: {
+        candidateId: candidate.candidateId,
+        level: candidate.achievedP19Level ?? null,
+        variationDb: candidate.achievedP19VariationDb ?? null,
+        worstFrequencyHz: candidate.officialP19WorstFrequencyHz ?? null,
+      },
+      p20: {
+        candidateId: candidate.candidateId,
+        level: candidate.achievedP20Level ?? null,
+        variationDb: candidate.achievedP20VariationDb ?? null,
+        worstSeatId: candidate.worstP20SeatId ?? null,
+        perSeatResults: (Array.isArray(candidate.perSeatP20Results) ? candidate.perSeatP20Results : [])
+          .map((seat) => ({ ...seat, candidateId: candidate.candidateId })),
+      },
+    },
+  };
+}
+
 export function finalOptimisedBassAuthorityMatches(response) {
   if (!response?.selectedCandidateId) return false;
   const candidateId = response.selectedCandidateId;

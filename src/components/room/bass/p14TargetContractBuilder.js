@@ -6,7 +6,7 @@
 // physics, maths, EQ, or calculation logic.
 
 import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
-import { buildFinalOptimisedBassResponse } from "./finalOptimisedBassResponse";
+import { buildFinalOptimisedBassResponse, applyAuthorityToCanonicalResult } from "./finalOptimisedBassResponse";
 import { evaluateCanonicalBassAuthority } from "@/components/utils/canonicalBassAuthorityEvaluation";
 import { buildCanonicalCompletedBassMetricAuthority } from "./canonicalCompletedBassMetricAuthority";
 import { buildMetricPublicationReceipt } from "./metricPublicationReceipt";
@@ -92,11 +92,21 @@ export function buildCompactContractFromWorkerResult({
     primaryLimitation: authority?.limitation || null,
   };
 
-  // Step 5: Build final optimised response with authority (same as foreground)
-  const finalOptimisedBassResponse = buildFinalOptimisedBassResponse({
-    optimisationResult: result,
-    selectedLayout: sources,
-  });
+  // Step 5: Overlay authority scalar fields onto the existing canonical result.
+  //
+  // The first buildFinalOptimisedBassResponse call (Step 3) already produced
+  // the canonical curve arrays (postEqRspCurve, canonicalTargetCurve,
+  // postEqPerSeatCurves, maximumSplCurveAfterEq, sourceCapabilityCurves,
+  // eqFilterBank). Authority evaluation (Step 4) only changes scalar metadata
+  // — it does NOT modify any curve arrays. Previously a SECOND
+  // buildFinalOptimisedBassResponse call re-cloned every curve array here
+  // unnecessarily, causing measurable UI latency on background completion.
+  //
+  // applyAuthorityToCanonicalResult reuses the immutable curve arrays from
+  // the first call and overlays only the authority-dependent scalar fields,
+  // producing a structurally identical result without the duplicate
+  // curve-cloning pass.
+  const finalOptimisedBassResponse = applyAuthorityToCanonicalResult(canonicalResult, selectedCandidate);
 
   // Step 6: Build canonical metric authority (same as foreground)
   const canonicalMetricAuthorityResult = buildCanonicalCompletedBassMetricAuthority({
