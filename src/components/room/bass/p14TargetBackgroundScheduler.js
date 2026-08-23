@@ -21,7 +21,8 @@ import {
 import { computeCalibrationFingerprint } from "./bassAnalysisFingerprints";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { buildCompactContractFromWorkerResult } from "./p14TargetContractBuilder";
-import { getTargetCacheEntry, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
+import { getTargetCacheEntry, getTargetCacheProgress, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
+import { resolveBackgroundTargetAdvance, captureTargetFailureDiagnostics, formatDiagnosticLine, createSweepDiagnostics, MAX_BACKGROUND_TARGET_RETRIES } from "./p14TargetBackgroundDiagnostics";
 import { safeConsole } from "@/components/utils/safeConsole";
 
 const createWorker = () => new Worker(
@@ -46,6 +47,10 @@ export class P14TargetBackgroundScheduler {
     this.foregroundTargetKey = null;
     this.delayHandle = null;
     this.idleHandle = null;
+    // Bounded retry + sweep diagnostic state. Reset on design/project change.
+    this.retryCounts = new Map();     // targetKey -> attempt count
+    this.failedTargets = new Set();   // targetKeys that exhausted retry this sweep
+    this.sweepDiagnostics = createSweepDiagnostics();
   }
 
   /**
@@ -59,6 +64,10 @@ export class P14TargetBackgroundScheduler {
       // completed targets before rebuilding the family queue.
       this.cancel();
       this.currentBaseDesignFingerprint = baseDesignFingerprint;
+      // Reset retry + sweep diagnostic state for the new design.
+      this.retryCounts.clear();
+      this.failedTargets.clear();
+      this.sweepDiagnostics = createSweepDiagnostics();
     }
 
     this.cancelled = false;
@@ -93,6 +102,17 @@ export class P14TargetBackgroundScheduler {
     if (this.queue.length === 0) {
       this.running = false;
       this.currentTarget = null;
+      // Report partial family if some targets exhausted retry. Do not
+      // pretend the family is 8/8 — successfully completed targets are
+      // flushed, missing targets remain identifiable for a later sweep.
+      const allKeys = (this.allTargets || []).map((t) => t.key);
+      const progress = getTargetCacheProgress(this.projectId, this.currentBaseDesignFingerprint, allKeys);
+      const failed = this.sweepDiagnostics.failedAfterRetry;
+      if (failed.length > 0) {
+        safeConsole.warn("p14-bg", `sweep complete: ${progress.ready}/${progress.total} cached, ${failed.length} failed: ${failed.join(', ')}`);
+      } else {
+        safeConsole.log("p14-bg", `sweep complete: ${progress.ready}/${progress.total} cached`);
+      }
       flushTargetCachePersistence(this.projectId);
       return;
     }
@@ -149,10 +169,12 @@ export class P14TargetBackgroundScheduler {
       selectedP18RequiredExtensionHz: target.p18RequiredExtensionHz,
     };
 
+    const targetBaseDesignFingerprint = this.currentBaseDesignFingerprint;
+
     try {
       this.worker = createWorker();
-      this.worker.onmessage = (event) => this.handleWorkerMessage(event.data, target, fingerprint, calibrationFingerprint);
-      this.worker.onerror = () => this.handleWorkerError(target);
+      this.worker.onmessage = (event) => this.handleWorkerMessage(event.data, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint);
+      this.worker.onerror = () => this.handleWorkerError(target, targetBaseDesignFingerprint, fingerprint, calibrationFingerprint);
       this.worker.postMessage({
         requestId: `p14-bg-${Date.now()}`,
         fingerprint,
@@ -163,20 +185,20 @@ export class P14TargetBackgroundScheduler {
         origin: "p14-background",
       });
     } catch (e) {
-      this.handleWorkerError(target);
+      this.handleWorkerError(target, targetBaseDesignFingerprint, fingerprint, calibrationFingerprint);
     }
   }
 
-  handleWorkerMessage(message, target, fingerprint, calibrationFingerprint) {
+  handleWorkerMessage(message, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint) {
     if (this.cancelled) { this.terminateWorker(); return; }
     if (message.fingerprint !== fingerprint) {
       safeConsole.warn("p14-bg", `target ${target.key}: fingerprint mismatch (expected ${fingerprint?.substring(0, 24)}..., got ${message.fingerprint?.substring(0, 24)}...)`);
-      this.handleWorkerError(target);
+      this.handleTargetFailure(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, null, 'fingerprint-mismatch');
       return;
     }
     if (message.type === "error") {
       safeConsole.warn("p14-bg", `target ${target.key}: worker returned error: ${message.error || "unknown"}`);
-      this.handleWorkerError(target);
+      this.handleTargetFailure(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, null, 'worker-error');
       return;
     }
     if (message.type !== "complete") return; // ignore progress
@@ -184,14 +206,14 @@ export class P14TargetBackgroundScheduler {
     const compatibility = validateOptimiserVersions(message, BASS_OPTIMISER_VERSIONS);
     if (!compatibility.valid) {
       safeConsole.warn("p14-bg", `target ${target.key}: rejected incompatible worker result (${compatibility.message})`);
-      this.handleWorkerError(target);
+      this.handleTargetFailure(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, null, 'version-incompatible');
       return;
     }
 
     const pool = message[BASS_OPTIMISER_POOL_PROPERTY];
     if (!pool || !Array.isArray(pool.candidates) || pool.candidates.length === 0) {
       this.terminateWorker();
-      this.yieldAndRunNext();
+      this.handleTargetFailure(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, null, 'empty-pool');
       return;
     }
 
@@ -217,32 +239,135 @@ export class P14TargetBackgroundScheduler {
       target,
     });
 
-    if (compactContract && setTargetCacheEntry(
-      this.projectId,
-      this.currentBaseDesignFingerprint,
-      target.key,
-      compactContract,
-      { deferPersistence: true },
-    )) {
-      safeConsole.log("p14-bg", `target ${target.key}: cached successfully (fingerprint ${fingerprint?.substring(0, 24)}...)`);
-    } else {
-      // Contract build or publication validation failed. The target remains
-      // missing and eligible for a later retry — do not cache a non-authoritative
-      // contract. Log enough to identify the target and reason for dev diagnosis.
-      safeConsole.warn("p14-bg", `target ${target.key}: contract build returned null (publication validation failed)`);
-    }
+    // Attempt insertion into the target cache.
+    const insertResult = compactContract
+      ? setTargetCacheEntry(
+          this.projectId,
+          this.currentBaseDesignFingerprint,
+          target.key,
+          compactContract,
+          { deferPersistence: true },
+        )
+      : false;
 
-    this.terminateWorker();
-    this.yieldAndRunNext();
+    // Verify readback: the cache must return the same authoritative entry.
+    // A target is complete ONLY when setTargetCacheEntry returns true AND
+    // getTargetCacheEntry readback returns the authoritative contract.
+    const readback = insertResult
+      ? getTargetCacheEntry(this.projectId, this.currentBaseDesignFingerprint, target.key)
+      : null;
+
+    const fingerprintChanged = targetBaseDesignFingerprint !== this.currentBaseDesignFingerprint;
+    const retryCount = this.retryCounts.get(target.key) || 0;
+
+    const decision = resolveBackgroundTargetAdvance({
+      insertResult,
+      readbackResult: !!readback,
+      retryCount,
+      maxRetries: MAX_BACKGROUND_TARGET_RETRIES,
+      fingerprintChanged,
+      cancelled: this.cancelled,
+    });
+
+    const failureReason = !compactContract
+      ? 'contract-build-null'
+      : !insertResult
+        ? 'insert-rejected'
+        : !readback
+          ? 'readback-missing'
+          : 'unknown';
+
+    this.applyTargetDecision(decision, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, compactContract, workerResult, failureReason);
   }
 
-  handleWorkerError(target) {
-    // Worker error — the target remains missing and eligible for a later retry.
-    // Log enough to identify the target for dev diagnosis without noisy
-    // permanent user-facing diagnostics.
-    safeConsole.warn("p14-bg", `target ${target.key}: worker error, will retry on next schedule`);
+  handleWorkerError(target, targetBaseDesignFingerprint, fingerprint, calibrationFingerprint) {
+    if (this.cancelled) { this.terminateWorker(); return; }
+    this.handleTargetFailure(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, null, 'worker-error');
+  }
+
+  /**
+   * Unified failure handler: applies the advance/retry/fail/discard decision
+   * for a target that did not produce a verified cache entry. Captures exact
+   * failure diagnostics without exposing large arrays.
+   */
+  handleTargetFailure(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, compactContract, failureReason) {
+    const fingerprintChanged = targetBaseDesignFingerprint !== this.currentBaseDesignFingerprint;
+    const retryCount = this.retryCounts.get(target.key) || 0;
+
+    const decision = resolveBackgroundTargetAdvance({
+      insertResult: false,
+      readbackResult: false,
+      retryCount,
+      maxRetries: MAX_BACKGROUND_TARGET_RETRIES,
+      fingerprintChanged,
+      cancelled: this.cancelled,
+    });
+
+    this.applyTargetDecision(decision, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, compactContract, null, failureReason);
+  }
+
+  /**
+   * Apply a scheduler decision for a completed (or failed) target.
+   * Terminates the worker, updates retry/sweep state, and advances to the
+   * next target via the idle-delay scheduler. This replaces the old
+   * unconditional yieldAndRunNext() that silently lost failed targets.
+   */
+  applyTargetDecision(decision, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, compactContract, workerResult, failureReason) {
     this.terminateWorker();
-    this.yieldAndRunNext();
+
+    switch (decision.action) {
+      case 'advance': {
+        this.retryCounts.delete(target.key);
+        safeConsole.log("p14-bg", `target ${target.key}: cached successfully (fingerprint ${fingerprint?.substring(0, 24)}...)`);
+        if (!this.sweepDiagnostics.retried.includes(target.key)) {
+          this.sweepDiagnostics.insertedFirstTry.push(target.key);
+        }
+        break;
+      }
+      case 'retry': {
+        this.retryCounts.set(target.key, decision.retryCount);
+        if (!this.sweepDiagnostics.retried.includes(target.key)) {
+          this.sweepDiagnostics.retried.push(target.key);
+        }
+        // Requeue at front for retry after idle delay. The target is NOT
+        // silently lost — it will be re-attempted once before failing.
+        this.queue.unshift(target);
+        safeConsole.warn("p14-bg", `target ${target.key}: insertion failed (${failureReason}), requeueing for retry ${decision.retryCount}/${MAX_BACKGROUND_TARGET_RETRIES}`);
+        break;
+      }
+      case 'fail': {
+        this.failedTargets.add(target.key);
+        if (!this.sweepDiagnostics.failedAfterRetry.includes(target.key)) {
+          this.sweepDiagnostics.failedAfterRetry.push(target.key);
+        }
+        const diag = captureTargetFailureDiagnostics({
+          targetKey: target.key,
+          compactContract,
+          workerResult,
+          fingerprint,
+          calibrationFingerprint,
+          baseDesignFingerprint: targetBaseDesignFingerprint,
+          foregroundTargetKey: this.foregroundTargetKey,
+          retryCount: decision.retryCount,
+          cancelled: this.cancelled,
+          failureReason,
+        });
+        this.sweepDiagnostics.failures.push(diag);
+        safeConsole.warn("p14-bg", formatDiagnosticLine(diag));
+        break;
+      }
+      case 'discard': {
+        // Cancellation or fingerprint change — not a failure. Do not retry
+        // the old target against a changed design; the foreground selected
+        // target must recalculate first.
+        safeConsole.log("p14-bg", `target ${target.key}: discarded (design changed or cancelled)`);
+        break;
+      }
+    }
+
+    this.currentTarget = null;
+    this.running = false;
+    this.scheduleNext();
   }
 
   yieldAndRunNext() {
