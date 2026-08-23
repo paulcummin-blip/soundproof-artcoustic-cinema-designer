@@ -7,6 +7,8 @@ import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
+import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
+import { buildP19SeatRows } from "@/components/room/bass/p19SeatPresentation";
 import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -250,6 +252,7 @@ export default function RP22CompliancePanel({
     [bassAuthority, p14Selection.noP14TargetSelected]
   );
   const selectedP20Results = bassPresentation.perSeatP20Results;
+  const selectedP19Results = bassPresentation.perSeatP19Results;
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";
   const p14Mode = bassPresentation.parameters.p14.targetBasis || appState?.splConfig?.p14Mode || "minimum";
@@ -367,6 +370,10 @@ export default function RP22CompliancePanel({
 
   const renderSeatPillGridForParam = (pId) => {
     if (Number(pId) === 20) return <P20SeatBlock seatingPositions={seats} perSeatP20Results={selectedP20Results} compact />;
+    if (Number(pId) === 19) {
+      const p19Rows = buildP19SeatRows(seats, selectedP19Results);
+      return <P19SeatBlock rows={p19Rows} perSeatP19Results={selectedP19Results} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassAuthority?.authorityStatus} compact />;
+    }
     if (!rows.length) return null;
 
     const pKey = `p${Number(pId)}`; // "p1" etc
@@ -835,7 +842,17 @@ export default function RP22CompliancePanel({
           {/* Achieved value line */}
           <div style={{ fontSize: 11, color: "#1B1A1A", marginTop: 6, fontWeight: 600 }}>
             {isSeatScope ? (
-              <span style={{ color: "#625143", fontStyle: "italic" }}>Per-seat evaluation — see individual seat results below</span>
+              p.id === 19 && bassPresentation.parameters.p19.isAuthoritative ? (
+                <span style={{ color: "#625143" }}>
+                  <span style={{ fontWeight: 700 }}>RSP</span> response fit:{" "}
+                  <span style={{ color: "#213428" }}>{bassPresentation.parameters.p19.valueText}</span>
+                  {" · "}
+                  <span style={{ color: "#213428" }}>{bassPresentation.parameters.p19.level}</span>
+                  <span style={{ fontStyle: "italic", marginLeft: 8 }}>Per-seat evaluation — see below</span>
+                </span>
+              ) : (
+                <span style={{ color: "#625143", fontStyle: "italic" }}>Per-seat evaluation — see individual seat results below</span>
+              )
             ) : (
               <>Achieved: <span style={{ color: "#213428" }}>{achievedValue}</span></>
             )}
