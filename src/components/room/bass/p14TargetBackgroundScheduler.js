@@ -22,7 +22,7 @@ import { computeCalibrationFingerprint } from "./bassAnalysisFingerprints";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { buildCompactContractFromWorkerResult } from "./p14TargetContractBuilder";
 import { getTargetCacheEntry, getTargetCacheProgress, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
-import { resolveBackgroundTargetAdvance, captureTargetFailureDiagnostics, formatDiagnosticLine, createSweepDiagnostics, MAX_BACKGROUND_TARGET_RETRIES } from "./p14TargetBackgroundDiagnostics";
+import { resolveBackgroundTargetAdvance, captureTargetFailureDiagnostics, formatDiagnosticLine, createSweepDiagnostics, MAX_BACKGROUND_TARGET_RETRIES, classifyBackgroundPoolFailure, captureGenerationFailureDiagnostics, formatGenerationFailureLine } from "./p14TargetBackgroundDiagnostics";
 import { safeConsole } from "@/components/utils/safeConsole";
 
 const createWorker = () => new Worker(
@@ -211,9 +211,30 @@ export class P14TargetBackgroundScheduler {
     }
 
     const pool = message[BASS_OPTIMISER_POOL_PROPERTY];
-    if (!pool || !Array.isArray(pool.candidates) || pool.candidates.length === 0) {
+
+    // Mirror the foreground classification order (bassBackgroundAnalysisStore.js):
+    // inspect generationStatus BEFORE candidate count. A non-complete
+    // generationStatus (e.g. "invalid-inputs", "invalid-anchor") is the real
+    // failure reason — do NOT mask it as "empty-pool". Only fall back to
+    // "no-candidates" when generation completed but the pool is genuinely empty.
+    const poolFailureReason = classifyBackgroundPoolFailure(pool);
+    if (poolFailureReason !== null) {
       this.terminateWorker();
-      this.handleTargetFailure(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, null, 'empty-pool');
+      if (poolFailureReason !== 'no-candidates' && poolFailureReason !== 'no-pool') {
+        // Non-complete generationStatus — capture compact diagnostics and log
+        // the real failure reason (invalid-inputs / invalid-anchor / etc.).
+        const retryCount = this.retryCounts.get(target.key) || 0;
+        const genDiag = captureGenerationFailureDiagnostics({
+          targetKey: target.key,
+          pool,
+          designContext: this.designContext,
+          fingerprint,
+          baseDesignFingerprint: targetBaseDesignFingerprint,
+          retryCount,
+        });
+        safeConsole.warn("p14-bg", formatGenerationFailureLine(genDiag));
+      }
+      this.handleTargetFailure(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, null, poolFailureReason);
       return;
     }
 

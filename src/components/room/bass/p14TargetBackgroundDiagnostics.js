@@ -20,6 +20,81 @@ import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 export const MAX_BACKGROUND_TARGET_RETRIES = 1;
 
 /**
+ * Classify a worker pool result for the background scheduler.
+ *
+ * Mirrors the foreground classification order in bassBackgroundAnalysisStore.js:
+ *   1. generationStatus exists AND !== "complete" → real generation status
+ *      (e.g. "invalid-inputs", "invalid-anchor"). This is the actual failure
+ *      reason — do NOT mask it as "empty-pool".
+ *   2. generationStatus === "complete" (or absent) AND zero candidates →
+ *      "no-candidates" fallback (structurally unusual; identity candidate
+ *      should exist when generation completes).
+ *   3. generationStatus === "complete" AND candidates present → null
+ *      (normal processing — caller proceeds with contract build).
+ *
+ * @param {object|null|undefined} pool - the optimiser pool from the worker message
+ * @returns {string|null} failureReason — null means proceed with normal processing
+ */
+export function classifyBackgroundPoolFailure(pool) {
+  if (!pool) return 'no-pool';
+  if (pool.generationStatus && pool.generationStatus !== 'complete') {
+    return pool.generationStatus;
+  }
+  if (!Array.isArray(pool.candidates) || pool.candidates.length === 0) {
+    return 'no-candidates';
+  }
+  return null;
+}
+
+/**
+ * Capture compact diagnostics for a non-complete generationStatus failure.
+ * Records only counts and lengths — never large curve arrays.
+ *
+ * @returns {object} compact diagnostic snapshot
+ */
+export function captureGenerationFailureDiagnostics({
+  targetKey,
+  pool,
+  designContext,
+  fingerprint,
+  baseDesignFingerprint,
+  retryCount,
+}) {
+  const ctx = designContext || {};
+  return {
+    targetKey,
+    generationStatus: pool?.generationStatus || null,
+    missingInputs: Array.isArray(pool?.missingInputs) ? [...pool.missingInputs] : [],
+    rawCurveLength: Array.isArray(ctx.rspRawCurve) ? ctx.rspRawCurve.length : null,
+    activeSubsCount: Array.isArray(ctx.sources) ? ctx.sources.length : null,
+    verticalOffsetDb: ctx.payload?.verticalOffsetDb ?? null,
+    requestFingerprint: fingerprint ? fingerprint.substring(0, 24) : null,
+    baseDesignFingerprint: baseDesignFingerprint ? baseDesignFingerprint.substring(0, 24) : null,
+    retryCount: retryCount || 0,
+    warningMessage: pool?.warningMessage || null,
+  };
+}
+
+/**
+ * Format a generation-failure diagnostic snapshot as a single console line.
+ * Does not include large arrays — only counts, lengths, and the missing-inputs list.
+ */
+export function formatGenerationFailureLine(diag) {
+  if (!diag) return '';
+  const parts = [
+    `target ${diag.targetKey}: generation failure`,
+    `status=${diag.generationStatus}`,
+    `missingInputs=[${(diag.missingInputs || []).join(',')}]`,
+    `rawCurveLen=${diag.rawCurveLength}`,
+    `activeSubs=${diag.activeSubsCount}`,
+    `verticalOffset=${diag.verticalOffsetDb}`,
+    `retry=${diag.retryCount}`,
+  ];
+  if (diag.warningMessage) parts.push(`— ${diag.warningMessage}`);
+  return parts.join(' ');
+}
+
+/**
  * Create a fresh sweep diagnostics tracker.
  */
 export function createSweepDiagnostics() {
