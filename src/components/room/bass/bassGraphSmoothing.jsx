@@ -1,6 +1,8 @@
-// bassGraphSmoothing.jsx — display-only fractional-octave smoothing for the Bass Response
-// graph. Does NOT touch simulation output, modal calculations, or null-depth raw detection —
-// it only reshapes an already-computed { frequency, spl }[] series for plotting.
+// bassGraphSmoothing.jsx — fractional-octave smoothing for the Bass Response graph and
+// authoritative P19/P20 assessment. Reshapes an already-computed { frequency, spl }[] series
+// using a logarithmic fractional-octave window with power-domain (energy) averaging, matching
+// REW 1/3-octave behaviour. Does NOT touch simulation output, modal calculations, or null-depth
+// raw detection.
 
 const SMOOTHING_LABELS = {
   none: 'None',
@@ -45,14 +47,18 @@ function smoothFractionalOctave(data, width) {
   const { sorted, bounds } = prepareBassSmoothingGrid(data, mode);
   return sorted.map(({ frequency }, pointIndex) => {
     const [start, end] = bounds[pointIndex];
-    let sum = 0;
+    // Power-domain (energy) averaging: convert dB to linear power, average, convert back.
+    // This matches REW fractional-octave smoothing and prevents narrow dips from being
+    // over-weighted relative to the acoustic energy they represent.
+    let powerSum = 0;
     let count = 0;
     for (let index = start; index < end; index++) {
-      if (!Number.isFinite(sorted[index].spl)) continue;
-      sum += sorted[index].spl;
+      const spl = sorted[index].spl;
+      if (!Number.isFinite(spl)) continue;
+      powerSum += Math.pow(10, spl / 10);
       count++;
     }
-    return { frequency, spl: count === 0 ? null : sum / count };
+    return { frequency, spl: count === 0 ? null : 10 * Math.log10(powerSum / count) };
   });
 }
 
