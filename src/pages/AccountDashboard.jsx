@@ -9,6 +9,7 @@ import AccountStatusActions from "@/components/admin/commercial/AccountStatusAct
 import AccountPromotionNote from "@/components/admin/promotions/AccountPromotionNote";
 import TargetedPromotionPanel from "@/components/admin/promotions/TargetedPromotionPanel";
 import AccountUsersPanel from "@/components/account/AccountUsersPanel";
+import AccountNameEditor from "@/components/admin/accounts/AccountNameEditor";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -197,9 +198,7 @@ export default function AccountDashboard() {
           }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
               <div>
-                <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: BRAND.text }}>
-                  {account.name || "Unnamed Account"}
-                </h1>
+                <AccountNameEditor account={account} onSaved={(updated) => setAccount(updated)} />
                 {account.contact_email && (
                   <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
                     {account.contact_email}

@@ -52,6 +52,7 @@ export default function Layout({ children, currentPageName }) {
   const canUseSoundProof = hasCapability(user, "soundProof");
   const canUsePriceList = hasCapability(user, "priceList");
   const canUseCommercial = hasCapability(user, "commercial");
+  const accountName = user?.access_context?.account?.name || null;
   const availableMenuItems = menuItems.filter((item) => hasCapability(user, item.capability));
   const [dealerAccountUrl, setDealerAccountUrl] = React.useState(null);
 
@@ -259,6 +260,33 @@ export default function Layout({ children, currentPageName }) {
                 </div>
               </div>
             </div>
+
+            {accountName && (
+              <div style={{
+                padding: '10px 16px 12px',
+                borderTop: '1px solid #DCDBD6',
+              }}>
+                <div style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: '#625143',
+                  marginBottom: 4,
+                }}>
+                  Account
+                </div>
+                <div style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: '#213428',
+                  fontFamily: 'Didact Gothic, sans-serif',
+                  lineHeight: 1.2,
+                }}>
+                  {accountName}
+                </div>
+              </div>
+            )}
 
             <nav className="flex-1 px-3 py-2">
               <div className="mb-4">

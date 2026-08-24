@@ -56,6 +56,11 @@ export function runP14TargetLifecycleFixtures() {
     targets.length === 8 && new Set(keys).size === 8, keys);
   check("Canonical target family keys are complete",
     expectedKeys.every((key) => keys.includes(key)), keys);
+  const selectedTargetKey = "minimum-L2";
+  const backgroundQueue = targets.filter((target) => target.key !== selectedTargetKey);
+  check("Selected target is excluded until foreground completion; seven remain",
+    backgroundQueue.length === 7 && backgroundQueue.every((target) => target.key !== selectedTargetKey),
+    backgroundQueue.map((target) => target.key));
   check("Cached worker contracts use display-independent P18 identity",
     targets.every((target) => target.p18TargetBasis === "minimum"));
   check("Base fingerprint carries v31 result schema",
