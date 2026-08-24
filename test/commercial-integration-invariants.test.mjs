@@ -45,11 +45,11 @@ test("dealer project header exposes only balance and separate special access", (
 test("unlimited access is decided before balance and does not debit the ledger", () => {
   const source = read("base44/functions/createProfessionalProject/entry.ts");
   const promotionStart = source.indexOf("UNLIMITED_PRO_PROJECTS");
-  const capacityCheck = source.indexOf("getAvailableCapacity");
+  const capacityCheck = source.indexOf("await getAvailableCapacity");
   assert.ok(promotionStart >= 0, "promotion check missing");
   assert.ok(capacityCheck > promotionStart, "capacity checked before promotion");
 
-  const promotionBranchEnd = source.indexOf("getAvailableCapacity", promotionStart);
+  const promotionBranchEnd = source.indexOf("await getAvailableCapacity", promotionStart);
   const promotionBranch = source.slice(promotionStart, promotionBranchEnd);
   assert.match(promotionBranch, /PromotionUsage/);
   assert.match(promotionBranch, /activation_ledger_entry_id:\s*null/);
