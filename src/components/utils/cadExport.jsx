@@ -794,9 +794,9 @@ export function generateSVG({
         const sx = cx(seat.x);
         const sy = cy(seat.y);
         const isMLP = seat.id === mlpSeatId;
-        const col = isMLP ? '#E63946' : '#444';
-        svg.push(`    <circle cx="${sx}" cy="${sy}" r="130" stroke="${col}" stroke-width="${isMLP ? 2 : 1}" fill="none"/>`);
-        svg.push(`    ${svgText(sx + 150, sy + 35, isMLP ? 'MLP' : `S${idx + 1}`, TEXT_H, 'start', col)}`);
+        const col = '#444';
+        svg.push(`    <circle cx="${sx}" cy="${sy}" r="130" stroke="${col}" stroke-width="1" fill="none"/>`);
+        svg.push(`    ${svgText(sx + 150, sy + 35, `S${idx + 1}`, TEXT_H, 'start', col)}`);
     });
     svg.push(`  </g>`);
 
@@ -1063,7 +1063,7 @@ export function generateDXF({
         const sy = cy(seat.y);
         const isMLP = seat.id === mlpSeatId;
         dxf.push(`0\nCIRCLE\n8\nSEATING\n10\n${sx}\n20\n${sy}\n40\n130`);
-        dxf.push(dxfText('LABELS', sx + 160, sy + 40, TEXT_H, isMLP ? 'MLP' : `S${idx + 1}`));
+        dxf.push(dxfText('LABELS', sx + 160, sy + 40, TEXT_H, `S${idx + 1}`));
     });
 
     // RSP / MLP in CAD coordinates for speaker aiming lines
@@ -1150,7 +1150,6 @@ export function generateDXF({
         // SPEAKER_AIMING — aiming line from acoustic centre toward RSP/MLP
         // (separate layer so it can be hidden independently; does not alter speaker geometry/rotation)
         if (hasMlp) {
-            dxf.push(dxfLine('SPEAKER_AIMING', insX, insY, mlpCadX, mlpCadY));
             // Compact metadata annotation block on the aiming layer
             const metaX = insX + labelOffset + LABEL_OFFSET;
             const metaH = 50;
