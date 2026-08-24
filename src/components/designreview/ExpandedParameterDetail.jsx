@@ -24,6 +24,7 @@
 
 import React from "react";
 import TechnicalLevelBadge from "@/components/report/technical/TechnicalLevelBadge";
+import SeatScopeBadge from "@/components/report/SeatScopeBadge";
 import SeatDetailTable from "@/components/designreview/SeatDetailTable";
 import SeatResultLayout from "@/components/designreview/SeatResultLayout";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
@@ -191,7 +192,8 @@ export default function ExpandedParameterDetail({
         <span>Scope: {String(param.scope || "").toUpperCase()}</span>
       </div>
 
-      {/* Result area — achieved value + level */}
+      {/* Result area — Room-scoped: achieved value + level badge.
+          Seat-scoped: SEAT badge only; per-seat results are below. */}
       <div
         style={{
           display: "flex",
@@ -204,19 +206,21 @@ export default function ExpandedParameterDetail({
           marginBottom: 10,
         }}
       >
-        <TechnicalLevelBadge level={lvl} />
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 700,
-            color: "#213428",
-            fontFamily: HEADING_FONT,
-            flex: 1,
-            lineHeight: 1.1,
-          }}
-        >
-          {achievedValue || "—"}
-        </div>
+        {isSeatScope ? <SeatScopeBadge /> : <TechnicalLevelBadge level={lvl} />}
+        {!isSeatScope && (
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 700,
+              color: "#213428",
+              fontFamily: HEADING_FONT,
+              flex: 1,
+              lineHeight: 1.1,
+            }}
+          >
+            {achievedValue || "—"}
+          </div>
+        )}
       </div>
 
       {/* Seat result layout map for SEAT-scope parameters — actual seating geometry */}

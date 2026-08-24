@@ -148,7 +148,7 @@ export default function ComplianceParameterMatrix({
                     P{p.id} {p.short || p.title}
                   </div>
                   <div style={{ fontSize: 10, color: "#625143", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {p.scope} · <span style={{ color: status.color }}>{status.label}</span> · <span style={{ color: "#213428", fontWeight: 600 }}>{achievedValue}</span>
+                    {p.scope} · <span style={{ color: status.color }}>{status.label}</span>{!isSeatScope && (<> · <span style={{ color: "#213428", fontWeight: 600 }}>{achievedValue}</span></>)}
                   </div>
                 </div>
                 <div style={{ flex: "0 0 auto" }}>
