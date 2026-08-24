@@ -671,7 +671,7 @@ export default function ProjectsPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {showCapacityIndicator && (
             <div style={{ fontSize: 13, color: BRAND.subtext, whiteSpace: "nowrap" }}>
-              Professional Projects: <strong style={{ color: BRAND.text }}>{capacityLoading ? '…' : professionalCapacity}</strong> {promotionEffective && !promoLoading ? 'banked' : 'available'}
+              Professional Projects: <strong style={{ color: BRAND.text }}>{capacityLoading ? '…' : professionalCapacity}</strong> available
             </div>
           )}
           {showCapacityIndicator && promotionEffective && !promoLoading && (
@@ -688,7 +688,7 @@ export default function ProjectsPage() {
                 whiteSpace: "nowrap",
               }}
             >
-              {`FREE Pro Projects until ${formatPromotionEndDate(promoEndsAt)}`}
+              {`Special access: Unlimited until ${formatPromotionEndDate(promoEndsAt)}`}
             </div>
           )}
           {showCapacityIndicator && !promotionEffective && (
