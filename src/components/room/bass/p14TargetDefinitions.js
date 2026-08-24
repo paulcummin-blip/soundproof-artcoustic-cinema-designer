@@ -29,10 +29,13 @@ export function buildP14TargetKey(basis, level) {
  * Uses the same deriveRequestedCalibrationConfig as the foreground path
  * so target dB values are always consistent with the live system.
  *
- * @param {string} p18TargetBasis - Current P18 target basis (same for all 8 targets)
+ * P18 grading basis is deliberately fixed to Minimum inside cached worker
+ * contracts. It is presentation-only and is recomputed from achieved extension
+ * whenever the user changes the P18 Minimum/Recommended view.
+ *
  * @returns {Array<{basis, level, db, key, p14RequiredExtensionHz, p18TargetBasis, p18RequiredExtensionHz}>}
  */
-export function buildP14TargetCombinations(p18TargetBasis) {
+export function buildP14TargetCombinations() {
   const combinations = [];
   for (const basis of P14_TARGET_BASES) {
     for (const level of P14_TARGET_LEVELS) {
@@ -40,7 +43,7 @@ export function buildP14TargetCombinations(p18TargetBasis) {
         splConfig: {
           selectedP14TargetBasis: basis,
           selectedP14Level: level,
-          selectedP18TargetBasis: p18TargetBasis,
+          selectedP18TargetBasis: "minimum",
         },
         optimisationTransitionHz: 120,
         designEqSystemLimits: {},
@@ -63,7 +66,7 @@ export function buildP14TargetCombinations(p18TargetBasis) {
  * Compute the base design fingerprint: the calibration fingerprint with P14
  * target identity stripped. All 8 P14 target combinations for the same
  * underlying design share this fingerprint. A change to any bass-relevant
- * design input (room, seats, subs, RSP, P18, EQ constraints, etc.) produces
+ * design input (room, seats, subs, RSP, acoustic/EQ constraints, etc.) produces
  * a different base design fingerprint, invalidating the entire target cache.
  *
  * @param {object} fingerprintInputs - The same inputs passed to computeCalibrationFingerprint
@@ -77,6 +80,9 @@ export function computeBaseDesignFingerprint(fingerprintInputs) {
     selectedP14TargetDb: null,
     p14TargetBasis: null,
     p14TargetLevel: null,
+    // P18 basis is a display/grading choice, not an acoustic design input.
+    p18TargetBasis: null,
+    selectedP18RequiredExtensionHz: null,
   };
   // Incorporate the result-schema revision so a calculated-result algorithm
   // change (e.g. the realistic post-calibration predictor) invalidates the
