@@ -21,6 +21,7 @@ import { getCurrentSystemSourceOutput, getSystemSourceCapability, getSourceDomai
 import { salvagePartialBank, buildSalvageEqResult } from "@/components/utils/designEqPartialBankSalvage";
 import { calculatePairedP14P18ProductionAuthority } from "@/components/utils/pairedP14P18ProductionAuthority";
 import { buildPairedP14P18CandidateSummary } from "@/components/utils/pairedP14P18CandidateSummary";
+import { predictRealisticPostCalibrationCorrection } from "@/components/utils/realisticPostCalibrationPrediction";
 
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
@@ -403,7 +404,7 @@ function buildCanonicalCandidate({
   perSeatRawCurves, perSeatMaximumSplCurves, eq, domains, targetCurve, targetShape,
   verticalOffsetDb, protectedNullRegions, baseRequestedSystemOutputDb,
   operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb,
-  operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis,
+  operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis, usableLfHz,
 }) {
   const requestedPreEqCurve = (levelNormalisedRawCurve || []).map((point) => ({ ...point }));
   // CHANGE 2 (Stage B1): The pre-EQ response IS the physical room response at
@@ -414,7 +415,22 @@ function buildCanonicalCandidate({
   // the post-EQ curve against the real "before", not a 2 dB-lowered phantom.
   const achievedPreEqCurve = requestedPreEqCurve.map((point) => ({ ...point }));
   const maximumAfterEq = buildMaximumSplCurveAfterEq(maximumSplCurveBeforeEq);
-  const unconstrainedPostEqCurve = (eq.curve || []).map((point) => ({ ...point }));
+  // Predict the realistic post-calibration correction using a simple per-frequency
+  // model: cut ≤ 15 dB, boost ≤ 6 dB, deep-narrow-null protection, product
+  // capability constraint. This replaces the PEQ filter-bank output as the
+  // authoritative post-EQ curve. The PEQ fitter still runs for diagnostics.
+  const realisticCorrectionCurve = predictRealisticPostCalibrationCorrection({
+    rawRspCurve: levelNormalisedRawCurve,
+    targetCurve,
+    protectedNullRegions,
+    activeSubs,
+    usableLfHz,
+    requestedSystemOutputDb: selectedOperatingOutputDb,
+  });
+  const unconstrainedPostEqCurve = (levelNormalisedRawCurve || []).map((point) => ({
+    frequency: point.frequency,
+    spl: point.spl + interpolateCorrection(realisticCorrectionCurve, point.frequency),
+  }));
   const productOperatingEnvelope = buildProductOperatingEnvelope({
     frequencyGrid: unconstrainedPostEqCurve.map((point) => point.frequency),
     targetCurve,
@@ -448,7 +464,7 @@ function buildCanonicalCandidate({
     ...achievedProtectedNullBoostViolations,
   ];
   const achievedPhysicalEqAuthorityPassed = achievedPhysicalAuthorityViolations.length === 0;
-  const requestedPerSeatPostEqCurves = applyBankToSeats(perSeatRawCurves, eq.combinedEqCurve);
+  const requestedPerSeatPostEqCurves = applyBankToSeats(perSeatRawCurves, realisticCorrectionCurve);
   const maximumPerSeatAfterEqCurves = (Array.isArray(perSeatMaximumSplCurves) ? perSeatMaximumSplCurves : [])
     .filter((seat) => seat?.seatId !== "rsp" && Array.isArray(seat?.responseData))
     .map((seat) => ({
@@ -476,7 +492,7 @@ function buildCanonicalCandidate({
     targetCurve,
   );
   const limits = bankLimits(eq);
-  const positiveEqDemandCurve = (eq.combinedEqCurve || []).map((point) => ({
+  const positiveEqDemandCurve = realisticCorrectionCurve.map((point) => ({
     frequency: point.frequency,
     demandDb: Math.max(0, Number(point.spl) || 0),
   }));
@@ -485,7 +501,7 @@ function buildCanonicalCandidate({
   const limitedRegions = capabilityLimitedRegions(finalPostEqCurve);
   const pairedP14P18Authority = calculatePairedP14P18ProductionAuthority({
     ...(pairedAuthorityInputs || {}),
-    combinedEqCurve: eq.combinedEqCurve || [],
+    combinedEqCurve: realisticCorrectionCurve,
     selectedEqBankIdentity: buildFilterBankSignature({ generatedFilterBank: eq.filters || [] }),
   });
   const pairedP14P18Summary = buildPairedP14P18CandidateSummary(pairedP14P18Authority);
@@ -527,7 +543,7 @@ function buildCanonicalCandidate({
     generatedFilterBank: eq.filters || [],
     unconstrainedPostEqCurve,
     finalPostEqCurve,
-    combinedEqCurve: eq.combinedEqCurve || [],
+    combinedEqCurve: realisticCorrectionCurve,
     perSeatPostEqCurves,
     maximumPerSeatPostEqCurves: maximumPerSeatAfterEqCurves,
     capabilityLimitedRegions: limitedRegions,
@@ -809,7 +825,7 @@ export function generateCanonicalCandidatePool({
     perSeatRawCurves: levelNormalisedSeats, perSeatMaximumSplCurves,
     eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
     baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
-    selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis,
+    selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis, usableLfHz,
   }));
 
   // ── Partial-bank salvage ──
@@ -946,7 +962,7 @@ export function generateCanonicalCandidatePool({
     perSeatRawCurves: levelNormalisedSeats, perSeatMaximumSplCurves,
     eq: identityEq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
     baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
-    selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis,
+    selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis, usableLfHz,
   });
   const candidates = annotateCandidatePoolForHouseCurveRanking([...eqCandidates, ...salvagedCandidates, identityCandidate]);
   const __canonicalTrace__ = {
