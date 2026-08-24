@@ -2,6 +2,8 @@ import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22Desig
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { buildP19SeatRows, p19LowestSeat, p19RspResult } from "@/components/room/bass/p19SeatPresentation";
 import { buildP20SeatRows, p20WorstSeat, p20BestPrimarySeat } from "@/components/room/bass/p20SeatPresentation";
+import { gradeP14ForBasis, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
+import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 
@@ -55,22 +57,10 @@ function readyPill(key, parameter, result) {
   const grade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;
   const value = formatBassParameterValue(key, parameter.value);
   if (key === "p14") {
-    const basis = parameter.targetBasis === "recommended" ? "Recommended" : "Minimum";
-    const basisAbbrev = basis === "Recommended" ? "Rec" : "Min";
-    const selectedLevel = parameter.selectedLevel || Math.max(1, parameter.level || 1);
-
-    // RULE 1: target achieved → P14 result = selected target level (design operating point).
-    // Do not promote P14 above the selected level due to unused SPL capability.
-    if (parameter.pass === true) {
-      const resultText = `${basis} L${selectedLevel} · PASS`;
-      return { label: "P14 Bass SPL", resultText, text: `P14 Bass SPL ${resultText}`, level: `L${selectedLevel}`, detail: null };
-    }
-
-    // RULE 2: target not achieved → P14 result = highest achievable level + FAIL.
-    const achievedGrade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;
-    const resultText = `${achievedGrade} · FAIL`;
-    const detail = `Target: ${basisAbbrev} L${selectedLevel}`;
-    return { label: "P14 Bass SPL", resultText, text: `P14 Bass SPL ${resultText}`, level: "FAIL", detail };
+    // P14 pill reports the achieved capability grade and achieved value. The
+    // requested target remains context, never a replacement for the result.
+    const resultText = `${grade}${value ? ` · ${value}` : ""}`;
+    return { label: "P14 Bass SPL", resultText, text: `P14 Bass SPL ${resultText}`, level: grade, detail: parameter.targetBasisDetail || null };
   }
   return {
     label,
@@ -139,11 +129,18 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  * @param {object} lifecycle - controller lifecycle snapshot
  * @param {Array} seatingPositions - appState.seatingPositions for seat priority
  * @param {number} nowMs - current timestamp for elapsed timer
+ * @param {object} displayBasis - current P14/P18 grading bases
  */
-export function formatOfficialBassResults(completedBassAuthority, lifecycle = null, seatingPositions = [], nowMs = Date.now(), noP14TargetSelected = false) {
+export function formatOfficialBassResults(completedBassAuthority, lifecycle = null, seatingPositions = [], nowMs = Date.now(), noP14TargetSelected = false, displayBasis = {}) {
   const presentation = buildComplianceBassPresentation({ completedBassAuthority });
   const { publicationVerified, parameters } = presentation;
   const contract = completedBassAuthority?.contract || null;
+  const activeP14Basis = normalizeP14TargetBasis(
+    displayBasis?.p14TargetBasis || contract?.productAnalysis?.parameters?.p14?.targetBasis,
+  );
+  const activeP18Basis = normalizeP18TargetBasis(
+    displayBasis?.p18TargetBasis || contract?.productAnalysis?.parameters?.p18?.targetBasis,
+  );
 
   const authorityStatus = completedBassAuthority?.authorityStatus || "UNCALCULATED";
   const lifecycleStatus = lifecycle?.status || "idle";
@@ -229,29 +226,43 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
 
   const pills = {};
 
-  // P14 — room parameter
+  // P14 — achieved level under the selected Minimum/Recommended basis,
+  // followed by the achieved product capability (not the requested target).
   if (isAuthoritative) {
-    const p = parameters.p14;
+    const source = contract?.productAnalysis?.parameters?.p14;
+    const achievedValue = isFiniteNumber(source?.achievedCapabilityDb)
+      ? Number(source.achievedCapabilityDb)
+      : isFiniteNumber(source?.value) ? Number(source.value) : null;
+    const achievedLevel = gradeP14ForBasis(achievedValue, activeP14Basis);
+    const levelText = achievedLevel > 0 ? `L${achievedLevel}` : "FAIL";
+    const valueText = formatBassParameterValue("p14", achievedValue);
+    const resultText = valueText ? `${levelText} · ${valueText}` : "—";
     pills.p14 = {
       label: "P14 Bass SPL",
-      resultText: p.valueText || "—",
-      text: `P14 Bass SPL ${p.valueText || "—"}`,
-      level: p.level,
-      detail: p.detail || null,
+      resultText,
+      text: `P14 Bass SPL ${resultText}`,
+      level: valueText ? levelText : "—",
+      detail: parameters.p14?.detail || null,
     };
   } else {
     pills.p14 = { label: "P14 Bass SPL", resultText: officialStateText(authorityStatus, isCalculating), text: `P14 Bass SPL ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P18 — room parameter
+  // P18 — dynamically regrade the achieved extension for the current display
+  // basis without changing fingerprints, workers, authority or cached curves.
   if (isAuthoritative) {
-    const p = parameters.p18;
+    const source = contract?.productAnalysis?.parameters?.p18;
+    const achievedValue = isFiniteNumber(source?.value) ? Number(source.value) : null;
+    const assessment = assessP18Extension(achievedValue, activeP18Basis);
+    const levelText = assessment.levelLabel || "FAIL";
+    const valueText = formatBassParameterValue("p18", achievedValue);
+    const resultText = valueText ? `${levelText} · ${valueText}` : "—";
     pills.p18 = {
       label: "P18 Extension",
-      resultText: p.valueText || "—",
-      text: `P18 Extension ${p.valueText || "—"}`,
-      level: p.level,
-      detail: p.detail || null,
+      resultText,
+      text: `P18 Extension ${resultText}`,
+      level: valueText ? levelText : "—",
+      detail: formatP18TargetBasisDetail(activeP18Basis),
     };
   } else {
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
