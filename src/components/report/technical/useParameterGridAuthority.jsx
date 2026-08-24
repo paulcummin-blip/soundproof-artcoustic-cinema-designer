@@ -302,9 +302,9 @@ export function useParameterGridAuthority({
   const renderSeatPillGrid = React.useCallback((pId) => {
     if (Number(pId) === 19) {
       const p19Rows = buildP19SeatRows(seats, bassPresentation.perSeatP19Results);
-      return <P19SeatBlock rows={p19Rows} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassPresentation.parameters.p19.status} compact />;
+      return <P19SeatBlock rows={p19Rows} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassPresentation.parameters.p19.status} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
     }
-    if (Number(pId) === 20) return <P20SeatBlock seatingPositions={seats} perSeatP20Results={bassPresentation.perSeatP20Results} compact />;
+    if (Number(pId) === 20) return <P20SeatBlock seatingPositions={seats} perSeatP20Results={bassPresentation.perSeatP20Results} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassPresentation.parameters.p20.status} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
     if (!rows.length) return null;
     const pKey = `p${Number(pId)}`;
     const getCompactPillState = (lvl) => {
@@ -369,7 +369,7 @@ export function useParameterGridAuthority({
         ))}
       </div>
     );
-  }, [rows, denseSeatGrid, getSnapshotForSeat, bassPresentation.perSeatP19Results, bassPresentation.perSeatP20Results, bassPresentation.publicationVerified, bassPresentation.parameters.p19.status, seats]);
+  }, [rows, denseSeatGrid, getSnapshotForSeat, bassPresentation.perSeatP19Results, bassPresentation.perSeatP20Results, bassPresentation.publicationVerified, bassPresentation.p14TargetUnselected, bassPresentation.parameters.p19.status, bassPresentation.parameters.p20.status, seats]);
 
   /* ----- Build per-seat grid data for TechnicalParameterCard ----- */
   const buildSeatGridData = React.useCallback((paramId) => {

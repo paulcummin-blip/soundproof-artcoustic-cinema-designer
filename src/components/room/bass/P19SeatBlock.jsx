@@ -20,13 +20,15 @@ const detailText = (seat) => [
  * Publication-gated: when publicationVerified is false, shows a consistent
  * "NOT VERIFIED" / "Calculating…" state instead of per-seat L-level pills.
  */
-export default function P19SeatBlock({ seatingPositions = [], perSeatP19Results = [], rows: providedRows = null, publicationVerified = true, authorityStatus = null, compact = false }) {
+export default function P19SeatBlock({ seatingPositions = [], perSeatP19Results = [], rows: providedRows = null, publicationVerified = true, authorityStatus = null, p14TargetUnselected = false, compact = false }) {
   const rows = providedRows || [];
   const allSeats = rows.flatMap((row) => row.seats);
   const [selectedSeatId, setSelectedSeatId] = useState(null);
 
   if (!publicationVerified || allSeats.length === 0) {
-    const stateText = authorityStatus === "NOT_VERIFIED" ? "NOT VERIFIED" : "Calculating…";
+    const stateText = p14TargetUnselected
+      ? "Select Bass Target"
+      : authorityStatus === "NOT_VERIFIED" ? "NOT VERIFIED" : "Calculating…";
     return (
       <div className="rounded-md border border-[#DCDBD6] bg-[#F8F8F7] px-3 py-2 text-[11px] text-[#625143]" aria-label="P19 per-seat levels">
         {stateText}

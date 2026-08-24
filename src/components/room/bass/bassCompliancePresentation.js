@@ -179,6 +179,7 @@ export function buildComplianceBassPresentation({ completedBassAuthority }, erro
     publicationRejectionReason,
     unavailable: !!safeErrorMessage,
     errorMessage: safeErrorMessage,
+    p14TargetUnselected: noP14TargetSelected,
     resultFingerprint: contract?.job?.resultFingerprint || null,
     selectedCandidateId: contract?.selectedCandidateId || null,
     parameters,

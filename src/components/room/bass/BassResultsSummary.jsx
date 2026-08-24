@@ -44,6 +44,7 @@ export default function BassResultsSummary({ compact = false, showPriority = tru
               rows={formatted.p19Rows}
               publicationVerified={formatted.publicationVerified}
               authorityStatus={shared.completedBassAuthority?.authorityStatus}
+              p14TargetUnselected={p14Selection.noP14TargetSelected}
             />
           </div>
         )}
@@ -54,6 +55,7 @@ export default function BassResultsSummary({ compact = false, showPriority = tru
               rows={formatted.p20Rows}
               publicationVerified={formatted.publicationVerified}
               authorityStatus={shared.completedBassAuthority?.authorityStatus}
+              p14TargetUnselected={p14Selection.noP14TargetSelected}
             />
           </div>
         )}

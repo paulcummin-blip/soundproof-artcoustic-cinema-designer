@@ -369,10 +369,10 @@ export default function RP22CompliancePanel({
   }, [seats]);
 
   const renderSeatPillGridForParam = (pId) => {
-    if (Number(pId) === 20) return <P20SeatBlock seatingPositions={seats} perSeatP20Results={selectedP20Results} compact />;
+    if (Number(pId) === 20) return <P20SeatBlock seatingPositions={seats} perSeatP20Results={selectedP20Results} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassAuthority?.authorityStatus} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
     if (Number(pId) === 19) {
       const p19Rows = buildP19SeatRows(seats, selectedP19Results);
-      return <P19SeatBlock rows={p19Rows} perSeatP19Results={selectedP19Results} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassAuthority?.authorityStatus} compact />;
+      return <P19SeatBlock rows={p19Rows} perSeatP19Results={selectedP19Results} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassAuthority?.authorityStatus} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
     }
     if (!rows.length) return null;
 
