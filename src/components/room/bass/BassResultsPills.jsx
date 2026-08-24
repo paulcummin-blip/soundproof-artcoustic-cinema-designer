@@ -21,6 +21,10 @@ export default function BassResultsPills({ compact = false, nowMs }) {
     shared.seatingPositions,
     nowMs ?? clock,
     p14Selection.noP14TargetSelected,
+    {
+      p14TargetBasis: shared.authoritative?.requested?.p14TargetBasis,
+      p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
+    },
   );
   return <div className="grid grid-cols-2 gap-1 sm:grid-cols-4" aria-label="Bass RP22 results">
     {Object.entries(formatted.pills).map(([key, pill]) => (
