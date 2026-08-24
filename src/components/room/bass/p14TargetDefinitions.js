@@ -11,6 +11,7 @@
 
 import { deriveRequestedCalibrationConfig } from "./requestedCalibrationConfig";
 import { computeCalibrationFingerprint } from "./bassAnalysisFingerprints";
+import { BASS_RESULT_SCHEMA_VERSION } from "./bassOptimiserWorkerProtocol";
 
 export const P14_TARGET_BASES = ["minimum", "recommended"];
 export const P14_TARGET_LEVELS = [1, 2, 3, 4];
@@ -77,5 +78,11 @@ export function computeBaseDesignFingerprint(fingerprintInputs) {
     p14TargetBasis: null,
     p14TargetLevel: null,
   };
-  return computeCalibrationFingerprint(inputs);
+  // Incorporate the result-schema revision so a calculated-result algorithm
+  // change (e.g. the realistic post-calibration predictor) invalidates the
+  // entire target cache. Without this, old target cache entries would survive
+  // a result-schema bump (the calibration fingerprint is algorithm-independent),
+  // block the foreground worker via the cache-hit path, then fail promotion
+  // because their job.resultFingerprint carries the old result-schema version.
+  return `${computeCalibrationFingerprint(inputs)}|rs:${BASS_RESULT_SCHEMA_VERSION}`;
 }
