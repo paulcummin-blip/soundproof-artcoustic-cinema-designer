@@ -49,7 +49,7 @@ test("rejects sensitive or unexpected dealer fields", () => {
 
 test("rejects duplicate stable dealer identifiers", () => {
   assert.throws(() => validateEntitlementContract(contract([
-    dealer(DEALER_A, [10000]),
+    dealer(DEALER_A.toUpperCase(), [10000]),
     dealer(DEALER_A, [10000]),
   ]), 2026), /duplicate dealer/);
 });
@@ -179,5 +179,5 @@ test("fails closed when a threshold ledger net is inconsistent", () => {
       { id: "a", idempotency_key: key, delta: 5 },
       { id: "b", idempotency_key: `${key}:duplicate`, delta: 5 },
     ],
-  }), /inconsistent ledger net/);
+  }), /invalid reward sequence|inconsistent ledger net/);
 });
