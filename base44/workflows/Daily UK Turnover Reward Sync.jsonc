@@ -5,7 +5,7 @@
       "trigger_type": "scheduled",
       "events": [],
       "schedule_mode": "recurring",
-      "cron_expression": "30 3 * * *",
+      "cron_expression": "0 2 * * *",
       "one_time_date": null,
       "timezone": "Europe/London",
       "interval_value": null,
@@ -37,12 +37,12 @@
           },
           "then": "end",
           "x-base44": {
-            "title": "Sync UK turnover rewards",
-            "description": "Fetch Partner Portal turnover, award milestones"
+            "title": "Reconcile Lovable Professional Project entitlements",
+            "description": "Reconcile the minimal Lovable entitlement contract into the append-only ledger"
           }
         }
       }
     ]
   },
-  "description": "Daily sync of UK Premium Partner turnover from the Artcoustic Partner Portal bridge. Awards +5 Professional Project capacity for every \u00a310k eligible turnover milestone reached. Runs at 03:30 London time, after the Partner Portal source sync at 02:00. Calendar year is computed dynamically from the current date, so it rolls over automatically on 1 January each year. If the bridge is unavailable, the sync is marked FAILED and retried the next day \u2014 no credits are awarded or removed on failure."
+  "description": "At 02:00 Europe/London, reconcile Lovable's minimal annual entitlement contract into Sound Proof's append-only Professional Project ledger. Missing thresholds are credited once; reduced entitlement creates explicit reversals; re-earned thresholds create explicit reinstatements. Invalid, duplicate, unavailable, or unsupported source data fails closed without commercial writes."
 }
