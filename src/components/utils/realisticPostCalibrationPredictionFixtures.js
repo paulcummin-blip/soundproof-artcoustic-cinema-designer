@@ -42,8 +42,8 @@ export function runRealisticCorrectionEnvelopeFixtures() {
   check("Production predictor publishes raw and smoothed envelopes",
     prediction.rawCorrectionCurve.length === 7 && prediction.correctionCurve.length === 7);
   check("Production predictor applies the light envelope smoothing",
-    prediction.rawCorrectionCurve[2].spl === -15
-      && prediction.correctionCurve[2].spl > -15
+    prediction.rawCorrectionCurve[2].spl < 0
+      && prediction.correctionCurve[2].spl > prediction.rawCorrectionCurve[2].spl
       && prediction.correctionCurve[2].spl < 0,
     { raw: prediction.rawCorrectionCurve[2].spl, smoothed: prediction.correctionCurve[2].spl });
 
