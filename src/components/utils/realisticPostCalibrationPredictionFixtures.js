@@ -1,4 +1,4 @@
-import { smoothPredictedCorrectionEnvelope } from "./realisticPostCalibrationPrediction.js";
+import { predictRealisticPostCalibrationCorrection, smoothPredictedCorrectionEnvelope } from "./realisticPostCalibrationPrediction.js";
 
 export function runRealisticCorrectionEnvelopeFixtures() {
   const checks = [];
@@ -27,6 +27,25 @@ export function runRealisticCorrectionEnvelopeFixtures() {
 
   const hardLimits = [...smoothedCut, ...smoothedBoost, ...smoothedNull];
   check("Hard +6/-15 limits preserved", hardLimits.every((point) => point.spl >= -15 && point.spl <= 6));
+
+  const maximumCapabilityCurve = steppedCut.map((point) => ({
+    frequency: point.frequency,
+    spl: 100 - point.spl,
+  }));
+  const targetCurve = steppedCut.map((point) => ({ frequency: point.frequency, spl: 100 }));
+  const prediction = predictRealisticPostCalibrationCorrection({
+    maximumCapabilityCurve,
+    targetCurve,
+    assessmentStartHz: 20,
+    assessmentEndHz: 26,
+  });
+  check("Production predictor publishes raw and smoothed envelopes",
+    prediction.rawCorrectionCurve.length === 7 && prediction.correctionCurve.length === 7);
+  check("Production predictor applies the light envelope smoothing",
+    prediction.rawCorrectionCurve[2].spl === -15
+      && prediction.correctionCurve[2].spl > -15
+      && prediction.correctionCurve[2].spl < 0,
+    { raw: prediction.rawCorrectionCurve[2].spl, smoothed: prediction.correctionCurve[2].spl });
 
   const passed = checks.filter((item) => item.passed).length;
   return { checks, passed, total: checks.length, allPassed: passed === checks.length };
