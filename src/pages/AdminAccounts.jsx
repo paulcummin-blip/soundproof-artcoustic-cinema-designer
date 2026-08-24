@@ -10,6 +10,7 @@ import {
 import AccountGroupSection from "@/components/admin/commercial/AccountGroupSection";
 import DiagnosticsPanel from "@/components/admin/commercial/DiagnosticsPanel";
 import GlobalAccountUsersOverview from "@/components/admin/accounts/GlobalAccountUsersOverview";
+import TurnoverRewardSyncStatus from "@/components/admin/commercial/TurnoverRewardSyncStatus";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -230,6 +231,9 @@ export default function AdminAccountsPage() {
           </div>
         </div>
       </div>
+
+      {/* Admin-only source/audit visibility for the nightly entitlement reconciliation */}
+      <TurnoverRewardSyncStatus />
 
       {/* Master view across every account and login */}
       <GlobalAccountUsersOverview refreshKey={promoRefreshKey} />
