@@ -68,14 +68,17 @@ function directBassDeviation(dB) {
 function formatDirectBassDeviation(dB) {
   const direct = directBassDeviation(dB);
   if (direct == null) return '—';
-  const rounded = Math.round(direct * 100) / 100;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  // Sound Proof design grade: display the floored whole-dB value, never the
+  // fractional decimal. 2.86 dB displays as "2", not "2.86".
+  return String(Math.floor(direct));
 }
 
-// Backward-compatible export names. They now preserve the direct metric and
-// must not floor or otherwise improve a maximum-deviation result.
+// Sound Proof design grade: floor the full-precision deviation to a whole
+// integer dB. The floored value is the authoritative RP22 design grade —
+// fractions of a decibel do not change a Performance Level.
 export function floorP19Deviation(dB) {
-  return directBassDeviation(dB);
+  const direct = directBassDeviation(dB);
+  return direct == null ? null : Math.floor(direct);
 }
 
 export function formatP19Deviation(dB) {
@@ -97,7 +100,8 @@ export function levelP19_lfResponse(dB) {
 }
 
 export function floorP20Deviation(dB) {
-  return directBassDeviation(dB);
+  const direct = directBassDeviation(dB);
+  return direct == null ? null : Math.floor(direct);
 }
 
 export function formatP20Deviation(dB) {
@@ -108,11 +112,14 @@ export function formatP20Deviation(dB) {
 export function levelP20_lfConsistency(dB) {
   const direct = directBassDeviation(dB);
   if (direct == null) return { level: 'N/A', ok: false };
-  if (direct <= 2) return { level: 'L4', ok: true };
-  if (direct <= 3) return { level: 'L3', ok: true };
-  if (direct <= 4) return { level: 'L2', ok: true };
-  // RP22 P20 does not define Level 1. Sound Proof rule: >4 dB maps to L1
-  // (not FAIL) because P20 is not applicable at Level 1. The large deviation
+  // Sound Proof design grade: floor to whole dB before grading. Fractions of
+  // a decibel do not change a Performance Level (4.99 → 4 → L2, not L1).
+  const floored = Math.floor(direct);
+  if (floored <= 2) return { level: 'L4', ok: true };
+  if (floored <= 3) return { level: 'L3', ok: true };
+  if (floored <= 4) return { level: 'L2', ok: true };
+  // RP22 P20 does not define Level 1. Sound Proof rule: floored ≥5 dB maps to
+  // L1 (not FAIL) because P20 is not applicable at Level 1. The large deviation
   // is still shown numerically — we grade at the highest level whose P20
   // requirement can be satisfied.
   return { level: 'L1', ok: true };

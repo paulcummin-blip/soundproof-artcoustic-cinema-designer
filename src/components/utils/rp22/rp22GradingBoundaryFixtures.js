@@ -27,26 +27,30 @@ export function runRp22GradingBoundaryFixtures() {
   [3.1, 11.3, 1000000].forEach((value) => expect(`P17 worse value ${value}`, levelP17_wsFR, value, "L2"));
   check("No finite P17 result produces L1 or FAIL", [-100, 0, 1.5, 1.6, 3, 3.1, 1000000].every((value) => ["L4", "L3", "L2"].includes(levelP17_wsFR(value).level)));
 
+  // Sound Proof design grade: floor to whole dB before grading/display.
+  // 2.99 → 2 → L4; 3.00 → 3 → L3; 5.99 → 5 → L1; 6.00 → 6 → FAIL.
   const p19Cases = [
-    [2.0, "2", "L4"], [2.01, "2.01", "L3"],
-    [3.0, "3", "L3"], [3.01, "3.01", "L2"],
-    [4.0, "4", "L2"], [4.01, "4.01", "L1"],
-    [5.0, "5", "L1"], [5.01, "5.01", "FAIL"],
+    [1.99, "1", "L4"], [2.0, "2", "L4"], [2.99, "2", "L4"],
+    [3.0, "3", "L3"], [3.99, "3", "L3"],
+    [4.0, "4", "L2"], [4.99, "4", "L2"],
+    [5.0, "5", "L1"], [5.99, "5", "L1"],
+    [6.0, "6", "FAIL"],
   ];
   p19Cases.forEach(([value, display, level]) => {
-    expect(`P19 ${value} grades directly`, levelP19_lfResponse, value, level);
-    check(`P19 ${value} displays ±${display} dB`, floorP19Deviation(value) === value && formatP19Deviation(value) === `±${display} dB`);
+    expect(`P19 ${value} grades floored`, levelP19_lfResponse, value, level);
+    check(`P19 ${value} displays ±${display} dB`, floorP19Deviation(value) === Math.floor(value) && formatP19Deviation(value) === `±${display} dB`);
   });
 
+  // P20: same flooring rule; floored ≥5 → L1 (P20 N/A at L1, not FAIL).
   const p20Cases = [
-    [2.0, "2", "L4"], [2.01, "2.01", "L3"],
-    [3.0, "3", "L3"], [3.01, "3.01", "L2"],
-    [4.0, "4", "L2"], [4.01, "4.01", "FAIL"],
-    [11.4, "11.4", "FAIL"],
+    [1.99, "1", "L4"], [2.0, "2", "L4"], [2.99, "2", "L4"],
+    [3.0, "3", "L3"], [3.99, "3", "L3"],
+    [4.0, "4", "L2"], [4.99, "4", "L2"],
+    [5.0, "5", "L1"], [11.4, "11", "L1"],
   ];
   p20Cases.forEach(([value, display, level]) => {
-    expect(`P20 ${value} grades directly`, levelP20_lfConsistency, value, level);
-    check(`P20 ${value} displays ±${display} dB`, floorP20Deviation(value) === value && formatP20Deviation(value) === `±${display} dB`);
+    expect(`P20 ${value} grades floored`, levelP20_lfConsistency, value, level);
+    check(`P20 ${value} displays ±${display} dB`, floorP20Deviation(value) === Math.floor(value) && formatP20Deviation(value) === `±${display} dB`);
   });
   const singleSeat = adaptCurrentBassOptimisationResult({
     optimisationResult: { selectedCandidate: { p20Available: true, achievedP20Level: 1, achievedP20VariationDb: 11.3, generatedFilterBank: [] }, poolId: "single-seat" },
@@ -63,12 +67,12 @@ export function runRp22GradingBoundaryFixtures() {
     perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }],
   });
   check("P20 retains full precision internally", fullPrecision.productAnalysis.parameters.p20.value === 4.9 && fullPrecision.selectedCandidate.achievedP20VariationDb === 4.9);
-  check("P20 contract preserves direct FAIL", fullPrecision.productAnalysis.parameters.p20.level === 0);
+  check("P20 contract floors 4.9 to L2", fullPrecision.productAnalysis.parameters.p20.level === 2);
   const p20Error = adaptCurrentBassOptimisationResult({ detailedStatus: "ERROR", perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }] });
   check("P20 genuine job error remains error", p20Error.productAnalysis.parameters.p20.status === "error");
   const p20Uncalculated = adaptCurrentBassOptimisationResult({ perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }] });
   check("P20 not calculated remains uncalculated", p20Uncalculated.productAnalysis.parameters.p20.status === "uncalculated" && p20Uncalculated.productAnalysis.parameters.p20.value === null);
-  check("P20 has no L1 and values above 4 dB FAIL", [4.01, 11.4, 1000000].every((value) => levelP20_lfConsistency(value).level === "FAIL") && [-100, 0, 2, 3, 4].every((value) => levelP20_lfConsistency(value).level !== "L1"));
+  check("P20 floors to L1 at floored 5+ dB", [5, 11.4, 1000000].every((value) => levelP20_lfConsistency(value).level === "L1") && [-100, 0, 2, 3, 4].every((value) => levelP20_lfConsistency(value).level !== "L1"));
 
   [[-12, "L4"], [-11.9, "L3"], [-10, "L3"], [-9.9, "L2"], [-8, "L2"], [-7.9, "L1"], [0, "L1"]]
     .forEach(([value, level]) => expect(`P21 ${value}`, levelP21_earlyReflections, value, level));
