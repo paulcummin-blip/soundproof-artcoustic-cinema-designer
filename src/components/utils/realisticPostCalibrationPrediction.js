@@ -29,6 +29,62 @@ import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 
 const MAX_BOOST_DB = 6;
 const MAX_CUT_DB = 15;
+const CORRECTION_SMOOTHING_WEIGHTS = Object.freeze([1, 2, 3, 2, 1]);
+
+/**
+ * Lightly round the predicted correction envelope without smoothing any
+ * acoustic response or changing what the optimiser can achieve.
+ *
+ * The triangular five-point window only relaxes an existing correction toward
+ * zero: it can never add boost, add cut, reverse correction sign, exceed the
+ * +6/-15 dB limits, or bridge across a protected cancellation null. Protected
+ * null points remain exactly 0 dB correction.
+ */
+export function smoothPredictedCorrectionEnvelope(correctionCurve, protectedNullRegions = []) {
+  if (!Array.isArray(correctionCurve) || correctionCurve.length < 3) {
+    return Array.isArray(correctionCurve) ? correctionCurve.map((point) => ({ ...point })) : [];
+  }
+
+  const protectedMask = correctionCurve.map((point) =>
+    isProtectedFrequency(point?.frequency, protectedNullRegions));
+  const radius = Math.floor(CORRECTION_SMOOTHING_WEIGHTS.length / 2);
+
+  return correctionCurve.map((point, index) => {
+    const originalDb = Number(point?.spl);
+    if (!Number.isFinite(originalDb)) return { ...point };
+    if (protectedMask[index]) return { ...point, spl: 0 };
+
+    let weightedTotal = 0;
+    let weightTotal = 0;
+    for (let offset = -radius; offset <= radius; offset += 1) {
+      const sampleIndex = index + offset;
+      if (sampleIndex < 0 || sampleIndex >= correctionCurve.length) continue;
+      const pathStart = Math.min(index, sampleIndex);
+      const pathEnd = Math.max(index, sampleIndex);
+      let crossesProtectedNull = false;
+      for (let pathIndex = pathStart; pathIndex <= pathEnd; pathIndex += 1) {
+        if (protectedMask[pathIndex]) { crossesProtectedNull = true; break; }
+      }
+      if (crossesProtectedNull) continue;
+      const sampleDb = Number(correctionCurve[sampleIndex]?.spl);
+      if (!Number.isFinite(sampleDb)) continue;
+      const weight = CORRECTION_SMOOTHING_WEIGHTS[offset + radius];
+      weightedTotal += sampleDb * weight;
+      weightTotal += weight;
+    }
+
+    if (!weightTotal) return { ...point };
+    const averagedDb = weightedTotal / weightTotal;
+    // Smooth inward only. This rounds artificial corners without claiming
+    // correction that the unsmoothed physical model did not allow.
+    const smoothedDb = originalDb > 0
+      ? Math.min(originalDb, Math.max(0, averagedDb))
+      : originalDb < 0
+        ? Math.max(originalDb, Math.min(0, averagedDb))
+        : 0;
+    return { ...point, spl: smoothedDb };
+  });
+}
 
 function interpolateValue(curve, frequency) {
   if (!Array.isArray(curve) || !curve.length) return null;
@@ -150,7 +206,7 @@ export function predictRealisticPostCalibrationCorrection({
   const availableBoostHeadroomDb = Math.max(0, -globalTrimDb);
 
   // ── Stage 3: Realistic EQ correction from O(f) ──
-  const correctionCurve = maximumCapabilityCurve.map((point) => {
+  const rawCorrectionCurve = maximumCapabilityCurve.map((point) => {
     const frequency = point.frequency;
     const operatingSpl = Number.isFinite(point.spl) ? point.spl + globalTrimDb : null;
     const targetSpl = interpolateValue(targetCurve, frequency);
@@ -192,5 +248,10 @@ export function predictRealisticPostCalibrationCorrection({
     return { frequency, spl: correctionDb };
   });
 
-  return { correctionCurve, globalTrimDb, operatingPreEqCurve };
+  // ── Stage 4: Light correction-envelope smoothing ──
+  // Only the predicted gain envelope is rounded. M(f), O(f), the house target,
+  // protected nulls and all RP22 assessment curves remain untouched.
+  const correctionCurve = smoothPredictedCorrectionEnvelope(rawCorrectionCurve, protectedNullRegions);
+
+  return { correctionCurve, rawCorrectionCurve, globalTrimDb, operatingPreEqCurve };
 }
