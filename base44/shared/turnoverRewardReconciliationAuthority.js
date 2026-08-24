@@ -116,13 +116,34 @@ function thresholdEvents(entries, accountId, calendarYear, threshold) {
 }
 
 function netThresholdCredits(events) {
-  return events.reduce((sum, entry) => {
+  let net = 0;
+  let activePositiveId = null;
+
+  for (const entry of events) {
     const delta = Number(entry?.delta);
     if (!Number.isFinite(delta) || Math.abs(delta) !== CREDITS_PER_THRESHOLD) {
       throw new Error("Turnover threshold ledger contains an invalid delta");
     }
-    return sum + delta;
-  }, 0);
+
+    if (delta > 0) {
+      if (entry?.transaction_type !== "UK_TURNOVER_REWARD" || net !== 0 || !entry?.id) {
+        throw new Error("Turnover threshold ledger contains an invalid reward sequence");
+      }
+      net = CREDITS_PER_THRESHOLD;
+      activePositiveId = entry.id;
+    } else {
+      if (entry?.transaction_type !== "REVERSAL"
+        || net !== CREDITS_PER_THRESHOLD
+        || !activePositiveId
+        || entry?.reversal_of !== activePositiveId) {
+        throw new Error("Turnover threshold ledger contains an invalid reversal sequence");
+      }
+      net = 0;
+      activePositiveId = null;
+    }
+  }
+
+  return net;
 }
 
 export function buildThresholdReconciliationPlan({
