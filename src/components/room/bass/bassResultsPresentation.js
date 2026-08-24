@@ -4,6 +4,7 @@ import { buildP19SeatRows, p19LowestSeat, p19RspResult } from "@/components/room
 import { buildP20SeatRows, p20WorstSeat, p20BestPrimarySeat } from "@/components/room/bass/p20SeatPresentation";
 import { formatP14Capability, formatP14BasisLabel, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
+import { seatScopeHeadlinePill } from "@/components/utils/rp22ParameterPresentation";
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 
@@ -120,12 +121,11 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  * or "NOT VERIFIED" consistently — never preliminary live values.
  *
  * P19 is a SEAT-scoped RP22 parameter (Room/Seat = Seat):
- *   P19 main pill: RSP headline result (the calibration reference), e.g.
- *     "RSP · L4 · ±2 dB" — per-seat results in the P19 — All Seats grid below.
+ *   P19 main pill: "SEAT" — per-seat results in the P19 — All Seats grid below.
+ *   No RSP headline, no aggregate level — seat results are the only P19 results.
  * P20 is a SEAT-scoped parameter:
- *   P20 main pill: "Lowest seat · Lx" (lowest achieved seat level) with
- *     "Worst: <seatId> · ±N dB" detail — per-seat results in the
- *     P20 — All Seats grid below.
+ *   P20 main pill: "SEAT" — per-seat results in the P20 — All Seats grid below.
+ *   No lowest/worst seat headline — seat results are the only P20 results.
  *
  * @param {object} completedBassAuthority - from useCompletedBassAuthority(scopeId)
  * @param {object} lifecycle - controller lifecycle snapshot
@@ -167,8 +167,8 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       pills: {
         p14: unselectedPill("P14 Bass SPL"),
         p18: unselectedPill("P18 Extension"),
-        p19: unselectedPill("P19 Response Fit"),
-        p20: unselectedPill("P20 Seat Consistency"),
+        p19: seatScopeHeadlinePill("P19 Response Fit"),
+        p20: seatScopeHeadlinePill("P20 Seat Consistency"),
       },
       statusText: "Select Bass Target",
       isReady: false,
@@ -271,41 +271,16 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P19 — SEAT-scoped RP22 parameter (Room/Seat = Seat). Main pill shows the
-  // RSP headline result (the calibration reference); per-seat grades are in the
-  // P19 — All Seats panel below. Every seat is graded against the same house
-  // target using the same RSP-derived EQ/trim — no independent seat EQ.
-  if (isAuthoritative && p19Rsp) {
-    const resultText = `RSP · ${p19Rsp.level} · ${p19Rsp.displayValue}`;
-    pills.p19 = {
-      label: "P19 Response Fit",
-      resultText,
-      text: `P19 Response Fit ${resultText}`,
-      level: p19Rsp.level,
-      detail: "RSP reference · per-seat below",
-    };
-  } else {
-    pills.p19 = { label: "P19 Response Fit", resultText: officialStateText(authorityStatus, isCalculating), text: `P19 Response Fit ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
-  }
+  // P19 — SEAT-scoped RP22 parameter (Room/Seat = Seat). The headline always
+  // displays "SEAT" — no RSP result, no aggregate level. Per-seat grades are
+  // in the P19 — All Seats panel below. Every seat is graded against the same
+  // house target using the same RSP-derived EQ/trim — no independent seat EQ.
+  pills.p19 = seatScopeHeadlinePill("P19 Response Fit");
 
-  // P20 — SEAT-scoped parameter. Main pill shows the lowest achieved seat
-  // level across evaluated seats ("Lowest seat · Lx") with the worst seat
-  // and its floored deviation as detail ("Worst: <seatId> · ±N dB"). Per-seat
-  // results are in the P20 — All Seats grid below. Calculation status
-  // ("Calculating…") appears in the statusText area, never as the main pill.
-  if (isAuthoritative && p20Lowest) {
-    const resultText = `Lowest seat · ${p20Lowest.level}`;
-    const detail = `Worst: ${p20Lowest.seatId} · ${p20Lowest.displayVariationDb}`;
-    pills.p20 = {
-      label: "P20 Seat Consistency",
-      resultText,
-      text: `P20 Seat Consistency ${resultText}`,
-      level: p20Lowest.level,
-      detail,
-    };
-  } else {
-    pills.p20 = { label: "P20 Seat Consistency", resultText: officialStateText(authorityStatus, isCalculating), text: `P20 Seat Consistency ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
-  }
+  // P20 — SEAT-scoped parameter. The headline always displays "SEAT" — no
+  // lowest/worst seat headline, no aggregate level. Per-seat results are in
+  // the P20 — All Seats grid below.
+  pills.p20 = seatScopeHeadlinePill("P20 Seat Consistency");
 
   // Status text
   let statusText = "Waiting for complete design";

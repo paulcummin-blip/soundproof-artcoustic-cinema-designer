@@ -55,11 +55,14 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
             SCOPE: <strong>{String(param.scope || "").toUpperCase()}</strong>
           </span>
         </div>
-        {/* Achieved value line */}
-        <div style={{ fontSize: 11, color: "#1B1A1A", marginTop: 6, fontWeight: 600 }}>
-          {isSeatScope ? "Achieved (RSP): " : "Achieved: "}
-          <span style={{ color: "#213428" }}>{achievedValue}</span>
-        </div>
+        {/* Achieved value line — Room-scoped only. Seat-scoped parameters show
+            no aggregate/RSP result in the headline; per-seat results are below. */}
+        {!isSeatScope && (
+          <div style={{ fontSize: 11, color: "#1B1A1A", marginTop: 6, fontWeight: 600 }}>
+            {"Achieved: "}
+            <span style={{ color: "#213428" }}>{achievedValue}</span>
+          </div>
+        )}
         {/* Target basis note (P12/P13 only) */}
         {targetBasisNote && (
           <div style={{ fontSize: 10, color: "#9B8E82", marginTop: 4, fontStyle: "italic" }}>

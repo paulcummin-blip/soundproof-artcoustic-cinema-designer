@@ -37,6 +37,25 @@ export const RP22_PRESENTATION_PARAMETERS = Object.values(RP22_CATALOG)
 export const RP22_SEAT_PARAMETERS = RP22_PRESENTATION_PARAMETERS.filter((parameter) => parameter.scope === "Seat");
 export const RP22_SEAT_PARAMETER_KEYS = RP22_SEAT_PARAMETERS.map((parameter) => `p${parameter.number}`);
 
+/**
+ * Reusable RP22 headline presentation rule:
+ * - Room-scoped parameter → headline shows the authoritative result.
+ * - Seat-scoped parameter → headline shows "SEAT"; individual results belong
+ *   in the per-seat presentation below. Never infer a headline from seats.
+ */
+export const isSeatScopedParameterKey = (paramKey) => {
+  const num = parseInt(String(paramKey || "").replace(/^p/i, ""), 10);
+  return RP22_SEAT_PARAMETERS.some((parameter) => parameter.number === num);
+};
+
+export const seatScopeHeadlinePill = (label) => ({
+  label,
+  resultText: "SEAT",
+  text: `${label} SEAT`,
+  level: "—",
+  detail: null,
+});
+
 export const createEmptySeatRp22Metrics = () => Object.fromEntries(
   RP22_SEAT_PARAMETER_KEYS.map((key) => [key, { value: null, formatted: "—", level: "—" }])
 );

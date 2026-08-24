@@ -210,18 +210,20 @@ export default function TechnicalParameterCard({
         }}
       >
         {isSeatScope ? <SeatScopeBadge variant="print" /> : <TechnicalLevelBadge level={lvl} />}
-        <div
-          style={{
-            fontSize: u.fsValue,
-            fontWeight: 700,
-            color: "#213428",
-            fontFamily: HEADING_FONT,
-            lineHeight: 1.1,
-            flex: 1,
-          }}
-        >
-          {achievedValue || "—"}
-        </div>
+        {!isSeatScope && (
+          <div
+            style={{
+              fontSize: u.fsValue,
+              fontWeight: 700,
+              color: "#213428",
+              fontFamily: HEADING_FONT,
+              lineHeight: 1.1,
+              flex: 1,
+            }}
+          >
+            {achievedValue || "—"}
+          </div>
+        )}
       </div>
 
       {/* 3. SHORT TECHNICAL EXPLANATION */}

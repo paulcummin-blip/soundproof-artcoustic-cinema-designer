@@ -768,7 +768,7 @@ export default function RP22CompliancePanel({
           })()
         : p.id === 14 ? bassPresentation.parameters.p14.detail :
       p.id === 18 ? "Official room result from the completed authoritative bass analysis." :
-      p.id === 19 ? "Official RSP-versus-target result from the completed authoritative bass analysis." :
+      p.id === 19 ? "Per-seat evaluation from the completed authoritative bass analysis." :
       null;
     const debugMetric = String(reportSource).startsWith("seat:")
       ? (() => {
@@ -839,20 +839,11 @@ export default function RP22CompliancePanel({
               SCOPE: <strong>{p.scope.toUpperCase()}</strong>
             </span>
           </div>
-          {/* Achieved value line */}
+          {/* Achieved value line — Room-scoped only. Seat-scoped parameters show
+              no aggregate/RSP result in the headline; per-seat results are below. */}
           <div style={{ fontSize: 11, color: "#1B1A1A", marginTop: 6, fontWeight: 600 }}>
             {isSeatScope ? (
-              p.id === 19 && bassPresentation.parameters.p19.isAuthoritative ? (
-                <span style={{ color: "#625143" }}>
-                  <span style={{ fontWeight: 700 }}>RSP</span> response fit:{" "}
-                  <span style={{ color: "#213428" }}>{bassPresentation.parameters.p19.valueText}</span>
-                  {" · "}
-                  <span style={{ color: "#213428" }}>{bassPresentation.parameters.p19.level}</span>
-                  <span style={{ fontStyle: "italic", marginLeft: 8 }}>Per-seat evaluation — see below</span>
-                </span>
-              ) : (
-                <span style={{ color: "#625143", fontStyle: "italic" }}>Per-seat evaluation — see individual seat results below</span>
-              )
+              <span style={{ color: "#625143", fontStyle: "italic" }}>Per-seat evaluation — see individual seat results below</span>
             ) : (
               <>Achieved: <span style={{ color: "#213428" }}>{achievedValue}</span></>
             )}
