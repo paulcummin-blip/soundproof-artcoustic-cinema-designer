@@ -119,11 +119,13 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  * While calculating / updating / NOT_VERIFIED, pills show "Calculating…"
  * or "NOT VERIFIED" consistently — never preliminary live values.
  *
- * P19 and P20 are SEAT-scoped parameters:
- *   P19 main pill: "SEAT" — per-seat results in seat grids below
- *   P20 main pill: "SEAT" — per-seat results in seat grids below
+ * P19 is a SEAT-scoped RP22 parameter (Room/Seat = Seat):
+ *   P19 main pill: RSP headline result (the calibration reference), e.g.
+ *     "L3 · ±2.86 dB" — per-seat results in the P19 — All Seats grid below.
+ * P20 is a SEAT-scoped parameter:
+ *   P20 main pill: "SEAT" — per-seat results in seat grids below.
  *   RSP (p19Rsp) and Best Primary (p20BestPrimary) are retained as
- *   diagnostic fields in the return value but never shown as the main pill.
+ *   diagnostic fields in the return value.
  *
  * @param {object} completedBassAuthority - from useCompletedBassAuthority(scopeId)
  * @param {object} lifecycle - controller lifecycle snapshot
@@ -277,10 +279,22 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P19 — SEAT-scoped RP22 parameter (Room/Seat = Seat). Main pill shows
-  // "SEAT"; per-seat grades are in the P19 — All Seats panel below. The RSP
-  // remains the calibration/target reference (p19Rsp) but is not the main pill.
-  pills.p19 = { label: "P19 Response Fit", resultText: "SEAT", text: "P19 Response Fit SEAT", level: "—", detail: null };
+  // P19 — SEAT-scoped RP22 parameter (Room/Seat = Seat). Main pill shows the
+  // RSP headline result (the calibration reference); per-seat grades are in the
+  // P19 — All Seats panel below. Every seat is graded against the same house
+  // target using the same RSP-derived EQ/trim — no independent seat EQ.
+  if (isAuthoritative && p19Rsp) {
+    const resultText = `${p19Rsp.level} · ${p19Rsp.displayValue}`;
+    pills.p19 = {
+      label: "P19 Response Fit",
+      resultText,
+      text: `P19 Response Fit ${resultText}`,
+      level: p19Rsp.level,
+      detail: "RSP reference · per-seat below",
+    };
+  } else {
+    pills.p19 = { label: "P19 Response Fit", resultText: officialStateText(authorityStatus, isCalculating), text: `P19 Response Fit ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
+  }
 
   // P20 — SEAT-scoped parameter. Main pill ALWAYS shows "SEAT" in every
   // lifecycle state (unselected, calculating, ready). Per-seat results are
