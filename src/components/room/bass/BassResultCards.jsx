@@ -38,6 +38,10 @@ export default function BassResultCards() {
     shared.seatingPositions,
     nowMs,
     p14Selection.noP14TargetSelected,
+    {
+      p14TargetBasis: shared.authoritative?.requested?.p14TargetBasis,
+      p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
+    },
   );
 
   return (
