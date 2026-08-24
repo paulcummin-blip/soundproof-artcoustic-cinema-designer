@@ -136,7 +136,7 @@ export default async function syncUkTurnoverRewards(req) {
       }, { status: 422 });
     }
 
-    const [allLinks, allMilestones, allLedgerEntries] = await Promise.all([
+    const [allLinks, allMilestones] = await Promise.all([
       base44.asServiceRole.entities.ExternalAccountLink.filter({
         source_system: SOURCE_SYSTEM,
         active: true,
@@ -144,15 +144,20 @@ export default async function syncUkTurnoverRewards(req) {
       base44.asServiceRole.entities.TurnoverMilestone.filter({
         calendar_year: calendarYear,
       }),
-      base44.asServiceRole.entities.CapacityLedger.list("-created_date", 5000),
     ]);
 
     const linksByDealerId = new Map();
+    const linksByAccountId = new Map();
     for (const link of Array.isArray(allLinks) ? allLinks : []) {
-      const dealerId = String(link?.partner_user_id || "").trim();
+      const dealerId = String(link?.partner_user_id || "").trim().toLowerCase();
       if (!dealerId) continue;
-      if (linksByDealerId.has(dealerId)) {
-        const message = `Duplicate active stable dealer link: ${dealerId}`;
+      const accountId = String(link?.account_id || "").trim();
+      const priorDealerLink = linksByDealerId.get(dealerId);
+      const priorAccountDealerId = linksByAccountId.get(accountId);
+      if (priorDealerLink || (accountId && priorAccountDealerId && priorAccountDealerId !== dealerId)) {
+        const message = priorDealerLink
+          ? `Duplicate active stable dealer link: ${dealerId}`
+          : `Sound Proof account ${accountId} has multiple active dealer identities`;
         await updateSyncRun(base44, syncRunId, {
           status: "FAILED",
           finished_at: new Date().toISOString(),
@@ -165,6 +170,7 @@ export default async function syncUkTurnoverRewards(req) {
         }, { status: 422 });
       }
       linksByDealerId.set(dealerId, link);
+      if (accountId) linksByAccountId.set(accountId, dealerId);
     }
 
     const milestonesByAccount = new Map();
@@ -173,12 +179,6 @@ export default async function syncUkTurnoverRewards(req) {
         milestonesByAccount.set(milestone.account_id, []);
       }
       milestonesByAccount.get(milestone.account_id).push(milestone);
-    }
-
-    const ledgerByAccount = new Map();
-    for (const entry of Array.isArray(allLedgerEntries) ? allLedgerEntries : []) {
-      if (!ledgerByAccount.has(entry.account_id)) ledgerByAccount.set(entry.account_id, []);
-      ledgerByAccount.get(entry.account_id).push(entry);
     }
 
     let dealersMatched = 0;
@@ -210,7 +210,13 @@ export default async function syncUkTurnoverRewards(req) {
 
       dealersMatched += 1;
       const accountId = link.account_id;
-      const accountLedger = ledgerByAccount.get(accountId) || [];
+      // Query per account so app-wide ledger growth cannot truncate old threshold
+      // events and accidentally make a previously credited threshold look missing.
+      const accountLedger = await base44.asServiceRole.entities.CapacityLedger.filter(
+        { account_id: accountId },
+        "-created_date",
+        5000,
+      );
       let actions;
       try {
         actions = buildThresholdReconciliationPlan({
