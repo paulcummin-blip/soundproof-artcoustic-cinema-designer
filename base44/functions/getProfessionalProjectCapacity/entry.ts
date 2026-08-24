@@ -48,7 +48,7 @@ export default async function(req) {
     const entries = await base44.asServiceRole.entities.CapacityLedger.filter(
       { account_id: accountId },
       "-created_date",
-      1000
+      5000
     );
 
     // SUM(delta) — REVERSAL entries net to zero automatically.
@@ -57,7 +57,9 @@ export default async function(req) {
       return sum + (Number.isFinite(d) ? d : 0);
     }, 0);
 
-    return Response.json({ status: "OK", available });
+    // A correction can make the internal ledger net negative after already-used
+    // projects are preserved. Dealer UI reports usable availability, never debt.
+    return Response.json({ status: "OK", available: Math.max(0, available) });
   } catch (error) {
     return Response.json({ status: "ERROR", available: null });
   }
