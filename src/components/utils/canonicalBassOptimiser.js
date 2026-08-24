@@ -14,7 +14,6 @@ import {
 import { identifyProtectedNullRegions, isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { findAggregatePeakBoostViolations } from "@/components/utils/designEqPhysicsAuthority";
 import { normaliseHouseCurveToP14Total } from "@/components/utils/p14HouseCurveNormalisation";
-import { p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
 import { assessP14Capability } from "@/components/utils/p14CapabilityAuthority";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getCurrentSystemSourceOutput, getSystemSourceCapability, getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
@@ -647,10 +646,11 @@ export function generateCanonicalCandidatePool({
   // band.
   const houseCurveShape = [15, 20, 25, 31.5, 40, 50, 63, 80, 100, 120, 150, 200, 400]
     .map((f) => ({ frequency: f, offsetDb: artcousticHouseCurveOffsetAt(f) }));
-  const requiredExtensionHz = Number.isFinite(Number(selectedP18RequiredExtensionHz))
-    ? Number(selectedP18RequiredExtensionHz)
-    : p18ThresholdHzForLevel(p18TargetBasis, 1);
   const p14AssessmentStartHz = 20;
+  // The positive operating-trim headroom band is physical and fixed. P18
+  // Minimum/Recommended is only a grading view over the achieved extension;
+  // using it here made a display toggle alter the calculated curve.
+  const requiredExtensionHz = p14AssessmentStartHz;
   const p14Normalisation = normaliseHouseCurveToP14Total({
     houseCurveShape,
     selectedP14TargetDb: Number(selectedP14TargetDb),
