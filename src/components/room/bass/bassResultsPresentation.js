@@ -121,11 +121,11 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  *
  * P19 is a SEAT-scoped RP22 parameter (Room/Seat = Seat):
  *   P19 main pill: RSP headline result (the calibration reference), e.g.
- *     "L3 · ±2.86 dB" — per-seat results in the P19 — All Seats grid below.
+ *     "RSP · L4 · ±2 dB" — per-seat results in the P19 — All Seats grid below.
  * P20 is a SEAT-scoped parameter:
- *   P20 main pill: "SEAT" — per-seat results in seat grids below.
- *   RSP (p19Rsp) and Best Primary (p20BestPrimary) are retained as
- *   diagnostic fields in the return value.
+ *   P20 main pill: "Lowest seat · Lx" (lowest achieved seat level) with
+ *     "Worst: <seatId> · ±N dB" detail — per-seat results in the
+ *     P20 — All Seats grid below.
  *
  * @param {object} completedBassAuthority - from useCompletedBassAuthority(scopeId)
  * @param {object} lifecycle - controller lifecycle snapshot
@@ -163,20 +163,12 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       level: "—",
       detail: null,
     });
-    // P19/P20 are SEAT-scoped — show "SEAT" neutral, not "Select Bass Target".
-    const seatPill = (label) => ({
-      label,
-      resultText: "SEAT",
-      text: `${label} SEAT`,
-      level: "—",
-      detail: null,
-    });
     return {
       pills: {
         p14: unselectedPill("P14 Bass SPL"),
         p18: unselectedPill("P18 Extension"),
         p19: unselectedPill("P19 Response Fit"),
-        p20: seatPill("P20 Seat Consistency"),
+        p20: unselectedPill("P20 Seat Consistency"),
       },
       statusText: "Select Bass Target",
       isReady: false,
@@ -284,7 +276,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // P19 — All Seats panel below. Every seat is graded against the same house
   // target using the same RSP-derived EQ/trim — no independent seat EQ.
   if (isAuthoritative && p19Rsp) {
-    const resultText = `${p19Rsp.level} · ${p19Rsp.displayValue}`;
+    const resultText = `RSP · ${p19Rsp.level} · ${p19Rsp.displayValue}`;
     pills.p19 = {
       label: "P19 Response Fit",
       resultText,
@@ -296,13 +288,24 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     pills.p19 = { label: "P19 Response Fit", resultText: officialStateText(authorityStatus, isCalculating), text: `P19 Response Fit ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P20 — SEAT-scoped parameter. Main pill ALWAYS shows "SEAT" in every
-  // lifecycle state (unselected, calculating, ready). Per-seat results are
-  // presented in the seat grids below. Calculation status ("Calculating…")
-  // appears in the statusText detail area, never as the main pill. Best
-  // Primary is retained as a diagnostic field (p20BestPrimary) but never as
-  // the main pill result — a "best primary" headline hides poor seats.
-  pills.p20 = { label: "P20 Seat Consistency", resultText: "SEAT", text: "P20 Seat Consistency SEAT", level: "—", detail: null };
+  // P20 — SEAT-scoped parameter. Main pill shows the lowest achieved seat
+  // level across evaluated seats ("Lowest seat · Lx") with the worst seat
+  // and its floored deviation as detail ("Worst: <seatId> · ±N dB"). Per-seat
+  // results are in the P20 — All Seats grid below. Calculation status
+  // ("Calculating…") appears in the statusText area, never as the main pill.
+  if (isAuthoritative && p20Lowest) {
+    const resultText = `Lowest seat · ${p20Lowest.level}`;
+    const detail = `Worst: ${p20Lowest.seatId} · ${p20Lowest.displayVariationDb}`;
+    pills.p20 = {
+      label: "P20 Seat Consistency",
+      resultText,
+      text: `P20 Seat Consistency ${resultText}`,
+      level: p20Lowest.level,
+      detail,
+    };
+  } else {
+    pills.p20 = { label: "P20 Seat Consistency", resultText: officialStateText(authorityStatus, isCalculating), text: `P20 Seat Consistency ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
+  }
 
   // Status text
   let statusText = "Waiting for complete design";
