@@ -257,24 +257,20 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P19 — SEAT-scoped parameter. Main pill shows "SEAT"; per-seat results
-  // are presented in the seat grids below. RSP is retained as a diagnostic
-  // field in the return value (p19Rsp) but never as the main pill result.
-  if (isAuthoritative) {
-    pills.p19 = { label: "P19 Response Fit", resultText: "SEAT", text: "P19 Response Fit SEAT", level: "—", detail: null };
-  } else {
-    pills.p19 = { label: "P19 Response Fit", resultText: officialStateText(authorityStatus, isCalculating), text: `P19 Response Fit ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
-  }
+  // P19 — SEAT-scoped parameter. Main pill ALWAYS shows "SEAT" in every
+  // lifecycle state (unselected, calculating, ready). Per-seat results are
+  // presented in the seat grids below. Calculation status ("Calculating…")
+  // appears in the statusText detail area, never as the main pill. RSP is
+  // retained as a diagnostic field (p19Rsp) but never as the main pill result.
+  pills.p19 = { label: "P19 Response Fit", resultText: "SEAT", text: "P19 Response Fit SEAT", level: "—", detail: null };
 
-  // P20 — SEAT-scoped parameter. Main pill shows "SEAT"; per-seat results
-  // are presented in the seat grids below. Best Primary is retained as a
-  // diagnostic field in the return value (p20BestPrimary) but never as the
-  // main pill result — a "best primary" headline hides poor seats.
-  if (isAuthoritative) {
-    pills.p20 = { label: "P20 Seat Consistency", resultText: "SEAT", text: "P20 Seat Consistency SEAT", level: "—", detail: null };
-  } else {
-    pills.p20 = { label: "P20 Seat Consistency", resultText: officialStateText(authorityStatus, isCalculating), text: `P20 Seat Consistency ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
-  }
+  // P20 — SEAT-scoped parameter. Main pill ALWAYS shows "SEAT" in every
+  // lifecycle state (unselected, calculating, ready). Per-seat results are
+  // presented in the seat grids below. Calculation status ("Calculating…")
+  // appears in the statusText detail area, never as the main pill. Best
+  // Primary is retained as a diagnostic field (p20BestPrimary) but never as
+  // the main pill result — a "best primary" headline hides poor seats.
+  pills.p20 = { label: "P20 Seat Consistency", resultText: "SEAT", text: "P20 Seat Consistency SEAT", level: "—", detail: null };
 
   // Status text
   let statusText = "Waiting for complete design";
