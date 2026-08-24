@@ -9,9 +9,8 @@ const priorityLabel = (priority) => priority === SECONDARY ? "Secondary" : "Prim
 const detailText = (seat) => [
   formatSeatLabel(seat.seatId),
   `${priorityLabel(seat.priority)}`,
-  `Raw variation: ${Number.isFinite(seat.variationDbRaw) ? `±${Math.abs(seat.variationDbRaw).toFixed(2)} dB` : "—"}`,
-  `Displayed variation: ${seat.displayVariationDb}`,
-  `Worst frequency: ${Number.isFinite(seat.worstFrequencyHz) ? `${seat.worstFrequencyHz.toFixed(2)} Hz` : "—"}`,
+  `Deviation: ${seat.displayVariationDb || "—"}`,
+  `Worst frequency: ${Number.isFinite(seat.worstFrequencyHz) ? `${Math.round(seat.worstFrequencyHz)} Hz` : "—"}`,
   `Comparison points: ${Number.isFinite(seat.comparisonPointCount) ? seat.comparisonPointCount : "—"}`,
 ].join("\n");
 
