@@ -29,13 +29,13 @@ import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 
 const MAX_BOOST_DB = 6;
 const MAX_CUT_DB = 15;
-const CORRECTION_SMOOTHING_WEIGHTS = Object.freeze([1, 2, 3, 2, 1]);
+const CORRECTION_SMOOTHING_WEIGHTS = Object.freeze([1, 6, 1]);
 
 /**
  * Lightly round the predicted correction envelope without smoothing any
  * acoustic response or changing what the optimiser can achieve.
  *
- * The triangular five-point window only relaxes an existing correction toward
+ * The centre-weighted three-point window only relaxes an existing correction toward
  * zero: it can never add boost, add cut, reverse correction sign, exceed the
  * +6/-15 dB limits, or bridge across a protected cancellation null. Protected
  * null points remain exactly 0 dB correction.
