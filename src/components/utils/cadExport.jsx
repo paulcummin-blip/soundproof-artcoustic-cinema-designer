@@ -688,8 +688,6 @@ export function generateSVG({
 
     const LABEL_OFFSET = 80;
     const TEXT_H = 90;
-    const mlpSeatId = findMlpSeatId(mlp, seatingPositions);
-
     const svg = [];
     svg.push(`<?xml version="1.0" encoding="UTF-8"?>`);
     svg.push(`<svg width="${W}mm" height="${L}mm" viewBox="0 0 ${W} ${L}" xmlns="http://www.w3.org/2000/svg">`);
@@ -788,15 +786,15 @@ export function generateSVG({
     }
 
     // ── SEATING ───────────────────────────────────────────────────────────────
+    // MLP/RSP is retained internally for speaker rotation calculations but is
+    // not rendered as a distinct marker or label in the CAD export.
     svg.push(`  <g id="SEATING">`);
     (seatingPositions || []).forEach((seat, idx) => {
         if (!Number.isFinite(seat?.x) || !Number.isFinite(seat?.y)) return;
         const sx = cx(seat.x);
         const sy = cy(seat.y);
-        const isMLP = seat.id === mlpSeatId;
-        const col = isMLP ? '#E63946' : '#444';
-        svg.push(`    <circle cx="${sx}" cy="${sy}" r="130" stroke="${col}" stroke-width="${isMLP ? 2 : 1}" fill="none"/>`);
-        svg.push(`    ${svgText(sx + 150, sy + 35, isMLP ? 'MLP' : `S${idx + 1}`, TEXT_H, 'start', col)}`);
+        svg.push(`    <circle cx="${sx}" cy="${sy}" r="130" stroke="#444" stroke-width="1" fill="none"/>`);
+        svg.push(`    ${svgText(sx + 150, sy + 35, `S${idx + 1}`, TEXT_H, 'start', '#444')}`);
     });
     svg.push(`  </g>`);
 
@@ -938,7 +936,6 @@ export function generateDXF({
 
     const LABEL_OFFSET = 100;
     const TEXT_H = 90;
-    const mlpSeatId = findMlpSeatId(mlp, seatingPositions);
     const dxf = [];
 
     // ── HEADER ────────────────────────────────────────────────────────────────
@@ -1056,20 +1053,15 @@ export function generateDXF({
         dxf.push(dxfText('PROJECTOR_LABELS', pxc + bw / 2 + LABEL_OFFSET, pyc, TEXT_H, 'PROJECTOR'));
     }
 
-    // SEATING
+    // SEATING — MLP/RSP is retained internally for speaker rotation calculations
+    // but is not rendered as a distinct marker or label in the CAD export.
     (seatingPositions || []).forEach((seat, idx) => {
         if (!Number.isFinite(seat?.x) || !Number.isFinite(seat?.y)) return;
         const sx = cx(seat.x);
         const sy = cy(seat.y);
-        const isMLP = seat.id === mlpSeatId;
         dxf.push(`0\nCIRCLE\n8\nSEATING\n10\n${sx}\n20\n${sy}\n40\n130`);
-        dxf.push(dxfText('LABELS', sx + 160, sy + 40, TEXT_H, isMLP ? 'MLP' : `S${idx + 1}`));
+        dxf.push(dxfText('LABELS', sx + 160, sy + 40, TEXT_H, `S${idx + 1}`));
     });
-
-    // RSP / MLP in CAD coordinates for speaker aiming lines
-    const mlpCadX = (mlp && Number.isFinite(mlp.x)) ? cx(mlp.x) : null;
-    const mlpCadY = (mlp && Number.isFinite(mlp.y)) ? cy(mlp.y) : null;
-    const hasMlp = (mlpCadX !== null && mlpCadY !== null);
 
     // SPEAKERS — emitted as INSERT references to footprint BLOCK definitions.
     // Each speaker is a single selectable CAD object (block reference) with XDATA
@@ -1147,23 +1139,6 @@ export function generateDXF({
         const labelOffset = meta.fp.isRound ? Math.round(meta.fp.diameterMm / 2) : Math.round(meta.fp.planWidthMm / 2);
         dxf.push(dxfText('LABELS', insX + labelOffset + LABEL_OFFSET, insY + 30, TEXT_H, role));
 
-        // SPEAKER_AIMING — aiming line from acoustic centre toward RSP/MLP
-        // (separate layer so it can be hidden independently; does not alter speaker geometry/rotation)
-        if (hasMlp) {
-            dxf.push(dxfLine('SPEAKER_AIMING', insX, insY, mlpCadX, mlpCadY));
-            // Compact metadata annotation block on the aiming layer
-            const metaX = insX + labelOffset + LABEL_OFFSET;
-            const metaH = 50;
-            const metaStep = 58;
-            let metaY = insY - 20;
-            dxf.push(dxfText('SPEAKER_AIMING', metaX, metaY, metaH, `MODEL=${modelName || ''}`));
-            metaY -= metaStep;
-            dxf.push(dxfText('SPEAKER_AIMING', metaX, metaY, metaH, `ROLE=${role}`));
-            metaY -= metaStep;
-            dxf.push(dxfText('SPEAKER_AIMING', metaX, metaY, metaH, `AIM TARGET: RSP`));
-            metaY -= metaStep;
-            dxf.push(dxfText('SPEAKER_AIMING', metaX, metaY, metaH, `ROTATION=${round2(finalRot)}`));
-        }
     });
 
     // SUBWOOFERS — true product footprints with orientation.
