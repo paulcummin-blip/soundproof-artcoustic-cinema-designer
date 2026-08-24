@@ -128,10 +128,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     return buildP14TargetKey(requested.p14TargetBasis, requested.requestedLevel);
   }, [requested.p14TargetBasis, requested.requestedLevel]);
 
-  const allTargets = useMemo(() => {
-    if (!requested?.p18TargetBasis) return [];
-    return buildP14TargetCombinations(requested.p18TargetBasis);
-  }, [requested.p18TargetBasis]);
+  // The eight-target acoustic family is independent of the P18 grading view.
+  // Minimum/Recommended P18 is recomputed from achieved extension at display
+  // time, so changing that selector neither rebuilds nor restarts this queue.
+  const allTargets = useMemo(() => buildP14TargetCombinations(), [OPTIMISER_VERSION_SIGNATURE]);
 
   // Reactive cache lookup: returns cached compact contract for the current target, or null
   const cachedContract = useTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey);
