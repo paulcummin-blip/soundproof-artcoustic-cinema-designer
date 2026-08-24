@@ -1,7 +1,7 @@
 {
   "name": "TurnoverMilestone",
   "type": "object",
-  "description": "Represents one actual turnover threshold reached by an account (e.g. \u00a310,000, \u00a320,000, \u00a330,000). Each milestone corresponds to a CapacityLedger reward entry. Future UK rule: each \u00a310,000 threshold = +5 Professional Projects. Automated awarding is NOT implemented in Stage B1.",
+  "description": "Admin-only reconciliation state for one annual UK turnover reward threshold. CapacityLedger remains the append-only commercial authority; this entity records the latest state and links its award/reversal history.",
   "properties": {
     "account_id": {
       "type": "string",
@@ -9,24 +9,66 @@
     },
     "calendar_year": {
       "type": "number",
-      "description": "Calendar year this milestone was reached (e.g. 2026)."
+      "description": "Calendar year this entitlement applies to."
     },
     "milestone_value_gbp": {
       "type": "number",
-      "description": "The actual turnover threshold in GBP (e.g. 10000, 20000, 30000)."
+      "description": "Earned reward threshold represented by this state record."
     },
     "reward_projects": {
       "type": "number",
-      "description": "Number of Professional Projects awarded for reaching this milestone (e.g. 5)."
+      "description": "Professional Projects represented by the threshold."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "REVERSED"
+      ],
+      "default": "ACTIVE",
+      "description": "Latest reconciled threshold state. History remains in CapacityLedger."
     },
     "reward_ledger_entry_id": {
       "type": "string",
-      "description": "ID of the CapacityLedger record that credited the reward for this milestone. Null if not yet awarded.",
+      "description": "ID of the first CapacityLedger reward entry for this threshold.",
+      "nullable": true
+    },
+    "reversal_ledger_entry_id": {
+      "type": "string",
+      "description": "ID of the latest explicit reversal for this threshold.",
+      "nullable": true
+    },
+    "latest_ledger_entry_id": {
+      "type": "string",
+      "description": "ID of the latest award, reinstatement, or reversal event.",
+      "nullable": true
+    },
+    "reversal_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of explicit reversals appended for this threshold."
+    },
+    "reinstatement_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of times this threshold was re-earned after reversal."
+    },
+    "source_calculated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When Lovable calculated the entitlement contract used for the latest reconciliation.",
+      "nullable": true
+    },
+    "last_reconciled_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When Sound Proof last changed this threshold state.",
       "nullable": true
     },
     "source_turnover_gbp": {
       "type": "number",
-      "description": "The actual eligible turnover in GBP at the time this milestone was recorded (may exceed the milestone value)."
+      "description": "Legacy admin-only source field retained for old records. The current minimal contract never writes raw turnover.",
+      "nullable": true
     }
   },
   "required": [
@@ -37,33 +79,9 @@
   ],
   "rls": {
     "read": {
-      "$or": [
-        {
-          "$and": [
-            {
-              "data.account_id": "{{user.data.account_id}}"
-            },
-            {
-              "data.account_id": {
-                "$nin": [
-                  null,
-                  ""
-                ]
-              }
-            },
-            {
-              "user_condition": {
-                "data.access_level": "FULL_ACCESS"
-              }
-            }
-          ]
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
+      "user_condition": {
+        "role": "admin"
+      }
     },
     "create": {
       "user_condition": {
