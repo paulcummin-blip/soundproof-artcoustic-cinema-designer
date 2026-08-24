@@ -41,10 +41,11 @@ export function validateEntitlementContract(payload, expectedCalendarYear) {
       throw new Error("Dealer entitlement contains unsupported fields");
     }
 
-    const dealerAccountId = String(rawDealer.dealer_account_id || "").trim();
-    if (!UUID_PATTERN.test(dealerAccountId)) {
+    const dealerAccountIdRaw = String(rawDealer.dealer_account_id || "").trim();
+    if (!UUID_PATTERN.test(dealerAccountIdRaw)) {
       throw new Error("Dealer entitlement has an invalid stable identifier");
     }
+    const dealerAccountId = dealerAccountIdRaw.toLowerCase();
     if (seenDealerIds.has(dealerAccountId)) {
       throw new Error("Contract contains a duplicate dealer stable identifier");
     }
