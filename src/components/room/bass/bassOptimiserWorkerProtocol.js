@@ -3,7 +3,7 @@ import { RP22_BASS_METRIC_SCHEMA_VERSION } from "../../../../base44/shared/bassA
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
 export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v38-independent-p18-product-room-eq";
 export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v38-independent-p18-product-room-eq";
-export const BASS_RESULT_SCHEMA_VERSION = 29;
+export const BASS_RESULT_SCHEMA_VERSION = 30;
 export const BASS_METRIC_SCHEMA_VERSION = RP22_BASS_METRIC_SCHEMA_VERSION;
 export const BASS_OPTIMISER_POOL_PROPERTY = "pool";
 

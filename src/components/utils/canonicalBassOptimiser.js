@@ -407,27 +407,32 @@ function buildCanonicalCandidate({
   operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis, usableLfHz,
 }) {
   const requestedPreEqCurve = (levelNormalisedRawCurve || []).map((point) => ({ ...point }));
-  // CHANGE 2 (Stage B1): The pre-EQ response IS the physical room response at
-  // the selected operating level. Do NOT cap it to (rawCurve - 2 dB) — a
-  // room-response dip is not an output-capability limit. The genuine product
-  // capability envelope is applied to the POST-EQ curve below. This also
-  // ensures violation detection (aggregate boost, protected null) compares
-  // the post-EQ curve against the real "before", not a 2 dB-lowered phantom.
-  const achievedPreEqCurve = requestedPreEqCurve.map((point) => ({ ...point }));
-  const maximumAfterEq = buildMaximumSplCurveAfterEq(maximumSplCurveBeforeEq);
-  // Predict the realistic post-calibration correction using a simple per-frequency
-  // model: cut ≤ 15 dB, boost ≤ 6 dB, deep-narrow-null protection, product
-  // capability constraint. This replaces the PEQ filter-bank output as the
-  // authoritative post-EQ curve. The PEQ fitter still runs for diagnostics.
-  const realisticCorrectionCurve = predictRealisticPostCalibrationCorrection({
-    rawRspCurve: levelNormalisedRawCurve,
+  // The realistic post-calibration predictor works from the Product + room
+  // maximum capability M(f), not directly from the level-normalised room
+  // response. A global operating-level trim is derived from M(f) vs target
+  // (1/3-octave smoothed, median, excluding protected nulls), creating an
+  // operating response O(f) = M(f) + globalTrimDb. The EQ correction is then
+  // computed from the residual error = target - O(f). This models a real
+  // calibrator who first sets the master volume, then EQs the response shape.
+  const realisticResult = predictRealisticPostCalibrationCorrection({
+    maximumCapabilityCurve: maximumSplCurveBeforeEq,
     targetCurve,
+    assessmentStartHz: domains.p19StartHz,
+    assessmentEndHz: domains.p19EndHz,
     protectedNullRegions,
     activeSubs,
     usableLfHz,
     requestedSystemOutputDb: selectedOperatingOutputDb,
   });
-  const unconstrainedPostEqCurve = (levelNormalisedRawCurve || []).map((point) => ({
+  const realisticCorrectionCurve = realisticResult.correctionCurve;
+  const realisticGlobalTrimDb = realisticResult.globalTrimDb;
+  const realisticOperatingPreEqCurve = realisticResult.operatingPreEqCurve;
+  // The achieved pre-EQ for violation detection is the operating response
+  // O(f) = M(f) + globalTrimDb, so boost/null violations compare like-for-like
+  // against the post-EQ curve (O(f) + correction).
+  const achievedPreEqCurve = realisticOperatingPreEqCurve.map((point) => ({ ...point }));
+  const maximumAfterEq = buildMaximumSplCurveAfterEq(maximumSplCurveBeforeEq);
+  const unconstrainedPostEqCurve = realisticOperatingPreEqCurve.map((point) => ({
     frequency: point.frequency,
     spl: point.spl + interpolateCorrection(realisticCorrectionCurve, point.frequency),
   }));
@@ -439,14 +444,12 @@ function buildCanonicalCandidate({
     selectedOperatingOutputDb,
     targetBasis: p14TargetBasis,
   });
-  // CHANGE 2 (Stage B1): Do NOT cap the post-EQ response to the raw room
-  // response (rawCurve - 2 dB). The post-EQ response is the physical pre-EQ
-  // response + EQ filter-bank transfer, constrained only by the genuine
-  // product operating envelope (product frequency range, max SPL capability,
-  // available headroom at the selected operating level, +6 dB aggregate
-  // boost limit, protected-null restrictions).
+  // Final EQ = O(f) + correction, first clamped to the physical ceiling M(f)
+  // (the boost headroom limit already guarantees this, but enforce explicitly),
+  // then to the product operating envelope for deep-LF extension limits.
+  const maximumClampedPostEqCurve = capCurveToEnvelope(unconstrainedPostEqCurve, maximumSplCurveBeforeEq);
   const finalPostEqCurve = capCurveToProductOperatingEnvelope(
-    unconstrainedPostEqCurve,
+    maximumClampedPostEqCurve,
     productOperatingEnvelope.curve,
   );
   // Candidate authority judges the response that can actually be delivered.
@@ -464,7 +467,19 @@ function buildCanonicalCandidate({
     ...achievedProtectedNullBoostViolations,
   ];
   const achievedPhysicalEqAuthorityPassed = achievedPhysicalAuthorityViolations.length === 0;
-  const requestedPerSeatPostEqCurves = applyBankToSeats(perSeatRawCurves, realisticCorrectionCurve);
+  // Per-seat: apply the same RSP-derived global trim and EQ correction. The
+  // per-seat raw curves carry the old operatingLevelOffsetDb; the delta between
+  // the new global trim and the old offset aligns per-seat pre-EQ with the RSP
+  // operating response. No separate trim or EQ is calculated per seat.
+  const perSeatOperatingOffsetDb = realisticGlobalTrimDb - operatingLevelOffsetDb;
+  const requestedPerSeatPostEqCurves = applyBankToSeats(perSeatRawCurves, realisticCorrectionCurve)
+    .map((seat) => ({
+      ...seat,
+      responseData: seat.responseData.map((point) => ({
+        ...point,
+        spl: Number.isFinite(point.spl) ? point.spl + perSeatOperatingOffsetDb : point.spl,
+      })),
+    }));
   const maximumPerSeatAfterEqCurves = (Array.isArray(perSeatMaximumSplCurves) ? perSeatMaximumSplCurves : [])
     .filter((seat) => seat?.seatId !== "rsp" && Array.isArray(seat?.responseData))
     .map((seat) => ({
@@ -533,6 +548,8 @@ function buildCanonicalCandidate({
     },
     requestedPreEqOperatingCurve: requestedPreEqCurve,
     rspBeforePeqAtOperatingLevel: achievedPreEqCurve,
+    realisticGlobalTrimDb: Number.isFinite(realisticGlobalTrimDb) ? realisticGlobalTrimDb : 0,
+    operatingPreEqCurve: (realisticOperatingPreEqCurve || []).map((point) => ({ ...point })),
     operatingLevelOffsetDb: Number.isFinite(operatingLevelOffsetDb) ? operatingLevelOffsetDb : 0,
     requestedOperatingLevelOffsetDb: Number.isFinite(requestedOperatingLevelOffsetDb) ? requestedOperatingLevelOffsetDb : 0,
     baseRequestedSystemOutputDb: Number.isFinite(baseRequestedSystemOutputDb) ? baseRequestedSystemOutputDb : null,

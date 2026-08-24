@@ -6,23 +6,26 @@
  * could achieve — without modelling actual PEQ/FIR filters.
  *
  * Core model (per frequency):
- *   error = houseTarget - productAwareRawResponse
- *   if error > 0 (below target):  boost = min(error, +6 dB)
+ *   M(f)     = Product + room maximum (physical ceiling)
+ *   O(f)     = M(f) + globalTrimDb          (global volume trim → operating response)
+ *   error    = houseTarget - O(f)            (residual after level normalisation)
+ *   if error > 0 (below target):  boost = min(error, +6 dB, -globalTrimDb)
  *   if error < 0 (above target):  cut  = max(error, -15 dB)
  *
  * Constraints:
+ *   - globalTrimDb = min(0, median(target - smoothedMaximum)) over the P19 band.
  *   - Deep narrow nulls (≥10 dB below surroundings, ≤6 Hz wide) are not boosted.
  *   - Boost is further limited by product capability (source-domain headroom
  *     and frequency coverage).
- *   - The product + room maximum curve is a hard ceiling (applied downstream
- *     by capCurveToProductOperatingEnvelope).
+ *   - FinalEQ = O(f) + correction, clamped to M(f) (applied downstream).
  *
  * The correction is derived from the RSP response only. The same correction
  * is applied to all seats (see applyBankToSeats in canonicalBassOptimiser.js).
  */
 
-import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
+import { isProtectedFrequency, isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
+import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 
 const MAX_BOOST_DB = 6;
 const MAX_CUT_DB = 15;
@@ -39,49 +42,137 @@ function interpolateValue(curve, frequency) {
 }
 
 /**
- * Predict the realistic post-calibration correction curve.
+ * Compute the global operating-level trim from the relationship between the
+ * Product + room maximum capability and the house target across the P19
+ * assessment band.
+ *
+ *   difference(f) = HouseTarget(f) - ProductRoomMaximum(f)
+ *   globalTrimDb  = min(0, median(valid difference(f)))
+ *
+ * Uses 1/3-octave-smoothed response so isolated modal spikes/nulls do not
+ * dominate the master volume decision. Frequencies inside protected
+ * cancellation-null regions (including their smoothing skirts) are excluded.
  *
  * @param {object} params
- * @param {Array}  params.rawRspCurve              - Product-aware raw in-room response at RSP (level-normalised)
- * @param {Array}  params.targetCurve              - House target curve
- * @param {Array}  [params.protectedNullRegions]    - Deep narrow null regions (from identifyProtectedNullRegions)
+ * @param {Array}  params.maximumCapabilityCurve  - M(f) = Product + room maximum [{frequency, spl}]
+ * @param {Array}  params.targetCurve             - House target curve [{frequency, spl}]
+ * @param {number} params.assessmentStartHz      - P19 band start
+ * @param {number} params.assessmentEndHz        - P19 band end
+ * @param {Array}  [params.protectedNullRegions]  - Deep narrow null regions
+ * @returns {number} globalTrimDb (≤ 0; 0 when no valid data or positive median)
+ */
+export function computeGlobalOperatingTrimDb({
+  maximumCapabilityCurve, targetCurve, assessmentStartHz, assessmentEndHz,
+  protectedNullRegions = [],
+}) {
+  if (!Array.isArray(maximumCapabilityCurve) || !maximumCapabilityCurve.length) return 0;
+  if (!Number.isFinite(assessmentStartHz) || !Number.isFinite(assessmentEndHz)) return 0;
+  if (assessmentEndHz <= assessmentStartHz) return 0;
+
+  // 1/3-octave smoothing so isolated modal spikes/nulls do not determine the
+  // master volume.
+  const smoothedMaximum = applyBassSmoothing(maximumCapabilityCurve, "third");
+
+  const differences = smoothedMaximum
+    .filter((point) => Number.isFinite(point?.frequency) && Number.isFinite(point?.spl)
+      && point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz
+      && !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions))
+    .map((point) => {
+      const targetSpl = interpolateValue(targetCurve, point.frequency);
+      if (!Number.isFinite(targetSpl)) return null;
+      return targetSpl - point.spl; // difference = target - maximum
+    })
+    .filter((diff) => diff !== null && Number.isFinite(diff));
+
+  if (!differences.length) return 0;
+
+  differences.sort((a, b) => a - b);
+  const mid = Math.floor(differences.length / 2);
+  const median = differences.length % 2 === 0
+    ? (differences[mid - 1] + differences[mid]) / 2
+    : differences[mid];
+
+  // No positive global gain — the system is already at maximum capability.
+  return Math.min(0, median);
+}
+
+/**
+ * Predict the realistic post-calibration correction curve with a global
+ * operating-level normalisation stage.
+ *
+ * Real-world calibration sequence:
+ *   M(f)  = Product + room maximum (physical ceiling)
+ *   O(f)  = M(f) + globalTrimDb     (global volume trim → operating response)
+ *   error = HouseTarget - O(f)     (residual after level normalisation)
+ *   cut  ≤ -15 dB; boost ≤ +6 dB and ≤ available headroom (= -globalTrimDb)
+ *   FinalEQ = O(f) + correction, clamped to M(f)
+ *
+ * The global trim and RSP-derived correction are applied identically to all
+ * seats (see applyBankToSeats in canonicalBassOptimiser.js).
+ *
+ * @param {object} params
+ * @param {Array}  params.maximumCapabilityCurve  - M(f) = Product + room maximum [{frequency, spl}]
+ * @param {Array}  params.targetCurve             - House target curve [{frequency, spl}]
+ * @param {number} params.assessmentStartHz      - P19 band start (for global trim)
+ * @param {number} params.assessmentEndHz        - P19 band end (for global trim)
+ * @param {Array}  [params.protectedNullRegions]    - Deep narrow null regions
  * @param {Array}  [params.activeSubs]             - Active subwoofer objects
  * @param {number} [params.usableLfHz]             - Usable LF frequency
  * @param {number} [params.requestedSystemOutputDb] - Requested system output (P14 target)
- * @returns {Array} Correction curve [{frequency, spl}] in dB (positive = boost, negative = cut)
+ * @returns {{ correctionCurve: Array, globalTrimDb: number, operatingPreEqCurve: Array }}
  */
 export function predictRealisticPostCalibrationCorrection({
-  rawRspCurve,
+  maximumCapabilityCurve,
   targetCurve,
+  assessmentStartHz,
+  assessmentEndHz,
   protectedNullRegions = [],
   activeSubs = [],
   usableLfHz = null,
   requestedSystemOutputDb = null,
 }) {
-  if (!Array.isArray(rawRspCurve) || !rawRspCurve.length) return [];
+  if (!Array.isArray(maximumCapabilityCurve) || !maximumCapabilityCurve.length) {
+    return { correctionCurve: [], globalTrimDb: 0, operatingPreEqCurve: [] };
+  }
 
-  return rawRspCurve.map((point) => {
+  // ── Stage 1: Global operating-level normalisation ──
+  const globalTrimDb = computeGlobalOperatingTrimDb({
+    maximumCapabilityCurve, targetCurve, assessmentStartHz, assessmentEndHz, protectedNullRegions,
+  });
+
+  // ── Stage 2: Operating response O(f) = M(f) + globalTrimDb ──
+  const operatingPreEqCurve = maximumCapabilityCurve.map((point) => ({
+    frequency: point.frequency,
+    spl: Number.isFinite(point.spl) ? point.spl + globalTrimDb : point.spl,
+  }));
+
+  // Available boost headroom = M(f) - O(f) = -globalTrimDb (constant across frequency)
+  const availableBoostHeadroomDb = Math.max(0, -globalTrimDb);
+
+  // ── Stage 3: Realistic EQ correction from O(f) ──
+  const correctionCurve = maximumCapabilityCurve.map((point) => {
     const frequency = point.frequency;
-    const rawSpl = Number(point.spl);
+    const operatingSpl = Number.isFinite(point.spl) ? point.spl + globalTrimDb : null;
     const targetSpl = interpolateValue(targetCurve, frequency);
 
-    if (!Number.isFinite(rawSpl) || !Number.isFinite(targetSpl)) {
+    if (!Number.isFinite(operatingSpl) || !Number.isFinite(targetSpl)) {
       return { frequency, spl: 0 };
     }
 
-    const errorDb = targetSpl - rawSpl; // positive = below target, negative = above target
+    const errorDb = targetSpl - operatingSpl; // positive = below target, negative = above
     const inProtectedNull = isProtectedFrequency(frequency, protectedNullRegions);
 
     let correctionDb;
     if (inProtectedNull) {
-      // Deep narrow null — do not boost into an extreme acoustic cancellation.
-      // The null remains substantially intact in the final response.
+      // Deep narrow null — the global trim still applies (system-wide level),
+      // but frequency-specific correction is ~0 dB. The null remains intact.
       correctionDb = 0;
     } else if (errorDb > 0) {
-      // Below target — boost, limited to +6 dB and by product capability.
-      const nominalBoost = Math.min(errorDb, MAX_BOOST_DB);
+      // Below target — boost, limited to +6 dB, available physical headroom,
+      // and product capability.
+      const nominalBoost = Math.min(errorDb, MAX_BOOST_DB, availableBoostHeadroomDb);
       if (!Array.isArray(activeSubs) || !activeSubs.length) {
-        correctionDb = nominalBoost;
+        correctionDb = Math.max(0, nominalBoost);
       } else {
         const allowance = getSourceDomainBoostAllowance({
           frequency,
@@ -100,4 +191,6 @@ export function predictRealisticPostCalibrationCorrection({
 
     return { frequency, spl: correctionDb };
   });
+
+  return { correctionCurve, globalTrimDb, operatingPreEqCurve };
 }
