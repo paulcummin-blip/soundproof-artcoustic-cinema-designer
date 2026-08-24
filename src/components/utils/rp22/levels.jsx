@@ -86,10 +86,13 @@ export function formatP19Deviation(dB) {
 export function levelP19_lfResponse(dB) {
   const direct = directBassDeviation(dB);
   if (direct == null) return { level: 'N/A', ok: false };
-  if (direct <= 2) return { level: 'L4', ok: true };
-  if (direct <= 3) return { level: 'L3', ok: true };
-  if (direct <= 4) return { level: 'L2', ok: true };
-  if (direct <= 5) return { level: 'L1', ok: true };
+  // Sound Proof design grade: floor to whole dB before grading. Fractions of
+  // a decibel do not change a Performance Level (2.99 → 2 → L4, not L3).
+  const floored = Math.floor(direct);
+  if (floored <= 2) return { level: 'L4', ok: true };
+  if (floored <= 3) return { level: 'L3', ok: true };
+  if (floored <= 4) return { level: 'L2', ok: true };
+  if (floored <= 5) return { level: 'L1', ok: true };
   return { level: 'FAIL', ok: false };
 }
 
