@@ -3,9 +3,9 @@ import { isCompletedBassContract } from "@/components/room/bass/completedBassRes
 
 const levelLabel = (level) => level == null ? "—" : Number(level) === 0 ? "FAIL" : `L${Number(level)}`;
 
-// RP22 P20 does not define Level 1. Level 1 (legacy "below L2" bucket) and 0
-// (Sound Proof FAIL convention) both display as "FAIL" — below RP22 L2 threshold.
-const p20LevelLabel = (level) => level == null ? "—" : Number(level) <= 1 ? "FAIL" : `L${Number(level)}`;
+// RP22 P20 does not define Level 1. Sound Proof grades >4 dB as L1 (not FAIL)
+// since P20 is not applicable at Level 1. Only level 0 displays as "FAIL".
+const p20LevelLabel = (level) => level == null ? "—" : Number(level) === 0 ? "FAIL" : `L${Number(level)}`;
 
 // C6.2D1: Resolve publication state from the completed bass authority object.
 // Do NOT infer authority from structural contract completion — only

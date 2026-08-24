@@ -108,8 +108,11 @@ export function levelP20_lfConsistency(dB) {
   if (direct <= 2) return { level: 'L4', ok: true };
   if (direct <= 3) return { level: 'L3', ok: true };
   if (direct <= 4) return { level: 'L2', ok: true };
-  // RP22 P20 does not define Level 1. >4 dB is FAIL.
-  return { level: 'FAIL', ok: false };
+  // RP22 P20 does not define Level 1. Sound Proof rule: >4 dB maps to L1
+  // (not FAIL) because P20 is not applicable at Level 1. The large deviation
+  // is still shown numerically — we grade at the highest level whose P20
+  // requirement can be satisfied.
+  return { level: 'L1', ok: true };
 }
 
 export function levelP21_earlyReflections(dB) {

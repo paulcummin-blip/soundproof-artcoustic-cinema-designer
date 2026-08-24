@@ -9,11 +9,12 @@ export function isRealP20Seat(seat) {
 }
 
 export function p20LevelText(level) {
-  // RP22 P20 does not define Level 1. Both 0 (new FAIL convention) and 1
-  // (legacy "below L2" bucket) display as "FAIL" — below RP22 L2 threshold.
+  // RP22 P20 does not define Level 1, but Sound Proof grades >4 dB as L1
+  // (not FAIL) because P20 is not applicable at Level 1. Only level 0
+  // (genuine failure / not computed) displays as "FAIL".
   const upper = String(level ?? "").toUpperCase();
-  if (level === 0 || level === 1 || upper === "FAIL" || upper === "L1") return "FAIL";
-  const match = upper.match(/^L?([2-4])$/);
+  if (level === 0 || upper === "FAIL") return "FAIL";
+  const match = upper.match(/^L?([1-4])$/);
   return match ? `L${match[1]}` : "—";
 }
 
@@ -75,8 +76,8 @@ export function p20BestPrimarySeat(rows = []) {
     .sort((a, b) => Math.abs(a.variationDbRaw) - Math.abs(b.variationDbRaw))[0] || null;
 }
 
-// Numeric rank for P20 level sorting: FAIL (below L2 threshold) = 0 (worst),
-// L1-L4 = 1-4, unknown = 5. RP22 P20 has no L1 — "FAIL" is the failure bucket.
+// Numeric rank for P20 level sorting: FAIL = 0 (worst), L1-L4 = 1-4, unknown = 5.
+// Sound Proof grades >4 dB as L1 (not FAIL) since P20 is not applicable at L1.
 const p20LevelRank = (level) => {
   if (level === "FAIL") return 0;
   const match = String(level || "").match(/^L([1-4])$/);

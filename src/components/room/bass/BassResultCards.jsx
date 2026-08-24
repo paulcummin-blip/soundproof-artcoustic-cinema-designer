@@ -11,7 +11,6 @@ import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTo
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
-import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
 
 const CARD_TITLES = {
@@ -65,19 +64,8 @@ export default function BassResultCards() {
       </div>
 
       {/* Expanded P19/P20 per-seat views — only when authoritative */}
-      {formatted.isReady && (formatted.p19Rows.length > 0 || formatted.p20Rows.length > 0) && (
+      {formatted.isReady && formatted.p20Rows.length > 0 && (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {formatted.p19Rows.length > 0 && (
-            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-              <div className="mb-1 text-[11px] font-semibold text-[#213428]">P19 — All Seats</div>
-              <P19SeatBlock
-                rows={formatted.p19Rows}
-                publicationVerified={formatted.publicationVerified}
-                authorityStatus={shared.completedBassAuthority?.authorityStatus}
-                p14TargetUnselected={p14Selection.noP14TargetSelected}
-              />
-            </div>
-          )}
           {formatted.p20Rows.length > 0 && (
             <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
               <div className="mb-1 text-[11px] font-semibold text-[#213428]">P20 — All Seats</div>

@@ -154,48 +154,13 @@ export function evaluateCanonicalBassAuthority({
   const achievedP14Db = p14?.value ?? null;
   const achievedP14Level = p14?.level ?? 0;
 
-  // P19: canonical post-EQ RSP versus the canonical target.
-  const p19 = computeOfficialP19Assessment({
-    rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
-    canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
-    assessmentStartHz: canonicalResult.assessmentStartHz,
-    assessmentEndHz: canonicalResult.assessmentEndHz,
-  });
-  const officialP19VariationDb = p19?.variationDbRaw ?? null;
-  const officialP19Level = houseCurveP19Level(officialP19VariationDb);
-  const p19AssessmentReady = isCanonicalP19Ready({
-    canonicalPostEqRsp: canonicalResult.canonicalPostEqRsp,
-    canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
-    officialVariationDb: officialP19VariationDb,
-    officialLevel: officialP19Level,
-  });
-  const achievedP19VariationDb = p19AssessmentReady ? officialP19VariationDb : null;
-  const achievedP19Level = p19AssessmentReady ? officialP19Level : null;
-  // P19 per-seat: same deviation maths applied to each real seat's post-EQ curve.
-  const perSeatP19Results = computeOfficialPerSeatP19Assessment({
-    perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
-    canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
-    assessmentStartHz: canonicalResult.assessmentStartHz,
-    assessmentEndHz: canonicalResult.assessmentEndHz,
-  });
-
-  // P20: canonical post-EQ real seats versus the canonical post-EQ RSP.
-  const p20 = computeOfficialP20Assessment({
-    rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
-    perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
-    assessmentStartHz: canonicalResult.assessmentStartHz,
-    assessmentEndHz: canonicalResult.assessmentEndHz,
-  });
-  const achievedP20VariationDb = p20?.worstSeat?.variationDbRaw ?? null;
-  const achievedP20Level = p20?.worstSeat?.level ?? 0;
-  const p20Available = !!p20?.available;
-
   const requestedP14Pass = Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb)
     ? achievedP14Db >= selectedTargetDb
     : null;
   // P18: find the achieved extension from the fixed post-EQ design at the
-  // selected P14 operating level. The required boundary below is only the L1
-  // floor for the chosen P18 basis; the achieved L1–L4 grade is independent.
+  // selected P14 operating level. Computed before P19/P20 so the precise
+  // -3 dB crossing becomes the lower bound of the shared P19/P20 assessment
+  // band (RP22: transition down to the achieved -3 dB lower limit).
   const extensionAssessment = assessP18AgainstRequiredExtension({
     rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
     canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
@@ -206,10 +171,6 @@ export function evaluateCanonicalBassAuthority({
     configuredUsableLfHz: usableLfHz,
   });
   const extensionShapePass = extensionAssessment?.passes ?? null;
-  // P18 is independently graded from the achieved -3 dB point at the selected
-  // operating output. A P14 shortfall must not erase a physically achieved P18
-  // result: the combined P14 + P18 envelope may fail, while P18 still publishes
-  // its own RP22 level.
   const requestedP18Pass = extensionShapePass;
   const p18RequiredExtensionAssessment = extensionAssessment ? {
     ...extensionAssessment,
@@ -232,6 +193,51 @@ export function evaluateCanonicalBassAuthority({
     p14CapabilityPass: requestedP14Pass,
     source: "selected-output-target-relative-rsp-extension-one-third-octave",
   } : null;
+
+  // Shared P19/P20 assessment band: precise achieved P18 -3 dB crossing →
+  // actual room transition frequency. Falls back to the domain band only
+  // when the P18 crossing is not available.
+  const p19AssessmentStartHz = Number.isFinite(achievedP18FrequencyHz) && achievedP18FrequencyHz > 0
+    ? achievedP18FrequencyHz
+    : (canonicalResult.assessmentStartHz ?? 20);
+  const p19AssessmentEndHz = canonicalResult.assessmentEndHz ?? 120;
+
+  // P19: canonical post-EQ RSP versus the canonical target (RSP only — the
+  // official RP22 P19 result is at the RSP relative to target).
+  const p19 = computeOfficialP19Assessment({
+    rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
+    canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
+    assessmentStartHz: p19AssessmentStartHz,
+    assessmentEndHz: p19AssessmentEndHz,
+  });
+  const officialP19VariationDb = p19?.variationDbRaw ?? null;
+  const officialP19Level = houseCurveP19Level(officialP19VariationDb);
+  const p19AssessmentReady = isCanonicalP19Ready({
+    canonicalPostEqRsp: canonicalResult.canonicalPostEqRsp,
+    canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
+    officialVariationDb: officialP19VariationDb,
+    officialLevel: officialP19Level,
+  });
+  const achievedP19VariationDb = p19AssessmentReady ? officialP19VariationDb : null;
+  const achievedP19Level = p19AssessmentReady ? officialP19Level : null;
+  // P19 per-seat: diagnostic only — not the official P19 grade.
+  const perSeatP19Results = computeOfficialPerSeatP19Assessment({
+    perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
+    canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
+    assessmentStartHz: p19AssessmentStartHz,
+    assessmentEndHz: p19AssessmentEndHz,
+  });
+
+  // P20: canonical post-EQ real seats versus the canonical post-EQ RSP.
+  const p20 = computeOfficialP20Assessment({
+    rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
+    perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
+    assessmentStartHz: p19AssessmentStartHz,
+    assessmentEndHz: p19AssessmentEndHz,
+  });
+  const achievedP20VariationDb = p20?.worstSeat?.variationDbRaw ?? null;
+  const achievedP20Level = p20?.worstSeat?.level ?? 0;
+  const p20Available = !!p20?.available;
   const postEqCapabilityAssessment = buildPostEqBassCapabilityOutcome({
     authority: { selectedTargetBasis: p14TargetBasis },
     requestedLevel,

@@ -173,7 +173,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       pills: {
         p14: unselectedPill("P14 Bass SPL"),
         p18: unselectedPill("P18 Extension"),
-        p19: seatPill("P19 Response Fit"),
+        p19: unselectedPill("P19 Response Fit"),
         p20: seatPill("P20 Seat Consistency"),
       },
       statusText: "Select Bass Target",
@@ -268,12 +268,20 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P19 — SEAT-scoped parameter. Main pill ALWAYS shows "SEAT" in every
-  // lifecycle state (unselected, calculating, ready). Per-seat results are
-  // presented in the seat grids below. Calculation status ("Calculating…")
-  // appears in the statusText detail area, never as the main pill. RSP is
-  // retained as a diagnostic field (p19Rsp) but never as the main pill result.
-  pills.p19 = { label: "P19 Response Fit", resultText: "SEAT", text: "P19 Response Fit SEAT", level: "—", detail: null };
+  // P19 — official RP22 P19 result is the RSP response relative to target
+  // (one canonical value, not per-seat). Per-seat target deviations are
+  // retained as diagnostic fields but are NOT presented as official P19.
+  if (isAuthoritative && p19Rsp) {
+    pills.p19 = {
+      label: "P19 Response Fit",
+      resultText: `${p19Rsp.level} · ${p19Rsp.displayValue}`,
+      text: `P19 Response Fit ${p19Rsp.level} · ${p19Rsp.displayValue}`,
+      level: p19Rsp.level,
+      detail: null,
+    };
+  } else {
+    pills.p19 = { label: "P19 Response Fit", resultText: officialStateText(authorityStatus, isCalculating), text: `P19 Response Fit ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
+  }
 
   // P20 — SEAT-scoped parameter. Main pill ALWAYS shows "SEAT" in every
   // lifecycle state (unselected, calculating, ready). Per-seat results are
