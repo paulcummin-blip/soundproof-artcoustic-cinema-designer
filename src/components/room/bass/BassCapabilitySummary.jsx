@@ -8,13 +8,13 @@ export default function BassCapabilitySummary({ capability, targetWarning, p14Pa
   const target = Number.isFinite(targetDb) ? `${basis} ${capability?.requested?.level || "—"} · ${targetDb} dBC` : "—";
   const availableDb = capability?.maximumAvailableSplAfterEqDb;
 
-  // P14 design operating point (RULE 1/2): when the selected target is achieved,
-  // the design result is the selected level (not the capability level). Only when
-  // the target cannot be achieved does the result fall to the highest achievable level.
+  // P14 design operating point: the level is ALWAYS the user-selected target
+  // level. Available capability is separate. When the target is not achievable,
+  // the level stays at the selected level and the outcome indicates the shortfall.
   const pass = p14Parameter?.pass;
-  const designLevel = pass === true ? p14Parameter?.selectedLevel : p14Parameter?.level;
+  const designLevel = p14Parameter?.selectedLevel ?? p14Parameter?.level;
   const designGrade = designLevel === 0 ? "FAIL" : (designLevel > 0 ? `L${designLevel}` : "—");
-  const outcome = pass === false ? "FAIL" : pass === true ? "PASS" : "—";
+  const outcome = pass === false ? "Target not achievable" : pass === true ? "PASS" : "—";
   const achievedResult = designGrade !== "—" ? `${designGrade} ${basis} · ${outcome}` : "—";
 
   return <div className="mt-2 rounded-md border border-border bg-card p-3 text-xs">

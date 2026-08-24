@@ -300,9 +300,10 @@ export function useParameterGridAuthority({
   }, [seatSnapshotsById, mlpSeatId]);
 
   const renderSeatPillGrid = React.useCallback((pId) => {
-    // P19 is RSP-only (official RP22 P19 result). Per-seat target deviations
-    // are diagnostic, not official P19 grades — not shown in the per-seat grid.
-    if (Number(pId) === 19) return null;
+    if (Number(pId) === 19) {
+      const p19Rows = buildP19SeatRows(seats, bassPresentation.perSeatP19Results);
+      return <P19SeatBlock rows={p19Rows} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassPresentation.parameters.p19.status} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
+    }
     if (Number(pId) === 20) return <P20SeatBlock seatingPositions={seats} perSeatP20Results={bassPresentation.perSeatP20Results} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassPresentation.parameters.p20.status} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
     if (!rows.length) return null;
     const pKey = `p${Number(pId)}`;
@@ -375,9 +376,25 @@ export function useParameterGridAuthority({
     if (!rows.length) return null;
     const pKey = `p${Number(paramId)}`;
 
-    // P19 is RSP-only (official RP22 P19 result). Per-seat target deviations
-    // are diagnostic, not official P19 grades — no per-seat grid for P19.
-    if (Number(paramId) === 19) return null;
+    if (Number(paramId) === 19) {
+      return rows.map(rowObj => ({
+        row: rowObj.row,
+        seats: rowObj.seats.map((seat, idx) => {
+          const result = bassPresentation.perSeatP19Results.find(
+            item => String(item?.seatId) === String(seat?.id)
+          );
+          return {
+            id: seat?.id,
+            indexInRow: extractSeatIndexInRow(seat, idx),
+            level: result ? p19LevelText(result.level) : "—",
+            value: result && Number.isFinite(Number(result.variationDbRaw))
+              ? formatAuthoritativeP19Result(result)
+              : "—",
+            isPrimary: !!seat?.isPrimary,
+          };
+        }),
+      }));
+    }
 
     if (Number(paramId) === 20) {
       return rows.map(rowObj => ({

@@ -1,9 +1,5 @@
 import { identifyBassLimitingParameter } from "@/components/utils/bassLimitingParameter";
-import {
-  formatP14TargetBasisDetail,
-  gradeP14Minimum,
-  gradeP14Recommended,
-} from "@/components/utils/p14CapabilityAuthority";
+import { formatP14TargetBasisDetail } from "@/components/utils/p14CapabilityAuthority";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
 
 const cloneParameter = (parameter) => ({ ...(parameter || {}) });
@@ -22,16 +18,34 @@ function buildTarget(parameters, basis, selectedCandidate, p18TargetBasis) {
   const selectedP18Basis = normalizeP18TargetBasis(p18TargetBasis);
   const p18Assessment = assessP18Extension(p18Base.value, selectedP18Basis);
   const p18ResultAvailable = p18Assessment.level != null;
-  const p14Level = Number.isFinite(p14Base.value)
-    ? (basis === "recommended" ? gradeP14Recommended(p14Base.value) : gradeP14Minimum(p14Base.value))
-    : p14Base.level;
+  // P14 level/value = USER-SELECTED target, not capability-graded.
+  // The user explicitly chooses the P14 operating target (Minimum/Recommended
+  // × L1–L4). That selection is authoritative. Available capability is retained
+  // separately (achievedCapabilityDb) for feasibility and headroom display.
+  // The capability never overwrites the target; the target never overwrites
+  // the capability.
+  const p14SelectedLevel = Number.isFinite(Number(p14Base.selectedLevel)) && Number(p14Base.selectedLevel) > 0
+    ? Math.max(1, Math.min(4, Math.round(Number(p14Base.selectedLevel))))
+    : null;
+  const p14SelectedTargetDb = Number.isFinite(p14Base.selectedTargetDb ?? p14Base.requestedTargetDb)
+    ? Number(p14Base.selectedTargetDb ?? p14Base.requestedTargetDb)
+    : null;
+  const p14Level = p14SelectedLevel;
+  const p14Value = p14SelectedTargetDb;
   const targetParameters = {
     p14: {
       ...p14Base,
       level: p14Level,
-      passedL1: Number.isFinite(p14Level) ? p14Level >= 1 : null,
+      value: p14Value,
+      passedL1: p14Base.pass === true,
       targetBasis: basis,
       targetBasisDetail: formatP14TargetBasisDetail(basis),
+      achievedCapabilityDb: p14Base.achievedCapabilityDb ?? p14Base.availableCapabilityDb ?? null,
+      availableCapabilityDb: p14Base.achievedCapabilityDb ?? p14Base.availableCapabilityDb ?? null,
+      pass: p14Base.pass,
+      selectedLevel: p14SelectedLevel,
+      selectedTargetDb: p14SelectedTargetDb,
+      requestedTargetDb: p14SelectedTargetDb,
     },
     p18: {
       ...p18Base,

@@ -2,7 +2,7 @@ import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22Desig
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { buildP19SeatRows, p19LowestSeat, p19RspResult } from "@/components/room/bass/p19SeatPresentation";
 import { buildP20SeatRows, p20WorstSeat, p20BestPrimarySeat } from "@/components/room/bass/p20SeatPresentation";
-import { gradeP14ForBasis, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
+import { formatP14Capability, formatP14BasisLabel, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
@@ -57,8 +57,8 @@ function readyPill(key, parameter, result) {
   const grade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;
   const value = formatBassParameterValue(key, parameter.value);
   if (key === "p14") {
-    // P14 pill reports the achieved capability grade and achieved value. The
-    // requested target remains context, never a replacement for the result.
+    // P14 pill reports the USER-SELECTED target level and target dB. Available
+    // capability is separate and shown in the detail line, never as the level.
     const resultText = `${grade}${value ? ` · ${value}` : ""}`;
     return { label: "P14 Bass SPL", resultText, text: `P14 Bass SPL ${resultText}`, level: grade, detail: parameter.targetBasisDetail || null };
   }
@@ -226,23 +226,32 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
 
   const pills = {};
 
-  // P14 — achieved level under the selected Minimum/Recommended basis,
-  // followed by the achieved product capability (not the requested target).
+  // P14 — USER-SELECTED target level and target dB (authoritative). Available
+  // capability is shown separately in the detail line. The capability never
+  // overwrites the user's selected target.
   if (isAuthoritative) {
     const source = contract?.productAnalysis?.parameters?.p14;
-    const achievedValue = isFiniteNumber(source?.achievedCapabilityDb)
-      ? Number(source.achievedCapabilityDb)
-      : isFiniteNumber(source?.value) ? Number(source.value) : null;
-    const achievedLevel = gradeP14ForBasis(achievedValue, activeP14Basis);
-    const levelText = achievedLevel > 0 ? `L${achievedLevel}` : "FAIL";
-    const valueText = formatBassParameterValue("p14", achievedValue);
-    const resultText = valueText ? `${levelText} · ${valueText}` : "—";
+    const selectedLevel = source?.selectedLevel ?? source?.level;
+    const selectedTargetDb = source?.selectedTargetDb ?? source?.requestedTargetDb ?? source?.value;
+    const availableCapabilityDb = source?.achievedCapabilityDb ?? source?.availableCapabilityDb ?? null;
+    const targetAchievable = source?.pass === true;
+
+    const levelText = Number.isFinite(selectedLevel) && selectedLevel > 0 ? `L${selectedLevel}` : "—";
+    const valueText = isFiniteNumber(selectedTargetDb) ? formatBassParameterValue("p14", selectedTargetDb) : "—";
+    const resultText = valueText !== "—" ? `${levelText} · ${valueText}` : "—";
+
+    const detailParts = [];
+    if (source?.targetBasis) detailParts.push(`Target basis: ${formatP14BasisLabel(source.targetBasis)}`);
+    if (isFiniteNumber(availableCapabilityDb)) detailParts.push(`Available: ${formatP14Capability(availableCapabilityDb)}`);
+    if (targetAchievable === false && isFiniteNumber(availableCapabilityDb)) detailParts.push("Target not achievable");
+    const detail = detailParts.join(" · ");
+
     pills.p14 = {
       label: "P14 Bass SPL",
       resultText,
       text: `P14 Bass SPL ${resultText}`,
-      level: valueText ? levelText : "—",
-      detail: parameters.p14?.detail || null,
+      level: valueText !== "—" ? levelText : "—",
+      detail,
     };
   } else {
     pills.p14 = { label: "P14 Bass SPL", resultText: officialStateText(authorityStatus, isCalculating), text: `P14 Bass SPL ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
@@ -268,20 +277,10 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P19 — official RP22 P19 result is the RSP response relative to target
-  // (one canonical value, not per-seat). Per-seat target deviations are
-  // retained as diagnostic fields but are NOT presented as official P19.
-  if (isAuthoritative && p19Rsp) {
-    pills.p19 = {
-      label: "P19 Response Fit",
-      resultText: `${p19Rsp.level} · ${p19Rsp.displayValue}`,
-      text: `P19 Response Fit ${p19Rsp.level} · ${p19Rsp.displayValue}`,
-      level: p19Rsp.level,
-      detail: null,
-    };
-  } else {
-    pills.p19 = { label: "P19 Response Fit", resultText: officialStateText(authorityStatus, isCalculating), text: `P19 Response Fit ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
-  }
+  // P19 — SEAT-scoped RP22 parameter (Room/Seat = Seat). Main pill shows
+  // "SEAT"; per-seat grades are in the P19 — All Seats panel below. The RSP
+  // remains the calibration/target reference (p19Rsp) but is not the main pill.
+  pills.p19 = { label: "P19 Response Fit", resultText: "SEAT", text: "P19 Response Fit SEAT", level: "—", detail: null };
 
   // P20 — SEAT-scoped parameter. Main pill ALWAYS shows "SEAT" in every
   // lifecycle state (unselected, calculating, ready). Per-seat results are

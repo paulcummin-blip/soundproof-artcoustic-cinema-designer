@@ -220,7 +220,9 @@ export function evaluateCanonicalBassAuthority({
   });
   const achievedP19VariationDb = p19AssessmentReady ? officialP19VariationDb : null;
   const achievedP19Level = p19AssessmentReady ? officialP19Level : null;
-  // P19 per-seat: diagnostic only — not the official P19 grade.
+  // P19 per-seat: RP22 marks P19 as Room/Seat = Seat. Per-seat P19 grades are
+  // the official P19 results for each seat. The RSP is the calibration/target
+  // reference; per-seat deviations relative to target are the seat-scoped grades.
   const perSeatP19Results = computeOfficialPerSeatP19Assessment({
     perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
     canonicalTargetCurve: canonicalResult.canonicalTargetCurve,

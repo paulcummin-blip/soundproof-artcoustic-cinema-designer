@@ -138,17 +138,25 @@ export function formatAuthoritativeBassParameter(completedBassAuthority, key, er
   };
   if (key === "p14") {
     Object.assign(result, buildP14Fields(parameter));
-    // P14 design operating point: when the selected target is achieved, the
-    // design level is the selected level (RULE 1). Do not promote P14 above
-    // the selected level due to unused SPL capability. Only when the target
-    // cannot be achieved does the design level fall to the highest achievable
-    // level (RULE 2). This feeds both the report level and the scoring rawValue.
-    if (parameter.pass === true && parameter.selectedLevel != null) {
-      result.level = levelLabel(parameter.selectedLevel);
-      if (Number.isFinite(parameter.requestedTargetDb)) {
-        result.rawValue = Number(parameter.requestedTargetDb);
-        result.valueText = formatBassParameterValue(key, parameter.requestedTargetDb);
-      }
+    // P14 is the USER-SELECTED target. The level and value always reflect the
+    // user's selection (e.g. Minimum L1 · 109 dBC), never the available
+    // capability. Available capability is retained separately for the
+    // "Available capability" detail and feasibility assessment. When the
+    // target is not achievable, the level stays at the selected level and
+    // "Target not achievable" is appended to the detail.
+    const selectedLevel = parameter?.selectedLevel;
+    const selectedTargetDb = parameter?.selectedTargetDb ?? parameter?.requestedTargetDb;
+    if (Number.isFinite(selectedLevel) && selectedLevel > 0) {
+      result.level = levelLabel(selectedLevel);
+    }
+    if (Number.isFinite(selectedTargetDb)) {
+      result.rawValue = Number(selectedTargetDb);
+      result.valueText = formatBassParameterValue(key, selectedTargetDb);
+    }
+    if (parameter?.pass === false && Number.isFinite(parameter?.achievedCapabilityDb)) {
+      result.detail = result.detail
+        ? `${result.detail} · Target not achievable`
+        : "Target not achievable";
     }
   }
   if (key === "p18") Object.assign(result, buildP18Fields(parameter));

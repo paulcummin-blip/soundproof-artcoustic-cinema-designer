@@ -370,9 +370,10 @@ export default function RP22CompliancePanel({
 
   const renderSeatPillGridForParam = (pId) => {
     if (Number(pId) === 20) return <P20SeatBlock seatingPositions={seats} perSeatP20Results={selectedP20Results} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassAuthority?.authorityStatus} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
-    // P19 is RSP-only (official RP22 P19 result). Per-seat target deviations
-    // are diagnostic, not official P19 grades — not shown in the per-seat grid.
-    if (Number(pId) === 19) return null;
+    if (Number(pId) === 19) {
+      const p19Rows = buildP19SeatRows(seats, selectedP19Results);
+      return <P19SeatBlock rows={p19Rows} perSeatP19Results={selectedP19Results} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassAuthority?.authorityStatus} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
+    }
     if (!rows.length) return null;
 
     const pKey = `p${Number(pId)}`; // "p1" etc
@@ -847,10 +848,8 @@ export default function RP22CompliancePanel({
                   <span style={{ color: "#213428" }}>{bassPresentation.parameters.p19.valueText}</span>
                   {" · "}
                   <span style={{ color: "#213428" }}>{bassPresentation.parameters.p19.level}</span>
-                  <span style={{ fontStyle: "italic", marginLeft: 8 }}>Official RP22 P19 result (RSP only)</span>
+                  <span style={{ fontStyle: "italic", marginLeft: 8 }}>Per-seat evaluation — see below</span>
                 </span>
-              ) : p.id === 19 ? (
-                <span style={{ color: "#625143", fontStyle: "italic" }}>Official RP22 P19 result (RSP only)</span>
               ) : (
                 <span style={{ color: "#625143", fontStyle: "italic" }}>Per-seat evaluation — see individual seat results below</span>
               )
