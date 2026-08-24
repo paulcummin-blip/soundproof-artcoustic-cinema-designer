@@ -63,33 +63,9 @@
   ],
   "rls": {
     "read": {
-      "$or": [
-        {
-          "$and": [
-            {
-              "data.account_id": "{{user.data.account_id}}"
-            },
-            {
-              "data.account_id": {
-                "$nin": [
-                  null,
-                  ""
-                ]
-              }
-            },
-            {
-              "user_condition": {
-                "data.access_level": "FULL_ACCESS"
-              }
-            }
-          ]
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
+      "user_condition": {
+        "role": "admin"
+      }
     },
     "create": {
       "user_condition": {
