@@ -1,27 +1,31 @@
 {
   "name": "TurnoverRewardSyncRun",
   "type": "object",
-  "description": "Audit log for UK turnover reward sync runs. One row per execution of syncUkTurnoverRewards. This is an audit trail, NOT a balance authority \u2014 CapacityLedger remains the sole commercial authority. Admin-only access.",
+  "description": "Admin-only audit log for the nightly Lovable entitlement reconciliation. CapacityLedger remains the append-only commercial authority.",
   "properties": {
     "started_at": {
       "type": "string",
       "format": "date-time",
-      "description": "When the sync run started."
+      "description": "When the reconciliation started."
     },
     "finished_at": {
       "type": "string",
       "format": "date-time",
-      "description": "When the sync run finished. Null while RUNNING.",
+      "description": "When the reconciliation finished. Null while RUNNING.",
       "nullable": true
     },
     "calendar_year": {
       "type": "number",
-      "description": "Calendar year this sync run processed (e.g. 2026)."
+      "description": "Calendar year reconciled."
+    },
+    "contract_version": {
+      "type": "number",
+      "description": "Version of the minimal entitlement contract accepted from Lovable."
     },
     "source_last_updated": {
       "type": "string",
       "format": "date-time",
-      "description": "The most recent source_last_updated timestamp observed across all dealer rows in this run. Used for staleness detection.",
+      "description": "Lovable contract calculated_at timestamp.",
       "nullable": true
     },
     "status": {
@@ -33,56 +37,81 @@
         "PARTIAL",
         "FAILED"
       ],
-      "description": "RUNNING = in progress; DRY_RUN = dry run completed (zero commercial writes); SUCCESS = all dealers processed; PARTIAL = some rows skipped due to errors; FAILED = aborted before processing."
+      "description": "RUNNING while active; DRY_RUN when a no-commercial-write validation completed; SUCCESS when all matched rows reconciled; PARTIAL when individual rows failed; FAILED when the run failed closed."
     },
     "dealers_received": {
       "type": "number",
       "default": 0,
-      "description": "Total dealer rows received from the Partner Portal bridge."
+      "description": "Stable dealer IDs received in the minimal contract."
     },
     "dealers_matched": {
       "type": "number",
       "default": 0,
-      "description": "Dealer rows that matched a Sound Proof Account via canonical ExternalAccountLink."
+      "description": "Dealer IDs matched through an active canonical ExternalAccountLink."
     },
     "dealers_unmatched": {
       "type": "number",
       "default": 0,
-      "description": "Dealer rows with no matching Sound Proof Account or canonical link."
+      "description": "Dealer IDs with no active canonical Sound Proof link. They are skipped and never treated as zero entitlement."
     },
     "dealers_updated": {
       "type": "number",
       "default": 0,
-      "description": "TurnoverRecord rows upserted (created or updated) in this run. Zero in dry run."
+      "description": "Matched dealers whose append-only ledger changed."
+    },
+    "dealers_reconciled": {
+      "type": "number",
+      "default": 0,
+      "description": "Matched dealers successfully checked, including no-op reconciliations."
     },
     "milestones_awarded": {
       "type": "number",
       "default": 0,
-      "description": "Number of TurnoverMilestone records created (and CapacityLedger UK_TURNOVER_REWARD entries appended) in this run. Zero in dry run."
+      "description": "New threshold reward or reinstatement ledger events appended."
     },
     "projects_awarded": {
       "type": "number",
       "default": 0,
-      "description": "Total Professional Projects credited in this run = milestones_awarded \u00d7 5. Zero in dry run."
+      "description": "Professional Project credits appended by new rewards."
+    },
+    "milestones_reversed": {
+      "type": "number",
+      "default": 0,
+      "description": "No-longer-earned thresholds corrected through explicit reversal events."
+    },
+    "projects_reversed": {
+      "type": "number",
+      "default": 0,
+      "description": "Professional Project credits removed by explicit reversal events. Completed project consumption is never reversed."
+    },
+    "milestones_reinstated": {
+      "type": "number",
+      "default": 0,
+      "description": "Previously reversed thresholds re-earned and explicitly reinstated."
+    },
+    "projects_reinstated": {
+      "type": "number",
+      "default": 0,
+      "description": "Professional Project credits restored by reinstatement events."
     },
     "discrepancy_count": {
       "type": "number",
       "default": 0,
-      "description": "Number of dealers whose turnover decreased since the last sync (credit note / correction / return). Earned projects are NOT reversed; the discrepancy is flagged for admin review."
+      "description": "Ledger-state inconsistencies or contract rows that could not be safely reconciled."
     },
     "error_count": {
       "type": "number",
       "default": 0,
-      "description": "Number of dealer rows skipped due to invalid data (missing partner_user_id, non-numeric turnover, etc.)."
+      "description": "Contract or dealer rows rejected or skipped for safety."
     },
     "error_summary": {
       "type": "string",
-      "description": "Concatenated summary of row-level errors and discrepancies for admin review."
+      "description": "Admin-only concise error and reconciliation notes."
     },
     "dry_run": {
       "type": "boolean",
       "default": false,
-      "description": "True if this run was a dry run (zero commercial writes). The sync run record itself is the only write in dry-run mode."
+      "description": "True when the run validated and planned actions without writing CapacityLedger or TurnoverMilestone."
     }
   },
   "required": [
