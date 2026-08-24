@@ -42,6 +42,20 @@ test("dealer project header exposes only balance and separate special access", (
   }
 });
 
+test("sync fails closed if one Sound Proof tenant has multiple external dealer identities", () => {
+  const source = read("base44/functions/syncUkTurnoverRewards/entry.ts");
+  assert.match(source, /linksByAccountId/);
+  assert.match(source, /multiple active dealer identities/);
+  assert.match(source, /DUPLICATE_ACCOUNT_LINK/);
+});
+
+test("dealer availability is account-scoped and never exposes negative debt", () => {
+  const source = read("base44/functions/getProfessionalProjectCapacity/entry.ts");
+  assert.match(source, /resolveAccountAccess/);
+  assert.match(source, /authoritativeUser\?\.account_id/);
+  assert.match(source, /Math\.max\(0, available\)/);
+});
+
 test("unlimited access is decided before balance and does not debit the ledger", () => {
   const source = read("base44/functions/createProfessionalProject/entry.ts");
   const promotionStart = source.indexOf("UNLIMITED_PRO_PROJECTS");
