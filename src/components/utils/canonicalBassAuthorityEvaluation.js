@@ -268,6 +268,13 @@ export function evaluateCanonicalBassAuthority({
     selectedP14Level: requestedLevel,
     selectedP14TargetDb: selectedTargetDb,
     selectedP14RequiredExtensionHz: p14AssessmentStartHz,
+    // Authoritative P19/P20 assessment band: precise achieved P18 -3 dB
+    // crossing → actual room transition frequency. This is the single
+    // authority consumed by the graph marker, persisted cache, and any
+    // report/debug text describing the assessment band. Falls back to the
+    // domain band (20 Hz) only when the P18 crossing is genuinely unavailable.
+    assessmentStartHz: p19AssessmentStartHz,
+    assessmentEndHz: p19AssessmentEndHz,
     availableP14CapabilityDb: achievedP14Db,
     requestedP14Pass,
     p14MarginDb: Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb) ? achievedP14Db - selectedTargetDb : null,

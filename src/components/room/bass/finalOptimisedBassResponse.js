@@ -164,6 +164,18 @@ export function applyAuthorityToCanonicalResult(canonicalResult, authorityBearin
           .map((seat) => ({ ...seat, candidateId: candidate.candidateId })),
       },
     },
+    // Overlay the authoritative P19/P20 assessment band from the authority
+    // evaluation. The canonical result's assessmentStartHz/assessmentEndHz
+    // come from the fixed domain (HOUSE_CURVE_P19_START_HZ = 20); the
+    // authority replaces the lower bound with the precise achieved P18 -3 dB
+    // crossing for the selected P14 target. This is the single authority
+    // consumed by the graph marker, persisted cache, and report/debug text.
+    assessmentStartHz: Number.isFinite(candidate.assessmentStartHz)
+      ? Number(candidate.assessmentStartHz)
+      : (canonicalResult.assessmentStartHz ?? null),
+    assessmentEndHz: Number.isFinite(candidate.assessmentEndHz)
+      ? Number(candidate.assessmentEndHz)
+      : (canonicalResult.assessmentEndHz ?? null),
   };
 }
 
