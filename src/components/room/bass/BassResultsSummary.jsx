@@ -24,6 +24,10 @@ export default function BassResultsSummary({ compact = false, showPriority = tru
     shared.seatingPositions,
     nowMs,
     p14Selection.noP14TargetSelected,
+    {
+      p14TargetBasis: shared.authoritative?.requested?.p14TargetBasis,
+      p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
+    },
   );
   return <div className={compact ? "space-y-1" : "rounded-lg border border-[#DCDBD6] bg-[#F8F8F7] p-2"}>
     {showPriority && <div className="mb-2 text-xs font-semibold text-[#213428]">Balanced RP22 Optimisation</div>}
