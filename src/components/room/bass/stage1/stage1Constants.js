@@ -4,7 +4,7 @@
 
 export const STAGE1_PLACEMENT_ALGORITHM_VERSION = "stage1-placement-v1";
 export const STAGE1_FAMILY_POLICY_VERSION = "stage1-family-policy-v1";
-export const STAGE1_CACHE_VERSION = 1;
+export const STAGE1_CACHE_VERSION = 2;
 
 // Frequency domain for positional consistency screening (RP22 §7.1).
 // This is NOT the canonical P19/P20 assessment band — Stage 2 owns that.
