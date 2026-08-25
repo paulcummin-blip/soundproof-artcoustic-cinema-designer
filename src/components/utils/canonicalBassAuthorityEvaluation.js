@@ -15,6 +15,7 @@ import { buildPostEqBassCapabilityOutcome } from "@/components/utils/postEqBassC
 import { assessP18AgainstRequiredExtension, buildBassTargetWarning } from "@/components/utils/bassDesignPhilosophyAuthority";
 import { assessP18Extension, normalizeP18TargetBasis, p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
 import { isCanonicalP19Ready } from "@/components/room/bass/p19Readiness";
+import { buildSmoothCapabilityEnvelope, buildPracticalCalibrationTarget } from "@/components/utils/practicalCalibrationTarget";
 
 export function buildPositionAwareP14Capability({
   canonicalResult,
@@ -202,11 +203,30 @@ export function evaluateCanonicalBassAuthority({
     : (canonicalResult.assessmentStartHz ?? 20);
   const p19AssessmentEndHz = canonicalResult.assessmentEndHz ?? 120;
 
-  // P19: canonical post-EQ RSP versus the canonical target (RSP only — the
-  // official RP22 P19 result is at the RSP relative to target).
+  // ── Practical Calibration Target T(f) ──
+  // P19 measures response smoothness against T(f), not the ideal H(f). T(f)
+  // follows the ideal house curve where the system can physically achieve it
+  // and rolls smoothly toward the broad LF capability envelope where it cannot.
+  // This removes the double-penalty where P18 already grades LF extension and
+  // P19 penalised the same system again for being below an impossible target.
+  // P18 continues to measure extension against the ideal H(f) (canonicalTargetCurve).
+  const idealHouseTarget = (Array.isArray(canonicalResult.canonicalTargetCurve) && canonicalResult.canonicalTargetCurve.length)
+    ? canonicalResult.canonicalTargetCurve
+    : [];
+  const practicalCalibrationTarget = (Array.isArray(canonicalResult.practicalCalibrationTarget) && canonicalResult.practicalCalibrationTarget.length)
+    ? canonicalResult.practicalCalibrationTarget
+    : buildPracticalCalibrationTarget({
+        idealTargetCurve: idealHouseTarget,
+        capabilityEnvelope: buildSmoothCapabilityEnvelope(canonicalResult.maximumSplCurveAfterEq || canonicalResult.maximumSplCurveBeforeEq || []),
+      });
+  // P19 target identity: the practical calibration target T(f).
+  const p19TargetCurve = practicalCalibrationTarget.length ? practicalCalibrationTarget : idealHouseTarget;
+
+  // P19: canonical post-EQ RSP versus the Practical Calibration Target T(f)
+  // (RSP only — the official RP22 P19 result is at the RSP relative to target).
   const p19 = computeOfficialP19Assessment({
     rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
-    canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
+    canonicalTargetCurve: p19TargetCurve,
     assessmentStartHz: p19AssessmentStartHz,
     assessmentEndHz: p19AssessmentEndHz,
   });
@@ -214,7 +234,7 @@ export function evaluateCanonicalBassAuthority({
   const officialP19Level = houseCurveP19Level(officialP19VariationDb);
   const p19AssessmentReady = isCanonicalP19Ready({
     canonicalPostEqRsp: canonicalResult.canonicalPostEqRsp,
-    canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
+    canonicalTargetCurve: p19TargetCurve,
     officialVariationDb: officialP19VariationDb,
     officialLevel: officialP19Level,
   });
@@ -225,7 +245,7 @@ export function evaluateCanonicalBassAuthority({
   // reference; per-seat deviations relative to target are the seat-scoped grades.
   const perSeatP19Results = computeOfficialPerSeatP19Assessment({
     perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
-    canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
+    canonicalTargetCurve: p19TargetCurve,
     assessmentStartHz: p19AssessmentStartHz,
     assessmentEndHz: p19AssessmentEndHz,
   });
@@ -268,6 +288,12 @@ export function evaluateCanonicalBassAuthority({
     selectedP14Level: requestedLevel,
     selectedP14TargetDb: selectedTargetDb,
     selectedP14RequiredExtensionHz: p14AssessmentStartHz,
+    // Explicit target identities so downstream code can distinguish which
+    // definition a curve uses. P18 references idealHouseTarget; P19 references
+    // practicalCalibrationTarget. P20 uses neither (seat-vs-RSP only).
+    idealHouseTarget,
+    practicalCalibrationTarget,
+    p19TargetIdentity: practicalCalibrationTarget.length ? "practical-calibration-target" : "ideal-house-target",
     // Authoritative P19/P20 assessment band: precise achieved P18 -3 dB
     // crossing → actual room transition frequency. This is the single
     // authority consumed by the graph marker, persisted cache, and any

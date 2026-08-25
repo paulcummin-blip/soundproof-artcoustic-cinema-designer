@@ -21,6 +21,7 @@ import { salvagePartialBank, buildSalvageEqResult } from "@/components/utils/des
 import { calculatePairedP14P18ProductionAuthority } from "@/components/utils/pairedP14P18ProductionAuthority";
 import { buildPairedP14P18CandidateSummary } from "@/components/utils/pairedP14P18CandidateSummary";
 import { predictRealisticPostCalibrationCorrection } from "@/components/utils/realisticPostCalibrationPrediction";
+import { buildPracticalCalibrationTargetFromCapability } from "@/components/utils/practicalCalibrationTarget";
 
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
@@ -404,6 +405,7 @@ function buildCanonicalCandidate({
   verticalOffsetDb, protectedNullRegions, baseRequestedSystemOutputDb,
   operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb,
   operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis, usableLfHz,
+  practicalCalibrationTarget,
 }) {
   const requestedPreEqCurve = (levelNormalisedRawCurve || []).map((point) => ({ ...point }));
   // The realistic post-calibration predictor works from the Product + room
@@ -567,6 +569,7 @@ function buildCanonicalCandidate({
     pairedP14P18Authority,
     pairedP14P18Summary,
     productionHouseCurveTarget: targetCurve.map((point) => ({ ...point })),
+    practicalCalibrationTarget: (Array.isArray(practicalCalibrationTarget) ? practicalCalibrationTarget : targetCurve).map((point) => ({ ...point })),
     fitterHouseCurveTarget: (eq.fitterHouseCurveTarget || targetCurve).map((point) => ({ ...point })),
     canonicalHouseCurveShape: targetShape.map((point) => ({ ...point })),
     canonicalVerticalOffsetDb: verticalOffsetDb,
@@ -691,13 +694,21 @@ export function generateCanonicalCandidatePool({
     ...seat,
     responseData: applyMaximumSplSafetyMargin(seat.responseData),
   }));
-  // CHANGE 1 (Stage B1): Fit against the real Sound Proof house target.
-  // The fitter solves residual = targetCurve(f) - currentPhysicalResponse(f).
-  // Product capability constrains whether a requested correction can be
-  // applied (via the product operating envelope and source-domain headroom
-  // checks in the candidate build), not what the desired target IS.
-  // Do NOT deform the target to follow the raw room response.
-  const capabilityConstrainedFitTarget = targetCurve.map((point) => ({ ...point }));
+  // CHANGE 1 (Stage B1): Fit against the Practical Calibration Target T(f).
+  // T(f) follows the ideal house curve H(f) where the system can physically
+  // achieve it, and rolls smoothly toward the broad LF capability envelope
+  // where the ideal is not achievable. This prevents the EQ from demanding
+  // boost beyond physical capability at the LF limit (the double-penalty that
+  // arose when P19 compared against the full ideal target everywhere).
+  // T(f) is derived from SMOOTH capability only (1-octave envelope) — it never
+  // follows narrow modal nulls, seat-specific structure, or post-EQ irregularities.
+  // P18 continues to measure extension against the ideal targetCurve H(f).
+  const { capabilityEnvelope: practicalCapabilityEnvelope, practicalCalibrationTarget } =
+    buildPracticalCalibrationTargetFromCapability({
+      idealTargetCurve: targetCurve,
+      maximumSplCurve: maximumSplCurveBeforeEq,
+    });
+  const capabilityConstrainedFitTarget = practicalCalibrationTarget;
   // ── Source output before and after global trim ──
   // baseRequestedSystemOutputDb is the configured LFE output level (the level
   // the headroom calculation subtracts from the manufacturer capability curve).
@@ -843,6 +854,7 @@ export function generateCanonicalCandidatePool({
     eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
     baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
     selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis, usableLfHz,
+    practicalCalibrationTarget,
   }));
 
   // ── Partial-bank salvage ──

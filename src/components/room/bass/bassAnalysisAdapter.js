@@ -358,6 +358,11 @@ export function adaptCurrentBassOptimisationResult({
   contract.selectedCandidate = buildCandidateRef(selectedCandidate, collectDiagnostics);
   contract.bassAuthority = selectedCandidate?.postEqCapabilityAssessment || null;
   contract.finalOptimisedBassResponse = finalResponse;
+  // Explicit target identities on the contract so downstream consumers (graph,
+  // report, persistence) can distinguish which definition a curve uses.
+  // P18 references idealHouseTarget; P19 references practicalCalibrationTarget.
+  contract.idealHouseTarget = finalResponse?.canonicalTargetCurve || null;
+  contract.practicalCalibrationTarget = finalResponse?.practicalCalibrationTarget || null;
   contract.achievedP14Db = selectedCandidate?.achievedP14Db ?? null;
   contract.achievedP14Level = selectedCandidate?.achievedP14Level ?? null;
   contract.achievedP18FrequencyHz = selectedCandidate?.achievedP18FrequencyHz ?? null;
@@ -542,7 +547,7 @@ export function adaptCurrentBassOptimisationResult({
     && hasCanonicalSeatResults(selectedCandidate?.perSeatP19Results, realSeatCount)
     && isCanonicalP19Ready({
       canonicalPostEqRsp: finalResponse?.canonicalPostEqRsp,
-      canonicalTargetCurve: finalResponse?.canonicalTargetCurve,
+      canonicalTargetCurve: finalResponse?.practicalCalibrationTarget || finalResponse?.canonicalTargetCurve,
       officialVariationDb: authorityP19?.variationDb,
       officialLevel: authorityP19?.level,
     });

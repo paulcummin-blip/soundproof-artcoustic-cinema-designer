@@ -27,6 +27,7 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     canonicalPostEqSeatResponses: postEqPerSeatCurves,
     canonicalHouseCurveShape: cloneCurve(candidate.canonicalHouseCurveShape),
     canonicalTargetCurve: cloneCurve(candidate.productionHouseCurveTarget),
+    practicalCalibrationTarget: cloneCurve(candidate.practicalCalibrationTarget),
     canonicalVerticalOffsetDb: candidate.canonicalVerticalOffsetDb ?? null,
     operatingLevelOffsetDb: candidate.operatingLevelOffsetDb ?? 0,
     requestedOperatingLevelOffsetDb: Number.isFinite(candidate.requestedOperatingLevelOffsetDb) ? candidate.requestedOperatingLevelOffsetDb : 0,
