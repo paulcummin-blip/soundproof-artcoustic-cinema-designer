@@ -78,6 +78,19 @@ export function isStage1CacheValid(hydrated, fingerprint) {
   if (hydrated.family_policy_version !== STAGE1_FAMILY_POLICY_VERSION) return false;
   if (hydrated.current_fingerprint !== fingerprint) return false;
   if (hydrated.status !== "complete") return false;
+
+  const requiredResults = [
+    hydrated.one_sub_result,
+    hydrated.two_sub_result,
+    hydrated.four_sub_result,
+  ];
+  if (requiredResults.some((result) =>
+    !result ||
+    result.status !== "complete" ||
+    !Array.isArray(result.finalists)
+  )) return false;
+  if (hydrated.a_prohibition_validation !== "PASS") return false;
+
   return true;
 }
 
