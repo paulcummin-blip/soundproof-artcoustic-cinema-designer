@@ -72,6 +72,7 @@ function buildSnapshot({
       officialP19WorstFrequencyHz: p19Worst,
       p20WorstSeatId: "seat-r2-c1",
       p20WorstFrequencyHz: p20Worst,
+      p19TargetIdentity: "practical-calibration-target",
     },
     requestedP14TargetDb: 112,
     requestedP14Basis: "minimum",

@@ -473,7 +473,22 @@ function buildCanonicalCandidate({
   // the new global trim and the old offset aligns per-seat pre-EQ with the RSP
   // operating response. No separate trim or EQ is calculated per seat.
   const perSeatOperatingOffsetDb = realisticGlobalTrimDb - operatingLevelOffsetDb;
-  const requestedPerSeatPostEqCurves = applyBankToSeats(perSeatRawCurves, realisticCorrectionCurve)
+  // Build a seatId → safety-margin-aware capability map for clamping. This
+  // mirrors the RSP's maximumSplCurveBeforeEq (rawCurve − SAFETY_MARGIN) so
+  // each seat is clamped to its own capability ceiling, not just the product
+  // operating envelope. When seatRaw == rspRaw, the clamp targets are
+  // identical and P20 = 0 for coincident positions.
+  const perSeatMaxSplMap = new Map();
+  for (const seat of (Array.isArray(perSeatMaximumSplCurves) ? perSeatMaximumSplCurves : [])) {
+    if (seat?.seatId && seat.seatId !== "rsp" && Array.isArray(seat?.responseData)) {
+      perSeatMaxSplMap.set(seat.seatId, seat.responseData);
+    }
+  }
+  // Start each seat from the SAME safety-margin-aware capability curve used
+  // for the RSP (perSeatMaximumSplCurves = seatRaw − SAFETY_MARGIN), not the
+  // raw seat response. This removes the false ~2 dB systematic P20 floor
+  // caused by the RSP starting 2 dB lower than the seats.
+  const requestedPerSeatPostEqCurves = applyBankToSeats(perSeatMaximumSplCurves, realisticCorrectionCurve)
     .map((seat) => ({
       ...seat,
       responseData: seat.responseData.map((point) => ({
@@ -488,15 +503,22 @@ function buildCanonicalCandidate({
       isPrimary: !!seat.isPrimary,
       responseData: buildMaximumSplCurveAfterEq(seat.responseData).curve,
     }));
-  // CHANGE 2 (Stage B1): Per-seat post-EQ curves are likewise constrained
-  // only by the product operating envelope, not the raw-response ceiling.
-  const perSeatPostEqCurves = requestedPerSeatPostEqCurves.map((seat) => ({
-    ...seat,
-    responseData: capCurveToProductOperatingEnvelope(
-      seat.responseData,
-      productOperatingEnvelope.curve,
-    ),
-  }));
+  // Clamp each seat to its safety-margin-aware capability envelope (mirroring
+  // the RSP's capCurveToEnvelope against maximumSplCurveBeforeEq), then to
+  // the product operating envelope. Both paths now use identical construction.
+  const perSeatPostEqCurves = requestedPerSeatPostEqCurves.map((seat) => {
+    const maxSpl = perSeatMaxSplMap.get(seat.seatId);
+    const capabilityClamped = maxSpl
+      ? capCurveToEnvelope(seat.responseData, maxSpl)
+      : seat.responseData;
+    return {
+      ...seat,
+      responseData: capCurveToProductOperatingEnvelope(
+        capabilityClamped,
+        productOperatingEnvelope.curve,
+      ),
+    };
+  });
   const seatsForMetrics = perSeatPostEqCurves.length
     ? perSeatPostEqCurves
     : [{ seatId: "rsp", isPrimary: true, responseData: finalPostEqCurve }];
