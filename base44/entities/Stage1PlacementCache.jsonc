@@ -1,0 +1,70 @@
+{
+  "name": "Stage1PlacementCache",
+  "type": "object",
+  "description": "Persistent Stage 1 subwoofer placement optimisation cache. Product-independent, P14-independent geometric placement search authority. Clearly separate from canonical completed bass authority, eight-target P14 cache, and applied-layout bass result.",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "Project identifier owning this Stage 1 placement cache."
+    },
+    "stage1_cache_version": {
+      "type": "integer",
+      "description": "Stage 1 cache envelope version.",
+      "default": 1
+    },
+    "placement_algorithm_version": {
+      "type": "string",
+      "description": "Stage 1 placement search algorithm version."
+    },
+    "family_policy_version": {
+      "type": "string",
+      "description": "Stage 1 family policy version (A-prohibition, B-gating, hierarchy)."
+    },
+    "modal_physics_version": {
+      "type": "string",
+      "description": "Modal physics version signature used by Stage 1."
+    },
+    "current_fingerprint": {
+      "type": "string",
+      "description": "Current Stage 1 fingerprint required by the project."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "uncalculated",
+        "updating",
+        "complete"
+      ],
+      "default": "uncalculated"
+    },
+    "completed_by_fingerprint": {
+      "type": "object",
+      "description": "Bounded completed Stage 1 result snapshots keyed by exact fingerprint."
+    },
+    "one_sub_result": {
+      "type": "object",
+      "description": "Stage 1 result for 1-sub search: status, family coverage, candidate count, finalists, screening metrics, timing."
+    },
+    "two_sub_result": {
+      "type": "object",
+      "description": "Stage 1 result for 2-sub search: status, family coverage, candidate count, finalists, screening metrics, timing."
+    },
+    "four_sub_result": {
+      "type": "object",
+      "description": "Stage 1 result for 4-sub search: status, family coverage, candidate count, finalists, screening metrics, timing."
+    },
+    "a_prohibition_validation": {
+      "type": "string",
+      "description": "A prohibited geometry validation status. PASS = no finalist violates the A geometry rule.",
+      "default": "PASS"
+    },
+    "b_evaluated": {
+      "type": "boolean",
+      "description": "Whether B family was evaluated. False for normal Stage 1; Stage 2 may later unlock B.",
+      "default": false
+    }
+  },
+  "required": [
+    "project_id"
+  ]
+}

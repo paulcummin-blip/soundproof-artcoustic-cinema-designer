@@ -37,6 +37,7 @@ import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
 import { SHOW_DEBUG_LOGS } from '../components/utils/diagnostics'; // NEW: Import SHOW_DEBUG_LOGS
 import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/seatingUtils';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
+import { useStage1PlacementOptimiser } from '@/components/room/bass/stage1/useStage1PlacementOptimiser';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 import { calculateRecommendedAbfuserQty } from "@/components/utils/abfuserRecommendation";
@@ -618,6 +619,17 @@ function RoomDesignerWithState() {
 
     return null;
   }, [appState?.mlpX_m, appState?.mlpY_m, stableDimensions?.width, appState?.seatingPositions]);
+
+  // ── Stage 1 Subwoofer Placement Optimiser ──────────────────────────
+  // Auto-starts in the background once room + seating + RSP geometry settles.
+  // Product-independent, P14-independent, EQ-independent. No UI rewrite.
+  useStage1PlacementOptimiser({
+    projectId: activeProjectId,
+    roomDims: stableDimensions,
+    rspPosition: mlpAnchorEffective,
+    seatingPositions: _seatingPositions,
+  });
+
   // manualRspY_m is not yet set, seed it from the current mlpY_m.
   // A ref prevents this from firing more than once per mode entry.
   const _didInitManualRspRef = useRef(false);
