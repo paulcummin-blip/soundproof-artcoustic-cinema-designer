@@ -131,9 +131,11 @@ function buildRspPostEq({ rspRaw, correction, globalTrimDb }) {
 
 function buildSeatPostEqFixed({ seatRaw, correction, globalTrimDb, operatingLevelOffsetDb }) {
   // FIXED seat path: start from (seatRaw - SAFETY_MARGIN), add correction,
-  // add per-seat offset (= globalTrim - oldOffset), clamp to (seatRaw - SAFETY_MARGIN)
+  // add per-seat offset (= globalTrim only, NOT globalTrim - operatingLevelOffsetDb,
+  // because perSeatMaximumSplCurves is built from raw seats, not level-normalised),
+  // clamp to (seatRaw - SAFETY_MARGIN)
   const maxSplBeforeEq = applySafetyMargin(seatRaw);
-  const perSeatOffset = globalTrimDb - operatingLevelOffsetDb;
+  const perSeatOffset = globalTrimDb; // no - operatingLevelOffsetDb
   const withCorrection = applyCorrection(maxSplBeforeEq, correction);
   const withOffset = applyTrim(withCorrection, perSeatOffset);
   const clamped = clampToEnvelope(withOffset, maxSplBeforeEq);
@@ -148,6 +150,19 @@ function buildSeatPostEqOldDefect({ seatRaw, correction, globalTrimDb, operating
   const withOffset = applyTrim(withCorrection, perSeatOffset);
   // No capability clamp — only product envelope (simulated as no clamp here)
   return withOffset;
+}
+
+function buildSeatPostEqV12Defect({ seatRaw, correction, globalTrimDb, operatingLevelOffsetDb }) {
+  // v12 DEFECTIVE seat path: starts from (seatRaw - SAFETY_MARGIN) but still
+  // subtracts operatingLevelOffsetDb from the per-seat offset, even though
+  // perSeatMaximumSplCurves is NOT level-normalised. This produces a constant
+  // offset equal to |operatingLevelOffsetDb| on every seat.
+  const maxSplBeforeEq = applySafetyMargin(seatRaw);
+  const perSeatOffset = globalTrimDb - operatingLevelOffsetDb; // BUG: should be just globalTrimDb
+  const withCorrection = applyCorrection(maxSplBeforeEq, correction);
+  const withOffset = applyTrim(withCorrection, perSeatOffset);
+  const clamped = clampToEnvelope(withOffset, maxSplBeforeEq);
+  return clamped;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,8 +212,6 @@ test("Test B: old asymmetric construction produced ~2 dB P20 floor", async () =>
   const rspRaw = flatCurve(20, 200, 2, 100);
   const seatRaw = flatCurve(20, 200, 2, 100); // identical to RSP
   // Zero correction — isolates the starting-curve asymmetry only.
-  // (A non-zero boost would push the RSP into its clamp and conflate the
-  //  starting offset with the clamp offset.)
   const correction = flatCurve(20, 200, 2, 0);
   const globalTrimDb = -1;
   const operatingLevelOffsetDb = 0;
@@ -231,6 +244,51 @@ test("Test B: old asymmetric construction produced ~2 dB P20 floor", async () =>
   assert.ok(
     Math.abs(p20Fixed.worstSeat.variationDbRaw) < 0.01,
     `Fixed P20 should be ~0 dB: ${p20Fixed.worstSeat.variationDbRaw}`,
+  );
+});
+
+test("Test B2: v12 defect — subtracting operatingLevelOffsetDb produced false P20 floor", async () => {
+  const { applyBassSmoothing } = await loadSmoothing();
+  const { computeOfficialP20Assessment } = await loadP20Assessment(applyBassSmoothing);
+
+  const rspRaw = flatCurve(20, 200, 2, 100);
+  const seatRaw = flatCurve(20, 200, 2, 100); // identical to RSP
+  const correction = flatCurve(20, 200, 2, 0);
+  // Use a large negative globalTrim so neither RSP nor seat hits the capability
+  // clamp — this isolates the offset asymmetry without clamp masking.
+  const globalTrimDb = -10;
+  // Non-zero operatingLevelOffsetDb — this is the v12 bug condition.
+  // The v12 code subtracted this from the seat offset even though
+  // perSeatMaximumSplCurves was NOT level-normalised.
+  const operatingLevelOffsetDb = -7.69;
+
+  const rspPostEq = buildRspPostEq({ rspRaw, correction, globalTrimDb });
+
+  // v12 defect: perSeatOffset = globalTrimDb - operatingLevelOffsetDb
+  const seatPostEqV12 = buildSeatPostEqV12Defect({ seatRaw, correction, globalTrimDb, operatingLevelOffsetDb });
+  const p20V12 = computeOfficialP20Assessment({
+    rspPostEqCurve: rspPostEq,
+    perSeatPostEqCurves: [{ seatId: "seat-1", responseData: seatPostEqV12 }],
+    assessmentStartHz: 20,
+    assessmentEndHz: 120,
+  });
+  // The v12 defect produces a P20 ≈ |operatingLevelOffsetDb| = 7.69 dB
+  assert.ok(
+    Math.abs(Math.abs(p20V12.worstSeat.variationDbRaw) - Math.abs(operatingLevelOffsetDb)) < 0.5,
+    `v12 defect P20 should be ~${Math.abs(operatingLevelOffsetDb)} dB: ${p20V12.worstSeat.variationDbRaw}`,
+  );
+
+  // v13 fix: perSeatOffset = globalTrimDb (no subtraction)
+  const seatPostEqFixed = buildSeatPostEqFixed({ seatRaw, correction, globalTrimDb, operatingLevelOffsetDb });
+  const p20Fixed = computeOfficialP20Assessment({
+    rspPostEqCurve: rspPostEq,
+    perSeatPostEqCurves: [{ seatId: "seat-1", responseData: seatPostEqFixed }],
+    assessmentStartHz: 20,
+    assessmentEndHz: 120,
+  });
+  assert.ok(
+    Math.abs(p20Fixed.worstSeat.variationDbRaw) < 0.01,
+    `v13 fixed P20 should be ~0 dB even with non-zero operatingLevelOffsetDb: ${p20Fixed.worstSeat.variationDbRaw}`,
   );
 });
 

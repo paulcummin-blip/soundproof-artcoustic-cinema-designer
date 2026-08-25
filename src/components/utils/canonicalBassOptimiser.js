@@ -469,10 +469,15 @@ function buildCanonicalCandidate({
   ];
   const achievedPhysicalEqAuthorityPassed = achievedPhysicalAuthorityViolations.length === 0;
   // Per-seat: apply the same RSP-derived global trim and EQ correction. The
-  // per-seat raw curves carry the old operatingLevelOffsetDb; the delta between
-  // the new global trim and the old offset aligns per-seat pre-EQ with the RSP
-  // operating response. No separate trim or EQ is calculated per seat.
-  const perSeatOperatingOffsetDb = realisticGlobalTrimDb - operatingLevelOffsetDb;
+  // per-seat maximum-SPL curves (perSeatMaximumSplCurves = seatRaw − SAFETY_MARGIN)
+  // are NOT level-normalised — they are built from the raw engine seats, not
+  // from levelNormalisedSeats. Therefore the seat offset is the full
+  // realisticGlobalTrimDb, with NO subtraction of operatingLevelOffsetDb.
+  // The old "− operatingLevelOffsetDb" term was a leftover from when seats
+  // started from level-normalised curves; it introduced a constant offset
+  // equal to operatingLevelOffsetDb on every seat, producing a false
+  // systematic P20 floor even when seatRaw == rspRaw.
+  const perSeatOperatingOffsetDb = realisticGlobalTrimDb;
   // Build a seatId → safety-margin-aware capability map for clamping. This
   // mirrors the RSP's maximumSplCurveBeforeEq (rawCurve − SAFETY_MARGIN) so
   // each seat is clamped to its own capability ceiling, not just the product

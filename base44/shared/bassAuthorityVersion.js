@@ -12,6 +12,6 @@
  * bare-Node regression tests (no application path alias required).
  */
 export const INSTANCE_AUTHORITY_VERSION = 3;
-export const BASS_ANALYSIS_CONTRACT_VERSION = 12;
+export const BASS_ANALYSIS_CONTRACT_VERSION = 13;
 export const COMPLETED_BASS_CACHE_VERSION = 4;
 export const RP22_BASS_METRIC_SCHEMA_VERSION = 7;
