@@ -2,6 +2,7 @@ const PORTAL_SOURCE = 'ARTCOUSTIC_PARTNER_PORTAL';
 const PORTAL_TARGET = 'SOUND_PROOF';
 const PILOT_EXTERNAL_SUBJECT = 'b9d453e8-3386-4294-bd99-7ad2d80120b2';
 const PILOT_SOUND_PROOF_ACCOUNT_ID = '6a832be3d4e6c6df3df23ee3';
+const PILOT_PARTNER_PROFILE_ID = '42b93780-c13e-40c6-bac3-991c2bcfc938';
 const BRIDGE_URL = 'https://jzwuhrmbshfyybxbeckf.supabase.co/functions/v1/soundproof-launch-service';
 
 function hasText(value) {
@@ -112,7 +113,8 @@ function bindingMatches(binding, identity, mapping) {
     binding?.target === PORTAL_TARGET
     && binding?.user_id === PILOT_EXTERNAL_SUBJECT
     && binding?.session_id === identity.portal_session_id
-    && binding?.profile_id === identity.partner_profile_id
+    && binding?.profile_id === PILOT_PARTNER_PROFILE_ID
+    && identity.partner_profile_id === PILOT_PARTNER_PROFILE_ID
     && identity.external_subject === PILOT_EXTERNAL_SUBJECT
     && identity.account_id === mapping.link.account_id
     && hasText(binding?.account_name)
@@ -133,7 +135,7 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass) {
     binding?.target !== PORTAL_TARGET
     || binding?.user_id !== PILOT_EXTERNAL_SUBJECT
     || !hasText(binding?.session_id)
-    || !hasText(binding?.profile_id)
+    || binding?.profile_id !== PILOT_PARTNER_PROFILE_ID
     || !hasText(binding?.account_name)
     || !hasText(binding?.expires_at)
     || Date.parse(binding.expires_at) <= Date.now()
@@ -222,6 +224,9 @@ export async function validatePilotPortalAccessIfRequired(base44, base44User, ac
   const mapping = await resolvePilotPortalMapping(service, account.id);
   if (!mapping.required) return { required: false, allowed: true };
   if (!mapping.allowed) return mapping;
+  if (account.status !== 'active') {
+    return { required: true, allowed: false, reason: 'PORTAL_ACCOUNT_INACTIVE' };
+  }
 
   try {
     const identities = await uniqueRows(service.entities.PortalIdentity, {
@@ -266,6 +271,7 @@ export async function validatePilotPortalAccessIfRequired(base44, base44User, ac
 
 export {
   PILOT_EXTERNAL_SUBJECT,
+  PILOT_PARTNER_PROFILE_ID,
   PILOT_SOUND_PROOF_ACCOUNT_ID,
   PORTAL_SOURCE,
   PORTAL_TARGET,
