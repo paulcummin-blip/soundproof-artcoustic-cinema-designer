@@ -5,13 +5,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, ChevronDown } from 'lucide-react';
 import { sanitizeProjectorElement } from '@/components/utils/projectorSanitise';
 import { fmtM } from '@/components/utils/formatMetres';
 import StepperInput from '@/components/ui/StepperInput';
 
 export default function RoomElements({ elements = [], onChange, roomDims }) {
   const [drafts, setDrafts] = React.useState({});  // eslint-disable-line
+
+  // Per-element collapsed/expanded state. Existing (saved) elements default to
+  // collapsed when the panel opens; newly created elements default to expanded.
+  // Not persisted to the project — UI-state only.
+  const [collapsedOverride, setCollapsedOverride] = React.useState({});
+  const newlyCreatedIdsRef = React.useRef(new Set());
+
+  const isCollapsed = (id) => {
+    if (Object.prototype.hasOwnProperty.call(collapsedOverride, id)) return collapsedOverride[id];
+    return !newlyCreatedIdsRef.current.has(id);
+  };
+
+  const toggleCollapsed = (id) => {
+    setCollapsedOverride(prev => ({ ...prev, [id]: !isCollapsed(id) }));
+  };
 
   // Returns the current draft string if one exists, otherwise the value rounded to 2dp (cm resolution)
   const getDraftValue = (element, field, fallback) => {
@@ -48,8 +63,10 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
 
   const addDoor = () => {
     const elementCount = (elements || []).length;
+    const newId = makeId();
+    newlyCreatedIdsRef.current.add(newId);
     const newElement = {
-      id: makeId(),
+      id: newId,
       type: 'door',
 
       // Placement
@@ -92,8 +109,10 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
     const lensY = roomL > 0 ? Math.max(0, roomL - 0.15) : 0; // 150mm from rear wall
     const lensZ = Math.max(0, roomH - 0.10 - bodyH / 2);     // near ceiling, 0.10 m clearance (matches updateElement clamp)
 
+    const newId = makeId();
+    newlyCreatedIdsRef.current.add(newId);
     const newElement = {
-      id: makeId(),
+      id: newId,
       type: 'projector',
       wall: 'rear',
       label: 'Projector',
@@ -158,6 +177,23 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
     return 'rear';
   };
 
+  const typeLabel = (type) => {
+    const t = String(type || '').toLowerCase();
+    if (t === 'projector') return 'Projector';
+    if (t === 'door') return 'Door';
+    if (t === 'window') return 'Window';
+    if (t === 'column') return 'Column';
+    if (t === 'opening') return 'Opening';
+    return 'Element';
+  };
+
+  const buildSummary = (element) => {
+    if (element?.type === 'projector') {
+      return `X ${fmtM(element?.x_lens_m, '—')} · Y ${fmtM(element?.y_lens_m, '—')} · Z ${fmtM(element?.z_lens_m, '—')} m`;
+    }
+    return `${wallLabel(element?.wall)} wall · ${fmtM(element?.length_m, '—')} m`;
+  };
+
   // Shared report-style typography (matches Room Dimensions section)
   const groupTitleStyle = {
     fontSize: "11px",
@@ -211,7 +247,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
           return (
             <div
               key={element.id}
-              className="rounded-lg border p-4"
+              className="rounded-lg border"
               style={{
                 borderColor: '#DCDBD6',
                 background: '#FFFFFF',
@@ -219,22 +255,38 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                 borderLeftColor: element?.type === 'projector' ? '#7A9B8C' : '#C4B5A8',
               }}
             >
-              <div className="flex justify-between items-center mb-3">
-                <div className="text-sm font-medium" style={{ color: element?.type === 'projector' ? '#213428' : '#625143' }}>
-                  {element?.label || 'Element'}
+              <div
+                className="flex justify-between items-center px-4 py-2.5 cursor-pointer select-none"
+                onClick={() => toggleCollapsed(element.id)}
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="text-sm font-medium shrink-0" style={{ color: element?.type === 'projector' ? '#213428' : '#625143' }}>
+                    {element?.label || typeLabel(element?.type)}
+                  </span>
+                  {isCollapsed(element.id) && (
+                    <span className="text-xs truncate" style={{ color: '#9CA3AF' }}>
+                      {buildSummary(element)}
+                    </span>
+                  )}
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => removeElement(element.id)}
-                  className="p-1.5 rounded-md transition-colors hover:bg-[#F3F2EF]"
-                  style={{ color: '#9CA3AF' }}
-                  aria-label="Remove element"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="p-1.5 rounded-md" style={{ color: '#9CA3AF' }} aria-hidden="true">
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isCollapsed(element.id) ? '' : 'rotate-180'}`} />
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removeElement(element.id); }}
+                    className="p-1.5 rounded-md transition-colors hover:bg-[#F3F2EF]"
+                    style={{ color: '#9CA3AF' }}
+                    aria-label="Remove element"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
+              {!isCollapsed(element.id) && (
+                <div className="px-4 pb-4 pt-1">
               {/* PROJECTOR LAYOUT */}
               {element?.type === 'projector' ? (
                 <>
@@ -496,6 +548,8 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       );
                     })()}
                   </div>
+                </div>
+              )}
                 </div>
               )}
             </div>
