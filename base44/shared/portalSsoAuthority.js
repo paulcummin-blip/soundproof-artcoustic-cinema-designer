@@ -87,9 +87,6 @@ export async function resolvePilotPortalMapping(service, accountId) {
   const pilotLinks = accountLinks.filter(
     (link) => link?.partner_user_id === PILOT_EXTERNAL_SUBJECT,
   );
-  if (pilotLinks.length === 0) {
-    return { required: false, allowed: true, link: null };
-  }
   if (pilotLinks.length !== 1) {
     return { required: true, allowed: false, reason: 'PORTAL_MAPPING_AMBIGUOUS' };
   }
