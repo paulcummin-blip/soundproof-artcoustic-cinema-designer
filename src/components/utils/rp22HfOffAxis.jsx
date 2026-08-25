@@ -298,12 +298,14 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos
     const atRsp = computeLcrLossAtPoint(spk, rspPoint, mlpPos, lcrAimMode);
     if (!atRsp) continue;
 
-    // Stricter P16 comparison: keep the RSP delta term, but retain part of the
-    // seat's absolute off-axis loss so outer seats do not collapse too easily.
+    // P16 is the seat's deviation from the RSP response. The RSP is the zero
+    // reference, so delta is the normalised difference only — no absolute
+    // off-axis loss term (that would make the RSP non-zero whenever the
+    // speaker is off-axis at the RSP). See RP22 RSP-normalisation principle.
     const seatLoss = Number(atSeat.continuousLossDb) || 0;
     const rspLoss = Number(atRsp.continuousLossDb) || 0;
     const normalizedDelta = Math.abs(seatLoss - rspLoss);
-    const delta = normalizedDelta + (seatLoss * 0.5);
+    const delta = normalizedDelta;
 
     const isBeyondLcrLimit = atSeat.isBeyondLcrLimit || atRsp.isBeyondLcrLimit;
 
@@ -880,8 +882,11 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
 
       const seatLoss = Number(resultAtSeat.lossDb) || 0;
       const rspLoss = Number(resultAtRsp ? resultAtRsp.lossDb : resultAtSeat.lossDb) || 0;
+      // P17 is the seat's deviation from the RSP response. The RSP is the zero
+      // reference, so delta is the normalised difference only — no absolute
+      // off-axis loss term. See RP22 RSP-normalisation principle.
       const normalizedDelta = Math.abs(seatLoss - rspLoss);
-      const delta = normalizedDelta + (seatLoss * 0.5);
+      const delta = normalizedDelta;
 
       // isBeyondNonLcrLimit: flag from the seat result (used for N/A display)
       const isBeyondNonLcrLimit = resultAtSeat.isBeyondNonLcrLimit || false;
