@@ -1,6 +1,7 @@
 const PORTAL_SOURCE = 'ARTCOUSTIC_PARTNER_PORTAL';
 const PORTAL_TARGET = 'SOUND_PROOF';
 const PILOT_EXTERNAL_SUBJECT = 'b9d453e8-3386-4294-bd99-7ad2d80120b2';
+const PILOT_SOUND_PROOF_ACCOUNT_ID = '6a832be3d4e6c6df3df23ee3';
 const BRIDGE_URL = 'https://jzwuhrmbshfyybxbeckf.supabase.co/functions/v1/soundproof-launch-service';
 
 function hasText(value) {
@@ -73,6 +74,10 @@ async function uniqueRows(entity, query) {
 }
 
 export async function resolvePilotPortalMapping(service, accountId) {
+  if (accountId !== PILOT_SOUND_PROOF_ACCOUNT_ID) {
+    return { required: false, allowed: true, link: null };
+  }
+
   const accountLinks = await uniqueRows(service.entities.ExternalAccountLink, {
     account_id: accountId,
     source_system: PORTAL_SOURCE,
@@ -264,6 +269,7 @@ export async function validatePilotPortalAccessIfRequired(base44, base44User, ac
 
 export {
   PILOT_EXTERNAL_SUBJECT,
+  PILOT_SOUND_PROOF_ACCOUNT_ID,
   PORTAL_SOURCE,
   PORTAL_TARGET,
 };
