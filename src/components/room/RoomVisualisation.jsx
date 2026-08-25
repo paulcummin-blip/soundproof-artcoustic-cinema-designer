@@ -74,7 +74,7 @@ import { usePlanResizeObserver } from "@/components/room/rv/hooks/usePlanResizeO
 import { useHudComputation } from "@/components/room/rv/hooks/useHudComputation";
 import { useSeatHoverLogic } from "@/components/room/rv/hooks/useSeatHoverLogic";
 import { useRoomDerivedState } from "@/components/room/rv/hooks/useRoomDerivedState";
-import { useCanvasZoomHandlers } from "@/components/room/rv/hooks/useCanvasZoomHandlers";
+import { usePlanWheelZoom } from "@/components/room/rv/hooks/usePlanWheelZoom";
 import { computeLcrZones } from "@/components/utils/rp22/lcrZoneAuthority";
 import { useLiveImpactBaseline } from "@/components/room/rv/hooks/useLiveImpactBaseline";
 import { useResetSideSurrounds } from "@/components/room/rv/hooks/useResetSideSurrounds";
@@ -195,8 +195,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     allSeatSplMetrics: allSeatSplMetricsProp = null,
     speakerPositionsView = 'off',
     showMlpRuler = false,
-    zoomMode: zoomModeProp = 'off',
-    onZoomModeChange,
     exportMode = 'default',
     exportWidthPx,
     exportHeightPx,
@@ -335,7 +333,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [viewOffsetPx, setViewOffsetPx] = React.useState({ x: 0, y: 0 });
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
-  const zoomMode = zoomModeProp;
   const lastPointerRef = useRef({ x: 0, y: 0 });
   const [containerW, setContainerW] = useState(null);
   const [containerH, setContainerH] = useState(null);
@@ -1043,16 +1040,17 @@ const byId = useEntitiesById({
     }
   }, [appState, getCanonicalRole]);
 
-  // Zoom handlers — delegated to hook
-  const { handlePlanClick } = useCanvasZoomHandlers({
-    zoom,
-    zoomMode,
+  // Direct mouse/trackpad wheel zoom (replaces click-to-zoom toolbar controls)
+  const { resetView, isNonDefault: viewIsNonDefault } = usePlanWheelZoom({
     planBoundsRef,
+    zoom,
     panX,
     panY,
+    viewOffsetPx,
+    setZoom,
     setPanX,
     setPanY,
-    setZoom,
+    setViewOffsetPx,
   });
 
   // Clear overhead selection when clicking on canvas background
@@ -1061,8 +1059,7 @@ const byId = useEntitiesById({
       setSelectedOverheadRow(null);
     }
     justSelectedOverheadRef.current = false;
-    handlePlanClick(e);
-  }, [handlePlanClick]);
+  }, []);
 
   // Reset just-selected ref after drag ends (handles case where onClick doesn't fire)
   useEffect(() => {
@@ -2157,9 +2154,10 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         planBoundsRef={planBoundsRef}
         rvWrapRef={rvWrapRef}
         aspect={aspect}
-        zoomMode={zoomMode}
         handlePlanClick={handlePlanClickWithSelection}
         lastPointerRef={lastPointerRef}
+        onResetView={resetView}
+        showResetView={viewIsNonDefault}
         canvasStyle={canvasStyle}
         svgWSafe={svgWSafe}
         svgHSafe={svgHSafe}

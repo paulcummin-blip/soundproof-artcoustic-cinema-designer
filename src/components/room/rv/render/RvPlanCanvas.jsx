@@ -29,9 +29,10 @@ export default function RvPlanCanvas({
   planBoundsRef,
   rvWrapRef,
   aspect,
-  zoomMode,
   handlePlanClick,
   lastPointerRef,
+  onResetView,
+  showResetView,
   canvasStyle,
   svgWSafe,
   svgHSafe,
@@ -263,7 +264,7 @@ export default function RvPlanCanvas({
         border: '1px solid #DCDBD6',
         borderRadius: '0px',
         backgroundColor: '#F8F8F7',
-        cursor: zoomMode === 'in' ? 'zoom-in' : zoomMode === 'out' ? 'zoom-out' : 'default',
+        cursor: 'default',
       }}
       onMouseMove={(e) => {
         lastPointerRef.current = { x: e.clientX, y: e.clientY };
@@ -795,6 +796,33 @@ export default function RvPlanCanvas({
         >
           {overheadWarningText}
         </div>
+      )}
+
+      {/* Reset view — only when zoomed/panned away from the fitted default */}
+      {showResetView && (
+        <button
+          type="button"
+          data-testid="plan-reset-view"
+          onClick={(e) => { e.stopPropagation(); onResetView?.(); }}
+          style={{
+            position: 'absolute',
+            bottom: 8,
+            right: 8,
+            zIndex: 20,
+            padding: '4px 10px',
+            fontSize: 11,
+            fontWeight: 500,
+            background: '#FFFFFF',
+            color: '#213428',
+            border: '1px solid #DCDBD6',
+            borderRadius: 4,
+            cursor: 'pointer',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            fontFamily: 'Didact Gothic, sans-serif',
+          }}
+        >
+          Reset view
+        </button>
       )}
     </div>
   );

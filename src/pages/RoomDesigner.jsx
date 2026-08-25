@@ -271,7 +271,6 @@ function RoomDesignerWithState() {
     [appState?.roomDims?.widthM, appState?.roomDims?.lengthM, appState?.speakerSystem?.placedSpeakers, appState?.seatingPositions]
   );
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
-  const [zoomMode, setZoomMode] = useState('off'); // 'off' | 'in' | 'out'
   const [localLiveImpactMode, setLocalLiveImpactMode] = React.useState("off");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [freeMoveLcr, setFreeMoveLcr] = useState(false); // Free Move (LCR) toggle
@@ -1941,8 +1940,6 @@ function RoomDesignerWithState() {
             setFreeMoveLcr={setFreeMoveLcr}
             liveImpactMode={safeLiveImpactMode}
             setLiveImpactMode={safeSetLiveImpactMode}
-            zoomMode={zoomMode}
-            setZoomMode={setZoomMode}
           />}
 
           {/* Content area */}
@@ -1988,8 +1985,6 @@ function RoomDesignerWithState() {
                   allSeatSplMetrics={allSeatSplMetrics}
                   speakerPositionsView={speakerPositionsView}
                   showMlpRuler={showMlpRuler}
-                  zoomMode={zoomMode}
-                  onZoomModeChange={setZoomMode}
                   isDraggingRef={isDraggingRef}
                   extraSurroundCount={appState?.extraSurroundCount ?? 0}
                   showRoomModesOverlay={showRoomModesOverlay}

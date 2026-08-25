@@ -14,8 +14,6 @@ export default function RoomDesignerPlanToolbar({
   setEnableFrontWides,
   liveImpactMode,
   setLiveImpactMode,
-  zoomMode,
-  setZoomMode,
 }) {
   return (
     <div
@@ -114,31 +112,6 @@ export default function RoomDesignerPlanToolbar({
         </select>
       </div>
 
-        {/* 3-state zoom toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid #DCDBD6', paddingLeft: 12 }}>
-        <span style={{ fontSize: 12, color: '#3E4349', fontWeight: 500 }}>Zoom</span>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {['off', 'in', 'out'].map((mode) =>
-          <button
-            key={mode}
-            type="button"
-            onClick={() => setZoomMode(mode)}
-            style={{
-              fontSize: 11,
-              padding: '4px 10px',
-              borderRadius: 4,
-              border: '1px solid #DCDBD6',
-              background: zoomMode === mode ? '#213428' : '#FFFFFF',
-              color: zoomMode === mode ? '#FFFFFF' : '#3E4349',
-              cursor: 'pointer',
-              fontWeight: 500
-            }}>
-
-              {mode === 'off' ? 'Off' : mode === 'in' ? '+' : '−'}
-            </button>
-          )}
-        </div>
       </div>
-    </div>
   );
 }
