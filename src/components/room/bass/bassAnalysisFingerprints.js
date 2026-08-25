@@ -146,7 +146,7 @@ export function computeGeometryFingerprint(inputs) {
       h: num(i.roomDims?.heightM),
     },
     rsp: i.rspPosition
-      ? { x: num(i.rspPosition.x), y: num(i.rspPosition.y), z: num(i.rspPosition.z) }
+      ? { x: num(i.rspPosition.x), y: num(i.rspPosition.y), z: num(i.rspPosition.z), designatedRspSeatId: i.rspPosition.designatedRspSeatId ?? null }
       : null,
     sources,
     sourceCount: sources.length,

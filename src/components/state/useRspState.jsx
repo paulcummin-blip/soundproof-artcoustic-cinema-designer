@@ -17,6 +17,7 @@ const RSP_MODE_VALUES = new Set([
   "back_row_center",
   "all_rows_average",
   "manual_position",
+  "seat_bound",
 ]);
 
 const DEFAULT_RSP_MODE = "auto_from_screen";
@@ -55,10 +56,23 @@ export function useRspState(initialPayload) {
     _setManualRspX_m(typeof x === "number" && Number.isFinite(x) ? x : null);
   }, []);
 
+  // Designated RSP seat identity — explicit seat-bound RSP authority.
+  // When set (and rspMode === "seat_bound"), the canonical RSP uses this
+  // seat's exact coordinates. Null = free-floating RSP (no seat bound).
+  const [designatedRspSeatId, _setDesignatedRspSeatId] = useState(() => {
+    const saved = initialPayload?.designated_rsp_seat_id;
+    return typeof saved === "string" && saved.trim() ? saved : null;
+  });
+
+  const setDesignatedRspSeatId = useCallback((id) => {
+    _setDesignatedRspSeatId(typeof id === "string" && id.trim() ? id : null);
+  }, []);
+
   const resetRspState = useCallback(() => {
     _setRspMode(DEFAULT_RSP_MODE);
     _setManualRspY_m(null);
     _setManualRspX_m(null);
+    _setDesignatedRspSeatId(null);
   }, []);
 
   return {
@@ -68,6 +82,8 @@ export function useRspState(initialPayload) {
     setManualRspY_m,
     manualRspX_m,
     setManualRspX_m,
+    designatedRspSeatId,
+    setDesignatedRspSeatId,
     resetRspState,
   };
 }

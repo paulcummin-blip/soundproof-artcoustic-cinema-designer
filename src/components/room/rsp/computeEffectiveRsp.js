@@ -49,8 +49,26 @@ export function computeEffectiveRsp({
   seatingPositions,
   currentMlpY_m,
   rowDerivedRspYByMode = {},
+  designatedRspSeat = null,
 }) {
   const centrelineX = Number.isFinite(Number(roomWidthM)) ? Number(roomWidthM) / 2 : null;
+
+  // ── seat_bound ───────────────────────────────────────────────────────────
+  // The canonical RSP is bound to a designated real seat. Use its exact X/Y
+  // so the green-dot visual matches the seat. The bass engine RSP uses the
+  // same exact coordinates via buildAuthoritativeRspPosition (which receives
+  // the resolved seat directly), guaranteeing P20 = 0 for that seat.
+  if (rspMode === "seat_bound") {
+    const seat = designatedRspSeat;
+    if (seat && Number.isFinite(Number(seat.x)) && Number.isFinite(Number(seat.y))) {
+      return {
+        effectiveRspX_m: Number(seat.x),
+        effectiveRspY_m: Number(seat.y),
+        rspSourceLabel: "Seat-bound RSP",
+      };
+    }
+    // Designated seat missing — fall through to fallback below.
+  }
 
   // ── auto_from_screen ────────────────────────────────────────────────────
   if (rspMode === "auto_from_screen") {

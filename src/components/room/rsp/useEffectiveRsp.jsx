@@ -34,6 +34,9 @@ export function useEffectiveRsp(params) {
       params?.screenWidthM,
       params?.currentMlpY_m,
       params?.rowDerivedRspYByMode,
+      params?.designatedRspSeat?.id,
+      params?.designatedRspSeat?.x,
+      params?.designatedRspSeat?.y,
       // rowCentersM, seatingPositions reserved for future use
     ]
   );
