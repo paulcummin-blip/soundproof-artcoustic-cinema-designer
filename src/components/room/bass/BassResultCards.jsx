@@ -12,6 +12,7 @@ import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTo
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
+import { formatCoverageSummaryFromRows } from "@/components/utils/seatCoverageSummary";
 import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
 
@@ -71,6 +72,7 @@ export default function BassResultCards() {
           {formatted.p19Rows.length > 0 && (
             <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
               <div className="mb-1 text-[11px] font-semibold text-[#213428]">P19 — All Seats</div>
+              <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{formatCoverageSummaryFromRows(formatted.p19Rows)}</div>
               <P19SeatBlock
                 rows={formatted.p19Rows}
                 publicationVerified={formatted.publicationVerified}
@@ -82,6 +84,7 @@ export default function BassResultCards() {
           {formatted.p20Rows.length > 0 && (
             <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
               <div className="mb-1 text-[11px] font-semibold text-[#213428]">P20 — All Seats</div>
+              <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{formatCoverageSummaryFromRows(formatted.p20Rows)}</div>
               <P20SeatBlock
                 rows={formatted.p20Rows}
                 publicationVerified={formatted.publicationVerified}

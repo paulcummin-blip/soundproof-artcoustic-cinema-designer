@@ -46,7 +46,7 @@ function parameterLabel(key, result) {
   if (key === "p14") return "Estimated LFE Capability";
   if (key === "p18") return "Bass Extension";
   if (key === "p19") return "Seat Consistency";
-  if (key === "p20") return "Worst Seat Performance";
+  if (key === "p20") return "Seat Consistency";
   return key.toUpperCase();
 }
 
@@ -125,7 +125,8 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  *   No RSP headline, no aggregate level — seat results are the only P19 results.
  * P20 is a SEAT-scoped parameter:
  *   P20 main pill: "SEAT" — per-seat results in the P20 — All Seats grid below.
- *   No lowest/worst seat headline — seat results are the only P20 results.
+ *   Coverage summary ("Primary Seats L{X} · No seat lower than L{Y}") appears
+ *   above the grid — no "worst seat" headline. Seat results are the only P20 results.
  *
  * @param {object} completedBassAuthority - from useCompletedBassAuthority(scopeId)
  * @param {object} lifecycle - controller lifecycle snapshot
@@ -210,11 +211,11 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   const p19Rows = isAuthoritative ? buildP19SeatRows(seatingPositions, perSeatP19Results) : [];
   const p20Rows = isAuthoritative ? buildP20SeatRows(seatingPositions, perSeatP20Results) : [];
 
-  // P19 compact: RSP + Lowest Seat
+  // P19 compact: RSP + lowest seat (internal authority — presented as coverage summary)
   const p19Rsp = isAuthoritative ? p19RspResult(contract?.productAnalysis?.parameters?.p19) : null;
   const p19Lowest = isAuthoritative ? p19LowestSeat(p19Rows) : null;
 
-  // P20 compact: Best Primary + Lowest Seat
+  // P20 compact: best Primary + lowest seat (internal authority — presented as coverage summary)
   const p20BestPrimary = isAuthoritative ? p20BestPrimarySeat(p20Rows) : null;
   const p20Lowest = isAuthoritative ? p20WorstSeat(p20Rows) : null;
 
@@ -278,8 +279,8 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   pills.p19 = seatScopeHeadlinePill("P19 Response Fit");
 
   // P20 — SEAT-scoped parameter. The headline always displays "SEAT" — no
-  // lowest/worst seat headline, no aggregate level. Per-seat results are in
-  // the P20 — All Seats grid below.
+  // "worst seat" headline, no aggregate level. Per-seat results are in the
+  // P20 — All Seats grid below, with a coverage summary above the grid.
   pills.p20 = seatScopeHeadlinePill("P20 Seat Consistency");
 
   // Status text

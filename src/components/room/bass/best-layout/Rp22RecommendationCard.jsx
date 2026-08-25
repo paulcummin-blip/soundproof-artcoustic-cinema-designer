@@ -60,7 +60,7 @@ export default function Rp22RecommendationCard({ title, layout, onClick, onApply
               <div className="font-semibold text-[#1B1A1A]">{currentP19}</div>
             </div>
             <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-2 py-1.5">
-              <div className="text-[10px] font-medium text-[#625143]">P20 · Worst Seat</div>
+              <div className="text-[10px] font-medium text-[#625143]">P20 · Seat Consistency</div>
               <div className="font-semibold text-[#1B1A1A]">{currentP20}</div>
             </div>
           </div>
@@ -73,7 +73,7 @@ export default function Rp22RecommendationCard({ title, layout, onClick, onApply
               <div className="font-semibold text-[#1B1A1A]">{previewP19}</div>
             </div>
             <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-2 py-1.5">
-              <div className="text-[10px] font-medium text-[#625143]">P20 · Worst Seat <span className="text-[#8A7B6A]">(preview)</span></div>
+              <div className="text-[10px] font-medium text-[#625143]">P20 · Seat Consistency <span className="text-[#8A7B6A]">(preview)</span></div>
               <div className="font-semibold text-[#1B1A1A]">{previewP20}</div>
             </div>
           </div>

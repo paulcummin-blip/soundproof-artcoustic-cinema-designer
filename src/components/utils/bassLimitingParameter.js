@@ -23,9 +23,9 @@ const DEFINITIONS = Object.freeze({
     recommendation: "Improve by adjusting subwoofer placement or adding additional subwoofers.",
   }),
   p20: Object.freeze({
-    name: "Worst Seat Performance",
-    limitation: "Worst-seat response",
-    reason: "The largest response variation at the worst listening seat sets the lowest achieved RP22 level.",
+    name: "Seat Consistency",
+    limitation: "Seat-to-seat response consistency",
+    reason: "The largest response variation across the listening area sets the lowest achieved RP22 level.",
     recommendation: "Improve by reviewing seating position or subwoofer placement.",
   }),
 });

@@ -155,7 +155,7 @@ export default function ExpandedParameterDetail({
   let lvl = getHudLevelForParam(param);
   let rspLabel = lockedSeatId ? formatSeatLabel(lockedSeatId) : null;
 
-  // P6 special case: worst seat spread
+  // P6 special case: seat spread
   if (param.id === 6) {
     const p6 = buildP6Presentation();
     achievedValue = p6.achievedValue;

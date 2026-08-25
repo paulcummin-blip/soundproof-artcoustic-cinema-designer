@@ -472,7 +472,7 @@ export function useParameterGridAuthority({
     }
     if (worstP6Raw !== null && Number.isFinite(worstP6Raw)) {
       const worstDesignDb = Math.floor(worstP6Raw);
-      const achievedValue = `Worst seat spread: ${worstDesignDb} dB`;
+      const achievedValue = `Seat spread: ${worstDesignDb} dB`;
       let worstLevel;
       if      (worstDesignDb <= 2)  worstLevel = 4;
       else if (worstDesignDb <= 4)  worstLevel = 3;
@@ -481,7 +481,7 @@ export function useParameterGridAuthority({
       else                          worstLevel = 0;
       return { achievedValue, lvl: worstLevel };
     }
-    return { achievedValue: "Worst seat spread: —", lvl: null };
+    return { achievedValue: "Seat spread: —", lvl: null };
   }, [seats, getSnapshotForSeat]);
 
   return {

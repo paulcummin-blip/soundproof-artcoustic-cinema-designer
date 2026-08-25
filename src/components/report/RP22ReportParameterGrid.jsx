@@ -127,7 +127,7 @@ export default function RP22ReportParameterGrid({
     const category = getCategoryForParam(param.id);
     const asdrFooter = buildAsdrFooter(param.id);
 
-    // P6 presentation: show worst seat spread across all seats, omit RSP label.
+    // P6 presentation: show seat spread across all seats, omit RSP label.
     let achievedValue = getHudValueForParam(param, { isPrintVariant });
     let lvl = getHudLevelForParam(param);
     let rspLabel = authority.lockedSeatId ? formatSeatLabel(authority.lockedSeatId) : null;
