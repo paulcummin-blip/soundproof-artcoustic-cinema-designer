@@ -28,6 +28,7 @@ import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from "../bassPhysicsDefaults";
 import { STAGE2_FALLBACK_SOURCE_HEIGHT_M, STAGE2_PRODUCT_ENGINEERING_VERSION } from "./stage2Constants";
 import { deriveCentreZ } from "@/components/utils/subwooferInstanceMigration";
 import { gradeP19FromRaw, gradeP20FromRaw } from "../completedBassResultPersistence";
+import { buildAuthoritativeAutoAlignDelays } from "../useAuthoritativeBassResponse";
 
 // ── Pure curve helpers (inlined to avoid React-dependent imports) ─────────
 
@@ -67,7 +68,11 @@ function buildStage2Physics() {
 
 // ── Source builder ───────────────────────────────────────────────────────
 
-function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM) {
+// Mirrors the production POSITION_LABELS used by buildAuthoritativeAutoAlignDelays
+// for sub ID generation (front-sub-left, front-sub-right, rear-sub-left, ...).
+const STAGE2_POSITION_LABELS = ["left", "right"];
+
+function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, rspPosition) {
   const W = Number(roomDims.widthM);
   const L = Number(roomDims.lengthM);
   // Derive acoustic-centre Z through the SAME production authority used by
@@ -79,16 +84,65 @@ function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPower
     : STAGE2_FALLBACK_SOURCE_HEIGHT_M;
   const modelKey = normaliseModelKey(selectedSubModel);
   const centreZ = deriveCentreZ({ bottomHeightM, model: modelKey });
-  return finalist.sources.map((s, i) => ({
-    id: `stage2-src-${i + 1}`,
-    modelKey,
-    bassCapability: resolveSubwooferBassCapability(selectedSubModel),
-    subwooferAmplifierPowerW: amplifierPowerPerSubW,
+
+  // Compute source X/Y/Z for each finalist position.
+  const sourcePositions = finalist.sources.map((s) => ({
     x: s.xNorm * W,
     y: s.yNorm * L,
     z: centreZ,
-    tuning: { gainDb: 0, delayMs: 0, polarity: 0 },
   }));
+
+  // Split into front/rear groups using the SAME authority as production:
+  // yNorm < 0.5 = front wall, yNorm >= 0.5 = rear wall. This matches how
+  // buildAuthoritativeAutoAlignDelays processes frontSubsLive / rearSubsLive.
+  // No delay/delayMs fields → manual delay = 0 (hypothetical layout, no user tuning).
+  const frontSubsLive = [];
+  const rearSubsLive = [];
+  finalist.sources.forEach((s, i) => {
+    const entry = { position: sourcePositions[i] };
+    if (s.yNorm < 0.5) frontSubsLive.push(entry);
+    else rearSubsLive.push(entry);
+  });
+
+  // Reuse the EXACT production auto-alignment authority — do not recreate its maths.
+  // buildAuthoritativeAutoAlignDelays computes per-sub delay = max(0, latestArrival - ownArrival)
+  // across all subs (front + rear pooled), aligning every sub to the furthest one.
+  const autoAlignDelays = buildAuthoritativeAutoAlignDelays({
+    enabled: true,
+    rspPosition,
+    frontSubsLive,
+    rearSubsLive,
+    frontSubsCfg: null,
+    rearSubsCfg: null,
+  });
+
+  // Build final source objects, looking up each auto-align delay by the same
+  // canonical sub ID pattern that buildAuthoritativeAutoAlignDelays generates:
+  // `${group}-sub-${POSITION_LABELS[indexInGroup] ?? indexInGroup}`.
+  let frontIdx = 0;
+  let rearIdx = 0;
+  return finalist.sources.map((s, i) => {
+    const group = s.yNorm < 0.5 ? "front" : "rear";
+    const indexInGroup = group === "front" ? frontIdx++ : rearIdx++;
+    const canonicalId = `${group}-sub-${STAGE2_POSITION_LABELS[indexInGroup] ?? indexInGroup}`;
+    const autoDelay = autoAlignDelays[canonicalId] ?? 0;
+    return {
+      id: `stage2-src-${i + 1}`,
+      modelKey,
+      bassCapability: resolveSubwooferBassCapability(selectedSubModel),
+      subwooferAmplifierPowerW: amplifierPowerPerSubW,
+      x: sourcePositions[i].x,
+      y: sourcePositions[i].y,
+      z: centreZ,
+      // Tuning matches production for a hypothetical layout with no user
+      // gain/polarity adjustments: gain=0, polarity=0 (normal), delay=auto-align.
+      tuning: {
+        gainDb: 0,
+        delayMs: autoDelay,
+        polarity: 0,
+      },
+    };
+  });
 }
 
 // ── Usable LF / transition ───────────────────────────────────────────────
@@ -193,7 +247,7 @@ export function evaluateStage2Finalist({
   // 1. Build sources from finalist positions + selected sub model.
   // Acoustic-centre Z is derived through the production authority (deriveCentreZ),
   // using the project's subwoofer bottom height + the selected model's cabinet height.
-  const sources = buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM);
+  const sources = buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, rspPosition);
 
   // 2. Run product-aware authoritative bass simulation
   const physics = buildStage2Physics();
