@@ -235,26 +235,25 @@ class Stage2PlacementController {
     this.activeJobs.delete(workerIndex);
     const qty = active.quantity;
 
-    if (message.type === "complete" && message.result) {
-      if (!this.completedResults[qty]) this.completedResults[qty] = [];
-      const result = message.result;
-      // Build ranking data
-      const seatPriorityMap = this.params?.seatPriorityMap;
-      const rankingData = buildStage2RankingTuple(result, seatPriorityMap);
-      result.rankingData = rankingData;
-      this.completedResults[qty].push(result);
+    if (message.type === "complete") {
+      // Count every completed job (including null results) so the third-finalist
+      // check fires even when a finalist evaluation returns null.
       this.quantityEvaluated[qty] = (this.quantityEvaluated[qty] || 0) + 1;
       this.canonicalJobsRun++;
-
-      // Check stop condition for this quantity
-      if (meetsStopCondition(rankingData)) {
-        this.quantityFinal[qty] = true;
+      if (message.result) {
+        if (!this.completedResults[qty]) this.completedResults[qty] = [];
+        const result = message.result;
+        const seatPriorityMap = this.params?.seatPriorityMap;
+        const rankingData = buildStage2RankingTuple(result, seatPriorityMap);
+        result.rankingData = rankingData;
+        this.completedResults[qty].push(result);
+        if (meetsStopCondition(rankingData)) {
+          this.quantityFinal[qty] = true;
+        }
+        this.publishProgress();
       }
-
-      // Publish provisional progress
-      this.publishProgress();
     } else if (message.type === "error") {
-      // Log and continue — a failed finalist is simply not ranked
+      // A failed finalist is simply not ranked
     }
 
     // Decide whether a third finalist is needed for this quantity
