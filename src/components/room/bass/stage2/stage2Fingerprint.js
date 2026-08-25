@@ -45,6 +45,8 @@ function hash64(text) {
  * @param {number} params.p14TargetLevel — 1–4
  * @param {number} params.p14TargetDb — derived target dB
  * @param {string} params.p18TargetBasis — "minimum" | "recommended"
+ * @param {number} [params.subwooferBottomHeightM] — project subwoofer bottom height (m).
+ *   Drives acoustic-centre Z via deriveCentreZ; must invalidate when it changes.
  * @returns {string|null} fingerprint, or null if inputs are invalid
  */
 export function computeStage2Fingerprint({
@@ -55,6 +57,7 @@ export function computeStage2Fingerprint({
   p14TargetLevel,
   p14TargetDb,
   p18TargetBasis,
+  subwooferBottomHeightM,
 }) {
   if (!stage1Fingerprint) return null;
   if (!selectedSubModel) return null;
@@ -81,6 +84,12 @@ export function computeStage2Fingerprint({
     p14TargetLevel: Math.round(p14TargetLevel),
     p14TargetDb: Math.round(p14TargetDb * 100) / 100,
     p18TargetBasis: p18TargetBasis || "minimum",
+    // Acoustic-centre Z authority: bottomHeightM drives deriveCentreZ. If the
+    // project subwoofer bottom height changes, the source Z changes and all
+    // downstream P14/P18/P19/P20 results must be recalculated.
+    subwooferBottomHeightM: (subwooferBottomHeightM != null && Number.isFinite(Number(subwooferBottomHeightM)))
+      ? Math.round(Number(subwooferBottomHeightM) * 1000) / 1000
+      : "default",
     resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION,
     metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
   };

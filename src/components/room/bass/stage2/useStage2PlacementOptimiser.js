@@ -65,6 +65,8 @@ function resolveQuantityOrder(currentQuantity) {
  * @param {number} [params.amplifierPowerPerSubW] — amplifier power per sub
  * @param {object} params.splConfig — P14/P18 selection config
  * @param {number} [params.currentQuantity] — user's current sub count (1/2/4)
+ * @param {number} [params.subwooferBottomHeightM] — project subwoofer bottom height (m).
+ *   Drives acoustic-centre Z via the production deriveCentreZ authority.
  */
 export function useStage2PlacementOptimiser({
   projectId,
@@ -75,6 +77,7 @@ export function useStage2PlacementOptimiser({
   amplifierPowerPerSubW,
   splConfig,
   currentQuantity,
+  subwooferBottomHeightM,
 }) {
   const state = useSyncExternalStore(
     subscribeStage2,
@@ -134,8 +137,9 @@ export function useStage2PlacementOptimiser({
       p14TargetLevel: p14Target.level,
       p14TargetDb: p14Target.db,
       p18TargetBasis: p14Target.p18TargetBasis,
+      subwooferBottomHeightM,
     });
-  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, p14Target]);
+  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, p14Target, subwooferBottomHeightM]);
 
   // Hydration on mount / project change
   useEffect(() => {
@@ -216,6 +220,7 @@ export function useStage2PlacementOptimiser({
         p14TargetDb: p14Target.db,
         p18TargetBasis: p14Target.p18TargetBasis,
         seatPriorityMap,
+        subwooferBottomHeightM,
       },
       quantityOrder,
       delay: STAGE2_START_DELAY_MS,

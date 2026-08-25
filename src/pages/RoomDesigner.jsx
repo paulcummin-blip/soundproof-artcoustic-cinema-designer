@@ -649,6 +649,23 @@ function RoomDesignerWithState() {
     return (count === 1 || count === 2 || count === 4) ? count : null;
   }, [appState?.subwoofers, appState?.subwooferInstances]);
 
+  // Subwoofer bottom height for Stage 2 acoustic-centre Z derivation.
+  // Read from the first enabled subwoofer instance (same authority as production
+  // bassInputAdapter). Falls back to the adapted subwoofers array, then null
+  // (Stage 2 uses its own fallback bottom height).
+  const _stage2SubBottomHeightM = React.useMemo(() => {
+    const instances = appState?.subwooferInstances || [];
+    const firstInstance = instances.find(i => i?.enabled !== false);
+    if (firstInstance && Number.isFinite(Number(firstInstance.bottomHeightM))) {
+      return Number(firstInstance.bottomHeightM);
+    }
+    const subs = appState?.subwoofers || [];
+    if (subs[0] && Number.isFinite(Number(subs[0].bottomHeightM))) {
+      return Number(subs[0].bottomHeightM);
+    }
+    return null;
+  }, [appState?.subwoofers, appState?.subwooferInstances]);
+
   useStage2PlacementOptimiser({
     projectId: activeProjectId,
     roomDims: stableDimensions,
@@ -658,6 +675,7 @@ function RoomDesignerWithState() {
     amplifierPowerPerSubW: appState?.splConfig?.subwooferAmplifierPowerW,
     splConfig: appState?.splConfig,
     currentQuantity: _stage2CurrentQty,
+    subwooferBottomHeightM: _stage2SubBottomHeightM,
   });
 
   // manualRspY_m is not yet set, seed it from the current mlpY_m.

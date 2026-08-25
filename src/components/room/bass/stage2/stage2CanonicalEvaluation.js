@@ -26,6 +26,7 @@ import { resolveSubwooferBassCapability } from "@/components/utils/speakerModelR
 import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from "../bassPhysicsDefaults";
 import { STAGE2_FALLBACK_SOURCE_HEIGHT_M, STAGE2_PRODUCT_ENGINEERING_VERSION } from "./stage2Constants";
+import { deriveCentreZ } from "@/components/utils/subwooferInstanceMigration";
 import { gradeP19FromRaw, gradeP20FromRaw } from "../completedBassResultPersistence";
 
 // ── Pure curve helpers (inlined to avoid React-dependent imports) ─────────
@@ -66,17 +67,26 @@ function buildStage2Physics() {
 
 // ── Source builder ───────────────────────────────────────────────────────
 
-function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW) {
+function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM) {
   const W = Number(roomDims.widthM);
   const L = Number(roomDims.lengthM);
+  // Derive acoustic-centre Z through the SAME production authority used by
+  // the normal bass calculation (deriveCentreZ from subwooferInstanceMigration).
+  // STAGE2_FALLBACK_SOURCE_HEIGHT_M is the fallback BOTTOM height (0.05m),
+  // not the acoustic-centre Z. The centre Z = bottomHeightM + cabinetHeightM/2.
+  const bottomHeightM = (subwooferBottomHeightM != null && Number.isFinite(Number(subwooferBottomHeightM)))
+    ? Math.max(0, Number(subwooferBottomHeightM))
+    : STAGE2_FALLBACK_SOURCE_HEIGHT_M;
+  const modelKey = normaliseModelKey(selectedSubModel);
+  const centreZ = deriveCentreZ({ bottomHeightM, model: modelKey });
   return finalist.sources.map((s, i) => ({
     id: `stage2-src-${i + 1}`,
-    modelKey: normaliseModelKey(selectedSubModel),
+    modelKey,
     bassCapability: resolveSubwooferBassCapability(selectedSubModel),
     subwooferAmplifierPowerW: amplifierPowerPerSubW,
     x: s.xNorm * W,
     y: s.yNorm * L,
-    z: STAGE2_FALLBACK_SOURCE_HEIGHT_M,
+    z: centreZ,
     tuning: { gainDb: 0, delayMs: 0, polarity: 0 },
   }));
 }
@@ -170,6 +180,7 @@ export function evaluateStage2Finalist({
   p14TargetLevel,
   p14TargetDb,
   p18TargetBasis,
+  subwooferBottomHeightM,
 }) {
   const startedAt = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
 
@@ -179,8 +190,10 @@ export function evaluateStage2Finalist({
 
   const seatPriorityMap = buildSeatPriorityMap(seatingPositions);
 
-  // 1. Build sources from finalist positions + selected sub model
-  const sources = buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW);
+  // 1. Build sources from finalist positions + selected sub model.
+  // Acoustic-centre Z is derived through the production authority (deriveCentreZ),
+  // using the project's subwoofer bottom height + the selected model's cabinet height.
+  const sources = buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM);
 
   // 2. Run product-aware authoritative bass simulation
   const physics = buildStage2Physics();
