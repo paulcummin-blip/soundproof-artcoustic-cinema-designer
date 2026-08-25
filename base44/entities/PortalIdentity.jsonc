@@ -1,0 +1,79 @@
+{
+  "name": "PortalIdentity",
+  "type": "object",
+  "description": "Verified Partner Portal identity mapped server-side to one Sound Proof account.",
+  "properties": {
+    "base44_user_id": {
+      "type": "string"
+    },
+    "external_subject": {
+      "type": "string"
+    },
+    "portal_session_id": {
+      "type": "string"
+    },
+    "partner_profile_id": {
+      "type": "string"
+    },
+    "account_id": {
+      "type": "string"
+    },
+    "account_name": {
+      "type": "string",
+      "description": "Canonical Partner Portal profiles.account_name."
+    },
+    "access_mode": {
+      "type": "string",
+      "enum": [
+        "PORTAL_SSO"
+      ]
+    },
+    "target": {
+      "type": "string",
+      "enum": [
+        "SOUND_PROOF"
+      ]
+    },
+    "binding_expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_verified_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "base44_user_id",
+    "external_subject",
+    "portal_session_id",
+    "partner_profile_id",
+    "account_id",
+    "account_name",
+    "access_mode",
+    "target",
+    "binding_expires_at"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
