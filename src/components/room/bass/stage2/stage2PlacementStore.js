@@ -168,13 +168,20 @@ class Stage2PlacementController {
       const finalists = promotionPlan[qty] || [];
       this.quantityFinalists[qty] = finalists;
       this.quantityEvaluated[qty] = 0;
-      this.quantityFinal[qty] = false;
+      // Mark as final if no finalists to evaluate
+      this.quantityFinal[qty] = finalists.length === 0;
       for (let i = 0; i < Math.min(STAGE2_FINALISTS_NORMAL, finalists.length); i++) {
         this.queue.push({ finalist: finalists[i], quantity: qty });
       }
     }
 
     markStage2Updating(projectId, fingerprint);
+
+    // If no finalists at all, complete immediately
+    if (this.queue.length === 0 && this.quantityOrder.every((qty) => this.quantityFinal[qty])) {
+      this.checkComplete();
+      return;
+    }
 
     const waitMs = Number.isFinite(delay) ? delay : STAGE2_START_DELAY_MS;
     setTimeout(() => {
