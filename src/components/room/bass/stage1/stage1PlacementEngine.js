@@ -232,6 +232,11 @@ export function runFullStage1Search({ roomDims, rspPosition, seatingPositions, p
   const overallStart = performance.now();
   const physics = physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS;
   const quantities = [2, 4, 1];
+  const quantityResultKeys = {
+    1: "one_sub_result",
+    2: "two_sub_result",
+    4: "four_sub_result",
+  };
   const results = {};
 
   for (const quantity of quantities) {
@@ -240,7 +245,7 @@ export function runFullStage1Search({ roomDims, rspPosition, seatingPositions, p
       roomDims, rspPosition, seatingPositions, physicsOptions: physics, quantity, generationId,
     });
     if (generationId && generationId.cancelled) return null;
-    if (result) results[`${quantity}_sub_result`] = result;
+    if (result) results[quantityResultKeys[quantity]] = result;
   }
 
   const totalMs = performance.now() - overallStart;
