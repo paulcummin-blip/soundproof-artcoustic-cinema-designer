@@ -1,3 +1,5 @@
+import { validatePilotPortalAccessIfRequired } from './portalSsoAuthority.js';
+
 export const ACCESS_LEVELS = Object.freeze({
   FULL_ACCESS: 'FULL_ACCESS',
   SOUND_PROOF_ONLY: 'SOUND_PROOF_ONLY',
@@ -141,10 +143,27 @@ export async function resolveAccountAccess(base44, sessionUser, {
   let accountId = String(authoritativeUser.account_id || '').trim();
   let invitationMembership = null;
 
-  // A newly invited Base44 user does not yet carry custom User fields. Resolve
-  // exactly one pending/active membership by normalised email, then bind the
-  // authoritative User record on first login. Cross-account duplicate pending
-  // seats are blocked by manageAccountUsers, and ambiguity fails closed here.
+  // Prefer an administrator-assigned Base44 user-id membership. This is the
+  // production SSO path: a verified external identity never receives account
+  // authority from its email, dealer name, URL or account parameter.
+  if (!accountId) {
+    const assignedRows = await service.entities.AccountMembership.filter({
+      user_id: authoritativeUser.id,
+    });
+    const eligibleAssignments = (assignedRows || []).filter((item) =>
+      item.status === 'pending' || item.status === 'active'
+    );
+    if (eligibleAssignments.length === 1) {
+      invitationMembership = eligibleAssignments[0];
+      accountId = String(invitationMembership.account_id || '').trim();
+    } else if (eligibleAssignments.length > 1) {
+      return { allowed: false, reason: 'MEMBERSHIP_AMBIGUOUS' };
+    }
+  }
+
+  // Preserve the legacy invitation path for non-portal accounts only. Portal
+  // pilot accounts are additionally subject to the verified OIDC/session gate
+  // below before any membership or User record is activated.
   if (!accountId && email) {
     const invitationRows = await service.entities.AccountMembership.filter({ email });
     const eligibleInvitations = (invitationRows || []).filter((item) =>
@@ -166,6 +185,23 @@ export async function resolveAccountAccess(base44, sessionUser, {
   }
   if (account.status === 'suspended') {
     return { allowed: false, reason: 'ACCOUNT_SUSPENDED', account };
+  }
+
+  // The iCubed pilot is fail-closed on every server-side authority call.
+  // A Base44 session, account membership, matching email or editable URL is
+  // never enough: the verified Supabase subject and live portal session must
+  // resolve through the unique ExternalAccountLink to this exact account.
+  const portalAccess = await validatePilotPortalAccessIfRequired(
+    base44,
+    authoritativeUser,
+    account,
+  );
+  if (portalAccess.required && !portalAccess.allowed) {
+    return {
+      allowed: false,
+      reason: portalAccess.reason || 'PORTAL_SSO_REQUIRED',
+      account,
+    };
   }
 
   if (!authoritativeUser.account_id && invitationMembership) {
