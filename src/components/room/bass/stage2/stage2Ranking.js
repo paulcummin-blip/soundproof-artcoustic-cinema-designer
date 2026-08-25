@@ -159,8 +159,8 @@ export function buildStage2RankingTuple(result, seatPriorityMap) {
  * Returns negative if a ranks higher (better), positive if b ranks higher.
  */
 export function compareStage2Results(a, b) {
-  const ta = a.rankingTuple;
-  const tb = b.rankingTuple;
+  const ta = Array.isArray(a?.rankingTuple) ? a.rankingTuple : [];
+  const tb = Array.isArray(b?.rankingTuple) ? b.rankingTuple : [];
   const len = Math.max(ta.length, tb.length);
   for (let i = 0; i < len; i += 1) {
     const va = ta[i] ?? 0;
