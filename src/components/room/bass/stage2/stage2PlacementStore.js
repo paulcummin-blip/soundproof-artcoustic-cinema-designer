@@ -222,13 +222,13 @@ class Stage2PlacementController {
     }
 
     markStage2Updating(projectId, fingerprint);
-    console.info("[Stage2Validation] scheduled", {
+    console.info("[Stage2Validation] scheduled " + JSON.stringify({
       fingerprint,
       queuedJobs: this.queue.length,
       finalistCounts: Object.fromEntries(
         Object.entries(this.quantityFinalists).map(([quantity, finalists]) => [quantity, finalists.length]),
       ),
-    });
+    }));
 
     // If no finalists at all, check B eligibility then complete
     if (this.queue.length === 0 && this.quantityOrder.every((qty) => this.quantityFinal[qty])) {
@@ -285,12 +285,12 @@ class Stage2PlacementController {
     if (!active || message.requestId !== active.requestId) return;
     if (message.fingerprint !== this.currentFingerprint) { this.activeJobs.delete(workerIndex); return; }
 
-    console.info("[Stage2Validation] worker message", {
+    console.info("[Stage2Validation] worker message " + JSON.stringify({
       type: message.type,
       error: message.error || null,
       finalistId: active.finalist?.id || null,
       quantity: active.quantity,
-    });
+    }));
     this.activeJobs.delete(workerIndex);
     const qty = active.quantity;
     const wasBJob = active.isB === true;
@@ -355,11 +355,11 @@ class Stage2PlacementController {
 
   handleError(workerIndex, errorMessage) {
     const active = this.activeJobs.get(workerIndex);
-    console.error("[Stage2Validation] worker failure", {
+    console.error("[Stage2Validation] worker failure " + JSON.stringify({
       error: errorMessage,
       finalistId: active?.finalist?.id || null,
       quantity: active?.quantity || null,
-    });
+    }));
     this.activeJobs.delete(workerIndex);
     // Track failed practical family (all attempts failed → optimiser incomplete)
     const failedFamilyId = active?.finalist?.familyId;
