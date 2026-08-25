@@ -10,7 +10,7 @@
 // Does NOT rerun Stage 1. Stage 1 remains product-independent.
 // Evaluates only the selected P14 target (not the full 8-target matrix).
 
-import { useEffect, useSyncExternalStore, useRef, useMemo } from "react";
+import { useEffect, useSyncExternalStore, useState, useMemo } from "react";
 import { computeStage2Fingerprint } from "./stage2Fingerprint";
 import {
   stage2PlacementController,
@@ -88,7 +88,7 @@ export function useStage2PlacementOptimiser({
     () => getStage1State(projectId),
   );
 
-  const hydrationDoneRef = useRef(false);
+  const [hydrationDone, setHydrationDone] = useState(false);
 
   // Compute P14 target from splConfig
   const p14Target = useMemo(() => {
@@ -139,9 +139,9 @@ export function useStage2PlacementOptimiser({
 
   // Hydration on mount / project change
   useEffect(() => {
-    hydrationDoneRef.current = false;
+    setHydrationDone(false);
     if (!projectId || projectId === "free") {
-      hydrationDoneRef.current = true;
+      setHydrationDone(true);
       return;
     }
 
@@ -149,7 +149,7 @@ export function useStage2PlacementOptimiser({
     (async () => {
       const hydrated = await hydrateStage2PlacementCache(projectId);
       if (cancelled) return;
-      hydrationDoneRef.current = true;
+      setHydrationDone(true);
 
       if (hydrated && isStage2CacheValid(hydrated, fingerprint)) {
         publishHydratedStage2(projectId, fingerprint, {
@@ -173,7 +173,7 @@ export function useStage2PlacementOptimiser({
 
   // Schedule / cancel on fingerprint change
   useEffect(() => {
-    if (!hydrationDoneRef.current) return;
+    if (!hydrationDone) return;
 
     if (!fingerprint) {
       markStage2Idle(projectId);
@@ -220,7 +220,7 @@ export function useStage2PlacementOptimiser({
       quantityOrder,
       delay: STAGE2_START_DELAY_MS,
     });
-  }, [fingerprint, projectId, hydrationDoneRef.current, currentQuantity]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, projectId, hydrationDone, currentQuantity]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return state;
 }
