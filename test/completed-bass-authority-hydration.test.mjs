@@ -43,6 +43,7 @@ function buildAuthoritativeSnapshot() {
     selectedCandidate: {
       id: "cand-min-L2",
       worstP20SeatId: "seat-r2-c1",
+      achievedP18FrequencyHz: 22.941,
       perSeatP19Results: [
         { seatId: "seat-r1-c1", variationDbRaw: 8.47, level: 0 },
         { seatId: "seat-r2-c1", variationDbRaw: 9.63, level: 0 },

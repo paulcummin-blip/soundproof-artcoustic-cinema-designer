@@ -209,6 +209,36 @@ export function validateAssessmentEnvelopeAuthority(contract) {
   if (!Number.isFinite(Number(envelope.assessmentEndHz)))
     return { valid: false, reason: "missing-assessment-end-hz" };
 
+  // Four-way P18 authority parity: the selected candidate, envelope, assessment
+  // start, and product-analysis card must all carry the same canonical achieved
+  // P18 crossing. A transition-window contract with a stale fixed-20-Hz
+  // assessmentStartHz alongside a higher achieved P18 crossing is rejected
+  // here — it must be replaced by a fresh canonical calculation. All four
+  // values are required; missing any one is a rejection (no partial authority
+  // by filtering). Full-precision values are compared (no rounding/display).
+  const P18_AUTHORITY_TOLERANCE_HZ = 0.01;
+  const candidateP18Raw = contract?.selectedCandidate?.achievedP18FrequencyHz;
+  const envelopeP18Raw = envelope.achievedP18FrequencyHz;
+  const envelopeStartRaw = envelope.assessmentStartHz;
+  const cardP18Raw = contract?.productAnalysis?.parameters?.p18?.value;
+  if (candidateP18Raw == null || envelopeP18Raw == null
+    || envelopeStartRaw == null || cardP18Raw == null) {
+    return { valid: false, reason: `p18-authority-missing:${candidateP18Raw ?? null}:${envelopeP18Raw ?? null}:${envelopeStartRaw ?? null}:${cardP18Raw ?? null}` };
+  }
+  const candidateP18 = Number(candidateP18Raw);
+  const envelopeP18 = Number(envelopeP18Raw);
+  const envelopeStartHz = Number(envelopeStartRaw);
+  const cardP18 = Number(cardP18Raw);
+  if (!Number.isFinite(candidateP18) || !Number.isFinite(envelopeP18)
+    || !Number.isFinite(envelopeStartHz) || !Number.isFinite(cardP18)) {
+    return { valid: false, reason: `p18-authority-missing:${candidateP18}:${envelopeP18}:${envelopeStartHz}:${cardP18}` };
+  }
+  const p18Spread = Math.max(candidateP18, envelopeP18, envelopeStartHz, cardP18)
+    - Math.min(candidateP18, envelopeP18, envelopeStartHz, cardP18);
+  if (p18Spread > P18_AUTHORITY_TOLERANCE_HZ) {
+    return { valid: false, reason: `p18-authority-split:${candidateP18}:${envelopeP18}:${envelopeStartHz}:${cardP18}` };
+  }
+
   // Validate per-seat P19 grades against current shared mapper
   const p19Seats = contract?.selectedCandidate?.perSeatP19Results;
   if (Array.isArray(p19Seats)) {
@@ -307,6 +337,11 @@ export function compactCompletedBassContract(contract, { graphPayloadTimings = n
       perSeatP19Results: contract.selectedCandidate?.perSeatP19Results || [],
       perSeatP20Results: contract.selectedCandidate?.perSeatP20Results || [],
       p14TargetBasis: contract.selectedCandidate?.p14TargetBasis || contract.productAnalysis?.parameters?.p14?.targetBasis || "minimum",
+      achievedP18FrequencyHz: Number.isFinite(Number(contract.selectedCandidate?.achievedP18FrequencyHz))
+        ? Number(contract.selectedCandidate.achievedP18FrequencyHz)
+        : (Number.isFinite(Number(contract.finalOptimisedBassResponse?.achievedP18FrequencyHz))
+          ? Number(contract.finalOptimisedBassResponse.achievedP18FrequencyHz)
+          : null),
     },
     requestedP14TargetDb: Number.isFinite(contract.selectedP14TargetDb) ? contract.selectedP14TargetDb : null,
     requestedP14Basis: contract.selectedP14TargetBasis || null,
