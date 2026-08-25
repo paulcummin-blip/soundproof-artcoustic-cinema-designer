@@ -14,6 +14,15 @@ import { validatePolarModel } from "@/components/utils/rp22/polarModelValidation
 import { levelP17_wsFR, numericRp22Level } from "@/components/utils/rp22/levels";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 
+// P16/P17 RSP-normalisation logic version. Bumped when the seat-vs-RSP delta
+// construction changes (e.g. removal of the absolute-loss offset term). This
+// is a non-bass, design-analysis-only version — it invalidates stale in-memory
+// seat-snapshot caches whose signature would otherwise be identical before
+// and after a normalisation correction. NOT a bass contract version.
+// v1 = legacy delta = abs(seatLoss - rspLoss) + (seatLoss * 0.5)
+// v2 = corrected delta = abs(seatLoss - rspLoss)  (RSP is true zero reference)
+export const P16_P17_NORMALISATION_VERSION = 2;
+
 const LCR_ROLES = new Set(["FL", "L", "FC", "C", "FR", "R"]);
 const OVERHEAD_ROLES = new Set(["TFL", "TFR", "TL", "TR", "TML", "TMR", "TBL", "TBR", "TFC", "TBC", "TRL", "TRR"]);
 const SURROUND_ROLES = new Set(["SL", "SR", "SBL", "SBR", "LW", "RW"]);

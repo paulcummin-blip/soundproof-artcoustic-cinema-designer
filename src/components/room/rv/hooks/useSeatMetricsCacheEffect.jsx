@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { buildSeatHudSnapshot } from "@/components/utils/buildSeatHudSnapshot";
+import { P16_P17_NORMALISATION_VERSION } from "@/components/utils/rp22HfOffAxis";
 
 export function useSeatMetricsCacheEffect({
   seatingPositions,
@@ -106,7 +107,7 @@ export function useSeatMetricsCacheEffect({
     const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
 
     const signature =
-      `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|MLP${mlpFingerprint}|SCR${screenRounded}|7B${sevenBedMode}|A${analysisRev}|S${splRev}|LCR${Math.round(lcrL*10)}:${Math.round(lcrR*10)}`;
+      `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|MLP${mlpFingerprint}|SCR${screenRounded}|7B${sevenBedMode}|A${analysisRev}|S${splRev}|LCR${Math.round(lcrL*10)}:${Math.round(lcrR*10)}|P16P17v${P16_P17_NORMALISATION_VERSION}`;
 
     if (lastCacheSignatureRef.current === signature) {
       return;
