@@ -34,6 +34,10 @@ export default function SeatPrioritySelector({
   seatingPositions = [],
   onSetSeatingPositions,
   disabled = false,
+  designatedRspSeatId = null,
+  onSetDesignatedRspSeatId = null,
+  rspMode = "auto_from_screen",
+  onRspModeChange = null,
 }) {
   // Group seats by rowNumber, sorted, then left->right by x (canonical order).
   const rows = useMemo(() => {
@@ -56,6 +60,23 @@ export default function SeatPrioritySelector({
     const next = toggleSeatPriority(seatingPositions, seatId);
     if (next !== seatingPositions) {
       onSetSeatingPositions(next);
+    }
+  };
+
+  // Designate a seat as the canonical RSP (seat_bound mode).
+  // Explicit action: the designer chooses this seat as the RSP, so the bass
+  // engine RSP uses its exact coordinates and P20 for that seat is naturally 0.
+  // Clicking the green dot on the already-designated seat unbinds (free-floating).
+  const handleDesignateRsp = (seatId) => {
+    if (disabled) return;
+    if (!onSetDesignatedRspSeatId || !onRspModeChange) return;
+    if (designatedRspSeatId === seatId && rspMode === "seat_bound") {
+      // Unbind — return to free-floating auto RSP.
+      onSetDesignatedRspSeatId(null);
+      onRspModeChange("auto_from_screen");
+    } else {
+      onSetDesignatedRspSeatId(seatId);
+      onRspModeChange("seat_bound");
     }
   };
 
@@ -103,6 +124,11 @@ export default function SeatPrioritySelector({
       <p className="text-[11px] leading-snug" style={{ color: "#625143", fontFamily: BODY_FONT }}>
         Tap any seat to toggle Primary / Secondary. Secondary seats stay fully
         included in every calculation.
+        {onSetDesignatedRspSeatId && onRspModeChange && (
+          <span style={{ display: "block", marginTop: 4 }}>
+            Tap the <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#22c55e", border: "1.5px solid #fff", boxShadow: "0 0 3px rgba(34,197,94,0.5)", verticalAlign: "middle" }} /> green dot to bind the RSP to that seat (P20 = 0 for the bound seat).
+          </span>
+        )}
       </p>
 
       <div className="space-y-2 p-3 rounded-lg" style={{ border: "1px solid #C1B6AD", background: "#F8F8F7" }}>
@@ -119,6 +145,7 @@ export default function SeatPrioritySelector({
                 {seats.map((seat, idxInRow) => {
                   const isSecondary = resolveSeatPriority(seat) === "secondary";
                   const label = compactSeatLabel(seat, idxInRow);
+                  const isDesignatedRsp = designatedRspSeatId === seat?.id && rspMode === "seat_bound";
 
                   const baseStyle = {
                     width: 34,
@@ -133,6 +160,7 @@ export default function SeatPrioritySelector({
                     cursor: disabled ? "default" : "pointer",
                     transition: "background-color 120ms ease, border-color 120ms ease, color 120ms ease",
                     userSelect: "none",
+                    position: "relative",
                   };
 
                   let style;
@@ -153,29 +181,78 @@ export default function SeatPrioritySelector({
                     };
                   }
 
+                  // Highlight the designated RSP seat with a green border.
+                  if (isDesignatedRsp) {
+                    style = {
+                      ...style,
+                      border: "2px solid #22c55e",
+                      boxShadow: "0 0 0 1px #22c55e",
+                    };
+                  }
+
                   const tooltip = isSecondary
                     ? `Secondary seat (${label}) — click to make Primary`
                     : `Primary seat (${label}) — click to make Secondary`;
+                  const rspTooltip = isDesignatedRsp
+                    ? `RSP bound to ${label} — click green dot to unbind`
+                    : `Designate ${label} as RSP (seat-bound)`;
 
                   return (
-                    <button
-                      type="button"
-                      key={seat?.id || label}
-                      title={tooltip}
-                      aria-label={tooltip}
-                      disabled={disabled}
-                      style={style}
-                      onClick={() => handleToggle(seat?.id)}
-                      onMouseEnter={(e) => {
-                        if (disabled) return;
-                        e.currentTarget.style.borderColor = "#213428";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = isSecondary ? "#C1B6AD" : "#1B1A1A";
-                      }}
-                    >
-                      {label}
-                    </button>
+                    <div key={seat?.id || label} className="flex items-center" style={{ position: "relative" }}>
+                      <button
+                        type="button"
+                        title={tooltip}
+                        aria-label={tooltip}
+                        disabled={disabled}
+                        style={style}
+                        onClick={() => handleToggle(seat?.id)}
+                        onMouseEnter={(e) => {
+                          if (disabled) return;
+                          e.currentTarget.style.borderColor = "#213428";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = isDesignatedRsp
+                            ? "#22c55e"
+                            : (isSecondary ? "#C1B6AD" : "#1B1A1A");
+                        }}
+                      >
+                        {label}
+                      </button>
+                      {onSetDesignatedRspSeatId && onRspModeChange && (
+                        <button
+                          type="button"
+                          title={rspTooltip}
+                          aria-label={rspTooltip}
+                          disabled={disabled}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDesignateRsp(seat?.id);
+                          }}
+                          style={{
+                            position: "absolute",
+                            top: -5,
+                            right: -5,
+                            width: 12,
+                            height: 12,
+                            borderRadius: "50%",
+                            border: "1.5px solid #ffffff",
+                            background: isDesignatedRsp ? "#22c55e" : "#ffffff",
+                            cursor: disabled ? "default" : "pointer",
+                            padding: 0,
+                            lineHeight: 0,
+                            boxShadow: isDesignatedRsp ? "0 0 4px rgba(34,197,94,0.6)" : "0 1px 2px rgba(0,0,0,0.15)",
+                            transition: "background-color 120ms ease, box-shadow 120ms ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (disabled) return;
+                            if (!isDesignatedRsp) e.currentTarget.style.background = "#86efac";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = isDesignatedRsp ? "#22c55e" : "#ffffff";
+                          }}
+                        />
+                      )}
+                    </div>
                   );
                 })}
               </div>

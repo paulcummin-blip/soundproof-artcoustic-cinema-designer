@@ -140,7 +140,18 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   const rearSubsCfg = appState?.rearSubsCfg;
   const splConfig = appState?.splConfig;
   const instanceStatus = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
-  const rspPosition = useMemo(() => buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m), [roomDims?.widthM, appState?.mlpY_m, appState?.mlpX_m]);
+  const designatedRspSeatId = appState?.designatedRspSeatId ?? null;
+  const designatedRspSeat = useMemo(() => {
+    if (!designatedRspSeatId) return null;
+    const seat = (Array.isArray(seatingPositions) ? seatingPositions : []).find((s) => s?.id === designatedRspSeatId);
+    if (!seat) return null;
+    const x = Number(seat.x);
+    const y = Number(seat.y);
+    const z = Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { id: seat.id, x, y, z };
+  }, [designatedRspSeatId, seatingPositions]);
+  const rspPosition = useMemo(() => buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m, designatedRspSeat), [roomDims?.widthM, appState?.mlpY_m, appState?.mlpX_m, designatedRspSeat]);
 
   const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
   const [roomDamping, setRoomDamping] = useState(DEFAULTS.roomDamping);

@@ -792,7 +792,7 @@ function useDesignerState() {
   }, []);
 
   // ── RSP STATE (composed from isolated hook) ──────────────────────────────
-  const { rspMode, setRspMode, manualRspY_m, setManualRspY_m, manualRspX_m, setManualRspX_m, resetRspState } = useRspState(__autosavePayload);
+  const { rspMode, setRspMode, manualRspY_m, setManualRspY_m, manualRspX_m, setManualRspX_m, designatedRspSeatId, setDesignatedRspSeatId, resetRspState } = useRspState(__autosavePayload);
   // ── END RSP STATE ─────────────────────────────────────────────────────────
 
   // ── VIEWING PRIORITY (multi-row viewing intent) ──────────────────────────
@@ -1515,6 +1515,7 @@ function useDesignerState() {
       if (typeof p.linkEarPlatformHeights === "boolean") setLinkEarPlatformHeights(p.linkEarPlatformHeights);
       if (typeof p.rsp_mode === "string") setRspMode(p.rsp_mode);
       if (p.manual_rsp_y_m !== undefined) setManualRspY_m(typeof p.manual_rsp_y_m === "number" ? p.manual_rsp_y_m : null);
+      if (typeof p.designated_rsp_seat_id === "string") setDesignatedRspSeatId(p.designated_rsp_seat_id || null);
       if (typeof p.viewingPriority === "string") setViewingPriority(p.viewingPriority);
       if (typeof p.designEqEnabled === "boolean") setDesignEqEnabled(p.designEqEnabled);
       if (Object.prototype.hasOwnProperty.call(p, "p12Mode")) setP12Mode(p.p12Mode);
@@ -1608,6 +1609,7 @@ function useDesignerState() {
       rsp_mode: rspMode,
       manual_rsp_y_m: manualRspY_m,
       manual_rsp_x_m: manualRspX_m,
+      designated_rsp_seat_id: designatedRspSeatId,
       viewingPriority,
       designEqEnabled,
       p12Mode,
@@ -1670,6 +1672,8 @@ function useDesignerState() {
     extraSurroundCount,
     rspMode,
     manualRspY_m,
+    manualRspX_m,
+    designatedRspSeatId,
     designEqEnabled,
     roomElements,
     subwooferInstances,
@@ -2228,6 +2232,8 @@ function useDesignerState() {
     setManualRspY_m,
     manualRspX_m,
     setManualRspX_m,
+    designatedRspSeatId,
+    setDesignatedRspSeatId,
     resetRspState,
     viewingPriority,
     setViewingPriority,
@@ -2237,7 +2243,7 @@ function useDesignerState() {
     setSelectedAbfuserQty,
     abfuserQtySource,
     setAbfuserQtySource,
-  ]);
+    ]);
 
   value.setP21EarlyReflectionPreset = setP21EarlyReflectionPresetSafe;
 

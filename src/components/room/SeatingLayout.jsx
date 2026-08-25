@@ -107,6 +107,9 @@ export default function SeatingLayout({
   onManualRspX_mChange,
   manualRspY_m = null,
   onManualRspY_mChange,
+  // Designated RSP seat (seat_bound mode)
+  designatedRspSeatId = null,
+  onSetDesignatedRspSeatId,
   // Viewing priority (multi-row viewing intent)
   viewingPriority = "balanced",
   onViewingPriorityChange,
@@ -585,6 +588,10 @@ export default function SeatingLayout({
           seatingPositions={seatingPositions}
           onSetSeatingPositions={onSetSeatingPositions}
           disabled={disabled}
+          designatedRspSeatId={designatedRspSeatId}
+          onSetDesignatedRspSeatId={onSetDesignatedRspSeatId}
+          rspMode={rspMode}
+          onRspModeChange={onRspModeChange}
         />
       </div>
     </div>
@@ -797,6 +804,7 @@ export default function SeatingLayout({
               onRspModeChange?.("auto_from_screen");
               onManualRspX_mChange?.(null);
               onManualRspY_mChange?.(null);
+              onSetDesignatedRspSeatId?.(null);
             }}>
             <RotateCcw className="w-3.5 h-3.5 mr-1" />
             Reset RSP to 57.5°

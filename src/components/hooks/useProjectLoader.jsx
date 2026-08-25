@@ -134,6 +134,8 @@ appState, // Pass appState directly for setters
       p12Level: appState.p12Level,
       rspMode: appState?.rspMode,
       manualRspY_m: appState?.manualRspY_m,
+      manualRspX_m: appState?.manualRspX_m,
+      designatedRspSeatId: appState?.designatedRspSeatId,
       viewingPriority: appState?.viewingPriority,
       acousticTreatmentEnabled: appState?.acousticTreatmentEnabled,
       selectedAbfuserQty: appState?.selectedAbfuserQty,
@@ -201,8 +203,10 @@ appState, // Pass appState directly for setters
       setExtraSurroundCount,
       setRspMode: appState?.setRspMode,
       setManualRspY_m: appState?.setManualRspY_m,
+      setManualRspX_m: appState?.setManualRspX_m,
+      setDesignatedRspSeatId: appState?.setDesignatedRspSeatId,
       setLinkEarPlatformHeights: appState?.setLinkEarPlatformHeights,
-    });
+      });
   }, [
   appState?.setRoomDims,
   setScreen, setDolbyConfig, setDolbyPreset, setSevenBedLayoutType, setLcrAimMode,
@@ -323,6 +327,8 @@ appState, // Pass appState directly for setters
           p12Level: p?.spl_config?.p12_level ?? null,
           rspMode: p?.rsp_mode || "auto_from_screen",
           manualRspY_m: (() => { const v = Number(p?.manual_rsp_y_m); return Number.isFinite(v) ? v : null; })(),
+          manualRspX_m: (() => { const v = Number(p?.manual_rsp_x_m); return Number.isFinite(v) ? v : null; })(),
+          designatedRspSeatId: typeof p?.designated_rsp_seat_id === "string" ? p.designated_rsp_seat_id : null,
           acousticTreatmentEnabled: !!p?.acoustic_treatment_enabled,
           selectedAbfuserQty: (() => { const v = Number(p?.selected_abfuser_qty); return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0; })(),
           p15ConstructionLevel: p?.p15_construction_level || "purpose-built",
@@ -629,6 +635,8 @@ appState, // Pass appState directly for setters
   appState?.subwooferInstanceMigrationState,
   appState?.rspMode,
   appState?.manualRspY_m,
+  appState?.manualRspX_m,
+  appState?.designatedRspSeatId,
   appState?.viewingPriority,
   appState?.acousticTreatmentEnabled,
   appState?.selectedAbfuserQty,

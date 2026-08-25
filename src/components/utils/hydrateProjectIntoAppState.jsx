@@ -96,6 +96,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     setRspMode,
     setManualRspY_m,
     setManualRspX_m,
+    setDesignatedRspSeatId,
   } = setters;
 
   // 1) ROOM DIMS
@@ -552,6 +553,10 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     const x = Number(p?.manual_rsp_x_m);
     setManualRspX_m(Number.isFinite(x) ? x : null);
   }
+  if (typeof setDesignatedRspSeatId === "function") {
+    const seatId = p?.designated_rsp_seat_id;
+    setDesignatedRspSeatId(typeof seatId === "string" && seatId.trim() ? seatId : null);
+  }
 
   // 10d2) SYNCHRONOUS RSP DERIVATION — close the cold-hydration first-render gap.
   // computeEffectiveRsp is the SAME pure authority used by useEffectiveRsp in
@@ -591,6 +596,21 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       return 120 * 0.0254;
     })();
 
+    // Resolve the designated RSP seat for seat_bound mode at hydration so the
+    // first render carries the exact seat coordinates (P20 = 0 parity on cold open).
+    const designatedRspSeatIdHydrated = typeof p?.designated_rsp_seat_id === "string" ? p.designated_rsp_seat_id : null;
+    const designatedRspSeatHydrated = (() => {
+      if (!designatedRspSeatIdHydrated) return null;
+      const spHydrated = parseMaybe(p?.seating_positions, []);
+      const seat = (Array.isArray(spHydrated) ? spHydrated : []).find((s) => s?.id === designatedRspSeatIdHydrated);
+      if (!seat) return null;
+      const sx = Number(seat.x);
+      const sy = Number(seat.y);
+      if (!Number.isFinite(sx) || !Number.isFinite(sy)) return null;
+      const sz = Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2;
+      return { id: seat.id, x: sx, y: sy, z: sz };
+    })();
+
     const rsp = computeEffectiveRsp({
       rspMode: rspModeHydrated,
       manualRspY_m: manualRspYHydrated,
@@ -600,6 +620,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       screenWidthM: screenWidthHydratedM,
       currentMlpY_m: null,
       rowDerivedRspYByMode: {},
+      designatedRspSeat: designatedRspSeatHydrated,
     });
 
     // Only publish an AUTHORITATIVE RSP derivation — never the "Current RSP"

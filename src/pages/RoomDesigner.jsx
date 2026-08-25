@@ -385,7 +385,7 @@ function RoomDesignerWithState() {
     // The effectiveRspY_m write-back effect (below) handles updates.
     // This screen-geometry writer must not run or it will overwrite the manual RSP.
     const currentRspMode = appState?.rspMode || "auto_from_screen";
-    if (currentRspMode === "manual_position") return;
+    if (currentRspMode === "manual_position" || currentRspMode === "seat_bound") return;
 
     // Pull needed values
     // Prefer the published screen front plane from RV.
@@ -547,6 +547,19 @@ function RoomDesignerWithState() {
     return result?.rowDerivedRspYByMode ?? {};
   }, [_seatingPositions, stableDimensions.width, stableDimensions.length]);
 
+  // Resolve the designated RSP seat (seat_bound mode) from seating positions.
+  const _designatedRspSeat = useMemo(() => {
+    const seatId = appState?.designatedRspSeatId;
+    if (!seatId) return null;
+    const seat = (Array.isArray(_seatingPositions) ? _seatingPositions : []).find((s) => s?.id === seatId);
+    if (!seat) return null;
+    const x = Number(seat.x);
+    const y = Number(seat.y);
+    const z = Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { id: seat.id, x, y, z };
+  }, [appState?.designatedRspSeatId, _seatingPositions]);
+
   const { effectiveRspX_m, effectiveRspY_m, rspSourceLabel } = useEffectiveRsp({
     rspMode: appState?.rspMode || "auto_from_screen",
     manualRspY_m: appState?.manualRspY_m ?? null,
@@ -558,6 +571,7 @@ function RoomDesignerWithState() {
     seatingPositions: appState?.seatingPositions || [],
     currentMlpY_m: appState?.mlpY_m ?? null,
     rowDerivedRspYByMode: _rowDerivedRspYByMode,
+    designatedRspSeat: _designatedRspSeat,
   });
 
   // Write effectiveRspY_m → appState.mlpY_m for auto_from_screen and manual_position.
@@ -565,7 +579,7 @@ function RoomDesignerWithState() {
   // React never sees a spurious state update and no loop is introduced.
   const _rspModeForEffect = appState?.rspMode || "auto_from_screen";
   useEffect(() => {
-    if (_rspModeForEffect !== "auto_from_screen" && _rspModeForEffect !== "manual_position") return;
+    if (_rspModeForEffect !== "auto_from_screen" && _rspModeForEffect !== "manual_position" && _rspModeForEffect !== "seat_bound") return;
     if (!Number.isFinite(effectiveRspY_m)) return;
     if (typeof appState?.setMlpY_m !== "function") return;
 
@@ -580,7 +594,7 @@ function RoomDesignerWithState() {
   // Stage B1: Publish canonical green-dot X (effectiveRspX_m) → appState.mlpX_m.
   // Same rounding/tolerance pattern as Y publication to avoid loops.
   useEffect(() => {
-    if (_rspModeForEffect !== "auto_from_screen" && _rspModeForEffect !== "manual_position") return;
+    if (_rspModeForEffect !== "auto_from_screen" && _rspModeForEffect !== "manual_position" && _rspModeForEffect !== "seat_bound") return;
     if (!Number.isFinite(effectiveRspX_m)) return;
     if (typeof appState?.setMlpX_m !== "function") return;
 
@@ -1995,6 +2009,7 @@ function RoomDesignerWithState() {
                   onSetManualRspX_m={appState?.setManualRspX_m}
                   onSetManualRspY_m={appState?.setManualRspY_m}
                   onSetRspMode={appState?.setRspMode}
+                  onClearDesignatedRspSeatId={() => appState?.setDesignatedRspSeatId?.(null)}
                   liveImpactMode={safeLiveImpactMode} />}
 
                 {leftPanelView === 'front' && (
@@ -2186,6 +2201,8 @@ function RoomDesignerWithState() {
             onManualRspX_mChange={appState?.setManualRspX_m}
             manualRspY_m={appState?.manualRspY_m ?? null}
             onManualRspY_mChange={appState?.setManualRspY_m}
+            designatedRspSeatId={appState?.designatedRspSeatId ?? null}
+            onSetDesignatedRspSeatId={appState?.setDesignatedRspSeatId}
             viewingPriority={appState?.viewingPriority ?? "balanced"}
             onViewingPriorityChange={appState?.setViewingPriority}
             linkEarPlatformHeights={appState?.linkEarPlatformHeights ?? true}

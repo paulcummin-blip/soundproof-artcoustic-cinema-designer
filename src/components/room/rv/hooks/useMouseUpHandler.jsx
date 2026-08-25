@@ -47,6 +47,7 @@ export function useMouseUpHandler({
   onSetManualRspY_m,
   onSetManualRspX_m,
   onSetRspMode,
+  onClearDesignatedRspSeatId,
   // Sub snap guide cleanup
   setSubSnapState,
 }) {
@@ -69,6 +70,11 @@ export function useMouseUpHandler({
       // Y becomes the canonical RSP authority (X stays centreline).
       if (hasY && typeof onSetRspMode === "function") {
         onSetRspMode("manual_position");
+      }
+      // Moving the RSP green dot independently breaks any seat binding —
+      // the RSP is now a free-floating point, not bound to a designated seat.
+      if (hasY && typeof onClearDesignatedRspSeatId === "function") {
+        onClearDesignatedRspSeatId();
       }
       recordTemporaryP18P19DragEnd({
         dragEndCount: ++temporaryRSPDragEndCount,
@@ -211,7 +217,7 @@ export function useMouseUpHandler({
     draggedSubWallRef.current = null;
     draggedSubTypeRef.current = null;
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, isDraggingSeatRef, draftSeatsRef, commitDraftSeatPositions, isDraggingSpeakerDraftRef, draftSpeakersRef, commitDraftSpeakerPositions,     mlpDragInfo, onSetManualRspY_m, onSetManualRspX_m, onSetRspMode, setSubSnapState]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, isDraggingSeatRef, draftSeatsRef, commitDraftSeatPositions, isDraggingSpeakerDraftRef, draftSpeakersRef, commitDraftSpeakerPositions,     mlpDragInfo, onSetManualRspY_m, onSetManualRspX_m, onSetRspMode, onClearDesignatedRspSeatId, setSubSnapState]);
 
   return { handleMouseUp };
 }

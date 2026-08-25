@@ -38,6 +38,9 @@ export function buildAuthoritativeRspPosition(roomDims, mlpY_m, mlpX_m, designat
   const widthM = Number(roomDims?.widthM);
   const y = Number(mlpY_m);
   if (!Number.isFinite(widthM) || !Number.isFinite(y) || widthM <= 0 || y <= 0) return null;
-  const x = Number.isFinite(Number(mlpX_m)) ? Number(mlpX_m) : widthM / 2;
+  // null/undefined mlpX_m → room centreline. Guard against Number(null)===0
+  // which would otherwise place the RSP on the left wall.
+  const mlpXNum = Number(mlpX_m);
+  const x = (mlpX_m != null && Number.isFinite(mlpXNum)) ? mlpXNum : widthM / 2;
   return { id: "rsp", x, y, z: 1.2, designatedRspSeatId: null, __isSyntheticRsp: true };
 }

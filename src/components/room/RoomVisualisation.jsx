@@ -192,6 +192,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     manualRspX_m,
     onSetManualRspX_m,
     onSetRspMode,
+    onClearDesignatedRspSeatId,
     allSeatSplMetrics: allSeatSplMetricsProp = null,
     speakerPositionsView = 'off',
     showMlpRuler = false,
@@ -1553,6 +1554,7 @@ const byId = useEntitiesById({
     onSetManualRspY_m,
     onSetManualRspX_m,
     onSetRspMode,
+    onClearDesignatedRspSeatId,
     setSubSnapState,
   });
 
@@ -2062,11 +2064,14 @@ useEffect(() => {
       onSetManualRspY_m?.(finalY);
       onSetManualRspX_m?.(null);
       onSetRspMode?.("manual_position");
+      // Placing the RSP via click-to-place breaks any seat binding — the RSP
+      // is now a free-floating point, not bound to a designated seat.
+      onClearDesignatedRspSeatId?.();
     }
     setMlpGrab(false);
     mlpDragActiveRef.current = false;
     setMlpDragInfo(null);
-  }, [_computeMlpYFromPointer, onSetManualRspY_m, onSetManualRspX_m, onSetRspMode]);
+  }, [_computeMlpYFromPointer, onSetManualRspY_m, onSetManualRspX_m, onSetRspMode, onClearDesignatedRspSeatId]);
 
   // Cancel: Escape while GRABBED → restore last committed Y → LOCKED.
   const handleMlpCancel = useCallback(() => {

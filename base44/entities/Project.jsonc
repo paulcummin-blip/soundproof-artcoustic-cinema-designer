@@ -321,10 +321,11 @@
         "middle_row_center",
         "back_row_center",
         "all_rows_average",
-        "manual_position"
+        "manual_position",
+        "seat_bound"
       ],
       "default": "auto_from_screen",
-      "description": "RSP source-of-truth mode. auto_from_screen = 57.5\u00b0 derived; *_row_* = seating-derived; manual_position = user-nominated Y."
+      "description": "RSP source-of-truth mode. auto_from_screen = 57.5\u00b0 derived; *_row_* = seating-derived; manual_position = user-nominated Y; seat_bound = canonical RSP bound to designated_rsp_seat_id (exact seat coordinates)."
     },
     "manual_rsp_y_m": {
       "type": "number",
@@ -334,6 +335,11 @@
     "manual_rsp_x_m": {
       "type": "number",
       "description": "Explicit RSP X position in meters when rsp_mode is manual_position. Null = use room centreline.",
+      "nullable": true
+    },
+    "designated_rsp_seat_id": {
+      "type": "string",
+      "description": "ID of the seating position bound as the canonical RSP when rsp_mode is seat_bound. Null = free-floating RSP (no seat bound). When set, the bass engine RSP uses this seat's exact XYZ so P20 for that seat is naturally 0 dB. Cleared when the designer moves the RSP green dot independently.",
       "nullable": true
     },
     "viewing_priority": {
