@@ -1,0 +1,65 @@
+{
+  "name": "Stage2PlacementCache",
+  "type": "object",
+  "description": "Persistent Stage 2 subwoofer placement canonical evaluation cache. Product-aware, P14-aware canonical P19/P20 ranking of Stage 1 finalists. Clearly separate from Stage 1 placement search, applied-layout canonical authority, and eight-target P14 cache.",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "Project identifier owning this Stage 2 placement cache."
+    },
+    "stage2_cache_version": {
+      "type": "integer",
+      "description": "Stage 2 cache envelope version.",
+      "default": 1
+    },
+    "stage2_ranking_version": {
+      "type": "string",
+      "description": "Stage 2 lexicographic ranking algorithm version."
+    },
+    "stage2_canonical_version": {
+      "type": "string",
+      "description": "Stage 2 canonical evaluation pipeline version."
+    },
+    "current_fingerprint": {
+      "type": "string",
+      "description": "Current Stage 2 fingerprint required by the project."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "uncalculated",
+        "updating",
+        "complete"
+      ],
+      "default": "uncalculated"
+    },
+    "one_sub_result": {
+      "type": "object",
+      "description": "Stage 2 result for 1-sub quantity: evaluated finalists, best finalist, ranking, runtime."
+    },
+    "two_sub_result": {
+      "type": "object",
+      "description": "Stage 2 result for 2-sub quantity: evaluated finalists, best finalist, ranking, runtime."
+    },
+    "four_sub_result": {
+      "type": "object",
+      "description": "Stage 2 result for 4-sub quantity: evaluated finalists, best finalist, ranking, runtime."
+    },
+    "overall_best": {
+      "type": "object",
+      "description": "Overall best finalist across all quantities, with quantity and family identity."
+    },
+    "canonical_jobs_run": {
+      "type": "integer",
+      "description": "Total number of canonical evaluation jobs run for this fingerprint.",
+      "default": 0
+    },
+    "total_runtime_ms": {
+      "type": "number",
+      "description": "Total Stage 2 wall-clock runtime in milliseconds."
+    }
+  },
+  "required": [
+    "project_id"
+  ]
+}

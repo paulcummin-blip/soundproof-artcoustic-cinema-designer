@@ -38,6 +38,7 @@ import { SHOW_DEBUG_LOGS } from '../components/utils/diagnostics'; // NEW: Impor
 import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/seatingUtils';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
 import { useStage1PlacementOptimiser } from '@/components/room/bass/stage1/useStage1PlacementOptimiser';
+import { useStage2PlacementOptimiser } from '@/components/room/bass/stage2/useStage2PlacementOptimiser';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 import { calculateRecommendedAbfuserQty } from "@/components/utils/abfuserRecommendation";
@@ -628,6 +629,35 @@ function RoomDesignerWithState() {
     roomDims: stableDimensions,
     rspPosition: mlpAnchorEffective,
     seatingPositions: _seatingPositions,
+  });
+
+  // ── Stage 2 Subwoofer Placement Optimiser ──────────────────────────
+  // Canonical P19/P20 evaluation of Stage 1 finalists at the selected P14 target.
+  // Product-aware, P14-aware. Reuses the existing canonical bass authority pipeline.
+  const _stage2SubModel = React.useMemo(() => {
+    const subs = appState?.subwoofers || [];
+    const instances = appState?.subwooferInstances || [];
+    const firstInstance = instances.find(i => i?.enabled !== false);
+    if (firstInstance?.model) return firstInstance.model;
+    return subs[0]?.modelKey || subs[0]?.model || null;
+  }, [appState?.subwoofers, appState?.subwooferInstances]);
+
+  const _stage2CurrentQty = React.useMemo(() => {
+    const subs = appState?.subwoofers || [];
+    const instances = (appState?.subwooferInstances || []).filter(i => i?.enabled !== false);
+    const count = instances.length || subs.length;
+    return (count === 1 || count === 2 || count === 4) ? count : null;
+  }, [appState?.subwoofers, appState?.subwooferInstances]);
+
+  useStage2PlacementOptimiser({
+    projectId: activeProjectId,
+    roomDims: stableDimensions,
+    rspPosition: mlpAnchorEffective,
+    seatingPositions: _seatingPositions,
+    selectedSubModel: _stage2SubModel,
+    amplifierPowerPerSubW: appState?.splConfig?.subwooferAmplifierPowerW,
+    splConfig: appState?.splConfig,
+    currentQuantity: _stage2CurrentQty,
   });
 
   // manualRspY_m is not yet set, seed it from the current mlpY_m.
