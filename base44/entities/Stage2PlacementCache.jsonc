@@ -43,7 +43,7 @@
     },
     "four_sub_result": {
       "type": "object",
-      "description": "Stage 2 result for 4-sub quantity: evaluated finalists, best finalist, ranking, runtime."
+      "description": "Stage 2 result for 4-sub quantity: evaluated finalists, best finalist, ranking, runtime. Includes B last-resort candidate if evaluated."
     },
     "overall_best": {
       "type": "object",
@@ -57,6 +57,34 @@
     "total_runtime_ms": {
       "type": "number",
       "description": "Total Stage 2 wall-clock runtime in milliseconds."
+    },
+    "b_eligible": {
+      "type": "boolean",
+      "description": "Whether RP22 B last-resort was eligible for evaluation. True only when all promoted practical four-sub candidates were evaluated and none passed the credibility gate.",
+      "default": false
+    },
+    "b_evaluated": {
+      "type": "boolean",
+      "description": "Whether RP22 B was actually evaluated through the canonical pipeline. False when B was not eligible or not yet evaluated.",
+      "default": false
+    },
+    "b_eligibility_reason": {
+      "type": "string",
+      "description": "Reason B became eligible (e.g. 'all_practical_candidates_failed_credibility_gate') or was not eligible (e.g. 'practical_candidate_passes', 'stale_fingerprint').",
+      "nullable": true
+    },
+    "b_failed_candidates": {
+      "type": "array",
+      "description": "List of practical four-sub candidates that failed the credibility gate, with finalistId, familyId, and failure reason. Empty when B was not eligible or a practical candidate passed.",
+      "items": {
+        "type": "object"
+      },
+      "default": []
+    },
+    "b_result": {
+      "type": "object",
+      "description": "B canonical evaluation result if evaluated. Same shape as other Stage 2 finalist results. Also included in four_sub_result.evaluatedFinalists. Null when B was not evaluated.",
+      "nullable": true
     }
   },
   "required": [

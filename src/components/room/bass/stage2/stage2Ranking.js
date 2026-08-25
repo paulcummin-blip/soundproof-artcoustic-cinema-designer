@@ -22,8 +22,9 @@
 //   15. -(asymmetry — not yet available, 0)
 //   16. deterministic coordinate key (string comparison)
 
-import { getFamilyPreferenceRank } from "../stage1/stage1FamilyRegistry";
+import { getFamilyPreferenceRank, isBFamily } from "../stage1/stage1FamilyRegistry";
 import { STAGE2_TIE_TOLERANCE_DB } from "./stage2Constants";
+import { compareBAgainstPractical } from "./stage2BLastResort";
 
 /**
  * Build a per-seat summary from P19/P20 results.
@@ -171,6 +172,22 @@ export function compareStage2Results(a, b) {
     }
   }
   return 0;
+}
+
+/**
+ * Compare two Stage 2 finalist results with the B last-resort material
+ * improvement rule applied when one result is B and the other is practical.
+ *
+ * B only beats a practical candidate if materially better on Primary-seat
+ * acoustic fields. Otherwise the practical candidate wins on family
+ * preference.
+ */
+export function compareStage2ResultsWithBRule(a, b) {
+  const aIsB = isBFamily(a?.familyId);
+  const bIsB = isBFamily(b?.familyId);
+  if (aIsB && !bIsB) return compareBAgainstPractical(a, b);
+  if (!aIsB && bIsB) return -compareBAgainstPractical(b, a);
+  return compareStage2Results(a, b);
 }
 
 /**

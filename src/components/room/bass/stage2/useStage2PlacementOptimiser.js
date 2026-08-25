@@ -159,6 +159,11 @@ export function useStage2PlacementOptimiser({
           overall_best: hydrated.overall_best,
           canonical_jobs_run: hydrated.canonical_jobs_run,
           total_runtime_ms: hydrated.total_runtime_ms,
+          b_eligible: hydrated.b_eligible,
+          b_evaluated: hydrated.b_evaluated,
+          b_eligibility_reason: hydrated.b_eligibility_reason,
+          b_failed_candidates: hydrated.b_failed_candidates,
+          b_result: hydrated.b_result,
         });
       }
     })();

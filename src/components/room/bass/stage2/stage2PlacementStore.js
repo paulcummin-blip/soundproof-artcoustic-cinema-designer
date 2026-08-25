@@ -8,8 +8,14 @@ import {
   STAGE2_FINALISTS_NORMAL,
   STAGE2_START_DELAY_MS,
 } from "./stage2Constants";
-import { buildStage2RankingTuple, compareStage2Results, meetsStopCondition } from "./stage2Ranking";
+import {
+  buildStage2RankingTuple,
+  compareStage2ResultsWithBRule,
+  meetsStopCondition,
+} from "./stage2Ranking";
 import { shouldEvaluateThirdFinalist } from "./stage2FinalistPromotion";
+import { evaluateBEligibility, generateBFinalist } from "./stage2BLastResort";
+import { isBFamily } from "../stage1/stage1FamilyRegistry";
 
 const listeners = new Set();
 const memoryByProject = new Map();
@@ -29,6 +35,11 @@ function emptyState(projectId) {
     totalRuntimeMs: 0,
     errorMessage: null,
     hydratedFromCache: false,
+    bEligible: false,
+    bEvaluated: false,
+    bEligibilityReason: null,
+    bFailedCandidates: [],
+    bResult: null,
   };
 }
 
@@ -66,6 +77,11 @@ export function publishHydratedStage2(projectId, fingerprint, results) {
     overall_best: results?.overall_best || null,
     canonicalJobsRun: results?.canonical_jobs_run || 0,
     totalRuntimeMs: results?.total_runtime_ms || 0,
+    bEligible: results?.b_eligible || false,
+    bEvaluated: results?.b_evaluated || false,
+    bEligibilityReason: results?.b_eligibility_reason || null,
+    bFailedCandidates: results?.b_failed_candidates || [],
+    bResult: results?.b_result || null,
     errorMessage: null,
     hydratedFromCache: true,
   });
@@ -104,6 +120,11 @@ function publishStage2Progress(projectId, fingerprint, results) {
     two_sub_result: results?.two_sub_result || null,
     four_sub_result: results?.four_sub_result || null,
     overall_best: results?.overall_best || null,
+    bEligible: results?.b_eligible || false,
+    bEvaluated: results?.b_evaluated || false,
+    bEligibilityReason: results?.b_eligibility_reason || null,
+    bFailedCandidates: results?.b_failed_candidates || [],
+    bResult: results?.b_result || null,
   });
 }
 
@@ -117,6 +138,11 @@ function publishStage2Complete(projectId, fingerprint, results) {
     overall_best: results?.overall_best || null,
     canonicalJobsRun: results?.canonical_jobs_run || 0,
     totalRuntimeMs: results?.total_runtime_ms || 0,
+    bEligible: results?.b_eligible || false,
+    bEvaluated: results?.b_evaluated || false,
+    bEligibilityReason: results?.b_eligibility_reason || null,
+    bFailedCandidates: results?.b_failed_candidates || [],
+    bResult: results?.b_result || null,
     errorMessage: null,
     hydratedFromCache: false,
   });
@@ -142,6 +168,11 @@ class Stage2PlacementController {
     this.quantityOrder = [];
     this.startTime = 0;
     this.canonicalJobsRun = 0;
+    // B last-resort state
+    this.bState = "not_checked"; // not_checked | eligible | queued | evaluated | not_eligible
+    this.bEligibilityReason = null;
+    this.bFailedCandidates = [];
+    this.bResult = null;
   }
 
   schedule({ projectId, fingerprint, promotionPlan, params, quantityOrder, delay }) {
@@ -161,6 +192,11 @@ class Stage2PlacementController {
     this.canonicalJobsRun = 0;
     this.startTime = now();
     this.quantityOrder = quantityOrder;
+    // Reset B last-resort state
+    this.bState = "not_checked";
+    this.bEligibilityReason = null;
+    this.bFailedCandidates = [];
+    this.bResult = null;
 
     // Build the queue: first NORMAL finalists per quantity in quantity order
     this.queue = [];
@@ -177,9 +213,9 @@ class Stage2PlacementController {
 
     markStage2Updating(projectId, fingerprint);
 
-    // If no finalists at all, complete immediately
+    // If no finalists at all, check B eligibility then complete
     if (this.queue.length === 0 && this.quantityOrder.every((qty) => this.quantityFinal[qty])) {
-      this.checkComplete();
+      this.maybeCheckBAndComplete();
       return;
     }
 
@@ -234,6 +270,7 @@ class Stage2PlacementController {
 
     this.activeJobs.delete(workerIndex);
     const qty = active.quantity;
+    const wasBJob = active.isB === true;
 
     if (message.type === "complete") {
       // Count every completed job (including null results) so the third-finalist
@@ -250,14 +287,24 @@ class Stage2PlacementController {
         if (meetsStopCondition(rankingData)) {
           this.quantityFinal[qty] = true;
         }
+        // Track B result separately for persistence
+        if (wasBJob) {
+          this.bResult = result;
+        }
         this.publishProgress();
       }
     } else if (message.type === "error") {
       // A failed finalist is simply not ranked
     }
 
+    // Mark B as evaluated (success or error) so completion can proceed
+    if (wasBJob) {
+      this.bState = "evaluated";
+    }
+
     // Decide whether a third finalist is needed for this quantity
-    if (!this.quantityFinal[qty] && this.quantityEvaluated[qty] >= STAGE2_FINALISTS_NORMAL) {
+    // (skip for B jobs — B is not a normal finalist)
+    if (!wasBJob && !this.quantityFinal[qty] && this.quantityEvaluated[qty] >= STAGE2_FINALISTS_NORMAL) {
       const evaluated = this.completedResults[qty] || [];
       const remaining = (this.quantityFinalists[qty] || []).slice(STAGE2_FINALISTS_NORMAL);
       if (shouldEvaluateThirdFinalist(evaluated, remaining) && remaining.length > 0) {
@@ -267,26 +314,77 @@ class Stage2PlacementController {
       }
     }
 
-    // Dispatch next or check completion
+    // Dispatch next or check B eligibility + completion
     if (this.queue.length > 0) {
       this.dispatchNext();
     } else if (this.activeJobs.size === 0) {
-      this.checkComplete();
+      this.maybeCheckBAndComplete();
     }
   }
 
   handleError(workerIndex, errorMessage) {
+    const active = this.activeJobs.get(workerIndex);
     this.activeJobs.delete(workerIndex);
+    // Mark B as evaluated even on error so completion can proceed
+    if (active?.isB === true) {
+      this.bState = "evaluated";
+    }
     if (this.queue.length > 0) {
       this.dispatchNext();
     } else if (this.activeJobs.size === 0) {
-      this.checkComplete();
+      this.maybeCheckBAndComplete();
     }
   }
 
   publishProgress() {
     const results = this.buildResultsSnapshot();
     publishStage2Progress(this.projectId, this.currentFingerprint, results);
+  }
+
+  /**
+   * Check B eligibility for 4-sub, then complete if ready.
+   * Called when the queue is empty and no active jobs remain.
+   *
+   * B is only checked once all normal quantities are final. If B is eligible,
+   * it is generated and queued for evaluation (completion deferred). If B is
+   * not eligible or already evaluated, proceeds to normal completion.
+   */
+  maybeCheckBAndComplete() {
+    const allFinal = this.quantityOrder.every((qty) => this.quantityFinal[qty]);
+    if (!allFinal) return;
+
+    // B only applies to 4-sub. Check eligibility once.
+    if (this.bState === "not_checked") {
+      const fourSubResults = this.completedResults[4] || [];
+      const promotedFinalists = this.quantityFinalists[4] || [];
+
+      const eligibility = evaluateBEligibility({
+        evaluatedResults: fourSubResults,
+        promotedFinalists,
+        fingerprint: this.currentFingerprint,
+        currentFingerprint: this.currentFingerprint,
+      });
+
+      this.bEligibilityReason = eligibility.reason;
+      this.bFailedCandidates = eligibility.failedCandidates;
+
+      if (eligibility.eligible) {
+        // Generate B finalist and queue it for evaluation
+        this.bState = "queued";
+        const bFinalist = generateBFinalist();
+        this.queue.push({ finalist: bFinalist, quantity: 4, isB: true });
+        this.dispatchNext();
+        return; // defer completion until B is evaluated
+      }
+
+      this.bState = "not_eligible";
+    }
+
+    // B is queued and still running — wait
+    if (this.bState === "queued") return;
+
+    // B is evaluated or not eligible — proceed to completion
+    this.checkComplete();
   }
 
   checkComplete() {
@@ -296,6 +394,11 @@ class Stage2PlacementController {
     const results = this.buildResultsSnapshot();
     results.canonical_jobs_run = this.canonicalJobsRun;
     results.total_runtime_ms = Math.max(0, now() - this.startTime);
+    results.b_eligible = this.bState === "queued" || this.bState === "evaluated";
+    results.b_evaluated = this.bState === "evaluated" && this.bResult != null;
+    results.b_eligibility_reason = this.bEligibilityReason;
+    results.b_failed_candidates = this.bFailedCandidates;
+    results.b_result = this.bResult;
 
     publishStage2Complete(this.projectId, this.currentFingerprint, results);
     this.persist(this.projectId, this.currentFingerprint, results);
@@ -313,7 +416,8 @@ class Stage2PlacementController {
         snapshot[quantityMap[qty]] = null;
         continue;
       }
-      const ranked = [...evaluated].sort(compareStage2Results);
+      // Use B-aware comparison so B is ranked correctly against practical
+      const ranked = [...evaluated].sort(compareStage2ResultsWithBRule);
       const best = ranked[0];
       snapshot[quantityMap[qty]] = {
         quantity: qty,

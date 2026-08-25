@@ -34,6 +34,11 @@ export async function hydrateStage2PlacementCache(projectId) {
       overall_best: record.overall_best || null,
       canonical_jobs_run: record.canonical_jobs_run || 0,
       total_runtime_ms: record.total_runtime_ms || 0,
+      b_eligible: record.b_eligible || false,
+      b_evaluated: record.b_evaluated || false,
+      b_eligibility_reason: record.b_eligibility_reason || null,
+      b_failed_candidates: record.b_failed_candidates || [],
+      b_result: record.b_result || null,
     };
   } catch {
     return null;
@@ -72,6 +77,11 @@ export async function syncStage2PlacementCache(projectId, fingerprint, results, 
       overall_best: results.overall_best || null,
       canonical_jobs_run: results.canonical_jobs_run || 0,
       total_runtime_ms: results.total_runtime_ms || 0,
+      b_eligible: results.b_eligible || false,
+      b_evaluated: results.b_evaluated || false,
+      b_eligibility_reason: results.b_eligibility_reason || null,
+      b_failed_candidates: results.b_failed_candidates || [],
+      b_result: results.b_result || null,
     };
     if (existingRecordId) {
       await base44.entities.Stage2PlacementCache.update(existingRecordId, payload);

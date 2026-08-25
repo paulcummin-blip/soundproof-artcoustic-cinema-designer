@@ -27,5 +27,11 @@ export const STAGE2_FALLBACK_SOURCE_HEIGHT_M = 0.05;
 // Lexicographic tie tolerance (dB).
 export const STAGE2_TIE_TOLERANCE_DB = 0.15;
 
+// B last-resort material improvement threshold (dB).
+// B must improve worst Primary P19/P20 deviation by at least this much
+// to beat a practical candidate on raw deviation fields. Prevents B from
+// winning on fractional (e.g. 0.2 dB) raw differences.
+export const STAGE2_B_MATERIAL_IMPROVEMENT_DB = 1.0;
+
 // Stop condition thresholds.
 export const STAGE2_STOP_ALL_L4_SECONDARY_L2 = true;
