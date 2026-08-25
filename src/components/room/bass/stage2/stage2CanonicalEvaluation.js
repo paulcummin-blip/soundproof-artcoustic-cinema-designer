@@ -244,17 +244,33 @@ export function evaluateStage2Finalist({
 
   const seatPriorityMap = buildSeatPriorityMap(seatingPositions);
 
+  // Canonicalise the RSP using the SAME production identity convention used by
+  // the normal bass calculation (buildAuthoritativeRspPosition in
+  // authoritativeRspPosition.js): { id: "rsp", x, y, z, __isSyntheticRsp: true }.
+  // The authoritative simulator keys seat responses by seat.id (falling back to
+  // `${x}-${y}`), so without id:"rsp" the RSP response is stored under "3-3.33"
+  // instead of "rsp" — causing NULL_GATE_RSP_RESPONSE. This canonical object is
+  // used for auto-alignment, simulation, and response extraction — ONE RSP
+  // representation, not two.
+  const canonicalRspPosition = {
+    id: "rsp",
+    x: Number(rspPosition.x),
+    y: Number(rspPosition.y),
+    z: Number.isFinite(Number(rspPosition.z)) ? Number(rspPosition.z) : 1.2,
+    __isSyntheticRsp: true,
+  };
+
   // 1. Build sources from finalist positions + selected sub model.
   // Acoustic-centre Z is derived through the production authority (deriveCentreZ),
   // using the project's subwoofer bottom height + the selected model's cabinet height.
-  const sources = buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, rspPosition);
+  const sources = buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, canonicalRspPosition);
 
   // 2. Run product-aware authoritative bass simulation
   const physics = buildStage2Physics();
   const simResult = simulateAuthoritativeBassResponse({
     roomDims,
     seatingPositions,
-    rspPosition,
+    rspPosition: canonicalRspPosition,
     sources,
     physics,
     qStrategyOverride: "ab_corrected",
