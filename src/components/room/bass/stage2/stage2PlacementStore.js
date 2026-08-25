@@ -10,12 +10,12 @@ import {
 } from "./stage2Constants";
 import {
   buildStage2RankingTuple,
-  compareStage2ResultsWithBRule,
+  compareStage2Results,
   meetsStopCondition,
 } from "./stage2Ranking";
 import { shouldEvaluateThirdFinalist } from "./stage2FinalistPromotion";
 import { evaluateBEligibility, generateBFinalist } from "./stage2BLastResort";
-import { isBFamily } from "../stage1/stage1FamilyRegistry";
+import { isBFamily, isProhibitedFamily } from "../stage1/stage1FamilyRegistry";
 
 const listeners = new Set();
 const memoryByProject = new Map();
@@ -169,13 +169,18 @@ class Stage2PlacementController {
     this.startTime = 0;
     this.canonicalJobsRun = 0;
     // B last-resort state
-    this.bState = "not_checked"; // not_checked | eligible | queued | evaluated | not_eligible
+    this.bState = "not_checked"; // not_checked | evaluating_representatives | queued | evaluated | not_eligible
     this.bEligibilityReason = null;
     this.bFailedCandidates = [];
     this.bResult = null;
+    // Practical family evidence tracking (4-sub only)
+    this.evaluatedFamilyIds = new Set();
+    this.failedFamilyIds = new Set();
+    this.allStage1FourSubFinalists = [];
+    this.stage1Complete = false;
   }
 
-  schedule({ projectId, fingerprint, promotionPlan, params, quantityOrder, delay }) {
+  schedule({ projectId, fingerprint, promotionPlan, allStage1Finalists, stage1Complete, params, quantityOrder, delay }) {
     this.cancelAll("superseded");
     if (!fingerprint) {
       markStage2Idle(projectId);
@@ -197,6 +202,11 @@ class Stage2PlacementController {
     this.bEligibilityReason = null;
     this.bFailedCandidates = [];
     this.bResult = null;
+    // Reset practical family evidence tracking
+    this.evaluatedFamilyIds = new Set();
+    this.failedFamilyIds = new Set();
+    this.allStage1FourSubFinalists = (allStage1Finalists && allStage1Finalists[4]) || [];
+    this.stage1Complete = !!stage1Complete;
 
     // Build the queue: first NORMAL finalists per quantity in quantity order
     this.queue = [];
@@ -280,6 +290,10 @@ class Stage2PlacementController {
       if (message.result) {
         if (!this.completedResults[qty]) this.completedResults[qty] = [];
         const result = message.result;
+        // Track evaluated practical family (has at least one successful result)
+        if (result.familyId && !isBFamily(result.familyId) && !isProhibitedFamily(result.familyId)) {
+          this.evaluatedFamilyIds.add(result.familyId);
+        }
         const seatPriorityMap = this.params?.seatPriorityMap;
         const rankingData = buildStage2RankingTuple(result, seatPriorityMap);
         result.rankingData = rankingData;
@@ -294,7 +308,11 @@ class Stage2PlacementController {
         this.publishProgress();
       }
     } else if (message.type === "error") {
-      // A failed finalist is simply not ranked
+      // Track failed practical family (all attempts failed → optimiser incomplete)
+      const failedFamilyId = active.finalist?.familyId;
+      if (failedFamilyId && !isBFamily(failedFamilyId) && !isProhibitedFamily(failedFamilyId)) {
+        this.failedFamilyIds.add(failedFamilyId);
+      }
     }
 
     // Mark B as evaluated (success or error) so completion can proceed
@@ -325,6 +343,11 @@ class Stage2PlacementController {
   handleError(workerIndex, errorMessage) {
     const active = this.activeJobs.get(workerIndex);
     this.activeJobs.delete(workerIndex);
+    // Track failed practical family (all attempts failed → optimiser incomplete)
+    const failedFamilyId = active?.finalist?.familyId;
+    if (failedFamilyId && !isBFamily(failedFamilyId) && !isProhibitedFamily(failedFamilyId)) {
+      this.failedFamilyIds.add(failedFamilyId);
+    }
     // Mark B as evaluated even on error so completion can proceed
     if (active?.isB === true) {
       this.bState = "evaluated";
@@ -345,28 +368,46 @@ class Stage2PlacementController {
    * Check B eligibility for 4-sub, then complete if ready.
    * Called when the queue is empty and no active jobs remain.
    *
-   * B is only checked once all normal quantities are final. If B is eligible,
-   * it is generated and queued for evaluation (completion deferred). If B is
-   * not eligible or already evaluated, proceeds to normal completion.
+   * B is only checked once all normal quantities are final. The eligibility
+   * gate may require additional practical family representatives to be
+   * evaluated before B can be considered (these exceed the normal
+   * two-per-quantity promotion limit, but only on the exceptional B failure
+   * path). If representatives are missing they are queued and completion is
+   * deferred. If B is eligible it is generated and queued. Otherwise the
+   * controller proceeds to normal completion.
    */
   maybeCheckBAndComplete() {
     const allFinal = this.quantityOrder.every((qty) => this.quantityFinal[qty]);
     if (!allFinal) return;
 
-    // B only applies to 4-sub. Check eligibility once.
-    if (this.bState === "not_checked") {
+    // B only applies to 4-sub. Check eligibility (initial or re-check after
+    // representative evaluations complete).
+    if (this.bState === "not_checked" || this.bState === "evaluating_representatives") {
       const fourSubResults = this.completedResults[4] || [];
-      const promotedFinalists = this.quantityFinalists[4] || [];
 
       const eligibility = evaluateBEligibility({
         evaluatedResults: fourSubResults,
-        promotedFinalists,
+        allStage1Finalists: this.allStage1FourSubFinalists,
+        stage1Complete: this.stage1Complete,
+        evaluatedFamilyIds: this.evaluatedFamilyIds,
+        failedFamilyIds: this.failedFamilyIds,
         fingerprint: this.currentFingerprint,
         currentFingerprint: this.currentFingerprint,
       });
 
       this.bEligibilityReason = eligibility.reason;
       this.bFailedCandidates = eligibility.failedCandidates;
+
+      // Required practical representatives still missing — queue their best
+      // finalist for canonical evaluation, then defer completion.
+      if (eligibility.missingRepresentatives && eligibility.missingRepresentatives.length > 0) {
+        this.bState = "evaluating_representatives";
+        for (const rep of eligibility.missingRepresentatives) {
+          this.queue.push({ finalist: rep.finalist, quantity: 4, isRepresentative: true });
+        }
+        this.dispatchNext();
+        return; // defer completion until representatives are evaluated
+      }
 
       if (eligibility.eligible) {
         // Generate B finalist and queue it for evaluation
@@ -416,8 +457,10 @@ class Stage2PlacementController {
         snapshot[quantityMap[qty]] = null;
         continue;
       }
-      // Use B-aware comparison so B is ranked correctly against practical
-      const ranked = [...evaluated].sort(compareStage2ResultsWithBRule);
+      // B is ranked identically to every other candidate through the normal
+      // lexicographic ranking. Family preference (tuple position 12) ensures a
+      // practical candidate wins any acoustic tie against B.
+      const ranked = [...evaluated].sort(compareStage2Results);
       const best = ranked[0];
       snapshot[quantityMap[qty]] = {
         quantity: qty,

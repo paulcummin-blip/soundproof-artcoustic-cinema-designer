@@ -203,6 +203,8 @@ export function useStage2PlacementOptimiser({
       projectId,
       fingerprint,
       promotionPlan,
+      allStage1Finalists: stage1Finalists,
+      stage1Complete: stage1State?.status === "complete",
       params: {
         roomDims,
         rspPosition,

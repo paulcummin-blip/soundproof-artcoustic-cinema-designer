@@ -1,13 +1,17 @@
 // stage2BLastResort.js
-// RP22 B last-resort eligibility gate, finalist generation, and material
-// improvement comparison rule.
+// RP22 B last-resort eligibility gate and finalist generation.
 //
-// B is ONLY evaluated when every promoted practical four-sub candidate has
-// been evaluated and none passes the credibility gate. B then runs through
-// the exact same canonical evaluation pipeline — no B-specific acoustic maths.
+// B is ONLY evaluated when the practical four-sub search is positively
+// exhausted: Stage 1 is complete, every practical family that retained a
+// finalist has been canonically evaluated (including representatives beyond
+// the normal two-per-quantity promotion limit), and none passes the
+// credibility gate. B then runs through the exact same canonical evaluation
+// pipeline and is ranked identically to every other candidate — no
+// B-specific acoustic maths, no B-specific threshold.
 //
-// B is not automatically the winner merely because it was needed. It must be
-// materially better on Primary-seat acoustic fields to beat a practical family.
+// B is never eligible merely because the practical candidate set is empty
+// (no vacuous eligibility). An empty practical set means the optimiser is
+// incomplete, not that B should step in.
 
 import {
   FAMILY_IDS,
@@ -15,17 +19,6 @@ import {
   isBFamily,
   isProhibitedFamily,
 } from "../stage1/stage1FamilyRegistry";
-import { compareStage2Results } from "./stage2Ranking";
-import { STAGE2_B_MATERIAL_IMPROVEMENT_DB, STAGE2_TIE_TOLERANCE_DB } from "./stage2Constants";
-
-// Practical four-sub families that must be exhausted before B is eligible.
-const PRACTICAL_FOUR_SUB_FAMILIES = [
-  FAMILY_IDS.RP22_C,
-  FAMILY_IDS.RP22_E,
-  FAMILY_IDS.RP22_D,
-  FAMILY_IDS.FOUR_SYMMETRIC_BOUNDARY_CUSTOM,
-  FAMILY_IDS.FOUR_ASYMMETRIC_BOUNDARY_CUSTOM,
-];
 
 /**
  * Check if a Stage 2 result passes the credibility gate.
@@ -71,55 +64,87 @@ function describeCredibilityFailure(result) {
 }
 
 /**
- * Evaluate B eligibility after all practical four-sub candidates have been
- * evaluated.
+ * Evaluate B eligibility after the practical four-sub search is exhausted.
  *
- * Conditions:
- * 1. RP22 C evaluated where available (promoted)
- * 2. RP22 E evaluated where available (promoted)
- * 3. RP22 D evaluated where available (promoted)
- * 4. Practical/custom symmetric finalists evaluated where promoted
- * 5. Evaluations completed successfully (not cancelled/stale)
- * 6. No practical candidate passes the credibility gate
+ * B is eligible only when ALL of the following are positively proven:
+ *
+ * 1. Fingerprint is not stale.
+ * 2. Stage 1 four-sub search is complete.
+ * 3. Stage 1 produced at least one practical finalist (no vacuous eligibility).
+ * 4. Every practical family that retained a Stage 1 finalist has canonical
+ *    evidence — either a successful evaluation or a failed evaluation. A
+ *    family that was not promoted but has a Stage 1 finalist must have its
+ *    best representative evaluated before B can become eligible (this may
+ *    exceed the normal two-finalists-per-quantity promotion limit).
+ * 5. No required family evaluation failed technically (a failed required
+ *    family means the optimiser is incomplete — B cannot conceal that).
+ * 6. No practical candidate passes the credibility gate.
  *
  * @param {object} params
- * @param {Array} params.evaluatedResults — 4-sub results from Stage 2
- * @param {Array} params.promotedFinalists — 4-sub finalists that were promoted
+ * @param {Array} params.evaluatedResults — 4-sub canonical results so far
+ * @param {Array} params.allStage1Finalists — ALL Stage 1 4-sub finalists (not just promoted)
+ * @param {boolean} params.stage1Complete — whether Stage 1 4-sub search completed
+ * @param {Set} params.evaluatedFamilyIds — family IDs with at least one successful evaluation
+ * @param {Set} params.failedFamilyIds — family IDs where ALL evaluations failed
  * @param {string} params.fingerprint — fingerprint when B check runs
  * @param {string} params.currentFingerprint — current active fingerprint
- * @returns {object} { eligible, reason, failedCandidates }
+ * @returns {object} { eligible, reason, failedCandidates, missingRepresentatives }
+ *   missingRepresentatives: [{ familyId, finalist }] for families that still
+ *   need canonical evaluation before B eligibility can be determined.
  */
 export function evaluateBEligibility({
   evaluatedResults,
-  promotedFinalists,
+  allStage1Finalists,
+  stage1Complete,
+  evaluatedFamilyIds,
+  failedFamilyIds,
   fingerprint,
   currentFingerprint,
 }) {
-  // Condition 5: not stale
+  const empty = { eligible: false, reason: null, failedCandidates: [], missingRepresentatives: [] };
+
+  // Condition 1: not stale
   if (fingerprint !== currentFingerprint) {
-    return { eligible: false, reason: "stale_fingerprint", failedCandidates: [] };
+    return { ...empty, reason: "stale_fingerprint" };
   }
 
-  // Families that were promoted for 4-sub (practical only)
-  const promotedPracticalFamilies = new Set(
-    (promotedFinalists || [])
-      .map((f) => f?.familyId)
-      .filter((f) => f && !isProhibitedFamily(f) && !isBFamily(f))
+  // Condition 2: Stage 1 search must be complete
+  if (!stage1Complete) {
+    return { ...empty, reason: "stage1_incomplete" };
+  }
+
+  // Condition 3: must have practical Stage 1 finalists (no vacuous eligibility)
+  const allFinalists = (allStage1Finalists || []).filter(
+    (f) => f && f.id && !isProhibitedFamily(f.familyId) && !isBFamily(f.familyId)
   );
+  if (allFinalists.length === 0) {
+    return { ...empty, reason: "incomplete_practical_evidence" };
+  }
 
-  // Families that were actually evaluated (non-B, non-A)
-  const evaluatedFamilies = new Set();
-  for (const result of evaluatedResults || []) {
-    if (result?.familyId && !isProhibitedFamily(result.familyId) && !isBFamily(result.familyId)) {
-      evaluatedFamilies.add(result.familyId);
+  // Build required families: best (first) finalist per practical family that
+  // Stage 1 retained. Stage 1 finalists are already ranked by screening
+  // quality, so the first finalist from each family is its best representative.
+  const familyToBestFinalist = new Map();
+  for (const f of allFinalists) {
+    if (!familyToBestFinalist.has(f.familyId)) {
+      familyToBestFinalist.set(f.familyId, f);
     }
   }
 
-  // Conditions 1-4: all promoted practical families were evaluated
-  for (const fam of promotedPracticalFamilies) {
-    if (!evaluatedFamilies.has(fam)) {
-      return { eligible: false, reason: `family_${fam}_not_evaluated`, failedCandidates: [] };
+  // Condition 4 & 5: every required family must have canonical evidence
+  const missingRepresentatives = [];
+  for (const [fam, finalist] of familyToBestFinalist.entries()) {
+    if (evaluatedFamilyIds && evaluatedFamilyIds.has(fam)) continue; // has a success
+    if (failedFamilyIds && failedFamilyIds.has(fam)) {
+      // All evaluations for this required family failed technically
+      return { ...empty, reason: `family_${fam}_evaluation_failed` };
     }
+    // Not yet evaluated — needs a representative before B can be considered
+    missingRepresentatives.push({ familyId: fam, finalist });
+  }
+
+  if (missingRepresentatives.length > 0) {
+    return { ...empty, reason: "missing_representatives", missingRepresentatives };
   }
 
   // Condition 6: no practical candidate passes the credibility gate
@@ -143,11 +168,12 @@ export function evaluateBEligibility({
   }
 
   if (passingCount > 0) {
-    return { eligible: false, reason: "practical_candidate_passes", failedCandidates: [] };
+    return { ...empty, reason: "practical_candidate_passes" };
   }
 
-  // All conditions met — B is eligible
+  // All required practical candidates genuinely failed the credibility gate
   return {
+    ...empty,
     eligible: true,
     reason: "all_practical_candidates_failed_credibility_gate",
     failedCandidates,
@@ -174,57 +200,4 @@ export function generateBFinalist() {
     symmetryState: "symmetric",
     seedDisplacement: 0,
   };
-}
-
-/**
- * Compare B against a practical candidate with the B material improvement rule.
- *
- * B wins only if its acoustic Primary-seat result is materially better:
- * - B improves a whole-dB level field (positions 0-4), OR
- * - B improves a raw deviation field (positions 5-6) by >= MATERIAL_IMPROVEMENT_DB
- *
- * If B is tied on whole-dB levels and only fractionally better on raw
- * deviations, the practical candidate wins on family preference.
- *
- * @param {object} bResult — B finalist result (with rankingTuple)
- * @param {object} practicalResult — practical finalist result (with rankingTuple)
- * @returns {number} negative if B ranks higher, positive if practical ranks higher
- */
-export function compareBAgainstPractical(bResult, practicalResult) {
-  const tb = bResult?.rankingTuple;
-  const tp = practicalResult?.rankingTuple;
-  if (!tb || !tp) return 0;
-
-  // Check whole-dB level fields (positions 0-4).
-  // Higher = better for all of these.
-  for (let i = 0; i < 5; i += 1) {
-    const vb = tb[i] ?? 0;
-    const vp = tp[i] ?? 0;
-    if (Math.abs(vb - vp) > 0.01) return vb > vp ? -1 : 1;
-  }
-
-  // Whole-dB levels are tied. Check raw deviation fields (positions 5-6).
-  // B must improve by >= MATERIAL_IMPROVEMENT_DB to win on raw deviations.
-  for (let i = 5; i < 7; i += 1) {
-    const vb = tb[i] ?? 0;
-    const vp = tp[i] ?? 0;
-    if (vb - vp >= STAGE2_B_MATERIAL_IMPROVEMENT_DB) return -1; // B wins
-    if (vp - vb >= STAGE2_B_MATERIAL_IMPROVEMENT_DB) return 1; // practical wins
-  }
-
-  // No material improvement on Primary acoustic fields (positions 0-6).
-  // Compare remaining fields (positions 7+) — practical wins on family preference.
-  const len = Math.max(tb.length, tp.length);
-  for (let i = 7; i < len; i += 1) {
-    const vb = tb[i] ?? 0;
-    const vp = tp[i] ?? 0;
-    if (typeof vb === "number" && typeof vp === "number") {
-      if (Math.abs(vb - vp) > STAGE2_TIE_TOLERANCE_DB) return vb > vp ? -1 : 1;
-    } else {
-      if (vb !== vp) return vb < vp ? -1 : 1;
-    }
-  }
-
-  // Completely tied — practical wins on family preference (position 12).
-  return 1;
 }
