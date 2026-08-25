@@ -62,6 +62,8 @@ function hasCanonicalSeatMetricAuthority(contract) {
 export function isAuthoritativeBassContract(contract) {
   if (!isStructurallyCompleteBassContract(contract)) return false;
   if (!hasCanonicalSeatMetricAuthority(contract)) return false;
+  const envelopeValidation = validateAssessmentEnvelopeAuthority(contract);
+  if (!envelopeValidation.valid) return false;
   const pub = contract?.metricPublication;
   return !!pub && pub.canonicalMetricPublicationValid === true;
 }
@@ -81,6 +83,173 @@ export const isCompletedBassContract = isStructurallyCompleteBassContract;
 
 function cloneCurve(curve) {
   return Array.isArray(curve) ? curve.map((point) => ({ ...point })) : [];
+}
+
+// ---------------------------------------------------------------------------
+// Assessment envelope authority (v9)
+//
+// The compact contract carries ONE authoritative assessment/marker envelope
+// so the finished graph adapter can reconstruct P18/P19/P20 graph markers
+// after cold reopen without re-running the bass engine.
+//
+// Grade validation: stored P19/P20 per-seat levels are validated against the
+// CURRENT shared grading authority (inlined here for bare-Node compatibility).
+// If a persisted level disagrees with the current mapper, the contract is
+// rejected as NOT_VERIFIED — it is never cosmetically repaired in the UI.
+//
+// Band validation: P19/P20 worst frequencies must fall within
+// [assessmentStartHz, assessmentEndHz]. An old fixed-20-Hz marker cannot
+// become authoritative when the achieved P18 crossing is higher.
+// ---------------------------------------------------------------------------
+
+/**
+ * Grade P19 from raw deviation using the current shared whole-dB rule.
+ * wholeDb = floor(abs(rawDeviationDb))
+ * 0–2 → L4 (4), 3 → L3 (3), 4 → L2 (2), 5 → L1 (1), 6+ → FAIL (0)
+ */
+export function gradeP19FromRaw(rawDeviationDb) {
+  if (!Number.isFinite(Number(rawDeviationDb))) return null;
+  const wholeDb = Math.floor(Math.abs(Number(rawDeviationDb)));
+  if (wholeDb <= 2) return 4;
+  if (wholeDb <= 3) return 3;
+  if (wholeDb <= 4) return 2;
+  if (wholeDb <= 5) return 1;
+  return 0;
+}
+
+/**
+ * Grade P20 from raw deviation using the current shared whole-dB rule.
+ * wholeDb = floor(abs(rawDeviationDb))
+ * 0–2 → L4 (4), 3 → L3 (3), 4 → L2 (2), 5+ → L1 (1)
+ * P20 never FAILs — floored ≥5 dB maps to L1 (not FAIL).
+ */
+export function gradeP20FromRaw(rawDeviationDb) {
+  if (!Number.isFinite(Number(rawDeviationDb))) return null;
+  const wholeDb = Math.floor(Math.abs(Number(rawDeviationDb)));
+  if (wholeDb <= 2) return 4;
+  if (wholeDb <= 3) return 3;
+  if (wholeDb <= 4) return 2;
+  return 1;
+}
+
+/**
+ * Build the authoritative assessment/marker envelope from a full contract's
+ * finalOptimisedBassResponse. This is the ONE envelope persisted on the
+ * compact contract and consumed by the finished graph adapter.
+ */
+export function buildAssessmentEnvelope(contract) {
+  const finalResponse = contract?.finalOptimisedBassResponse;
+  if (!finalResponse) return null;
+
+  const achievedP18FrequencyHz = Number.isFinite(Number(finalResponse.achievedP18FrequencyHz))
+    ? Number(finalResponse.achievedP18FrequencyHz)
+    : (Number.isFinite(Number(finalResponse.finalSeatVariationData?.p18?.extensionHz))
+      ? Number(finalResponse.finalSeatVariationData.p18.extensionHz)
+      : null);
+
+  const assessmentStartHz = Number.isFinite(Number(finalResponse.assessmentStartHz))
+    ? Number(finalResponse.assessmentStartHz)
+    : null;
+
+  const assessmentEndHz = Number.isFinite(Number(finalResponse.assessmentEndHz))
+    ? Number(finalResponse.assessmentEndHz)
+    : null;
+
+  const officialP19WorstFrequencyHz = Number.isFinite(Number(finalResponse.finalSeatVariationData?.p19?.worstFrequencyHz))
+    ? Number(finalResponse.finalSeatVariationData.p19.worstFrequencyHz)
+    : null;
+
+  // P20 worst seat: resolve from finalSeatVariationData or selectedCandidate
+  const p20SeatData = finalResponse.finalSeatVariationData?.p20;
+  const p20WorstSeatId = p20SeatData?.worstSeatId ?? contract?.selectedCandidate?.worstP20SeatId ?? null;
+  const p20PerSeat = Array.isArray(p20SeatData?.perSeatResults) ? p20SeatData.perSeatResults : [];
+  const worstP20 = p20PerSeat.find((s) => String(s?.seatId) === String(p20WorstSeatId))
+    || p20PerSeat.reduce((worst, seat) => {
+      if (!Number.isFinite(Number(seat?.variationDbRaw))) return worst;
+      if (!worst || Math.abs(Number(seat.variationDbRaw)) > Math.abs(Number(worst.variationDbRaw))) return seat;
+      return worst;
+    }, null);
+  const p20WorstFrequencyHz = worstP20 && Number.isFinite(Number(worstP20.worstFrequencyHz))
+    ? Number(worstP20.worstFrequencyHz)
+    : null;
+
+  return {
+    achievedP18FrequencyHz,
+    assessmentStartHz,
+    assessmentEndHz,
+    officialP19WorstFrequencyHz,
+    p20WorstSeatId,
+    p20WorstFrequencyHz,
+  };
+}
+
+/**
+ * Validate a contract's assessment envelope authority.
+ *
+ * For compact contracts: requires the stored assessmentEnvelope.
+ * For full contracts: builds the envelope from finalOptimisedBassResponse.
+ *
+ * Validates:
+ *   1. Envelope presence (v9 requirement — removing it causes rejection)
+ *   2. Per-seat P19/P20 grades match the current shared mapper
+ *   3. P19/P20 worst frequencies fall within [assessmentStartHz, assessmentEndHz]
+ */
+export function validateAssessmentEnvelopeAuthority(contract) {
+  const isCompact = !contract?.finalOptimisedBassResponse;
+  const envelope = isCompact
+    ? contract?.assessmentEnvelope
+    : buildAssessmentEnvelope(contract);
+
+  if (!envelope) return { valid: false, reason: "missing-assessment-envelope" };
+
+  if (!Number.isFinite(Number(envelope.achievedP18FrequencyHz)))
+    return { valid: false, reason: "missing-achieved-p18-frequency" };
+  if (!Number.isFinite(Number(envelope.assessmentStartHz)))
+    return { valid: false, reason: "missing-assessment-start-hz" };
+  if (!Number.isFinite(Number(envelope.assessmentEndHz)))
+    return { valid: false, reason: "missing-assessment-end-hz" };
+
+  // Validate per-seat P19 grades against current shared mapper
+  const p19Seats = contract?.selectedCandidate?.perSeatP19Results;
+  if (Array.isArray(p19Seats)) {
+    for (const seat of p19Seats) {
+      if (!Number.isFinite(Number(seat?.variationDbRaw))) continue;
+      const expectedLevel = gradeP19FromRaw(seat.variationDbRaw);
+      const storedLevel = Number(seat?.level);
+      if (expectedLevel != null && Number.isFinite(storedLevel) && expectedLevel !== storedLevel) {
+        return { valid: false, reason: `p19-grade-mismatch:seat:${seat.seatId}:stored:${storedLevel}:expected:${expectedLevel}` };
+      }
+    }
+  }
+
+  // Validate per-seat P20 grades against current shared mapper
+  const p20Seats = contract?.selectedCandidate?.perSeatP20Results;
+  if (Array.isArray(p20Seats)) {
+    for (const seat of p20Seats) {
+      if (!Number.isFinite(Number(seat?.variationDbRaw))) continue;
+      const expectedLevel = gradeP20FromRaw(seat.variationDbRaw);
+      const storedLevel = Number(seat?.level);
+      if (expectedLevel != null && Number.isFinite(storedLevel) && expectedLevel !== storedLevel) {
+        return { valid: false, reason: `p20-grade-mismatch:seat:${seat.seatId}:stored:${storedLevel}:expected:${expectedLevel}` };
+      }
+    }
+  }
+
+  // Band validation: worst frequencies must be within [assessmentStartHz, assessmentEndHz]
+  const start = Number(envelope.assessmentStartHz);
+  const end = Number(envelope.assessmentEndHz);
+  if (Number.isFinite(Number(envelope.officialP19WorstFrequencyHz))) {
+    const f = Number(envelope.officialP19WorstFrequencyHz);
+    if (f < start || f > end)
+      return { valid: false, reason: `p19-worst-frequency-out-of-band:${f}:${start}:${end}` };
+  }
+  if (Number.isFinite(Number(envelope.p20WorstFrequencyHz))) {
+    const f = Number(envelope.p20WorstFrequencyHz);
+    if (f < start || f > end)
+      return { valid: false, reason: `p20-worst-frequency-out-of-band:${f}:${start}:${end}` };
+  }
+
+  return { valid: true, reason: null };
 }
 
 /**
@@ -143,6 +312,7 @@ export function compactCompletedBassContract(contract, { graphPayloadTimings = n
     requestedP14Basis: contract.selectedP14TargetBasis || null,
     requestedP14Level: Number.isFinite(contract.selectedP14Level) ? contract.selectedP14Level : null,
     requestedP18ExtensionHz: Number.isFinite(contract.selectedP18RequiredExtensionHz) ? contract.selectedP18RequiredExtensionHz : null,
+    assessmentEnvelope: buildAssessmentEnvelope(contract),
     metricPublication: contract.metricPublication || null,
     provenance: contract.provenance || {},
     graphPayload: graphPayloadTimings

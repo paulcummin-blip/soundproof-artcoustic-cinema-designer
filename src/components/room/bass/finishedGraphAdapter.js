@@ -20,7 +20,7 @@
 //   - Bypass the publication gate — the caller must verify the contract is
 //     authoritative (isAuthoritativeBassContract) before calling this adapter.
 
-import { buildCurveSignature, buildFilterBankSignature } from "./bassResultAuthority";
+import { buildCurveSignature, buildFilterBankSignature } from "./bassResultAuthority.js";
 
 /**
  * Build a synthetic optimisationResult from a compact completed contract's
@@ -44,11 +44,16 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
   const postEqCurveSignature = postEqRspCurve.length ? buildCurveSignature(postEqRspCurve) : null;
   const filterBankSignature = eqFilterBank.length ? buildFilterBankSignature({ generatedFilterBank: eqFilterBank }) : null;
 
-  // Reconstruct finalSeatVariationData so finalOptimisedBassAuthorityMatches passes.
+  // Reconstruct finalSeatVariationData from the persisted assessment envelope
+  // (v9) so buildRp22GraphMarkers produces identical markers after cold reopen.
+  const envelope = compactContract.assessmentEnvelope || null;
+  const perSeatP20Results = Array.isArray(compactContract.selectedCandidate?.perSeatP20Results)
+    ? compactContract.selectedCandidate.perSeatP20Results.map((seat) => ({ ...seat }))
+    : [];
   const finalSeatVariationData = candidateId ? {
-    p18: { candidateId, level: null, extensionHz: null, authority: null },
-    p19: { candidateId, level: null, variationDb: null, worstFrequencyHz: null },
-    p20: { candidateId, level: null, variationDb: null, worstSeatId: null, perSeatResults: [] },
+    p18: { candidateId, level: null, extensionHz: envelope?.achievedP18FrequencyHz ?? null, authority: null },
+    p19: { candidateId, level: null, variationDb: null, worstFrequencyHz: envelope?.officialP19WorstFrequencyHz ?? null },
+    p20: { candidateId, level: null, variationDb: null, worstSeatId: envelope?.p20WorstSeatId ?? null, perSeatResults: perSeatP20Results },
   } : null;
 
   const finalOptimisedBassResponse = {
@@ -67,6 +72,8 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
     physicalRawResponseCurve: null, // live rspRawCurve is the same curve
     selectedSubwooferLayout: [],
     finalSeatVariationData,
+    assessmentStartHz: envelope?.assessmentStartHz ?? null,
+    assessmentEndHz: envelope?.assessmentEndHz ?? null,
     // Graph-source identity fields consumed by buildGraphSourceIdentity
     // are recomputed above (postEqCurveSignature, filterBankSignature).
   };

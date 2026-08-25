@@ -7,7 +7,7 @@ import {
   HOUSE_CURVE_ENGINE_VERSION,
   describeOptimiserCompatibility,
   validateOptimiserVersions,
-} from "./bassOptimiserWorkerProtocol";
+} from "./bassOptimiserWorkerProtocol.js";
 
 export {
   BASS_METRIC_SCHEMA_VERSION,
