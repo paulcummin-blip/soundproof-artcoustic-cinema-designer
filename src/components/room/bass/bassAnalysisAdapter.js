@@ -363,6 +363,10 @@ export function adaptCurrentBassOptimisationResult({
   // P18 references idealHouseTarget; P19 references practicalCalibrationTarget.
   contract.idealHouseTarget = finalResponse?.canonicalTargetCurve || null;
   contract.practicalCalibrationTarget = finalResponse?.practicalCalibrationTarget || null;
+  contract.p19TargetIdentity = finalResponse?.p19TargetIdentity
+    || (Array.isArray(contract.practicalCalibrationTarget) && contract.practicalCalibrationTarget.length
+      ? "practical-calibration-target"
+      : "ideal-house-target");
   contract.achievedP14Db = selectedCandidate?.achievedP14Db ?? null;
   contract.achievedP14Level = selectedCandidate?.achievedP14Level ?? null;
   contract.achievedP18FrequencyHz = selectedCandidate?.achievedP18FrequencyHz ?? null;

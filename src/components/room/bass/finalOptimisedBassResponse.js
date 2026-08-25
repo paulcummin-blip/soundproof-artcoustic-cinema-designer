@@ -28,6 +28,10 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     canonicalHouseCurveShape: cloneCurve(candidate.canonicalHouseCurveShape),
     canonicalTargetCurve: cloneCurve(candidate.productionHouseCurveTarget),
     practicalCalibrationTarget: cloneCurve(candidate.practicalCalibrationTarget),
+    p19TargetIdentity: candidate.p19TargetIdentity
+      || (Array.isArray(candidate.practicalCalibrationTarget) && candidate.practicalCalibrationTarget.length
+        ? "practical-calibration-target"
+        : "ideal-house-target"),
     canonicalVerticalOffsetDb: candidate.canonicalVerticalOffsetDb ?? null,
     operatingLevelOffsetDb: candidate.operatingLevelOffsetDb ?? 0,
     requestedOperatingLevelOffsetDb: Number.isFinite(candidate.requestedOperatingLevelOffsetDb) ? candidate.requestedOperatingLevelOffsetDb : 0,

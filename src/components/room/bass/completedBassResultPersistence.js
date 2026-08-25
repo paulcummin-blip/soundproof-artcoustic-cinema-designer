@@ -173,6 +173,12 @@ export function buildAssessmentEnvelope(contract) {
     ? Number(worstP20.worstFrequencyHz)
     : null;
 
+  const p19TargetIdentity = (typeof finalResponse.p19TargetIdentity === "string" && finalResponse.p19TargetIdentity)
+    ? finalResponse.p19TargetIdentity
+    : (Array.isArray(finalResponse.practicalCalibrationTarget) && finalResponse.practicalCalibrationTarget.length
+      ? "practical-calibration-target"
+      : "ideal-house-target");
+
   return {
     achievedP18FrequencyHz,
     assessmentStartHz,
@@ -180,6 +186,7 @@ export function buildAssessmentEnvelope(contract) {
     officialP19WorstFrequencyHz,
     p20WorstSeatId,
     p20WorstFrequencyHz,
+    p19TargetIdentity,
   };
 }
 
@@ -208,6 +215,13 @@ export function validateAssessmentEnvelopeAuthority(contract) {
     return { valid: false, reason: "missing-assessment-start-hz" };
   if (!Number.isFinite(Number(envelope.assessmentEndHz)))
     return { valid: false, reason: "missing-assessment-end-hz" };
+
+  // P19 target identity: must be present and one of the two canonical values.
+  // This ensures the persisted envelope records which target definition P19
+  // was assessed against (practical-calibration-target or ideal-house-target).
+  const P19_TARGET_IDENTITIES = new Set(["practical-calibration-target", "ideal-house-target"]);
+  if (typeof envelope.p19TargetIdentity !== "string" || !P19_TARGET_IDENTITIES.has(envelope.p19TargetIdentity))
+    return { valid: false, reason: `p19-target-identity-missing-or-invalid:${String(envelope.p19TargetIdentity)}` };
 
   // Four-way P18 authority parity: the selected candidate, envelope, assessment
   // start, and product-analysis card must all carry the same canonical achieved
