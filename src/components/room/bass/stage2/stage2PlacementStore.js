@@ -457,10 +457,25 @@ class Stage2PlacementController {
         snapshot[quantityMap[qty]] = null;
         continue;
       }
+      // Only results carrying a valid ranking tuple are eligible for the
+      // ranked set / winner selection. Incomplete, malformed, or failed
+      // results (no rankingData.rankingTuple) are excluded — they must never
+      // become bestFinalist or overall_best. They remain in this.completedResults
+      // for lifecycle/progress tracking but are not promoted into the snapshot.
+      const rankable = evaluated.filter((r) => Array.isArray(r?.rankingData?.rankingTuple));
+      if (!rankable.length) {
+        snapshot[quantityMap[qty]] = {
+          quantity: qty,
+          evaluatedFinalists: [],
+          bestFinalist: null,
+          finalistCount: 0,
+        };
+        continue;
+      }
       // B is ranked identically to every other candidate through the normal
       // lexicographic ranking. Family preference (tuple position 12) ensures a
       // practical candidate wins any acoustic tie against B.
-      const ranked = [...evaluated].sort(compareStage2Results);
+      const ranked = [...rankable].sort(compareStage2Results);
       const best = ranked[0];
       snapshot[quantityMap[qty]] = {
         quantity: qty,

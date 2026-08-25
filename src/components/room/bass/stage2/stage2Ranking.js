@@ -159,8 +159,19 @@ export function buildStage2RankingTuple(result, seatPriorityMap) {
  * Returns negative if a ranks higher (better), positive if b ranks higher.
  */
 export function compareStage2Results(a, b) {
-  const ta = Array.isArray(a?.rankingTuple) ? a.rankingTuple : [];
-  const tb = Array.isArray(b?.rankingTuple) ? b.rankingTuple : [];
+  // The ranking tuple is stored on each completed result as
+  // result.rankingData.rankingTuple (see buildStage2RankingTuple). A missing
+  // or non-array tuple means the result is unrankable/incomplete — NOT an
+  // empty valid tuple. Unrankable results sort last; they are excluded from
+  // winner selection by the caller (buildResultsSnapshot).
+  const ta = Array.isArray(a?.rankingData?.rankingTuple) ? a.rankingData.rankingTuple : null;
+  const tb = Array.isArray(b?.rankingData?.rankingTuple) ? b.rankingData.rankingTuple : null;
+  const aValid = ta != null;
+  const bValid = tb != null;
+  if (!aValid && !bValid) return 0;
+  if (!aValid) return 1;   // a unrankable → ranks lower than b
+  if (!bValid) return -1;  // b unrankable → ranks lower than a
+
   const len = Math.max(ta.length, tb.length);
   for (let i = 0; i < len; i += 1) {
     const va = ta[i] ?? 0;
