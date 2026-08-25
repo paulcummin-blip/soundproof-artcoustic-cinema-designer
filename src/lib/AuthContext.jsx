@@ -5,6 +5,17 @@ import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 
 const AuthContext = createContext();
 
+function takePortalLaunchPass() {
+  const search = new URLSearchParams(window.location.search);
+  const launchPass = search.get('launch_pass');
+  if (!launchPass) return null;
+
+  search.delete('launch_pass');
+  const cleanUrl = `${window.location.pathname}${search.toString() ? `?${search}` : ''}${window.location.hash}`;
+  window.history.replaceState({}, document.title, cleanUrl);
+  return launchPass;
+}
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -91,6 +102,33 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
+
+      // A launch pass is consumed only after Base44 has established the SSO
+      // session. It is removed from browser history immediately and never used
+      // as account authority; the server verifies the provider subject, live
+      // portal session and pre-assigned Sound Proof membership.
+      const launchPass = takePortalLaunchPass();
+      if (launchPass) {
+        try {
+          await base44.functions.invoke('consumePortalLaunch', {
+            launch_pass: launchPass,
+            target: 'SOUND_PROOF',
+          });
+        } catch (launchError) {
+          const payload = launchError?.response?.data || launchError?.data || {};
+          const reason = payload?.reason || 'PORTAL_LAUNCH_REJECTED';
+          setUser(currentUser);
+          setIsAuthenticated(false);
+          setAuthError({
+            type: 'access_denied',
+            message: reason === 'PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED'
+              ? 'The verified iCubed login is ready, but its Sound Proof administrator seat still needs to be assigned.'
+              : 'This Dealer Portal launch could not be verified. Return to the dealer page and try again.',
+          });
+          setIsLoadingAuth(false);
+          return;
+        }
+      }
 
       // Permissions are resolved server-side from the authoritative User,
       // Account and AccountMembership records. Browser-supplied roles are
