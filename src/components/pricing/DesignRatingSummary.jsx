@@ -44,6 +44,7 @@ function lowestLevelFromDistribution(distribution) {
 }
 
 // One category block — Primary + Secondary seat-scoped modal results.
+// Stable two-column grid: label left, result pill right (shared right edge).
 function CategoryBlock({ label, primary, secondary, isScreen }) {
   const renderScopeLine = (scope, isPrimary) => {
     if (!scope?.hasContribs) {
@@ -54,6 +55,7 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
       );
     }
 
+    // Screen / Viewing Geometry — standard RP23 pill + descriptor underneath.
     if (isScreen) {
       const lvl = scope.screenLevel;
       if (!lvl) {
@@ -63,17 +65,21 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
           </div>
         );
       }
-      const rp23Text = lvl === 'FAIL'
-        ? 'RP23 FAIL'
-        : `RP23 Level ${levelNum(lvl)} · ${SCREEN_DESCRIPTOR[lvl] ?? ''}`.trim();
-      const failWording = lvl === 'FAIL';
+      const isFail = lvl === 'FAIL';
       const lead = isPrimary
-        ? (failWording ? 'Primary Seats FAIL' : 'Primary Seats achieve')
-        : (failWording ? 'Secondary Seats FAIL' : 'Secondary Seats — no lower than');
+        ? (isFail ? 'Primary Seats FAIL' : 'Primary Seats achieve')
+        : (isFail ? 'Secondary Seats FAIL' : 'Secondary Seats — no lower than');
+      const pillLabel = isFail ? 'RP23 FAIL' : `RP23 L${levelNum(lvl)}`;
+      const descriptor = isFail ? null : (SCREEN_DESCRIPTOR[lvl] ?? null);
       return (
-        <div style={{ fontSize: 10, lineHeight: 1.45, color: '#3E4349' }}>
-          <span style={{ fontWeight: 600, color: '#625143' }}>{lead}</span>{' '}
-          <span style={{ fontWeight: 600, color: failWording ? '#8B2E2E' : '#213428' }}>{rp23Text}</span>
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
+            <RP22GradingPill level={lvl} compact>{pillLabel}</RP22GradingPill>
+          </div>
+          {descriptor && (
+            <div style={{ fontSize: 9, color: '#9B9890', marginTop: 1 }}>{descriptor}</div>
+          )}
         </div>
       );
     }
@@ -82,8 +88,8 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
     if (scope.hasFail) {
       const lead = isPrimary ? 'Primary Seats FAIL' : 'Secondary Seats FAIL';
       return (
-        <div style={{ fontSize: 10, lineHeight: 1.45 }}>
-          <span style={{ fontWeight: 600, color: '#625143' }}>{lead}</span>{' '}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
+          <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
           <RP22GradingPill level="FAIL" compact />
         </div>
       );
@@ -93,12 +99,12 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
     const pillLevel = scope.modalLevels && scope.modalLevels.length === 1 ? scope.modalLevels[0] : null;
     const lead = isPrimary ? 'Primary Seats achieve' : 'Secondary Seats — no lower than';
     return (
-      <div style={{ fontSize: 10, lineHeight: 1.45, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 600, color: '#625143' }}>{lead}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
+        <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
         {pillLevel ? (
           <RP22GradingPill level={pillLevel} compact />
         ) : (
-          <span style={{ fontWeight: 600, color: '#213428' }}>{modalText || '—'}</span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: '#213428', justifySelf: 'end' }}>{modalText || '—'}</span>
         )}
       </div>
     );
