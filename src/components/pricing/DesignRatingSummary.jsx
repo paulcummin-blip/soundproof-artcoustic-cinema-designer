@@ -7,19 +7,18 @@
 // and the overall Design Performance Index summary for Primary / Secondary /
 // All seating scopes.
 //
-// Category results use the MODAL achieved level (most frequently achieved
-// level across the relevant parameters/seats) — never an average. Screen /
-// Viewing Geometry retains RP23 terminology. No ASDR/DPI maths, thresholds,
-// weights, parameter authority, or category membership are changed.
+// Category results use the FLOOR (lowest achieved level) across all included
+// parameters in each category — never an average, never the modal/most-common
+// level. The weakest applicable parameter governs. Screen / Viewing Geometry
+// retains RP23 terminology. No ASDR/DPI maths, thresholds, weights, parameter
+// authority, or category membership are changed.
 
 import React from 'react';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
 import {
   getRoomDesignRatingDesignation,
   getDesignPerformanceIndex,
-  getCategoryModalSummaries,
-  formatModalLevels,
-  formatLevelDistribution,
+  getCategoryFloorSummaries,
 } from '@/components/report/technical/designRatingPresentation';
 
 const SCREEN_DESCRIPTOR = {
@@ -34,16 +33,7 @@ function levelNum(key) {
   return Number(String(key).replace('L', ''));
 }
 
-// Lowest achieved level from a modal distribution, or null.
-function lowestLevelFromDistribution(distribution) {
-  if (!distribution) return null;
-  for (const key of ['L1', 'L2', 'L3', 'L4']) {
-    if ((distribution[key] || 0) > 0) return key;
-  }
-  return null;
-}
-
-// One category block — Primary + Secondary seat-scoped modal results.
+// One category block — Primary + Secondary seat-scoped floor results.
 // Stable two-column grid: label left, result pill right (shared right edge).
 function CategoryBlock({ label, primary, secondary, isScreen }) {
   const renderScopeLine = (scope, isPrimary) => {
@@ -56,6 +46,7 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
     }
 
     // Screen / Viewing Geometry — standard RP23 pill + descriptor underneath.
+    // Separately governed by RP23 authority; not affected by floor method.
     if (isScreen) {
       const lvl = scope.screenLevel;
       if (!lvl) {
@@ -84,9 +75,11 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
       );
     }
 
-    // Acoustic categories — modal level method.
-    if (scope.hasFail) {
-      const lead = isPrimary ? 'Primary Seats FAIL' : 'Secondary Seats FAIL';
+    // RP22 performance categories — floor (lowest achieved level) method.
+    // The pill itself IS the conservative lowest-category result.
+    const floor = scope.floorLevel;
+    if (scope.hasFail || floor === 'FAIL') {
+      const lead = isPrimary ? 'Primary Seats' : 'Secondary Seats';
       return (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
           <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
@@ -95,37 +88,18 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
       );
     }
 
-    const modalText = formatModalLevels(scope.modalLevels);
-    const pillLevel = scope.modalLevels && scope.modalLevels.length === 1 ? scope.modalLevels[0] : null;
-    const lead = isPrimary ? 'Primary Seats achieve' : 'Secondary Seats — no lower than';
+    const lead = isPrimary ? 'Primary Seats — no lower than' : 'Secondary Seats — no lower than';
     return (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
         <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
-        {pillLevel ? (
-          <RP22GradingPill level={pillLevel} compact />
+        {floor ? (
+          <RP22GradingPill level={floor} compact />
         ) : (
-          <span style={{ fontSize: 10, fontWeight: 600, color: '#213428', justifySelf: 'end' }}>{modalText || '—'}</span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: '#213428', justifySelf: 'end' }}>—</span>
         )}
       </div>
     );
   };
-
-  // Optional "Lowest contributing result" line — only for acoustic categories
-  // when the lowest achieved level is below the modal level.
-  let lowestLine = null;
-  if (!isScreen && primary?.hasContribs && !primary?.hasFail) {
-    const lowest = lowestLevelFromDistribution(primary.distribution);
-    const modalLowest = primary.modalLevels && primary.modalLevels.length > 0
-      ? primary.modalLevels.reduce((min, k) => (levelNum(k) < levelNum(min) ? k : min), primary.modalLevels[0])
-      : null;
-    if (lowest && modalLowest && levelNum(lowest) < levelNum(modalLowest)) {
-      lowestLine = (
-        <div style={{ fontSize: 9, color: '#9B9890', marginTop: 2 }}>
-          Lowest contributing result: {lowest}
-        </div>
-      );
-    }
-  }
 
   return (
     <div style={{ paddingTop: 6, borderTop: '1px solid #ECEAE6' }}>
@@ -136,7 +110,6 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
       {secondary?.hasContribs && (
         <div style={{ marginTop: 2 }}>{renderScopeLine(secondary, false)}</div>
       )}
-      {lowestLine}
     </div>
   );
 }
@@ -184,8 +157,8 @@ export default function DesignRatingSummary({
 
   const isNotAssessed = !allRating || allRating.status === 'NOT_ASSESSED';
 
-  const primaryCats = primaryRating ? getCategoryModalSummaries(primaryRating) : [];
-  const secondaryCats = secondaryRating ? getCategoryModalSummaries(secondaryRating) : [];
+  const primaryCats = primaryRating ? getCategoryFloorSummaries(primaryRating) : [];
+  const secondaryCats = secondaryRating ? getCategoryFloorSummaries(secondaryRating) : [];
 
   const secondaryIsConfigured =
     secondaryRating &&

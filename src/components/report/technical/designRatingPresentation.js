@@ -778,3 +778,102 @@ export function getCategoryModalSummaries(roomDesignRating) {
     return { label: g.label, hasContribs: true, isScreen: false, modalLevels, distribution, total, hasFail };
   });
 }
+
+// ── Category floor authority (lowest achieved level) ──────────────────────
+// Reports the WEAKEST achieved level across all included parameters in each
+// category, separately per seating scope. This is the conservative governing
+// floor — NOT an average and NOT the modal/most-common level.
+//
+// Category membership (floor authority):
+//   Spatial Resolution:  P1–P11
+//   Dynamic Range:        P12–P14   (P15 silently excluded)
+//   Timbre Matching:      P16–P20   (P21 silently excluded)
+//   Screen / Viewing Geometry: RP23 (separately governed, not floored)
+//
+// For each included parameter:
+//   - Room-scoped: the room level applies equally to every seat.
+//   - Seat-scoped: the worst (lowest) seat level in the scope governs.
+// The category floor is the minimum across all included parameter levels.
+// P15 and P21 are excluded by range definition (not counted, no warning).
+
+const FLOOR_CATEGORY_RANGES = [
+  { label: "Spatial Resolution", range: [1, 11] },
+  { label: "Dynamic Range", range: [12, 14] },
+  { label: "Timbre Matching", range: [16, 20] },
+  { label: "Screen / Viewing Geometry", range: null },
+];
+
+function getFloorGroupForContrib(contrib) {
+  if (contrib.key === "screen") return "Screen / Viewing Geometry";
+  const num = contrib.parameter;
+  if (!Number.isFinite(num)) return null;
+  for (const g of FLOOR_CATEGORY_RANGES) {
+    if (g.range && num >= g.range[0] && num <= g.range[1]) return g.label;
+  }
+  return null;
+}
+
+/**
+ * Per-category floor (lowest achieved level) for a scoped rating.
+ *
+ * For the three RP22 performance categories, returns the lowest achieved
+ * level across all included parameters in the category. Room-scoped
+ * parameters contribute their room level; seat-scoped parameters contribute
+ * their worst (lowest) seat level in the scope (via worstLevelFromResultLevel).
+ * The category floor is the minimum of all included parameter levels.
+ *
+ * Screen / Viewing Geometry is separately governed by RP23 and returns the
+ * authoritative RP23 level (worst achieved) without flooring.
+ *
+ * P15 and P21 are silently excluded (not in the category ranges). P8 is
+ * V1-excluded by the rating authority and never appears in contributions.
+ *
+ * @param {Object} roomDesignRating — a scoped rating (e.g. scopedRatings.primary)
+ * @returns {Array<{ label, hasContribs, isScreen?, screenLevel?, floorLevel?, hasFail?, paramDetails? }>}
+ */
+export function getCategoryFloorSummaries(roomDesignRating) {
+  if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED" || roomDesignRating.status === "NOT_CONFIGURED") {
+    return FLOOR_CATEGORY_RANGES.map((g) => ({ label: g.label, hasContribs: false }));
+  }
+  const contributions = roomDesignRating.contributions || [];
+  const groups = {};
+  for (const c of contributions) {
+    const g = getFloorGroupForContrib(c);
+    if (!g) continue;
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(c);
+  }
+
+  return FLOOR_CATEGORY_RANGES.map((g) => {
+    const contribs = groups[g.label];
+    if (!contribs || contribs.length === 0) {
+      return { label: g.label, hasContribs: false };
+    }
+    // Screen / Viewing Geometry: RP23 authority, not floored.
+    if (g.label === SCREEN_CATEGORY_LABEL) {
+      const screenContrib = contribs.find((c) => c.key === "screen");
+      const worst = screenContrib ? worstLevelFromResultLevel(screenContrib.resultLevel) : null;
+      return { label: g.label, hasContribs: true, isScreen: true, screenLevel: worst };
+    }
+    // RP22 performance categories: floor = lowest achieved level across
+    // all included parameters. FAIL dominates — any FAIL parameter makes
+    // the category floor FAIL.
+    let floorLevel = null;
+    let hasFail = false;
+    const paramDetails = [];
+    for (const c of contribs) {
+      const worst = worstLevelFromResultLevel(c.resultLevel);
+      if (!worst) continue;
+      paramDetails.push({ key: c.key, level: worst });
+      if (worst === "FAIL") {
+        hasFail = true;
+        continue;
+      }
+      if (floorLevel == null || levelNum(worst) < levelNum(floorLevel)) {
+        floorLevel = worst;
+      }
+    }
+    if (hasFail) floorLevel = "FAIL";
+    return { label: g.label, hasContribs: true, isScreen: false, floorLevel, hasFail, paramDetails };
+  });
+}
