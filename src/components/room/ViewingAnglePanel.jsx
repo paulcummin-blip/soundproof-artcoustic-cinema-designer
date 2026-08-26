@@ -2,6 +2,7 @@ import React, { useMemo, useSyncExternalStore } from 'react';
 import { Eye, Ruler } from 'lucide-react';
 import { useAppState } from '@/components/AppStateProvider';
 import { calculateViewingAngle, assignRP23Level, buildPerRowViewingData } from '@/components/utils/viewingAngleUtils';
+import { resolveEffectiveVisibleWidthInches } from '@/components/models/screen/resolveEffectiveScreen';
 import { buildViewingPrioritySummary, describeViewingBalance } from '@/components/utils/viewingPriorityAuthority';
 import RP22GradingPill from '../ui/RP22GradingPill';
 import { getLevelColors } from '@/components/utils/rp22Colors';

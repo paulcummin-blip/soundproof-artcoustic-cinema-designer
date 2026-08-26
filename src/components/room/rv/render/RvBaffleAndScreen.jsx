@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolveEffectiveScreen";
 
 export default function RvBaffleAndScreen({
   screen,

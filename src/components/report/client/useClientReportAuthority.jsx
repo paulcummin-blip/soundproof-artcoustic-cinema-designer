@@ -32,6 +32,7 @@ import { buildComplianceBassPresentation } from "@/components/room/bass/bassComp
 import { computeAllSeatSplMetrics } from "@/components/utils/spl/centralSplEngine";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { useActiveProjectId } from "@/components/state/project-session";
+import { resolveEffectiveVisibleWidthInches, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 
 // TV preset → viewable width in inches (matches RoomDesigner TV_KEY_TO_INCHES)
 const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
