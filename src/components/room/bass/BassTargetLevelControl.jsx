@@ -44,7 +44,7 @@ export default function BassTargetLevelControl({ disabled = false }) {
   const selectTarget = (basis, level) => appState?.updateGlobalSpl?.({ p14Mode: basis, selectedP14TargetBasis: basis, selectedP14Level: level });
   const selectP18Basis = (basis) => appState?.updateGlobalSpl?.({ p18Mode: basis, selectedP18TargetBasis: basis });
 
-  return <div className="flex items-start justify-between gap-4">
+  return <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:gap-4">
     <div className="grid min-w-0 flex-1 gap-1.5">
     <span className="text-xs font-medium text-muted-foreground">P14 Bass SPL:</span>
     {["minimum", "recommended"].map((basis) => <div key={basis} className="flex flex-wrap items-center gap-1">
