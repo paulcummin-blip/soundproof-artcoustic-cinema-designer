@@ -79,6 +79,8 @@ export function getSubPlacementGuideCoordinates({
   const quarterX1 = W * 0.25;
   const midX = W * 0.5;
   const quarterX3 = W * 0.75;
+  const thirdX1 = W / 3;
+  const thirdX3 = (W * 2) / 3;
   const quarterY1 = L * 0.25;
   const midY = L * 0.5;
   const quarterY3 = L * 0.75;
@@ -91,6 +93,8 @@ export function getSubPlacementGuideCoordinates({
     quarterX1,
     midX,
     quarterX3,
+    thirdX1,
+    thirdX3,
     quarterY1,
     midY,
     quarterY3,

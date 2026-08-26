@@ -1,7 +1,8 @@
 import React from "react";
 
-export default function BestSubLayoutCard({ recommendation, rank }) {
+export default function BestSubLayoutCard({ recommendation, rank, familyComparison }) {
   const m = recommendation.metrics;
+  const showComparison = rank === 1 && familyComparison && familyComparison.winnerId === recommendation.id;
   return (
     <div className={`rounded-lg px-4 py-3 ${rank === 1 ? "border-2 border-[#213428] bg-[#F3F1EC]" : "border border-[#E7E4DF] bg-white"}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -15,6 +16,16 @@ export default function BestSubLayoutCard({ recommendation, rank }) {
         <Metric label="Transfer efficiency" value={m.transferEfficiencyClass} /><Metric label="Seats assessed" value={m.rspOnly ? "RSP-only" : m.realSeatsAssessed} />
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-[#625143]">{m.rankingReason}</p>
+      {showComparison && (
+        <div className="mt-2 rounded-md border border-[#213428]/20 bg-white/70 px-3 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Four-sub family comparison</div>
+          <p className="mt-1 text-[11px] leading-relaxed text-[#1B1A1A]">{familyComparison.explanation}</p>
+          <div className="mt-1.5 grid grid-cols-2 gap-2 text-[10px] text-[#625143]">
+            <span>25/75 worst seat: {familyComparison.quarter.worstSeatVariationDb.toFixed(2)} dB</span>
+            <span>33/67 worst seat: {familyComparison.third.worstSeatVariationDb.toFixed(2)} dB</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

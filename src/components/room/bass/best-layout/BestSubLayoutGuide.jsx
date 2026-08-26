@@ -6,6 +6,7 @@ import { useActiveProjectId } from "@/components/state/project-session";
 import { getStage2State, subscribeStage2 } from "@/components/room/bass/stage2/stage2PlacementStore";
 import { useP14AnalysisProgress } from "@/components/room/bass/p14AnalysisProgressStore";
 import { buildCurrentCanonicalLayout, buildStage2RecommendationLayout } from "./stage2RecommendationAdapter";
+import { buildFourSubFamilyComparison } from "./fourSubFamilyComparison";
 
 function placementPhaseText(stage2, p14Progress) {
   const p14Complete = p14Progress?.status === "complete"
@@ -60,6 +61,10 @@ export default function BestSubLayoutGuide({ roomDims, seatingPositions, rspPosi
   const best1 = useMemo(() => buildOption(stage2.one_sub_result), [recommendationsReady, stage2.one_sub_result, canonical.roomDims, canonical.seatingPositions, sourceHeights?.front, currentLayout, currentContract]);
   const best2 = useMemo(() => buildOption(stage2.two_sub_result), [recommendationsReady, stage2.two_sub_result, canonical.roomDims, canonical.seatingPositions, sourceHeights?.front, currentLayout, currentContract]);
   const best4 = useMemo(() => buildOption(stage2.four_sub_result), [recommendationsReady, stage2.four_sub_result, canonical.roomDims, canonical.seatingPositions, sourceHeights?.front, currentLayout, currentContract]);
+  const fourSubFamilyComparison = useMemo(
+    () => recommendationsReady ? buildFourSubFamilyComparison(stage2.four_sub_result) : null,
+    [recommendationsReady, stage2.four_sub_result],
+  );
   const phaseText = placementPhaseText(stage2, p14Progress);
   const progressText = stage2.status === "updating" && stage2.totalJobsPlanned > 0
     ? `Optimising subwoofer positions · ${stage2.completedJobs} of ${stage2.totalJobsPlanned} finalists`

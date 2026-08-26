@@ -30,6 +30,7 @@ export function generateBestSubLayoutCandidateSet(roomDims, sourceHeights, roomE
   if (!guide) return { candidates: [], diagnostics };
   const front = guide.frontY, rear = guide.rearY, left = guide.leftX, right = guide.rightX;
   const q1 = guide.quarterX1, q3 = guide.quarterX3, midX = guide.midX, midY = guide.midY;
+  const t1 = guide.thirdX1, t3 = guide.thirdX3;
   const make = (id, name, family, mode, points) => candidate(id, name, family, mode, points, heights);
   const raw = [
     make("front-centre-1", "Front centre", "Front wall", "Front wall midpoint", [{ x: midX, y: front, placement: "front" }]),
@@ -39,7 +40,8 @@ export function generateBestSubLayoutCandidateSet(roomDims, sourceHeights, roomE
     make("front-rear-midpoint-2", "Front + rear midpoint", "Front + rear", "Front wall midpoint + rear wall midpoint", [{ x: midX, y: front, placement: "front" }, { x: midX, y: rear, placement: "rear" }]),
     make("side-midpoints-2", "Opposite wall midpoints", "Side walls", "Opposite wall midpoint", [{ x: left, y: midY, placement: "left" }, { x: right, y: midY, placement: "right" }]),
     make("front-quarter-2", "Quarter point positions", "Front wall", "Quarter point positions", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }]),
-    make("front-rear-pairs-4", "Front pair + rear pair", "Front + rear", "Front pair + rear pair", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }, { x: q1, y: rear, placement: "rear" }, { x: q3, y: rear, placement: "rear" }]),
+    make("front-rear-pairs-4", "Front pair + rear pair (25/75)", "Front + rear", "Front pair + rear pair (25/75 width split)", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }, { x: q1, y: rear, placement: "rear" }, { x: q3, y: rear, placement: "rear" }]),
+    make("front-rear-pairs-third-4", "Front pair + rear pair (33/67)", "Front + rear", "Front pair + rear pair (33/67 width split)", [{ x: t1, y: front, placement: "front" }, { x: t3, y: front, placement: "front" }, { x: t1, y: rear, placement: "rear" }, { x: t3, y: rear, placement: "rear" }]),
     make("four-midpoints-4", "Four midpoint positions", "Four walls", "Four midpoint positions", [{ x: midX, y: front, placement: "front" }, { x: midX, y: rear, placement: "rear" }, { x: left, y: midY, placement: "left" }, { x: right, y: midY, placement: "right" }]),
     make("four-corners-4", "Four corner positions", "Four walls", "Four corner positions", [{ x: left, y: front, placement: "front" }, { x: right, y: front, placement: "front" }, { x: left, y: rear, placement: "rear" }, { x: right, y: rear, placement: "rear" }]),
   ];
