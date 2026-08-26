@@ -844,6 +844,17 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     usesCompleteAbRoomField ||
     (options?.rewSourceCurveMode === 'flat_rew_reference' && options?.rewParityFieldMode === 'full_field') ||
     options?.rewParityFieldMode === 'modes_only';
+  // When the Allen–Berkley corrected solver is the authoritative modal path
+  // (qStrategy === 'ab_corrected' + modes_only + coherent summation), the
+  // legacy modal solver's result is completely replaced and its diagnostic
+  // vectors are not consumed by any production authority. Skip the expensive
+  // legacy call unless legacy diagnostics are explicitly requested via
+  // options.legacyModalDiagnostics === true. The legacy implementation is
+  // preserved for diagnostic tools, comparison fixtures, and legacy mode.
+  const skipLegacyModal = options?.qStrategy === 'ab_corrected'
+    && isModeOnlyParity
+    && (options?.modalCoherenceMode || 'coherent') === 'coherent'
+    && options?.legacyModalDiagnostics !== true;
   const disableModalPropagationPhase = rewParityModalPhase ? true : options?.disableModalPropagationPhase === true;
   const mute68HzAxialMode = options?.mute68HzAxialMode === true;
   const propagationPhaseScaleOption = Number(options?.propagationPhaseScale);
@@ -1247,6 +1258,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
     // __TEMP_DIAGNOSTIC__ debugDisableModalContribution — remove after polarity masking diagnosis
     if (enableModes) {
+      // When skipLegacyModal is true (AB-corrected + modes_only + coherent),
+      // bypass the legacy modal solver entirely. The AB override below
+      // replaces modalSumRe/modalSumIm; the legacy diagnostic vectors are
+      // zeroed (not NaN) so downstream coherence/debug series remain safe.
       let {
         modalSumRe,
         modalSumIm,
@@ -1260,14 +1275,16 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         _debugStrongestMode,
         _debugModalContributors,
         _debugActiveModalVectorBreakdown,
-      } = legacyModalTransferLocal(
-        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale, source.tuning.delayMs, source.tuning.polarity,
-        Number.isFinite(Number(options?.debugMode200Multiplier)) ? Number(options.debugMode200Multiplier) : 1.0, // __TEMP_REW_PARITY_MODE_200_SCALE__
-        debugModalHSign, // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
-        highOrderAxialScale, // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
-        axialFamilyScale, tangentialFamilyScale, obliqueFamilyScale, // __TEMP_DIAGNOSTIC_FAMILY_SCALES__
-        muteModeKey // __TEMP_DIAGNOSTIC_MUTE_MODE_KEY__
-      );
+      } = skipLegacyModal
+        ? { modalSumRe: 0, modalSumIm: 0, diagnosticPerturbedModalSumRe: 0, diagnosticPerturbedModalSumIm: 0, distributedCoherenceModalSumRe: 0, distributedCoherenceModalSumIm: 0, splitCoherenceModalSumRe: 0, splitCoherenceModalSumIm: 0, splitCoherenceModalEnergySq: 0, _debugStrongestMode: null, _debugModalContributors: null, _debugActiveModalVectorBreakdown: null }
+        : legacyModalTransferLocal(
+            frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale, source.tuning.delayMs, source.tuning.polarity,
+            Number.isFinite(Number(options?.debugMode200Multiplier)) ? Number(options.debugMode200Multiplier) : 1.0, // __TEMP_REW_PARITY_MODE_200_SCALE__
+            debugModalHSign, // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
+            highOrderAxialScale, // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
+            axialFamilyScale, tangentialFamilyScale, obliqueFamilyScale, // __TEMP_DIAGNOSTIC_FAMILY_SCALES__
+            muteModeKey // __TEMP_DIAGNOSTIC_MUTE_MODE_KEY__
+          );
 
       // __CANDIDATE_AB_CORRECTED_MODAL__ — override the legacy modal sum with the A&B corrected
       // term only when explicitly selected. Direct path, reflections, and Q assignment above are
@@ -1831,9 +1848,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     axialQ,
   };
 
-  const activeModalVectorPath = pureDeterministicModalSum
-    ? 'storedModalContrib clean path'
-    : 'perturbedStoredModalContrib diagnostic path';
+  const activeModalVectorPath = skipLegacyModal
+    ? 'ab_corrected production path (legacy skipped)'
+    : pureDeterministicModalSum
+      ? 'storedModalContrib clean path'
+      : 'perturbedStoredModalContrib diagnostic path';
 
   return {
     freqsHz,
