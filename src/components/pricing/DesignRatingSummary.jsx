@@ -166,8 +166,8 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
   };
 
   return (
-    <div style={{ paddingTop: 6, borderTop: '1px solid #ECEAE6' }}>
-      <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 3 }}>
+    <div style={{ paddingTop: 10, borderTop: '1px solid #E0DDD7' }}>
+      <div style={{ fontSize: 9.5, fontWeight: 800, color: '#1B1A1A', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>
         {label}
       </div>
       {renderScopeLine(primary, true)}
