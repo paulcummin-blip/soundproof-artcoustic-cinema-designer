@@ -16,6 +16,7 @@ import { assessP18AgainstRequiredExtension, buildBassTargetWarning } from "@/com
 import { assessP18Extension, normalizeP18TargetBasis, p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
 import { isCanonicalP19Ready } from "@/components/room/bass/p19Readiness";
 import { buildSmoothCapabilityEnvelope, buildPracticalCalibrationTarget } from "@/components/utils/practicalCalibrationTarget";
+import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 
 export function buildPositionAwareP14Capability({
   canonicalResult,
@@ -115,6 +116,65 @@ export function buildPositionAwareP14Capability({
   };
 }
 
+// Helper: build the common return fields for the P14-passes case (used when
+// P18 is achieved and when P18 is not achieved but P14 still passes).
+// P19/P20 fields are added by the caller.
+function buildP14PassReturnObject(params) {
+  const {
+    p14TargetBasis, requestedLevel, selectedTargetDb, p14AssessmentStartHz,
+    achievedP14Db, achievedP14Level, p14, requestedP14Pass,
+    selectedP18TargetBasis, requiredExtensionHz,
+    achievedP18FrequencyHz, independentP18Assessment, achievedP18Level, p18,
+    extensionAssessment, extensionShapePass, requestedP18Pass,
+    p18RequiredExtensionAssessment, idealHouseTarget, practicalCalibrationTarget,
+    assessmentBand,
+  } = params;
+  return {
+    selectedP14TargetBasis: p14TargetBasis,
+    selectedP14Level: requestedLevel,
+    selectedP14TargetDb: selectedTargetDb,
+    selectedP14RequiredExtensionHz: p14AssessmentStartHz,
+    idealHouseTarget,
+    practicalCalibrationTarget,
+    p19TargetIdentity: practicalCalibrationTarget.length ? "practical-calibration-target" : "ideal-house-target",
+    assessmentStartHz: assessmentBand.valid ? assessmentBand.lowerHz : null,
+    assessmentEndHz: assessmentBand.valid ? assessmentBand.upperHz : null,
+    assessmentBandValid: assessmentBand.valid,
+    availableP14CapabilityDb: achievedP14Db,
+    requestedP14Pass,
+    p14MarginDb: Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb) ? achievedP14Db - selectedTargetDb : null,
+    maximumAchievableMinimumLevel: p14?.minimumLevel ?? 0,
+    maximumAchievableRecommendedLevel: p14?.recommendedLevel ?? 0,
+    achievedP14Db,
+    achievedP14Level,
+    achievedP14MinimumLevel: p14?.minimumLevel ?? 0,
+    achievedP14RecommendedLevel: p14?.recommendedLevel ?? 0,
+    minimumLevel: p14?.minimumLevel ?? 0,
+    recommendedLevel: p14?.recommendedLevel ?? 0,
+    limitingFrequencyHz: p14?.limitingFrequency ?? null,
+    headroomConsumedByEqDb: p14?.headroomConsumedByEqDb ?? null,
+    p14CapabilityDetails: p14,
+    p14TargetBasis,
+    p18TargetBasis: selectedP18TargetBasis,
+    selectedP18TargetBasis,
+    selectedP18RequiredExtensionHz: requiredExtensionHz,
+    achievedP18FrequencyHz,
+    achievedP18DesignHz: independentP18Assessment?.designHz ?? null,
+    p18PerformanceBand: independentP18Assessment?.performanceBand ?? null,
+    p18PerformanceMultiplier: independentP18Assessment?.performanceMultiplier ?? null,
+    achievedP18Level,
+    p18AchievedAuthority: p18,
+    p18Limitation: achievedP18FrequencyHz == null || achievedP18Level === 0
+      ? "Canonical post-EQ extension does not achieve P18 Level 1"
+      : null,
+    p18Evaluated: true,
+    p18NotEvaluatedReason: null,
+    requestedP18Pass,
+    p18RequiredExtensionAssessment,
+    requiredExtensionHz,
+  };
+}
+
 export function evaluateCanonicalBassAuthority({
   canonicalResult,
   activeSubs = [],
@@ -158,10 +218,87 @@ export function evaluateCanonicalBassAuthority({
   const requestedP14Pass = Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb)
     ? achievedP14Db >= selectedTargetDb
     : null;
+
+  // ── P14 FAIL → P18/P19/P20 NOT EVALUATED ──
+  // The selected P14 operating target is authoritative. When it cannot be
+  // achieved, P18/P19/P20 are not graded under that operating point — no
+  // fallback to a different SPL, no substitute lower bound, no persisted
+  // grades. The designer sees the strict FAIL and the available maximum.
+  if (requestedP14Pass === false) {
+    return {
+      selectedP14TargetBasis: p14TargetBasis,
+      selectedP14Level: requestedLevel,
+      selectedP14TargetDb: selectedTargetDb,
+      selectedP14RequiredExtensionHz: p14AssessmentStartHz,
+      idealHouseTarget: [],
+      practicalCalibrationTarget: [],
+      p19TargetIdentity: "not-evaluated",
+      assessmentStartHz: null,
+      assessmentEndHz: null,
+      assessmentBandValid: false,
+      availableP14CapabilityDb: achievedP14Db,
+      requestedP14Pass: false,
+      p14MarginDb: Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb) ? achievedP14Db - selectedTargetDb : null,
+      maximumAchievableMinimumLevel: p14?.minimumLevel ?? 0,
+      maximumAchievableRecommendedLevel: p14?.recommendedLevel ?? 0,
+      achievedP14Db,
+      achievedP14Level,
+      achievedP14MinimumLevel: p14?.minimumLevel ?? 0,
+      achievedP14RecommendedLevel: p14?.recommendedLevel ?? 0,
+      minimumLevel: p14?.minimumLevel ?? 0,
+      recommendedLevel: p14?.recommendedLevel ?? 0,
+      limitingFrequencyHz: p14?.limitingFrequency ?? null,
+      headroomConsumedByEqDb: p14?.headroomConsumedByEqDb ?? null,
+      p14CapabilityDetails: p14,
+      p14TargetBasis,
+      p18TargetBasis: selectedP18TargetBasis,
+      selectedP18TargetBasis,
+      selectedP18RequiredExtensionHz: requiredExtensionHz,
+      // P18/P19/P20 not evaluated at the requested operating point
+      achievedP18FrequencyHz: null,
+      achievedP18DesignHz: null,
+      p18PerformanceBand: null,
+      p18PerformanceMultiplier: null,
+      achievedP18Level: 0,
+      p18AchievedAuthority: null,
+      p18Limitation: "Not evaluated at requested operating point",
+      p18Evaluated: false,
+      p18NotEvaluatedReason: "p14-operating-point-not-achieved",
+      achievedP19VariationDb: null,
+      achievedP19Level: null,
+      p19AssessmentReady: false,
+      officialP19VariationDb: null,
+      officialP19WorstFrequencyHz: null,
+      perSeatP19Results: [],
+      p19Evaluated: false,
+      p19NotEvaluatedReason: "p14-operating-point-not-achieved",
+      achievedP20VariationDb: null,
+      achievedP20Level: null,
+      worstP20SeatId: null,
+      perSeatP20Results: [],
+      p20Available: false,
+      p20Evaluated: false,
+      p20NotEvaluatedReason: "p14-operating-point-not-achieved",
+      postEqCapabilityAssessment: null,
+      limitation: "P14 operating target not achieved — P18/P19/P20 not evaluated",
+      requestedP18Pass: null,
+      p18RequiredExtensionAssessment: null,
+      requiredExtensionHz,
+      targetWarning: buildBassTargetWarning({
+        p14Pass: false,
+        p18Pass: null,
+        p14ShortfallDb: Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb) ? selectedTargetDb - achievedP14Db : null,
+        p14LimitingFrequencyHz: p14?.limitingFrequency ?? null,
+        p18ShortfallHz: null,
+        p18RequiredExtensionHz: requiredExtensionHz,
+      }),
+    };
+  }
+
   // P18: find the achieved extension from the fixed post-EQ design at the
-  // selected P14 operating level. Computed before P19/P20 so the precise
-  // -3 dB crossing becomes the lower bound of the shared P19/P20 assessment
-  // band (RP22: transition down to the achieved -3 dB lower limit).
+  // selected P14 operating level. Uses the 60–200 Hz median method (METHOD A)
+  // — refDb = median of 1/3-octave-smoothed response over 60–200 Hz,
+  // cutoffDb = refDb − 3, F3 = sustained extension walk.
   const extensionAssessment = assessP18AgainstRequiredExtension({
     rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
     canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
@@ -179,7 +316,7 @@ export function evaluateCanonicalBassAuthority({
     p14CapabilityPass: requestedP14Pass,
     conditionalOnP14: false,
     passes: requestedP18Pass,
-    failureReason: extensionShapePass === false ? "target-relative-extension-shortfall" : null,
+    failureReason: extensionShapePass === false ? "in-room-extension-shortfall" : null,
   } : null;
   const achievedP18FrequencyHz = extensionAssessment?.achievedExtensionHz ?? null;
   const independentP18Assessment = assessP18Extension(achievedP18FrequencyHz, selectedP18TargetBasis);
@@ -192,24 +329,26 @@ export function evaluateCanonicalBassAuthority({
     targetBasis: selectedP18TargetBasis,
     gradedIndependentlyFromP14: true,
     p14CapabilityPass: requestedP14Pass,
-    source: "selected-output-target-relative-rsp-extension-one-third-octave",
+    source: "in-room-60-200-median-sustained-extension",
   } : null;
 
-  // Shared P19/P20 assessment band: precise achieved P18 -3 dB crossing →
-  // actual room transition frequency. Falls back to the domain band only
-  // when the P18 crossing is not available.
-  const p19AssessmentStartHz = Number.isFinite(achievedP18FrequencyHz) && achievedP18FrequencyHz > 0
-    ? achievedP18FrequencyHz
-    : (canonicalResult.assessmentStartHz ?? 20);
-  const p19AssessmentEndHz = canonicalResult.assessmentEndHz ?? 120;
+  // ── Single P19/P20 assessment-band authority ──
+  // The band is [achieved P18 F3 → room transition], valid only when P14
+  // passes AND a legitimate sustained P18 F3 exists. When invalid, P19/P20
+  // are not evaluated — no fallback to a different lower bound.
+  const transitionHz = canonicalResult.assessmentEndHz ?? null;
+  const assessmentBand = resolveBassAssessmentBand({
+    p14Pass: requestedP14Pass === true,
+    achievedP18Hz: achievedP18FrequencyHz,
+    transitionHz,
+  });
+  const p19AssessmentStartHz = assessmentBand.valid ? assessmentBand.lowerHz : null;
+  const p19AssessmentEndHz = assessmentBand.valid ? assessmentBand.upperHz : null;
 
   // ── Practical Calibration Target T(f) ──
   // P19 measures response smoothness against T(f), not the ideal H(f). T(f)
   // follows the ideal house curve where the system can physically achieve it
   // and rolls smoothly toward the broad LF capability envelope where it cannot.
-  // This removes the double-penalty where P18 already grades LF extension and
-  // P19 penalised the same system again for being below an impossible target.
-  // P18 continues to measure extension against the ideal H(f) (canonicalTargetCurve).
   const idealHouseTarget = (Array.isArray(canonicalResult.canonicalTargetCurve) && canonicalResult.canonicalTargetCurve.length)
     ? canonicalResult.canonicalTargetCurve
     : [];
@@ -219,8 +358,42 @@ export function evaluateCanonicalBassAuthority({
         idealTargetCurve: idealHouseTarget,
         capabilityEnvelope: buildSmoothCapabilityEnvelope(canonicalResult.maximumSplCurveAfterEq || canonicalResult.maximumSplCurveBeforeEq || []),
       });
-  // P19 target identity: the practical calibration target T(f).
   const p19TargetCurve = practicalCalibrationTarget.length ? practicalCalibrationTarget : idealHouseTarget;
+
+  // When the assessment band is invalid (P14 passed but P18 F3 not achieved,
+  // or transition not available), P19/P20 are NOT evaluated. No fallback to
+  // a different lower bound — there is no valid assessment region.
+  if (!assessmentBand.valid) {
+    return {
+      ...buildP14PassReturnObject({
+        p14TargetBasis, requestedLevel, selectedTargetDb, p14AssessmentStartHz,
+        achievedP14Db, achievedP14Level, p14, requestedP14Pass,
+        selectedP18TargetBasis, requiredExtensionHz,
+        achievedP18FrequencyHz, independentP18Assessment, achievedP18Level, p18,
+        extensionAssessment, extensionShapePass, requestedP18Pass,
+        p18RequiredExtensionAssessment, idealHouseTarget, practicalCalibrationTarget,
+        assessmentBand,
+      }),
+      // P19/P20 not evaluated
+      achievedP19VariationDb: null,
+      achievedP19Level: null,
+      p19AssessmentReady: false,
+      officialP19VariationDb: null,
+      officialP19WorstFrequencyHz: null,
+      perSeatP19Results: [],
+      p19Evaluated: false,
+      p19NotEvaluatedReason: assessmentBand.reason || "p18-extension-not-achieved",
+      achievedP20VariationDb: null,
+      achievedP20Level: null,
+      worstP20SeatId: null,
+      perSeatP20Results: [],
+      p20Available: false,
+      p20Evaluated: false,
+      p20NotEvaluatedReason: assessmentBand.reason || "p18-extension-not-achieved",
+      postEqCapabilityAssessment: null,
+      limitation: "P18 extension not achieved — P19/P20 not evaluated",
+    };
+  }
 
   // P19: canonical post-EQ RSP versus the Practical Calibration Target T(f)
   // (RSP only — the official RP22 P19 result is at the RSP relative to target).
@@ -240,9 +413,6 @@ export function evaluateCanonicalBassAuthority({
   });
   const achievedP19VariationDb = p19AssessmentReady ? officialP19VariationDb : null;
   const achievedP19Level = p19AssessmentReady ? officialP19Level : null;
-  // P19 per-seat: RP22 marks P19 as Room/Seat = Seat. Per-seat P19 grades are
-  // the official P19 results for each seat. The RSP is the calibration/target
-  // reference; per-seat deviations relative to target are the seat-scoped grades.
   const perSeatP19Results = computeOfficialPerSeatP19Assessment({
     perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
     canonicalTargetCurve: p19TargetCurve,
@@ -284,70 +454,37 @@ export function evaluateCanonicalBassAuthority({
   });
 
   return {
-    selectedP14TargetBasis: p14TargetBasis,
-    selectedP14Level: requestedLevel,
-    selectedP14TargetDb: selectedTargetDb,
-    selectedP14RequiredExtensionHz: p14AssessmentStartHz,
-    // Explicit target identities so downstream code can distinguish which
-    // definition a curve uses. P18 references idealHouseTarget; P19 references
-    // practicalCalibrationTarget. P20 uses neither (seat-vs-RSP only).
-    idealHouseTarget,
-    practicalCalibrationTarget,
-    p19TargetIdentity: practicalCalibrationTarget.length ? "practical-calibration-target" : "ideal-house-target",
-    // Authoritative P19/P20 assessment band: precise achieved P18 -3 dB
-    // crossing → actual room transition frequency. This is the single
-    // authority consumed by the graph marker, persisted cache, and any
-    // report/debug text describing the assessment band. Falls back to the
-    // domain band (20 Hz) only when the P18 crossing is genuinely unavailable.
-    assessmentStartHz: p19AssessmentStartHz,
-    assessmentEndHz: p19AssessmentEndHz,
-    availableP14CapabilityDb: achievedP14Db,
-    requestedP14Pass,
-    p14MarginDb: Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb) ? achievedP14Db - selectedTargetDb : null,
-    maximumAchievableMinimumLevel: p14?.minimumLevel ?? 0,
-    maximumAchievableRecommendedLevel: p14?.recommendedLevel ?? 0,
-    achievedP14Db,
-    achievedP14Level,
-    achievedP14MinimumLevel: p14?.minimumLevel ?? 0,
-    achievedP14RecommendedLevel: p14?.recommendedLevel ?? 0,
-    minimumLevel: p14?.minimumLevel ?? 0,
-    recommendedLevel: p14?.recommendedLevel ?? 0,
-    limitingFrequencyHz: p14?.limitingFrequency ?? null,
-    headroomConsumedByEqDb: p14?.headroomConsumedByEqDb ?? null,
-    p14CapabilityDetails: p14,
-    p14TargetBasis,
-    p18TargetBasis: selectedP18TargetBasis,
-    selectedP18TargetBasis,
-    selectedP18RequiredExtensionHz: requiredExtensionHz,
-    achievedP18FrequencyHz,
-    achievedP18DesignHz: independentP18Assessment.designHz,
-    p18PerformanceBand: independentP18Assessment.performanceBand,
-    p18PerformanceMultiplier: independentP18Assessment.performanceMultiplier,
-    achievedP18Level,
+    ...buildP14PassReturnObject({
+      p14TargetBasis, requestedLevel, selectedTargetDb, p14AssessmentStartHz,
+      achievedP14Db, achievedP14Level, p14, requestedP14Pass,
+      selectedP18TargetBasis, requiredExtensionHz,
+      achievedP18FrequencyHz, independentP18Assessment, achievedP18Level, p18,
+      extensionAssessment, extensionShapePass, requestedP18Pass,
+      p18RequiredExtensionAssessment, idealHouseTarget, practicalCalibrationTarget,
+      assessmentBand,
+    }),
     p18AchievedAuthority: p18 ? {
       ...p18,
       operatingP14CapabilityDb: achievedP14Db,
       operatingP14Level: achievedP14Level,
     } : null,
-    p18Limitation: achievedP18FrequencyHz == null || achievedP18Level === 0
-      ? "Canonical post-EQ extension does not achieve P18 Level 1"
-      : null,
     achievedP19VariationDb,
     achievedP19Level,
     p19AssessmentReady,
     officialP19VariationDb: achievedP19VariationDb,
     officialP19WorstFrequencyHz: p19AssessmentReady ? (p19?.worstFrequencyHz ?? null) : null,
     perSeatP19Results,
+    p19Evaluated: true,
+    p19NotEvaluatedReason: null,
     achievedP20VariationDb,
     achievedP20Level,
     worstP20SeatId: p20?.worstSeat?.seatId ?? null,
     perSeatP20Results: p20?.perSeatResults || [],
     p20Available,
+    p20Evaluated: true,
+    p20NotEvaluatedReason: null,
     postEqCapabilityAssessment,
     limitation: postEqCapabilityAssessment.limitation,
-    requestedP18Pass,
-    p18RequiredExtensionAssessment,
-    requiredExtensionHz,
     targetWarning,
   };
 }

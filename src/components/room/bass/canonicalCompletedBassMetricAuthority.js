@@ -22,8 +22,8 @@
 //      grid parity between post-EQ and target curves.
 
 import { buildCurveSignature, buildFilterBankSignature } from "./bassResultAuthority";
+import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 
-const ASSESSMENT_BAND = Object.freeze({ lowerHz: 20, upperHz: 120 });
 const EXPECTED_CURVE_LENGTH = 360;
 const LEGACY_CURVE_LENGTH = 186;
 const FREQUENCY_TOLERANCE_HZ = 0.01;
@@ -377,6 +377,24 @@ export function buildCanonicalCompletedBassMetricAuthority({
   const headroomOrShortfallDb = achievedCapabilityDb - requestedDb;
   const pass = achievedCapabilityDb >= requestedDb;
 
+  // Resolve the P19/P20 assessment band from the operating-point chain.
+  // The band is [achieved P18 → transition], valid only when P14 passes
+  // AND a legitimate sustained P18 F3 exists. Replaces the former hardcoded
+  // 20–120 Hz band with the single bassAssessmentBandAuthority.
+  const achievedP18Hz = isFiniteNum(finalOptimisedBassResponse?.achievedP18FrequencyHz)
+    ? Number(finalOptimisedBassResponse.achievedP18FrequencyHz)
+    : isFiniteNum(finalOptimisedBassResponse?.finalSeatVariationData?.p18?.extensionHz)
+      ? Number(finalOptimisedBassResponse.finalSeatVariationData.p18.extensionHz)
+      : null;
+  const transitionHz = isFiniteNum(finalOptimisedBassResponse?.assessmentEndHz)
+    ? Number(finalOptimisedBassResponse.assessmentEndHz)
+    : null;
+  const assessmentBand = resolveBassAssessmentBand({
+    p14Pass: pass,
+    achievedP18Hz,
+    transitionHz,
+  });
+
   const authority = {
     identity: {
       activeRequestFingerprint,
@@ -440,7 +458,11 @@ export function buildCanonicalCompletedBassMetricAuthority({
     },
     p18Input: {
       canonicalPostEqRsp: postEqRsp,
-      assessmentBand: { ...ASSESSMENT_BAND },
+      assessmentBand: assessmentBand.valid
+        ? { lowerHz: assessmentBand.lowerHz, upperHz: assessmentBand.upperHz }
+        : { lowerHz: null, upperHz: null },
+      assessmentBandValid: assessmentBand.valid,
+      assessmentBandReason: assessmentBand.reason,
       // P18 is independently graded at the selected P14 output. Its L1 floor
       // is carried by the completed P18 authority, never borrowed from P14.
       requiredExtensionHz: isFiniteNum(finalOptimisedBassResponse?.finalSeatVariationData?.p18?.authority?.requiredExtensionHz)
@@ -450,7 +472,11 @@ export function buildCanonicalCompletedBassMetricAuthority({
     p19Input: {
       canonicalPostEqRsp: postEqRsp,
       productionHouseCurveTarget: targetCurve,
-      assessmentBand: { ...ASSESSMENT_BAND },
+      assessmentBand: assessmentBand.valid
+        ? { lowerHz: assessmentBand.lowerHz, upperHz: assessmentBand.upperHz }
+        : { lowerHz: null, upperHz: null },
+      assessmentBandValid: assessmentBand.valid,
+      assessmentBandReason: assessmentBand.reason,
     },
   };
 

@@ -36,6 +36,7 @@
 
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { requiredP14ExtensionHz } from "@/components/utils/p14HouseCurveNormalisation";
+import { computeInRoomF3FromResponseCurve } from "@/components/utils/rp22BassMetrics";
 
 export const BASS_DESIGN_PHILOSOPHY = Object.freeze({
   rule: "The selected RP22 house curve is the immutable design target.",
@@ -103,70 +104,44 @@ export function assessP18AgainstRequiredExtension({
   upperLfeHz = 120,
 }) {
   if (!Array.isArray(rspPostEqCurve) || !rspPostEqCurve.length) return null;
-  if (!Array.isArray(canonicalTargetCurve) || !canonicalTargetCurve.length) return null;
   const targetDb = Number(selectedP14TargetDb);
   const requiredHz = Number(requiredExtensionHz);
+  // p18CutoffDb (= P14Target − 3) is NOT used as an absolute per-frequency SPL
+  // floor for the in-room response. It remains in the return for diagnostic
+  // compatibility with product-extension consumers, but the achieved in-room
+  // F3 uses the response's own 60–200 Hz median (METHOD A).
   const absoluteCutoffDb = Number.isFinite(Number(p18CutoffDb)) ? Number(p18CutoffDb) : null;
   const usableLfHz = Number.isFinite(Number(configuredUsableLfHz))
     ? Number(configuredUsableLfHz)
     : null;
   if (!Number.isFinite(requiredHz)) return null;
 
-  const targetSmoothed = smoothedCurve(canonicalTargetCurve)
-    .filter((point) => point.frequency <= upperLfeHz);
   const seatCurves = (Array.isArray(perSeatPostEqCurves) ? perSeatPostEqCurves : [])
     .filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
 
-  // RP22 P18 is the in-room -3 dB extension at the selected P14 operating
-  // condition. P14 supplies the total-system SPL gate; P18 therefore measures
-  // the RSP shape relative to the selected house curve, not against the P14
-  // dBC number as though it were a per-frequency SPL threshold.
+  // P18 F3 = achieved in-room −3 dB extension of the confirmed operating
+  // response at the selected P14 SPL. Uses the shared 60–200 Hz median
+  // authority (METHOD A) — refDb = median of 1/3-octave-smoothed response over
+  // 60–200 Hz, cutoffDb = refDb − 3, F3 = sustained extension walk.
   //
-  // Require one-third octave of support after the crossing so a narrow modal
-  // spike cannot create a false extension pass. Later modal dips belong to P19,
-  // while seat-to-seat variation belongs to P20.
-  function targetRelativeExtension(curve) {
-    const residual = smoothedCurve(curve)
-      .filter((point) => point.frequency <= upperLfeHz)
-      .map((point) => {
-        const targetSpl = curveValueAt(targetSmoothed, point.frequency);
-        return Number.isFinite(targetSpl)
-          ? { frequency: point.frequency, residualDb: point.spl - targetSpl }
-          : null;
-      })
-      .filter(Boolean);
-    // Do not clamp the in-room result to the product's nominal -6 dB usable-LF
-    // figure. That rating remains a diagnostic and a capability input, but room
-    // gain plus unused output headroom can legitimately move the in-room -3 dB
-    // point lower at a modest P14 target. The measured post-EQ curve is the P18
-    // authority; product limits already constrain the curve and permitted boost.
-    const startIndex = 0;
+  // The 60–200 Hz band is fixed and NOT capped at the room transition.
+  // Diagnostic evidence confirmed this is robust to isolated modes, broad
+  // modal humps, and small-room transition bleed. P18 reference-band selection
+  // and P19/P20 grading-band selection are separate authorities.
+  const rspF3 = computeInRoomF3FromResponseCurve(rspPostEqCurve);
+  const rspExtensionHz = rspF3.f3Hz;
+  const rspRefDb = rspF3.refDb;
+  const rspCutoffDb = rspF3.cutoffDb;
 
-    for (let index = startIndex; index < residual.length; index += 1) {
-      const point = residual[index];
-      if (point.residualDb < -3) continue;
-      const guardEndHz = Math.min(upperLfeHz, point.frequency * Math.pow(2, 1 / 3));
-      const guardPoints = residual.filter((candidate) =>
-        candidate.frequency >= point.frequency && candidate.frequency <= guardEndHz
-      );
-      if (!guardPoints.length || guardPoints.some((candidate) => candidate.residualDb < -3)) continue;
-
-      const previous = residual[index - 1];
-      let crossingHz = point.frequency;
-      if (previous && previous.residualDb < -3 && point.residualDb !== previous.residualDb) {
-        const ratio = (-3 - previous.residualDb) / (point.residualDb - previous.residualDb);
-        crossingHz = previous.frequency + (point.frequency - previous.frequency) * ratio;
-      }
-      return crossingHz;
-    }
-    return null;
-  }
-
-  const rspExtensionHz = targetRelativeExtension(rspPostEqCurve);
-  const seatResults = seatCurves.map((seat) => ({
-    seatId: seat.seatId,
-    extensionHz: targetRelativeExtension(seat.responseData),
-  }));
+  const seatResults = seatCurves.map((seat) => {
+    const seatF3 = computeInRoomF3FromResponseCurve(seat.responseData);
+    return {
+      seatId: seat.seatId,
+      extensionHz: seatF3.f3Hz,
+      refDb: seatF3.refDb,
+      cutoffDb: seatF3.cutoffDb,
+    };
+  });
   const validSeatExtensions = seatResults.map((seat) => seat.extensionHz).filter(isFiniteNumber);
   const worstSeatExtensionHz = validSeatExtensions.length ? Math.max(...validSeatExtensions) : null;
   const worstSeatId = seatResults.filter((seat) => isFiniteNumber(seat.extensionHz))
@@ -181,6 +156,10 @@ export function assessP18AgainstRequiredExtension({
     selectedP14TargetDb: Number.isFinite(targetDb) ? targetDb : null,
     requiredExtensionHz: requiredHz,
     p18CutoffDb: absoluteCutoffDb,
+    // The achieved in-room F3 uses the response's own 60–200 Hz median, NOT
+    // p18CutoffDb. This field is retained for diagnostic compatibility only.
+    rspRefDb,
+    rspCutoffDb,
     relativeCutoffDb: -3,
     configuredUsableLfHz: usableLfHz,
     rspExtensionHz,
@@ -191,7 +170,7 @@ export function assessP18AgainstRequiredExtension({
     achievedExtensionHz,
     passes,
     shortfallHz,
-    assessmentSource: "canonical-target-relative-post-eq-rsp",
+    assessmentSource: "in-room-60-200-median-sustained-extension",
   };
 }
 

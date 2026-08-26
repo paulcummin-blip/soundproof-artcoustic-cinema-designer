@@ -18,7 +18,7 @@
 // new fingerprint version that, combined with the instanceAuthorityVersion
 // in completedBassResultPersistence.js, forms an explicit instance-authority
 // cache namespace. Old CFG results always miss.
-export const FINGERPRINT_VERSION = 5;
+export const FINGERPRINT_VERSION = 6;
 
 // ---------------------------------------------------------------------------
 // 1. Stable serialization primitives

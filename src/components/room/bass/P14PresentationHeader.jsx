@@ -20,6 +20,9 @@ export default function P14PresentationHeader({
     : null;
   const capabilityDb = Number.isFinite(availableP14CapabilityDb) ? availableP14CapabilityDb : null;
   const headroomDb = capabilityDb != null && targetDb != null ? capabilityDb - targetDb : null;
+  // P14 PASS/FAIL: strict — the selected target is achievable only when
+  // available capability >= requested target. Never silently downgrade.
+  const p14Pass = capabilityDb != null && targetDb != null ? capabilityDb >= targetDb : null;
   const p19Variation = Number.isFinite(achievedP19VariationDb) ? achievedP19VariationDb : null;
   const p19Available = p19Variation != null && Number.isFinite(achievedP19Level);
   const p19Pass = p19Available && achievedP19Level >= 1;
@@ -90,12 +93,22 @@ export default function P14PresentationHeader({
         </div>
       )}
 
-      {/* P14 Total LFE Target */}
+      {/* P14 Total LFE Target — PASS/FAIL against the selected operating point */}
       <div style={cardStyle}>
         <div style={titleStyle}>P14 Total LFE Target</div>
-        <div style={valueStyle("#213428")}>{targetDb != null ? `${targetDb} dBC` : "—"}</div>
-        <div style={subtitleStyle("#3E4349")}>{basisLabel} Level {levelNum}</div>
-        <div style={captionStyle}>Integrated across the P14 assessment band</div>
+        {p14Pass === false ? (
+          <>
+            <div style={valueStyle("#b45309")}>FAIL</div>
+            <div style={subtitleStyle("#b45309")}>{basisLabel} Level {levelNum} · {targetDb != null ? `${targetDb} dBC` : "—"}</div>
+            <div style={captionStyle}>Target not achievable at current capability</div>
+          </>
+        ) : (
+          <>
+            <div style={valueStyle("#213428")}>{targetDb != null ? `${targetDb} dBC` : "—"}</div>
+            <div style={subtitleStyle("#3E4349")}>{basisLabel} Level {levelNum}</div>
+            <div style={captionStyle}>Integrated across the P14 assessment band</div>
+          </>
+        )}
       </div>
 
       {/* Available P14 Capability */}

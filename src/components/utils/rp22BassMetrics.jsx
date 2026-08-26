@@ -139,6 +139,51 @@ export function computeP18InRoomF3({ freqsHz, splDb, targetDb, minHz = 10, maxHz
   return { f3Hz: f3, details: { refDb, cutoffDb, samples: freqsHz.length } };
 }
 
+// ── Shared P18 F3 authority — METHOD A (60–200 Hz median, no transition cap) ──
+//
+// Operates on {frequency, spl} response curves (the canonical authority format).
+// This is the SAME proven method as computeP18InRoomF3, refactored to work on
+// the curve format used by the canonical bass authority.
+//
+//   1. 1/3-octave smooth the confirmed operating response.
+//   2. refDb = median of the smoothed response over 60–200 Hz.
+//   3. cutoffDb = refDb − 3.
+//   4. F3 = sustained extension walk (lowest freq where spl sustains >= cutoff).
+//
+// The 60–200 Hz band is fixed and deliberately NOT capped at the room transition.
+// Diagnostic evidence confirmed this band is robust to isolated modes, broad
+// modal humps, and small-room transition bleed. A narrower transition-capped
+// band was tested and REJECTED because modal structure inside the narrow band
+// inflated the reference and produced false F3 failures.
+//
+// P18 reference-band selection (this function) and P19/P20 grading-band
+// selection (bassAssessmentBandAuthority) are separate authorities.
+export function computeInRoomF3FromResponseCurve(curve) {
+  if (!Array.isArray(curve) || curve.length === 0) return { f3Hz: null, refDb: null, cutoffDb: null };
+  const smoothed = smoothThird(toSplCurve(curve));
+  if (!smoothed.length) return { f3Hz: null, refDb: null, cutoffDb: null };
+  // 60–200 Hz median — METHOD A, no transition cap.
+  const refPoints = smoothed.filter((p) => p.frequency >= 60 && p.frequency <= 200);
+  const refValues = (refPoints.length > 0 ? refPoints : smoothed).map((p) => p.spl).filter(isNum);
+  const refDb = median(refValues);
+  if (!isNum(refDb)) return { f3Hz: null, refDb: null, cutoffDb: null };
+  const cutoffDb = refDb - 3;
+  // Sustained walk: find the lowest frequency where spl >= cutoff and stays
+  // >= cutoff for all subsequent points (sustained-above protection).
+  const points = smoothed.filter((p) => p.frequency <= 200 && isNum(p.spl));
+  let f3Hz = null;
+  for (let index = 0; index < points.length; index += 1) {
+    if (points[index].spl < cutoffDb) continue;
+    if (points.slice(index).some((point) => point.spl < cutoffDb)) continue;
+    const previous = points[index - 1];
+    if (!previous || previous.spl >= cutoffDb) { f3Hz = points[index].frequency; break; }
+    const ratio = (cutoffDb - previous.spl) / (points[index].spl - previous.spl);
+    f3Hz = previous.frequency + (points[index].frequency - previous.frequency) * ratio;
+    break;
+  }
+  return { f3Hz, refDb, cutoffDb };
+}
+
 // P19 — direct maximum absolute response-to-target deviation below Schroeder frequency.
 export function computeP19DeviationBelowSchroeder({ freqsHz, splDb, targetDb, schroederHz }) {
   if (!Array.isArray(freqsHz) || !Array.isArray(splDb) || freqsHz.length === 0) {
@@ -321,16 +366,24 @@ export function computeParam18AchievedExtension({ rspPostEqCurve, perSeatPostEqC
   if (!product) return null;
   const seatCurves = (perSeatPostEqCurves || []).filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
   const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
+  // P18 F3 is derived from the response's own 60–200 Hz median (METHOD A),
+  // NOT from definition.p18CutoffDb (= P14Target − 3) as an absolute SPL floor.
+  // The 60–200 Hz median is a single shared authority — see computeInRoomF3FromResponseCurve.
+  const rspF3 = computeInRoomF3FromResponseCurve(rspPostEqCurve);
+  const rspExtensionHz = rspF3.f3Hz;
+  const seatF3Results = seatCurves.map((seat) => {
+    const seatF3 = computeInRoomF3FromResponseCurve(seat.responseData);
+    return { seatId: seat.seatId, extensionHz: seatF3.f3Hz, refDb: seatF3.refDb, cutoffDb: seatF3.cutoffDb };
+  });
   const targets = definitions.map((definition) => {
-    const rspExtensionHz = sustainedExtensionAtCutoff(rspPostEqCurve, definition.p18CutoffDb);
-    const seatExtensions = seatCurves.map((seat) => ({ seatId: seat.seatId, extensionHz: sustainedExtensionAtCutoff(seat.responseData, definition.p18CutoffDb) }));
+    const seatExtensions = seatF3Results.map((seat) => ({ seatId: seat.seatId, extensionHz: seat.extensionHz }));
     const productTarget = product.targets.find((target) => target.level === definition.level);
     const sourceExtensions = [productTarget?.extensionHz, rspExtensionHz, ...seatExtensions.map((seat) => seat.extensionHz)];
     const complete = sourceExtensions.every(isNum);
     const extensionHz = complete ? Math.max(...sourceExtensions) : null;
     const worstSeat = seatExtensions.filter((seat) => isNum(seat.extensionHz)).sort((a, b) => b.extensionHz - a.extensionHz)[0] || null;
     const designHz = resolveRp22DesignValue(18, extensionHz);
-    return { level: definition.level, cutoffDb: definition.p18CutoffDb, limitHz: definition.p18LimitHz, extensionHz: designHz,
+    return { level: definition.level, cutoffDb: rspF3.cutoffDb, refDb: rspF3.refDb, limitHz: definition.p18LimitHz, extensionHz: designHz,
       extensionHzRaw: extensionHz,
       rspExtensionHz, productExtensionHz: productTarget?.extensionHz ?? null, worstSeatId: worstSeat?.seatId ?? null,
       worstSeatExtensionHz: worstSeat?.extensionHz ?? null, passesFrequency: designHz != null && designHz <= definition.p18LimitHz };
@@ -338,43 +391,32 @@ export function computeParam18AchievedExtension({ rspPostEqCurve, perSeatPostEqC
   const winningTarget = targets.slice().reverse().find((target) => target.passesFrequency) || null;
   return { targets, level: winningTarget?.level || null, value: winningTarget?.extensionHz ?? null,
     formatted: winningTarget ? `${winningTarget.extensionHz} Hz` : null,
+    refDb: rspF3.refDb, cutoffDb: rspF3.cutoffDb,
     productCapability: product, source: "post-eq-rsp-worst-seat-achieved-extension",
-    note: "Achieved in-room extension from post-EQ RSP, conservatively bounded by product capability and worst-seat post-EQ response." };
+    note: "Achieved in-room extension from post-EQ RSP using 60–200 Hz median (METHOD A), conservatively bounded by product capability and worst-seat post-EQ response." };
 }
 
 // Legacy in-room extension helper retained for non-authoritative simulation consumers.
+// Uses the shared 60–200 Hz median F3 authority (METHOD A) — NOT p18CutoffDb.
 export function computeParam18BassExtension(rspResponse) {
   if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
-  const sorted = smoothThird(toSplCurve(rspResponse)).sort((a, b) => a.frequency - b.frequency);
-  if (!sorted.length) return null;
+  const f3 = computeInRoomF3FromResponseCurve(rspResponse);
+  const extensionHz = f3.f3Hz;
+  const refDb = f3.refDb;
+  const cutoffDb = f3.cutoffDb;
+  if (!isNum(extensionHz)) return { targets: [], level: null, value: null, formatted: null, refDb, cutoffDb, note: "Predicted design-stage extension from the shared calibrated response; independently graded from P14." };
 
   const targets = getRp22BassOperatingDefinitions().map((definition) => {
-    const cutoffDb = definition.p18CutoffDb;
-    let extensionHz = null;
-    let bounded = false;
-    if (sorted[0].spl >= cutoffDb) {
-      extensionHz = sorted[0].frequency;
-      bounded = true;
-    } else {
-      for (let index = 0; index < sorted.length - 1; index += 1) {
-        const low = sorted[index];
-        const high = sorted[index + 1];
-        if (low.spl < cutoffDb && high.spl >= cutoffDb) {
-          const ratio = (cutoffDb - low.spl) / (high.spl - low.spl);
-          extensionHz = low.frequency + (high.frequency - low.frequency) * ratio;
-          break;
-        }
-      }
-    }
     const designHz = resolveRp22DesignValue(18, extensionHz);
     return {
       level: definition.level,
       targetSplDb: definition.p14TargetDb,
       cutoffDb,
+      refDb,
       limitHz: definition.p18LimitHz,
       extensionHz: designHz,
       extensionHzRaw: extensionHz,
-      bounded,
+      bounded: false,
       passesFrequency: designHz != null && designHz <= definition.p18LimitHz,
     };
   });
@@ -384,8 +426,10 @@ export function computeParam18BassExtension(rspResponse) {
     targets,
     level: winningTarget?.level || null,
     value: winningTarget?.extensionHz ?? null,
-    formatted: winningTarget == null ? null : winningTarget.bounded ? `≤ ${winningTarget.extensionHz} Hz` : `${winningTarget.extensionHz} Hz`,
-    note: "Predicted design-stage extension from the shared calibrated response; independently graded from P14.",
+    formatted: winningTarget == null ? null : `${winningTarget.extensionHz} Hz`,
+    refDb,
+    cutoffDb,
+    note: "Predicted design-stage extension from the shared calibrated response (60–200 Hz median, METHOD A); independently graded from P14.",
   };
 }
 
@@ -396,7 +440,7 @@ export function computeParam18BassExtension(rspResponse) {
 //  median SPL of the 1/3-octave smoothed RSP curve (i.e. flat-target) across
 //  the smoothed bass band. Max absolute deviation below the transition
 //  frequency is returned.
-export function computeParam19Deviation(rspResponse, transitionHz) {
+export function computeParam19Deviation(rspResponse, transitionHz, lowerHz = null) {
   if (!isNum(transitionHz) || transitionHz <= 0) return null;
   if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
   const curve = toSplCurve(rspResponse);
@@ -410,7 +454,11 @@ export function computeParam19Deviation(rspResponse, transitionHz) {
   const refDb = median(bandUsed.map((p) => p.spl));
   if (!isNum(refDb)) return null;
 
-  const below = smoothed.filter((p) => p.frequency <= transitionHz);
+  // Assessment band: [achieved P18 → transition]. When lowerHz is provided
+  // (the achieved P18 F3), filter out points below it. Falls back to no
+  // lower bound only when lowerHz is null/invalid (legacy callers).
+  const hasLower = isNum(lowerHz) && lowerHz > 0;
+  const below = smoothed.filter((p) => p.frequency <= transitionHz && (!hasLower || p.frequency >= lowerHz));
   if (below.length === 0) return null;
 
   let rawMaxDev = 0;
@@ -444,15 +492,18 @@ function levelForDeviation(dev) {
 // Parameter 20 — Seat-to-seat frequency response below transition, relative to
 // RSP, per seat, 1/3-octave smoothing. The worst (non-RSP) seat result is the
 // achieved room value.
-export function computeParam20SeatConsistency({ rspResponse, perSeatResponses, transitionHz, rspSeatId }) {
+export function computeParam20SeatConsistency({ rspResponse, perSeatResponses, transitionHz, rspSeatId, lowerHz = null }) {
   if (!isNum(transitionHz) || transitionHz <= 0) return null;
   if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
 
   const rspSmoothed = smoothThird(toSplCurve(rspResponse));
   if (rspSmoothed.length === 0) return null;
 
+  // Assessment band: [achieved P18 → transition]. When lowerHz is provided
+  // (the achieved P18 F3), filter out points below it.
+  const hasLower = isNum(lowerHz) && lowerHz > 0;
   const rspBandFreqs = rspSmoothed
-    .filter((p) => p.frequency <= transitionHz)
+    .filter((p) => p.frequency <= transitionHz && (!hasLower || p.frequency >= lowerHz))
     .map((p) => p.frequency);
   if (rspBandFreqs.length === 0) return null;
 

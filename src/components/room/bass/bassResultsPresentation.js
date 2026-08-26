@@ -201,29 +201,30 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   const isError = authorityStatus === "ERROR";
   const isUncalculated = authorityStatus === "UNCALCULATED" && !isCalculating;
 
-  // Per-seat arrays (publication-gated — empty when not verified)
-  const perSeatP19Results = isAuthoritative
+  // Per-seat arrays (publication-gated — empty when not verified or P14 failed)
+  const perSeatP19Results = (isAuthoritative && !p14Failed)
     ? (Array.isArray(contract?.selectedCandidate?.perSeatP19Results) ? contract.selectedCandidate.perSeatP19Results : [])
     : [];
-  const perSeatP20Results = presentation.perSeatP20Results || [];
+  const perSeatP20Results = (isAuthoritative && !p14Failed) ? (presentation.perSeatP20Results || []) : [];
 
   // Build per-seat rows for expanded views
-  const p19Rows = isAuthoritative ? buildP19SeatRows(seatingPositions, perSeatP19Results) : [];
-  const p20Rows = isAuthoritative ? buildP20SeatRows(seatingPositions, perSeatP20Results) : [];
+  const p19Rows = (isAuthoritative && !p14Failed) ? buildP19SeatRows(seatingPositions, perSeatP19Results) : [];
+  const p20Rows = (isAuthoritative && !p14Failed) ? buildP20SeatRows(seatingPositions, perSeatP20Results) : [];
 
   // P19 compact: RSP + lowest seat (internal authority — presented as coverage summary)
-  const p19Rsp = isAuthoritative ? p19RspResult(contract?.productAnalysis?.parameters?.p19) : null;
-  const p19Lowest = isAuthoritative ? p19LowestSeat(p19Rows) : null;
+  const p19Rsp = (isAuthoritative && !p14Failed) ? p19RspResult(contract?.productAnalysis?.parameters?.p19) : null;
+  const p19Lowest = (isAuthoritative && !p14Failed) ? p19LowestSeat(p19Rows) : null;
 
   // P20 compact: best Primary + lowest seat (internal authority — presented as coverage summary)
-  const p20BestPrimary = isAuthoritative ? p20BestPrimarySeat(p20Rows) : null;
-  const p20Lowest = isAuthoritative ? p20WorstSeat(p20Rows) : null;
+  const p20BestPrimary = (isAuthoritative && !p14Failed) ? p20BestPrimarySeat(p20Rows) : null;
+  const p20Lowest = (isAuthoritative && !p14Failed) ? p20WorstSeat(p20Rows) : null;
 
   const pills = {};
 
   // P14 — USER-SELECTED target level and target dB (authoritative). Available
   // capability is shown separately in the detail line. The capability never
-  // overwrites the user's selected target.
+  // overwrites the user's selected target. When the target is NOT achievable,
+  // the pill shows strict FAIL + Available max — never a downgraded level.
   if (isAuthoritative) {
     const source = contract?.productAnalysis?.parameters?.p14;
     const selectedLevel = source?.selectedLevel ?? source?.level;
@@ -231,30 +232,45 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     const availableCapabilityDb = source?.achievedCapabilityDb ?? source?.availableCapabilityDb ?? null;
     const targetAchievable = source?.pass === true;
 
-    const levelText = Number.isFinite(selectedLevel) && selectedLevel > 0 ? `L${selectedLevel}` : "—";
-    const valueText = isFiniteNumber(selectedTargetDb) ? formatBassParameterValue("p14", selectedTargetDb) : "—";
-    const resultText = valueText !== "—" ? `${levelText} · ${valueText}` : "—";
-
     const detailParts = [];
     if (source?.targetBasis) detailParts.push(`Target basis: ${formatP14BasisLabel(source.targetBasis)}`);
-    if (isFiniteNumber(availableCapabilityDb)) detailParts.push(`Available: ${formatP14Capability(availableCapabilityDb)}`);
-    if (targetAchievable === false && isFiniteNumber(availableCapabilityDb)) detailParts.push("Target not achievable");
-    const detail = detailParts.join(" · ");
 
-    pills.p14 = {
-      label: "P14 Bass SPL",
-      resultText,
-      text: `P14 Bass SPL ${resultText}`,
-      level: valueText !== "—" ? levelText : "—",
-      detail,
-    };
+    if (targetAchievable === false) {
+      // P14 FAIL — strict: show FAIL, not a downgraded level. Available max
+      // is shown so the designer knows what the system can actually achieve.
+      if (isFiniteNumber(availableCapabilityDb)) detailParts.push(`Available: ${formatP14Capability(availableCapabilityDb)}`);
+      pills.p14 = {
+        label: "P14 Bass SPL",
+        resultText: "FAIL",
+        text: "P14 Bass SPL FAIL",
+        level: "FAIL",
+        detail: detailParts.join(" · "),
+      };
+    } else {
+      // P14 PASS — show the selected level and target dB.
+      const levelText = Number.isFinite(selectedLevel) && selectedLevel > 0 ? `L${selectedLevel}` : "—";
+      const valueText = isFiniteNumber(selectedTargetDb) ? formatBassParameterValue("p14", selectedTargetDb) : "—";
+      const resultText = valueText !== "—" ? `${levelText} · ${valueText}` : "—";
+      if (isFiniteNumber(availableCapabilityDb)) detailParts.push(`Available: ${formatP14Capability(availableCapabilityDb)}`);
+      pills.p14 = {
+        label: "P14 Bass SPL",
+        resultText,
+        text: `P14 Bass SPL ${resultText}`,
+        level: valueText !== "—" ? levelText : "—",
+        detail: detailParts.join(" · "),
+      };
+    }
   } else {
     pills.p14 = { label: "P14 Bass SPL", resultText: officialStateText(authorityStatus, isCalculating), text: `P14 Bass SPL ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
+  // P14 FAIL → P18/P19/P20 not evaluated at the requested operating point.
+  const p14Failed = isAuthoritative && contract?.productAnalysis?.parameters?.p14?.pass === false;
+  const notEvaluatedText = "Not evaluated at requested operating point";
+
   // P18 — dynamically regrade the achieved extension for the current display
   // basis without changing fingerprints, workers, authority or cached curves.
-  if (isAuthoritative) {
+  if (isAuthoritative && !p14Failed) {
     const source = contract?.productAnalysis?.parameters?.p18;
     const achievedValue = isFiniteNumber(source?.value) ? Number(source.value) : null;
     const assessment = assessP18Extension(achievedValue, activeP18Basis);
@@ -268,20 +284,24 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       level: valueText ? levelText : "—",
       detail: formatP18TargetBasisDetail(activeP18Basis),
     };
+  } else if (p14Failed) {
+    pills.p18 = { label: "P18 Extension", resultText: notEvaluatedText, text: `P18 Extension ${notEvaluatedText}`, level: "—", detail: null };
   } else {
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
   // P19 — SEAT-scoped RP22 parameter (Room/Seat = Seat). The headline always
   // displays "SEAT" — no RSP result, no aggregate level. Per-seat grades are
-  // in the P19 — All Seats panel below. Every seat is graded against the same
-  // house target using the same RSP-derived EQ/trim — no independent seat EQ.
-  pills.p19 = seatScopeHeadlinePill("P19 Response Fit");
+  // in the P19 — All Seats panel below. When P14 fails, P19 is not evaluated.
+  pills.p19 = p14Failed
+    ? { label: "P19 Response Fit", resultText: notEvaluatedText, text: `P19 Response Fit ${notEvaluatedText}`, level: "—", detail: null }
+    : seatScopeHeadlinePill("P19 Response Fit");
 
   // P20 — SEAT-scoped parameter. The headline always displays "SEAT" — no
-  // "worst seat" headline, no aggregate level. Per-seat results are in the
-  // P20 — All Seats grid below, with a coverage summary above the grid.
-  pills.p20 = seatScopeHeadlinePill("P20 Seat Consistency");
+  // "worst seat" headline, no aggregate level. When P14 fails, P20 is not evaluated.
+  pills.p20 = p14Failed
+    ? { label: "P20 Seat Consistency", resultText: notEvaluatedText, text: `P20 Seat Consistency ${notEvaluatedText}`, level: "—", detail: null }
+    : seatScopeHeadlinePill("P20 Seat Consistency");
 
   // Status text
   let statusText = "Waiting for complete design";

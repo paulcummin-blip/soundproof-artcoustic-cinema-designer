@@ -66,10 +66,10 @@ export default function BassResultCards() {
         ))}
       </div>
 
-      {/* Expanded P19/P20 per-seat views — only when authoritative */}
-      {formatted.isReady && (formatted.p19Rows.length > 0 || formatted.p20Rows.length > 0) && (
+      {/* Expanded P19/P20 per-seat views — when authoritative (or P14 failed → not evaluated) */}
+      {formatted.isReady && (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {formatted.p19Rows.length > 0 && (
+          {formatted.p19Rows.length > 0 ? (
             <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
               <div className="mb-1 text-[11px] font-semibold text-[#213428]">P19 — All Seats</div>
               <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{formatCoverageSummaryFromRows(formatted.p19Rows)}</div>
@@ -80,14 +80,34 @@ export default function BassResultCards() {
                 p14TargetUnselected={p14Selection.noP14TargetSelected}
               />
             </div>
+          ) : (
+            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
+              <div className="mb-1 text-[11px] font-semibold text-[#213428]">P19 — All Seats</div>
+              <P19SeatBlock
+                rows={[]}
+                publicationVerified={false}
+                authorityStatus={shared.completedBassAuthority?.authorityStatus}
+                p14TargetUnselected={p14Selection.noP14TargetSelected}
+              />
+            </div>
           )}
-          {formatted.p20Rows.length > 0 && (
+          {formatted.p20Rows.length > 0 ? (
             <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
               <div className="mb-1 text-[11px] font-semibold text-[#213428]">P20 — All Seats</div>
               <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{formatCoverageSummaryFromRows(formatted.p20Rows)}</div>
               <P20SeatBlock
                 rows={formatted.p20Rows}
                 publicationVerified={formatted.publicationVerified}
+                authorityStatus={shared.completedBassAuthority?.authorityStatus}
+                p14TargetUnselected={p14Selection.noP14TargetSelected}
+              />
+            </div>
+          ) : (
+            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
+              <div className="mb-1 text-[11px] font-semibold text-[#213428]">P20 — All Seats</div>
+              <P20SeatBlock
+                rows={[]}
+                publicationVerified={false}
                 authorityStatus={shared.completedBassAuthority?.authorityStatus}
                 p14TargetUnselected={p14Selection.noP14TargetSelected}
               />
