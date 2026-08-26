@@ -16,6 +16,7 @@ export const emptyBassResults = () => ({
   onRetry: null,
   authoritative: null,
   completedBassAuthority: null,
+  p14FamilyProgress: null,
   seatingPositions: [],
 });
 
