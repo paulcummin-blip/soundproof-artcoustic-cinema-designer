@@ -18,6 +18,7 @@ import {
   subscribeStage2,
   publishHydratedStage2,
   markStage2Idle,
+  markStage2Waiting,
 } from "./stage2PlacementStore";
 import { hydrateStage2PlacementCache, isStage2CacheValid } from "./stage2PlacementPersistence";
 import { buildPromotionPlan } from "./stage2FinalistPromotion";
@@ -26,6 +27,7 @@ import { deriveRequestedCalibrationConfig } from "../requestedCalibrationConfig"
 import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { STAGE2_DEFAULT_QUANTITY_ORDER, STAGE2_START_DELAY_MS } from "./stage2Constants";
+import { useP14AnalysisProgress } from "../p14AnalysisProgressStore";
 
 function computeTransitionHz(roomDims) {
   const volume = Number(roomDims?.widthM) * Number(roomDims?.lengthM) * Number(roomDims?.heightM);
@@ -92,6 +94,11 @@ export function useStage2PlacementOptimiser({
   );
 
   const [hydrationDone, setHydrationDone] = useState(false);
+  const [hydratedCache, setHydratedCache] = useState(null);
+  const p14FamilyProgress = useP14AnalysisProgress(projectId);
+  const p14FamilyReady = p14FamilyProgress?.status === "complete"
+    && Number(p14FamilyProgress?.total) === 8
+    && Number(p14FamilyProgress?.completed) >= 8;
 
   // Compute P14 target from splConfig
   const p14Target = useMemo(() => {
@@ -144,6 +151,7 @@ export function useStage2PlacementOptimiser({
   // Hydration on mount / project change
   useEffect(() => {
     setHydrationDone(false);
+    setHydratedCache(null);
     if (!projectId || projectId === "free") {
       setHydrationDone(true);
       return;
@@ -153,34 +161,46 @@ export function useStage2PlacementOptimiser({
     (async () => {
       const hydrated = await hydrateStage2PlacementCache(projectId);
       if (cancelled) return;
+      setHydratedCache(hydrated || null);
       setHydrationDone(true);
-
-      if (hydrated && isStage2CacheValid(hydrated, fingerprint)) {
-        publishHydratedStage2(projectId, fingerprint, {
-          one_sub_result: hydrated.one_sub_result,
-          two_sub_result: hydrated.two_sub_result,
-          four_sub_result: hydrated.four_sub_result,
-          overall_best: hydrated.overall_best,
-          canonical_jobs_run: hydrated.canonical_jobs_run,
-          total_runtime_ms: hydrated.total_runtime_ms,
-          b_eligible: hydrated.b_eligible,
-          b_evaluated: hydrated.b_evaluated,
-          b_eligibility_reason: hydrated.b_eligibility_reason,
-          b_failed_candidates: hydrated.b_failed_candidates,
-          b_result: hydrated.b_result,
-        });
-      }
     })();
 
     return () => { cancelled = true; };
-  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  // Restore only after both the current Stage 2 fingerprint and the complete
+  // eight-target bass authority are known. This prevents a cold reopen from
+  // starting a redundant worker before persisted authority is checked.
+  useEffect(() => {
+    if (!hydrationDone || !p14FamilyReady || !isStage2CacheValid(hydratedCache, fingerprint)) return;
+    publishHydratedStage2(projectId, fingerprint, {
+      one_sub_result: hydratedCache.one_sub_result,
+      two_sub_result: hydratedCache.two_sub_result,
+      four_sub_result: hydratedCache.four_sub_result,
+      overall_best: hydratedCache.overall_best,
+      canonical_jobs_run: hydratedCache.canonical_jobs_run,
+      total_runtime_ms: hydratedCache.total_runtime_ms,
+      b_eligible: hydratedCache.b_eligible,
+      b_evaluated: hydratedCache.b_evaluated,
+      b_eligibility_reason: hydratedCache.b_eligibility_reason,
+      b_failed_candidates: hydratedCache.b_failed_candidates,
+      b_result: hydratedCache.b_result,
+    });
+  }, [hydrationDone, p14FamilyReady, hydratedCache, fingerprint, projectId]);
 
   // Schedule / cancel on fingerprint change
   useEffect(() => {
     if (!hydrationDone) return;
 
     if (!fingerprint) {
+      stage2PlacementController.cancelAll("inputs-incomplete");
       markStage2Idle(projectId);
+      return;
+    }
+
+    if (!p14FamilyReady) {
+      stage2PlacementController.cancelAll("p14-family-incomplete");
+      markStage2Waiting(projectId, fingerprint, "waiting_for_bass");
       return;
     }
 
@@ -225,7 +245,7 @@ export function useStage2PlacementOptimiser({
       quantityOrder,
       delay: STAGE2_START_DELAY_MS,
     });
-  }, [fingerprint, projectId, hydrationDone, currentQuantity]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, projectId, hydrationDone, currentQuantity, p14FamilyReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return state;
 }
