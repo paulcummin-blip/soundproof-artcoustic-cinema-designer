@@ -34,7 +34,7 @@ function traceSubs(label, subs) {
   console.groupEnd();
 }
 
-export default function Rp22PlacementRecommendation({ roomDims, currentLayout, best1, best2, best4, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, isRecalculating, currentSubs, subwooferInstances, commitInstances, hasCanonicalInstances }) {
+export default function Rp22PlacementRecommendation({ roomDims, currentLayout, best1, best2, best4, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, isRecalculating, recommendationStatus = "updating", recommendationPhase = "Preparing placement analysis…", currentSubs, subwooferInstances, commitInstances, hasCanonicalInstances }) {
   const [selected, setSelected] = useState(null);
   // previous stores the COMPLETE prior canonical instance array for undo,
   // not only CFG. Restore with one canonical-first commit. Preserve disabled
@@ -109,7 +109,8 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
   const openDialog = (layout) => { setApplyError(null); setSelected(layout); };
 
   const renderOption = (title, applyLabel, layout) => {
-    if (!layout) return <Unavailable title={title} message="No recognised layout of this quantity is available for the current room." />;
+    if (!layout && recommendationStatus !== "ready") return <UpdatingOption title={title} phase={recommendationPhase} />;
+    if (!layout) return <Unavailable title={title} message="No recognised canonical layout of this quantity is available for the current room." />;
     return (
       <Rp22RecommendationCard
         title={title}
@@ -122,17 +123,12 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
         applying={applying}
         applyError={isLayoutApplied(layout) ? null : applyError}
         unsupported={hasUnsupportedPlacement(layout)}
-        currentMetrics={currentLayout?.metrics}
       />
     );
   };
 
   return (
-    <div className="mt-4 space-y-3 rounded-lg border-2 border-[#213428] bg-[#F3F1EC] p-4">
-      <div>
-        <h5 className="text-[14px] font-semibold text-[#1B1A1A]">Subwoofer Placement Guide</h5>
-        <p className="mt-1 text-[11px] text-[#625143]">Based on RP22 positional-optimisation guidance and recognised multi-subwoofer placement research.</p>
-      </div>
+    <div className="mt-3 space-y-3 rounded-lg border border-[#D9D5CE] bg-[#F3F1EC] p-4">
       {currentLayout && <CurrentLayout layout={currentLayout} isRecalculating={isRecalculating} />}
       {renderOption("Best 1-sub layout", "Apply 1-sub layout", best1)}
       {renderOption("Best 2-sub layout", "Apply 2-sub layout", best2)}
@@ -153,24 +149,37 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
   );
 }
 
-function CurrentLayout({ layout, isRecalculating }) {
+function coverageText(results) {
+  const seats = Array.isArray(results) ? results : [];
+  const primary = seats.filter((seat) => seat.isPrimary !== false);
+  const primaryFloor = primary.length ? Math.min(...primary.map((seat) => Number(seat.level) || 0)) : 0;
+  const allFloor = seats.length ? Math.min(...seats.map((seat) => Number(seat.level) || 0)) : 0;
+  return seats.length
+    ? `Primary Seats ${levelText(primaryFloor)} · No seat lower than ${levelText(allFloor)}`
+    : "No seat authority";
+}
+
+function CurrentLayout({ layout }) {
   const metrics = layout.metrics;
-  const authority = metrics?.responseAuthority;
-  const hasCanonical = authority === "final-post-eq";
-  const p19Value = isRecalculating ? "…" : hasCanonical ? levelText(metrics.p19Level) : "—";
-  const p20Value = isRecalculating ? "…" : hasCanonical ? levelText(metrics.p20Level) : "—";
   return (
     <div className="rounded-lg border border-[#D9D5CE] bg-white/70 p-4">
       <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Current subwoofer layout</div>
-      <div className="mt-1">
-        <div className="text-sm font-semibold text-[#1B1A1A]">Current positions</div>
-        <div className="text-[11px] text-[#625143]">{metrics.sourceCount} {metrics.sourceCount === 1 ? "subwoofer" : "subwoofers"}</div>
+      <div className="mt-1 text-sm font-semibold text-[#1B1A1A]">Current positions</div>
+      <div className="text-[11px] text-[#625143]">{metrics.sourceCount} {metrics.sourceCount === 1 ? "subwoofer" : "subwoofers"} · canonical authority</div>
+      <div className="mt-3 grid gap-1.5 text-[11px] text-[#1B1A1A]">
+        <div><b>P19</b> · {coverageText(metrics.perSeatP19)}</div>
+        <div><b>P20</b> · {coverageText(metrics.perSeatP20)}</div>
       </div>
-      <div className="mt-3 flex gap-5 text-xs">
-        <span><b>P19</b> {p19Value}</span>
-        <span><b>P20</b> {p20Value}</span>
-      </div>
-      {isRecalculating && <p className="mt-1 text-[10px] text-[#625143]">Recalculating bass response…</p>}
+    </div>
+  );
+}
+
+function UpdatingOption({ title, phase }) {
+  return (
+    <div className="rounded-lg border border-dashed border-[#C9C2B8] bg-white/60 p-4">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">{title}</div>
+      <div className="mt-2 flex items-center gap-2 text-xs font-medium text-[#625143]"><span className="h-3 w-3 animate-spin rounded-full border-2 border-[#C9C2B8] border-t-[#213428]" />Updating…</div>
+      <p className="mt-1 text-[10px] text-[#8A7B6A]">{phase}</p>
     </div>
   );
 }
