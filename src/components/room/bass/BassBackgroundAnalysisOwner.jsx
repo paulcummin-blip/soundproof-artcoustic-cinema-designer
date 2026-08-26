@@ -191,7 +191,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // Any hydration, invalid-input, or active drag transition immediately
     // terminates speculative work. Foreground/user work always owns the only
     // heavy optimiser slot for this project.
-    if (!isProjectHydrationReady || isDragging || !fingerprints || !targetKey) {
+    if (!isProjectHydrationReady || !targetCacheHydrated || isDragging || !fingerprints || !targetKey) {
       scheduler.cancel();
       controller.cancelActive("no-p14-target");
       return;
@@ -232,7 +232,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       identity: requestIdentity,
       collectDiagnostics: false,
     });
-  }, [controller, isDragging, inputsValid, cacheKey, fingerprints, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE, cachedContract, isProjectHydrationReady, bassAuthorityHydrationSettled]);
+  }, [controller, isDragging, inputsValid, cacheKey, fingerprints, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE, cachedContract, isProjectHydrationReady, targetCacheHydrated, bassAuthorityHydrationSettled]);
   useEffect(() => () => {
     getP14TargetBackgroundScheduler().cancel();
     flushTargetCachePersistence(scopeId);
@@ -599,6 +599,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // identity matches the current selection, AND that same contract must be
   // the current completed authority (currentFingerprint === cacheKey).
   const foregroundReadyPathA = isProjectHydrationReady
+    && targetCacheHydrated
     && !!cachedContract
     && isAuthoritativeBassContract(cachedContract)
     && hasGraphPayload(cachedContract)
@@ -608,6 +609,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && !!completedBassAuthority?.authoritative
     && completedBassAuthority?.currentFingerprint === cacheKey;
   const foregroundReadyPathB = isProjectHydrationReady
+    && targetCacheHydrated
     && !cachedContract
     && !!optimisationResult
     && !!matchingResult
@@ -664,7 +666,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   useEffect(() => {
     const scheduler = getP14TargetBackgroundScheduler();
     // Hydration and live interaction are hard pauses for speculative work.
-    if (!isProjectHydrationReady || isDragging || !baseDesignFingerprint || !targetKey) {
+    if (!isProjectHydrationReady || !targetCacheHydrated || isDragging || !baseDesignFingerprint || !targetKey) {
       scheduler.cancel();
       return;
     }
@@ -685,7 +687,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       allTargets,
       designContext: designContextRef.current,
     });
-  }, [baseDesignFingerprint, targetKey, foregroundReady, backgroundInputsReady, allTargets, scopeId, isProjectHydrationReady, isDragging]);
+  }, [baseDesignFingerprint, targetKey, foregroundReady, backgroundInputsReady, allTargets, scopeId, isProjectHydrationReady, targetCacheHydrated, isDragging]);
 
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target
