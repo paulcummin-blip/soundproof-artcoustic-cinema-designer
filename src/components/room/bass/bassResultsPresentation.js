@@ -1,10 +1,14 @@
-import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { buildP19SeatRows, p19LowestSeat, p19RspResult } from "@/components/room/bass/p19SeatPresentation";
 import { buildP20SeatRows, p20WorstSeat, p20BestPrimarySeat } from "@/components/room/bass/p20SeatPresentation";
 import { formatP14Capability, formatP14BasisLabel, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
 import { seatScopeHeadlinePill } from "@/components/utils/rp22ParameterPresentation";
+import { formatBassParameterValue } from "@/components/room/bass/bassParameterValueFormatter";
+
+// Re-export so existing consumers (bassResultsPresentationFixtures, seatHudPresentation)
+// can still import formatBassParameterValue from this module without changes.
+export { formatBassParameterValue };
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 
@@ -21,25 +25,6 @@ function readyMatchesCurrent(result) {
   const requested = result?.job?.currentJobFingerprint;
   const completed = result?.job?.resultFingerprint;
   return !!requested && completed === requested && !!result?.selectedCandidate;
-}
-
-const normalizeIntegerNoise = (value) => {
-  const number = Number(value);
-  const nearestInteger = Math.round(number);
-  return Math.abs(number - nearestInteger) <= 1e-8 ? nearestInteger : number;
-};
-
-export function formatBassParameterValue(key, value) {
-  if (!isFiniteNumber(value)) return "";
-  const number = normalizeIntegerNoise(value);
-  if (key === "p14") return `${Math.floor(number + 1e-8)} dBC`;
-  if (key === "p18") return `${Math.floor(number)} Hz`;
-  if (key === "p19" || key === "p20") {
-    const pid = key === "p19" ? 19 : 20;
-    const designVal = resolveRp22DesignValue(pid, Math.abs(number));
-    return `±${designVal} dB`;
-  }
-  return `${number.toFixed(1)} dB`;
 }
 
 function parameterLabel(key, result) {

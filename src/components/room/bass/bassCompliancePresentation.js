@@ -1,4 +1,4 @@
-import { formatBassParameterValue } from "@/components/room/bass/bassResultsPresentation";
+import { formatBassParameterValue } from "@/components/room/bass/bassParameterValueFormatter";
 import { isCompletedBassContract } from "@/components/room/bass/completedBassResultPersistence";
 
 const levelLabel = (level) => level == null ? "—" : Number(level) === 0 ? "FAIL" : `L${Number(level)}`;
