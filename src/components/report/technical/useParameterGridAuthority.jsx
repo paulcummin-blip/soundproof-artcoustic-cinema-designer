@@ -460,7 +460,7 @@ export function useParameterGridAuthority({
     return resolveParamThresholds(param, p12Mode, p13Mode, p14Mode, p18Mode);
   }, [p12Mode, p13Mode, p14Mode, p18Mode]);
 
-  /* ----- Build P6 worst-seat presentation (same as renderPrintCard) ----- */
+  /* ----- Build P6 seat-spread presentation (same as renderPrintCard) ----- */
   const buildP6Presentation = React.useCallback(() => {
     let worstP6Raw = null;
     for (const seat of seats) {

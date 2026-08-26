@@ -125,9 +125,12 @@ export default function ReportHiddenCaptures({
         ROOM_DIMS: true,
     }), []);
 
-    // Speaker plan capture — clean plan with room dims + throw, no perimeter speaker dims
+    // Speaker plan capture — speaker position dimensions overlay.
+    // ROOM_DIMS is false because speakerPositionsView="plan" is mutually exclusive
+    // with room dimensions (they share the same gutter space). The "plan" view
+    // expands the clipping rect with side/top gutters for speaker dimension labels.
     const overlaysSpeakerPlan = useMemo(() => ({
-        ROOM_DIMS: true,
+        ROOM_DIMS: false,
         EXPORT_RSP_LABEL: true,
         EXPORT_CEILING_LABEL: true,
     }), []);
@@ -179,13 +182,13 @@ export default function ReportHiddenCaptures({
                 />
             </div>
 
-            {/* Speaker positions plan */}
+            {/* Speaker positions plan — speaker position dimension labels enabled */}
             <div data-plan-capture-speaker-dims style={HIDDEN_STYLE}>
                 <RvStaticCanvas
                     {...commonProps}
                     appState={app}
                     overlays={overlaysSpeakerPlan}
-                    speakerPositionsView="off"
+                    speakerPositionsView="plan"
                     showMlpRuler={false}
                     showThrowDistance={true}
                 />

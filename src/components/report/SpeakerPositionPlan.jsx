@@ -43,7 +43,7 @@ export default function SpeakerPositionPlan({
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div style={{ width: '100%', background: '#FFFFFF', padding: '8mm 10mm', fontFamily: BODY_FONT, color: COLORS.text }}>
+    <div style={{ width: '100%', background: '#FFFFFF', padding: '8mm 10mm', fontFamily: BODY_FONT, color: COLORS.text, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, borderBottom: `1.5px solid ${COLORS.text}`, paddingBottom: 5 }}>

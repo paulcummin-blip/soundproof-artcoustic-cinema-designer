@@ -1627,19 +1627,19 @@ function RP22ReportInner() {
                             </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
+                            <section id="pdf-room-plan" className="print-avoid-break" style={{ background: 'transparent', padding: 0, margin: 0 }}>
                                 <div className="plan-fitbox"><img src={planImageDataUrl} alt="Room plan" style={{ background: 'transparent' }} /></div>
                             </section>
                         )}
 
                         {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-dims" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
+                            <section id="pdf-room-plan-dims" className="print-page-break-before print-avoid-break" style={{ background: 'transparent', padding: 0, margin: 0 }}>
                                 <div className="plan-fitbox"><img src={planDimsImageDataUrl} alt="Room plan (dimensions)" style={{ background: 'transparent' }} /></div>
                             </section>
                         )}
 
                         {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-positions" className="print-page-break-before" style={{ background: '#FFFFFF', padding: 0, margin: 0 }}>
+                            <section id="pdf-room-plan-positions" className="print-page-break-before print-avoid-break" style={{ background: '#FFFFFF', padding: 0, margin: 0 }}>
                                 <SpeakerPositionPlan
                                     projectName={projectDetails?.name || ''}
                                     clientName={projectDetails?.client_name || ''}
