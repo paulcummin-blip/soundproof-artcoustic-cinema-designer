@@ -168,6 +168,7 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
         onOpenChange={(open) => { if (!open) { setSelected(null); setApplyError(null); } }}
         layout={selected}
         roomDims={roomDims}
+        subModel={frontSubsCfg?.model || rearSubsCfg?.model || null}
         onApply={apply}
         isApplied={selected ? isLayoutApplied(selected) : false}
         applyError={applyError}

@@ -2,21 +2,73 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { wallRelativeDimensions } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 
-export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomDims, onApply, isApplied, applyError, applying, unsupported }) {
+// Breathing room around the room outline — 12.5% of room span on each side.
+const PADDING_FRACTION = 0.125;
+
+export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomDims, subModel, onApply, isApplied, applyError, applying, unsupported }) {
   if (!layout) return null;
   const width = Number(roomDims?.widthM) || 1;
   const length = Number(roomDims?.lengthM) || 1;
+
+  // Real cabinet footprint from the product registry — same authority as the
+  // main Room Designer plan view (getModelDimsM → SpeakerRect).
+  const { widthM: cabW, depthM: cabD } = getModelDimsM(subModel);
+
+  // Padded viewBox so the room sits with ~12.5% breathing room on every side.
+  const padX = width * PADDING_FRACTION;
+  const padY = length * PADDING_FRACTION;
+  const vbW = width + padX * 2;
+  const vbH = length + padY * 2;
+
+  // Subtle stroke scaled to room size.
+  const outlineStroke = Math.max(0.02, Math.min(width, length) * 0.008);
+  const subStroke = Math.max(0.01, Math.min(width, length) * 0.004);
+  const fontSizeLabel = Math.max(0.10, Math.min(width, length) * 0.045);
+  const fontSizeFront = Math.max(0.12, Math.min(width, length) * 0.05);
+
+  // Offset from room coordinate (0..width, 0..length) to viewBox coordinate.
+  const ox = (x) => padX + Number(x);
+  const oy = (y) => padY + Number(y);
+
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>{layout.name}</DialogTitle>
         <DialogDescription>Recommended subwoofer positions based on recognised placement patterns. Marker positions represent cabinet centres.</DialogDescription>
       </DialogHeader>
-      <svg viewBox={`0 0 ${width} ${length}`} className="max-h-[300px] w-full rounded-md border border-[#D9D5CE] bg-[#F8F7F4]" role="img" aria-label={`Room plan showing ${layout.sources.length} recommended subwoofer positions`}>
-        <rect x="0.03" y="0.03" width={Math.max(0, width - 0.06)} height={Math.max(0, length - 0.06)} fill="none" stroke="#625143" strokeWidth="0.06" />
-        <text x={width / 2} y={Math.min(0.28, length * 0.08)} textAnchor="middle" fontSize="0.16" fill="#625143">FRONT</text>
-        {layout.sources.map((source, index) => <g key={source.id || index}><circle cx={source.x} cy={source.y} r={Math.max(0.12, Math.min(width, length) * 0.035)} fill="#213428" stroke="#FFFFFF" strokeWidth="0.04" /><text x={source.x} y={source.y + 0.055} textAnchor="middle" fontSize="0.14" fontWeight="700" fill="#FFFFFF">{index + 1}</text></g>)}
+      <svg viewBox={`0 0 ${vbW} ${vbH}`} className="max-h-[300px] w-full rounded-md border border-[#D9D5CE] bg-[#F8F7F4]" role="img" aria-label={`Room plan showing ${layout.sources.length} recommended subwoofer positions`}>
+        {/* Room outline */}
+        <rect x={padX} y={padY} width={width} height={length} fill="none" stroke="#625143" strokeWidth={outlineStroke} />
+        {/* Subtle FRONT label in the top padding band */}
+        <text x={padX + width / 2} y={padY * 0.62} textAnchor="middle" fontSize={fontSizeFront} fill="#8A7B6A" letterSpacing="0.08em">FRONT</text>
+        {/* Subwoofers — real cabinet footprints centred on the recommended coordinates */}
+        {layout.sources.map((source, index) => {
+          const cx = ox(source.x);
+          const cy = oy(source.y);
+          return <g key={source.id || index}>
+            <rect
+              x={cx - cabW / 2}
+              y={cy - cabD / 2}
+              width={cabW}
+              height={cabD}
+              rx={0}
+              ry={0}
+              fill="#1a1a1a"
+              stroke="#0a0a0a"
+              strokeWidth={subStroke}
+            />
+            <text
+              x={cx}
+              y={cy + fontSizeLabel * 0.35}
+              textAnchor="middle"
+              fontSize={fontSizeLabel}
+              fontWeight="700"
+              fill="#FFFFFF"
+            >{index + 1}</text>
+          </g>;
+        })}
       </svg>
       <p className="text-[10px] leading-relaxed text-[#8A7B6A]">Apply this layout to recalculate the bass response.</p>
       <div className="rounded-md border border-[#E7E4DF] bg-white/60 p-3">
