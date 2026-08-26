@@ -98,7 +98,7 @@ function countFailAtRank(seats, rank) {
  * Returns one of:
  *   "Primary Seats L4 · No seat lower than L4"
  *   "Primary Seats L3 · No seat lower than L2"
- *   "Primary Seats require improvement · No seat lower than FAIL"
+ *   "Primary Seats require improvement"
  *   "Primary Seats L3 · One seat requires improvement"
  *   "Primary Seats L3 · 2 seats require improvement"
  *   "—" (when no seats are evaluated)
@@ -119,7 +119,7 @@ export function formatCoverageSummary(seats) {
 
   // Primary seat failure — do not hide it.
   if (primaryRank === 0) {
-    return `Primary Seats require improvement · No seat lower than FAIL`;
+    return `Primary Seats require improvement`;
   }
 
   // All seats pass (no FAIL anywhere).
