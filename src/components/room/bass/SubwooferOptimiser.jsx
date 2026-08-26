@@ -309,7 +309,7 @@ function buildSummary(candidate) {
     asymmetric: 'asymmetric points',
   };
 
-  return `${wallText} ${placementMap[candidate.placementMode] || candidate.placementMode} gives lowest seat variation and avoids major nulls`;
+  return `${wallText} ${placementMap[candidate.placementMode] || candidate.placementMode} gives the best seat-to-seat consistency and avoids major nulls`;
 }
 
 export function optimiseSubwooferLayout({
