@@ -17,9 +17,6 @@ import {
   getRoomDesignRatingDesignation,
   getDesignPerformanceIndex,
   getDesignRatingSupportingSentence,
-  getModalLevelForContribs,
-  formatModalLevels,
-  formatLevelDistribution,
 } from "./designRatingPresentation";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
@@ -47,25 +44,10 @@ function SeatingBlock({ label, rating, emphasize, concise }) {
     : "Not configured";
   const index = configured ? getDesignPerformanceIndex(rating) : null;
 
-  let modalLine = null;
-  let distLine = null;
   let supportLine = null;
 
-  if (configured) {
-    if (concise) {
-      supportLine = getDesignRatingSupportingSentence(rating);
-    } else {
-      const { modalLevels, distribution, hasFail } = getModalLevelForContribs(
-        rating.contributions || []
-      );
-      const modalText = hasFail
-        ? "Parameters FAIL"
-        : formatModalLevels(modalLevels)
-          ? `Predominantly ${formatModalLevels(modalLevels)}`
-          : null;
-      if (modalText) modalLine = modalText;
-      distLine = formatLevelDistribution(distribution);
-    }
+  if (configured && concise) {
+    supportLine = getDesignRatingSupportingSentence(rating);
   }
 
   return (
@@ -107,31 +89,6 @@ function SeatingBlock({ label, rating, emphasize, concise }) {
           </span>
         )}
       </div>
-      {modalLine && (
-        <div
-          style={{
-            fontSize: "9pt",
-            fontWeight: 600,
-            color: COLORS.primary,
-            fontFamily: FONT_BODY,
-            marginTop: "1mm",
-          }}
-        >
-          {modalLine}
-        </div>
-      )}
-      {distLine && (
-        <div
-          style={{
-            fontSize: "8pt",
-            color: COLORS.secondary,
-            fontFamily: FONT_BODY,
-            marginTop: "0.5mm",
-          }}
-        >
-          {distLine}
-        </div>
-      )}
       {supportLine && (
         <div
           style={{

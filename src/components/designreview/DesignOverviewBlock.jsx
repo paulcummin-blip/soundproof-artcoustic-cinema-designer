@@ -25,9 +25,9 @@ import {
 } from "@/components/designreview/needsAttentionAuthority";
 import {
   getRoomDesignRatingDesignation,
-  getDesignRatingSupportingSentence,
   getDesignPerformanceIndex,
 } from "@/components/report/technical/designRatingPresentation";
+import DesignRatingCategoryFloor from "./DesignRatingCategoryFloor";
 
 const COLORS = {
   bg: "transparent",
@@ -65,29 +65,60 @@ function getParamLabel(contrib) {
   return `P${num}  ${getHumanTitleForParam(num)}`;
 }
 
-function summarizePillar(contribs) {
-  const counts = { L4: 0, L3: 0, L2: 0, L1: 0, FAIL: 0, total: 0 };
-  for (const c of contribs) {
-    if (!c.resultLevel) continue;
-    counts.total++;
-    const str = String(c.resultLevel);
-    if (str.includes("FAIL")) counts.FAIL++;
-    else if (str.includes("L1")) counts.L1++;
-    else if (str.includes("L2")) counts.L2++;
-    else if (str.includes("L3")) counts.L3++;
-    else if (str.includes("L4")) counts.L4++;
-  }
-  return counts;
-}
+function DpiScopeSummary({ label, rating, emphasize }) {
+  const isNotAssessed = !rating || rating.status === "NOT_ASSESSED" || rating.status === "NOT_CONFIGURED";
+  const designation = isNotAssessed ? null : getRoomDesignRatingDesignation(rating);
+  const index = isNotAssessed ? null : getDesignPerformanceIndex(rating);
 
-function formatPillarSummary(counts) {
-  const parts = [];
-  if (counts.L4) parts.push(`${counts.L4}×L4`);
-  if (counts.L3) parts.push(`${counts.L3}×L3`);
-  if (counts.L2) parts.push(`${counts.L2}×L2`);
-  if (counts.L1) parts.push(`${counts.L1}×L1`);
-  if (counts.FAIL) parts.push(`${counts.FAIL}×FAIL`);
-  return parts.length ? parts.join(" · ") : "—";
+  return (
+    <div
+      style={{
+        background: COLORS.cardBg,
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 8,
+        padding: emphasize ? "16px 20px" : "12px 16px",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 9,
+          fontWeight: 700,
+          color: COLORS.secondary,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          fontFamily: FONT_BODY,
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: emphasize ? 22 : 18,
+          fontWeight: 400,
+          color: isNotAssessed ? COLORS.muted : COLORS.primary,
+          fontFamily: FONT_HEADING,
+          lineHeight: 1.1,
+        }}
+      >
+        {designation || "Not configured"}
+      </div>
+      {index != null && (
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: COLORS.secondary,
+            fontFamily: FONT_BODY,
+            marginTop: 4,
+            letterSpacing: "0.03em",
+          }}
+        >
+          Design Performance Index {index}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function levelColor(norm) {
@@ -104,123 +135,7 @@ function formatPoints(earned, maximum) {
 
 // ── Sub-components ───────────────────────────────────────────────────
 
-function RatingCard({ rating }) {
-  const isNotAssessed = !rating || rating.status === "NOT_ASSESSED";
-  const designation = isNotAssessed ? null : getRoomDesignRatingDesignation(rating);
-  const supportingSentence = isNotAssessed ? null : getDesignRatingSupportingSentence(rating);
-  const index = isNotAssessed ? null : getDesignPerformanceIndex(rating);
 
-  return (
-    <div
-      style={{
-        background: COLORS.cardBg,
-        border: `1px solid ${COLORS.border}`,
-        borderRadius: 8,
-        padding: "20px 24px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 16,
-      }}
-    >
-      <div>
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            color: COLORS.secondary,
-            letterSpacing: "0.1em",
-            fontFamily: FONT_BODY,
-            marginBottom: 6,
-          }}
-        >
-          ARTCOUSTIC SYSTEM DESIGN RATING
-        </div>
-        <div
-          style={{
-            fontSize: 28,
-            fontWeight: 400,
-            color: COLORS.primary,
-            fontFamily: FONT_HEADING,
-            lineHeight: 1.1,
-          }}
-        >
-          {designation || "NOT ASSESSED"}
-        </div>
-        {supportingSentence && (
-          <div
-            style={{
-              fontSize: 11,
-              color: COLORS.body,
-              fontFamily: FONT_BODY,
-              lineHeight: 1.4,
-              marginTop: 4,
-            }}
-          >
-            {supportingSentence}
-          </div>
-        )}
-        {index != null && (
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: COLORS.secondary,
-              fontFamily: FONT_BODY,
-              marginTop: 4,
-              letterSpacing: "0.03em",
-            }}
-          >
-            Design Performance Index {index}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PillarSummaryCard({ pillar, contribs }) {
-  const counts = summarizePillar(contribs);
-  const hasFail = counts.FAIL > 0;
-
-  return (
-    <div
-      style={{
-        background: COLORS.cardBg,
-        border: `1px solid ${COLORS.border}`,
-        borderRadius: 8,
-        padding: "14px 16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 6,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 9,
-          fontWeight: 700,
-          color: COLORS.secondary,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          fontFamily: FONT_BODY,
-        }}
-      >
-        {pillar}
-      </div>
-      <div
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: hasFail ? COLORS.fail : COLORS.primary,
-          fontFamily: FONT_BODY,
-          lineHeight: 1.3,
-        }}
-      >
-        {formatPillarSummary(counts)}
-      </div>
-    </div>
-  );
-}
 
 function LowestResultRow({ contrib, onParamClick }) {
   const norm = normalizeLevel(contrib.resultLevel);
@@ -479,7 +394,17 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
 
   const contributions = rating.contributions || [];
 
-  // Group by pillar
+  // Scoped ratings for category floor + DPI summaries (same authority as sidebar)
+  const scopedRatings = rating.scopedRatings || null;
+  const primaryRating = scopedRatings?.primary || null;
+  const secondaryRating = scopedRatings?.secondary || null;
+  const allRating = scopedRatings?.all || rating || null;
+  const secondaryIsConfigured =
+    secondaryRating &&
+    secondaryRating.status !== "NOT_ASSESSED" &&
+    secondaryRating.status !== "NOT_CONFIGURED";
+
+  // Group by pillar (for Full Scorecard)
   const pillarMap = {};
   for (const contrib of contributions) {
     const pillar = getPillar(contrib);
@@ -508,24 +433,19 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "4px 0" }}>
-      {/* Rating card */}
-      <RatingCard rating={rating} />
+      {/* Four design categories — lead story (shared floor authority) */}
+      <DesignRatingCategoryFloor rating={rating} />
 
-      {/* Pillar summaries */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: 10,
-        }}
-      >
-        {PILLAR_ORDER.map((pillar) => (
-          <PillarSummaryCard
-            key={pillar}
-            pillar={pillar}
-            contribs={pillarMap[pillar] || []}
-          />
-        ))}
+      {/* Divider */}
+      <div style={{ borderTop: `2px solid ${COLORS.borderStrong}`, margin: "4px 0" }} />
+
+      {/* Overall DPI summaries — Primary / Secondary / All */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <DpiScopeSummary label="Primary Seating" rating={primaryRating} emphasize />
+        {secondaryIsConfigured
+          ? <DpiScopeSummary label="Secondary Seating" rating={secondaryRating} />
+          : <DpiScopeSummary label="Secondary Seating" rating={null} />}
+        <DpiScopeSummary label="All Seating" rating={allRating} />
       </div>
 
       {/* Full canonical scorecard — collapsed by default */}

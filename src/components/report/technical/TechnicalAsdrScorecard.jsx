@@ -19,7 +19,7 @@
 import React from "react";
 import AsdrCategorySection from "./AsdrCategorySection";
 import AsdrSeatingSummary from "./AsdrSeatingSummary";
-import { getCategoryModalSummaries } from "./designRatingPresentation";
+import { getCategoryFloorSummaries } from "./designRatingPresentation";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -39,7 +39,7 @@ const CATEGORY_DISPLAY = [
   "Spatial Resolution",
   "Dynamic Range",
   "Timbre Matching",
-  "Viewing Geometry",
+  "Screen / Viewing Geometry",
 ];
 
 export default function TechnicalAsdrScorecard({
@@ -56,11 +56,10 @@ export default function TechnicalAsdrScorecard({
   const secondaryRating = scopes.secondary || null;
   const allRating = scopes.all || roomDesignRating;
 
-  const primaryCats = getCategoryModalSummaries(primaryRating);
+  const primaryCats = getCategoryFloorSummaries(primaryRating);
   const secondaryCats = secondaryRating
-    ? getCategoryModalSummaries(secondaryRating)
+    ? getCategoryFloorSummaries(secondaryRating)
     : null;
-  const allCats = getCategoryModalSummaries(allRating);
 
   return (
     <div
@@ -120,7 +119,6 @@ export default function TechnicalAsdrScorecard({
             label={label}
             primary={primaryCats[i]}
             secondary={secondaryCats ? secondaryCats[i] : null}
-            all={allCats[i]}
           />
         ))}
       </div>

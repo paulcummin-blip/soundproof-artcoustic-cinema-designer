@@ -1,15 +1,17 @@
 /**
  * AsdrCategorySection.jsx
  * -----------------------
- * One design-category block in the redesigned ASDR scorecard (Technical Report
- * left sidebar). Leads with the category name and a headline result, followed by
- * Primary / Secondary seating subrows.
+ * One design-category block in the Technical Report ASDR scorecard (PDF).
+ * Leads with the category name, followed by Primary / Secondary seat-scoped
+ * floor results using standard RP22GradingPill / RP23 pills.
  *
- * Pure presentation — consumes modal summaries from getCategoryModalSummaries()
- * in designRatingPresentation. No ASDR maths, no recalculation, no re-grading.
+ * Pure presentation — consumes floor summaries from getCategoryFloorSummaries()
+ * in designRatingPresentation (the SAME shared authority as the Room Designer
+ * sidebar). No ASDR maths, no recalculation, no re-grading. No hover tooltips
+ * in print; the detailed parameter section provides the full evidence.
  */
 import React from "react";
-import { formatModalLevels, formatLevelDistribution } from "./designRatingPresentation";
+import RP22GradingPill from "@/components/ui/RP22GradingPill";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -35,120 +37,101 @@ function levelNum(key) {
   return Number(String(key).replace("L", ""));
 }
 
-/**
- * Combine Primary + Secondary modal levels into a single category headline.
- * Same modal → "Predominantly Level 3".
- * Adjacent tie → "Predominantly Level 2–3".
- * Non-adjacent → "Predominantly Level 1 · Level 3".
- */
-function combineModalLevels(primaryLevels, secondaryLevels) {
-  const all = new Set([...(primaryLevels || []), ...(secondaryLevels || [])]);
-  const nums = [...all]
-    .map(levelNum)
-    .filter((n) => Number.isFinite(n))
-    .sort((a, b) => a - b);
-  if (nums.length === 0) return null;
-  if (nums.length === 1) return `Predominantly Level ${nums[0]}`;
-  const allAdjacent = nums.every((n, i) => i === 0 || n === nums[i - 1] + 1);
-  if (allAdjacent) return `Predominantly Level ${nums[0]}–${nums[nums.length - 1]}`;
-  return `Predominantly ${nums.map((n) => `Level ${n}`).join(" · ")}`;
-}
+function ScopeLine({ scope, isPrimary, isScreen }) {
+  const rowStyle = {
+    display: "grid",
+    gridTemplateColumns: "1fr auto",
+    alignItems: "center",
+    gap: "2px 4mm",
+    padding: "1.8mm 0",
+    borderTop: `1px solid ${COLORS.border}`,
+  };
 
-function ScopeSubRow({ label, levelText, distribution, muted }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "baseline",
-        padding: "1.8mm 0",
-        borderTop: `1px solid ${COLORS.border}`,
-      }}
-    >
-      <span
-        style={{
-          fontSize: "8pt",
-          fontWeight: 600,
-          color: COLORS.secondary,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          fontFamily: FONT_BODY,
-        }}
-      >
-        {label}
-      </span>
-      <span
-        style={{
-          fontSize: "10pt",
-          fontWeight: 400,
-          color: muted ? COLORS.muted : COLORS.primary,
-          fontFamily: FONT_HEADING,
-          textAlign: "right",
-        }}
-      >
-        {levelText}
-        {distribution && !muted && (
-          <span
-            style={{
-              fontSize: "7.5pt",
-              color: COLORS.secondary,
-              fontFamily: FONT_BODY,
-              marginLeft: "2mm",
-            }}
-          >
-            {distribution}
+  if (!scope?.hasContribs) {
+    return (
+      <div style={rowStyle}>
+        <span style={{ fontSize: "8pt", fontWeight: 600, color: COLORS.muted, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: FONT_BODY }}>
+          {isPrimary ? "Primary Seats" : "Secondary Seats"}
+        </span>
+        <span style={{ fontSize: "9pt", color: COLORS.muted, fontFamily: FONT_BODY }}>—</span>
+      </div>
+    );
+  }
+
+  // Screen / Viewing Geometry — RP23 pill + descriptor.
+  if (isScreen) {
+    const lvl = scope.screenLevel;
+    if (!lvl) {
+      return (
+        <div style={rowStyle}>
+          <span style={{ fontSize: "8pt", fontWeight: 600, color: COLORS.muted, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: FONT_BODY }}>
+            {isPrimary ? "Primary Seats" : "Secondary Seats"}
           </span>
-        )}
+          <span style={{ fontSize: "9pt", color: COLORS.muted, fontFamily: FONT_BODY }}>—</span>
+        </div>
+      );
+    }
+    const isFail = lvl === "FAIL";
+    const lead = isPrimary
+      ? (isFail ? "Primary Seats FAIL" : "Primary Seats achieve")
+      : (isFail ? "Secondary Seats FAIL" : "Secondary Seats — no lower than");
+    const pillLabel = isFail ? "RP23 FAIL" : `RP23 L${levelNum(lvl)}`;
+    const descriptor = isFail ? null : (SCREEN_DESCRIPTOR[lvl] ?? null);
+    return (
+      <div style={rowStyle}>
+        <div>
+          <span style={{ fontSize: "8pt", fontWeight: 600, color: COLORS.secondary, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: FONT_BODY }}>
+            {lead}
+          </span>
+          {descriptor && (
+            <div style={{ fontSize: "7.5pt", color: COLORS.muted, fontFamily: FONT_BODY, marginTop: "0.5mm" }}>
+              {descriptor}
+            </div>
+          )}
+        </div>
+        <RP22GradingPill level={lvl} compact>{pillLabel}</RP22GradingPill>
+      </div>
+    );
+  }
+
+  // RP22 performance categories — floor (lowest achieved level).
+  const floor = scope.floorLevel;
+  if (scope.hasFail || floor === "FAIL") {
+    const lead = isPrimary ? "Primary Seats" : "Secondary Seats";
+    return (
+      <div style={rowStyle}>
+        <span style={{ fontSize: "8pt", fontWeight: 600, color: COLORS.secondary, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: FONT_BODY }}>
+          {lead}
+        </span>
+        <RP22GradingPill level="FAIL" compact />
+      </div>
+    );
+  }
+
+  const lead = isPrimary ? "Primary Seats — no lower than" : "Secondary Seats — no lower than";
+  const pill = floor ? (
+    <RP22GradingPill level={floor} compact />
+  ) : (
+    <span style={{ fontSize: "9pt", color: COLORS.muted, fontFamily: FONT_BODY }}>—</span>
+  );
+  return (
+    <div style={rowStyle}>
+      <span style={{ fontSize: "8pt", fontWeight: 600, color: COLORS.secondary, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: FONT_BODY }}>
+        {lead}
       </span>
+      {pill}
     </div>
   );
 }
 
 /**
  * Props:
- *   label     — display label (e.g. "Spatial Resolution", "Viewing Geometry")
- *   primary   — category modal summary for Primary scope (from getCategoryModalSummaries)
- *   secondary — category modal summary for Secondary scope (may be null)
- *   all       — category modal summary for All scope (used for screen headline)
+ *   label     — display label (e.g. "Spatial Resolution", "Screen / Viewing Geometry")
+ *   primary   — category floor summary for Primary scope (from getCategoryFloorSummaries)
+ *   secondary — category floor summary for Secondary scope (may be null)
  */
-export default function AsdrCategorySection({ label, primary, secondary, all }) {
-  const isScreen = primary?.isScreen || secondary?.isScreen || all?.isScreen;
-
-  let headline = null;
-  let primaryText = "—";
-  let secondaryText = "—";
-  let primaryDist = null;
-  let secondaryDist = null;
-
-  if (isScreen) {
-    const pLvl = primary?.screenLevel;
-    const sLvl = secondary?.screenLevel;
-    const aLvl = all?.screenLevel;
-    const headlineLevel = aLvl || pLvl;
-    headline = headlineLevel ? SCREEN_DESCRIPTOR[headlineLevel] ?? null : null;
-    primaryText = pLvl
-      ? pLvl === "FAIL" ? "RP23 FAIL" : `RP23 Level ${levelNum(pLvl)}`
-      : "—";
-    secondaryText = sLvl
-      ? sLvl === "FAIL" ? "RP23 FAIL" : `RP23 Level ${levelNum(sLvl)}`
-      : "—";
-  } else {
-    if (primary?.hasFail || secondary?.hasFail) {
-      headline = "Improvement Required";
-    } else {
-      headline = combineModalLevels(primary?.modalLevels, secondary?.modalLevels);
-    }
-    primaryText = primary?.hasFail
-      ? "Parameters FAIL"
-      : formatModalLevels(primary?.modalLevels) || "—";
-    secondaryText = secondary?.hasFail
-      ? "Parameters FAIL"
-      : formatModalLevels(secondary?.modalLevels) || "—";
-    primaryDist = formatLevelDistribution(primary?.distribution);
-    secondaryDist = formatLevelDistribution(secondary?.distribution);
-  }
-
-  const hasSecondary = !!secondary?.hasContribs;
+export default function AsdrCategorySection({ label, primary, secondary }) {
+  const isScreen = primary?.isScreen || secondary?.isScreen;
 
   return (
     <div
@@ -168,33 +151,12 @@ export default function AsdrCategorySection({ label, primary, secondary, all }) 
       >
         {label}
       </div>
-      <div
-        style={{
-          fontSize: "14pt",
-          fontWeight: 400,
-          color: COLORS.primary,
-          fontFamily: FONT_HEADING,
-          lineHeight: 1.2,
-          marginTop: "1mm",
-          marginBottom: "2mm",
-        }}
-      >
-        {headline || "—"}
+      <div style={{ marginTop: "1mm" }}>
+        <ScopeLine scope={primary} isPrimary={true} isScreen={isScreen} />
+        {secondary?.hasContribs && (
+          <ScopeLine scope={secondary} isPrimary={false} isScreen={isScreen} />
+        )}
       </div>
-      <ScopeSubRow
-        label="Primary Seating"
-        levelText={primaryText}
-        distribution={primaryDist}
-        muted={!primary?.hasContribs}
-      />
-      {hasSecondary && (
-        <ScopeSubRow
-          label="Secondary Seating"
-          levelText={secondaryText}
-          distribution={secondaryDist}
-          muted={!secondary?.hasContribs}
-        />
-      )}
     </div>
   );
 }
