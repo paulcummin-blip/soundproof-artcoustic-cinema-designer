@@ -86,6 +86,7 @@ export default function BestSubLayoutGuide({ roomDims, seatingPositions, rspPosi
         best1={best1}
         best2={best2}
         best4={best4}
+        fourSubFamilyComparison={fourSubFamilyComparison}
         frontSubsCfg={frontSubsCfg}
         rearSubsCfg={rearSubsCfg}
         setFrontSubsCfg={setFrontSubsCfg}

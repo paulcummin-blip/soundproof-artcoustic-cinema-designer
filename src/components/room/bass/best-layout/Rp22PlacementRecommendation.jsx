@@ -34,7 +34,7 @@ function traceSubs(label, subs) {
   console.groupEnd();
 }
 
-export default function Rp22PlacementRecommendation({ roomDims, currentLayout, best1, best2, best4, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, isRecalculating, recommendationStatus = "updating", recommendationPhase = "Preparing placement analysis…", currentSubs, subwooferInstances, commitInstances, hasCanonicalInstances }) {
+export default function Rp22PlacementRecommendation({ roomDims, currentLayout, best1, best2, best4, fourSubFamilyComparison, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, isRecalculating, recommendationStatus = "updating", recommendationPhase = "Preparing placement analysis…", currentSubs, subwooferInstances, commitInstances, hasCanonicalInstances }) {
   const [selected, setSelected] = useState(null);
   // previous stores the COMPLETE prior canonical instance array for undo,
   // not only CFG. Restore with one canonical-first commit. Preserve disabled
@@ -133,6 +133,7 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
       {renderOption("Best 1-sub layout", "Apply 1-sub layout", best1)}
       {renderOption("Best 2-sub layout", "Apply 2-sub layout", best2)}
       {renderOption("Best 4-sub layout", "Apply 4-sub layout", best4)}
+      {fourSubFamilyComparison && <FourSubFamilyComparisonNote comparison={fourSubFamilyComparison} />}
       {previous && <Button type="button" size="sm" variant="outline" onClick={undo}>Undo recommended positions</Button>}
       <Rp22LayoutPlanDialog
         open={Boolean(selected)}
@@ -186,4 +187,24 @@ function UpdatingOption({ title, phase }) {
 
 function Unavailable({ title, message = "No recognised layout matches the current quantity." }) {
   return <div className="rounded-lg border border-dashed border-[#C9C2B8] bg-white/50 p-4"><div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">{title}</div><p className="mt-1 text-xs text-[#8A7B6A]">{message}</p></div>;
+}
+
+function FourSubFamilyComparisonNote({ comparison }) {
+  if (!comparison) return null;
+  const { quarter, third, winnerLabel, nearEquivalent, explanation } = comparison;
+  return (
+    <div className="rounded-md border border-[#213428]/20 bg-white/70 px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">25/75 vs 33/67 · four-sub comparison</div>
+      <p className="mt-1 text-[11px] leading-relaxed text-[#1B1A1A]">{explanation}</p>
+      <div className="mt-1.5 grid grid-cols-2 gap-2 text-[10px] text-[#625143]">
+        <span>25/75 worst primary-seat P20: {Number(quarter.worstPrimaryP20Db).toFixed(0)} dB</span>
+        <span>33/67 worst primary-seat P20: {Number(third.worstPrimaryP20Db).toFixed(0)} dB</span>
+      </div>
+      {winnerLabel && (
+        <div className="mt-1 text-[10px] font-medium text-[#213428]">
+          {nearEquivalent ? "Near-equivalent · " : ""}Canonical winner: {winnerLabel}
+        </div>
+      )}
+    </div>
+  );
 }

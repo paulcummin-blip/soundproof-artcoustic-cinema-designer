@@ -6,41 +6,12 @@ import { computeBestSubLayoutDirectReference } from "@/components/room/bass/best
 import { applyFinalOptimisedAuthorityToLayout, assessLayoutResult, compareRankedLayouts } from "@/components/room/bass/best-layout/bestSubLayoutScoring";
 import { alignSubsToRSP } from "@/components/room/bass/alignSubsToRSP";
 
-// Four-sub family identifiers — used for the 25/75 vs 33/67 comparison.
+// Four-sub family identifiers — retained for fixture/geometry screening only.
+// The dealer-facing 25/75 vs 33/67 comparison is NOT produced here; it is derived
+// from completed Stage 2 canonical finalists (see fourSubFamilyComparison.js).
+// This lighter-weight engine generates and screens geometry only.
 export const FOUR_SUB_FAMILY_QUARTER = "front-rear-pairs-4";
 export const FOUR_SUB_FAMILY_THIRD = "front-rear-pairs-third-4";
-
-/**
- * Build a four-sub family comparison summary from the ranked candidates.
- * Both families must be present and assessed with identical alignment authority
- * for the comparison to be meaningful. Returns null when either family is
- * absent or the assessment is RSP-only (no real-seat authority).
- */
-function buildFourSubFamilyComparison(ranked, rspOnly) {
-  if (rspOnly) return null;
-  const quarter = ranked.find((layout) => layout.id === FOUR_SUB_FAMILY_QUARTER);
-  const third = ranked.find((layout) => layout.id === FOUR_SUB_FAMILY_THIRD);
-  if (!quarter || !third) return null;
-  const quarterVariation = Number(quarter.metrics.worstSeatVariationDb);
-  const thirdVariation = Number(third.metrics.worstSeatVariationDb);
-  const deltaDb = Number((quarterVariation - thirdVariation).toFixed(2));
-  const winner = deltaDb > 0.05 ? third : deltaDb < -0.05 ? quarter : null;
-  const winnerId = winner === third ? FOUR_SUB_FAMILY_THIRD : winner === quarter ? FOUR_SUB_FAMILY_QUARTER : null;
-  const nearEquivalent = Math.abs(deltaDb) < 1.0;
-  return {
-    quarter: { id: quarter.id, name: quarter.name, worstSeatVariationDb: quarterVariation, p19Level: quarter.metrics.p19Level, p20Level: quarter.metrics.p20Level },
-    third: { id: third.id, name: third.name, worstSeatVariationDb: thirdVariation, p19Level: third.metrics.p19Level, p20Level: third.metrics.p20Level },
-    deltaDb,
-    winnerId,
-    winnerName: winner?.name || null,
-    nearEquivalent,
-    explanation: winner
-      ? (nearEquivalent
-        ? `${winner.name} and ${winner === quarter ? third.name : quarter.name} are near-equivalent in this room; ${winner.name} is numerically better by ${Math.abs(deltaDb).toFixed(2)} dB at the worst seat.`
-        : `${winner.name} improves worst-seat consistency by ${Math.abs(deltaDb).toFixed(2)} dB versus ${winner === quarter ? third.name : quarter.name} in this room.`)
-      : `${quarter.name} and ${third.name} are effectively similar in this room (worst-seat difference ${Math.abs(deltaDb).toFixed(2)} dB).`,
-  };
-}
 
 export function runBestSubLayoutRecommendation({ roomDims, seatingPositions, rspPosition, physicsOptions, sourceHeights, roomElements, currentSubs, finalOptimisedBassResponse, cabinetHalfExtents }) {
   const started = performance.now();
@@ -79,7 +50,6 @@ export function runBestSubLayoutRecommendation({ roomDims, seatingPositions, rsp
   const currentLayout = applyFinalOptimisedAuthorityToLayout(currentLayoutRaw, finalOptimisedBassResponse);
   const currentQuantityBest = ranked.find((layout) => layout.metrics.sourceCount === currentSources.length) || null;
   const upgradeBest = ranked.find((layout) => layout.metrics.sourceCount > currentSources.length) || null;
-  const fourSubFamilyComparison = buildFourSubFamilyComparison(ranked, rspOnly);
   return {
     recommendations: ranked.slice(0, C.maximumRecommendations),
     currentQuantityBest,
@@ -89,7 +59,6 @@ export function runBestSubLayoutRecommendation({ roomDims, seatingPositions, rsp
     renderedRecommendationCount: Math.min(ranked.length, C.maximumRecommendations),
     rspOnly,
     currentLayout,
-    fourSubFamilyComparison,
     diagnostics,
     workerCalculationTimeMs: performance.now() - started,
     physicsOptions,
