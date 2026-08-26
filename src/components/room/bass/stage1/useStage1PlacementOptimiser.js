@@ -3,7 +3,7 @@
 // Auto-starts 500-750ms after valid geometry settles.
 // Hydrates from DB on reopen; starts 0 workers if cache is valid.
 
-import { useEffect, useSyncExternalStore, useRef } from "react";
+import { useEffect, useSyncExternalStore, useRef, useState } from "react";
 import { computeStage1Fingerprint } from "./stage1Fingerprint";
 import {
   stage1PlacementController,
@@ -34,7 +34,8 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
   );
 
   const fingerprintRef = useRef(null);
-  const hydrationDoneRef = useRef(false);
+  const [hydrationDone, setHydrationDone] = useState(false);
+  const [hydratedCache, setHydratedCache] = useState(null);
 
   // Compute fingerprint (product-independent, P14-independent)
   const fingerprint = computeStage1Fingerprint({
@@ -46,9 +47,10 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
 
   // ── Hydration on mount / project change ──────────────────────────────
   useEffect(() => {
-    hydrationDoneRef.current = false;
+    setHydrationDone(false);
+    setHydratedCache(null);
     if (!projectId || projectId === "free") {
-      hydrationDoneRef.current = true;
+      setHydrationDone(true);
       return;
     }
 
@@ -56,30 +58,45 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     (async () => {
       const hydrated = await hydrateStage1PlacementCache(projectId);
       if (cancelled) return;
-      hydrationDoneRef.current = true;
-
-      if (hydrated && isStage1CacheValid(hydrated, fingerprint)) {
-        // Cache is valid — restore finalists, start 0 workers
-        publishHydratedStage1(projectId, fingerprint, {
-          one_sub_result: hydrated.one_sub_result,
-          two_sub_result: hydrated.two_sub_result,
-          four_sub_result: hydrated.four_sub_result,
-        });
-      }
+      setHydratedCache(hydrated || null);
+      setHydrationDone(true);
     })();
 
     return () => { cancelled = true; };
-  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  // Project geometry can hydrate after the cache query completes. Retain the
+  // persisted snapshot and restore as soon as the final fingerprint is known.
+  useEffect(() => {
+    if (!hydrationDone || !isStage1CacheValid(hydratedCache, fingerprint)) return;
+    publishHydratedStage1(projectId, fingerprint, {
+      one_sub_result: hydratedCache.one_sub_result,
+      two_sub_result: hydratedCache.two_sub_result,
+      four_sub_result: hydratedCache.four_sub_result,
+    });
+  }, [hydrationDone, hydratedCache, fingerprint, projectId]);
 
   // ── Schedule / cancel search on fingerprint change ───────────────────
   useEffect(() => {
     fingerprintRef.current = fingerprint;
 
-    // Wait for hydration to complete before scheduling
-    if (!hydrationDoneRef.current) return;
+    // Wait for both persisted-cache hydration and final project geometry.
+    if (!hydrationDone) return;
 
     if (!fingerprint) {
       markStage1Idle(projectId);
+      return;
+    }
+
+    // A valid persisted snapshot is authoritative for this fingerprint.
+    // Restore synchronously here as well so scheduling cannot race the restore
+    // effect during the same commit.
+    if (isStage1CacheValid(hydratedCache, fingerprint)) {
+      publishHydratedStage1(projectId, fingerprint, {
+        one_sub_result: hydratedCache.one_sub_result,
+        two_sub_result: hydratedCache.two_sub_result,
+        four_sub_result: hydratedCache.four_sub_result,
+      });
       return;
     }
 
@@ -98,7 +115,7 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     return () => {
       // Cleanup on unmount — cancel active search
     };
-  }, [fingerprint, projectId, hydrationDoneRef.current]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, projectId, hydrationDone, hydratedCache]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Cleanup on unmount ───────────────────────────────────────────────
   useEffect(() => {
