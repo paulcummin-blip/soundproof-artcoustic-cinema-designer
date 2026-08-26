@@ -20,8 +20,7 @@ export async function load(url, context, nextLoad) {
   if (url.endsWith('.jsx') || url.endsWith('.js') || url.endsWith('.mjs')) {
     const filePath = fileURLToPath(url);
     if (!filePath.includes('/node_modules/')) {
-      let source;
-      try { source = readFileSync(filePath, 'utf8'); } catch { return nextLoad(url, context); }
+      let source; try { source = readFileSync(filePath, 'utf8'); } catch { return nextLoad(url, context); }
       const result = transformSync(source, { loader: url.endsWith('.jsx') ? 'jsx' : 'js', format: 'esm', target: 'es2020', jsx: 'automatic' });
       return { format: 'module', source: result.code, shortCircuit: true };
     }
