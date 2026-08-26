@@ -10,6 +10,7 @@ import { useAppState } from "@/components/AppStateProvider";
 import { useResolvedSpeakerLayout } from "@/components/room/rv/utils/resolveActiveSpeakerLayout";
 import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
 import { getCanonicalRole as getCanonicalRoleShared } from "@/components/utils/surroundRoleMap";
+import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolveEffectiveScreen";
 
 // ---------------------------------------------------------------------------
 // SideElevation – static read-only engineering drawing
@@ -44,21 +45,11 @@ const FACE_ICON_MAP = {
   'q8-5': Q85FaceIcon,        'spitfire-q8-5': Q85FaceIcon,
 };
 
-// Derive screen dimensions from screen config (same logic as FrontElevation)
+// Derive screen dimensions — uses the single effective-screen resolver so
+// manual override dimensions are authoritative (same logic as FrontElevation).
 function screenDimsM(screen) {
-  if (!screen) return { w: 2.54, h: 1.43 };
-  const TV_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
-  let wInches = 0;
-  if (screen.tvPresetKey && TV_INCHES[screen.tvPresetKey]) {
-    wInches = TV_INCHES[screen.tvPresetKey];
-  } else if (screen.manualMode && Number(screen.manualWidthM) > 0) {
-    return { w: Number(screen.manualWidthM), h: Number(screen.manualHeightM) || Number(screen.manualWidthM) * (9 / 16) };
-  } else {
-    wInches = Number(screen.visibleWidthInches) || 100;
-  }
-  const wM = wInches * 0.0254;
-  const ar = screen.aspectRatio === "2.35:1" ? (2.35 / 1) : (16 / 9);
-  return { w: wM, h: wM / ar };
+  const dims = resolveEffectiveViewableDimsM(screen);
+  return { w: dims.widthM, h: dims.heightM };
 }
 
 // ---------------------------------------------------------------------------

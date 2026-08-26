@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useEffect, useCallback, useState } from "react"
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon } from "@/components/report/SpeakerFaceIcons";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
+import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolveEffectiveScreen";
 
 // Roles displayed in front elevation
 const FRONT_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
@@ -10,25 +11,11 @@ const canonFront = (role) => {
   return map[String(role || "").toUpperCase()] || null;
 };
 
-// Convert screen config to viewable width/height in metres
+// Convert screen config to viewable width/height in metres — uses the single
+// effective-screen resolver so manual override dimensions are authoritative.
 function screenDimsM(screen) {
-  if (!screen) return { w: 2.54, h: 1.43 };
-
-  // TV preset widths (inches)
-  const TV_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
-  let wInches = 0;
-
-  if (screen.tvPresetKey && TV_INCHES[screen.tvPresetKey]) {
-    wInches = TV_INCHES[screen.tvPresetKey];
-  } else if (screen.manualMode && Number(screen.manualWidthM) > 0) {
-    return { w: Number(screen.manualWidthM), h: Number(screen.manualHeightM) || Number(screen.manualWidthM) * (9 / 16) };
-  } else {
-    wInches = Number(screen.visibleWidthInches) || 100;
-  }
-
-  const wM = wInches * 0.0254;
-  const ar = screen.aspectRatio === "2.35:1" ? (2.35 / 1) : (16 / 9);
-  return { w: wM, h: wM / ar };
+  const dims = resolveEffectiveViewableDimsM(screen);
+  return { w: dims.widthM, h: dims.heightM };
 }
 
 export default function FrontElevation({ dimensions, screen, placedSpeakers = [], frontSubs = [], frontSubsCfg, roomElements = [], onLcrSpeakerMoved, onFrontSubMoved, isDraggingRef }) {

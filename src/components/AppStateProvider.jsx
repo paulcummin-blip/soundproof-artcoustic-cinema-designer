@@ -13,6 +13,7 @@ import { validateInstances, bassInputAdapter, normaliseLegacySubwoofers } from "
 import { migrateP12Mode, P12_MODE_MINIMUM, P12_MODE_RECOMMENDED } from "@/components/utils/p12ModeAuthority";
 import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuthority";
 import { normaliseP14Level } from "@/components/room/bass/p14TargetSelectionState";
+import { applyManualOverrideToScreen } from "@/components/models/screen/resolveEffectiveScreen";
 // Seat priority is an independent user classification. It is intentionally
 // not coupled to the acoustic RSP / legacy isPrimary authority here.
 
@@ -504,7 +505,7 @@ function useDesignerState() {
     return result;
   };
 
-  const [screen, setScreen] = useState(() => {
+  const [screen, _setScreen] = useState(() => {
     if (__autosavePayload && __autosavePayload.screen) {
       return backfillTvPresetKey(__autosavePayload.screen);
     }
@@ -516,6 +517,16 @@ function useDesignerState() {
       tvWidthMm: null,
     };
   });
+  // Wrap setScreen so manual override dimensions become the single screen authority.
+  // When manualSize is enabled, effective dimensions are written into the standard
+  // screen fields (visibleWidthInches, aspectRatio, viewableWidthM, viewableHeightM)
+  // while the original preset is preserved in backup fields. When disabled, restored.
+  const setScreen = useCallback((next) => {
+    _setScreen((prev) => {
+      const merged = typeof next === "function" ? next(prev) : next;
+      return applyManualOverrideToScreen(prev, merged);
+    });
+  }, []);
   const [screenHeight, setScreenHeight] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.screenHeight === "number") ? __autosavePayload.screenHeight : 0.5
   ));
