@@ -5,6 +5,7 @@
 import { idealDistanceForWidth, viewingDimsM, angleFromDistance, rp23LevelForAngle } from "./viewingAndScreenMetrics";
 import { computeScreenWidthMeters, distanceForHorizontalFOV } from "./viewingGeometry";
 import { computeScreenMetrics, clampViewingOffset } from "./screenMetrics";
+import { resolveEffectiveVisibleWidthInches, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 
 /**
  * Calculate viewing angle from a seat position to the screen
@@ -79,6 +80,8 @@ export function rp23DisplayAngleDeg(angleDeg) {
  * screens consume the persisted visible width.
  */
 export function resolveVisibleScreenWidthInches(screen = null) {
+  // Manual override is the single screen-size authority when active.
+  if (isManualOverrideActive(screen)) return resolveEffectiveVisibleWidthInches(screen);
   const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
   const tvKey = screen?.tvPresetKey;
   const tvMm = Number(screen?.tvWidthMm);

@@ -46,14 +46,7 @@ export default function ViewingAnglePanel({
       return null;
     }
 
-    const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
-    const tvKey = screen?.tvPresetKey;
-    const tvMm = Number(screen?.tvWidthMm);
-    const visibleWidthInches = (() => {
-      if (tvKey && TV_KEY_TO_INCHES[tvKey]) return TV_KEY_TO_INCHES[tvKey];
-      if (Number.isFinite(tvMm) && tvMm > 0) return tvMm / 25.4;
-      return Number(screen?.visibleWidthInches) || 100;
-    })();
+    const visibleWidthInches = resolveEffectiveVisibleWidthInches(screen);
     const aspectRatio = screen?.aspectRatio || "16:9";
 
     // Compute angle using only the true RSP position (mlpY_m)

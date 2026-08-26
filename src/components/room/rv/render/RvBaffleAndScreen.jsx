@@ -23,9 +23,8 @@ export default function RvBaffleAndScreen({
   const isTvPreset = !!(screen?.tvPresetKey);
   const DEFAULT_BORDER_M = isTvPreset ? 0.005 : 0.08;
   const borderM = Math.max(0, Number(screen?.borderThicknessM ?? DEFAULT_BORDER_M) || DEFAULT_BORDER_M);
-  const visibleWm = (screen?.tvPresetKey && Number(screen?.tvWidthMm) > 0)
-    ? Math.max(0.1, Number(screen.tvWidthMm) / 1000)
-    : Math.max(0.1, Number(screen?.visibleWidthInches || 100) * inch2m);
+  // Manual override is the single screen-size authority; resolver checks manualSize first.
+  const visibleWm = Math.max(0.1, resolveEffectiveViewableDimsM(screen).widthM);
   const frameWm = visibleWm + (2 * borderM);
 
   const exportPlaneM = Number(screenFrontPlaneM);

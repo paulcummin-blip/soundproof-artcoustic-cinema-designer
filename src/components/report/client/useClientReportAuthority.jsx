@@ -38,6 +38,8 @@ const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 }
 
 function resolveScreenVisibleWidthInches(screen) {
   if (!screen) return 120;
+  // Manual override is the single screen-size authority when active.
+  if (isManualOverrideActive(screen)) return resolveEffectiveVisibleWidthInches(screen);
   if (screen.tvPresetKey && TV_KEY_TO_INCHES[screen.tvPresetKey]) {
     return TV_KEY_TO_INCHES[screen.tvPresetKey];
   }
