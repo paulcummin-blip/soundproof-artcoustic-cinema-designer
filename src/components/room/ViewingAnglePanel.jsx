@@ -83,7 +83,7 @@ export default function ViewingAnglePanel({
   // mlpOverride drives effectiveViewerY live during seat drag — must be in deps.
   // mlpY_m is the fallback when no override exists (updated after mouseup).
   // seatingPositions triggers recompute on every drag tick via mlpOverride.
-  }, [mlpOverride, mlpY_m, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio, screen?.tvPresetKey, screen?.tvWidthMm]);
+  }, [mlpOverride, mlpY_m, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio, screen?.tvPresetKey, screen?.tvWidthMm, screen?.manualSize]);
 
   // Live draft seat positions during a longitudinal seat/row drag.
   // Pure geometry only — no bass / RP22 / ASDR recalculation is triggered.

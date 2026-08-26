@@ -371,6 +371,8 @@ export default function ScreenConfiguration(props) {
                 <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A] h-10 hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
                   <SelectValue>
                     {(() => {
+                      // Manual override active → preset is no longer the dimensional authority.
+                      if (manualSize.enabled) return 'MANUAL';
                       const TV_KEY_TO_LABEL = { tv65: 'TV 65"', tv77: 'TV 77"', tv83: 'TV 83"', tv100: 'TV 100"' };
                       if (screenData.tvPresetKey && TV_KEY_TO_LABEL[screenData.tvPresetKey]) return TV_KEY_TO_LABEL[screenData.tvPresetKey];
                       const valStr = Number(screenData.visibleWidthInches ?? 100).toFixed(2);
