@@ -204,11 +204,14 @@ function extractPerSeatP20(perSeatP20Results, seatPriorityMap) {
   });
 }
 
-// ── Main evaluation function ──────────────────────────────────────────────
+// ── Placement evaluation (P14-independent) ───────────────────────────────
 
 /**
- * Evaluate a single Stage 1 finalist through the full canonical bass authority
- * pipeline at the selected P14 target.
+ * Evaluate a single Stage 1 finalist's P14-INDEPENDENT raw transfer.
+ *
+ * This runs ONLY the expensive modal simulation (simulateAuthoritativeBassResponse)
+ * and builds the raw transfer curves. The result is cached under the placement
+ * fingerprint and reused across all P14 target changes.
  *
  * @param {object} params
  * @param {object} params.finalist — Stage 1 finalist { id, familyId, sources: [{ xNorm, yNorm }] }
@@ -217,41 +220,24 @@ function extractPerSeatP20(perSeatP20Results, seatPriorityMap) {
  * @param {Array} params.seatingPositions — [{ id, x, y, z, priority }]
  * @param {string} params.selectedSubModel — subwoofer model key
  * @param {number} params.amplifierPowerPerSubW — amplifier power per sub
- * @param {string} params.p14TargetBasis — "minimum" | "recommended"
- * @param {number} params.p14TargetLevel — 1–4
- * @param {number} params.p14TargetDb — derived P14 target dB
- * @param {string} params.p18TargetBasis — "minimum" | "recommended"
- * @returns {object|null} Stage 2 finalist evaluation result, or null on failure
+ * @param {number} [params.subwooferBottomHeightM] — project subwoofer bottom height
+ * @returns {object|null} Raw transfer data, or null on failure
  */
-export function evaluateStage2Finalist({
+export function evaluateStage2Placement({
   finalist,
   roomDims,
   rspPosition,
   seatingPositions,
   selectedSubModel,
   amplifierPowerPerSubW,
-  p14TargetBasis,
-  p14TargetLevel,
-  p14TargetDb,
-  p18TargetBasis,
   subwooferBottomHeightM,
 }) {
-  const startedAt = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
-
-  if (!finalist?.sources?.length || !roomDims?.widthM || !selectedSubModel || !Number.isFinite(p14TargetDb)) {
+  if (!finalist?.sources?.length || !roomDims?.widthM || !selectedSubModel) {
     return null;
   }
 
   const seatPriorityMap = buildSeatPriorityMap(seatingPositions);
 
-  // Canonicalise the RSP using the SAME production identity convention used by
-  // the normal bass calculation (buildAuthoritativeRspPosition in
-  // authoritativeRspPosition.js): { id: "rsp", x, y, z, __isSyntheticRsp: true }.
-  // The authoritative simulator keys seat responses by seat.id (falling back to
-  // `${x}-${y}`), so without id:"rsp" the RSP response is stored under "3-3.33"
-  // instead of "rsp" — causing NULL_GATE_RSP_RESPONSE. This canonical object is
-  // used for auto-alignment, simulation, and response extraction — ONE RSP
-  // representation, not two.
   const canonicalRspPosition = {
     id: "rsp",
     x: Number(rspPosition.x),
@@ -260,12 +246,8 @@ export function evaluateStage2Finalist({
     __isSyntheticRsp: true,
   };
 
-  // 1. Build sources from finalist positions + selected sub model.
-  // Acoustic-centre Z is derived through the production authority (deriveCentreZ),
-  // using the project's subwoofer bottom height + the selected model's cabinet height.
   const sources = buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, canonicalRspPosition);
 
-  // 2. Run product-aware authoritative bass simulation
   const physics = buildStage2Physics();
   const simResult = simulateAuthoritativeBassResponse({
     roomDims,
@@ -276,28 +258,76 @@ export function evaluateStage2Finalist({
     qStrategyOverride: "ab_corrected",
   });
 
-  // 3. Build rawCurve + perSeatRawCurves
   const { rspRawCurve, perSeatRawCurves } = buildResponseCurves(simResult.seatResponses);
   if (!rspRawCurve.length) return null;
 
-  // Add isPrimary to perSeatRawCurves for the canonical pipeline
   const perSeatRawCurvesWithPriority = perSeatRawCurves.map((seat) => ({
     ...seat,
     isPrimary: seatPriorityMap.get(String(seat.seatId)) === "primary",
   }));
 
-  // 4. Compute usableLfHz + transitionHz
   const usableLfHz = computeUsableLfHz(sources);
   const transitionHz = computeTransitionHz(roomDims);
 
-  // 5. Run generateCanonicalCandidatePool at the selected P14 target
+  const coordinates = finalist.sources.map((s) => ({
+    x: s.xNorm * Number(roomDims.widthM),
+    y: s.yNorm * Number(roomDims.lengthM),
+  }));
+
+  return {
+    finalistId: finalist.id,
+    familyId: finalist.familyId,
+    quantity: finalist.sources.length,
+    coordinates,
+    selectedProduct: normaliseModelKey(selectedSubModel),
+    rspRawCurve,
+    perSeatRawCurves: perSeatRawCurvesWithPriority,
+    sources,
+    usableLfHz,
+    transitionHz,
+    seatPriorityMap: Array.from(seatPriorityMap.entries()),
+  };
+}
+
+// ── Confirmation evaluation (P14-dependent) ──────────────────────────────
+
+/**
+ * Evaluate the P14-DEPENDENT canonical confirmation using a cached raw transfer.
+ *
+ * This runs the EQ candidate pool, selection, and authority evaluation against
+ * the selected P14 target. It does NOT re-run simulateAuthoritativeBassResponse —
+ * the raw transfer is reused from the placement cache.
+ *
+ * @param {object} rawTransfer — Cached raw transfer from evaluateStage2Placement
+ * @param {object} params — P14 target parameters
+ * @param {string} params.p14TargetBasis — "minimum" | "recommended"
+ * @param {number} params.p14TargetLevel — 1–4
+ * @param {number} params.p14TargetDb — derived P14 target dB
+ * @param {string} params.p18TargetBasis — "minimum" | "recommended"
+ * @returns {object|null} Stage 2 finalist evaluation result, or null on failure
+ */
+export function evaluateStage2Confirmation(rawTransfer, {
+  p14TargetBasis,
+  p14TargetLevel,
+  p14TargetDb,
+  p18TargetBasis,
+}) {
+  const startedAt = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+
+  if (!rawTransfer || !Number.isFinite(p14TargetDb)) return null;
+
+  const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
+  const { rspRawCurve, perSeatRawCurves, sources, usableLfHz, transitionHz } = rawTransfer;
+
+  if (!rspRawCurve?.length) return null;
+
   const pool = generateCanonicalCandidatePool({
     rawCurve: rspRawCurve,
     activeSubs: sources,
     usableLfHz,
     transitionHz,
     correctionEndHz: 200,
-    perSeatRawCurves: perSeatRawCurvesWithPriority,
+    perSeatRawCurves,
     selectedP14TargetDb: p14TargetDb,
     p14TargetBasis,
     p14TargetLevel,
@@ -307,18 +337,15 @@ export function evaluateStage2Finalist({
     calibrationFingerprint: null,
   });
 
-  // 6. Select best candidate from pool
   const selection = selectCandidateFromPool(pool);
   if (!selection?.selectedCandidate) return null;
 
-  // 7. Build canonicalResult
   const canonicalResult = buildFinalOptimisedBassResponse({
     optimisationResult: selection,
     selectedLayout: sources,
   });
   if (!canonicalResult) return null;
 
-  // 8. Run evaluateCanonicalBassAuthority
   const authority = evaluateCanonicalBassAuthority({
     canonicalResult,
     activeSubs: sources,
@@ -329,7 +356,6 @@ export function evaluateStage2Finalist({
   });
   if (!authority) return null;
 
-  // 9. Extract results
   const perSeatP19 = extractPerSeatP19(authority.perSeatP19Results, seatPriorityMap);
   const perSeatP20 = extractPerSeatP20(authority.perSeatP20Results, seatPriorityMap);
 
@@ -342,24 +368,18 @@ export function evaluateStage2Finalist({
   const assessmentStartHz = authority.assessmentStartHz;
   const assessmentEndHz = authority.assessmentEndHz;
 
-  // P14/P18 limited: cannot achieve selected P14 target or valid P18
   const p14Limited = !authority.requestedP14Pass;
   const p18Limited = !authority.requestedP18Pass || !Number.isFinite(achievedP18Hz) || achievedP18Hz === null;
   const limited = p14Limited || p18Limited;
 
-  const coordinates = finalist.sources.map((s) => ({
-    x: s.xNorm * Number(roomDims.widthM),
-    y: s.yNorm * Number(roomDims.lengthM),
-  }));
-
   const endedAt = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
 
   return {
-    finalistId: finalist.id,
-    familyId: finalist.familyId,
-    quantity: finalist.sources.length,
-    coordinates,
-    selectedProduct: normaliseModelKey(selectedSubModel),
+    finalistId: rawTransfer.finalistId,
+    familyId: rawTransfer.familyId,
+    quantity: rawTransfer.quantity,
+    coordinates: rawTransfer.coordinates,
+    selectedProduct: rawTransfer.selectedProduct,
     p14TargetBasis,
     p14TargetLevel,
     p14TargetDb,
@@ -383,6 +403,49 @@ export function evaluateStage2Finalist({
       productEngineeringVersion: STAGE2_PRODUCT_ENGINEERING_VERSION,
     },
     runtimeMs: Math.max(0, endedAt - startedAt),
-    algorithmVersion: "stage2-canonical-v1",
+    algorithmVersion: "stage2-canonical-v2",
   };
+}
+
+// ── Legacy combined evaluation (backward compatibility) ───────────────────
+
+/**
+ * Evaluate a single Stage 1 finalist through the full canonical bass authority
+ * pipeline at the selected P14 target. Combines placement + confirmation.
+ * Prefer evaluateStage2Placement + evaluateStage2Confirmation for caching.
+ */
+export function evaluateStage2Finalist({
+  finalist,
+  roomDims,
+  rspPosition,
+  seatingPositions,
+  selectedSubModel,
+  amplifierPowerPerSubW,
+  p14TargetBasis,
+  p14TargetLevel,
+  p14TargetDb,
+  p18TargetBasis,
+  subwooferBottomHeightM,
+}) {
+  if (!finalist?.sources?.length || !roomDims?.widthM || !selectedSubModel || !Number.isFinite(p14TargetDb)) {
+    return null;
+  }
+
+  const rawTransfer = evaluateStage2Placement({
+    finalist,
+    roomDims,
+    rspPosition,
+    seatingPositions,
+    selectedSubModel,
+    amplifierPowerPerSubW,
+    subwooferBottomHeightM,
+  });
+  if (!rawTransfer) return null;
+
+  return evaluateStage2Confirmation(rawTransfer, {
+    p14TargetBasis,
+    p14TargetLevel,
+    p14TargetDb,
+    p18TargetBasis,
+  });
 }

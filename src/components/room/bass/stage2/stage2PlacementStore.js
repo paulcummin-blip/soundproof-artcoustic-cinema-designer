@@ -16,6 +16,13 @@ import {
 import { shouldEvaluateThirdFinalist } from "./stage2FinalistPromotion";
 import { evaluateBEligibility, generateBFinalist } from "./stage2BLastResort";
 import { isBFamily, isProhibitedFamily } from "../stage1/stage1FamilyRegistry";
+import { buildPlacementRankingTuple, comparePlacementResults, isPlacementTied } from "./stage2PlacementRanking";
+import {
+  getCachedRawTransfer,
+  setCachedRawTransfer,
+  hasCachedRawTransfer,
+  getCachedRawTransfersForFingerprint,
+} from "./stage2RawTransferCache";
 
 const listeners = new Set();
 const memoryByProject = new Map();
@@ -210,9 +217,17 @@ class Stage2PlacementController {
     this.failedFamilyIds = new Set();
     this.allStage1FourSubFinalists = [];
     this.stage1Complete = false;
+    // Two-phase architecture: placement (P14-independent) → confirmation (P14-dependent)
+    this.placementFingerprint = null;
+    this.confirmationFingerprint = null;
+    this.controllerPhase = "idle"; // idle | placement | confirmation | ready
+    this.placementResults = {};   // { qty -> [{ finalistId, rawTransfer, placementRanking }] }
+    this.bestPerQuantity = {};    // { qty -> { finalist, rawTransfer } }
+    this.confirmationJobsPlanned = 0;
+    this.confirmationJobsDone = 0;
   }
 
-  schedule({ projectId, fingerprint, promotionPlan, allStage1Finalists, stage1Complete, params, quantityOrder, delay }) {
+  schedule({ projectId, fingerprint, placementFingerprint, confirmationFingerprint, promotionPlan, allStage1Finalists, stage1Complete, params, quantityOrder, delay }) {
     this.cancelAll("superseded");
     if (!fingerprint) {
       markStage2Idle(projectId);
@@ -221,14 +236,20 @@ class Stage2PlacementController {
 
     this.projectId = projectId;
     this.currentFingerprint = fingerprint;
+    this.placementFingerprint = placementFingerprint || null;
+    this.confirmationFingerprint = confirmationFingerprint || null;
     this.params = params;
     this.completedResults = {};
     this.quantityEvaluated = {};
     this.quantityFinal = {};
     this.quantityFinalists = {};
+    this.placementResults = {};
+    this.bestPerQuantity = {};
     this.canonicalJobsRun = 0;
     this.completedJobs = 0;
     this.totalJobsPlanned = 0;
+    this.confirmationJobsPlanned = 0;
+    this.confirmationJobsDone = 0;
     this.startTime = now();
     this.quantityOrder = quantityOrder;
     // Reset B last-resort state
@@ -242,29 +263,68 @@ class Stage2PlacementController {
     this.allStage1FourSubFinalists = (allStage1Finalists && allStage1Finalists[4]) || [];
     this.stage1Complete = !!stage1Complete;
 
-    // Build the queue: first NORMAL finalists per quantity in quantity order
-    this.queue = [];
+    // Build the promotion plan per quantity
     for (const qty of quantityOrder) {
       const finalists = promotionPlan[qty] || [];
       this.quantityFinalists[qty] = finalists;
       this.quantityEvaluated[qty] = 0;
-      // Mark as final if no finalists to evaluate
       this.quantityFinal[qty] = finalists.length === 0;
-      for (let i = 0; i < Math.min(STAGE2_FINALISTS_NORMAL, finalists.length); i++) {
-        this.queue.push({ finalist: finalists[i], quantity: qty });
+      this.placementResults[qty] = [];
+    }
+
+    // Check if raw transfers are already cached for this placement fingerprint.
+    // If so, skip the placement phase and go straight to confirmation.
+    const allCached = placementFingerprint && quantityOrder.every((qty) => {
+      const finalists = promotionPlan[qty] || [];
+      return finalists.length === 0 || finalists.every((f) => hasCachedRawTransfer(placementFingerprint, f.id));
+    });
+
+    if (allCached) {
+      // Placement cache hit — skip to confirmation
+      this.controllerPhase = "confirmation";
+      for (const qty of quantityOrder) {
+        const finalists = promotionPlan[qty] || [];
+        for (const f of finalists) {
+          const rawTransfer = getCachedRawTransfer(placementFingerprint, f.id);
+          if (rawTransfer) {
+            const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
+            const placementRanking = buildPlacementRankingTuple(rawTransfer, seatPriorityMap);
+            this.placementResults[qty].push({ finalistId: f.id, rawTransfer, placementRanking });
+          }
+        }
+      }
+      this.startConfirmation();
+      return;
+    }
+
+    // Placement phase: queue all finalists for raw transfer evaluation
+    this.controllerPhase = "placement";
+    this.queue = [];
+    for (const qty of quantityOrder) {
+      const finalists = promotionPlan[qty] || [];
+      for (const f of finalists) {
+        // Skip if already cached
+        if (placementFingerprint && hasCachedRawTransfer(placementFingerprint, f.id)) {
+          const rawTransfer = getCachedRawTransfer(placementFingerprint, f.id);
+          const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
+          const placementRanking = buildPlacementRankingTuple(rawTransfer, seatPriorityMap);
+          this.placementResults[qty].push({ finalistId: f.id, rawTransfer, placementRanking });
+          continue;
+        }
+        this.queue.push({ finalist: f, quantity: qty, phase: "placement" });
       }
     }
 
     this.totalJobsPlanned = this.queue.length;
     markStage2Updating(projectId, fingerprint, {
-      phase: "preparing",
+      phase: "placement",
       completedJobs: 0,
       totalJobsPlanned: this.totalJobsPlanned,
     });
 
-    // If no finalists at all, check B eligibility then complete
-    if (this.queue.length === 0 && this.quantityOrder.every((qty) => this.quantityFinal[qty])) {
-      this.maybeCheckBAndComplete();
+    // If no placement jobs needed (all cached), start confirmation
+    if (this.queue.length === 0) {
+      this.startConfirmation();
       return;
     }
 
@@ -288,12 +348,19 @@ class Stage2PlacementController {
     // seatPriorityMap is a Map used only by the controller for ranking —
     // do not send it to the worker (it would be structured-cloned unnecessarily).
     const { seatPriorityMap, ...workerParams } = this.params;
-    this.workers[workerIndex].postMessage({
+    const phase = job.phase || "placement";
+    const workerMessage = {
       requestId,
       fingerprint: this.currentFingerprint,
+      phase,
       finalist: job.finalist,
       ...workerParams,
-    });
+    };
+    // For confirmation phase, pass the cached raw transfer
+    if (phase === "confirmation" && job.rawTransfer) {
+      workerMessage.rawTransfer = job.rawTransfer;
+    }
+    this.workers[workerIndex].postMessage(workerMessage);
     this.publishProgress();
   }
 
@@ -321,17 +388,44 @@ class Stage2PlacementController {
     this.activeJobs.delete(workerIndex);
     const qty = active.quantity;
     const wasBJob = active.isB === true;
+    const phase = active.phase || "placement";
     this.completedJobs++;
     this.canonicalJobsRun++;
 
+    // ── Placement phase: cache raw transfer ──────────────────────────────
+    if (phase === "placement") {
+      if (message.type === "complete" && message.result) {
+        const rawTransfer = message.result;
+        // Cache the raw transfer for reuse across P14 changes
+        if (this.placementFingerprint) {
+          setCachedRawTransfer(this.placementFingerprint, rawTransfer.finalistId, rawTransfer);
+        }
+        const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
+        const placementRanking = buildPlacementRankingTuple(rawTransfer, seatPriorityMap);
+        if (!this.placementResults[qty]) this.placementResults[qty] = [];
+        this.placementResults[qty].push({ finalistId: rawTransfer.finalistId, rawTransfer, placementRanking });
+      } else if (message.type === "error") {
+        const failedFamilyId = active.finalist?.familyId;
+        if (failedFamilyId && !isBFamily(failedFamilyId) && !isProhibitedFamily(failedFamilyId)) {
+          this.failedFamilyIds.add(failedFamilyId);
+        }
+      }
+      this.publishProgress();
+      // After all placement jobs complete, start confirmation
+      if (this.queue.length > 0) {
+        this.dispatchNext();
+      } else if (this.activeJobs.size === 0) {
+        this.startConfirmation();
+      }
+      return;
+    }
+
+    // ── Confirmation phase: process canonical result ─────────────────────
     if (message.type === "complete") {
-      // Count every completed job (including null results) so the third-finalist
-      // check fires even when a finalist evaluation returns null.
       this.quantityEvaluated[qty] = (this.quantityEvaluated[qty] || 0) + 1;
       if (message.result) {
         if (!this.completedResults[qty]) this.completedResults[qty] = [];
         const result = message.result;
-        // Track evaluated practical family (has at least one successful result)
         if (result.familyId && !isBFamily(result.familyId) && !isProhibitedFamily(result.familyId)) {
           this.evaluatedFamilyIds.add(result.familyId);
         }
@@ -342,36 +436,27 @@ class Stage2PlacementController {
         if (meetsStopCondition(rankingData)) {
           this.quantityFinal[qty] = true;
         }
-        // Track B result separately for persistence
         if (wasBJob) {
           this.bResult = result;
         }
+        this.confirmationJobsDone++;
         this.publishProgress();
       }
     } else if (message.type === "error") {
-      // Track failed practical family (all attempts failed → optimiser incomplete)
       const failedFamilyId = active.finalist?.familyId;
       if (failedFamilyId && !isBFamily(failedFamilyId) && !isProhibitedFamily(failedFamilyId)) {
         this.failedFamilyIds.add(failedFamilyId);
       }
     }
 
-    // Mark B as evaluated (success or error) so completion can proceed
     if (wasBJob) {
       this.bState = "evaluated";
     }
 
-    // Decide whether a third finalist is needed for this quantity
-    // (skip for B jobs — B is not a normal finalist)
-    if (!wasBJob && !this.quantityFinal[qty] && this.quantityEvaluated[qty] >= STAGE2_FINALISTS_NORMAL) {
-      const evaluated = this.completedResults[qty] || [];
-      const remaining = (this.quantityFinalists[qty] || []).slice(STAGE2_FINALISTS_NORMAL);
-      if (shouldEvaluateThirdFinalist(evaluated, remaining) && remaining.length > 0) {
-        this.queue.push({ finalist: remaining[0], quantity: qty });
-        this.totalJobsPlanned++;
-      } else {
-        this.quantityFinal[qty] = true;
-      }
+    // In the confirmation phase, each quantity has at most 1-2 confirmation
+    // jobs (best + optional alternate if tied). No third-finalist logic.
+    if (!wasBJob && !this.quantityFinal[qty]) {
+      this.quantityFinal[qty] = true;
     }
 
     // Dispatch next or check B eligibility + completion
@@ -382,6 +467,70 @@ class Stage2PlacementController {
     }
   }
 
+  /**
+   * Start the confirmation phase after all placement jobs complete.
+   * Ranks finalists P14-independently, selects best per quantity, and
+   * queues confirmation jobs for the selected P14 target.
+   */
+  startConfirmation() {
+    this.controllerPhase = "confirmation";
+    this.queue = [];
+    this.completedResults = {};
+    this.quantityEvaluated = {};
+    this.quantityFinal = {};
+
+    const seatPriorityMap = this.params?.seatPriorityMap;
+
+    for (const qty of this.quantityOrder) {
+      const placements = this.placementResults[qty] || [];
+      this.quantityEvaluated[qty] = 0;
+      this.quantityFinal[qty] = placements.length === 0;
+
+      if (placements.length === 0) continue;
+
+      // Rank P14-independently and select best
+      const ranked = [...placements].sort(comparePlacementResults);
+      const best = ranked[0];
+      this.bestPerQuantity[qty] = best;
+
+      // Queue confirmation for the best
+      this.queue.push({
+        finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s, i) => ({ xNorm: s.x / Number(this.params.roomDims?.widthM), yNorm: s.y / Number(this.params.roomDims?.lengthM) })) },
+        quantity: qty,
+        phase: "confirmation",
+        rawTransfer: best.rawTransfer,
+      });
+
+      // If there's a tie, queue an alternate confirmation
+      if (ranked.length > 1 && isPlacementTied(best, ranked[1])) {
+        const alternate = ranked[1];
+        this.queue.push({
+          finalist: { id: alternate.finalistId, familyId: alternate.rawTransfer.familyId, sources: alternate.rawTransfer.sources?.map((s, i) => ({ xNorm: s.x / Number(this.params.roomDims?.widthM), yNorm: s.y / Number(this.params.roomDims?.lengthM) })) },
+          quantity: qty,
+          phase: "confirmation",
+          rawTransfer: alternate.rawTransfer,
+        });
+      }
+    }
+
+    this.confirmationJobsPlanned = this.queue.length;
+    this.totalJobsPlanned += this.queue.length;
+    this.quantityFinal[this.quantityOrder[0]] = this.quantityFinal[this.quantityOrder[0]] || false;
+
+    markStage2Updating(this.projectId, this.currentFingerprint, {
+      phase: "confirmation",
+      completedJobs: this.completedJobs,
+      totalJobsPlanned: this.totalJobsPlanned,
+    });
+
+    if (this.queue.length === 0) {
+      this.maybeCheckBAndComplete();
+      return;
+    }
+
+    this.dispatchNext();
+  }
+
   handleError(workerIndex, errorMessage) {
     const active = this.activeJobs.get(workerIndex);
     this.activeJobs.delete(workerIndex);
@@ -389,14 +538,22 @@ class Stage2PlacementController {
       this.completedJobs++;
       this.canonicalJobsRun++;
     }
-    // Track failed practical family (all attempts failed → optimiser incomplete)
     const failedFamilyId = active?.finalist?.familyId;
     if (failedFamilyId && !isBFamily(failedFamilyId) && !isProhibitedFamily(failedFamilyId)) {
       this.failedFamilyIds.add(failedFamilyId);
     }
-    // Mark B as evaluated even on error so completion can proceed
     if (active?.isB === true) {
       this.bState = "evaluated";
+    }
+    // Placement phase errors: continue to next placement job or start confirmation
+    const phase = active?.phase || "placement";
+    if (phase === "placement") {
+      if (this.queue.length > 0) {
+        this.dispatchNext();
+      } else if (this.activeJobs.size === 0) {
+        this.startConfirmation();
+      }
+      return;
     }
     if (this.queue.length > 0) {
       this.dispatchNext();
@@ -412,7 +569,19 @@ class Stage2PlacementController {
     results.canonical_jobs_run = this.canonicalJobsRun;
     results.completed_jobs = this.completedJobs;
     results.total_jobs_planned = this.totalJobsPlanned;
-    results.phase = Number.isFinite(nextQuantity) ? `evaluating_${nextQuantity}_sub` : "preparing";
+    // Phase label reflects the two-phase architecture:
+    //   placement → "placement" (P14-independent raw transfer)
+    //   confirmation → "confirmation_N_of_M" (P14-dependent canonical confirmation)
+    //   ready → "ready"
+    if (this.controllerPhase === "placement") {
+      results.phase = "placement";
+    } else if (this.controllerPhase === "confirmation") {
+      const done = this.confirmationJobsDone;
+      const total = this.confirmationJobsPlanned || 1;
+      results.phase = `confirmation_${done}_of_${total}`;
+    } else {
+      results.phase = Number.isFinite(nextQuantity) ? `evaluating_${nextQuantity}_sub` : "preparing";
+    }
     publishStage2Progress(this.projectId, this.currentFingerprint, results);
   }
 

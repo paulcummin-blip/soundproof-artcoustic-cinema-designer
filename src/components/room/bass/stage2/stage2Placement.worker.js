@@ -1,26 +1,51 @@
 // stage2Placement.worker.js
-// Worker that evaluates a SINGLE Stage 1 finalist through the full canonical
-// bass authority pipeline. The controller maintains a pool of 2 workers for
-// concurrent evaluation.
+// Worker that evaluates Stage 1 finalists through the two-phase canonical
+// bass authority pipeline.
+//
+// Phase 1 — PLACEMENT (P14-independent):
+//   Runs evaluateStage2Placement to compute the raw modal transfer
+//   (rspRawCurve, perSeatRawCurves, sources, alignment). Cached under
+//   the placement fingerprint and reused across P14 changes.
+//
+// Phase 2 — CONFIRMATION (P14-dependent):
+//   Runs evaluateStage2Confirmation using a cached raw transfer to
+//   produce P14/P18/P19/P20 authority. Does NOT re-run the modal simulation.
 
-import { evaluateStage2Finalist } from "./stage2CanonicalEvaluation";
+import { evaluateStage2Placement, evaluateStage2Confirmation } from "./stage2CanonicalEvaluation";
 
 self.onmessage = (event) => {
-  const { requestId, fingerprint, finalist, ...params } = event.data || {};
+  const { requestId, fingerprint, phase, finalist, rawTransfer, ...params } = event.data || {};
   if (!requestId) {
     self.postMessage({ type: "error", requestId: null, error: "Missing requestId" });
     return;
   }
   try {
-    const result = evaluateStage2Finalist({ finalist, ...params });
-    self.postMessage({ type: "complete", requestId, fingerprint, finalistId: finalist?.id, result });
+    if (phase === "placement") {
+      const result = evaluateStage2Placement({ finalist, ...params });
+      self.postMessage({ type: "complete", requestId, fingerprint, phase: "placement", finalistId: finalist?.id, result });
+    } else if (phase === "confirmation") {
+      if (!rawTransfer) {
+        self.postMessage({ type: "error", requestId, fingerprint, phase: "confirmation", finalistId: finalist?.id, error: "Missing rawTransfer for confirmation phase" });
+        return;
+      }
+      const result = evaluateStage2Confirmation(rawTransfer, params);
+      self.postMessage({ type: "complete", requestId, fingerprint, phase: "confirmation", finalistId: finalist?.id, result });
+    } else {
+      // Legacy: full combined evaluation (backward compatibility)
+      const result = evaluateStage2Confirmation(
+        evaluateStage2Placement({ finalist, ...params }),
+        params,
+      );
+      self.postMessage({ type: "complete", requestId, fingerprint, phase: "combined", finalistId: finalist?.id, result });
+    }
   } catch (error) {
     self.postMessage({
       type: "error",
       requestId,
       fingerprint,
+      phase: phase || "combined",
       finalistId: finalist?.id,
-      error: error?.message || String(error) || "Stage 2 canonical evaluation failed",
+      error: error?.message || String(error) || "Stage 2 evaluation failed",
     });
   }
 };
