@@ -15,6 +15,7 @@
 
 import React from 'react';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import {
   getRoomDesignRatingDesignation,
   getDesignPerformanceIndex,
@@ -31,6 +32,63 @@ const SCREEN_DESCRIPTOR = {
 
 function levelNum(key) {
   return Number(String(key).replace('L', ''));
+}
+
+// Format a contribution key ("p11") as the concise parameter label ("P11").
+function paramLabel(key) {
+  const num = String(key || '').replace(/^p/i, '');
+  return num ? `P${num}` : String(key || '');
+}
+
+// Return the included parameters whose achieved level equals the category
+// floor for this scope. For a FAIL floor, returns the FAIL parameters.
+// Screen / Viewing Geometry is excluded (RP23, separately governed).
+function getLimitingParams(scope) {
+  if (!scope || !scope.paramDetails || scope.isScreen) return [];
+  const floor = scope.floorLevel;
+  if (!floor) return [];
+  return scope.paramDetails.filter((p) => p.level === floor);
+}
+
+// Tooltip body: category title + one row per limiting parameter.
+function FloorTooltipBody({ label, isPrimary, limiting }) {
+  return (
+    <div style={{ minWidth: 150 }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>
+        {label} · {isPrimary ? 'Primary' : 'Secondary'}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {limiting.map((p) => (
+          <div key={p.key} style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#213428' }}>{paramLabel(p.key)}</span>
+            <RP22GradingPill level={p.level} compact />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Wrap a pill in a hover/focus tooltip showing the limiting parameters,
+// but only when there are limiting parameters to show.
+function FloorPillWithTooltip({ pill, scope, label, isPrimary }) {
+  const limiting = getLimitingParams(scope);
+  if (limiting.length === 0) return pill;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={0} style={{ cursor: 'help', outline: 'none', display: 'inline-flex' }}>{pill}</span>
+      </TooltipTrigger>
+      <TooltipContent
+        side="right"
+        align="start"
+        sideOffset={6}
+        className="bg-white text-foreground border border-[#DCDBD6] shadow-md px-3 py-2 z-50 rounded-md"
+      >
+        <FloorTooltipBody label={label} isPrimary={isPrimary} limiting={limiting} />
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 // One category block — Primary + Secondary seat-scoped floor results.
@@ -83,20 +141,26 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
       return (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
           <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
-          <RP22GradingPill level="FAIL" compact />
+          <FloorPillWithTooltip
+            pill={<RP22GradingPill level="FAIL" compact />}
+            scope={scope}
+            label={label}
+            isPrimary={isPrimary}
+          />
         </div>
       );
     }
 
     const lead = isPrimary ? 'Primary Seats — no lower than' : 'Secondary Seats — no lower than';
+    const pill = floor ? (
+      <RP22GradingPill level={floor} compact />
+    ) : (
+      <span style={{ fontSize: 10, fontWeight: 600, color: '#213428', justifySelf: 'end' }}>—</span>
+    );
     return (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
         <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
-        {floor ? (
-          <RP22GradingPill level={floor} compact />
-        ) : (
-          <span style={{ fontSize: 10, fontWeight: 600, color: '#213428', justifySelf: 'end' }}>—</span>
-        )}
+        <FloorPillWithTooltip pill={pill} scope={scope} label={label} isPrimary={isPrimary} />
       </div>
     );
   };
@@ -189,6 +253,7 @@ export default function DesignRatingSummary({
   );
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div
       style={{
         padding: '12px 16px',
@@ -245,5 +310,6 @@ export default function DesignRatingSummary({
         </div>
       )}
     </div>
+    </TooltipProvider>
   );
 }
