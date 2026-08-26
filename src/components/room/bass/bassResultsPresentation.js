@@ -186,6 +186,10 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   const isError = authorityStatus === "ERROR";
   const isUncalculated = authorityStatus === "UNCALCULATED" && !isCalculating;
 
+  // P14 FAIL → P18/P19/P20 not evaluated at the requested operating point.
+  // Declared early — used by per-seat gating below.
+  const p14Failed = isAuthoritative && contract?.productAnalysis?.parameters?.p14?.pass === false;
+
   // Per-seat arrays (publication-gated — empty when not verified or P14 failed)
   const perSeatP19Results = (isAuthoritative && !p14Failed)
     ? (Array.isArray(contract?.selectedCandidate?.perSeatP19Results) ? contract.selectedCandidate.perSeatP19Results : [])
@@ -249,8 +253,6 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     pills.p14 = { label: "P14 Bass SPL", resultText: officialStateText(authorityStatus, isCalculating), text: `P14 Bass SPL ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P14 FAIL → P18/P19/P20 not evaluated at the requested operating point.
-  const p14Failed = isAuthoritative && contract?.productAnalysis?.parameters?.p14?.pass === false;
   const notEvaluatedText = "Not evaluated at requested operating point";
 
   // P18 — dynamically regrade the achieved extension for the current display
