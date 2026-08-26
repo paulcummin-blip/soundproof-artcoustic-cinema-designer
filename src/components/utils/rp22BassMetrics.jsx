@@ -168,13 +168,29 @@ export function computeInRoomF3FromResponseCurve(curve) {
   const refDb = median(refValues);
   if (!isNum(refDb)) return { f3Hz: null, refDb: null, cutoffDb: null };
   const cutoffDb = refDb - 3;
-  // Sustained walk: find the lowest frequency where spl >= cutoff and stays
-  // >= cutoff for all subsequent points (sustained-above protection).
+  // LOCAL 1/3-octave sustained crossing.
+  //
+  // Starting from the lowest frequency, find the lowest upward crossing of
+  // cutoffDb where the smoothed response remains at or above cutoffDb through
+  // a local window extending from the crossing frequency to crossing × 2^(1/3).
+  //
+  // This preserves narrow-spike protection (a single-point spike cannot fake
+  // extension) while preventing unrelated higher-frequency modal dips from
+  // erasing genuine LF extension. A distant null at 90/120/170 Hz may make
+  // P19/P20 worse but must not erase a legitimate 20 Hz P18 extension.
   const points = smoothed.filter((p) => p.frequency <= 200 && isNum(p.spl));
   let f3Hz = null;
   for (let index = 0; index < points.length; index += 1) {
     if (points[index].spl < cutoffDb) continue;
-    if (points.slice(index).some((point) => point.spl < cutoffDb)) continue;
+    // Local 1/3-octave window: [crossing, crossing × 2^(1/3)].
+    const windowEndHz = points[index].frequency * Math.pow(2, 1 / 3);
+    let sustained = true;
+    for (let j = index; j < points.length; j += 1) {
+      if (points[j].frequency > windowEndHz) break;
+      if (points[j].spl < cutoffDb) { sustained = false; break; }
+    }
+    if (!sustained) continue;
+    // Interpolate the exact crossing from the previous point.
     const previous = points[index - 1];
     if (!previous || previous.spl >= cutoffDb) { f3Hz = points[index].frequency; break; }
     const ratio = (cutoffDb - previous.spl) / (points[index].spl - previous.spl);
@@ -351,7 +367,14 @@ function sustainedExtensionAtCutoff(curve, cutoffDb, upperHz = 120) {
   const points = smoothThird(toSplCurve(curve)).filter((point) => point.frequency <= upperHz);
   for (let index = 0; index < points.length; index += 1) {
     if (points[index].spl < cutoffDb) continue;
-    if (points.slice(index).some((point) => point.spl < cutoffDb)) continue;
+    // Local 1/3-octave window: [crossing, crossing × 2^(1/3)].
+    const windowEndHz = points[index].frequency * Math.pow(2, 1 / 3);
+    let sustained = true;
+    for (let j = index; j < points.length; j += 1) {
+      if (points[j].frequency > windowEndHz) break;
+      if (points[j].spl < cutoffDb) { sustained = false; break; }
+    }
+    if (!sustained) continue;
     const previous = points[index - 1];
     if (!previous || previous.spl >= cutoffDb) return points[index].frequency;
     const ratio = (cutoffDb - previous.spl) / (points[index].spl - previous.spl);

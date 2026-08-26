@@ -11,7 +11,7 @@ export const STAGE2_RANKING_VERSION = "stage2-ranking-v1";
 // authority pipeline. Bumped to v3: confirmation fingerprint now carries
 // canonicalVersion + productEngineeringVersion (moved from placement), and
 // p18TargetBasis removed (presentation-only grading view).
-export const STAGE2_CANONICAL_VERSION = "stage2-canonical-v3";
+export const STAGE2_CANONICAL_VERSION = "stage2-canonical-v4";
 export const STAGE2_PRODUCT_ENGINEERING_VERSION = "product-engineering-v5";
 // Placement layer version: P14-independent raw modal transfer. Bumped to v2:
 // placement fingerprint is now physics-only (canonicalVersion and
