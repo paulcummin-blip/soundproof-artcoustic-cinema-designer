@@ -217,6 +217,11 @@ class Stage2PlacementController {
     this.failedFamilyIds = new Set();
     this.allStage1FourSubFinalists = [];
     this.stage1Complete = false;
+    // B-representative lifecycle state: finalistId → "placement" | "confirmation" | "evaluated" | "failed".
+    // Prevents the infinite loop where a missing representative's placement
+    // completes but no confirmation is ever queued, so evaluatedFamilyIds
+    // never records the family and B eligibility re-queues it indefinitely.
+    this.representativeState = new Map();
     // Two-phase architecture: placement (P14-independent) → confirmation (P14-dependent)
     this.placementFingerprint = null;
     this.confirmationFingerprint = null;
@@ -264,6 +269,7 @@ class Stage2PlacementController {
     this.failedFamilyIds = new Set();
     this.allStage1FourSubFinalists = (allStage1Finalists && allStage1Finalists[4]) || [];
     this.stage1Complete = !!stage1Complete;
+    this.representativeState = new Map();
 
     // Build the promotion plan per quantity. Iterate quantityOrder so the
     // selected quantity's placement jobs are queued first — its confirmation
@@ -461,30 +467,74 @@ class Stage2PlacementController {
         if (this.placementFingerprint) {
           setCachedRawTransfer(this.placementFingerprint, rawTransfer.finalistId, rawTransfer);
         }
-        const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
-        const placementRanking = buildPlacementRankingTuple(rawTransfer, seatPriorityMap);
-        if (!this.placementResults[qty]) this.placementResults[qty] = [];
-        this.placementResults[qty].push({ finalistId: rawTransfer.finalistId, rawTransfer, placementRanking });
+
+        // B-representative: queue exactly one confirmation job now that the
+        // raw transfer exists. This is the critical fix — without this, the
+        // representative's placement completes but no confirmation is ever
+        // queued (confirmationQueued[4] is already true from the normal
+        // confirmation), so evaluatedFamilyIds never records the family and
+        // B eligibility re-queues the same representative indefinitely.
+        if (active.isRepresentative) {
+          const W = Number(this.params.roomDims?.widthM);
+          const L = Number(this.params.roomDims?.lengthM);
+          this.representativeState.set(rawTransfer.finalistId, "confirmation");
+          this.queue.push({
+            finalist: { id: rawTransfer.finalistId, familyId: rawTransfer.familyId, sources: rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+            quantity: 4,
+            phase: "confirmation",
+            isRepresentative: true,
+            rawTransfer,
+          });
+          this.totalJobsPlanned++;
+        } else if (wasBJob) {
+          // B finalist: queue exactly one confirmation job after placement.
+          // Same lifecycle defect as representatives — without this, the B
+          // finalist's placement completes but no confirmation is queued
+          // (confirmationQueued[4] is already true), so bState stays "queued"
+          // forever and the controller never completes.
+          const W = Number(this.params.roomDims?.widthM);
+          const L = Number(this.params.roomDims?.lengthM);
+          this.queue.push({
+            finalist: { id: rawTransfer.finalistId, familyId: rawTransfer.familyId, sources: rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+            quantity: 4,
+            phase: "confirmation",
+            isB: true,
+            rawTransfer,
+          });
+          this.totalJobsPlanned++;
+        } else {
+          const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
+          const placementRanking = buildPlacementRankingTuple(rawTransfer, seatPriorityMap);
+          if (!this.placementResults[qty]) this.placementResults[qty] = [];
+          this.placementResults[qty].push({ finalistId: rawTransfer.finalistId, rawTransfer, placementRanking });
+        }
       } else if (message.type === "error") {
         const failedFamilyId = active.finalist?.familyId;
         if (failedFamilyId && !isBFamily(failedFamilyId) && !isProhibitedFamily(failedFamilyId)) {
           this.failedFamilyIds.add(failedFamilyId);
         }
+        if (active.isRepresentative) {
+          this.representativeState.set(active.finalist?.id, "failed");
+        }
       }
-      // Track placement processing for per-quantity completion
-      this.quantityPlacementProcessed[qty] = (this.quantityPlacementProcessed[qty] || 0) + 1;
+      // Track placement processing for per-quantity completion (normal
+      // finalists only — representatives and B are not part of the per-quantity
+      // promotion plan and must not affect quantityPlacementProcessed).
+      if (!active.isRepresentative && !wasBJob) {
+        this.quantityPlacementProcessed[qty] = (this.quantityPlacementProcessed[qty] || 0) + 1;
 
-      // If this quantity's placement is now complete, start its confirmation
-      // immediately — do NOT wait for other quantities' placement to finish.
-      // Confirmation jobs are inserted at the front of the queue so they
-      // are dispatched before remaining placement jobs for other quantities.
-      if (this.isQuantityPlacementComplete(qty) && !this.confirmationQueued[qty]) {
-        this.startConfirmationForQuantity(qty);
+        // If this quantity's placement is now complete, start its confirmation
+        // immediately — do NOT wait for other quantities' placement to finish.
+        // Confirmation jobs are inserted at the front of the queue so they
+        // are dispatched before remaining placement jobs for other quantities.
+        if (this.isQuantityPlacementComplete(qty) && !this.confirmationQueued[qty]) {
+          this.startConfirmationForQuantity(qty);
+        }
       }
 
       this.publishProgress();
-      // Dispatch next (may be a confirmation job for this quantity or a
-      // placement job for another quantity).
+      // Dispatch next (may be a representative confirmation, a normal
+      // confirmation, or a placement job for another quantity).
       if (this.queue.length > 0) {
         this.dispatchNext();
       } else if (this.activeJobs.size === 0) {
@@ -501,6 +551,12 @@ class Stage2PlacementController {
         const result = message.result;
         if (result.familyId && !isBFamily(result.familyId) && !isProhibitedFamily(result.familyId)) {
           this.evaluatedFamilyIds.add(result.familyId);
+        }
+        // Mark B-representative as evaluated — this breaks the infinite loop
+        // by ensuring evaluateBEligibility sees the family as evaluated on
+        // the next check, so it is never re-queued for the same fingerprint.
+        if (active.isRepresentative) {
+          this.representativeState.set(active.finalist?.id, "evaluated");
         }
         const seatPriorityMap = this.params?.seatPriorityMap;
         const rankingData = buildStage2RankingTuple(result, seatPriorityMap);
@@ -519,6 +575,9 @@ class Stage2PlacementController {
       const failedFamilyId = active.finalist?.familyId;
       if (failedFamilyId && !isBFamily(failedFamilyId) && !isProhibitedFamily(failedFamilyId)) {
         this.failedFamilyIds.add(failedFamilyId);
+      }
+      if (active.isRepresentative) {
+        this.representativeState.set(active.finalist?.id, "failed");
       }
     }
 
@@ -561,11 +620,15 @@ class Stage2PlacementController {
     if (active?.isB === true) {
       this.bState = "evaluated";
     }
+    // Mark B-representative as failed on worker error — prevents re-queuing
+    if (active?.isRepresentative) {
+      this.representativeState.set(active.finalist?.id, "failed");
+    }
     // Placement phase errors: track processing and check per-quantity completion
     const phase = active?.phase || "placement";
     if (phase === "placement") {
       const errQty = active.quantity;
-      if (errQty != null) {
+      if (errQty != null && !active?.isRepresentative && !active?.isB) {
         this.quantityPlacementProcessed[errQty] = (this.quantityPlacementProcessed[errQty] || 0) + 1;
         if (this.isQuantityPlacementComplete(errQty) && !this.confirmationQueued[errQty]) {
           this.startConfirmationForQuantity(errQty);
@@ -651,11 +714,47 @@ class Stage2PlacementController {
       // finalist for canonical evaluation, then defer completion.
       if (eligibility.missingRepresentatives && eligibility.missingRepresentatives.length > 0) {
         this.bState = "evaluating_representatives";
+        const W = Number(this.params.roomDims?.widthM);
+        const L = Number(this.params.roomDims?.lengthM);
+        let queuedAny = false;
         for (const rep of eligibility.missingRepresentatives) {
-          this.queue.push({ finalist: rep.finalist, quantity: 4, isRepresentative: true });
-          this.totalJobsPlanned++;
+          const repId = rep.finalist?.id;
+          if (!repId) continue;
+          const repState = this.representativeState.get(repId);
+          // Skip representatives already evaluated or failed — they must not
+          // be re-queued for the same fingerprint.
+          if (repState === "evaluated" || repState === "failed") continue;
+          // Skip if the family already has a successful evaluation
+          if (this.evaluatedFamilyIds.has(rep.familyId)) continue;
+          // If a placement or confirmation job is already in-flight, don't duplicate
+          if (repState === "placement" || repState === "confirmation") continue;
+
+          // If the raw transfer is already cached (from a prior run or cold
+          // hydration), queue the confirmation directly — skip placement.
+          if (this.placementFingerprint && hasCachedRawTransfer(this.placementFingerprint, repId)) {
+            const rawTransfer = getCachedRawTransfer(this.placementFingerprint, repId);
+            this.representativeState.set(repId, "confirmation");
+            this.queue.push({
+              finalist: { id: repId, familyId: rep.familyId, sources: rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+              quantity: 4,
+              phase: "confirmation",
+              isRepresentative: true,
+              rawTransfer,
+            });
+            this.totalJobsPlanned++;
+            queuedAny = true;
+          } else {
+            // Queue for placement/raw transfer. The confirmation will be
+            // queued automatically when this placement completes.
+            this.representativeState.set(repId, "placement");
+            this.queue.push({ finalist: rep.finalist, quantity: 4, phase: "placement", isRepresentative: true });
+            this.totalJobsPlanned++;
+            queuedAny = true;
+          }
         }
-        this.dispatchNext();
+        if (queuedAny) {
+          this.dispatchNext();
+        }
         return; // defer completion until representatives are evaluated
       }
 
@@ -663,7 +762,7 @@ class Stage2PlacementController {
         // Generate B finalist and queue it for evaluation
         this.bState = "queued";
         const bFinalist = generateBFinalist();
-        this.queue.push({ finalist: bFinalist, quantity: 4, isB: true });
+        this.queue.push({ finalist: bFinalist, quantity: 4, phase: "placement", isB: true });
         this.totalJobsPlanned++;
         this.dispatchNext();
         return; // defer completion until B is evaluated
