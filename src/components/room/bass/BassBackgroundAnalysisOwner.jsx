@@ -10,7 +10,8 @@ import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOp
 import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract, bassContractMatchesRequestedP14 } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
-import { useTargetCacheEntry, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
+import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
+import { beginP14AnalysisJob, publishP14AnalysisProgress } from "./p14AnalysisProgressStore";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
 import { isBackgroundInputsReady } from "./backgroundInputReadiness";
 
@@ -132,9 +133,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // Minimum/Recommended P18 is recomputed from achieved extension at display
   // time, so changing that selector neither rebuilds nor restarts this queue.
   const allTargets = useMemo(() => buildP14TargetCombinations(), [OPTIMISER_VERSION_SIGNATURE]);
+  const allTargetKeys = useMemo(() => allTargets.map((target) => target.key), [allTargets]);
 
   // Reactive cache lookup: returns cached compact contract for the current target, or null
   const cachedContract = useTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey);
+  const targetFamilyProgress = useTargetCacheProgress(scopeId, baseDesignFingerprint, allTargetKeys);
+  const targetDurationSignature = targetFamilyProgress.completedDurationsMs.join("|");
 
   // Hydrate target cache from DB on mount / project change
   const [targetCacheHydrated, setTargetCacheHydrated] = useState(false);
@@ -616,6 +620,29 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && !!completedBassAuthority?.authoritative
     && completedBassAuthority?.currentFingerprint === cacheKey;
   const foregroundReady = foregroundReadyPathA || foregroundReadyPathB;
+
+  // Publish one shared, non-acoustic lifecycle snapshot for the P14 selector
+  // and Stage 2 gate. Counts come only from verified target-cache entries.
+  // Timing evidence comes from completed real jobs; no countdown is invented.
+  useEffect(() => {
+    const basePatch = {
+      baseDesignFingerprint,
+      completed: targetFamilyProgress.ready,
+      total: targetFamilyProgress.total,
+      completedDurationsMs: targetFamilyProgress.completedDurationsMs,
+      status: targetCacheHydrated ? "calculating" : "idle",
+    };
+    if (targetFamilyProgress.total > 0 && targetFamilyProgress.ready >= targetFamilyProgress.total) {
+      publishP14AnalysisProgress(scopeId, { ...basePatch, status: "complete", activeTargetKey: null, activeStartedAtMs: null });
+      return;
+    }
+    if ((lifecycle.status === "queued" || lifecycle.status === "calculating") && targetKey) {
+      beginP14AnalysisJob(scopeId, { ...basePatch, targetKey });
+      return;
+    }
+    publishP14AnalysisProgress(scopeId, basePatch);
+  }, [scopeId, baseDesignFingerprint, targetKey, targetCacheHydrated, targetFamilyProgress.ready, targetFamilyProgress.total, targetDurationSignature, lifecycle.status]);
+
   // ── Live background worker-input readiness ──────────────────────────
   // Reflects the ACTUAL live payload needed by the background worker, NOT the
   // completed foreground authority. On cold restore, foregroundReadyPathA can
@@ -683,6 +710,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     return buildFinishedGraphOptimisationResult(completedContract);
   }, [isProjectHydrationReady, optimisationResult, completedContractMatches, completedContract]);
   const effectiveOptimisationResult = optimisationResult || cachedGraphOptimisationResult;
-  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions });
+  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p14FamilyProgress: targetFamilyProgress });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
