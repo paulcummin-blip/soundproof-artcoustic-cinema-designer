@@ -627,15 +627,25 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // and Stage 2 gate. Counts come only from verified target-cache entries.
   // Timing evidence comes from completed real jobs; no countdown is invented.
   useEffect(() => {
+    // Hydration gate: before the base design fingerprint is available and
+    // persisted bass-authority hydration has settled, the P14 family progress
+    // must NOT show "calculating" — the hydrated cache hasn't been read yet
+    // and the family count is 0. Showing "calculating 0/8" here causes a
+    // transient flash before the hydrated 8/8 (or partial) family resolves.
+    const hydrationGated = !targetCacheHydrated || !baseDesignFingerprint || !bassAuthorityHydrationSettled;
     const basePatch = {
       baseDesignFingerprint,
       completed: targetFamilyProgress.ready,
       total: targetFamilyProgress.total,
       completedDurationsMs: targetFamilyProgress.completedDurationsMs,
-      status: targetCacheHydrated ? "calculating" : "idle",
+      status: hydrationGated ? "idle" : "calculating",
     };
     if (targetFamilyProgress.total > 0 && targetFamilyProgress.ready >= targetFamilyProgress.total) {
       publishP14AnalysisProgress(scopeId, { ...basePatch, status: "complete", activeTargetKey: null, activeStartedAtMs: null });
+      return;
+    }
+    if (hydrationGated) {
+      publishP14AnalysisProgress(scopeId, basePatch);
       return;
     }
     if ((lifecycle.status === "queued" || lifecycle.status === "calculating") && targetKey) {
@@ -643,7 +653,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       return;
     }
     publishP14AnalysisProgress(scopeId, basePatch);
-  }, [scopeId, baseDesignFingerprint, targetKey, targetCacheHydrated, targetFamilyProgress.ready, targetFamilyProgress.total, targetDurationSignature, lifecycle.status]);
+  }, [scopeId, baseDesignFingerprint, targetKey, targetCacheHydrated, bassAuthorityHydrationSettled, targetFamilyProgress.ready, targetFamilyProgress.total, targetDurationSignature, lifecycle.status]);
 
   // ── Live background worker-input readiness ──────────────────────────
   // Reflects the ACTUAL live payload needed by the background worker, NOT the

@@ -54,8 +54,11 @@ export function presentCombinedPhase({
     return "Optimising subwoofer positions…";
   }
 
-  // 3. Background P14 family running
-  if (p14Progress && p14Progress.status !== "complete" && Number(p14Progress.completed) < Number(p14Progress.total)) {
+  // 3. Background P14 family running — only when work is actually in progress.
+  // "idle" status means hydration hasn't settled or the background scheduler
+  // hasn't started yet; showing "Calculating bass targets · 0 of 8" here is a
+  // transient flash before the hydrated family resolves.
+  if (p14Progress && p14Progress.status === "calculating" && Number(p14Progress.completed) < Number(p14Progress.total)) {
     const presented = presentP14AnalysisProgress(p14Progress);
     if (presented && !presented.complete) {
       return `Calculating bass targets · ${presented.label}`;

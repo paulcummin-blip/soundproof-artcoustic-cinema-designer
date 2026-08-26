@@ -142,6 +142,13 @@ export function presentP14AnalysisProgress(progress, nowMs = Date.now()) {
     return { label: "Analysis complete", etaSeconds: null, complete: true };
   }
 
+  // Hydration gate: "idle" status means the persisted cache hasn't been read
+  // yet or no work is in progress. Don't show "Calculating N/8" — it's a
+  // transient flash before the hydrated family resolves.
+  if (progress?.status === "idle") {
+    return { label: "Preparing…", etaSeconds: null, complete: false };
+  }
+
   const active = !!progress?.activeTargetKey;
   const ordinal = Math.min(total, completed + (active ? 1 : 0));
   const baseLabel = `Calculating ${ordinal} of ${total}`;
