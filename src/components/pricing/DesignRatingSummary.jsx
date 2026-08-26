@@ -264,7 +264,6 @@ export default function DesignRatingSummary({
         maxHeight: '48vh',
         overflowY: 'auto',
       }}
-      title="Proprietary Sound Proof design metric. Not part of CEDIA RP22 or RP23."
     >
       <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8, letterSpacing: '0.04em' }}>
         ARTCOUSTIC SYSTEM
