@@ -157,6 +157,136 @@ function generateRP22_D_Fine(bestQ) {
   return candidates;
 }
 
+// ── Front third pair ───────────────────────────────────────────────────
+function generateFRONT_THIRD_PAIR() {
+  const candidates = [];
+  const { coarseStep } = STAGE1_LOCAL_SEARCH;
+  for (let q = 0.23; q <= 0.40 + 1e-9; q += coarseStep) {
+    const sources = [makeSource(q, 0), makeSource(1 - q, 0)];
+    const displacement = Math.abs(q - 0.333);
+    candidates.push(makeCandidate(FAMILY_IDS.FRONT_THIRD_PAIR, sources, 1, "symmetric", displacement));
+  }
+  return candidates;
+}
+
+function generateFRONT_THIRD_PAIR_Fine(bestQ) {
+  const { fineStep, fineRadius } = STAGE1_LOCAL_SEARCH;
+  const candidates = [];
+  for (let q = bestQ - fineRadius; q <= bestQ + fineRadius + 1e-9; q += fineStep) {
+    if (q < 0.05 || q > 0.45) continue;
+    const sources = [makeSource(q, 0), makeSource(1 - q, 0)];
+    const displacement = Math.abs(q - 0.333);
+    candidates.push(makeCandidate(FAMILY_IDS.FRONT_THIRD_PAIR, sources, 1, "symmetric", displacement));
+  }
+  return candidates;
+}
+
+// ── Front corner pair ──────────────────────────────────────────────────
+function generateFRONT_CORNER_PAIR() {
+  const candidates = [];
+  candidates.push(makeCandidate(FAMILY_IDS.FRONT_CORNER_PAIR, [
+    makeSource(0, 0), makeSource(1, 0),
+  ], 1, "symmetric", 0));
+  for (const d of [0.02, 0.05, 0.08]) {
+    candidates.push(makeCandidate(FAMILY_IDS.FRONT_CORNER_PAIR, [
+      makeSource(d, 0), makeSource(1 - d, 0),
+    ], 1, "symmetric", d));
+  }
+  return candidates;
+}
+
+// ── Rear quarter pair ──────────────────────────────────────────────────
+function generateREAR_QUARTER_PAIR() {
+  const candidates = [];
+  const { coarseStep } = STAGE1_LOCAL_SEARCH;
+  for (let q = 0.15; q <= 0.35 + 1e-9; q += coarseStep) {
+    const sources = [makeSource(q, 1), makeSource(1 - q, 1)];
+    const displacement = Math.abs(q - 0.25);
+    candidates.push(makeCandidate(FAMILY_IDS.REAR_QUARTER_PAIR, sources, 1, "symmetric", displacement));
+  }
+  return candidates;
+}
+
+function generateREAR_QUARTER_PAIR_Fine(bestQ) {
+  const { fineStep, fineRadius } = STAGE1_LOCAL_SEARCH;
+  const candidates = [];
+  for (let q = bestQ - fineRadius; q <= bestQ + fineRadius + 1e-9; q += fineStep) {
+    if (q < 0.05 || q > 0.45) continue;
+    const sources = [makeSource(q, 1), makeSource(1 - q, 1)];
+    const displacement = Math.abs(q - 0.25);
+    candidates.push(makeCandidate(FAMILY_IDS.REAR_QUARTER_PAIR, sources, 1, "symmetric", displacement));
+  }
+  return candidates;
+}
+
+// ── Rear third pair ────────────────────────────────────────────────────
+function generateREAR_THIRD_PAIR() {
+  const candidates = [];
+  const { coarseStep } = STAGE1_LOCAL_SEARCH;
+  for (let q = 0.23; q <= 0.40 + 1e-9; q += coarseStep) {
+    const sources = [makeSource(q, 1), makeSource(1 - q, 1)];
+    const displacement = Math.abs(q - 0.333);
+    candidates.push(makeCandidate(FAMILY_IDS.REAR_THIRD_PAIR, sources, 1, "symmetric", displacement));
+  }
+  return candidates;
+}
+
+function generateREAR_THIRD_PAIR_Fine(bestQ) {
+  const { fineStep, fineRadius } = STAGE1_LOCAL_SEARCH;
+  const candidates = [];
+  for (let q = bestQ - fineRadius; q <= bestQ + fineRadius + 1e-9; q += fineStep) {
+    if (q < 0.05 || q > 0.45) continue;
+    const sources = [makeSource(q, 1), makeSource(1 - q, 1)];
+    const displacement = Math.abs(q - 0.333);
+    candidates.push(makeCandidate(FAMILY_IDS.REAR_THIRD_PAIR, sources, 1, "symmetric", displacement));
+  }
+  return candidates;
+}
+
+// ── Rear corner pair ───────────────────────────────────────────────────
+function generateREAR_CORNER_PAIR() {
+  const candidates = [];
+  candidates.push(makeCandidate(FAMILY_IDS.REAR_CORNER_PAIR, [
+    makeSource(0, 1), makeSource(1, 1),
+  ], 1, "symmetric", 0));
+  for (const d of [0.02, 0.05, 0.08]) {
+    candidates.push(makeCandidate(FAMILY_IDS.REAR_CORNER_PAIR, [
+      makeSource(d, 1), makeSource(1 - d, 1),
+    ], 1, "symmetric", d));
+  }
+  return candidates;
+}
+
+// ── Four third pairs ───────────────────────────────────────────────────
+function generateFOUR_THIRD_PAIRS() {
+  const candidates = [];
+  const { coarseStep } = STAGE1_LOCAL_SEARCH;
+  for (let q = 0.23; q <= 0.40 + 1e-9; q += coarseStep) {
+    const sources = [
+      makeSource(q, 0), makeSource(1 - q, 0),
+      makeSource(q, 1), makeSource(1 - q, 1),
+    ];
+    const displacement = Math.abs(q - 0.333);
+    candidates.push(makeCandidate(FAMILY_IDS.FOUR_THIRD_PAIRS, sources, 1, "symmetric", displacement));
+  }
+  return candidates;
+}
+
+function generateFOUR_THIRD_PAIRS_Fine(bestQ) {
+  const { fineStep, fineRadius } = STAGE1_LOCAL_SEARCH;
+  const candidates = [];
+  for (let q = bestQ - fineRadius; q <= bestQ + fineRadius + 1e-9; q += fineStep) {
+    if (q < 0.05 || q > 0.45) continue;
+    const sources = [
+      makeSource(q, 0), makeSource(1 - q, 0),
+      makeSource(q, 1), makeSource(1 - q, 1),
+    ];
+    const displacement = Math.abs(q - 0.333);
+    candidates.push(makeCandidate(FAMILY_IDS.FOUR_THIRD_PAIRS, sources, 1, "symmetric", displacement));
+  }
+  return candidates;
+}
+
 // ── One-sub generation ──────────────────────────────────────────────────
 
 function generateOneSub() {
@@ -194,8 +324,6 @@ function generateOneSub() {
 
 function generateTwoSubFallback() {
   const candidates = [];
-  // Rear quarter pair
-  candidates.push(makeCandidate(FAMILY_IDS.TWO_SYMMETRIC_BOUNDARY_CUSTOM, [makeSource(0.25, 1), makeSource(0.75, 1)], 2, "symmetric", 0));
   // Symmetric front/rear boundary pair (offset from F)
   for (const d of [0.10, 0.20]) {
     candidates.push(makeCandidate(FAMILY_IDS.TWO_SYMMETRIC_BOUNDARY_CUSTOM, [makeSource(0.5 - d, 0), makeSource(0.5 + d, 1)], 2, "symmetric", d));
@@ -207,11 +335,7 @@ function generateTwoSubFallback() {
 
 function generateFourSubFallback() {
   const candidates = [];
-  // Custom symmetric boundary: front/rear midpoints + side midpoints (not B — different topology)
-  candidates.push(makeCandidate(FAMILY_IDS.FOUR_SYMMETRIC_BOUNDARY_CUSTOM, [
-    makeSource(0.25, 0), makeSource(0.75, 0), makeSource(0.25, 1), makeSource(0.75, 1),
-  ], 2, "symmetric", 0));
-  // Mixed: front quarter + rear midpoint pair
+  // Custom symmetric boundary: wider quarter positions (0.20/0.80)
   candidates.push(makeCandidate(FAMILY_IDS.FOUR_SYMMETRIC_BOUNDARY_CUSTOM, [
     makeSource(0.20, 0), makeSource(0.80, 0), makeSource(0.20, 1), makeSource(0.80, 1),
   ], 2, "symmetric", 0.05));
@@ -222,10 +346,16 @@ function generateFourSubFallback() {
 
 const FAMILY_GENERATORS = {
   [FAMILY_IDS.C_FRONT_PAIR]: generateC_FRONT_PAIR,
+  [FAMILY_IDS.FRONT_THIRD_PAIR]: generateFRONT_THIRD_PAIR,
+  [FAMILY_IDS.FRONT_CORNER_PAIR]: generateFRONT_CORNER_PAIR,
+  [FAMILY_IDS.REAR_QUARTER_PAIR]: generateREAR_QUARTER_PAIR,
+  [FAMILY_IDS.REAR_THIRD_PAIR]: generateREAR_THIRD_PAIR,
+  [FAMILY_IDS.REAR_CORNER_PAIR]: generateREAR_CORNER_PAIR,
   [FAMILY_IDS.RP22_F]: generateRP22_F,
   [FAMILY_IDS.RP22_G]: generateRP22_G,
   [FAMILY_IDS.RP22_C]: generateRP22_C,
   [FAMILY_IDS.RP22_E]: generateRP22_E,
+  [FAMILY_IDS.FOUR_THIRD_PAIRS]: generateFOUR_THIRD_PAIRS,
   [FAMILY_IDS.RP22_D]: generateRP22_D,
 };
 
@@ -280,7 +410,11 @@ export function generateStage1Candidates(quantity) {
  */
 export function generateFineCandidates(familyId, bestParam) {
   if (familyId === FAMILY_IDS.C_FRONT_PAIR) return generateC_FRONT_PAIR_Fine(bestParam);
+  if (familyId === FAMILY_IDS.FRONT_THIRD_PAIR) return generateFRONT_THIRD_PAIR_Fine(bestParam);
+  if (familyId === FAMILY_IDS.REAR_QUARTER_PAIR) return generateREAR_QUARTER_PAIR_Fine(bestParam);
+  if (familyId === FAMILY_IDS.REAR_THIRD_PAIR) return generateREAR_THIRD_PAIR_Fine(bestParam);
   if (familyId === FAMILY_IDS.RP22_C) return generateRP22_C_Fine(bestParam);
+  if (familyId === FAMILY_IDS.FOUR_THIRD_PAIRS) return generateFOUR_THIRD_PAIRS_Fine(bestParam);
   if (familyId === FAMILY_IDS.RP22_D) return generateRP22_D_Fine(bestParam);
   return [];
 }

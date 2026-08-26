@@ -147,7 +147,15 @@ export function runStage1SearchForQuantity({ roomDims, rspPosition, seatingPosit
 
   // ── Fine search for parameterised families ──────────────────────────
   const fineResults = [];
-  const parameterisedFamilies = [FAMILY_IDS.C_FRONT_PAIR, FAMILY_IDS.RP22_C, FAMILY_IDS.RP22_D];
+  const parameterisedFamilies = [
+    FAMILY_IDS.C_FRONT_PAIR,
+    FAMILY_IDS.FRONT_THIRD_PAIR,
+    FAMILY_IDS.REAR_QUARTER_PAIR,
+    FAMILY_IDS.REAR_THIRD_PAIR,
+    FAMILY_IDS.RP22_C,
+    FAMILY_IDS.FOUR_THIRD_PAIRS,
+    FAMILY_IDS.RP22_D,
+  ];
   for (const familyId of parameterisedFamilies) {
     if (generationId && generationId.cancelled) return null;
     // Only fine-search if this family is in the enabled set for this quantity
