@@ -21,12 +21,14 @@ function coverageData(results) {
   const secondary = seats.filter((seat) => seat.isPrimary === false);
   const primaryFloor = primary.length ? Math.min(...primary.map((seat) => Number(seat.level) || 0)) : 0;
   const secondaryFloor = secondary.length ? Math.min(...secondary.map((seat) => Number(seat.level) || 0)) : 0;
+  const secondaryHasFail = secondary.some((seat) => (Number(seat.level) || 0) <= 0);
   return {
     hasSeats: seats.length > 0,
     hasPrimary: primary.length > 0,
     hasSecondary: secondary.length > 0,
     primaryLevel: primaryFloor,
     secondaryLevel: secondaryFloor,
+    secondaryHasFail,
   };
 }
 
@@ -41,8 +43,21 @@ function CoverageRow({ label, results }) {
         {data.hasPrimary ? <LevelPill level={data.primaryLevel} /> : <span className="text-[#8A7B6A]">No Primary seats</span>}
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="text-[#625143]">Secondary Seats — no lower than</span>
-        {data.hasSecondary ? <LevelPill level={data.secondaryLevel} /> : <span className="text-[#8A7B6A]">No Secondary seats</span>}
+        {data.hasSecondary ? (
+          data.secondaryHasFail ? (
+            <>
+              <span className="text-[#625143]">Secondary Seats</span>
+              <LevelPill level={0} />
+            </>
+          ) : (
+            <>
+              <span className="text-[#625143]">Secondary Seats — no lower than</span>
+              <LevelPill level={data.secondaryLevel} />
+            </>
+          )
+        ) : (
+          <span className="text-[#8A7B6A]">No Secondary seats</span>
+        )}
       </div>
     </div>
   );
