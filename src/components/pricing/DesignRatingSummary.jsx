@@ -2,34 +2,141 @@
 // ------------------------------------------
 // Compact Artcoustic System Design Rating sidebar card.
 //
-// Stage C: All recommendation content has been moved to the interactive
-// Technical Report / RP22 Compliance Report page. This sidebar is now a
-// concise ASDR status summary only — no recommendations, no counts, no
-// dropdowns.
+// Hierarchy: the four design categories lead (Spatial Resolution, Dynamic
+// Range, Timbre Matching, Screen / Viewing Geometry), followed by a divider
+// and the overall Design Performance Index summary for Primary / Secondary /
+// All seating scopes.
 //
-// Shows three scoped ASDR results (Primary, Secondary, All) from the
-// already-computed rating.scopedRatings, one supporting sentence derived
-// from the Primary scoped contribution profile, and four Primary-scope
-// performance summaries (Spatial Resolution, Dynamic Range, Timbre
-// Matching, Screen / Viewing Geometry).
-//
-// No recommendation generation, ranking, scoring, RP22/RP23 logic, or
-// scoped-rating authority is reimplemented here. The scopedRatings object
-// is consumed as-is from useAppDesignRating.
+// Category results use the MODAL achieved level (most frequently achieved
+// level across the relevant parameters/seats) — never an average. Screen /
+// Viewing Geometry retains RP23 terminology. No ASDR/DPI maths, thresholds,
+// weights, parameter authority, or category membership are changed.
 
 import React from 'react';
+import RP22GradingPill from '@/components/ui/RP22GradingPill';
 import {
   getRoomDesignRatingDesignation,
-  getDesignRatingSupportingSentence,
   getDesignPerformanceIndex,
-  getCategoryAchievedSummaries,
+  getCategoryModalSummaries,
+  formatModalLevels,
+  formatLevelDistribution,
 } from '@/components/report/technical/designRatingPresentation';
+
+const SCREEN_DESCRIPTOR = {
+  L4: 'Exceptional Performance',
+  L3: 'Reference Performance',
+  L2: 'Good Performance',
+  L1: 'Acceptable Performance',
+  FAIL: 'Design Improvement Recommended',
+};
+
+function levelNum(key) {
+  return Number(String(key).replace('L', ''));
+}
+
+// Lowest achieved level from a modal distribution, or null.
+function lowestLevelFromDistribution(distribution) {
+  if (!distribution) return null;
+  for (const key of ['L1', 'L2', 'L3', 'L4']) {
+    if ((distribution[key] || 0) > 0) return key;
+  }
+  return null;
+}
+
+// One category block — Primary + Secondary seat-scoped modal results.
+function CategoryBlock({ label, primary, secondary, isScreen }) {
+  const renderScopeLine = (scope, isPrimary) => {
+    if (!scope?.hasContribs) {
+      return (
+        <div style={{ fontSize: 10, fontWeight: 600, color: '#9B9890' }}>
+          {isPrimary ? 'Primary Seats — not assessed' : 'Not configured'}
+        </div>
+      );
+    }
+
+    if (isScreen) {
+      const lvl = scope.screenLevel;
+      if (!lvl) {
+        return (
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#9B9890' }}>
+            {isPrimary ? 'Primary Seats — not assessed' : 'Not configured'}
+          </div>
+        );
+      }
+      const rp23Text = lvl === 'FAIL'
+        ? 'RP23 FAIL'
+        : `RP23 Level ${levelNum(lvl)} · ${SCREEN_DESCRIPTOR[lvl] ?? ''}`.trim();
+      const failWording = lvl === 'FAIL';
+      const lead = isPrimary
+        ? (failWording ? 'Primary Seats FAIL' : 'Primary Seats achieve')
+        : (failWording ? 'Secondary Seats FAIL' : 'Secondary Seats — no lower than');
+      return (
+        <div style={{ fontSize: 10, lineHeight: 1.45, color: '#3E4349' }}>
+          <span style={{ fontWeight: 600, color: '#625143' }}>{lead}</span>{' '}
+          <span style={{ fontWeight: 600, color: failWording ? '#8B2E2E' : '#213428' }}>{rp23Text}</span>
+        </div>
+      );
+    }
+
+    // Acoustic categories — modal level method.
+    if (scope.hasFail) {
+      const lead = isPrimary ? 'Primary Seats FAIL' : 'Secondary Seats FAIL';
+      return (
+        <div style={{ fontSize: 10, lineHeight: 1.45 }}>
+          <span style={{ fontWeight: 600, color: '#625143' }}>{lead}</span>{' '}
+          <RP22GradingPill level="FAIL" compact />
+        </div>
+      );
+    }
+
+    const modalText = formatModalLevels(scope.modalLevels);
+    const pillLevel = scope.modalLevels && scope.modalLevels.length === 1 ? scope.modalLevels[0] : null;
+    const lead = isPrimary ? 'Primary Seats achieve' : 'Secondary Seats — no lower than';
+    return (
+      <div style={{ fontSize: 10, lineHeight: 1.45, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <span style={{ fontWeight: 600, color: '#625143' }}>{lead}</span>
+        {pillLevel ? (
+          <RP22GradingPill level={pillLevel} compact />
+        ) : (
+          <span style={{ fontWeight: 600, color: '#213428' }}>{modalText || '—'}</span>
+        )}
+      </div>
+    );
+  };
+
+  // Optional "Lowest contributing result" line — only for acoustic categories
+  // when the lowest achieved level is below the modal level.
+  let lowestLine = null;
+  if (!isScreen && primary?.hasContribs && !primary?.hasFail) {
+    const lowest = lowestLevelFromDistribution(primary.distribution);
+    const modalLowest = primary.modalLevels && primary.modalLevels.length > 0
+      ? primary.modalLevels.reduce((min, k) => (levelNum(k) < levelNum(min) ? k : min), primary.modalLevels[0])
+      : null;
+    if (lowest && modalLowest && levelNum(lowest) < levelNum(modalLowest)) {
+      lowestLine = (
+        <div style={{ fontSize: 9, color: '#9B9890', marginTop: 2 }}>
+          Lowest contributing result: {lowest}
+        </div>
+      );
+    }
+  }
+
+  return (
+    <div style={{ paddingTop: 6, borderTop: '1px solid #ECEAE6' }}>
+      <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 3 }}>
+        {label}
+      </div>
+      {renderScopeLine(primary, true)}
+      {secondary?.hasContribs && (
+        <div style={{ marginTop: 2 }}>{renderScopeLine(secondary, false)}</div>
+      )}
+      {lowestLine}
+    </div>
+  );
+}
 
 /**
  * Compact Artcoustic System Design Rating sidebar card.
- * @param {boolean} showAsdr — whether the ASDR card is visible
- * @param {Object|null} rating — full roomRating from useAppDesignRating (includes .scopedRatings)
- * @param {Object|null} recommendations — unused (kept for Layout.jsx compatibility; recommendations moved to Technical Report)
  */
 export default function DesignRatingSummary({
   showAsdr = false,
@@ -41,87 +148,28 @@ export default function DesignRatingSummary({
 }) {
   if (!showAsdr) return null;
 
-  // Minimum 5.1 system not present — ASDR is unavailable. Show the message
-  // instead of calculating or showing a partial / provisional rating. This
-  // takes priority over the P14-unselected and bass-pending states.
-  if (asdrUnavailable) {
-    return (
-      <div
-        style={{
-          padding: '12px 16px',
-          background: '#FFFFFF',
-          border: '1px solid #DCDBD6',
-          borderRadius: '8px',
-          margin: '0 16px 12px 16px',
-        }}
-        title="Minimum system not present"
-      >
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8, letterSpacing: '0.04em' }}>
-          ARTCOUSTIC SYSTEM
-          <br />
-          DESIGN RATING
-        </div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#625143' }}>
-          Add LCR, surrounds and subwoofer to calculate rating
-        </div>
+  const unavailableCard = (message) => (
+    <div
+      style={{
+        padding: '12px 16px',
+        background: '#FFFFFF',
+        border: '1px solid #DCDBD6',
+        borderRadius: '8px',
+        margin: '0 16px 12px 16px',
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8, letterSpacing: '0.04em' }}>
+        ARTCOUSTIC SYSTEM
+        <br />
+        DESIGN RATING
       </div>
-    );
-  }
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#625143' }}>{message}</div>
+    </div>
+  );
 
-  // P14 target not selected — the minimum system is present but no bass
-  // target has been chosen. No calculation is running. Show a neutral
-  // message instead of "Calculating bass analysis…" (which implies a real
-  // foreground optimiser is in progress).
-  if (p14TargetUnselected && !rating) {
-    return (
-      <div
-        style={{
-          padding: '12px 16px',
-          background: '#FFFFFF',
-          border: '1px solid #DCDBD6',
-          borderRadius: '8px',
-          margin: '0 16px 12px 16px',
-        }}
-        title="P14 bass target not selected"
-      >
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8, letterSpacing: '0.04em' }}>
-          ARTCOUSTIC SYSTEM
-          <br />
-          DESIGN RATING
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#625143' }}>
-          Select Bass Target to complete design rating
-        </div>
-      </div>
-    );
-  }
-
-  // While bass analysis is genuinely pending (real foreground work in
-  // progress) and no final rating has been published yet, show a
-  // calculating state instead of a partial numeric score.
-  if (bassPending && !rating) {
-    return (
-      <div
-        style={{
-          padding: '12px 16px',
-          background: '#FFFFFF',
-          border: '1px solid #DCDBD6',
-          borderRadius: '8px',
-          margin: '0 16px 12px 16px',
-        }}
-        title="Bass analysis in progress"
-      >
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8, letterSpacing: '0.04em' }}>
-          ARTCOUSTIC SYSTEM
-          <br />
-          DESIGN RATING
-        </div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#625143' }}>
-          Calculating bass analysis…
-        </div>
-      </div>
-    );
-  }
+  if (asdrUnavailable) return unavailableCard('Add LCR, surrounds and subwoofer to calculate rating');
+  if (p14TargetUnselected && !rating) return unavailableCard('Select Bass Target to complete design rating');
+  if (bassPending && !rating) return unavailableCard('Calculating bass analysis…');
 
   const scopedRatings = rating?.scopedRatings || null;
   const primaryRating = scopedRatings?.primary || null;
@@ -130,20 +178,36 @@ export default function DesignRatingSummary({
 
   const isNotAssessed = !allRating || allRating.status === 'NOT_ASSESSED';
 
-  const primaryDesignation = primaryRating ? getRoomDesignRatingDesignation(primaryRating) : null;
-  const primaryIndex = primaryRating ? getDesignPerformanceIndex(primaryRating) : null;
-  const primarySentence = primaryRating ? getDesignRatingSupportingSentence(primaryRating) : null;
-  const primaryCategories = primaryRating ? getCategoryAchievedSummaries(primaryRating) : [];
+  const primaryCats = primaryRating ? getCategoryModalSummaries(primaryRating) : [];
+  const secondaryCats = secondaryRating ? getCategoryModalSummaries(secondaryRating) : [];
 
   const secondaryIsConfigured =
     secondaryRating &&
     secondaryRating.status !== 'NOT_ASSESSED' &&
     secondaryRating.status !== 'NOT_CONFIGURED';
+
+  const primaryDesignation = primaryRating ? getRoomDesignRatingDesignation(primaryRating) : null;
+  const primaryIndex = primaryRating ? getDesignPerformanceIndex(primaryRating) : null;
   const secondaryDesignation = secondaryIsConfigured ? getRoomDesignRatingDesignation(secondaryRating) : null;
   const secondaryIndex = secondaryIsConfigured ? getDesignPerformanceIndex(secondaryRating) : null;
-
   const allDesignation = allRating ? getRoomDesignRatingDesignation(allRating) : null;
   const allIndex = allRating ? getDesignPerformanceIndex(allRating) : null;
+
+  const CATEGORY_LABELS = ['Spatial Resolution', 'Dynamic Range', 'Timbre Matching', 'Screen / Viewing Geometry'];
+
+  const renderScopeSummary = (label, designation, index, emphasize) => (
+    <div style={{ marginTop: emphasize ? 0 : 6, paddingTop: emphasize ? 0 : 6, borderTop: emphasize ? 'none' : '1px solid #ECEAE6' }}>
+      <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        {label}
+      </div>
+      <div style={{ fontSize: emphasize ? 14 : 12, fontWeight: 700, color: '#213428', lineHeight: 1.2, marginTop: 2 }}>
+        {designation || '—'}
+      </div>
+      <div style={{ marginTop: 2, fontSize: 10, fontWeight: 600, color: '#625143', letterSpacing: '0.03em' }}>
+        Design Performance Index {index ?? '—'}
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -165,84 +229,40 @@ export default function DesignRatingSummary({
       </div>
 
       {isNotAssessed ? (
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#9B9890' }}>
-          NOT ASSESSED
-        </div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#9B9890' }}>NOT ASSESSED</div>
       ) : (
         <div>
-          {/* ── Primary Seating — strongest visual emphasis ── */}
-          <div>
-            <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Primary Seating
-            </div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#213428', lineHeight: 1.2, marginTop: 2 }}>
-              {primaryDesignation || '—'}
-            </div>
-            {primarySentence && (
-              <div style={{ marginTop: 4, fontSize: 10, lineHeight: 1.4, color: '#3E4349' }}>
-                {primarySentence}
+          {/* ── Four design categories — lead story ── */}
+          {CATEGORY_LABELS.map((label) => {
+            const idx = primaryCats.findIndex((c) => c.label === label);
+            if (idx < 0) return null;
+            return (
+              <CategoryBlock
+                key={label}
+                label={label}
+                primary={primaryCats[idx]}
+                secondary={secondaryCats[idx]}
+                isScreen={primaryCats[idx]?.isScreen}
+              />
+            );
+          })}
+
+          {/* ── Divider ── */}
+          <div style={{ marginTop: 10, paddingTop: 8, borderTop: '2px solid #DCDBD6' }} />
+
+          {/* ── Overall Design Performance Index summary ── */}
+          {renderScopeSummary('Primary Seating', primaryDesignation, primaryIndex, true)}
+          {secondaryIsConfigured
+            ? renderScopeSummary('Secondary Seating', secondaryDesignation, secondaryIndex, false)
+            : (
+              <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #ECEAE6' }}>
+                <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  Secondary Seating
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#9B9890', marginTop: 2 }}>Not configured</div>
               </div>
             )}
-            <div style={{ marginTop: 4, fontSize: 10, fontWeight: 600, color: '#625143', letterSpacing: '0.03em' }}>
-              Design Performance Index {primaryIndex ?? '—'}
-            </div>
-          </div>
-
-          {/* ── Secondary Seating — compact ── */}
-          <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #ECEAE6' }}>
-            <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Secondary Seating
-            </div>
-            {secondaryIsConfigured ? (
-              <>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#213428', lineHeight: 1.2, marginTop: 2 }}>
-                  {secondaryDesignation || '—'}
-                </div>
-                <div style={{ marginTop: 2, fontSize: 10, fontWeight: 600, color: '#625143', letterSpacing: '0.03em' }}>
-                  Design Performance Index {secondaryIndex ?? '—'}
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#9B9890', marginTop: 2 }}>
-                Not configured
-              </div>
-            )}
-          </div>
-
-          {/* ── All Seating — compact ── */}
-          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #ECEAE6' }}>
-            <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              All Seating
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#213428', lineHeight: 1.2, marginTop: 2 }}>
-              {allDesignation || '—'}
-            </div>
-            <div style={{ marginTop: 2, fontSize: 10, fontWeight: 600, color: '#625143', letterSpacing: '0.03em' }}>
-              Design Performance Index {allIndex ?? '—'}
-            </div>
-          </div>
-
-          {/* ── Four performance summaries from Primary scope ── */}
-          {primaryCategories.length > 0 && (
-            <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
-              {primaryCategories.map((cat) => (
-                <div key={cat.label} style={{ borderTop: '1px solid #ECEAE6', paddingTop: 4 }}>
-                  <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                    {cat.label}
-                  </div>
-                  {cat.lines.length > 0 ? (
-                    cat.lines.map((line, i) => (
-                      <div key={i} style={{ fontSize: 10, fontWeight: 600, color: '#213428' }}>
-                        {line}
-                      </div>
-                    ))
-                  ) : (
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#9B9890' }}>—</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          {renderScopeSummary('All Seating', allDesignation, allIndex, false)}
         </div>
       )}
     </div>
