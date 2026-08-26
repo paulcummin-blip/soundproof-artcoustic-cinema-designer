@@ -198,6 +198,8 @@ class Stage2PlacementController {
     this.quantityOrder = [];
     this.startTime = 0;
     this.canonicalJobsRun = 0;
+    this.completedJobs = 0;
+    this.totalJobsPlanned = 0;
     // B last-resort state
     this.bState = "not_checked"; // not_checked | evaluating_representatives | queued | evaluated | not_eligible
     this.bEligibilityReason = null;
@@ -225,6 +227,8 @@ class Stage2PlacementController {
     this.quantityFinal = {};
     this.quantityFinalists = {};
     this.canonicalJobsRun = 0;
+    this.completedJobs = 0;
+    this.totalJobsPlanned = 0;
     this.startTime = now();
     this.quantityOrder = quantityOrder;
     // Reset B last-resort state
@@ -251,7 +255,12 @@ class Stage2PlacementController {
       }
     }
 
-    markStage2Updating(projectId, fingerprint);
+    this.totalJobsPlanned = this.queue.length;
+    markStage2Updating(projectId, fingerprint, {
+      phase: "preparing",
+      completedJobs: 0,
+      totalJobsPlanned: this.totalJobsPlanned,
+    });
 
     // If no finalists at all, check B eligibility then complete
     if (this.queue.length === 0 && this.quantityOrder.every((qty) => this.quantityFinal[qty])) {
@@ -285,6 +294,7 @@ class Stage2PlacementController {
       finalist: job.finalist,
       ...workerParams,
     });
+    this.publishProgress();
   }
 
   dispatchNext() {
@@ -311,12 +321,13 @@ class Stage2PlacementController {
     this.activeJobs.delete(workerIndex);
     const qty = active.quantity;
     const wasBJob = active.isB === true;
+    this.completedJobs++;
+    this.canonicalJobsRun++;
 
     if (message.type === "complete") {
       // Count every completed job (including null results) so the third-finalist
       // check fires even when a finalist evaluation returns null.
       this.quantityEvaluated[qty] = (this.quantityEvaluated[qty] || 0) + 1;
-      this.canonicalJobsRun++;
       if (message.result) {
         if (!this.completedResults[qty]) this.completedResults[qty] = [];
         const result = message.result;
@@ -357,6 +368,7 @@ class Stage2PlacementController {
       const remaining = (this.quantityFinalists[qty] || []).slice(STAGE2_FINALISTS_NORMAL);
       if (shouldEvaluateThirdFinalist(evaluated, remaining) && remaining.length > 0) {
         this.queue.push({ finalist: remaining[0], quantity: qty });
+        this.totalJobsPlanned++;
       } else {
         this.quantityFinal[qty] = true;
       }
@@ -373,6 +385,10 @@ class Stage2PlacementController {
   handleError(workerIndex, errorMessage) {
     const active = this.activeJobs.get(workerIndex);
     this.activeJobs.delete(workerIndex);
+    if (active) {
+      this.completedJobs++;
+      this.canonicalJobsRun++;
+    }
     // Track failed practical family (all attempts failed → optimiser incomplete)
     const failedFamilyId = active?.finalist?.familyId;
     if (failedFamilyId && !isBFamily(failedFamilyId) && !isProhibitedFamily(failedFamilyId)) {
@@ -391,6 +407,12 @@ class Stage2PlacementController {
 
   publishProgress() {
     const results = this.buildResultsSnapshot();
+    const activeQuantities = [...this.activeJobs.values()].map((job) => job.quantity).filter(Number.isFinite);
+    const nextQuantity = activeQuantities[0] ?? this.queue[0]?.quantity ?? null;
+    results.canonical_jobs_run = this.canonicalJobsRun;
+    results.completed_jobs = this.completedJobs;
+    results.total_jobs_planned = this.totalJobsPlanned;
+    results.phase = Number.isFinite(nextQuantity) ? `evaluating_${nextQuantity}_sub` : "preparing";
     publishStage2Progress(this.projectId, this.currentFingerprint, results);
   }
 
@@ -434,6 +456,7 @@ class Stage2PlacementController {
         this.bState = "evaluating_representatives";
         for (const rep of eligibility.missingRepresentatives) {
           this.queue.push({ finalist: rep.finalist, quantity: 4, isRepresentative: true });
+          this.totalJobsPlanned++;
         }
         this.dispatchNext();
         return; // defer completion until representatives are evaluated
@@ -444,6 +467,7 @@ class Stage2PlacementController {
         this.bState = "queued";
         const bFinalist = generateBFinalist();
         this.queue.push({ finalist: bFinalist, quantity: 4, isB: true });
+        this.totalJobsPlanned++;
         this.dispatchNext();
         return; // defer completion until B is evaluated
       }
@@ -464,6 +488,9 @@ class Stage2PlacementController {
 
     const results = this.buildResultsSnapshot();
     results.canonical_jobs_run = this.canonicalJobsRun;
+    results.completed_jobs = this.completedJobs;
+    results.total_jobs_planned = this.totalJobsPlanned;
+    results.phase = "ready";
     results.total_runtime_ms = Math.max(0, now() - this.startTime);
     results.b_eligible = this.bState === "queued" || this.bState === "evaluated";
     results.b_evaluated = this.bState === "evaluated" && this.bResult != null;
