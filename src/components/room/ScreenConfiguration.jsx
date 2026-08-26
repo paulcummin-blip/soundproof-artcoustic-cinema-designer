@@ -541,15 +541,14 @@ export default function ScreenConfiguration(props) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className={fieldLabelStyle}>Diagonal (inches)</Label>
-                    <Input
-                      type="number"
-                      step="1"
-                      min="20"
-                      max="500"
-                      value={inputBuffer['manual.diagonalInches'] ?? manualSize.diagonalInches}
-                      onChange={(e) => handleDebouncedInput('manual.diagonalInches', Number(e.target.value))}
+                    <ManualSizeInput
+                      value={manualSize.diagonalInches}
+                      onCommit={(v) => handleUpdate({ manualSize: { ...manualSize, diagonalInches: v ?? 0 } })}
                       disabled={disabled}
-                      style={compactInputStyle}
+                      step="1"
+                      min={20}
+                      max={500}
+                      placeholder="0"
                     />
                   </div>
                   <div>
@@ -576,25 +575,21 @@ export default function ScreenConfiguration(props) {
                   </div>
                   {manualSize.aspect === "Custom" && (
                     <div className="col-span-2 grid grid-cols-2 gap-2">
-                      <Input
-                        type="number"
-                        min="1"
+                      <ManualSizeInput
+                        value={manualSize.customAspectW}
+                        onCommit={(v) => handleUpdate({ manualSize: { ...manualSize, customAspectW: v ?? 16 } })}
+                        disabled={disabled}
                         step="0.1"
+                        min={1}
                         placeholder="W"
-                        value={inputBuffer['manual.customAspectW'] ?? manualSize.customAspectW}
-                        onChange={(e) => handleDebouncedInput('manual.customAspectW', Number(e.target.value))}
-                        disabled={disabled}
-                        style={compactInputStyle}
                       />
-                      <Input
-                        type="number"
-                        min="1"
-                        step="0.1"
-                        placeholder="H"
-                        value={inputBuffer['manual.customAspectH'] ?? manualSize.customAspectH}
-                        onChange={(e) => handleDebouncedInput('manual.customAspectH', Number(e.target.value))}
+                      <ManualSizeInput
+                        value={manualSize.customAspectH}
+                        onCommit={(v) => handleUpdate({ manualSize: { ...manualSize, customAspectH: v ?? 9 } })}
                         disabled={disabled}
-                        style={compactInputStyle}
+                        step="0.1"
+                        min={1}
+                        placeholder="H"
                       />
                     </div>
                   )}
@@ -603,28 +598,26 @@ export default function ScreenConfiguration(props) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className={fieldLabelStyle}>Width (m)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0.5"
-                      max="20"
-                      value={inputBuffer['manual.widthM'] ?? manualSize.widthM}
-                      onChange={(e) => handleDebouncedInput('manual.widthM', Number(e.target.value))}
+                    <ManualSizeInput
+                      value={manualSize.widthM}
+                      onCommit={(v) => handleUpdate({ manualSize: { ...manualSize, widthM: v ?? 0 } })}
                       disabled={disabled}
-                      style={compactInputStyle}
+                      step="0.01"
+                      min={0.5}
+                      max={20}
+                      placeholder="0"
                     />
                   </div>
                   <div>
                     <Label className={fieldLabelStyle}>Height (m)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0.3"
-                      max="15"
-                      value={inputBuffer['manual.heightM'] ?? manualSize.heightM}
-                      onChange={(e) => handleDebouncedInput('manual.heightM', Number(e.target.value))}
+                    <ManualSizeInput
+                      value={manualSize.heightM}
+                      onCommit={(v) => handleUpdate({ manualSize: { ...manualSize, heightM: v ?? 0 } })}
                       disabled={disabled}
-                      style={compactInputStyle}
+                      step="0.01"
+                      min={0.3}
+                      max={15}
+                      placeholder="0"
                     />
                   </div>
                 </div>
