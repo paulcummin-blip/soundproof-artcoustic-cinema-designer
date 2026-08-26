@@ -13,6 +13,7 @@ import RoomVisualisation from "./RoomVisualisation";
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import ManualSizeInput from "./ManualSizeInput";
 
 export default function ScreenConfiguration(props) {
   const {
