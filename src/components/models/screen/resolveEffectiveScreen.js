@@ -46,7 +46,7 @@ export function computeManualDimensions(manualSize) {
   // Express the actual entered ratio as a "W:H" string so downstream
   // consumers that derive height from width / ratio get the correct value.
   const ratio = widthM / heightM;
-  const aspectRatio = `${ratio.toFixed(4)}:1`;
+  const aspectRatio = `${ratio.toFixed(2)}:1`;
 
   return { widthM, heightM, widthInches, aspectRatio };
 }
