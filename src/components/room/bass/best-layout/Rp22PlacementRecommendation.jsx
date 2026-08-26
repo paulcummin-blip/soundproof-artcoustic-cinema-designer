@@ -1,10 +1,28 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import Rp22RecommendationCard from "@/components/room/bass/best-layout/Rp22RecommendationCard";
 import Rp22LayoutPlanDialog from "@/components/room/bass/best-layout/Rp22LayoutPlanDialog";
 import { coordinatesMatch, validateRecommendationLayout, buildAppliedInstances, hasUnsupportedPlacement } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 
-const levelText = (level) => Number.isFinite(level) ? (level > 0 ? `L${level}` : "FAIL") : "—";
+function LevelPill({ level }) {
+  const n = Number(level);
+  const pillLevel = Number.isFinite(n) && n > 0 ? n : "FAIL";
+  return <RP22GradingPill level={pillLevel} compact />;
+}
+
+function coverageData(results) {
+  const seats = Array.isArray(results) ? results : [];
+  const primary = seats.filter((seat) => seat.isPrimary !== false);
+  const primaryFloor = primary.length ? Math.min(...primary.map((seat) => Number(seat.level) || 0)) : 0;
+  const allFloor = seats.length ? Math.min(...seats.map((seat) => Number(seat.level) || 0)) : 0;
+  return {
+    hasSeats: seats.length > 0,
+    hasPrimary: primary.length > 0,
+    primaryLevel: primaryFloor,
+    floorLevel: allFloor,
+  };
+}
 
 /**
  * Trace subwoofer objects before/after Apply to prove tuning preservation.
@@ -111,6 +129,12 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
   const renderOption = (title, applyLabel, layout) => {
     if (!layout && recommendationStatus !== "ready") return <UpdatingOption title={title} phase={recommendationPhase} />;
     if (!layout) return <Unavailable title={title} message="No recognised canonical layout of this quantity is available for the current room." />;
+    // Gate on confirmed canonical seat authority — a layout must not be
+    // presented as "BEST" without completed P19/P20 seat-scoped authority.
+    if (!layout.metrics?.hasConfirmedSeatAuthority) {
+      if (recommendationStatus !== "ready") return <UpdatingOption title={title} phase="Calculating canonical seat authority…" />;
+      return <Unavailable title={title} message="No confirmed result available — canonical seat authority has not completed." />;
+    }
     return (
       <Rp22RecommendationCard
         title={title}
@@ -150,14 +174,21 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
   );
 }
 
-function coverageText(results) {
-  const seats = Array.isArray(results) ? results : [];
-  const primary = seats.filter((seat) => seat.isPrimary !== false);
-  const primaryFloor = primary.length ? Math.min(...primary.map((seat) => Number(seat.level) || 0)) : 0;
-  const allFloor = seats.length ? Math.min(...seats.map((seat) => Number(seat.level) || 0)) : 0;
-  return seats.length
-    ? `Primary Seats ${levelText(primaryFloor)} · No seat lower than ${levelText(allFloor)}`
-    : "No seat authority";
+function CurrentCoverageRow({ results }) {
+  const data = coverageData(results);
+  if (!data.hasSeats) return <span className="text-[11px] text-[#8A7B6A]">No seat authority</span>;
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[#625143]">Primary Seats</span>
+        {data.hasPrimary ? <LevelPill level={data.primaryLevel} /> : <span className="text-[#8A7B6A]">No Primary seats</span>}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[#625143]">No seat lower than</span>
+        <LevelPill level={data.floorLevel} />
+      </div>
+    </div>
+  );
 }
 
 function CurrentLayout({ layout }) {
@@ -167,9 +198,15 @@ function CurrentLayout({ layout }) {
       <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Current subwoofer layout</div>
       <div className="mt-1 text-sm font-semibold text-[#1B1A1A]">Current positions</div>
       <div className="text-[11px] text-[#625143]">{metrics.sourceCount} {metrics.sourceCount === 1 ? "subwoofer" : "subwoofers"} · canonical authority</div>
-      <div className="mt-3 grid gap-1.5 text-[11px] text-[#1B1A1A]">
-        <div><b>P19</b> · {coverageText(metrics.perSeatP19)}</div>
-        <div><b>P20</b> · {coverageText(metrics.perSeatP20)}</div>
+      <div className="mt-3 grid gap-2">
+        <div>
+          <div className="text-[10px] font-medium text-[#625143]">P19 · Canonical seat coverage</div>
+          <div className="mt-0.5"><CurrentCoverageRow results={metrics.perSeatP19} /></div>
+        </div>
+        <div>
+          <div className="text-[10px] font-medium text-[#625143]">P20 · Canonical seat coverage</div>
+          <div className="mt-0.5"><CurrentCoverageRow results={metrics.perSeatP20} /></div>
+        </div>
       </div>
     </div>
   );

@@ -121,11 +121,14 @@ function canonicalMetrics({
   canonicalResult,
   reusedFromCurrent = false,
 }) {
+  const normalisedP19 = normaliseSeatResults(perSeatP19, seatingPositions);
+  const normalisedP20 = normaliseSeatResults(perSeatP20, seatingPositions);
   return {
     sourceCount,
     responseAuthority: "final-post-eq",
-    perSeatP19: normaliseSeatResults(perSeatP19, seatingPositions),
-    perSeatP20: normaliseSeatResults(perSeatP20, seatingPositions),
+    perSeatP19: normalisedP19,
+    perSeatP20: normalisedP20,
+    hasConfirmedSeatAuthority: normalisedP19.length > 0 && normalisedP20.length > 0,
     p14TargetDb: canonicalResult?.p14TargetDb ?? null,
     p14AchievedDb: canonicalResult?.p14AchievedDb ?? null,
     p14HeadroomDb: canonicalResult?.p14HeadroomDb ?? null,

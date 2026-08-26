@@ -1,6 +1,7 @@
 import React from "react";
 import { Check, Loader2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import RP22GradingPill from "@/components/ui/RP22GradingPill";
 
 function expectedBenefit(sourceCount) {
   if (sourceCount === 1) return "Best available single-sub layout, with canonical seat coverage shown below.";
@@ -8,16 +9,41 @@ function expectedBenefit(sourceCount) {
   return "Typically gives the strongest seat-to-seat consistency and the most robust RP22 bass result.";
 }
 
-const levelText = (level) => Number.isFinite(Number(level)) && Number(level) > 0 ? `L${Number(level)}` : "FAIL";
+function LevelPill({ level }) {
+  const n = Number(level);
+  const pillLevel = Number.isFinite(n) && n > 0 ? n : "FAIL";
+  return <RP22GradingPill level={pillLevel} compact />;
+}
 
-function coverageText(results) {
+function coverageData(results) {
   const seats = Array.isArray(results) ? results : [];
   const primary = seats.filter((seat) => seat.isPrimary !== false);
   const primaryFloor = primary.length ? Math.min(...primary.map((seat) => Number(seat.level) || 0)) : 0;
   const allFloor = seats.length ? Math.min(...seats.map((seat) => Number(seat.level) || 0)) : 0;
-  const primaryText = primary.length ? `Primary Seats ${levelText(primaryFloor)}` : "No Primary seats";
-  const floorText = seats.length ? `No seat lower than ${levelText(allFloor)}` : "No seat authority";
-  return `${primaryText} · ${floorText}`;
+  return {
+    hasSeats: seats.length > 0,
+    hasPrimary: primary.length > 0,
+    primaryLevel: primaryFloor,
+    floorLevel: allFloor,
+  };
+}
+
+function CoverageRow({ label, results }) {
+  const data = coverageData(results);
+  if (!data.hasSeats) return <span className="text-[11px] text-[#8A7B6A]">No seat authority</span>;
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+      <span className="font-medium text-[#1B1A1A]">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[#625143]">Primary Seats</span>
+        {data.hasPrimary ? <LevelPill level={data.primaryLevel} /> : <span className="text-[#8A7B6A]">No Primary seats</span>}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[#625143]">No seat lower than</span>
+        <LevelPill level={data.floorLevel} />
+      </div>
+    </div>
+  );
 }
 
 function SeatCoverage({ metrics }) {
@@ -27,14 +53,14 @@ function SeatCoverage({ metrics }) {
   const rows = p19.map((seat) => ({ seat, p20: p20ById.get(String(seat.seatId)) }));
   return (
     <>
-      <div className="mt-3 grid gap-2 text-[11px]">
-        <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-2 py-1.5">
+      <div className="mt-3 grid gap-2">
+        <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-2.5 py-2">
           <div className="text-[10px] font-medium text-[#625143]">P19 · Canonical seat coverage</div>
-          <div className="font-semibold text-[#1B1A1A]">{coverageText(p19)}</div>
+          <div className="mt-1"><CoverageRow label="" results={p19} /></div>
         </div>
-        <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-2 py-1.5">
+        <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-2.5 py-2">
           <div className="text-[10px] font-medium text-[#625143]">P20 · Canonical seat coverage</div>
-          <div className="font-semibold text-[#1B1A1A]">{coverageText(p20)}</div>
+          <div className="mt-1"><CoverageRow label="" results={p20} /></div>
         </div>
       </div>
       {rows.length > 0 && (
@@ -42,10 +68,14 @@ function SeatCoverage({ metrics }) {
           <summary className="cursor-pointer text-[10px] font-medium text-[#625143]">View individual seat authority</summary>
           <div className="mt-2 space-y-1.5">
             {rows.map(({ seat, p20: seatP20 }) => (
-              <div key={seat.seatId} className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 text-[10px] text-[#625143]">
-                <span className="truncate font-medium text-[#1B1A1A]">{seat.seatLabel}</span>
-                <span>P19 {levelText(seat.level)} · {seat.wholeDbDeviation ?? "—"} dB</span>
-                <span>P20 {levelText(seatP20?.level)} · {seatP20?.wholeDbDeviation ?? "—"} dB</span>
+              <div key={seat.seatId} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[#625143]">
+                <span className="min-w-[5rem] truncate font-medium text-[#1B1A1A]">{seat.seatLabel}</span>
+                <span className="flex items-center gap-1">
+                  P19 <LevelPill level={seat.level} /> {seat.wholeDbDeviation ?? "—"} dB
+                </span>
+                <span className="flex items-center gap-1">
+                  P20 <LevelPill level={seatP20?.level} /> {seatP20?.wholeDbDeviation ?? "—"} dB
+                </span>
               </div>
             ))}
           </div>
@@ -56,7 +86,7 @@ function SeatCoverage({ metrics }) {
 }
 
 export default function Rp22RecommendationCard({ title, layout, onClick, onApply, isApplied, isRecalculating, applying, applyError, unsupported, applyLabel = "Apply layout" }) {
-  if (!layout?.metrics || layout.metrics.responseAuthority !== "final-post-eq") return null;
+  if (!layout?.metrics || layout.metrics.responseAuthority !== "final-post-eq" || !layout.metrics.hasConfirmedSeatAuthority) return null;
   const m = layout.metrics;
   return (
     <div className={`w-full rounded-lg border p-4 text-left transition ${isApplied ? "border-2 border-[#213428] bg-[#F3F1EC]" : "border border-[#D9D5CE] bg-white"} hover:border-[#213428] hover:shadow-sm`}>
