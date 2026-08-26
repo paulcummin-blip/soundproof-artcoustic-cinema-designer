@@ -245,6 +245,8 @@ class Stage2PlacementController {
     this.quantityFinalists = {};
     this.placementResults = {};
     this.bestPerQuantity = {};
+    this.confirmationQueued = {}; // track per-qty: confirmation already queued?
+    this.quantityPlacementProcessed = {}; // qty -> count of processed (cached + completed + failed)
     this.canonicalJobsRun = 0;
     this.completedJobs = 0;
     this.totalJobsPlanned = 0;
@@ -263,68 +265,53 @@ class Stage2PlacementController {
     this.allStage1FourSubFinalists = (allStage1Finalists && allStage1Finalists[4]) || [];
     this.stage1Complete = !!stage1Complete;
 
-    // Build the promotion plan per quantity
+    // Build the promotion plan per quantity. Iterate quantityOrder so the
+    // selected quantity's placement jobs are queued first — its confirmation
+    // starts as soon as its placement completes, before other quantities.
+    this.controllerPhase = "placement";
+    this.queue = [];
     for (const qty of quantityOrder) {
       const finalists = promotionPlan[qty] || [];
       this.quantityFinalists[qty] = finalists;
       this.quantityEvaluated[qty] = 0;
       this.quantityFinal[qty] = finalists.length === 0;
+      this.confirmationQueued[qty] = false;
       this.placementResults[qty] = [];
-    }
+      this.quantityPlacementProcessed[qty] = 0;
 
-    // Check if raw transfers are already cached for this placement fingerprint.
-    // If so, skip the placement phase and go straight to confirmation.
-    const allCached = placementFingerprint && quantityOrder.every((qty) => {
-      const finalists = promotionPlan[qty] || [];
-      return finalists.length === 0 || finalists.every((f) => hasCachedRawTransfer(placementFingerprint, f.id));
-    });
-
-    if (allCached) {
-      // Placement cache hit — skip to confirmation
-      this.controllerPhase = "confirmation";
-      for (const qty of quantityOrder) {
-        const finalists = promotionPlan[qty] || [];
-        for (const f of finalists) {
-          const rawTransfer = getCachedRawTransfer(placementFingerprint, f.id);
-          if (rawTransfer) {
-            const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
-            const placementRanking = buildPlacementRankingTuple(rawTransfer, seatPriorityMap);
-            this.placementResults[qty].push({ finalistId: f.id, rawTransfer, placementRanking });
-          }
-        }
-      }
-      this.startConfirmation();
-      return;
-    }
-
-    // Placement phase: queue all finalists for raw transfer evaluation
-    this.controllerPhase = "placement";
-    this.queue = [];
-    for (const qty of quantityOrder) {
-      const finalists = promotionPlan[qty] || [];
       for (const f of finalists) {
-        // Skip if already cached
         if (placementFingerprint && hasCachedRawTransfer(placementFingerprint, f.id)) {
           const rawTransfer = getCachedRawTransfer(placementFingerprint, f.id);
           const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
           const placementRanking = buildPlacementRankingTuple(rawTransfer, seatPriorityMap);
           this.placementResults[qty].push({ finalistId: f.id, rawTransfer, placementRanking });
-          continue;
+          this.quantityPlacementProcessed[qty]++;
+        } else {
+          this.queue.push({ finalist: f, quantity: qty, phase: "placement" });
         }
-        this.queue.push({ finalist: f, quantity: qty, phase: "placement" });
       }
     }
 
     this.totalJobsPlanned = this.queue.length;
+
+    // Start confirmation for any quantity whose placement is already complete
+    // (all finalists were cached). The selected quantity (quantityOrder[0])
+    // is processed first so its authoritative result is published ASAP.
+    for (const qty of quantityOrder) {
+      if (this.isQuantityPlacementComplete(qty) && !this.confirmationQueued[qty]) {
+        this.startConfirmationForQuantity(qty);
+      }
+    }
+
     markStage2Updating(projectId, fingerprint, {
-      phase: "placement",
+      phase: this.queue.length > 0 ? "placement" : "confirmation",
       completedJobs: 0,
       totalJobsPlanned: this.totalJobsPlanned,
     });
 
-    // If no placement jobs needed (all cached), start confirmation
-    if (this.queue.length === 0) {
-      this.startConfirmation();
+    if (this.queue.length === 0 && this.activeJobs.size === 0) {
+      // All placement was cached and confirmations are queued — dispatch now.
+      this.dispatchNext();
       return;
     }
 
@@ -333,6 +320,80 @@ class Stage2PlacementController {
       if (this.currentFingerprint !== fingerprint) return; // stale
       this.dispatchNext();
     }, waitMs);
+  }
+
+  /**
+   * Check whether all placement jobs for a quantity are complete (all
+   * finalists have raw transfers in placementResults).
+   */
+  isQuantityPlacementComplete(qty) {
+    const finalists = this.quantityFinalists[qty] || [];
+    if (finalists.length === 0) return true;
+    // Complete when all finalists have been processed (cached, successfully
+    // placed, or failed). Failed placements still count as processed — the
+    // quantity's confirmation can proceed with whatever placements succeeded.
+    return (this.quantityPlacementProcessed[qty] || 0) >= finalists.length;
+  }
+
+  /**
+   * Start confirmation for a SINGLE quantity after its placement completes.
+   * Ranks the quantity's placements P14-independently, selects the best, and
+   * queues a confirmation job. Confirmation jobs are inserted at the FRONT of
+   * the queue so they are dispatched before remaining placement jobs for other
+   * quantities — the selected quantity's authoritative result is published
+   * without waiting for non-selected placement to finish.
+   */
+  startConfirmationForQuantity(qty) {
+    if (this.confirmationQueued[qty]) return;
+    this.confirmationQueued[qty] = true;
+
+    const placements = this.placementResults[qty] || [];
+    this.quantityEvaluated[qty] = 0;
+    if (placements.length === 0) {
+      this.quantityFinal[qty] = true;
+      return;
+    }
+
+    // Rank P14-independently and select best
+    const ranked = [...placements].sort(comparePlacementResults);
+    const best = ranked[0];
+    this.bestPerQuantity[qty] = best;
+
+    const W = Number(this.params.roomDims?.widthM);
+    const L = Number(this.params.roomDims?.lengthM);
+
+    // Insert confirmation jobs at the FRONT of the queue so they are
+    // dispatched before remaining placement jobs for other quantities.
+    const confirmationJobs = [];
+    confirmationJobs.push({
+      finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+      quantity: qty,
+      phase: "confirmation",
+      rawTransfer: best.rawTransfer,
+    });
+    this.confirmationJobsPlanned++;
+    this.totalJobsPlanned++;
+
+    // If there's a tie, queue an alternate confirmation
+    if (ranked.length > 1 && isPlacementTied(best, ranked[1])) {
+      const alternate = ranked[1];
+      confirmationJobs.push({
+        finalist: { id: alternate.finalistId, familyId: alternate.rawTransfer.familyId, sources: alternate.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+        quantity: qty,
+        phase: "confirmation",
+        rawTransfer: alternate.rawTransfer,
+      });
+      this.confirmationJobsPlanned++;
+      this.totalJobsPlanned++;
+    }
+
+    // unshift inserts at front — confirmation jobs are dispatched before
+    // remaining placement jobs for non-selected quantities.
+    this.queue.unshift(...confirmationJobs);
+
+    if (this.controllerPhase === "placement") {
+      this.controllerPhase = "confirmation";
+    }
   }
 
   startWorker(workerIndex) {
@@ -410,12 +471,24 @@ class Stage2PlacementController {
           this.failedFamilyIds.add(failedFamilyId);
         }
       }
+      // Track placement processing for per-quantity completion
+      this.quantityPlacementProcessed[qty] = (this.quantityPlacementProcessed[qty] || 0) + 1;
+
+      // If this quantity's placement is now complete, start its confirmation
+      // immediately — do NOT wait for other quantities' placement to finish.
+      // Confirmation jobs are inserted at the front of the queue so they
+      // are dispatched before remaining placement jobs for other quantities.
+      if (this.isQuantityPlacementComplete(qty) && !this.confirmationQueued[qty]) {
+        this.startConfirmationForQuantity(qty);
+      }
+
       this.publishProgress();
-      // After all placement jobs complete, start confirmation
+      // Dispatch next (may be a confirmation job for this quantity or a
+      // placement job for another quantity).
       if (this.queue.length > 0) {
         this.dispatchNext();
       } else if (this.activeJobs.size === 0) {
-        this.startConfirmation();
+        this.maybeCheckBAndComplete();
       }
       return;
     }
@@ -467,69 +540,12 @@ class Stage2PlacementController {
     }
   }
 
-  /**
-   * Start the confirmation phase after all placement jobs complete.
-   * Ranks finalists P14-independently, selects best per quantity, and
-   * queues confirmation jobs for the selected P14 target.
-   */
-  startConfirmation() {
-    this.controllerPhase = "confirmation";
-    this.queue = [];
-    this.completedResults = {};
-    this.quantityEvaluated = {};
-    this.quantityFinal = {};
-
-    const seatPriorityMap = this.params?.seatPriorityMap;
-
-    for (const qty of this.quantityOrder) {
-      const placements = this.placementResults[qty] || [];
-      this.quantityEvaluated[qty] = 0;
-      this.quantityFinal[qty] = placements.length === 0;
-
-      if (placements.length === 0) continue;
-
-      // Rank P14-independently and select best
-      const ranked = [...placements].sort(comparePlacementResults);
-      const best = ranked[0];
-      this.bestPerQuantity[qty] = best;
-
-      // Queue confirmation for the best
-      this.queue.push({
-        finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s, i) => ({ xNorm: s.x / Number(this.params.roomDims?.widthM), yNorm: s.y / Number(this.params.roomDims?.lengthM) })) },
-        quantity: qty,
-        phase: "confirmation",
-        rawTransfer: best.rawTransfer,
-      });
-
-      // If there's a tie, queue an alternate confirmation
-      if (ranked.length > 1 && isPlacementTied(best, ranked[1])) {
-        const alternate = ranked[1];
-        this.queue.push({
-          finalist: { id: alternate.finalistId, familyId: alternate.rawTransfer.familyId, sources: alternate.rawTransfer.sources?.map((s, i) => ({ xNorm: s.x / Number(this.params.roomDims?.widthM), yNorm: s.y / Number(this.params.roomDims?.lengthM) })) },
-          quantity: qty,
-          phase: "confirmation",
-          rawTransfer: alternate.rawTransfer,
-        });
-      }
-    }
-
-    this.confirmationJobsPlanned = this.queue.length;
-    this.totalJobsPlanned += this.queue.length;
-    this.quantityFinal[this.quantityOrder[0]] = this.quantityFinal[this.quantityOrder[0]] || false;
-
-    markStage2Updating(this.projectId, this.currentFingerprint, {
-      phase: "confirmation",
-      completedJobs: this.completedJobs,
-      totalJobsPlanned: this.totalJobsPlanned,
-    });
-
-    if (this.queue.length === 0) {
-      this.maybeCheckBAndComplete();
-      return;
-    }
-
-    this.dispatchNext();
-  }
+  // startConfirmation() has been replaced by startConfirmationForQuantity(qty).
+  // The old method queued ALL quantities' confirmations at once after ALL
+  // placement completed. The new method queues each quantity's confirmation
+  // as soon as THAT quantity's placement completes, so the selected quantity
+  // (quantityOrder[0]) is confirmed and published before non-selected
+  // quantities finish their placement.
 
   handleError(workerIndex, errorMessage) {
     const active = this.activeJobs.get(workerIndex);
@@ -545,13 +561,20 @@ class Stage2PlacementController {
     if (active?.isB === true) {
       this.bState = "evaluated";
     }
-    // Placement phase errors: continue to next placement job or start confirmation
+    // Placement phase errors: track processing and check per-quantity completion
     const phase = active?.phase || "placement";
     if (phase === "placement") {
+      const errQty = active.quantity;
+      if (errQty != null) {
+        this.quantityPlacementProcessed[errQty] = (this.quantityPlacementProcessed[errQty] || 0) + 1;
+        if (this.isQuantityPlacementComplete(errQty) && !this.confirmationQueued[errQty]) {
+          this.startConfirmationForQuantity(errQty);
+        }
+      }
       if (this.queue.length > 0) {
         this.dispatchNext();
       } else if (this.activeJobs.size === 0) {
-        this.startConfirmation();
+        this.maybeCheckBAndComplete();
       }
       return;
     }
@@ -569,16 +592,21 @@ class Stage2PlacementController {
     results.canonical_jobs_run = this.canonicalJobsRun;
     results.completed_jobs = this.completedJobs;
     results.total_jobs_planned = this.totalJobsPlanned;
-    // Phase label reflects the two-phase architecture:
-    //   placement → "placement" (P14-independent raw transfer)
-    //   confirmation → "confirmation_N_of_M" (P14-dependent canonical confirmation)
-    //   ready → "ready"
-    if (this.controllerPhase === "placement") {
-      results.phase = "placement";
-    } else if (this.controllerPhase === "confirmation") {
+    // Phase label reflects the interleaved two-phase architecture. Placement
+    // and confirmation can overlap: the selected quantity's confirmation may
+    // run while non-selected quantities' placement is still in progress.
+    //   "placement" — only placement jobs running (no confirmations yet)
+    //   "confirmation_N_of_M" — at least one confirmation has started
+    //   "ready" — all complete
+    const hasConfirmationStarted = this.confirmationJobsDone > 0
+      || (this.queue.some((j) => j.phase === "confirmation"))
+      || [...this.activeJobs.values()].some((j) => j.phase === "confirmation");
+    if (hasConfirmationStarted || this.controllerPhase === "confirmation") {
       const done = this.confirmationJobsDone;
       const total = this.confirmationJobsPlanned || 1;
       results.phase = `confirmation_${done}_of_${total}`;
+    } else if (this.controllerPhase === "placement") {
+      results.phase = "placement";
     } else {
       results.phase = Number.isFinite(nextQuantity) ? `evaluating_${nextQuantity}_sub` : "preparing";
     }

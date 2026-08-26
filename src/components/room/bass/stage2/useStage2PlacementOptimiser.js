@@ -143,7 +143,8 @@ export function useStage2PlacementOptimiser({
     });
   }, [stage1Fingerprint, stage1Finalists, selectedSubModel, subwooferBottomHeightM]);
 
-  // Compute P14-dependent confirmation fingerprint (placement + P14)
+  // Compute P14-dependent confirmation fingerprint (placement + P14).
+  // p18TargetBasis is NOT included — it is a presentation-only grading view.
   const confirmationFingerprint = useMemo(() => {
     if (!placementFingerprint || !p14Target) return null;
     return computeStage2ConfirmationFingerprint({
@@ -151,11 +152,11 @@ export function useStage2PlacementOptimiser({
       p14TargetBasis: p14Target.basis,
       p14TargetLevel: p14Target.level,
       p14TargetDb: p14Target.db,
-      p18TargetBasis: p14Target.p18TargetBasis,
     });
   }, [placementFingerprint, p14Target]);
 
-  // Legacy fingerprint for cache compatibility (includes P14)
+  // Legacy fingerprint for cache compatibility (includes P14).
+  // p18TargetBasis is NOT included — it is a presentation-only grading view.
   const fingerprint = useMemo(() => {
     if (!stage1Fingerprint || !stage1Finalists || !selectedSubModel || !p14Target) return null;
     return computeStage2Fingerprint({
@@ -165,7 +166,6 @@ export function useStage2PlacementOptimiser({
       p14TargetBasis: p14Target.basis,
       p14TargetLevel: p14Target.level,
       p14TargetDb: p14Target.db,
-      p18TargetBasis: p14Target.p18TargetBasis,
       subwooferBottomHeightM,
     });
   }, [stage1Fingerprint, stage1Finalists, selectedSubModel, p14Target, subwooferBottomHeightM]);

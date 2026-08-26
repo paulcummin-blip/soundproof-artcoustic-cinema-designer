@@ -22,6 +22,12 @@ import { BASS_RESULT_SCHEMA_VERSION } from "../bassOptimiserWorkerProtocol";
 import { RP22_BASS_METRIC_SCHEMA_VERSION } from "../../../../../base44/shared/bassAuthorityVersion.js";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
 
+// NOTE: p18TargetBasis (Minimum/Recommended) is a PRESENTATION-ONLY grading
+// view. The achieved P18 extension Hz is identical regardless of which
+// grading threshold set is applied. Therefore p18TargetBasis is NOT included
+// in either fingerprint. The confirmed contract carries the achieved Hz;
+// presentation grades it against Min/Rec thresholds at display time.
+
 function stable(value) {
   if (value === null || value === undefined) return "null";
   if (typeof value === "number") return Number.isFinite(value) ? String(Math.round(value * 1e6) / 1e6) : "null";
@@ -73,20 +79,22 @@ export function computeStage2PlacementFingerprint({
   if (!stage1Fingerprint) return null;
   if (!selectedSubModel) return null;
 
+  // Physics-only: includes only inputs that affect the raw modal transfer.
+  // EQ/canonical/product-engineering versions are NOT here — they are
+  // confirmation-layer concerns. An EQ-only change must NOT invalidate
+  // the placement cache; a physics/source-model change MUST.
   const canonical = {
     cacheVersion: STAGE2_CACHE_VERSION,
     placementVersion: STAGE2_PLACEMENT_VERSION,
-    canonicalVersion: STAGE2_CANONICAL_VERSION,
     stage1Fingerprint,
     finalistIdentity: buildFinalistIdentity(stage1Finalists),
     selectedSubModel: normaliseModelKey(selectedSubModel),
-    productEngineeringVersion: STAGE2_PRODUCT_ENGINEERING_VERSION,
     subwooferBottomHeightM: (subwooferBottomHeightM != null && Number.isFinite(Number(subwooferBottomHeightM)))
       ? Math.round(Number(subwooferBottomHeightM) * 1000) / 1000
       : "default",
   };
 
-  return `stage2-place:v1:${hash64(stable(canonical))}`;
+  return `stage2-place:v2:${hash64(stable(canonical))}`;
 }
 
 /**
@@ -105,22 +113,25 @@ export function computeStage2ConfirmationFingerprint({
   p14TargetBasis,
   p14TargetLevel,
   p14TargetDb,
-  p18TargetBasis,
 }) {
   if (!placementFingerprint) return null;
   if (!p14TargetBasis || !Number.isFinite(p14TargetLevel)) return null;
   if (!Number.isFinite(p14TargetDb)) return null;
 
+  // Confirmation-layer: placement fingerprint + P14 target + EQ/canonical/
+  // product-engineering versions + result/metric schema versions.
+  // p18TargetBasis is NOT here — it is a presentation-only grading view.
   const canonical = {
     placementFingerprint,
     rankingVersion: STAGE2_RANKING_VERSION,
+    canonicalVersion: STAGE2_CANONICAL_VERSION,
+    productEngineeringVersion: STAGE2_PRODUCT_ENGINEERING_VERSION,
     p14TargetBasis,
     p14TargetLevel: Math.round(p14TargetLevel),
     p14TargetDb: Math.round(p14TargetDb * 100) / 100,
-    p18TargetBasis: p18TargetBasis || "minimum",
     resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION,
     metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
   };
 
-  return `stage2-confirm:v1:${hash64(stable(canonical))}`;
+  return `stage2-confirm:v2:${hash64(stable(canonical))}`;
 }

@@ -85,6 +85,16 @@
       "type": "object",
       "description": "B canonical evaluation result if evaluated. Same shape as other Stage 2 finalist results. Also included in four_sub_result.evaluatedFinalists. Null when B was not evaluated.",
       "nullable": true
+    },
+    "placement_fingerprint": {
+      "type": "string",
+      "description": "P14-independent placement fingerprint for the raw transfer cache. Survives P14 target changes \u2014 only invalidated by physics/source-model changes. Null when no placement has been evaluated.",
+      "nullable": true
+    },
+    "raw_transfers": {
+      "type": "object",
+      "description": "Persistent P14-independent raw modal transfer cache. Map of finalistId \u2192 rawTransfer object. Keyed by placement_fingerprint. Each rawTransfer contains: { finalistId, familyId, quantity, coordinates, selectedProduct, rspRawCurve, perSeatRawCurves, sources, usableLfHz, transitionHz, seatPriorityMap }. On cold reopen, these are restored to the in-memory cache so P14 switches reuse them without recomputing placement. Null when no raw transfers have been persisted.",
+      "nullable": true
     }
   },
   "required": [

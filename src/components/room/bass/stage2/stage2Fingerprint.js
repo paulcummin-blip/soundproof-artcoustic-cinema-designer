@@ -44,10 +44,12 @@ function hash64(text) {
  * @param {string} params.p14TargetBasis — "minimum" | "recommended"
  * @param {number} params.p14TargetLevel — 1–4
  * @param {number} params.p14TargetDb — derived target dB
- * @param {string} params.p18TargetBasis — "minimum" | "recommended"
  * @param {number} [params.subwooferBottomHeightM] — project subwoofer bottom height (m).
  *   Drives acoustic-centre Z via deriveCentreZ; must invalidate when it changes.
  * @returns {string|null} fingerprint, or null if inputs are invalid
+ *
+ * NOTE: p18TargetBasis is NOT a fingerprint input. It is a presentation-only
+ * grading view — the achieved P18 Hz is identical regardless of Min/Rec.
  */
 export function computeStage2Fingerprint({
   stage1Fingerprint,
@@ -56,7 +58,6 @@ export function computeStage2Fingerprint({
   p14TargetBasis,
   p14TargetLevel,
   p14TargetDb,
-  p18TargetBasis,
   subwooferBottomHeightM,
 }) {
   if (!stage1Fingerprint) return null;
@@ -83,7 +84,6 @@ export function computeStage2Fingerprint({
     p14TargetBasis,
     p14TargetLevel: Math.round(p14TargetLevel),
     p14TargetDb: Math.round(p14TargetDb * 100) / 100,
-    p18TargetBasis: p18TargetBasis || "minimum",
     // Acoustic-centre Z authority: bottomHeightM drives deriveCentreZ. If the
     // project subwoofer bottom height changes, the source Z changes and all
     // downstream P14/P18/P19/P20 results must be recalculated.
@@ -94,5 +94,5 @@ export function computeStage2Fingerprint({
     metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
   };
 
-  return `stage2:v1:${hash64(stable(canonical))}`;
+  return `stage2:v2:${hash64(stable(canonical))}`;
 }
