@@ -86,32 +86,32 @@ export default function SeatPrioritySelector({
     <div className="space-y-3" data-seat-priority-selector>
       <div className="flex items-center justify-between">
         <span
-          className="text-sm font-medium"
-          style={{ color: "#3E4349", fontFamily: BODY_FONT }}
+          className="text-lg font-bold"
+          style={{ color: "#1B1A1A", fontFamily: BODY_FONT, letterSpacing: "0.01em" }}
         >
           Seat Priority
         </span>
-        <div className="flex items-center gap-3 text-[10px]" style={{ color: "#625143", fontFamily: BODY_FONT }}>
-          <span className="flex items-center gap-1">
+        <div className="flex items-center gap-4 text-xs" style={{ color: "#3E4349", fontFamily: BODY_FONT }}>
+          <span className="flex items-center gap-1.5">
             <span
               style={{
                 display: "inline-block",
-                width: 12,
-                height: 12,
-                borderRadius: 3,
+                width: 16,
+                height: 16,
+                borderRadius: 4,
                 background: "#1B1A1A",
                 border: "1px solid #1B1A1A",
               }}
             />
             Primary
           </span>
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1.5">
             <span
               style={{
                 display: "inline-block",
-                width: 12,
-                height: 12,
-                borderRadius: 3,
+                width: 16,
+                height: 16,
+                borderRadius: 4,
                 background: "#EDECE8",
                 border: "1px solid #C1B6AD",
               }}
@@ -121,7 +121,7 @@ export default function SeatPrioritySelector({
         </div>
       </div>
 
-      <p className="text-[11px] leading-snug" style={{ color: "#625143", fontFamily: BODY_FONT }}>
+      <p className="text-sm leading-snug" style={{ color: "#3E4349", fontFamily: BODY_FONT }}>
         Tap any seat to toggle Primary / Secondary. Secondary seats stay fully
         included in every calculation.
         {onSetDesignatedRspSeatId && onRspModeChange && (
@@ -131,31 +131,31 @@ export default function SeatPrioritySelector({
         )}
       </p>
 
-      <div className="space-y-2 p-3 rounded-lg" style={{ border: "1px solid #C1B6AD", background: "#F8F8F7" }}>
+      <div className="space-y-3 p-5 rounded-xl" style={{ border: "1.5px solid #C1B6AD", background: "#F8F8F7" }}>
         {rows.map(({ rowNum, seats }) => (
-          <div key={`row-${rowNum}`} className="flex items-center gap-2">
+          <div key={`row-${rowNum}`} className="flex items-center gap-3">
             <div
-              className="text-xs shrink-0"
-              style={{ color: "#625143", fontFamily: BODY_FONT, width: 44 }}
+              className="text-sm shrink-0 font-medium"
+              style={{ color: "#3E4349", fontFamily: BODY_FONT, width: 64 }}
             >
               Row {rowNum}
             </div>
             <div className="flex-1 flex justify-center">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2.5">
                 {seats.map((seat, idxInRow) => {
                   const isSecondary = resolveSeatPriority(seat) === "secondary";
                   const label = compactSeatLabel(seat, idxInRow);
                   const isDesignatedRsp = designatedRspSeatId === seat?.id && rspMode === "seat_bound";
 
                   const baseStyle = {
-                    width: 34,
-                    height: 30,
-                    borderRadius: 6,
+                    width: 54,
+                    height: 46,
+                    borderRadius: 8,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 10,
-                    fontWeight: 600,
+                    fontSize: 15,
+                    fontWeight: 700,
                     fontFamily: BODY_FONT,
                     cursor: disabled ? "default" : "pointer",
                     transition: "background-color 120ms ease, border-color 120ms ease, color 120ms ease",
@@ -230,17 +230,17 @@ export default function SeatPrioritySelector({
                           }}
                           style={{
                             position: "absolute",
-                            top: -5,
-                            right: -5,
-                            width: 12,
-                            height: 12,
+                            top: -6,
+                            right: -6,
+                            width: 16,
+                            height: 16,
                             borderRadius: "50%",
-                            border: "1.5px solid #ffffff",
+                            border: "2px solid #ffffff",
                             background: isDesignatedRsp ? "#22c55e" : "#ffffff",
                             cursor: disabled ? "default" : "pointer",
                             padding: 0,
                             lineHeight: 0,
-                            boxShadow: isDesignatedRsp ? "0 0 4px rgba(34,197,94,0.6)" : "0 1px 2px rgba(0,0,0,0.15)",
+                            boxShadow: isDesignatedRsp ? "0 0 5px rgba(34,197,94,0.6)" : "0 1px 2px rgba(0,0,0,0.15)",
                             transition: "background-color 120ms ease, box-shadow 120ms ease",
                           }}
                           onMouseEnter={(e) => {
