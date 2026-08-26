@@ -32,6 +32,9 @@ function emptyState(projectId) {
     four_sub_result: null,
     overall_best: null,
     canonicalJobsRun: 0,
+    completedJobs: 0,
+    totalJobsPlanned: 0,
+    phase: "idle",
     totalRuntimeMs: 0,
     errorMessage: null,
     hydratedFromCache: false,
@@ -76,6 +79,9 @@ export function publishHydratedStage2(projectId, fingerprint, results) {
     four_sub_result: results?.four_sub_result || null,
     overall_best: results?.overall_best || null,
     canonicalJobsRun: results?.canonical_jobs_run || 0,
+    completedJobs: results?.canonical_jobs_run || 0,
+    totalJobsPlanned: results?.canonical_jobs_run || 0,
+    phase: "ready",
     totalRuntimeMs: results?.total_runtime_ms || 0,
     bEligible: results?.b_eligible || false,
     bEvaluated: results?.b_evaluated || false,
@@ -87,20 +93,37 @@ export function publishHydratedStage2(projectId, fingerprint, results) {
   });
 }
 
-export function markStage2Updating(projectId, fingerprint) {
+export function markStage2Updating(projectId, fingerprint, progress = {}) {
   return setMemory(projectId, {
     status: "updating",
     fingerprint,
+    one_sub_result: null,
+    two_sub_result: null,
+    four_sub_result: null,
+    overall_best: null,
+    canonicalJobsRun: 0,
+    completedJobs: 0,
+    totalJobsPlanned: 0,
+    phase: "preparing",
     errorMessage: null,
     hydratedFromCache: false,
+    bEligible: false,
+    bEvaluated: false,
+    bEligibilityReason: null,
+    bFailedCandidates: [],
+    bResult: null,
+    ...progress,
   });
+}
+
+export function markStage2Waiting(projectId, fingerprint, phase = "waiting_for_bass") {
+  return markStage2Updating(projectId, fingerprint, { phase });
 }
 
 export function markStage2Idle(projectId) {
   return setMemory(projectId, {
+    ...emptyState(projectId),
     status: "idle",
-    fingerprint: null,
-    errorMessage: null,
   });
 }
 
@@ -120,6 +143,10 @@ function publishStage2Progress(projectId, fingerprint, results) {
     two_sub_result: results?.two_sub_result || null,
     four_sub_result: results?.four_sub_result || null,
     overall_best: results?.overall_best || null,
+    canonicalJobsRun: results?.canonical_jobs_run || 0,
+    completedJobs: results?.completed_jobs || 0,
+    totalJobsPlanned: results?.total_jobs_planned || 0,
+    phase: results?.phase || "preparing",
     bEligible: results?.b_eligible || false,
     bEvaluated: results?.b_evaluated || false,
     bEligibilityReason: results?.b_eligibility_reason || null,
@@ -137,6 +164,9 @@ function publishStage2Complete(projectId, fingerprint, results) {
     four_sub_result: results?.four_sub_result || null,
     overall_best: results?.overall_best || null,
     canonicalJobsRun: results?.canonical_jobs_run || 0,
+    completedJobs: results?.completed_jobs ?? results?.canonical_jobs_run ?? 0,
+    totalJobsPlanned: results?.total_jobs_planned ?? results?.canonical_jobs_run ?? 0,
+    phase: "ready",
     totalRuntimeMs: results?.total_runtime_ms || 0,
     bEligible: results?.b_eligible || false,
     bEvaluated: results?.b_evaluated || false,
