@@ -23,8 +23,12 @@ const persistedSignatures = new Map();
 const persistenceTimers = new Map();
 const dirtyProjects = new Set();
 const TARGET_CACHE_WRITE_DEBOUNCE_MS = 2000;
+let cacheRevision = 0;
 
-function notify() { listeners.forEach((l) => l()); }
+function notify() {
+  cacheRevision += 1;
+  listeners.forEach((l) => l());
+}
 
 function projectKey(projectId) { return String(projectId || "free"); }
 
@@ -60,15 +64,22 @@ export function getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey)
  * Get cache progress: how many of the 8 targets are ready.
  */
 export function getTargetCacheProgress(projectId, baseDesignFingerprint, allTargetKeys) {
-  if (!baseDesignFingerprint) return { ready: 0, total: allTargetKeys.length };
+  const keys = Array.isArray(allTargetKeys) ? allTargetKeys : [];
+  if (!baseDesignFingerprint) return { ready: 0, total: keys.length, completedDurationsMs: [], readyTargetKeys: [] };
   const cache = ensureCache(projectId);
-  if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION) return { ready: 0, total: allTargetKeys.length };
-  if (cache.baseDesignFingerprint !== baseDesignFingerprint) return { ready: 0, total: allTargetKeys.length };
-  const ready = allTargetKeys.filter((k) => {
-    const entry = cache.targets[k];
-    return entry && isAuthoritativeBassContract(entry) && hasGraphPayload(entry) && hasReadyCanonicalP19Contract(entry);
-  }).length;
-  return { ready, total: allTargetKeys.length };
+  if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION) return { ready: 0, total: keys.length, completedDurationsMs: [], readyTargetKeys: [] };
+  if (cache.baseDesignFingerprint !== baseDesignFingerprint) return { ready: 0, total: keys.length, completedDurationsMs: [], readyTargetKeys: [] };
+  const readyTargetKeys = [];
+  const completedDurationsMs = [];
+  keys.forEach((key) => {
+    const entry = cache.targets[key];
+    const ready = entry && isAuthoritativeBassContract(entry) && hasGraphPayload(entry) && hasReadyCanonicalP19Contract(entry);
+    if (!ready) return;
+    readyTargetKeys.push(key);
+    const elapsedMs = Number(entry?.job?.elapsedMs);
+    if (Number.isFinite(elapsedMs) && elapsedMs > 0) completedDurationsMs.push(elapsedMs);
+  });
+  return { ready: readyTargetKeys.length, total: keys.length, completedDurationsMs, readyTargetKeys };
 }
 
 /**
@@ -204,6 +215,15 @@ export function useTargetCacheEntry(projectId, baseDesignFingerprint, targetKey)
     () => getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey),
     () => getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey),
   );
+}
+
+export function useTargetCacheProgress(projectId, baseDesignFingerprint, allTargetKeys) {
+  useSyncExternalStore(
+    (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
+    () => cacheRevision,
+    () => cacheRevision,
+  );
+  return getTargetCacheProgress(projectId, baseDesignFingerprint, allTargetKeys);
 }
 
 export function useTargetCacheHydration(projectId) {
