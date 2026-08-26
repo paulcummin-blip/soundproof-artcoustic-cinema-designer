@@ -150,10 +150,13 @@ export function buildCurrentCanonicalLayout({
   const sources = activeSubs.map((sub, index) => sourceFromCurrent(sub, index, roomDims));
   if (sources.some((source) => !Number.isFinite(source.x) || !Number.isFinite(source.y))) return null;
   const candidate = contract.selectedCandidate;
+  const p14 = contract.productAnalysis?.parameters?.p14;
   const canonicalResult = {
-    p14TargetDb: contract.requestedP14TargetDb,
-    p14TargetLevel: contract.requestedP14Level,
-    p14TargetBasis: contract.requestedP14Basis,
+    p14TargetDb: contract.requestedP14TargetDb ?? contract.selectedP14TargetDb ?? p14?.selectedTargetDb,
+    p14TargetLevel: contract.requestedP14Level ?? contract.selectedP14Level ?? p14?.selectedLevel,
+    p14TargetBasis: contract.requestedP14Basis ?? contract.selectedP14TargetBasis ?? p14?.targetBasis,
+    p14AchievedDb: p14?.achievedCapabilityDb ?? p14?.availableCapabilityDb ?? null,
+    p14HeadroomDb: p14?.headroomOrShortfallDb ?? null,
     achievedP18Hz: candidate.achievedP18FrequencyHz,
     assessmentStartHz: contract.assessmentEnvelope?.assessmentStartHz,
     assessmentEndHz: contract.assessmentEnvelope?.assessmentEndHz,
