@@ -27,6 +27,7 @@ import { requeueInterruptedTargetOnSoftPause } from "./p14TargetSoftPauseRequeue
 import { pushP14BgTimingRecordFromTimings } from "./p14BgTimingsBuffer";
 import { safeConsole } from "@/components/utils/safeConsole";
 import { subscribe as subscribeUserInteraction, isUserInteracting, getIdleResumeDeadline } from "@/components/state/userInteractionStore";
+import { beginP14AnalysisJob, pauseP14AnalysisJob, publishP14AnalysisProgress } from "./p14AnalysisProgressStore";
 
 const createWorker = () => new Worker(
   new URL("../../utils/bassOptimiser.worker.js", import.meta.url),
@@ -99,6 +100,7 @@ export class P14TargetBackgroundScheduler {
     this.terminateWorker();
     this.currentTarget = null;
     this.running = false;
+    pauseP14AnalysisJob(this.projectId, { baseDesignFingerprint: this.currentBaseDesignFingerprint });
     if (this.pendingCompletion) {
       this.armCompletionProcessTimer();
       return;
@@ -164,6 +166,16 @@ export class P14TargetBackgroundScheduler {
       const allKeys = (this.allTargets || []).map((t) => t.key);
       const progress = getTargetCacheProgress(this.projectId, this.currentBaseDesignFingerprint, allKeys);
       const failed = this.sweepDiagnostics.failedAfterRetry;
+      publishP14AnalysisProgress(this.projectId, {
+        baseDesignFingerprint: this.currentBaseDesignFingerprint,
+        status: progress.ready >= progress.total && progress.total > 0 ? "complete" : "calculating",
+        completed: progress.ready,
+        total: progress.total,
+        completedDurationsMs: progress.completedDurationsMs,
+        failedTargetKeys: failed,
+        activeTargetKey: null,
+        activeStartedAtMs: null,
+      });
       if (failed.length > 0) {
         safeConsole.warn("p14-bg", `sweep complete: ${progress.ready}/${progress.total} cached, ${failed.length} failed: ${failed.join(', ')}`);
       } else {
@@ -176,6 +188,15 @@ export class P14TargetBackgroundScheduler {
     this.running = true;
     const target = this.queue.shift();
     this.currentTarget = target;
+    const allKeys = (this.allTargets || []).map((item) => item.key);
+    const progress = getTargetCacheProgress(this.projectId, this.currentBaseDesignFingerprint, allKeys);
+    beginP14AnalysisJob(this.projectId, {
+      baseDesignFingerprint: this.currentBaseDesignFingerprint,
+      targetKey: target.key,
+      completed: progress.ready,
+      total: progress.total,
+      completedDurationsMs: progress.completedDurationsMs,
+    });
     safeConsole.log("p14-bg", `target ${target.key}: starting background calculation (fingerprint ${this.currentBaseDesignFingerprint?.substring(0, 24)}...)`);
     this.runTarget(target);
   }
@@ -473,6 +494,17 @@ export class P14TargetBackgroundScheduler {
     switch (decision.action) {
       case 'advance': {
         this.retryCounts.delete(target.key);
+        const allKeys = (this.allTargets || []).map((item) => item.key);
+        const progress = getTargetCacheProgress(this.projectId, this.currentBaseDesignFingerprint, allKeys);
+        publishP14AnalysisProgress(this.projectId, {
+          baseDesignFingerprint: this.currentBaseDesignFingerprint,
+          status: progress.ready >= progress.total && progress.total > 0 ? "complete" : "calculating",
+          completed: progress.ready,
+          total: progress.total,
+          completedDurationsMs: progress.completedDurationsMs,
+          activeTargetKey: null,
+          activeStartedAtMs: null,
+        });
         safeConsole.log("p14-bg", `target ${target.key}: cached successfully (fingerprint ${fingerprint?.substring(0, 24)}...)`);
         if (!this.sweepDiagnostics.retried.includes(target.key)) {
           this.sweepDiagnostics.insertedFirstTry.push(target.key);
@@ -585,6 +617,7 @@ export class P14TargetBackgroundScheduler {
     this.queue = [];
     this.running = false;
     this.currentTarget = null;
+    pauseP14AnalysisJob(projectId, { baseDesignFingerprint: this.currentBaseDesignFingerprint });
     // Completed background targets remain memory-first, then flush as one
     // snapshot when a sweep is interrupted by foreground/user work.
     if (projectId) flushTargetCachePersistence(projectId);
