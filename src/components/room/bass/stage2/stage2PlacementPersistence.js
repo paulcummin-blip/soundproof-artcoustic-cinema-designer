@@ -39,6 +39,8 @@ export async function hydrateStage2PlacementCache(projectId) {
       b_eligibility_reason: record.b_eligibility_reason || null,
       b_failed_candidates: record.b_failed_candidates || [],
       b_result: record.b_result || null,
+      placement_fingerprint: record.placement_fingerprint || null,
+      raw_transfers: record.raw_transfers || null,
     };
   } catch {
     return null;
@@ -59,9 +61,30 @@ export function isStage2CacheValid(hydrated, fingerprint) {
 }
 
 /**
- * Persist Stage 2 results to the database.
+ * Check whether a hydrated raw transfer cache is valid for the current
+ * placement fingerprint. Raw transfers survive P14 changes — they are only
+ * invalidated by physics/source-model changes (placement fingerprint mismatch)
+ * or a cache version bump. Returns false if the placement fingerprint does
+ * not match, preventing stale/mixed old-new hydration.
  */
-export async function syncStage2PlacementCache(projectId, fingerprint, results, existingRecordId) {
+export function isRawTransferCacheValid(hydrated, placementFingerprint) {
+  if (!hydrated || !placementFingerprint) return false;
+  if (hydrated.stage2_cache_version !== STAGE2_CACHE_VERSION) return false;
+  if (hydrated.placement_fingerprint !== placementFingerprint) return false;
+  if (!hydrated.raw_transfers || typeof hydrated.raw_transfers !== "object") return false;
+  return true;
+}
+
+/**
+ * Persist Stage 2 results and raw transfers to the database.
+ * @param {string} projectId
+ * @param {string} fingerprint — confirmation fingerprint (legacy combined)
+ * @param {object} results — canonical results snapshot
+ * @param {string|null} placementFingerprint — P14-independent placement fingerprint
+ * @param {object|null} rawTransfers — { finalistId → rawTransfer } for the placement fingerprint
+ * @param {string|null} existingRecordId
+ */
+export async function syncStage2PlacementCache(projectId, fingerprint, results, placementFingerprint, rawTransfers, existingRecordId) {
   if (!projectId || !fingerprint || !results) return null;
   try {
     const payload = {
@@ -82,6 +105,8 @@ export async function syncStage2PlacementCache(projectId, fingerprint, results, 
       b_eligibility_reason: results.b_eligibility_reason || null,
       b_failed_candidates: results.b_failed_candidates || [],
       b_result: results.b_result || null,
+      placement_fingerprint: placementFingerprint || null,
+      raw_transfers: rawTransfers || null,
     };
     if (existingRecordId) {
       await base44.entities.Stage2PlacementCache.update(existingRecordId, payload);

@@ -24,7 +24,8 @@ import {
   markStage2Idle,
   markStage2Waiting,
 } from "./stage2PlacementStore";
-import { hydrateStage2PlacementCache, isStage2CacheValid } from "./stage2PlacementPersistence";
+import { hydrateStage2PlacementCache, isStage2CacheValid, isRawTransferCacheValid } from "./stage2PlacementPersistence";
+import { setCachedRawTransfer } from "./stage2RawTransferCache";
 import { buildPromotionPlan } from "./stage2FinalistPromotion";
 import { getStage1State, subscribeStage1 } from "../stage1/stage1PlacementStore";
 import { deriveRequestedCalibrationConfig } from "../requestedCalibrationConfig";
@@ -209,6 +210,22 @@ export function useStage2PlacementOptimiser({
       b_result: hydratedCache.b_result,
     });
   }, [hydrationDone, hydratedCache, fingerprint, projectId]);
+
+  // Restore persisted raw transfers to the in-memory cache on cold reopen.
+  // Only restores when the placement fingerprint matches — a mismatch means
+  // physics/source-model inputs changed, so the raw transfers are stale and
+  // must NOT be reused (placement will be recomputed).
+  useEffect(() => {
+    if (!hydrationDone || !placementFingerprint) return;
+    if (!isRawTransferCacheValid(hydratedCache, placementFingerprint)) return;
+    const persisted = hydratedCache.raw_transfers;
+    if (!persisted || typeof persisted !== "object") return;
+    for (const [finalistId, rawTransfer] of Object.entries(persisted)) {
+      if (rawTransfer && typeof rawTransfer === "object") {
+        setCachedRawTransfer(placementFingerprint, finalistId, rawTransfer);
+      }
+    }
+  }, [hydrationDone, hydratedCache, placementFingerprint]);
 
   // Schedule / cancel on fingerprint change. No 8/8 gate — Stage 2 starts
   // as soon as Stage 1 is complete, the sub model is selected, and a valid

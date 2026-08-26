@@ -760,7 +760,26 @@ class Stage2PlacementController {
     if (!projectId || projectId === "free" || !results) return;
     try {
       const { syncStage2PlacementCache } = await import("./stage2PlacementPersistence");
-      await syncStage2PlacementCache(projectId, fingerprint, results, null);
+      // Extract raw transfers from the in-memory cache for this placement
+      // fingerprint so they persist across cold reopen + P14 switches.
+      let rawTransfersObj = null;
+      if (this.placementFingerprint) {
+        const rawTransfersMap = getCachedRawTransfersForFingerprint(this.placementFingerprint);
+        if (rawTransfersMap.size > 0) {
+          rawTransfersObj = {};
+          for (const [finalistId, rawTransfer] of rawTransfersMap.entries()) {
+            rawTransfersObj[finalistId] = rawTransfer;
+          }
+        }
+      }
+      await syncStage2PlacementCache(
+        projectId,
+        fingerprint,
+        results,
+        this.placementFingerprint,
+        rawTransfersObj,
+        null,
+      );
     } catch { /* non-fatal */ }
   }
 }
