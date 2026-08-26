@@ -56,6 +56,8 @@ export function coordinatesMatch(currentSources, recommendationSources, toleranc
   const recommended = Array.isArray(recommendationSources) ? recommendationSources : [];
   if (current.length === 0 || recommended.length === 0) return false;
   if (current.length !== recommended.length) return false;
+  if (current.some((source) => !SUPPORTED_PLACEMENTS.includes(source?.placement))) return false;
+  if (recommended.some((source) => !SUPPORTED_PLACEMENTS.includes(source?.placement))) return false;
   return SUPPORTED_PLACEMENTS.every((group) =>
     unorderedGroupMatch(
       current.filter((s) => s.placement === group),
