@@ -12,6 +12,7 @@ import RP22GradingPill from '../components/ui/RP22GradingPill';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
 import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
 import { computeScreenMetrics } from '../components/utils/screenMetrics';
+import { resolveEffectiveViewableDimsM } from '../components/models/screen/resolveEffectiveScreen';
 import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { deriveSubwoofersFromCfg } from '@/components/utils/deriveSubwoofersFromCfg';
@@ -596,21 +597,17 @@ function RP22ReportInner() {
     // Used by ReportHeader to snapshot metrics at print time.
     const resolveScreenMetricsSnapshot = React.useCallback(() => {
         try {
-            const TV_PRESET_WIDTH_MM = { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 };
-            const tvKey = app?.screen?.tvPresetKey;
-            const tvMm = Number(app?.screen?.tvWidthMm);
-            const resolvedWidthIn = (() => {
-                if (tvKey && TV_PRESET_WIDTH_MM[tvKey]) return TV_PRESET_WIDTH_MM[tvKey] / 25.4;
-                if (Number.isFinite(tvMm) && tvMm > 0) return tvMm / 25.4;
-                return Number(app?.screen?.visibleWidthInches) || 0;
-            })();
-            const aspectRatio = app?.screen?.aspectRatio || "16:9";
+            // Use the same single authority as the live Front Elevation so manual
+            // screen dimensions, TV presets, and visibleWidthInches all resolve
+            // identically.  Previously this used computeScreenMetrics (width ÷ aspect)
+            // which ignored manualSize overrides and produced stale screen heights.
+            const dims = resolveEffectiveViewableDimsM(app?.screen);
+            const viewWm = dims.widthM;
+            const viewHm = dims.heightM;
             const rawBorder = Number(app?.screen?.borderThicknessM);
-            const borderThicknessM = Number.isFinite(rawBorder) && rawBorder >= 0 ? rawBorder : 0.08;
-            if (resolvedWidthIn <= 0) {
-                return { ok: true, viewWm: null, viewHm: null, overallWm: null, overallHm: null, wallDistM: null, screenChoiceLabel: formatScreenChoiceLabel(app?.screen) };
-            }
-            const { viewWm, viewHm, overallWm, overallHm } = computeScreenMetrics(resolvedWidthIn, aspectRatio, borderThicknessM);
+            const borderThicknessM = Number.isFinite(rawBorder) && rawBorder > 0 ? rawBorder : 0.08;
+            const overallWm = viewWm + borderThicknessM * 2;
+            const overallHm = viewHm + borderThicknessM * 2;
             const screenFrontPlaneM = app?.screenFrontPlaneM ?? app?.screen?.frontPlaneYm ?? null;
             return {
                 ok: true, viewWm, viewHm, overallWm, overallHm,
@@ -620,7 +617,7 @@ function RP22ReportInner() {
         } catch {
             return { ok: true, viewWm: null, viewHm: null, overallWm: null, overallHm: null, wallDistM: null, screenChoiceLabel: formatScreenChoiceLabel(app?.screen) };
         }
-    }, [app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.aspectRatio]);
+    }, [app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.borderThicknessM, app?.screen]);
 
     // When P14 target is unselected, bassReadiness.ready is false but pending is
     // also false (reason: 'p14-target-not-selected'). The report must RENDER and

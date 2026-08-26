@@ -4,6 +4,7 @@ import { Q43FaceIcon, Q45FaceIcon, Q63FaceIcon, Q85FaceIcon } from '@/components
 import { yHalfExtentM_physical } from '@/components/room/rv/RenderPrimitives';
 import { calculateAzimuth } from '@/components/utils/aimingUtils';
 import { SCREEN_BUFFER_M } from '@/components/room/rv/utils/rvGeometry';
+import { calculateLcrAcousticCentreBand } from '@/components/utils/acoustics/acousticCentreBand';
 
 const HEADING_FONT = '"Futura PT Light", "Century Gothic", sans-serif';
 const BODY_FONT = '"Didact Gothic", "Century Gothic", sans-serif';
@@ -210,8 +211,23 @@ export default function ScreenWallConstructionGraphic({
   const screenOuterY = screenInnerBottom - borderY;
   const screenOuterTop = screenInnerTop + borderY;
 
-  const bandBottom = screenBottom + screenViewH / 3;
-  const bandTop = screenBottom + (screenViewH * 2) / 3;
+  // Acoustic-centre guidance band — same authority as the live LCR panel.
+  // Uses calculateLcrAcousticCentreBand which clamps the lower bound to
+  // seated-ear height (1.20 m) and the upper bound to the image upper-third,
+  // rather than the raw screen middle-third that previously drew the band
+  // too low.  Band bounds do not depend on current speaker height, so no
+  // drawnSpeakers dependency is needed.
+  const acousticBand = (() => {
+    if (screenViewH <= 0) return { minHeightM: null, maxHeightM: null };
+    const band = calculateLcrAcousticCentreBand({
+      screenBottomHeightM: screenBottom,
+      viewableImageHeightM: screenViewH,
+      currentAcousticCentreM: null,
+    });
+    return { minHeightM: band.minHeightM, maxHeightM: band.maxHeightM };
+  })();
+  const bandBottom = acousticBand.minHeightM ?? 0;
+  const bandTop = acousticBand.maxHeightM ?? 0;
 
   const drawnSpeakers = useMemo(() => {
     const list = Array.isArray(placedSpeakers) ? placedSpeakers : [];
@@ -256,28 +272,32 @@ export default function ScreenWallConstructionGraphic({
 
   const drawnSubs = useMemo(() => {
     const list = Array.isArray(frontSubs) ? frontSubs : [];
+    // Only require a valid X (plan position).  Z/height is derived from
+    // bottomHeightM + half cabinet when position.z is absent, so both
+    // legacy subwoofers[] and canonical subwooferInstances[] are included.
     return list
       .filter((item) => {
         const x = Number.isFinite(item?.x) ? item.x : item?.position?.x;
-        const z = Number.isFinite(item?.z) ? item.z : item?.position?.z;
-        return Number.isFinite(x) && Number.isFinite(z);
+        return Number.isFinite(x);
       })
       .map((item, index) => {
         const x = Number.isFinite(item?.x) ? item.x : item?.position?.x;
-        const z = Number.isFinite(item?.z) ? item.z : item?.position?.z;
-        const bottomHeightM = Number(item?.bottomHeightM);
+        const rawZ = Number.isFinite(item?.z) ? item.z : item?.position?.z;
+        const bottomHeightM = Number.isFinite(Number(item?.bottomHeightM))
+          ? Number(item.bottomHeightM)
+          : Number.isFinite(Number(frontSubsCfg?.bottomHeightM))
+            ? Number(frontSubsCfg.bottomHeightM)
+            : 0.05;
         const orientation = item?.orientation || frontSubsCfg?.orientation;
+        const dims = resolveDims(item.model, SUB_FALLBACKS, { widthM: 0.6, heightM: 0.255, depthM: 0.255 }, orientation);
+        const zM = Number.isFinite(rawZ) ? rawZ : bottomHeightM + dims.heightM / 2;
         return {
           label: `SUB${index + 1}`,
           model: item.model || `SUB ${index + 1}`,
           xM: Number(x),
-          zM: Number(z),
-          bottomHeightM: Number.isFinite(bottomHeightM)
-            ? bottomHeightM
-            : Number.isFinite(Number(frontSubsCfg?.bottomHeightM))
-              ? Number(frontSubsCfg.bottomHeightM)
-              : 0.05,
-          dims: resolveDims(item.model, SUB_FALLBACKS, { widthM: 0.6, heightM: 0.255, depthM: 0.255 }, orientation),
+          zM,
+          bottomHeightM,
+          dims,
         };
       });
   }, [frontSubs, frontSubsCfg?.orientation, frontSubsCfg?.bottomHeightM]);
@@ -315,18 +335,22 @@ export default function ScreenWallConstructionGraphic({
         rows.push({ role, model: '—', dims: '—', centreX: '—', centreH: '—', yaw: '—' });
       }
     });
-    const sub = drawnSubs[0];
-    if (sub) {
-      rows.push({
-        role: sub.label,
-        model: sub.model,
-        dims: `${Math.round(sub.dims.widthM * 1000)} × ${Math.round(sub.dims.heightM * 1000)} × ${Math.round(sub.dims.depthM * 1000)}`,
-        centreX: fmtM(sub.xM),
-        centreH: fmtM(sub.bottomHeightM + sub.dims.heightM / 2),
-        yaw: '—',
-      });
-    } else {
+    // Iterate every actual front-wall subwoofer instance — do NOT deduplicate
+    // by model, role, or legacy group.  Two identical SUB2-12 cabinets are
+    // still two separate installed pieces of equipment.
+    if (drawnSubs.length === 0) {
       rows.push({ role: 'SUB1', model: '—', dims: '—', centreX: '—', centreH: '—', yaw: '—' });
+    } else {
+      drawnSubs.forEach((sub) => {
+        rows.push({
+          role: sub.label,
+          model: sub.model,
+          dims: `${Math.round(sub.dims.widthM * 1000)} × ${Math.round(sub.dims.heightM * 1000)} × ${Math.round(sub.dims.depthM * 1000)}`,
+          centreX: fmtM(sub.xM),
+          centreH: fmtM(sub.bottomHeightM + sub.dims.heightM / 2),
+          yaw: '—',
+        });
+      });
     }
     return rows;
   }, [drawnSpeakers, drawnSubs]);
@@ -514,18 +538,19 @@ export default function ScreenWallConstructionGraphic({
               </g>
             );
           })}
-          {drawnSubs[0] && (
-            <text x={tableX} y={tableStartY + (scheduleRows.length + 1) * rowH + 12} fontSize="8" fill={COLORS.muted} fontFamily={BODY_FONT}>
-              {drawnSubs[0].label} bottom height: {fmtM(drawnSubs[0].bottomHeightM)}
+          {drawnSubs.map((sub, i) => (
+            <text key={sub.label} x={tableX} y={tableStartY + (scheduleRows.length + 1) * rowH + 12 + i * 12} fontSize="8" fill={COLORS.muted} fontFamily={BODY_FONT}>
+              {sub.label} bottom height: {fmtM(sub.bottomHeightM)}
             </text>
-          )}
+          ))}
         </g>
 
         {/* Notes — flow after equipment schedule, not bottom-anchored */}
         <g>
           {(() => {
-            const subNoteY = drawnSubs[0]
-              ? tableStartY + (scheduleRows.length + 1) * rowH + 12
+            const subNoteLines = drawnSubs.length;
+            const subNoteY = subNoteLines > 0
+              ? tableStartY + (scheduleRows.length + 1) * rowH + 12 + subNoteLines * 12
               : tableStartY + (scheduleRows.length + 1) * rowH;
             const notesGap = 18;
             const dividerY = subNoteY + notesGap;
