@@ -118,14 +118,20 @@ export class P14TargetBackgroundScheduler {
   }
 
   /** Schedule background calculation of remaining targets. Same design →
-   *  update foreground target and continue; changed design → cancel+restart. */
+    *  update foreground target and continue; changed design → cancel+restart.
+    *
+    *  Remaining targets are sorted by smallest absolute dBC distance from the
+    *  selected (foreground) target. When distances tie, the same Minimum/
+    *  Recommended basis as the selected target is preferred. This ensures the
+    *  closest targets to the user's selection are calculated first, so a P14
+    *  switch to a nearby target is most likely to hit a cached result. */
   schedule({ projectId, baseDesignFingerprint, foregroundTargetKey, allTargets, designContext }) {
-   if (this.currentBaseDesignFingerprint !== baseDesignFingerprint || this.projectId !== projectId) {
-     this.cancel();
-     this.currentBaseDesignFingerprint = baseDesignFingerprint;
-     this.retryCounts.clear();
-      this.failedTargets.clear();
-      this.sweepDiagnostics = createSweepDiagnostics();
+    if (this.currentBaseDesignFingerprint !== baseDesignFingerprint || this.projectId !== projectId) {
+      this.cancel();
+      this.currentBaseDesignFingerprint = baseDesignFingerprint;
+      this.retryCounts.clear();
+       this.failedTargets.clear();
+       this.sweepDiagnostics = createSweepDiagnostics();
     }
 
     this.cancelled = false;
@@ -133,13 +139,33 @@ export class P14TargetBackgroundScheduler {
     this.foregroundTargetKey = foregroundTargetKey;
     this.allTargets = allTargets;
     this.designContext = designContext;
-    // Always rebuild from the canonical family. Cached targets are skipped by
-    // runNext(), and the currently running target is excluded to avoid a
-    // duplicate when React republishes the same scheduling inputs.
-    this.queue = allTargets.filter((target) =>
-      target.key !== foregroundTargetKey
-      && target.key !== this.currentTarget?.key
-    );
+
+    // Find the foreground target's dB and basis for distance-based sorting
+    const foregroundTarget = allTargets.find((t) => t.key === foregroundTargetKey);
+    const foregroundDb = Number.isFinite(foregroundTarget?.db) ? foregroundTarget.db : null;
+    const foregroundBasis = foregroundTarget?.basis || null;
+
+    // Build the queue of remaining targets, sorted by absolute dBC distance
+    // from the selected target. Same-basis preferred when distances tie.
+    this.queue = allTargets
+      .filter((target) =>
+        target.key !== foregroundTargetKey
+        && target.key !== this.currentTarget?.key
+      )
+      .sort((a, b) => {
+        if (foregroundDb != null && Number.isFinite(a.db) && Number.isFinite(b.db)) {
+          const distA = Math.abs(a.db - foregroundDb);
+          const distB = Math.abs(b.db - foregroundDb);
+          if (Math.abs(distA - distB) > 0.01) return distA - distB;
+          // Tie: same basis as foreground preferred
+          const aSameBasis = a.basis === foregroundBasis ? 0 : 1;
+          const bSameBasis = b.basis === foregroundBasis ? 0 : 1;
+          if (aSameBasis !== bSameBasis) return aSameBasis - bSameBasis;
+        }
+        // Fallback: sort by key for determinism
+        return (a.key || "").localeCompare(b.key || "");
+      });
+
     if (!this.running) this.scheduleNext();
   }
 

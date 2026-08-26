@@ -11,6 +11,7 @@ export default function P14PresentationHeader({
   availableP14CapabilityDb,
   achievedP19VariationDb,
   achievedP19Level,
+  phaseLabel,
 }) {
   const targetDb = Number.isFinite(selectedP14TargetDb) ? Math.round(selectedP14TargetDb) : null;
   const basisLabel = selectedP14TargetBasis === "recommended" ? "Recommended" : "Minimum";
@@ -62,6 +63,33 @@ export default function P14PresentationHeader({
 
   return (
     <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+      {/* Calculation phase indicator */}
+      {phaseLabel && (
+        <div style={{
+          ...cardStyle,
+          flex: "1 1 100%",
+          minWidth: "100%",
+          background: "#213428",
+          color: "#FFFFFF",
+          border: "1px solid #213428",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "8px 14px",
+        }}>
+          <div style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: phaseLabel === "Analysis complete" ? "#7DBA84" : "#FFFFFF",
+            animation: phaseLabel === "Analysis complete" ? "none" : "pulse 1.5s ease-in-out infinite",
+          }} />
+          <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.02em" }}>
+            {phaseLabel}
+          </span>
+        </div>
+      )}
+
       {/* P14 Total LFE Target */}
       <div style={cardStyle}>
         <div style={titleStyle}>P14 Total LFE Target</div>

@@ -13,6 +13,10 @@
 import { useEffect, useSyncExternalStore, useState, useMemo } from "react";
 import { computeStage2Fingerprint } from "./stage2Fingerprint";
 import {
+  computeStage2PlacementFingerprint,
+  computeStage2ConfirmationFingerprint,
+} from "./stage2PlacementFingerprint";
+import {
   stage2PlacementController,
   getStage2State,
   subscribeStage2,
@@ -27,7 +31,6 @@ import { deriveRequestedCalibrationConfig } from "../requestedCalibrationConfig"
 import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { STAGE2_DEFAULT_QUANTITY_ORDER, STAGE2_START_DELAY_MS } from "./stage2Constants";
-import { useP14AnalysisProgress } from "../p14AnalysisProgressStore";
 
 function computeTransitionHz(roomDims) {
   const volume = Number(roomDims?.widthM) * Number(roomDims?.lengthM) * Number(roomDims?.heightM);
@@ -95,10 +98,6 @@ export function useStage2PlacementOptimiser({
 
   const [hydrationDone, setHydrationDone] = useState(false);
   const [hydratedCache, setHydratedCache] = useState(null);
-  const p14FamilyProgress = useP14AnalysisProgress(projectId);
-  const p14FamilyReady = p14FamilyProgress?.status === "complete"
-    && Number(p14FamilyProgress?.total) === 8
-    && Number(p14FamilyProgress?.completed) >= 8;
 
   // Compute P14 target from splConfig
   const p14Target = useMemo(() => {
@@ -133,7 +132,30 @@ export function useStage2PlacementOptimiser({
 
   const stage1Fingerprint = stage1State?.fingerprint || null;
 
-  // Compute Stage 2 fingerprint
+  // Compute P14-independent placement fingerprint (raw transfer cache identity)
+  const placementFingerprint = useMemo(() => {
+    if (!stage1Fingerprint || !stage1Finalists || !selectedSubModel) return null;
+    return computeStage2PlacementFingerprint({
+      stage1Fingerprint,
+      stage1Finalists,
+      selectedSubModel,
+      subwooferBottomHeightM,
+    });
+  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, subwooferBottomHeightM]);
+
+  // Compute P14-dependent confirmation fingerprint (placement + P14)
+  const confirmationFingerprint = useMemo(() => {
+    if (!placementFingerprint || !p14Target) return null;
+    return computeStage2ConfirmationFingerprint({
+      placementFingerprint,
+      p14TargetBasis: p14Target.basis,
+      p14TargetLevel: p14Target.level,
+      p14TargetDb: p14Target.db,
+      p18TargetBasis: p14Target.p18TargetBasis,
+    });
+  }, [placementFingerprint, p14Target]);
+
+  // Legacy fingerprint for cache compatibility (includes P14)
   const fingerprint = useMemo(() => {
     if (!stage1Fingerprint || !stage1Finalists || !selectedSubModel || !p14Target) return null;
     return computeStage2Fingerprint({
@@ -168,11 +190,11 @@ export function useStage2PlacementOptimiser({
     return () => { cancelled = true; };
   }, [projectId]);
 
-  // Restore only after both the current Stage 2 fingerprint and the complete
-  // eight-target bass authority are known. This prevents a cold reopen from
-  // starting a redundant worker before persisted authority is checked.
+  // Restore from persisted cache when valid. No longer requires the 8/8 P14
+  // family — Stage 2 only needs the authoritative selected P14 result and
+  // valid placement/raw authority.
   useEffect(() => {
-    if (!hydrationDone || !p14FamilyReady || !isStage2CacheValid(hydratedCache, fingerprint)) return;
+    if (!hydrationDone || !isStage2CacheValid(hydratedCache, fingerprint)) return;
     publishHydratedStage2(projectId, fingerprint, {
       one_sub_result: hydratedCache.one_sub_result,
       two_sub_result: hydratedCache.two_sub_result,
@@ -186,21 +208,18 @@ export function useStage2PlacementOptimiser({
       b_failed_candidates: hydratedCache.b_failed_candidates,
       b_result: hydratedCache.b_result,
     });
-  }, [hydrationDone, p14FamilyReady, hydratedCache, fingerprint, projectId]);
+  }, [hydrationDone, hydratedCache, fingerprint, projectId]);
 
-  // Schedule / cancel on fingerprint change
+  // Schedule / cancel on fingerprint change. No 8/8 gate — Stage 2 starts
+  // as soon as Stage 1 is complete, the sub model is selected, and a valid
+  // P14 target exists. The selected P14 target is confirmed first; the
+  // remaining seven targets are calculated in the background afterwards.
   useEffect(() => {
     if (!hydrationDone) return;
 
     if (!fingerprint) {
       stage2PlacementController.cancelAll("inputs-incomplete");
       markStage2Idle(projectId);
-      return;
-    }
-
-    if (!p14FamilyReady) {
-      stage2PlacementController.cancelAll("p14-family-incomplete");
-      markStage2Waiting(projectId, fingerprint, "waiting_for_bass");
       return;
     }
 
@@ -226,6 +245,8 @@ export function useStage2PlacementOptimiser({
     stage2PlacementController.schedule({
       projectId,
       fingerprint,
+      placementFingerprint,
+      confirmationFingerprint,
       promotionPlan,
       allStage1Finalists: stage1Finalists,
       stage1Complete: stage1State?.status === "complete",
@@ -245,7 +266,7 @@ export function useStage2PlacementOptimiser({
       quantityOrder,
       delay: STAGE2_START_DELAY_MS,
     });
-  }, [fingerprint, projectId, hydrationDone, currentQuantity, p14FamilyReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return state;
 }
