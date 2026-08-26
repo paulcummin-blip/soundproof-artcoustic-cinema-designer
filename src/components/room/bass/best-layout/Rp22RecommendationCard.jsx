@@ -3,31 +3,61 @@ import { Check, Loader2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 function expectedBenefit(sourceCount) {
-  if (sourceCount === 1) return "Best available single-sub layout, but limited seat-to-seat consistency is expected.";
+  if (sourceCount === 1) return "Best available single-sub layout, with canonical seat coverage shown below.";
   if (sourceCount === 2) return "Improves modal averaging and seat-to-seat bass consistency.";
   return "Typically gives the strongest seat-to-seat consistency and the most robust RP22 bass result.";
 }
 
-const levelText = (level) => Number.isFinite(level) ? (level > 0 ? `L${level}` : "FAIL") : "—";
+const levelText = (level) => Number.isFinite(Number(level)) && Number(level) > 0 ? `L${Number(level)}` : "FAIL";
 
-export default function Rp22RecommendationCard({ title, layout, onClick, onApply, isApplied, isRecalculating, applying, applyError, unsupported, applyLabel = "Apply layout", currentMetrics }) {
-  if (!layout) return null;
+function coverageText(results) {
+  const seats = Array.isArray(results) ? results : [];
+  const primary = seats.filter((seat) => seat.isPrimary !== false);
+  const primaryFloor = primary.length ? Math.min(...primary.map((seat) => Number(seat.level) || 0)) : 0;
+  const allFloor = seats.length ? Math.min(...seats.map((seat) => Number(seat.level) || 0)) : 0;
+  const primaryText = primary.length ? `Primary Seats ${levelText(primaryFloor)}` : "No Primary seats";
+  const floorText = seats.length ? `No seat lower than ${levelText(allFloor)}` : "No seat authority";
+  return `${primaryText} · ${floorText}`;
+}
+
+function SeatCoverage({ metrics }) {
+  const p19 = Array.isArray(metrics?.perSeatP19) ? metrics.perSeatP19 : [];
+  const p20 = Array.isArray(metrics?.perSeatP20) ? metrics.perSeatP20 : [];
+  const p20ById = new Map(p20.map((seat) => [String(seat.seatId), seat]));
+  const rows = p19.map((seat) => ({ seat, p20: p20ById.get(String(seat.seatId)) }));
+  return (
+    <>
+      <div className="mt-3 grid gap-2 text-[11px]">
+        <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-2 py-1.5">
+          <div className="text-[10px] font-medium text-[#625143]">P19 · Canonical seat coverage</div>
+          <div className="font-semibold text-[#1B1A1A]">{coverageText(p19)}</div>
+        </div>
+        <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-2 py-1.5">
+          <div className="text-[10px] font-medium text-[#625143]">P20 · Canonical seat coverage</div>
+          <div className="font-semibold text-[#1B1A1A]">{coverageText(p20)}</div>
+        </div>
+      </div>
+      {rows.length > 0 && (
+        <details className="mt-2 rounded-md border border-[#E7E4DF] bg-white/50 px-2.5 py-2">
+          <summary className="cursor-pointer text-[10px] font-medium text-[#625143]">View individual seat authority</summary>
+          <div className="mt-2 space-y-1.5">
+            {rows.map(({ seat, p20: seatP20 }) => (
+              <div key={seat.seatId} className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 text-[10px] text-[#625143]">
+                <span className="truncate font-medium text-[#1B1A1A]">{seat.seatLabel}</span>
+                <span>P19 {levelText(seat.level)} · {seat.wholeDbDeviation ?? "—"} dB</span>
+                <span>P20 {levelText(seatP20?.level)} · {seatP20?.wholeDbDeviation ?? "—"} dB</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </>
+  );
+}
+
+export default function Rp22RecommendationCard({ title, layout, onClick, onApply, isApplied, isRecalculating, applying, applyError, unsupported, applyLabel = "Apply layout" }) {
+  if (!layout?.metrics || layout.metrics.responseAuthority !== "final-post-eq") return null;
   const m = layout.metrics;
-
-  // Authoritative current-layout P19/P20 (post-EQ / product-aware).
-  const hasCurrentCanonical = currentMetrics?.responseAuthority === "final-post-eq";
-  const currentP19 = isRecalculating ? "…" : hasCurrentCanonical ? levelText(currentMetrics?.p19Level) : "—";
-  const currentP20 = isRecalculating ? "…" : hasCurrentCanonical ? levelText(currentMetrics?.p20Level) : "—";
-
-  // Preview-path P19/P20 (pre-EQ placement estimate).
-  const previewP19Level = m?.p19Level;
-  const previewP20Level = m?.p20Level;
-  const previewP19 = m?.rspOnly || previewP19Level == null
-    ? "Prediction unavailable"
-    : `${previewP19Level > 0 ? `L${previewP19Level}` : "FAIL"} · ±${Number(m.meanSeatVariationDb).toFixed(1)} dB`;
-  const previewP20 = m?.rspOnly || previewP20Level == null
-    ? "Prediction unavailable"
-    : `${previewP20Level > 0 ? `L${previewP20Level}` : "FAIL"} · ±${Number(m.worstSeatVariationDb).toFixed(1)} dB`;
   return (
     <div className={`w-full rounded-lg border p-4 text-left transition ${isApplied ? "border-2 border-[#213428] bg-[#F3F1EC]" : "border border-[#D9D5CE] bg-white"} hover:border-[#213428] hover:shadow-sm`}>
       <button type="button" onClick={() => onClick(layout)} className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#213428]">
@@ -35,51 +65,27 @@ export default function Rp22RecommendationCard({ title, layout, onClick, onApply
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">{title}</div>
             <div className="mt-1 text-sm font-semibold text-[#1B1A1A]">{layout.name}</div>
-            <div className="mt-0.5 text-[11px] text-[#625143]">{m.sourceCount} subwoofers · {layout.placementMode}</div>
+            <div className="mt-0.5 text-[11px] text-[#625143]">{m.sourceCount} {m.sourceCount === 1 ? "subwoofer" : "subwoofers"} · {layout.placementMode}</div>
           </div>
           <ChevronRight className="h-4 w-4 text-[#625143]" />
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-[#625143]">{expectedBenefit(m.sourceCount)}</p>
       </button>
 
-      {isApplied ? (
-        <>
-          <div className="mt-3 rounded-md border border-[#213428]/30 bg-white/70 p-3">
-            <div className="flex items-center gap-2">
-              <Check className="h-4 w-4 text-[#213428]" />
-              <span className="text-xs font-semibold text-[#213428]">Already applied · current layout</span>
-              {applying && <span className="flex items-center gap-1 text-[10px] text-[#625143]"><Loader2 className="h-3 w-3 animate-spin" />Applying positions…</span>}
-              {!applying && isRecalculating && <span className="flex items-center gap-1 text-[10px] text-[#625143]"><Loader2 className="h-3 w-3 animate-spin" />Recalculating bass response…</span>}
-            </div>
-            <p className="mt-1.5 text-[11px] text-[#213428]">Current layout already matches this tested position.</p>
-            <p className="mt-0.5 text-[10px] text-[#625143]">P19/P20 below are the confirmed authoritative results for the current layout.</p>
+      {isApplied && (
+        <div className="mt-3 rounded-md border border-[#213428]/30 bg-white/70 p-3">
+          <div className="flex items-center gap-2">
+            <Check className="h-4 w-4 text-[#213428]" />
+            <span className="text-xs font-semibold text-[#213428]">Already applied · current layout</span>
+            {applying && <span className="flex items-center gap-1 text-[10px] text-[#625143]"><Loader2 className="h-3 w-3 animate-spin" />Applying positions…</span>}
+            {!applying && isRecalculating && <span className="flex items-center gap-1 text-[10px] text-[#625143]"><Loader2 className="h-3 w-3 animate-spin" />Updating authority…</span>}
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
-            <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-2 py-1.5">
-              <div className="text-[10px] font-medium text-[#625143]">P19 · Seat Consistency</div>
-              <div className="font-semibold text-[#1B1A1A]">{currentP19}</div>
-            </div>
-            <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-2 py-1.5">
-              <div className="text-[10px] font-medium text-[#625143]">P20 · Seat Consistency</div>
-              <div className="font-semibold text-[#1B1A1A]">{currentP20}</div>
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-            <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-2 py-1.5">
-              <div className="text-[10px] font-medium text-[#625143]">P19 · Seat Consistency <span className="text-[#8A7B6A]">(preview)</span></div>
-              <div className="font-semibold text-[#1B1A1A]">{previewP19}</div>
-            </div>
-            <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-2 py-1.5">
-              <div className="text-[10px] font-medium text-[#625143]">P20 · Seat Consistency <span className="text-[#8A7B6A]">(preview)</span></div>
-              <div className="font-semibold text-[#1B1A1A]">{previewP20}</div>
-            </div>
-          </div>
-          <p className="mt-1.5 text-[10px] text-[#8A7B6A]">Placement preview · pre-EQ estimate. Final P19/P20 are confirmed after applying and recalculating.</p>
-        </>
+          <p className="mt-1.5 text-[11px] text-[#213428]">This tested position reuses the current canonical result.</p>
+        </div>
       )}
+
+      {m.limited && <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-2 text-[10px] font-medium text-amber-800">Limited at the selected P14/P18 target; the seat authority below remains canonical.</p>}
+      <SeatCoverage metrics={m} />
 
       {unsupported && (
         <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3">
@@ -91,7 +97,7 @@ export default function Rp22RecommendationCard({ title, layout, onClick, onApply
       {applyError && !unsupported && <p className="mt-2 text-[11px] text-red-700">{applyError}</p>}
 
       {!isApplied && !unsupported && (
-        <Button type="button" size="sm" className="mt-3 w-full bg-[#213428] text-white hover:bg-[#3E4349]" onClick={(e) => { e.stopPropagation(); onApply?.(layout); }} disabled={applying}>
+        <Button type="button" size="sm" className="mt-3 w-full bg-[#213428] text-white hover:bg-[#3E4349]" onClick={(event) => { event.stopPropagation(); onApply?.(layout); }} disabled={applying}>
           {applying ? "Applying…" : applyLabel}
         </Button>
       )}
