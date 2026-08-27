@@ -74,17 +74,26 @@ export function loadAutosave(projectId) {
     }
 
     // Migration: try legacy global key (one-time).
+    // SECURITY: Only migrate if the legacy payload carries a positively
+    // matching project ID. Anonymous payloads (no __projectId) must NEVER
+    // initialise an existing saved project. If project identity is absent
+    // or cannot be proven, the legacy payload is ignored.
     const legacyRaw = localStorage.getItem(LEGACY_KEY);
     if (!legacyRaw) return null;
     const legacy = safeJsonParse(legacyRaw);
     if (!legacy) return null;
-    // Only use legacy payload if it has no project binding or matches.
     if (
-      !legacy.payload?.__projectId ||
-      !pid ||
+      pid &&
+      legacy.payload?.__projectId &&
       legacy.payload.__projectId === pid
     ) {
       return legacy;
+    }
+    // Anonymous or mismatched legacy payload — archive it, do not migrate.
+    try {
+      localStorage.removeItem(LEGACY_KEY);
+    } catch {
+      // ignore
     }
     return null;
   } catch {
