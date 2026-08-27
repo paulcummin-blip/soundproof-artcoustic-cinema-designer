@@ -11,8 +11,8 @@
  *      (auto-rebuilt / hydrated speakers must never inherit stale rotation)
  *   2. Aim-at-MLP toggles from appState
  *   3. Role-based defaults
- *      - SBL / SBR  → always aim at MLP  (prevents 168° bug at RSP)
- *      - SL  / SR   → wall-flat (+90 / -90)
+ *      - SBL / SBR  → wall-flat 180° (rear wall faces screen); aim toggle → RSP
+ *      - SL  / SR   → wall-flat (-90 / +90)  (left/right wall faces room interior)
  *      - LW  / RW   → wall-flat (-90 / +90)
  */
 
@@ -71,13 +71,14 @@ export function resolveSpeakerYaw({ speaker, mlpPos, appState, getCanonicalRole 
 
   // ─── 3. Role-based defaults ───────────────────────────────────────────────
 
-  // Rear surrounds: flat to wall (0°) unless aim toggle is ON
+  // Rear surrounds: flat to rear wall — front face points toward the screen (-Y = 180°).
+  // Aim toggle ON → face the RSP directly (azimuth from speaker to RSP, no 180° offset).
   if (isRear) {
     if (aimRear && hasValidMlp) {
       const y = _yawFromTo(pos, mlpPos);
-      return isNum(y) ? y : 0;
+      return isNum(y) ? y : 180;
     }
-    return 0;
+    return 180;
   }
 
   // Side surrounds: wall-flat by default, but rear-wall-mounted if on the back wall
@@ -86,15 +87,16 @@ export function resolveSpeakerYaw({ speaker, mlpPos, appState, getCanonicalRole 
     const isOnRearWall = speaker.isOnRearWall === true;
 
     if (isOnRearWall) {
-      // Long edge against rear wall, face into room → yaw 0
-      // Reuse aimRear toggle so the same MLP-aim UI controls both SBL/SBR and rear-mounted SL/SR
-      if (aimRear && hasValidMlp) return _yawFromTo(pos, mlpPos) ?? 0;
-      return 0;
+      // Long edge against rear wall — front face points toward the screen (-Y = 180°).
+      // Reuse aimRear toggle so the same MLP-aim UI controls both SBL/SBR and rear-mounted SL/SR.
+      if (aimRear && hasValidMlp) return _yawFromTo(pos, mlpPos) ?? 180;
+      return 180;
     }
 
-    // On side wall: original behaviour preserved exactly
-    if (canon === 'SL' || /^SL\d+$/.test(canon)) return  90;
-    if (canon === 'SR' || /^SR\d+$/.test(canon)) return -90;
+    // On side wall: front face points into the room interior.
+    // Left-wall speakers (SL) face +X = -90°; right-wall speakers (SR) face -X = +90°.
+    if (canon === 'SL' || /^SL\d+$/.test(canon)) return -90;
+    if (canon === 'SR' || /^SR\d+$/.test(canon)) return  90;
     return 0;
   }
 
