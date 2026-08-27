@@ -171,43 +171,30 @@ const buildP16DebugText = (metric) => {
 const buildP17DebugText = (metric) => {
   if (!metric?.perSpeaker || metric.perSpeaker.length === 0) return "";
   const lines = [];
+  // Engine P17 per-speaker quantity = seat-vs-RSP response delta (s.lossDb). Display the
+  // actual numeric delta so the worst value matches the final raw P17 variation before
+  // integer grading. No stepped buckets or placeholder 0.0 dB values.
   const speakerLine = metric.perSpeaker
     .slice()
     .sort((a, b) => a.role.localeCompare(b.role))
     .map((s) => {
       const displayAngle = Number.isFinite(s?.rawAngleDeg) ? s.rawAngleDeg : s?.angleDeg;
       const angle = Number.isFinite(displayAngle) ? String(Math.floor(Math.abs(displayAngle) + 1e-9)) : '—';
-      const rawLoss = Number.isFinite(s?.lossDb) ? Number(s.lossDb) : null;
-      let lossText = '—';
-      if (s?.isBeyondNonLcrLimit) lossText = 'N/A';
-      else if (rawLoss == null) lossText = '—';
-      else if (rawLoss <= 0.0) lossText = '0.0 dB';
-      else if (rawLoss <= 1.5) lossText = '1.5 dB';
-      else if (rawLoss <= 3.0) lossText = '3.0 dB';
-      else lossText = '>3.0 dB';
-      const text = `${s.role} ${angle}° / ${lossText}`;
+      const rawDelta = Number.isFinite(s?.lossDb) ? Number(s.lossDb) : null;
+      const deltaText = rawDelta == null ? '—' : `${rawDelta.toFixed(1)} dB`;
+      const text = `${s.role} ${angle}° / ${deltaText}`;
       return metric?.worstRole === s.role ? `[worst] ${text}` : text;
     })
     .join(', ');
   lines.push(speakerLine);
 
   if (metric?.worstRole && Number.isFinite(metric?.worstAngleDeg) && Number.isFinite(metric?.worstLossDb)) {
-    const raw = Number(metric.worstLossDb);
-    const worstLossText = raw <= 0.0 ? '0.0 dB' : raw <= 1.5 ? '1.5 dB' : raw <= 3.0 ? '3.0 dB' : '>3.0 dB';
-    lines.push(`(worst: ${metric.worstRole} ${String(Math.floor(Math.abs(metric.worstAngleDeg) + 1e-9))}° / ${worstLossText})`);
+    const worstDelta = Number(metric.worstLossDb);
+    lines.push(`(worst: ${metric.worstRole} ${String(Math.floor(Math.abs(metric.worstAngleDeg) + 1e-9))}° / ${worstDelta.toFixed(1)} dB)`);
   }
 
   if (metric.p17HasNaAngles) {
     lines.push('N/A = >41° off-axis; RP22 Level 2 limit');
-  }
-
-  const BED_DEBUG_ROLES = ['SBL', 'SBR', 'SL', 'SR', 'LW', 'RW'];
-  const debugSpeakers = metric.perSpeaker.filter(s => BED_DEBUG_ROLES.includes(s.role) && s.debug);
-  if (debugSpeakers.length) {
-    const formatDbgVal = (v) => Number.isFinite(v) ? v.toFixed(1) : '—';
-    debugSpeakers.forEach((s) => {
-      lines.push(`${s.role} dbg: seatAz=${formatDbgVal(s.debug.seatAzDeg)} ref=${formatDbgVal(s.debug.referenceDeg ?? s.debug.aimDegRaw)} offAxis=${formatDbgVal(s.debug.offAxisDegComputed)}`);
-    });
   }
 
   return lines.join('\n');
