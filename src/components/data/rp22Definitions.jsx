@@ -54,7 +54,7 @@ export const RP22_DEFINITIONS = {
     title: "9. Maximum allowable vertical angle between adjacent (L/R rows of) upper speakers",
     description: "To ensure that sound movement is smooth and localisation is accurate, this metric specifies the maximum vertical angle between adjacent upper speakers at the seating location. Excludes top middle centre (\"Voice of God\") and height centre speakers.",
     thresholds: [
-      { level: 1, criteria: "> 80.1°" },
+      { level: 1, criteria: "N/A" },
       { level: 2, criteria: "≤ 80°" },
       { level: 3, criteria: "≤ 60°" },
       { level: 4, criteria: "≤ 50°" }

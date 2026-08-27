@@ -111,9 +111,9 @@ export const RP22_CATALOG = deepFreeze({
     unit: "deg",
     scope: "Seat",
     direction: "max",
-    levels: { L1: 80.1, L2: 80, L3: 60, L4: 50 },
+    levels: { L1: null, L2: 80, L3: 60, L4: 50 },
     notes:
-      "To ensure that sound movement is smooth, and localization is accurate, this metric specifies the maximum vertical angle between adjacent upper speakers at the seating location. Excludes top middle center (\"Voice of God\") and height center speakers."
+      "To ensure that sound movement is smooth, and localization is accurate, this metric specifies the maximum vertical angle between adjacent upper speakers at the seating location. Excludes top middle center (\"Voice of God\") and height center speakers. Level 1 has no separate numeric threshold — any result exceeding the L2 maximum (80°) is graded L1."
   },
   "10": {
     number: 10,
