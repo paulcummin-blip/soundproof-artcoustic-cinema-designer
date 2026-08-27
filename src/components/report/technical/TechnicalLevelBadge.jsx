@@ -37,6 +37,7 @@ export default function TechnicalLevelBadge({ level, size = "normal" }) {
 
   return (
     <div
+      className={size === "small" ? "tech-seat-badge" : undefined}
       style={{
         width: dims.w,
         height: dims.h,

@@ -356,6 +356,18 @@ export default function ReportPrintStyles() {
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
                 }
+
+                /* ── Technical Report seat-result pills: 2× size in print/PDF only ──
+                   Affects only the per-seat L1–L4 / FAIL badges (TechnicalLevelBadge
+                   size="small") inside the Technical Report. Web UI, Room Designer,
+                   compliance panel and category-summary pills are unchanged. */
+                .rp22-report .tech-seat-badge {
+                    width: 52px !important;
+                    height: 36px !important;
+                    min-width: 52px !important;
+                    font-size: 16pt !important;
+                    border-radius: 6px !important;
+                }
             }
 
             @media screen {
