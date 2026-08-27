@@ -4,14 +4,16 @@
  * Canonical instance-authority version for the completed-bass-authority
  * persistence/hydration contract.
  *
- * Single source of truth — imported by:
- *   - subwooferInstanceMigration.js (re-exports for app consumers)
- *   - completedBassResultPersistence.js (resolver + adapter)
+ * Re-exports from the frontend-safe canonical location (src/lib/bassAuthorityVersion.js)
+ * so bare-Node regression tests and backend functions can import this shared
+ * path without pulling in @/-aliased modules.
  *
- * Kept dependency-free so the persistence adapter/resolver is importable from
- * bare-Node regression tests (no application path alias required).
+ * Frontend/browser modules MUST import @/lib/bassAuthorityVersion directly —
+ * importing from /base44/shared/... causes a 403 in the preview sandbox.
  */
-export const INSTANCE_AUTHORITY_VERSION = 4;
-export const BASS_ANALYSIS_CONTRACT_VERSION = 14;
-export const COMPLETED_BASS_CACHE_VERSION = 5;
-export const RP22_BASS_METRIC_SCHEMA_VERSION = 10;
+export {
+  INSTANCE_AUTHORITY_VERSION,
+  BASS_ANALYSIS_CONTRACT_VERSION,
+  COMPLETED_BASS_CACHE_VERSION,
+  RP22_BASS_METRIC_SCHEMA_VERSION,
+} from "../../src/lib/bassAuthorityVersion.js";

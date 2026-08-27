@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
-import { INSTANCE_AUTHORITY_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "../../../../base44/shared/bassAuthorityVersion.js";
+import { INSTANCE_AUTHORITY_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
 import {
   COMPLETED_BASS_CACHE_VERSION,
   BASS_AUTHORITY_STATUS,

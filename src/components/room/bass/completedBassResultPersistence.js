@@ -3,7 +3,7 @@ import {
   COMPLETED_BASS_CACHE_VERSION,
   INSTANCE_AUTHORITY_VERSION,
   RP22_BASS_METRIC_SCHEMA_VERSION,
-} from "../../../../base44/shared/bassAuthorityVersion.js";
+} from "@/lib/bassAuthorityVersion";
 
 export { COMPLETED_BASS_CACHE_VERSION };
 

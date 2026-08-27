@@ -11,7 +11,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
-import { COMPLETED_BASS_CACHE_VERSION, INSTANCE_AUTHORITY_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "../../../../base44/shared/bassAuthorityVersion.js";
+import { COMPLETED_BASS_CACHE_VERSION, INSTANCE_AUTHORITY_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
 import { isAuthoritativeBassContract } from "./completedBassResultPersistence";
 import { hasGraphPayload } from "./finishedGraphAdapter";
 import { hasReadyCanonicalP19Contract } from "./p19Readiness";

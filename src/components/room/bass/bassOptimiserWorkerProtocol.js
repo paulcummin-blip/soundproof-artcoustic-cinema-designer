@@ -1,4 +1,4 @@
-import { RP22_BASS_METRIC_SCHEMA_VERSION } from "../../../../base44/shared/bassAuthorityVersion.js";
+import { RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
 
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
 export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v39-smoothed-correction-envelope";

@@ -40,7 +40,7 @@ import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 // Re-export from the dependency-free shared module so the completed-bass
 // persistence/resolver can import the authority version without pulling in
 // @/-aliased modules (keeps the resolver bare-Node testable).
-export { INSTANCE_AUTHORITY_VERSION } from "../../../base44/shared/bassAuthorityVersion.js";
+export { INSTANCE_AUTHORITY_VERSION } from "@/lib/bassAuthorityVersion";
 
 const SUB_WIDTH_FALLBACK_M = 0.50;
 const SUB_HEIGHT_FALLBACK_M = 0.50;

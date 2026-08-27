@@ -14,7 +14,7 @@
 // It exists alongside the current implementation and has zero visible effect.
 
 import { isValidFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
-import { BASS_ANALYSIS_CONTRACT_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "../../../../base44/shared/bassAuthorityVersion.js";
+import { BASS_ANALYSIS_CONTRACT_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
 import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 
 export { isValidFingerprint };
