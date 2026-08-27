@@ -102,6 +102,7 @@ export function assessP18AgainstRequiredExtension({
   p18CutoffDb,
   configuredUsableLfHz = null,
   upperLfeHz = 120,
+  productCurveMinHz = null,
 }) {
   if (!Array.isArray(rspPostEqCurve) || !rspPostEqCurve.length) return null;
   const targetDb = Number(selectedP14TargetDb);
@@ -119,6 +120,15 @@ export function assessP18AgainstRequiredExtension({
   const seatCurves = (Array.isArray(perSeatPostEqCurves) ? perSeatPostEqCurves : [])
     .filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
 
+  // P18 valid lower bound: the simulation grid floor (15 Hz) raised to the
+  // product capability validity floor when the active subwoofers have no
+  // authoritative engineering data below that point. A response still above
+  // the -3 dB cutoff at this floor is a BOUNDED result (extension is at or
+  // below the floor), not a measured crossing — see computeInRoomF3FromResponseCurve.
+  const simulationMinHz = 15;
+  const productFloorHz = Number.isFinite(Number(productCurveMinHz)) ? Number(productCurveMinHz) : null;
+  const validMinHz = productFloorHz != null ? Math.max(simulationMinHz, productFloorHz) : simulationMinHz;
+
   // P18 F3 = achieved in-room −3 dB extension of the confirmed operating
   // response at the selected P14 SPL. Uses the shared 60–200 Hz median
   // authority (METHOD A) — refDb = median of 1/3-octave-smoothed response over
@@ -128,18 +138,21 @@ export function assessP18AgainstRequiredExtension({
   // Diagnostic evidence confirmed this is robust to isolated modes, broad
   // modal humps, and small-room transition bleed. P18 reference-band selection
   // and P19/P20 grading-band selection are separate authorities.
-  const rspF3 = computeInRoomF3FromResponseCurve(rspPostEqCurve);
-  const rspExtensionHz = rspF3.f3Hz;
+  const rspF3 = computeInRoomF3FromResponseCurve(rspPostEqCurve, validMinHz);
+  const rspBounded = rspF3.achievedExtensionBounded === true;
+  const rspExtensionHz = rspBounded ? rspF3.extensionUpperBoundHz : rspF3.f3Hz;
   const rspRefDb = rspF3.refDb;
   const rspCutoffDb = rspF3.cutoffDb;
 
   const seatResults = seatCurves.map((seat) => {
-    const seatF3 = computeInRoomF3FromResponseCurve(seat.responseData);
+    const seatF3 = computeInRoomF3FromResponseCurve(seat.responseData, validMinHz);
+    const seatBounded = seatF3.achievedExtensionBounded === true;
     return {
       seatId: seat.seatId,
-      extensionHz: seatF3.f3Hz,
+      extensionHz: seatBounded ? seatF3.extensionUpperBoundHz : seatF3.f3Hz,
       refDb: seatF3.refDb,
       cutoffDb: seatF3.cutoffDb,
+      achievedExtensionBounded: seatBounded,
     };
   });
   const validSeatExtensions = seatResults.map((seat) => seat.extensionHz).filter(isFiniteNumber);
@@ -147,6 +160,8 @@ export function assessP18AgainstRequiredExtension({
   const worstSeatId = seatResults.filter((seat) => isFiniteNumber(seat.extensionHz))
     .sort((a, b) => b.extensionHz - a.extensionHz)[0]?.seatId ?? null;
   const achievedExtensionHz = rspExtensionHz;
+  const achievedExtensionBounded = rspBounded;
+  const extensionUpperBoundHz = rspBounded ? rspF3.extensionUpperBoundHz : null;
   const passes = isFiniteNumber(achievedExtensionHz) && achievedExtensionHz <= requiredHz;
   const shortfallHz = passes
     ? null
@@ -168,9 +183,15 @@ export function assessP18AgainstRequiredExtension({
     seatResults,
     seatConsistencyExcludedFromP18: true,
     achievedExtensionHz,
+    achievedExtensionBounded,
+    extensionUpperBoundHz,
+    validMinHz,
+    productCurveMinHz: productFloorHz,
     passes,
     shortfallHz,
-    assessmentSource: "in-room-60-200-median-sustained-extension",
+    assessmentSource: rspBounded
+      ? "in-room-60-200-median-bounded-at-product-validity-floor"
+      : "in-room-60-200-median-sustained-extension",
   };
 }
 

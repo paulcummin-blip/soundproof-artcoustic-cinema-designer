@@ -158,27 +158,47 @@ export function computeP18InRoomF3({ freqsHz, splDb, targetDb, minHz = 10, maxHz
 //
 // P18 reference-band selection (this function) and P19/P20 grading-band
 // selection (bassAssessmentBandAuthority) are separate authorities.
-export function computeInRoomF3FromResponseCurve(curve) {
-  if (!Array.isArray(curve) || curve.length === 0) return { f3Hz: null, refDb: null, cutoffDb: null };
+export function computeInRoomF3FromResponseCurve(curve, validMinHz = null) {
+  const empty = { f3Hz: null, refDb: null, cutoffDb: null, achievedExtensionBounded: false, extensionUpperBoundHz: null };
+  if (!Array.isArray(curve) || curve.length === 0) return empty;
   const smoothed = smoothThird(toSplCurve(curve));
-  if (!smoothed.length) return { f3Hz: null, refDb: null, cutoffDb: null };
+  if (!smoothed.length) return empty;
   // 60–200 Hz median — METHOD A, no transition cap.
   const refPoints = smoothed.filter((p) => p.frequency >= 60 && p.frequency <= 200);
   const refValues = (refPoints.length > 0 ? refPoints : smoothed).map((p) => p.spl).filter(isNum);
   const refDb = median(refValues);
-  if (!isNum(refDb)) return { f3Hz: null, refDb: null, cutoffDb: null };
+  if (!isNum(refDb)) return empty;
   const cutoffDb = refDb - 3;
-  // LOCAL 1/3-octave sustained crossing.
-  //
-  // Starting from the lowest frequency, find the lowest upward crossing of
-  // cutoffDb where the smoothed response remains at or above cutoffDb through
-  // a local window extending from the crossing frequency to crossing × 2^(1/3).
-  //
-  // This preserves narrow-spike protection (a single-point spike cannot fake
-  // extension) while preventing unrelated higher-frequency modal dips from
-  // erasing genuine LF extension. A distant null at 90/120/170 Hz may make
-  // P19/P20 worse but must not erase a legitimate 20 Hz P18 extension.
-  const points = smoothed.filter((p) => p.frequency <= 200 && isNum(p.spl));
+
+  // P18 valid lower bound: respects both the simulation grid and product
+  // capability authority. Frequencies below this floor are not authoritative —
+  // a response still above cutoff here is a BOUNDED result (extension is at or
+  // below the floor), not a measured -3 dB crossing. This prevents the
+  // simulation grid edge (e.g. 15 Hz) from being reported as an exact crossing
+  // when the product has no engineering data there.
+  const curveMinHz = smoothed[0].frequency;
+  const floorHz = Number.isFinite(Number(validMinHz)) && Number(validMinHz) > 0
+    ? Math.max(Number(validMinHz), curveMinHz)
+    : curveMinHz;
+
+  const points = smoothed.filter((p) => p.frequency <= 200 && isNum(p.spl) && p.frequency >= floorHz);
+  if (!points.length) {
+    return { f3Hz: null, refDb, cutoffDb, achievedExtensionBounded: true, extensionUpperBoundHz: floorHz };
+  }
+
+  // Case B: response is still above cutoff at the lowest valid frequency.
+  // No downward -3 dB crossing exists inside the valid range — the extension
+  // is bounded by the floor, not measured. Returning the grid edge as an exact
+  // crossing would manufacture a false P18 result.
+  if (points[0].spl >= cutoffDb) {
+    return { f3Hz: null, refDb, cutoffDb, achievedExtensionBounded: true, extensionUpperBoundHz: floorHz };
+  }
+
+  // Case A/C: search upward for the first sustained crossing of cutoffDb.
+  // LOCAL 1/3-octave sustained crossing — narrow-spike protection prevents a
+  // single-point spike from faking extension, while a distant null at
+  // 90/120/170 Hz may make P19/P20 worse but must not erase a legitimate
+  // 20 Hz P18 extension.
   let f3Hz = null;
   for (let index = 0; index < points.length; index += 1) {
     if (points[index].spl < cutoffDb) continue;
@@ -197,7 +217,7 @@ export function computeInRoomF3FromResponseCurve(curve) {
     f3Hz = previous.frequency + (points[index].frequency - previous.frequency) * ratio;
     break;
   }
-  return { f3Hz, refDb, cutoffDb };
+  return { f3Hz, refDb, cutoffDb, achievedExtensionBounded: false, extensionUpperBoundHz: null };
 }
 
 // P19 — direct maximum absolute response-to-target deviation below Schroeder frequency.
@@ -389,14 +409,29 @@ export function computeParam18AchievedExtension({ rspPostEqCurve, perSeatPostEqC
   if (!product) return null;
   const seatCurves = (perSeatPostEqCurves || []).filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
   const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
+  // Product capability validity floor: the highest (worst) lowest engineering
+  // frequency among active subwoofers. P18 must not claim a measured crossing
+  // below this floor — the product has no authoritative SPL data there.
+  const productMinHzValues = (activeSubs || [])
+    .map((sub) => {
+      const curve = getSubwooferCurve(sub?.modelKey ?? sub?.model);
+      if (!Array.isArray(curve) || !curve.length) return null;
+      const freqs = curve.map((p) => Number(p.hz)).filter(Number.isFinite).sort((a, b) => a - b);
+      return freqs.length ? freqs[0] : null;
+    })
+    .filter(Number.isFinite);
+  const productCurveMinHz = productMinHzValues.length ? Math.max(...productMinHzValues) : null;
+  const validMinHz = Number.isFinite(productCurveMinHz) ? Math.max(15, productCurveMinHz) : null;
   // P18 F3 is derived from the response's own 60–200 Hz median (METHOD A),
   // NOT from definition.p18CutoffDb (= P14Target − 3) as an absolute SPL floor.
   // The 60–200 Hz median is a single shared authority — see computeInRoomF3FromResponseCurve.
-  const rspF3 = computeInRoomF3FromResponseCurve(rspPostEqCurve);
-  const rspExtensionHz = rspF3.f3Hz;
+  const rspF3 = computeInRoomF3FromResponseCurve(rspPostEqCurve, validMinHz);
+  const rspExtensionHz = rspF3.achievedExtensionBounded ? rspF3.extensionUpperBoundHz : rspF3.f3Hz;
+  const rspBounded = rspF3.achievedExtensionBounded;
   const seatF3Results = seatCurves.map((seat) => {
-    const seatF3 = computeInRoomF3FromResponseCurve(seat.responseData);
-    return { seatId: seat.seatId, extensionHz: seatF3.f3Hz, refDb: seatF3.refDb, cutoffDb: seatF3.cutoffDb };
+    const seatF3 = computeInRoomF3FromResponseCurve(seat.responseData, validMinHz);
+    const seatExtensionHz = seatF3.achievedExtensionBounded ? seatF3.extensionUpperBoundHz : seatF3.f3Hz;
+    return { seatId: seat.seatId, extensionHz: seatExtensionHz, refDb: seatF3.refDb, cutoffDb: seatF3.cutoffDb, achievedExtensionBounded: seatF3.achievedExtensionBounded };
   });
   const targets = definitions.map((definition) => {
     const seatExtensions = seatF3Results.map((seat) => ({ seatId: seat.seatId, extensionHz: seat.extensionHz }));
@@ -421,10 +456,15 @@ export function computeParam18AchievedExtension({ rspPostEqCurve, perSeatPostEqC
 
 // Legacy in-room extension helper retained for non-authoritative simulation consumers.
 // Uses the shared 60–200 Hz median F3 authority (METHOD A) — NOT p18CutoffDb.
-export function computeParam18BassExtension(rspResponse) {
+// Accepts an optional productCurveMinHz so callers with product context can
+// bound the P18 search to the valid product data range.
+export function computeParam18BassExtension(rspResponse, productCurveMinHz = null) {
   if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
-  const f3 = computeInRoomF3FromResponseCurve(rspResponse);
-  const extensionHz = f3.f3Hz;
+  const validMinHz = Number.isFinite(Number(productCurveMinHz)) && Number(productCurveMinHz) > 0
+    ? Math.max(15, Number(productCurveMinHz))
+    : null;
+  const f3 = computeInRoomF3FromResponseCurve(rspResponse, validMinHz);
+  const extensionHz = f3.achievedExtensionBounded ? f3.extensionUpperBoundHz : f3.f3Hz;
   const refDb = f3.refDb;
   const cutoffDb = f3.cutoffDb;
   if (!isNum(extensionHz)) return { targets: [], level: null, value: null, formatted: null, refDb, cutoffDb, note: "Predicted design-stage extension from the shared calibrated response; independently graded from P14." };

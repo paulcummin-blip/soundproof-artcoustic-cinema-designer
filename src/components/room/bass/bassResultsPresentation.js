@@ -257,12 +257,17 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
 
   // P18 — dynamically regrade the achieved extension for the current display
   // basis without changing fingerprints, workers, authority or cached curves.
+  // A bounded result (response still above -3 dB at the product validity floor)
+  // is displayed as "≤{floor} Hz" — not a fake exact crossing below valid data.
   if (isAuthoritative && !p14Failed) {
     const source = contract?.productAnalysis?.parameters?.p18;
     const achievedValue = isFiniteNumber(source?.value) ? Number(source.value) : null;
+    const bounded = source?.achievedExtensionBounded === true;
     const assessment = assessP18Extension(achievedValue, activeP18Basis);
     const levelText = assessment.levelLabel || "FAIL";
-    const valueText = formatBassParameterValue("p18", achievedValue);
+    const valueText = isFiniteNumber(achievedValue)
+      ? `${bounded ? "≤" : ""}${formatBassParameterValue("p18", achievedValue)}`
+      : "";
     const resultText = valueText ? `${levelText} · ${valueText}` : "—";
     pills.p18 = {
       label: "P18 Extension",

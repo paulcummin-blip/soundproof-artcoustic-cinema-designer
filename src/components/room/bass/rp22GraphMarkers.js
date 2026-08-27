@@ -13,6 +13,13 @@ export function buildRp22GraphMarkers(finalBassResponse) {
       return worst;
     }, null);
 
+  // P18 bounded flag: when the response is still above the -3 dB cutoff at the
+  // product validity floor, the extension is bounded (≤ floor), not a measured
+  // crossing. The marker sits on the bound — not a fake exact point below valid
+  // product data. The authority payload retains the precise crossing when exact.
+  const p18Bounded = seatVariation?.p18?.authority?.achievedExtensionBounded === true
+    || seatVariation?.p18?.achievedExtensionBounded === true;
+
   return {
     // P18 is published at favourable whole-Hz resolution. Put the
     // marker on the same authoritative design value used by the pill and
@@ -20,6 +27,7 @@ export function buildRp22GraphMarkers(finalBassResponse) {
     p18FrequencyHz: finite(seatVariation?.p18?.extensionHz)
       ? Math.floor(Number(seatVariation.p18.extensionHz))
       : null,
+    p18Bounded,
     p19StartHz: finite(finalBassResponse?.assessmentStartHz)
       ? Number(finalBassResponse.assessmentStartHz)
       : null,

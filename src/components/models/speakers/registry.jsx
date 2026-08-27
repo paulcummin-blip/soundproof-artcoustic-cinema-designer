@@ -580,6 +580,17 @@ export function getSubwooferCurve(modelKey) {
   return rawCurve.map(([hz, db]) => ({ hz, db }));
 }
 
+// Product curve frequency range — the authoritative engineering data span.
+// Frequencies outside [minHz, maxHz] have no product authority and must not be
+// treated as valid for product-limited SPL capability or P18 extension.
+export function getProductCurveFrequencyRange(modelKey) {
+  const curve = getSubwooferCurve(modelKey);
+  if (!Array.isArray(curve) || curve.length === 0) return null;
+  const freqs = curve.map((p) => Number(p.hz)).filter(Number.isFinite).sort((a, b) => a - b);
+  if (!freqs.length) return null;
+  return { minHz: freqs[0], maxHz: freqs[freqs.length - 1] };
+}
+
 // CATEGORY LISTS IN EXACT UI ORDER
 export function getModelsByCategoryOrdered() {
   const byCat = { LCR: [], SURROUNDS: [], ARCHITECT: [], SUBWOOFERS: [] };
@@ -594,4 +605,4 @@ export function getModelsByCategoryOrdered() {
   return ordered;
 }
 
-export default { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, isValidCurve, getSpeakerPriceGbp, hasSpeakerModel, isGraphDerivedEstimate, getApprovedContinuousSplDb, getApprovedContinuousSplAt30HzDb, getApprovedPeakSplDb, getApprovedFrequencyRangeHz, CATEGORY_ORDER, MODELS };
+export default { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, getProductCurveFrequencyRange, isValidCurve, getSpeakerPriceGbp, hasSpeakerModel, isGraphDerivedEstimate, getApprovedContinuousSplDb, getApprovedContinuousSplAt30HzDb, getApprovedPeakSplDb, getApprovedFrequencyRangeHz, CATEGORY_ORDER, MODELS };

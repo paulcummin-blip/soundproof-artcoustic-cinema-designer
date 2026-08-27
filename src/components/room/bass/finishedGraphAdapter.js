@@ -51,7 +51,7 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
     ? compactContract.selectedCandidate.perSeatP20Results.map((seat) => ({ ...seat }))
     : [];
   const finalSeatVariationData = candidateId ? {
-    p18: { candidateId, level: null, extensionHz: envelope?.achievedP18FrequencyHz ?? null, authority: null },
+    p18: { candidateId, level: null, extensionHz: envelope?.achievedP18FrequencyHz ?? null, achievedExtensionBounded: envelope?.achievedP18Bounded === true, authority: null },
     p19: { candidateId, level: null, variationDb: null, worstFrequencyHz: envelope?.officialP19WorstFrequencyHz ?? null },
     p20: { candidateId, level: null, variationDb: null, worstSeatId: envelope?.p20WorstSeatId ?? null, perSeatResults: perSeatP20Results },
   } : null;

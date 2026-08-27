@@ -541,6 +541,8 @@ export function adaptCurrentBassOptimisationResult({
     performanceBand: p18Assessment.performanceBand,
     performanceMultiplier: p18Assessment.performanceMultiplier,
     qualifiedAtSelectedP14Output: p18ResultAvailable,
+    achievedExtensionBounded: authorityP18?.authority?.achievedExtensionBounded === true
+      || authorityP18?.achievedExtensionBounded === true,
   };
 
   // P19 — publish only from the official assessment of the finished canonical

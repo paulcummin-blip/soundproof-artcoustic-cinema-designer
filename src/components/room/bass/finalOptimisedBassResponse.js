@@ -86,6 +86,7 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
         candidateId: candidate.candidateId,
         level: candidate.achievedP18Level ?? null,
         extensionHz: candidate.achievedP18FrequencyHz ?? null,
+        achievedExtensionBounded: candidate.p18AchievedAuthority?.achievedExtensionBounded === true,
         authority: candidate.p18AchievedAuthority || null,
       },
       p19: {
@@ -152,6 +153,7 @@ export function applyAuthorityToCanonicalResult(canonicalResult, authorityBearin
         candidateId: candidate.candidateId,
         level: candidate.achievedP18Level ?? null,
         extensionHz: candidate.achievedP18FrequencyHz ?? null,
+        achievedExtensionBounded: candidate.p18AchievedAuthority?.achievedExtensionBounded === true,
         authority: candidate.p18AchievedAuthority || null,
       },
       p19: {

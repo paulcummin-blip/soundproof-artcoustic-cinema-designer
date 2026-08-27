@@ -17,6 +17,7 @@ import { assessP18Extension, normalizeP18TargetBasis, p18ThresholdHzForLevel } f
 import { isCanonicalP19Ready } from "@/components/room/bass/p19Readiness";
 import { buildSmoothCapabilityEnvelope, buildPracticalCalibrationTarget } from "@/components/utils/practicalCalibrationTarget";
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
+import { getProductCurveFrequencyRange } from "@/components/models/speakers/registry";
 
 export function buildPositionAwareP14Capability({
   canonicalResult,
@@ -299,6 +300,15 @@ export function evaluateCanonicalBassAuthority({
   // selected P14 operating level. Uses the 60–200 Hz median method (METHOD A)
   // — refDb = median of 1/3-octave-smoothed response over 60–200 Hz,
   // cutoffDb = refDb − 3, F3 = sustained extension walk.
+  //
+  // Product capability validity floor: the highest (worst) lowest engineering
+  // frequency among active subwoofers. The system cannot claim product-limited
+  // SPL capability below this floor — a response still above the -3 dB cutoff
+  // there is a bounded result (≤ floor), not a measured crossing.
+  const productCurveMinHzValues = (activeSubs || [])
+    .map((sub) => getProductCurveFrequencyRange(sub?.modelKey ?? sub?.model)?.minHz)
+    .filter(Number.isFinite);
+  const productCurveMinHz = productCurveMinHzValues.length ? Math.max(...productCurveMinHzValues) : null;
   const extensionAssessment = assessP18AgainstRequiredExtension({
     rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
     canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
@@ -307,6 +317,7 @@ export function evaluateCanonicalBassAuthority({
     requiredExtensionHz,
     p18CutoffDb: requested?.p18CutoffDb,
     configuredUsableLfHz: usableLfHz,
+    productCurveMinHz,
   });
   const extensionShapePass = extensionAssessment?.passes ?? null;
   const requestedP18Pass = extensionShapePass;

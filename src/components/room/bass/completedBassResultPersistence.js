@@ -147,6 +147,9 @@ export function buildAssessmentEnvelope(contract) {
       ? Number(finalResponse.finalSeatVariationData.p18.extensionHz)
       : null);
 
+  const achievedP18Bounded = finalResponse.finalSeatVariationData?.p18?.achievedExtensionBounded === true
+    || finalResponse.finalSeatVariationData?.p18?.authority?.achievedExtensionBounded === true;
+
   const assessmentStartHz = Number.isFinite(Number(finalResponse.assessmentStartHz))
     ? Number(finalResponse.assessmentStartHz)
     : null;
@@ -181,6 +184,7 @@ export function buildAssessmentEnvelope(contract) {
 
   return {
     achievedP18FrequencyHz,
+    achievedP18Bounded,
     assessmentStartHz,
     assessmentEndHz,
     officialP19WorstFrequencyHz,
