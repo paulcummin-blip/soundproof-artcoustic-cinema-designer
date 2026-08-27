@@ -42,6 +42,60 @@ function findNearestMeasuredAngle(angles, targetDeg) {
   return best;
 }
 
+// Linear interpolation of a measured polar curve at an arbitrary target angle, between the two
+// bracketing measured angles. Exact measured-angle matches return that angle's verbatim curve.
+// Clamps to the nearest endpoint measured curve outside the measured range (no extrapolation).
+// Curves are arrays of { frequency, spl }; the lo-curve's frequency grid is used and the hi-curve
+// is sampled at the same frequencies (curves share a common log-spaced grid in the source data).
+function interpolatedCurve(map, angles, targetDeg) {
+  if (!map || !Array.isArray(angles) || !angles.length || !isNum(targetDeg)) return null;
+  const t = Number(targetDeg);
+  // Exact measured-angle match (object keys are strings; numeric t coerces correctly).
+  if (map[t] != null && Array.isArray(map[t]) && map[t].length) return map[t];
+
+  const sorted = [...angles].sort((a, b) => a - b);
+  if (t <= sorted[0]) return (Array.isArray(map[sorted[0]]) && map[sorted[0]].length) ? map[sorted[0]] : null;
+  if (t >= sorted[sorted.length - 1]) {
+    const last = sorted[sorted.length - 1];
+    return (Array.isArray(map[last]) && map[last].length) ? map[last] : null;
+  }
+
+  let lo = sorted[0];
+  let hi = sorted[sorted.length - 1];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (t >= sorted[i] && t <= sorted[i + 1]) { lo = sorted[i]; hi = sorted[i + 1]; break; }
+  }
+  const loCurve = map[lo];
+  const hiCurve = map[hi];
+  if (!Array.isArray(loCurve) || !loCurve.length || !Array.isArray(hiCurve) || !hiCurve.length) return null;
+
+  const frac = (t - lo) / (hi - lo);
+  // Sample the hi-curve at a given frequency (linear interp across its sorted frequency grid).
+  const hiAt = (freq) => {
+    for (let i = 0; i < hiCurve.length; i++) {
+      if (hiCurve[i].frequency === freq) return hiCurve[i].spl;
+      if (hiCurve[i].frequency > freq) {
+        if (i === 0) return hiCurve[0].spl;
+        const a = hiCurve[i - 1];
+        const b = hiCurve[i];
+        const tt = (freq - a.frequency) / (b.frequency - a.frequency);
+        return a.spl + (b.spl - a.spl) * tt;
+      }
+    }
+    return hiCurve[hiCurve.length - 1].spl;
+  };
+
+  return loCurve
+    .map((p) => {
+      const f = p.frequency;
+      const loSpl = p.spl;
+      const hiSpl = hiAt(f);
+      if (!isNum(loSpl) || !isNum(hiSpl)) return { frequency: f, spl: loSpl };
+      return { frequency: f, spl: loSpl + (hiSpl - loSpl) * frac };
+    })
+    .filter((p) => isNum(p.spl));
+}
+
 /**
  * Estimate the predicted response at one 3D listening angle using the nearest available measured
  * horizontal and vertical polar data. Engineering approximation only — see file header.
@@ -89,8 +143,10 @@ export function estimatePredictedResponse({ polarModel, horizontalOffAxisAngle, 
   const selectedHorizontalAngle = findNearestMeasuredAngle(dataset.horizontalAngles, targetH);
   const selectedVerticalAngle = findNearestMeasuredAngle(dataset.verticalAngles, targetV);
 
-  const hCurve = dataset.horizontal?.[selectedHorizontalAngle];
-  const vCurve = dataset.vertical?.[selectedVerticalAngle];
+  // Interpolate between neighbouring measured angles (linear in angle) rather than snapping to
+  // the nearest measured angle. selectedHorizontal/VerticalAngle are retained for diagnostics.
+  const hCurve = interpolatedCurve(dataset.horizontal, dataset.horizontalAngles, targetH);
+  const vCurve = interpolatedCurve(dataset.vertical, dataset.verticalAngles, targetV);
 
   if (!Array.isArray(hCurve) || !hCurve.length || !Array.isArray(vCurve) || !vCurve.length) {
     return {

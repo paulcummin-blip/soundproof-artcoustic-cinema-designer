@@ -617,7 +617,14 @@ function RoomDesignerWithState() {
     const mlpY = Number(appState?.mlpY_m);
     const x = Number.isFinite(mlpX) ? mlpX : cx;
     if (Number.isFinite(mlpY)) {
-      return { x, y: mlpY, z: 1.2 };
+      // RSP ear height: 1.20 m default. When the RSP is bound to a designated seat, use that
+      // seat's ear height (including any riser/platform contribution) so P17 (and any other
+      // z-aware analysis) references the true listening height instead of the flat default.
+      const rspMode = appState?.rspMode;
+      const seatZ = (rspMode === "seat_bound" && _designatedRspSeat && Number.isFinite(Number(_designatedRspSeat.z)))
+        ? Number(_designatedRspSeat.z)
+        : 1.2;
+      return { x, y: mlpY, z: seatZ };
     }
 
     // Fallback: if mlpY_m not yet computed, derive from primary seat as a one-time bootstrap.
@@ -632,7 +639,7 @@ function RoomDesignerWithState() {
     }
 
     return null;
-  }, [appState?.mlpX_m, appState?.mlpY_m, stableDimensions?.width, appState?.seatingPositions]);
+  }, [appState?.mlpX_m, appState?.mlpY_m, stableDimensions?.width, appState?.seatingPositions, appState?.rspMode, _designatedRspSeat]);
 
   // ── Stage 1 Subwoofer Placement Optimiser ──────────────────────────
   // Auto-starts in the background once room + seating + RSP geometry settles.

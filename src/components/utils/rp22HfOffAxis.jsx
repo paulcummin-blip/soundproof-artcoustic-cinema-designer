@@ -557,13 +557,17 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
   const ang = angleBetweenDeg(downAxis, seatVec);
   const rawAngleDeg = Number.isFinite(ang) ? ang : 0;
 
-  // Get model metadata for aim offset and dispersion
+  // Get model metadata for built-in tilt and dispersion
   const meta = getSpeakerModelMeta(modelKey);
-  const aimOffsetDeg = meta?.builtInTiltDeg ?? getOverheadTiltDeg(modelKey) ?? 0;
+  const tiltDeg = Number.isFinite(meta?.builtInTiltDeg) ? Number(meta.builtInTiltDeg) : (getOverheadTiltDeg(modelKey) ?? 0);
 
-  // Built-in tilt reduces effective off-axis angle (simple discount)
-  const tiltDeg = Number.isFinite(aimOffsetDeg) ? Number(aimOffsetDeg) : 0;
-  const effectiveAngleDeg = Math.max(0, rawAngleDeg - tiltDeg);
+  // ── Aimed acoustic axis (P17 overhead geometry authority) ──────────────────
+  // The built-in tilt is directed toward the RSP as a true 3D axis vector, NOT a scalar
+  // subtraction from the raw vertical angle. The effective off-axis angle is the angle between
+  // this aimed axis and the speaker→seat vector — so seats toward the RSP benefit from the
+  // tilt, while seats away from the aiming direction do NOT receive a free discount.
+  const frame = buildOverheadAimedFrame(spk, rspPos, tiltDeg);
+  const effectiveAngleDeg = frame ? aimedAxisOffAxisDeg(frame, seatVec) : rawAngleDeg;
 
   // Use model-specific dispersion windows if available
   // For overheads: use MAX(horizontal, vertical) per threshold (forgiving approach)
@@ -636,8 +640,10 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
     debug: {
       modelKey,
       rawAngleDeg,        // angle between straight-down axis and speaker→seat vector
-      aimOffsetDeg,       // built-in scalar tilt reduction (5° or 20°)
-      effectiveAngleDeg,  // rawAngleDeg - aimOffsetDeg (clamped to 0)
+      tiltDeg,            // built-in acoustic-axis tilt (5° / 20° / 22°)
+      effectiveAngleDeg,  // angle between AIMED axis and speaker→seat vector
+      aimedAxis: frame ? { x: frame.forward.x, y: frame.forward.y, z: frame.forward.z } : null,
+      rspAimDir: frame ? { x: frame.horizontalDir.x, y: frame.horizontalDir.y } : null,
       dispersionWindows: meta?.dispersion?.horizontal ? {
         minus1p5dB: meta.dispersion.horizontal.minus1p5dB ?? meta.dispersion.horizontal.minus1p5 ?? null,
         minus3dB: meta.dispersion.horizontal.minus3dB ?? meta.dispersion.horizontal.minus3 ?? null,
@@ -703,32 +709,34 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
   // polarModel is missing/incomplete (true for every current speaker), we safely fall through
   // to the existing estimated path — guaranteeing zero behaviour change for existing speakers.
   if (modelMeta?.polarModel?.type === "measured" && validatePolarModel(modelMeta.polarModel).readyForMeasuredP17) {
-    // Horizontal off-axis: reuse the same azimuth geometry already used for bed-layer surrounds.
-    const seatAzDeg = angleFromTo(pos, seat);
-    const resolvedYaw = resolveSpeakerYaw({ speaker, mlpPos, appState, getCanonicalRole });
-    const horizontalOffAxisAngle = (isNum(seatAzDeg) && isNum(resolvedYaw))
-      ? shortestAngleDeg(seatAzDeg, resolvedYaw)
-      : null;
-
-    // Vertical off-axis: reuse the same straight-axis + tilt geometry already used for
-    // overheads, using the polarModel's own axisTiltDeg instead of the registry's builtInTiltDeg.
+    // ── Aimed acoustic axis (P17 overhead measured-path geometry authority) ──
+    // The polarModel's axisTiltDeg is directed toward the RSP as a true 3D axis vector. The
+    // horizontal/vertical off-axis angles fed to the measured polar dataset are decomposed
+    // relative to this AIMED frame — NOT against room +Y or a scalar-tilt-subtracted vertical.
     const spk3 = spkXYZ({ position: speaker.position }, roomHeightM);
     const seat3 = seatXYZ(seat);
-    const downAxis = { x: 0, y: 0, z: -1 };
-    const seatVec3 = { x: seat3.x - spk3.x, y: seat3.y - spk3.y, z: seat3.z - spk3.z };
-    const rawVertAngle = angleBetweenDeg(downAxis, seatVec3);
     const tiltDeg = isNum(modelMeta.polarModel.axisTiltDeg) ? modelMeta.polarModel.axisTiltDeg : 0;
-    const verticalOffAxisAngle = isNum(rawVertAngle) ? Math.max(0, rawVertAngle - tiltDeg) : null;
 
-    // RSP reference angles, for the seat-vs-RSP comparison inside the measured engine.
-    const rspAzDeg = (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y)) ? angleFromTo(pos, mlpPos) : seatAzDeg;
-    const rspHorizontalOffAxisAngle = (isNum(rspAzDeg) && isNum(resolvedYaw))
-      ? shortestAngleDeg(rspAzDeg, resolvedYaw)
-      : horizontalOffAxisAngle;
-    const rspSeat3 = mlpPos ? seatXYZ(mlpPos) : seat3;
-    const rspSeatVec3 = { x: rspSeat3.x - spk3.x, y: rspSeat3.y - spk3.y, z: rspSeat3.z - spk3.z };
-    const rspRawVertAngle = angleBetweenDeg(downAxis, rspSeatVec3);
-    const rspVerticalOffAxisAngle = isNum(rspRawVertAngle) ? Math.max(0, rspRawVertAngle - tiltDeg) : verticalOffAxisAngle;
+    // RSP reference point (aim target + reference listener). Ear height = mlpPos.z if present
+    // (seat-bound RSP propagates the bound seat's ear height), else the seat's ear height, else 1.2 m.
+    const rspEarZ = (mlpPos && isNum(mlpPos.z)) ? Number(mlpPos.z)
+      : (Number.isFinite(Number(earHeightM)) ? Number(earHeightM) : 1.2);
+    const rspPos3 = (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y))
+      ? { x: Number(mlpPos.x), y: Number(mlpPos.y), z: rspEarZ }
+      : { x: seat3.x, y: seat3.y, z: seat3.z };
+
+    const frame = buildOverheadAimedFrame(spk3, rspPos3, tiltDeg);
+
+    const seatVec3 = { x: seat3.x - spk3.x, y: seat3.y - spk3.y, z: seat3.z - spk3.z };
+    const rspVec3 = { x: rspPos3.x - spk3.x, y: rspPos3.y - spk3.y, z: rspPos3.z - spk3.z };
+
+    const seatOff = frame ? aimedFrameOffAxisDeg(frame, seatVec3) : { horizontalOffAxis: null, verticalOffAxis: null };
+    const rspOff = frame ? aimedFrameOffAxisDeg(frame, rspVec3) : { horizontalOffAxis: null, verticalOffAxis: null };
+
+    const horizontalOffAxisAngle = seatOff.horizontalOffAxis;
+    const verticalOffAxisAngle = seatOff.verticalOffAxis;
+    const rspHorizontalOffAxisAngle = rspOff.horizontalOffAxis;
+    const rspVerticalOffAxisAngle = rspOff.verticalOffAxis;
 
     // Development-only validation mode override — forces the measured lookup to a specific
     // measured angle. Inactive in production; set via globalThis for dev testing only.
@@ -746,10 +754,12 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
     });
 
     if (!measured.missingMeasuredData) {
+      // offAxisDeg/rawAngleDeg for HUD + scoring: total 3D off-axis from the AIMED axis.
+      const totalOff = frame ? aimedAxisOffAxisDeg(frame, seatVec3) : 0;
       return {
         role,
-        offAxisDeg: quantiseAngleDown(horizontalOffAxisAngle ?? 0, 0.5),
-        rawAngleDeg: quantiseAngleDown(horizontalOffAxisAngle ?? 0, 0.5),
+        offAxisDeg: quantiseAngleDown(totalOff, 0.5),
+        rawAngleDeg: quantiseAngleDown(totalOff, 0.5),
         lossDb: isNum(measured.maximumDeviationDb) ? Number(measured.maximumDeviationDb.toFixed(1)) : 0,
         measured: true,
         measuredDiagnostics: measured,
