@@ -8,6 +8,9 @@ import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFrom
 import { parseProjectJson } from "@/components/roomdesigner/RoomDesignerHelpers";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { INSTANCE_STATUS, MIGRATION_STATE } from "@/components/utils/subwooferInstanceCompatibility";
+import { canSave as hydrationCanSave, markLoaded, markError, createAuthority } from "@/components/state/hydrationAuthority";
+import { logSaveEvent } from "@/components/state/saveAuditLog";
+import { checkDestructiveSave } from "@/components/state/destructiveSaveTripwire";
 
 // Hook to encapsulate project loading, saving, and state management
 export function useProjectLoader(
@@ -84,6 +87,14 @@ appState, // Pass appState directly for setters
   // Tracks the loaded project's room_dimensions_edited flag so serializeProject
   // never resets it to false. Set during loadProject, cleared on project switch.
   const loadedRoomDimensionsEditedRef = useRef(false);
+  // Hydration authority — gates ALL database writes. A project must reach
+  // status "loaded" with matching projectId + loadGenerationId before any
+  // save (autosave or manual) is permitted.
+  const loadGenerationRef = useRef(0);
+  const hydrationAuthorityRef = useRef(null);
+  // Structural counts snapshot from the hydrated DB record, used by the
+  // destructive-save tripwire to detect accidental hydration wipes.
+  const hydratedStructuralCountsRef = useRef(null);
 
   // SHARED PAYLOAD BUILDER — single source of truth for both autosave and manual save.
   // Both paths must use this function so their signatures are always identical.
@@ -224,6 +235,7 @@ appState, // Pass appState directly for setters
     const id = idOverride || activeProjectId || projectIdState;
     if (!id) return;
     appState?.setProjectHydrationReady?.(false);
+    hydrationAuthorityRef.current = createAuthority(id, loadGenerationRef.current);
     setLoadState({ phase: "loading", error: null, name: null });
     try {
       // AbortController signal is not directly supported by the SDK, but the operation is fast.
@@ -238,6 +250,18 @@ appState, // Pass appState directly for setters
       // never resets it to false. Defaults to false for pre-feature projects.
       loadedRoomDimensionsEditedRef.current = p?.room_dimensions_edited === true;
       setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
+      // Only enable saving after successful same-project hydration.
+      hydrationAuthorityRef.current = markLoaded(hydrationAuthorityRef.current);
+      appState?.setProjectHydrationReady?.(true);
+      // Snapshot structural counts for the destructive-save tripwire.
+      const _parseArr = (v) => { if (Array.isArray(v)) return v; if (typeof v === "string") { try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; } } return []; };
+      hydratedStructuralCountsRef.current = {
+        speakers: _parseArr(p?.selected_speakers).length,
+        subs: Array.isArray(p?.subwooferInstances) ? p.subwooferInstances.length : 0,
+        roomElements: _parseArr(p?.room_elements).length,
+        seatingPositions: _parseArr(p?.seating_positions).length,
+        dolbyConfig: p?.dolby_config || "5.1",
+      };
 
       // Stamp the loaded signature using the same serializeProject() shape that
       // autosave/manual save compare against, so the autosave effect does not
@@ -347,22 +371,27 @@ appState, // Pass appState directly for setters
         // preserve saveToken if already set by a prior save in this session
       }
       } else {
-        // Project not found in cloud; keeping id so user can still save into it
-        if (globalThis.__B44_LOGS) console.log('[RoomDesigner] Project not found in cloud; keeping id so user can continue working.');
-        setLoadState({ phase: "idle", error: null, name: null });
+        // Project not found in cloud — FAIL CLOSED. Do not allow default state
+        // to overwrite a potentially-stale record. Saving stays disabled.
+        if (globalThis.__B44_LOGS) console.log('[RoomDesigner] Project not found in cloud; saving disabled (fail-closed).');
+        hydrationAuthorityRef.current = markError(hydrationAuthorityRef.current);
+        appState?.setProjectHydrationReady?.(false);
+        setLoadState({ phase: "error", error: "Project not found", name: null });
       }
     } catch (err) {
       const errMsg = String(err?.message || err || '');
 
       // Abort is fine – usually navigating away or changing project.
+      // Do NOT enable saving on abort — the new project will set its own authority.
       if (err?.name === "AbortError") {
-        setLoadState((prev) => ({ ...prev, phase: "idle" }));
         return;
       }
 
       // Stale / invalid ID / 404 – don't keep retrying, mark as error
       if (errMsg.includes("Invalid id value") || errMsg.includes("Object not found") || errMsg.includes("404")) {
         if (globalThis.__B44_LOGS) console.log("[RoomDesigner] Invalid project ID detected, keeping it but stopping auto-reload.");
+        hydrationAuthorityRef.current = markError(hydrationAuthorityRef.current);
+        appState?.setProjectHydrationReady?.(false);
         setLoadState({ phase: "error", error: errMsg, name: null });
         return;
       }
@@ -371,10 +400,11 @@ appState, // Pass appState directly for setters
       window.__APP_DEBUG = window.__APP_DEBUG || [];
       window.__APP_DEBUG.push(`[RoomDesigner] Project load error: ${errMsg}`);
       if (globalThis.__B44_LOGS) console.error("[RoomDesigner] Failed to load project:", err);
+      hydrationAuthorityRef.current = markError(hydrationAuthorityRef.current);
+      appState?.setProjectHydrationReady?.(false);
       setLoadState({ phase: "error", error: errMsg, name: null });
-    } finally {
-      appState?.setProjectHydrationReady?.(true);
     }
+    // NO finally block — saving is enabled ONLY on successful load, never on failure.
   }, [projectIdState, hydrateFromProject, setProjectNameState]);
 
   const reloadProject = useCallback((signal) => {
@@ -405,7 +435,7 @@ appState, // Pass appState directly for setters
 
   useEffect(() => {
     // Update the ref whenever loadState changes
-    const isCurrentlyHydrating = loadState.phase === "loading" || activeProjectId && loadState.phase !== "loaded" && loadState.phase !== "error";
+    const isCurrentlyHydrating = activeProjectId ? loadState.phase !== "loaded" : false;
     isHydratingRef.current = isCurrentlyHydrating;
   }, [loadState.phase, activeProjectId]);
 
@@ -490,6 +520,15 @@ appState, // Pass appState directly for setters
       if (!effectiveProjectId) return;
       if (isHydratingRef.current) return;
 
+      // HARD SAVE AUTHORITY: database writes are permitted ONLY when the
+      // hydration authority confirms this exact project + generation has
+      // successfully hydrated. This prevents default/partially-hydrated
+      // state from overwriting a real saved project.
+      if (!hydrationCanSave(hydrationAuthorityRef.current, effectiveProjectId, loadGenerationRef.current)) {
+        setAutosaveStatus("idle");
+        return;
+      }
+
       // Only save when dirty, and avoid overlapping writes
       if (!r.dirty || r.inFlight) return;
 
@@ -512,7 +551,45 @@ appState, // Pass appState directly for setters
           return;
         }
 
+        // Destructive-save tripwire: compare outgoing structural counts against
+        // the hydrated snapshot. If multiple major groups collapse to empty,
+        // block the save — this looks like an accidental hydration wipe.
+        const tripwireResult = checkDestructiveSave(hydratedStructuralCountsRef.current, data);
+        if (tripwireResult.destructive) {
+          setAutosaveStatus("error");
+          if (globalThis.__B44_LOGS) console.error("[RoomDesigner] DESTRUCTIVE_SAVE_BLOCKED (autosave):", tripwireResult.reason);
+          logSaveEvent({
+            projectId: effectiveProjectId,
+            source: "autosave",
+            hydrationGenerationId: loadGenerationRef.current,
+            hydrationStatus: hydrationAuthorityRef.current?.status || "unknown",
+            payloadHash: sig.slice(0, 64),
+            structuralCounts: {
+              seats: Array.isArray(data.seating_positions) ? data.seating_positions.length : 0,
+              speakers: Array.isArray(data.selected_speakers) ? data.selected_speakers.length : 0,
+              subs: Array.isArray(data.subwooferInstances) ? data.subwooferInstances.length : 0,
+              roomElements: Array.isArray(data.room_elements) ? data.room_elements.length : 0,
+            },
+            systemFormat: data.dolby_config,
+            blocked: true,
+            blockReason: tripwireResult.reason,
+          });
+          r.inFlight = false;
+          return;
+        }
+
+        // Capture generation before the await so we can detect stale completions
+        // if the project switches while we are waiting for the DB response.
+        const myGeneration = loadGenerationRef.current;
+
         await Project.update(effectiveProjectId, data);
+
+        // If the project switched while we were awaiting, our write is stale —
+        // do not stamp state for a different project.
+        if (loadGenerationRef.current !== myGeneration) {
+          setAutosaveStatus(r.dirty ? "dirty" : "saved");
+          return;
+        }
 
         // If a manual save completed while we were awaiting, its token bump means
         // our result is now stale — do not overwrite the newer stamped state.
@@ -533,6 +610,22 @@ appState, // Pass appState directly for setters
         r.lastSaveAt = Date.now();
         r.dirty = false;
         setAutosaveStatus("saved");
+        logSaveEvent({
+          projectId: effectiveProjectId,
+          source: "autosave",
+          hydrationGenerationId: myGeneration,
+          hydrationStatus: "loaded",
+          payloadHash: sig.slice(0, 64),
+          structuralCounts: {
+            seats: Array.isArray(data.seating_positions) ? data.seating_positions.length : 0,
+            speakers: Array.isArray(data.selected_speakers) ? data.selected_speakers.length : 0,
+            subs: Array.isArray(data.subwooferInstances) ? data.subwooferInstances.length : 0,
+            roomElements: Array.isArray(data.room_elements) ? data.room_elements.length : 0,
+          },
+          systemFormat: data.dolby_config,
+          blocked: false,
+          blockReason: null,
+        });
         // Successful save → transition migration state to PERSISTED
         if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
           appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.PERSISTED);
@@ -665,6 +758,21 @@ appState, // Pass appState directly for setters
 
     try {
       lastBootTargetRef.current = currentTargetKey;
+      // Project switch: increment load generation to invalidate any in-flight
+      // saves from the previous project. Cancel pending autosave timers and
+      // clear the hydration authority so no database write can occur until
+      // the new project successfully hydrates.
+      loadGenerationRef.current += 1;
+      hydrationAuthorityRef.current = null;
+      hydratedStructuralCountsRef.current = null;
+      // Cancel any pending autosave timers for the previous project.
+      const prevProjectId = autosaveProjectIdRef.current;
+      if (prevProjectId) {
+        const prevRefs = globalThis[`__rdAutosaveRefs_${prevProjectId}`];
+        if (prevRefs?.intervalId) { clearInterval(prevRefs.intervalId); prevRefs.intervalId = null; }
+        if (prevRefs?.debounceId) { clearTimeout(prevRefs.debounceId); prevRefs.debounceId = null; }
+      }
+      appState?.setProjectHydrationReady?.(false);
       setProjectIdState(effectiveProjectId);
       loadProject(controller.signal, effectiveProjectId);
     } catch (e) {
@@ -683,12 +791,18 @@ appState, // Pass appState directly for setters
   );
 
   const manualSaveProject = useCallback(async () => {
-    setAutosaveStatus("saving");
-
     // Work out which project we are saving into:
     // 1) local state set by loader
     // 2) id from URL query (?project=...)
     const effectiveProjectId = projectIdState || projectIdFromUrl || null;
+
+    // HARD SAVE AUTHORITY: manual save must obey the same hydration gate as autosave.
+    if (!hydrationCanSave(hydrationAuthorityRef.current, effectiveProjectId, loadGenerationRef.current)) {
+      setAutosaveStatus("error");
+      return { success: false, error: "Project has not finished loading. Wait for hydration to complete before saving." };
+    }
+
+    setAutosaveStatus("saving");
 
     // Reuse the same per-project bucket as autosave so we share the inFlight lock
     const savedRefKey = `__rdAutosaveRefs_${effectiveProjectId}`;
@@ -734,7 +848,41 @@ appState, // Pass appState directly for setters
         delete projectData.name;
         delete projectData.client_name;
 
+        // Destructive-save tripwire for manual save.
+        const tripwireResult = checkDestructiveSave(hydratedStructuralCountsRef.current, projectData);
+        if (tripwireResult.destructive) {
+          setAutosaveStatus("error");
+          if (globalThis.__B44_LOGS) console.error("[RoomDesigner] DESTRUCTIVE_SAVE_BLOCKED (manual):", tripwireResult.reason);
+          logSaveEvent({
+            projectId: effectiveProjectId,
+            source: "manual",
+            hydrationGenerationId: loadGenerationRef.current,
+            hydrationStatus: hydrationAuthorityRef.current?.status || "unknown",
+            payloadHash: (() => { try { return JSON.stringify(projectData).slice(0, 64); } catch { return "error"; } })(),
+            structuralCounts: {
+              seats: Array.isArray(projectData.seating_positions) ? projectData.seating_positions.length : 0,
+              speakers: Array.isArray(projectData.selected_speakers) ? projectData.selected_speakers.length : 0,
+              subs: Array.isArray(projectData.subwooferInstances) ? projectData.subwooferInstances.length : 0,
+              roomElements: Array.isArray(projectData.room_elements) ? projectData.room_elements.length : 0,
+            },
+            systemFormat: projectData.dolby_config,
+            blocked: true,
+            blockReason: tripwireResult.reason,
+          });
+          rMS.inFlight = false;
+          return { success: false, error: `Save blocked: ${tripwireResult.reason}. If this is intentional, use the reset function.` };
+        }
+
+        // Capture generation before the await.
+        const myGeneration = loadGenerationRef.current;
+
         savedProject = await Project.update(effectiveProjectId, projectData);
+
+        // If the project switched while we were awaiting, do not stamp state.
+        if (loadGenerationRef.current !== myGeneration) {
+          setAutosaveStatus("error");
+          return { success: false, error: "Project changed during save." };
+        }
 
         // Make sure our local state tracks this id
         if (!projectIdState) {
@@ -764,6 +912,22 @@ appState, // Pass appState directly for setters
         rMS.dirty = false;
 
         setAutosaveStatus("saved");
+        logSaveEvent({
+          projectId: effectiveProjectId,
+          source: "manual",
+          hydrationGenerationId: loadGenerationRef.current,
+          hydrationStatus: "loaded",
+          payloadHash: savedSig.slice(0, 64),
+          structuralCounts: {
+            seats: Array.isArray(projectData.seating_positions) ? projectData.seating_positions.length : 0,
+            speakers: Array.isArray(projectData.selected_speakers) ? projectData.selected_speakers.length : 0,
+            subs: Array.isArray(projectData.subwooferInstances) ? projectData.subwooferInstances.length : 0,
+            roomElements: Array.isArray(projectData.room_elements) ? projectData.room_elements.length : 0,
+          },
+          systemFormat: projectData.dolby_config,
+          blocked: false,
+          blockReason: null,
+        });
         // Successful manual save → transition migration state to PERSISTED
         if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
           appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.PERSISTED);
