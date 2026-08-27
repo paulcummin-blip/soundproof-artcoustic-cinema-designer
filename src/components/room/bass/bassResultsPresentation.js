@@ -185,10 +185,15 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   const isBlocked = authorityStatus === "BLOCKED";
   const isError = authorityStatus === "ERROR";
   const isUncalculated = authorityStatus === "UNCALCULATED" && !isCalculating;
+  // LIMITED: P14 capability below the requested target. The calculation is
+  // terminal (not pending), but P18/P19/P20 were not evaluated. Treat like
+  // p14Failed for downstream gating, but with a distinct status label.
+  const isLimited = authorityStatus === "LIMITED";
 
   // P14 FAIL → P18/P19/P20 not evaluated at the requested operating point.
-  // Declared early — used by per-seat gating below.
-  const p14Failed = isAuthoritative && contract?.productAnalysis?.parameters?.p14?.pass === false;
+  // Declared early — used by per-seat gating below. A LIMITED contract also
+  // has P14 pass === false, so include it in the p14Failed gating.
+  const p14Failed = (isAuthoritative || isLimited) && contract?.productAnalysis?.parameters?.p14?.pass === false;
 
   // Per-seat arrays (publication-gated — empty when not verified or P14 failed)
   const perSeatP19Results = (isAuthoritative && !p14Failed)
@@ -210,11 +215,13 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
 
   const pills = {};
 
-  // P14 — USER-SELECTED target level and target dB (authoritative). Available
-  // capability is shown separately in the detail line. The capability never
-  // overwrites the user's selected target. When the target is NOT achievable,
-  // the pill shows strict FAIL + Available max — never a downgraded level.
-  if (isAuthoritative) {
+  // P14 — USER-SELECTED target level and target dB (authoritative or LIMITED).
+  // Available capability is shown separately in the detail line. The capability
+  // never overwrites the user's selected target. When the target is NOT
+  // achievable, the pill shows strict FAIL + Available max — never a downgraded
+  // level. A LIMITED contract also has P14 data (pass === false) and should
+  // display the same FAIL pill.
+  if (isAuthoritative || isLimited) {
     const source = contract?.productAnalysis?.parameters?.p14;
     const selectedLevel = source?.selectedLevel ?? source?.level;
     const selectedTargetDb = source?.selectedTargetDb ?? source?.requestedTargetDb ?? source?.value;
@@ -259,6 +266,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // basis without changing fingerprints, workers, authority or cached curves.
   // A bounded result (response still above -3 dB at the product validity floor)
   // is displayed as "≤{floor} Hz" — not a fake exact crossing below valid data.
+  // LIMITED contracts have no P18 data (P14 failed → P18 not evaluated).
   if (isAuthoritative && !p14Failed) {
     const source = contract?.productAnalysis?.parameters?.p18;
     const achievedValue = isFiniteNumber(source?.value) ? Number(source.value) : null;
@@ -284,13 +292,15 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
 
   // P19 — SEAT-scoped RP22 parameter (Room/Seat = Seat). The headline always
   // displays "SEAT" — no RSP result, no aggregate level. Per-seat grades are
-  // in the P19 — All Seats panel below. When P14 fails, P19 is not evaluated.
+  // in the P19 — All Seats panel below. When P14 fails (or LIMITED), P19 is
+  // not evaluated.
   pills.p19 = p14Failed
     ? { label: "P19 Response Fit", resultText: notEvaluatedText, text: `P19 Response Fit ${notEvaluatedText}`, level: "—", detail: null }
     : seatScopeHeadlinePill("P19 Response Fit");
 
   // P20 — SEAT-scoped parameter. The headline always displays "SEAT" — no
-  // "worst seat" headline, no aggregate level. When P14 fails, P20 is not evaluated.
+  // "worst seat" headline, no aggregate level. When P14 fails (or LIMITED),
+  // P20 is not evaluated.
   pills.p20 = p14Failed
     ? { label: "P20 Seat Consistency", resultText: notEvaluatedText, text: `P20 Seat Consistency ${notEvaluatedText}`, level: "—", detail: null }
     : seatScopeHeadlinePill("P20 Seat Consistency");
@@ -301,6 +311,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   else if (isError) statusText = completedBassAuthority?.errorMessage || "Analysis failed";
   else if (isNotVerified) statusText = "NOT VERIFIED";
   else if (isBlocked) statusText = "Waiting for complete design";
+  else if (isLimited) statusText = "P14 capability below target";
   else if (isAuthoritative) statusText = contract?.job?.message || (contract?.job?.cacheStatus === "hit" ? "Restored from cache" : "Analysis ready");
   else if (isUpdating) statusText = `Calculating… · ${elapsedSeconds} s`;
 
@@ -310,6 +321,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     isReady: isAuthoritative,
     isUpdating: isUpdating || isCalculating,
     isNotVerified,
+    isLimited,
     elapsedSeconds,
     selectedMode: contract?.selectedMode || "balanced",
     parameterValues: Object.fromEntries(PARAM_KEYS.map((key) => [key, parameters[key]?.rawValue ?? parameters[key]?.value ?? null])),
@@ -332,6 +344,7 @@ function officialStateText(authorityStatus, isCalculating) {
   if (authorityStatus === "NOT_VERIFIED") return "NOT VERIFIED";
   if (authorityStatus === "ERROR") return "Error";
   if (authorityStatus === "BLOCKED") return "Waiting…";
+  if (authorityStatus === "LIMITED") return "Below Target";
   return "Calculating…";
 }
 

@@ -126,6 +126,14 @@ export function resolveBassReadiness(completedBassAuthority, bassApplicable = fa
     }
     return { ready: false, pending: true, reason: 'fingerprint-mismatch', fingerprint: currentFp };
   }
+  // LIMITED: the requested P14 dBC is physically unattainable. The bass
+  // analysis is terminal (not pending), but the design rating cannot be
+  // completed at this target — P18/P19/P20 were not evaluated. Settled
+  // (not pending) so the UI can show the capability shortfall rather than
+  // an indefinite "calculating" state.
+  if (status === BASS_AUTHORITY_STATUS.LIMITED) {
+    return { ready: false, pending: false, reason: 'p14-capability-limited', fingerprint: currentFp };
+  }
   if (status === BASS_AUTHORITY_STATUS.NOT_VERIFIED) {
     return { ready: false, pending: true, reason: 'not-verified', fingerprint: currentFp };
   }

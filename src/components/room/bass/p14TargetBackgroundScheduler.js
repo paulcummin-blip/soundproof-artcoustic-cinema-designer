@@ -21,7 +21,8 @@ import {
 import { computeCalibrationFingerprint } from "./bassAnalysisFingerprints";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { buildCompactContractFromWorkerResult } from "./p14TargetContractBuilder";
-import { getTargetCacheEntry, getTargetCacheProgress, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
+import { getTargetCacheEntry, getTargetCacheProgress, setTargetCacheEntry, setLimitedTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
+import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 import { resolveBackgroundTargetAdvance, captureTargetFailureDiagnostics, formatDiagnosticLine, createSweepDiagnostics, MAX_BACKGROUND_TARGET_RETRIES, classifyBackgroundPoolFailure, captureGenerationFailureDiagnostics, formatGenerationFailureLine } from "./p14TargetBackgroundDiagnostics";
 import { requeueInterruptedTargetOnSoftPause } from "./p14TargetSoftPauseRequeue";
 import { pushP14BgTimingRecordFromTimings } from "./p14BgTimingsBuffer";
@@ -194,18 +195,19 @@ export class P14TargetBackgroundScheduler {
       const failed = this.sweepDiagnostics.failedAfterRetry;
       publishP14AnalysisProgress(this.projectId, {
         baseDesignFingerprint: this.currentBaseDesignFingerprint,
-        status: progress.ready >= progress.total && progress.total > 0 ? "complete" : "calculating",
-        completed: progress.ready,
+        status: progress.resolved >= progress.total && progress.total > 0 ? "complete" : "calculating",
+        completed: progress.resolved,
         total: progress.total,
         completedDurationsMs: progress.completedDurationsMs,
         failedTargetKeys: failed,
         activeTargetKey: null,
         activeStartedAtMs: null,
       });
+      const limitedCount = progress.limitedTargetKeys?.length || 0;
       if (failed.length > 0) {
-        safeConsole.warn("p14-bg", `sweep complete: ${progress.ready}/${progress.total} cached, ${failed.length} failed: ${failed.join(', ')}`);
+        safeConsole.warn("p14-bg", `sweep complete: ${progress.ready}/${progress.total} cached (${limitedCount} limited), ${failed.length} failed: ${failed.join(', ')}`);
       } else {
-        safeConsole.log("p14-bg", `sweep complete: ${progress.ready}/${progress.total} cached`);
+        safeConsole.log("p14-bg", `sweep complete: ${progress.ready}/${progress.total} cached (${limitedCount} limited)`);
       }
       flushTargetCachePersistence(this.projectId);
       return;
@@ -219,7 +221,7 @@ export class P14TargetBackgroundScheduler {
     beginP14AnalysisJob(this.projectId, {
       baseDesignFingerprint: this.currentBaseDesignFingerprint,
       targetKey: target.key,
-      completed: progress.ready,
+      completed: progress.resolved,
       total: progress.total,
       completedDurationsMs: progress.completedDurationsMs,
     });
@@ -434,20 +436,36 @@ export class P14TargetBackgroundScheduler {
       timings,
     }));
 
+    // Detect a LIMITED P14 contract: the calculation succeeded but the
+    // requested P14 dBC is physically unattainable. This is a terminal
+    // engineering result, not a failure. Store via the limited cache path
+    // so the authoritative cache gate is not weakened.
+    const isLimited = compactContract && isValidLimitedP14Contract(compactContract);
+
     // Attempt insertion into the target cache.
+    //   - AUTHORITATIVE contracts → setTargetCacheEntry
+    //   - LIMITED contracts → setLimitedTargetCacheEntry (separate path)
     const insertResult = compactContract
-      ? time("cacheInsert", () => setTargetCacheEntry(
-          this.projectId,
-          this.currentBaseDesignFingerprint,
-          target.key,
-          compactContract,
-          { deferPersistence: true },
-        ))
+      ? (isLimited
+        ? time("cacheInsert", () => setLimitedTargetCacheEntry(
+            this.projectId,
+            this.currentBaseDesignFingerprint,
+            target.key,
+            compactContract,
+            { deferPersistence: true },
+          ))
+        : time("cacheInsert", () => setTargetCacheEntry(
+            this.projectId,
+            this.currentBaseDesignFingerprint,
+            target.key,
+            compactContract,
+            { deferPersistence: true },
+          )))
       : false;
 
-    // Verify readback: the cache must return the same authoritative entry.
-    // A target is complete ONLY when setTargetCacheEntry returns true AND
-    // getTargetCacheEntry readback returns the authoritative contract.
+    // Verify readback: the cache must return the same entry (authoritative
+    // OR limited). A target is complete ONLY when insertion returns true
+    // AND getTargetCacheEntry readback returns the contract.
     const readback = insertResult
       ? time("readback", () => getTargetCacheEntry(this.projectId, this.currentBaseDesignFingerprint, target.key))
       : null;
@@ -469,6 +487,8 @@ export class P14TargetBackgroundScheduler {
       maxRetries: MAX_BACKGROUND_TARGET_RETRIES,
       fingerprintChanged,
       cancelled: this.cancelled,
+      isLimited,
+      contract: compactContract,
     });
 
     const failureReason = !compactContract
@@ -524,14 +544,37 @@ export class P14TargetBackgroundScheduler {
         const progress = getTargetCacheProgress(this.projectId, this.currentBaseDesignFingerprint, allKeys);
         publishP14AnalysisProgress(this.projectId, {
           baseDesignFingerprint: this.currentBaseDesignFingerprint,
-          status: progress.ready >= progress.total && progress.total > 0 ? "complete" : "calculating",
-          completed: progress.ready,
+          status: progress.resolved >= progress.total && progress.total > 0 ? "complete" : "calculating",
+          completed: progress.resolved,
           total: progress.total,
           completedDurationsMs: progress.completedDurationsMs,
           activeTargetKey: null,
           activeStartedAtMs: null,
         });
         safeConsole.log("p14-bg", `target ${target.key}: cached successfully (fingerprint ${fingerprint?.substring(0, 24)}...)`);
+        if (!this.sweepDiagnostics.retried.includes(target.key)) {
+          this.sweepDiagnostics.insertedFirstTry.push(target.key);
+        }
+        break;
+      }
+      case 'limited': {
+        // LIMITED: a terminal capability-limited result. The target is
+        // resolved (will not be retried) but is NOT authoritative — it
+        // carries P14 capability data only, no P18/P19/P20. Count it as
+        // resolved so the sweep can reach 8/8 and report "complete".
+        this.retryCounts.delete(target.key);
+        const allKeys = (this.allTargets || []).map((item) => item.key);
+        const progress = getTargetCacheProgress(this.projectId, this.currentBaseDesignFingerprint, allKeys);
+        publishP14AnalysisProgress(this.projectId, {
+          baseDesignFingerprint: this.currentBaseDesignFingerprint,
+          status: progress.resolved >= progress.total && progress.total > 0 ? "complete" : "calculating",
+          completed: progress.resolved,
+          total: progress.total,
+          completedDurationsMs: progress.completedDurationsMs,
+          activeTargetKey: null,
+          activeStartedAtMs: null,
+        });
+        safeConsole.log("p14-bg", `target ${target.key}: LIMITED (capability below requested P14 target) — terminal, not retried`);
         if (!this.sweepDiagnostics.retried.includes(target.key)) {
           this.sweepDiagnostics.insertedFirstTry.push(target.key);
         }

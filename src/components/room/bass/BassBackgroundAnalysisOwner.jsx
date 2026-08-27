@@ -7,7 +7,7 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract, bassContractMatchesRequestedP14 } from "./completedBassResultStore";
+import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, publishCachedLimitedBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract, bassContractMatchesRequestedP14 } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
 import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
@@ -24,6 +24,7 @@ import { evaluateCanonicalBassAuthority } from "@/components/utils/canonicalBass
 import { buildCanonicalCompletedBassMetricAuthority } from "./canonicalCompletedBassMetricAuthority";
 import { buildMetricPublicationReceipt } from "./metricPublicationReceipt";
 import { hasReadyCanonicalP19Contract } from "./p19Readiness";
+import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -415,6 +416,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     if (!isProjectHydrationReady || !targetKey) return;
     // ── Cache hit: publish cached compact contract directly, skip optimiser ──
     if (cachedContract) {
+      // LIMITED cache hit: the requested P14 dBC is physically unattainable.
+      // Publish as a LIMITED authority (not AUTHORITATIVE) so the UI can show
+      // the P14 capability shortfall without running the optimiser again.
+      if (isValidLimitedP14Contract(cachedContract)) {
+        publishCachedLimitedBassContract(scopeId, cachedContract, cacheKey, requested);
+        return;
+      }
       // Stage 4: publish cached compact contract with full safety guards.
       // cacheKey = buildBassResultCacheKey(calibrationFingerprint) — the
       // expected full result fingerprint. requested = the selected P14 target
@@ -601,13 +609,19 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const foregroundReadyPathA = isProjectHydrationReady
     && targetCacheHydrated
     && !!cachedContract
-    && isAuthoritativeBassContract(cachedContract)
-    && hasGraphPayload(cachedContract)
     && bassContractMatchesRequestedP14(cachedContract, requested)
     && !!cachedContract?.job?.resultFingerprint
     && cachedContract.job.resultFingerprint === cacheKey
-    && !!completedBassAuthority?.authoritative
-    && completedBassAuthority?.currentFingerprint === cacheKey;
+    && (
+      // AUTHORITATIVE: full P14/P18/P19/P20 authority with graph payload
+      (isAuthoritativeBassContract(cachedContract)
+        && hasGraphPayload(cachedContract)
+        && !!completedBassAuthority?.authoritative
+        && completedBassAuthority?.currentFingerprint === cacheKey)
+      // LIMITED: terminal P14 capability shortfall (no P19). The foreground
+      // target is resolved — the scheduler may proceed to fill the family.
+      || isValidLimitedP14Contract(cachedContract)
+    );
   const foregroundReadyPathB = isProjectHydrationReady
     && targetCacheHydrated
     && !cachedContract
@@ -635,12 +649,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     const hydrationGated = !targetCacheHydrated || !baseDesignFingerprint || !bassAuthorityHydrationSettled;
     const basePatch = {
       baseDesignFingerprint,
-      completed: targetFamilyProgress.ready,
+      completed: targetFamilyProgress.resolved,
       total: targetFamilyProgress.total,
       completedDurationsMs: targetFamilyProgress.completedDurationsMs,
       status: hydrationGated ? "idle" : "calculating",
     };
-    if (targetFamilyProgress.total > 0 && targetFamilyProgress.ready >= targetFamilyProgress.total) {
+    if (targetFamilyProgress.total > 0 && targetFamilyProgress.resolved >= targetFamilyProgress.total) {
       publishP14AnalysisProgress(scopeId, { ...basePatch, status: "complete", activeTargetKey: null, activeStartedAtMs: null });
       return;
     }
@@ -653,7 +667,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       return;
     }
     publishP14AnalysisProgress(scopeId, basePatch);
-  }, [scopeId, baseDesignFingerprint, targetKey, targetCacheHydrated, bassAuthorityHydrationSettled, targetFamilyProgress.ready, targetFamilyProgress.total, targetDurationSignature, lifecycle.status]);
+  }, [scopeId, baseDesignFingerprint, targetKey, targetCacheHydrated, bassAuthorityHydrationSettled, targetFamilyProgress.resolved, targetFamilyProgress.total, targetDurationSignature, lifecycle.status]);
 
   // ── Live background worker-input readiness ──────────────────────────
   // Reflects the ACTUAL live payload needed by the background worker, NOT the

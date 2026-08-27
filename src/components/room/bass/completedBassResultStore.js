@@ -14,6 +14,7 @@ import {
   isExportableBassContract,
   resolvePersistedBassAuthority,
 } from "./completedBassResultPersistence";
+import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 
 export {
   BASS_AUTHORITY_STATUS,
@@ -229,6 +230,41 @@ export function publishCachedCompactBassContract(projectId, compactContract, exp
   // it survives project close/reopen. Without this, the cached target
   // promotion is memory-only and reverts to the previous authority on reopen.
   syncCachedCompactBassAuthority(key, compactContract);
+  return true;
+}
+
+/**
+ * Publish a cached LIMITED P14 contract as the live authority.
+ *
+ * A LIMITED contract is a terminal engineering result where the requested P14
+ * dBC is physically unattainable. It is structurally complete but NOT
+ * authoritative (no P18/P19/P20). The authority status is set to LIMITED so
+ * downstream consumers can distinguish "capability below target" from
+ * "calculating" or "error".
+ *
+ * Does NOT persist to the DB — LIMITED contracts are cache-only. The DB
+ * current authority remains on the last authoritative result so reopening
+ * the project restores a valid authoritative state, not a dead-end LIMITED.
+ */
+export function publishCachedLimitedBassContract(projectId, compactContract, expectedFingerprint = null, requestedP14Identity = null) {
+  if (!compactContract || !isValidLimitedP14Contract(compactContract)) return false;
+  const resultFingerprint = compactContract.job?.resultFingerprint || null;
+  if (expectedFingerprint && resultFingerprint !== expectedFingerprint) return false;
+  if (requestedP14Identity && !bassContractMatchesRequestedP14(compactContract, requestedP14Identity)) return false;
+  const key = projectKey(projectId);
+  setMemory(key, {
+    projectId: key,
+    status: "complete",
+    authorityStatus: BASS_AUTHORITY_STATUS.LIMITED,
+    currentFingerprint: resultFingerprint,
+    contract: compactContract,
+    staleContract: memoryByProject.get(key)?.contract || null,
+    errorMessage: null,
+    structurallyComplete: true,
+    authoritative: false,
+    exportable: false,
+    publicationRejectionReason: "p14-capability-limited",
+  });
   return true;
 }
 
