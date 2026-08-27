@@ -823,36 +823,17 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       return 0;
     };
 
-    // Default reference: physical wall-normal, but LW/RW use shared visualiser aim logic
-    // and SBL/SBR respect the rear-surround aim toggle.
-    let referenceDeg;
-    if (role === 'LW' || role === 'RW') {
-      const resolvedYaw = resolveSpeakerYaw({
-        speaker,
-        mlpPos,
-        appState,
-        getCanonicalRole,
-      });
-      referenceDeg = isNum(resolvedYaw) ? resolvedYaw : getWallNormal(role);
-    } else if ((role === 'SBL' || role === 'SBR') && appState?.aimRearSurroundsAtMLP) {
-      // Toggle ON: aim at MLP/RSP
-      const mlpYaw = isNum(mlpPos?.x) && isNum(mlpPos?.y) ? angleFromTo(pos, mlpPos) : null;
-      referenceDeg = isNum(mlpYaw) ? mlpYaw : 180;
-    } else {
-      referenceDeg = getWallNormal(role);
-    }
-
-    // Manual rotation override — only when user explicitly aimed the speaker
-    // (rotation?.y excluded — it's an unreliable default object field)
-    if (speaker.positionSource === 'user') {
-      const manualYaw =
-        (isNum(speaker.yaw)          ? speaker.yaw          : null) ??
-        (isNum(speaker.rotationDeg)  ? speaker.rotationDeg  : null) ??
-        (isNum(speaker.rotation_deg) ? speaker.rotation_deg : null);
-      if (manualYaw != null) {
-        referenceDeg = manualYaw;
-      }
-    }
+    // All bed-layer roles resolve aim through the shared single-source-of-truth
+    // resolveSpeakerYaw. This wires the SL/SR aim-at-MLP toggle (and manual yaw,
+    // LW/RW aim toggle, SBL/SBR aim toggle) into the P17 geometry path — previously
+    // SL/SR went straight to wall-normal and bypassed the aim toggle.
+    const resolvedYaw = resolveSpeakerYaw({
+      speaker,
+      mlpPos,
+      appState,
+      getCanonicalRole,
+    });
+    let referenceDeg = isNum(resolvedYaw) ? resolvedYaw : getWallNormal(role);
 
     // Off-axis magnitude (0..180)
     const offAxisRaw = shortestAngleDeg(seatAzDeg, referenceDeg);
@@ -865,27 +846,18 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
     // Get model metadata for dispersion
     const meta = modelMeta || (speaker.model ? getSpeakerModelMeta(speaker.model) : null);
 
-    // Use centralized mapping with model-specific dispersion
-    const lossFromAngle = mapAngleToHfLossDb(effectiveAngleDeg, meta);
+    // Continuous HF loss — same function as the P16/LCR path. No stepped buckets
+    // and no 3 dB cap: the loss rises naturally beyond the −3 dB window so that
+    // re-aiming a bed speaker produces a meaningful seat-vs-RSP response change.
+    const lossDb = continuousHfLossDb(effectiveAngleDeg, meta);
 
-    let lossDb;
-    let isBeyondNonLcrLimit = false;
-
-    // Determine limit based on model-specific dispersion or fallback to 41°
+    // N/A flag: beyond the model's −3 dB window (for the debug "N/A = >41°" indicator).
+    // This flag no longer caps the loss value — it is display-only.
     const nonLcrLimit = halfDispersionDeg(
       meta?.dispersion?.horizontal?.minus3dB ?? 
       meta?.dispersion?.horizontal?.minus3
     ) ?? 41;
-
-    if (Math.abs(effectiveAngleDeg) > nonLcrLimit) {
-      // Beyond the model's −3 dB window
-      isBeyondNonLcrLimit = true;
-      // For RP22 we still want P17 to land at Level 2, so use 3 dB as the nominal value
-      lossDb = 3.0;
-    } else {
-      // Within the model's coverage: use the normal dispersion-based values
-      lossDb = lossFromAngle != null ? lossFromAngle : 5.0;
-    }
+    const isBeyondNonLcrLimit = Math.abs(effectiveAngleDeg) > nonLcrLimit;
 
     if (globalThis.__B44_RV_DEBUG === true) {
       console.log("[P17 SURROUND]", role, {
