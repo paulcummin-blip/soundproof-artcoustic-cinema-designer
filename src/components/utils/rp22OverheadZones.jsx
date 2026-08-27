@@ -257,17 +257,73 @@ export function getListeningAreaBounds(
 }
 
 /**
+ * Count distinct seating rows from seating positions.
+ * Prefers explicit rowNumber; falls back to Y clustering with a 0.20 m
+ * threshold (matching useRoomDerivedState row detection).
+ */
+function countSeatRows(seatingPositions) {
+  if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return 0;
+  const rowNumbers = seatingPositions
+    .map((s) => s?.rowNumber)
+    .filter((n) => Number.isInteger(n));
+  if (rowNumbers.length > 0) return new Set(rowNumbers).size;
+  const seatYs = seatingPositions
+    .map((s) => Number(s?.position?.y ?? s?.y))
+    .filter((v) => Number.isFinite(v))
+    .sort((a, b) => a - b);
+  if (seatYs.length === 0) return 0;
+  let rows = 1;
+  let anchor = seatYs[0];
+  for (let i = 1; i < seatYs.length; i++) {
+    if (Math.abs(seatYs[i] - anchor) > 0.20) {
+      rows++;
+      anchor = seatYs[i];
+    }
+  }
+  return rows;
+}
+
+/**
+ * Average Y of all seats (the single-row reference Y).
+ */
+function getSingleRowY(seatingPositions) {
+  if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return null;
+  const ys = seatingPositions
+    .map((s) => Number(s?.position?.y ?? s?.y))
+    .filter((v) => Number.isFinite(v));
+  if (ys.length === 0) return null;
+  return ys.reduce((a, b) => a + b, 0) / ys.length;
+}
+
+/**
+ * Detect the overhead speaker count from placedSpeakers (roles starting with "T").
+ */
+function detectOverheadCount(placedSpeakers, getCanonicalRole) {
+  if (!Array.isArray(placedSpeakers)) return 0;
+  let count = 0;
+  for (const s of placedSpeakers) {
+    const role = getCanonicalRole ? getCanonicalRole(s?.role) : String(s?.role || "").toUpperCase();
+    if (role && String(role).startsWith("T")) count++;
+  }
+  return count;
+}
+
+/**
  * Compute RP22-compliant overhead zone extents.
  * Returns three zones: front (Upper Front), mid (Top Middle), back (Upper Back).
  * X-width constrained by seats and front L/R speakers.
  * Zones are height-aware: positions respond to ceiling height and ear height.
- * 
+ *
+ * Single-row .4 rule: front zone inner boundary is 1.00 m forward of the
+ * seating row; rear zone inner boundary is 1.00 m behind. Short rooms that
+ * cannot provide the separation return inactive zones (no silent relaxation).
+ *
  * @param {Object} bounds - Output from getListeningAreaBounds
  * @param {Object} roomDims - {widthM, lengthM, heightM}
  * @param {Array} seatingPositions - Array of seat objects
  * @param {Array} placedSpeakers - Array of speaker objects
  * @param {Function} getCanonicalRole - Role normalization function
- * @returns {Object} {frontZone, midZone, backZone} each with {x1, x2, y1, y2, active}
+ * @returns {Object} {frontZone, midZone, backZone} each with {x1, x2, y1, y2, active, placementY}
  */
 export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPositions, placedSpeakers, getCanonicalRole) {
   if (!bounds || bounds.active === false) {
@@ -467,10 +523,42 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
     pieces: basePieces,
   };
 
+  // ────────────────────────────────────────────────────────────────────────────
+  // SINGLE-ROW .4 EXCLUSION ZONE
+  // For a single seating row with 4 overheads, enforce a 1.00 m exclusion
+  // zone around the row: front zone stops 1.00 m forward, rear zone starts
+  // 1.00 m behind. Short rooms that cannot provide the separation return
+  // inactive zones — the rule is never silently relaxed.
+  // ────────────────────────────────────────────────────────────────────────────
+  const ohCount = detectOverheadCount(placedSpeakers, getCanonicalRole);
+  const rowCount = countSeatRows(seatingPositions);
+  const isSingleRowDot4 = ohCount === 4 && rowCount === 1;
+
+  if (isSingleRowDot4) {
+    const seatRowY = getSingleRowY(seatingPositions);
+    if (Number.isFinite(seatRowY)) {
+      frontZone.y2 = seatRowY - 1.00; // 1.00 m forward of seating row (not clamped)
+      backZone.y1 = seatRowY + 1.00;  // 1.00 m behind seating row (not clamped)
+    }
+  }
+
   // Re-evaluate active flags after lateral authority computation
   frontZone.active = frontZone.y2 > frontZone.y1 && Array.isArray(frontZone.pieces) && frontZone.pieces.length > 0;
   midZone.active   = midZone.y2   > midZone.y1   && Array.isArray(midZone.pieces)   && midZone.pieces.length   > 0;
   backZone.active  = backZone.y2  > backZone.y1  && Array.isArray(backZone.pieces)  && backZone.pieces.length  > 0;
+
+  // Recommended placement Y for auto-placement. Default = zone centre.
+  // Single-row .4: place at the inner boundary (nearest to RSP) so the
+  // front pair sits at the 1.00 m forward boundary and the rear pair at
+  // the 1.00 m behind boundary — yielding the natural ~80° (L2) P9 angle.
+  frontZone.placementY = (frontZone.y1 + frontZone.y2) / 2;
+  midZone.placementY = (midZone.y1 + midZone.y2) / 2;
+  backZone.placementY = (backZone.y1 + backZone.y2) / 2;
+
+  if (isSingleRowDot4) {
+    if (frontZone.active) frontZone.placementY = frontZone.y2; // inner edge (nearest RSP)
+    if (backZone.active) backZone.placementY = backZone.y1;    // inner edge (nearest RSP)
+  }
 
   // Extract corridor limits for speaker clamping
   const extractCorridorLimits = (zone) => {

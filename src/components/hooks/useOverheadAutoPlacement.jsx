@@ -45,29 +45,32 @@ export function useOverheadAutoPlacement({
     const zoneInfo = {};
     
     if (overheadZones.frontZone?.active) {
-      const { x1, x2, y1, y2 } = overheadZones.frontZone;
+      const { x1, x2, y1, y2, placementY } = overheadZones.frontZone;
       zoneInfo.front = {
         centerY: (y1 + y2) / 2,
+        placementY: Number.isFinite(placementY) ? placementY : (y1 + y2) / 2,
         leftX: x1,
         rightX: x2,
         zone: overheadZones.frontZone
       };
     }
-    
+
     if (overheadZones.midZone?.active) {
-      const { x1, x2, y1, y2 } = overheadZones.midZone;
+      const { x1, x2, y1, y2, placementY } = overheadZones.midZone;
       zoneInfo.mid = {
         centerY: (y1 + y2) / 2,
+        placementY: Number.isFinite(placementY) ? placementY : (y1 + y2) / 2,
         leftX: x1,
         rightX: x2,
         zone: overheadZones.midZone
       };
     }
-    
+
     if (overheadZones.backZone?.active) {
-      const { x1, x2, y1, y2 } = overheadZones.backZone;
+      const { x1, x2, y1, y2, placementY } = overheadZones.backZone;
       zoneInfo.rear = {
         centerY: (y1 + y2) / 2,
+        placementY: Number.isFinite(placementY) ? placementY : (y1 + y2) / 2,
         leftX: x1,
         rightX: x2,
         zone: overheadZones.backZone
@@ -97,7 +100,7 @@ export function useOverheadAutoPlacement({
       if (!band || !zoneInfo[band]) return spk;
       
       const zone = zoneInfo[band];
-      const targetY = zone.centerY;
+      const targetY = zone.placementY ?? zone.centerY;
       const targetX = side === 'R' ? zone.rightX : zone.leftX;
       
       const currentX = spk.position?.x;
