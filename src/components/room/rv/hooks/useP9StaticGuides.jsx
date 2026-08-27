@@ -250,14 +250,18 @@ export function useP9StaticGuides({
     const boundaries = [];
 
     for (const { level, deg } of P9_THRESHOLDS) {
+      // P9 is the angle between the front and rear overhead directions at
+      // the listener. For both .4 and .6 the helper solves the symmetric
+      // front↔rear gap (mid is a visual anchor at RSP, not part of the
+      // gap measurement), so the solver always uses the front+rear pair.
       const offset = solveOffset({
         targetDeg: deg,
         rspPoint,
         ohZ,
         frontX,
         rearX,
-        midX,
-        hasMid,
+        midX: null,
+        hasMid: false,
         roomCenterX,
         canonicalRoleFn,
       });
