@@ -15,6 +15,7 @@ import { COMPLETED_BASS_CACHE_VERSION, INSTANCE_AUTHORITY_VERSION, RP22_BASS_MET
 import { isAuthoritativeBassContract } from "./completedBassResultPersistence";
 import { hasGraphPayload } from "./finishedGraphAdapter";
 import { hasReadyCanonicalP19Contract } from "./p19Readiness";
+import { isValidLimitedP14Contract, isLimitedP14Entry } from "./p14LimitedTargetAuthority";
 
 const cacheByProject = new Map();
 const listeners = new Set();
@@ -51,13 +52,39 @@ export function getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey)
   if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION) return null;
   if (cache.baseDesignFingerprint !== baseDesignFingerprint) return null;
   const entry = cache.targets[targetKey];
-  if (!entry || !isAuthoritativeBassContract(entry)) return null;
-  // Stage 3: a reusable target must also contain the finished graph payload.
-  // Older entries (pre-Stage 3) without graphPayload are treated as cache
-  // misses so they get recalculated with the full payload.
-  if (!hasGraphPayload(entry)) return null;
-  if (!hasReadyCanonicalP19Contract(entry)) return null;
-  return entry;
+  if (!entry) return null;
+  // AUTHORITATIVE: structurally complete + graph payload + P19 ready
+  if (isAuthoritativeBassContract(entry) && hasGraphPayload(entry) && hasReadyCanonicalP19Contract(entry)) {
+    return entry;
+  }
+  // LIMITED: a valid capability-limited P14 contract (terminal, no P19)
+  if (isValidLimitedP14Contract(entry)) {
+    return entry;
+  }
+  return null;
+}
+
+/**
+ * Store a LIMITED P14 contract for a target. A LIMITED contract represents a
+ * successful terminal engineering result: the requested P14 dBC cannot be
+ * achieved. It is stored separately from authoritative contracts and does
+ * NOT pass the authoritative cache gate.
+ */
+export function setLimitedTargetCacheEntry(projectId, baseDesignFingerprint, targetKey, limitedContract, { deferPersistence = false } = {}) {
+  if (!baseDesignFingerprint || !targetKey || !limitedContract) return false;
+  if (!isValidLimitedP14Contract(limitedContract)) return false;
+  const cache = ensureCache(projectId);
+  if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION
+    || cache.baseDesignFingerprint !== baseDesignFingerprint) {
+    cache.metricSchemaVersion = RP22_BASS_METRIC_SCHEMA_VERSION;
+    cache.baseDesignFingerprint = baseDesignFingerprint;
+    cache.targets = {};
+  }
+  // Mark the entry so isLimitedP14Entry can identify it without re-validating
+  cache.targets[targetKey] = { ...limitedContract, __p14Limited: true };
+  notify();
+  scheduleSync(projectId, { deferPersistence });
+  return true;
 }
 
 /**
@@ -65,21 +92,39 @@ export function getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey)
  */
 export function getTargetCacheProgress(projectId, baseDesignFingerprint, allTargetKeys) {
   const keys = Array.isArray(allTargetKeys) ? allTargetKeys : [];
-  if (!baseDesignFingerprint) return { ready: 0, total: keys.length, completedDurationsMs: [], readyTargetKeys: [] };
+  const empty = { ready: 0, resolved: 0, total: keys.length, completedDurationsMs: [], readyTargetKeys: [], limitedTargetKeys: [], resolvedTargetKeys: [] };
+  if (!baseDesignFingerprint) return empty;
   const cache = ensureCache(projectId);
-  if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION) return { ready: 0, total: keys.length, completedDurationsMs: [], readyTargetKeys: [] };
-  if (cache.baseDesignFingerprint !== baseDesignFingerprint) return { ready: 0, total: keys.length, completedDurationsMs: [], readyTargetKeys: [] };
+  if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION) return empty;
+  if (cache.baseDesignFingerprint !== baseDesignFingerprint) return empty;
   const readyTargetKeys = [];
+  const limitedTargetKeys = [];
+  const resolvedTargetKeys = [];
   const completedDurationsMs = [];
   keys.forEach((key) => {
     const entry = cache.targets[key];
-    const ready = entry && isAuthoritativeBassContract(entry) && hasGraphPayload(entry) && hasReadyCanonicalP19Contract(entry);
-    if (!ready) return;
-    readyTargetKeys.push(key);
-    const elapsedMs = Number(entry?.job?.elapsedMs);
-    if (Number.isFinite(elapsedMs) && elapsedMs > 0) completedDurationsMs.push(elapsedMs);
+    if (!entry) return;
+    const isAuthoritative = isAuthoritativeBassContract(entry) && hasGraphPayload(entry) && hasReadyCanonicalP19Contract(entry);
+    const isLimited = isValidLimitedP14Contract(entry);
+    if (isAuthoritative) {
+      readyTargetKeys.push(key);
+      resolvedTargetKeys.push(key);
+      const elapsedMs = Number(entry?.job?.elapsedMs);
+      if (Number.isFinite(elapsedMs) && elapsedMs > 0) completedDurationsMs.push(elapsedMs);
+    } else if (isLimited) {
+      limitedTargetKeys.push(key);
+      resolvedTargetKeys.push(key);
+    }
   });
-  return { ready: readyTargetKeys.length, total: keys.length, completedDurationsMs, readyTargetKeys };
+  return {
+    ready: readyTargetKeys.length,
+    resolved: resolvedTargetKeys.length,
+    total: keys.length,
+    completedDurationsMs,
+    readyTargetKeys,
+    limitedTargetKeys,
+    resolvedTargetKeys,
+  };
 }
 
 /**

@@ -19,6 +19,10 @@ import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 
 export const MAX_BACKGROUND_TARGET_RETRIES = 1;
 
+// Import the LIMITED validator so resolveBackgroundTargetAdvance can
+// distinguish a capability limitation (terminal) from a genuine failure.
+import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
+
 /**
  * Classify a worker pool result for the background scheduler.
  *
@@ -130,10 +134,20 @@ export function resolveBackgroundTargetAdvance({
   maxRetries = MAX_BACKGROUND_TARGET_RETRIES,
   fingerprintChanged = false,
   cancelled = false,
+  isLimited = false,
+  contract = null,
 }) {
   if (cancelled) return { action: 'discard', retryCount };
   if (fingerprintChanged) return { action: 'discard', retryCount };
   if (insertResult && readbackResult) return { action: 'advance', retryCount: 0 };
+  // A deterministic P14 capability limitation is a terminal result, not a
+  // failure. If the contract is a valid LIMITED P14 contract, advance without
+  // retrying — retrying the identical acoustic calculation cannot improve
+  // physical capability.
+  if (!insertResult && contract && isValidLimitedP14Contract(contract)) {
+    return { action: 'limited', retryCount: 0 };
+  }
+  if (isLimited) return { action: 'limited', retryCount: 0 };
   if (retryCount < maxRetries) return { action: 'retry', retryCount: retryCount + 1 };
   return { action: 'fail', retryCount };
 }

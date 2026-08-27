@@ -22,6 +22,7 @@ export const BASS_AUTHORITY_STATUS = Object.freeze({
   UNCALCULATED: "UNCALCULATED",
   NOT_VERIFIED: "NOT_VERIFIED",
   AUTHORITATIVE: "AUTHORITATIVE",
+  LIMITED: "LIMITED",
 });
 
 export function isStructurallyCompleteBassContract(contract) {

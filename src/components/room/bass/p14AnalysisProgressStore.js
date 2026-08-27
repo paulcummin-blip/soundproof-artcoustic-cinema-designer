@@ -157,6 +157,13 @@ export function presentP14AnalysisProgress(progress, nowMs = Date.now()) {
     return { label: baseLabel, etaSeconds: null, complete: false };
   }
 
+  // Suppress stale ETA: when no target is actively running, there is no
+  // outstanding work to estimate. Showing "~Ns remaining" when the queue
+  // is empty and no worker is active freezes a false prediction indefinitely.
+  if (!active) {
+    return { label: baseLabel, etaSeconds: null, complete: false };
+  }
+
   const jobsRemaining = Math.max(0, total - completed);
   const elapsedCurrentMs = active && Number.isFinite(progress?.activeStartedAtMs)
     ? Math.max(0, nowMs - progress.activeStartedAtMs)
@@ -164,6 +171,14 @@ export function presentP14AnalysisProgress(progress, nowMs = Date.now()) {
   const remainingCurrentMs = active ? Math.max(0, meanDurationMs - elapsedCurrentMs) : 0;
   const queuedJobs = active ? Math.max(0, jobsRemaining - 1) : jobsRemaining;
   const remainingMs = remainingCurrentMs + queuedJobs * meanDurationMs;
+
+  // Suppress stale ETA: if the active job has been running for more than 3x
+  // the predicted mean duration, the ETA is no longer reliable. Show the
+  // label without a frozen countdown rather than misleading the user.
+  if (elapsedCurrentMs > 3 * meanDurationMs) {
+    return { label: baseLabel, etaSeconds: null, complete: false };
+  }
+
   const rawSeconds = Math.max(1, remainingMs / 1000);
   const etaSeconds = rawSeconds >= 15
     ? Math.max(5, Math.round(rawSeconds / 5) * 5)
