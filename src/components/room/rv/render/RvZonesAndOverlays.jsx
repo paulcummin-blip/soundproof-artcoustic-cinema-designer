@@ -138,6 +138,7 @@ export default function RvZonesAndOverlays({
           note={p9Corridors?.note}
           selectedRow={p9Corridors?.selectedRow}
           rows={p9Corridors?.rows}
+          midMarker={p9Corridors?.midMarker}
           overheadZones={overheadZones}
           toPx={toPx}
           widthM={widthM}

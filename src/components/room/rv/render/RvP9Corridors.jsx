@@ -33,6 +33,7 @@ export default function RvP9Corridors({
   note,
   selectedRow,
   rows,
+  midMarker,
   overheadZones,
   toPx,
   widthM,
@@ -200,6 +201,57 @@ export default function RvP9Corridors({
           </g>
         );
       })}
+
+      {/* Top Middle / RSP cross-line — .6 only. TML/TMR align to RSP;
+          no 50/60/80 ladder is drawn for the mid row. */}
+      {midMarker && (() => {
+        const midZone = overheadZones?.midZone;
+        const zoneForX = (midZone && midZone.active) ? midZone : overheadZones?.frontZone;
+        if (!zoneForX || !zoneForX.active) return null;
+        const pieces = Array.isArray(zoneForX.pieces) && zoneForX.pieces.length
+          ? zoneForX.pieces
+          : [{ x1: zoneForX.x1, x2: zoneForX.x2 }];
+        if (pieces.length === 0) return null;
+        const yPx = yToPx(midMarker.y);
+        return (
+          <g key="p9-mid-marker">
+            {pieces.map((piece, pi) => {
+              const [x0px] = toPx(Math.min(piece.x1, piece.x2), 0);
+              const [x1px] = toPx(Math.max(piece.x1, piece.x2), 0);
+              return (
+                <line
+                  key={`p9-mid-line-${pi}`}
+                  x1={x0px}
+                  y1={yPx}
+                  x2={x1px}
+                  y2={yPx}
+                  stroke="#213428"
+                  strokeWidth={2}
+                  strokeOpacity={0.5}
+                  strokeDasharray="2 3"
+                />
+              );
+            })}
+            {(() => {
+              const firstPiece = pieces[0];
+              const [cx] = toPx((firstPiece.x1 + firstPiece.x2) / 2, 0);
+              return (
+                <text
+                  x={cx}
+                  y={yPx - 4}
+                  fill="#213428"
+                  fontSize={9}
+                  textAnchor="middle"
+                  fontFamily="Didact Gothic, sans-serif"
+                  opacity={0.6}
+                >
+                  Top Middle · RSP
+                </text>
+              );
+            })()}
+          </g>
+        );
+      })()}
     </g>
   );
 }

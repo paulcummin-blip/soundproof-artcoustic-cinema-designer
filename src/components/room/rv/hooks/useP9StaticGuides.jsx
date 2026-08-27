@@ -1,36 +1,34 @@
 /**
  * useP9StaticGuides
  * -----------------
- * Fixed P9 reference guides for .4 overhead layouts.
+ * Fixed P9 reference guides for .4 and .6 overhead layouts.
  *
- * Computes the Y positions at which a SYMMETRICAL pair of overhead rows
- * (front + rear, centred on the RSP) would produce a P9 adjacent-row
- * vertical separation of 50° (L4), 60° (L3), or 80° (L2).
+ * .4: symmetric front+rear pair centred on RSP. Binary-search the
+ *     half-offset d such that the front↔rear adjacent-row gap equals
+ *     50° (L4), 60° (L3), or 80° (L2). Emits one front ladder and one
+ *     rear ladder, both RSP-anchored.
+ *
+ * .6: front+mid+rear with mid fixed at RSP (TML/TMR aligned to RSP).
+ *     Binary-search the offset d such that the front↔mid gap (and by
+ *     symmetry mid↔rear) equals each threshold. Emits one front ladder
+ *     (rspY − d), one rear ladder (rspY + d), and a midMarker at rspY
+ *     so the renderer can draw the RSP cross-line / Top Middle label.
+ *     No 50/60/80 ladder is drawn for the mid row.
  *
  * The guides are STATIC — they do NOT depend on the current draggable
- * Y positions of TFL/TFR or TRL/TRR.  They depend only on:
+ * Y positions of the overhead speakers. They depend only on:
  *   - RSP X/Y/Z
  *   - room / ceiling geometry (overhead Z = ceiling height)
  *   - overhead placement-zone geometry (for zone-derived X and Y filtering)
  *
- * Solver:
- *   For each threshold, binary-search the half-offset `d` such that a
- *   synthetic .4 arrangement (front at rspY-d, rear at rspY+d, both at
- *   ceiling Z, left/right X from the zone pieces) produces the target
- *   adjacent-row gap when evaluated by the canonical
- *   computeUpperVerticalAnglesForSeat() helper.
+ * Solver uses the canonical computeUpperVerticalAnglesForSeat() helper
+ * as the sole angle authority — no alternative P9 trigonometry.
  *
- *   No alternative P9 trigonometry is introduced — the canonical helper
- *   is the sole angle authority.
- *
- * Output shape matches useP9CorridorsComputed so the same renderer
- * (RvP9Corridors) can consume it:
- *   { applicable, state, ranges, boundaries, selectedRow, rows, note }
+ * Output shape (consumed by RvP9Corridors):
+ *   { applicable, state, ranges, boundaries, selectedRow, rows, midMarker, note }
  *   boundaries: [{ y, level, deg, row }]  — only entries whose Y falls
  *   inside the corresponding overhead placement zone.
- *
- * .6 layouts are NOT handled here (returns not-applicable); the caller
- * falls back to the dynamic corridors for .6.
+ *   midMarker: { y } | null  — RSP Y for the Top Middle cross-line (.6 only)
  */
 
 import { useMemo } from "react";
@@ -45,7 +43,9 @@ const P9_THRESHOLDS = [
   { level: "L2", deg: 80 },
 ];
 
-const SEARCH_HIGH_M = 5.0; // max half-offset (5 m either side of RSP)
+// Max half-offset. .6 L2 (80°) offset = dz·tan(80°) can exceed 5 m for
+// tall ceilings, so allow up to 8 m; out-of-zone guides are filtered.
+const SEARCH_HIGH_M = 8.0;
 const SEARCH_ITERATIONS = 30;
 
 /**
@@ -69,32 +69,66 @@ function getZoneLeftRightX(zone) {
 }
 
 /**
- * Build synthetic .4 speakers for a candidate half-offset.
- *   front row: TFL/TFR at (leftX, rspY - offset, ohZ) / (rightX, rspY - offset, ohZ)
- *   rear  row: TRL/TRR at (leftX, rspY + offset, ohZ) / (rightX, rspY + offset, ohZ)
+ * Build synthetic overhead speakers for a candidate offset.
+ *   .4: front row at rspY−offset, rear row at rspY+offset (no mid).
+ *   .6: front row at rspY−offset, mid row at rspY (midOffset=0),
+ *       rear row at rspY+offset.
  */
-function buildSyntheticSpeakers({ rspY, offset, ohZ, frontX, rearX }) {
-  return [
-    { id: "synth-TFL", role: "TFL", position: { x: frontX.leftX, y: rspY - offset, z: ohZ } },
-    { id: "synth-TFR", role: "TFR", position: { x: frontX.rightX, y: rspY - offset, z: ohZ } },
-    { id: "synth-TRL", role: "TRL", position: { x: rearX.leftX, y: rspY + offset, z: ohZ } },
-    { id: "synth-TRR", role: "TRR", position: { x: rearX.rightX, y: rspY + offset, z: ohZ } },
+function buildSyntheticSpeakers({
+  rspY,
+  frontOffset,
+  rearOffset,
+  midOffset,
+  ohZ,
+  frontX,
+  rearX,
+  midX,
+  hasMid,
+}) {
+  const speakers = [
+    { id: "synth-TFL", role: "TFL", position: { x: frontX.leftX, y: rspY - frontOffset, z: ohZ } },
+    { id: "synth-TFR", role: "TFR", position: { x: frontX.rightX, y: rspY - frontOffset, z: ohZ } },
+    { id: "synth-TRL", role: "TRL", position: { x: rearX.leftX, y: rspY + rearOffset, z: ohZ } },
+    { id: "synth-TRR", role: "TRR", position: { x: rearX.rightX, y: rspY + rearOffset, z: ohZ } },
   ];
+  if (hasMid) {
+    speakers.push(
+      { id: "synth-TML", role: "TML", position: { x: midX.leftX, y: rspY + midOffset, z: ohZ } },
+      { id: "synth-TMR", role: "TMR", position: { x: midX.rightX, y: rspY + midOffset, z: ohZ } },
+    );
+  }
+  return speakers;
 }
 
 /**
- * Evaluate the canonical P9 adjacent-row gap for a candidate offset.
+ * Evaluate the canonical P9 max vertical gap for a candidate offset.
  * Uses getUpperSpeakersForSeat + computeUpperVerticalAnglesForSeat.
- * Returns maxVerticalGapDeg (max of left/right front↔rear gaps; both are
- * equal because elevation is independent of X).
+ * For symmetric layouts (.4 and .6 with mid at RSP) all adjacent gaps
+ * are equal, so maxVerticalGapDeg is the single relevant gap.
  */
-function evaluateGap({ rspPoint, offset, ohZ, frontX, rearX, roomCenterX, canonicalRoleFn }) {
+function evaluateGap({
+  rspPoint,
+  frontOffset,
+  rearOffset,
+  midOffset,
+  ohZ,
+  frontX,
+  rearX,
+  midX,
+  hasMid,
+  roomCenterX,
+  canonicalRoleFn,
+}) {
   const synth = buildSyntheticSpeakers({
     rspY: rspPoint.y,
-    offset,
+    frontOffset,
+    rearOffset,
+    midOffset,
     ohZ,
     frontX,
     rearX,
+    midX,
+    hasMid,
   });
   const upperSpeakers = getUpperSpeakersForSeat(rspPoint, synth, canonicalRoleFn);
   const result = computeUpperVerticalAnglesForSeat(rspPoint, upperSpeakers, roomCenterX);
@@ -106,13 +140,35 @@ function evaluateGap({ rspPoint, offset, ohZ, frontX, rearX, roomCenterX, canoni
  * Gap is monotonically increasing with offset (0° at offset=0 → 180° at
  * offset→∞), so a standard binary search converges quickly.
  */
-function solveOffset({ targetDeg, rspPoint, ohZ, frontX, rearX, roomCenterX, canonicalRoleFn }) {
+function solveOffset({
+  targetDeg,
+  rspPoint,
+  ohZ,
+  frontX,
+  rearX,
+  midX,
+  hasMid,
+  roomCenterX,
+  canonicalRoleFn,
+}) {
   let low = 0;
   let high = SEARCH_HIGH_M;
 
   for (let i = 0; i < SEARCH_ITERATIONS; i++) {
     const mid = (low + high) / 2;
-    const gap = evaluateGap({ rspPoint, offset: mid, ohZ, frontX, rearX, roomCenterX, canonicalRoleFn });
+    const gap = evaluateGap({
+      rspPoint,
+      frontOffset: mid,
+      rearOffset: mid,
+      midOffset: 0,
+      ohZ,
+      frontX,
+      rearX,
+      midX,
+      hasMid,
+      roomCenterX,
+      canonicalRoleFn,
+    });
     if (!Number.isFinite(gap)) return null;
     // gap increases with offset: if gap < target, need larger offset
     if (gap < targetDeg) low = mid;
@@ -139,6 +195,7 @@ export function useP9StaticGuides({
       boundaries: [],
       selectedRow: null,
       rows: [],
+      midMarker: null,
       note: null,
     };
 
@@ -155,10 +212,11 @@ export function useP9StaticGuides({
     const heightM = Number(roomDims?.heightM) || 2.4;
     const roomCenterX = widthM / 2;
 
-    // Only .4 layouts — .6 is handled by the dynamic corridors
     const parts = String(dolbyLayout || "").split(".");
     const ohCount = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
-    if (ohCount !== 4) return empty;
+    const hasMid = ohCount === 6;
+    // .4 and .6 use the RSP-anchored static guide; .2 is not applicable.
+    if (ohCount !== 4 && ohCount !== 6) return empty;
 
     // Canonical overhead Z = ceiling plane
     const ohZ = heightM;
@@ -171,6 +229,14 @@ export function useP9StaticGuides({
     const frontX = getZoneLeftRightX(frontZone);
     const rearX = getZoneLeftRightX(rearZone);
     if (!frontX || !rearX) return empty;
+
+    let midX = null;
+    if (hasMid) {
+      const midZone = overheadZones?.midZone;
+      if (!midZone?.active) return empty;
+      midX = getZoneLeftRightX(midZone);
+      if (!midX) return empty;
+    }
 
     const rspPoint = { x: rspX, y: rspY, z: rspZ };
     const canonicalRoleFn = getCanonicalRole || ((role) => String(role || "").toUpperCase());
@@ -190,6 +256,8 @@ export function useP9StaticGuides({
         ohZ,
         frontX,
         rearX,
+        midX,
+        hasMid,
         roomCenterX,
         canonicalRoleFn,
       });
@@ -207,16 +275,22 @@ export function useP9StaticGuides({
       }
     }
 
+    const rows = [
+      { row: "front", state: "static" },
+      { row: "rear", state: "static" },
+    ];
+
+    // .6: Top Middle is fixed at RSP — no 50/60/80 ladder, just a cross-line.
+    const midMarker = hasMid ? { y: rspY } : null;
+
     return {
       applicable: true,
       state: "static",
       ranges: [],
       boundaries,
       selectedRow: null,
-      rows: [
-        { row: "front", state: "static" },
-        { row: "rear", state: "static" },
-      ],
+      rows,
+      midMarker,
       note: null,
     };
   }, [
