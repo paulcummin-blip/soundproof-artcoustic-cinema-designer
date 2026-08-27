@@ -406,16 +406,119 @@ function getOverheadTiltDeg(modelKey) {
 
 
 
+// ── P17 overhead aimed-axis geometry ───────────────────────────────────────
+// The built-in acoustic-axis tilt (5° Architect 2-1, 22° Spitfire Cloud, 20° PAS2-2) is
+// directed toward the RSP as a true 3D axis vector — NOT a scalar subtraction from the raw
+// vertical angle. The axis starts as the ceiling-normal (straight down) and is rotated by
+// `tiltDeg` in the vertical plane containing the speaker→RSP horizontal direction. This makes
+// the tilt benefit seats toward the RSP while seats away from the aiming direction no longer
+// receive a free angular discount.
+//
+// Speaker acoustic origin = cabinet centre at ceiling height (no tweeter/driver offset).
+function buildOverheadAimedFrame(speakerPos, rspPos, tiltDeg) {
+  if (!speakerPos || !rspPos) return null;
+  const spkX = Number(speakerPos.x);
+  const spkY = Number(speakerPos.y);
+  const rspX = Number(rspPos.x);
+  const rspY = Number(rspPos.y);
+  if (!Number.isFinite(spkX) || !Number.isFinite(spkY) || !Number.isFinite(rspX) || !Number.isFinite(rspY)) return null;
+
+  const t = Number.isFinite(Number(tiltDeg)) ? (Number(tiltDeg) * Math.PI) / 180 : 0;
+  const sinT = Math.sin(t);
+  const cosT = Math.cos(t);
+
+  // Horizontal unit vector from speaker toward RSP (the tilt direction).
+  const dx = rspX - spkX;
+  const dy = rspY - spkY;
+  const dh = Math.hypot(dx, dy);
+
+  // Speaker directly above the RSP — no preferred tilt direction. Collapse to the untilted
+  // (straight-down) axis with an arbitrary orthonormal frame.
+  if (dh <= 1e-6) {
+    return {
+      forward: { x: 0, y: 0, z: -1 },
+      up: { x: 0, y: 0, z: 1 },
+      right: { x: 1, y: 0, z: 0 },
+      tiltDeg: 0,
+      horizontalDir: { x: 0, y: 0 },
+    };
+  }
+
+  const Hx = dx / dh;
+  const Hy = dy / dh;
+
+  // forward = H·sin(t) + D·cos(t),  D = (0,0,-1)  → aimed acoustic axis (into the room)
+  const forward = { x: Hx * sinT, y: Hy * sinT, z: -cosT };
+  // up = (Hx·cos t, Hy·cos t, sin t)  → in the tilt plane, perpendicular to forward
+  const up = { x: Hx * cosT, y: Hy * cosT, z: sinT };
+  // right = (Hy, -Hx, 0)  → horizontal, perpendicular to the tilt plane (pitch axis)
+  const right = { x: Hy, y: -Hx, z: 0 };
+
+  return { forward, up, right, tiltDeg: Number.isFinite(Number(tiltDeg)) ? Number(tiltDeg) : 0, horizontalDir: { x: Hx, y: Hy } };
+}
+
+// Signed horizontal/vertical off-axis components (degrees) of a target direction relative to the
+// aimed frame. vertical = elevation in the tilt plane (fore/aft vs RSP aim); horizontal = azimuth
+// perpendicular to the tilt plane (left/right of RSP aim). Used to interrogate measured H/V polar
+// datasets relative to the AIMED axis (not room +Y).
+function aimedFrameOffAxisDeg(frame, targetVec) {
+  if (!frame || !targetVec) return { horizontalOffAxis: null, verticalOffAxis: null };
+  const vx = Number(targetVec.x), vy = Number(targetVec.y), vz = Number(targetVec.z);
+  if (!Number.isFinite(vx) || !Number.isFinite(vy) || !Number.isFinite(vz)) return { horizontalOffAxis: null, verticalOffAxis: null };
+  const m = Math.hypot(vx, vy, vz);
+  if (m <= 1e-9) return { horizontalOffAxis: 0, verticalOffAxis: 0 };
+  const v = { x: vx / m, y: vy / m, z: vz / m };
+
+  // Vertical component: project v into the tilt plane (remove the `right` component).
+  const dRight = dot3(v, frame.right);
+  const vVert = { x: v.x - dRight * frame.right.x, y: v.y - dRight * frame.right.y, z: v.z - dRight * frame.right.z };
+  const mVert = Math.hypot(vVert.x, vVert.y, vVert.z);
+  let verticalOffAxis = 0;
+  if (mVert > 1e-9) {
+    let c = dot3(frame.forward, vVert) / mVert;
+    c = Math.max(-1, Math.min(1, c));
+    verticalOffAxis = (Math.acos(c) * 180) / Math.PI;
+    if (dot3(vVert, frame.up) < 0) verticalOffAxis = -verticalOffAxis;
+  }
+
+  // Horizontal component: project v into the plane perpendicular to `up`.
+  const dUp = dot3(v, frame.up);
+  const vHoriz = { x: v.x - dUp * frame.up.x, y: v.y - dUp * frame.up.y, z: v.z - dUp * frame.up.z };
+  const mHoriz = Math.hypot(vHoriz.x, vHoriz.y, vHoriz.z);
+  let horizontalOffAxis = 0;
+  if (mHoriz > 1e-9) {
+    let c = dot3(frame.forward, vHoriz) / mHoriz;
+    c = Math.max(-1, Math.min(1, c));
+    horizontalOffAxis = (Math.acos(c) * 180) / Math.PI;
+    if (dot3(vHoriz, frame.right) < 0) horizontalOffAxis = -horizontalOffAxis;
+  }
+
+  return { horizontalOffAxis, verticalOffAxis };
+}
+
+// Total 3D off-axis angle (degrees, 0..180) between the aimed axis and a target vector.
+function aimedAxisOffAxisDeg(frame, targetVec) {
+  if (!frame || !targetVec) return 0;
+  const vx = Number(targetVec.x), vy = Number(targetVec.y), vz = Number(targetVec.z);
+  const m = Math.hypot(vx, vy, vz);
+  if (m <= 1e-9) return 0;
+  let c = dot3(frame.forward, { x: vx, y: vy, z: vz }) / m;
+  c = Math.max(-1, Math.min(1, c));
+  return (Math.acos(c) * 180) / Math.PI;
+}
+
 /**
- * Compute vertical off-axis angle for a ceiling-mounted overhead speaker relative to the listener.
+ * Compute the effective off-axis angle for a ceiling-mounted overhead speaker relative to the
+ * listener, using a genuine RSP-directed aimed acoustic axis.
  *
- * Physical model: overhead speakers are mounted in the ceiling and face straight DOWN by default.
- * rawAngleDeg = angle between the straight-down axis (0,0,-1) and the speaker→seat vector.
- * effectiveAngleDeg = rawAngleDeg - builtInTiltDeg (scalar reduction; floor at 0).
+ * Physical model: overhead speakers are ceiling-mounted. The acoustic axis starts as the
+ * ceiling-normal (straight down) and is rotated by the product's built-in tilt toward the RSP.
+ * rawAngleDeg = angle between straight-down and the speaker→seat vector (display only).
+ * effectiveAngleDeg = angle between the AIMED axis and the speaker→seat vector (scoring).
  *
  * - speakerPos: { x, y, z? }  (z overridden by roomHeightM if provided)
  * - seatPos: { x, y, z? }
- * - rspPos: unused (kept in signature for call-site compatibility)
+ * - rspPos: RSP position — used to direct the built-in tilt (aim target)
  * - earHeightM: listener ear height in metres
  * - modelKey: string used to look up built-in tilt and dispersion
  * - roomHeightM: current room ceiling height (if finite, overrides speakerPos.z)
