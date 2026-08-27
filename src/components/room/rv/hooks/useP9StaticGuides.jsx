@@ -250,18 +250,23 @@ export function useP9StaticGuides({
     const boundaries = [];
 
     for (const { level, deg } of P9_THRESHOLDS) {
-      // P9 is the angle between the front and rear overhead directions at
-      // the listener. For both .4 and .6 the helper solves the symmetric
-      // front↔rear gap (mid is a visual anchor at RSP, not part of the
-      // gap measurement), so the solver always uses the front+rear pair.
+      // P9 measures the vertical angle between ADJACENT upper-speaker rows.
+      //  .4: front and rear are the only adjacent rows. Symmetric around RSP,
+      //      each row carries half the total P9 angle → offset = dz·tan(deg/2).
+      //  .6: mid is fixed at RSP (Top Middle aligned to RSP). Adjacent pairs
+      //      are front↔mid and mid↔rear — each a single-angle triangle, so
+      //      offset = dz·tan(deg). The solver includes mid at RSP so the
+      //      canonical authority measures the front↔mid adjacent gap (NOT
+      //      the front↔rear gap, which would wrongly apply the .4 half-angle
+      //      formula to a 6-height layout).
       const offset = solveOffset({
         targetDeg: deg,
         rspPoint,
         ohZ,
         frontX,
         rearX,
-        midX: null,
-        hasMid: false,
+        midX: hasMid ? midX : null,
+        hasMid,
         roomCenterX,
         canonicalRoleFn,
       });
