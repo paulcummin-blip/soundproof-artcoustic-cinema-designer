@@ -56,8 +56,12 @@ export function levelP16_screenFR(dB) {
 
 export function levelP17_wsFR(dB) {
   if (!Number.isFinite(dB)) return { level: 'N/A', ok: false };
-  if (dB <= 1.5) return { level: 'L4', ok: true };
-  if (dB <= 3.0) return { level: 'L3', ok: true };
+  // Sound Proof integer display authority: floor to whole dB before grading.
+  // Fractions of a decibel do not change a Performance Level — the displayed
+  // integer must reach 4 dB before P17 falls to L2 (3.99 → 3 → L3, not L2).
+  const floored = Math.floor(dB);
+  if (floored <= 1) return { level: 'L4', ok: true };
+  if (floored <= 3) return { level: 'L3', ok: true };
   return { level: 'L2', ok: true };
 }
 
