@@ -293,6 +293,33 @@ export function markBassAuthorityUpdating(projectId, currentFingerprint) {
   });
 }
 
+export function markBassAuthorityStale(projectId, currentFingerprint) {
+  const key = projectKey(projectId);
+  const previous = memoryByProject.get(key) || emptyAuthority(projectId);
+  const staleContract = previous.contract || previous.staleContract || null;
+  if (!staleContract) return previous;
+  if (
+    previous.authorityStatus === BASS_AUTHORITY_STATUS.STALE
+    && previous.currentFingerprint === (currentFingerprint || null)
+  ) return previous;
+
+  const next = setMemory(projectId, {
+    ...previous,
+    status: "stale",
+    authorityStatus: BASS_AUTHORITY_STATUS.STALE,
+    currentFingerprint: currentFingerprint || null,
+    contract: null,
+    staleContract,
+    errorMessage: null,
+    structurallyComplete: false,
+    authoritative: false,
+    exportable: false,
+    publicationRejectionReason: null,
+  });
+  syncStaleBassAuthority(key, currentFingerprint || null);
+  return next;
+}
+
 export function markBassAuthorityFailed(projectId, currentFingerprint, errorMessage) {
   const previous = memoryByProject.get(projectKey(projectId)) || emptyAuthority(projectId);
   setMemory(projectId, {
@@ -395,6 +422,57 @@ export function syncCachedCompactBassAuthority(projectId, compactContract) {
     } catch (e) {
       // Sync failure is non-fatal — next change will retry
       return null;
+    }
+  });
+  writeQueues.set(key, queued);
+  return queued;
+}
+
+export function syncStaleBassAuthority(projectId, currentFingerprint) {
+  const key = projectKey(projectId);
+  if (key === "free" || !currentFingerprint) return Promise.resolve(null);
+  const signature = `stale:${currentFingerprint}`;
+  if (syncSignatures.get(key) === signature) return writeQueues.get(key) || Promise.resolve(null);
+  syncSignatures.set(key, signature);
+
+  const queued = (writeQueues.get(key) || Promise.resolve()).then(async () => {
+    try {
+      const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
+      const record = Array.isArray(records) ? records[0] : null;
+      const existing = record ? {
+        version: record.completed_cache_version,
+        instanceAuthorityVersion: record.instance_authority_version,
+        metricSchemaVersion: record.metric_schema_version,
+        currentFingerprint: record.current_fingerprint,
+        status: record.status,
+        completedByFingerprint: record.completed_by_fingerprint,
+      } : null;
+      const persisted = {
+        ...buildPersistedBassAuthority(existing, currentFingerprint, null, false),
+        status: "stale",
+      };
+      const payload = {
+        project_id: key,
+        completed_cache_version: COMPLETED_BASS_CACHE_VERSION,
+        instance_authority_version: INSTANCE_AUTHORITY_VERSION,
+        metric_schema_version: RP22_BASS_METRIC_SCHEMA_VERSION,
+        current_fingerprint: persisted.currentFingerprint,
+        status: persisted.status,
+        completed_by_fingerprint: persisted.completedByFingerprint,
+      };
+      if (record?.id) await base44.entities.ProjectAnalysisCache.update(record.id, payload);
+      else await base44.entities.ProjectAnalysisCache.create(payload);
+
+      const live = memoryByProject.get(key);
+      if (
+        live?.authorityStatus === BASS_AUTHORITY_STATUS.STALE
+        && live?.currentFingerprint === currentFingerprint
+      ) {
+        return setMemory(key, resolvePersistedBassAuthority(key, persisted));
+      }
+      return live || null;
+    } catch (e) {
+      return memoryByProject.get(key) || null;
     }
   });
   writeQueues.set(key, queued);
