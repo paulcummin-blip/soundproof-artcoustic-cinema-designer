@@ -7,7 +7,7 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, publishCachedLimitedBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract, bassContractMatchesRequestedP14 } from "./completedBassResultStore";
+import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityStale, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, publishCachedLimitedBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract, bassContractMatchesRequestedP14 } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
 import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
@@ -35,6 +35,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const recommendationsActive = useRecommendationGate();
   const controllerRef = useRef(null);
   const scopeRef = useRef(null);
+  const [manualAnalysisRequest, setManualAnalysisRequest] = useState(null);
+  const manualRequestSequenceRef = useRef(0);
+  const dispatchedManualRequestRef = useRef(null);
 
   // Event-driven drag state: listen for drag-start/drag-end events so the
   // heavy EQ worker only runs on pointer-up, not continuously during drag.
@@ -65,7 +68,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
 
   const frontSubsLive = useMemo(() => (appState?.subwoofers || []).filter((sub) => sub?.group === "front"), [appState?.subwoofers]);
   const rearSubsLive = useMemo(() => (appState?.subwoofers || []).filter((sub) => sub?.group === "rear"), [appState?.subwoofers]);
-  const authoritative = useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubsLive });
+  const authoritative = useAuthoritativeBassResponse({
+    appState,
+    frontSubsLive,
+    rearSubsLive,
+    analysisRequestId: manualAnalysisRequest?.id || null,
+    analysisRequestFingerprint: manualAnalysisRequest?.fingerprint || null,
+  });
   const {
     roomDims, seatingPositions, rspPosition, sources, rspRawCurve, perSeatRawCurves,
     designEqSystemLimits, optimisationTransitionHz, requested, fingerprintInputs,
@@ -79,6 +88,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     seatingPositions,
     subsForSimulation: sources,
     physicsOptions: normalizedPhysicsOptions,
+    analysisRequestId: manualAnalysisRequest?.id || null,
+    analysisRequestFingerprint: manualAnalysisRequest?.normalizedFingerprint || null,
   });
   const normalizedTransferReady = normalizedLive.status === "ready" && normalizedLive.quality === "refined";
   const payload = useMemo(() => ({
