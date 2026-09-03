@@ -39,6 +39,7 @@ import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/sea
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
 import { useStage1PlacementOptimiser } from '@/components/room/bass/stage1/useStage1PlacementOptimiser';
 import { useStage2PlacementOptimiser } from '@/components/room/bass/stage2/useStage2PlacementOptimiser';
+import { useBassHeavyAction, markBassHeavyActionRunning, markBassHeavyActionComplete, markBassHeavyActionError } from '@/components/room/bass/bassHeavyActionStore';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 import { calculateRecommendedAbfuserQty } from "@/components/utils/abfuserRecommendation";
@@ -641,17 +642,21 @@ function RoomDesignerWithState() {
     return null;
   }, [appState?.mlpX_m, appState?.mlpY_m, stableDimensions?.width, appState?.seatingPositions, appState?.rspMode, _designatedRspSeat]);
 
-  // ── Stage 1/2 Subwoofer Placement Optimisers ───────────────────────
-  // Preserved for the explicit post-result optimisation workflow. They are
-  // never eligible merely because the panel is open or geometry changed.
-  // Stage D replaces this fixed gate with the “Optimise Bass Layout” action.
-  const recommendationsActive = false;
-  useStage1PlacementOptimiser({
+  // ── Explicit Stage 1/2 placement search ───────────────────────────
+  // Heavy placement work receives a unique request identity from a deliberate
+  // post-result user action. The hooks bind that request to their first valid
+  // fingerprint and refuse to follow later geometry/model/target changes.
+  const bassHeavyAction = useBassHeavyAction(activeProjectId);
+  const recommendationsActive = !!bassHeavyAction?.requestId
+    && ["optimise", "compare"].includes(bassHeavyAction.action)
+    && ["requested", "running", "complete"].includes(bassHeavyAction.status);
+  const stage1Optimisation = useStage1PlacementOptimiser({
     projectId: activeProjectId,
     roomDims: stableDimensions,
     rspPosition: mlpAnchorEffective,
     seatingPositions: _seatingPositions,
     enabled: recommendationsActive,
+    requestId: recommendationsActive ? bassHeavyAction.requestId : null,
   });
 
   // ── Stage 2 Subwoofer Placement Optimiser ──────────────────────────
@@ -689,7 +694,7 @@ function RoomDesignerWithState() {
     return null;
   }, [appState?.subwoofers, appState?.subwooferInstances]);
 
-  useStage2PlacementOptimiser({
+  const stage2Optimisation = useStage2PlacementOptimiser({
     projectId: activeProjectId,
     roomDims: stableDimensions,
     rspPosition: mlpAnchorEffective,
@@ -700,7 +705,36 @@ function RoomDesignerWithState() {
     currentQuantity: _stage2CurrentQty,
     subwooferBottomHeightM: _stage2SubBottomHeightM,
     enabled: recommendationsActive,
+    requestId: recommendationsActive ? bassHeavyAction.requestId : null,
   });
+
+  useEffect(() => {
+    if (!recommendationsActive || !bassHeavyAction?.requestId) return;
+    if (stage1Optimisation?.status === "error" || stage2Optimisation?.status === "error") {
+      markBassHeavyActionError(
+        activeProjectId,
+        bassHeavyAction.requestId,
+        stage2Optimisation?.errorMessage || stage1Optimisation?.errorMessage,
+      );
+      return;
+    }
+    if (stage2Optimisation?.status === "complete") {
+      markBassHeavyActionComplete(activeProjectId, bassHeavyAction.requestId);
+      return;
+    }
+    if (bassHeavyAction.status === "requested") {
+      markBassHeavyActionRunning(activeProjectId, bassHeavyAction.requestId);
+    }
+  }, [
+    recommendationsActive,
+    activeProjectId,
+    bassHeavyAction?.requestId,
+    bassHeavyAction?.status,
+    stage1Optimisation?.status,
+    stage1Optimisation?.errorMessage,
+    stage2Optimisation?.status,
+    stage2Optimisation?.errorMessage,
+  ]);
 
   // manualRspY_m is not yet set, seed it from the current mlpY_m.
   // A ref prevents this from firing more than once per mode entry.
