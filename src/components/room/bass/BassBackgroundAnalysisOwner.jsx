@@ -200,53 +200,98 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && cacheKey
     && completedFingerprint === cacheKey;
 
+  const manualRequestMatchesCurrent = !!manualAnalysisRequest
+    && manualAnalysisRequest.fingerprint === cacheKey
+    && manualAnalysisRequest.normalizedFingerprint === normalizedLive.geometryFingerprint;
+  const canCalculate = isProjectHydrationReady
+    && bassAuthorityHydrationSettled
+    && !!fingerprints
+    && !!cacheKey
+    && !!targetKey
+    && !!normalizedLive.geometryFingerprint
+    && sources.length > 0
+    && seatingPositions.length > 0;
+
+  // Observe identity only. This path deliberately has no worker start and no
+  // debounce: a design change can cancel/invalidate work, but never schedules
+  // an authoritative replacement.
   useEffect(() => {
-    const scheduler = getP14TargetBackgroundScheduler();
-    // Any hydration, invalid-input, or active drag transition immediately
-    // terminates speculative work. Foreground/user work always owns the only
-    // heavy optimiser slot for this project.
-    if (!isProjectHydrationReady || !targetCacheHydrated || isDragging || !fingerprints || !targetKey) {
-      scheduler.cancel();
-      controller.cancelActive("no-p14-target");
-      return;
-    }
-    if (cachedContract) {
-      // Cache hit — cancel any in-flight foreground worker so it doesn't
-      // compete with the background scheduler for CPU or publish a stale
-      // result after the cached contract is already live.
-      controller.cancelActive("cache-hit");
-      return; // Skip controller when cache hit — no optimiser run
-    }
-    // #1: Do not start a foreground job while persisted bass-authority
-    // hydration is still in flight. The persisted authority may restore
-    // (AUTHORITATIVE → authority-restored skip) or confirm no authority
-    // (UNCALCULATED → calculate). Starting before hydration settles wastes a
-    // worker that is cancelled the moment the persisted authority arrives.
-    if (!bassAuthorityHydrationSettled) {
-      scheduler.cancel();
-      return;
-    }
-    // ── Route-navigation guard ──────────────────────────────────────────
-    // When returning to Room Designer after viewing a report (Technical /
-    // Visual / Design Review), the completed bass store already holds the
-    // authoritative contract for this fingerprint. Skip the optimiser
-    // entirely — no recalculation, no worker, no lag. The fallback contract
-    // (effectiveCompletedContract below) feeds the bass graph immediately.
-    if (hasAuthoritativeResult(scopeId, cacheKey)) {
-      controller.cancelActive("authority-restored");
-      return;
-    }
-    scheduler.cancel();
+    getP14TargetBackgroundScheduler().cancel();
     controller.ensureProtocolCompatibility(BASS_OPTIMISER_VERSIONS);
-    controller.updateInputs({
-      valid: inputsValid,
+    controller.observeInputs({
+      valid: !!fingerprints && !!cacheKey && !!targetKey,
       fingerprint: cacheKey,
-      legacyFingerprint: calibrationFingerprint,
+    });
+
+    if (
+      bassAuthorityHydrationSettled
+      && cacheKey
+      && completedBassAuthority?.currentFingerprint
+      && completedBassAuthority.currentFingerprint !== cacheKey
+    ) {
+      if (completedBassAuthority.contract || completedBassAuthority.staleContract) {
+        markBassAuthorityStale(scopeId, cacheKey);
+      } else {
+        markBassAuthorityUpdating(scopeId, null);
+      }
+    }
+
+    if (manualAnalysisRequest && !manualRequestMatchesCurrent) {
+      dispatchedManualRequestRef.current = null;
+      setManualAnalysisRequest(null);
+    }
+  }, [
+    controller,
+    scopeId,
+    cacheKey,
+    targetKey,
+    fingerprints,
+    bassAuthorityHydrationSettled,
+    completedBassAuthority,
+    manualAnalysisRequest,
+    manualRequestMatchesCurrent,
+    OPTIMISER_VERSION_SIGNATURE,
+  ]);
+
+  // Once both authoritative raw response preparations have completed for the
+  // exact submitted fingerprint, dispatch exactly one existing full optimiser
+  // run. Geometry changes cannot reach this branch because they invalidate the
+  // submitted identity above.
+  useEffect(() => {
+    if (!manualRequestMatchesCurrent || !manualAnalysisRequest) return;
+    if (authoritative.status === "error" || normalizedLive.status === "error") {
+      markBassAuthorityFailed(scopeId, cacheKey, authoritative.reason || normalizedLive.errorMessage || "Bass analysis preparation failed");
+      dispatchedManualRequestRef.current = null;
+      setManualAnalysisRequest(null);
+      return;
+    }
+    if (!inputsValid || !normalizedTransferReady) return;
+    if (dispatchedManualRequestRef.current === manualAnalysisRequest.id) return;
+
+    dispatchedManualRequestRef.current = manualAnalysisRequest.id;
+    controller.requestManual({
+      fingerprint: cacheKey,
       payload,
       identity: requestIdentity,
-      collectDiagnostics: false,
+      collectDiagnostics: manualAnalysisRequest.collectDiagnostics === true,
+      force: true,
+      diagnosticToken: manualAnalysisRequest.diagnosticToken || null,
     });
-  }, [controller, isDragging, inputsValid, cacheKey, fingerprints, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE, cachedContract, isProjectHydrationReady, targetCacheHydrated, bassAuthorityHydrationSettled]);
+  }, [
+    controller,
+    scopeId,
+    manualAnalysisRequest,
+    manualRequestMatchesCurrent,
+    authoritative.status,
+    authoritative.reason,
+    normalizedLive.status,
+    normalizedLive.errorMessage,
+    inputsValid,
+    normalizedTransferReady,
+    cacheKey,
+    payload,
+    requestIdentity,
+  ]);
   useEffect(() => () => {
     getP14TargetBackgroundScheduler().cancel();
     flushTargetCachePersistence(scopeId);
