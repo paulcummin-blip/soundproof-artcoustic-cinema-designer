@@ -1,11 +1,10 @@
 // useStage2PlacementOptimiser.js
-// React hook for Stage 2 canonical placement evaluation.
+// React hook for explicit Stage 2 canonical placement evaluation.
 //
-// Auto-starts when all inputs are ready:
-//   - Stage 1 complete (valid finalists)
-//   - Selected subwoofer model
-//   - Selected P14 target
-//   - Valid room/seating/RSP
+// Starts only for a fingerprint-bound Optimise/Compare request when:
+//   - Stage 1 is complete (valid finalists)
+//   - A subwoofer model and P14 target are selected
+//   - Room/seating/RSP inputs are valid
 //
 // Does NOT rerun Stage 1. Stage 1 remains product-independent.
 // Evaluates only the selected P14 target (not the full 8-target matrix).
@@ -61,7 +60,7 @@ function resolveQuantityOrder(currentQuantity) {
 }
 
 /**
- * Auto-start Stage 2 canonical placement evaluation.
+ * Run Stage 2 canonical placement evaluation for an explicit heavy-action request.
  *
  * @param {object} params
  * @param {string} params.projectId
@@ -236,10 +235,8 @@ export function useStage2PlacementOptimiser({
     }
   }, [hydrationDone, hydratedCache, placementFingerprint]);
 
-  // Schedule / cancel on fingerprint change. No 8/8 gate — Stage 2 starts
-  // as soon as Stage 1 is complete, the sub model is selected, and a valid
-  // P14 target exists. The selected P14 target is confirmed first; the
-  // remaining seven targets are calculated in the background afterwards.
+  // Schedule / cancel for the explicit request. No 8/8 gate — the selected
+  // P14 target is the only target evaluated for this requested layout search.
   useEffect(() => {
     if (!hydrationDone) return;
 
