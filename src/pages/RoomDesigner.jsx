@@ -66,7 +66,6 @@ import AimLoudspeakerControls from "@/components/roomdesigner/AimLoudspeakerCont
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import RoomDesignerControlsPanel from "@/components/roomdesigner/RoomDesignerControlsPanel";
 import BassBackgroundAnalysisOwner from "@/components/room/bass/BassBackgroundAnalysisOwner";
-import { useRecommendationGate } from "@/components/state/recommendationGateStore";
 import FrontElevation from "@/components/room/FrontElevation";
 import SideElevation from "@/components/room/SideElevation";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
@@ -642,13 +641,11 @@ function RoomDesignerWithState() {
     return null;
   }, [appState?.mlpX_m, appState?.mlpY_m, stableDimensions?.width, appState?.seatingPositions, appState?.rspMode, _designatedRspSeat]);
 
-  // ── Stage 1 Subwoofer Placement Optimiser ──────────────────────────
-  // Auto-starts in the background once room + seating + RSP geometry settles.
-  // Product-independent, P14-independent, EQ-independent. No UI rewrite.
-  // Gated by the recommendation panel: only runs when BestSubLayoutGuide is
-  // mounted (Speakers → Subwoofers panel open). Eliminates speculative
-  // worker starts during dragging or when the panel is closed.
-  const recommendationsActive = useRecommendationGate();
+  // ── Stage 1/2 Subwoofer Placement Optimisers ───────────────────────
+  // Preserved for the explicit post-result optimisation workflow. They are
+  // never eligible merely because the panel is open or geometry changed.
+  // Stage D replaces this fixed gate with the “Optimise Bass Layout” action.
+  const recommendationsActive = false;
   useStage1PlacementOptimiser({
     projectId: activeProjectId,
     roomDims: stableDimensions,
