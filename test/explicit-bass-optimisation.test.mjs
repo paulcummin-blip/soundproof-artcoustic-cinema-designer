@@ -44,7 +44,7 @@ test("geometry changes cancel an optimisation request", () => {
 });
 
 test("post-calculation optimiser is explicit and explains the current constraint", () => {
-  assert.match(panel, />Optimise Bass Layout</);
+  assert.match(panel, /"Optimise Bass Layout"/);
   assert.match(panel, /if \(!shared\.hasCurrentResult\) return null/);
   assert.match(panel, /Placement and\/or subwoofer quantity is the present constraint/);
   assert.match(panel, /Capability or extension is the present constraint/);
