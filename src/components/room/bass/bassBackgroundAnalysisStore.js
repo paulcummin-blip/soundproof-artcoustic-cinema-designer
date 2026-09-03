@@ -169,6 +169,50 @@ export class BassBackgroundAnalysisController {
     return true;
   }
 
+  // Observe live design identity without scheduling work. This is the manual
+  // authority boundary: geometry/model/target changes may invalidate or cancel
+  // an existing result, but they can never queue a replacement calculation.
+  observeInputs({ valid, fingerprint }) {
+    const nextFingerprint = valid && fingerprint ? fingerprint : null;
+    const sameFingerprint = this.state.currentCalibrationFingerprint === nextFingerprint;
+    if (sameFingerprint && !this.activeRequest && !this.pending && this.timer == null) {
+      return { action: "observed_unchanged" };
+    }
+    if (sameFingerprint && (this.state.status === "queued" || this.state.status === "calculating")) {
+      return { action: "active_request_preserved" };
+    }
+
+    const staleResult = this.state.result || this.state.staleResult;
+    this.cancelActive("superseded");
+    this.pending = null;
+    this.manualAuthorityFingerprint = null;
+    this.emit({
+      status: staleResult ? "stale" : "idle",
+      currentCalibrationFingerprint: nextFingerprint,
+      currentJobFingerprint: null,
+      resultFingerprint: null,
+      result: null,
+      staleResult,
+      previousResultStale: !!staleResult,
+      queuedAtMs: null,
+      startedAtMs: null,
+      completedAtMs: null,
+      elapsedMs: null,
+      cacheStatus: "none",
+      cacheRejectionReason: null,
+      errorMessage: null,
+      progress: null,
+      progressStage: null,
+      activeJobId: null,
+      terminalOutcome: staleResult ? "superseded" : null,
+      workerStatus: "idle",
+      requestIdentity: null,
+      returnedIdentity: null,
+      returnedFingerprint: null,
+    });
+    return { action: staleResult ? "stale" : "idle" };
+  }
+
   updateInputs({ valid, fingerprint, legacyFingerprint = null, payload, identity = null, collectDiagnostics = false, diagnosticToken = null }) {
     if (!valid || !fingerprint) {
       const nextFingerprint = fingerprint || null;
