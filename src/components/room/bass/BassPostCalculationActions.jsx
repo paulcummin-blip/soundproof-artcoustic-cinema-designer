@@ -230,10 +230,44 @@ export default function BassPostCalculationActions({
     currentLayout,
     shared.contract,
   ]);
+  const recommended2 = useMemo(() => buildStage2RecommendationLayout({
+    quantityResult: stage2.two_sub_result,
+    roomDims: canonical.roomDims,
+    seatingPositions: canonical.seatingPositions,
+    sourceHeightM,
+    currentLayout,
+    currentContract: shared.contract,
+  }), [
+    stage2.two_sub_result,
+    canonical.roomDims,
+    canonical.seatingPositions,
+    sourceHeightM,
+    currentLayout,
+    shared.contract,
+  ]);
+  const recommended4 = useMemo(() => buildStage2RecommendationLayout({
+    quantityResult: stage2.four_sub_result,
+    roomDims: canonical.roomDims,
+    seatingPositions: canonical.seatingPositions,
+    sourceHeightM,
+    currentLayout,
+    currentContract: shared.contract,
+  }), [
+    stage2.four_sub_result,
+    canonical.roomDims,
+    canonical.seatingPositions,
+    sourceHeightM,
+    currentLayout,
+    shared.contract,
+  ]);
   const currentSources = currentLayout?.sources || [];
-  const requestRunning = action?.action === "optimise"
-    && ["requested", "running"].includes(action.status);
+  const requestRunning = ["requested", "running"].includes(action?.status);
+  const optimiseRunning = action?.action === "optimise" && requestRunning;
+  const compareRunning = action?.action === "compare" && requestRunning;
   const resultReady = action?.action === "optimise"
+    && action.status === "complete"
+    && stage2.status === "complete";
+  const comparisonReady = action?.action === "compare"
     && action.status === "complete"
     && stage2.status === "complete";
   const applicationValid = recommendation
@@ -246,6 +280,11 @@ export default function BassPostCalculationActions({
   const startOptimisation = () => {
     if (!shared.hasCurrentResult || !shared.cacheKey) return;
     requestBassHeavyAction(projectId, "optimise", shared.cacheKey);
+  };
+
+  const startComparison = () => {
+    if (!shared.hasCurrentResult || !shared.cacheKey) return;
+    requestBassHeavyAction(projectId, "compare", shared.cacheKey);
   };
 
   const apply = (layout) => {
@@ -276,19 +315,35 @@ export default function BassPostCalculationActions({
     <div className="mt-3 rounded-lg border border-[#D9D5CE] bg-white px-4 py-4">
       <div className="text-[13px] font-semibold text-[#1B1A1A]">Improve this design</div>
       <p className="mt-1 text-[11px] leading-relaxed text-[#625143]">{focusText(shared.contract)}</p>
-      <Button
-        type="button"
-        className="mt-3 w-full bg-[#213428] text-white hover:bg-[#3E4349]"
-        onClick={startOptimisation}
-        disabled={requestRunning}
-      >
-        {requestRunning ? "Optimising Bass Layout…" : "Optimise Bass Layout"}
-      </Button>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <Button
+          type="button"
+          className="bg-[#213428] text-white hover:bg-[#3E4349]"
+          onClick={startOptimisation}
+          disabled={requestRunning}
+        >
+          {optimiseRunning ? "Optimising Bass Layout…" : "Optimise Bass Layout"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={startComparison}
+          disabled={requestRunning}
+        >
+          {compareRunning ? "Comparing Bass Options…" : "Compare Bass Options"}
+        </Button>
+      </div>
       {action?.action === "optimise" && action.status === "error" && (
         <p className="mt-2 text-[11px] text-red-700">{action.error}</p>
       )}
       {action?.action === "optimise" && action.status === "cancelled" && (
         <p className="mt-2 text-[11px] text-amber-700">Optimisation cancelled because the design changed.</p>
+      )}
+      {action?.action === "compare" && action.status === "error" && (
+        <p className="mt-2 text-[11px] text-red-700">{action.error}</p>
+      )}
+      {action?.action === "compare" && action.status === "cancelled" && (
+        <p className="mt-2 text-[11px] text-amber-700">Comparison cancelled because the design changed.</p>
       )}
       {resultReady && recommendation && (
         <div className="mt-3 rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-3">
@@ -326,6 +381,14 @@ export default function BassPostCalculationActions({
       )}
       {resultReady && !recommendation && (
         <p className="mt-2 text-[11px] text-[#625143]">No credible same-quantity improvement was found.</p>
+      )}
+      {comparisonReady && (
+        <ComparisonTable
+          currentLayout={currentLayout}
+          twoSubLayout={recommended2}
+          fourSubLayout={recommended4}
+          onInspect={setSelected}
+        />
       )}
       <Rp22LayoutPlanDialog
         open={Boolean(selected)}
