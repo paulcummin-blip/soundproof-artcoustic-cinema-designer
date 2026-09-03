@@ -92,5 +92,6 @@ test("advisor UI is lightweight, visual and contains no authoritative grades or 
   assert.match(guideSource, /Apply Layout/);
   assert.match(guideSource, /not P14\/P18\/P19\/P20 results/);
   assert.doesNotMatch(guideSource, /useStage2PlacementOptimiser|completedJobs|totalJobsPlanned|of .*finalists/);
-  assert.match(ownerSource, /const recommendationsActive = false/);
+  assert.match(ownerSource, /useBassHeavyAction/);
+  assert.match(ownerSource, /\["optimise", "compare"\]\.includes\(bassHeavyAction\.action\)/);
 });
