@@ -17,8 +17,15 @@ const source = (x, y, placement, index, heights) => ({
   tuning: { gainDb: 0, delayMs: 0, polarity: 0 },
 });
 
-function candidate(id, name, placementFamily, placementMode, points, heights) {
-  return { id, name, placementFamily, placementMode, sources: points.map((point, index) => source(point.x, point.y, point.placement, index, heights)) };
+function candidate(id, name, placementFamily, placementMode, points, heights, practicalTier = 1) {
+  return {
+    id,
+    name,
+    placementFamily,
+    placementMode,
+    practicalTier,
+    sources: points.map((point, index) => source(point.x, point.y, point.placement, index, heights)),
+  };
 }
 
 export function generateBestSubLayoutCandidateSet(roomDims, sourceHeights, roomElements = [], cabinetHalfExtents = null) {
@@ -30,20 +37,33 @@ export function generateBestSubLayoutCandidateSet(roomDims, sourceHeights, roomE
   if (!guide) return { candidates: [], diagnostics };
   const front = guide.frontY, rear = guide.rearY, left = guide.leftX, right = guide.rightX;
   const q1 = guide.quarterX1, q3 = guide.quarterX3, midX = guide.midX, midY = guide.midY;
+  const yq1 = guide.quarterY1, yq3 = guide.quarterY3;
   const t1 = guide.thirdX1, t3 = guide.thirdX3;
-  const make = (id, name, family, mode, points) => candidate(id, name, family, mode, points, heights);
+  const make = (id, name, family, mode, points, practicalTier = 1) => candidate(id, name, family, mode, points, heights, practicalTier);
   const raw = [
-    make("front-centre-1", "Front centre", "Front wall", "Front wall midpoint", [{ x: midX, y: front, placement: "front" }]),
-    make("rear-midpoint-1", "Rear midpoint", "Rear wall", "Rear wall midpoint", [{ x: midX, y: rear, placement: "rear" }]),
-    make("left-midpoint-1", "Left midpoint", "Side wall", "Left wall midpoint", [{ x: left, y: midY, placement: "left" }]),
-    make("right-midpoint-1", "Right midpoint", "Side wall", "Right wall midpoint", [{ x: right, y: midY, placement: "right" }]),
-    make("front-rear-midpoint-2", "Front + rear midpoint", "Front + rear", "Front wall midpoint + rear wall midpoint", [{ x: midX, y: front, placement: "front" }, { x: midX, y: rear, placement: "rear" }]),
-    make("side-midpoints-2", "Opposite wall midpoints", "Side walls", "Opposite wall midpoint", [{ x: left, y: midY, placement: "left" }, { x: right, y: midY, placement: "right" }]),
-    make("front-quarter-2", "Quarter point positions", "Front wall", "Quarter point positions", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }]),
-    make("front-rear-pairs-4", "Front pair + rear pair (25/75)", "Front + rear", "Front pair + rear pair (25/75 width split)", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }, { x: q1, y: rear, placement: "rear" }, { x: q3, y: rear, placement: "rear" }]),
-    make("front-rear-pairs-third-4", "Front pair + rear pair (33/67)", "Front + rear", "Front pair + rear pair (33/67 width split)", [{ x: t1, y: front, placement: "front" }, { x: t3, y: front, placement: "front" }, { x: t1, y: rear, placement: "rear" }, { x: t3, y: rear, placement: "rear" }]),
-    make("four-midpoints-4", "Four midpoint positions", "Four walls", "Four midpoint positions", [{ x: midX, y: front, placement: "front" }, { x: midX, y: rear, placement: "rear" }, { x: left, y: midY, placement: "left" }, { x: right, y: midY, placement: "right" }]),
-    make("four-corners-4", "Four corner positions", "Four walls", "Four corner positions", [{ x: left, y: front, placement: "front" }, { x: right, y: front, placement: "front" }, { x: left, y: rear, placement: "rear" }, { x: right, y: rear, placement: "rear" }]),
+    // 1 sub: practical front/rear starts plus RP22-style side-wall quarter points.
+    make("front-centre-1", "Front-wall midpoint", "Front wall", "Front-wall midpoint", [{ x: midX, y: front, placement: "front" }]),
+    make("front-quarter-left-1", "Front-wall 1/4", "Front wall", "Front-wall quarter point", [{ x: q1, y: front, placement: "front" }]),
+    make("front-quarter-right-1", "Front-wall 3/4", "Front wall", "Front-wall three-quarter point", [{ x: q3, y: front, placement: "front" }]),
+    make("rear-midpoint-1", "Rear-wall midpoint", "Rear wall", "Rear-wall midpoint", [{ x: midX, y: rear, placement: "rear" }]),
+    make("left-quarter-front-1", "Left-wall 1/4", "Side wall", "Side-wall quarter point", [{ x: left, y: yq1, placement: "left" }], 3),
+    make("left-quarter-rear-1", "Left-wall 3/4", "Side wall", "Side-wall three-quarter point", [{ x: left, y: yq3, placement: "left" }], 3),
+    make("right-quarter-front-1", "Right-wall 1/4", "Side wall", "Side-wall quarter point", [{ x: right, y: yq1, placement: "right" }], 3),
+    make("right-quarter-rear-1", "Right-wall 3/4", "Side wall", "Side-wall three-quarter point", [{ x: right, y: yq3, placement: "right" }], 3),
+
+    // 2 subs: front/rear solutions first; side-wall midpoints are a fallback.
+    make("front-rear-midpoint-2", "Front + rear midpoints", "Front + rear", "Front and rear wall midpoints", [{ x: midX, y: front, placement: "front" }, { x: midX, y: rear, placement: "rear" }]),
+    make("front-quarter-2", "Front pair at 1/4 + 3/4", "Front wall", "Front-wall quarter points", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }]),
+    make("front-thirds-2", "Front pair at 1/3 + 2/3", "Front wall", "Front-wall third points", [{ x: t1, y: front, placement: "front" }, { x: t3, y: front, placement: "front" }]),
+    make("rear-quarter-2", "Rear pair at 1/4 + 3/4", "Rear wall", "Rear-wall quarter points", [{ x: q1, y: rear, placement: "rear" }, { x: q3, y: rear, placement: "rear" }], 2),
+    make("rear-thirds-2", "Rear pair at 1/3 + 2/3", "Rear wall", "Rear-wall third points", [{ x: t1, y: rear, placement: "rear" }, { x: t3, y: rear, placement: "rear" }], 2),
+    make("side-midpoints-2", "Opposing side-wall midpoints", "Side walls", "Opposing side-wall midpoints", [{ x: left, y: midY, placement: "left" }, { x: right, y: midY, placement: "right" }], 3),
+
+    // 4 subs: all credible front/rear families precede the side-wall alternative.
+    make("front-rear-pairs-4", "Front + rear pairs at 1/4 + 3/4", "Front + rear", "Front and rear quarter points", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }, { x: q1, y: rear, placement: "rear" }, { x: q3, y: rear, placement: "rear" }]),
+    make("front-rear-pairs-third-4", "Front + rear pairs at 1/3 + 2/3", "Front + rear", "Front and rear third points", [{ x: t1, y: front, placement: "front" }, { x: t3, y: front, placement: "front" }, { x: t1, y: rear, placement: "rear" }, { x: t3, y: rear, placement: "rear" }]),
+    make("four-corners-4", "Four corners", "Front + rear", "Four room corners", [{ x: left, y: front, placement: "front" }, { x: right, y: front, placement: "front" }, { x: left, y: rear, placement: "rear" }, { x: right, y: rear, placement: "rear" }]),
+    make("four-midpoints-4", "Four wall midpoints", "Four walls", "Front, rear and side-wall midpoints", [{ x: midX, y: front, placement: "front" }, { x: midX, y: rear, placement: "rear" }, { x: left, y: midY, placement: "left" }, { x: right, y: midY, placement: "right" }], 3),
   ];
   const openings = (Array.isArray(roomElements) ? roomElements : []).filter((element) => element?.type === "door");
   const blocked = (item) => openings.some((opening) => {
