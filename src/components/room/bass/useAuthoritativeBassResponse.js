@@ -133,7 +133,7 @@ export function buildAuthoritativeResponseCurves(seatResponses) {
   };
 }
 
-export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubsLive }) {
+export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubsLive, analysisRequestId = null, analysisRequestFingerprint = null }) {
   const roomDims = appState?.roomDims;
   const seatingPositions = appState?.seatingPositions || [];
   const frontSubsCfg = appState?.frontSubsCfg;
@@ -248,6 +248,15 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       return undefined;
     }
 
+    // Manual-authority gate: raw authoritative room simulation may start only
+    // for an explicit request whose submitted full calibration fingerprint is
+    // still the live design fingerprint. Geometry/target changes invalidate the
+    // request before any replacement worker can start.
+    if (!analysisRequestId || !analysisRequestFingerprint || analysisRequestFingerprint !== fingerprints?.calibration) {
+      setSimulationState({ request: null, status: "idle", result: null, error: null });
+      return undefined;
+    }
+
     setSimulationState({ request: simulationRequest, status: "calculating", result: null, error: null });
     let cancelled = false;
     const finish = (nextState) => {
@@ -294,7 +303,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       cancelled = true;
       worker.terminate();
     };
-  }, [analysisBlocked, simulationRequest, runSimulation, qStrategy]);
+  }, [analysisBlocked, simulationRequest, runSimulation, qStrategy, analysisRequestId, analysisRequestFingerprint]);
   const simulationReady = simulationState.request === simulationRequest
     && simulationState.status === "complete"
     && !!simulationState.result;
@@ -367,7 +376,9 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   const responseStatus = analysisBlocked
     ? "blocked"
     : blockedReason ? "error"
-      : simulationReady ? "ready" : "calculating";
+      : !analysisRequestId || analysisRequestFingerprint !== fingerprints?.calibration
+        ? "idle"
+        : simulationReady ? "ready" : "calculating";
 
   return {
     status: responseStatus,
