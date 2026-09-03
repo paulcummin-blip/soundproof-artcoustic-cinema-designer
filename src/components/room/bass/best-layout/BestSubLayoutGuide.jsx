@@ -7,6 +7,7 @@ import { getStage2State, subscribeStage2 } from "@/components/room/bass/stage2/s
 import { useP14AnalysisProgress } from "@/components/room/bass/p14AnalysisProgressStore";
 import { buildCurrentCanonicalLayout, buildStage2RecommendationLayout } from "./stage2RecommendationAdapter";
 import { buildFourSubFamilyComparison } from "./fourSubFamilyComparison";
+import { setRecommendationGateActive } from "@/components/state/recommendationGateStore";
 
 function placementPhaseText(stage2, p14Progress) {
   const p14Complete = p14Progress?.status === "complete"
@@ -24,6 +25,13 @@ function placementPhaseText(stage2, p14Progress) {
 
 export default function BestSubLayoutGuide({ roomDims, seatingPositions, rspPosition, sourceHeights, currentSubs, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, subwooferInstances, commitInstances, hasCanonicalInstances }) {
   const projectId = useActiveProjectId();
+  // Gate: while this recommendation UI is mounted, Stage 1/Stage 2 placement
+  // optimisers and the P14 background sweep are permitted to run. Unmount
+  // (panel collapsed) gates them off — no speculative work during dragging.
+  React.useEffect(() => {
+    setRecommendationGateActive(true);
+    return () => setRecommendationGateActive(false);
+  }, []);
   const sharedBassResults = useOptionalSharedBassResults();
   const canonical = useMemo(
     () => canonicalizeNormalizedRoomInputs({ roomDims, seatingPositions, rspPosition }),

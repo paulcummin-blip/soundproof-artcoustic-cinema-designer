@@ -84,6 +84,7 @@ export function useStage2PlacementOptimiser({
   splConfig,
   currentQuantity,
   subwooferBottomHeightM,
+  enabled = true,
 }) {
   const state = useSyncExternalStore(
     subscribeStage2,
@@ -234,6 +235,17 @@ export function useStage2PlacementOptimiser({
   useEffect(() => {
     if (!hydrationDone) return;
 
+    // Recommendation gate: when the recommendation UI is not active, cancel
+    // any pending/active evaluation and stay idle. This eliminates speculative
+    // Stage 2 worker starts during dragging or when the panel is closed.
+    if (!enabled) {
+      const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
+      if (isDev) console.log("[stage2-gate]", "GATED — recommendation panel closed, cancelling speculative canonical evaluation");
+      stage2PlacementController.cancelAll("recommendation-gate-closed");
+      markStage2Idle(projectId);
+      return;
+    }
+
     if (!fingerprint) {
       stage2PlacementController.cancelAll("inputs-incomplete");
       markStage2Idle(projectId);
@@ -283,7 +295,7 @@ export function useStage2PlacementOptimiser({
       quantityOrder,
       delay: STAGE2_START_DELAY_MS,
     });
-  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return state;
 }

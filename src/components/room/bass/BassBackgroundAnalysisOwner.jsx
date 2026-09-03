@@ -25,12 +25,14 @@ import { buildCanonicalCompletedBassMetricAuthority } from "./canonicalCompleted
 import { buildMetricPublicationReceipt } from "./metricPublicationReceipt";
 import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
+import { useRecommendationGate } from "@/components/state/recommendationGateStore";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
 
 export default function BassBackgroundAnalysisOwner({ children, scopeId = "free" }) {
   const appState = useAppState();
+  const recommendationsActive = useRecommendationGate();
   const controllerRef = useRef(null);
   const scopeRef = useRef(null);
 
@@ -694,6 +696,17 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       scheduler.cancel();
       return;
     }
+    // Recommendation gate: the P14 background sweep (7 remaining targets) is
+    // speculative work that only matters when the recommendation UI is open.
+    // When the panel is closed, cancel the sweep to eliminate worker
+    // contention during dragging. The selected (foreground) target is
+    // always calculated by the foreground path regardless of this gate.
+    if (!recommendationsActive) {
+      const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
+      if (isDev) console.log("[p14-sweep-gate]", "GATED — recommendation panel closed, cancelling P14 background sweep");
+      scheduler.cancel();
+      return;
+    }
     if (!foregroundReady || !allTargets.length || !backgroundInputsReady) {
       // Foreground is recalculating — cancel background work to avoid
       // concurrent heavy calculations. Queue rebuilds when foreground completes.
@@ -711,7 +724,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       allTargets,
       designContext: designContextRef.current,
     });
-  }, [baseDesignFingerprint, targetKey, foregroundReady, backgroundInputsReady, allTargets, scopeId, isProjectHydrationReady, targetCacheHydrated, isDragging]);
+  }, [baseDesignFingerprint, targetKey, foregroundReady, backgroundInputsReady, allTargets, scopeId, isProjectHydrationReady, targetCacheHydrated, isDragging, recommendationsActive]);
 
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target

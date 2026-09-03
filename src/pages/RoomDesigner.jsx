@@ -66,6 +66,7 @@ import AimLoudspeakerControls from "@/components/roomdesigner/AimLoudspeakerCont
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import RoomDesignerControlsPanel from "@/components/roomdesigner/RoomDesignerControlsPanel";
 import BassBackgroundAnalysisOwner from "@/components/room/bass/BassBackgroundAnalysisOwner";
+import { useRecommendationGate } from "@/components/state/recommendationGateStore";
 import FrontElevation from "@/components/room/FrontElevation";
 import SideElevation from "@/components/room/SideElevation";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
@@ -644,11 +645,16 @@ function RoomDesignerWithState() {
   // ── Stage 1 Subwoofer Placement Optimiser ──────────────────────────
   // Auto-starts in the background once room + seating + RSP geometry settles.
   // Product-independent, P14-independent, EQ-independent. No UI rewrite.
+  // Gated by the recommendation panel: only runs when BestSubLayoutGuide is
+  // mounted (Speakers → Subwoofers panel open). Eliminates speculative
+  // worker starts during dragging or when the panel is closed.
+  const recommendationsActive = useRecommendationGate();
   useStage1PlacementOptimiser({
     projectId: activeProjectId,
     roomDims: stableDimensions,
     rspPosition: mlpAnchorEffective,
     seatingPositions: _seatingPositions,
+    enabled: recommendationsActive,
   });
 
   // ── Stage 2 Subwoofer Placement Optimiser ──────────────────────────
@@ -696,6 +702,7 @@ function RoomDesignerWithState() {
     splConfig: appState?.splConfig,
     currentQuantity: _stage2CurrentQty,
     subwooferBottomHeightM: _stage2SubBottomHeightM,
+    enabled: recommendationsActive,
   });
 
   // manualRspY_m is not yet set, seed it from the current mlpY_m.

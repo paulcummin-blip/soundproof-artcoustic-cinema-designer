@@ -18,7 +18,8 @@
 const IDLE_QUIET_MS = 3000;
 
 let lastInteractionAt = 0;
-let dragActive = false;
+let pointerDown = false;     // primary pointer button held — brackets ALL drag types
+let bassDragActive = false;  // explicit b44-bass-drag-start/end events
 let idleQuietMs = IDLE_QUIET_MS;
 const listeners = new Set();
 
@@ -37,19 +38,19 @@ export function markInteraction() {
 /** Set/clear the active-drag flag. Drag-start and drag-end both count as
  *  interactions (they bracket a sustained user activity). */
 export function setDragActive(active) {
-  dragActive = !!active;
+  bassDragActive = !!active;
   lastInteractionAt = now();
   notify();
 }
 
 export function getLastInteractionAt() { return lastInteractionAt; }
-export function isDragActive() { return dragActive; }
+export function isDragActive() { return pointerDown || bassDragActive; }
 
 /** True if the user is currently interacting: an active drag, OR a meaningful
  *  interaction within the last IDLE_QUIET_MS. Used to defer heavy background
  *  completion processing until the app is genuinely idle. */
 export function isUserInteracting() {
-  return dragActive || (now() - lastInteractionAt < idleQuietMs);
+  return isDragActive() || (now() - lastInteractionAt < idleQuietMs);
 }
 
 /** Deadline (ms timestamp) after which background work may resume. */
@@ -66,16 +67,30 @@ export function subscribe(listener) {
 export function setIdleQuietMsForTest(ms) { idleQuietMs = ms; }
 export function resetUserInteractionForTest() {
   lastInteractionAt = 0;
-  dragActive = false;
+  pointerDown = false;
+  bassDragActive = false;
   listeners.clear();
 }
 
 // ── Install window listeners (browser only, passive) ───────────────────────
 // Hover / pointermove / mousemove are deliberately NOT registered.
+// pointerdown with the primary button brackets ALL drag types (seat, RSP,
+// speaker, subwoofer, bass) — not just bass drags. pointerup/pointercancel
+// clear the bracket. This catches drags that don't dispatch the custom
+// b44-bass-drag-start/end events.
 if (typeof window !== "undefined") {
-  const meaningfulEvents = ["pointerdown", "wheel", "keydown"];
-  meaningfulEvents.forEach((evt) => {
-    window.addEventListener(evt, markInteraction, { passive: true });
+  window.addEventListener("pointerdown", (e) => {
+    if (e.button === 0 || e.button === undefined) pointerDown = true;
+    markInteraction();
+  }, { passive: true });
+  window.addEventListener("wheel", markInteraction, { passive: true });
+  window.addEventListener("keydown", markInteraction, { passive: true });
+  const dragEndEvents = ["pointerup", "pointercancel"];
+  dragEndEvents.forEach((evt) => {
+    window.addEventListener(evt, () => {
+      pointerDown = false;
+      markInteraction();
+    }, { passive: true });
   });
   window.addEventListener("b44-bass-drag-start", () => setDragActive(true));
   window.addEventListener("b44-bass-drag-end", () => setDragActive(false));

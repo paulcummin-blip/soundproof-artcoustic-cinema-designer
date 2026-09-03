@@ -26,7 +26,7 @@ import { STAGE1_START_DELAY_MS } from "./stage1Constants";
  * @param {Array} params.seatingPositions — [{ id, x, y, z?, priority? }]
  * @param {object} params.physicsOptions — modal physics options (optional)
  */
-export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, seatingPositions, physicsOptions }) {
+export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, seatingPositions, physicsOptions, enabled = true }) {
   const state = useSyncExternalStore(
     subscribeStage1,
     () => getStage1State(projectId),
@@ -83,6 +83,17 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     // Wait for both persisted-cache hydration and final project geometry.
     if (!hydrationDone) return;
 
+    // Recommendation gate: when the recommendation UI is not active, cancel
+    // any pending/active search and stay idle. This eliminates speculative
+    // Stage 1 worker starts during dragging or when the panel is closed.
+    if (!enabled) {
+      const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
+      if (isDev) console.log("[stage1-gate]", "GATED — recommendation panel closed, cancelling speculative placement search");
+      stage1PlacementController.cancelActive("recommendation-gate-closed");
+      markStage1Idle(projectId);
+      return;
+    }
+
     if (!fingerprint) {
       markStage1Idle(projectId);
       return;
@@ -115,7 +126,7 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     return () => {
       // Cleanup on unmount — cancel active search
     };
-  }, [fingerprint, projectId, hydrationDone, hydratedCache]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, projectId, hydrationDone, hydratedCache, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Cleanup on unmount ───────────────────────────────────────────────
   useEffect(() => {
