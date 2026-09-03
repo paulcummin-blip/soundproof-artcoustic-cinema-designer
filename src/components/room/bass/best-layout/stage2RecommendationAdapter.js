@@ -104,6 +104,73 @@ function sameCoordinates(aSources, bSources) {
   });
 }
 
+function isSideWallResult(result, roomDims) {
+  const width = Number(roomDims?.widthM);
+  const length = Number(roomDims?.lengthM);
+  return (result?.coordinates || []).some((coordinate) => {
+    const x = Number(coordinate?.x);
+    const y = Number(coordinate?.y);
+    const onSide = Math.abs(x) <= TOLERANCE_M
+      || (Number.isFinite(width) && Math.abs(x - width) <= TOLERANCE_M);
+    const onFrontRear = Math.abs(y) <= TOLERANCE_M
+      || (Number.isFinite(length) && Math.abs(y - length) <= TOLERANCE_M);
+    return onSide && !onFrontRear;
+  });
+}
+
+function primaryRows(result, key) {
+  return (Array.isArray(result?.[key]) ? result[key] : [])
+    .filter((seat) => seat?.isPrimary !== false);
+}
+
+function resultFloor(result) {
+  const rows = primaryRows(result, "perSeatP19").concat(primaryRows(result, "perSeatP20"));
+  return rows.length ? Math.min(...rows.map((row) => numericLevel(row?.level))) : 0;
+}
+
+function worstVariation(result, key) {
+  const rows = primaryRows(result, key);
+  return rows.length
+    ? Math.max(...rows.map((row) => Math.abs(Number(row?.variationDbRaw) || 0)))
+    : Number.POSITIVE_INFINITY;
+}
+
+function seriousPriorityBandProblem(result) {
+  return primaryRows(result, "perSeatP19")
+    .concat(primaryRows(result, "perSeatP20"))
+    .some((row) => Number(row?.worstFrequencyHz) >= 30
+      && Number(row?.worstFrequencyHz) <= 60
+      && Math.abs(Number(row?.variationDbRaw) || 0) >= 8);
+}
+
+export function selectPracticalStage2Finalist(quantityResult, roomDims) {
+  const ranked = Array.isArray(quantityResult?.evaluatedFinalists)
+    ? quantityResult.evaluatedFinalists.filter(Boolean)
+    : [];
+  const acousticWinner = quantityResult?.bestFinalist || ranked[0] || null;
+  if (!acousticWinner || Number(acousticWinner.quantity) === 1 || !isSideWallResult(acousticWinner, roomDims)) {
+    return acousticWinner;
+  }
+  const practical = ranked.find((result) => !isSideWallResult(result, roomDims));
+  if (!practical) return acousticWinner;
+
+  const quantity = Number(acousticWinner.quantity);
+  const variationThreshold = quantity === 4 ? 2.5 : 2;
+  const p20Gain = worstVariation(practical, "perSeatP20") - worstVariation(acousticWinner, "perSeatP20");
+  const gradeBandGain = resultFloor(acousticWinner) - resultFloor(practical);
+  const poorToCredible = resultFloor(practical) < 2 && resultFloor(acousticWinner) >= 2;
+  const priorityProblemRemoved = seriousPriorityBandProblem(practical)
+    && !seriousPriorityBandProblem(acousticWinner)
+    && (
+      worstVariation(practical, "perSeatP19") - worstVariation(acousticWinner, "perSeatP19") >= 3
+      || p20Gain >= 3
+    );
+
+  return gradeBandGain >= 1 || p20Gain >= variationThreshold || poorToCredible || priorityProblemRemoved
+    ? acousticWinner
+    : practical;
+}
+
 function p14IdentityMatches(result, contract) {
   const contractDb = Number(contract?.requestedP14TargetDb ?? contract?.selectedP14TargetDb);
   const contractLevel = Number(contract?.requestedP14Level ?? contract?.selectedP14Level);
@@ -188,7 +255,7 @@ export function buildStage2RecommendationLayout({
   currentLayout,
   currentContract,
 }) {
-  const result = quantityResult?.bestFinalist;
+  const result = selectPracticalStage2Finalist(quantityResult, roomDims);
   if (!result) return null;
   const metadata = getFamilyDisplayMetadata(result.familyId);
   const sources = sourcesFromStage2(result, roomDims, sourceHeightM);
@@ -212,5 +279,15 @@ export function buildStage2RecommendationLayout({
     sources,
     metrics,
     canonicalResult: exactCurrentIdentity ? currentLayout.canonicalResult : result,
+    recommendationKind: isSideWallResult(result, roomDims)
+      ? "side-wall-alternative"
+      : result !== quantityResult?.bestFinalist
+        ? "practical-preferred"
+        : "practical",
+    practicalReason: isSideWallResult(result, roomDims)
+      ? "Acoustic alternative — less practical placement. The canonical improvement is material."
+      : result !== quantityResult?.bestFinalist
+        ? "Preferred front/rear-wall result; the side-wall improvement was too small to justify the installation compromise."
+        : "Highest-ranked practical authoritative layout for this room and seating area.",
   };
 }
