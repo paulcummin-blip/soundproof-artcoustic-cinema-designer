@@ -617,22 +617,29 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       }
     }
   }, [controller, lifecycle.resultFingerprint, lifecycle.activeJobId, optimisationResult]);
-  const onRetry = useCallback(
-    ({ collectDiagnostics = false, force = true } = {}) => {
-      const diagnosticToken = collectDiagnostics ? createDiagToken("manual-forced") : null;
-      if (diagnosticToken) recordDiagStage(diagnosticToken, "token-created", { origin: "manual-forced", collectDiagnostics: true });
+  const onCalculate = useCallback(
+    ({ collectDiagnostics = false } = {}) => {
+      if (!canCalculate) return { action: "blocked" };
+      const diagnosticToken = collectDiagnostics ? createDiagToken("manual-authoritative") : null;
+      if (diagnosticToken) recordDiagStage(diagnosticToken, "token-created", { origin: "manual-authoritative", collectDiagnostics: true });
+
       getP14TargetBackgroundScheduler().cancel();
-      return controller.requestManual({
+      controller.cancelActive("manual-replaced");
+      dispatchedManualRequestRef.current = null;
+      markBassAuthorityUpdating(scopeId, cacheKey);
+      const id = `manual-bass-${++manualRequestSequenceRef.current}`;
+      setManualAnalysisRequest({
+        id,
         fingerprint: cacheKey,
-        payload,
-        identity: requestIdentity,
+        normalizedFingerprint: normalizedLive.geometryFingerprint,
         collectDiagnostics: collectDiagnostics === true,
-        force: force === true,
         diagnosticToken,
-        });
+      });
+      return { action: "queued", requestId: id, fingerprint: cacheKey };
     },
-    [controller, cacheKey, payload, requestIdentity]
+    [controller, scopeId, canCalculate, cacheKey, normalizedLive.geometryFingerprint]
   );
+  const onRetry = onCalculate;
   // ── P14 target background scheduler ──────────────────────────────────
   // After the foreground result is complete (cached or fresh), quietly
   // precompute remaining P14 targets one at a time. The scheduler's schedule()
