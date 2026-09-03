@@ -15,7 +15,7 @@ import { COMPLETED_BASS_CACHE_VERSION, INSTANCE_AUTHORITY_VERSION, RP22_BASS_MET
 import { isAuthoritativeBassContract } from "./completedBassResultPersistence";
 import { hasGraphPayload } from "./finishedGraphAdapter";
 import { hasReadyCanonicalP19Contract } from "./p19Readiness";
-import { isValidLimitedP14Contract, isLimitedP14Entry } from "./p14LimitedTargetAuthority";
+import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 
 const cacheByProject = new Map();
 const listeners = new Set();
