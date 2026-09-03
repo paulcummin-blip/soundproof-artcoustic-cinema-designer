@@ -173,6 +173,21 @@ export class P14TargetBackgroundScheduler {
   runNext() {
     if (this.cancelled) { this.running = false; return; }
 
+    // FIX 4: Re-check the live interaction state immediately before starting
+    // ANY speculative worker. Elapsed time alone must never override an active
+    // drag — the idle timer callback fires at lastInteractionAt + 3000, but a
+    // long-held drag keeps lastInteractionAt fresh via continuous pointerdown
+    // events. This guard ensures that even if the timer fires during an active
+    // drag, no worker starts. Re-arm scheduleNext to wait for genuine idle.
+    if (isUserInteracting()) {
+      this.running = false;
+      this.currentTarget = null;
+      const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
+      if (isDev) console.log("[p14-sweep-gate]", "BLOCKED — user interacting, re-arming idle gate");
+      this.scheduleNext();
+      return;
+    }
+
     // Skip already-cached targets
     while (this.queue.length > 0) {
       const target = this.queue[0];

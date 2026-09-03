@@ -4,18 +4,17 @@ import { canonicalizeNormalizedRoomInputs } from "@/components/room/bass/normali
 import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { getStage2State, subscribeStage2 } from "@/components/room/bass/stage2/stage2PlacementStore";
-import { useP14AnalysisProgress } from "@/components/room/bass/p14AnalysisProgressStore";
 import { buildCurrentCanonicalLayout, buildStage2RecommendationLayout } from "./stage2RecommendationAdapter";
 import { buildFourSubFamilyComparison } from "./fourSubFamilyComparison";
 import { setRecommendationGateActive } from "@/components/state/recommendationGateStore";
 
-function placementPhaseText(stage2, p14Progress) {
-  const p14Complete = p14Progress?.status === "complete"
-    && Number(p14Progress?.completed) >= Number(p14Progress?.total)
-    && Number(p14Progress?.total) === 8;
-  if (!p14Complete) {
-    return `Bass analysis · ${Number(p14Progress?.completed) || 0} of ${Number(p14Progress?.total) || 8}`;
-  }
+// FIX 2: Recommendation readiness depends only on the information actually
+// required for the selected/current design: Stage 2 completion (which itself
+// requires Stage 1 + selected P14 target). The old 8/8 P14 family gate is
+// removed — the seven alternative P14 targets no longer run automatically,
+// so waiting for them would permanently stall the UI.
+
+function placementPhaseText(stage2) {
   if (stage2?.status === "complete") return "Recommendations ready";
   if (stage2?.phase === "evaluating_1_sub") return "Evaluating 1-sub layouts…";
   if (stage2?.phase === "evaluating_2_sub") return "Evaluating 2-sub layouts…";
@@ -42,10 +41,8 @@ export default function BestSubLayoutGuide({ roomDims, seatingPositions, rspPosi
     () => getStage2State(projectId),
     () => getStage2State(projectId),
   );
-  const p14Progress = useP14AnalysisProgress(projectId);
-  const recommendationsReady = stage2.status === "complete"
-    && p14Progress.status === "complete"
-    && Number(p14Progress.completed) >= 8;
+  // FIX 2: Readiness depends only on Stage 2 completion — no 8/8 P14 gate.
+  const recommendationsReady = stage2.status === "complete";
   const currentContract = sharedBassResults?.contract || null;
   const currentLayout = useMemo(() => buildCurrentCanonicalLayout({
     currentSubs,
@@ -73,7 +70,7 @@ export default function BestSubLayoutGuide({ roomDims, seatingPositions, rspPosi
     () => recommendationsReady ? buildFourSubFamilyComparison(stage2.four_sub_result) : null,
     [recommendationsReady, stage2.four_sub_result],
   );
-  const phaseText = placementPhaseText(stage2, p14Progress);
+  const phaseText = placementPhaseText(stage2);
   const progressText = stage2.status === "updating" && stage2.totalJobsPlanned > 0
     ? `Optimising subwoofer positions · ${stage2.completedJobs} of ${stage2.totalJobsPlanned} finalists`
     : phaseText;

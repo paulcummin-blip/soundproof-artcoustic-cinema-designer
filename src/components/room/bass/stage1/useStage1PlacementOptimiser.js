@@ -15,6 +15,7 @@ import {
 import { hydrateStage1PlacementCache, isStage1CacheValid } from "./stage1PlacementPersistence";
 import { DEFAULT_BEST_SUB_LAYOUT_PHYSICS } from "../best-layout/bestSubLayoutPhysicsSnapshot";
 import { STAGE1_START_DELAY_MS } from "./stage1Constants";
+import { useIsDragActive } from "@/components/state/userInteractionStore";
 
 /**
  * Auto-start Stage 1 placement search.
@@ -32,6 +33,10 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     () => getStage1State(projectId),
     () => getStage1State(projectId),
   );
+  // FIX 5: Consume the shared interaction authority. When any drag type is
+  // active (subwoofer, seat, RSP/MLP, speaker), cancel speculative Stage 1
+  // work immediately. Resume only when manipulation genuinely ends.
+  const isInteracting = useIsDragActive();
 
   const fingerprintRef = useRef(null);
   const [hydrationDone, setHydrationDone] = useState(false);
@@ -94,6 +99,18 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
       return;
     }
 
+    // FIX 5: Interaction gate — cancel speculative Stage 1 work during any
+    // active drag (subwoofer, seat, RSP/MLP, speaker). Do NOT mark idle —
+    // preserve completed results so they don't need re-computation after
+    // the drag ends. When interaction ends, the effect re-runs and either
+    // finds an existing complete result (no re-schedule) or re-schedules.
+    if (isInteracting) {
+      const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
+      if (isDev) console.log("[stage1-gate]", "BLOCKED — user interacting, cancelling speculative placement search");
+      stage1PlacementController.cancelActive("user-interaction");
+      return;
+    }
+
     if (!fingerprint) {
       markStage1Idle(projectId);
       return;
@@ -126,7 +143,7 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     return () => {
       // Cleanup on unmount — cancel active search
     };
-  }, [fingerprint, projectId, hydrationDone, hydratedCache, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, projectId, hydrationDone, hydratedCache, enabled, isInteracting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Cleanup on unmount ───────────────────────────────────────────────
   useEffect(() => {

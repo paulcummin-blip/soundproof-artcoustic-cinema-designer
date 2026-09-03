@@ -690,41 +690,20 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }), [payload, sources, designEqSystemLimits, rspRawCurve, perSeatRawCurves, fingerprints, fingerprintInputs]);
 
   useEffect(() => {
+    // FIX 1: The alternative P14 sweep (7 targets other than the selected
+    // foreground target) is completely decoupled from the recommendation gate.
+    // Opening the BestSubLayoutGuide panel must NOT trigger the seven
+    // alternative P14 target calculations. Normal automatic behaviour is:
+    //   - selected P14 target calculates (foreground path)
+    //   - no other P14 target calculates
+    // The scheduler capability is preserved for a future explicit user action
+    // specifically requesting alternative target analysis. If no such explicit
+    // UI exists today, the alternatives never run at all.
     const scheduler = getP14TargetBackgroundScheduler();
-    // Hydration and live interaction are hard pauses for speculative work.
-    if (!isProjectHydrationReady || !targetCacheHydrated || isDragging || !baseDesignFingerprint || !targetKey) {
-      scheduler.cancel();
-      return;
-    }
-    // Recommendation gate: the P14 background sweep (7 remaining targets) is
-    // speculative work that only matters when the recommendation UI is open.
-    // When the panel is closed, cancel the sweep to eliminate worker
-    // contention during dragging. The selected (foreground) target is
-    // always calculated by the foreground path regardless of this gate.
-    if (!recommendationsActive) {
-      const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
-      if (isDev) console.log("[p14-sweep-gate]", "GATED — recommendation panel closed, cancelling P14 background sweep");
-      scheduler.cancel();
-      return;
-    }
-    if (!foregroundReady || !allTargets.length || !backgroundInputsReady) {
-      // Foreground is recalculating — cancel background work to avoid
-      // concurrent heavy calculations. Queue rebuilds when foreground completes.
-      // backgroundInputsReady === false means the live rspRawCurve has not yet
-      // hydrated (cold restore, design change re-simulation). Do NOT schedule
-      // with a premature designContext — the worker would receive rawCurve=[]
-      // and return invalid-inputs. Wait for the live curve, then schedule.
-      scheduler.cancel();
-      return;
-    }
-    scheduler.schedule({
-      projectId: scopeId,
-      baseDesignFingerprint,
-      foregroundTargetKey: targetKey,
-      allTargets,
-      designContext: designContextRef.current,
-    });
-  }, [baseDesignFingerprint, targetKey, foregroundReady, backgroundInputsReady, allTargets, scopeId, isProjectHydrationReady, targetCacheHydrated, isDragging, recommendationsActive]);
+    const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
+    if (isDev) console.log("[p14-sweep-gate]", "CANCELLED — alternative P14 sweep is never automatically scheduled");
+    scheduler.cancel();
+  }, [scopeId, baseDesignFingerprint, targetKey, isProjectHydrationReady, targetCacheHydrated, isDragging, recommendationsActive]);
 
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target

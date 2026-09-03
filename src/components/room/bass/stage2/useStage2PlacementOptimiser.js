@@ -32,6 +32,7 @@ import { deriveRequestedCalibrationConfig } from "../requestedCalibrationConfig"
 import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { STAGE2_DEFAULT_QUANTITY_ORDER, STAGE2_START_DELAY_MS } from "./stage2Constants";
+import { useIsDragActive } from "@/components/state/userInteractionStore";
 
 function computeTransitionHz(roomDims) {
   const volume = Number(roomDims?.widthM) * Number(roomDims?.lengthM) * Number(roomDims?.heightM);
@@ -91,6 +92,11 @@ export function useStage2PlacementOptimiser({
     () => getStage2State(projectId),
     () => getStage2State(projectId),
   );
+
+  // FIX 5: Consume the shared interaction authority. When any drag type is
+  // active (subwoofer, seat, RSP/MLP, speaker), cancel speculative Stage 2
+  // work immediately. Resume only when manipulation genuinely ends.
+  const isInteracting = useIsDragActive();
 
   const stage1State = useSyncExternalStore(
     subscribeStage1,
@@ -246,6 +252,18 @@ export function useStage2PlacementOptimiser({
       return;
     }
 
+    // FIX 5: Interaction gate — cancel speculative Stage 2 work during any
+    // active drag (subwoofer, seat, RSP/MLP, speaker). Do NOT mark idle —
+    // preserve completed results so they don't need re-computation after
+    // the drag ends. When interaction ends, the effect re-runs and either
+    // finds an existing complete result (no re-schedule) or re-schedules.
+    if (isInteracting) {
+      const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
+      if (isDev) console.log("[stage2-gate]", "BLOCKED — user interacting, cancelling speculative canonical evaluation");
+      stage2PlacementController.cancelAll("user-interaction");
+      return;
+    }
+
     if (!fingerprint) {
       stage2PlacementController.cancelAll("inputs-incomplete");
       markStage2Idle(projectId);
@@ -295,7 +313,7 @@ export function useStage2PlacementOptimiser({
       quantityOrder,
       delay: STAGE2_START_DELAY_MS,
     });
-  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, isInteracting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return state;
 }
