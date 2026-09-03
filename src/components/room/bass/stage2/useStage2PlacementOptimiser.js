@@ -10,7 +10,7 @@
 // Does NOT rerun Stage 1. Stage 1 remains product-independent.
 // Evaluates only the selected P14 target (not the full 8-target matrix).
 
-import { useEffect, useSyncExternalStore, useState, useMemo } from "react";
+import { useEffect, useSyncExternalStore, useState, useMemo, useRef } from "react";
 import { computeStage2Fingerprint } from "./stage2Fingerprint";
 import {
   computeStage2PlacementFingerprint,
@@ -86,6 +86,7 @@ export function useStage2PlacementOptimiser({
   currentQuantity,
   subwooferBottomHeightM,
   enabled = true,
+  requestId = null,
 }) {
   const state = useSyncExternalStore(
     subscribeStage2,
@@ -106,6 +107,7 @@ export function useStage2PlacementOptimiser({
 
   const [hydrationDone, setHydrationDone] = useState(false);
   const [hydratedCache, setHydratedCache] = useState(null);
+  const explicitRequestRef = useRef({ requestId: null, fingerprint: null });
 
   // Compute P14 target from splConfig
   const p14Target = useMemo(() => {
@@ -244,10 +246,26 @@ export function useStage2PlacementOptimiser({
     // Recommendation gate: when the recommendation UI is not active, cancel
     // any pending/active evaluation and stay idle. This eliminates speculative
     // Stage 2 worker starts during dragging or when the panel is closed.
-    if (!enabled) {
-      const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
-      if (isDev) console.log("[stage2-gate]", "GATED — recommendation panel closed, cancelling speculative canonical evaluation");
-      stage2PlacementController.cancelAll("recommendation-gate-closed");
+    if (!enabled || !requestId) {
+      explicitRequestRef.current = { requestId: null, fingerprint: null };
+      stage2PlacementController.cancelAll("explicit-action-required");
+      markStage2Idle(projectId);
+      return;
+    }
+
+    const requestToken = String(requestId);
+    if (explicitRequestRef.current.requestId !== requestToken) {
+      explicitRequestRef.current = { requestId: requestToken, fingerprint: null };
+    }
+    // Stage 2's fingerprint only exists after Stage 1 finalists are ready.
+    // Capture it once for this explicit request, then refuse to follow later
+    // geometry/model/target changes automatically.
+    if (fingerprint && !explicitRequestRef.current.fingerprint) {
+      explicitRequestRef.current.fingerprint = fingerprint;
+    } else if (fingerprint
+      && explicitRequestRef.current.fingerprint
+      && explicitRequestRef.current.fingerprint !== fingerprint) {
+      stage2PlacementController.cancelAll("request-fingerprint-stale");
       markStage2Idle(projectId);
       return;
     }
@@ -313,7 +331,7 @@ export function useStage2PlacementOptimiser({
       quantityOrder,
       delay: STAGE2_START_DELAY_MS,
     });
-  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, isInteracting]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return state;
 }
