@@ -17,6 +17,7 @@ export { COMPLETED_BASS_CACHE_VERSION };
 export const BASS_AUTHORITY_STATUS = Object.freeze({
   LOADING: "LOADING",
   UPDATING: "UPDATING",
+  STALE: "STALE",
   BLOCKED: "BLOCKED",
   ERROR: "ERROR",
   UNCALCULATED: "UNCALCULATED",
@@ -514,10 +515,14 @@ export function resolvePersistedBassAuthority(projectId, persisted) {
     : null;
   const authorityStatus = structurallyComplete
     ? (authoritative ? BASS_AUTHORITY_STATUS.AUTHORITATIVE : BASS_AUTHORITY_STATUS.NOT_VERIFIED)
-    : (state.status === "uncalculated" ? BASS_AUTHORITY_STATUS.UNCALCULATED : BASS_AUTHORITY_STATUS.UPDATING);
+    : (state.status === "uncalculated"
+      ? BASS_AUTHORITY_STATUS.UNCALCULATED
+      : state.status === "stale"
+        ? BASS_AUTHORITY_STATUS.STALE
+        : BASS_AUTHORITY_STATUS.UPDATING);
   return {
     projectId: String(projectId || "free"),
-    status: current ? "complete" : state.status === "uncalculated" ? "uncalculated" : "updating",
+    status: current ? "complete" : state.status === "uncalculated" ? "uncalculated" : state.status === "stale" ? "stale" : "updating",
     authorityStatus,
     currentFingerprint,
     contract: structurallyComplete ? current : null,
