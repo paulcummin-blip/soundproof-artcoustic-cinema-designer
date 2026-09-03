@@ -143,6 +143,9 @@ export function resolveBassReadiness(completedBassAuthority, bassApplicable = fa
   if (status === BASS_AUTHORITY_STATUS.UPDATING) {
     return { ready: false, pending: true, reason: 'updating', fingerprint: currentFp };
   }
+  if (status === BASS_AUTHORITY_STATUS.STALE) {
+    return { ready: false, pending: true, reason: 'needs-recalculation', fingerprint: currentFp };
+  }
   if (status === BASS_AUTHORITY_STATUS.UNCALCULATED) {
     if (!hydrationSettled) {
       return { ready: false, pending: true, reason: 'hydration-loading', fingerprint: null };
