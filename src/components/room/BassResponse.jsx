@@ -12,7 +12,6 @@ import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
-import BackgroundAnalysisControls from "@/components/room/bass/BackgroundAnalysisControls";
 import BassEngineeringDetails from "@/components/room/bass/BassEngineeringDetails";
 import BassResultCards from "@/components/room/bass/BassResultCards";
 import BassDesignRecommendation from "@/components/room/bass/BassDesignRecommendation";
@@ -51,6 +50,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
   const sharedBassResults = useSharedBassResults();
   const authoritative = sharedBassResults.authoritative;
+  const hasCurrentBassResult = sharedBassResults?.hasCurrentResult === true;
+  const bassAuthorityStatus = sharedBassResults?.completedBassAuthority?.authorityStatus || "UNCALCULATED";
   const {
     roomDims, seatingPositions, splConfig, rspPosition, subsForSimulation, simulationResults,
     rspRawCurve, perSeatRawCurves, designEqSystemLimits, optimisationTransitionHz,
@@ -572,12 +573,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
       </div>
 
-      {/* 2. P14/P18/P19/P20 result cards — replace long thin bars */}
-      <BassResultCards />
-
-      {/* 3. Primary limitation + Recommended improvement — gated when P14 unselected */}
-      {p14Selection.noP14TargetSelected ? null : (
-        <BassDesignRecommendation recommendation={sharedBassResults.contract?.designRecommendation} />
+      {/* Current authoritative results only. Stale values never read as current. */}
+      {hasCurrentBassResult ? (
+        <>
+          <BassResultCards />
+          {!p14Selection.noP14TargetSelected && (
+            <BassDesignRecommendation recommendation={sharedBassResults.contract?.designRecommendation} />
+          )}
+        </>
+      ) : (
+        <div className={`rounded-xl border px-4 py-4 ${bassAuthorityStatus === "STALE" ? "border-amber-200 bg-amber-50" : "border-[#DCDBD6] bg-white"}`}>
+          <div className="text-[13px] font-semibold text-[#1B1A1A]">
+            {bassAuthorityStatus === "STALE" ? "Bass result needs recalculation" : "No current bass result"}
+          </div>
+          <p className="mt-1 text-[11px] text-[#625143]">
+            {bassAuthorityStatus === "STALE"
+              ? "The design changed after the last calculation. Previous values are excluded from the current RP22 score and report."
+              : "Choose Calculate Bass Performance in the Subwoofers panel when the layout is ready."}
+          </p>
+        </div>
       )}
       
       {(subWarnings?.front?.length > 0 || subWarnings?.rear?.length > 0) && (
@@ -612,6 +626,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#625143" }}>Select Bass Target</div>
           <div style={{ fontSize: 12, color: "#8B7F76", marginTop: 4 }}>Choose a bass target to view the response graph</div>
+        </div>
+      ) : !hasCurrentBassResult ? (
+        <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center" }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#625143" }}>
+            {bassAuthorityStatus === "STALE" ? "Response needs recalculation" : "Calculate Bass Performance"}
+          </div>
+          <div style={{ fontSize: 12, color: "#8B7F76", marginTop: 4 }}>
+            The authoritative response graph appears after the current design has been calculated.
+          </div>
         </div>
       ) : (
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
@@ -679,15 +702,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                     <option value="third">1/3 octave</option>
                   </select>
                 </div>
-                {designEqEnabled && (
-                  <BackgroundAnalysisControls
-                    lifecycle={detailedLifecycle}
-                    onRecalculate={() => calculateDetailed?.({ collectDiagnostics: includeDiagnostics === true, force: true })}
-                    disabled={!detailedInputsValid || detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"}
-                    includeDiagnostics={includeDiagnostics}
-                    onDiagnosticsChange={setIncludeDiagnostics}
-                  />
-                )}
                 <CopyLiveBassValidationButton />
                 <CopyEqForensicTraceButton />
               </>
