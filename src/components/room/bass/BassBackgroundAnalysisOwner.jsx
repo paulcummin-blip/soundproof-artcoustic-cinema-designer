@@ -26,6 +26,7 @@ import { buildMetricPublicationReceipt } from "./metricPublicationReceipt";
 import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 import { useRecommendationGate } from "@/components/state/recommendationGateStore";
+import { getBassHeavyAction, cancelBassHeavyAction } from "./bassHeavyActionStore";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -222,6 +223,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       valid: !!fingerprints && !!cacheKey && !!targetKey,
       fingerprint: cacheKey,
     });
+
+    const heavyAction = getBassHeavyAction(scopeId);
+    if (heavyAction?.requestId
+      && heavyAction.sourceFingerprint
+      && heavyAction.sourceFingerprint !== cacheKey) {
+      cancelBassHeavyAction(scopeId, "Design changed — request cancelled.");
+    }
 
     if (
       bassAuthorityHydrationSettled
