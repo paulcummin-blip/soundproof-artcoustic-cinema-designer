@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import HeightInput from '@/components/ui/HeightInput';
 import BassResultsSummary from '@/components/room/bass/BassResultsSummary';
+import { useSharedBassResults } from '@/components/room/bass/bassResultsStore';
 import BassTargetLevelControl from '@/components/room/bass/BassTargetLevelControl';
 import BestSubLayoutGuide from '@/components/room/bass/best-layout/BestSubLayoutGuide';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
@@ -63,6 +64,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
   const activeProjectId = useActiveProjectId();
   const layoutContextId = resolveBestSubLayoutContextId({ projectId: activeProjectId, roomDims: roomDimensions });
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
+  const sharedBassResults = useSharedBassResults();
   const hasLcrSubClash = useMemo(() => hasFrontLcrSubClash({
     speakers: appState?.speakerSystem?.placedSpeakers,
     frontSubs: appState?.subwoofers,
@@ -84,12 +86,38 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
     const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
     return instances.some((i) => i?.enabled !== false && i?.model);
   }, [appState?.subwooferInstances]);
+  const bassAuthorityStatus = sharedBassResults?.completedBassAuthority?.authorityStatus || 'UNCALCULATED';
+  const hasPreviousBassResult = !!sharedBassResults?.completedBassAuthority?.staleContract;
+  const bassCalculationInProgress = sharedBassResults?.calculationInProgress === true;
+  const bassActionLabel = sharedBassResults?.hasCurrentResult || hasPreviousBassResult || bassAuthorityStatus === 'STALE'
+    ? 'Recalculate Bass'
+    : 'Calculate Bass Performance';
+  const bassActionDisabled = disabled
+    || !hasActiveSubModel
+    || sharedBassResults?.canCalculate !== true
+    || bassCalculationInProgress;
 
   return (
     <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
       <div className="rounded-none border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-4">
         <div className="mb-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
           <BassTargetLevelControl disabled={disabled} />
+        </div>
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => sharedBassResults?.onCalculate?.()}
+            disabled={bassActionDisabled}
+            className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {bassCalculationInProgress ? 'Calculating Bass Performance…' : bassActionLabel}
+          </button>
+          {bassAuthorityStatus === 'STALE' && (
+            <p className="mt-2 text-[11px] font-medium text-amber-700">Design changed — the previous bass result is no longer current.</p>
+          )}
+          {!bassCalculationInProgress && !bassActionDisabled && (
+            <p className="mt-2 text-[11px] text-[#625143]">Analysis runs only when you press this button. You can keep editing while it runs.</p>
+          )}
         </div>
         <div className="mb-3">
           {hasActiveSubModel ? (
