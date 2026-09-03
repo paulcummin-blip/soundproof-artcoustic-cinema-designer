@@ -21,7 +21,7 @@ export const STAGE2_PLACEMENT_VERSION = "stage2-placement-v2";
 // Maximum concurrent canonical finalist evaluation jobs.
 export const STAGE2_MAX_CONCURRENT_JOBS = 2;
 
-// Auto-start delay after Stage 1 settles + product/P14 selected (ms).
+// Short yield before an explicitly requested canonical search starts (ms).
 export const STAGE2_START_DELAY_MS = 800;
 export const STAGE2_DEBOUNCE_MS = 300;
 
