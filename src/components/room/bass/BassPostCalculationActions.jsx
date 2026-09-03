@@ -74,6 +74,101 @@ function improvementText(currentLayout, recommendation) {
   return `The searched layout ${parts.join(" and ")}.`;
 }
 
+function comparisonValues(layout) {
+  const metrics = layout?.metrics || {};
+  return {
+    p14Level: Number.isFinite(Number(metrics.p14AchievedLevel)) ? Number(metrics.p14AchievedLevel) : null,
+    p14Db: Number.isFinite(Number(metrics.p14AchievedDb)) ? Number(metrics.p14AchievedDb) : null,
+    p18Level: Number.isFinite(Number(metrics.p18AchievedLevel)) ? Number(metrics.p18AchievedLevel) : null,
+    p18Hz: Number.isFinite(Number(metrics.achievedP18Hz)) ? Number(metrics.achievedP18Hz) : null,
+    p19Level: floorLevel(metrics.perSeatP19),
+    p20Level: floorLevel(metrics.perSeatP20),
+    p20VariationDb: worstVariation(metrics.perSeatP20),
+    quantity: Number(metrics.sourceCount) || layout?.sources?.length || 0,
+  };
+}
+
+function resultCell(level, value, unit) {
+  const valueText = Number.isFinite(value) ? `${value.toFixed(unit === "dBC" ? 1 : 0)} ${unit}` : null;
+  return [levelText(level), valueText].filter(Boolean).join(" · ") || "—";
+}
+
+function comparisonNarrative(currentLayout, twoSubLayout, fourSubLayout) {
+  const current = comparisonValues(currentLayout);
+  const two = comparisonValues(twoSubLayout);
+  const four = comparisonValues(fourSubLayout);
+  const requestedLevel = Number(currentLayout?.canonicalResult?.p14TargetLevel);
+  const placementStrong = Math.min(current.p19Level ?? 0, current.p20Level ?? 0) >= 3;
+  if (placementStrong && Number.isFinite(requestedLevel) && (current.p14Level ?? 0) < requestedLevel) {
+    return "Placement performance is already strong; improve subwoofer capability or size before adding boxes solely for placement.";
+  }
+  if (Number.isFinite(two.p20VariationDb) && Number.isFinite(four.p20VariationDb)
+    && Math.abs(two.p20VariationDb - four.p20VariationDb) < 0.5
+    && two.p19Level === four.p19Level && two.p20Level === four.p20Level) {
+    return "Four subs provide only marginal useful improvement over the recommended two-sub design in this room.";
+  }
+  if (Math.min(four.p19Level ?? 0, four.p20Level ?? 0) > Math.min(two.p19Level ?? 0, two.p20Level ?? 0)) {
+    return "Four subs materially improve the weakest placement result and are justified for this seating area.";
+  }
+  if (current.quantity === 1
+    && Math.min(two.p19Level ?? 0, two.p20Level ?? 0) > Math.min(current.p19Level ?? 0, current.p20Level ?? 0)) {
+    return "A second sub improves the weakest seat-coverage result; quantity and placement are the useful upgrade.";
+  }
+  return "The table shows the real engineering trade-off; more subwoofers are not recommended unless the authoritative result improves materially.";
+}
+
+function ComparisonTable({ currentLayout, twoSubLayout, fourSubLayout, onInspect }) {
+  const columns = [
+    { key: "current", title: "Current", layout: currentLayout },
+    { key: "two", title: "Recommended 2 Subs", layout: twoSubLayout },
+    { key: "four", title: "Recommended 4 Subs", layout: fourSubLayout },
+  ];
+  const values = Object.fromEntries(columns.map((column) => [column.key, comparisonValues(column.layout)]));
+  const rows = [
+    { label: "P14", render: (value) => resultCell(value.p14Level, value.p14Db, "dBC") },
+    { label: "P18", render: (value) => resultCell(value.p18Level, value.p18Hz, "Hz") },
+    { label: "P19", render: (value) => levelText(value.p19Level) },
+    { label: "P20", render: (value) => resultCell(value.p20Level, value.p20VariationDb, "dB") },
+  ];
+  return (
+    <div className="mt-3 rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-3">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Authoritative bass option comparison</div>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full min-w-[560px] border-collapse text-left text-[11px]">
+          <thead>
+            <tr>
+              <th className="border-b border-[#D9D5CE] px-2 py-2 text-[#625143]">Parameter</th>
+              {columns.map((column) => (
+                <th key={column.key} className="border-b border-[#D9D5CE] px-2 py-2 text-[#1B1A1A]">{column.title}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label}>
+                <th className="border-b border-[#E7E4DF] px-2 py-2 font-semibold text-[#213428]">{row.label}</th>
+                {columns.map((column) => (
+                  <td key={column.key} className="border-b border-[#E7E4DF] px-2 py-2 text-[#625143]">
+                    {column.layout ? row.render(values[column.key]) : "—"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-[11px] font-medium leading-relaxed text-[#213428]">
+        {comparisonNarrative(currentLayout, twoSubLayout, fourSubLayout)}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {twoSubLayout && <Button type="button" size="sm" variant="outline" onClick={() => onInspect(twoSubLayout)}>View 2-sub positions</Button>}
+        {fourSubLayout && <Button type="button" size="sm" variant="outline" onClick={() => onInspect(fourSubLayout)}>View 4-sub positions</Button>}
+      </div>
+      <p className="mt-2 text-[10px] text-[#8A7B6A]">Compared alternatives use the selected model, selected P14 target and the full canonical P14/P18/P19/P20 evaluation.</p>
+    </div>
+  );
+}
+
 export default function BassPostCalculationActions({
   roomDims,
   seatingPositions,
