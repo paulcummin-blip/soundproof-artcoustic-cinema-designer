@@ -27,7 +27,7 @@ export default function P19SeatBlock({ seatingPositions = [], perSeatP19Results 
   if (!publicationVerified || allSeats.length === 0) {
     const stateText = p14TargetUnselected
       ? "Select Bass Target"
-      : authorityStatus === "LIMITED" ? "Not evaluated"
+      : authorityStatus === "LIMITED" ? "FAIL"
       : authorityStatus === "NOT_VERIFIED" ? "NOT VERIFIED" : "Calculating…";
     return (
       <div className="rounded-md border border-[#DCDBD6] bg-[#F8F8F7] px-3 py-2 text-[11px] text-[#625143]" aria-label="P19 per-seat levels">

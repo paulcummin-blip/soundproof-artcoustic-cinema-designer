@@ -285,7 +285,10 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       detail: formatP18TargetBasisDetail(activeP18Basis),
     };
   } else if (p14Failed) {
-    pills.p18 = { label: "P18 Extension", resultText: notEvaluatedText, text: `P18 Extension ${notEvaluatedText}`, level: "—", detail: null };
+    // P14 FAIL (or LIMITED) → P18 FAIL. Internally P18 was not evaluated because
+    // the selected P14 operating target is unattainable; the dealer-facing
+    // pill shows strict FAIL, not "Not evaluated".
+    pills.p18 = { label: "P18 Extension", resultText: "FAIL", text: "P18 Extension FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null };
   } else {
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
@@ -295,14 +298,14 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // in the P19 — All Seats panel below. When P14 fails (or LIMITED), P19 is
   // not evaluated.
   pills.p19 = p14Failed
-    ? { label: "P19 Response Fit", resultText: notEvaluatedText, text: `P19 Response Fit ${notEvaluatedText}`, level: "—", detail: null }
+    ? { label: "P19 Response Fit", resultText: "FAIL", text: "P19 Response Fit FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
     : seatScopeHeadlinePill("P19 Response Fit");
 
   // P20 — SEAT-scoped parameter. The headline always displays "SEAT" — no
   // "worst seat" headline, no aggregate level. When P14 fails (or LIMITED),
   // P20 is not evaluated.
   pills.p20 = p14Failed
-    ? { label: "P20 Seat Consistency", resultText: notEvaluatedText, text: `P20 Seat Consistency ${notEvaluatedText}`, level: "—", detail: null }
+    ? { label: "P20 Seat Consistency", resultText: "FAIL", text: "P20 Seat Consistency FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
     : seatScopeHeadlinePill("P20 Seat Consistency");
 
   // Status text
