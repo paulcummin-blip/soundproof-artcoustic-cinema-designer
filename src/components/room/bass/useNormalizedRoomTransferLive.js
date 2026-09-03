@@ -82,7 +82,7 @@ function hasValidRoom(roomDims) {
   return roomDims && Number.isFinite(roomDims.widthM) && Number.isFinite(roomDims.lengthM) && Number.isFinite(roomDims.heightM);
 }
 
-export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPositions, subsForSimulation, physicsOptions }) {
+export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPositions, subsForSimulation, physicsOptions, analysisRequestId = null, analysisRequestFingerprint = null }) {
   const canonicalInputs = useMemo(
     () => canonicalizeNormalizedRoomInputs({ roomDims, rspPosition, seatingPositions }),
     [roomDims, rspPosition, seatingPositions]
@@ -313,7 +313,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     activeRefinementRequestRef.current = null;
     setIsRefining(false);
 
-    if (!geometryFingerprint) {
+    if (!geometryFingerprint || !analysisRequestId || !analysisRequestFingerprint || analysisRequestFingerprint !== geometryFingerprint) {
       setStatus("idle");
       return;
     }
@@ -381,7 +381,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geometryFingerprint]);
+  }, [geometryFingerprint, analysisRequestId, analysisRequestFingerprint]);
 
   // Cleanup on unmount — terminate both workers and clear both timers.
   useEffect(() => {
