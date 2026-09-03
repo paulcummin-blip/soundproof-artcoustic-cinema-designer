@@ -103,32 +103,20 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
         <div className="mb-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
           <BassTargetLevelControl disabled={disabled} />
         </div>
-        <div className="mb-4">
-          <button
-            type="button"
-            onClick={() => sharedBassResults?.onCalculate?.()}
-            disabled={bassActionDisabled}
-            className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {bassCalculationInProgress ? 'Calculating Bass Performance…' : bassActionLabel}
-          </button>
-          {bassAuthorityStatus === 'STALE' && (
-            <p className="mt-2 text-[11px] font-medium text-amber-700">Design changed — the previous bass result is no longer current.</p>
-          )}
-          {!bassCalculationInProgress && !bassActionDisabled && (
-            <p className="mt-2 text-[11px] text-[#625143]">Analysis runs only when you press this button. You can keep editing while it runs.</p>
-          )}
-        </div>
-        <div className="mb-3">
-          {hasActiveSubModel ? (
-            <BassResultsSummary />
-          ) : (
-            <div className="rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
-              <p className="text-[12px] font-medium text-[#1B1A1A]">Waiting for subwoofer selection</p>
-              <p className="mt-1 text-[11px] text-[#625143]">Select a subwoofer model and quantity to calculate bass performance.</p>
-            </div>
-          )}
-        </div>
+        <BestSubLayoutGuide
+          roomDims={roomDimensions}
+          seatingPositions={seats}
+          rspPosition={rspPosition}
+          sourceHeights={{ front: frontSubsCfg?.bottomHeightM, rear: rearSubsCfg?.bottomHeightM }}
+          contextId={layoutContextId}
+          roomElements={appState?.roomElements}
+          currentSubs={appState?.subwoofers}
+          frontSubsCfg={frontSubsCfg}
+          rearSubsCfg={rearSubsCfg}
+          subwooferInstances={appState?.subwooferInstances}
+          commitInstances={compat.commitInstances}
+          hasCanonicalInstances={compat.hasCanonicalInstances}
+        />
         <div className="grid grid-cols-12 gap-x-4 gap-y-3">
           <div className="col-span-12 md:col-span-6">
             <h4 className="text-[15px] font-semibold text-[#1B1A1A] mb-2">Front Subwoofers</h4>
@@ -362,6 +350,34 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
           </div>
 
           <div className="col-span-12 mt-4 border-t border-[#DCDBD6] pt-4">
+            <button
+              type="button"
+              onClick={() => sharedBassResults?.onCalculate?.()}
+              disabled={bassActionDisabled}
+              className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {bassCalculationInProgress ? 'Calculating Bass Performance…' : bassActionLabel}
+            </button>
+            {bassAuthorityStatus === 'STALE' && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-[11px] font-semibold text-amber-800">Needs recalculation</p>
+                <p className="mt-1 text-[10px] text-amber-700">The previous result is retained for reference but is not part of the current RP22 score or report.</p>
+              </div>
+            )}
+            {!hasActiveSubModel && (
+              <p className="mt-2 text-[11px] text-[#625143]">Select a subwoofer model and quantity before calculating.</p>
+            )}
+            {!bassCalculationInProgress && !bassActionDisabled && (
+              <p className="mt-2 text-[11px] text-[#625143]">The analysis runs only when you press this button. You can continue editing while it runs.</p>
+            )}
+            {sharedBassResults?.hasCurrentResult && (
+              <div className="mt-4">
+                <BassResultsSummary />
+              </div>
+            )}
+          </div>
+
+          <div className="col-span-12 mt-4 border-t border-[#DCDBD6] pt-4">
             <SubwooferInstanceList appState={appState} />
           </div>
 
@@ -397,23 +413,6 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               )}
             </div>
 
-            <BestSubLayoutGuide
-              roomDims={roomDimensions}
-              seatingPositions={seats}
-              rspPosition={rspPosition}
-              sourceHeights={{ front: frontSubsCfg?.bottomHeightM, rear: rearSubsCfg?.bottomHeightM }}
-              contextId={layoutContextId}
-              roomElements={appState?.roomElements}
-              currentSubs={appState?.subwoofers}
-              frontSubsCfg={frontSubsCfg}
-              rearSubsCfg={rearSubsCfg}
-              setFrontSubsCfg={appState?.setFrontSubsCfg}
-              setRearSubsCfg={appState?.setRearSubsCfg}
-              subwooferInstances={appState?.subwooferInstances}
-              setSubwooferInstances={appState?.setSubwooferInstances}
-              commitInstances={compat.commitInstances}
-              hasCanonicalInstances={compat.hasCanonicalInstances}
-            />
           </div>
         </div>
       </div>
