@@ -27,7 +27,7 @@ import { useIsDragActive } from "@/components/state/userInteractionStore";
  * @param {Array} params.seatingPositions — [{ id, x, y, z?, priority? }]
  * @param {object} params.physicsOptions — modal physics options (optional)
  */
-export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, seatingPositions, physicsOptions, enabled = true }) {
+export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, seatingPositions, physicsOptions, enabled = true, requestId = null }) {
   const state = useSyncExternalStore(
     subscribeStage1,
     () => getStage1State(projectId),
@@ -39,6 +39,7 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
   const isInteracting = useIsDragActive();
 
   const fingerprintRef = useRef(null);
+  const explicitRequestRef = useRef({ requestId: null, fingerprint: null });
   const [hydrationDone, setHydrationDone] = useState(false);
   const [hydratedCache, setHydratedCache] = useState(null);
 
@@ -91,10 +92,26 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     // Recommendation gate: when the recommendation UI is not active, cancel
     // any pending/active search and stay idle. This eliminates speculative
     // Stage 1 worker starts during dragging or when the panel is closed.
-    if (!enabled) {
-      const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
-      if (isDev) console.log("[stage1-gate]", "GATED — recommendation panel closed, cancelling speculative placement search");
-      stage1PlacementController.cancelActive("recommendation-gate-closed");
+    if (!enabled || !requestId) {
+      explicitRequestRef.current = { requestId: null, fingerprint: null };
+      stage1PlacementController.cancelActive("explicit-action-required");
+      markStage1Idle(projectId);
+      return;
+    }
+
+    const requestToken = String(requestId);
+    if (explicitRequestRef.current.requestId !== requestToken) {
+      explicitRequestRef.current = { requestId: requestToken, fingerprint: null };
+    }
+    if (!fingerprint) {
+      stage1PlacementController.cancelActive("inputs-incomplete");
+      markStage1Idle(projectId);
+      return;
+    }
+    if (!explicitRequestRef.current.fingerprint) {
+      explicitRequestRef.current.fingerprint = fingerprint;
+    } else if (explicitRequestRef.current.fingerprint !== fingerprint) {
+      stage1PlacementController.cancelActive("request-fingerprint-stale");
       markStage1Idle(projectId);
       return;
     }
@@ -143,7 +160,7 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     return () => {
       // Cleanup on unmount — cancel active search
     };
-  }, [fingerprint, projectId, hydrationDone, hydratedCache, enabled, isInteracting]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, projectId, hydrationDone, hydratedCache, enabled, requestId, isInteracting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Cleanup on unmount ───────────────────────────────────────────────
   useEffect(() => {
