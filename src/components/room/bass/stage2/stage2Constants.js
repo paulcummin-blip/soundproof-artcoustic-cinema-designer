@@ -8,10 +8,10 @@
 export const STAGE2_CACHE_VERSION = 3;
 export const STAGE2_RANKING_VERSION = "stage2-ranking-v1";
 // Confirmation layer version: P14-dependent EQ/canonical/P14/P18/P19/P20
-// authority pipeline. Bumped to v3: confirmation fingerprint now carries
-// canonicalVersion + productEngineeringVersion (moved from placement), and
-// p18TargetBasis removed (presentation-only grading view).
-export const STAGE2_CANONICAL_VERSION = "stage2-canonical-v4";
+// authority pipeline. v5 exposes the already-authoritative P14/P18 outcomes
+// on each comparison result. The equations are unchanged; this invalidates
+// older confirmation records that do not contain those presentation fields.
+export const STAGE2_CANONICAL_VERSION = "stage2-canonical-v5";
 export const STAGE2_PRODUCT_ENGINEERING_VERSION = "product-engineering-v5";
 // Placement layer version: P14-independent raw modal transfer. Bumped to v2:
 // placement fingerprint is now physics-only (canonicalVersion and
