@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import HeightInput from '@/components/ui/HeightInput';
 import BassResultsSummary from '@/components/room/bass/BassResultsSummary';
+import BassPostCalculationActions from '@/components/room/bass/BassPostCalculationActions';
 import { useSharedBassResults } from '@/components/room/bass/bassResultsStore';
 import BassTargetLevelControl from '@/components/room/bass/BassTargetLevelControl';
 import BestSubLayoutGuide from '@/components/room/bass/best-layout/BestSubLayoutGuide';
@@ -375,6 +376,17 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 <BassResultsSummary />
               </div>
             )}
+            <BassPostCalculationActions
+              roomDims={roomDimensions}
+              seatingPositions={seats}
+              currentSubs={appState?.subwoofers}
+              sourceHeightM={frontSubsCfg?.bottomHeightM ?? rearSubsCfg?.bottomHeightM}
+              frontSubsCfg={frontSubsCfg}
+              rearSubsCfg={rearSubsCfg}
+              subwooferInstances={appState?.subwooferInstances}
+              commitInstances={compat.commitInstances}
+              hasCanonicalInstances={compat.hasCanonicalInstances}
+            />
           </div>
 
           <div className="col-span-12 mt-4 border-t border-[#DCDBD6] pt-4">
