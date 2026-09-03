@@ -182,6 +182,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   const isAuthoritative = publicationVerified === true;
   const isNotVerified = authorityStatus === "NOT_VERIFIED";
   const isUpdating = ["UPDATING", "LOADING"].includes(authorityStatus) || isCalculating;
+  const isStale = authorityStatus === "STALE";
   const isBlocked = authorityStatus === "BLOCKED";
   const isError = authorityStatus === "ERROR";
   const isUncalculated = authorityStatus === "UNCALCULATED" && !isCalculating;
@@ -312,6 +313,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   let statusText = "Waiting for complete design";
   if (isCalculating) statusText = `Calculating… · ${elapsedSeconds} s`;
   else if (isError) statusText = completedBassAuthority?.errorMessage || "Analysis failed";
+  else if (isStale) statusText = "Needs recalculation";
   else if (isNotVerified) statusText = "NOT VERIFIED";
   else if (isBlocked) statusText = "Waiting for complete design";
   else if (isLimited) statusText = "P14 capability below target";
@@ -324,6 +326,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     isReady: isAuthoritative,
     isUpdating: isUpdating || isCalculating,
     isNotVerified,
+    isStale,
     isLimited,
     elapsedSeconds,
     selectedMode: contract?.selectedMode || "balanced",
@@ -344,6 +347,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
 
 function officialStateText(authorityStatus, isCalculating) {
   if (isCalculating) return "Calculating…";
+  if (authorityStatus === "STALE") return "Needs recalculation";
   if (authorityStatus === "NOT_VERIFIED") return "NOT VERIFIED";
   if (authorityStatus === "ERROR") return "Error";
   if (authorityStatus === "BLOCKED") return "Waiting…";
