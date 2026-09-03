@@ -473,7 +473,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // publish, no authority marking, no cache seeding.
     if (!isProjectHydrationReady || !targetKey) return;
     // ── Cache hit: publish cached compact contract directly, skip optimiser ──
-    if (cachedContract) {
+    if (cachedContract && manualRequestMatchesCurrent) {
       // LIMITED cache hit: the requested P14 dBC is physically unattainable.
       // Publish as a LIMITED authority (not AUTHORITATIVE) so the UI can show
       // the P14 capability shortfall without running the optimiser again.
@@ -603,7 +603,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       publishedContractTokensRef.current.add(publishedToken);
       recordDiagStage(publishedToken, "contract-published", { contractAnalysisId: contract?.analysisId || null, contractFingerprint: resultFingerprint });
     }
-  }, [scopeId, cacheKey, contract, fingerprints, cachedContract, isProjectHydrationReady, baseDesignFingerprint, targetKey, bassAuthorityHydrationSettled]);
+  }, [scopeId, cacheKey, contract, fingerprints, cachedContract, manualRequestMatchesCurrent, isProjectHydrationReady, baseDesignFingerprint, targetKey, bassAuthorityHydrationSettled]);
 
   const publishedStagesRef = useRef(new Set());
   useEffect(() => {
@@ -771,8 +771,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target
   // identity may still be in pre-hydration/default/transitional state.
+  const visibleCachedContract = manualRequestMatchesCurrent ? cachedContract : null;
   const effectiveContract = isProjectHydrationReady
-    ? (cachedContract || contract || (completedContractMatches ? completedContract : null))
+    ? (visibleCachedContract || contract || (completedContractMatches ? completedContract : null))
     : null;
   // When using the fallback completed contract (controller skipped), show
   // COMPLETE status so the bass graph and status indicators don't flash IDLE.
@@ -791,6 +792,15 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     return buildFinishedGraphOptimisationResult(completedContract);
   }, [isProjectHydrationReady, optimisationResult, completedContractMatches, completedContract]);
   const effectiveOptimisationResult = optimisationResult || cachedGraphOptimisationResult;
-  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p14FamilyProgress: targetFamilyProgress });
+  const calculationInProgress = !!manualAnalysisRequest
+    && manualRequestMatchesCurrent
+    && (
+      dispatchedManualRequestRef.current !== manualAnalysisRequest.id
+      || lifecycle.status === "queued"
+      || lifecycle.status === "calculating"
+    );
+  const hasCurrentResult = completedBassAuthority?.authoritative === true
+    && completedBassAuthority?.currentFingerprint === cacheKey;
+  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, canCalculate, calculationInProgress, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p14FamilyProgress: targetFamilyProgress });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
