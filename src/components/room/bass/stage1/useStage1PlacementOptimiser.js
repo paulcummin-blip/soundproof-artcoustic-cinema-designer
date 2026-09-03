@@ -1,6 +1,6 @@
 // useStage1PlacementOptimiser.js
-// React hook for Stage 1 placement optimiser.
-// Auto-starts 500-750ms after valid geometry settles.
+// React hook for the explicit Stage 1 placement optimiser.
+// Starts only for a fingerprint-bound Optimise/Compare request.
 // Hydrates from DB on reopen; starts 0 workers if cache is valid.
 
 import { useEffect, useSyncExternalStore, useRef, useState } from "react";
@@ -18,7 +18,7 @@ import { STAGE1_START_DELAY_MS } from "./stage1Constants";
 import { useIsDragActive } from "@/components/state/userInteractionStore";
 
 /**
- * Auto-start Stage 1 placement search.
+ * Run Stage 1 placement search for an explicit heavy-action request.
  *
  * @param {object} params
  * @param {string} params.projectId
