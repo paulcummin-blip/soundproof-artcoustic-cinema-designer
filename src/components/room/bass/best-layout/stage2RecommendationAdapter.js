@@ -198,8 +198,10 @@ function canonicalMetrics({
     hasConfirmedSeatAuthority: normalisedP19.length > 0 && normalisedP20.length > 0,
     p14TargetDb: canonicalResult?.p14TargetDb ?? null,
     p14AchievedDb: canonicalResult?.p14AchievedDb ?? null,
+    p14AchievedLevel: canonicalResult?.p14AchievedLevel ?? null,
     p14HeadroomDb: canonicalResult?.p14HeadroomDb ?? null,
     achievedP18Hz: canonicalResult?.achievedP18Hz ?? null,
+    p18AchievedLevel: canonicalResult?.p18AchievedLevel ?? null,
     assessmentStartHz: canonicalResult?.assessmentStartHz ?? null,
     assessmentEndHz: canonicalResult?.assessmentEndHz ?? null,
     limited: !!canonicalResult?.limited,
@@ -221,13 +223,16 @@ export function buildCurrentCanonicalLayout({
   if (sources.some((source) => !Number.isFinite(source.x) || !Number.isFinite(source.y))) return null;
   const candidate = contract.selectedCandidate;
   const p14 = contract.productAnalysis?.parameters?.p14;
+  const p18 = contract.productAnalysis?.parameters?.p18;
   const canonicalResult = {
     p14TargetDb: contract.requestedP14TargetDb ?? contract.selectedP14TargetDb ?? p14?.selectedTargetDb,
     p14TargetLevel: contract.requestedP14Level ?? contract.selectedP14Level ?? p14?.selectedLevel,
     p14TargetBasis: contract.requestedP14Basis ?? contract.selectedP14TargetBasis ?? p14?.targetBasis,
-    p14AchievedDb: p14?.achievedCapabilityDb ?? p14?.availableCapabilityDb ?? null,
+    p14AchievedDb: p14?.achievedCapabilityDb ?? p14?.availableCapabilityDb ?? candidate.achievedP14Db ?? null,
+    p14AchievedLevel: p14?.level ?? candidate.achievedP14Level ?? null,
     p14HeadroomDb: p14?.headroomOrShortfallDb ?? null,
     achievedP18Hz: candidate.achievedP18FrequencyHz,
+    p18AchievedLevel: p18?.level ?? candidate.achievedP18Level ?? null,
     assessmentStartHz: contract.assessmentEnvelope?.assessmentStartHz,
     assessmentEndHz: contract.assessmentEnvelope?.assessmentEndHz,
   };
