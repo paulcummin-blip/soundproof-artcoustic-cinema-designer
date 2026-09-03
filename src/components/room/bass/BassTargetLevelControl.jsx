@@ -1,31 +1,7 @@
-import { useEffect, useState } from "react";
-import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppState } from "@/components/AppStateProvider";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { formatP18TargetBasisDetail } from "@/components/utils/p18ExtensionAuthority";
-import { useActiveProjectId } from "@/components/state/project-session";
-import { presentP14AnalysisProgress, useP14AnalysisProgress } from "./p14AnalysisProgressStore";
-
-function P14AnalysisStatus() {
-  const projectId = useActiveProjectId();
-  const progress = useP14AnalysisProgress(projectId);
-  const [nowMs, setNowMs] = useState(Date.now());
-  useEffect(() => {
-    if (!progress?.activeTargetKey || progress?.status === "complete") return undefined;
-    const timer = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [progress?.activeTargetKey, progress?.status]);
-  const presentation = presentP14AnalysisProgress(progress, nowMs);
-  return (
-    <div className="flex shrink-0 items-center gap-1.5 pt-0.5 text-[10px] font-medium text-muted-foreground" aria-live="polite">
-      {presentation.complete
-        ? <Check className="h-3.5 w-3.5 text-[#213428]" />
-        : <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-      <span className="whitespace-nowrap">{presentation.label}</span>
-    </div>
-  );
-}
 
 export default function BassTargetLevelControl({ disabled = false }) {
   const appState = useAppState();
@@ -80,6 +56,5 @@ export default function BassTargetLevelControl({ disabled = false }) {
       <strong className="ml-1 text-foreground">{formatP18TargetBasisDetail(selectedP18Basis)}</strong>
     </span>
     </div>
-    <P14AnalysisStatus />
   </div>;
 }
