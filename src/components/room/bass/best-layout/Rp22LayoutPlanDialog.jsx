@@ -36,7 +36,7 @@ export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomD
     <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>{layout.name}</DialogTitle>
-        <DialogDescription>Recommended subwoofer positions based on recognised placement patterns. Marker positions represent cabinet centres.</DialogDescription>
+        <DialogDescription>Room-scored starting positions based on recognised placement patterns. Marker positions represent cabinet centres.</DialogDescription>
       </DialogHeader>
       <svg viewBox={`0 0 ${vbW} ${vbH}`} className="max-h-[300px] w-full rounded-md border border-[#D9D5CE] bg-[#F8F7F4]" role="img" aria-label={`Room plan showing ${layout.sources.length} recommended subwoofer positions`}>
         {/* Room outline */}
@@ -70,7 +70,7 @@ export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomD
           </g>;
         })}
       </svg>
-      <p className="text-[10px] leading-relaxed text-[#8A7B6A]">Apply this layout to recalculate the bass response.</p>
+      <p className="text-[10px] leading-relaxed text-[#8A7B6A]">Applying this layout only moves the subwoofers. It does not start bass analysis.</p>
       <div className="rounded-md border border-[#E7E4DF] bg-white/60 p-3">
         <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Exact coordinates (cabinet centres)</div>
         <div className="mt-2 space-y-1.5">
