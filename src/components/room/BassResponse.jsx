@@ -330,12 +330,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const detailedLifecycle = sharedBassResults.lifecycle;
   const detailedStatus = sharedBassResults.detailedStatus;
   const detailedError = sharedBassResults.detailedError;
-  const detailedInputsValid = sharedBassResults.inputsValid;
   const optimisationResult = sharedBassResults.optimisationResult;
   const bassAnalysisContract = sharedBassResults.contract;
   const optimiserPriorityMode = sharedBassResults.selectedPriorityMode;
   const setOptimiserPriorityMode = sharedBassResults.onPriorityChange;
-  const calculateDetailed = sharedBassResults.onRetry;
 
   // Product-independent transfer is owned by the shared room analysis owner so
   // the graph and optimiser consume one calculation for the current geometry.
