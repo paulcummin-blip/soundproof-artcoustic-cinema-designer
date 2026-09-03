@@ -303,8 +303,13 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     const gen = ++geometryGenerationRef.current;
     currentFingerprintRef.current = geometryFingerprint;
 
-    // Terminate the active refinement worker immediately so a long refinement
-    // never delays the next interactive preview. The preview worker is reused.
+    // Manual authority: terminate both workers when the request identity or
+    // geometry changes. A stale preview must not keep consuming CPU while the
+    // designer continues dragging.
+    if (previewWorkerRef.current) {
+      previewWorkerRef.current.terminate();
+      previewWorkerRef.current = null;
+    }
     if (refinementWorkerRef.current) {
       refinementWorkerRef.current.terminate();
       refinementWorkerRef.current = null;
