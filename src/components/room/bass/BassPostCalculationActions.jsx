@@ -37,6 +37,19 @@ function worstVariation(rows) {
   return values.length ? Math.max(...values) : null;
 }
 
+function finiteNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function numericResultLevel(value) {
+  const parsed = finiteNumber(value);
+  if (parsed !== null) return Math.max(0, Math.min(4, parsed));
+  const match = String(value || "").match(/^L([1-4])$/i);
+  return match ? Number(match[1]) : null;
+}
+
 function levelText(value) {
   if (!Number.isFinite(value)) return "—";
   return value > 0 ? `L${value}` : "FAIL";
@@ -77,14 +90,14 @@ function improvementText(currentLayout, recommendation) {
 function comparisonValues(layout) {
   const metrics = layout?.metrics || {};
   return {
-    p14Level: Number.isFinite(Number(metrics.p14AchievedLevel)) ? Number(metrics.p14AchievedLevel) : null,
-    p14Db: Number.isFinite(Number(metrics.p14AchievedDb)) ? Number(metrics.p14AchievedDb) : null,
-    p18Level: Number.isFinite(Number(metrics.p18AchievedLevel)) ? Number(metrics.p18AchievedLevel) : null,
-    p18Hz: Number.isFinite(Number(metrics.achievedP18Hz)) ? Number(metrics.achievedP18Hz) : null,
+    p14Level: numericResultLevel(metrics.p14AchievedLevel),
+    p14Db: finiteNumber(metrics.p14AchievedDb),
+    p18Level: numericResultLevel(metrics.p18AchievedLevel),
+    p18Hz: finiteNumber(metrics.achievedP18Hz),
     p19Level: floorLevel(metrics.perSeatP19),
     p20Level: floorLevel(metrics.perSeatP20),
     p20VariationDb: worstVariation(metrics.perSeatP20),
-    quantity: Number(metrics.sourceCount) || layout?.sources?.length || 0,
+    quantity: finiteNumber(metrics.sourceCount) || layout?.sources?.length || 0,
   };
 }
 
@@ -97,9 +110,9 @@ function comparisonNarrative(currentLayout, twoSubLayout, fourSubLayout) {
   const current = comparisonValues(currentLayout);
   const two = comparisonValues(twoSubLayout);
   const four = comparisonValues(fourSubLayout);
-  const requestedLevel = Number(currentLayout?.canonicalResult?.p14TargetLevel);
+  const requestedLevel = numericResultLevel(currentLayout?.canonicalResult?.p14TargetLevel);
   const placementStrong = Math.min(current.p19Level ?? 0, current.p20Level ?? 0) >= 3;
-  if (placementStrong && Number.isFinite(requestedLevel) && (current.p14Level ?? 0) < requestedLevel) {
+  if (placementStrong && requestedLevel !== null && (current.p14Level ?? 0) < requestedLevel) {
     return "Placement performance is already strong; improve subwoofer capability or size before adding boxes solely for placement.";
   }
   if (Number.isFinite(two.p20VariationDb) && Number.isFinite(four.p20VariationDb)
