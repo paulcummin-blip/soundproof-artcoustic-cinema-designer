@@ -32,7 +32,8 @@ test("geometry changes cancel stale work and invalidate publication authority", 
 });
 
 test("legacy placement sweeps cannot auto-start from panel or geometry", () => {
-  assert.match(designer, /const recommendationsActive = false/);
+  assert.match(designer, /useBassHeavyAction/);
+  assert.match(designer, /requestId: recommendationsActive \? bassHeavyAction\.requestId : null/);
   assert.match(designer, /enabled: recommendationsActive/);
 });
 
