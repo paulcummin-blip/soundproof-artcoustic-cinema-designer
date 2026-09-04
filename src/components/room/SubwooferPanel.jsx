@@ -15,6 +15,7 @@ import { useSharedBassResults } from '@/components/room/bass/bassResultsStore';
 import BassTargetLevelControl from '@/components/room/bass/BassTargetLevelControl';
 import BestSubLayoutGuide from '@/components/room/bass/best-layout/BestSubLayoutGuide';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
+import { subwooferModelKey, subwooferDisplayLabel } from '@/components/utils/subwooferDisplayLabel';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { useActiveProjectId } from '@/components/state/project-session';
 import { resolveBestSubLayoutContextId } from '@/components/room/bass/best-layout/bestSubLayoutContext';
@@ -140,9 +141,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__mixed__" disabled>Mixed</SelectItem>
-                    <SelectItem value="SUB2-12">SUB2-12</SelectItem>
-                    <SelectItem value="SUB3-12">SUB3-12</SelectItem>
-                    <SelectItem value="SUB4-12">SUB4-12</SelectItem>
+                    <SelectItem value="sub2-12">{subwooferDisplayLabel("sub2-12")}</SelectItem>
+                    <SelectItem value="sub3-12">{subwooferDisplayLabel("sub3-12")}</SelectItem>
+                    <SelectItem value="sub4-12">{subwooferDisplayLabel("sub4-12")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -270,9 +271,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__mixed__" disabled>Mixed</SelectItem>
-                    <SelectItem value="SUB2-12">SUB2-12</SelectItem>
-                    <SelectItem value="SUB3-12">SUB3-12</SelectItem>
-                    <SelectItem value="SUB4-12">SUB4-12</SelectItem>
+                    <SelectItem value="sub2-12">{subwooferDisplayLabel("sub2-12")}</SelectItem>
+                    <SelectItem value="sub3-12">{subwooferDisplayLabel("sub3-12")}</SelectItem>
+                    <SelectItem value="sub4-12">{subwooferDisplayLabel("sub4-12")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

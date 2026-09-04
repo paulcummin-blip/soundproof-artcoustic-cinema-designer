@@ -36,6 +36,7 @@ import {
   INSTANCE_STATUS,
   MIGRATION_STATE,
 } from "@/components/utils/subwooferInstanceCompatibility";
+import { subwooferModelKey } from "@/components/utils/subwooferDisplayLabel";
 
 /**
  * @param {Object} appState - From useAppState()
@@ -52,20 +53,22 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
 
   // Display-only model value for the Front/Rear model selector.
   //   null        → no enabled instances and no CFG model (show placeholder)
-  //   "<model>"   → all enabled instances share one model
+  //   "<key>"     → all enabled instances share one model (canonical lowercase key)
   //   "__mixed__" → enabled instances have different models
+  // Values are normalised to the canonical model key so the selector value
+  // matches SelectItem keys regardless of the case persisted on instances.
   const frontModelDisplay = useMemo(() => {
     const enabled = instances.filter((i) => i?.legacyGroup === "front" && i.enabled !== false);
-    if (enabled.length === 0) return String(frontSubsCfg?.model || "").trim() || null;
-    const models = new Set(enabled.map((i) => String(i.model || "").trim()).filter(Boolean));
+    if (enabled.length === 0) return subwooferModelKey(frontSubsCfg?.model) || null;
+    const models = new Set(enabled.map((i) => subwooferModelKey(i.model)).filter(Boolean));
     if (models.size === 1) return [...models][0];
     return "__mixed__";
   }, [instances, frontSubsCfg]);
 
   const rearModelDisplay = useMemo(() => {
     const enabled = instances.filter((i) => i?.legacyGroup === "rear" && i.enabled !== false);
-    if (enabled.length === 0) return String(rearSubsCfg?.model || "").trim() || null;
-    const models = new Set(enabled.map((i) => String(i.model || "").trim()).filter(Boolean));
+    if (enabled.length === 0) return subwooferModelKey(rearSubsCfg?.model) || null;
+    const models = new Set(enabled.map((i) => subwooferModelKey(i.model)).filter(Boolean));
     if (models.size === 1) return [...models][0];
     return "__mixed__";
   }, [instances, rearSubsCfg]);
