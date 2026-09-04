@@ -308,6 +308,15 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     && simulationState.status === "complete"
     && !!simulationState.result;
   const simulationResults = simulationReady ? simulationState.result : EMPTY_SIMULATION_RESULT;
+  // PASS 2: perSourceRspComplexTransfers now come from the authoritative
+  // simulation itself (flat-source RSP transfers, same mode bank). No
+  // separate normalized full simulation is required on the manual path.
+  const perSourceRspComplexTransfers = useMemo(
+    () => Array.isArray(simulationResults?.perSourceRspComplexTransfers)
+      ? simulationResults.perSourceRspComplexTransfers
+      : [],
+    [simulationResults],
+  );
   const { rspRawCurve, perSeatRawCurves } = useMemo(() => {
     if (!simulationResults) return { rspRawCurve: [], perSeatRawCurves: [] };
     return buildAuthoritativeResponseCurves(simulationResults.seatResponses);
@@ -386,7 +395,8 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     exportable: !analysisBlocked && inputsValid,
     roomDims, seatingPositions, splConfig, rspPosition, sources, subsForSimulation: sources, simulationResults,
     frontSubsLive, rearSubsLive,
-    rspRawCurve, perSeatRawCurves, designEqSystemLimits, optimisationTransitionHz, requested,
+    rspRawCurve, perSeatRawCurves, perSourceRspComplexTransfers,
+    designEqSystemLimits, optimisationTransitionHz, requested,
     fingerprintInputs, fingerprints, payload, inputsValid, physics, runSimulation,
     autoAlignEnabled, setAutoAlignEnabled, autoAlignDelays, roomDamping, setRoomDamping,
     surfaceAbsorptionInputs, setSurfaceAbsorptionInputs, surfaceAbsorption,

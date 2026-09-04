@@ -1,11 +1,20 @@
-import { simulateBassResponseRewCore, simulateBassResponseRewParityField } from "@/bass/core/rewBassEngine";
+import { simulateBassResponseRewCore, simulateBassResponseRewParityField, prepareModeBank } from "@/bass/core/rewBassEngine";
 import { getSubwooferCurve } from "@/components/models/speakers/registry";
 import { REW_SOURCE_CURVES } from "./rewSourceCurves";
 import { getPerSubwooferAmplifierAuthority } from "@/components/utils/subwooferCapability";
 
+// Flat 94 dB source used for per-source RSP complex transfers (paired P14/P18
+// capability logic). The downstream consumer divides by 10^(94/20) to get a
+// dimensionless room transfer, then multiplies by the product capability
+// curve. This MUST use the flat source — NOT the product curve — so the
+// product shaping is applied exactly once by the downstream consumer.
+const FLAT_SOURCE_CURVE = REW_SOURCE_CURVES.flat_rew_reference;
+const REFERENCE_SOURCE_DB = 94;
+const REFERENCE_SOURCE_AMPLITUDE = Math.pow(10, REFERENCE_SOURCE_DB / 20);
+
 export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, rspPosition, sources, physics, qStrategyOverride }) {
   if (!sources.length || !roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
-    return { seatResponses: {}, metrics: null, audit: null, runtimeVectorCapture: { rows: [] } };
+    return { seatResponses: {}, metrics: null, audit: null, runtimeVectorCapture: { rows: [] }, perSourceRspComplexTransfers: [] };
   }
   const amplifierAuthority = getPerSubwooferAmplifierAuthority(sources);
   const seatResponses = {};
@@ -16,6 +25,86 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
   const debugSeatId = "rsp";
   const debugSub = sources[0] || null;
   const listeners = [rspPosition, ...(Array.isArray(seatingPositions) ? seatingPositions : [])].filter(Boolean);
+
+  // PASS 2 — Mode-bank reuse: prepare the room mode bank once per request.
+  // The mode bank depends only on room dimensions, absorption, Q strategy and
+  // frequency range — never on the source or listener position. Reusing it
+  // across all N×M simulations eliminates redundant mode computation with
+  // zero acoustic delta (validated: complex-response numerical delta = 0).
+  const engineOptionsBase = {
+    surfaceAbsorption: physics.surfaceAbsorption,
+    freqMinHz: 15,
+    freqMaxHz: 200,
+    smoothing: "none",
+    axialQ: physics.axialQ,
+    qStrategy: qStrategyOverride,
+    rewModalBandwidthScale: physics.rewModalBandwidthScale,
+    enableRewCoreReflections: physics.enableRewCoreReflections,
+    rewParityFieldMode: physics.rewParityFieldMode,
+    abApplyModeMultiplicity: qStrategyOverride === "ab_corrected",
+    roomIsSealed: qStrategyOverride === "ab_corrected",
+    abMidbandQScale: 1,
+    overrideConstantAxialQ: physics.overrideConstantAxialQ,
+    overrideAbsorptionAxialQ: physics.overrideAbsorptionAxialQ,
+    debugMode200Multiplier: physics.debugMode200Multiplier,
+    debugModalPhaseConvention: "normal",
+    reflectionGainScale: physics.reflectionGainScale,
+    debugModalHSign: "normal",
+    rewParityModalMagnitudeScale: physics.rewSourceCurveMode === "flat_rew_reference" ? physics.rewParityModalMagnitudeScale : 1,
+    modalCoherenceMode: physics.modalCoherenceMode,
+    highOrderAxialScale: physics.highOrderAxialScale,
+    mute68HzAxialMode: physics.mute68HzAxialMode,
+    debugDisableModalContribution: physics.debugDisableModalContribution,
+    disableReflectionPhaseJitter: physics.disableReflectionPhaseJitter,
+    disableReflectionCoherenceWeight: physics.disableReflectionCoherenceWeight,
+    disableLateField: physics.disableLateField,
+    disableModalPropagationPhase: physics.rewSourceCurveMode === "flat_rew_reference" ? true : physics.disableModalPropagationPhase,
+    modalSourceReferenceMode: physics.modalSourceReferenceMode,
+    modalGainScalar: physics.modalGainScalar,
+    modalDistanceBlend: physics.modalDistanceBlend,
+    modalStorageMode: physics.modalStorageMode,
+    propagationPhaseScale: physics.propagationPhaseScale,
+  };
+  const precomputedModes = prepareModeBank(roomDims, { ...engineOptionsBase, enableModes: true });
+
+  // PASS 2 — Per-source RSP complex transfers: run N flat-source simulations
+  // for the RSP listener only (reusing the same precomputed mode bank). This
+  // produces the dimensionless room transfer data required by paired P14/P18
+  // capability logic without a separate full normalized room simulation.
+  const perSourceRspComplexTransfers = [];
+  if (rspPosition && Number.isFinite(rspPosition.x) && Number.isFinite(rspPosition.y)) {
+    const rspListenerZ = Number.isFinite(Number(rspPosition.z)) ? Number(rspPosition.z) : 1.2;
+    sources.forEach((sub, sourceIndex) => {
+      if (!Number.isFinite(sub?.x) || !Number.isFinite(sub?.y) || !Number.isFinite(sub?.z)) return;
+      try {
+        const flatResult = simulateBassResponseRewCore(
+          roomDims,
+          { x: rspPosition.x, y: rspPosition.y, z: rspListenerZ },
+          sub,
+          FLAT_SOURCE_CURVE,
+          { ...engineOptionsBase, precomputedModes }
+        );
+        perSourceRspComplexTransfers.push({
+          sourceIndex,
+          sourceId: sub?.id || null,
+          amplitudeDomain: "pressure amplitude relative to 20 µPa",
+          sourceReferenceDb: REFERENCE_SOURCE_DB,
+          sourceReferenceAmplitude: REFERENCE_SOURCE_AMPLITUDE,
+          dimensionlessTransferOperation: "complexPressure / sourceReferenceAmplitude",
+          points: (flatResult.freqsHz || []).map((frequency, index) => ({
+            frequency,
+            re: flatResult.complexPressure[index]?.re ?? null,
+            im: flatResult.complexPressure[index]?.im ?? null,
+          })),
+        });
+      } catch {
+        // Per-source transfer capture failure is non-fatal — the main
+        // simulation still produces the authoritative response. The
+        // downstream consumer handles missing transfer data gracefully.
+      }
+    });
+  }
+
   listeners.forEach((seat) => {
     const seatId = seat.id || `${seat.x}-${seat.y}`;
     let freqsHz = null;
@@ -101,6 +190,7 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
             qStrategy: qStrategyOverride,
             rewModalBandwidthScale: physics.rewModalBandwidthScale,
             runtimeVectorCapture: physics.runtimeVectorCapture,
+            precomputedModes,
           });
       if (stepDebug === null && seatId === debugSeatId && sub === debugSub && result.stepDebug?.length > 0) {
         stepDebug = result.stepDebug;
@@ -167,5 +257,6 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
       plottedGraphValueDb: 20 * Math.log10(Math.max(finalMagnitude, 1e-10)) };
   });
   return { seatResponses, metrics: null, audit: null, stepDebug, wholeCurveDebugRows,
-    activeModalVectorPath, amplifierAuthority, runtimeVectorCapture: { rows: runtimeRows } };
+    activeModalVectorPath, amplifierAuthority, runtimeVectorCapture: { rows: runtimeRows },
+    perSourceRspComplexTransfers };
 }

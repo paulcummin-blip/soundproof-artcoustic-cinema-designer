@@ -27,6 +27,7 @@ import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 import { useRecommendationGate } from "@/components/state/recommendationGateStore";
 import { getBassHeavyAction, cancelBassHeavyAction } from "./bassHeavyActionStore";
+import { createManualBassTimingTrace } from "./manualBassTimingDiagnostics";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -83,23 +84,31 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   } = authoritative;
   const calibrationFingerprint = fingerprints?.calibration ?? null;
   const normalizedPhysicsOptions = useNormalizedPhysicsOptions(authoritative);
+  // PASS 2: The normalized room-transfer hook is NO LONGER driven by the manual
+  // Calculate request. perSourceRspComplexTransfers now come from the
+  // authoritative simulation itself (flat-source RSP transfers, same mode
+  // bank). The hook is retained for potential non-manual live features but
+  // stays idle during manual Calculate (no analysisRequestId passed).
   const normalizedLive = useNormalizedRoomTransferLive({
     roomDims,
     rspPosition,
     seatingPositions,
     subsForSimulation: sources,
     physicsOptions: normalizedPhysicsOptions,
-    analysisRequestId: manualAnalysisRequest?.id || null,
-    analysisRequestFingerprint: manualAnalysisRequest?.normalizedFingerprint || null,
+    analysisRequestId: null,
+    analysisRequestFingerprint: null,
   });
-  const normalizedTransferReady = normalizedLive.status === "ready" && normalizedLive.quality === "refined";
+  // PASS 2: Use perSourceRspComplexTransfers from the authoritative simulation.
+  // The authoritative engine produces these from a flat 94 dB source (same
+  // physics as the normalized engine) reusing the same precomputed mode bank.
+  const authoritativeTransferReady = authoritative.status === "ready" && (authoritative.perSourceRspComplexTransfers?.length || 0) > 0;
   const payload = useMemo(() => ({
     ...basePayload,
-    perSourceComplexTransfers: normalizedTransferReady ? normalizedLive.result?.perSourceRspComplexTransfers || [] : [],
-    normalizedTransferFingerprint: normalizedTransferReady ? normalizedLive.geometryFingerprint : null,
+    perSourceComplexTransfers: authoritativeTransferReady ? authoritative.perSourceRspComplexTransfers || [] : [],
+    normalizedTransferFingerprint: authoritativeTransferReady ? fingerprints?.geometry ?? null : null,
     calibrationFingerprint: fingerprints?.calibration ?? null,
-  }), [basePayload, normalizedTransferReady, normalizedLive.result, normalizedLive.geometryFingerprint, fingerprints]);
-  const inputsValid = baseInputsValid && normalizedTransferReady;
+  }), [basePayload, authoritativeTransferReady, authoritative.perSourceRspComplexTransfers, fingerprints]);
+  const inputsValid = baseInputsValid && authoritativeTransferReady;
   // #1: Real project hydration authority. appState.isProjectHydrationReady is
   // set false at the start of useProjectLoader.loadProject and set true in its
   // finally block — the single existing flag that means the current Project
@@ -201,9 +210,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && cacheKey
     && completedFingerprint === cacheKey;
 
+  // PASS 2: manualRequestMatchesCurrent no longer depends on the normalized
+  // transfer fingerprint. The cacheKey (full calibration fingerprint) captures
+  // the complete design identity — geometry, product, target. That is
+  // sufficient to confirm the request is still valid.
   const manualRequestMatchesCurrent = !!manualAnalysisRequest
-    && manualAnalysisRequest.fingerprint === cacheKey
-    && manualAnalysisRequest.normalizedFingerprint === normalizedLive.geometryFingerprint;
+    && manualAnalysisRequest.fingerprint === cacheKey;
   const canCalculate = isProjectHydrationReady
     && bassAuthorityHydrationSettled
     && !!fingerprints
@@ -261,21 +273,76 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     OPTIMISER_VERSION_SIGNATURE,
   ]);
 
-  // Once both authoritative raw response preparations have completed for the
-  // exact submitted fingerprint, dispatch exactly one existing full optimiser
-  // run. Geometry changes cannot reach this branch because they invalidate the
+  // PASS 1 — Preparation watchdog: covers the entire preparation phase
+  // (authoritative simulation) from request acceptance to optimiser dispatch.
+  // Bounded at 90 seconds — generous for development/debugging, but finite.
+  // When it fires: terminate the request, mark failed, clear calculating state,
+  // and prevent stale workers from publishing. Fingerprint-specific so an old
+  // timeout cannot kill a newer calculation.
+  const PREPARATION_WATCHDOG_MS = 90000;
+  const preparationWatchdogRef = useRef(null);
+  const timingTraceRef = useRef(null);
+
+  useEffect(() => {
+    if (!manualAnalysisRequest) {
+      // No active manual request — clear any stale watchdog.
+      if (preparationWatchdogRef.current) {
+        clearTimeout(preparationWatchdogRef.current);
+        preparationWatchdogRef.current = null;
+      }
+      return;
+    }
+    // Start watchdog when a new manual request is accepted.
+    if (preparationWatchdogRef.current) {
+      clearTimeout(preparationWatchdogRef.current);
+    }
+    const requestFingerprint = manualAnalysisRequest.fingerprint;
+    const requestId = manualAnalysisRequest.id;
+    preparationWatchdogRef.current = setTimeout(() => {
+      // Guard: only fire if this exact request is still pending.
+      if (!manualAnalysisRequest || manualAnalysisRequest.id !== requestId || manualAnalysisRequest.fingerprint !== requestFingerprint) return;
+      if (dispatchedManualRequestRef.current === requestId) return; // Already dispatched to optimiser.
+      const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
+      if (isDev) console.log("[bass-prep-watchdog]", "TIMEOUT", { requestId, requestFingerprint });
+      if (timingTraceRef.current) timingTraceRef.current.mark("preparationTimeoutMs");
+      markBassAuthorityFailed(scopeId, requestFingerprint, "Bass preparation timed out — please retry.");
+      dispatchedManualRequestRef.current = null;
+      setManualAnalysisRequest(null);
+    }, PREPARATION_WATCHDOG_MS);
+    return () => {
+      if (preparationWatchdogRef.current) {
+        clearTimeout(preparationWatchdogRef.current);
+        preparationWatchdogRef.current = null;
+      }
+    };
+  }, [manualAnalysisRequest?.id, manualAnalysisRequest?.fingerprint, scopeId]);
+
+  // Once the authoritative raw response preparation has completed for the exact
+  // submitted fingerprint, dispatch exactly one existing full optimiser run.
+  // Geometry changes cannot reach this branch because they invalidate the
   // submitted identity above.
   useEffect(() => {
     if (!manualRequestMatchesCurrent || !manualAnalysisRequest) return;
-    if (authoritative.status === "error" || normalizedLive.status === "error") {
-      markBassAuthorityFailed(scopeId, cacheKey, authoritative.reason || normalizedLive.errorMessage || "Bass analysis preparation failed");
+    // PASS 1 — Problem A: Authoritative preparation failure must be terminal.
+    // The authoritative engine is the sole preparation path on the manual
+    // workflow. Its failure must immediately terminate the request, clear
+    // calculating state, and surface a concise error. No stranded spinner.
+    if (authoritative.status === "error") {
+      if (timingTraceRef.current) timingTraceRef.current.mark("preparationFailMs");
+      markBassAuthorityFailed(scopeId, cacheKey, authoritative.reason || "Bass analysis preparation failed");
       dispatchedManualRequestRef.current = null;
       setManualAnalysisRequest(null);
       return;
     }
-    if (!inputsValid || !normalizedTransferReady) return;
+    if (!inputsValid) return;
     if (dispatchedManualRequestRef.current === manualAnalysisRequest.id) return;
 
+    // Clear the preparation watchdog — preparation is complete.
+    if (preparationWatchdogRef.current) {
+      clearTimeout(preparationWatchdogRef.current);
+      preparationWatchdogRef.current = null;
+    }
+    if (timingTraceRef.current) timingTraceRef.current.mark("optimiserStartMs");
     dispatchedManualRequestRef.current = manualAnalysisRequest.id;
     controller.requestManual({
       fingerprint: cacheKey,
@@ -292,10 +359,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     manualRequestMatchesCurrent,
     authoritative.status,
     authoritative.reason,
-    normalizedLive.status,
-    normalizedLive.errorMessage,
     inputsValid,
-    normalizedTransferReady,
     cacheKey,
     payload,
     requestIdentity,
@@ -473,6 +537,22 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     collectDiagnostics: includeDiagnostics,
     metricPublication,
   });
+  // PASS 1: Mark authoritative preparation completion for timing diagnostics.
+  useEffect(() => {
+    if (!manualAnalysisRequest || !manualRequestMatchesCurrent) return;
+    if (authoritative.status === "ready" && timingTraceRef.current && timingTraceRef.current.trace.authoritativeCompleteMs === null) {
+      timingTraceRef.current.mark("authoritativeCompleteMs");
+    }
+  }, [authoritative.status, manualAnalysisRequest, manualRequestMatchesCurrent]);
+
+  // PASS 1: Mark optimiser completion for timing diagnostics.
+  useEffect(() => {
+    if (!manualAnalysisRequest || !manualRequestMatchesCurrent) return;
+    if (lifecycle.status === "ready" && lifecycle.resultFingerprint === cacheKey && timingTraceRef.current && timingTraceRef.current.trace.optimiserCompleteMs === null) {
+      timingTraceRef.current.mark("optimiserCompleteMs");
+    }
+  }, [lifecycle.status, lifecycle.resultFingerprint, cacheKey, manualAnalysisRequest, manualRequestMatchesCurrent]);
+
   const publishedContractTokensRef = useRef(new Set());
   useEffect(() => {
     // #1: Do not publish/promote/sync while the project record is still
@@ -564,6 +644,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       return;
     }
     const published = publishCompletedBassContract(scopeId, contract);
+    if (published && timingTraceRef.current && timingTraceRef.current.trace.publicationMs === null) {
+      timingTraceRef.current.mark("publicationMs");
+    }
     if (!published && !hasAuthoritativeResult(scopeId, cacheKey)) {
       markBassAuthorityUpdating(scopeId, cacheKey);
     }
@@ -636,16 +719,22 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       dispatchedManualRequestRef.current = null;
       markBassAuthorityUpdating(scopeId, cacheKey);
       const id = `manual-bass-${++manualRequestSequenceRef.current}`;
+      // PASS 2: normalizedFingerprint removed — the authoritative simulation
+      // now provides perSourceRspComplexTransfers directly. The cacheKey
+      // (full calibration fingerprint) is the sole identity check.
       setManualAnalysisRequest({
         id,
         fingerprint: cacheKey,
-        normalizedFingerprint: normalizedLive.geometryFingerprint,
         collectDiagnostics: collectDiagnostics === true,
         diagnosticToken,
       });
+      // PASS 1: Start timing trace for this manual request.
+      timingTraceRef.current = createManualBassTimingTrace(id, cacheKey);
+      timingTraceRef.current.mark("acceptedAtMs");
+      timingTraceRef.current.mark("authoritativeStartMs");
       return { action: "queued", requestId: id, fingerprint: cacheKey };
     },
-    [controller, scopeId, canCalculate, cacheKey, normalizedLive.geometryFingerprint]
+    [controller, scopeId, canCalculate, cacheKey]
   );
   const onRetry = onCalculate;
   // ── P14 target background scheduler ──────────────────────────────────
@@ -800,6 +889,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     return buildFinishedGraphOptimisationResult(completedContract);
   }, [isProjectHydrationReady, optimisationResult, completedContractMatches, completedContract]);
   const effectiveOptimisationResult = optimisationResult || cachedGraphOptimisationResult;
+  // PASS 1: User-facing phase states. Replaces the single ambiguous
+  // long-running message with a small number of useful phases:
+  //   "Preparing bass response…"  — authoritative simulation running
+  //   "Optimising bass performance…" — optimiser worker running
+  //   "Finalising results…" — publication/fingerprint validation
+  // No worker names, calculation counts, frequency samples, or implementation
+  // detail. The designer remains interactive throughout.
   const calculationInProgress = !!manualAnalysisRequest
     && manualRequestMatchesCurrent
     && (
@@ -807,8 +903,34 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       || lifecycle.status === "queued"
       || lifecycle.status === "calculating"
     );
+  const calculationPhase = !calculationInProgress ? null
+    : dispatchedManualRequestRef.current !== manualAnalysisRequest.id
+      ? "preparing"   // Authoritative simulation in flight
+      : lifecycle.status === "queued" || lifecycle.status === "calculating"
+        ? "optimising" // Optimiser worker in flight
+        : "finalising"; // Publication / fingerprint validation
+  const calculationPhaseLabel = calculationPhase === "preparing"
+    ? "Preparing bass response…"
+    : calculationPhase === "optimising"
+      ? "Optimising bass performance…"
+      : calculationPhase === "finalising"
+        ? "Finalising results…"
+        : null;
+
+  // PASS 1: When calculation is no longer in progress, mark the timing trace
+  // as complete and clear the trace ref. This fires on every terminal path:
+  // complete, error, cancelled, stale, or timeout.
+  useEffect(() => {
+    if (!manualAnalysisRequest && timingTraceRef.current) {
+      if (timingTraceRef.current.trace.calculatingClearedMs === null) {
+        timingTraceRef.current.mark("calculatingClearedMs");
+        timingTraceRef.current.finish();
+      }
+      timingTraceRef.current = null;
+    }
+  }, [manualAnalysisRequest]);
   const hasCurrentResult = completedBassAuthority?.authoritative === true
     && completedBassAuthority?.currentFingerprint === cacheKey;
-  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, canCalculate, calculationInProgress, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p14FamilyProgress: targetFamilyProgress });
+  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, canCalculate, calculationInProgress, calculationPhaseLabel, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p14FamilyProgress: targetFamilyProgress });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
