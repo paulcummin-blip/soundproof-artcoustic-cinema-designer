@@ -5,7 +5,8 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import HeightInput from '@/components/ui/HeightInput';
-import BassResultsSummary from '@/components/room/bass/BassResultsSummary';
+import BassResultBlock from '@/components/room/bass/BassResultBlock';
+import BassTerminalStatus from '@/components/room/bass/BassTerminalStatus';
 import BassPostCalculationActions from '@/components/room/bass/BassPostCalculationActions';
 import { useSharedBassResults } from '@/components/room/bass/bassResultsStore';
 import BassTargetLevelControl from '@/components/room/bass/BassTargetLevelControl';
@@ -372,10 +373,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
             {!bassCalculationInProgress && !bassActionDisabled && (
               <p className="mt-2 text-[11px] text-[#625143]">The analysis runs only when you press this button. You can continue editing while it runs.</p>
             )}
+            <BassTerminalStatus />
             {sharedBassResults?.hasCurrentResult && (
-              <div className="mt-4">
-                <BassResultsSummary />
-              </div>
+              <BassResultBlock />
             )}
             <BassPostCalculationActions
               roomDims={roomDimensions}
