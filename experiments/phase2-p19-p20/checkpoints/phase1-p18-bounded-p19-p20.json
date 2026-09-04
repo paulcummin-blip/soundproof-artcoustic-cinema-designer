@@ -1,0 +1,1227 @@
+{
+  "authority": {
+    "smoothing": "production applyBassSmoothing(..., 'third')",
+    "p19Meaning": "maximum absolute RSP-to-practical-target deviation",
+    "p20Meaning": "maximum absolute real-seat-to-RSP deviation",
+    "assessmentStartAuthority": "achieved P18 frequency",
+    "assessmentEndAuthority": "room transition frequency",
+    "belowP18AffectsGrade": false
+  },
+  "generatedAt": "2026-09-04T17:37:07.720Z",
+  "rooms": [
+    {
+      "roomId": "room-b",
+      "roomName": "Room B",
+      "transitionHz": 162.65001215808886,
+      "rows": [
+        {
+          "quantity": 1,
+          "finalist": "current production",
+          "achievedP18Hz": 23.97802712894989,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            23.97802712894989,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 23.983560215326534,
+            "deviationDb": 8.158194576865853,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 53.45392308842035,
+            "deviationDb": 12.017415753200254,
+            "level": 1,
+            "worstSeat": "secondary-centre"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              23.81101577952299
+            ],
+            "p19WorstFrequencyHz": 22.15239218909249,
+            "p19DeviationDb": 13.28288602662515,
+            "p20WorstFrequencyHz": 16.357615989978864,
+            "p20DeviationDb": 11.349048033529684,
+            "p20WorstSeat": "secondary-centre"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 1,
+          "finalist": "practical placement only",
+          "achievedP18Hz": 23.9711164035745,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            23.9711164035745,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 23.983560215326534,
+            "deviationDb": 8.153464826051476,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 53.45392308842035,
+            "deviationDb": 12.036266079852311,
+            "level": 1,
+            "worstSeat": "secondary-centre"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              23.81101577952299
+            ],
+            "p19WorstFrequencyHz": 22.15239218909249,
+            "p19DeviationDb": 13.270233098568,
+            "p20WorstFrequencyHz": 16.357615989978864,
+            "p20DeviationDb": 11.344199739962747,
+            "p20WorstSeat": "secondary-centre"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 1,
+          "finalist": "practical + optimised delay",
+          "achievedP18Hz": 23.9711164035745,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            23.9711164035745,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 23.983560215326534,
+            "deviationDb": 8.153464826051476,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 53.45392308842035,
+            "deviationDb": 12.036266079852311,
+            "level": 1,
+            "worstSeat": "secondary-centre"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              23.81101577952299
+            ],
+            "p19WorstFrequencyHz": 22.15239218909249,
+            "p19DeviationDb": 13.270233098568,
+            "p20WorstFrequencyHz": 16.357615989978864,
+            "p20DeviationDb": 11.344199739962747,
+            "p20WorstSeat": "secondary-centre"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 1,
+          "finalist": "practical + optimised level/delay",
+          "achievedP18Hz": 23.9711164035745,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            23.9711164035745,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 23.983560215326534,
+            "deviationDb": 8.153464826051476,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 53.45392308842035,
+            "deviationDb": 12.036266079852311,
+            "level": 1,
+            "worstSeat": "secondary-centre"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              23.81101577952299
+            ],
+            "p19WorstFrequencyHz": 22.15239218909249,
+            "p19DeviationDb": 13.270233098568,
+            "p20WorstFrequencyHz": 16.357615989978864,
+            "p20DeviationDb": 11.344199739962747,
+            "p20WorstSeat": "secondary-centre"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 1,
+          "finalist": "unrestricted + optimised level/delay",
+          "achievedP18Hz": 23.9711164035745,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            23.9711164035745,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 23.983560215326534,
+            "deviationDb": 8.153464826051476,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 53.45392308842035,
+            "deviationDb": 12.036266079852311,
+            "level": 1,
+            "worstSeat": "secondary-centre"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              23.81101577952299
+            ],
+            "p19WorstFrequencyHz": 22.15239218909249,
+            "p19DeviationDb": 13.270233098568,
+            "p20WorstFrequencyHz": 16.357615989978864,
+            "p20DeviationDb": 11.344199739962747,
+            "p20WorstSeat": "secondary-centre"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 2,
+          "finalist": "current production",
+          "achievedP18Hz": 17.19997378042133,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            17.19997378042133,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 17.205611499597115,
+            "deviationDb": 8.333914047676416,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 17.330290453084093,
+            "deviationDb": 10.71740914954239,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              17.08182952135037
+            ],
+            "p19WorstFrequencyHz": 15,
+            "p19DeviationDb": 9.095410403593746,
+            "p20WorstFrequencyHz": 17.08182952135037,
+            "p20DeviationDb": 10.513527245520663,
+            "p20WorstSeat": "secondary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 2,
+          "finalist": "practical placement only",
+          "achievedP18Hz": 23.073509811444836,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            23.073509811444836,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 23.133162381119114,
+            "deviationDb": 7.805123706426244,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 93.20317924708232,
+            "deviationDb": 12.151815151115727,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              22.966735945028482
+            ],
+            "p19WorstFrequencyHz": 21.213203435596427,
+            "p19DeviationDb": 10.946065860177526,
+            "p20WorstFrequencyHz": 17.330290453084093,
+            "p20DeviationDb": 11.2346002143871,
+            "p20WorstSeat": "secondary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 2,
+          "finalist": "practical + optimised delay",
+          "achievedP18Hz": 16.392885652223697,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            16.392885652223697,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 16.476150018439302,
+            "deviationDb": 8.242042919988776,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 65.90460007375721,
+            "deviationDb": 7.484707994733327,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              16.357615989978864
+            ],
+            "p19WorstFrequencyHz": 15,
+            "p19DeviationDb": 9.135545593149232,
+            "p20WorstFrequencyHz": 15,
+            "p20DeviationDb": 0,
+            "p20WorstSeat": "primary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 2,
+          "finalist": "practical + optimised level/delay",
+          "achievedP18Hz": 16.861518873201735,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            16.861518873201735,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 16.958938065253285,
+            "deviationDb": 7.877422838957401,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 93.20317924708232,
+            "deviationDb": 12.180113663015874,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              16.836930724640595
+            ],
+            "p19WorstFrequencyHz": 15,
+            "p19DeviationDb": 9.117740900908075,
+            "p20WorstFrequencyHz": 15,
+            "p20DeviationDb": 0,
+            "p20WorstSeat": "primary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 2,
+          "finalist": "unrestricted + optimised level/delay",
+          "achievedP18Hz": 16.861518873201735,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            16.861518873201735,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 16.958938065253285,
+            "deviationDb": 7.877422838957401,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 93.20317924708232,
+            "deviationDb": 12.180113663015874,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              16.836930724640595
+            ],
+            "p19WorstFrequencyHz": 15,
+            "p19DeviationDb": 9.117740900908075,
+            "p20WorstFrequencyHz": 15,
+            "p20DeviationDb": 0,
+            "p20WorstSeat": "primary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 4,
+          "finalist": "current production",
+          "achievedP18Hz": 15,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            15,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 15,
+            "deviationDb": 7.0934818646928335,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 51.93219366036858,
+            "deviationDb": 18.50091532638949,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": null,
+            "p19WorstFrequencyHz": null,
+            "p19DeviationDb": null,
+            "p20WorstFrequencyHz": null,
+            "p20DeviationDb": null,
+            "p20WorstSeat": null
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 4,
+          "finalist": "practical placement only",
+          "achievedP18Hz": 15,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            15,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 15,
+            "deviationDb": 7.750171731431266,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 53.45392308842035,
+            "deviationDb": 14.369584246409389,
+            "level": 1,
+            "worstSeat": "secondary-centre"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": null,
+            "p19WorstFrequencyHz": null,
+            "p19DeviationDb": null,
+            "p20WorstFrequencyHz": null,
+            "p20DeviationDb": null,
+            "p20WorstSeat": null
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 4,
+          "finalist": "practical + optimised delay",
+          "achievedP18Hz": 15,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            15,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 15,
+            "deviationDb": 6.172171969471293,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 138.64232362467277,
+            "deviationDb": 11.516123627851215,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": null,
+            "p19WorstFrequencyHz": null,
+            "p19DeviationDb": null,
+            "p20WorstFrequencyHz": null,
+            "p20DeviationDb": null,
+            "p20WorstSeat": null
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 4,
+          "finalist": "practical + optimised level/delay",
+          "achievedP18Hz": 15,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            15,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 15,
+            "deviationDb": 6.169468441600586,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 90.54986565560537,
+            "deviationDb": 6.4416196556129535,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": null,
+            "p19WorstFrequencyHz": null,
+            "p19DeviationDb": null,
+            "p20WorstFrequencyHz": null,
+            "p20DeviationDb": null,
+            "p20WorstSeat": null
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        },
+        {
+          "quantity": 4,
+          "finalist": "unrestricted + optimised level/delay",
+          "achievedP18Hz": 15,
+          "transitionHz": 162.65001215808886,
+          "assessmentBandHz": [
+            15,
+            162.65001215808886
+          ],
+          "p19": {
+            "worstFrequencyHz": 15,
+            "deviationDb": 6.169468441600586,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 90.54986565560537,
+            "deviationDb": 6.4416196556129535,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": null,
+            "p19WorstFrequencyHz": null,
+            "p19DeviationDb": null,
+            "p20WorstFrequencyHz": null,
+            "p20DeviationDb": null,
+            "p20WorstSeat": null
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-b.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": 0
+          }
+        }
+      ]
+    },
+    {
+      "roomId": "room-c",
+      "roomName": "Room C",
+      "transitionHz": 128.30005981991684,
+      "rows": [
+        {
+          "quantity": 1,
+          "finalist": "current production",
+          "achievedP18Hz": 20.845614945974724,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            20.845614945974724,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 20.909073951734992,
+            "deviationDb": 6.820556887785955,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 34.911745763327325,
+            "deviationDb": 15.930534771821442,
+            "level": 1,
+            "worstSeat": "secondary-right"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              20.758648229457478
+            ],
+            "p19WorstFrequencyHz": 16.836930724640595,
+            "p19DeviationDb": 9.110078319676049,
+            "p20WorstFrequencyHz": 19.173705353406458,
+            "p20DeviationDb": 5.006120656636213,
+            "p20WorstSeat": "primary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 1,
+          "finalist": "practical placement only",
+          "achievedP18Hz": 19.339947431360887,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            19.339947431360887,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 19.452593319765146,
+            "deviationDb": 8.292253878293437,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 45.27493282780269,
+            "deviationDb": 18.336707417417216,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              19.31264592625308
+            ],
+            "p19WorstFrequencyHz": 15,
+            "p19DeviationDb": 11.856834224668916,
+            "p20WorstFrequencyHz": 15,
+            "p20DeviationDb": 0,
+            "p20WorstSeat": "primary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 1,
+          "finalist": "practical + optimised delay",
+          "achievedP18Hz": 19.339947431360887,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            19.339947431360887,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 19.452593319765146,
+            "deviationDb": 8.292253878293437,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 45.27493282780269,
+            "deviationDb": 18.336707417417216,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              19.31264592625308
+            ],
+            "p19WorstFrequencyHz": 15,
+            "p19DeviationDb": 11.856834224668916,
+            "p20WorstFrequencyHz": 15,
+            "p20DeviationDb": 0,
+            "p20WorstSeat": "primary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 1,
+          "finalist": "practical + optimised level/delay",
+          "achievedP18Hz": 19.339947431360887,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            19.339947431360887,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 19.452593319765146,
+            "deviationDb": 8.292253878293437,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 45.27493282780269,
+            "deviationDb": 18.336707417417216,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              19.31264592625308
+            ],
+            "p19WorstFrequencyHz": 15,
+            "p19DeviationDb": 11.856834224668916,
+            "p20WorstFrequencyHz": 15,
+            "p20DeviationDb": 0,
+            "p20WorstSeat": "primary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 1,
+          "finalist": "unrestricted + optimised level/delay",
+          "achievedP18Hz": 19.339947431360887,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            19.339947431360887,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 19.452593319765146,
+            "deviationDb": 8.292253878293437,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 45.27493282780269,
+            "deviationDb": 18.336707417417216,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              19.31264592625308
+            ],
+            "p19WorstFrequencyHz": 15,
+            "p19DeviationDb": 11.856834224668916,
+            "p20WorstFrequencyHz": 15,
+            "p20DeviationDb": 0,
+            "p20WorstSeat": "primary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 2,
+          "finalist": "current production",
+          "achievedP18Hz": 20.17924050147771,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            20.17924050147771,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 20.313833204053388,
+            "deviationDb": 7.877439626489718,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 45.27493282780269,
+            "deviationDb": 10.346717109981796,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              20.167689810089687
+            ],
+            "p19WorstFrequencyHz": 18.76285238554493,
+            "p19DeviationDb": 9.897535586642974,
+            "p20WorstFrequencyHz": 15,
+            "p20DeviationDb": 10.528132145574787,
+            "p20WorstSeat": "secondary-centre"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 2,
+          "finalist": "practical placement only",
+          "achievedP18Hz": 16.366043959753217,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            16.366043959753217,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 16.476150018439302,
+            "deviationDb": 8.66953190016929,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 45.27493282780269,
+            "deviationDb": 18.35785519497675,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              16.357615989978864
+            ],
+            "p19WorstFrequencyHz": 15,
+            "p19DeviationDb": 9.236278571708155,
+            "p20WorstFrequencyHz": 16.357615989978864,
+            "p20DeviationDb": 0.3723468457881012,
+            "p20WorstSeat": "secondary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 2,
+          "finalist": "practical + optimised delay",
+          "achievedP18Hz": 17.716931671657388,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            17.716931671657388,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 17.838106725040817,
+            "deviationDb": 6.7848809093391935,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 116.58383293843272,
+            "deviationDb": 12.636192950480464,
+            "level": 1,
+            "worstSeat": "primary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              17.709774399354295
+            ],
+            "p19WorstFrequencyHz": 15,
+            "p19DeviationDb": 8.992784482432583,
+            "p20WorstFrequencyHz": 15,
+            "p20DeviationDb": 0,
+            "p20WorstSeat": "primary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 2,
+          "finalist": "practical + optimised level/delay",
+          "achievedP18Hz": 17.734906039251303,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            17.734906039251303,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 17.838106725040817,
+            "deviationDb": 6.766300159494463,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 77.25058370501233,
+            "deviationDb": 12.244685135976539,
+            "level": 1,
+            "worstSeat": "primary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              17.709774399354295
+            ],
+            "p19WorstFrequencyHz": 15,
+            "p19DeviationDb": 8.97713919843659,
+            "p20WorstFrequencyHz": 15,
+            "p20DeviationDb": 0,
+            "p20WorstSeat": "primary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 2,
+          "finalist": "unrestricted + optimised level/delay",
+          "achievedP18Hz": 17.734906039251303,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            17.734906039251303,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 17.838106725040817,
+            "deviationDb": 6.766300159494463,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 77.25058370501233,
+            "deviationDb": 12.244685135976539,
+            "level": 1,
+            "worstSeat": "primary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": [
+              15,
+              17.709774399354295
+            ],
+            "p19WorstFrequencyHz": 15,
+            "p19DeviationDb": 8.97713919843659,
+            "p20WorstFrequencyHz": 15,
+            "p20DeviationDb": 0,
+            "p20WorstSeat": "primary-left"
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 4,
+          "finalist": "current production",
+          "achievedP18Hz": 15,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            15,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 15,
+            "deviationDb": 6.921756326591421,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 47.622031559045986,
+            "deviationDb": 20.94586793235095,
+            "level": 1,
+            "worstSeat": "secondary-left"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": null,
+            "p19WorstFrequencyHz": null,
+            "p19DeviationDb": null,
+            "p20WorstFrequencyHz": null,
+            "p20DeviationDb": null,
+            "p20WorstSeat": null
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 4,
+          "finalist": "practical placement only",
+          "achievedP18Hz": 15,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            15,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 15,
+            "deviationDb": 7.2142279223351125,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 44.30478437818498,
+            "deviationDb": 18.79475908410987,
+            "level": 1,
+            "worstSeat": "secondary-right"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": null,
+            "p19WorstFrequencyHz": null,
+            "p19DeviationDb": null,
+            "p20WorstFrequencyHz": null,
+            "p20DeviationDb": null,
+            "p20WorstSeat": null
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 4,
+          "finalist": "practical + optimised delay",
+          "achievedP18Hz": 15,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            15,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 15,
+            "deviationDb": 6.169253566821737,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 40.335379620179374,
+            "deviationDb": 10.297858277479136,
+            "level": 1,
+            "worstSeat": "secondary-right"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": null,
+            "p19WorstFrequencyHz": null,
+            "p19DeviationDb": null,
+            "p20WorstFrequencyHz": null,
+            "p20DeviationDb": null,
+            "p20WorstSeat": null
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 4,
+          "finalist": "practical + optimised level/delay",
+          "achievedP18Hz": 15,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            15,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 15,
+            "deviationDb": 6.168466489738876,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 36.457420799414066,
+            "deviationDb": 13.883001436560576,
+            "level": 1,
+            "worstSeat": "secondary-centre"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": null,
+            "p19WorstFrequencyHz": null,
+            "p19DeviationDb": null,
+            "p20WorstFrequencyHz": null,
+            "p20DeviationDb": null,
+            "p20WorstSeat": null
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        },
+        {
+          "quantity": 4,
+          "finalist": "unrestricted + optimised level/delay",
+          "achievedP18Hz": 15,
+          "transitionHz": 128.30005981991684,
+          "assessmentBandHz": [
+            15,
+            128.30005981991684
+          ],
+          "p19": {
+            "worstFrequencyHz": 15,
+            "deviationDb": 6.170428119151822,
+            "level": 0
+          },
+          "p20": {
+            "worstFrequencyHz": 48.31470995847763,
+            "deviationDb": 20.268773046335667,
+            "level": 1,
+            "worstSeat": "secondary-centre"
+          },
+          "belowP18DiagnosticOnly": {
+            "affectsOfficialGrade": false,
+            "assessedBandHz": null,
+            "p19WorstFrequencyHz": null,
+            "p19DeviationDb": null,
+            "p20WorstFrequencyHz": null,
+            "p20DeviationDb": null,
+            "p20WorstSeat": null
+          },
+          "provenance": {
+            "sourceResult": "experiments/phase2-p19-p20/results/room-c.json",
+            "reusedSavedPostEqCurves": true,
+            "reranRoomSearch": false,
+            "reranSimulation": false,
+            "reranOptimiser": false,
+            "targetReconstructionMaxErrorDb": null
+          }
+        }
+      ]
+    }
+  ]
+}
