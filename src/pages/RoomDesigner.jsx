@@ -987,15 +987,23 @@ function RoomDesignerWithState() {
   });
 
 
-  const frontSubsForRendering = React.useMemo(() => {
-    const subs = appState?.subwoofers || [];
-    return subs.filter(s => s?.group === 'front');
-  }, [appState?.subwoofers]);
-
-  const rearSubsForRendering = React.useMemo(() => {
-    const subs = appState?.subwoofers || [];
-    return subs.filter(s => s?.group === 'rear');
-  }, [appState?.subwoofers]);
+  // Canonical rendering authority: derive front/rear rendering arrays directly
+  // from subwooferInstances via bassInputAdapter. This eliminates the one-frame
+  // delay of the legacy useSubwooferSync → appState.subwoofers path, so quantity
+  // changes (especially decreases) are reflected in the plan immediately.
+  // Side-wall (left/right) instances remain in the canonical collection but are
+  // not forced into front/rear — they are preserved for the bass engine.
+  const { frontSubsForRendering, rearSubsForRendering } = React.useMemo(() => {
+    const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
+    const adapted = bassInputAdapter(instances, {
+      frontOrientation: appState?.frontSubsCfg?.orientation ?? null,
+      rearOrientation: appState?.rearSubsCfg?.orientation ?? null,
+    });
+    return {
+      frontSubsForRendering: adapted.filter(s => s?.group === 'front'),
+      rearSubsForRendering: adapted.filter(s => s?.group === 'rear'),
+    };
+  }, [appState?.subwooferInstances, appState?.frontSubsCfg?.orientation, appState?.rearSubsCfg?.orientation]);
 
   // Single commercial pricing authority for every app surface. Product choices,
   // acoustic treatment and manual extras all enter this one calculation.

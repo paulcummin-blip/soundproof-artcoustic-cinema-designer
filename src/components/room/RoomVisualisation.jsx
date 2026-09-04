@@ -563,16 +563,24 @@ const onHudHeaderMouseDown = useCallback((event) => {
     return true;
   }, [EPS_M]);
 
-  // Clear held draft refs when committed state has caught up
+  // Clear held draft refs when committed state has caught up OR when the
+  // enabled instance count has changed. A stale draft must never be allowed
+  // to preserve a removed sub — if the count differs, clear immediately.
   useEffect(() => {
-    if (_lastValidDraftFrontSubsRef.current &&
-        areSubsEffectivelyEqual(_lastValidDraftFrontSubsRef.current, frontSubs)) {
-      _lastValidDraftFrontSubsRef.current = null;
+    if (_lastValidDraftFrontSubsRef.current) {
+      const held = _lastValidDraftFrontSubsRef.current;
+      const committed = Array.isArray(frontSubs) ? frontSubs : [];
+      if (held.length !== committed.length || areSubsEffectivelyEqual(held, committed)) {
+        _lastValidDraftFrontSubsRef.current = null;
+      }
     }
 
-    if (_lastValidDraftRearSubsRef.current &&
-        areSubsEffectivelyEqual(_lastValidDraftRearSubsRef.current, rearSubs)) {
-      _lastValidDraftRearSubsRef.current = null;
+    if (_lastValidDraftRearSubsRef.current) {
+      const held = _lastValidDraftRearSubsRef.current;
+      const committed = Array.isArray(rearSubs) ? rearSubs : [];
+      if (held.length !== committed.length || areSubsEffectivelyEqual(held, committed)) {
+        _lastValidDraftRearSubsRef.current = null;
+      }
     }
   }, [frontSubs, rearSubs, areSubsEffectivelyEqual]);
 
@@ -2148,8 +2156,10 @@ const idsGrid = (ids && ids.grid) ? ids.grid : 'b44_grid_fallback';
 const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
 
   // Derive frontSubs and rearSubs: empty array when config is inactive
-  const frontSubsActive = Array.isArray(frontSubs) && Number(frontSubsCfg?.count) > 0 && frontSubsCfg?.model;
-  const rearSubsActive = Array.isArray(rearSubs) && Number(rearSubsCfg?.count) > 0 && rearSubsCfg?.model;
+  // Rendering gate derives from the actual rendering array (canonical instances
+  // via bassInputAdapter), not the CFG mirror which may lag one frame.
+  const frontSubsActive = Array.isArray(frontSubs) && frontSubs.length > 0;
+  const rearSubsActive = Array.isArray(rearSubs) && rearSubs.length > 0;
   const safeFrontSubs = frontSubsActive ? frontSubs : [];
   const safeRearSubs = rearSubsActive ? rearSubs : [];
 
