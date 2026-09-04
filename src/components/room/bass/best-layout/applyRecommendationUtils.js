@@ -3,11 +3,47 @@
 // room-plan subwoofer objects.
 
 import { generateStableId } from "@/components/utils/subwooferInstanceMigration";
+import { deriveSubWallOrientation, subHalfExtents } from "@/components/room/rv/utils/subWallOrientation";
 
 export const COORDINATE_TOLERANCE_M = 0.01; // 10 mm
 
-// Only front and rear placements are supported by the app's subwoofer config.
-export const SUPPORTED_PLACEMENTS = ["front", "rear"];
+// All placement groups are supported — front, rear, left, right walls.
+export const SUPPORTED_PLACEMENTS = ["front", "rear", "left", "right"];
+
+const CABINET_CLEARANCE_M = 0.01; // 10 mm cabinet-to-wall clearance
+
+/**
+ * Adjust a recommendation source position so the entire cabinet footprint
+ * sits inside the room. Determines wall orientation and clamps the cabinet
+ * centre to keep the cabinet clear of all walls. Does not alter the acoustic
+ * fractional position more than necessary for the physical cabinet footprint.
+ *
+ * Returns a new source object with adjusted x/y and a rotationDeg field
+ * (0 for front/rear walls, 90 for left/right walls).
+ */
+export function adjustSourceForCabinet(source, roomDims, cabWidthM, cabDepthM) {
+  const x = Number(source?.x);
+  const y = Number(source?.y);
+  const W = Number(roomDims?.widthM) || 0;
+  const L = Number(roomDims?.lengthM) || 0;
+  if (!Number.isFinite(x) || !Number.isFinite(y) || W <= 0 || L <= 0) {
+    return { ...source };
+  }
+  const { rotationDeg } = deriveSubWallOrientation({
+    x, y, widthM: W, lengthM: L, subWidthM: cabWidthM, subDepthM: cabDepthM,
+  });
+  const { halfX, halfY } = subHalfExtents(cabWidthM, cabDepthM, rotationDeg);
+  const minX = halfX + CABINET_CLEARANCE_M;
+  const maxX = W - halfX - CABINET_CLEARANCE_M;
+  const minY = halfY + CABINET_CLEARANCE_M;
+  const maxY = L - halfY - CABINET_CLEARANCE_M;
+  return {
+    ...source,
+    x: Math.max(minX, Math.min(maxX, x)),
+    y: Math.max(minY, Math.min(maxY, y)),
+    rotationDeg,
+  };
+}
 
 const roundCoord = (value) => Number(Number(value || 0).toFixed(6));
 
@@ -42,8 +78,9 @@ function unorderedGroupMatch(currentGroup, recommendedGroup, tolerance) {
  * Only front and rear placements can be applied to the app's subwoofer config.
  */
 export function hasUnsupportedPlacement(layout) {
-  if (!layout?.sources) return false;
-  return layout.sources.some((s) => !SUPPORTED_PLACEMENTS.includes(s?.placement));
+  // All placement groups (front, rear, left, right) are now supported.
+  // Retained for backward compatibility — always returns false.
+  return false;
 }
 
 /**
@@ -91,10 +128,6 @@ export function validateRecommendationLayout(layout, roomDims) {
     }
     if (x < margin || x > width - margin || y < margin || y > length - margin) {
       return { valid: false, reason: `Sub ${index + 1} is outside the room boundary.`, invalidIndex: index };
-    }
-    const placement = source?.placement;
-    if (!SUPPORTED_PLACEMENTS.includes(placement)) {
-      return { valid: false, reason: `Sub ${index + 1} uses unsupported placement "${placement}". Only front and rear are supported.`, invalidIndex: index };
     }
   }
   return { valid: true, reason: null };
@@ -177,22 +210,18 @@ export function buildAppliedConfigs(layout, frontSubsCfg, rearSubsCfg) {
  * @param {Object} rearSubsCfg - Legacy rear config (for model fallback on new instances)
  * @returns {Array} Updated subwooferInstances[]
  */
-export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, rearSubsCfg) {
+const PLACEMENT_GROUPS = ["front", "rear", "left", "right"];
+const ROTATION_BY_GROUP = { front: 0, rear: 180, left: 90, right: 270 };
+
+export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, rearSubsCfg, modelOverride = null) {
   const instances = Array.isArray(currentInstances) ? currentInstances : [];
-  const frontSources = (layout?.sources || []).filter((s) => s.placement === "front");
-  const rearSources = (layout?.sources || []).filter((s) => s.placement === "rear");
+  const sources = layout?.sources || [];
 
-  // Sort recommended sources by x then y for deterministic assignment
-  const sortSources = (sources) =>
-    sources.slice().sort((a, b) => (Number(a.x) - Number(b.x)) || (Number(a.y) - Number(b.y)));
-  const sortedFront = sortSources(frontSources);
-  const sortedRear = sortSources(rearSources);
+  const sortSources = (srcs) =>
+    srcs.slice().sort((a, b) => (Number(a.x) - Number(b.x)) || (Number(a.y) - Number(b.y)));
 
-  // Build a set of all existing IDs for uniqueness checking
   const existingIds = new Set(instances.filter((i) => i?.id).map((i) => i.id));
 
-  // Track which indices in the original array belong to each group,
-  // split into enabled and disabled for priority matching.
   const buildGroupIndices = (group) => {
     const enabled = [];
     const disabled = [];
@@ -205,47 +234,58 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
     return { enabled, disabled, all: [...enabled, ...disabled] };
   };
 
-  const frontIdx = buildGroupIndices("front");
-  const rearIdx = buildGroupIndices("rear");
+  const resolvedBottomHeight = Number.isFinite(Number(frontSubsCfg?.bottomHeightM))
+    ? Math.max(0, Math.min(2.5, Number(frontSubsCfg.bottomHeightM)))
+    : Number.isFinite(Number(rearSubsCfg?.bottomHeightM))
+      ? Math.max(0, Math.min(2.5, Number(rearSubsCfg.bottomHeightM)))
+      : 0.05;
 
-  // Build updated instances for a group, preserving original array positions
-  const updateGroupInPlace = (groupIdx, sortedSources, cfg, group) => {
-    const result = new Map(); // index → updated instance
+  const groupResults = new Map();
 
-    // Phase 1: Match sorted sources to existing ENABLED instances first
+  for (const group of PLACEMENT_GROUPS) {
+    const groupSrcs = sortSources(sources.filter((s) => s.placement === group));
+    const groupIdx = buildGroupIndices(group);
+
+    // Skip groups with no sources and no existing instances
+    if (groupSrcs.length === 0 && groupIdx.all.length === 0) continue;
+
+    const cfg = group === "front" ? frontSubsCfg : group === "rear" ? rearSubsCfg : null;
+    const cfgModel = modelOverride || cfg?.model || null;
+
+    const result = new Map();
     let sourceIdx = 0;
-    for (let e = 0; e < groupIdx.enabled.length && sourceIdx < sortedSources.length; e++) {
+
+    // Phase 1: Match to enabled instances
+    for (let e = 0; e < groupIdx.enabled.length && sourceIdx < groupSrcs.length; e++) {
       const origIdx = groupIdx.enabled[e];
-      const rec = sortedSources[sourceIdx];
+      const rec = groupSrcs[sourceIdx];
       result.set(origIdx, {
         ...instances[origIdx],
         position: { x: Number(rec.x), y: Number(rec.y) },
         positionSource: "user",
         enabled: true,
+        ...(modelOverride ? { model: modelOverride } : {}),
       });
       sourceIdx++;
     }
 
-    // Phase 2: Re-enable DISABLED instances for remaining sources
-    for (let d = 0; d < groupIdx.disabled.length && sourceIdx < sortedSources.length; d++) {
+    // Phase 2: Re-enable disabled instances
+    for (let d = 0; d < groupIdx.disabled.length && sourceIdx < groupSrcs.length; d++) {
       const origIdx = groupIdx.disabled[d];
-      const rec = sortedSources[sourceIdx];
+      const rec = groupSrcs[sourceIdx];
       result.set(origIdx, {
         ...instances[origIdx],
         position: { x: Number(rec.x), y: Number(rec.y) },
         positionSource: "user",
         enabled: true,
+        ...(modelOverride ? { model: modelOverride } : {}),
       });
       sourceIdx++;
     }
 
-    // Phase 3: Disable excess enabled instances that don't have a matching source
-    const totalMatched = sortedSources.length;
-    const totalGroup = groupIdx.all.length;
-    if (totalMatched < totalGroup) {
-      // How many enabled instances were matched vs how many exist
-      const enabledMatched = Math.min(groupIdx.enabled.length, totalMatched);
-      // Disable remaining enabled instances that weren't matched
+    // Phase 3: Disable excess enabled instances
+    if (groupSrcs.length < groupIdx.all.length) {
+      const enabledMatched = Math.min(groupIdx.enabled.length, groupSrcs.length);
       for (let e = enabledMatched; e < groupIdx.enabled.length; e++) {
         const origIdx = groupIdx.enabled[e];
         if (!result.has(origIdx)) {
@@ -254,12 +294,12 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
       }
     }
 
-    // Phase 4: Create new instances only if disabled were exhausted
+    // Phase 4: Create new instances
     const newInstances = [];
-    if (sourceIdx < sortedSources.length) {
-      const model = String(cfg?.model || "").trim();
-      for (let i = sourceIdx; i < sortedSources.length; i++) {
-        const rec = sortedSources[i];
+    if (sourceIdx < groupSrcs.length) {
+      const model = String(cfgModel || "").trim();
+      for (let i = sourceIdx; i < groupSrcs.length; i++) {
+        const rec = groupSrcs[i];
         newInstances.push({
           id: generateStableId(existingIds, group),
           model,
@@ -267,8 +307,8 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
           position: { x: Number(rec.x), y: Number(rec.y) },
           bottomHeightM: Number.isFinite(Number(cfg?.bottomHeightM))
             ? Math.max(0, Math.min(2.5, Number(cfg.bottomHeightM)))
-            : 0.05,
-          rotationDeg: group === "front" ? 0 : 180,
+            : resolvedBottomHeight,
+          rotationDeg: ROTATION_BY_GROUP[group] ?? 0,
           positionSource: "user",
           legacyGroup: group,
           symmetryLinkId: null,
@@ -279,22 +319,23 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
       }
     }
 
-    return { result, newInstances };
-  };
+    groupResults.set(group, { result, newInstances });
+  }
 
-  const frontResult = updateGroupInPlace(frontIdx, sortedFront, frontSubsCfg, "front");
-  const rearResult = updateGroupInPlace(rearIdx, sortedRear, rearSubsCfg, "rear");
-
-  // Reassemble preserving original order: walk the original array,
-  // replacing entries that were updated, keeping others unchanged
+  // Reassemble preserving original order
   const next = instances.map((inst, i) => {
-    if (frontResult.result.has(i)) return frontResult.result.get(i);
-    if (rearResult.result.has(i)) return rearResult.result.get(i);
+    for (const group of PLACEMENT_GROUPS) {
+      const gr = groupResults.get(group);
+      if (gr?.result.has(i)) return gr.result.get(i);
+    }
     return inst;
   });
 
-  // Append newly created instances at the end
-  next.push(...frontResult.newInstances, ...rearResult.newInstances);
+  // Append newly created instances
+  for (const group of PLACEMENT_GROUPS) {
+    const gr = groupResults.get(group);
+    if (gr) next.push(...gr.newInstances);
+  }
 
   return next;
 }

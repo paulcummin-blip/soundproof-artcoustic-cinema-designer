@@ -21,7 +21,6 @@ import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTo
 import {
   buildAppliedInstances,
   coordinatesMatch,
-  hasUnsupportedPlacement,
   validateRecommendationLayout,
 } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 
@@ -324,18 +323,18 @@ export default function BassPostCalculationActions({
     requestBassHeavyAction(projectId, "compare", shared.cacheKey);
   };
 
-  const apply = (layout) => {
+  const apply = (layout, modelOverride = null) => {
     setApplyError(null);
     const validation = validateRecommendationLayout(layout, canonical.roomDims);
     if (!validation.valid) {
-      setApplyError("Use these wall-relative coordinates as guidance, then recalculate the placed design.");
+      setApplyError("Could not apply this layout. Please check the room dimensions.");
       return;
     }
     if (!hasCanonicalInstances || typeof commitInstances !== "function") {
       setApplyError("Subwoofer instances are not ready.");
       return;
     }
-    const next = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg);
+    const next = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, modelOverride);
     commitInstances(next, {
       front: { placementMode: "manual", isManual: true },
       rear: { placementMode: "manual", isManual: true },
@@ -406,14 +405,11 @@ export default function BassPostCalculationActions({
               size="sm"
               className="bg-[#213428] text-white hover:bg-[#3E4349]"
               onClick={() => apply(recommendation)}
-              disabled={!applicationValid.valid || hasUnsupportedPlacement(recommendation) || applied}
+              disabled={!applicationValid.valid || applied}
             >
-              {applied ? "Applied" : applicationValid.valid ? "Apply Layout" : "Positioning guide"}
+              {applied ? "Applied" : "Apply Layout"}
             </Button>
           </div>
-          {!applicationValid.valid && (
-            <p className="mt-2 text-[10px] text-[#8A7B6A]">The optimiser reports acoustic wall coordinates. Use View positions as placement guidance, then calculate the exact installed design.</p>
-          )}
         </div>
       )}
       {resultReady && !recommendation && (
@@ -435,9 +431,7 @@ export default function BassPostCalculationActions({
         subModel={frontSubsCfg?.model || rearSubsCfg?.model || null}
         onApply={apply}
         isApplied={selected ? coordinatesMatch(currentSources, selected.sources) : false}
-        applyError={applyError}
         applying={false}
-        unsupported={selected ? hasUnsupportedPlacement(selected) || !validateRecommendationLayout(selected, canonical.roomDims).valid : false}
       />
     </div>
   );

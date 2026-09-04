@@ -4,7 +4,6 @@ import Rp22LayoutPlanDialog from "@/components/room/bass/best-layout/Rp22LayoutP
 import {
   buildAppliedInstances,
   coordinatesMatch,
-  hasUnsupportedPlacement,
   validateRecommendationLayout,
 } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 import { useFastBassPlacementAdvisor } from "@/components/room/bass/best-layout/useFastBassPlacementAdvisor";
@@ -72,7 +71,6 @@ function AdvisorCard({ quantity, layout, roomDims, isApplied, onApply, onInspect
   }
   const metrics = layout.metrics || {};
   const sideWall = layout.recommendationKind === "side-wall-alternative";
-  const unsupported = hasUnsupportedPlacement(layout);
   return (
     <div className="rounded-lg border border-[#D9D5CE] bg-white p-3">
       <div className="flex items-start justify-between gap-2">
@@ -104,10 +102,10 @@ function AdvisorCard({ quantity, layout, roomDims, isApplied, onApply, onInspect
           type="button"
           size="sm"
           onClick={() => onApply(layout)}
-          disabled={disabled || isApplied || unsupported}
+          disabled={disabled || isApplied}
           className="bg-[#213428] text-white hover:bg-[#3E4349]"
         >
-          {isApplied ? "Applied" : unsupported ? "Guidance only" : "Apply Layout"}
+          {isApplied ? "Applied" : "Apply Layout"}
         </Button>
       </div>
     </div>
@@ -146,7 +144,7 @@ export default function BestSubLayoutGuide({
 
   const isApplied = (layout) => coordinatesMatch(currentSources, layout?.sources || []);
 
-  const apply = (layout) => {
+  const apply = (layout, modelOverride = null) => {
     setApplyError(null);
     if (!hasCanonicalInstances || typeof commitInstances !== "function") {
       setApplyError("Subwoofer instances are not ready.");
@@ -165,6 +163,7 @@ export default function BestSubLayoutGuide({
       subwooferInstances,
       frontSubsCfg,
       rearSubsCfg,
+      modelOverride,
     );
     commitInstances(next, {
       front: { placementMode: "manual", isManual: true },
@@ -238,9 +237,7 @@ export default function BestSubLayoutGuide({
         subModel={frontSubsCfg?.model || rearSubsCfg?.model || null}
         onApply={apply}
         isApplied={selected ? isApplied(selected) : false}
-        applyError={applyError}
         applying={false}
-        unsupported={selected ? hasUnsupportedPlacement(selected) : false}
       />
     </div>
   );
