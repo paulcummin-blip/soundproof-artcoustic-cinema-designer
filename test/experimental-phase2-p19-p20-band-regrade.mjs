@@ -27,7 +27,7 @@ try {
     server.ssrLoadModule("/src/components/utils/p14HouseCurveNormalisation.js"),
     server.ssrLoadModule("/src/components/utils/houseCurveTargetAuthority.js"),
     server.ssrLoadModule("/src/components/utils/practicalCalibrationTarget.js"),
-    server.ssrLoadModule("/src/components/utils/rp22BassMetrics.js"),
+    server.ssrLoadModule("/src/components/utils/rp22BassMetrics.jsx"),
     server.ssrLoadModule("/src/components/utils/houseCurveFitterCore.js"),
   ]);
 
