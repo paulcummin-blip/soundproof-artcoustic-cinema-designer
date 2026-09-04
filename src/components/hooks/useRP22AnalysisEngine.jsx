@@ -32,6 +32,7 @@ import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22Desig
 import { gradeP1Distance } from "@/components/utils/rp22/p1LevelAuthority";
 import { computeP11Compliance } from "@/components/utils/rp22/computeP11Compliance";
 import { clampLcrZoneDepth, computeLcrZones, isCentreInZone } from "@/components/utils/rp22/lcrZoneAuthority";
+import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 
 // TEMPORARY P18/P19 execution trace — display-only, no calculation control flow.
 let temporaryAnalysisRunId = 0;
@@ -977,7 +978,33 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           temporaryTrace.p19ExecutionCount = temporaryP19ExecutionCount;
           temporaryTrace.p19InputCurveReference = temporaryReferenceId(finalRspBassCurve);
           temporaryTrace.transitionHz = transitionHz;
-          bassP19 = computeParam19Deviation(finalRspBassCurve, transitionHz);
+          // Resolve the P19 assessment band from the operating-point chain.
+          // The band is [achieved P18 F3 → transition], valid only when P14
+          // passes AND a legitimate sustained P18 F3 exists. This is the
+          // SAME canonical authority (resolveBassAssessmentBand) used by the
+          // canonical completed-bass metric path — production now delegates
+          // to it instead of assessing [0 → transition] with a mismatched
+          // 70–200 Hz reference.
+          const p14Pass = bassP14?.level != null;
+          const achievedP18Hz = isNum(bassP18?.value) ? Number(bassP18.value) : null;
+          const p19AssessmentBand = resolveBassAssessmentBand({
+            p14Pass,
+            achievedP18Hz,
+            transitionHz,
+          });
+          temporaryTrace.p19AssessmentBand = p19AssessmentBand;
+          // Only grade P19 when the assessment band is valid. When P14 fails
+          // or P18 is not achieved, preserve the not-calculated lifecycle
+          // (bassP19 = null → status "no_data") rather than inventing a result.
+          if (p19AssessmentBand.valid) {
+            bassP19 = computeParam19Deviation(
+              finalRspBassCurve,
+              transitionHz,
+              p19AssessmentBand.lowerHz,
+            );
+          } else {
+            bassP19 = null;
+          }
           temporaryTrace.p19 = { value: bassP19?.maxDevDb ?? null, formatted: bassP19?.formatted ?? null, level: bassP19?.level ?? null, status: bassP19 ? "ok" : "no_data" };
           bassP20 = computeParam20SeatConsistency({
             rspResponse: rspBassResponse,

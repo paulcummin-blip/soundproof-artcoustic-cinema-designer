@@ -18,6 +18,12 @@ export { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouse
 
 export { applyDesignEqCurve, calculateDesignEqCurve };
 
+// Shared P18/P19 reference band — the 60–200 Hz median used as the SPL plateau
+// authority by BOTH P18 F3 calculation and P19 deviation reference. Keeping
+// this as a single constant ensures P18 and P19 share the same reference
+// baseline, preventing vertical reference drift between the two metrics.
+export const P18_REFERENCE_BAND_HZ = [60, 200];
+
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
 
@@ -116,10 +122,10 @@ export function computeP18InRoomF3({ freqsHz, splDb, targetDb, minHz = 10, maxHz
   if (!Array.isArray(freqsHz) || !Array.isArray(splDb) || freqsHz.length === 0) {
     return { f3Hz: null, details: { samples: 0 } };
   }
-  // Reference level = median of splDb in 60-200 Hz band (usable-bass reference).
+  // Reference level = median of splDb in the shared P18/P19 reference band.
   const refIdxs = [];
   for (let i = 0; i < freqsHz.length; i++) {
-    if (freqsHz[i] >= 60 && freqsHz[i] <= 200 && isNum(splDb[i])) refIdxs.push(i);
+    if (freqsHz[i] >= P18_REFERENCE_BAND_HZ[0] && freqsHz[i] <= P18_REFERENCE_BAND_HZ[1] && isNum(splDb[i])) refIdxs.push(i);
   }
   const refVals = (refIdxs.length > 0 ? refIdxs : freqsHz.map((_, i) => i))
     .map((i) => splDb[i])
@@ -163,8 +169,8 @@ export function computeInRoomF3FromResponseCurve(curve, validMinHz = null) {
   if (!Array.isArray(curve) || curve.length === 0) return empty;
   const smoothed = smoothThird(toSplCurve(curve));
   if (!smoothed.length) return empty;
-  // 60–200 Hz median — METHOD A, no transition cap.
-  const refPoints = smoothed.filter((p) => p.frequency >= 60 && p.frequency <= 200);
+  // Shared P18/P19 reference band (60–200 Hz) — METHOD A, no transition cap.
+  const refPoints = smoothed.filter((p) => p.frequency >= P18_REFERENCE_BAND_HZ[0] && p.frequency <= P18_REFERENCE_BAND_HZ[1]);
   const refValues = (refPoints.length > 0 ? refPoints : smoothed).map((p) => p.spl).filter(isNum);
   const refDb = median(refValues);
   if (!isNum(refDb)) return empty;
@@ -512,7 +518,8 @@ export function computeParam19Deviation(rspResponse, transitionHz, lowerHz = nul
   const smoothed = smoothThird(curve);
   if (smoothed.length === 0) return null;
 
-  const bandHigh = smoothed.filter((p) => p.frequency >= 70 && p.frequency <= 200);
+  // Shared P18/P19 reference band (60–200 Hz) — same authority as P18 F3.
+  const bandHigh = smoothed.filter((p) => p.frequency >= P18_REFERENCE_BAND_HZ[0] && p.frequency <= P18_REFERENCE_BAND_HZ[1]);
   const bandUsed = bandHigh.length > 0 ? bandHigh : smoothed;
   const refDb = median(bandUsed.map((p) => p.spl));
   if (!isNum(refDb)) return null;
