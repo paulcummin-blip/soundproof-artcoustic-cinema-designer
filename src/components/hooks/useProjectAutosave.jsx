@@ -31,8 +31,8 @@ export function useProjectAutosave(opts) {
     seatingPositions, roomElements, subwoofers,
     showZones,
     showAngles,
-    p15ConstructionLevel,
-    p21EarlyReflectionPreset,
+    assumedP15Level,
+    assumedP21Level,
     isHydrating, onProjectCreated, debounceMs = 800,
   } = opts || {};
 
@@ -48,15 +48,15 @@ export function useProjectAutosave(opts) {
     dolbyPreset,
     showZones,
     showAngles,
-    p15ConstructionLevel,
-    p21EarlyReflectionPreset,
+    assumedP15Level,
+    assumedP21Level,
   }), [
     projectName, dimensions, screen,
     seatingPositions, roomElements, subwoofers, dolbyPreset,
     showZones,
     showAngles,
-    p15ConstructionLevel,
-    p21EarlyReflectionPreset,
+    assumedP15Level,
+    assumedP21Level,
   ]);
 
   const hash = useMemo(() => {

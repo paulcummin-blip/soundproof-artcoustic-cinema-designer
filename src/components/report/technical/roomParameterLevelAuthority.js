@@ -11,6 +11,7 @@
 
 import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
 import { p18ThresholdsForBasis } from "@/components/utils/p18ExtensionAuthority";
+import { normalizeAssumedLevel } from "@/components/utils/assumedParameterAuthority";
 
 /* ---------- P12/P13/P14 mode-aware threshold resolver ---------- */
 
@@ -95,8 +96,8 @@ export function resolveRoomParameterLevel(paramId, {
   p12Mode = "minimum",
   p13Mode = "minimum",
   p14Mode = "minimum",
-  p15ConstructionLevel = "standard",
-  p21EarlyReflectionPreset = "l2",
+  assumedP15Level = null,
+  assumedP21Level = null,
   bassPresentation,
 }) {
   const pid = Number(paramId);
@@ -135,10 +136,7 @@ export function resolveRoomParameterLevel(paramId, {
   }
   if (pid === 8) return "L4";
   if (pid === 11) return "L4";
-  if (pid === 15) {
-    const MAP = { standard: "L1", "purpose-built": "L2", reference: "L3", studio: "L4" };
-    return MAP[p15ConstructionLevel || "standard"] || "—";
-  }
-  if (pid === 21) return getP21PresetResult(p21EarlyReflectionPreset || "l2").level;
+  if (pid === 15) return normalizeAssumedLevel(assumedP15Level) || "—";
+  if (pid === 21) return normalizeAssumedLevel(assumedP21Level) || "—";
   return "—";
 }

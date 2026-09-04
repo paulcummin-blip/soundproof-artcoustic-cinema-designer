@@ -1,31 +1,28 @@
 /**
  * P15P21AssumptionControl.jsx
  * ---------------------------
- * Compact "Manual design estimate" selector for P15/P21 parameters.
+ * Shared L1–L4 pill selector for the designer-assumed RP22 parameters P15
+ * (background noise floor) and P21 (early reflections).
  *
- * Screen mode: interactive <select> wired to the existing AppState safe setters.
- * Print mode:  read-only descriptive text using the existing P15/P21 mapping/label authority.
+ * Both the Compliance Report and the Technical Report render this same
+ * control. The value is owned by AppState (assumedP15Level / assumedP21Level)
+ * and persisted via the normal autosave path. A change immediately updates
+ * the single shared project assumption — last change wins everywhere.
  *
- * No local state — the value is owned by AppState and persisted via the normal
- * autosave path. A change immediately updates the existing P15/P21 authority
- * and therefore any dependent ASDR/compliance presentation.
+ * null = NOT CALCULATED (no silent default). Once the designer selects a
+ * level, the status becomes "Assumed" and the derived display value (NCB / dB)
+ * is shown.
+ *
+ * No local state — pure presentation of the shared authority.
  */
-
 import React from "react";
-
-const P15_OPTIONS = [
-  { value: "standard", label: "Standard domestic room (NCB 26 · L1)" },
-  { value: "purpose-built", label: "Purpose-built home cinema (NCB 22 · L2)" },
-  { value: "reference", label: "Reference-grade isolated room (NCB 18 · L3)" },
-  { value: "studio", label: "Studio / screening-room grade (NCB 15 · L4)" },
-];
-
-const P21_OPTIONS = [
-  { value: "l1", label: "No estimate / not applicable (N/A)" },
-  { value: "l2", label: "Moderately live room (−8 dB · L2)" },
-  { value: "l3", label: "Well-balanced treated room (−10 dB · L3)" },
-  { value: "l4", label: "Heavily optimised room (−12 dB · L4)" },
-];
+import {
+  ASSUMED_P15_OPTIONS,
+  ASSUMED_P21_OPTIONS,
+  getAssumedP15DisplayValue,
+  getAssumedP21DisplayValue,
+  isAssumedLevelSet,
+} from "@/components/utils/assumedParameterAuthority";
 
 const LABEL_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
 
@@ -35,12 +32,14 @@ export default function P15P21AssumptionControl({
   onChange,
   variant = "screen",
 }) {
-  const isP15 = paramId === 15;
-  const options = isP15 ? P15_OPTIONS : P21_OPTIONS;
-  const currentValue = value || (isP15 ? "purpose-built" : "l3");
-  const selectedOption = options.find((o) => o.value === currentValue) || options[0];
+  const isP15 = Number(paramId) === 15;
+  const options = isP15 ? ASSUMED_P15_OPTIONS : ASSUMED_P21_OPTIONS;
+  const currentLevel = isAssumedLevelSet(value) ? String(value).toUpperCase() : null;
+  const displayValue = isP15
+    ? getAssumedP15DisplayValue(value)
+    : getAssumedP21DisplayValue(value);
 
-  // Print mode: read-only descriptive text
+  // ── Print mode: read-only descriptive text ──
   if (variant === "print") {
     return (
       <div
@@ -56,13 +55,13 @@ export default function P15P21AssumptionControl({
           lineHeight: 1.3,
         }}
       >
-        <strong style={{ fontWeight: 600, color: "#1B1A1A" }}>Manual design estimate: </strong>
-        {selectedOption.label}
+        <strong style={{ fontWeight: 600, color: "#1B1A1A" }}>Assumed: </strong>
+        {currentLevel ? `${currentLevel} · ${displayValue}` : "Not Calculated"}
       </div>
     );
   }
 
-  // Screen mode: interactive selector
+  // ── Screen mode: interactive L1–L4 pill selector ──
   return (
     <div
       style={{
@@ -75,37 +74,76 @@ export default function P15P21AssumptionControl({
     >
       <div
         style={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: "#1B1A1A",
-          marginBottom: 4,
-          fontFamily: LABEL_FONT,
-          letterSpacing: "0.02em",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 6,
         }}
       >
-        Manual design estimate
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "#1B1A1A",
+            fontFamily: LABEL_FONT,
+            letterSpacing: "0.02em",
+          }}
+        >
+          Assumed Performance Level
+        </span>
+        {currentLevel ? (
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#213428" }}>
+            {currentLevel} · {displayValue}
+          </span>
+        ) : (
+          <span style={{ fontSize: 10, fontWeight: 600, color: "#8B7F76", fontStyle: "italic" }}>
+            Not Calculated
+          </span>
+        )}
       </div>
-      <select
-        style={{
-          width: "100%",
-          padding: "5px 8px",
-          fontSize: 12,
-          border: "1px solid #DCDBD6",
-          borderRadius: 4,
-          background: "#fff",
-          color: "#1B1A1A",
-          cursor: "pointer",
-          fontFamily: LABEL_FONT,
-        }}
-        value={currentValue}
-        onChange={(e) => onChange?.(e.target.value)}
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+      <div style={{ display: "flex", gap: 6 }}>
+        {options.map((opt) => {
+          const selected = currentLevel === opt.level;
+          return (
+            <button
+              key={opt.level}
+              type="button"
+              onClick={() => onChange?.(opt.level)}
+              style={{
+                flex: "1 1 0",
+                padding: "6px 4px",
+                borderRadius: 5,
+                border: selected
+                  ? "2px solid #213428"
+                  : "1px solid #DCDBD6",
+                background: selected ? "#213428" : "#FFFFFF",
+                color: selected ? "#FFFFFF" : "#1B1A1A",
+                cursor: "pointer",
+                fontFamily: LABEL_FONT,
+                fontWeight: 600,
+                fontSize: 12,
+                lineHeight: 1.2,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 2,
+                transition: "all 150ms ease",
+              }}
+            >
+              <span>{opt.level}</span>
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: 500,
+                  color: selected ? "rgba(255,255,255,0.8)" : "#625143",
+                }}
+              >
+                {opt.sublabel}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

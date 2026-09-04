@@ -35,10 +35,10 @@ export default function RP22ReportParameterGrid({
   seatHudSnapshots,
   seatingPositions,
   mlpSeatId,
-  p15ConstructionLevel,
-  p21EarlyReflectionPreset,
-  setP15ConstructionLevelSafe,
-  setP21EarlyReflectionPresetSafe,
+  assumedP15Level,
+  assumedP21Level,
+  setAssumedP15LevelSafe,
+  setAssumedP21LevelSafe,
   bassAuthority = null,
   bassErrorMessage = null,
   variant = "screen",
@@ -51,8 +51,8 @@ export default function RP22ReportParameterGrid({
     seatHudSnapshots,
     seatingPositions,
     mlpSeatId,
-    p15ConstructionLevel,
-    p21EarlyReflectionPreset,
+    assumedP15Level,
+    assumedP21Level,
     bassAuthority,
     bassErrorMessage,
     contributionsByKey,
@@ -98,8 +98,8 @@ export default function RP22ReportParameterGrid({
         {isP15P21 && (
           <P15P21AssumptionControl
             paramId={param.id}
-            value={param.id === 15 ? p15ConstructionLevel : p21EarlyReflectionPreset}
-            onChange={param.id === 15 ? setP15ConstructionLevelSafe : setP21EarlyReflectionPresetSafe}
+            value={param.id === 15 ? assumedP15Level : assumedP21Level}
+            onChange={param.id === 15 ? setAssumedP15LevelSafe : setAssumedP21LevelSafe}
             variant="screen"
           />
         )}
@@ -156,7 +156,7 @@ export default function RP22ReportParameterGrid({
         {isP15P21 && (
           <P15P21AssumptionControl
             paramId={param.id}
-            value={param.id === 15 ? p15ConstructionLevel : p21EarlyReflectionPreset}
+            value={param.id === 15 ? assumedP15Level : assumedP21Level}
             variant="print"
           />
         )}

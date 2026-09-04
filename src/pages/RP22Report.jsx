@@ -658,7 +658,7 @@ function RP22ReportInner() {
         mlpPointOverride: reportMlpAnchorEffective,
         overheadState: { globalModel: app?.overheadGlobalModel, frontOverride: app?.overheadFrontOverride, midOverride: app?.overheadMidOverride, rearOverride: app?.overheadRearOverride, useFrontGlobal: app?.useFrontGlobal ?? true, useMidGlobal: app?.useMidGlobal ?? true, useRearGlobal: app?.useRearGlobal ?? true, aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
         aimState: { aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP, lcrAimMode: app?.lcrAimMode },
-        p15ConstructionLevel: app?.p15ConstructionLevel,
+        assumedP15Level: app?.assumedP15Level,
         screen,
         screenFrontPlaneM: reportScreenFrontPlaneM,
         dolbyLayout: canonicalP2Layout,
@@ -727,11 +727,11 @@ function RP22ReportInner() {
             p12Mode: reportP12Mode,
             p13Mode: reportP13Mode,
             p14Mode: reportP14Mode,
-            p15ConstructionLevel: app?.p15ConstructionLevel,
-            p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
+            assumedP15Level: app?.assumedP15Level,
+            assumedP21Level: app?.assumedP21Level,
             bassPresentation: completedBassPresentation,
         });
-    }, [analysisResult, reportP12Mode, reportP13Mode, reportP14Mode, app?.p15ConstructionLevel, app?.p21EarlyReflectionPreset, completedBassPresentation]);
+    }, [analysisResult, reportP12Mode, reportP13Mode, reportP14Mode, app?.assumedP15Level, app?.assumedP21Level, completedBassPresentation]);
 
     const getSeatResults = React.useCallback((paramId) => {
         if (!analysisResult?.perSeatRp22) return [];
@@ -1253,10 +1253,10 @@ function RP22ReportInner() {
         seatHudSnapshots: reportSeatHudById,
         seatingPositions: seats,
         mlpSeatId: rspSeatId,
-        p15ConstructionLevel: app?.p15ConstructionLevel,
+        assumedP15Level: app?.assumedP15Level,
         p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
-        setP15ConstructionLevelSafe: app?.setP15ConstructionLevelSafe,
-        setP21EarlyReflectionPresetSafe: app?.setP21EarlyReflectionPresetSafe,
+        setAssumedP15LevelSafe: app?.setAssumedP15LevelSafe,
+        setAssumedP21LevelSafe: app?.setAssumedP21LevelSafe,
         bassAuthority: completedBassAuthority,
         bassErrorMessage,
         contributionsByKey: showDesignRating ? asdrContributionsByKey : null,

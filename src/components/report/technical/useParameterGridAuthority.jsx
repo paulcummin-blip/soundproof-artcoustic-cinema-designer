@@ -22,6 +22,11 @@ import {
   resolveRoomParameterLevel,
   resolveP12P13DualLevels,
 } from "@/components/report/technical/roomParameterLevelAuthority";
+import {
+  getAssumedP15DisplayValue,
+  getAssumedP21DisplayValue,
+  isAssumedLevelSet,
+} from "@/components/utils/assumedParameterAuthority";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
@@ -108,8 +113,8 @@ export const getMetricDisplayState = (metric, paramId = null) => {
  * @param {Object} params.seatHudSnapshots    — { [seatId]: snapshot } object
  * @param {Array}  params.seatingPositions    — array of seat objects
  * @param {string} params.mlpSeatId           — id of the RSP/primary seat
- * @param {string} params.p15ConstructionLevel
- * @param {string} params.p21EarlyReflectionPreset
+ * @param {string} params.assumedP15Level
+ * @param {string} params.assumedP21Level
  * @param {Object} params.bassAuthority
  * @param {string} params.bassErrorMessage
  * @param {Object} params.contributionsByKey  — ASDR contributions by key
@@ -119,8 +124,8 @@ export function useParameterGridAuthority({
   seatHudSnapshots,
   seatingPositions,
   mlpSeatId,
-  p15ConstructionLevel,
-  p21EarlyReflectionPreset,
+  assumedP15Level,
+  assumedP21Level,
   bassAuthority = null,
   bassErrorMessage = null,
   contributionsByKey = null,
@@ -175,8 +180,8 @@ export function useParameterGridAuthority({
         p12Mode,
         p13Mode,
         p14Mode,
-        p15ConstructionLevel,
-        p21EarlyReflectionPreset,
+        assumedP15Level,
+        assumedP21Level,
         bassPresentation,
       });
     }
@@ -184,7 +189,7 @@ export function useParameterGridAuthority({
     const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
     const metric = snap?.rp22?.[`p${pid}`];
     return getMetricDisplayState(metric, pid).level || "—";
-  }, [analysisResult, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId, p12Mode, p13Mode, p14Mode, bassPresentation]);
+  }, [analysisResult, assumedP15Level, assumedP21Level, seatSnapshotsById, lockedSeatId, mlpSeatId, p12Mode, p13Mode, p14Mode, bassPresentation]);
 
   /* ----- getHudValueForParam ----- */
   const getHudValueForParam = React.useCallback((param, opts = {}) => {
@@ -226,8 +231,8 @@ export function useParameterGridAuthority({
       }
       if (pid === 8) return "No";
       if (pid === 11) return "0";
-      if (pid === 15) { const LABEL = { standard: "NCB 26 (standard)", "purpose-built": "NCB 22 (purpose-built)", reference: "NCB 18 (reference)", studio: "NCB 15 (studio)" }; return LABEL[p15ConstructionLevel || "standard"] || "—"; }
-      if (pid === 21) return getP21PresetResult(p21EarlyReflectionPreset || "l2").formatted;
+      if (pid === 15) return getAssumedP15DisplayValue(assumedP15Level) || "Not Calculated";
+      if (pid === 21) return getAssumedP21DisplayValue(assumedP21Level) || "Not Calculated";
       return "—";
     }
 
@@ -253,7 +258,7 @@ export function useParameterGridAuthority({
     const n = getMetricNumericValue(metric);
     if (Number.isFinite(n)) return formatMetricFallback(n, paramDef?.unit || "");
     return "Not Calculated";
-  }, [analysisResult, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId, bassPresentation]);
+  }, [analysisResult, assumedP15Level, assumedP21Level, seatSnapshotsById, lockedSeatId, mlpSeatId, bassPresentation]);
 
   /* ----- Per-seat pill grid for seat-scoped params ----- */
   const seats = Array.isArray(seatingPositions) ? seatingPositions : [];

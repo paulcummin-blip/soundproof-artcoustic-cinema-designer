@@ -18,6 +18,12 @@ import { resolveParamThresholds, resolveP12P13DualLevels } from "@/components/re
 import ComplianceParameterMatrix from "@/components/rp22/ComplianceParameterMatrix";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
+import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl";
+import {
+  getAssumedP15DisplayValue,
+  getAssumedP21DisplayValue,
+  isAssumedLevelSet,
+} from "@/components/utils/assumedParameterAuthority";
 
 /* ---------- Helpers */
 
@@ -224,8 +230,8 @@ export default function RP22CompliancePanel({
   dolbyLayout,
   frontSubsCount,
   rearSubsCount,
-  p15ConstructionLevel,
-  p21EarlyReflectionPreset,
+  assumedP15Level,
+  assumedP21Level,
   freeMoveLcr = false,
 }) {
   const appState = useAppState();
@@ -594,12 +600,11 @@ export default function RP22CompliancePanel({
       if (pid === 11) return "L4";
 
       if (pid === 15) {
-        const MAP = { standard: "L1", "purpose-built": "L2", reference: "L3", studio: "L4" };
-        return MAP[p15ConstructionLevel || "standard"] || "—";
+        return isAssumedLevelSet(assumedP15Level) ? assumedP15Level : "—";
       }
 
       if (pid === 21) {
-        return getP21PresetResult(p21EarlyReflectionPreset || "l2").level;
+        return isAssumedLevelSet(assumedP21Level) ? assumedP21Level : "—";
       }
 
       return "—";
@@ -675,19 +680,13 @@ export default function RP22CompliancePanel({
       if (pid === 8) return "No";
       if (pid === 11) return "0";
 
-      // P15 / P21 are effectively "selection-driven" on the report page; show their chosen value
+      // P15 / P21 are assumed design parameters — show the derived display value
       if (pid === 15) {
-        const LABEL = {
-          standard: "NCB 26 (standard)",
-          "purpose-built": "NCB 22 (purpose-built)",
-          reference: "NCB 18 (reference)",
-          studio: "NCB 15 (studio)",
-        };
-        return LABEL[p15ConstructionLevel || "standard"] || "—";
+        return getAssumedP15DisplayValue(assumedP15Level) || "Not Calculated";
       }
 
       if (pid === 21) {
-        return getP21PresetResult(p21EarlyReflectionPreset || "l2").formatted;
+        return getAssumedP21DisplayValue(assumedP21Level) || "Not Calculated";
       }
 
       return "—";
@@ -833,7 +832,7 @@ export default function RP22CompliancePanel({
             {isSeatScope ? (
               <span style={{ color: "#625143", fontStyle: "italic" }}>Per-seat evaluation — see individual seat results below</span>
             ) : (
-              <>Achieved: <span style={{ color: "#213428" }}>{achievedValue}</span></>
+              <>{(p.id === 15 || p.id === 21) ? "Assumed: " : "Achieved: "}<span style={{ color: "#213428" }}>{achievedValue}</span></>
             )}
           </div>
           {targetBasisNote && (
@@ -909,13 +908,21 @@ export default function RP22CompliancePanel({
                 );
               })}
             </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+            </div>
+            </div>
+            {(p.id === 15 || p.id === 21) && (
+            <P15P21AssumptionControl
+            paramId={p.id}
+            value={p.id === 15 ? assumedP15Level : assumedP21Level}
+            onChange={p.id === 15 ? appState?.setAssumedP15LevelSafe : appState?.setAssumedP21LevelSafe}
+            variant="screen"
+            />
+            )}
+            </div>
+            );
+            };
 
-  return (
+            return (
     <div>
       {/* RP23 Screen Size Guide */}
       <div style={{ ...card, marginBottom: 12 }}>

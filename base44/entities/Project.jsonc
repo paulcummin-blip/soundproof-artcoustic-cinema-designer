@@ -452,27 +452,27 @@
       "default": "recommended",
       "description": "Whether selected_abfuser_qty was auto-seeded from the recommendation ('recommended') or manually set by the designer ('user'). When 'recommended', the selected quantity auto-follows recommendation changes."
     },
-    "p15_construction_level": {
+    "assumed_p15_level": {
       "type": "string",
       "enum": [
-        "standard",
-        "purpose-built",
-        "reference",
-        "studio"
+        "L1",
+        "L2",
+        "L3",
+        "L4"
       ],
-      "default": "purpose-built",
-      "description": "Manual design estimate for P15 background noise floor. standard = NCB 26 (L1), purpose-built = NCB 22 (L2), reference = NCB 18 (L3), studio = NCB 15 (L4)."
+      "nullable": true,
+      "description": "Designer-assumed RP22 P15 background noise floor Performance Level. L1 = NCB 26, L2 = NCB 22, L3 = NCB 18, L4 = NCB 15. Null = not yet assumed (NOT CALCULATED). Single shared authority consumed by Compliance Report, Technical Report, rating engine, and PDF exports."
     },
-    "p21_early_reflection_preset": {
+    "assumed_p21_level": {
       "type": "string",
       "enum": [
-        "l1",
-        "l2",
-        "l3",
-        "l4"
+        "L1",
+        "L2",
+        "L3",
+        "L4"
       ],
-      "default": "l3",
-      "description": "Manual design estimate for P21 early reflections. l1 = N/A, l2 = -8 dB (L2), l3 = -10 dB (L3), l4 = -12 dB (L4)."
+      "nullable": true,
+      "description": "Designer-assumed RP22 P21 early reflections Performance Level. L1 = N/A, L2 = \u22128 dB, L3 = \u221210 dB, L4 = \u221212 dB. Null = not yet assumed (NOT CALCULATED). Single shared authority consumed by Compliance Report, Technical Report, rating engine, and PDF exports."
     },
     "room_dimensions_edited": {
       "type": "boolean",

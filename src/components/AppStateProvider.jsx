@@ -749,18 +749,17 @@ function useDesignerState() {
   // Latest seat snapshot (no signature, just seat.id -> full snapshot)
   const [seatSnapshotBySeatId, setSeatSnapshotBySeatId] = useState({});
 
-  const [p15ConstructionLevel, setP15ConstructionLevel] = useState(() => (
-    (__autosavePayload && __autosavePayload.p15ConstructionLevel) ? __autosavePayload.p15ConstructionLevel : 'purpose-built'
+  const [assumedP15Level, setAssumedP15Level] = useState(() => (
+    (__autosavePayload && __autosavePayload.assumedP15Level) ? __autosavePayload.assumedP15Level : null
   ));
 
-  const setP15ConstructionLevelSafe = useCallback((next) => {
-    const allowed = new Set(["standard", "purpose-built", "reference", "studio"]);
-    const v = allowed.has(next) ? next : "standard";
-    setP15ConstructionLevel(v);
+  const setAssumedP15LevelSafe = useCallback((next) => {
+    const allowed = new Set(["L1", "L2", "L3", "L4", null]);
+    setAssumedP15Level(allowed.has(next) ? next : null);
   }, []);
 
-  const [p21EarlyReflectionPreset, setP21EarlyReflectionPreset] = useState(() => (
-    (__autosavePayload && __autosavePayload.p21EarlyReflectionPreset) ? __autosavePayload.p21EarlyReflectionPreset : 'l3'
+  const [assumedP21Level, setAssumedP21Level] = useState(() => (
+    (__autosavePayload && __autosavePayload.assumedP21Level) ? __autosavePayload.assumedP21Level : null
   ));
 
   const [designEqEnabled, setDesignEqEnabled] = useState(() => (
@@ -777,10 +776,9 @@ function useDesignerState() {
   }, []);
   const [p12Level, setP12Level] = useState(null);
 
-  const setP21EarlyReflectionPresetSafe = useCallback((next) => {
-    const allowed = new Set(["l1", "l2", "l3", "l4"]);
-    const v = allowed.has(next) ? next : "l2";
-    setP21EarlyReflectionPreset(v);
+  const setAssumedP21LevelSafe = useCallback((next) => {
+    const allowed = new Set(["L1", "L2", "L3", "L4", null]);
+    setAssumedP21Level(allowed.has(next) ? next : null);
   }, []);
 
   const [mlpOverride, setMlpOverride] = useState(() => (
@@ -1362,10 +1360,10 @@ function useDesignerState() {
         setEnableFrontWides(!!v);
         showToast(v ? 'Front-wide overlay on' : 'Front-wide overlay off', 'info');
       };
-      window.__APPSTATE__.p15ConstructionLevel = p15ConstructionLevel;
-      window.__APPSTATE__.setP15ConstructionLevel = setP15ConstructionLevel;
+      window.__APPSTATE__.assumedP15Level = assumedP15Level;
+      window.__APPSTATE__.setAssumedP15Level = setAssumedP15Level;
     }
-  }, [enableFrontWides, showToast, p15ConstructionLevel]);
+  }, [enableFrontWides, showToast, assumedP15Level]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1612,8 +1610,8 @@ function useDesignerState() {
       useMidGlobal,
       useRearGlobal,
       seatMetricsById,
-      p15ConstructionLevel,
-      p21EarlyReflectionPreset,
+      assumedP15Level,
+      assumedP21Level,
       splConfig,
       mlpOverride,
       extraSurroundCount,
@@ -1676,8 +1674,8 @@ function useDesignerState() {
     useMidGlobal,
     useRearGlobal,
     seatMetricsById,
-    p15ConstructionLevel,
-    p21EarlyReflectionPreset,
+    assumedP15Level,
+    assumedP21Level,
     splConfig,
     mlpOverride,
     extraSurroundCount,
@@ -2108,10 +2106,10 @@ function useDesignerState() {
     seatMetricsById,
     roomResetEpoch,
     resetRoomDesignerToDefaults,
-    p15ConstructionLevel,
-    setP15ConstructionLevelSafe,
-    p21EarlyReflectionPreset,
-    setP21EarlyReflectionPresetSafe,
+    assumedP15Level,
+    setAssumedP15LevelSafe,
+    assumedP21Level,
+    setAssumedP21LevelSafe,
     designEqEnabled,
     setDesignEqEnabled: setDesignEqEnabledSafe,
     mlpOverride,
@@ -2221,10 +2219,10 @@ function useDesignerState() {
     seatMetricsById,
     roomResetEpoch,
     resetRoomDesignerToDefaults,
-    p15ConstructionLevel,
-    setP15ConstructionLevelSafe,
-    p21EarlyReflectionPreset,
-    setP21EarlyReflectionPresetSafe,
+    assumedP15Level,
+    setAssumedP15LevelSafe,
+    assumedP21Level,
+    setAssumedP21LevelSafe,
     designEqEnabled,
     setDesignEqEnabledSafe,
     mlpOverride,
@@ -2256,7 +2254,7 @@ function useDesignerState() {
     setAbfuserQtySource,
     ]);
 
-  value.setP21EarlyReflectionPreset = setP21EarlyReflectionPresetSafe;
+  value.setAssumedP21Level = setAssumedP21LevelSafe;
 
   return value;
 }
