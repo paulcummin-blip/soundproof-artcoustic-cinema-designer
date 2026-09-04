@@ -102,7 +102,7 @@ function SeatCoverage({ metrics }) {
   );
 }
 
-export default function Rp22RecommendationCard({ title, layout, onClick, onApply, isApplied, isRecalculating, applying, applyError, unsupported, applyLabel = "Apply layout" }) {
+export default function Rp22RecommendationCard({ title, layout, onClick, onApply, isApplied, isRecalculating, applying, applyError, applyLabel = "Apply layout" }) {
   if (!layout?.metrics || layout.metrics.responseAuthority !== "final-post-eq" || !layout.metrics.hasConfirmedSeatAuthority) return null;
   const m = layout.metrics;
   return (
@@ -134,16 +134,9 @@ export default function Rp22RecommendationCard({ title, layout, onClick, onApply
       {m.limited && <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-2 text-[10px] font-medium text-amber-800">Limited at the selected P14/P18 target; the seat authority below remains canonical.</p>}
       <SeatCoverage metrics={m} />
 
-      {unsupported && (
-        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3">
-          <p className="text-[11px] font-medium text-amber-800">Exact application of this side-wall layout is not currently supported.</p>
-          <p className="mt-1 text-[10px] text-amber-700">View the layout details for reference, or choose a front/rear layout to apply.</p>
-        </div>
-      )}
+      {applyError && <p className="mt-2 text-[11px] text-red-700">{applyError}</p>}
 
-      {applyError && !unsupported && <p className="mt-2 text-[11px] text-red-700">{applyError}</p>}
-
-      {!isApplied && !unsupported && (
+      {!isApplied && (
         <Button type="button" size="sm" className="mt-3 w-full bg-[#213428] text-white hover:bg-[#3E4349]" onClick={(event) => { event.stopPropagation(); onApply?.(layout); }} disabled={applying}>
           {applying ? "Applying…" : applyLabel}
         </Button>

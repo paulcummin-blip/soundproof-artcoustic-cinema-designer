@@ -74,16 +74,6 @@ function unorderedGroupMatch(currentGroup, recommendedGroup, tolerance) {
 }
 
 /**
- * Check if a layout contains unsupported placement values (left/right).
- * Only front and rear placements can be applied to the app's subwoofer config.
- */
-export function hasUnsupportedPlacement(layout) {
-  // All placement groups (front, rear, left, right) are now supported.
-  // Retained for backward compatibility — always returns false.
-  return false;
-}
-
-/**
  * Compare two arrays of sources. Matches count, placement group, x, and y.
  * z is not compared because current subs use centre height while recommendation
  * sources use bottom height (see comment in unorderedGroupMatch).
@@ -264,6 +254,7 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
         position: { x: Number(rec.x), y: Number(rec.y) },
         positionSource: "user",
         enabled: true,
+        rotationDeg: Number.isFinite(Number(rec.rotationDeg)) ? Number(rec.rotationDeg) : (instances[origIdx].rotationDeg ?? ROTATION_BY_GROUP[group] ?? 0),
         ...(modelOverride ? { model: modelOverride } : {}),
       });
       sourceIdx++;
@@ -278,6 +269,7 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
         position: { x: Number(rec.x), y: Number(rec.y) },
         positionSource: "user",
         enabled: true,
+        rotationDeg: Number.isFinite(Number(rec.rotationDeg)) ? Number(rec.rotationDeg) : (instances[origIdx].rotationDeg ?? ROTATION_BY_GROUP[group] ?? 0),
         ...(modelOverride ? { model: modelOverride } : {}),
       });
       sourceIdx++;

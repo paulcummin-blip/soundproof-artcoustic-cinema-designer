@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import Rp22RecommendationCard from "@/components/room/bass/best-layout/Rp22RecommendationCard";
 import Rp22LayoutPlanDialog from "@/components/room/bass/best-layout/Rp22LayoutPlanDialog";
-import { coordinatesMatch, validateRecommendationLayout, buildAppliedInstances, hasUnsupportedPlacement } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { coordinatesMatch, validateRecommendationLayout, buildAppliedInstances } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 
 function LevelPill({ level }) {
   const n = Number(level);
@@ -150,7 +150,6 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
         isRecalculating={isLayoutApplied(layout) && isRecalculating}
         applying={applying}
         applyError={isLayoutApplied(layout) ? null : applyError}
-        unsupported={hasUnsupportedPlacement(layout)}
       />
     );
   };
@@ -173,7 +172,6 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
         isApplied={selected ? isLayoutApplied(selected) : false}
         applyError={applyError}
         applying={applying}
-        unsupported={selected ? hasUnsupportedPlacement(selected) : false}
       />
     </div>
   );
