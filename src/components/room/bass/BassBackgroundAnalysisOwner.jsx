@@ -38,6 +38,11 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const controllerRef = useRef(null);
   const scopeRef = useRef(null);
   const [manualAnalysisRequest, setManualAnalysisRequest] = useState(null);
+  // FIX 2&3: Explicit terminal outcome tracking. When the manual request is
+  // cleared, this records WHY — success, error, timeout, cancelled, stale,
+  // or rejected — so the UI can show an explicit status instead of silently
+  // returning to idle.
+  const [lastTerminalOutcome, setLastTerminalOutcome] = useState(null);
   const manualRequestSequenceRef = useRef(0);
   const dispatchedManualRequestRef = useRef(null);
 
@@ -75,7 +80,11 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     frontSubsLive,
     rearSubsLive,
     analysisRequestId: manualAnalysisRequest?.id || null,
-    analysisRequestFingerprint: manualAnalysisRequest?.fingerprint || null,
+    // FIX 1: Pass the BARE calibration fingerprint to the authoritative hook,
+    // not the full result/cache fingerprint. The hook checks
+    // analysisRequestFingerprint === fingerprints.calibration — these must
+    // match for the authoritative worker to start.
+    analysisRequestFingerprint: manualAnalysisRequest?.calibrationFingerprint || null,
   });
   const {
     roomDims, seatingPositions, rspPosition, sources, rspRawCurve, perSeatRawCurves,
@@ -262,6 +271,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
 
     if (manualAnalysisRequest && !manualRequestMatchesCurrent) {
       dispatchedManualRequestRef.current = null;
+      // FIX 3: Design changed during calculation — terminal "cancelled" state.
+      setLastTerminalOutcome({ outcome: "cancelled", fingerprint: manualAnalysisRequest.fingerprint });
       setManualAnalysisRequest(null);
     }
   }, [
@@ -311,6 +322,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       if (timingTraceRef.current) timingTraceRef.current.mark("preparationTimeoutMs");
       markBassAuthorityFailed(scopeId, requestFingerprint, "Bass preparation timed out — please retry.");
       dispatchedManualRequestRef.current = null;
+      // FIX 3: Watchdog timeout — terminal "timeout" state, distinct from error.
+      setLastTerminalOutcome({ outcome: "timeout", fingerprint: requestFingerprint });
       setManualAnalysisRequest(null);
     }, PREPARATION_WATCHDOG_MS);
     return () => {
@@ -335,6 +348,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       if (timingTraceRef.current) timingTraceRef.current.mark("preparationFailMs");
       markBassAuthorityFailed(scopeId, cacheKey, authoritative.reason || "Bass analysis preparation failed");
       dispatchedManualRequestRef.current = null;
+      // FIX 3: Authoritative preparation failure — terminal "error" state.
+      setLastTerminalOutcome({ outcome: "error", fingerprint: cacheKey, message: authoritative.reason || "Bass analysis preparation failed" });
       setManualAnalysisRequest(null);
       return;
     }
@@ -549,6 +564,15 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     }
   }, [authoritative.status, manualAnalysisRequest, manualRequestMatchesCurrent]);
 
+  // FIX 7: Mark authoritativeStartMs when the authoritative simulation worker
+  // actually starts (status transitions to "calculating"), not at button click.
+  useEffect(() => {
+    if (!manualAnalysisRequest || !manualRequestMatchesCurrent) return;
+    if (authoritative.status === "calculating" && timingTraceRef.current && timingTraceRef.current.trace.authoritativeStartMs === null) {
+      timingTraceRef.current.mark("authoritativeStartMs");
+    }
+  }, [authoritative.status, manualAnalysisRequest, manualRequestMatchesCurrent]);
+
   // PASS 1: Mark optimiser completion for timing diagnostics.
   useEffect(() => {
     if (!manualAnalysisRequest || !manualRequestMatchesCurrent) return;
@@ -647,12 +671,26 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       }
       return;
     }
+    // FIX 4: publishCompletedBassContract returns true ONLY for authoritative
+    // acceptance. A structurally complete but NOT_VERIFIED contract returns
+    // false — treat that as a terminal rejected state, not success.
     const published = publishCompletedBassContract(scopeId, contract);
     if (published && timingTraceRef.current && timingTraceRef.current.trace.publicationMs === null) {
       timingTraceRef.current.mark("publicationMs");
     }
-    if (!published && !hasAuthoritativeResult(scopeId, cacheKey)) {
-      markBassAuthorityUpdating(scopeId, cacheKey);
+    if (!published) {
+      // If the contract was structurally complete and P19-ready but
+      // publication returned false, it is NOT_VERIFIED — terminal rejected.
+      if (jobComplete && p19Ready) {
+        if (timingTraceRef.current && timingTraceRef.current.trace.publicationMs === null) {
+          timingTraceRef.current.mark("publicationMs");
+        }
+        setLastTerminalOutcome({ outcome: "rejected", fingerprint: cacheKey, message: "Bass calculation could not be verified." });
+        dispatchedManualRequestRef.current = null;
+        setManualAnalysisRequest(null);
+      } else if (!hasAuthoritativeResult(scopeId, cacheKey)) {
+        markBassAuthorityUpdating(scopeId, cacheKey);
+      }
     }
     // ── #2: Current authority persistence invariant ──────────────────────
     // A contract may update persisted CURRENT completed authority ONLY when
@@ -728,17 +766,25 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       // (full calibration fingerprint) is the sole identity check.
       setManualAnalysisRequest({
         id,
+        // FIX 1: fingerprint = full result/cache fingerprint for authority
+        // and cache identity checks (manualRequestMatchesCurrent, watchdog,
+        // controller.requestManual).
         fingerprint: cacheKey,
+        // FIX 1: calibrationFingerprint = BARE calibration fingerprint for the
+        // authoritative hook (analysisRequestFingerprint). This is what
+        // useAuthoritativeBassResponse compares against fingerprints.calibration.
+        calibrationFingerprint,
         collectDiagnostics: collectDiagnostics === true,
         diagnosticToken,
       });
       // PASS 1: Start timing trace for this manual request.
       timingTraceRef.current = createManualBassTimingTrace(id, cacheKey);
       timingTraceRef.current.mark("acceptedAtMs");
-      timingTraceRef.current.mark("authoritativeStartMs");
+      // FIX 7: authoritativeStartMs is marked when the authoritative worker
+      // actually starts (see the effect below), not at button-click time.
       return { action: "queued", requestId: id, fingerprint: cacheKey };
     },
-    [controller, scopeId, canCalculate, cacheKey]
+    [controller, scopeId, canCalculate, cacheKey, calibrationFingerprint]
   );
   const onRetry = onCalculate;
   // ── P14 target background scheduler ──────────────────────────────────
@@ -935,6 +981,46 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }, [manualAnalysisRequest]);
   const hasCurrentResult = completedBassAuthority?.authoritative === true
     && completedBassAuthority?.currentFingerprint === cacheKey;
-  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, canCalculate, calculationInProgress, calculationPhaseLabel, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p14FamilyProgress: targetFamilyProgress });
+
+  // FIX 3: Explicit success terminal — clear the manual request only after
+  // the completed contract becomes the current authoritative result and the
+  // calculation is no longer in progress. Do not derive "finished" merely
+  // because the optimiser became ready.
+  useEffect(() => {
+    if (!manualAnalysisRequest || !manualRequestMatchesCurrent) return;
+    if (hasCurrentResult && !calculationInProgress) {
+      if (timingTraceRef.current && timingTraceRef.current.trace.publicationAcceptedMs === null) {
+        timingTraceRef.current.mark("publicationAcceptedMs");
+      }
+      setLastTerminalOutcome({ outcome: "success", fingerprint: cacheKey });
+      setManualAnalysisRequest(null);
+    }
+  }, [manualAnalysisRequest, manualRequestMatchesCurrent, hasCurrentResult, calculationInProgress, cacheKey]);
+
+  // FIX 2: Explicit terminal calculation outcome. Distinguishes success,
+  // error, timeout, cancelled, stale, and rejected — never implies success
+  // merely because the button returned to idle.
+  const calculationOutcome = calculationInProgress
+    ? calculationPhase  // "preparing" | "optimising" | "finalising"
+    : (lastTerminalOutcome?.outcome
+        || (completedBassAuthority?.authorityStatus === "AUTHORITATIVE" ? "success"
+          : completedBassAuthority?.authorityStatus === "LIMITED" ? "success"
+          : completedBassAuthority?.authorityStatus === "STALE" ? "stale"
+          : completedBassAuthority?.authorityStatus === "ERROR" ? "error"
+          : completedBassAuthority?.authorityStatus === "NOT_VERIFIED" ? "rejected"
+          : "idle"));
+  const terminalMessage = calculationOutcome === "error"
+    ? (lastTerminalOutcome?.message || "Bass calculation could not be completed. Please try again.")
+    : calculationOutcome === "timeout"
+      ? "Bass calculation timed out before completion."
+      : calculationOutcome === "cancelled"
+        ? "Design changed during calculation. Recalculate to analyse the current layout."
+        : calculationOutcome === "stale"
+          ? "Needs recalculation"
+          : calculationOutcome === "rejected"
+            ? "Bass calculation could not be verified. Please try again."
+            : null;
+
+  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p14FamilyProgress: targetFamilyProgress });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

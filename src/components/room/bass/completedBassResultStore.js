@@ -189,7 +189,10 @@ export function publishCompletedBassContract(projectId, contract) {
     exportable,
     publicationRejectionReason,
   });
-  return true;
+  // FIX 4: Return true ONLY when the contract is authoritatively accepted.
+  // A structurally stored but NOT_VERIFIED contract must return false so
+  // callers treat it as a terminal rejected state, not success.
+  return authoritative;
 }
 
 /**

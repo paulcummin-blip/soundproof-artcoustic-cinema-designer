@@ -2,9 +2,10 @@
 //
 // Development-only bounded instrumentation for one manual Calculate Bass
 // Performance request. Captures elapsed milliseconds for each lifecycle
-// phase: request accepted, authoritative preparation start/complete,
-// preparation failure/timeout, optimiser start/complete, final publication,
-// and calculating state cleared.
+// phase: request accepted, authoritative worker start, main room/listener
+// preparation, flat-reference RSP transfers, preparation complete,
+// optimiser start/complete, candidate/finalisation, authoritative
+// publication accepted, terminal state cleared, and total button-to-result.
 //
 // Console/debug-only. Never persisted to project data. Never accumulates
 // history — each request creates a fresh trace.
@@ -18,11 +19,13 @@ export function createManualBassTimingTrace(requestId, fingerprint) {
     acceptedAtMs: null,
     authoritativeStartMs: null,
     authoritativeCompleteMs: null,
+    flatTransferStartMs: null,
     preparationFailMs: null,
     preparationTimeoutMs: null,
     optimiserStartMs: null,
     optimiserCompleteMs: null,
     publicationMs: null,
+    publicationAcceptedMs: null,
     calculatingClearedMs: null,
     authoritativeDurationMs: null,
     optimiserDurationMs: null,
@@ -53,6 +56,7 @@ export function createManualBassTimingTrace(requestId, fingerprint) {
         authoritativeMs: trace.authoritativeDurationMs?.toFixed(1),
         optimiserMs: trace.optimiserDurationMs?.toFixed(1),
         totalMs: trace.totalDurationMs?.toFixed(1),
+        published: trace.publicationAcceptedMs !== null,
       });
     }
     return trace;

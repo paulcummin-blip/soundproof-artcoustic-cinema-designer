@@ -18,6 +18,8 @@ export const emptyBassResults = () => ({
   canCalculate: false,
   calculationInProgress: false,
   calculationPhaseLabel: null,
+  calculationOutcome: "idle",
+  terminalMessage: null,
   hasCurrentResult: false,
   authoritative: null,
   completedBassAuthority: null,
