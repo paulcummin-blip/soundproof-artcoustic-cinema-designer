@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { getModelsByCategoryOrdered } from "@/components/models/speakers/registry";
+import { subwooferDisplayLabel } from "@/components/utils/subwooferDisplayLabel";
 
 const SUB_MODELS = getModelsByCategoryOrdered().SUBWOOFERS;
 
@@ -94,7 +95,9 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
           onValueChange={(val) => commit({ model: val })}
         >
           <SelectTrigger className="h-10 bg-white border-[#DCDBD6] text-2xl font-semibold text-[#213428]">
-            <SelectValue placeholder="Select subwoofer model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
+            <SelectValue placeholder="Select subwoofer model" className="text-2xl font-semibold" style={{ color: "#213428" }}>
+              {safeModel ? subwooferDisplayLabel(safeModel) : undefined}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {SUB_MODELS.map(m => (

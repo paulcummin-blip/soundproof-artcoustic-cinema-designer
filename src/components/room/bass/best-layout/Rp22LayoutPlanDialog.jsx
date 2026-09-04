@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 import { getModelsByCategoryOrdered } from "@/components/models/speakers/registry";
 import { adjustSourceForCabinet, designMatchesRecommendation } from "@/components/room/bass/best-layout/applyRecommendationUtils";
-import { subwooferModelKey } from "@/components/utils/subwooferDisplayLabel";
+import { subwooferModelKey, subwooferDisplayLabel } from "@/components/utils/subwooferDisplayLabel";
 
 const PADDING_FRACTION = 0.125;
 const SUBWOOFER_MODELS = getModelsByCategoryOrdered().SUBWOOFERS;
@@ -115,7 +115,9 @@ export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomD
           <label className="text-[11px] font-semibold uppercase tracking-wide text-[#625143]">Subwoofer model</label>
           <Select value={selectedModel} onValueChange={setSelectedModel}>
             <SelectTrigger className="mt-1 w-full">
-              <SelectValue placeholder="Select subwoofer" />
+              <SelectValue placeholder="Select subwoofer">
+                {selectedModel ? subwooferDisplayLabel(selectedModel) : undefined}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {SUBWOOFER_MODELS.map((model) => (
