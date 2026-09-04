@@ -11,7 +11,7 @@ const OUTPUT_JSON = `${OUTPUT_DIR}/phase1-p18-bounded-p19-p20.json`;
 const OUTPUT_CSV = `${OUTPUT_DIR}/phase1-p18-bounded-p19-p20.csv`;
 const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
 
-const round = (value, digits = 3) => Number.isFinite(Number(value))
+const round = (value, digits = 3) => value !== null && value !== "" && Number.isFinite(Number(value))
   ? Number(Number(value).toFixed(digits))
   : null;
 
