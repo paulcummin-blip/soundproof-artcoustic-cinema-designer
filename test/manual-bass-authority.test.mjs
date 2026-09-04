@@ -105,3 +105,14 @@ test("timing instrumentation is development-only and bounded", () => {
   // No persistence or history accumulation.
   assert.doesNotMatch(timing, /localStorage|sessionStorage|JSON\.stringify/);
 });
+
+test("flat-source RSP transfers use buildNormalizedPhysicsOptions for numerical parity", () => {
+  // The engine must import buildNormalizedPhysicsOptions from the normalized builder.
+  assert.match(engine, /import \{ buildNormalizedPhysicsOptions \} from "@\/components\/room\/bass\/normalizedPhysicsOptionsBuilder"/);
+  // The flat-source transfer must use buildNormalizedPhysicsOptions(physics), NOT engineOptionsBase.
+  assert.match(engine, /const flatTransferPhysics = buildNormalizedPhysicsOptions\(physics\)/);
+  assert.match(engine, /\.\.\.flatTransferPhysics, freqMinHz: 15, freqMaxHz: 200, smoothing: "none", precomputedModes/);
+  // The flat-source transfer call must NOT pass engineOptionsBase directly.
+  const flatTransferBlock = engine.match(/PASS 2[\s\S]*?perSourceRspComplexTransfers\.push\(/)?.[0] || "";
+  assert.doesNotMatch(flatTransferBlock, /\.\.\.engineOptionsBase, precomputedModes\}/);
+});

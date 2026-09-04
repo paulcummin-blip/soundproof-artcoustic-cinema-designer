@@ -2,6 +2,7 @@ import { simulateBassResponseRewCore, simulateBassResponseRewParityField, prepar
 import { getSubwooferCurve } from "@/components/models/speakers/registry";
 import { REW_SOURCE_CURVES } from "./rewSourceCurves";
 import { getPerSubwooferAmplifierAuthority } from "@/components/utils/subwooferCapability";
+import { buildNormalizedPhysicsOptions } from "@/components/room/bass/normalizedPhysicsOptionsBuilder";
 
 // Flat 94 dB source used for per-source RSP complex transfers (paired P14/P18
 // capability logic). The downstream consumer divides by 10^(94/20) to get a
@@ -71,6 +72,18 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
   // for the RSP listener only (reusing the same precomputed mode bank). This
   // produces the dimensionless room transfer data required by paired P14/P18
   // capability logic without a separate full normalized room simulation.
+  //
+  // CRITICAL: the flat-source transfer options MUST match the old normalized
+  // refinement physics exactly (buildNormalizedPhysicsOptions) — NOT
+  // engineOptionsBase. engineOptionsBase omits enableModes/enableReflections
+  // and the flat-source forcing flags (pureDeterministicModalSum,
+  // disableLateField, disableModalPropagationPhase, rewSourceCurveMode,
+  // debugReflectionOrder, rewParityModalMagnitudeScale). Without these, the
+  // engine defaults enableModes=false and enableReflections=false, producing
+  // direct-path-only results that are NOT a room transfer. buildNormalizedPhysicsOptions
+  // forces all the same values the old normalized-refinement path used, guaranteeing
+  // numerical equivalence with the legacy transfers.
+  const flatTransferPhysics = buildNormalizedPhysicsOptions(physics);
   const perSourceRspComplexTransfers = [];
   if (rspPosition && Number.isFinite(rspPosition.x) && Number.isFinite(rspPosition.y)) {
     const rspListenerZ = Number.isFinite(Number(rspPosition.z)) ? Number(rspPosition.z) : 1.2;
@@ -82,7 +95,7 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
           { x: rspPosition.x, y: rspPosition.y, z: rspListenerZ },
           sub,
           FLAT_SOURCE_CURVE,
-          { ...engineOptionsBase, precomputedModes }
+          { ...flatTransferPhysics, freqMinHz: 15, freqMaxHz: 200, smoothing: "none", precomputedModes }
         );
         perSourceRspComplexTransfers.push({
           sourceIndex,
