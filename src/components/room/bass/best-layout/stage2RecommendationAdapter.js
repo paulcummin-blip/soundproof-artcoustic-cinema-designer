@@ -1,4 +1,5 @@
 import { getFamilyDisplayMetadata } from "../stage1/stage1FamilyRegistry";
+import { selectAuthoritativeFinalist, detectMutedSubs } from "./authoritativeFinalistSelection";
 
 const TOLERANCE_M = 0.01;
 
@@ -143,32 +144,13 @@ function seriousPriorityBandProblem(result) {
       && Math.abs(Number(row?.variationDbRaw) || 0) >= 8);
 }
 
-export function selectPracticalStage2Finalist(quantityResult, roomDims) {
-  const ranked = Array.isArray(quantityResult?.evaluatedFinalists)
-    ? quantityResult.evaluatedFinalists.filter(Boolean)
-    : [];
-  const acousticWinner = quantityResult?.bestFinalist || ranked[0] || null;
-  if (!acousticWinner || Number(acousticWinner.quantity) === 1 || !isSideWallResult(acousticWinner, roomDims)) {
-    return acousticWinner;
-  }
-  const practical = ranked.find((result) => !isSideWallResult(result, roomDims));
-  if (!practical) return acousticWinner;
-
-  const quantity = Number(acousticWinner.quantity);
-  const variationThreshold = quantity === 4 ? 2.5 : 2;
-  const p20Gain = worstVariation(practical, "perSeatP20") - worstVariation(acousticWinner, "perSeatP20");
-  const gradeBandGain = resultFloor(acousticWinner) - resultFloor(practical);
-  const poorToCredible = resultFloor(practical) < 2 && resultFloor(acousticWinner) >= 2;
-  const priorityProblemRemoved = seriousPriorityBandProblem(practical)
-    && !seriousPriorityBandProblem(acousticWinner)
-    && (
-      worstVariation(practical, "perSeatP19") - worstVariation(acousticWinner, "perSeatP19") >= 3
-      || p20Gain >= 3
-    );
-
-  return gradeBandGain >= 1 || p20Gain >= variationThreshold || poorToCredible || priorityProblemRemoved
-    ? acousticWinner
-    : practical;
+export function selectPracticalStage2Finalist(quantityResult, roomDims, currentLayout) {
+  // Authoritative Pareto-filtered finalist selection.
+  // Replaces the proxy-based winner selection with a comparison using the
+  // actual authoritative P18/P19/P20 results that the canonical evaluation
+  // already produced for every Stage 2 finalist.
+  // Returns the full selection object so callers can access trade-off info.
+  return selectAuthoritativeFinalist(quantityResult, roomDims, currentLayout);
 }
 
 function p14IdentityMatches(result, contract) {
@@ -236,18 +218,22 @@ export function buildCurrentCanonicalLayout({
     assessmentStartHz: contract.assessmentEnvelope?.assessmentStartHz,
     assessmentEndHz: contract.assessmentEnvelope?.assessmentEndHz,
   };
+  const mutedSubInfo = detectMutedSubs(sources);
   return {
     id: "current-canonical-layout",
     name: "Current positions",
     placementMode: "Current design",
     sources,
-    metrics: canonicalMetrics({
-      perSeatP19: candidate.perSeatP19Results,
-      perSeatP20: candidate.perSeatP20Results,
-      seatingPositions,
-      sourceCount: sources.length,
-      canonicalResult,
-    }),
+    metrics: {
+      ...canonicalMetrics({
+        perSeatP19: candidate.perSeatP19Results,
+        perSeatP20: candidate.perSeatP20Results,
+        seatingPositions,
+        sourceCount: sources.length,
+        canonicalResult,
+      }),
+      mutedSubInfo,
+    },
     canonicalResult,
   };
 }
@@ -260,8 +246,9 @@ export function buildStage2RecommendationLayout({
   currentLayout,
   currentContract,
 }) {
-  const result = selectPracticalStage2Finalist(quantityResult, roomDims);
-  if (!result) return null;
+  const selection = selectPracticalStage2Finalist(quantityResult, roomDims, currentLayout);
+  if (selection.isCurrent || !selection.winner) return null;
+  const result = selection.winner;
   const metadata = getFamilyDisplayMetadata(result.familyId);
   const sources = sourcesFromStage2(result, roomDims, sourceHeightM);
   const exactCurrentIdentity = !!currentLayout
@@ -276,6 +263,13 @@ export function buildStage2RecommendationLayout({
         sourceCount: result.quantity,
         canonicalResult: result,
       });
+
+  // Detect muted subs in the current layout to adjust the active-sub authority
+  const mutedInfo = currentLayout ? detectMutedSubs(currentLayout.sources) : { activeCount: 0, mutedCount: 0, mutedIds: [] };
+
+  // Use the trade-off info from the authoritative selection
+  const isTradeOff = selection.isTradeOff && !exactCurrentIdentity;
+
   return {
     id: result.finalistId,
     name: metadata?.label || result.familyId || `${result.quantity}-sub layout`,
@@ -286,13 +280,20 @@ export function buildStage2RecommendationLayout({
     canonicalResult: exactCurrentIdentity ? currentLayout.canonicalResult : result,
     recommendationKind: isSideWallResult(result, roomDims)
       ? "side-wall-alternative"
-      : result !== quantityResult?.bestFinalist
-        ? "practical-preferred"
-        : "practical",
+      : isTradeOff
+        ? "trade-off"
+        : result !== quantityResult?.bestFinalist
+          ? "practical-preferred"
+          : "practical",
     practicalReason: isSideWallResult(result, roomDims)
       ? "Acoustic alternative — less practical placement. The canonical improvement is material."
-      : result !== quantityResult?.bestFinalist
-        ? "Preferred front/rear-wall result; the side-wall improvement was too small to justify the installation compromise."
-        : "Highest-ranked practical authoritative layout for this room and seating area.",
+      : isTradeOff
+        ? selection.tradeOffDescription || "Trade-off: improves one metric while worsening another. Not an unconditional improvement."
+        : result !== quantityResult?.bestFinalist
+          ? "Preferred front/rear-wall result; the side-wall improvement was too small to justify the installation compromise."
+          : "Highest-ranked practical authoritative layout for this room and seating area.",
+    isTradeOff,
+    tradeOffDescription: isTradeOff ? selection.tradeOffDescription : null,
+    mutedSubInfo: mutedInfo,
   };
 }

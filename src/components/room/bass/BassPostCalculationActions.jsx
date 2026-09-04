@@ -115,22 +115,40 @@ function comparisonNarrative(currentLayout, twoSubLayout, fourSubLayout) {
   const four = comparisonValues(fourSubLayout);
   const requestedLevel = numericResultLevel(currentLayout?.canonicalResult?.p14TargetLevel);
   const placementStrong = Math.min(current.p19Level ?? 0, current.p20Level ?? 0) >= 3;
+
+  // Trade-off labels
+  const twoTradeOff = twoSubLayout?.isTradeOff ? twoSubLayout.tradeOffDescription : null;
+  const fourTradeOff = fourSubLayout?.isTradeOff ? fourSubLayout.tradeOffDescription : null;
+
+  // Muted-sub detection in current layout
+  const mutedInfo = currentLayout?.mutedSubInfo || currentLayout?.metrics?.mutedSubInfo;
+  const mutedNote = mutedInfo && mutedInfo.mutedCount > 0
+    ? ` Note: ${mutedInfo.mutedCount} sub(s) in the current layout are effectively muted and excluded from active-sub capability.`
+    : "";
+
   if (placementStrong && requestedLevel !== null && (current.p14Level ?? 0) < requestedLevel) {
-    return "Placement performance is already strong; improve subwoofer capability or size before adding boxes solely for placement.";
+    return `Placement performance is already strong; improve subwoofer capability or size before adding boxes solely for placement.${mutedNote}`;
   }
   if (Number.isFinite(two.p20VariationDb) && Number.isFinite(four.p20VariationDb)
     && Math.abs(two.p20VariationDb - four.p20VariationDb) < 0.5
     && two.p19Level === four.p19Level && two.p20Level === four.p20Level) {
-    return "Four subs provide only marginal useful improvement over the recommended two-sub design in this room.";
+    return `Four subs provide only marginal useful improvement over the recommended two-sub design in this room.${mutedNote}`;
   }
   if (Math.min(four.p19Level ?? 0, four.p20Level ?? 0) > Math.min(two.p19Level ?? 0, two.p20Level ?? 0)) {
-    return "Four subs materially improve the weakest placement result and are justified for this seating area.";
+    return `Four subs materially improve the weakest placement result and are justified for this seating area.${mutedNote}`;
   }
   if (current.quantity === 1
     && Math.min(two.p19Level ?? 0, two.p20Level ?? 0) > Math.min(current.p19Level ?? 0, current.p20Level ?? 0)) {
-    return "A second sub improves the weakest seat-coverage result; quantity and placement are the useful upgrade.";
+    return `A second sub improves the weakest seat-coverage result; quantity and placement are the useful upgrade.${mutedNote}`;
   }
-  return "The table shows the real engineering trade-off; more subwoofers are not recommended unless the authoritative result improves materially.";
+  // If either recommended option is a trade-off, say so explicitly
+  if (twoTradeOff || fourTradeOff) {
+    const parts = [];
+    if (twoTradeOff) parts.push(`2-sub: ${twoTradeOff}`);
+    if (fourTradeOff) parts.push(`4-sub: ${fourTradeOff}`);
+    return `The table shows the real engineering trade-off. ${parts.join(" ")}${mutedNote}`;
+  }
+  return `The table shows the real engineering trade-off; more subwoofers are not recommended unless the authoritative result improves materially.${mutedNote}`;
 }
 
 function ComparisonPill({ parameterKey, level, resultText }) {
@@ -394,11 +412,17 @@ export default function BassPostCalculationActions({
             {recommendation.recommendationKind === "side-wall-alternative" && (
               <span className="rounded-full bg-amber-50 px-2 py-1 text-[9px] font-semibold text-amber-800">Less practical alternative</span>
             )}
+            {recommendation.isTradeOff && (
+              <span className="rounded-full bg-amber-50 px-2 py-1 text-[9px] font-semibold text-amber-800">Trade-off</span>
+            )}
           </div>
           <div className="mt-2 flex gap-4 text-[11px] text-[#625143]">
             <span>P19 floor <strong className="text-[#1B1A1A]">{levelText(p19)}</strong></span>
             <span>P20 floor <strong className="text-[#1B1A1A]">{levelText(p20)}</strong></span>
           </div>
+          {recommendation.isTradeOff && recommendation.tradeOffDescription && (
+            <p className="mt-2 text-[10px] font-medium leading-relaxed text-amber-800">{recommendation.tradeOffDescription}</p>
+          )}
           <p className="mt-2 text-[10px] leading-relaxed text-[#625143]">{improvementText(currentLayout, recommendation)}</p>
           <p className="mt-1 text-[10px] leading-relaxed text-[#8A7B6A]">{recommendation.practicalReason}</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
