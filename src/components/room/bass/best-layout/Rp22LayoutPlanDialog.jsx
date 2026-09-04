@@ -4,18 +4,26 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 import { getModelsByCategoryOrdered } from "@/components/models/speakers/registry";
-import { adjustSourceForCabinet } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { adjustSourceForCabinet, coordinatesMatch, designMatchesRecommendation } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 
 const PADDING_FRACTION = 0.125;
 const SUBWOOFER_MODELS = getModelsByCategoryOrdered().SUBWOOFERS;
 const DEFAULT_SUB_MODEL = SUBWOOFER_MODELS[0]?.key || "sub2-12";
 
-export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomDims, subModel, onApply, isApplied, applying }) {
+export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomDims, subModel, onApply, currentSources, currentModel, applying }) {
   const [selectedModel, setSelectedModel] = useState(subModel || DEFAULT_SUB_MODEL);
 
   useEffect(() => {
     if (open) setSelectedModel(subModel || DEFAULT_SUB_MODEL);
   }, [open, subModel]);
+
+  // Applied state includes MODEL match: the current canonical design must
+  // match the recommendation positions AND the selected dialog model.
+  // Changing the dropdown without applying makes the button revert to "Apply".
+  const isApplied = useMemo(() => {
+    if (!layout?.sources) return false;
+    return designMatchesRecommendation(currentSources, layout.sources, currentModel, selectedModel);
+  }, [layout, currentSources, currentModel, selectedModel]);
 
   const cabDims = getModelDimsM(selectedModel);
   const cabW = Number(cabDims.widthM) || 0.5;

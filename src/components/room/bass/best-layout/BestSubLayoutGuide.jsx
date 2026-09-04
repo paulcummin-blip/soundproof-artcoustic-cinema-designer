@@ -5,6 +5,8 @@ import {
   buildAppliedInstances,
   coordinatesMatch,
   validateRecommendationLayout,
+  currentModelFromInstances,
+  defaultDialogModel,
 } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 import { useFastBassPlacementAdvisor } from "@/components/room/bass/best-layout/useFastBassPlacementAdvisor";
 import { useBestSubLayoutLiveInputs } from "@/components/room/bass/best-layout/bestSubLayoutLiveInputs";
@@ -140,6 +142,7 @@ export default function BestSubLayoutGuide({
   const [previousInstances, setPreviousInstances] = useState(null);
   const [applyError, setApplyError] = useState(null);
   const currentSources = useMemo(() => currentSourcesFrom(currentSubs), [currentSubs]);
+  const currentModel = useMemo(() => currentModelFromInstances(subwooferInstances), [subwooferInstances]);
   const recommendations = advisor.result?.recommendations || {};
 
   const isApplied = (layout) => coordinatesMatch(currentSources, layout?.sources || []);
