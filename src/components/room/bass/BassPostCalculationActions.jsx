@@ -132,45 +132,67 @@ function comparisonNarrative(currentLayout, twoSubLayout, fourSubLayout) {
   return "The table shows the real engineering trade-off; more subwoofers are not recommended unless the authoritative result improves materially.";
 }
 
-function ComparisonTable({ currentLayout, twoSubLayout, fourSubLayout, onInspect }) {
+function ComparisonPill({ parameterKey, level, resultText }) {
+  const pillLevel = level == null ? -1 : level;
+  return (
+    <span className="flex flex-col gap-1" aria-label={resultText}>
+      <BassRp22ParameterTooltip parameterKey={parameterKey}>
+        <span className="cursor-help text-center text-[11px] font-semibold text-[#213428] underline decoration-dotted underline-offset-2">
+          {parameterKey.toUpperCase()}
+        </span>
+      </BassRp22ParameterTooltip>
+      <RP22GradingPill level={pillLevel} compact style={{ width: "100%" }}>{resultText}</RP22GradingPill>
+    </span>
+  );
+}
+
+function buildComparisonPills(values) {
+  const p14ResultText = values.p14Level != null
+    ? [levelText(values.p14Level), values.p14Db != null ? `${values.p14Db.toFixed(1)} dBC` : null].filter(Boolean).join(" · ")
+    : "—";
+  const p18ResultText = values.p18Level != null
+    ? [levelText(values.p18Level), values.p18Hz != null ? `${values.p18Hz.toFixed(0)} Hz` : null].filter(Boolean).join(" · ")
+    : "—";
+  const p19ResultText = values.p19Level != null ? levelText(values.p19Level) : "—";
+  const p20ResultText = values.p20Level != null
+    ? [levelText(values.p20Level), values.p20VariationDb != null ? `${values.p20VariationDb.toFixed(0)} dB` : null].filter(Boolean).join(" · ")
+    : "—";
+  return [
+    { key: "p14", level: values.p14Level, resultText: p14ResultText },
+    { key: "p18", level: values.p18Level, resultText: p18ResultText },
+    { key: "p19", level: values.p19Level, resultText: p19ResultText },
+    { key: "p20", level: values.p20Level, resultText: p20ResultText },
+  ];
+}
+
+function ComparisonCards({ currentLayout, twoSubLayout, fourSubLayout, onInspect }) {
   const columns = [
     { key: "current", title: "Current", layout: currentLayout },
     { key: "two", title: "Recommended 2 Subs", layout: twoSubLayout },
     { key: "four", title: "Recommended 4 Subs", layout: fourSubLayout },
   ];
-  const values = Object.fromEntries(columns.map((column) => [column.key, comparisonValues(column.layout)]));
-  const rows = [
-    { label: "P14", render: (value) => resultCell(value.p14Level, value.p14Db, "dBC") },
-    { label: "P18", render: (value) => resultCell(value.p18Level, value.p18Hz, "Hz") },
-    { label: "P19", render: (value) => levelText(value.p19Level) },
-    { label: "P20", render: (value) => resultCell(value.p20Level, value.p20VariationDb, "dB") },
-  ];
   return (
     <div className="mt-3 rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-3">
       <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Authoritative bass option comparison</div>
-      <div className="mt-2 overflow-x-auto">
-        <table className="w-full min-w-[560px] border-collapse text-left text-[11px]">
-          <thead>
-            <tr>
-              <th className="border-b border-[#D9D5CE] px-2 py-2 text-[#625143]">Parameter</th>
-              {columns.map((column) => (
-                <th key={column.key} className="border-b border-[#D9D5CE] px-2 py-2 text-[#1B1A1A]">{column.title}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.label}>
-                <th className="border-b border-[#E7E4DF] px-2 py-2 font-semibold text-[#213428]">{row.label}</th>
-                {columns.map((column) => (
-                  <td key={column.key} className="border-b border-[#E7E4DF] px-2 py-2 text-[#625143]">
-                    {column.layout ? row.render(values[column.key]) : "—"}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-2 grid gap-3 md:grid-cols-3">
+        {columns.map((column) => {
+          const values = column.layout ? comparisonValues(column.layout) : null;
+          const pills = values ? buildComparisonPills(values) : [];
+          return (
+            <div key={column.key} className="rounded-lg border border-[#D9D5CE] bg-white p-3">
+              <div className="text-[12px] font-semibold text-[#1B1A1A]">{column.title}</div>
+              {pills.length > 0 ? (
+                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  {pills.map((pill) => (
+                    <ComparisonPill key={pill.key} parameterKey={pill.key} level={pill.level} resultText={pill.resultText} />
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-2 text-[11px] text-[#8A7B6A]">No layout available.</div>
+              )}
+            </div>
+          );
+        })}
       </div>
       <p className="mt-3 text-[11px] font-medium leading-relaxed text-[#213428]">
         {comparisonNarrative(currentLayout, twoSubLayout, fourSubLayout)}
