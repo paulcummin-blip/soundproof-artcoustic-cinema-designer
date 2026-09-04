@@ -46,6 +46,7 @@ import { calculateRecommendedAbfuserQty } from "@/components/utils/abfuserRecomm
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
+import { bassInputAdapter } from "@/components/utils/subwooferInstanceMigration";
 import { safeCanon, mergePreserveOverheads, cloneRoleWithModel, speakersEqual, preserveSurroundModels } from "@/components/room/utils/speakerHelpers";
 import { DOLBY_PRESETS, seedSpeakersFromPreset, getTargetOverheadIds, ensureAtmosOverheads } from "@/components/room/utils/dolbyHelpers";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
