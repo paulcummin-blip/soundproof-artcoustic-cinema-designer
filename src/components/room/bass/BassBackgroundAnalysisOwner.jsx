@@ -28,6 +28,7 @@ import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 import { useRecommendationGate } from "@/components/state/recommendationGateStore";
 import { getBassHeavyAction, cancelBassHeavyAction } from "./bassHeavyActionStore";
 import { createManualBassTimingTrace } from "./manualBassTimingDiagnostics";
+import { consumeCalculateAllTargetsRequest, useCalculateAllTargetsRequest } from "./calculateAllTargetsStore";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -35,6 +36,7 @@ const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATIN
 export default function BassBackgroundAnalysisOwner({ children, scopeId = "free" }) {
   const appState = useAppState();
   const recommendationsActive = useRecommendationGate();
+  const calcAllTargetsRequest = useCalculateAllTargetsRequest();
   const controllerRef = useRef(null);
   const scopeRef = useRef(null);
   const [manualAnalysisRequest, setManualAnalysisRequest] = useState(null);
@@ -900,20 +902,28 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }), [payload, sources, designEqSystemLimits, rspRawCurve, perSeatRawCurves, fingerprints, fingerprintInputs]);
 
   useEffect(() => {
-    // FIX 1: The alternative P14 sweep (7 targets other than the selected
-    // foreground target) is completely decoupled from the recommendation gate.
-    // Opening the BestSubLayoutGuide panel must NOT trigger the seven
-    // alternative P14 target calculations. Normal automatic behaviour is:
-    //   - selected P14 target calculates (foreground path)
-    //   - no other P14 target calculates
-    // The scheduler capability is preserved for a future explicit user action
-    // specifically requesting alternative target analysis. If no such explicit
-    // UI exists today, the alternatives never run at all.
+    // The alternative P14 sweep (7 targets other than the selected foreground
+    // target) is completely decoupled from the recommendation gate. It runs
+    // ONLY when the designer explicitly presses "Calculate All Target Results".
+    // Normal automatic behaviour: scheduler is cancelled (no automatic sweep).
     const scheduler = getP14TargetBackgroundScheduler();
-    const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
-    if (isDev) console.log("[p14-sweep-gate]", "CANCELLED — alternative P14 sweep is never automatically scheduled");
-    scheduler.cancel();
-  }, [scopeId, baseDesignFingerprint, targetKey, isProjectHydrationReady, targetCacheHydrated, isDragging, recommendationsActive]);
+
+    if (calcAllTargetsRequest?.requested && backgroundInputsReady && baseDesignFingerprint && scopeId !== "free") {
+      // Explicit user request — start the sweep for all 8 targets
+      consumeCalculateAllTargetsRequest();
+      const allTargets = buildP14TargetCombinations();
+      scheduler.schedule({
+        projectId: scopeId,
+        baseDesignFingerprint,
+        foregroundTargetKey: targetKey,
+        allTargets,
+        designContext: designContextRef.current,
+      });
+    } else if (!scheduler.isRunning()) {
+      // No explicit request and nothing running — cancel to ensure clean state
+      scheduler.cancel();
+    }
+  }, [scopeId, baseDesignFingerprint, targetKey, isProjectHydrationReady, targetCacheHydrated, isDragging, recommendationsActive, backgroundInputsReady, calcAllTargetsRequest]);
 
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target

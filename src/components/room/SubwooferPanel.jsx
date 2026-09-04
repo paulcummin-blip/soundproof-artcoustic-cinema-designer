@@ -8,6 +8,8 @@ import HeightInput from '@/components/ui/HeightInput';
 import BassResultBlock from '@/components/room/bass/BassResultBlock';
 import BassTerminalStatus from '@/components/room/bass/BassTerminalStatus';
 import BassPostCalculationActions from '@/components/room/bass/BassPostCalculationActions';
+import BassPermanentPills from '@/components/room/bass/BassPermanentPills';
+import CalculateAllTargetResults from '@/components/room/bass/CalculateAllTargetResults';
 import { useSharedBassResults } from '@/components/room/bass/bassResultsStore';
 import BassTargetLevelControl from '@/components/room/bass/BassTargetLevelControl';
 import BestSubLayoutGuide from '@/components/room/bass/best-layout/BestSubLayoutGuide';
@@ -92,8 +94,8 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
   const bassCalculationInProgress = sharedBassResults?.calculationInProgress === true;
   const bassCalculationPhaseLabel = sharedBassResults?.calculationPhaseLabel || null;
   const bassActionLabel = sharedBassResults?.hasCurrentResult || hasPreviousBassResult || bassAuthorityStatus === 'STALE'
-    ? 'Recalculate Bass'
-    : 'Calculate Bass Performance';
+    ? 'Recalculate Parameter Results'
+    : 'Calculate Parameter Results';
   const bassActionDisabled = disabled
     || !hasActiveSubModel
     || sharedBassResults?.canCalculate !== true
@@ -102,9 +104,6 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
   return (
     <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
       <div className="rounded-none border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-4">
-        <div className="mb-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
-          <BassTargetLevelControl disabled={disabled} />
-        </div>
         <BestSubLayoutGuide
           roomDims={roomDimensions}
           seatingPositions={seats}
@@ -119,6 +118,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
           commitInstances={compat.commitInstances}
           hasCanonicalInstances={compat.hasCanonicalInstances}
         />
+        <div className="mt-4 mb-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
+          <BassTargetLevelControl disabled={disabled} />
+        </div>
         <div className="grid grid-cols-12 gap-x-4 gap-y-3">
           <div className="col-span-12 md:col-span-6">
             <h4 className="text-[15px] font-semibold text-[#1B1A1A] mb-2">Front Subwoofers</h4>
@@ -352,30 +354,39 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
           </div>
 
           <div className="col-span-12 mt-4 border-t border-[#DCDBD6] pt-4">
-            <button
-              type="button"
-              onClick={() => sharedBassResults?.onCalculate?.()}
-              disabled={bassActionDisabled}
-              className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {bassCalculationInProgress ? (bassCalculationPhaseLabel || 'Calculating Bass Performance…') : bassActionLabel}
-            </button>
-            {bassAuthorityStatus === 'STALE' && (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-                <p className="text-[11px] font-semibold text-amber-800">Needs recalculation</p>
-                <p className="mt-1 text-[10px] text-amber-700">The previous result is retained for reference but is not part of the current RP22 score or report.</p>
-              </div>
-            )}
-            {!hasActiveSubModel && (
-              <p className="mt-2 text-[11px] text-[#625143]">Select a subwoofer model and quantity before calculating.</p>
-            )}
-            {!bassCalculationInProgress && !bassActionDisabled && (
-              <p className="mt-2 text-[11px] text-[#625143]">The analysis runs only when you press this button. You can continue editing while it runs.</p>
-            )}
+            {/* Permanent P14/P18/P19/P20 parameter pills */}
+            <BassPermanentPills />
+
+            {/* Calculate Parameter Results — calculates only the currently selected target */}
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => sharedBassResults?.onCalculate?.()}
+                disabled={bassActionDisabled}
+                className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {bassCalculationInProgress ? (bassCalculationPhaseLabel || 'Calculating target results…') : bassActionLabel}
+                </button>
+              {!hasActiveSubModel && (
+                <p className="mt-2 text-[11px] text-[#625143]">Select a subwoofer model and quantity before calculating.</p>
+              )}
+              {bassAuthorityStatus === 'STALE' && (
+                <p className="mt-2 text-[11px] font-medium text-amber-700">Previous result needs recalculation — press Calculate to update.</p>
+              )}
+            </div>
+
+            {/* Calculate All Target Results — explicit heavy processing of all 8 P14 targets */}
+            <div className="mt-2">
+              <CalculateAllTargetResults disabled={disabled || !hasActiveSubModel} />
+            </div>
+
+            {/* Terminal status + detailed result block (shown when a verified result exists) */}
             <BassTerminalStatus />
             {sharedBassResults?.hasCurrentResult && !sharedBassResults?.calculationInProgress && (
               <BassResultBlock />
             )}
+
+            {/* Improve Bass Response — placement and quantity optimisation */}
             <BassPostCalculationActions
               roomDims={roomDimensions}
               seatingPositions={seats}

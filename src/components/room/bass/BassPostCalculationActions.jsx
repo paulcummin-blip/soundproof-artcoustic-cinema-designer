@@ -349,8 +349,8 @@ export default function BassPostCalculationActions({
 
   return (
     <div className="mt-3 rounded-lg border border-[#D9D5CE] bg-white px-4 py-4">
-      <div className="text-[13px] font-semibold text-[#1B1A1A]">Improve this design</div>
-      <p className="mt-1 text-[11px] leading-relaxed text-[#625143]">{focusText(shared.contract)}</p>
+      <div className="text-[13px] font-semibold text-[#1B1A1A]">Improve Bass Response</div>
+      <p className="mt-1 text-[11px] leading-relaxed text-[#625143]">Find practical subwoofer positions that improve response smoothness and seat consistency.</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <Button
           type="button"
@@ -358,7 +358,7 @@ export default function BassPostCalculationActions({
           onClick={startOptimisation}
           disabled={requestRunning}
         >
-          {optimiseRunning ? "Optimising Bass Layout…" : "Optimise Bass Layout"}
+          {optimiseRunning ? "Finding Better Positions…" : "Find Better Positions"}
         </Button>
         <Button
           type="button"
