@@ -119,19 +119,19 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
   // uses it. "__mixed__" is never saved as a product model.
   const setFrontSubModel = useCallback((model) => {
     if (!hasCanonical) return;
-    const next = applyModelChange(instances, "front", model);
+    const next = applyModelChange(instances, "front", model, appState?.roomDims);
     const enabledFront = next.filter((i) => i?.legacyGroup === "front" && i.enabled !== false);
     const overrides = enabledFront.length === 0 ? { front: { model } } : undefined;
     commitInstances(next, overrides);
-  }, [hasCanonical, instances, commitInstances]);
+  }, [hasCanonical, instances, appState?.roomDims, commitInstances]);
 
   const setRearSubModel = useCallback((model) => {
     if (!hasCanonical) return;
-    const next = applyModelChange(instances, "rear", model);
+    const next = applyModelChange(instances, "rear", model, appState?.roomDims);
     const enabledRear = next.filter((i) => i?.legacyGroup === "rear" && i.enabled !== false);
     const overrides = enabledRear.length === 0 ? { rear: { model } } : undefined;
     commitInstances(next, overrides);
-  }, [hasCanonical, instances, commitInstances]);
+  }, [hasCanonical, instances, appState?.roomDims, commitInstances]);
 
   // --- Count change ---
   const setFrontSubCount = useCallback((count) => {

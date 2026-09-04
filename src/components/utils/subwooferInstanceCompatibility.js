@@ -14,6 +14,7 @@ import {
   getCabinetWidthM,
   getCabinetDepthM,
 } from "./subwooferInstanceMigration";
+import { adjustSourceForCabinet } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 
 export const MIGRATION_STATE = {
   NONE: "none",
@@ -74,14 +75,35 @@ function getDefaultY(lengthM, group, model) {
 
 /**
  * Update model for instances in a legacy group.
- * Only the model field is changed; IDs, positions, calibration survive.
+ * The model field changes on every instance in the group (enabled + disabled).
+ * ENABLED instances also have their cabinet centre clamped inside the room
+ * so a larger cabinet does not intersect a wall after a model swap. Wall
+ * rotation is re-derived from the new cabinet dimensions and the instance
+ * position. IDs, calibration, bottomHeightM, and enabled state survive.
  */
-export function applyModelChange(instances, group, newModel) {
+export function applyModelChange(instances, group, newModel, roomDims) {
   const model = String(newModel || "").trim();
   if (!model) return instances;
-  return instances.map((inst) =>
-    inst?.legacyGroup === group ? { ...inst, model } : inst
-  );
+  const cabW = getCabinetWidthM(model);
+  const cabD = getCabinetDepthM(model);
+  const W = Number(roomDims?.widthM) || 0;
+  const L = Number(roomDims?.lengthM) || 0;
+  const hasRoom = W > 0 && L > 0;
+  return instances.map((inst) => {
+    if (inst?.legacyGroup !== group) return inst;
+    if (!hasRoom || inst.enabled === false) return { ...inst, model };
+    const adjusted = adjustSourceForCabinet(
+      { x: inst.position?.x, y: inst.position?.y },
+      { widthM: W, lengthM: L },
+      cabW, cabD,
+    );
+    return {
+      ...inst,
+      model,
+      position: { ...inst.position, x: adjusted.x, y: adjusted.y },
+      rotationDeg: Number.isFinite(adjusted.rotationDeg) ? adjusted.rotationDeg : (inst.rotationDeg ?? 0),
+    };
+  });
 }
 
 /**
