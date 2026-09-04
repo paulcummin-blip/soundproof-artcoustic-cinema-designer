@@ -336,6 +336,62 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
  * Compute wall-relative distances for a source position.
  * All distances are in metres from the cabinet centre to the wall.
  */
+/**
+ * Compute the single common model from all enabled canonical instances.
+ * Returns the model key if all enabled instances share one model, otherwise null
+ * (mixed models or no enabled instances).
+ */
+export function currentModelFromInstances(instances) {
+  const list = Array.isArray(instances) ? instances : [];
+  const enabled = list.filter((i) => i?.enabled !== false);
+  if (enabled.length === 0) return null;
+  const models = new Set(enabled.map((i) => String(i.model || "").trim()).filter(Boolean));
+  if (models.size === 1) return [...models][0];
+  return null;
+}
+
+/**
+ * Compute the default model for a recommendation dialog from the actual design.
+ * Priority:
+ *   1. If all enabled instances share one common model → use that.
+ *   2. If the recommendation has front sources and front has a model → use front model.
+ *   3. If the recommendation has only rear sources and rear has a model → use rear model.
+ *   4. Otherwise return null (caller falls back to application default).
+ */
+export function defaultDialogModel(instances, layout) {
+  const common = currentModelFromInstances(instances);
+  if (common) return common;
+  const list = Array.isArray(instances) ? instances : [];
+  const sources = layout?.sources || [];
+  const hasFront = sources.some((s) => s?.placement === "front");
+  const hasRear = sources.some((s) => s?.placement === "rear");
+  if (hasFront) {
+    const frontEnabled = list.filter((i) => i?.legacyGroup === "front" && i?.enabled !== false);
+    const frontModels = new Set(frontEnabled.map((i) => String(i.model || "").trim()).filter(Boolean));
+    if (frontModels.size === 1) return [...frontModels][0];
+  }
+  if (hasRear && !hasFront) {
+    const rearEnabled = list.filter((i) => i?.legacyGroup === "rear" && i?.enabled !== false);
+    const rearModels = new Set(rearEnabled.map((i) => String(i.model || "").trim()).filter(Boolean));
+    if (rearModels.size === 1) return [...rearModels][0];
+  }
+  return null;
+}
+
+/**
+ * Full design-vs-recommendation match: position match AND model match.
+ * A recommendation is Applied only if the current canonical design matches
+ * ALL relevant attributes: enabled count, positions, and selected model.
+ */
+export function designMatchesRecommendation(currentSources, recommendationSources, currentModel, selectedModel, tolerance = COORDINATE_TOLERANCE_M) {
+  const positionMatch = coordinatesMatch(currentSources, recommendationSources, tolerance);
+  if (!positionMatch) return false;
+  const cm = String(currentModel || "").trim();
+  const sm = String(selectedModel || "").trim();
+  if (!cm || !sm) return false;
+  return cm === sm;
+}
+
 export function wallRelativeDimensions(source, roomDims) {
   const x = Number(source?.x) || 0;
   const y = Number(source?.y) || 0;
