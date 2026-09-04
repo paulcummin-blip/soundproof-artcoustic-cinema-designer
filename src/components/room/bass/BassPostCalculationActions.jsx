@@ -22,6 +22,8 @@ import {
   buildAppliedInstances,
   coordinatesMatch,
   validateRecommendationLayout,
+  currentModelFromInstances,
+  defaultDialogModel,
 } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 
 function floorLevel(rows) {
@@ -297,6 +299,7 @@ export default function BassPostCalculationActions({
     shared.contract,
   ]);
   const currentSources = currentLayout?.sources || [];
+  const currentModel = useMemo(() => currentModelFromInstances(subwooferInstances), [subwooferInstances]);
   const requestRunning = ["requested", "running"].includes(action?.status);
   const optimiseRunning = action?.action === "optimise" && requestRunning;
   const compareRunning = action?.action === "compare" && requestRunning;
