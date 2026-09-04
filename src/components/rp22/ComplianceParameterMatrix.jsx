@@ -6,6 +6,7 @@ import React, { useState, useMemo } from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import SeatScopeBadge from "@/components/report/SeatScopeBadge";
 import { ChevronDown } from "lucide-react";
+import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
 
 const LEVEL_ORD = { L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0 };
 
@@ -145,7 +146,7 @@ export default function ComplianceParameterMatrix({
               >
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: "#1B1A1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    P{p.id} {p.short || p.title}
+                    P{p.id} {getOfficialRp22Title(p.id)}
                   </div>
                   <div style={{ fontSize: 10, color: "#625143", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {p.scope} · <span style={{ color: status.color }}>{status.label}</span>{!isSeatScope && (<> · <span style={{ color: "#213428", fontWeight: 600 }}>{achievedValue}</span></>)}

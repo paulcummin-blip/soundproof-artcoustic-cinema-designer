@@ -17,6 +17,7 @@ import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTo
 import { resolveParamThresholds, resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import ComplianceParameterMatrix from "@/components/rp22/ComplianceParameterMatrix";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
+import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
 
 /* ---------- Helpers */
 
@@ -779,7 +780,7 @@ export default function RP22CompliancePanel({
               <BassRp22ParameterTooltip parameterKey={`p${p.id}`}>
                 <span className="cursor-help underline decoration-dotted underline-offset-2">P{p.id}</span>
               </BassRp22ParameterTooltip>
-            ) : <span>{p.id}. {p.title}</span>}
+            ) : <span>{p.id}. {getOfficialRp22Title(p.id)}</span>}
             {debugText ? (
               <TooltipProvider>
                 <Tooltip>
