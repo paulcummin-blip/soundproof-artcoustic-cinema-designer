@@ -216,12 +216,16 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // sufficient to confirm the request is still valid.
   const manualRequestMatchesCurrent = !!manualAnalysisRequest
     && manualAnalysisRequest.fingerprint === cacheKey;
+  // PASS 2: canCalculate no longer depends on the normalized room-transfer
+  // hook. The authoritative geometry fingerprint (fingerprints.geometry) is the
+  // sole geometry-validity gate. The normalized hook stays idle during manual
+  // Calculate (analysisRequestId: null) and is not waited on.
   const canCalculate = isProjectHydrationReady
     && bassAuthorityHydrationSettled
     && !!fingerprints
+    && !!fingerprints?.geometry
     && !!cacheKey
     && !!targetKey
-    && !!normalizedLive.geometryFingerprint
     && sources.length > 0
     && seatingPositions.length > 0;
 

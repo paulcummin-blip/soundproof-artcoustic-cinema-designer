@@ -90,6 +90,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
   const bassAuthorityStatus = sharedBassResults?.completedBassAuthority?.authorityStatus || 'UNCALCULATED';
   const hasPreviousBassResult = !!sharedBassResults?.completedBassAuthority?.staleContract;
   const bassCalculationInProgress = sharedBassResults?.calculationInProgress === true;
+  const bassCalculationPhaseLabel = sharedBassResults?.calculationPhaseLabel || null;
   const bassActionLabel = sharedBassResults?.hasCurrentResult || hasPreviousBassResult || bassAuthorityStatus === 'STALE'
     ? 'Recalculate Bass'
     : 'Calculate Bass Performance';
@@ -357,7 +358,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               disabled={bassActionDisabled}
               className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {bassCalculationInProgress ? 'Calculating Bass Performance…' : bassActionLabel}
+              {bassCalculationInProgress ? (bassCalculationPhaseLabel || 'Calculating Bass Performance…') : bassActionLabel}
             </button>
             {bassAuthorityStatus === 'STALE' && (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">

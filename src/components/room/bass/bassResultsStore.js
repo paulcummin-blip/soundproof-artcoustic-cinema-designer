@@ -17,6 +17,7 @@ export const emptyBassResults = () => ({
   onRetry: null,
   canCalculate: false,
   calculationInProgress: false,
+  calculationPhaseLabel: null,
   hasCurrentResult: false,
   authoritative: null,
   completedBassAuthority: null,
