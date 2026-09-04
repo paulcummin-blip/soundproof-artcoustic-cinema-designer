@@ -70,6 +70,20 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
     return "__mixed__";
   }, [instances, rearSubsCfg]);
 
+  // --- Quantity derived from enabled canonical instances ---
+  // The UI authority for the Front/Rear count selectors. The CFG mirror
+  // (frontSubsCfg.count) is kept for backward compatibility but is NOT the
+  // display authority — it can lag one frame behind instance changes.
+  const frontCount = useMemo(
+    () => instances.filter((i) => i?.legacyGroup === "front" && i.enabled !== false).length,
+    [instances]
+  );
+
+  const rearCount = useMemo(
+    () => instances.filter((i) => i?.legacyGroup === "rear" && i.enabled !== false).length,
+    [instances]
+  );
+
   // --- Single canonical-first commit helper ---
   // 1. setSubwooferInstances exactly once
   // 2. derive both CFG mirrors from the same next array
@@ -224,6 +238,8 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
     hasCanonicalInstances: hasCanonical,
     frontModelDisplay,
     rearModelDisplay,
+    frontCount,
+    rearCount,
     setFrontSubModel,
     setRearSubModel,
     setFrontSubCount,

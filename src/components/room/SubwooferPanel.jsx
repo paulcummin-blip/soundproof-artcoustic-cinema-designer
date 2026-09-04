@@ -148,7 +148,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
 
               <div className="col-span-5">
                 <Select
-                  value={String(frontSubsCfg?.count ?? 0)}
+                  value={String(compat.frontCount ?? 0)}
                   disabled={disabled || !compat.hasCanonicalInstances}
                   onValueChange={(v) => {
                     compat.setFrontSubCount(Number(v));
@@ -278,7 +278,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
 
               <div className="col-span-5">
                 <Select
-                  value={String(rearSubsCfg?.count ?? 0)}
+                  value={String(compat.rearCount ?? 0)}
                   disabled={disabled || !compat.hasCanonicalInstances}
                   onValueChange={(v) => {
                     compat.setRearSubCount(Number(v));
