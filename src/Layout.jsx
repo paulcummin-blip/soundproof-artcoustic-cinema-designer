@@ -33,13 +33,13 @@ import PriceSummary from "@/components/pricing/PriceSummary";
 import DesignRatingSummary from "@/components/pricing/DesignRatingSummary";
 import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAuth } from "@/lib/AuthContext";
-import { hasCapability } from "@/lib/accountAccess";
+import { hasCapability, isMasterAdmin } from "@/lib/accountAccess";
 
 
 const menuItems = [
   { title: "Projects", url: "/Projects", icon: Layers3, capability: "soundProof" },
   { title: "Room Designer", url: "/RoomDesigner", icon: Home, capability: "soundProof" },
-  { title: "SPL Calculator", url: "/SPLCalculator", icon: Calculator, capability: "soundProof" },
+  { title: "SPL Calculator", url: "/SPLCalculator", icon: Calculator, capability: "soundProof", adminOnly: true },
   { title: "Price List", url: "/PriceList", icon: Tags, capability: "priceList" },
   { title: "Users & Permissions", url: "/account/users", icon: UserCog, capability: "manageUsers" },
 ];
@@ -53,7 +53,9 @@ export default function Layout({ children, currentPageName }) {
   const canUsePriceList = hasCapability(user, "priceList");
   const canUseCommercial = hasCapability(user, "commercial");
   const accountName = user?.access_context?.account?.name || null;
-  const availableMenuItems = menuItems.filter((item) => hasCapability(user, item.capability));
+  const availableMenuItems = menuItems.filter((item) =>
+    hasCapability(user, item.capability) && (!item.adminOnly || isMasterAdmin(user))
+  );
   const [dealerAccountUrl, setDealerAccountUrl] = React.useState(null);
 
   // Price summary state (read from window.__ROOM_DESIGNER_PRICE__ set by RoomDesigner)

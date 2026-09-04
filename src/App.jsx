@@ -26,6 +26,7 @@ import PriceList from './pages/PriceList';
 import AccountUsers from './pages/AccountUsers';
 import AccessGate from '@/components/AccessGate';
 import AccessDeniedScreen from '@/components/AccessDeniedScreen';
+import AdminOnlyRoute from '@/components/AdminOnlyRoute';
 import { defaultPathForUser } from '@/lib/accountAccess';
 
 const { Pages, Layout, mainPage } = pagesConfig;
@@ -87,13 +88,17 @@ const AuthenticatedApp = () => {
     <LayoutWrapper currentPageName={mainPageKey}>
       <Routes>
         <Route path="/" element={<AccessHome />} />
-        {Object.entries(Pages).map(([path, Page]) => (
-          <Route
-            key={path}
-            path={`/${path}`}
-            element={<AccessGate capability="soundProof"><Page /></AccessGate>}
-          />
-        ))}
+        {Object.entries(Pages)
+          .filter(([path]) => path !== "SPLCalculator" && path !== "SPLCalculatorV2")
+          .map(([path, Page]) => (
+            <Route
+              key={path}
+              path={`/${path}`}
+              element={<AccessGate capability="soundProof"><Page /></AccessGate>}
+            />
+          ))}
+        <Route path="/SPLCalculator" element={<AdminOnlyRoute redirectTo="/Projects"><Pages.SPLCalculator /></AdminOnlyRoute>} />
+        <Route path="/SPLCalculatorV2" element={<AdminOnlyRoute redirectTo="/Projects"><Pages.SPLCalculatorV2 /></AdminOnlyRoute>} />
         <Route path="/RP22ClientReport" element={<AccessGate capability="soundProof"><RP22ClientReport /></AccessGate>} />
         <Route path="/DesignReview" element={<AccessGate capability="soundProof"><DesignReviewPage /></AccessGate>} />
         <Route path="/PurchaseProjects" element={<AccessGate capability="commercial"><PurchaseProjects /></AccessGate>} />
