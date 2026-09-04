@@ -1,0 +1,292 @@
+{
+  "packageVersion": "sound-proof-rew-golden-inputs-v1",
+  "generatedAt": "2026-09-04T16:44:02.430Z",
+  "authority": "Exact unsmoothed production authoritative arrays; no resampling before REW text import",
+  "inputFrequencyGrid": {
+    "nominalPointsPerOctave": 96,
+    "startHz": 15,
+    "endHz": 200,
+    "pointCount": 360,
+    "finalEndpointRetained": true
+  },
+  "rewProcedure": [
+    "File > Import > Import Frequency Response; select each .txt input.",
+    "Do not alter the imported data or frequency axis.",
+    "Request 1/3 octave smoothing in actual REW.",
+    "Export or API-read the smoothed magnitude at 96 PPO over the overlapping 15-200 Hz range.",
+    "Name each result <fixtureId>.rew-third-octave.txt and record the REW version/date."
+  ],
+  "fixtures": [
+    {
+      "fixtureId": "curve-1-broad-modal",
+      "purpose": "Broad modal response",
+      "filename": "curve-1-broad-modal.txt",
+      "source": {
+        "roomId": "room-c",
+        "roomName": "Room C",
+        "quantity": 4,
+        "comparison": "current production",
+        "seatId": "rsp",
+        "isRsp": true,
+        "isPrimary": true,
+        "placement": [
+          {
+            "x": 1.2,
+            "y": 0.1,
+            "z": 0.35
+          },
+          {
+            "x": 3.5999999999999996,
+            "y": 0.1,
+            "z": 0.35
+          },
+          {
+            "x": 1.2,
+            "y": 7.4,
+            "z": 0.35
+          },
+          {
+            "x": 3.5999999999999996,
+            "y": 7.4,
+            "z": 0.35
+          }
+        ],
+        "levelsDb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "delaysMs": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "selectionMetric": {
+        "p10ToP90Db": 23.145027874597346
+      },
+      "pointCount": 360
+    },
+    {
+      "fixtureId": "curve-2-narrow-deep-null",
+      "purpose": "Narrow deep null",
+      "filename": "curve-2-narrow-deep-null.txt",
+      "source": {
+        "roomId": "room-c",
+        "roomName": "Room C",
+        "quantity": 2,
+        "comparison": "practical + optimised delay",
+        "seatId": "rsp",
+        "isRsp": true,
+        "isPrimary": true,
+        "placement": [
+          {
+            "x": 2.4,
+            "y": 7.3725,
+            "z": 0.35
+          },
+          {
+            "x": 2.4,
+            "y": 0.1275,
+            "z": 0.35
+          }
+        ],
+        "levelsDb": [
+          0,
+          0
+        ],
+        "delaysMs": [
+          0,
+          10.846
+        ]
+      },
+      "selectionMetric": {
+        "score": 28.46577907758015,
+        "frequencyHz": 45.60301365447344,
+        "signedDb": -28.46577907758015
+      },
+      "pointCount": 360
+    },
+    {
+      "fixtureId": "curve-3-broad-30-60-null",
+      "purpose": "Broad 30-60 Hz null",
+      "filename": "curve-3-broad-30-60-null.txt",
+      "source": {
+        "roomId": "room-c",
+        "roomName": "Room C",
+        "quantity": 2,
+        "comparison": "practical + optimised level/delay",
+        "seatId": "secondary-centre",
+        "isRsp": false,
+        "isPrimary": false,
+        "placement": [
+          {
+            "x": 2.4,
+            "y": 7.3725,
+            "z": 0.35
+          },
+          {
+            "x": 2.4,
+            "y": 0.1275,
+            "z": 0.35
+          }
+        ],
+        "levelsDb": [
+          0,
+          -1.139
+        ],
+        "delaysMs": [
+          0,
+          11.19
+        ]
+      },
+      "selectionMetric": {
+        "score": 10.541357442264385,
+        "centreHz": 58,
+        "depressionDb": 10.541357442264385
+      },
+      "pointCount": 360
+    },
+    {
+      "fixtureId": "curve-4a-room-b-rsp",
+      "purpose": "Multi-seat pair: Room B RSP",
+      "filename": "curve-4a-room-b-rsp.txt",
+      "source": {
+        "roomId": "room-b",
+        "roomName": "Room B",
+        "quantity": 4,
+        "comparison": "practical + optimised level/delay",
+        "seatId": "rsp",
+        "isRsp": true,
+        "isPrimary": true,
+        "placement": [
+          {
+            "x": 2,
+            "y": 0.1275,
+            "z": 0.35
+          },
+          {
+            "x": 1.3,
+            "y": 6.1725,
+            "z": 0.35
+          },
+          {
+            "x": 2,
+            "y": 6.1725,
+            "z": 0.35
+          },
+          {
+            "x": 2.7,
+            "y": 6.1725,
+            "z": 0.35
+          }
+        ],
+        "levelsDb": [
+          0,
+          -1.64,
+          -0.902,
+          -1.574
+        ],
+        "delaysMs": [
+          10.807,
+          0,
+          7.162,
+          0
+        ]
+      },
+      "selectionMetric": {
+        "pairedFixture": "curve-4b-room-b-secondary"
+      },
+      "pointCount": 360
+    },
+    {
+      "fixtureId": "curve-4b-room-b-secondary",
+      "purpose": "Multi-seat pair: problematic Room B secondary seat",
+      "filename": "curve-4b-room-b-secondary.txt",
+      "source": {
+        "roomId": "room-b",
+        "roomName": "Room B",
+        "quantity": 4,
+        "comparison": "practical + optimised level/delay",
+        "seatId": "secondary-centre",
+        "isRsp": false,
+        "isPrimary": false,
+        "placement": [
+          {
+            "x": 2,
+            "y": 0.1275,
+            "z": 0.35
+          },
+          {
+            "x": 1.3,
+            "y": 6.1725,
+            "z": 0.35
+          },
+          {
+            "x": 2,
+            "y": 6.1725,
+            "z": 0.35
+          },
+          {
+            "x": 2.7,
+            "y": 6.1725,
+            "z": 0.35
+          }
+        ],
+        "levelsDb": [
+          0,
+          -1.64,
+          -0.902,
+          -1.574
+        ],
+        "delaysMs": [
+          10.807,
+          0,
+          7.162,
+          0
+        ]
+      },
+      "selectionMetric": {
+        "rawWorstDifferenceDb": 34.951695862880655,
+        "rawWorstFrequencyHz": 25.409696919482336,
+        "pairedFixture": "curve-4a-room-b-rsp"
+      },
+      "pointCount": 360
+    },
+    {
+      "fixtureId": "curve-5-upper-band-feature",
+      "purpose": "100-180 Hz feature",
+      "filename": "curve-5-upper-band-feature.txt",
+      "source": {
+        "roomId": "room-c",
+        "roomName": "Room C",
+        "quantity": 1,
+        "comparison": "practical placement only",
+        "seatId": "rsp",
+        "isRsp": true,
+        "isPrimary": true,
+        "placement": [
+          {
+            "x": 2.4,
+            "y": 0.1275,
+            "z": 0.35
+          }
+        ],
+        "levelsDb": [
+          0
+        ],
+        "delaysMs": [
+          0
+        ]
+      },
+      "selectionMetric": {
+        "score": 37.794575191850356,
+        "frequencyHz": 140.65892265831016,
+        "signedDb": -37.794575191850356
+      },
+      "pointCount": 360
+    }
+  ]
+}
