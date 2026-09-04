@@ -127,7 +127,15 @@ try {
     }
     return result;
   };
-  const dedupe = (items, keyFn) => Array.from(new Map(items.map((item) => [keyFn(item), item])).values());
+  const dedupe = (items, keyFn) => {
+    const seen = new Set();
+    return items.filter((item) => {
+      const key = keyFn(item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
   const placementFor = (p) => {
     const { widthM: w, lengthM: l } = room.roomDims;
     const distances = [
