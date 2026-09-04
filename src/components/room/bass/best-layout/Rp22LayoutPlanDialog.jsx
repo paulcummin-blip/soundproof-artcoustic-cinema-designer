@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 import { getModelsByCategoryOrdered } from "@/components/models/speakers/registry";
-import { adjustSourceForCabinet, coordinatesMatch, designMatchesRecommendation } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { adjustSourceForCabinet, designMatchesRecommendation } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 
 const PADDING_FRACTION = 0.125;
 const SUBWOOFER_MODELS = getModelsByCategoryOrdered().SUBWOOFERS;
