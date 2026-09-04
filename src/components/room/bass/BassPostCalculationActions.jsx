@@ -16,6 +16,8 @@ import {
 } from "@/components/room/bass/best-layout/stage2RecommendationAdapter";
 import { canonicalizeNormalizedRoomInputs } from "@/components/room/bass/normalizedRoomInputAdapters";
 import Rp22LayoutPlanDialog from "@/components/room/bass/best-layout/Rp22LayoutPlanDialog";
+import RP22GradingPill from "@/components/ui/RP22GradingPill";
+import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 import {
   buildAppliedInstances,
   coordinatesMatch,
