@@ -485,7 +485,15 @@ export function syncStaleBassAuthority(projectId, currentFingerprint) {
 export function syncPersistentBassAuthority(projectId, currentFingerprint, contract) {
   const key = projectKey(projectId);
   if (key === "free") return Promise.resolve(null);
-  const completed = compactCompletedBassContract(contract);
+  // FIX 1: Detect already-compact contracts (has graphPayload, lacks
+  // finalOptimisedBassResponse) and use them directly. Re-compacting a compact
+  // contract destroys assessmentEnvelope and graphPayload because
+  // buildAssessmentEnvelope / buildGraphPayload read from
+  // finalOptimisedBassResponse which is absent on compact contracts. This is
+  // the same guard used in buildPersistedBassAuthority (line 424) and
+  // syncCachedCompactBassAuthority.
+  const isAlreadyCompact = contract && !contract.finalOptimisedBassResponse && contract.graphPayload;
+  const completed = isAlreadyCompact ? contract : compactCompletedBassContract(contract);
   const signature = `${currentFingerprint || ""}|${completed?.job?.resultFingerprint || ""}|${completed?.selectedCandidateId || ""}`;
   if (syncSignatures.get(key) === signature) return writeQueues.get(key) || Promise.resolve(null);
   syncSignatures.set(key, signature);

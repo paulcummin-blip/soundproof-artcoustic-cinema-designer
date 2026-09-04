@@ -374,7 +374,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               <p className="mt-2 text-[11px] text-[#625143]">The analysis runs only when you press this button. You can continue editing while it runs.</p>
             )}
             <BassTerminalStatus />
-            {sharedBassResults?.hasCurrentResult && (
+            {sharedBassResults?.hasCurrentResult && !sharedBassResults?.calculationInProgress && (
               <BassResultBlock />
             )}
             <BassPostCalculationActions
