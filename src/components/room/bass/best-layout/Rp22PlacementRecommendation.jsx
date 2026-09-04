@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import Rp22RecommendationCard from "@/components/room/bass/best-layout/Rp22RecommendationCard";
 import Rp22LayoutPlanDialog from "@/components/room/bass/best-layout/Rp22LayoutPlanDialog";
-import { coordinatesMatch, validateRecommendationLayout, buildAppliedInstances } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { coordinatesMatch, validateRecommendationLayout, buildAppliedInstances, currentModelFromInstances, defaultDialogModel } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 
 function LevelPill({ level }) {
   const n = Number(level);
@@ -78,13 +78,15 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
     return currentLayout.sources.map((source) => ({ x: source.x, y: source.y, z: source.z, placement: source.placement }));
   }, [currentLayout?.sources]);
 
+  const currentModel = useMemo(() => currentModelFromInstances(subwooferInstances), [subwooferInstances]);
+
   const isLayoutApplied = (layout) => {
     if (!layout?.sources) return false;
     const recommendedSources = layout.sources.map((source) => ({ x: source.x, y: source.y, z: source.z, placement: source.placement }));
     return coordinatesMatch(currentSources, recommendedSources);
   };
 
-  const apply = (layout) => {
+  const apply = (layout, modelOverride = null) => {
     setApplyError(null);
     // Status must be VALID; otherwise application is blocked.
     if (!hasCanonicalInstances) {
@@ -104,7 +106,9 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
     // Save the COMPLETE prior canonical instance array for undo (not only CFG).
     setPrevious({ instances: Array.isArray(subwooferInstances) ? subwooferInstances.map((i) => ({ ...i })) : [] });
     // Build the next canonical instance array from the recommendation layout.
-    const nextInstances = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg);
+    // Pass modelOverride so the dialog's selected model is applied to every
+    // matched instance, not only the positions.
+    const nextInstances = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, modelOverride);
     // One canonical-first commit: instances once, then both CFG mirrors derive
     // afterward. No direct CFG-first setters.
     commitInstances(nextInstances, {
@@ -167,9 +171,10 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
         onOpenChange={(open) => { if (!open) { setSelected(null); setApplyError(null); } }}
         layout={selected}
         roomDims={roomDims}
-        subModel={frontSubsCfg?.model || rearSubsCfg?.model || null}
+        subModel={selected ? defaultDialogModel(subwooferInstances, selected) : null}
         onApply={apply}
-        isApplied={selected ? isLayoutApplied(selected) : false}
+        currentSources={currentSources}
+        currentModel={currentModel}
         applyError={applyError}
         applying={applying}
       />
