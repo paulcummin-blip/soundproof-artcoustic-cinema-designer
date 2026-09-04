@@ -139,7 +139,6 @@ function SeatMap({ rows, showResults }) {
           <div
             style={{
               width: 52,
-              shrink: 0,
               flexShrink: 0,
               fontSize: 12,
               fontWeight: 600,
