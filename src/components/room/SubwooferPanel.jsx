@@ -9,6 +9,7 @@ import BassResultBlock from '@/components/room/bass/BassResultBlock';
 import BassTerminalStatus from '@/components/room/bass/BassTerminalStatus';
 import BassPostCalculationActions from '@/components/room/bass/BassPostCalculationActions';
 import BassPermanentPills from '@/components/room/bass/BassPermanentPills';
+import BassPermanentSeatResults from '@/components/room/bass/BassPermanentSeatResults';
 import CalculateAllTargetResults from '@/components/room/bass/CalculateAllTargetResults';
 import { useSharedBassResults } from '@/components/room/bass/bassResultsStore';
 import BassTargetLevelControl from '@/components/room/bass/BassTargetLevelControl';
@@ -358,6 +359,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
 
             {/* Permanent P14/P18/P19/P20 parameter pills */}
             <BassPermanentPills />
+
+            {/* Permanent P19/P20 per-seat results — always visible beneath the pills */}
+            <BassPermanentSeatResults />
 
             {/* Calculate Parameter Results — calculates only the currently selected target */}
             <div className="mt-3">
