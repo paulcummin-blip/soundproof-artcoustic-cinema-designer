@@ -149,32 +149,25 @@ export function presentP14AnalysisProgress(progress, nowMs = Date.now()) {
     return { label: "Preparing…", etaSeconds: null, complete: false };
   }
 
+  // Secondary status label — small, non-blocking. Shows completed count,
+  // not the ordinal, so a stuck queue honestly reports "2 of 8 prepared"
+  // without implying active progress. ETA is computed for internal/debug
+  // use but is NOT shown in the user-facing label.
+  const baseLabel = `${completed} of ${total} prepared`;
   const active = !!progress?.activeTargetKey;
-  const ordinal = Math.min(total, completed + (active ? 1 : 0));
-  const baseLabel = `Calculating ${ordinal} of ${total}`;
   const meanDurationMs = weightedDurationMs(progress?.completedDurationsMs);
-  if (!Number.isFinite(meanDurationMs)) {
-    return { label: baseLabel, etaSeconds: null, complete: false };
-  }
-
-  // Suppress stale ETA: when no target is actively running, there is no
-  // outstanding work to estimate. Showing "~Ns remaining" when the queue
-  // is empty and no worker is active freezes a false prediction indefinitely.
-  if (!active) {
+  if (!Number.isFinite(meanDurationMs) || !active) {
     return { label: baseLabel, etaSeconds: null, complete: false };
   }
 
   const jobsRemaining = Math.max(0, total - completed);
-  const elapsedCurrentMs = active && Number.isFinite(progress?.activeStartedAtMs)
+  const elapsedCurrentMs = Number.isFinite(progress?.activeStartedAtMs)
     ? Math.max(0, nowMs - progress.activeStartedAtMs)
     : 0;
-  const remainingCurrentMs = active ? Math.max(0, meanDurationMs - elapsedCurrentMs) : 0;
-  const queuedJobs = active ? Math.max(0, jobsRemaining - 1) : jobsRemaining;
+  const remainingCurrentMs = Math.max(0, meanDurationMs - elapsedCurrentMs);
+  const queuedJobs = Math.max(0, jobsRemaining - 1);
   const remainingMs = remainingCurrentMs + queuedJobs * meanDurationMs;
 
-  // Suppress stale ETA: if the active job has been running for more than 3x
-  // the predicted mean duration, the ETA is no longer reliable. Show the
-  // label without a frozen countdown rather than misleading the user.
   if (elapsedCurrentMs > 3 * meanDurationMs) {
     return { label: baseLabel, etaSeconds: null, complete: false };
   }
@@ -183,9 +176,5 @@ export function presentP14AnalysisProgress(progress, nowMs = Date.now()) {
   const etaSeconds = rawSeconds >= 15
     ? Math.max(5, Math.round(rawSeconds / 5) * 5)
     : Math.max(1, Math.round(rawSeconds));
-  return {
-    label: `${baseLabel} · ~${etaSeconds}s remaining`,
-    etaSeconds,
-    complete: false,
-  };
+  return { label: baseLabel, etaSeconds, complete: false };
 }

@@ -35,11 +35,9 @@ export default function CalculateAllTargetResults({ disabled = false }) {
     requestCalculateAllTargets();
   };
 
-  const label = isRunning
-    ? (presentation?.label || "Calculating P18 results…")
-    : isComplete
-      ? "Recalculate All P18 Results"
-      : "Calculate All P18 Results";
+  // Button always says "Calculate All P18 Results" — no Recalculate wording.
+  // Progress ("X of Y prepared") is shown as small secondary text below.
+  const label = "Calculate All P18 Results";
 
   return (
     <div>
@@ -53,7 +51,7 @@ export default function CalculateAllTargetResults({ disabled = false }) {
       </button>
       {isRunning && !isComplete && (
         <p className="mt-1.5 text-[11px] text-[#625143]">
-          {presentation?.label || "Calculating P18 results…"}
+          {presentation?.label || "Preparing…"}
         </p>
       )}
       {isComplete && !isRunning && (

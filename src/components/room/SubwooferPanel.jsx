@@ -5,7 +5,6 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import HeightInput from '@/components/ui/HeightInput';
-import BassResultBlock from '@/components/room/bass/BassResultBlock';
 import BassTerminalStatus from '@/components/room/bass/BassTerminalStatus';
 import BassPostCalculationActions from '@/components/room/bass/BassPostCalculationActions';
 import BassPermanentPills from '@/components/room/bass/BassPermanentPills';
@@ -95,9 +94,6 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
   const hasPreviousBassResult = !!sharedBassResults?.completedBassAuthority?.staleContract;
   const bassCalculationInProgress = sharedBassResults?.calculationInProgress === true;
   const bassCalculationPhaseLabel = sharedBassResults?.calculationPhaseLabel || null;
-  const bassActionLabel = sharedBassResults?.hasCurrentResult || hasPreviousBassResult || bassAuthorityStatus === 'STALE'
-    ? 'Recalculate Parameter Results'
-    : 'Calculate Parameter Results';
   const bassActionDisabled = disabled
     || !hasActiveSubModel
     || sharedBassResults?.canCalculate !== true
@@ -376,7 +372,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 disabled={bassActionDisabled}
                 className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
               >
-                {bassCalculationInProgress ? (bassCalculationPhaseLabel || 'Calculating target results…') : bassActionLabel}
+                {bassCalculationInProgress ? (bassCalculationPhaseLabel || 'Calculating…') : 'Calculate Parameter Results'}
                 </button>
               {!hasActiveSubModel && (
                 <p className="mt-2 text-[11px] text-[#625143]">Select a subwoofer model and quantity before calculating.</p>
@@ -391,11 +387,8 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               <CalculateAllTargetResults disabled={disabled || !hasActiveSubModel} />
             </div>
 
-            {/* Terminal status + detailed result block (shown when a verified result exists) */}
+            {/* Terminal status — error/notice messages only (no duplicated results) */}
             <BassTerminalStatus />
-            {sharedBassResults?.hasCurrentResult && !sharedBassResults?.calculationInProgress && (
-              <BassResultBlock />
-            )}
 
             {/* Improve Bass Response — placement and quantity optimisation */}
             <BassPostCalculationActions

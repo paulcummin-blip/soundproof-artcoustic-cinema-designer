@@ -93,19 +93,16 @@ export default function BassPermanentPills({ compact = true }) {
       {PARAM_KEYS.map((key) => {
         const pill = pills[key] || neutralPill(PARAM_LABELS[key], "—");
         return (
-          <span key={key} className="flex flex-col gap-1" aria-label={pill.text || pill.resultText}>
-            <BassRp22ParameterTooltip parameterKey={key}>
-              <span className="cursor-help text-center text-[11px] font-semibold text-[#213428] underline decoration-dotted underline-offset-2">
+          <BassRp22ParameterTooltip key={key} parameterKey={key}>
+            <span className="flex flex-col gap-1 cursor-help" aria-label={pill.text || pill.resultText}>
+              <span className="text-center text-[11px] font-semibold text-[#213428] underline decoration-dotted underline-offset-2">
                 {key.toUpperCase()}
               </span>
-            </BassRp22ParameterTooltip>
-            <RP22GradingPill level={pill.level} compact={compact} style={{ width: "100%" }}>
-              {pill.resultText}
-            </RP22GradingPill>
-            {pill.detail && (
-              <small className="text-center text-[10px] text-muted-foreground">{pill.detail}</small>
-            )}
-          </span>
+              <RP22GradingPill level={pill.level} compact={compact} style={{ width: "100%" }}>
+                {pill.resultText}
+              </RP22GradingPill>
+            </span>
+          </BassRp22ParameterTooltip>
         );
       })}
     </div>
