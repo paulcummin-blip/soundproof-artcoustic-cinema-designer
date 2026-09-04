@@ -22,7 +22,7 @@ test("Compare Bass Options is an explicit fingerprint-bound heavy action", () =>
 
 test("comparison publishes only after the explicit canonical search completes", () => {
   assert.match(panel, /const comparisonReady = action\?\.action === "compare"[\s\S]*action\.status === "complete"[\s\S]*stage2\.status === "complete"/);
-  assert.match(panel, /\{comparisonReady && \([\s\S]*<ComparisonTable/);
+  assert.match(panel, /\{comparisonReady && \([\s\S]*<ComparisonCards/);
   assert.match(stage2, /simulateAuthoritativeBassResponse/);
   assert.match(stage2, /generateCanonicalCandidatePool/);
   assert.match(stage2, /evaluateCanonicalBassAuthority/);

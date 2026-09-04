@@ -14,8 +14,6 @@
 // It ONLY changes how the final winner is chosen from the evaluated finalists.
 // ---------------------------------------------------------------------------
 
-import { getFamilyDisplayMetadata } from "../stage1/stage1FamilyRegistry";
-
 // Small tolerance so differences of only a few hundredths of a dB do not
 // determine the winner. Matches the user's "small equality tolerance" spec.
 const PARETO_TOLERANCE_DB = 0.05;
