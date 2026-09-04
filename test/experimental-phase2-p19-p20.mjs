@@ -55,7 +55,7 @@ const room = ROOMS[roomArg];
 
 const server = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "error" });
 try {
-  const [engineMod, coreMod, curvesMod, physicsMod, optimiserMod, authorityMod, useAuthorityMod, layoutMod, alignMod] = await Promise.all([
+  const [engineMod, coreMod, curvesMod, physicsMod, optimiserMod, authorityMod, useAuthorityMod, layoutMod, alignMod, finalResponseMod, canonicalAuthorityMod] = await Promise.all([
     server.ssrLoadModule("/src/components/room/bass/authoritativeBassResponseEngine.js"),
     server.ssrLoadModule("/src/bass/core/rewBassEngine.js"),
     server.ssrLoadModule("/src/components/room/bass/rewSourceCurves.js"),
@@ -65,6 +65,8 @@ try {
     server.ssrLoadModule("/src/components/room/bass/useAuthoritativeBassResponse.js"),
     server.ssrLoadModule("/src/components/room/bass/best-layout/bestSubLayoutEngine.js"),
     server.ssrLoadModule("/src/components/room/bass/alignSubsToRSP.jsx"),
+    server.ssrLoadModule("/src/components/room/bass/finalOptimisedBassResponse.js"),
+    server.ssrLoadModule("/src/components/utils/canonicalBassAuthorityEvaluation.js"),
   ]);
 
   const { simulateAuthoritativeBassResponse } = engineMod;
@@ -76,6 +78,8 @@ try {
   const { buildAuthoritativeResponseCurves } = useAuthorityMod;
   const { runBestSubLayoutRecommendation } = layoutMod;
   const { alignSubsToRSP } = alignMod;
+  const { buildFinalOptimisedBassResponse } = finalResponseMod;
+  const { evaluateCanonicalBassAuthority } = canonicalAuthorityMod;
 
   const PHYSICS = Object.freeze({
     surfaceAbsorption: { front: 0.3, back: 0.3, left: 0.3, right: 0.3, ceiling: 0.3, floor: 0.3 },
@@ -229,7 +233,8 @@ try {
   }
 
   grid.all.forEach(computeField);
-  console.log(`[${room.name}] cached ${fieldCache.size} position fields in ${round(performance.now() - fieldStarted, 0)} ms`);
+  const fieldDurationMs = performance.now() - fieldStarted;
+  console.log(`[${room.name}] cached ${fieldCache.size} position fields in ${round(fieldDurationMs, 0)} ms`);
 
   const band30 = () => searchFrequencies.map((f, i) => (f >= 30 && f <= 60 ? i : -1)).filter((i) => i >= 0);
   const fullBand = () => searchFrequencies.map((f, i) => (f >= 20 && f <= transitionHz ? i : -1)).filter((i) => i >= 0);
@@ -576,18 +581,32 @@ try {
       p18TargetBasis: "minimum",
       collectDiagnostics: false,
     });
-    const selected = selectCandidateFromPool(pool).selectedCandidate;
+    const selectedResult = selectCandidateFromPool(pool);
+    const baseSelected = selectedResult.selectedCandidate;
     const optimiserMs = performance.now() - eqStarted;
-    if (!selected) throw new Error(`No selected production candidate for ${config.comparison} q${config.quantity}`);
+    if (!baseSelected) throw new Error(`No selected production candidate for ${config.comparison} q${config.quantity}`);
+    const canonicalResult = buildFinalOptimisedBassResponse({ optimisationResult: selectedResult, selectedLayout: sources });
+    const authority = evaluateCanonicalBassAuthority({
+      canonicalResult,
+      activeSubs: sources,
+      usableLfHz: 22,
+      p14TargetBasis: "minimum",
+      p18TargetBasis: "minimum",
+      requestedLevel: TARGET_LEVEL,
+    });
+    const selected = authority ? { ...baseSelected, ...authority } : baseSelected;
+    const p19DiagnosticTarget = authority?.practicalCalibrationTarget?.length
+      ? authority.practicalCalibrationTarget
+      : baseSelected.productionHouseCurveTarget;
     const diagnosticP19 = computeOfficialP19Assessment({
-      rspPostEqCurve: selected.finalPostEqCurve,
-      canonicalTargetCurve: selected.productionHouseCurveTarget,
+      rspPostEqCurve: baseSelected.finalPostEqCurve,
+      canonicalTargetCurve: p19DiagnosticTarget,
       assessmentStartHz: 30,
       assessmentEndHz: 60,
     });
     const diagnosticP20 = computeOfficialP20Assessment({
-      rspPostEqCurve: selected.finalPostEqCurve,
-      perSeatPostEqCurves: selected.perSeatPostEqCurves,
+      rspPostEqCurve: baseSelected.finalPostEqCurve,
+      perSeatPostEqCurves: baseSelected.perSeatPostEqCurves,
       assessmentStartHz: 30,
       assessmentEndHz: 60,
     });
@@ -608,10 +627,10 @@ try {
         p20WorstSeat: diagnosticP20.worstSeat?.seatId ?? null,
         p20WorstFrequencyHz: diagnosticP20.worstSeat?.worstFrequencyHz ?? null,
       },
-      commonEqFilters: (selected.generatedFilterBank || []).filter((filter) => filter.enabled).map((filter) => ({ frequencyHz: filter.frequencyHz, gainDb: filter.gainDb, q: filter.q ?? filter.Q })),
+      commonEqFilters: (baseSelected.generatedFilterBank || []).filter((filter) => filter.enabled).map((filter) => ({ frequencyHz: filter.frequencyHz, gainDb: filter.gainDb, q: filter.q ?? filter.Q })),
       assessmentBandHz: [selected.assessmentStartHz, selected.assessmentEndHz],
       rawUnsmoothed: { rsp: curves.rspRawCurve, seats: perSeatRawCurves },
-      postEq: { rsp: selected.finalPostEqCurve, seats: selected.perSeatPostEqCurves },
+      postEq: { rsp: baseSelected.finalPostEqCurve, seats: baseSelected.perSeatPostEqCurves },
     };
     evaluationCache.set(key, result);
     console.log(`[${room.name}] final q${config.quantity} ${config.comparison}: P19 ${round(result.p19.rawDb, 2)} dB L${result.p19.level}; P20 ${round(result.p20.rawDb, 2)} dB L${result.p20.level}; ${round(result.timingsMs.total / 1000, 1)} s`);
@@ -651,7 +670,7 @@ try {
     },
     searchDiagnostics: {
       cachedPositionCount: fieldCache.size,
-      cachedPositionTimeMs: round(performance.now() - fieldStarted, 1),
+      cachedPositionTimeMs: round(fieldDurationMs, 1),
       byQuantity: Object.fromEntries(Object.entries(searchResults).map(([quantity, value]) => [quantity, {
         layoutsGenerated: value.layoutsGenerated,
         practicalParetoCount: value.practicalParetoCount,
