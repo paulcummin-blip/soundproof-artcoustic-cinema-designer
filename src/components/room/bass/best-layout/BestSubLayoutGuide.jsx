@@ -237,9 +237,10 @@ export default function BestSubLayoutGuide({
         onOpenChange={(open) => { if (!open) { setSelected(null); setApplyError(null); } }}
         layout={selected}
         roomDims={roomDims}
-        subModel={frontSubsCfg?.model || rearSubsCfg?.model || null}
+        subModel={selected ? defaultDialogModel(subwooferInstances, selected) : null}
         onApply={apply}
-        isApplied={selected ? isApplied(selected) : false}
+        currentSources={currentSources}
+        currentModel={currentModel}
         applying={false}
       />
     </div>
