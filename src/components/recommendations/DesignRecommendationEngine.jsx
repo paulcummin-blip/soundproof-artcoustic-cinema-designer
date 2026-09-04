@@ -215,7 +215,7 @@ function CandidateRatingEvaluator({
     extraSurroundCount: appState?.extraSurroundCount,
     mlpPointOverride: candidate.mlpPoint,
     seatSplMetrics,
-    p15ConstructionLevel: appState?.p15ConstructionLevel,
+    assumedP15Level: appState?.assumedP15Level,
     screen: candidate.screen,
     dolbyLayout: candidate.dolbyLayout,
     includeBassAnalysis: false,

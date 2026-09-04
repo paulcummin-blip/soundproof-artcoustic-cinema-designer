@@ -382,8 +382,8 @@ export default function RoomDesignerControlsPanel({
               dolbyLayout={appState?.dolbyLayout}
               frontSubsCount={appState?.frontSubsCfg?.count}
               rearSubsCount={appState?.rearSubsCfg?.count}
-              p15ConstructionLevel={appState?.p15ConstructionLevel}
-              p21EarlyReflectionPreset={appState?.p21EarlyReflectionPreset}
+              assumedP15Level={appState?.assumedP15Level}
+              assumedP21Level={appState?.assumedP21Level}
               freeMoveLcr={freeMoveLcr} />
           </Suspense>
         </CollapsiblePanel>

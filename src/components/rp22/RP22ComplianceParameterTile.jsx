@@ -55,11 +55,12 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
             SCOPE: <strong>{String(param.scope || "").toUpperCase()}</strong>
           </span>
         </div>
-        {/* Achieved value line — Room-scoped only. Seat-scoped parameters show
-            no aggregate/RSP result in the headline; per-seat results are below. */}
+        {/* Achieved/Assumed value line — Room-scoped only. Seat-scoped parameters show
+            no aggregate/RSP result in the headline; per-seat results are below.
+            P15/P21 are designer-assumed, not calculated — label says "Assumed:". */}
         {!isSeatScope && (
           <div style={{ fontSize: 11, color: "#1B1A1A", marginTop: 6, fontWeight: 600 }}>
-            {"Achieved: "}
+            {(param.id === 15 || param.id === 21) ? "Assumed: " : "Achieved: "}
             <span style={{ color: "#213428" }}>{achievedValue}</span>
           </div>
         )}

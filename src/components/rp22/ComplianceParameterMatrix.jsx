@@ -23,9 +23,12 @@ const levelKey = (lvl) => {
 const deriveStatus = (achievedValue, paramId) => {
   const v = String(achievedValue || "");
   if (/not verified|waiting for bass|waiting for authoritative/i.test(v)) return { label: "Not verified", color: "#8B7F76" };
-  if (/not calculated|insufficient|—|^n\/a$/i.test(v) || v === "") return { label: "Not calculated", color: "#8B7F76" };
   // P15 and P21 are designer-assumed parameters, not calculated results.
-  if (Number(paramId) === 15 || Number(paramId) === 21) return { label: "Assumed", color: "#2d7a4f" };
+  if (Number(paramId) === 15 || Number(paramId) === 21) {
+    if (/not calculated/i.test(v) || v === "" || v === "—") return { label: "Not calculated", color: "#8B7F76" };
+    return { label: "Assumed", color: "#2d7a4f" };
+  }
+  if (/not calculated|insufficient|—|^n\/a$/i.test(v) || v === "") return { label: "Not calculated", color: "#8B7F76" };
   return { label: "Calculated", color: "#2d7a4f" };
 };
 

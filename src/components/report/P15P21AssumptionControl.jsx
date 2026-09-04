@@ -55,13 +55,26 @@ export default function P15P21AssumptionControl({
           lineHeight: 1.3,
         }}
       >
-        <strong style={{ fontWeight: 600, color: "#1B1A1A" }}>Assumed: </strong>
-        {currentLevel ? `${currentLevel} · ${displayValue}` : "Not Calculated"}
+        {currentLevel ? (
+          <>
+            <span style={{ fontWeight: 600, color: "#1B1A1A" }}>
+              Assumed · {currentLevel}
+            </span>
+            {displayValue && (
+              <span style={{ color: "#625143", marginLeft: 4 }}>
+                — Design target: {displayValue}
+              </span>
+            )}
+          </>
+        ) : (
+          <span style={{ fontWeight: 600, color: "#8B7F76" }}>NOT CALCULATED</span>
+        )}
       </div>
     );
   }
 
   // ── Screen mode: interactive L1–L4 pill selector ──
+  // The selected button IS the level indicator — no duplicate pill elsewhere.
   return (
     <div
       style={{
@@ -72,14 +85,7 @@ export default function P15P21AssumptionControl({
         border: "1px solid #EFEEEA",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 6,
-        }}
-      >
+      <div style={{ marginBottom: 6 }}>
         <span
           style={{
             fontSize: 11,
@@ -91,13 +97,17 @@ export default function P15P21AssumptionControl({
         >
           Assumed Performance Level
         </span>
-        {currentLevel ? (
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#213428" }}>
-            {currentLevel} · {displayValue}
-          </span>
-        ) : (
-          <span style={{ fontSize: 10, fontWeight: 600, color: "#8B7F76", fontStyle: "italic" }}>
-            Not Calculated
+        {!currentLevel && (
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: "#8B7F76",
+              fontStyle: "italic",
+              marginLeft: 8,
+            }}
+          >
+            NOT CALCULATED
           </span>
         )}
       </div>
@@ -144,6 +154,18 @@ export default function P15P21AssumptionControl({
           );
         })}
       </div>
+      {currentLevel && displayValue && (
+        <div
+          style={{
+            marginTop: 6,
+            fontSize: 10,
+            color: "#625143",
+            fontFamily: LABEL_FONT,
+          }}
+        >
+          Design target: {displayValue}
+        </div>
+      )}
     </div>
   );
 }

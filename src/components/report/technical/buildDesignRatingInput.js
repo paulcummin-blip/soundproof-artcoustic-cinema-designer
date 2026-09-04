@@ -90,6 +90,8 @@ export function buildDesignRatingInput({
   reportP18Mode = "minimum",
   hasFrontWides = false,
   placedSpeakers = [],
+  assumedP15Level = null,
+  assumedP21Level = null,
 }) {
   const bassVerified = isBassPublicationVerified(completedBassAuthority);
   const seatIds = (Array.isArray(seats) ? seats : []).map((s) => s?.id).filter(Boolean);
@@ -212,6 +214,7 @@ export function buildDesignRatingInput({
     p12,
     p13,
     p14,
+    p15: assumedP15Level || null,
     p18,
     // Seat-scope
     p1: seatScope.p1,
@@ -224,6 +227,7 @@ export function buildDesignRatingInput({
     p17: seatScope.p17,
     p19: seatScope.p19,
     p20: seatScope.p20,
+    p21: assumedP21Level || null,
     screen: screenInput,
   };
 }

@@ -238,6 +238,8 @@ export function useAppDesignRating({
         reportP18Mode,
         hasFrontWides,
         placedSpeakers,
+        assumedP15Level: appState?.assumedP15Level || null,
+        assumedP21Level: appState?.assumedP21Level || null,
       });
       const authority = buildArtcousticDesignRatingAuthority(input);
       const rating = calculateRoomDesignRating(authority);
@@ -282,7 +284,7 @@ export function useAppDesignRating({
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;
     }
-  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, minimumSystemMet]);
+  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, minimumSystemMet, appState?.assumedP15Level, appState?.assumedP21Level]);
 
   // ── Bass readiness gate ──
   // A rating is final only when the completed bass contract is authoritative

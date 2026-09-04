@@ -398,7 +398,7 @@ const getCanonicalRole = (role) => String(role || "").toUpperCase();
 // so that the seatResponses reference never changes between unrelated renders.
 const EMPTY_SEAT_RESPONSES = Object.freeze([]);
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, screenFrontPlaneM, dolbyLayout, visiblePlanSpeakers, includeBassAnalysis = true, diagnosticOwner = "unknown/unattributed" }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, assumedP15Level, screen, screenFrontPlaneM, dolbyLayout, visiblePlanSpeakers, includeBassAnalysis = true, diagnosticOwner = "unknown/unattributed" }) => {
   // Report consumers disable this calculation path and present only the completed bass authority.
   const liveSeatResponses = useSeatResponses(includeBassAnalysis);
   const seatResponses = includeBassAnalysis ? liveSeatResponses : EMPTY_SEAT_RESPONSES;
@@ -851,28 +851,35 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       status: "no_data"
     };
 
-    // RP22 Parameter 15 — Background noise floor (design estimate)
+    // RP22 Parameter 15 — Background noise floor (designer-assumed level)
+    // Consumes the single shared project-level assumedP15Level (L1–L4).
+    // null = NOT CALCULATED (no silent default).
     const p15CatalogEntry = RP22_CATALOG["15"];
-    const p15LevelKey = p15ConstructionLevel || 'standard';
-    
-    // Map construction level to NCB value and RP22 level
-    const p15Mapping = {
-      'standard': { value: 26, level: 1 },
-      'purpose-built': { value: 22, level: 2 },
-      'reference': { value: 18, level: 3 },
-      'studio': { value: 15, level: 4 }
-    };
-    
-    const p15Data = p15Mapping[p15LevelKey] || p15Mapping['standard'];
-    
-    gradedParameters.primary[15] = {
-      title: p15CatalogEntry?.title || "Background noise floor",
-      level: `L${p15Data.level}`,
-      value: p15Data.value,
-      formatted: `NCB ${p15Data.value} (estimate)`,
-      unit: p15CatalogEntry?.unit || "NCB",
-      status: "ok"
-    };
+    const P15_LEVEL_TO_NCB = { L1: 26, L2: 22, L3: 18, L4: 15 };
+    const p15Level = (assumedP15Level && /^L[1-4]$/.test(String(assumedP15Level).toUpperCase()))
+      ? String(assumedP15Level).toUpperCase()
+      : null;
+
+    if (p15Level) {
+      const p15Value = P15_LEVEL_TO_NCB[p15Level];
+      gradedParameters.primary[15] = {
+        title: p15CatalogEntry?.title || "Background noise floor",
+        level: p15Level,
+        value: p15Value,
+        formatted: `NCB ${p15Value}`,
+        unit: p15CatalogEntry?.unit || "NCB",
+        status: "ok"
+      };
+    } else {
+      gradedParameters.primary[15] = {
+        title: p15CatalogEntry?.title || "Background noise floor",
+        level: null,
+        value: null,
+        formatted: "Not Calculated",
+        unit: p15CatalogEntry?.unit || "NCB",
+        status: "no_data"
+      };
+    }
 
     gradedParameters.secondary = null;
 
@@ -1721,7 +1728,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     aimState?.aimRearSurroundsAtMLP,
     aimState?.lcrAimMode,
     overheadState?.lcrAimMode,
-    p15ConstructionLevel,
+    assumedP15Level,
     dolbyLayout,
     screen?.mountMode,
     screen?.floatDepthM,

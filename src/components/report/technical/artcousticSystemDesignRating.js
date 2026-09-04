@@ -36,6 +36,7 @@ import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 import gradeP1Distance from "@/components/utils/rp22/p1LevelAuthority";
 import { isAuthoritativeBassContract } from "@/components/room/bass/completedBassResultPersistence";
 import { assessP18Extension } from "@/components/utils/p18ExtensionAuthority";
+import { normalizeAssumedLevel } from "@/components/utils/assumedParameterAuthority";
 
 // ═══════════════════════════════════════════════════════════════
 // Fixed V1 constants
@@ -61,7 +62,7 @@ export const LEVEL_MULTIPLIERS = Object.freeze({
 });
 
 /** V1 excluded assumption metrics — applicable but unscoreable, always provisional. */
-export const V1_EXCLUDED_PARAMS = Object.freeze(new Set(["p8", "p15", "p21"]));
+export const V1_EXCLUDED_PARAMS = Object.freeze(new Set(["p8"]));
 
 /** Bass-authority parameters that require explicit publication verification to score. */
 const BASS_PARAMS = new Set(["p14", "p18", "p19", "p20"]);
@@ -344,6 +345,21 @@ function scoreScreen(angleDeg) {
   return applyScreenThresholds(angleDeg);
 }
 
+// P15 / P21 are designer-assumed RP22 performance levels. The selected level
+// IS the authority — no acoustic calculation is involved. The rating engine
+// consumes the assumed level directly as the scored level.
+function scoreP15Assumed(assumedLevel) {
+  const lvl = normalizeAssumedLevel(assumedLevel);
+  if (!lvl) return { level: null, provisional: true };
+  return { level: lvl };
+}
+
+function scoreP21Assumed(assumedLevel) {
+  const lvl = normalizeAssumedLevel(assumedLevel);
+  if (!lvl) return { level: null, provisional: true };
+  return { level: lvl };
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Authority building
 // ═══════════════════════════════════════════════════════════════
@@ -367,6 +383,23 @@ function scoreRoomParam(key, input) {
     const result = scoreP11(input);
     if (result.provisional) {
       return { state: "provisional", level: null, multiplier: null, reason: result.reason };
+    }
+    return { state: "scored", level: result.level, multiplier: multiplierForLevel(result.level), reason: null };
+  }
+
+  // P15 / P21 are designer-assumed levels — the level itself IS the authority.
+  // Input is the raw assumed level string (e.g. "L3") or null.
+  if (key === "p15") {
+    const result = scoreP15Assumed(input);
+    if (result.provisional) {
+      return { state: "provisional", level: null, multiplier: null, reason: "not-assumed" };
+    }
+    return { state: "scored", level: result.level, multiplier: multiplierForLevel(result.level), reason: null };
+  }
+  if (key === "p21") {
+    const result = scoreP21Assumed(input);
+    if (result.provisional) {
+      return { state: "provisional", level: null, multiplier: null, reason: "not-assumed" };
     }
     return { state: "scored", level: result.level, multiplier: multiplierForLevel(result.level), reason: null };
   }

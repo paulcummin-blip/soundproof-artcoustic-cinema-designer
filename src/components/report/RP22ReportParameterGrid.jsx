@@ -23,8 +23,8 @@ const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
  *   dolbyLayout         — e.g. "7.1.4"
  *   frontSubsCount      — number
  *   rearSubsCount       — number
- *   p15ConstructionLevel
- *   p21EarlyReflectionPreset
+ *   assumedP15Level
+ *   assumedP21Level
  *   bassAuthority
  *   bassErrorMessage
  *   variant             — "screen" (default) or "print"

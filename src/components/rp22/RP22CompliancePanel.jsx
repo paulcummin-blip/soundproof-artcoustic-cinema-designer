@@ -843,6 +843,9 @@ export default function RP22CompliancePanel({
         </div>
 
         <div style={body}>
+          {/* For P15/P21 the L1–L4 selector below IS the level indicator —
+              no duplicate Level pill row here. All other params show it. */}
+          {!(p.id === 15 || p.id === 21) && (
           <div style={{ ...row, marginTop: 0 }}>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <span style={{ fontSize: 12, color: "#625143" }}>
@@ -863,6 +866,7 @@ export default function RP22CompliancePanel({
               );
             })()}
           </div>
+          )}
 
           {/* thresholds grid */}
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #F0EFEA" }}>

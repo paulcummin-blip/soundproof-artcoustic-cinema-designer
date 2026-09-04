@@ -1366,7 +1366,7 @@ const byId = useEntitiesById({
     seatSplMetrics: allSeatSplMetricsProp,
     overheadState: engineState,
     aimState: engineState,
-    p15ConstructionLevel: appState?.p15ConstructionLevel ?? null,
+    assumedP15Level: appState?.assumedP15Level ?? null,
     screen,
     screenFrontPlaneM,
     visiblePlanSpeakers,

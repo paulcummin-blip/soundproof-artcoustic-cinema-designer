@@ -3,12 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RP22GradingPill from '../ui/RP22GradingPill';
 import { getP21PresetResult } from '@/components/utils/rp22/levels';
+import {
+  getAssumedP15DisplayValue,
+  getAssumedP21DisplayValue,
+  isAssumedLevelSet,
+  normalizeAssumedLevel,
+} from '@/components/utils/assumedParameterAuthority';
 
-export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null, p15ConstructionLevel, onP15ConstructionLevelChange, p21EarlyReflectionPreset, onP21EarlyReflectionPresetChange, displayedLevel = null }) {
-    const [p15Local, setP15Local] = React.useState("purpose-built");
-
+export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null, assumedP15Level, assumedP21Level, displayedLevel = null }) {
     if (!parameter) return null;
-    const p21Local = p21EarlyReflectionPreset || "l3";
 
     const hasRoomResult = roomResult && typeof roomResult === 'object';
     // Use displayedLevel if provided (ensures consistency with count box)
@@ -40,16 +43,13 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
         return <RP22GradingPill level={lvl || '—'} />;
     };
 
-    // P15 local result computation
-    const P15_MAP = {
-        standard: { value: 26, level: "L1" },
-        "purpose-built": { value: 22, level: "L2" },
-        reference: { value: 18, level: "L3" },
-        studio: { value: 15, level: "L4" },
-    };
-    const p15Result = P15_MAP[p15Local];
-
-    const p21Result = getP21PresetResult(p21Local);
+    // P15/P21 are designer-assumed levels — the selected level IS the authority.
+    // No local state, no "estimate" wording. The display value is the canonical
+    // RP22 design target for the selected level, not a Sound Proof calculation.
+    const p15Level = normalizeAssumedLevel(assumedP15Level);
+    const p21Level = normalizeAssumedLevel(assumedP21Level);
+    const p15Display = getAssumedP15DisplayValue(assumedP15Level);
+    const p21Display = getAssumedP21DisplayValue(assumedP21Level);
 
     return (
         <Card className="border bg-white border-[#DCDBD6] h-full">
@@ -214,23 +214,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                             </div>
                         ) : parameter.id === 15 ? (
                             <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
-                                <div className="mb-2">
-                                    <label className="block text-[11px] font-semibold text-[#1B1A1A] mb-1.5">
-                                        Expected room noise control (design estimate)
-                                    </label>
-                                    <select
-                                        className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
-                                        value={p15Local}
-                                        onChange={(e) => setP15Local(e.target.value)}
-                                    >
-                                        <option value="standard">Standard domestic room</option>
-                                        <option value="purpose-built">Purpose-built home cinema</option>
-                                        <option value="reference">Reference-grade isolated room</option>
-                                        <option value="studio">Studio / screening-room grade</option>
-                                    </select>
-                                </div>
                                 <div className="mb-1 pt-2 border-t border-gray-100">Max. NCB rating</div>
-                                <div className="mb-1">Rec.</div>
                                 <div className="text-[13px] space-y-0.5">
                                     <div>L1: 26</div>
                                     <div>L2: 22</div>
@@ -244,21 +228,6 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                             </div>
                         ) : parameter.id === 21 ? (
                             <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
-                                <div className="mb-2">
-                                    <label className="block text-[11px] font-semibold text-[#1B1A1A] mb-1.5">
-                                        Expected early reflection control (design estimate)
-                                    </label>
-                                    <select
-                                        className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
-                                        value={p21Local}
-                                        onChange={(e) => onP21EarlyReflectionPresetChange?.(e.target.value)}
-                                    >
-                                        <option value="l1">No estimate / not applicable</option>
-                                        <option value="l2">Moderately live room</option>
-                                        <option value="l3">Well-balanced treated room</option>
-                                        <option value="l4">Heavily optimised room</option>
-                                    </select>
-                                </div>
                                 <div className="mb-1 pt-2 border-t border-gray-100">Early reflection level (0–15 ms)</div>
                                 <div className="text-[13px] space-y-0.5">
                                     <div>L1: N/A</div>
@@ -330,16 +299,16 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                         ) : parameter.id === 15 ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-bold text-[#1B1A1A]">
-                                    NCB {p15Result.value} (estimate)
+                                    {p15Level ? `Assumed · ${p15Level}` : 'NOT CALCULATED'}
                                 </span>
-                                <RP22GradingPill level={p15Result.level} />
+                                {p15Level && <RP22GradingPill level={p15Level} />}
                             </div>
                         ) : parameter.id === 21 ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-bold text-[#1B1A1A]">
-                                    {p21Result.formatted} (estimate)
+                                    {p21Level ? `Assumed · ${p21Level}` : 'NOT CALCULATED'}
                                 </span>
-                                <RP22GradingPill level={p21Result.level} />
+                                {p21Level && <RP22GradingPill level={p21Level} />}
                             </div>
                         ) : hasRoomResult && roomResult.status !== 'no_data' ? (
                             <div className="flex justify-between items-center">
