@@ -420,7 +420,7 @@ export default function BassPostCalculationActions({
         <p className="mt-2 text-[11px] text-[#625143]">No credible same-quantity improvement was found.</p>
       )}
       {comparisonReady && (
-        <ComparisonTable
+        <ComparisonCards
           currentLayout={currentLayout}
           twoSubLayout={recommended2}
           fourSubLayout={recommended4}
