@@ -4,6 +4,7 @@
 
 import { generateStableId } from "@/components/utils/subwooferInstanceMigration";
 import { deriveSubWallOrientation, subHalfExtents } from "@/components/room/rv/utils/subWallOrientation";
+import { normaliseModelKey } from "@/components/models/speakers/registry";
 
 export const COORDINATE_TOLERANCE_M = 0.01; // 10 mm
 
@@ -386,8 +387,10 @@ export function defaultDialogModel(instances, layout) {
 export function designMatchesRecommendation(currentSources, recommendationSources, currentModel, selectedModel, tolerance = COORDINATE_TOLERANCE_M) {
   const positionMatch = coordinatesMatch(currentSources, recommendationSources, tolerance);
   if (!positionMatch) return false;
-  const cm = String(currentModel || "").trim();
-  const sm = String(selectedModel || "").trim();
+  // Normalise both sides through the registry so legacy uppercase persisted
+  // values compare equal to canonical lowercase keys (and vice-versa).
+  const cm = normaliseModelKey(currentModel);
+  const sm = normaliseModelKey(selectedModel);
   if (!cm || !sm) return false;
   return cm === sm;
 }

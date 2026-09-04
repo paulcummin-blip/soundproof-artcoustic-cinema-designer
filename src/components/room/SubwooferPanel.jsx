@@ -186,7 +186,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               </div>
               </div>
 
-              {frontSubsCfg?.model === "SUB4-12" && (
+              {subwooferModelKey(frontSubsCfg?.model) === "sub4-12" && (
               <div className="col-span-12 mt-3 flex items-center gap-3">
                 <label className="shrink-0 text-[12px] text-[#625143]">Orientation</label>
                 <div className="relative z-10 flex flex-wrap gap-2">
@@ -313,7 +313,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               </div>
               </div>
 
-              {rearSubsCfg?.model === "SUB4-12" && (
+              {subwooferModelKey(rearSubsCfg?.model) === "sub4-12" && (
               <div className="col-span-12 mt-3 flex items-center gap-3">
                 <label className="shrink-0 text-[12px] text-[#625143]">Orientation</label>
                 <div className="relative z-10 flex flex-wrap gap-2">

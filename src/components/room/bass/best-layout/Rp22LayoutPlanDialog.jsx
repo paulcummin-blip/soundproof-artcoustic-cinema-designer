@@ -5,16 +5,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 import { getModelsByCategoryOrdered } from "@/components/models/speakers/registry";
 import { adjustSourceForCabinet, designMatchesRecommendation } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { subwooferModelKey } from "@/components/utils/subwooferDisplayLabel";
 
 const PADDING_FRACTION = 0.125;
 const SUBWOOFER_MODELS = getModelsByCategoryOrdered().SUBWOOFERS;
 const DEFAULT_SUB_MODEL = SUBWOOFER_MODELS[0]?.key || "sub2-12";
 
 export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomDims, subModel, onApply, currentSources, currentModel, applying }) {
-  const [selectedModel, setSelectedModel] = useState(subModel || DEFAULT_SUB_MODEL);
+  const [selectedModel, setSelectedModel] = useState(subwooferModelKey(subModel) || DEFAULT_SUB_MODEL);
 
   useEffect(() => {
-    if (open) setSelectedModel(subModel || DEFAULT_SUB_MODEL);
+    if (open) setSelectedModel(subwooferModelKey(subModel) || DEFAULT_SUB_MODEL);
   }, [open, subModel]);
 
   // Applied state includes MODEL match: the current canonical design must

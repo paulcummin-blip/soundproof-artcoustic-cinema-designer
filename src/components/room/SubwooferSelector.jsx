@@ -6,8 +6,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { getModelsByCategoryOrdered } from "@/components/models/speakers/registry";
 
-const SUB_MODELS = ["SUB2-12", "SUB3-12", "SUB4-12"];
+const SUB_MODELS = getModelsByCategoryOrdered().SUBWOOFERS;
 
 /**
  * cfg: { count?: number, items?: Array<{ model: string }> }
@@ -97,7 +98,7 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
           </SelectTrigger>
           <SelectContent>
             {SUB_MODELS.map(m => (
-              <SelectItem key={m} value={m}>{m}</SelectItem>
+              <SelectItem key={m.key} value={m.key}>{m.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useSubwooferCompatibilityActions } from '@/components/hooks/useSubwooferCompatibilityActions';
+import { subwooferDisplayLabel } from '@/components/utils/subwooferDisplayLabel';
 
 /**
  * SubwooferInstanceList
@@ -54,7 +55,7 @@ function PositionInput({ label, value, onCommit, disabled }) {
 
 function InstanceRow({ instance, selected, onSelect, onPositionChange, canEdit }) {
   const id = instance?.id ?? '—';
-  const model = instance?.model ?? '—';
+  const model = subwooferDisplayLabel(instance?.model) || '—';
   const enabled = instance?.enabled !== false;
   const px = Number(instance?.position?.x);
   const py = Number(instance?.position?.y);

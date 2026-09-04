@@ -5,6 +5,7 @@ import { yHalfExtentM_physical } from '@/components/room/rv/RenderPrimitives';
 import { calculateAzimuth } from '@/components/utils/aimingUtils';
 import { SCREEN_BUFFER_M } from '@/components/room/rv/utils/rvGeometry';
 import { calculateLcrAcousticCentreBand } from '@/components/utils/acoustics/acousticCentreBand';
+import { subwooferDisplayLabel } from '@/components/utils/subwooferDisplayLabel';
 
 const HEADING_FONT = '"Futura PT Light", "Century Gothic", sans-serif';
 const BODY_FONT = '"Didact Gothic", "Century Gothic", sans-serif';
@@ -325,7 +326,7 @@ export default function ScreenWallConstructionGraphic({
       if (s) {
         rows.push({
           role,
-          model: s.model,
+          model: getSpeakerModelMeta(s.model)?.label || s.model,
           dims: `${Math.round(s.dims.widthM * 1000)} × ${Math.round(s.dims.heightM * 1000)} × ${Math.round(s.dims.depthM * 1000)}`,
           centreX: fmtM(s.xM),
           centreH: fmtM(s.zM),
@@ -344,7 +345,7 @@ export default function ScreenWallConstructionGraphic({
       drawnSubs.forEach((sub) => {
         rows.push({
           role: sub.label,
-          model: sub.model,
+          model: subwooferDisplayLabel(sub.model),
           dims: `${Math.round(sub.dims.widthM * 1000)} × ${Math.round(sub.dims.heightM * 1000)} × ${Math.round(sub.dims.depthM * 1000)}`,
           centreX: fmtM(sub.xM),
           centreH: fmtM(sub.bottomHeightM + sub.dims.heightM / 2),
