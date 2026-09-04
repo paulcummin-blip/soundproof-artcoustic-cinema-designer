@@ -1,8 +1,8 @@
-// calculateAllTargetsStore.js — Explicit "Calculate All Target Results" request.
+// calculateAllTargetsStore.js — Explicit "Calculate All P18 Results" request.
 //
 // The background P14 target scheduler (p14TargetBackgroundScheduler.js) is
 // never started automatically. It runs ONLY when the designer explicitly
-// presses the "Calculate All Target Results" button. This store is the
+// presses the "Calculate All P18 Results" button. This store is the
 // bridge: the UI requests, BassBackgroundAnalysisOwner consumes and
 // calls scheduler.schedule().
 

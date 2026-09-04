@@ -118,9 +118,6 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
           commitInstances={compat.commitInstances}
           hasCanonicalInstances={compat.hasCanonicalInstances}
         />
-        <div className="mt-4 mb-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
-          <BassTargetLevelControl disabled={disabled} />
-        </div>
         <div className="grid grid-cols-12 gap-x-4 gap-y-3">
           <div className="col-span-12 md:col-span-6">
             <h4 className="text-[15px] font-semibold text-[#1B1A1A] mb-2">Front Subwoofers</h4>
@@ -354,6 +351,11 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
           </div>
 
           <div className="col-span-12 mt-4 border-t border-[#DCDBD6] pt-4">
+            {/* P14/P18 target controls — kept visually with the parameter pills */}
+            <div className="mb-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
+              <BassTargetLevelControl disabled={disabled} />
+            </div>
+
             {/* Permanent P14/P18/P19/P20 parameter pills */}
             <BassPermanentPills />
 
@@ -375,7 +377,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               )}
             </div>
 
-            {/* Calculate All Target Results — explicit heavy processing of all 8 P14 targets */}
+            {/* Calculate All P18 Results — explicit heavy processing of all 8 P14 targets */}
             <div className="mt-2">
               <CalculateAllTargetResults disabled={disabled || !hasActiveSubModel} />
             </div>

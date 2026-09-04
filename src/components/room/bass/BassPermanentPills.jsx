@@ -42,9 +42,6 @@ export default function BassPermanentPills({ compact = true }) {
   const p14Selection = resolveP14TargetSelectionState(shared?.authoritative?.requested);
   const noP14TargetSelected = p14Selection.noP14TargetSelected;
 
-  // No subwoofer model selected — neutral waiting state
-  const hasActiveSubModel = Array.isArray(shared?.seatingPositions) || true; // gating done by parent
-
   // Build pills based on state
   let pills;
 

@@ -904,7 +904,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   useEffect(() => {
     // The alternative P14 sweep (7 targets other than the selected foreground
     // target) is completely decoupled from the recommendation gate. It runs
-    // ONLY when the designer explicitly presses "Calculate All Target Results".
+    // ONLY when the designer explicitly presses "Calculate All P18 Results".
     // Normal automatic behaviour: scheduler is cancelled (no automatic sweep).
     const scheduler = getP14TargetBackgroundScheduler();
 
