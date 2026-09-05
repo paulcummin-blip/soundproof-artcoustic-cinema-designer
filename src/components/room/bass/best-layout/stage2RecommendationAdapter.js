@@ -66,25 +66,47 @@ function placementForCoordinate(coordinate, roomDims) {
 }
 
 function sourcesFromStage2(result, roomDims, sourceHeightM) {
-  return (Array.isArray(result?.coordinates) ? result.coordinates : []).map((coordinate, index) => ({
-    id: `stage2-recommendation-${result.finalistId || result.familyId || "layout"}-${index + 1}`,
-    x: Number(coordinate.x),
-    y: Number(coordinate.y),
-    z: Number.isFinite(Number(sourceHeightM)) ? Number(sourceHeightM) : 0.05,
-    placement: placementForCoordinate(coordinate, roomDims),
-  }));
+  const appliedTuning = Array.isArray(result?.appliedTuning) ? result.appliedTuning : null;
+  return (Array.isArray(result?.coordinates) ? result.coordinates : []).map((coordinate, index) => {
+    const source = {
+      id: `stage2-recommendation-${result.finalistId || result.familyId || "layout"}-${index + 1}`,
+      x: Number(coordinate.x),
+      y: Number(coordinate.y),
+      z: Number.isFinite(Number(sourceHeightM)) ? Number(sourceHeightM) : 0.05,
+      placement: placementForCoordinate(coordinate, roomDims),
+    };
+    // Carry the tuning from delay-only / level+delay variants so the
+    // recommendation can be applied to the project's subwoofer instances.
+    if (appliedTuning && appliedTuning[index]) {
+      source.tuning = {
+        gainDb: appliedTuning[index].gainDb ?? 0,
+        delayMs: appliedTuning[index].delayMs ?? 0,
+        polarity: appliedTuning[index].polarity ?? 0,
+      };
+    }
+    return source;
+  });
 }
 
 function sourceFromCurrent(sub, index, roomDims) {
   const x = Number.isFinite(Number(sub?.position?.x)) ? Number(sub.position.x) : Number(sub?.x);
   const y = Number.isFinite(Number(sub?.position?.y)) ? Number(sub.position.y) : Number(sub?.y);
   const group = sub?.group || sub?.legacyGroup;
+  // Preserve per-sub tuning (gainDb, delayMs, polarity) so detectMutedSubs
+  // can correctly identify effectively muted subs (gainDb ≤ −30 dB).
+  // Without this, tuning is dropped and muted subs are never detected.
+  const tuning = {
+    gainDb: Number(sub?.gainDb) || 0,
+    delayMs: Number(sub?.delayMs) || 0,
+    polarity: Number(sub?.polarity) || 0,
+  };
   return {
     id: sub?.id || `current-sub-${index + 1}`,
     x,
     y,
     z: Number.isFinite(Number(sub?.position?.z)) ? Number(sub.position.z) : Number(sub?.z),
     placement: group === "front" || group === "rear" ? group : placementForCoordinate({ x, y }, roomDims),
+    tuning,
   };
 }
 

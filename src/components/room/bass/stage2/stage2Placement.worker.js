@@ -11,10 +11,10 @@
 //   Runs evaluateStage2Confirmation using a cached raw transfer to
 //   produce P14/P18/P19/P20 authority. Does NOT re-run the modal simulation.
 
-import { evaluateStage2Placement, evaluateStage2Confirmation } from "./stage2CanonicalEvaluation";
+import { evaluateStage2Placement, evaluateStage2Confirmation, evaluateStage2ConfirmationWithTuning } from "./stage2CanonicalEvaluation";
 
 self.onmessage = (event) => {
-  const { requestId, fingerprint, phase, finalist, rawTransfer, ...params } = event.data || {};
+  const { requestId, fingerprint, phase, finalist, rawTransfer, tuningVariant, ...params } = event.data || {};
   if (!requestId) {
     self.postMessage({ type: "error", requestId: null, error: "Missing requestId" });
     return;
@@ -28,8 +28,16 @@ self.onmessage = (event) => {
         self.postMessage({ type: "error", requestId, fingerprint, phase: "confirmation", finalistId: finalist?.id, error: "Missing rawTransfer for confirmation phase" });
         return;
       }
-      const result = evaluateStage2Confirmation(rawTransfer, params);
-      self.postMessage({ type: "complete", requestId, fingerprint, phase: "confirmation", finalistId: finalist?.id, result });
+      // Delay-only and level+delay variants re-sum the per-source per-seat
+      // complex transfers with searched tuning, then run the full canonical
+      // chain. Placement-only uses the existing confirmation path.
+      if (tuningVariant === "delay-only" || tuningVariant === "level-delay") {
+        const result = evaluateStage2ConfirmationWithTuning(rawTransfer, { tuningVariant, ...params });
+        self.postMessage({ type: "complete", requestId, fingerprint, phase: "confirmation", finalistId: finalist?.id, tuningVariant, result });
+      } else {
+        const result = evaluateStage2Confirmation(rawTransfer, params);
+        self.postMessage({ type: "complete", requestId, fingerprint, phase: "confirmation", finalistId: finalist?.id, result });
+      }
     } else {
       // Legacy: full combined evaluation (backward compatibility)
       const result = evaluateStage2Confirmation(

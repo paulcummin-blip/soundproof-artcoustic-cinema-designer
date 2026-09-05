@@ -230,6 +230,8 @@ class Stage2PlacementController {
     this.bestPerQuantity = {};    // { qty -> { finalist, rawTransfer } }
     this.confirmationJobsPlanned = 0;
     this.confirmationJobsDone = 0;
+    this.confirmationJobsExpectedByQty = {}; // qty -> expected confirmation count
+    this.confirmationJobsDoneByQty = {};     // qty -> completed confirmation count
   }
 
   schedule({ projectId, fingerprint, placementFingerprint, confirmationFingerprint, promotionPlan, allStage1Finalists, stage1Complete, params, quantityOrder, delay }) {
@@ -284,6 +286,8 @@ class Stage2PlacementController {
       this.confirmationQueued[qty] = false;
       this.placementResults[qty] = [];
       this.quantityPlacementProcessed[qty] = 0;
+      this.confirmationJobsExpectedByQty[qty] = 0;
+      this.confirmationJobsDoneByQty[qty] = 0;
 
       for (const f of finalists) {
         if (placementFingerprint && hasCachedRawTransfer(placementFingerprint, f.id)) {
@@ -370,7 +374,15 @@ class Stage2PlacementController {
 
     // Insert confirmation jobs at the FRONT of the queue so they are
     // dispatched before remaining placement jobs for other quantities.
+    // For each shortlisted coordinate set, queue FOUR candidate families:
+    //   1. Placement-only (geometric auto-align, 0 dB trims) — existing
+    //   2. Delay-only (searched delays, 0 dB trims) — new
+    //   3. Level+delay (searched delays + trims) — new
+    // Current is supplied by the adapter's buildCurrentCanonicalLayout.
     const confirmationJobs = [];
+    const hasPerSourceTransfers = !!(best.rawTransfer?.perSourcePerSeatComplexTransfers?.length);
+
+    // 1. Placement-only (always)
     confirmationJobs.push({
       finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
       quantity: qty,
@@ -380,7 +392,31 @@ class Stage2PlacementController {
     this.confirmationJobsPlanned++;
     this.totalJobsPlanned++;
 
-    // If there's a tie, queue an alternate confirmation
+    // 2. Delay-only (only if per-source per-seat transfers are available)
+    if (hasPerSourceTransfers) {
+      confirmationJobs.push({
+        finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+        quantity: qty,
+        phase: "confirmation",
+        tuningVariant: "delay-only",
+        rawTransfer: best.rawTransfer,
+      });
+      this.confirmationJobsPlanned++;
+      this.totalJobsPlanned++;
+
+      // 3. Level+delay
+      confirmationJobs.push({
+        finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+        quantity: qty,
+        phase: "confirmation",
+        tuningVariant: "level-delay",
+        rawTransfer: best.rawTransfer,
+      });
+      this.confirmationJobsPlanned++;
+      this.totalJobsPlanned++;
+    }
+
+    // If there's a tie, queue an alternate confirmation (placement-only)
     if (ranked.length > 1 && isPlacementTied(best, ranked[1])) {
       const alternate = ranked[1];
       confirmationJobs.push({
@@ -396,6 +432,9 @@ class Stage2PlacementController {
     // unshift inserts at front — confirmation jobs are dispatched before
     // remaining placement jobs for non-selected quantities.
     this.queue.unshift(...confirmationJobs);
+
+    // Track expected confirmations for this quantity
+    this.confirmationJobsExpectedByQty[qty] = (this.confirmationJobsExpectedByQty[qty] || 0) + confirmationJobs.length;
 
     if (this.controllerPhase === "placement") {
       this.controllerPhase = "confirmation";
@@ -486,6 +525,7 @@ class Stage2PlacementController {
             rawTransfer,
           });
           this.totalJobsPlanned++;
+          this.confirmationJobsExpectedByQty[4] = (this.confirmationJobsExpectedByQty[4] || 0) + 1;
         } else if (wasBJob) {
           // B finalist: queue exactly one confirmation job after placement.
           // Same lifecycle defect as representatives — without this, the B
@@ -502,6 +542,7 @@ class Stage2PlacementController {
             rawTransfer,
           });
           this.totalJobsPlanned++;
+          this.confirmationJobsExpectedByQty[4] = (this.confirmationJobsExpectedByQty[4] || 0) + 1;
         } else {
           const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
           const placementRanking = buildPlacementRankingTuple(rawTransfer, seatPriorityMap);
@@ -585,10 +626,16 @@ class Stage2PlacementController {
       this.bState = "evaluated";
     }
 
-    // In the confirmation phase, each quantity has at most 1-2 confirmation
-    // jobs (best + optional alternate if tied). No third-finalist logic.
-    if (!wasBJob && !this.quantityFinal[qty]) {
-      this.quantityFinal[qty] = true;
+    // In the confirmation phase, a quantity may have multiple confirmation
+    // jobs (placement-only, delay-only, level+delay, optional alternate).
+    // Only mark the quantity as final when ALL expected confirmations are done.
+    if (!wasBJob) {
+      this.confirmationJobsDoneByQty[qty] = (this.confirmationJobsDoneByQty[qty] || 0) + 1;
+      const expected = this.confirmationJobsExpectedByQty[qty] || 0;
+      const done = this.confirmationJobsDoneByQty[qty];
+      if (done >= expected && !this.quantityFinal[qty]) {
+        this.quantityFinal[qty] = true;
+      }
     }
 
     // Dispatch next or check B eligibility + completion
@@ -742,6 +789,7 @@ class Stage2PlacementController {
               rawTransfer,
             });
             this.totalJobsPlanned++;
+            this.confirmationJobsExpectedByQty[4] = (this.confirmationJobsExpectedByQty[4] || 0) + 1;
             queuedAny = true;
           } else {
             // Queue for placement/raw transfer. The confirmation will be

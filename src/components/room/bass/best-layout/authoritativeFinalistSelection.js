@@ -382,10 +382,24 @@ export function selectAuthoritativeFinalist(quantityResult, roomDims, currentLay
     });
 
     if (jointlyImproving.length > 0) {
-      // Among jointly improving, prefer practical (front/rear) layouts
+      // Practicality is a PREFERENCE, not an absolute veto. Prefer practical
+      // (front/rear) layouts, but a side-wall candidate that is materially
+      // better on BOTH P19 and P20 must still be eligible and may win.
       const practical = jointlyImproving.filter((c) => !c.isSideWall);
-      const pool = practical.length > 0 ? practical : jointlyImproving;
-      // Pick the one with the best combined P19+P20 variation
+      const sideWall = jointlyImproving.filter((c) => c.isSideWall);
+      let pool = practical;
+      if (practical.length > 0 && sideWall.length > 0) {
+        // Check if any side-wall candidate is materially better than ALL
+        // practical candidates on both axes. If so, include it in the pool.
+        const bestPracticalCombined = Math.min(...practical.map((c) => c.metrics.p19VariationDb + c.metrics.p20VariationDb));
+        const materiallyBetterSideWall = sideWall.filter((c) =>
+          (c.metrics.p19VariationDb + c.metrics.p20VariationDb) < bestPracticalCombined - MATERIAL_IMPROVEMENT_DB
+        );
+        if (materiallyBetterSideWall.length > 0) {
+          pool = [...practical, ...materiallyBetterSideWall];
+        }
+      }
+      if (practical.length === 0) pool = jointlyImproving;
       winner = pool.reduce((best, c) =>
         (c.metrics.p19VariationDb + c.metrics.p20VariationDb) <
         (best.metrics.p19VariationDb + best.metrics.p20VariationDb) ? c : best
@@ -398,9 +412,20 @@ export function selectAuthoritativeFinalist(quantityResult, roomDims, currentLay
       });
 
       if (tradeOffs.length > 0) {
-        // Select the best trade-off but label it as such
+        // Practicality is a preference, not a veto — same logic as above.
         const practical = tradeOffs.filter((c) => !c.isSideWall);
-        const pool = practical.length > 0 ? practical : tradeOffs;
+        const sideWall = tradeOffs.filter((c) => c.isSideWall);
+        let pool = practical;
+        if (practical.length > 0 && sideWall.length > 0) {
+          const bestPracticalCombined = Math.min(...practical.map((c) => c.metrics.p19VariationDb + c.metrics.p20VariationDb));
+          const materiallyBetterSideWall = sideWall.filter((c) =>
+            (c.metrics.p19VariationDb + c.metrics.p20VariationDb) < bestPracticalCombined - MATERIAL_IMPROVEMENT_DB
+          );
+          if (materiallyBetterSideWall.length > 0) {
+            pool = [...practical, ...materiallyBetterSideWall];
+          }
+        }
+        if (practical.length === 0) pool = tradeOffs;
         winner = pool.reduce((best, c) =>
           (c.metrics.p19VariationDb + c.metrics.p20VariationDb) <
           (best.metrics.p19VariationDb + best.metrics.p20VariationDb) ? c : best
@@ -420,9 +445,22 @@ export function selectAuthoritativeFinalist(quantityResult, roomDims, currentLay
       }
     }
   } else {
-    // No current layout to compare — pick the best Pareto candidate
+    // No current layout to compare — pick the best Pareto candidate.
+    // Practicality is a preference: prefer practical, but allow materially
+    // better side-wall candidates to win.
     const practical = nonCurrentPareto.filter((c) => !c.isSideWall);
-    const pool = practical.length > 0 ? practical : nonCurrentPareto;
+    const sideWall = nonCurrentPareto.filter((c) => c.isSideWall);
+    let pool = practical;
+    if (practical.length > 0 && sideWall.length > 0) {
+      const bestPracticalCombined = Math.min(...practical.map((c) => c.metrics.p19VariationDb + c.metrics.p20VariationDb));
+      const materiallyBetterSideWall = sideWall.filter((c) =>
+        (c.metrics.p19VariationDb + c.metrics.p20VariationDb) < bestPracticalCombined - MATERIAL_IMPROVEMENT_DB
+      );
+      if (materiallyBetterSideWall.length > 0) {
+        pool = [...practical, ...materiallyBetterSideWall];
+      }
+    }
+    if (practical.length === 0) pool = nonCurrentPareto;
     winner = pool.reduce((best, c) =>
       (c.metrics.p19VariationDb + c.metrics.p20VariationDb) <
       (best.metrics.p19VariationDb + best.metrics.p20VariationDb) ? c : best

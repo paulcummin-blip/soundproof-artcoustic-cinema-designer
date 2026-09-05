@@ -417,6 +417,94 @@ export function evaluateStage2Confirmation(rawTransfer, {
   };
 }
 
+// ── Tuning-variant confirmation (delay-only, level+delay) ────────────────
+
+/**
+ * Evaluate a Stage 2 finalist with a specific tuning variant (delay-only or
+ * level+delay). Re-sums the per-source per-seat complex transfers with the
+ * variant's tuning, then runs the FULL canonical chain (EQ pool, P18, P19,
+ * P20, grading). This is mathematically equivalent to re-simulating with the
+ * variant's tuning but avoids re-running the modal simulation.
+ *
+ * @param {object} rawTransfer — Cached raw transfer with perSourcePerSeatComplexTransfers
+ * @param {object} params — P14 target parameters + tuningVariant
+ * @param {string} params.tuningVariant — "delay-only" | "level-delay"
+ * @param {string} params.p14TargetBasis
+ * @param {number} params.p14TargetLevel
+ * @param {number} params.p14TargetDb
+ * @param {string} params.p18TargetBasis
+ * @returns {object|null} Stage 2 finalist evaluation result with tuningVariant tag
+ */
+export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
+  tuningVariant,
+  p14TargetBasis,
+  p14TargetLevel,
+  p14TargetDb,
+  p18TargetBasis,
+}) {
+  if (!rawTransfer?.perSourcePerSeatComplexTransfers?.length) return null;
+  if (!Number.isFinite(p14TargetDb)) return null;
+
+  const { sources, perSourcePerSeatComplexTransfers, seatIds, usableLfHz, transitionHz } = rawTransfer;
+  if (!sources?.length) return null;
+
+  // Search for the best tuning using per-source RSP transfers
+  const rspTransfers = perSourcePerSeatComplexTransfers.filter((t) => t.seatId === "rsp");
+  let searchResult;
+  if (tuningVariant === "delay-only") {
+    searchResult = searchDelayOnly(rspTransfers, sources.map((s) => ({ yNorm: s.yNorm ?? (s.y / Number(rawTransfer.coordinates?.[0]?.x ? 1 : 1)) })));
+  } else if (tuningVariant === "level-delay") {
+    searchResult = searchLevelAndDelay(rspTransfers, sources.map((s) => ({ yNorm: s.yNorm ?? (s.y / Number(rawTransfer.coordinates?.[0]?.x ? 1 : 1)) })));
+  } else {
+    return null;
+  }
+
+  // Re-sum all seats with the best tuning
+  const tunedSeatResponses = resumWithTuning(perSourcePerSeatComplexTransfers, searchResult.tuning, seatIds);
+  const { rspRawCurve, perSeatRawCurves } = buildResponseCurves(tunedSeatResponses);
+  if (!rspRawCurve.length) return null;
+
+  const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
+  const perSeatRawCurvesWithPriority = perSeatRawCurves.map((seat) => ({
+    ...seat,
+    isPrimary: seatPriorityMap.get(String(seat.seatId)) === "primary",
+  }));
+
+  // Build a tuned raw transfer for the canonical confirmation
+  const tunedRawTransfer = {
+    ...rawTransfer,
+    rspRawCurve,
+    perSeatRawCurves: perSeatRawCurvesWithPriority,
+    // Override sources with the tuned delay/level
+    sources: sources.map((s, i) => ({
+      ...s,
+      tuning: searchResult.tuning[i] || { delayMs: 0, gainDb: 0, polarity: 0 },
+    })),
+  };
+
+  // Run the existing canonical confirmation chain
+  const result = evaluateStage2Confirmation(tunedRawTransfer, {
+    p14TargetBasis,
+    p14TargetLevel,
+    p14TargetDb,
+    p18TargetBasis,
+  });
+
+  if (!result) return null;
+
+  // Tag the result with the tuning variant and per-source tuning
+  return {
+    ...result,
+    tuningVariant,
+    tuningSearch: {
+      bestDelayMs: searchResult.bestDelayMs,
+      bestGainDb: searchResult.bestGainDb ?? 0,
+      bestScore: searchResult.bestScore,
+    },
+    appliedTuning: searchResult.tuning,
+  };
+}
+
 // ── Legacy combined evaluation (backward compatibility) ───────────────────
 
 /**
