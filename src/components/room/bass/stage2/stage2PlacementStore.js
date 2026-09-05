@@ -466,6 +466,10 @@ class Stage2PlacementController {
     if (phase === "confirmation" && job.rawTransfer) {
       workerMessage.rawTransfer = job.rawTransfer;
     }
+    // Pass tuning variant (delay-only / level-delay) for confirmation phase
+    if (phase === "confirmation" && job.tuningVariant) {
+      workerMessage.tuningVariant = job.tuningVariant;
+    }
     this.workers[workerIndex].postMessage(workerMessage);
     this.publishProgress();
   }

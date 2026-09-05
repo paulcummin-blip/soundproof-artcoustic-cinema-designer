@@ -120,6 +120,10 @@ function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPower
       x: sourcePositions[i].x,
       y: sourcePositions[i].y,
       z: centreZ,
+      // Preserve normalised position for front/rear group splitting in
+      // delay/level tuning search (confirmation phase re-summation).
+      yNorm: s.yNorm,
+      xNorm: s.xNorm,
       // When zeroTuning=true, all tuning is zero so per-source per-seat
       // complex transfers can be captured for later re-summation with
       // any tuning variant (placement-only, delay-only, level+delay).
@@ -448,13 +452,16 @@ export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
   const { sources, perSourcePerSeatComplexTransfers, seatIds, usableLfHz, transitionHz } = rawTransfer;
   if (!sources?.length) return null;
 
-  // Search for the best tuning using per-source RSP transfers
+  // Search for the best tuning using per-source RSP transfers.
+  // Sources carry yNorm (normalised 0-1 along room length) for front/rear
+  // group splitting in the delay/level tuning search.
   const rspTransfers = perSourcePerSeatComplexTransfers.filter((t) => t.seatId === "rsp");
+  const searchSources = sources.map((s) => ({ yNorm: s.yNorm ?? 0 }));
   let searchResult;
   if (tuningVariant === "delay-only") {
-    searchResult = searchDelayOnly(rspTransfers, sources.map((s) => ({ yNorm: s.yNorm ?? (s.y / Number(rawTransfer.coordinates?.[0]?.x ? 1 : 1)) })));
+    searchResult = searchDelayOnly(rspTransfers, searchSources);
   } else if (tuningVariant === "level-delay") {
-    searchResult = searchLevelAndDelay(rspTransfers, sources.map((s) => ({ yNorm: s.yNorm ?? (s.y / Number(rawTransfer.coordinates?.[0]?.x ? 1 : 1)) })));
+    searchResult = searchLevelAndDelay(rspTransfers, searchSources);
   } else {
     return null;
   }
