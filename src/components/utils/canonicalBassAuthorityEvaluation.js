@@ -15,7 +15,7 @@ import { buildPostEqBassCapabilityOutcome } from "@/components/utils/postEqBassC
 import { assessP18AgainstRequiredExtension, buildBassTargetWarning } from "@/components/utils/bassDesignPhilosophyAuthority";
 import { assessP18Extension, normalizeP18TargetBasis, p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
 import { isCanonicalP19Ready } from "@/components/room/bass/p19Readiness";
-import { buildSmoothCapabilityEnvelope, buildPracticalCalibrationTarget } from "@/components/utils/practicalCalibrationTarget";
+import { buildSmoothCapabilityEnvelope, buildPracticalCalibrationTarget, applyP18IntentAwareLfOverlay, computeP18ReferenceDb } from "@/components/utils/practicalCalibrationTarget";
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 import { getProductCurveFrequencyRange } from "@/components/models/speakers/registry";
 
@@ -360,14 +360,25 @@ export function evaluateCanonicalBassAuthority({
   // P19 measures response smoothness against T(f), not the ideal H(f). T(f)
   // follows the ideal house curve where the system can physically achieve it
   // and rolls smoothly toward the broad LF capability envelope where it cannot.
+  //
+  // The P18-intent-aware LF overlay is applied to the fallback rebuild so the
+  // target shape is deterministic for the selected target combination even
+  // when the persisted target is missing. The persisted target from the
+  // optimiser already carries the overlay (built with the correct Fd).
   const idealHouseTarget = (Array.isArray(canonicalResult.canonicalTargetCurve) && canonicalResult.canonicalTargetCurve.length)
     ? canonicalResult.canonicalTargetCurve
     : [];
+  const p18DesignHz = p18ThresholdHzForLevel(p14TargetBasis, requestedLevel);
+  const p18ReferenceDb = computeP18ReferenceDb(idealHouseTarget);
   const practicalCalibrationTarget = (Array.isArray(canonicalResult.practicalCalibrationTarget) && canonicalResult.practicalCalibrationTarget.length)
     ? canonicalResult.practicalCalibrationTarget
-    : buildPracticalCalibrationTarget({
-        idealTargetCurve: idealHouseTarget,
-        capabilityEnvelope: buildSmoothCapabilityEnvelope(canonicalResult.maximumSplCurveAfterEq || canonicalResult.maximumSplCurveBeforeEq || []),
+    : applyP18IntentAwareLfOverlay({
+        practicalTargetA: buildPracticalCalibrationTarget({
+          idealTargetCurve: idealHouseTarget,
+          capabilityEnvelope: buildSmoothCapabilityEnvelope(canonicalResult.maximumSplCurveAfterEq || canonicalResult.maximumSplCurveBeforeEq || []),
+        }),
+        p18DesignHz,
+        p18ReferenceDb,
       });
   const p19TargetCurve = practicalCalibrationTarget.length ? practicalCalibrationTarget : idealHouseTarget;
 

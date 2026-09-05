@@ -1,9 +1,9 @@
 import { RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
 
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
-export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v39-smoothed-correction-envelope";
-export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v39-smoothed-correction-envelope";
-export const BASS_RESULT_SCHEMA_VERSION = 31;
+export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v40-p18-intent-aware-lf-target";
+export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v40-p18-intent-aware-lf-target";
+export const BASS_RESULT_SCHEMA_VERSION = 32;
 export const BASS_METRIC_SCHEMA_VERSION = RP22_BASS_METRIC_SCHEMA_VERSION;
 export const BASS_OPTIMISER_POOL_PROPERTY = "pool";
 

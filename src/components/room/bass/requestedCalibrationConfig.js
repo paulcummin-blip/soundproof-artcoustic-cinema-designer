@@ -66,12 +66,13 @@ export function deriveRequestedCalibrationConfig({
     };
   }
   const target = resolveRequestedRp22HouseCurveTarget(getRp22BassOperatingDefinitions(p14TargetBasis, p18TargetBasis), requestedLevel);
-  // P14 and P18 are independent RP22 parameters. P14 is the user's fixed
-  // 20–120 Hz SPL demand; it does not silently request the same numbered P18
-  // level. P18 is graded from the extension actually delivered at that P14
-  // operating output. The only P18 requirement carried here is the selected
-  // basis' L1 floor, used to distinguish a real P18 FAIL from an achieved level.
-  const selectedP18RequiredExtensionHz = p18ThresholdHzForLevel(p18TargetBasis, 1);
+  // Fd = the P18 design frequency for the CURRENT target combination, derived
+  // from the P14 target basis + level (Minimum/Recommended × L1–L4). This is
+  // the target identity's P18 requirement — each of the 8 combinations has its
+  // own deterministic Fd that shapes the Practical Calibration Target's LF
+  // region. This is NOT the L1-only fallback; the P18 pass/fail boundary in
+  // evaluateCanonicalBassAuthority remains L1 (the minimum to pass P18 at all).
+  const selectedP18RequiredExtensionHz = p18ThresholdHzForLevel(p14TargetBasis, requestedLevel);
   const targetSpl = target.targetAnchorDb;
 
   return {

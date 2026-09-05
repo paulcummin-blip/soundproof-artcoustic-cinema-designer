@@ -99,21 +99,142 @@ export function buildPracticalCalibrationTarget({
   });
 }
 
+// ── P18-intent-aware LF target overlay ──
+//
+// The standard Practical Calibration Target A(f) continues the raised house
+// curve unchanged through the P18 extension region, creating an internal
+// contradiction: an otherwise legitimate extension boundary becomes an
+// automatic P19 FAIL because the target at Fd is ~8 dB above the valid -3 dB
+// boundary.
+//
+// The LF overlay resolves this by constructing a tolerance-centred target at
+// the selected P18 design frequency (Fd):
+//
+//   A(f) = existing capability-aware Practical Calibration Target
+//   Fd   = selected P18 design frequency for the current target combination
+//   R    = predetermined P18 reference (median of ideal target over 60–200 Hz)
+//   C    = R - 3 dB (the valid -3 dB boundary level)
+//   M    = (C + A(Fd)) / 2 (midpoint: tolerance between boundary and target)
+//
+// Target shape:
+//   At Fd:       Target = M
+//   Fd → Fd×√2:  smoothstep transition from M back to A(f) (half-octave)
+//   Above Fd×√2: Target = A(f) unchanged (house curve preserved)
+//   Below Fd:    roll down from M at 6 dB/octave
+//   Never:       new target > A(f) (never exceed existing target)
+//
+// This target is PREDETERMINED — it is constructed from the target identity
+// (selected level + basis) before seeing the achieved response. It does NOT
+// move Fd because a smaller subwoofer rolls off early. P18 honestly reports
+// the shortfall; P19 honestly reports the deviation against this fixed target.
+//
+// Both EQ fitting and P19 assessment use the SAME target, preventing authority
+// mismatch.
+
+const P18_REFERENCE_BAND_HZ = [60, 200];
+
+export function computeP18ReferenceDb(idealTargetCurve) {
+  const ideal = normalizeCurve(idealTargetCurve);
+  if (!ideal.length) return null;
+  const bandPoints = ideal.filter((p) => p.frequency >= P18_REFERENCE_BAND_HZ[0] && p.frequency <= P18_REFERENCE_BAND_HZ[1]);
+  if (!bandPoints.length) return null;
+  const sorted = bandPoints.map((p) => p.spl).sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+// smoothstep: 0 at t=0, 1 at t=1, smooth S-curve between.
+function smoothstep(t) {
+  const clamped = Math.max(0, Math.min(1, t));
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
+/**
+ * Apply the P18-intent-aware LF overlay to an existing Practical Calibration
+ * Target A(f). Returns a new target curve that is bit-identical to A(f) above
+ * Fd × √2 and modified below.
+ *
+ * @param {Array} practicalTargetA - The existing capability-aware target A(f)
+ * @param {number} p18DesignHz - Fd, the P18 design frequency for the current target combination
+ * @param {number|null} p18ReferenceDb - R, the predetermined P18 reference level (median of ideal target over 60–200 Hz). If null, derived from practicalTargetA.
+ * @returns {Array} New target curve with the LF overlay applied
+ */
+export function applyP18IntentAwareLfOverlay({ practicalTargetA, p18DesignHz, p18ReferenceDb = null }) {
+  const target = normalizeCurve(practicalTargetA);
+  if (!target.length || !Number.isFinite(p18DesignHz) || p18DesignHz <= 0) return target;
+
+  const fd = Number(p18DesignHz);
+  const kneeHz = fd * Math.SQRT2; // half-octave transition end
+
+  // R = predetermined P18 reference. Derive from the target curve itself
+  // (which is the ideal house target shaped by capability) over 60–200 Hz.
+  // This is predetermined — it does NOT use the achieved response.
+  const rDb = Number.isFinite(p18ReferenceDb) ? Number(p18ReferenceDb) : computeP18ReferenceDb(target);
+  if (!Number.isFinite(rDb)) return target;
+
+  // C = R - 3 dB (the valid -3 dB boundary level)
+  const cDb = rDb - 3;
+
+  // A(Fd) = existing practical target at Fd
+  const aFd = interpolateCurveValue(target, fd);
+  if (!Number.isFinite(aFd)) return target;
+
+  // M = (C + A(Fd)) / 2 — tolerance-centred midpoint
+  const mDb = (cDb + aFd) / 2;
+
+  // 6 dB/octave rolloff below Fd: dB per octave = -6 * log2(f / Fd)
+  // At f = Fd/2, reduction = 6 dB; at f = Fd/4, reduction = 12 dB, etc.
+  return target.map((point) => {
+    const f = point.frequency;
+    const aSpl = point.spl;
+
+    if (f >= kneeHz) {
+      // Above the knee: target = A(f) unchanged
+      return { frequency: f, spl: aSpl };
+    }
+
+    if (f >= fd) {
+      // Fd → Fd×√2: smoothstep transition from M (at Fd) to A(f) (at knee)
+      const t = (f - fd) / (kneeHz - fd);
+      const blend = smoothstep(t);
+      const overlaySpl = mDb + (aSpl - mDb) * blend;
+      // Never exceed A(f)
+      return { frequency: f, spl: Math.min(overlaySpl, aSpl) };
+    }
+
+    // Below Fd: roll down from M at 6 dB/octave
+    const octavesBelow = Math.log2(fd / f);
+    const rolloffDb = 6 * octavesBelow;
+    const overlaySpl = mDb - rolloffDb;
+    // Never exceed A(f)
+    return { frequency: f, spl: Math.min(overlaySpl, aSpl) };
+  });
+}
+
 // Convenience: build both the smooth envelope and the practical target from the
 // raw max SPL curve and the ideal target. Returns { capabilityEnvelope,
 // practicalCalibrationTarget } so callers can persist both identities.
+//
+// When p18DesignHz (Fd) is provided, the P18-intent-aware LF overlay is applied
+// to the practical calibration target. This makes the target shape deterministic
+// for the selected target combination (Minimum/Recommended × L1–L4).
 export function buildPracticalCalibrationTargetFromCapability({
   idealTargetCurve,
   maximumSplCurve,
   requiredHeadroomDb = 0,
   blendScaleDb = DEFAULT_BLEND_SCALE_DB,
+  p18DesignHz = null,
+  p18ReferenceDb = null,
 }) {
   const capabilityEnvelope = buildSmoothCapabilityEnvelope(maximumSplCurve);
-  const practicalCalibrationTarget = buildPracticalCalibrationTarget({
+  const baseTarget = buildPracticalCalibrationTarget({
     idealTargetCurve,
     capabilityEnvelope,
     requiredHeadroomDb,
     blendScaleDb,
   });
+  const practicalCalibrationTarget = (Number.isFinite(p18DesignHz) && p18DesignHz > 0)
+    ? applyP18IntentAwareLfOverlay({ practicalTargetA: baseTarget, p18DesignHz, p18ReferenceDb })
+    : baseTarget;
   return { capabilityEnvelope, practicalCalibrationTarget };
 }
