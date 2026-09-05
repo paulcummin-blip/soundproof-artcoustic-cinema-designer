@@ -658,14 +658,19 @@ export default function RP22CompliancePanel({
           return formatSplDisplay(v);
         }
 
+        if (typeof v === "number" && Number.isFinite(v)) {
+          const paramDef = RP22_PARAMS.find(p => p.id === pid);
+          const unit = paramDef?.unit || "";
+          if (unit === "dB SPL (C)") return formatSplDisplay(v);
+        }
+
         if (res.formatted) return res.formatted;
 
         if (v !== null && v !== undefined) {
           if (typeof v === "number" && Number.isFinite(v)) {
             const paramDef = RP22_PARAMS.find(p => p.id === pid);
             const unit = paramDef?.unit || "";
-            const unitStr = unit === "dB SPL (C)" ? "dBC" : unit;
-            return unit ? `${v.toFixed(1)} ${unitStr}` : v.toFixed(1);
+            return unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1);
           }
           return String(v);
         }
