@@ -1,5 +1,6 @@
 import React from "react";
 import { formatP19Deviation } from "@/components/utils/rp22/levels";
+import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 
 const formatDb = (value, digits = 1) =>
   Number.isFinite(value) ? Number(value).toFixed(digits) : "—";
@@ -114,7 +115,7 @@ export default function P14PresentationHeader({
       {/* Available P14 Capability */}
       <div style={cardStyle}>
         <div style={titleStyle}>Available P14 Capability</div>
-        <div style={valueStyle("#213428")}>{capabilityDb != null ? `${formatDb(capabilityDb)} dBC` : "—"}</div>
+        <div style={valueStyle("#213428")}>{capabilityDb != null ? formatSplDisplay(capabilityDb) : "—"}</div>
         <div style={subtitleStyle(headroomDb != null && headroomDb >= 0 ? "#213428" : "#b45309")}>
           {headroomDb != null ? `${formatDb(headroomDb)} dB headroom after EQ` : "—"}
         </div>
