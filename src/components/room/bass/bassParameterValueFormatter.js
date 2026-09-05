@@ -6,6 +6,7 @@
 // Behaviour is identical to the original function — pure extraction.
 
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 
 const isFiniteNumber = (value) => value !== null
   && value !== undefined
@@ -22,7 +23,7 @@ const normalizeIntegerNoise = (value) => {
 export function formatBassParameterValue(key, value) {
   if (!isFiniteNumber(value)) return "";
   const number = normalizeIntegerNoise(value);
-  if (key === "p14") return `${Math.floor(number + 1e-8)} dBC`;
+  if (key === "p14") return formatSplDisplay(number);
   if (key === "p18") return `${Math.floor(number)} Hz`;
   if (key === "p19" || key === "p20") {
     const pid = key === "p19" ? 19 : 20;
