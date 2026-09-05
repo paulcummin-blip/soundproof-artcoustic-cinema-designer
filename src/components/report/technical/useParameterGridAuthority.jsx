@@ -36,6 +36,7 @@ import { p19LevelText, formatAuthoritativeP19Result, buildP19SeatRows } from "@/
 import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
+import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 
 const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
 
@@ -54,7 +55,7 @@ export const formatMetricFallback = (n, unit) => {
   const u = String(unit || "").trim();
   if (u === "m") return `${n.toFixed(2)}m`;
   if (u === "dB" || u === "± dB") return `${n.toFixed(1)} dB`;
-  if (u === "dB SPL (C)") return `${Math.round(n)} dBC`;
+  if (u === "dB SPL (C)") return formatSplDisplay(n);
   if (u === "Hz") return `${Math.round(n)} Hz`;
   if (u === "°") return `${Math.round(n)}°`;
   if (u === "%") return `${Math.round(n)}%`;
