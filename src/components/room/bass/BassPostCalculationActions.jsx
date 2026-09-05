@@ -15,6 +15,7 @@ import {
   buildStage2RecommendationLayout,
 } from "@/components/room/bass/best-layout/stage2RecommendationAdapter";
 import { canonicalizeNormalizedRoomInputs } from "@/components/room/bass/normalizedRoomInputAdapters";
+import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 import Rp22LayoutPlanDialog from "@/components/room/bass/best-layout/Rp22LayoutPlanDialog";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
@@ -105,7 +106,9 @@ function comparisonValues(layout) {
 }
 
 function resultCell(level, value, unit) {
-  const valueText = Number.isFinite(value) ? `${value.toFixed(unit === "dBC" ? 1 : 0)} ${unit}` : null;
+  const valueText = Number.isFinite(value)
+    ? (unit === "dBC" ? formatSplDisplay(value) : `${value.toFixed(0)} ${unit}`)
+    : null;
   return [levelText(level), valueText].filter(Boolean).join(" · ") || "—";
 }
 
@@ -167,7 +170,7 @@ function ComparisonPill({ parameterKey, level, resultText }) {
 
 function buildComparisonPills(values) {
   const p14ResultText = values.p14Level != null
-    ? [levelText(values.p14Level), values.p14Db != null ? `${values.p14Db.toFixed(1)} dBC` : null].filter(Boolean).join(" · ")
+    ? [levelText(values.p14Level), values.p14Db != null ? formatSplDisplay(values.p14Db) : null].filter(Boolean).join(" · ")
     : "—";
   const p18ResultText = values.p18Level != null
     ? [levelText(values.p18Level), values.p18Hz != null ? `${values.p18Hz.toFixed(0)} Hz` : null].filter(Boolean).join(" · ")
