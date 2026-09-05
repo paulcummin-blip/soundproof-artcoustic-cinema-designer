@@ -727,6 +727,36 @@ try {
     "production Stage 1 top placement + " + stage1TuningSearch.proxyBest.kind,
   );
 
+  if (phase === "baseline") {
+    savePhase({
+      controls: {
+        current,
+        currentSimulationMs: round(currentPlacement.runtimeMs, 1),
+        trusted,
+        trustedSimulationMs: round(trustedPlacement.runtimeMs, 1),
+      },
+      productionPlacement: {
+        stage1: {
+          runtimeMs: round(stage1RuntimeMs, 1),
+          candidateCount: stage1.candidateCount,
+          finalists: stage1.finalists.map((entry) => ({
+            id: entry.id,
+            familyId: entry.familyId,
+            positions: entry.sources.map((source) => ({ x: source.x, y: source.y })),
+          })),
+        },
+        topPlacement: stage1PlacementResult,
+        topTuned: stage1TunedResult,
+        simulationMs: round(stage1Placement.runtimeMs, 1),
+        tuningSearchMs: round(stage1TuningSearch.runtimeMs, 1),
+        delayBest: stage1TuningSearch.delayBest,
+        trimBest: stage1TuningSearch.trimBest,
+      },
+    });
+    await server.close();
+    process.exit(0);
+  }
+
   const seedOptions = [
     { name: "trusted", raw: trustedPlacement.raw, tuning: savedTuning, result: trusted },
     {
