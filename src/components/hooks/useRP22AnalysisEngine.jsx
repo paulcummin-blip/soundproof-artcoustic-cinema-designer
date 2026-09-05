@@ -29,6 +29,7 @@ import {
 import { evaluateCanonicalP2 } from "@/components/utils/rp22/canonicalP2Authority";
 import { computeP10RspNormalisedSpread } from "@/components/utils/rp22/p10RspNormalisation";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 import { gradeP1Distance } from "@/components/utils/rp22/p1LevelAuthority";
 import { computeP11Compliance } from "@/components/utils/rp22/computeP11Compliance";
 import { clampLcrZoneDepth, computeLcrZones, isCentreInZone } from "@/components/utils/rp22/lcrZoneAuthority";
@@ -752,7 +753,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             title: p12CatalogEntry?.title || "Screen speakers SPL capability at RSP",
             level: `L${level12}`,
             value: minSpl,
-            formatted: `${minSpl} dBC`,
+            formatted: formatSplDisplay(minSpl),
             unit: p12CatalogEntry?.unit || "dB SPL (C)",
             status: "ok"
           };
@@ -835,7 +836,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             title: p13CatalogEntry?.title || "Non-screen speakers SPL capability at RSP",
             level: `L${level13}`,
             value: minSpl,
-            formatted: `${minSpl} dBC (${limitingGroup.label})`,
+            formatted: `${formatSplDisplay(minSpl)} (${limitingGroup.label})`,
             unit: p13CatalogEntry?.unit || "dB SPL (C)",
             limitingGroup: limitingGroup.label,
             status: "ok"
