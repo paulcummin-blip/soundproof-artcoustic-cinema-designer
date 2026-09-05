@@ -6,8 +6,9 @@ import { createServer } from "vite";
 
 const roomKey = String(process.argv[2] || "B").toUpperCase();
 const quantity = Number(process.argv[3] || 2);
-if (!["B", "C"].includes(roomKey) || ![2, 4].includes(quantity)) {
-  throw new Error("Usage: node test/experimental-improve-bass-v2.mjs <B|C> <2|4>");
+const phase = String(process.argv[4] || "baseline").toLowerCase();
+if (!["B", "C"].includes(roomKey) || ![2, 4].includes(quantity) || !["baseline", "polarity", "seating", "allpass"].includes(phase)) {
+  throw new Error("Usage: node test/experimental-improve-bass-v2.mjs <B|C> <2|4> <baseline|polarity|seating|allpass>");
 }
 
 const MODEL = "SUB2-12";
@@ -102,6 +103,7 @@ try {
     finalResponseMod,
     authorityMod,
     officialAssessmentMod,
+    normalizedTransferMod,
   ] = await Promise.all([
     server.ssrLoadModule("/src/components/room/bass/stage2/stage2CanonicalEvaluation.js"),
     server.ssrLoadModule("/src/components/room/bass/stage2/stage2TuningSearch.js"),
@@ -112,6 +114,7 @@ try {
     server.ssrLoadModule("/src/components/room/bass/finalOptimisedBassResponse.js"),
     server.ssrLoadModule("/src/components/utils/canonicalBassAuthorityEvaluation.js"),
     server.ssrLoadModule("/src/components/utils/bassAuthoritativeAssessment.js"),
+    server.ssrLoadModule("/src/components/room/bass/normalizedRoomTransferEngine.js"),
   ]);
 
   const { evaluateStage2Placement } = stage2Mod;
@@ -123,6 +126,7 @@ try {
   const { buildFinalOptimisedBassResponse } = finalResponseMod;
   const { evaluateCanonicalBassAuthority } = authorityMod;
   const { computeOfficialP19Assessment, computeOfficialP20Assessment } = officialAssessmentMod;
+  const { computeNormalizedRoomTransfer } = normalizedTransferMod;
 
   function finalistFromPositions(id, positions, familyId = id) {
     return {
