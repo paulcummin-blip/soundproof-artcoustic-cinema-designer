@@ -1,4 +1,5 @@
 import BassTargetWarning from "@/components/room/bass/BassTargetWarning";
+import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 
 export default function BassCapabilitySummary({ capability, targetWarning, p14Parameter }) {
   if (!capability && !targetWarning) return null;
@@ -22,7 +23,7 @@ export default function BassCapabilitySummary({ capability, targetWarning, p14Pa
       <div className="font-semibold text-foreground">P14 Bass SPL Authority</div>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <div><span className="text-muted-foreground">P14 Target:</span> {target}</div>
-        <div><span className="text-muted-foreground">Available Capability:</span> {Number.isFinite(availableDb) ? `${availableDb.toFixed(1)} dBC` : "—"}</div>
+        <div><span className="text-muted-foreground">Available Capability:</span> {formatSplDisplay(availableDb)}</div>
         <div><span className="text-muted-foreground">Achieved Result:</span> {achievedResult}</div>
         <div><span className="text-muted-foreground">P14 + P18 envelope:</span> {capability.passesRequestedLevel ? "PASS" : "FAIL"}</div>
         <div><span className="text-muted-foreground">Limitation:</span> {limitation ? limitation.primary : "None"}</div>
