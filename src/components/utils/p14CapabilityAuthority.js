@@ -1,4 +1,5 @@
 import { getApprovedContinuousSplDb, getSubwooferCurve } from "@/components/models/speakers/registry";
+import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 
 export const P14_MINIMUM_THRESHOLDS = Object.freeze({ L1: 109, L2: 112, L3: 115, L4: 118 });
 export const P14_RECOMMENDED_THRESHOLDS = Object.freeze({ L1: 114, L2: 117, L3: 120, L4: 123 });
@@ -19,7 +20,7 @@ export const p14ThresholdsForBasis = (basis) => normalizeP14TargetBasis(basis) =
   ? P14_RECOMMENDED_THRESHOLDS
   : P14_MINIMUM_THRESHOLDS;
 export const gradeP14ForBasis = (value, basis) => gradeAtThresholds(value, p14ThresholdsForBasis(basis));
-export const formatP14Capability = (value) => Number.isFinite(value) ? `${Math.floor(value + 1e-8)} dBC` : "—";
+export const formatP14Capability = (value) => formatSplDisplay(value);
 export const formatP14BasisLabel = (basis) => normalizeP14TargetBasis(basis) === "recommended" ? "Recommended" : "Minimum";
 
 export function combinedApprovedP14Capability(activeSubs) {
