@@ -1,7 +1,7 @@
 {
   "metadata": {
     "experiment": "post-fix-p19-validation",
-    "generatedAt": "2026-09-04T23:47:04.541Z",
+    "generatedAt": "2026-09-05T12:04:45.545Z",
     "productionCodeModified": false,
     "reranPlacementSearch": false,
     "reranTuningSearch": false,
@@ -103,10 +103,10 @@
         162.65001215808886
       ],
       "correctedP19": {
-        "rawDb": 8.153464826051476,
-        "grade": "FAIL",
-        "level": 0,
-        "worstFrequencyHz": 23.983560215326534
+        "rawDb": 4.115523214415461,
+        "grade": "L2",
+        "level": 2,
+        "worstFrequencyHz": 72.39027184803132
       },
       "p20": {
         "rawDb": 12.036266079852311,
@@ -116,9 +116,9 @@
         "worstFrequencyHz": 53.45392308842035
       },
       "diagnostic30To60": {
-        "p19RawDb": 0.8356193652950594,
+        "p19RawDb": 2.9510951396338356,
         "p19Grade": "L4",
-        "p19WorstFrequencyHz": 30,
+        "p19WorstFrequencyHz": 31.328213472822412,
         "p20RawDb": 12.036266079852311,
         "p20Grade": "L1",
         "p20WorstSeat": "secondary-centre",
@@ -127,10 +127,10 @@
       "beforeAfterP19": {
         "oldRawDb": 8.153465,
         "oldGrade": "FAIL",
-        "correctedRawDb": 8.153464826051476,
-        "correctedGrade": "FAIL",
-        "deltaDb": -1.739485249174777e-7,
-        "improvementDb": 1.739485249174777e-7
+        "correctedRawDb": 4.115523214415461,
+        "correctedGrade": "L2",
+        "deltaDb": -4.03794178558454,
+        "improvementDb": 4.03794178558454
       },
       "authority": {
         "p14Pass": true,
@@ -141,9 +141,9 @@
         "p20Unchanged": true
       },
       "timingsMs": {
-        "authoritativeSimulation": 2863.734929,
-        "optimiserAndCanonicalAuthority": 9958.118956999999,
-        "total": 12821.853885999999
+        "authoritativeSimulation": 5123.769887999999,
+        "optimiserAndCanonicalAuthority": 14748.853051999999,
+        "total": 19872.622939999997
       }
     },
     {
@@ -181,10 +181,10 @@
         162.65001215808886
       ],
       "correctedP19": {
-        "rawDb": 8.333914047676416,
-        "grade": "FAIL",
-        "level": 0,
-        "worstFrequencyHz": 17.205611499597115
+        "rawDb": 3.9858955328351584,
+        "grade": "L3",
+        "level": 3,
+        "worstFrequencyHz": 27.709470975376064
       },
       "p20": {
         "rawDb": 10.71740914954239,
@@ -194,9 +194,9 @@
         "worstFrequencyHz": 17.330290453084093
       },
       "diagnostic30To60": {
-        "p19RawDb": 0.3142258383543606,
-        "p19Grade": "L4",
-        "p19WorstFrequencyHz": 57.872548129037206,
+        "p19RawDb": 3.534248315130938,
+        "p19Grade": "L3",
+        "p19WorstFrequencyHz": 30,
         "p20RawDb": 8.981407266606169,
         "p20Grade": "L1",
         "p20WorstSeat": "secondary-left",
@@ -205,10 +205,10 @@
       "beforeAfterP19": {
         "oldRawDb": 8.333914,
         "oldGrade": "FAIL",
-        "correctedRawDb": 8.333914047676416,
-        "correctedGrade": "FAIL",
-        "deltaDb": 4.76764157042453e-8,
-        "improvementDb": -4.76764157042453e-8
+        "correctedRawDb": 3.9858955328351584,
+        "correctedGrade": "L3",
+        "deltaDb": -4.348018467164842,
+        "improvementDb": 4.348018467164842
       },
       "authority": {
         "p14Pass": true,
@@ -219,9 +219,9 @@
         "p20Unchanged": true
       },
       "timingsMs": {
-        "authoritativeSimulation": 5864.087366,
-        "optimiserAndCanonicalAuthority": 12269.353886000004,
-        "total": 18133.441252000004
+        "authoritativeSimulation": 10013.277188,
+        "optimiserAndCanonicalAuthority": 15022.021483000004,
+        "total": 25035.298671000004
       }
     },
     {
@@ -259,10 +259,10 @@
         162.65001215808886
       ],
       "correctedP19": {
-        "rawDb": 8.242042919988776,
-        "grade": "FAIL",
-        "level": 0,
-        "worstFrequencyHz": 16.476150018439302
+        "rawDb": 4.197649048939709,
+        "grade": "L2",
+        "level": 2,
+        "worstFrequencyHz": 26.72696154421018
       },
       "p20": {
         "rawDb": 7.484707994733327,
@@ -272,9 +272,9 @@
         "worstFrequencyHz": 65.90460007375721
       },
       "diagnostic30To60": {
-        "p19RawDb": 1.6819999775265302,
-        "p19Grade": "L4",
-        "p19WorstFrequencyHz": 60,
+        "p19RawDb": 3.534320747543447,
+        "p19Grade": "L3",
+        "p19WorstFrequencyHz": 30,
         "p20RawDb": 5.864430962644462,
         "p20Grade": "L1",
         "p20WorstSeat": "secondary-left",
@@ -283,10 +283,10 @@
       "beforeAfterP19": {
         "oldRawDb": 8.242043,
         "oldGrade": "FAIL",
-        "correctedRawDb": 8.242042919988776,
-        "correctedGrade": "FAIL",
-        "deltaDb": -8.001122431267049e-8,
-        "improvementDb": 8.001122431267049e-8
+        "correctedRawDb": 4.197649048939709,
+        "correctedGrade": "L2",
+        "deltaDb": -4.044393951060291,
+        "improvementDb": 4.044393951060291
       },
       "authority": {
         "p14Pass": true,
@@ -297,9 +297,9 @@
         "p20Unchanged": true
       },
       "timingsMs": {
-        "authoritativeSimulation": 5647.3438160000005,
-        "optimiserAndCanonicalAuthority": 6089.873927000001,
-        "total": 11737.217743000001
+        "authoritativeSimulation": 9879.374217000004,
+        "optimiserAndCanonicalAuthority": 6857.735192000007,
+        "total": 16737.10940900001
       }
     },
     {
@@ -353,10 +353,10 @@
         162.65001215808886
       ],
       "correctedP19": {
-        "rawDb": 7.0934818646928335,
-        "grade": "FAIL",
-        "level": 0,
-        "worstFrequencyHz": 15
+        "rawDb": 4.922129553755511,
+        "grade": "L2",
+        "level": 2,
+        "worstFrequencyHz": 23.983560215326534
       },
       "p20": {
         "rawDb": 18.50091532638949,
@@ -366,9 +366,9 @@
         "worstFrequencyHz": 51.93219366036858
       },
       "diagnostic30To60": {
-        "p19RawDb": 1.0882435771902834,
-        "p19Grade": "L4",
-        "p19WorstFrequencyHz": 57.872548129037206,
+        "p19RawDb": 3.529425635341269,
+        "p19Grade": "L3",
+        "p19WorstFrequencyHz": 30,
         "p20RawDb": 18.50091532638949,
         "p20Grade": "L1",
         "p20WorstSeat": "secondary-left",
@@ -377,10 +377,10 @@
       "beforeAfterP19": {
         "oldRawDb": 7.093482,
         "oldGrade": "FAIL",
-        "correctedRawDb": 7.0934818646928335,
-        "correctedGrade": "FAIL",
-        "deltaDb": -1.353071663601213e-7,
-        "improvementDb": 1.353071663601213e-7
+        "correctedRawDb": 4.922129553755511,
+        "correctedGrade": "L2",
+        "deltaDb": -2.171352446244489,
+        "improvementDb": 2.171352446244489
       },
       "authority": {
         "p14Pass": true,
@@ -391,9 +391,9 @@
         "p20Unchanged": true
       },
       "timingsMs": {
-        "authoritativeSimulation": 11699.518070999999,
-        "optimiserAndCanonicalAuthority": 12608.198676999993,
-        "total": 24307.71674799999
+        "authoritativeSimulation": 19510.487053000004,
+        "optimiserAndCanonicalAuthority": 20639.505535999997,
+        "total": 40149.992589
       }
     },
     {
@@ -447,10 +447,10 @@
         162.65001215808886
       ],
       "correctedP19": {
-        "rawDb": 6.169468441600586,
-        "grade": "FAIL",
-        "level": 0,
-        "worstFrequencyHz": 15
+        "rawDb": 4.904965865070238,
+        "grade": "L2",
+        "level": 2,
+        "worstFrequencyHz": 20.313833204053388
       },
       "p20": {
         "rawDb": 6.4416196556129535,
@@ -460,8 +460,8 @@
         "worstFrequencyHz": 90.54986565560537
       },
       "diagnostic30To60": {
-        "p19RawDb": 0.08525701228039395,
-        "p19Grade": "L4",
+        "p19RawDb": 3.5348142465097396,
+        "p19Grade": "L3",
         "p19WorstFrequencyHz": 30,
         "p20RawDb": 6.124216902086573,
         "p20Grade": "L1",
@@ -471,10 +471,10 @@
       "beforeAfterP19": {
         "oldRawDb": 6.169468,
         "oldGrade": "FAIL",
-        "correctedRawDb": 6.169468441600586,
-        "correctedGrade": "FAIL",
-        "deltaDb": 4.416005854324112e-7,
-        "improvementDb": -4.416005854324112e-7
+        "correctedRawDb": 4.904965865070238,
+        "correctedGrade": "L2",
+        "deltaDb": -1.2645021349297618,
+        "improvementDb": 1.2645021349297618
       },
       "authority": {
         "p14Pass": true,
@@ -485,9 +485,9 @@
         "p20Unchanged": true
       },
       "timingsMs": {
-        "authoritativeSimulation": 11837.356612000003,
-        "optimiserAndCanonicalAuthority": 24175.107445,
-        "total": 36012.464057000005
+        "authoritativeSimulation": 19707.355027000012,
+        "optimiserAndCanonicalAuthority": 26207.20908,
+        "total": 45914.56410700001
       }
     }
   ]
