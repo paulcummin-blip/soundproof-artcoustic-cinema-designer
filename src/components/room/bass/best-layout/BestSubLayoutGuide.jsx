@@ -1,12 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import Rp22LayoutPlanDialog from "@/components/room/bass/best-layout/Rp22LayoutPlanDialog";
 import {
   buildAppliedInstances,
   coordinatesMatch,
   validateRecommendationLayout,
-  currentModelFromInstances,
-  defaultDialogModel,
 } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 import { useFastBassPlacementAdvisor } from "@/components/room/bass/best-layout/useFastBassPlacementAdvisor";
 import { useBestSubLayoutLiveInputs } from "@/components/room/bass/best-layout/bestSubLayoutLiveInputs";
@@ -62,9 +59,8 @@ function LayoutThumbnail({ layout, roomDims }) {
   );
 }
 
-function AdvisorCard({ quantity, layout, roomDims, isApplied, onApply, onInspect, disabled }) {
+function AdvisorCard({ quantity, layout, roomDims, isApplied, onApply, disabled, seatingPositions }) {
   const copy = OPTION_COPY[quantity];
-  const [showDetails, setShowDetails] = useState(false);
   if (!layout) {
     return (
       <div className="rounded-lg border border-dashed border-[#C9C2B8] bg-white/60 p-3">
@@ -73,8 +69,6 @@ function AdvisorCard({ quantity, layout, roomDims, isApplied, onApply, onInspect
       </div>
     );
   }
-  const metrics = layout.metrics || {};
-  const sideWall = layout.recommendationKind === "side-wall-alternative";
   return (
     <div className={`rounded-lg border p-3 ${isApplied ? "border-2 border-[#213428] bg-[#F3F1EC]" : "border border-[#D9D5CE] bg-white"}`}>
       <div className="flex items-start justify-between gap-2">
@@ -83,13 +77,13 @@ function AdvisorCard({ quantity, layout, roomDims, isApplied, onApply, onInspect
           <span className="rounded-full bg-[#213428] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Applied</span>
         )}
       </div>
-      <button type="button" onClick={() => onInspect(layout)} className="mt-2 block w-full text-left">
+      <div className="mt-2">
         <LayoutThumbnail layout={layout} roomDims={roomDims} />
-      </button>
+      </div>
       <p className="mt-2 text-[12px] leading-snug text-[#1B1A1A]">{copy.verdict}</p>
       {isApplied && (
         <div className="mt-2">
-          <AppliedLayoutPills />
+          <AppliedLayoutPills seatingPositions={seatingPositions} />
         </div>
       )}
       <div className="mt-3">
@@ -103,28 +97,6 @@ function AdvisorCard({ quantity, layout, roomDims, isApplied, onApply, onInspect
           {isApplied ? "Applied" : "Apply"}
         </Button>
       </div>
-      <button
-        type="button"
-        onClick={() => setShowDetails(!showDetails)}
-        className="mt-2 text-[10px] text-[#625143] underline decoration-dotted underline-offset-2 hover:text-[#213428]"
-      >
-        {showDetails ? "Hide details" : "Details"}
-      </button>
-      {showDetails && (
-        <div className="mt-1 space-y-1 text-[10px] leading-relaxed text-[#625143]">
-          <div><span className="font-medium text-[#1B1A1A]">Layout:</span> {layout.name}</div>
-          {sideWall && <div className="text-amber-700">Acoustic alternative — less practical placement.</div>}
-          <div>{metrics.nullRiskLabel}</div>
-          <div>{metrics.expectedConsistencyLabel}</div>
-          <div>{metrics.smoothnessLabel}</div>
-          {layout.practicalReason && <div>{layout.practicalReason}</div>}
-          <div><span className="font-medium text-[#1B1A1A]">Seats assessed:</span> {metrics.rspOnly ? "RSP-only" : metrics.seatsAssessed || "—"}</div>
-          <div>
-            <span className="font-medium text-[#1B1A1A]">Positions:</span>{" "}
-            {(layout.sources || []).map((s) => `(${Number(s.x).toFixed(2)}, ${Number(s.y).toFixed(2)})`).join(" · ")}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -153,11 +125,9 @@ export default function BestSubLayoutGuide({
     sourceHeights,
     roomElements,
   });
-  const [selected, setSelected] = useState(null);
   const [previousInstances, setPreviousInstances] = useState(null);
   const [applyError, setApplyError] = useState(null);
   const currentSources = useMemo(() => currentSourcesFrom(currentSubs), [currentSubs]);
-  const currentModel = useMemo(() => currentModelFromInstances(subwooferInstances), [subwooferInstances]);
   const recommendations = advisor.result?.recommendations || {};
 
   const isApplied = (layout) => coordinatesMatch(currentSources, layout?.sources || []);
@@ -187,7 +157,6 @@ export default function BestSubLayoutGuide({
       front: { placementMode: "manual", isManual: true },
       rear: { placementMode: "manual", isManual: true },
     });
-    setSelected(null);
   };
 
   const undo = () => {
@@ -231,8 +200,8 @@ export default function BestSubLayoutGuide({
               roomDims={roomDims}
               isApplied={recommendations[quantity] ? isApplied(recommendations[quantity]) : false}
               onApply={apply}
-              onInspect={setSelected}
               disabled={!hasCanonicalInstances}
+              seatingPositions={seatingPositions}
             />
           ))}
         </div>
@@ -247,17 +216,6 @@ export default function BestSubLayoutGuide({
         Applying a layout only moves the subwoofers. Press Calculate Parameter Results to run the authoritative bass analysis.
       </p>
 
-      <Rp22LayoutPlanDialog
-        open={Boolean(selected)}
-        onOpenChange={(open) => { if (!open) { setSelected(null); setApplyError(null); } }}
-        layout={selected}
-        roomDims={roomDims}
-        subModel={selected ? defaultDialogModel(subwooferInstances, selected) : null}
-        onApply={apply}
-        currentSources={currentSources}
-        currentModel={currentModel}
-        applying={false}
-      />
     </div>
   );
 }
