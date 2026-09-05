@@ -1,6 +1,7 @@
 import { applyBassSmoothing } from "./bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { buildGraphSourceIdentity } from "./graphSourceIdentity";
+import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 
 export const NORMALIZED_ROOM_REFERENCE_DB = 94;
 
@@ -133,7 +134,7 @@ export function buildAbsoluteHouseCurveSeries(optimisationResult) {
     ? Math.round(optimisationResult.selectedP14TargetDb)
     : null;
   const label = p14TotalDb != null
-    ? `House-curve target · ${p14TotalDb} dBC total`
+    ? `House-curve target · ${formatSplDisplay(p14TotalDb)} total`
     : `Absolute house-curve target — correction band ${Math.round(startHz)}–${Math.round(endHz)} Hz`;
   // C6.2A2: consume all source identity from the shared helper (once).
   const graphIdentity = buildGraphSourceIdentity(optimisationResult);
