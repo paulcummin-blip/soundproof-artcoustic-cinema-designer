@@ -32,7 +32,7 @@ export function runP14TargetBasisFixtures() {
   const displayed = formatP14Capability(112.4);
   const minimum112 = gradeP14ForBasis(112.4, "minimum");
   const recommended112 = gradeP14ForBasis(112.4, "recommended");
-  check("112.4 raw grading versus conservative display rounding", "112 dBC; Minimum L2; Recommended FAIL", `${displayed}; Minimum ${minimum112 ? `L${minimum112}` : "FAIL"}; Recommended ${recommended112 ? `L${recommended112}` : "FAIL"}`, displayed === "112 dBC" && minimum112 === 2 && recommended112 === 0);
+  check("112.4 raw grading versus upward whole-dB display rounding", "113 dBC; Minimum L2; Recommended FAIL", `${displayed}; Minimum ${minimum112 ? `L${minimum112}` : "FAIL"}; Recommended ${recommended112 ? `L${recommended112}` : "FAIL"}`, displayed === "113 dBC" && minimum112 === 2 && recommended112 === 0);
 
   const minDefinitions = getRp22BassOperatingDefinitions("minimum");
   const recDefinitions = getRp22BassOperatingDefinitions("recommended");
