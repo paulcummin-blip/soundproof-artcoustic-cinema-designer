@@ -11,7 +11,7 @@ import {
 import { generateHouseCurveTrials } from "@/components/utils/houseCurveFilterTrials";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
-import { bankResponseSignature, createHouseCurveEvaluationMemo, readExactMemo, writeExactMemo } from "@/components/utils/houseCurveEvaluationMemo";
+import { bankResponseSignature, createHouseCurveEvaluationMemo, filterResponseCacheKey, readExactMemo, writeExactMemo } from "@/components/utils/houseCurveEvaluationMemo";
 import { calculatePreparedBassCurveMetrics, prepareBassCurveMetricGrid } from "@/components/utils/preparedBassCurveMetrics";
 import { evaluatePreparedBankLimits, prepareBankValidation } from "@/components/utils/preparedBankValidation";
 import { evaluateNearTargetProtection, isProtectedFrequency, isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
@@ -84,7 +84,31 @@ function correctedCurvesForSharedBank(seats, filters, operationCounts, memo = nu
     const gridKey = raw.map((point) => point.frequency).join("|");
     let correction = correctionsByFrequencyGrid.get(gridKey);
     if (!correction) {
-      correction = raw.map((point) => filters.reduce((sum, filter) => sum + peakingEqResponseDb(point.frequency, filter), 0));
+      // Per-filter PEQ response-vector cache: each filter's response across
+      // the canonical frequency grid is computed once and reused across
+      // trial banks that share the same filter. Filter addition order is
+      // preserved exactly — the sum still iterates filters in array order,
+      // producing bit-identical floating-point results to the uncached path.
+      if (memo?.enabled && memo.filterResponses) {
+        const filterResponses = filters.map((filter) => {
+          const filterKey = filterResponseCacheKey(filter, gridKey);
+          let responseVector = memo.filterResponses.get(filterKey);
+          if (!responseVector) {
+            responseVector = raw.map((point) => peakingEqResponseDb(point.frequency, filter));
+            memo.filterResponses.set(filterKey, responseVector);
+          }
+          return responseVector;
+        });
+        correction = raw.map((point, pointIndex) => {
+          let sum = 0;
+          for (let filterIndex = 0; filterIndex < filters.length; filterIndex++) {
+            sum += filterResponses[filterIndex][pointIndex];
+          }
+          return sum;
+        });
+      } else {
+        correction = raw.map((point) => filters.reduce((sum, filter) => sum + peakingEqResponseDb(point.frequency, filter), 0));
+      }
       correctionsByFrequencyGrid.set(gridKey, correction);
       if (operationCounts) {
         operationCounts.uniqueCurveFilterEvaluations += 1;
