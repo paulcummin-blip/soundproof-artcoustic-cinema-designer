@@ -50,7 +50,7 @@ export function runBassResultsPresentationFixtures() {
     ["P14 exact integer", "p14", 114.0, "114 dBC"],
     ["P14 rounds 114.1 upward", "p14", 114.1, "115 dBC"],
     ["P14 rounds 114.9 upward", "p14", 114.9, "115 dBC"],
-    ["P14 ignores positive integer noise", "p14", 114.0000000001, "114 dBC"],
+    ["P14 uses strict ceil semantics above an integer", "p14", 114.0000000001, "115 dBC"],
     ["P18 exact integer", "p18", 23.0, "23 Hz"],
     ["P18 rounds 23.4 downward", "p18", 23.4, "23 Hz"],
     ["P18 rounds 23.9 downward", "p18", 23.9, "23 Hz"],
