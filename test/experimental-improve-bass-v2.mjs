@@ -588,7 +588,7 @@ try {
   function savePhase(data) {
     const outputDir = "experiments/improve-bass-v2";
     mkdirSync(outputDir, { recursive: true });
-    const path = outputDir + "/room-" + roomKey.toLowerCase() + "-q" + quantity + "-" + phase + ".json";
+    const path = outputDir + "/room-" + roomKey.toLowerCase() + "-q" + quantity + "-" + phase + "-" + variant + ".json";
     const output = {
       metadata: {
         experiment: "improve-bass-response-v2-read-only-sandbox",
