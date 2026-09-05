@@ -583,6 +583,118 @@ try {
     "TRUSTED_PREVIOUS_FINALIST",
   );
 
+  const phaseStarted = now();
+  function savePhase(data) {
+    const outputDir = "experiments/improve-bass-v2";
+    mkdirSync(outputDir, { recursive: true });
+    const path = outputDir + "/room-" + roomKey.toLowerCase() + "-q" + quantity + "-" + phase + ".json";
+    const output = {
+      metadata: {
+        experiment: "improve-bass-response-v2-read-only-sandbox",
+        productionCodeModified: false,
+        generatedAt: new Date().toISOString(),
+        room: room.name,
+        quantity,
+        phase,
+        model: MODEL,
+        target: TARGET,
+        transitionHz: round(transitionHz),
+      },
+      geometry: {
+        roomDims: room.roomDims,
+        rspPosition: room.rspPosition,
+        seatingPositions: room.seatingPositions,
+      },
+      ...data,
+      totalPhaseRuntimeMs: round(now() - phaseStarted, 1),
+    };
+    writeFileSync(path, JSON.stringify(output, null, 2));
+    console.log("RESULT " + path);
+    console.log(JSON.stringify(output, null, 2));
+  }
+
+  if (phase === "polarity") {
+    const placement = simulatePlacement(trustedFinalist);
+    const control = canonical(placement.raw, savedTuning, "trusted saved finalist");
+    const search = searchPolarity(placement.raw);
+    const alone = canonical(placement.raw, search.best.polarity.tuning, "polarity alone");
+    const delay = canonical(placement.raw, search.best.polarityDelay.tuning, "polarity + delay");
+    const delayTrim = canonical(placement.raw, search.best.polarityDelayTrim.tuning, "polarity + delay + trim");
+    savePhase({
+      control,
+      simulationMs: round(placement.runtimeMs, 1),
+      searchRuntimeMs: round(search.runtimeMs, 1),
+      combinations: search.counts,
+      bestProxy: search.best,
+      authoritative: { alone, delay, delayTrim },
+    });
+    await server.close();
+    process.exit(0);
+  }
+
+  if (phase === "seating") {
+    const placement = simulatePlacement(trustedFinalist);
+    const control = canonical(placement.raw, savedTuning, "trusted saved finalist");
+    const search = searchSeatBlock(trustedFinalist, savedTuning);
+    const movedFixed = canonical(
+      search.best.raw,
+      savedTuning,
+      "seat moved " + round(search.best.offsetM * 1000, 0) + " mm; fixed prior tuning",
+    );
+    const retune = searchPolarity(search.best.raw);
+    const movedTuning = retune.best.polarityDelayTrim.tuning;
+    const movedRetuned = canonical(
+      search.best.raw,
+      movedTuning,
+      "seat moved " + round(search.best.offsetM * 1000, 0) + " mm; polarity/delay/trim retuned",
+    );
+    savePhase({
+      control,
+      simulationMs: round(placement.runtimeMs, 1),
+      search: {
+        runtimeMs: round(search.runtimeMs, 1),
+        coarseCount: search.coarseCount,
+        refineCount: search.refineCount,
+        bestOffsetMm: round(search.best.offsetM * 1000, 0),
+        top: search.top,
+        bestFullSimulationMs: round(search.best.simulationMs, 1),
+      },
+      fixedPriorTuning: movedFixed,
+      retuneSearchMs: round(retune.runtimeMs, 1),
+      retuned: movedRetuned,
+      retunedTuning: movedTuning,
+    });
+    await server.close();
+    process.exit(0);
+  }
+
+  if (phase === "allpass") {
+    const placement = simulatePlacement(trustedFinalist);
+    const control = canonical(placement.raw, savedTuning, "trusted saved finalist");
+    const polarity = searchPolarity(placement.raw);
+    const baseTuning = polarity.best.polarityDelayTrim.tuning;
+    const base = canonical(placement.raw, baseTuning, "polarity + delay + trim base");
+    const search = searchAllPass(placement.raw, baseTuning);
+    const proof = canonical(
+      search.raw,
+      baseTuning,
+      "one first-order all-pass per non-reference sub",
+    );
+    savePhase({
+      control,
+      simulationMs: round(placement.runtimeMs, 1),
+      base,
+      baseTuning,
+      polaritySearchMs: round(polarity.runtimeMs, 1),
+      allPassSearchMs: round(search.runtimeMs, 1),
+      settings: search.settings,
+      proxy: search.proxy,
+      proof,
+    });
+    await server.close();
+    process.exit(0);
+  }
+
   console.log("[" + room.name + " q" + quantity + "] current control");
   const currentPlacement = simulatePlacement(currentFinalist);
   const current = canonical(currentPlacement.raw, zeros(quantity), "current control");
