@@ -18,7 +18,7 @@ import {
   FAMILY_SEEDS,
   isBFamily,
   isProhibitedFamily,
-} from "../stage1/stage1FamilyRegistry";
+} from "../stage1/stage1FamilyRegistry.js";
 
 /**
  * Check if a Stage 2 result passes the credibility gate.

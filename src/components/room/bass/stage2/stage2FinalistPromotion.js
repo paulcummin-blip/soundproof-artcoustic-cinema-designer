@@ -8,8 +8,8 @@
 // A remains prohibited. B is NOT promoted by this module — the B last-resort
 // gate is handled separately by the engine after normal evaluation.
 
-import { STAGE2_FINALISTS_NORMAL, STAGE2_FINALISTS_MAX } from "./stage2Constants";
-import { isProhibitedFamily, isBFamily } from "../stage1/stage1FamilyRegistry";
+import { STAGE2_FINALISTS_NORMAL, STAGE2_FINALISTS_MAX } from "./stage2Constants.js";
+import { isProhibitedFamily, isBFamily } from "../stage1/stage1FamilyRegistry.js";
 
 /**
  * Promote finalists for a single quantity from Stage 1 results.

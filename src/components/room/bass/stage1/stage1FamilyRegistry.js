@@ -2,7 +2,7 @@
 // Stable family identities, display metadata, and search hierarchy for Stage 1.
 // A is prohibited. B is gated/disabled for normal Stage 1.
 
-import { STAGE1_FAMILY_POLICY_VERSION } from "./stage1Constants";
+import { STAGE1_FAMILY_POLICY_VERSION } from "./stage1Constants.js";
 
 // ── Family IDs ──────────────────────────────────────────────────────────
 export const FAMILY_IDS = Object.freeze({

@@ -22,8 +22,8 @@
 //   15. -(asymmetry — not yet available, 0)
 //   16. deterministic coordinate key (string comparison)
 
-import { getFamilyPreferenceRank } from "../stage1/stage1FamilyRegistry";
-import { STAGE2_TIE_TOLERANCE_DB } from "./stage2Constants";
+import { getFamilyPreferenceRank } from "../stage1/stage1FamilyRegistry.js";
+import { STAGE2_TIE_TOLERANCE_DB } from "./stage2Constants.js";
 
 /**
  * Build a per-seat summary from P19/P20 results.

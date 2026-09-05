@@ -21,8 +21,8 @@
 //   5.  -(family preference rank)                  — approved family practicality
 //   6.  deterministic coordinate key               — stable tiebreaker
 
-import { getFamilyPreferenceRank } from "../stage1/stage1FamilyRegistry";
-import { STAGE2_TIE_TOLERANCE_DB } from "./stage2Constants";
+import { getFamilyPreferenceRank } from "../stage1/stage1FamilyRegistry.js";
+import { STAGE2_TIE_TOLERANCE_DB } from "./stage2Constants.js";
 
 /**
  * Compute the raw null depth for a single seat's raw curve.
