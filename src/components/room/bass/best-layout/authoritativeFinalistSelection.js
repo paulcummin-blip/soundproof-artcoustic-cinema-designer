@@ -38,31 +38,6 @@ function numericLevel(value) {
   return match ? Number(match[1]) : 0;
 }
 
-function primarySeats(result, key) {
-  return (Array.isArray(result?.[key]) ? result[key] : [])
-    .filter((seat) => seat?.isPrimary !== false);
-}
-
-/**
- * Worst absolute variation across primary seats for a given metric key.
- * Lower is better (minimisation objective for Pareto).
- */
-function worstPrimaryVariationDb(result, key) {
-  const rows = primarySeats(result, key);
-  if (!rows.length) return Number.POSITIVE_INFINITY;
-  return Math.max(...rows.map((row) => Math.abs(Number(row?.variationDbRaw) || 0)));
-}
-
-/**
- * Floor level across primary seats for a given metric key.
- * Higher is better.
- */
-function primaryFloorLevel(result, key) {
-  const rows = primarySeats(result, key);
-  if (!rows.length) return 0;
-  return Math.min(...rows.map((row) => numericLevel(row?.level)));
-}
-
 /**
  * Detect effectively muted subs from the current layout's source tuning.
  * A sub with gainDb ≤ MUTED_SUB_GAIN_THRESHOLD_DB is effectively muted and
@@ -129,11 +104,19 @@ export function extractAuthoritativeMetrics(result, layout) {
       hasAuthority: false,
     };
   }
+  // Use CANONICAL HEADLINE metrics — the SAME values displayed/reported as the
+  // authoritative headline results. P19 = RSP raw deviation, P20 = worst-seat
+  // raw deviation. Do NOT use worstPrimaryVariationDb or primary-seat-only
+  // proxies for final authoritative selection.
+  const rawP19 = Number(result?.achievedP19VariationDb ?? result?.canonicalResult?.achievedP19VariationDb);
+  const rawP20 = Number(result?.achievedP20VariationDb ?? result?.canonicalResult?.achievedP20VariationDb);
+  const p19VariationDb = Number.isFinite(rawP19) ? Math.abs(rawP19) : Number.POSITIVE_INFINITY;
+  const p20VariationDb = Number.isFinite(rawP20) ? Math.abs(rawP20) : Number.POSITIVE_INFINITY;
   return {
-    p19VariationDb: worstPrimaryVariationDb(result, "perSeatP19"),
-    p20VariationDb: worstPrimaryVariationDb(result, "perSeatP20"),
-    p19Level: primaryFloorLevel(result, "perSeatP19"),
-    p20Level: primaryFloorLevel(result, "perSeatP20"),
+    p19VariationDb,
+    p20VariationDb,
+    p19Level: numericLevel(result?.achievedP19Level ?? result?.canonicalResult?.achievedP19Level),
+    p20Level: numericLevel(result?.achievedP20Level ?? result?.canonicalResult?.achievedP20Level),
     p18Level: numericLevel(result?.p18AchievedLevel ?? result?.canonicalResult?.p18AchievedLevel),
     p18Hz: Number.isFinite(Number(result?.achievedP18Hz ?? result?.canonicalResult?.achievedP18Hz))
       ? Number(result.achievedP18Hz ?? result.canonicalResult.achievedP18Hz)
@@ -143,7 +126,7 @@ export function extractAuthoritativeMetrics(result, layout) {
       ? Number(result.p14AchievedDb ?? result.canonicalResult.p14AchievedDb)
       : null,
     activeCount: layout ? effectiveActiveCount(layout) : Number(result?.quantity) || 0,
-    hasAuthority: !!(result?.perSeatP19?.length || result?.perSeatP20?.length),
+    hasAuthority: Number.isFinite(rawP19) && Number.isFinite(rawP20),
   };
 }
 
@@ -324,6 +307,12 @@ export function selectAuthoritativeFinalist(quantityResult, roomDims, currentLay
       achievedP18Hz: currentLayout.metrics.achievedP18Hz,
       p14AchievedLevel: currentLayout.metrics.p14AchievedLevel,
       p14AchievedDb: currentLayout.metrics.p14AchievedDb,
+      // Canonical headline P19/P20 — same fields the Stage 2 confirmation
+      // result carries, so the current layout is compared on the same basis.
+      achievedP19VariationDb: currentLayout.metrics.achievedP19VariationDb,
+      achievedP19Level: currentLayout.metrics.achievedP19Level,
+      achievedP20VariationDb: currentLayout.metrics.achievedP20VariationDb,
+      achievedP20Level: currentLayout.metrics.achievedP20Level,
       quantity: currentLayout.sources?.length || 0,
     };
     scored.push({

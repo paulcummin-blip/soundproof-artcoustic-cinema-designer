@@ -84,6 +84,8 @@ function makeFinalist({
   p20VariationBySeat = [2.0, 2.5],
   p19Levels = [3, 3],
   p20Levels = [3, 3],
+  p19Headline = null,
+  p20Headline = null,
   p18Level = 3,
   p18Hz = 28,
   p14Level = 3,
@@ -104,6 +106,8 @@ function makeFinalist({
     level: p20Levels[i] ?? 3,
     worstFrequencyHz: 45,
   }));
+  const achievedP19VariationDb = p19Headline ?? Math.max(...p19VariationBySeat.map((v) => Math.abs(v)));
+  const achievedP20VariationDb = p20Headline ?? Math.max(...p20VariationBySeat.map((v) => Math.abs(v)));
   return {
     finalistId,
     familyId,
@@ -111,6 +115,10 @@ function makeFinalist({
     coordinates,
     perSeatP19,
     perSeatP20,
+    achievedP19VariationDb,
+    achievedP19Level: p19Levels[0] ?? 3,
+    achievedP20VariationDb,
+    achievedP20Level: p20Levels[0] ?? 3,
     p18AchievedLevel: p18Level,
     achievedP18Hz: p18Hz,
     p14AchievedLevel: p14Level,
@@ -125,18 +133,20 @@ test("delay-only search returns a tuning array with correct length", () => {
   const sources = [{ yNorm: 0.1 }, { yNorm: 0.9 }];
   const rspTransfers = makeRspTransfersWithNull(2);
   const result = searchDelayOnly(rspTransfers, sources);
-  assert.ok(Array.isArray(result.tuning), "tuning should be an array");
-  assert.equal(result.tuning.length, 2, "tuning should have one entry per source");
-  assert.ok(Number.isFinite(result.bestDelayMs), "bestDelayMs should be finite");
-  assert.ok(Number.isFinite(result.bestScore), "bestScore should be finite");
+  assert.ok(Array.isArray(result.finalists), "finalists should be an array");
+  assert.ok(result.finalists.length >= 1, "should retain at least one finalist");
+  const tuning = result.finalists[0].tuning;
+  assert.ok(Array.isArray(tuning), "tuning should be an array");
+  assert.equal(tuning.length, 2, "tuning should have one entry per source");
+  assert.ok(Number.isFinite(result.finalists[0].score), "score should be finite");
   // Tuning entries should have delayMs, gainDb, polarity
-  for (const t of result.tuning) {
+  for (const t of tuning) {
     assert.ok("delayMs" in t, "tuning entry should have delayMs");
     assert.ok("gainDb" in t, "tuning entry should have gainDb");
     assert.ok("polarity" in t, "tuning entry should have polarity");
   }
   // Delay-only should have zero gain
-  for (const t of result.tuning) {
+  for (const t of tuning) {
     assert.equal(t.gainDb, 0, "delay-only should have zero gainDb");
   }
 });
@@ -146,11 +156,13 @@ test("level+delay search returns tuning with non-positive gain", () => {
   const sources = [{ yNorm: 0.1 }, { yNorm: 0.9 }];
   const rspTransfers = makeRspTransfersWithNull(2);
   const result = searchLevelAndDelay(rspTransfers, sources);
-  assert.ok(Array.isArray(result.tuning), "tuning should be an array");
-  assert.equal(result.tuning.length, 2);
-  assert.ok(Number.isFinite(result.bestGainDb), "bestGainDb should be finite");
+  assert.ok(Array.isArray(result.finalists), "finalists should be an array");
+  assert.ok(result.finalists.length >= 1, "should retain at least one finalist");
+  const tuning = result.finalists[0].tuning;
+  assert.ok(Array.isArray(tuning), "tuning should be an array");
+  assert.equal(tuning.length, 2);
   // Gain should be in [LEVEL_MIN_DB, LEVEL_MAX_DB] = [-10, 0]
-  for (const t of result.tuning) {
+  for (const t of tuning) {
     assert.ok(t.gainDb <= 0 + 1e-6, "gainDb should be <= 0");
     assert.ok(t.gainDb >= -10 - 1e-6, "gainDb should be >= -10");
   }
@@ -295,6 +307,10 @@ test("current layout is kept when no finalist Pareto-dominates it", () => {
     metrics: {
       perSeatP19: current.perSeatP19,
       perSeatP20: current.perSeatP20,
+      achievedP19VariationDb: current.achievedP19VariationDb,
+      achievedP19Level: current.achievedP19Level,
+      achievedP20VariationDb: current.achievedP20VariationDb,
+      achievedP20Level: current.achievedP20Level,
       p18AchievedLevel: current.p18AchievedLevel,
       achievedP18Hz: current.achievedP18Hz,
       p14AchievedLevel: current.p14AchievedLevel,
@@ -333,8 +349,9 @@ test("delay-only search with single source returns zero delay", () => {
   const sources = [{ yNorm: 0.1 }];
   const rspTransfers = makeRspTransfersWithNull(1);
   const result = searchDelayOnly(rspTransfers, sources);
-  // With only front subs (no rear), delay search is trivial — best delay = 0
-  assert.equal(result.bestDelayMs, 0, "single-group delay should be 0");
+  // Single source → trivial tuning (delay 0)
+  assert.ok(result.finalists.length >= 1, "should have a finalist");
+  assert.equal(result.finalists[0].tuning[0].delayMs, 0, "single-source delay should be 0");
 });
 
 // TEST 14: Level+delay search with all rear sources (no front)
@@ -342,10 +359,9 @@ test("level+delay search with all-rear sources returns zero tuning", () => {
   const sources = [{ yNorm: 0.9 }, { yNorm: 0.8 }];
   const rspTransfers = makeRspTransfersWithNull(2);
   const result = searchLevelAndDelay(rspTransfers, sources);
-  // No front subs → no delay/level search → all zero
-  assert.equal(result.bestDelayMs, 0, "no front subs → zero delay");
-  assert.equal(result.bestGainDb, 0, "no front subs → zero gain");
-  for (const t of result.tuning) {
+  assert.ok(result.finalists.length >= 1, "should have a finalist");
+  const tuning = result.finalists[0].tuning;
+  for (const t of tuning) {
     assert.equal(t.delayMs, 0, "all tuning should be zero");
     assert.equal(t.gainDb, 0, "all gain should be zero");
   }
@@ -354,9 +370,8 @@ test("level+delay search with all-rear sources returns zero tuning", () => {
 // TEST 15: Empty input handling
 test("searchDelayOnly handles empty input gracefully", () => {
   const result = searchDelayOnly([], []);
-  assert.ok(Array.isArray(result.tuning), "should return tuning array");
-  assert.equal(result.tuning.length, 0, "empty input → empty tuning");
-  assert.equal(result.bestDelayMs, 0, "empty input → zero delay");
+  assert.ok(Array.isArray(result.finalists), "should return finalists array");
+  assert.equal(result.finalists.length, 0, "empty input → no finalists");
 });
 
 // TEST 16: detectMutedSubs with empty input

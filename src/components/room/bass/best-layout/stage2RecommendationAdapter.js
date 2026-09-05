@@ -208,6 +208,14 @@ function canonicalMetrics({
     p18AchievedLevel: canonicalResult?.p18AchievedLevel ?? null,
     assessmentStartHz: canonicalResult?.assessmentStartHz ?? null,
     assessmentEndHz: canonicalResult?.assessmentEndHz ?? null,
+    // Canonical headline P19/P20 — the SAME values the authoritative finalist
+    // selection uses for Pareto comparison. P19 = RSP raw deviation,
+    // P20 = worst-seat raw deviation. These flow from the canonical authority
+    // through the Stage 2 confirmation result and the current-layout candidate.
+    achievedP19VariationDb: canonicalResult?.achievedP19VariationDb ?? null,
+    achievedP19Level: canonicalResult?.achievedP19Level ?? null,
+    achievedP20VariationDb: canonicalResult?.achievedP20VariationDb ?? null,
+    achievedP20Level: canonicalResult?.achievedP20Level ?? null,
     limited: !!canonicalResult?.limited,
     canonicalAuthorityReceipt: canonicalResult?.canonicalAuthorityReceipt || null,
     authorityReusedFromCurrent: reusedFromCurrent,
@@ -239,6 +247,14 @@ export function buildCurrentCanonicalLayout({
     p18AchievedLevel: p18?.level ?? candidate.achievedP18Level ?? null,
     assessmentStartHz: contract.assessmentEnvelope?.assessmentStartHz,
     assessmentEndHz: contract.assessmentEnvelope?.assessmentEndHz,
+    // Canonical headline P19/P20 from the current layout's authority result.
+    // These are the SAME fields the Stage 2 confirmation result carries, so
+    // the current layout is compared on exactly the same authority basis as
+    // optimiser candidates (Pareto selection uses these, not per-seat proxies).
+    achievedP19VariationDb: candidate.achievedP19VariationDb ?? null,
+    achievedP19Level: candidate.achievedP19Level ?? null,
+    achievedP20VariationDb: candidate.achievedP20VariationDb ?? null,
+    achievedP20Level: candidate.achievedP20Level ?? null,
   };
   const mutedSubInfo = detectMutedSubs(sources);
   return {
