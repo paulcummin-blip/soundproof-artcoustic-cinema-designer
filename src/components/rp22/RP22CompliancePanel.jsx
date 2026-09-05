@@ -18,6 +18,7 @@ import { resolveParamThresholds, resolveP12P13DualLevels } from "@/components/re
 import ComplianceParameterMatrix from "@/components/rp22/ComplianceParameterMatrix";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
+import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl";
 import {
   getAssumedP15DisplayValue,
@@ -504,7 +505,7 @@ export default function RP22CompliancePanel({
 
     if (u === "m") return `${n.toFixed(2)}m`;
     if (u === "dB" || u === "± dB") return `${n.toFixed(1)} dB`;
-    if (u === "dB SPL (C)") return `${Math.round(n)} dBC`;
+    if (u === "dB SPL (C)") return formatSplDisplay(n);
     if (u === "Hz") return `${Math.round(n)} Hz`;
     if (u === "°") return `${Math.round(n)}°`;
     if (u === "%") return `${Math.round(n)}%`;
@@ -654,7 +655,7 @@ export default function RP22CompliancePanel({
 
         // P14: display ceil'd achieved SPL (e.g. 111.4 → "112 dBC"). Display only.
         if (pid === 14 && typeof v === "number" && Number.isFinite(v)) {
-          return `${Math.ceil(v)} dBC`;
+          return formatSplDisplay(v);
         }
 
         if (res.formatted) return res.formatted;
