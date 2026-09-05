@@ -404,6 +404,12 @@ export function evaluateStage2Confirmation(rawTransfer, {
     p18AchievedLevel: authority.achievedP18Level ?? canonicalResult.achievedP18Level ?? null,
     assessmentStartHz,
     assessmentEndHz,
+    // Canonical headline P19/P20 — the SAME values displayed/reported as the
+    // authoritative headline results. P19 = RSP raw deviation, P20 = worst-seat
+    // raw deviation. Used by the authoritative finalist selection for Pareto
+    // comparison. Do NOT use worst-primary-variation proxies for final selection.
+    achievedP19VariationDb: authority.achievedP19VariationDb ?? null,
+    achievedP20VariationDb: authority.achievedP20VariationDb ?? null,
     perSeatP19,
     perSeatP20,
     limited,
@@ -440,6 +446,7 @@ export function evaluateStage2Confirmation(rawTransfer, {
  * @returns {object|null} Stage 2 finalist evaluation result with tuningVariant tag
  */
 export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
+  tuning,
   tuningVariant,
   p14TargetBasis,
   p14TargetLevel,
@@ -452,22 +459,33 @@ export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
   const { sources, perSourcePerSeatComplexTransfers, seatIds, usableLfHz, transitionHz } = rawTransfer;
   if (!sources?.length) return null;
 
-  // Search for the best tuning using per-source RSP transfers.
-  // Sources carry yNorm (normalised 0-1 along room length) for front/rear
-  // group splitting in the delay/level tuning search.
-  const rspTransfers = perSourcePerSeatComplexTransfers.filter((t) => t.seatId === "rsp");
-  const searchSources = sources.map((s) => ({ yNorm: s.yNorm ?? 0 }));
-  let searchResult;
-  if (tuningVariant === "delay-only") {
-    searchResult = searchDelayOnly(rspTransfers, searchSources);
-  } else if (tuningVariant === "level-delay") {
-    searchResult = searchLevelAndDelay(rspTransfers, searchSources);
-  } else {
-    return null;
+  // Use the provided tuning if available (from the main-thread search). This
+  // avoids re-running the search in the worker and allows the store to pass
+  // specific tuning finalists (best + second credible variant). If no tuning
+  // is provided, fall back to searching (backward compatibility).
+  let tuningToApply = tuning;
+  let searchMeta = {};
+
+  if (!tuningToApply) {
+    const rspTransfers = perSourcePerSeatComplexTransfers.filter((t) => t.seatId === "rsp");
+    const searchSources = sources.map((s) => ({ yNorm: s.yNorm ?? 0 }));
+    let searchResult;
+    if (tuningVariant === "delay-only") {
+      searchResult = searchDelayOnly(rspTransfers, searchSources);
+    } else if (tuningVariant === "level-delay") {
+      searchResult = searchLevelAndDelay(rspTransfers, searchSources);
+    } else {
+      return null;
+    }
+    tuningToApply = searchResult.finalists[0]?.tuning
+      || sources.map(() => ({ delayMs: 0, gainDb: 0, polarity: 0 }));
+    searchMeta = {
+      bestScore: searchResult.finalists[0]?.score ?? Infinity,
+    };
   }
 
-  // Re-sum all seats with the best tuning
-  const tunedSeatResponses = resumWithTuning(perSourcePerSeatComplexTransfers, searchResult.tuning, seatIds);
+  // Re-sum all seats with the tuning
+  const tunedSeatResponses = resumWithTuning(perSourcePerSeatComplexTransfers, tuningToApply, seatIds);
   const { rspRawCurve, perSeatRawCurves } = buildResponseCurves(tunedSeatResponses);
   if (!rspRawCurve.length) return null;
 
@@ -485,7 +503,7 @@ export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
     // Override sources with the tuned delay/level
     sources: sources.map((s, i) => ({
       ...s,
-      tuning: searchResult.tuning[i] || { delayMs: 0, gainDb: 0, polarity: 0 },
+      tuning: tuningToApply[i] || { delayMs: 0, gainDb: 0, polarity: 0 },
     })),
   };
 
@@ -503,12 +521,8 @@ export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
   return {
     ...result,
     tuningVariant,
-    tuningSearch: {
-      bestDelayMs: searchResult.bestDelayMs,
-      bestGainDb: searchResult.bestGainDb ?? 0,
-      bestScore: searchResult.bestScore,
-    },
-    appliedTuning: searchResult.tuning,
+    tuningSearch: searchMeta,
+    appliedTuning: tuningToApply,
   };
 }
 

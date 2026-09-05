@@ -14,7 +14,7 @@
 import { evaluateStage2Placement, evaluateStage2Confirmation, evaluateStage2ConfirmationWithTuning } from "./stage2CanonicalEvaluation";
 
 self.onmessage = (event) => {
-  const { requestId, fingerprint, phase, finalist, rawTransfer, tuningVariant, ...params } = event.data || {};
+  const { requestId, fingerprint, phase, finalist, rawTransfer, tuningVariant, tuning, ...params } = event.data || {};
   if (!requestId) {
     self.postMessage({ type: "error", requestId: null, error: "Missing requestId" });
     return;
@@ -32,7 +32,7 @@ self.onmessage = (event) => {
       // complex transfers with searched tuning, then run the full canonical
       // chain. Placement-only uses the existing confirmation path.
       if (tuningVariant === "delay-only" || tuningVariant === "level-delay") {
-        const result = evaluateStage2ConfirmationWithTuning(rawTransfer, { tuningVariant, ...params });
+        const result = evaluateStage2ConfirmationWithTuning(rawTransfer, { tuningVariant, tuning, ...params });
         self.postMessage({ type: "complete", requestId, fingerprint, phase: "confirmation", finalistId: finalist?.id, tuningVariant, result });
       } else {
         const result = evaluateStage2Confirmation(rawTransfer, params);

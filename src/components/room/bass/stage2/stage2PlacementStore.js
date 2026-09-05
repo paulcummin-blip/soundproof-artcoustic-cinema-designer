@@ -23,6 +23,7 @@ import {
   hasCachedRawTransfer,
   getCachedRawTransfersForFingerprint,
 } from "./stage2RawTransferCache";
+import { searchDelayOnly, searchLevelAndDelay } from "./stage2TuningSearch";
 
 const listeners = new Set();
 const memoryByProject = new Map();
@@ -374,10 +375,14 @@ class Stage2PlacementController {
 
     // Insert confirmation jobs at the FRONT of the queue so they are
     // dispatched before remaining placement jobs for other quantities.
-    // For each shortlisted coordinate set, queue FOUR candidate families:
+    // For each shortlisted coordinate set, queue:
     //   1. Placement-only (geometric auto-align, 0 dB trims) — existing
-    //   2. Delay-only (searched delays, 0 dB trims) — new
-    //   3. Level+delay (searched delays + trims) — new
+    //   2. Delay-only finalists (up to 2: best + second credible variant)
+    //   3. Level+delay finalists (up to 2: best + second credible variant)
+    // The independent per-source tuning search is run in the MAIN THREAD
+    // (cheap re-summation, ~2-20 ms) using the cached RSP transfers. Each
+    // finalist's specific tuning is passed to the worker, which only needs
+    // to re-sum and run the canonical chain — no search in the worker.
     // Current is supplied by the adapter's buildCurrentCanonicalLayout.
     const confirmationJobs = [];
     const hasPerSourceTransfers = !!(best.rawTransfer?.perSourcePerSeatComplexTransfers?.length);
@@ -392,28 +397,42 @@ class Stage2PlacementController {
     this.confirmationJobsPlanned++;
     this.totalJobsPlanned++;
 
-    // 2. Delay-only (only if per-source per-seat transfers are available)
+    // 2 + 3. Independent per-source tuning search (only if per-source
+    // per-seat transfers are available). Run the search in the main thread
+    // and queue one confirmation job per tuning finalist.
     if (hasPerSourceTransfers) {
-      confirmationJobs.push({
-        finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
-        quantity: qty,
-        phase: "confirmation",
-        tuningVariant: "delay-only",
-        rawTransfer: best.rawTransfer,
-      });
-      this.confirmationJobsPlanned++;
-      this.totalJobsPlanned++;
+      const rspTransfers = best.rawTransfer.perSourcePerSeatComplexTransfers.filter((t) => t.seatId === "rsp");
+      const searchSources = best.rawTransfer.sources?.map((s) => ({ yNorm: s.yNorm ?? 0 })) || [];
 
-      // 3. Level+delay
-      confirmationJobs.push({
-        finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
-        quantity: qty,
-        phase: "confirmation",
-        tuningVariant: "level-delay",
-        rawTransfer: best.rawTransfer,
-      });
-      this.confirmationJobsPlanned++;
-      this.totalJobsPlanned++;
+      // Delay-only finalists (up to 2)
+      const delayResult = searchDelayOnly(rspTransfers, searchSources);
+      for (const finalist of (delayResult.finalists || [])) {
+        confirmationJobs.push({
+          finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+          quantity: qty,
+          phase: "confirmation",
+          tuningVariant: "delay-only",
+          tuning: finalist.tuning,
+          rawTransfer: best.rawTransfer,
+        });
+        this.confirmationJobsPlanned++;
+        this.totalJobsPlanned++;
+      }
+
+      // Level+delay finalists (up to 2)
+      const levelDelayResult = searchLevelAndDelay(rspTransfers, searchSources);
+      for (const finalist of (levelDelayResult.finalists || [])) {
+        confirmationJobs.push({
+          finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+          quantity: qty,
+          phase: "confirmation",
+          tuningVariant: "level-delay",
+          tuning: finalist.tuning,
+          rawTransfer: best.rawTransfer,
+        });
+        this.confirmationJobsPlanned++;
+        this.totalJobsPlanned++;
+      }
     }
 
     // If there's a tie, queue an alternate confirmation (placement-only)
@@ -466,9 +485,14 @@ class Stage2PlacementController {
     if (phase === "confirmation" && job.rawTransfer) {
       workerMessage.rawTransfer = job.rawTransfer;
     }
-    // Pass tuning variant (delay-only / level-delay) for confirmation phase
+    // Pass tuning variant (delay-only / level-delay) and the specific tuning
+    // array for confirmation phase. The tuning is searched in the main thread
+    // and passed to the worker, which only re-sums and runs the canonical chain.
     if (phase === "confirmation" && job.tuningVariant) {
       workerMessage.tuningVariant = job.tuningVariant;
+      if (job.tuning) {
+        workerMessage.tuning = job.tuning;
+      }
     }
     this.workers[workerIndex].postMessage(workerMessage);
     this.publishProgress();
