@@ -4,6 +4,7 @@ import { mergeBassGraphSeries } from '@/components/room/bass/bassGraphSeriesAlig
 import BassModeMarkers from '@/components/room/bass/BassModeMarkers';
 import ProtectedNullOverlay from '@/components/room/bass/ProtectedNullOverlay';
 import { P14_EQ_ASSESSMENT_RANGE_HZ } from '@/components/utils/p14CapabilityAuthority';
+import { formatSplDisplay } from '@/components/utils/splDisplayFormatter';
 
 const hasFiniteValue = (value) =>
   value !== null &&
@@ -504,7 +505,7 @@ export default function BassGraph({
                             strokeDasharray="3 3"
                             ifOverflow="extendDomain"
                             label={{
-                              value: `P14 integration band · Σ ${Math.round(p14TotalDb)} dBC`,
+                              value: `P14 integration band · Σ ${formatSplDisplay(p14TotalDb)}`,
                               position: 'insideBottom',
                               fill: '#625143',
                               fontSize: 9,
