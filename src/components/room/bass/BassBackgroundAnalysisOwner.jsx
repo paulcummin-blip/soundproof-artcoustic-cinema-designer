@@ -758,7 +758,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       const diagnosticToken = collectDiagnostics ? createDiagToken("manual-authoritative") : null;
       if (diagnosticToken) recordDiagStage(diagnosticToken, "token-created", { origin: "manual-authoritative", collectDiagnostics: true });
 
-      getP14TargetBackgroundScheduler().cancel();
+      // FIX 5: Foreground manual Calculate has priority. Pause the background
+      // sweep WITHOUT destroying the batch — the queue and remaining targets
+      // are preserved. After the manual calculation completes, the owner
+      // calls resumeAfterForegroundCalculate() to restart the background sweep
+      // from the remaining missing targets.
+      getP14TargetBackgroundScheduler().pauseForForegroundCalculate();
       controller.cancelActive("manual-replaced");
       dispatchedManualRequestRef.current = null;
       markBassAuthorityUpdating(scopeId, cacheKey);
@@ -909,7 +914,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     const scheduler = getP14TargetBackgroundScheduler();
 
     if (calcAllTargetsRequest?.requested && backgroundInputsReady && baseDesignFingerprint && scopeId !== "free") {
-      // Explicit user request — start the sweep for all 8 targets
+      // Explicit user request — start the sweep for all 8 targets.
+      // FIX 3: The request is only the start signal. After schedule() accepts
+      // ownership, the scheduler/store owns the batch intent. Consuming the
+      // request does NOT destroy the batch — hasActiveBatchWork() preserves it.
       consumeCalculateAllTargetsRequest();
       const allTargets = buildP14TargetCombinations();
       scheduler.schedule({
@@ -919,8 +927,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         allTargets,
         designContext: designContextRef.current,
       });
-    } else if (!scheduler.isRunning()) {
-      // No explicit request and nothing running — cancel to ensure clean state
+    } else if (!scheduler.hasActiveBatchWork()) {
+      // FIX 2: Only cancel when there is genuinely no active batch work.
+      // hasActiveBatchWork() returns true for queued work, delayed-start
+      // timers, idle timers, pending completions, and foreground-calculate
+      // pauses — not just active worker execution. This prevents the owner
+      // from hard-cancelling a valid queued batch after request consumption.
       scheduler.cancel();
     }
   }, [scopeId, baseDesignFingerprint, targetKey, isProjectHydrationReady, targetCacheHydrated, isDragging, recommendationsActive, backgroundInputsReady, calcAllTargetsRequest]);
@@ -1006,6 +1018,19 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       setManualAnalysisRequest(null);
     }
   }, [manualAnalysisRequest, manualRequestMatchesCurrent, hasCurrentResult, calculationInProgress, cacheKey]);
+
+  // FIX 5: After the foreground manual Calculate completes (manualAnalysisRequest
+  // cleared), resume the background P14 sweep if it was paused for the manual
+  // calculation. The background scheduler's queue and remaining targets were
+  // preserved by pauseForForegroundCalculate() — this restarts the sweep from
+  // the missing targets without recalculating verified ones.
+  useEffect(() => {
+    if (manualAnalysisRequest) return;
+    const scheduler = getP14TargetBackgroundScheduler();
+    if (scheduler.foregroundCalculateInProgress) {
+      scheduler.resumeAfterForegroundCalculate();
+    }
+  }, [manualAnalysisRequest]);
 
   // FIX 2: Explicit terminal calculation outcome. Distinguishes success,
   // error, timeout, cancelled, stale, and rejected — never implies success

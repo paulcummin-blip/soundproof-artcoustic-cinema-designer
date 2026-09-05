@@ -37,6 +37,10 @@ const createWorker = () => new Worker(
 
 const BACKGROUND_IDLE_DELAY_MS = 1500;
 const BACKGROUND_IDLE_TIMEOUT_MS = 3000;
+// FIX 9: Worker watchdog — terminates a background worker that never settles.
+// Generous: bass calculations typically take 5-20s; 60s catches genuine hangs
+// without killing legitimate long calculations.
+const BACKGROUND_WORKER_WATCHDOG_MS = 60000;
 
 export class P14TargetBackgroundScheduler {
   constructor() {
@@ -55,6 +59,12 @@ export class P14TargetBackgroundScheduler {
     // Idle-only background: pending deferred completion + its idle-wait timer.
     this.pendingCompletion = null;
     this.completionProcessHandle = null;
+    // FIX 5: Foreground-calculate pause flag. When true, scheduleNext() does not
+    // arm the idle timer — the background sweep waits for an explicit
+    // resumeAfterForegroundCalculate() call from the owner.
+    this.foregroundCalculateInProgress = false;
+    // FIX 9: Worker watchdog handle. Cleared on terminal worker message/error.
+    this.workerWatchdogHandle = null;
     // Bounded retry + sweep diagnostic state. Reset on design/project change.
     this.retryCounts = new Map();     // targetKey -> attempt count
     this.failedTargets = new Set();   // targetKeys that exhausted retry this sweep
@@ -93,6 +103,7 @@ export class P14TargetBackgroundScheduler {
       clearTimeout(this.completionProcessHandle);
       this.completionProcessHandle = null;
     }
+    this.clearWorkerWatchdog();
     // SOFT pause: capture the in-flight target before terminating so it can be
     // requeued at the FRONT (restarts first after 3s idle). HARD cancel goes
     // through cancel() and does NOT requeue against the old fingerprint.
@@ -101,6 +112,13 @@ export class P14TargetBackgroundScheduler {
     this.terminateWorker();
     this.currentTarget = null;
     this.running = false;
+    // FIX 6: Publish "paused" status so the UI shows "Paused — N of 8 prepared".
+    publishP14AnalysisProgress(this.projectId, {
+      baseDesignFingerprint: this.currentBaseDesignFingerprint,
+      status: "paused",
+      activeTargetKey: null,
+      activeStartedAtMs: null,
+    });
     pauseP14AnalysisJob(this.projectId, { baseDesignFingerprint: this.currentBaseDesignFingerprint });
     if (this.pendingCompletion) {
       this.armCompletionProcessTimer();
@@ -130,12 +148,17 @@ export class P14TargetBackgroundScheduler {
     if (this.currentBaseDesignFingerprint !== baseDesignFingerprint || this.projectId !== projectId) {
       this.cancel();
       this.currentBaseDesignFingerprint = baseDesignFingerprint;
-      this.retryCounts.clear();
-       this.failedTargets.clear();
-       this.sweepDiagnostics = createSweepDiagnostics();
     }
+    // FIX 7: Always reset retry/failure state on a fresh schedule() call so
+    // a retryable-partial sweep gets a clean retry budget for missing targets.
+    // Verified cached targets are skipped by runNext() — only missing targets
+    // are re-attempted.
+    this.retryCounts.clear();
+    this.failedTargets.clear();
+    this.sweepDiagnostics = createSweepDiagnostics();
 
     this.cancelled = false;
+    this.foregroundCalculateInProgress = false;
     this.projectId = projectId;
     this.foregroundTargetKey = foregroundTargetKey;
     this.allTargets = allTargets;
@@ -208,9 +231,16 @@ export class P14TargetBackgroundScheduler {
       const allKeys = (this.allTargets || []).map((t) => t.key);
       const progress = getTargetCacheProgress(this.projectId, this.currentBaseDesignFingerprint, allKeys);
       const failed = this.sweepDiagnostics.failedAfterRetry;
+      // FIX 6/7: Distinguish "complete" (8/8), "retryable-partial" (some failed),
+      // and "calculating" (should not reach here with remaining work).
+      const status = progress.resolved >= progress.total && progress.total > 0
+        ? "complete"
+        : failed.length > 0
+          ? "retryable-partial"
+          : "calculating";
       publishP14AnalysisProgress(this.projectId, {
         baseDesignFingerprint: this.currentBaseDesignFingerprint,
-        status: progress.resolved >= progress.total && progress.total > 0 ? "complete" : "calculating",
+        status,
         completed: progress.resolved,
         total: progress.total,
         completedDurationsMs: progress.completedDurationsMs,
@@ -304,12 +334,37 @@ export class P14TargetBackgroundScheduler {
         collectDiagnostics: false,
         origin: "p14-background",
       });
+      // FIX 9: Arm the worker watchdog. If the worker never sends a terminal
+      // message within BACKGROUND_WORKER_WATCHDOG_MS, terminate it and treat
+      // the attempt as a failure (follows the normal retry/partial lifecycle).
+      this.armWorkerWatchdog(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint);
     } catch (e) {
       this.handleWorkerError(target, targetBaseDesignFingerprint, fingerprint, calibrationFingerprint);
     }
   }
 
+  // FIX 9: Arm the worker watchdog timer.
+  armWorkerWatchdog(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint) {
+    this.clearWorkerWatchdog();
+    this.workerWatchdogHandle = setTimeout(() => {
+      this.workerWatchdogHandle = null;
+      if (this.cancelled) return;
+      safeConsole.warn("p14-bg", `target ${target.key}: worker watchdog timeout (${BACKGROUND_WORKER_WATCHDOG_MS}ms) — terminating`);
+      this.terminateWorker();
+      this.handleTargetFailure(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, null, 'worker-watchdog-timeout');
+    }, BACKGROUND_WORKER_WATCHDOG_MS);
+  }
+
+  // FIX 9: Clear the worker watchdog timer.
+  clearWorkerWatchdog() {
+    if (this.workerWatchdogHandle != null) {
+      clearTimeout(this.workerWatchdogHandle);
+      this.workerWatchdogHandle = null;
+    }
+  }
+
   handleWorkerMessage(message, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint) {
+    this.clearWorkerWatchdog();
     if (this.cancelled) { this.terminateWorker(); return; }
     if (message.fingerprint !== fingerprint) {
       safeConsole.warn("p14-bg", `target ${target.key}: fingerprint mismatch (expected ${fingerprint?.substring(0, 24)}..., got ${message.fingerprint?.substring(0, 24)}...)`);
@@ -429,8 +484,22 @@ export class P14TargetBackgroundScheduler {
   }
 
   /** Build, validate, compact, and cache a completed worker result. Timings
-   *  are always collected and pushed to the preview ring buffer. */
+    *  are always collected and pushed to the preview ring buffer. */
   processCompletedWorkerResult(workerResult, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint) {
+    // FIX 10: Wrap the entire main-thread construction path so a synchronous
+    // exception cannot strand the batch. Any exception becomes a normal target
+    // attempt failure and follows the same retry/partial lifecycle.
+    try {
+      return this._processCompletedWorkerResultInner(workerResult, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint);
+    } catch (e) {
+      safeConsole.warn("p14-bg", `target ${target.key}: main-thread construction error: ${e?.message || e}`);
+      this.terminateWorker();
+      this.handleTargetFailure(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, null, 'construction-exception');
+      return;
+    }
+  }
+
+  _processCompletedWorkerResultInner(workerResult, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint) {
     const isDev = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV) === true;
     const timings = {};
     const time = (key, fn) => {
@@ -460,6 +529,11 @@ export class P14TargetBackgroundScheduler {
     // Attempt insertion into the target cache.
     //   - AUTHORITATIVE contracts → setTargetCacheEntry
     //   - LIMITED contracts → setLimitedTargetCacheEntry (separate path)
+    // FIX 8: Each verified target is persisted immediately (debounced 2s) via
+    // deferPersistence: false. This ensures verified results survive app
+    // close, browser refresh, interaction cancellation, and partial failure.
+    // The previous deferPersistence: true only flushed on sweep completion or
+    // cancel — losing results if the app closed mid-sweep.
     const insertResult = compactContract
       ? (isLimited
         ? time("cacheInsert", () => setLimitedTargetCacheEntry(
@@ -467,14 +541,14 @@ export class P14TargetBackgroundScheduler {
             this.currentBaseDesignFingerprint,
             target.key,
             compactContract,
-            { deferPersistence: true },
+            { deferPersistence: false },
           ))
         : time("cacheInsert", () => setTargetCacheEntry(
             this.projectId,
             this.currentBaseDesignFingerprint,
             target.key,
             compactContract,
-            { deferPersistence: true },
+            { deferPersistence: false },
           )))
       : false;
 
@@ -518,6 +592,7 @@ export class P14TargetBackgroundScheduler {
   }
 
   handleWorkerError(target, targetBaseDesignFingerprint, fingerprint, calibrationFingerprint) {
+    this.clearWorkerWatchdog();
     if (this.cancelled) { this.terminateWorker(); return; }
     this.handleTargetFailure(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, null, 'worker-error');
   }
@@ -643,6 +718,10 @@ export class P14TargetBackgroundScheduler {
 
   scheduleNext() {
     if (this.cancelled || this.running || this.delayHandle != null || this.idleHandle != null) return;
+    // FIX 5: Do not arm the idle timer while a foreground manual Calculate
+    // holds the batch. The owner calls resumeAfterForegroundCalculate() to
+    // restart the sweep after the manual calculation completes.
+    if (this.foregroundCalculateInProgress) return;
     // A completed result waiting for idle takes precedence over starting a new
     // target — let the completion timer drive, then scheduleNext continues.
     if (this.pendingCompletion) {
@@ -696,11 +775,13 @@ export class P14TargetBackgroundScheduler {
       clearTimeout(this.completionProcessHandle);
       this.completionProcessHandle = null;
     }
+    this.clearWorkerWatchdog();
     this.pendingCompletion = null;
     this.terminateWorker();
     this.queue = [];
     this.running = false;
     this.currentTarget = null;
+    this.foregroundCalculateInProgress = false;
     pauseP14AnalysisJob(projectId, { baseDesignFingerprint: this.currentBaseDesignFingerprint });
     // Completed background targets remain memory-first, then flush as one
     // snapshot when a sweep is interrupted by foreground/user work.
@@ -708,6 +789,81 @@ export class P14TargetBackgroundScheduler {
   }
 
   isRunning() { return this.running; }
+
+  // FIX 1: Durable active-work predicate. Returns true when ANY of:
+  //   - worker is actively executing (this.running)
+  //   - queue contains targets waiting to be processed
+  //   - delayed-start timer is armed (this.delayHandle)
+  //   - idle/resume timer is armed (this.idleHandle)
+  //   - pending completion exists (worker finished, waiting for idle to process)
+  //   - foreground-calculate pause holds the batch (will resume after manual calc)
+  //
+  // This is the sole authority for "does the scheduler own a valid batch?".
+  // The React owner must NOT cancel when this returns true — the batch is
+  // still alive even if no worker is actively running.
+  hasActiveBatchWork() {
+    return this.running
+      || this.queue.length > 0
+      || this.delayHandle != null
+      || this.idleHandle != null
+      || !!this.pendingCompletion
+      || this.foregroundCalculateInProgress;
+  }
+
+  // FIX 5: Pause the background sweep for a foreground manual Calculate.
+  // Terminates the current worker, preserves the queue and batch intent, and
+  // sets a flag that prevents scheduleNext() from arming the idle timer.
+  // The owner must call resumeAfterForegroundCalculate() after the manual
+  // calculation completes to restart the background sweep.
+  pauseForForegroundCalculate() {
+    this.cancelScheduledStart();
+    if (this.completionProcessHandle != null) {
+      clearTimeout(this.completionProcessHandle);
+      this.completionProcessHandle = null;
+    }
+    this.clearWorkerWatchdog();
+    const interruptedTarget = this.currentTarget;
+    const interruptedFingerprint = this.currentBaseDesignFingerprint;
+    this.terminateWorker();
+    this.currentTarget = null;
+    this.running = false;
+    this.foregroundCalculateInProgress = true;
+    // Publish "paused" status so the UI shows "Paused — N of 8 prepared".
+    publishP14AnalysisProgress(this.projectId, {
+      baseDesignFingerprint: this.currentBaseDesignFingerprint,
+      status: "paused",
+      activeTargetKey: null,
+      activeStartedAtMs: null,
+    });
+    if (this.pendingCompletion) {
+      // Hold the pending completion — it will be processed after resume.
+      return;
+    }
+    if (interruptedTarget) {
+      requeueInterruptedTargetOnSoftPause({
+        queue: this.queue, target: interruptedTarget,
+        targetBaseDesignFingerprint: interruptedFingerprint,
+        currentBaseDesignFingerprint: this.currentBaseDesignFingerprint,
+        projectId: this.projectId,
+        pendingCompletionTargetKey: this.pendingCompletion?.target?.key ?? null,
+      });
+    }
+    // Do NOT call scheduleNext() — wait for explicit resume.
+  }
+
+  // FIX 5: Resume the background sweep after a foreground manual Calculate
+  // completed. Clears the pause flag and re-arms the scheduler.
+  resumeAfterForegroundCalculate() {
+    this.foregroundCalculateInProgress = false;
+    if (this.cancelled) return;
+    if (this.pendingCompletion) {
+      this.armCompletionProcessTimer();
+      return;
+    }
+    if (!this.running && this.queue.length > 0) {
+      this.scheduleNext();
+    }
+  }
 }
 
 let globalScheduler = null;

@@ -139,7 +139,7 @@ export function presentP14AnalysisProgress(progress, nowMs = Date.now()) {
   const total = Number(progress?.total) || 8;
   const completed = Math.max(0, Math.min(total, Number(progress?.completed) || 0));
   if (progress?.status === "complete" || (total > 0 && completed >= total)) {
-    return { label: "Analysis complete", etaSeconds: null, complete: true };
+    return { label: `${total} of ${total} prepared`, etaSeconds: null, complete: true };
   }
 
   // Hydration gate: "idle" status means the persisted cache hasn't been read
@@ -147,6 +147,20 @@ export function presentP14AnalysisProgress(progress, nowMs = Date.now()) {
   // transient flash before the hydrated family resolves.
   if (progress?.status === "idle") {
     return { label: "Preparing…", etaSeconds: null, complete: false };
+  }
+
+  // FIX 6: Paused status — the sweep was paused by user interaction or a
+  // foreground manual Calculate. The batch is still alive; missing targets
+  // will resume after the pause ends.
+  if (progress?.status === "paused") {
+    return { label: `Paused — ${completed} of ${total} prepared`, etaSeconds: null, complete: false };
+  }
+
+  // FIX 7: Retryable-partial status — one or more targets exhausted retry
+  // attempts. Verified results are preserved; the designer can press Prepare
+  // All again to retry only the missing targets.
+  if (progress?.status === "retryable-partial") {
+    return { label: `${completed} of ${total} prepared — retry`, etaSeconds: null, complete: false, retryable: true };
   }
 
   // Secondary status label — small, non-blocking. Shows completed count,

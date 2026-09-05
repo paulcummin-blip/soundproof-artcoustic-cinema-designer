@@ -23,10 +23,18 @@ export default function CalculateAllTargetResults({ disabled = false }) {
   const presentation = presentP14AnalysisProgress(progress);
 
   const requestPending = request?.requested === true;
-  const isRunning = progress?.status === "calculating" || requestPending;
+  // FIX 6: "calculating" means active or resumable work. "paused" and
+  // "retryable-partial" are NOT calculating — the button stays enabled so
+  // the designer can interact (resume or retry).
+  const isCalculating = progress?.status === "calculating" || requestPending;
   const isComplete = progress?.status === "complete" && (progress?.completed || 0) >= (progress?.total || 8);
+  const isPaused = progress?.status === "paused";
+  const isRetryable = progress?.status === "retryable-partial" || presentation?.retryable === true;
 
-  const buttonDisabled = disabled || isRunning
+  // Button is disabled only during active calculation or when the shared
+  // bass context is not ready. Paused and retryable-partial states keep the
+  // button enabled — the designer can press to resume or retry.
+  const buttonDisabled = disabled || isCalculating
     || !shared?.canCalculate
     || shared?.calculationInProgress === true;
 
@@ -49,12 +57,22 @@ export default function CalculateAllTargetResults({ disabled = false }) {
       >
         {label}
       </button>
-      {isRunning && !isComplete && (
+      {isCalculating && !isComplete && (
         <p className="mt-1.5 text-[11px] text-[#625143]">
           {presentation?.label || "Preparing…"}
         </p>
       )}
-      {isComplete && !isRunning && (
+      {isPaused && !isComplete && (
+        <p className="mt-1.5 text-[11px] text-[#625143]">
+          {presentation?.label || "Paused"}
+        </p>
+      )}
+      {isRetryable && !isComplete && (
+        <p className="mt-1.5 text-[11px] text-[#625143]">
+          {presentation?.label || "Retry available"}
+        </p>
+      )}
+      {isComplete && !isCalculating && (
         <p className="mt-1.5 text-[11px] text-[#213428]">
           All {progress?.total || 8} P18 results saved. Switch between target choices to see them instantly.
         </p>
