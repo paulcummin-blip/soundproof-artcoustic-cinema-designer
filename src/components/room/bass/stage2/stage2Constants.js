@@ -40,3 +40,8 @@ export const STAGE2_TIE_TOLERANCE_DB = 0.15;
 
 // Stop condition thresholds.
 export const STAGE2_STOP_ALL_L4_SECONDARY_L2 = true;
+
+// Worker watchdog timeout (ms). Canonical confirmations can take ~21-36 sec
+// depending on subwoofer quantity. 60 sec gives generous headroom for slow
+// machines without being aggressive enough to kill legitimate work.
+export const STAGE2_WORKER_TIMEOUT_MS = 60000;

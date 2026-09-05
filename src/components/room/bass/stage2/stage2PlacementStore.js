@@ -7,23 +7,24 @@ import {
   STAGE2_MAX_CONCURRENT_JOBS,
   STAGE2_FINALISTS_NORMAL,
   STAGE2_START_DELAY_MS,
-} from "./stage2Constants";
+  STAGE2_WORKER_TIMEOUT_MS,
+} from "./stage2Constants.js";
 import {
   buildStage2RankingTuple,
   compareStage2Results,
   meetsStopCondition,
-} from "./stage2Ranking";
-import { shouldEvaluateThirdFinalist } from "./stage2FinalistPromotion";
-import { evaluateBEligibility, generateBFinalist } from "./stage2BLastResort";
-import { isBFamily, isProhibitedFamily } from "../stage1/stage1FamilyRegistry";
-import { buildPlacementRankingTuple, comparePlacementResults, isPlacementTied } from "./stage2PlacementRanking";
+} from "./stage2Ranking.js";
+import { shouldEvaluateThirdFinalist } from "./stage2FinalistPromotion.js";
+import { evaluateBEligibility, generateBFinalist } from "./stage2BLastResort.js";
+import { isBFamily, isProhibitedFamily } from "../stage1/stage1FamilyRegistry.js";
+import { buildPlacementRankingTuple, comparePlacementResults, isPlacementTied } from "./stage2PlacementRanking.js";
 import {
   getCachedRawTransfer,
   setCachedRawTransfer,
   hasCachedRawTransfer,
   getCachedRawTransfersForFingerprint,
-} from "./stage2RawTransferCache";
-import { searchDelayOnly, searchLevelAndDelay } from "./stage2TuningSearch";
+} from "./stage2RawTransferCache.js";
+import { searchDelayOnly, searchLevelAndDelay } from "./stage2TuningSearch.js";
 
 const listeners = new Set();
 const memoryByProject = new Map();
@@ -190,7 +191,7 @@ function publishStage2Complete(projectId, fingerprint, results) {
 
 const now = () => (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
 
-class Stage2PlacementController {
+export class Stage2PlacementController {
   constructor() {
     this.workers = [];
     this.activeJobs = new Map();
@@ -233,6 +234,9 @@ class Stage2PlacementController {
     this.confirmationJobsDone = 0;
     this.confirmationJobsExpectedByQty = {}; // qty -> expected confirmation count
     this.confirmationJobsDoneByQty = {};     // qty -> completed confirmation count
+    // Watchdog timers: workerIndex -> setTimeout handle. Ensures a silent
+    // worker can never hang Stage 2 — the job settles as failure on timeout.
+    this.watchdogs = new Map();
   }
 
   schedule({ projectId, fingerprint, placementFingerprint, confirmationFingerprint, promotionPlan, allStage1Finalists, stage1Complete, params, quantityOrder, delay }) {
@@ -494,7 +498,20 @@ class Stage2PlacementController {
         workerMessage.tuning = job.tuning;
       }
     }
-    this.workers[workerIndex].postMessage(workerMessage);
+    // FIX 4: Wrap postMessage — a synchronous failure must enter the same
+    // shared terminal settlement path. It must not strand the expected
+    // confirmation count or quantity-final state.
+    try {
+      this.workers[workerIndex].postMessage(workerMessage);
+    } catch (err) {
+      this.settleJob(workerIndex, {
+        type: "error",
+        errorMessage: `postMessage failed: ${err?.message || err}`,
+      });
+      return;
+    }
+    // Start the watchdog — a silent worker can never hang Stage 2.
+    this.startWatchdog(workerIndex);
     this.publishProgress();
   }
 
@@ -505,9 +522,17 @@ class Stage2PlacementController {
       this.startWorker(workerIndex);
     }
 
+    // Recreate workers terminated by the watchdog (set to null). The worker
+    // pool size is preserved, but null slots must be refilled before dispatch.
+    for (let i = 0; i < this.workers.length; i++) {
+      if (!this.workers[i] && this.queue.length > 0) {
+        this.startWorker(i);
+      }
+    }
+
     // Dispatch to idle workers
     for (let i = 0; i < this.workers.length; i++) {
-      if (!this.activeJobs.has(i) && this.queue.length > 0) {
+      if (this.workers[i] && !this.activeJobs.has(i) && this.queue.length > 0) {
         const job = this.queue.shift();
         this.dispatchToWorker(i, job);
       }
@@ -515,32 +540,73 @@ class Stage2PlacementController {
   }
 
   handleMessage(workerIndex, message) {
-    const active = this.activeJobs.get(workerIndex);
-    if (!active || message.requestId !== active.requestId) return;
-    if (message.fingerprint !== this.currentFingerprint) { this.activeJobs.delete(workerIndex); return; }
+    // Stale fingerprint — clear watchdog + release ownership without settlement.
+    // The job belongs to a superseded run; its counters must not affect the
+    // current run's expected/done convergence.
+    if (message.fingerprint !== this.currentFingerprint) {
+      this.clearWatchdog(workerIndex);
+      this.activeJobs.delete(workerIndex);
+      return;
+    }
+    // Delegate to the shared terminal settlement path.
+    this.settleJob(workerIndex, {
+      type: message.type,
+      result: message.result,
+      requestId: message.requestId,
+    });
+  }
 
+  handleError(workerIndex, errorMessage) {
+    // Delegate to the shared terminal settlement path. Worker onerror is a
+    // terminal signal — settle exactly once via the same authority as success.
+    this.settleJob(workerIndex, {
+      type: "error",
+      errorMessage: errorMessage || "Worker error",
+    });
+  }
+
+  /**
+   * Shared terminal settlement for ALL Stage 2 job terminal conditions:
+   * successful worker result, worker-reported { type: "error" }, Worker onerror,
+   * synchronous postMessage() failure, and watchdog timeout.
+   *
+   * Every accepted Stage 2 job settles exactly once via this method. The
+   * activeJobs map + requestId check is the exactly-once ownership authority:
+   * if the job is no longer in activeJobs (already settled by a prior terminal
+   * signal), this method returns immediately — no double-counting.
+   */
+  settleJob(workerIndex, outcome) {
+    const active = this.activeJobs.get(workerIndex);
+    if (!active) return; // already settled or stale — exactly-once guard
+
+    // Exactly-once: verify requestId if provided (prevents late duplicate
+    // terminal events from a worker that already settled via watchdog).
+    if (outcome.requestId && active.requestId !== outcome.requestId) return;
+
+    // Clear the watchdog — the job is settling, no timeout needed.
+    this.clearWatchdog(workerIndex);
+
+    // Release ownership.
     this.activeJobs.delete(workerIndex);
+
     const qty = active.quantity;
     const wasBJob = active.isB === true;
     const phase = active.phase || "placement";
+    const isSuccess = outcome.type === "complete" && outcome.result;
+
     this.completedJobs++;
     this.canonicalJobsRun++;
 
     // ── Placement phase: cache raw transfer ──────────────────────────────
     if (phase === "placement") {
-      if (message.type === "complete" && message.result) {
-        const rawTransfer = message.result;
-        // Cache the raw transfer for reuse across P14 changes
+      if (isSuccess) {
+        const rawTransfer = outcome.result;
         if (this.placementFingerprint) {
           setCachedRawTransfer(this.placementFingerprint, rawTransfer.finalistId, rawTransfer);
         }
 
         // B-representative: queue exactly one confirmation job now that the
-        // raw transfer exists. This is the critical fix — without this, the
-        // representative's placement completes but no confirmation is ever
-        // queued (confirmationQueued[4] is already true from the normal
-        // confirmation), so evaluatedFamilyIds never records the family and
-        // B eligibility re-queues the same representative indefinitely.
+        // raw transfer exists.
         if (active.isRepresentative) {
           const W = Number(this.params.roomDims?.widthM);
           const L = Number(this.params.roomDims?.lengthM);
@@ -556,10 +622,6 @@ class Stage2PlacementController {
           this.confirmationJobsExpectedByQty[4] = (this.confirmationJobsExpectedByQty[4] || 0) + 1;
         } else if (wasBJob) {
           // B finalist: queue exactly one confirmation job after placement.
-          // Same lifecycle defect as representatives — without this, the B
-          // finalist's placement completes but no confirmation is queued
-          // (confirmationQueued[4] is already true), so bState stays "queued"
-          // forever and the controller never completes.
           const W = Number(this.params.roomDims?.widthM);
           const L = Number(this.params.roomDims?.lengthM);
           this.queue.push({
@@ -577,7 +639,8 @@ class Stage2PlacementController {
           if (!this.placementResults[qty]) this.placementResults[qty] = [];
           this.placementResults[qty].push({ finalistId: rawTransfer.finalistId, rawTransfer, placementRanking });
         }
-      } else if (message.type === "error") {
+      } else {
+        // Placement error (worker-reported, onerror, postMessage failure, or watchdog)
         const failedFamilyId = active.finalist?.familyId;
         if (failedFamilyId && !isBFamily(failedFamilyId) && !isProhibitedFamily(failedFamilyId)) {
           this.failedFamilyIds.add(failedFamilyId);
@@ -591,19 +654,12 @@ class Stage2PlacementController {
       // promotion plan and must not affect quantityPlacementProcessed).
       if (!active.isRepresentative && !wasBJob) {
         this.quantityPlacementProcessed[qty] = (this.quantityPlacementProcessed[qty] || 0) + 1;
-
-        // If this quantity's placement is now complete, start its confirmation
-        // immediately — do NOT wait for other quantities' placement to finish.
-        // Confirmation jobs are inserted at the front of the queue so they
-        // are dispatched before remaining placement jobs for other quantities.
         if (this.isQuantityPlacementComplete(qty) && !this.confirmationQueued[qty]) {
           this.startConfirmationForQuantity(qty);
         }
       }
 
       this.publishProgress();
-      // Dispatch next (may be a representative confirmation, a normal
-      // confirmation, or a placement job for another quantity).
       if (this.queue.length > 0) {
         this.dispatchNext();
       } else if (this.activeJobs.size === 0) {
@@ -613,34 +669,29 @@ class Stage2PlacementController {
     }
 
     // ── Confirmation phase: process canonical result ─────────────────────
-    if (message.type === "complete") {
+    if (isSuccess) {
       this.quantityEvaluated[qty] = (this.quantityEvaluated[qty] || 0) + 1;
-      if (message.result) {
-        if (!this.completedResults[qty]) this.completedResults[qty] = [];
-        const result = message.result;
-        if (result.familyId && !isBFamily(result.familyId) && !isProhibitedFamily(result.familyId)) {
-          this.evaluatedFamilyIds.add(result.familyId);
-        }
-        // Mark B-representative as evaluated — this breaks the infinite loop
-        // by ensuring evaluateBEligibility sees the family as evaluated on
-        // the next check, so it is never re-queued for the same fingerprint.
-        if (active.isRepresentative) {
-          this.representativeState.set(active.finalist?.id, "evaluated");
-        }
-        const seatPriorityMap = this.params?.seatPriorityMap;
-        const rankingData = buildStage2RankingTuple(result, seatPriorityMap);
-        result.rankingData = rankingData;
-        this.completedResults[qty].push(result);
-        if (meetsStopCondition(rankingData)) {
-          this.quantityFinal[qty] = true;
-        }
-        if (wasBJob) {
-          this.bResult = result;
-        }
-        this.confirmationJobsDone++;
-        this.publishProgress();
+      const result = outcome.result;
+      if (result.familyId && !isBFamily(result.familyId) && !isProhibitedFamily(result.familyId)) {
+        this.evaluatedFamilyIds.add(result.familyId);
       }
-    } else if (message.type === "error") {
+      if (active.isRepresentative) {
+        this.representativeState.set(active.finalist?.id, "evaluated");
+      }
+      const seatPriorityMap = this.params?.seatPriorityMap;
+      const rankingData = buildStage2RankingTuple(result, seatPriorityMap);
+      result.rankingData = rankingData;
+      if (!this.completedResults[qty]) this.completedResults[qty] = [];
+      this.completedResults[qty].push(result);
+      if (meetsStopCondition(rankingData)) {
+        this.quantityFinal[qty] = true;
+      }
+      if (wasBJob) {
+        this.bResult = result;
+      }
+      this.confirmationJobsDone++;
+    } else {
+      // Confirmation error — track failed family/representative
       const failedFamilyId = active.finalist?.familyId;
       if (failedFamilyId && !isBFamily(failedFamilyId) && !isProhibitedFamily(failedFamilyId)) {
         this.failedFamilyIds.add(failedFamilyId);
@@ -654,9 +705,12 @@ class Stage2PlacementController {
       this.bState = "evaluated";
     }
 
-    // In the confirmation phase, a quantity may have multiple confirmation
-    // jobs (placement-only, delay-only, level+delay, optional alternate).
-    // Only mark the quantity as final when ALL expected confirmations are done.
+    // KEY FIX: increment confirmationJobsDoneByQty for BOTH success AND error.
+    // Previously only the success path incremented this counter, so a failed
+    // confirmation job (Worker onerror) left the quantity permanently
+    // non-final — confirmationJobsDoneByQty never reached
+    // confirmationJobsExpectedByQty, quantityFinal stayed false, and
+    // maybeCheckBAndComplete() never published completion.
     if (!wasBJob) {
       this.confirmationJobsDoneByQty[qty] = (this.confirmationJobsDoneByQty[qty] || 0) + 1;
       const expected = this.confirmationJobsExpectedByQty[qty] || 0;
@@ -666,6 +720,7 @@ class Stage2PlacementController {
       }
     }
 
+    this.publishProgress();
     // Dispatch next or check B eligibility + completion
     if (this.queue.length > 0) {
       this.dispatchNext();
@@ -674,53 +729,45 @@ class Stage2PlacementController {
     }
   }
 
-  // startConfirmation() has been replaced by startConfirmationForQuantity(qty).
-  // The old method queued ALL quantities' confirmations at once after ALL
-  // placement completed. The new method queues each quantity's confirmation
-  // as soon as THAT quantity's placement completes, so the selected quantity
-  // (quantityOrder[0]) is confirmed and published before non-selected
-  // quantities finish their placement.
+  // ── Watchdog ───────────────────────────────────────────────────────────
 
-  handleError(workerIndex, errorMessage) {
+  /**
+   * Start a bounded watchdog for an active job. If the worker does not send
+   * a terminal message within STAGE2_WORKER_TIMEOUT_MS, the job is settled
+   * as failure and the worker is terminated — Stage 2 can never hang.
+   */
+  startWatchdog(workerIndex) {
+    this.clearWatchdog(workerIndex);
+    const timer = setTimeout(() => {
+      this.handleWatchdogTimeout(workerIndex);
+    }, STAGE2_WORKER_TIMEOUT_MS);
+    this.watchdogs.set(workerIndex, timer);
+  }
+
+  clearWatchdog(workerIndex) {
+    const timer = this.watchdogs.get(workerIndex);
+    if (timer) {
+      clearTimeout(timer);
+      this.watchdogs.delete(workerIndex);
+    }
+  }
+
+  handleWatchdogTimeout(workerIndex) {
     const active = this.activeJobs.get(workerIndex);
-    this.activeJobs.delete(workerIndex);
-    if (active) {
-      this.completedJobs++;
-      this.canonicalJobsRun++;
+    if (!active) return; // already settled — exactly-once guard
+
+    // Terminate the silent worker. It will be recreated by dispatchNext.
+    if (this.workers[workerIndex]) {
+      try { this.workers[workerIndex].terminate(); } catch { /* ignore */ }
+      this.workers[workerIndex] = null;
     }
-    const failedFamilyId = active?.finalist?.familyId;
-    if (failedFamilyId && !isBFamily(failedFamilyId) && !isProhibitedFamily(failedFamilyId)) {
-      this.failedFamilyIds.add(failedFamilyId);
-    }
-    if (active?.isB === true) {
-      this.bState = "evaluated";
-    }
-    // Mark B-representative as failed on worker error — prevents re-queuing
-    if (active?.isRepresentative) {
-      this.representativeState.set(active.finalist?.id, "failed");
-    }
-    // Placement phase errors: track processing and check per-quantity completion
-    const phase = active?.phase || "placement";
-    if (phase === "placement") {
-      const errQty = active.quantity;
-      if (errQty != null && !active?.isRepresentative && !active?.isB) {
-        this.quantityPlacementProcessed[errQty] = (this.quantityPlacementProcessed[errQty] || 0) + 1;
-        if (this.isQuantityPlacementComplete(errQty) && !this.confirmationQueued[errQty]) {
-          this.startConfirmationForQuantity(errQty);
-        }
-      }
-      if (this.queue.length > 0) {
-        this.dispatchNext();
-      } else if (this.activeJobs.size === 0) {
-        this.maybeCheckBAndComplete();
-      }
-      return;
-    }
-    if (this.queue.length > 0) {
-      this.dispatchNext();
-    } else if (this.activeJobs.size === 0) {
-      this.maybeCheckBAndComplete();
-    }
+    this.watchdogs.delete(workerIndex);
+
+    // Settle the job as failure via the shared path.
+    this.settleJob(workerIndex, {
+      type: "error",
+      errorMessage: "Stage 2 worker watchdog timeout",
+    });
   }
 
   publishProgress() {
@@ -922,6 +969,11 @@ class Stage2PlacementController {
 
   cancelAll(outcome = "cancelled") {
     this.queue = [];
+    // Clear all watchdogs — no terminal settlement will fire for cancelled jobs.
+    for (const timer of this.watchdogs.values()) {
+      clearTimeout(timer);
+    }
+    this.watchdogs.clear();
     for (let i = 0; i < this.workers.length; i++) {
       if (this.workers[i]) {
         try { this.workers[i].terminate(); } catch { /* ignore */ }
@@ -934,7 +986,7 @@ class Stage2PlacementController {
   async persist(projectId, fingerprint, results) {
     if (!projectId || projectId === "free" || !results) return;
     try {
-      const { syncStage2PlacementCache } = await import("./stage2PlacementPersistence");
+      const { syncStage2PlacementCache } = await import("./stage2PlacementPersistence.js");
       // Extract raw transfers from the in-memory cache for this placement
       // fingerprint so they persist across cold reopen + P14 switches.
       let rawTransfersObj = null;
