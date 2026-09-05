@@ -459,42 +459,93 @@ try {
     return yValues.every((y) => y >= 0.3 && y <= room.roomDims.lengthM - 0.3);
   }
 
+  function scoreNormalizedTransfer(transfer) {
+    const rsp = transfer.rspCurve || [];
+    const indices = rsp.map((point, index) =>
+      point.frequency >= 20 && point.frequency <= transitionHz ? index : -1
+    ).filter((index) => index >= 0);
+    const rspValues = indices.map((index) => rsp[index]?.spl).filter(Number.isFinite);
+    const rspPeakToPeakDb = Math.max(...rspValues) - Math.min(...rspValues);
+    let worstSeatDifferenceDb = 0;
+    let worstSeat = null;
+    let worstFrequencyHz = null;
+    for (const seat of transfer.seatCurves || []) {
+      for (const index of indices) {
+        const difference = Math.abs(Number(seat.responseData[index]?.spl) - Number(rsp[index]?.spl));
+        if (difference > worstSeatDifferenceDb) {
+          worstSeatDifferenceDb = difference;
+          worstSeat = seat.originalSeatId;
+          worstFrequencyHz = rsp[index]?.frequency;
+        }
+      }
+    }
+    return {
+      score: rspPeakToPeakDb + 2 * worstSeatDifferenceDb,
+      rspPeakToPeakDb,
+      worstSeatDifferenceDb,
+      worstSeat,
+      worstFrequencyHz,
+    };
+  }
+
   function searchSeatBlock(finalist, fixedTuning) {
     const started = now();
+    const physicalSources = finalist.sources.map((source, index) => ({
+      id: "seat-screen-" + index,
+      x: source.xNorm * room.roomDims.widthM,
+      y: source.yNorm * room.roomDims.lengthM,
+      z: 0.35,
+      tuning: fixedTuning[index] || { delayMs: 0, gainDb: 0, polarity: 0 },
+    }));
+
+    function screen(offsetM) {
+      const geometry = movedGeometry(offsetM);
+      const transfer = computeNormalizedRoomTransfer({
+        roomDims: geometry.roomDims,
+        rspPosition: geometry.rspPosition,
+        seatingPositions: geometry.seatingPositions,
+        subsForSimulation: physicalSources,
+        physicsOptions: DEFAULT_BEST_SUB_LAYOUT_PHYSICS,
+        pointsPerOctave: 8,
+      });
+      if (transfer.status !== "complete") return null;
+      return {
+        offsetM,
+        proxy: scoreNormalizedTransfer(transfer),
+        screeningMs: transfer.calculationDurationMs,
+      };
+    }
+
     const coarse = [];
     for (let step = -5; step <= 5; step += 1) {
-      const offsetM = step * 0.2;
+      const offsetM = round(step * 0.2, 3);
       if (!validOffset(offsetM)) continue;
-      const placement = simulatePlacement(finalist, movedGeometry(offsetM));
-      coarse.push({
-        offsetM,
-        raw: placement.raw,
-        simulationMs: placement.runtimeMs,
-        proxy: proxy(placement.raw, fixedTuning),
-      });
+      const entry = screen(offsetM);
+      if (entry) coarse.push(entry);
     }
     coarse.sort((a, b) => a.proxy.score - b.proxy.score);
     const centre = coarse[0].offsetM;
-    const seen = new Set(coarse.map((entry) => round(entry.offsetM, 3)));
+    const seen = new Set(coarse.map((entry) => entry.offsetM));
     const refined = [];
     for (let step = -4; step <= 4; step += 1) {
       const offsetM = round(centre + step * 0.05, 3);
       if (Math.abs(offsetM) > 1 || !validOffset(offsetM) || seen.has(offsetM)) continue;
-      const placement = simulatePlacement(finalist, movedGeometry(offsetM));
-      refined.push({
-        offsetM,
-        raw: placement.raw,
-        simulationMs: placement.runtimeMs,
-        proxy: proxy(placement.raw, fixedTuning),
-      });
+      const entry = screen(offsetM);
+      if (entry) refined.push(entry);
     }
     const ranked = [...coarse, ...refined].sort((a, b) => a.proxy.score - b.proxy.score);
+    const placement = simulatePlacement(finalist, movedGeometry(ranked[0].offsetM));
+    const best = {
+      ...ranked[0],
+      raw: placement.raw,
+      simulationMs: placement.runtimeMs,
+    };
     return {
-      best: ranked[0],
+      best,
       top: ranked.slice(0, 5).map((entry) => ({
         offsetM: entry.offsetM,
         proxy: entry.proxy,
-        simulationMs: round(entry.simulationMs, 1),
+        screeningMs: round(entry.screeningMs, 1),
       })),
       coarseCount: coarse.length,
       refineCount: refined.length,
