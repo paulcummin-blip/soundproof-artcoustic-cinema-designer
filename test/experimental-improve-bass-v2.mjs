@@ -7,8 +7,8 @@ import { createServer } from "vite";
 const roomKey = String(process.argv[2] || "B").toUpperCase();
 const quantity = Number(process.argv[3] || 2);
 const phase = String(process.argv[4] || "baseline").toLowerCase();
-if (!["B", "C"].includes(roomKey) || ![2, 4].includes(quantity) || !["baseline", "polarity", "seating", "allpass"].includes(phase)) {
-  throw new Error("Usage: node test/experimental-improve-bass-v2.mjs <B|C> <2|4> <baseline|polarity|seating|allpass>");
+if (!["B", "C"].includes(roomKey) || ![2, 4].includes(quantity) || !["baseline", "placement", "polarity", "seating", "allpass"].includes(phase)) {
+  throw new Error("Usage: node test/experimental-improve-bass-v2.mjs <B|C> <2|4> <baseline|placement|polarity|seating|allpass>");
 }
 
 const MODEL = "SUB2-12";
@@ -613,6 +613,50 @@ try {
     console.log(JSON.stringify(output, null, 2));
   }
 
+  if (phase === "placement") {
+    const stage1Started = now();
+    const stage1 = runStage1SearchForQuantity({
+      roomDims: room.roomDims,
+      rspPosition: room.rspPosition,
+      seatingPositions: room.seatingPositions,
+      physicsOptions: DEFAULT_BEST_SUB_LAYOUT_PHYSICS,
+      quantity,
+    });
+    const stage1RuntimeMs = now() - stage1Started;
+    const finalist = stage1.finalists[0];
+    const placement = simulatePlacement(finalist);
+    const tuningSearch = bestExistingTuning(placement.raw);
+    const placementOnly = canonical(
+      placement.raw,
+      placement.raw.autoAlignTuning,
+      "production Stage 1 top placement + auto-align",
+    );
+    const tuned = canonical(
+      placement.raw,
+      tuningSearch.proxyBest.tuning,
+      "production Stage 1 top placement + " + tuningSearch.proxyBest.kind,
+    );
+    savePhase({
+      stage1: {
+        runtimeMs: round(stage1RuntimeMs, 1),
+        candidateCount: stage1.candidateCount,
+        finalists: stage1.finalists.map((entry) => ({
+          id: entry.id,
+          familyId: entry.familyId,
+          positions: entry.sources.map((source) => ({ x: source.x, y: source.y })),
+        })),
+      },
+      simulationMs: round(placement.runtimeMs, 1),
+      tuningSearchMs: round(tuningSearch.runtimeMs, 1),
+      delayBest: tuningSearch.delayBest,
+      trimBest: tuningSearch.trimBest,
+      placementOnly,
+      tuned,
+    });
+    await server.close();
+    process.exit(0);
+  }
+
   if (phase === "polarity") {
     const placement = simulatePlacement(trustedFinalist);
     const control = canonical(placement.raw, savedTuning, "trusted saved finalist");
@@ -702,6 +746,19 @@ try {
   console.log("[" + room.name + " q" + quantity + "] trusted saved finalist");
   const trustedPlacement = simulatePlacement(trustedFinalist);
   const trusted = canonical(trustedPlacement.raw, savedTuning, "trusted saved finalist");
+
+  if (phase === "baseline") {
+    savePhase({
+      controls: {
+        current,
+        currentSimulationMs: round(currentPlacement.runtimeMs, 1),
+        trusted,
+        trustedSimulationMs: round(trustedPlacement.runtimeMs, 1),
+      },
+    });
+    await server.close();
+    process.exit(0);
+  }
 
   console.log("[" + room.name + " q" + quantity + "] production Stage 1/2");
   const stage1Started = now();
