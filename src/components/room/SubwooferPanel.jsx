@@ -382,7 +382,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               )}
             </div>
 
-            {/* Calculate All P18 Results — explicit heavy processing of all 8 P14 targets */}
+            {/* P18 target preparation progress — passive status + retry for failed targets */}
             <div className="mt-2">
               <CalculateAllTargetResults disabled={disabled || !hasActiveSubModel} />
             </div>

@@ -11,7 +11,7 @@ import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthoritySta
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
 import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
-import { beginP14AnalysisJob, publishP14AnalysisProgress } from "./p14AnalysisProgressStore";
+import { beginP14AnalysisJob, publishP14AnalysisProgress, getP14AnalysisProgress } from "./p14AnalysisProgressStore";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
 import { isBackgroundInputsReady } from "./backgroundInputReadiness";
 
@@ -26,9 +26,10 @@ import { buildMetricPublicationReceipt } from "./metricPublicationReceipt";
 import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 import { useRecommendationGate } from "@/components/state/recommendationGateStore";
-import { getBassHeavyAction, cancelBassHeavyAction } from "./bassHeavyActionStore";
+import { getBassHeavyAction, cancelBassHeavyAction, useBassHeavyAction } from "./bassHeavyActionStore";
 import { createManualBassTimingTrace } from "./manualBassTimingDiagnostics";
 import { consumeCalculateAllTargetsRequest, useCalculateAllTargetsRequest } from "./calculateAllTargetsStore";
+import { getStage2State, subscribeStage2 } from "./stage2/stage2PlacementStore";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -37,6 +38,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const appState = useAppState();
   const recommendationsActive = useRecommendationGate();
   const calcAllTargetsRequest = useCalculateAllTargetsRequest();
+  // FIX 5: Higher-priority work detection. The P14 background sweep must yield
+  // to manual Calculate, Improve Bass Response / Stage 2, and recommendation
+  // work. These reactive subscriptions ensure the auto-start useEffect re-runs
+  // when higher-priority work starts or ends.
+  const heavyAction = useBassHeavyAction(scopeId);
+  const stage2State = useSyncExternalStore(subscribeStage2, () => getStage2State(scopeId), () => getStage2State(scopeId));
+  const heavyActionRunning = heavyAction?.status === "requested" || heavyAction?.status === "running";
+  const stage2Updating = stage2State?.status === "updating";
   const controllerRef = useRef(null);
   const scopeRef = useRef(null);
   const [manualAnalysisRequest, setManualAnalysisRequest] = useState(null);
@@ -860,32 +869,45 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // and Stage 2 gate. Counts come only from verified target-cache entries.
   // Timing evidence comes from completed real jobs; no countdown is invented.
   useEffect(() => {
-    // Hydration gate: before the base design fingerprint is available and
-    // persisted bass-authority hydration has settled, the P14 family progress
-    // must NOT show "calculating" — the hydrated cache hasn't been read yet
-    // and the family count is 0. Showing "calculating 0/8" here causes a
-    // transient flash before the hydrated 8/8 (or partial) family resolves.
+    // FIX 1: "calculating" must mean real scheduler ownership. A partial
+    // hydrated cache (e.g. 1/8) with no active scheduler work and no
+    // foreground calculation must report "idle", not "calculating". Cache
+    // incompleteness is not active calculation.
     const hydrationGated = !targetCacheHydrated || !baseDesignFingerprint || !bassAuthorityHydrationSettled;
     const basePatch = {
       baseDesignFingerprint,
       completed: targetFamilyProgress.resolved,
       total: targetFamilyProgress.total,
       completedDurationsMs: targetFamilyProgress.completedDurationsMs,
-      status: hydrationGated ? "idle" : "calculating",
     };
     if (targetFamilyProgress.total > 0 && targetFamilyProgress.resolved >= targetFamilyProgress.total) {
       publishP14AnalysisProgress(scopeId, { ...basePatch, status: "complete", activeTargetKey: null, activeStartedAtMs: null });
       return;
     }
     if (hydrationGated) {
-      publishP14AnalysisProgress(scopeId, basePatch);
+      publishP14AnalysisProgress(scopeId, { ...basePatch, status: "idle", activeTargetKey: null, activeStartedAtMs: null });
       return;
     }
     if ((lifecycle.status === "queued" || lifecycle.status === "calculating") && targetKey) {
       beginP14AnalysisJob(scopeId, { ...basePatch, targetKey });
       return;
     }
-    publishP14AnalysisProgress(scopeId, basePatch);
+    // FIX 1: Fallthrough — partial cache with no foreground calculation.
+    // Only preserve "calculating" if the scheduler genuinely owns a batch.
+    // Preserve "retryable-partial" and "paused" statuses from the scheduler.
+    // Otherwise publish "idle" — cache incompleteness is NOT active work.
+    const scheduler = getP14TargetBackgroundScheduler();
+    const currentProgress = getP14AnalysisProgress(scopeId);
+    const currentStatus = currentProgress?.status;
+    if (scheduler.hasActiveBatchWork()
+      || currentStatus === "retryable-partial"
+      || currentStatus === "paused") {
+      // Scheduler owns the status or a terminal/paused status exists —
+      // update counts only, preserve the scheduler's published status.
+      publishP14AnalysisProgress(scopeId, basePatch);
+    } else {
+      publishP14AnalysisProgress(scopeId, { ...basePatch, status: "idle", activeTargetKey: null, activeStartedAtMs: null });
+    }
   }, [scopeId, baseDesignFingerprint, targetKey, targetCacheHydrated, bassAuthorityHydrationSettled, targetFamilyProgress.resolved, targetFamilyProgress.total, targetDurationSignature, lifecycle.status]);
 
   // ── Live background worker-input readiness ──────────────────────────
@@ -907,19 +929,17 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }), [payload, sources, designEqSystemLimits, rspRawCurve, perSeatRawCurves, fingerprints, fingerprintInputs]);
 
   useEffect(() => {
-    // The alternative P14 sweep (7 targets other than the selected foreground
-    // target) is completely decoupled from the recommendation gate. It runs
-    // ONLY when the designer explicitly presses "Calculate All P18 Results".
-    // Normal automatic behaviour: scheduler is cancelled (no automatic sweep).
+    // FIX 2-5: Automatic P18 target preparation. The background P14 target
+    // scheduler auto-starts when the foreground target is ready and missing
+    // targets exist. It yields to higher-priority work (manual Calculate,
+    // Improve Bass Response / Stage 2, recommendation) and resumes when
+    // that work reaches a terminal state. Only missing targets run —
+    // schedule() skips already-cached targets.
     const scheduler = getP14TargetBackgroundScheduler();
 
+    // Explicit Retry request — bypass the retryable-partial guard.
     if (calcAllTargetsRequest?.requested && backgroundInputsReady && baseDesignFingerprint && scopeId !== "free") {
-      // Explicit user request — start the sweep for all 8 targets.
-      // FIX 3: The request is only the start signal. After schedule() accepts
-      // ownership, the scheduler/store owns the batch intent. Consuming the
-      // request does NOT destroy the batch — hasActiveBatchWork() preserves it.
       consumeCalculateAllTargetsRequest();
-      const allTargets = buildP14TargetCombinations();
       scheduler.schedule({
         projectId: scopeId,
         baseDesignFingerprint,
@@ -927,15 +947,64 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         allTargets,
         designContext: designContextRef.current,
       });
-    } else if (!scheduler.hasActiveBatchWork()) {
-      // FIX 2: Only cancel when there is genuinely no active batch work.
-      // hasActiveBatchWork() returns true for queued work, delayed-start
-      // timers, idle timers, pending completions, and foreground-calculate
-      // pauses — not just active worker execution. This prevents the owner
-      // from hard-cancelling a valid queued batch after request consumption.
-      scheduler.cancel();
+      return;
     }
-  }, [scopeId, baseDesignFingerprint, targetKey, isProjectHydrationReady, targetCacheHydrated, isDragging, recommendationsActive, backgroundInputsReady, calcAllTargetsRequest]);
+
+    // Don't auto-start during hydration or when inputs aren't ready.
+    if (!foregroundReady || !backgroundInputsReady || !baseDesignFingerprint || scopeId === "free") {
+      if (!scheduler.hasActiveBatchWork()) scheduler.cancel();
+      return;
+    }
+
+    // FIX 5: Higher-priority work gate. When manual Calculate, Improve Bass
+    // Response / Stage 2, or recommendation work is active, pause the
+    // background sweep (soft pause — preserves the batch). Resume when the
+    // higher-priority work reaches a terminal state.
+    const higherPriorityActive = !!manualAnalysisRequest
+      || heavyActionRunning
+      || stage2Updating
+      || recommendationsActive;
+
+    if (higherPriorityActive) {
+      if (scheduler.hasActiveBatchWork() && !scheduler.foregroundCalculateInProgress) {
+        scheduler.pauseForForegroundCalculate();
+      }
+      return;
+    }
+
+    // Resume after higher-priority work ends.
+    if (scheduler.foregroundCalculateInProgress) {
+      scheduler.resumeAfterForegroundCalculate();
+      return;
+    }
+
+    // FIX 6: Don't auto-start if retryable-partial — user must press Retry.
+    const currentProgress = getP14AnalysisProgress(scopeId);
+    if (currentProgress?.status === "retryable-partial") {
+      return;
+    }
+
+    // FIX 3/H: All targets prepared — no scheduler work needed.
+    if (targetFamilyProgress.total > 0 && targetFamilyProgress.resolved >= targetFamilyProgress.total) {
+      if (scheduler.hasActiveBatchWork()) scheduler.cancel();
+      return;
+    }
+
+    // FIX 2: Missing targets exist — auto-start the scheduler if not already
+    // running for this fingerprint. schedule() skips cached targets, so only
+    // missing targets run.
+    if (scheduler.hasActiveBatchWork() && scheduler.currentBaseDesignFingerprint === baseDesignFingerprint) {
+      return;
+    }
+
+    scheduler.schedule({
+      projectId: scopeId,
+      baseDesignFingerprint,
+      foregroundTargetKey: targetKey,
+      allTargets,
+      designContext: designContextRef.current,
+    });
+  }, [scopeId, baseDesignFingerprint, targetKey, foregroundReady, backgroundInputsReady, manualAnalysisRequest, heavyActionRunning, stage2Updating, targetFamilyProgress.resolved, targetFamilyProgress.total, calcAllTargetsRequest, allTargets]);
 
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target

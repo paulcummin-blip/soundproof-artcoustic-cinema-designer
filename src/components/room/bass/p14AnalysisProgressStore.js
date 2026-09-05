@@ -146,6 +146,9 @@ export function presentP14AnalysisProgress(progress, nowMs = Date.now()) {
   // yet or no work is in progress. Don't show "Calculating N/8" — it's a
   // transient flash before the hydrated family resolves.
   if (progress?.status === "idle") {
+    if (completed > 0) {
+      return { label: `${completed} of ${total} prepared`, etaSeconds: null, complete: false };
+    }
     return { label: "Preparing…", etaSeconds: null, complete: false };
   }
 
@@ -167,8 +170,10 @@ export function presentP14AnalysisProgress(progress, nowMs = Date.now()) {
   // not the ordinal, so a stuck queue honestly reports "2 of 8 prepared"
   // without implying active progress. ETA is computed for internal/debug
   // use but is NOT shown in the user-facing label.
-  const baseLabel = `${completed} of ${total} prepared`;
   const active = !!progress?.activeTargetKey;
+  const baseLabel = active
+    ? `Preparing ${Math.min(completed + 1, total)} of ${total}`
+    : `${completed} of ${total} prepared`;
   const meanDurationMs = weightedDurationMs(progress?.completedDurationsMs);
   if (!Number.isFinite(meanDurationMs) || !active) {
     return { label: baseLabel, etaSeconds: null, complete: false };
