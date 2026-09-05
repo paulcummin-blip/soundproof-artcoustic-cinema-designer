@@ -1,6 +1,7 @@
 // hooks/useLiveP14Level.jsx
 // Reads the completed frequency-aware P14 authority from the shared bass result.
 import { useOptionalSharedBassResults } from '@/components/room/bass/bassResultsStore';
+import { formatSplDisplay } from '@/components/utils/splDisplayFormatter';
 
 export function useLiveP14Level() {
   const shared = useOptionalSharedBassResults();
@@ -15,6 +16,6 @@ export function useLiveP14Level() {
     hasData: true,
     level,
     valueDb,
-    formatted: `${valueDb.toFixed(1)} dBC`,
+    formatted: formatSplDisplay(valueDb),
   };
 }
