@@ -1,0 +1,494 @@
+{
+  "metadata": {
+    "experiment": "post-fix-p19-validation",
+    "generatedAt": "2026-09-04T23:45:04.710Z",
+    "productionCodeModified": false,
+    "reranPlacementSearch": false,
+    "reranTuningSearch": false,
+    "reusedSavedLayoutsAndTunings": true,
+    "authoritativePath": "simulateAuthoritativeBassResponse -> generateCandidatePool -> selectCandidateFromPool -> evaluateCanonicalBassAuthority",
+    "modelKey": "SUB2-12",
+    "modelLabel": "SUB2‑12",
+    "target": {
+      "p14TargetBasis": "minimum",
+      "level": 2,
+      "splDbC": 112
+    },
+    "room": {
+      "id": "room-c",
+      "name": "Room C",
+      "roomDims": {
+        "widthM": 4.8,
+        "lengthM": 7.5,
+        "heightM": 2.7
+      },
+      "rspPosition": {
+        "id": "rsp",
+        "x": 2.4,
+        "y": 4,
+        "z": 1.2
+      },
+      "seatingPositions": [
+        {
+          "id": "primary-left",
+          "x": 1.2,
+          "y": 4,
+          "z": 1.2,
+          "isPrimary": true
+        },
+        {
+          "id": "primary-centre",
+          "x": 2.4,
+          "y": 4,
+          "z": 1.2,
+          "isPrimary": true
+        },
+        {
+          "id": "primary-right",
+          "x": 3.6,
+          "y": 4,
+          "z": 1.2,
+          "isPrimary": true
+        },
+        {
+          "id": "secondary-left",
+          "x": 1.2,
+          "y": 5.6,
+          "z": 1.2,
+          "isPrimary": false
+        },
+        {
+          "id": "secondary-centre",
+          "x": 2.4,
+          "y": 5.6,
+          "z": 1.2,
+          "isPrimary": false
+        },
+        {
+          "id": "secondary-right",
+          "x": 3.6,
+          "y": 5.6,
+          "z": 1.2,
+          "isPrimary": false
+        }
+      ]
+    },
+    "transitionHz": 128.30005981991684
+  },
+  "rows": [
+    {
+      "room": "Room C",
+      "quantity": 1,
+      "comparison": "current/best practical",
+      "modelKey": "SUB2-12",
+      "modelLabel": "SUB2‑12",
+      "positions": [
+        {
+          "x": 0.1,
+          "y": 5.625,
+          "z": 0.35,
+          "placement": "left"
+        }
+      ],
+      "delaysMs": [
+        0
+      ],
+      "levelTrimsDb": [
+        0
+      ],
+      "achievedP18CutoffHz": 20.845614945974724,
+      "transitionHz": 128.30005981991684,
+      "p19AssessmentBandHz": [
+        20.845614945974724,
+        128.30005981991684
+      ],
+      "correctedP19": {
+        "rawDb": 6.820556887785955,
+        "grade": "FAIL",
+        "level": 0,
+        "worstFrequencyHz": 20.909073951734992
+      },
+      "p20": {
+        "rawDb": 15.930534771821442,
+        "grade": "L1",
+        "level": 1,
+        "worstSeat": "secondary-right",
+        "worstFrequencyHz": 34.911745763327325
+      },
+      "diagnostic30To60": {
+        "p19RawDb": 0.4839684790911605,
+        "p19Grade": "L4",
+        "p19WorstFrequencyHz": 30,
+        "p20RawDb": 15.930534771821442,
+        "p20Grade": "L1",
+        "p20WorstSeat": "secondary-right",
+        "p20WorstFrequencyHz": 34.911745763327325
+      },
+      "beforeAfterP19": {
+        "oldRawDb": 6.820557,
+        "oldGrade": "FAIL",
+        "correctedRawDb": 6.820556887785955,
+        "correctedGrade": "FAIL",
+        "deltaDb": -1.1221404516703615e-7,
+        "improvementDb": 1.1221404516703615e-7
+      },
+      "authority": {
+        "p14Pass": true,
+        "p19TargetIdentity": "practical-calibration-target",
+        "p18ReferenceConvention": "median 60–200 Hz",
+        "p19AssessmentStartAuthority": "achieved P18 −3 dB cutoff",
+        "p19AssessmentEndAuthority": "room transition",
+        "p20Unchanged": true
+      },
+      "timingsMs": {
+        "authoritativeSimulation": 4610.889963000001,
+        "optimiserAndCanonicalAuthority": 10188.477628,
+        "total": 14799.367591000002
+      }
+    },
+    {
+      "room": "Room C",
+      "quantity": 2,
+      "comparison": "current practical",
+      "modelKey": "SUB2-12",
+      "modelLabel": "SUB2‑12",
+      "positions": [
+        {
+          "x": 1.2,
+          "y": 7.4,
+          "z": 0.35,
+          "placement": "rear"
+        },
+        {
+          "x": 3.6,
+          "y": 7.4,
+          "z": 0.35,
+          "placement": "rear"
+        }
+      ],
+      "delaysMs": [
+        0,
+        0
+      ],
+      "levelTrimsDb": [
+        0,
+        0
+      ],
+      "achievedP18CutoffHz": 20.179240501477707,
+      "transitionHz": 128.30005981991684,
+      "p19AssessmentBandHz": [
+        20.179240501477707,
+        128.30005981991684
+      ],
+      "correctedP19": {
+        "rawDb": 7.877439626489689,
+        "grade": "FAIL",
+        "level": 0,
+        "worstFrequencyHz": 20.313833204053388
+      },
+      "p20": {
+        "rawDb": 10.346717109981796,
+        "grade": "L1",
+        "level": 1,
+        "worstSeat": "secondary-left",
+        "worstFrequencyHz": 45.27493282780269
+      },
+      "diagnostic30To60": {
+        "p19RawDb": 0.9828206882895785,
+        "p19Grade": "L4",
+        "p19WorstFrequencyHz": 60,
+        "p20RawDb": 10.346717109981796,
+        "p20Grade": "L1",
+        "p20WorstSeat": "secondary-left",
+        "p20WorstFrequencyHz": 45.27493282780269
+      },
+      "beforeAfterP19": {
+        "oldRawDb": 7.87744,
+        "oldGrade": "FAIL",
+        "correctedRawDb": 7.877439626489689,
+        "correctedGrade": "FAIL",
+        "deltaDb": -3.735103106805582e-7,
+        "improvementDb": 3.735103106805582e-7
+      },
+      "authority": {
+        "p14Pass": true,
+        "p19TargetIdentity": "practical-calibration-target",
+        "p18ReferenceConvention": "median 60–200 Hz",
+        "p19AssessmentStartAuthority": "achieved P18 −3 dB cutoff",
+        "p19AssessmentEndAuthority": "room transition",
+        "p20Unchanged": true
+      },
+      "timingsMs": {
+        "authoritativeSimulation": 9400.896879,
+        "optimiserAndCanonicalAuthority": 19612.786137000003,
+        "total": 29013.683016000003
+      }
+    },
+    {
+      "room": "Room C",
+      "quantity": 2,
+      "comparison": "best delay finalist",
+      "modelKey": "SUB2-12",
+      "modelLabel": "SUB2‑12",
+      "positions": [
+        {
+          "x": 2.4,
+          "y": 7.3725,
+          "z": 0.35,
+          "placement": "rear"
+        },
+        {
+          "x": 2.4,
+          "y": 0.1275,
+          "z": 0.35,
+          "placement": "front"
+        }
+      ],
+      "delaysMs": [
+        0,
+        10.846
+      ],
+      "levelTrimsDb": [
+        0,
+        0
+      ],
+      "achievedP18CutoffHz": 17.716931671657388,
+      "transitionHz": 128.30005981991684,
+      "p19AssessmentBandHz": [
+        17.716931671657388,
+        128.30005981991684
+      ],
+      "correctedP19": {
+        "rawDb": 6.7848809093391935,
+        "grade": "FAIL",
+        "level": 0,
+        "worstFrequencyHz": 17.838106725040817
+      },
+      "p20": {
+        "rawDb": 12.636192950480464,
+        "grade": "L1",
+        "level": 1,
+        "worstSeat": "primary-left",
+        "worstFrequencyHz": 116.58383293843272
+      },
+      "diagnostic30To60": {
+        "p19RawDb": 0.9747234839921077,
+        "p19Grade": "L4",
+        "p19WorstFrequencyHz": 50.090806284269355,
+        "p20RawDb": 6.953687680233941,
+        "p20Grade": "L1",
+        "p20WorstSeat": "secondary-left",
+        "p20WorstFrequencyHz": 43.04351316933
+      },
+      "beforeAfterP19": {
+        "oldRawDb": 6.784881,
+        "oldGrade": "FAIL",
+        "correctedRawDb": 6.7848809093391935,
+        "correctedGrade": "FAIL",
+        "deltaDb": -9.066080686181976e-8,
+        "improvementDb": 9.066080686181976e-8
+      },
+      "authority": {
+        "p14Pass": true,
+        "p19TargetIdentity": "practical-calibration-target",
+        "p18ReferenceConvention": "median 60–200 Hz",
+        "p19AssessmentStartAuthority": "achieved P18 −3 dB cutoff",
+        "p19AssessmentEndAuthority": "room transition",
+        "p20Unchanged": true
+      },
+      "timingsMs": {
+        "authoritativeSimulation": 9421.899828999994,
+        "optimiserAndCanonicalAuthority": 10936.918630999993,
+        "total": 20358.818459999988
+      }
+    },
+    {
+      "room": "Room C",
+      "quantity": 4,
+      "comparison": "current practical",
+      "modelKey": "SUB2-12",
+      "modelLabel": "SUB2‑12",
+      "positions": [
+        {
+          "x": 1.2,
+          "y": 0.1,
+          "z": 0.35,
+          "placement": "front"
+        },
+        {
+          "x": 3.6,
+          "y": 0.1,
+          "z": 0.35,
+          "placement": "front"
+        },
+        {
+          "x": 1.2,
+          "y": 7.4,
+          "z": 0.35,
+          "placement": "rear"
+        },
+        {
+          "x": 3.6,
+          "y": 7.4,
+          "z": 0.35,
+          "placement": "rear"
+        }
+      ],
+      "delaysMs": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "levelTrimsDb": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "achievedP18CutoffHz": 15,
+      "transitionHz": 128.30005981991684,
+      "p19AssessmentBandHz": [
+        15,
+        128.30005981991684
+      ],
+      "correctedP19": {
+        "rawDb": 6.921756326591421,
+        "grade": "FAIL",
+        "level": 0,
+        "worstFrequencyHz": 15
+      },
+      "p20": {
+        "rawDb": 20.94586793235095,
+        "grade": "L1",
+        "level": 1,
+        "worstSeat": "secondary-left",
+        "worstFrequencyHz": 47.622031559045986
+      },
+      "diagnostic30To60": {
+        "p19RawDb": 1.00383157576249,
+        "p19Grade": "L4",
+        "p19WorstFrequencyHz": 49.37266434461894,
+        "p20RawDb": 20.94586793235095,
+        "p20Grade": "L1",
+        "p20WorstSeat": "secondary-left",
+        "p20WorstFrequencyHz": 47.622031559045986
+      },
+      "beforeAfterP19": {
+        "oldRawDb": 6.921756,
+        "oldGrade": "FAIL",
+        "correctedRawDb": 6.921756326591421,
+        "correctedGrade": "FAIL",
+        "deltaDb": 3.265914205741183e-7,
+        "improvementDb": -3.265914205741183e-7
+      },
+      "authority": {
+        "p14Pass": true,
+        "p19TargetIdentity": "practical-calibration-target",
+        "p18ReferenceConvention": "median 60–200 Hz",
+        "p19AssessmentStartAuthority": "achieved P18 −3 dB cutoff",
+        "p19AssessmentEndAuthority": "room transition",
+        "p20Unchanged": true
+      },
+      "timingsMs": {
+        "authoritativeSimulation": 18899.407325000007,
+        "optimiserAndCanonicalAuthority": 11127.016269,
+        "total": 30026.423594000007
+      }
+    },
+    {
+      "room": "Room C",
+      "quantity": 4,
+      "comparison": "best credible delay finalist",
+      "modelKey": "SUB2-12",
+      "modelLabel": "SUB2‑12",
+      "positions": [
+        {
+          "x": 3.26,
+          "y": 0.1275,
+          "z": 0.35,
+          "placement": "front"
+        },
+        {
+          "x": 2.4,
+          "y": 0.1275,
+          "z": 0.35,
+          "placement": "front"
+        },
+        {
+          "x": 1.54,
+          "y": 7.3725,
+          "z": 0.35,
+          "placement": "rear"
+        },
+        {
+          "x": 1.54,
+          "y": 0.1275,
+          "z": 0.35,
+          "placement": "front"
+        }
+      ],
+      "delaysMs": [
+        0,
+        10.064,
+        2.998,
+        14.514
+      ],
+      "levelTrimsDb": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "achievedP18CutoffHz": 15,
+      "transitionHz": 128.30005981991684,
+      "p19AssessmentBandHz": [
+        15,
+        128.30005981991684
+      ],
+      "correctedP19": {
+        "rawDb": 6.169253566821737,
+        "grade": "FAIL",
+        "level": 0,
+        "worstFrequencyHz": 15
+      },
+      "p20": {
+        "rawDb": 10.297858277479136,
+        "grade": "L1",
+        "level": 1,
+        "worstSeat": "secondary-right",
+        "worstFrequencyHz": 40.335379620179374
+      },
+      "diagnostic30To60": {
+        "p19RawDb": 0.08089915836097816,
+        "p19Grade": "L4",
+        "p19WorstFrequencyHz": 30,
+        "p20RawDb": 10.297858277479136,
+        "p20Grade": "L1",
+        "p20WorstSeat": "secondary-right",
+        "p20WorstFrequencyHz": 40.335379620179374
+      },
+      "beforeAfterP19": {
+        "oldRawDb": 6.169254,
+        "oldGrade": "FAIL",
+        "correctedRawDb": 6.169253566821737,
+        "correctedGrade": "FAIL",
+        "deltaDb": -4.3317826214916977e-7,
+        "improvementDb": 4.3317826214916977e-7
+      },
+      "authority": {
+        "p14Pass": true,
+        "p19TargetIdentity": "practical-calibration-target",
+        "p18ReferenceConvention": "median 60–200 Hz",
+        "p19AssessmentStartAuthority": "achieved P18 −3 dB cutoff",
+        "p19AssessmentEndAuthority": "room transition",
+        "p20Unchanged": true
+      },
+      "timingsMs": {
+        "authoritativeSimulation": 18827.760823000004,
+        "optimiserAndCanonicalAuthority": 26844.65815099998,
+        "total": 45672.418973999986
+      }
+    }
+  ]
+}
