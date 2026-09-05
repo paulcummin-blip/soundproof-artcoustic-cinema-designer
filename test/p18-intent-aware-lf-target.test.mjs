@@ -54,12 +54,11 @@ function buildIdealTargetCurve(frequencyGrid, targetDb) {
   });
 }
 
-// Build a synthetic capability envelope that rolls off below 30 Hz.
+// Build a synthetic capability envelope that is ALWAYS above the ideal target.
+// This ensures A(f) = idealTarget(f) everywhere, so the overlay is the sole
+// LF shaper and target distinction between different Fd values is visible.
 function buildCapabilityEnvelope(frequencyGrid, targetDb) {
-  return frequencyGrid.map((f) => {
-    const rolloff = f < 30 ? 12 * Math.log2(30 / Math.max(f, 1)) : 0;
-    return { frequency: f, spl: targetDb - rolloff };
-  });
+  return frequencyGrid.map((f) => ({ frequency: f, spl: targetDb + 20 }));
 }
 
 test("P18-Intent-Aware LF Target", async (t) => {
@@ -68,7 +67,7 @@ test("P18-Intent-Aware LF Target", async (t) => {
   const { p18ThresholdHzForLevel } = await loadP18Authority();
 
   const frequencyGrid = [];
-  for (let f = 15; f <= 200; f += 1) frequencyGrid.push(f);
+  for (let f = 5; f <= 200; f += 1) frequencyGrid.push(f);
   const targetDb = 105;
   const idealTarget = buildIdealTargetCurve(frequencyGrid, targetDb);
   const capabilityEnvelope = buildCapabilityEnvelope(frequencyGrid, targetDb);
@@ -119,12 +118,13 @@ test("P18-Intent-Aware LF Target", async (t) => {
     const fd = 20;
     const target = applyP18IntentAwareLfOverlay({ practicalTargetA: baseTargetA, p18DesignHz: fd, p18ReferenceDb: rDb });
     // The target at Fd should be M = (C + A(Fd)) / 2, where C = R - 3.
+    // Since A(Fd) > M (flat high capability), target = M (not capped by A(f)).
     const cDb = rDb - 3;
     const aFd = baseTargetA.find((p) => p.frequency === fd)?.spl;
     assert.ok(Number.isFinite(aFd), "A(Fd) exists");
     const expectedM = (cDb + aFd) / 2;
     const targetAtFd = target.find((p) => p.frequency === fd)?.spl;
-    assert.ok(Math.abs(targetAtFd - expectedM) < 0.5, `Target at Fd = M = ${expectedM.toFixed(2)}, got ${targetAtFd?.toFixed(2)}`);
+    assert.ok(Math.abs(targetAtFd - expectedM) < 0.01, `Target at Fd = M = ${expectedM.toFixed(2)}, got ${targetAtFd?.toFixed(2)}`);
     // The target at 29 Hz should NOT be M for 29 Hz — it should be in the
     // smoothstep transition from M(20Hz) toward A(f).
     const targetAt29 = target.find((p) => p.frequency === 29)?.spl;
