@@ -14,6 +14,7 @@ import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOper
 import { getSpeakerModelMeta, getSubwooferCurve } from "@/components/models/speakers/registry";
 import { levelP19_lfResponse, levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 export { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 
 export { applyDesignEqCurve, calculateDesignEqCurve };
@@ -304,7 +305,7 @@ export function computeParam14LfeCapability(rspResponse, designEqEnabled, band =
     value: designSpl,
     rawValue: minSpl,
     level: level >= 1 ? `L${level}` : null,
-    formatted: `${designSpl} dBC`,
+    formatted: formatSplDisplay(designSpl),
     designEqEnabled: !!designEqEnabled,
     band,
     note: 'Post-EQ design estimate at RSP using selected subwoofer product data.',
