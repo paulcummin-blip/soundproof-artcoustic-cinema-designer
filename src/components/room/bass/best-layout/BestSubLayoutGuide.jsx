@@ -11,11 +11,12 @@ import {
 import { useFastBassPlacementAdvisor } from "@/components/room/bass/best-layout/useFastBassPlacementAdvisor";
 import { useBestSubLayoutLiveInputs } from "@/components/room/bass/best-layout/bestSubLayoutLiveInputs";
 import { selectBestSubLayoutPhysics } from "@/components/room/bass/best-layout/bestSubLayoutPhysicsSnapshot";
+import AppliedLayoutPills from "@/components/room/bass/best-layout/AppliedLayoutPills";
 
 const OPTION_COPY = {
-  1: { title: "1 Sub", strapline: "Recommended starting layout" },
-  2: { title: "2 Subs", strapline: "Better expected consistency" },
-  4: { title: "4 Subs", strapline: "Best expected consistency" },
+  1: { title: "1 Sub", verdict: "Simple starting layout" },
+  2: { title: "2 Subs", verdict: "Improves bass coverage across the seating area" },
+  4: { title: "4 Subs", verdict: "Best starting point for maximum extension and consistency" },
 };
 
 function currentSourcesFrom(subs) {
@@ -45,7 +46,7 @@ function LayoutThumbnail({ layout, roomDims }) {
   return (
     <svg
       viewBox={`${-pad} ${-pad} ${width + pad * 2} ${length + pad * 2}`}
-      className="h-28 w-full rounded-md border border-[#D9D5CE] bg-[#F8F7F4]"
+      className="h-36 w-full rounded-md border border-[#D9D5CE] bg-[#F8F7F4]"
       role="img"
       aria-label={`Plan showing ${layout?.sources?.length || 0} suggested subwoofer positions`}
     >
@@ -63,53 +64,67 @@ function LayoutThumbnail({ layout, roomDims }) {
 
 function AdvisorCard({ quantity, layout, roomDims, isApplied, onApply, onInspect, disabled }) {
   const copy = OPTION_COPY[quantity];
+  const [showDetails, setShowDetails] = useState(false);
   if (!layout) {
     return (
       <div className="rounded-lg border border-dashed border-[#C9C2B8] bg-white/60 p-3">
         <div className="text-[13px] font-semibold text-[#1B1A1A]">{copy.title}</div>
-        <div className="mt-1 text-[11px] text-[#8A7B6A]">No practical canonical layout is available for the current room.</div>
+        <div className="mt-1 text-[11px] text-[#8A7B6A]">No practical layout available for the current room.</div>
       </div>
     );
   }
   const metrics = layout.metrics || {};
   const sideWall = layout.recommendationKind === "side-wall-alternative";
   return (
-    <div className="rounded-lg border border-[#D9D5CE] bg-white p-3">
+    <div className={`rounded-lg border p-3 ${isApplied ? "border-2 border-[#213428] bg-[#F3F1EC]" : "border border-[#D9D5CE] bg-white"}`}>
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="text-[14px] font-semibold text-[#1B1A1A]">{copy.title}</div>
-          <div className="text-[10px] font-medium uppercase tracking-wide text-[#625143]">{copy.strapline}</div>
-        </div>
-        {sideWall && (
-          <span className="max-w-[130px] rounded-full bg-amber-50 px-2 py-1 text-center text-[9px] font-semibold leading-tight text-amber-800">
-            Acoustic alternative · less practical
-          </span>
+        <div className="text-[14px] font-semibold text-[#1B1A1A]">{copy.title}</div>
+        {isApplied && (
+          <span className="rounded-full bg-[#213428] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Applied</span>
         )}
       </div>
-      <button type="button" onClick={() => onInspect(layout)} className="mt-3 block w-full text-left">
+      <button type="button" onClick={() => onInspect(layout)} className="mt-2 block w-full text-left">
         <LayoutThumbnail layout={layout} roomDims={roomDims} />
-        <div className="mt-2 text-[12px] font-semibold text-[#213428]">{layout.name}</div>
       </button>
-      <div className="mt-2 space-y-1 text-[10px] text-[#625143]">
-        <div>{metrics.nullRiskLabel}</div>
-        <div>{metrics.expectedConsistencyLabel}</div>
-        <div>{metrics.smoothnessLabel}</div>
-      </div>
-      <p className="mt-2 text-[10px] leading-relaxed text-[#8A7B6A]">{layout.practicalReason}</p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={() => onInspect(layout)}>
-          View positions
-        </Button>
+      <p className="mt-2 text-[12px] leading-snug text-[#1B1A1A]">{copy.verdict}</p>
+      {isApplied && (
+        <div className="mt-2">
+          <AppliedLayoutPills />
+        </div>
+      )}
+      <div className="mt-3">
         <Button
           type="button"
           size="sm"
           onClick={() => onApply(layout)}
           disabled={disabled || isApplied}
-          className="bg-[#213428] text-white hover:bg-[#3E4349]"
+          className="w-full bg-[#213428] text-white hover:bg-[#3E4349]"
         >
-          {isApplied ? "Applied" : "Apply Layout"}
+          {isApplied ? "Applied" : "Apply"}
         </Button>
       </div>
+      <button
+        type="button"
+        onClick={() => setShowDetails(!showDetails)}
+        className="mt-2 text-[10px] text-[#625143] underline decoration-dotted underline-offset-2 hover:text-[#213428]"
+      >
+        {showDetails ? "Hide details" : "Details"}
+      </button>
+      {showDetails && (
+        <div className="mt-1 space-y-1 text-[10px] leading-relaxed text-[#625143]">
+          <div><span className="font-medium text-[#1B1A1A]">Layout:</span> {layout.name}</div>
+          {sideWall && <div className="text-amber-700">Acoustic alternative — less practical placement.</div>}
+          <div>{metrics.nullRiskLabel}</div>
+          <div>{metrics.expectedConsistencyLabel}</div>
+          <div>{metrics.smoothnessLabel}</div>
+          {layout.practicalReason && <div>{layout.practicalReason}</div>}
+          <div><span className="font-medium text-[#1B1A1A]">Seats assessed:</span> {metrics.rspOnly ? "RSP-only" : metrics.seatsAssessed || "—"}</div>
+          <div>
+            <span className="font-medium text-[#1B1A1A]">Positions:</span>{" "}
+            {(layout.sources || []).map((s) => `(${Number(s.x).toFixed(2)}, ${Number(s.y).toFixed(2)})`).join(" · ")}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -186,7 +201,7 @@ export default function BestSubLayoutGuide({
     <div className="mt-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4" data-advisor-status={advisor.status}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h5 className="text-[14px] font-semibold text-[#1B1A1A]">Starting Layout Advisor</h5>
+          <h5 className="text-[14px] font-semibold text-[#1B1A1A]">Recommended Layouts</h5>
           <p className="mt-1 text-[11px] leading-relaxed text-[#625143]">
             Fast room-and-seat guidance only. These are scored starting positions, not P14/P18/P19/P20 results.
           </p>
@@ -229,7 +244,7 @@ export default function BestSubLayoutGuide({
         </Button>
       )}
       <p className="mt-3 text-[10px] leading-relaxed text-[#8A7B6A]">
-        Applying a layout only moves the subwoofers. Bass analysis will not start until you choose Calculate Bass Performance.
+        Applying a layout only moves the subwoofers. Press Calculate Parameter Results to run the authoritative bass analysis.
       </p>
 
       <Rp22LayoutPlanDialog

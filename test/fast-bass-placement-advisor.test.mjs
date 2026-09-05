@@ -89,7 +89,7 @@ test("removing a serious 30–60 Hz null is a material improvement", () => {
 test("advisor UI is lightweight, visual and contains no authoritative grades or worker counts", () => {
   assert.match(guideSource, /useFastBassPlacementAdvisor/);
   assert.match(guideSource, /LayoutThumbnail/);
-  assert.match(guideSource, /Apply Layout/);
+  assert.match(guideSource, /"Apply"/);
   assert.match(guideSource, /not P14\/P18\/P19\/P20 results/);
   assert.doesNotMatch(guideSource, /useStage2PlacementOptimiser|completedJobs|totalJobsPlanned|of .*finalists/);
   assert.match(ownerSource, /useBassHeavyAction/);
