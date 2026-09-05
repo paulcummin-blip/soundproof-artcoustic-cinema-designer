@@ -7,6 +7,7 @@ import { createServer } from "vite";
 const roomKey = String(process.argv[2] || "B").toUpperCase();
 const quantity = Number(process.argv[3] || 2);
 const phase = String(process.argv[4] || "baseline").toLowerCase();
+const variant = String(process.argv[5] || "default").toLowerCase();
 if (!["B", "C"].includes(roomKey) || ![2, 4].includes(quantity) || !["baseline", "placement", "polarity", "seating", "allpass"].includes(phase)) {
   throw new Error("Usage: node test/experimental-improve-bass-v2.mjs <B|C> <2|4> <baseline|placement|polarity|seating|allpass>");
 }
@@ -596,6 +597,7 @@ try {
         room: room.name,
         quantity,
         phase,
+        variant,
         model: MODEL,
         target: TARGET,
         transitionHz: round(transitionHz),
@@ -613,6 +615,24 @@ try {
     console.log(JSON.stringify(output, null, 2));
   }
 
+  if (phase === "baseline") {
+    const useTrusted = variant === "trusted";
+    const finalist = useTrusted ? trustedFinalist : currentFinalist;
+    const tuning = useTrusted ? savedTuning : zeros(quantity);
+    const placement = simulatePlacement(finalist);
+    const result = canonical(
+      placement.raw,
+      tuning,
+      useTrusted ? "trusted saved finalist" : "current control",
+    );
+    savePhase({
+      result,
+      simulationMs: round(placement.runtimeMs, 1),
+    });
+    await server.close();
+    process.exit(0);
+  }
+
   if (phase === "placement") {
     const stage1Started = now();
     const stage1 = runStage1SearchForQuantity({
@@ -626,15 +646,13 @@ try {
     const finalist = stage1.finalists[0];
     const placement = simulatePlacement(finalist);
     const tuningSearch = bestExistingTuning(placement.raw);
-    const placementOnly = canonical(
+    const useTuned = variant === "tuned";
+    const result = canonical(
       placement.raw,
-      placement.raw.autoAlignTuning,
-      "production Stage 1 top placement + auto-align",
-    );
-    const tuned = canonical(
-      placement.raw,
-      tuningSearch.proxyBest.tuning,
-      "production Stage 1 top placement + " + tuningSearch.proxyBest.kind,
+      useTuned ? tuningSearch.proxyBest.tuning : placement.raw.autoAlignTuning,
+      useTuned
+        ? "production Stage 1 top placement + " + tuningSearch.proxyBest.kind
+        : "production Stage 1 top placement + auto-align",
     );
     savePhase({
       stage1: {
@@ -650,8 +668,8 @@ try {
       tuningSearchMs: round(tuningSearch.runtimeMs, 1),
       delayBest: tuningSearch.delayBest,
       trimBest: tuningSearch.trimBest,
-      placementOnly,
-      tuned,
+      result,
+      selectedVariant: useTuned ? tuningSearch.proxyBest.kind : "auto-align",
     });
     await server.close();
     process.exit(0);
@@ -659,42 +677,45 @@ try {
 
   if (phase === "polarity") {
     const placement = simulatePlacement(trustedFinalist);
-    const control = canonical(placement.raw, savedTuning, "trusted saved finalist");
     const search = searchPolarity(placement.raw);
-    const alone = canonical(placement.raw, search.best.polarity.tuning, "polarity alone");
-    const delay = canonical(placement.raw, search.best.polarityDelay.tuning, "polarity + delay");
-    const delayTrim = canonical(placement.raw, search.best.polarityDelayTrim.tuning, "polarity + delay + trim");
+    const key = variant === "alone"
+      ? "polarity"
+      : variant === "delay"
+        ? "polarityDelay"
+        : "polarityDelayTrim";
+    const labels = {
+      polarity: "polarity alone",
+      polarityDelay: "polarity + delay",
+      polarityDelayTrim: "polarity + delay + trim",
+    };
+    const result = canonical(placement.raw, search.best[key].tuning, labels[key]);
     savePhase({
-      control,
+      result,
       simulationMs: round(placement.runtimeMs, 1),
       searchRuntimeMs: round(search.runtimeMs, 1),
       combinations: search.counts,
-      bestProxy: search.best,
-      authoritative: { alone, delay, delayTrim },
+      selectedSearch: search.best[key],
     });
     await server.close();
     process.exit(0);
   }
 
   if (phase === "seating") {
-    const placement = simulatePlacement(trustedFinalist);
-    const control = canonical(placement.raw, savedTuning, "trusted saved finalist");
     const search = searchSeatBlock(trustedFinalist, savedTuning);
-    const movedFixed = canonical(
+    const useRetuned = variant === "retuned";
+    const retune = useRetuned ? searchPolarity(search.best.raw) : null;
+    const tuning = useRetuned
+      ? retune.best.polarityDelayTrim.tuning
+      : savedTuning;
+    const result = canonical(
       search.best.raw,
-      savedTuning,
-      "seat moved " + round(search.best.offsetM * 1000, 0) + " mm; fixed prior tuning",
-    );
-    const retune = searchPolarity(search.best.raw);
-    const movedTuning = retune.best.polarityDelayTrim.tuning;
-    const movedRetuned = canonical(
-      search.best.raw,
-      movedTuning,
-      "seat moved " + round(search.best.offsetM * 1000, 0) + " mm; polarity/delay/trim retuned",
+      tuning,
+      "seat moved " + round(search.best.offsetM * 1000, 0) + " mm; "
+        + (useRetuned ? "polarity/delay/trim retuned" : "fixed prior tuning"),
     );
     savePhase({
-      control,
-      simulationMs: round(placement.runtimeMs, 1),
+      result,
+      tuning,
       search: {
         runtimeMs: round(search.runtimeMs, 1),
         coarseCount: search.coarseCount,
@@ -703,10 +724,7 @@ try {
         top: search.top,
         bestFullSimulationMs: round(search.best.simulationMs, 1),
       },
-      fixedPriorTuning: movedFixed,
-      retuneSearchMs: round(retune.runtimeMs, 1),
-      retuned: movedRetuned,
-      retunedTuning: movedTuning,
+      retuneSearchMs: round(retune?.runtimeMs || 0, 1),
     });
     await server.close();
     process.exit(0);
@@ -714,26 +732,22 @@ try {
 
   if (phase === "allpass") {
     const placement = simulatePlacement(trustedFinalist);
-    const control = canonical(placement.raw, savedTuning, "trusted saved finalist");
     const polarity = searchPolarity(placement.raw);
     const baseTuning = polarity.best.polarityDelayTrim.tuning;
-    const base = canonical(placement.raw, baseTuning, "polarity + delay + trim base");
     const search = searchAllPass(placement.raw, baseTuning);
-    const proof = canonical(
+    const result = canonical(
       search.raw,
       baseTuning,
       "one first-order all-pass per non-reference sub",
     );
     savePhase({
-      control,
-      simulationMs: round(placement.runtimeMs, 1),
-      base,
+      result,
       baseTuning,
+      simulationMs: round(placement.runtimeMs, 1),
       polaritySearchMs: round(polarity.runtimeMs, 1),
       allPassSearchMs: round(search.runtimeMs, 1),
       settings: search.settings,
       proxy: search.proxy,
-      proof,
     });
     await server.close();
     process.exit(0);
