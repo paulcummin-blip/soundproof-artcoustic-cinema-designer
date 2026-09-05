@@ -12,9 +12,7 @@ import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTo
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
-import { formatCoverageSummaryFromRows } from "@/components/utils/seatCoverageSummary";
-import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
-import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
+import SharedP19P20SeatResults from "@/components/room/bass/SharedP19P20SeatResults";
 
 const CARD_TITLES = {
   p14: "P14 Bass SPL",
@@ -66,55 +64,14 @@ export default function BassResultCards() {
         ))}
       </div>
 
-      {/* Expanded P19/P20 per-seat views — when authoritative (or P14 failed → not evaluated) */}
-      {formatted.isReady && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {formatted.p19Rows.length > 0 ? (
-            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-              <div className="mb-1 text-[11px] font-semibold text-[#213428]">P19 — All Seats</div>
-              <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{formatCoverageSummaryFromRows(formatted.p19Rows)}</div>
-              <P19SeatBlock
-                rows={formatted.p19Rows}
-                publicationVerified={formatted.publicationVerified}
-                authorityStatus={shared.completedBassAuthority?.authorityStatus}
-                p14TargetUnselected={p14Selection.noP14TargetSelected}
-              />
-            </div>
-          ) : (
-            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-              <div className="mb-1 text-[11px] font-semibold text-[#213428]">P19 — All Seats</div>
-              <P19SeatBlock
-                rows={[]}
-                publicationVerified={false}
-                authorityStatus={shared.completedBassAuthority?.authorityStatus}
-                p14TargetUnselected={p14Selection.noP14TargetSelected}
-              />
-            </div>
-          )}
-          {formatted.p20Rows.length > 0 ? (
-            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-              <div className="mb-1 text-[11px] font-semibold text-[#213428]">P20 — All Seats</div>
-              <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{formatCoverageSummaryFromRows(formatted.p20Rows)}</div>
-              <P20SeatBlock
-                rows={formatted.p20Rows}
-                publicationVerified={formatted.publicationVerified}
-                authorityStatus={shared.completedBassAuthority?.authorityStatus}
-                p14TargetUnselected={p14Selection.noP14TargetSelected}
-              />
-            </div>
-          ) : (
-            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-              <div className="mb-1 text-[11px] font-semibold text-[#213428]">P20 — All Seats</div>
-              <P20SeatBlock
-                rows={[]}
-                publicationVerified={false}
-                authorityStatus={shared.completedBassAuthority?.authorityStatus}
-                p14TargetUnselected={p14Selection.noP14TargetSelected}
-              />
-            </div>
-          )}
-        </div>
-      )}
+      {/* Expanded P19/P20 per-seat views — shared component */}
+      <SharedP19P20SeatResults
+        p19Rows={formatted.p19Rows}
+        p20Rows={formatted.p20Rows}
+        publicationVerified={formatted.publicationVerified}
+        authorityStatus={shared.completedBassAuthority?.authorityStatus}
+        p14TargetUnselected={p14Selection.noP14TargetSelected}
+      />
 
       <div className="flex items-center gap-2 text-[10px] font-medium text-[#625143]" aria-live="polite">
         {shared.lifecycle?.status === "error" && shared.onRetry
