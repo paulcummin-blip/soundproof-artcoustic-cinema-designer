@@ -29,6 +29,7 @@ import { STAGE2_FALLBACK_SOURCE_HEIGHT_M, STAGE2_PRODUCT_ENGINEERING_VERSION } f
 import { deriveCentreZ } from "@/components/utils/subwooferInstanceMigration";
 import { gradeP19FromRaw, gradeP20FromRaw } from "../completedBassResultPersistence";
 import { buildAuthoritativeAutoAlignDelays } from "../useAuthoritativeBassResponse";
+import { searchDelayOnly, searchLevelAndDelay, resumWithTuning } from "./stage2TuningSearch";
 
 // ── Pure curve helpers (inlined to avoid React-dependent imports) ─────────
 
@@ -72,30 +73,21 @@ function buildStage2Physics() {
 // for sub ID generation (front-sub-left, front-sub-right, rear-sub-left, ...).
 const STAGE2_POSITION_LABELS = ["left", "right"];
 
-function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, rspPosition) {
+function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, rspPosition, zeroTuning = false) {
   const W = Number(roomDims.widthM);
   const L = Number(roomDims.lengthM);
-  // Derive acoustic-centre Z through the SAME production authority used by
-  // the normal bass calculation (deriveCentreZ from subwooferInstanceMigration).
-  // STAGE2_FALLBACK_SOURCE_HEIGHT_M is the fallback BOTTOM height (0.05m),
-  // not the acoustic-centre Z. The centre Z = bottomHeightM + cabinetHeightM/2.
   const bottomHeightM = (subwooferBottomHeightM != null && Number.isFinite(Number(subwooferBottomHeightM)))
     ? Math.max(0, Number(subwooferBottomHeightM))
     : STAGE2_FALLBACK_SOURCE_HEIGHT_M;
   const modelKey = normaliseModelKey(selectedSubModel);
   const centreZ = deriveCentreZ({ bottomHeightM, model: modelKey });
 
-  // Compute source X/Y/Z for each finalist position.
   const sourcePositions = finalist.sources.map((s) => ({
     x: s.xNorm * W,
     y: s.yNorm * L,
     z: centreZ,
   }));
 
-  // Split into front/rear groups using the SAME authority as production:
-  // yNorm < 0.5 = front wall, yNorm >= 0.5 = rear wall. This matches how
-  // buildAuthoritativeAutoAlignDelays processes frontSubsLive / rearSubsLive.
-  // No delay/delayMs fields → manual delay = 0 (hypothetical layout, no user tuning).
   const frontSubsLive = [];
   const rearSubsLive = [];
   finalist.sources.forEach((s, i) => {
@@ -104,9 +96,6 @@ function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPower
     else rearSubsLive.push(entry);
   });
 
-  // Reuse the EXACT production auto-alignment authority — do not recreate its maths.
-  // buildAuthoritativeAutoAlignDelays computes per-sub delay = max(0, latestArrival - ownArrival)
-  // across all subs (front + rear pooled), aligning every sub to the furthest one.
   const autoAlignDelays = buildAuthoritativeAutoAlignDelays({
     enabled: true,
     rspPosition,
@@ -116,9 +105,6 @@ function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPower
     rearSubsCfg: null,
   });
 
-  // Build final source objects, looking up each auto-align delay by the same
-  // canonical sub ID pattern that buildAuthoritativeAutoAlignDelays generates:
-  // `${group}-sub-${POSITION_LABELS[indexInGroup] ?? indexInGroup}`.
   let frontIdx = 0;
   let rearIdx = 0;
   return finalist.sources.map((s, i) => {
@@ -134,13 +120,16 @@ function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPower
       x: sourcePositions[i].x,
       y: sourcePositions[i].y,
       z: centreZ,
-      // Tuning matches production for a hypothetical layout with no user
-      // gain/polarity adjustments: gain=0, polarity=0 (normal), delay=auto-align.
+      // When zeroTuning=true, all tuning is zero so per-source per-seat
+      // complex transfers can be captured for later re-summation with
+      // any tuning variant (placement-only, delay-only, level+delay).
       tuning: {
         gainDb: 0,
-        delayMs: autoDelay,
+        delayMs: zeroTuning ? 0 : autoDelay,
         polarity: 0,
       },
+      // Auto-align delay stored separately for placement-only re-summation
+      autoAlignDelayMs: autoDelay,
     };
   });
 }
@@ -246,7 +235,9 @@ export function evaluateStage2Placement({
     __isSyntheticRsp: true,
   };
 
-  const sources = buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, canonicalRspPosition);
+  // Run simulation with ZERO tuning so per-source per-seat complex transfers
+  // can be captured for later re-summation with any tuning variant.
+  const sources = buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, canonicalRspPosition, true);
 
   const physics = buildStage2Physics();
   const simResult = simulateAuthoritativeBassResponse({
@@ -256,9 +247,20 @@ export function evaluateStage2Placement({
     sources,
     physics,
     qStrategyOverride: "ab_corrected",
+    capturePerSourcePerSeat: true,
   });
 
-  const { rspRawCurve, perSeatRawCurves } = buildResponseCurves(simResult.seatResponses);
+  // Re-sum the per-source per-seat complex transfers with auto-align delays
+  // to produce the placement-only response (mathematically identical to
+  // running the simulation with auto-align tuning).
+  const perSourcePerSeatComplexTransfers = simResult.perSourcePerSeatComplexTransfers || [];
+  const seatIds = [canonicalRspPosition.id, ...(Array.isArray(seatingPositions) ? seatingPositions.map((s) => String(s.id || `${s.x}-${s.y}`)) : [])];
+  const autoAlignTuning = sources.map((s) => ({ delayMs: s.autoAlignDelayMs || 0, gainDb: 0, polarity: 0 }));
+  const placementSeatResponses = perSourcePerSeatComplexTransfers.length > 0
+    ? resumWithTuning(perSourcePerSeatComplexTransfers, autoAlignTuning, seatIds)
+    : simResult.seatResponses;
+
+  const { rspRawCurve, perSeatRawCurves } = buildResponseCurves(placementSeatResponses);
   if (!rspRawCurve.length) return null;
 
   const perSeatRawCurvesWithPriority = perSeatRawCurves.map((seat) => ({
@@ -286,6 +288,13 @@ export function evaluateStage2Placement({
     usableLfHz,
     transitionHz,
     seatPriorityMap: Array.from(seatPriorityMap.entries()),
+    // Per-source per-seat complex transfers with ZERO tuning, for re-summation
+    // with delay-only / level+delay variants in the confirmation phase.
+    perSourcePerSeatComplexTransfers,
+    // Auto-align tuning (placement-only) for reference
+    autoAlignTuning,
+    // Seat IDs in order (for re-summation)
+    seatIds,
   };
 }
 

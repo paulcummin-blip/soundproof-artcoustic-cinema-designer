@@ -13,12 +13,13 @@ const FLAT_SOURCE_CURVE = REW_SOURCE_CURVES.flat_rew_reference;
 const REFERENCE_SOURCE_DB = 94;
 const REFERENCE_SOURCE_AMPLITUDE = Math.pow(10, REFERENCE_SOURCE_DB / 20);
 
-export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, rspPosition, sources, physics, qStrategyOverride }) {
+export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, rspPosition, sources, physics, qStrategyOverride, capturePerSourcePerSeat }) {
   if (!sources.length || !roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
-    return { seatResponses: {}, metrics: null, audit: null, runtimeVectorCapture: { rows: [] }, perSourceRspComplexTransfers: [] };
+    return { seatResponses: {}, metrics: null, audit: null, runtimeVectorCapture: { rows: [] }, perSourceRspComplexTransfers: [], perSourcePerSeatComplexTransfers: [] };
   }
   const amplifierAuthority = getPerSubwooferAmplifierAuthority(sources);
   const seatResponses = {};
+  let perSourcePerSeatComplexTransfers = capturePerSourcePerSeat ? [] : null;
   let stepDebug = null;
   let wholeCurveDebugRows = null;
   let activeModalVectorPath = null;
@@ -234,6 +235,23 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
           }
         });
       }
+      // Optional per-source per-seat capture for Stage 2 tuning search.
+      // Stores the individual complex pressures BEFORE summation so the
+      // confirmation phase can re-sum with different delay/level tuning
+      // without re-running the modal simulation. Zero cost when flag is off.
+      if (capturePerSourcePerSeat) {
+        if (!perSourcePerSeatComplexTransfers) perSourcePerSeatComplexTransfers = [];
+        perSourcePerSeatComplexTransfers.push({
+          seatId,
+          sourceIndex,
+          sourceId: sub?.id || null,
+          points: (result.freqsHz || []).map((frequency, index) => ({
+            frequency,
+            re: result.complexPressure[index]?.re ?? null,
+            im: result.complexPressure[index]?.im ?? null,
+          })),
+        });
+      }
     });
     if (freqsHz && sumRe && sumIm) {
       seatResponses[seatId] = {
@@ -271,5 +289,6 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
   });
   return { seatResponses, metrics: null, audit: null, stepDebug, wholeCurveDebugRows,
     activeModalVectorPath, amplifierAuthority, runtimeVectorCapture: { rows: runtimeRows },
-    perSourceRspComplexTransfers };
+    perSourceRspComplexTransfers,
+    perSourcePerSeatComplexTransfers: perSourcePerSeatComplexTransfers || [] };
 }
