@@ -131,7 +131,7 @@ export function buildAbsoluteHouseCurveSeries(optimisationResult) {
   const startHz = candidate.correctionStartHz;
   const endHz = candidate.correctionEndHz;
   const p14TotalDb = Number.isFinite(optimisationResult?.selectedP14TargetDb)
-    ? Math.round(optimisationResult.selectedP14TargetDb)
+    ? Number(optimisationResult.selectedP14TargetDb)
     : null;
   const label = p14TotalDb != null
     ? `House-curve target · ${formatSplDisplay(p14TotalDb)} total`
