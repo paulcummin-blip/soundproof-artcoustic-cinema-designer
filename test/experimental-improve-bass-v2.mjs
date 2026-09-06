@@ -8,8 +8,8 @@ const roomKey = String(process.argv[2] || "B").toUpperCase();
 const quantity = Number(process.argv[3] || 2);
 const phase = String(process.argv[4] || "baseline").toLowerCase();
 const variant = String(process.argv[5] || "default").toLowerCase();
-if (!["B", "C"].includes(roomKey) || ![2, 4].includes(quantity) || !["baseline", "placement", "polarity", "seating", "allpass"].includes(phase)) {
-  throw new Error("Usage: node test/experimental-improve-bass-v2.mjs <B|C> <2|4> <baseline|placement|polarity|seating|allpass>");
+if (!["B", "C"].includes(roomKey) || ![2, 4].includes(quantity) || !["baseline", "placement", "tuning", "polarity", "seating", "allpass"].includes(phase)) {
+  throw new Error("Usage: node test/experimental-improve-bass-v2.mjs <B|C> <2|4> <baseline|placement|tuning|polarity|seating|allpass>");
 }
 
 const MODEL = "SUB2-12";
@@ -688,6 +688,25 @@ try {
       trimBest: tuningSearch.trimBest,
       result,
       selectedVariant: useTuned ? tuningSearch.proxyBest.kind : "auto-align",
+    });
+    await server.close();
+    process.exit(0);
+  }
+
+  if (phase === "tuning") {
+    const placement = simulatePlacement(trustedFinalist);
+    const search = bestExistingTuning(placement.raw);
+    const selected = variant === "delay" ? search.delayBest : search.trimBest;
+    const result = canonical(
+      placement.raw,
+      selected.tuning,
+      variant === "delay" ? "independent delay only" : "independent delay + trim",
+    );
+    savePhase({
+      result,
+      simulationMs: round(placement.runtimeMs, 1),
+      searchRuntimeMs: round(search.runtimeMs, 1),
+      selectedSearch: selected,
     });
     await server.close();
     process.exit(0);
