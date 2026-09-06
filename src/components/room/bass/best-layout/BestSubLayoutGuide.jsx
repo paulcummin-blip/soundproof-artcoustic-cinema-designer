@@ -17,22 +17,34 @@ const OPTION_COPY = {
 };
 
 function currentSourcesFrom(subs) {
-  return (Array.isArray(subs) ? subs : []).map((sub) => {
-    const position = sub?.position || sub;
-    const placement = sub?.group === "rear"
-      ? "rear"
-      : sub?.group === "left"
-        ? "left"
-        : sub?.group === "right"
-          ? "right"
-          : "front";
-    return {
-      x: Number(position?.x),
-      y: Number(position?.y),
-      z: Number(position?.z),
-      placement,
-    };
-  }).filter((source) => Number.isFinite(source.x) && Number.isFinite(source.y));
+  // Build Current-layout sources from canonical subwooferInstances.
+  // Preserve instance identity (id, model), tuning (gainDb, delayMs, polarity),
+  // and enabled/disabled state. Use legacyGroup for placement (canonical field).
+  return (Array.isArray(subs) ? subs : [])
+    .filter((sub) => sub?.enabled !== false)
+    .map((sub) => {
+      const position = sub?.position || sub;
+      const group = sub?.group || sub?.legacyGroup;
+      const placement = group === "rear"
+        ? "rear"
+        : group === "left"
+          ? "left"
+          : group === "right"
+            ? "right"
+            : "front";
+      return {
+        id: sub?.id,
+        model: sub?.model,
+        x: Number(position?.x),
+        y: Number(position?.y),
+        z: Number(position?.z),
+        placement,
+        gainDb: Number(sub?.gainDb) || 0,
+        delayMs: Number(sub?.delayMs) || 0,
+        polarity: Number(sub?.polarity) || 0,
+      };
+    })
+    .filter((source) => Number.isFinite(source.x) && Number.isFinite(source.y));
 }
 
 function LayoutThumbnail({ layout, roomDims }) {

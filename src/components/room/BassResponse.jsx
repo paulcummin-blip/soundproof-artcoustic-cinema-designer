@@ -346,8 +346,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     [normalizedLive.result, normalizedLive.quality, normalizedLive.isRefining]
   );
 
+  // Graph readiness: a valid persisted graphPayload (structurally complete,
+  // current-schema, fingerprint-matching, candidate-identity matching) is
+  // sufficient to render the post-EQ graph — even without the transient live
+  // rspRawCurve that only exists during an active calculation. The
+  // finalOptimisedBassAuthorityMatches check enforces fingerprint/candidate-
+  // identity parity, so stale authority is still rejected.
   const hasValidDetailedResult = !!designEqEnabled &&
-    finalOptimisedBassAuthorityMatches(optimisationResult?.finalOptimisedBassResponse) && rspRawCurve.length > 0;
+    finalOptimisedBassAuthorityMatches(optimisationResult?.finalOptimisedBassResponse);
   const selectedP14TargetDb = authoritative.requested?.selectedP14TargetDb;
   const selectedP18TargetBasis = authoritative.requested?.selectedP18TargetBasis || splConfig?.selectedP18TargetBasis || "minimum";
   const selectedP18RequiredExtensionHz = authoritative.requested?.selectedP18RequiredExtensionHz;

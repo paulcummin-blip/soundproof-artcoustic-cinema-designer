@@ -109,7 +109,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
           sourceHeights={{ front: frontSubsCfg?.bottomHeightM, rear: rearSubsCfg?.bottomHeightM }}
           contextId={layoutContextId}
           roomElements={appState?.roomElements}
-          currentSubs={appState?.subwoofers}
+          currentSubs={appState?.subwooferInstances}
           frontSubsCfg={frontSubsCfg}
           rearSubsCfg={rearSubsCfg}
           subwooferInstances={appState?.subwooferInstances}
@@ -394,7 +394,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
             <BassPostCalculationActions
               roomDims={roomDimensions}
               seatingPositions={seats}
-              currentSubs={appState?.subwoofers}
+              currentSubs={appState?.subwooferInstances}
               sourceHeightM={frontSubsCfg?.bottomHeightM ?? rearSubsCfg?.bottomHeightM}
               frontSubsCfg={frontSubsCfg}
               rearSubsCfg={rearSubsCfg}
