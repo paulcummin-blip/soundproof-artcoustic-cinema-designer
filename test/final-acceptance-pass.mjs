@@ -29,12 +29,12 @@ import { computeStage2PlacementFingerprint } from '@/components/room/bass/stage2
 import { getCachedRawTransfersForFingerprint, setCachedRawTransfer, clearAllRawTransferCache } from '@/components/room/bass/stage2/stage2RawTransferCache.js';
 
 // --- Subwoofer data ---
-import { getSubwooferBassCapabilities } from '@/components/data/subwooferBassCapabilities.js';
+import { SUBWOOFER_BASS_CAPABILITIES } from '@/components/data/subwooferBassCapabilities.js';
 import { normaliseModelKey } from '@/components/utils/modelKeyNormaliser.js';
 import { subwooferDisplayLabel } from '@/components/utils/subwooferDisplayLabel.js';
 
 // --- House curve ---
-import { getArtcousticHouseCurveOffset } from '@/components/utils/artcousticHouseCurve.js';
+import { artcousticHouseCurveOffsetAt } from '@/components/utils/artcousticHouseCurve.js';
 
 const results = [];
 function record(test, expected, actual, pass, notes = '') {
@@ -63,7 +63,7 @@ const PROJECT = {
     { id: 'seat-r2-c2', x: 2.0, y: 4.39, z: 1.5, rowNumber: 2, isPrimary: false, priority: 'secondary' },
     { id: 'seat-r2-c3', x: 2.8, y: 4.39, z: 1.5, rowNumber: 2, isPrimary: false, priority: 'secondary' },
   ],
-  rspPosition: { x: 2.0, y: 2.59, z: 1.2, designatedRspSeatId: null },
+  rspPosition: { id: 'rsp', x: 2.0, y: 2.59, z: 1.2, designatedRspSeatId: null },
   subwooferInstances: [
     { id: 'sub-front-1', model: 'sub4-12', enabled: true, position: { x: 1, y: 0.145 }, bottomHeightM: 0.05, rotationDeg: 0, positionSource: 'user', legacyGroup: 'front', symmetryLinkId: null, gainDb: 0, delayMs: 0, polarity: 1 },
     { id: 'sub-front-2', model: 'sub4-12', enabled: true, position: { x: 3, y: 0.145 }, bottomHeightM: 0.05, rotationDeg: 0, positionSource: 'user', legacyGroup: 'front', symmetryLinkId: null, gainDb: 0, delayMs: 0, polarity: 1 },
