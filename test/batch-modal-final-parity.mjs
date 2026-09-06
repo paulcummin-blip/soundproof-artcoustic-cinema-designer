@@ -212,6 +212,27 @@ for (let fi = 0; fi < FINALISTS.length; fi++) {
     .map(t => ({ sourceIndex: t.sourceIndex, seatId: t.listenerId, points: t.points }))
     .sort((a, b) => a.sourceIndex - b.sourceIndex);
 
+  // Direct transfer comparison (find the 1.46 dB source)
+  const prodTransfers = prodRaw.perSourcePerSeatComplexTransfers || [];
+  let transferMaxReDelta = 0, transferMaxImDelta = 0, transferMaxSplDelta = 0;
+  let transferWorst = {};
+  for (const pt of prodTransfers) {
+    const bt = batchTransfers.find(t => t.sourceIndex === pt.sourceIndex && t.seatId === pt.seatId);
+    if (!bt) continue;
+    for (let pi = 0; pi < pt.points.length; pi++) {
+      const dRe = Math.abs((pt.points[pi].re ?? 0) - (bt.points[pi].re ?? 0));
+      const dIm = Math.abs((pt.points[pi].im ?? 0) - (bt.points[pi].im ?? 0));
+      const prodMag = Math.hypot(pt.points[pi].re ?? 0, pt.points[pi].im ?? 0);
+      const batchMag = Math.hypot(bt.points[pi].re ?? 0, bt.points[pi].im ?? 0);
+      const prodSpl = 20 * Math.log10(Math.max(prodMag, 1e-10));
+      const batchSpl = 20 * Math.log10(Math.max(batchMag, 1e-10));
+      const dSpl = Math.abs(prodSpl - batchSpl);
+      if (dRe > transferMaxReDelta) transferMaxReDelta = dRe;
+      if (dIm > transferMaxImDelta) transferMaxImDelta = dIm;
+      if (dSpl > transferMaxSplDelta) { transferMaxSplDelta = dSpl; transferWorst = { s: pt.sourceIndex, l: pt.seatId, f: pt.points[pi].frequency, prod: prodSpl, batch: batchSpl, prodRe: pt.points[pi].re, batchRe: bt.points[pi].re }; }
+    }
+  }
+
   // Re-sum with the SAME auto-align tuning
   const batchSeatResponses = resumWithTuning(batchTransfers, prodRaw.autoAlignTuning, prodRaw.seatIds);
   const { rspRawCurve: batchRsp, perSeatRawCurves: batchPerSeat } = buildResponseCurves(batchSeatResponses);
