@@ -17,12 +17,11 @@
 // Does NOT change: P14/P18/P19/P20 maths or grading, smoothing, EQ constraints,
 // Stage 2 authoritative per-seat finalist rules.
 
-import { searchDelayOnly, searchPolarity, searchGainOnly, resumWithTuning } from "../stage2/stage2TuningSearch";
-import { selectAuthoritativeFinalist, hasPrimarySeatRegression } from "../best-layout/authoritativeFinalistSelection";
-import { detectMutedSubs } from "../best-layout/authoritativeFinalistSelection";
-import { getCachedRawTransfersForFingerprint } from "../stage2/stage2RawTransferCache";
-import { normaliseModelKey } from "@/components/models/speakers/registry";
-import { computeV2DesignFingerprint, isCurrentAuthorityNonStale } from "./improveBassV2Fingerprint";
+import { searchDelayOnly, searchPolarity, searchGainOnly, resumWithTuning } from "../stage2/stage2TuningSearch.js";
+import { selectAuthoritativeFinalist, hasPrimarySeatRegression, detectMutedSubs } from "../best-layout/authoritativeFinalistSelection.js";
+import { getCachedRawTransfersForFingerprint } from "../stage2/stage2RawTransferCache.js";
+import { normaliseModelKey } from "../../../utils/modelKeyNormaliser.js";
+import { computeV2DesignFingerprint, isCurrentAuthorityNonStale } from "./improveBassV2Fingerprint.js";
 
 const MAX_CHALLENGERS = 3;
 const YIELD_DELAY_MS = 0;

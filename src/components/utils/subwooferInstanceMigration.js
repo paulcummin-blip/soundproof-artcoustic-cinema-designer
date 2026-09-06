@@ -375,18 +375,8 @@ export function validateInstances(instances) {
  * @param {string|null} group - Legacy group ("front", "rear", or null)
  * @returns {string} A unique ID
  */
-export function generateStableId(existingIds, group) {
-  const prefix = group ? `sub-${group}-` : "sub-";
-  let n = 1;
-  while (true) {
-    const id = `${prefix}${n}`;
-    if (!existingIds || !existingIds.has(id)) {
-      if (existingIds) existingIds.add(id);
-      return id;
-    }
-    n++;
-  }
-}
+// Extracted to stableIdGenerator.js for Node compatibility; re-exported here.
+export { generateStableId } from "@/components/utils/stableIdGenerator";
 
 /**
  * Quick boolean check for backward compatibility.

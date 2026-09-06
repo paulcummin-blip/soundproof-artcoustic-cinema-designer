@@ -3,10 +3,13 @@
 // Applies: positions, orientation, delay, trim, polarity, and marks the
 // old bass authority stale. Also provides tuning-aware applied-state matching.
 
-import { generateStableId } from "@/components/utils/subwooferInstanceMigration";
-import { deriveSubWallOrientation, subHalfExtents } from "@/components/room/rv/utils/subWallOrientation";
-import { normaliseModelKey } from "@/components/models/speakers/registry";
-import { COORDINATE_TOLERANCE_M } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { generateStableId } from "../../../utils/stableIdGenerator.js";
+import { deriveSubWallOrientation, subHalfExtents } from "../../rv/utils/subWallOrientation.js";
+import { normaliseModelKey } from "../../../utils/modelKeyNormaliser.js";
+
+// Coordinate tolerance for position matching (mirrors applyRecommendationUtils.js).
+// Defined locally to avoid pulling in @/ aliased transitive deps for Node tests.
+const COORDINATE_TOLERANCE_M = 0.01; // 10 mm
 
 const TUNING_TOLERANCE_DELAY_MS = 0.1;
 const TUNING_TOLERANCE_GAIN_DB = 0.1;
@@ -21,7 +24,9 @@ const TUNING_TOLERANCE_GAIN_DB = 0.1;
  */
 function normalisePolarity(value) {
   const n = Number(value) || 0;
-  return n < 0 ? -1 : 0;
+  // -1 (canonical UI) and 180 (engine degrees) both mean inverted.
+  // 0 and 1 (and any other positive non-180) mean normal.
+  return (n < 0 || n === 180) ? -1 : 0;
 }
 
 /**
@@ -42,7 +47,8 @@ export function buildOptimisedInstances(winner, currentInstances, roomDims, mode
   const L = Number(roomDims?.lengthM) || 0;
   const normalisedModel = normaliseModelKey(modelKey);
   const tuning = winner.appliedTuning || winner.tuning || [];
-  const existingById = new Map((currentInstances || []).map((inst) => [String(inst.id), inst]));
+  const existingList = Array.isArray(currentInstances) ? currentInstances : [];
+  const usedIds = new Set(existingList.map((inst) => String(inst.id)));
 
   return winner.coordinates.map((coord, i) => {
     const x = Number(coord.x);
@@ -52,16 +58,17 @@ export function buildOptimisedInstances(winner, currentInstances, roomDims, mode
     });
 
     const t = tuning[i] || { delayMs: 0, gainDb: 0, polarity: 0 };
-    const id = existingById.size > 0 && Array.from(existingById.values())[i]?.id
-      ? Array.from(existingById.values())[i].id
-      : generateStableId("sub");
+    const existing = existingList[i];
+    const id = existing?.id
+      ? existing.id
+      : generateStableId(usedIds, "sub");
 
     return {
       id,
       model: normalisedModel,
       enabled: true,
       position: { x, y },
-      bottomHeightM: Array.from(existingById.values())[i]?.bottomHeightM || 0,
+      bottomHeightM: Number(existing?.bottomHeightM) || 0,
       rotationDeg,
       positionSource: "v2-optimised",
       gainDb: Number(t.gainDb) || 0,
@@ -124,6 +131,6 @@ export function buildCalibrationSummary(winner) {
   return {
     delays: tuning.map((t) => `${(Number(t.delayMs) || 0).toFixed(1)} ms`),
     trims: tuning.map((t) => `${(Number(t.gainDb) || 0).toFixed(1)} dB`),
-    polarities: tuning.map((t) => (Number(t.polarity) || 0) < 0 ? "Inverted" : "Normal"),
+    polarities: tuning.map((t) => normalisePolarity(t.polarity) < 0 ? "Inverted" : "Normal"),
   };
 }

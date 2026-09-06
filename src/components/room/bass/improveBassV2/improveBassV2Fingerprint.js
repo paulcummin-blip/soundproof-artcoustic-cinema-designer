@@ -12,10 +12,10 @@
 // publishing a winner, or enabling Apply, the current fingerprint is recomputed
 // and compared. If it changed, V2 terminates cleanly as stale.
 
-import { computeCalibrationFingerprint, computeHouseCurveFingerprint } from "../bassAnalysisFingerprints";
-import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from "../bassPhysicsDefaults";
-import { ARTCOUSTIC_HOUSE_CURVE } from "@/components/utils/artcousticHouseCurve";
-import { normaliseModelKey } from "@/components/models/speakers/registry";
+import { computeCalibrationFingerprint, computeHouseCurveFingerprint } from "../bassAnalysisFingerprints.js";
+import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from "../bassPhysicsDefaults.js";
+import { ARTCOUSTIC_HOUSE_CURVE } from "../../../utils/artcousticHouseCurve.js";
+import { normaliseModelKey } from "../../../utils/modelKeyNormaliser.js";
 
 /**
  * Compute the V2 design fingerprint from V2 engine inputs.

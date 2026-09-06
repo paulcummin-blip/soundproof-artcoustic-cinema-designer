@@ -1,5 +1,6 @@
 // components/models/speakers/registry.js
 import { SUBWOOFER_BASS_CAPABILITIES } from "@/components/data/subwooferBassCapabilities";
+import { normaliseModelKey } from "@/components/utils/modelKeyNormaliser";
 
 // CANONICAL SPEAKER REGISTRY — DO NOT EDIT WITHOUT APPROVAL
 // Units: millimetres. Plan view uses widthMm (X) and depthMm (Y). Height is for reporting/UI.
@@ -305,25 +306,8 @@ export const MODELS = [
 ];
 
 // NORMALISATION — TOLERANT TO SPACES/CASE/EXTRA TEXT
-export function normaliseModelKey(name = "") {
-  const raw = String(name).toLowerCase();
-  // STEP 1: Preserve underscores in the sanitiser
-  let s = raw.replace(/[()]/g, " ").replace(/[^a-z0-9_]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-  // unify known families
-  s = s.replace(/^spitfire-q-(\d+)-(\d+)$/, "q$1-$2");
-  s = s.replace(/^spitfire-q(\d+)-(\d+)$/, "q$1-$2"); // NEW: handle "spitfire-q4-3" -> "q4-3"
-  s = s.replace(/^evolve-(\d+)-(\d+)$/, "evolve-$1-$2");
-  s = s.replace(/^architect-(pas2-2)$/, "architect-$1");
-  s = s.replace(/^architect-mikro$/, "architect-mikro");
-  
-  // Safety net: normalise a trailing "-s" back to "_s"
-  if (s.endsWith("-s")) {
-      s = s.slice(0, -2) + "_s";
-  }
-
-  // allow "_s" variants for surrounds already keyed above
-  return s;
-}
+// Extracted to modelKeyNormaliser.js for Node compatibility; re-exported here.
+export { normaliseModelKey };
 
 // DISPLAY HELPER — Remove _s suffix for UI display
 export function displayModelKey(modelKey = "") {
