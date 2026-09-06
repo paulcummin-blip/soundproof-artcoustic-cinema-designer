@@ -290,7 +290,7 @@ export function selectAuthoritativeFinalist(quantityResult, roomDims, currentLay
   }
 
   // Build scored candidates from all evaluated finalists
-  const scored = ranked.map((result) => ({
+  let scored = ranked.map((result) => ({
     result,
     layout: null, // Stage 2 finalists don't have a layout object
     metrics: extractAuthoritativeMetrics(result),
@@ -321,6 +321,19 @@ export function selectAuthoritativeFinalist(quantityResult, roomDims, currentLay
       metrics: extractAuthoritativeMetrics(currentResult, currentLayout),
       isCurrent: true,
       isSideWall: false,
+    });
+  }
+
+  // Primary-seat protection: filter out non-current candidates that cause
+  // primary-seat P19/P20 regression versus the current design. A candidate
+  // that improves headline P19/P20 but degrades any primary seat's level
+  // is REJECTED — this is a hard veto, not a preference.
+  const currentForProtection = scored.find((c) => c.isCurrent);
+  if (currentForProtection) {
+    scored = scored.filter((c) => {
+      if (c.isCurrent) return true;
+      const regression = hasPrimarySeatRegression(c.result, currentForProtection.result);
+      return !regression.regressed;
     });
   }
 
@@ -463,4 +476,68 @@ export function selectAuthoritativeFinalist(quantityResult, roomDims, currentLay
     tradeOffDescription,
     paretoFinalistIds,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Primary-seat protection (V2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Check whether a candidate causes primary-seat P19/P20 regression versus
+ * the current design. A primary seat is any seat marked isPrimary in the
+ * per-seat results. Regression = any primary seat's P19 or P20 level drops.
+ *
+ * This implements the hard veto described in the V2 spec:
+ *   Room B 4-sub: headline improved (P19 L2, P20 L1) but primary seats
+ *   degraded from P19 L2/L2/L2, P20 L4/L4/L4 to P19 FAIL/L2/FAIL, P20 L1/L4/L1.
+ *   That candidate MUST be rejected.
+ *
+ * @param {object} candidateResult — Stage 2 finalist result with perSeatP19/P20
+ * @param {object} currentResult — current design result with perSeatP19/P20
+ * @returns {{ regressed: boolean, seatId?: string, parameter?: string, currentLevel?: number, candidateLevel?: number }}
+ */
+export function hasPrimarySeatRegression(candidateResult, currentResult) {
+  const candidateP19 = Array.isArray(candidateResult?.perSeatP19) ? candidateResult.perSeatP19 : [];
+  const candidateP20 = Array.isArray(candidateResult?.perSeatP20) ? candidateResult.perSeatP20 : [];
+  const currentP19 = Array.isArray(currentResult?.perSeatP19) ? currentResult.perSeatP19 : [];
+  const currentP20 = Array.isArray(currentResult?.perSeatP20) ? currentResult.perSeatP20 : [];
+
+  const currentP19Map = new Map(currentP19.map((s) => [String(s.seatId), s]));
+  const currentP20Map = new Map(currentP20.map((s) => [String(s.seatId), s]));
+
+  for (const seat of candidateP19) {
+    if (!seat.isPrimary) continue;
+    const currentSeat = currentP19Map.get(String(seat.seatId));
+    if (!currentSeat) continue;
+    const candidateLevel = numericLevel(seat.level);
+    const currentLevel = numericLevel(currentSeat.level);
+    if (candidateLevel < currentLevel) {
+      return {
+        regressed: true,
+        seatId: seat.seatId,
+        parameter: "P19",
+        currentLevel,
+        candidateLevel,
+      };
+    }
+  }
+
+  for (const seat of candidateP20) {
+    if (!seat.isPrimary) continue;
+    const currentSeat = currentP20Map.get(String(seat.seatId));
+    if (!currentSeat) continue;
+    const candidateLevel = numericLevel(seat.level);
+    const currentLevel = numericLevel(currentSeat.level);
+    if (candidateLevel < currentLevel) {
+      return {
+        regressed: true,
+        seatId: seat.seatId,
+        parameter: "P20",
+        currentLevel,
+        candidateLevel,
+      };
+    }
+  }
+
+  return { regressed: false };
 }

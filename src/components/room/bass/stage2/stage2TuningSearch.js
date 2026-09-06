@@ -486,3 +486,364 @@ export function resumWithTuning(perSourcePerSeatTransfers, tuning, seatIds) {
   }
   return seatResponses;
 }
+
+// ---------------------------------------------------------------------------
+// Polarity search (V2 — relative polarity dimension)
+// ---------------------------------------------------------------------------
+
+/**
+ * Search for the best relative polarity configuration.
+ * For N subs, source 0 is the polarity reference (0°). The remaining N-1
+ * sources each have 0° or 180° (2^(N-1) combinations). Scores each by
+ * peak-to-peak SPL variation at RSP using complex re-summation.
+ *
+ * @param {Array} perSourceRspTransfers — per-source RSP complex transfers
+ * @param {Array} delays — delay configuration to hold fixed
+ * @param {Array} gains — gain configuration to hold fixed (optional)
+ * @returns {{ polarities: number[], score: number }}
+ */
+export function searchPolarity(perSourceRspTransfers, delays, gains) {
+  const sourceCount = perSourceRspTransfers?.length || 0;
+  if (!sourceCount || sourceCount <= 1) {
+    return { polarities: new Array(sourceCount || 0).fill(0), score: Infinity };
+  }
+
+  const remaining = sourceCount - 1;
+  const combinations = 2 ** remaining;
+  let bestPolarities = new Array(sourceCount).fill(0);
+  let bestScore = Infinity;
+
+  for (let combo = 0; combo < combinations; combo++) {
+    const polarities = [0]; // reference is always 0
+    for (let bit = 0; bit < remaining; bit++) {
+      polarities.push((combo >> bit) & 1 ? -1 : 0);
+    }
+    const tuning = polarities.map((p, i) => ({
+      delayMs: delays?.[i] || 0,
+      gainDb: gains?.[i] || 0,
+      polarity: p,
+    }));
+    const { freqsHz, re, im } = sumTunedTransfers(perSourceRspTransfers, tuning);
+    const score = scorePeakToPeak(freqsHz, re, im);
+    if (score < bestScore) {
+      bestScore = score;
+      bestPolarities = polarities;
+    }
+  }
+
+  return { polarities: bestPolarities, score: bestScore };
+}
+
+// ---------------------------------------------------------------------------
+// Gain-only coordinate descent (V2 — trim with fixed delay + polarity)
+// ---------------------------------------------------------------------------
+
+/**
+ * Coordinate descent for independent per-source gains with fixed delays
+ * and polarities. Source at refIndex is held at 0 dB. All other sources
+ * are optimised independently (≤ 0 dB).
+ *
+ * @param {Array} perSourceRspTransfers — per-source RSP complex transfers
+ * @param {number} sourceCount — total number of sources
+ * @param {number} refIndex — index of the reference source (held at 0 dB)
+ * @param {Array} fixedDelays — delay configuration (held fixed)
+ * @param {Array} fixedPolarities — polarity configuration (held fixed)
+ * @param {Array} initialGains — starting gain configuration
+ * @returns {{ gains: number[], score: number }}
+ */
+function coordinateDescentGainOnly(perSourceRspTransfers, sourceCount, refIndex, fixedDelays, fixedPolarities, initialGains) {
+  const gains = [...initialGains];
+  gains[refIndex] = 0;
+
+  function scoreWithGains(testGains) {
+    const tuning = [];
+    for (let i = 0; i < sourceCount; i++) {
+      tuning.push({
+        delayMs: fixedDelays[i] || 0,
+        gainDb: testGains[i] || 0,
+        polarity: fixedPolarities[i] || 0,
+      });
+    }
+    const { freqsHz, re, im } = sumTunedTransfers(perSourceRspTransfers, tuning);
+    return scorePeakToPeak(freqsHz, re, im);
+  }
+
+  let bestScore = scoreWithGains(gains);
+
+  for (let pass = 0; pass < MAX_CD_PASSES; pass++) {
+    let improved = false;
+    for (let i = 0; i < sourceCount; i++) {
+      if (i === refIndex) continue;
+      let bestGain = gains[i];
+      let bestLocal = bestScore;
+      for (let g = LEVEL_MIN_DB; g <= LEVEL_MAX_DB; g += LEVEL_STEP_DB) {
+        gains[i] = g;
+        const s = scoreWithGains(gains);
+        if (s < bestLocal - 1e-9) {
+          bestLocal = s;
+          bestGain = g;
+        }
+      }
+      const gFineStart = Math.max(LEVEL_MIN_DB, bestGain - LEVEL_FINE_WINDOW_DB / 2);
+      const gFineEnd = Math.min(LEVEL_MAX_DB, bestGain + LEVEL_FINE_WINDOW_DB / 2);
+      for (let g = gFineStart; g <= gFineEnd; g += LEVEL_FINE_STEP_DB) {
+        gains[i] = g;
+        const s = scoreWithGains(gains);
+        if (s < bestLocal - 1e-9) {
+          bestLocal = s;
+          bestGain = g;
+        }
+      }
+      gains[i] = bestGain;
+      if (bestLocal < bestScore - 1e-9) {
+        bestScore = bestLocal;
+        improved = true;
+      }
+    }
+    if (!improved) break;
+  }
+
+  return { gains, score: bestScore };
+}
+
+/**
+ * Search for the best gain-only (trim) tuning with fixed delays and polarities.
+ * Returns up to 2 credible finalists.
+ *
+ * @param {Array} perSourceRspTransfers — per-source RSP complex transfers
+ * @param {Array} sources — source positions
+ * @param {Array} fixedDelays — delay configuration (held fixed)
+ * @param {Array} fixedPolarities — polarity configuration (held fixed)
+ * @returns {{ finalists: Array<{ tuning: Array, score: number, gains: number[] }> }}
+ */
+export function searchGainOnly(perSourceRspTransfers, sources, fixedDelays, fixedPolarities) {
+  const sourceCount = perSourceRspTransfers?.length || sources?.length || 0;
+  if (!sourceCount) return { finalists: [] };
+  if (sourceCount <= 1) {
+    return {
+      finalists: [{
+        tuning: [{ delayMs: 0, gainDb: 0, polarity: 0 }],
+        score: Infinity,
+        gains: [0],
+      }],
+    };
+  }
+
+  const refIndex = 0;
+  const initGains = new Array(sourceCount).fill(0);
+  const result = coordinateDescentGainOnly(perSourceRspTransfers, sourceCount, refIndex, fixedDelays, fixedPolarities, initGains);
+
+  const tuning = [];
+  for (let i = 0; i < sourceCount; i++) {
+    tuning.push({
+      delayMs: fixedDelays[i] || 0,
+      gainDb: result.gains[i] || 0,
+      polarity: fixedPolarities[i] || 0,
+    });
+  }
+
+  return {
+    finalists: [{
+      tuning,
+      score: result.score,
+      gains: result.gains,
+    }],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Combined delay + polarity + trim search (V2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Combined delay + polarity + trim search using coordinate descent and
+ * polarity enumeration. All three dimensions are searched:
+ *   1. Delay search (coordinate descent, polarity=0, gain=0)
+ *   2. Polarity search (enumeration, given best delays, gain=0)
+ *   3. Trim search (coordinate descent on gains, given best delays + polarities)
+ *   4. Re-optimise delays (coordinate descent, given best polarities + gains)
+ *
+ * Returns up to 2 credible finalists.
+ *
+ * @param {Array} perSourceRspTransfers — per-source RSP complex transfers
+ * @param {Array} sources — source positions
+ * @returns {{ finalists: Array<{ tuning: Array, score: number, delays: number[], gains: number[], polarities: number[] }> }}
+ */
+export function searchDelayPolarityTrim(perSourceRspTransfers, sources) {
+  const sourceCount = perSourceRspTransfers?.length || sources?.length || 0;
+  if (!sourceCount) return { finalists: [] };
+  if (sourceCount <= 1) {
+    return {
+      finalists: [{
+        tuning: [{ delayMs: 0, gainDb: 0, polarity: 0 }],
+        score: Infinity,
+        delays: [0],
+        gains: [0],
+        polarities: [0],
+      }],
+    };
+  }
+
+  // Phase 1: Delay search (coordinate descent, polarity=0, gain=0)
+  const delayResult = searchDelayOnly(perSourceRspTransfers, sources);
+  const bestDelays = delayResult.finalists[0]?.delays || new Array(sourceCount).fill(0);
+
+  // Phase 2: Polarity search (enumeration, given best delays, gain=0)
+  const polarityResult = searchPolarity(perSourceRspTransfers, bestDelays, null);
+  const bestPolarities = polarityResult.polarities;
+
+  // Phase 3: Trim search (coordinate descent on gains, given best delays + polarities)
+  const trimResult = searchGainOnly(perSourceRspTransfers, sources, bestDelays, bestPolarities);
+  const bestGains = trimResult.finalists[0]?.gains || new Array(sourceCount).fill(0);
+
+  // Phase 4: Re-optimise delays (coordinate descent, given best polarities + gains)
+  // Build transfers with polarity and gain applied, then search delays
+  const refIndex = 0;
+  const reOptDelays = coordinateDescentDelayWithPolarityGain(
+    perSourceRspTransfers, sourceCount, refIndex, bestDelays, bestPolarities, bestGains,
+  );
+
+  // Build combined tuning
+  const tuning = [];
+  for (let i = 0; i < sourceCount; i++) {
+    tuning.push({
+      delayMs: reOptDelays[i] || 0,
+      gainDb: bestGains[i] || 0,
+      polarity: bestPolarities[i] || 0,
+    });
+  }
+
+  // Score the combined tuning
+  const { freqsHz, re, im } = sumTunedTransfers(perSourceRspTransfers, tuning);
+  const combinedScore = scorePeakToPeak(freqsHz, re, im);
+
+  const finalists = [{
+    tuning,
+    score: combinedScore,
+    delays: reOptDelays,
+    gains: bestGains,
+    polarities: bestPolarities,
+  }];
+
+  // Second finalist: different polarity combination (if available)
+  if (sourceCount > 2) {
+    const altPolarityResult = searchPolarityAlt(perSourceRspTransfers, bestDelays, null, bestPolarities);
+    if (altPolarityResult) {
+      const altTrim = searchGainOnly(perSourceRspTransfers, sources, bestDelays, altPolarityResult.polarities);
+      const altTuning = [];
+      for (let i = 0; i < sourceCount; i++) {
+        altTuning.push({
+          delayMs: bestDelays[i] || 0,
+          gainDb: altTrim.finalists[0]?.gains?.[i] || 0,
+          polarity: altPolarityResult.polarities[i] || 0,
+        });
+      }
+      const { freqsHz: af, re: ar, im: ai } = sumTunedTransfers(perSourceRspTransfers, altTuning);
+      const altScore = scorePeakToPeak(af, ar, ai);
+      if (altScore <= combinedScore * SECOND_FINALIST_SCORE_MARGIN) {
+        finalists.push({
+          tuning: altTuning,
+          score: altScore,
+          delays: bestDelays,
+          gains: altTrim.finalists[0]?.gains || new Array(sourceCount).fill(0),
+          polarities: altPolarityResult.polarities,
+        });
+      }
+    }
+  }
+
+  return { finalists };
+}
+
+/**
+ * Coordinate descent for delays with fixed polarities and gains.
+ */
+function coordinateDescentDelayWithPolarityGain(perSourceRspTransfers, sourceCount, refIndex, initialDelays, fixedPolarities, fixedGains) {
+  const delays = [...initialDelays];
+  delays[refIndex] = 0;
+
+  function scoreWithDelays(testDelays) {
+    const tuning = [];
+    for (let i = 0; i < sourceCount; i++) {
+      tuning.push({
+        delayMs: testDelays[i] || 0,
+        gainDb: fixedGains[i] || 0,
+        polarity: fixedPolarities[i] || 0,
+      });
+    }
+    const { freqsHz, re, im } = sumTunedTransfers(perSourceRspTransfers, tuning);
+    return scorePeakToPeak(freqsHz, re, im);
+  }
+
+  let bestScore = scoreWithDelays(delays);
+
+  for (let pass = 0; pass < MAX_CD_PASSES; pass++) {
+    let improved = false;
+    for (let i = 0; i < sourceCount; i++) {
+      if (i === refIndex) continue;
+      let bestDelay = delays[i];
+      let bestLocal = bestScore;
+      for (let d = DELAY_MIN_MS; d <= DELAY_MAX_MS; d += DELAY_COARSE_STEP_MS) {
+        delays[i] = d;
+        const s = scoreWithDelays(delays);
+        if (s < bestLocal - 1e-9) {
+          bestLocal = s;
+          bestDelay = d;
+        }
+      }
+      const fineStart = Math.max(DELAY_MIN_MS, bestDelay - DELAY_FINE_WINDOW_MS / 2);
+      const fineEnd = Math.min(DELAY_MAX_MS, bestDelay + DELAY_FINE_WINDOW_MS / 2);
+      for (let d = fineStart; d <= fineEnd; d += DELAY_FINE_STEP_MS) {
+        delays[i] = d;
+        const s = scoreWithDelays(delays);
+        if (s < bestLocal - 1e-9) {
+          bestLocal = s;
+          bestDelay = d;
+        }
+      }
+      delays[i] = bestDelay;
+      if (bestLocal < bestScore - 1e-9) {
+        bestScore = bestLocal;
+        improved = true;
+      }
+    }
+    if (!improved) break;
+  }
+
+  return normaliseDelays(delays);
+}
+
+/**
+ * Find the second-best polarity combination (different from the best).
+ */
+function searchPolarityAlt(perSourceRspTransfers, delays, gains, bestPolarities) {
+  const sourceCount = perSourceRspTransfers?.length || 0;
+  if (sourceCount <= 1) return null;
+  const remaining = sourceCount - 1;
+  const combinations = 2 ** remaining;
+  let altResult = null;
+  let altScore = Infinity;
+
+  for (let combo = 0; combo < combinations; combo++) {
+    const polarities = [0];
+    for (let bit = 0; bit < remaining; bit++) {
+      polarities.push((combo >> bit) & 1 ? -1 : 0);
+    }
+    // Skip the best combination
+    if (polarities.every((p, i) => p === bestPolarities[i])) continue;
+
+    const tuning = polarities.map((p, i) => ({
+      delayMs: delays?.[i] || 0,
+      gainDb: gains?.[i] || 0,
+      polarity: p,
+    }));
+    const { freqsHz, re, im } = sumTunedTransfers(perSourceRspTransfers, tuning);
+    const score = scorePeakToPeak(freqsHz, re, im);
+    if (score < altScore) {
+      altScore = score;
+      altResult = { polarities, score };
+    }
+  }
+
+  return altResult;
+}
