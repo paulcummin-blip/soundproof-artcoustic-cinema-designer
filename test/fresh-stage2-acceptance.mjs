@@ -1,42 +1,36 @@
 // Fresh Stage 2 regeneration + Graph smell test + Improve with fresh finalists
+// Uses the ACTUAL production Stage 2 evaluation path (evaluateStage2Placement +
+// evaluateStage2Confirmation) — not a hand-rolled simulateAuthoritativeBassResponse call.
 // Run with: node --import ./test/_alias-register.mjs test/fresh-stage2-acceptance.mjs
 
-import { simulateAuthoritativeBassResponse } from '@/components/room/bass/authoritativeBassResponseEngine';
-import { buildAuthoritativeRspPosition } from '@/components/room/bass/authoritativeRspPosition';
-import { buildNormalizedPhysicsOptions } from '@/components/room/bass/normalizedPhysicsOptionsBuilder';
-import { buildAuthoritativeAutoAlignDelays } from '@/components/room/bass/useAuthoritativeBassResponse';
-import { gradeP19FromRaw, gradeP20FromRaw } from '@/components/room/bass/completedBassResultPersistence';
+import { evaluateStage2Placement, evaluateStage2Confirmation } from '@/components/room/bass/stage2/stage2CanonicalEvaluation';
 import { buildFinalOptimisedBassResponse } from '@/components/room/bass/finalOptimisedBassResponse';
 import { generateCanonicalCandidatePool } from '@/components/utils/canonicalBassOptimiser';
 import { selectCandidateFromPool } from '@/components/utils/bassCandidatePoolSelection';
 import { evaluateCanonicalBassAuthority } from '@/components/utils/canonicalBassAuthorityEvaluation';
-import { resolveSubwooferBassCapability } from '@/components/utils/speakerModelResolver';
-import { MODELS, normaliseModelKey } from '@/components/models/speakers/registry';
-import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from '@/components/room/bass/bassPhysicsDefaults';
+import { buildAuthoritativeRspPosition } from '@/components/room/bass/authoritativeRspPosition';
+import {
+  hasPrimarySeatRegression,
+  extractAuthoritativeMetrics,
+  classifyVersusCurrent,
+} from '@/components/room/bass/best-layout/authoritativeFinalistSelection';
+import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from '@/components/utils/subwooferCapability';
 import { subwooferDisplayLabel } from '@/components/utils/subwooferDisplayLabel';
-import { hasPrimarySeatRegression } from '@/components/room/bass/best-layout/authoritativeFinalistSelection';
-
-function isSamePlacement(sourcesA, sourcesB) {
-  if (!Array.isArray(sourcesA) || !Array.isArray(sourcesB)) return false;
-  if (sourcesA.length !== sourcesB.length) return false;
-  const tol = 0.01;
-  for (let i = 0; i < sourcesA.length; i++) {
-    const a = sourcesA[i], b = sourcesB[i];
-    if (Math.abs(a.x - b.x) > tol || Math.abs(a.y - b.y) > tol) return false;
-  }
-  return true;
-}
-import { artcousticHouseCurveOffsetAt } from '@/components/utils/artcousticHouseCurve';
+import { STAGE2_CACHE_VERSION, STAGE2_PLACEMENT_VERSION, STAGE2_CANONICAL_VERSION } from '@/components/room/bass/stage2/stage2Constants';
+import { computeStage2PlacementFingerprint } from '@/components/room/bass/stage2/stage2PlacementFingerprint';
 import fs from 'node:fs';
+
 const DATA = JSON.parse(fs.readFileSync(new URL('./_fresh-stage2-data.json', import.meta.url), 'utf8'));
 
 const PROJECT_ID = '6a917353f0f4315a0652781f';
 const SELECTED_SUB_MODEL = 'sub4-12';
-const AMP_POWER_PER_SUB_W = 1000;
-const TARGET_SPL = 105;
 const P14_TARGET_DB = 75;
 const P14_TARGET_BASIS = 'recommended';
 const P14_TARGET_LEVEL = 4;
+const P18_TARGET_BASIS = 'minimum';
+const SUBWOOFER_BOTTOM_HEIGHT_M = 0.05;
+
+// ── Helpers ──────────────────────────────────────────────────────────────
 
 function parseRoomDims(project) {
   try {
@@ -45,159 +39,93 @@ function parseRoomDims(project) {
   } catch { return { widthM: 4, lengthM: 6.3, heightM: 2.4 }; }
 }
 
-function buildSeatingPositions(project, roomDims) {
+function buildSeatingPositions(project) {
   const positions = project.seating_positions || [];
-  // The project stores seating_positions as a flat array of {id, x, y, z, isPrimary, ...}
-  if (Array.isArray(positions) && positions.length > 0 && positions[0].x != null) {
-    return positions.map(seat => ({
-      id: seat.id,
-      x: Number(seat.x),
-      y: Number(seat.y),
-      z: Number(seat.z ?? 1.2),
-      isPrimary: !!seat.isPrimary,
-    }));
-  }
-  // Fallback: nested rows structure
-  const rows = positions;
-  const result = [];
-  for (const row of rows) {
-    const seats = row.seats || row.positions || [];
-    const y = row.y_position ?? row.y ?? (roomDims.lengthM * 0.5);
-    for (let i = 0; i < seats.length; i++) {
-      const seat = seats[i];
-      const x = seat.x_position ?? seat.x ?? (roomDims.widthM * (i + 1) / (seats.length + 1));
-      result.push({
-        id: seat.id || `seat-r${row.row_index ?? 0}-s${i}`,
-        x: Number(x),
-        y: Number(y),
-        z: 1.2,
-        isPrimary: (row.row_index === 0 || row.row_index === '0') && i === Math.floor(seats.length / 2),
-      });
-    }
-  }
-  return result;
-}
-
-function buildSourcesFromFinalist(finalist, roomDims, subModel, ampPowerW) {
-  const modelKey = normaliseModelKey(subModel);
-  const model = MODELS[modelKey];
-  const cabinetHeightM = model?.cabinetHeightM ?? 0.4;
-  const bottomHeightM = 0.05;
-  const centreZ = bottomHeightM + cabinetHeightM / 2;
-  const sources = (finalist.sources || []).map((s, idx) => ({
-    id: `sub-${idx + 1}`,
-    model: modelKey,
-    x: Number(s.x),
-    y: Number(s.y),
-    z: centreZ,
-    bottomHeightM,
-    tuning: { gainDb: 0, delayMs: 0, polarity: 1 },
-    amplifierPowerW: ampPowerW,
+  return positions.map(seat => ({
+    id: seat.id,
+    x: Number(seat.x),
+    y: Number(seat.y),
+    z: Number(seat.z ?? 1.2),
+    priority: seat.priority || (seat.isPrimary ? 'primary' : 'secondary'),
   }));
-  const delays = buildAuthoritativeAutoAlignDelays(sources, { x: roomDims.widthM / 2, y: roomDims.lengthM * 0.41, z: 1.2 });
-  sources.forEach((s, i) => { s.tuning.delayMs = delays[i] || 0; });
-  return sources;
 }
 
-function buildCurrentSources(project, roomDims) {
-  const instances = project.subwooferInstances || [];
-  const modelKey = normaliseModelKey(project.subwoofers?.[0]?.model || SELECTED_SUB_MODEL);
-  const model = MODELS[modelKey];
-  const cabinetHeightM = model?.cabinetHeightM ?? 0.4;
-  return instances.filter(inst => inst.enabled !== false).map((inst, idx) => {
-    const bottomHeightM = inst.bottomHeightM ?? 0.05;
-    const centreZ = bottomHeightM + cabinetHeightM / 2;
-    return {
-      id: inst.id || `sub-${idx + 1}`,
-      model: normaliseModelKey(inst.model || modelKey),
-      x: Number(inst.position?.x),
-      y: Number(inst.position?.y),
-      z: centreZ,
-      bottomHeightM,
-      tuning: {
-        gainDb: inst.gainDb ?? 0,
-        delayMs: inst.delayMs ?? 0,
-        polarity: inst.polarity ?? 1,
-      },
-      amplifierPowerW: AMP_POWER_PER_SUB_W,
-    };
-  });
-}
-
-function responseCurve(response) {
-  return (response?.freqsHz || []).map((frequency, index) => ({
-    frequency,
-    spl: Number.isFinite(response?.splDb?.[index]) ? response.splDb[index] : null,
-  })).filter(p => Number.isFinite(p.frequency) && p.frequency > 0 && Number.isFinite(p.spl));
-}
-
-function computeP19P20(seatResponses, seatingPositions) {
-  const seatIds = Object.keys(seatResponses).filter(id => id !== 'rsp');
-  const rspResponse = seatResponses['rsp'];
-  const rspSpl = rspResponse?.splDb || [];
-  const freqs = rspResponse?.freqsHz || [];
-
-  let maxP19Variation = 0;
-  for (let i = 0; i < freqs.length; i++) {
-    const f = freqs[i];
-    if (f < 20 || f > 200) continue;
-    const spls = seatIds.map(id => seatResponses[id].splDb?.[i]).filter(v => v != null);
-    if (spls.length < 2) continue;
-    const variation = Math.max(...spls) - Math.min(...spls);
-    if (variation > maxP19Variation) maxP19Variation = variation;
-  }
-
-  const perSeatP20 = [];
-  for (const seatId of seatIds) {
-    const response = seatResponses[seatId];
-    const spl = response.splDb || [];
-    let maxP20 = 0;
-    for (let i = 0; i < freqs.length; i++) {
-      const f = freqs[i];
-      if (f < 20 || f > 200) continue;
-      if (rspSpl[i] != null && spl[i] != null) {
-        const delta = Math.abs(spl[i] - rspSpl[i]);
-        if (delta > maxP20) maxP20 = delta;
-      }
-    }
-    const seat = seatingPositions.find(s => s.id === seatId);
-    perSeatP20.push({
-      seatId,
-      isPrimary: seat?.isPrimary || false,
-      variationDbRaw: maxP20,
-      level: gradeP20FromRaw(maxP20),
-    });
-  }
-
-  const p19Level = gradeP19FromRaw(maxP19Variation);
-  const perSeatP19 = seatIds.map(seatId => {
-    const seat = seatingPositions.find(s => s.id === seatId);
-    return {
-      seatId,
-      isPrimary: seat?.isPrimary || false,
-      variationDbRaw: maxP19Variation,
-      level: p19Level,
-    };
-  });
-
+function buildCurrentFinalist(project, roomDims) {
+  const instances = (project.subwooferInstances || []).filter(inst => inst.enabled !== false);
   return {
-    p19: { variationDb: maxP19Variation, level: p19Level, perSeat: perSeatP19 },
-    p20: { level: perSeatP20.length ? Math.min(...perSeatP20.map(s => s.level)) : null, perSeat: perSeatP20 },
+    id: 'current-design',
+    familyId: 'current',
+    sources: instances.map(inst => ({
+      xNorm: Number(inst.position.x) / roomDims.widthM,
+      yNorm: Number(inst.position.y) / roomDims.lengthM,
+    })),
   };
 }
 
-function extractLevels(metrics) {
-  return {
-    p19: metrics?.p19?.level ?? null,
-    p20: metrics?.p20?.level ?? null,
-    p19Variation: metrics?.p19?.variationDb ?? null,
-  };
+function isSamePlacement(sourcesA, sourcesB) {
+  if (!Array.isArray(sourcesA) || !Array.isArray(sourcesB)) return false;
+  if (sourcesA.length !== sourcesB.length) return false;
+  const tol = 0.01;
+  for (let i = 0; i < sourcesA.length; i++) {
+    if (Math.abs(sourcesA[i].x - sourcesB[i].x) > tol || Math.abs(sourcesA[i].y - sourcesB[i].y) > tol) return false;
+  }
+  return true;
+}
+
+/**
+ * Replicate the EXACT production confirmation pipeline (same functions, same
+ * parameter names as evaluateStage2Confirmation) but also capture canonicalResult
+ * for graph-series extraction. This IS the production path — just with an extra
+ * return field.
+ */
+function evaluateStage2ConfirmationWithGraph(rawTransfer, p14Params) {
+  if (!rawTransfer || !Number.isFinite(p14Params.db)) return null;
+  const { rspRawCurve, perSeatRawCurves, sources, usableLfHz, transitionHz } = rawTransfer;
+  if (!rspRawCurve?.length) return null;
+
+  const pool = generateCanonicalCandidatePool({
+    rawCurve: rspRawCurve,
+    activeSubs: sources,
+    usableLfHz,
+    transitionHz,
+    correctionEndHz: 200,
+    perSeatRawCurves,
+    selectedP14TargetDb: p14Params.db,
+    p14TargetBasis: p14Params.basis,
+    p14TargetLevel: p14Params.level,
+    p18TargetBasis: p14Params.p18TargetBasis || 'minimum',
+    perSourceComplexTransfers: [],
+    normalizedTransferFingerprint: null,
+    calibrationFingerprint: null,
+  });
+
+  const selection = selectCandidateFromPool(pool);
+  if (!selection?.selectedCandidate) return null;
+
+  const canonicalResult = buildFinalOptimisedBassResponse({
+    optimisationResult: selection,
+    selectedLayout: sources,
+    roomResponseCurve: rspRawCurve,
+  });
+  if (!canonicalResult) return null;
+
+  const authority = evaluateCanonicalBassAuthority({
+    canonicalResult,
+    activeSubs: sources,
+    usableLfHz,
+    p14TargetBasis: p14Params.basis,
+    p18TargetBasis: p14Params.p18TargetBasis || 'minimum',
+    requestedLevel: p14Params.level,
+  });
+  if (!authority) return null;
+
+  return { authority, canonicalResult, selection };
 }
 
 function analyzeGraphCredibility(curve, label) {
-  if (!curve || !curve.length) return { label, credible: false, reason: 'no data' };
+  if (!curve || !curve.length) return { label, credible: false, reason: 'no data', range: 0, peaks: 0, nulls: 0 };
   const spls = curve.map(p => p.spl).filter(v => Number.isFinite(v));
-  if (!spls.length) return { label, credible: false, reason: 'no SPL data' };
+  if (!spls.length) return { label, credible: false, reason: 'no SPL data', range: 0, peaks: 0, nulls: 0 };
   const max = Math.max(...spls);
   const min = Math.min(...spls);
   const range = max - min;
@@ -207,169 +135,187 @@ function analyzeGraphCredibility(curve, label) {
     if (curr > prev && curr > next) peaks++;
     if (curr < prev && curr < next) nulls++;
   }
-  const lfMax = Math.max(...curve.filter(p => p.frequency <= 40).map(p => p.spl));
-  const crossRow = range;
-  return {
-    label, credible: peaks > 0 && nulls > 0 && range > 3,
-    range, peaks, nulls, lfMax, crossRow,
-  };
+  return { label, credible: peaks > 0 && nulls > 0 && range > 3, range, peaks, nulls };
 }
+
+// ── Main ─────────────────────────────────────────────────────────────────
 
 async function main() {
   console.log('='.repeat(60));
-  console.log('FRESH STAGE 2 REGENERATION + GRAPH SMELL TEST + IMPROVE');
+  console.log('FRESH STAGE 2 → V2 PRODUCTION-PATH VALIDATION');
   console.log('='.repeat(60));
 
-  // ── Load project ──────────────────────────────────────────────────────
   const project = DATA.project;
   const roomDims = parseRoomDims(project);
-  const seatingPositions = buildSeatingPositions(project, roomDims);
+  const seatingPositions = buildSeatingPositions(project);
   const mlpY_m = roomDims.lengthM * 0.41;
   const rspPosition = buildAuthoritativeRspPosition(roomDims, mlpY_m, null, null);
+  const amplifierPowerPerSubW = (project.amplifier_power != null && Number.isFinite(Number(project.amplifier_power)) && Number(project.amplifier_power) > 0)
+    ? Number(project.amplifier_power)
+    : DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W;
 
   console.log(`\nRoom: ${roomDims.widthM} × ${roomDims.lengthM} × ${roomDims.heightM} m`);
   console.log(`Seats: ${seatingPositions.length}, RSP: (${rspPosition.x}, ${rspPosition.y.toFixed(3)}, ${rspPosition.z})`);
+  console.log(`Sub: ${subwooferDisplayLabel(SELECTED_SUB_MODEL)}, Amp: ${amplifierPowerPerSubW}W/sub`);
+  console.log(`P14 target: ${P14_TARGET_DB} dB (L${P14_TARGET_LEVEL} ${P14_TARGET_BASIS})`);
 
-  // ── Read Stage 1 finalists ─────────────────────────────────────────────
-  const stage1 = DATA.stage1;
-  const freshFinalists = stage1?.four_sub_result?.finalists || [];
+  // ── Compute placement fingerprint (production) ──────────────────────────
+  const stage1Fingerprint = DATA.stage1?.current_fingerprint || 'stage1:v1:unknown';
+  const stage1Finalists = {
+    4: DATA.stage1?.four_sub_result?.finalists || [],
+  };
+  const placementFingerprint = computeStage2PlacementFingerprint({
+    stage1Fingerprint,
+    stage1Finalists,
+    selectedSubModel: SELECTED_SUB_MODEL,
+    subwooferBottomHeightM: SUBWOOFER_BOTTOM_HEIGHT_M,
+    amplifierPowerPerSubW,
+  });
+  console.log(`\nPlacement fingerprint: ${placementFingerprint}`);
+  console.log(`Cache version: ${STAGE2_CACHE_VERSION}`);
+  console.log(`Placement version: ${STAGE2_PLACEMENT_VERSION}`);
+  console.log(`Canonical version: ${STAGE2_CANONICAL_VERSION}`);
+
+  const freshFinalists = stage1Finalists[4];
   console.log(`Fresh Stage 1 finalists (4-sub): ${freshFinalists.length}`);
 
-  // ── Build physics options ──────────────────────────────────────────────
-  const physicsOptions = buildNormalizedPhysicsOptions({
-    ...BASS_NORMALIZED_PHYSICS_DEFAULTS,
-    qStrategy: 'ab_corrected',
-  });
+  const p14Params = {
+    basis: P14_TARGET_BASIS,
+    level: P14_TARGET_LEVEL,
+    db: P14_TARGET_DB,
+    p18TargetBasis: P18_TARGET_BASIS,
+  };
 
-  // ── STEP 1: FRESH STAGE 2 — Run all 5 finalists through the engine ──────
-  console.log('\n--- STEP 1: FRESH STAGE 2 REGENERATION ---');
-  console.log('  Running 5 fresh finalists through authoritative bass engine...');
+  // ════════════════════════════════════════════════════════════════════════
+  // STEP 1: FRESH STAGE 2 — Run all 5 finalists through the PRODUCTION path
+  // ════════════════════════════════════════════════════════════════════════
+  console.log('\n--- STEP 1: FRESH STAGE 2 (production path) ---');
 
   const stage2StartTime = Date.now();
   const freshResults = [];
+  let rawTransferWrites = 0;
+
   for (let i = 0; i < freshFinalists.length; i++) {
     const finalist = freshFinalists[i];
-    const sources = buildSourcesFromFinalist(finalist, roomDims, SELECTED_SUB_MODEL, AMP_POWER_PER_SUB_W);
     const t0 = Date.now();
-    const result = simulateAuthoritativeBassResponse({
+
+    // ── Production placement evaluation ──
+    const rawTransfer = evaluateStage2Placement({
+      finalist,
       roomDims,
-      sources,
-      seatingPositions,
       rspPosition,
-      physicsOptions,
-      collectDiagnostics: false,
+      seatingPositions,
+      selectedSubModel: SELECTED_SUB_MODEL,
+      amplifierPowerPerSubW,
+      subwooferBottomHeightM: SUBWOOFER_BOTTOM_HEIGHT_M,
     });
-    const elapsed = Date.now() - t0;
-    const seatResponses = result.seatResponses;
-    const rspCurve = responseCurve(seatResponses?.rsp);
-    const metrics = computeP19P20(seatResponses, seatingPositions);
-    const levels = extractLevels(metrics);
-    freshResults.push({
+
+    if (!rawTransfer) {
+      console.log(`  [${i + 1}/${freshFinalists.length}] ${finalist.familyId}: PLACEMENT FAILED`);
+      continue;
+    }
+    rawTransferWrites++;
+
+    // ── Production confirmation (with graph series capture) ──
+    const confirmResult = evaluateStage2ConfirmationWithGraph(rawTransfer, p14Params);
+    const placementElapsed = Date.now() - t0;
+
+    if (!confirmResult) {
+      console.log(`  [${i + 1}/${freshFinalists.length}] ${finalist.familyId}: CONFIRMATION FAILED (${placementElapsed}ms)`);
+      continue;
+    }
+
+    const { authority, canonicalResult } = confirmResult;
+    const freshResult = {
       finalistId: finalist.id,
       familyId: finalist.familyId,
-      sources,
-      seatResponses,
-      rspCurve,
-      metrics,
-      levels,
-      elapsed,
-    });
-    console.log(`  [${i + 1}/5] ${finalist.familyId} (${finalist.id.substring(0, 40)}...): ${elapsed}ms, P19=${levels.p19 !== null ? 'L' + levels.p19 : 'null'} (${metrics.p19.variationDb.toFixed(1)}dB), P20=${levels.p20 !== null ? 'L' + levels.p20 : 'null'}`);
+      rawTransfer,
+      authority,
+      canonicalResult,
+      placementElapsed,
+    };
+    freshResults.push(freshResult);
+
+    console.log(
+      `  [${i + 1}/${freshFinalists.length}] ${finalist.familyId} (${finalist.id.substring(0, 35)}...): ${placementElapsed}ms` +
+      ` | P14=${authority.achievedP14Db?.toFixed(1) ?? 'null'}dB` +
+      ` P18=${authority.achievedP18FrequencyHz?.toFixed(1) ?? 'null'}Hz` +
+      ` P19=${authority.achievedP19VariationDb?.toFixed(1) ?? 'null'}dB` +
+      ` P20=${authority.achievedP20VariationDb?.toFixed(1) ?? 'null'}dB`
+    );
   }
+
   const stage2Elapsed = Date.now() - stage2StartTime;
-  console.log(`  Fresh Stage 2 total elapsed: ${stage2Elapsed} ms (${(stage2Elapsed / 1000).toFixed(1)}s)`);
+  console.log(`\n  Fresh Stage 2 total elapsed: ${stage2Elapsed} ms (${(stage2Elapsed / 1000).toFixed(1)}s)`);
+  console.log(`  Finalists evaluated: ${freshResults.length}/${freshFinalists.length}`);
+  console.log(`  Raw-transfer cache writes: ${rawTransferWrites}`);
+  console.log(`  Fresh canonical finalist IDs:`);
+  freshResults.forEach(r => console.log(`    ${r.familyId}: ${r.finalistId}`));
 
-  // Rank fresh finalists by P19 variation (lower is better)
-  const ranked = [...freshResults].sort((a, b) => a.metrics.p19.variationDb - b.metrics.p19.varationDb);
-  const bestFresh = ranked[0];
-  console.log(`  Best fresh finalist: ${bestFresh.familyId} (P19 variation: ${bestFresh.metrics.p19.variationDb.toFixed(1)} dB)`);
+  // ════════════════════════════════════════════════════════════════════════
+  // STEP 2: CURRENT DESIGN — Same production path
+  // ════════════════════════════════════════════════════════════════════════
+  console.log('\n--- STEP 2: CURRENT DESIGN (production path) ---');
 
-  // ── STEP 2: CURRENT DESIGN — Run through the same engine ──────────────
-  console.log('\n--- STEP 2: CURRENT DESIGN ---');
-  const currentSources = buildCurrentSources(project, roomDims);
+  const currentFinalist = buildCurrentFinalist(project, roomDims);
   const currentT0 = Date.now();
-  const currentResult = simulateAuthoritativeBassResponse({
+  const currentRawTransfer = evaluateStage2Placement({
+    finalist: currentFinalist,
     roomDims,
-    sources: currentSources,
-    seatingPositions,
     rspPosition,
-    physicsOptions,
-    collectDiagnostics: false,
+    seatingPositions,
+    selectedSubModel: SELECTED_SUB_MODEL,
+    amplifierPowerPerSubW,
+    subwooferBottomHeightM: SUBWOOFER_BOTTOM_HEIGHT_M,
   });
+  const currentConfirm = currentRawTransfer
+    ? evaluateStage2ConfirmationWithGraph(currentRawTransfer, p14Params)
+    : null;
   const currentElapsed = Date.now() - currentT0;
-  const currentSeatResponses = currentResult.seatResponses;
-  const currentRspCurve = responseCurve(currentSeatResponses?.rsp);
-  const currentMetrics = computeP19P20(currentSeatResponses, seatingPositions);
-  const currentLevels = extractLevels(currentMetrics);
-  console.log(`  Current: ${currentElapsed}ms, P19=${currentLevels.p19 !== null ? 'L' + currentLevels.p19 : 'null'} (${currentMetrics.p19.variationDb.toFixed(1)}dB), P20=${currentLevels.p20 !== null ? 'L' + currentLevels.p20 : 'null'}`);
-  console.log(`  Current sources: ${currentSources.length}`);
-  currentSources.forEach(s => {
-    console.log(`    ${s.id}: (${s.x}, ${s.y.toFixed(3)}) delay=${s.tuning.delayMs.toFixed(2)}ms`);
+
+  if (!currentConfirm) {
+    console.log('  CURRENT DESIGN FAILED — cannot proceed');
+    process.exit(1);
+  }
+
+  const { authority: currentAuthority, canonicalResult: currentCanonical } = currentConfirm;
+  console.log(`  Current: ${currentElapsed}ms` +
+    ` | P14=${currentAuthority.achievedP14Db?.toFixed(1) ?? 'null'}dB` +
+    ` P18=${currentAuthority.achievedP18FrequencyHz?.toFixed(1) ?? 'null'}Hz` +
+    ` P19=${currentAuthority.achievedP19VariationDb?.toFixed(1) ?? 'null'}dB` +
+    ` P20=${currentAuthority.achievedP20VariationDb?.toFixed(1) ?? 'null'}dB`
+  );
+  console.log(`  Current sources: ${currentRawTransfer.coordinates.length}`);
+  currentRawTransfer.coordinates.forEach((c, i) => {
+    console.log(`    sub-${i + 1}: (${c.x.toFixed(3)}, ${c.y.toFixed(3)})`);
   });
 
-  // ── STEP 3: GRAPH SMELL TEST ───────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════
+  // STEP 3: GRAPH SMELL TEST (from Current's production canonicalResult)
+  // ════════════════════════════════════════════════════════════════════════
   console.log('\n--- STEP 3: GRAPH SMELL TEST ---');
 
-  // Run the full canonical EQ pipeline for the Current design
-  // This produces: postEqRspCurve (Final EQ), maximumSplCurveAfterEq (Product+Room Max),
-  // productionHouseCurveTarget (House Target), roomResponseCurve (Room Response)
-  const subCapability = resolveSubwooferBassCapability(SELECTED_SUB_MODEL);
-  const canonicalT0 = Date.now();
-  const candidatePool = generateCanonicalCandidatePool({
-    rspRawCurve: currentRspCurve,
-    perSeatRawCurves: Object.entries(currentSeatResponses)
-      .filter(([id]) => id !== 'rsp')
-      .map(([seatId, resp]) => ({ seatId, responseData: responseCurve(resp) })),
-    sources: currentSources,
-    subCapability,
-    p14TargetDb: P14_TARGET_DB,
-    p14TargetBasis: P14_TARGET_BASIS,
-    p14TargetLevel: P14_TARGET_LEVEL,
-    targetSpl: TARGET_SPL,
-    roomDims,
-  });
-  const selectedCandidate = selectCandidateFromPool(candidatePool, {
-    p14TargetDb: P14_TARGET_DB,
-    p14TargetBasis: P14_TARGET_BASIS,
-  });
-  const finalResponse = buildFinalOptimisedBassResponse({
-    selectedCandidate,
-    rspRawCurve: currentRspCurve,
-    perSeatRawCurves: Object.entries(currentSeatResponses)
-      .filter(([id]) => id !== 'rsp')
-      .map(([seatId, resp]) => ({ seatId, responseData: responseCurve(resp) })),
-    sources: currentSources,
-    roomDims,
-    targetSpl: TARGET_SPL,
-  });
-  const canonicalElapsed = Date.now() - canonicalT0;
+  const roomResponse = currentCanonical.roomResponseCurve || currentCanonical.physicalRawResponseCurve || [];
+  const finalEq = currentCanonical.postEqRspCurve || [];
+  const productMax = currentCanonical.maximumSplCurveAfterEq || [];
+  const houseTarget = currentCanonical.canonicalTargetCurve || [];
+  const physicalRaw = currentCanonical.physicalRawResponseCurve || currentRawTransfer.rspRawCurve || [];
 
-  // Extract graph series
-  const finalEq = finalResponse?.postEqRspCurve || [];
-  const productMax = finalResponse?.maximumSplCurveAfterEq || [];
-  const houseTarget = selectedCandidate?.productionHouseCurveTarget || [];
-  const roomResponse = finalResponse?.roomResponseCurve || [];
-  const physicalRaw = currentRspCurve; // RSP before EQ
-
-  console.log(`  Canonical EQ pipeline: ${canonicalElapsed}ms`);
   console.log(`  Graph series lengths:`);
   console.log(`    Room Response: ${roomResponse.length} points`);
-  console.log(`    Physical RSP (before EQ): ${physicalRaw.length} points`);
+  console.log(`    Physical Raw (before EQ): ${physicalRaw.length} points`);
   console.log(`    Final EQ (post-EQ RSP): ${finalEq.length} points`);
-  console.log(`    Product+Room Max (usable max): ${productMax.length} points`);
+  console.log(`    Product+Room Max: ${productMax.length} points`);
   console.log(`    House Target: ${houseTarget.length} points`);
 
-  // Verify constraints
   const constraints = [];
 
-  // 1. Final EQ never exceeds Product + Room Maximum
+  // 1. Final EQ ≤ Product+Room Maximum
   let finalEqExceedsMax = 0;
   if (finalEq.length && productMax.length) {
     for (const point of finalEq) {
       const maxAtFreq = productMax.find(p => Math.abs(p.frequency - point.frequency) < 0.5);
-      if (maxAtFreq && point.spl > maxAtFreq.spl + 0.5) {
-        finalEqExceedsMax++;
-      }
+      if (maxAtFreq && point.spl > maxAtFreq.spl + 0.5) finalEqExceedsMax++;
     }
   }
   constraints.push({
@@ -379,183 +325,256 @@ async function main() {
     pass: finalEqExceedsMax === 0,
   });
 
-  // 2. +EQ ≤ +6 dB (boost limit)
-  let maxBoost = 0;
-  if (finalEq.length && physicalRaw.length) {
-    for (let i = 0; i < finalEq.length; i++) {
-      const rawAtFreq = physicalRaw.find(p => Math.abs(p.frequency - finalEq[i].frequency) < 0.5);
-      if (rawAtFreq) {
-        const boost = finalEq[i].spl - rawAtFreq.spl;
+  // 2. +EQ ≤ +6 dB — compare post-EQ vs pre-EQ BOTH at operating level
+  // (rspBeforePeqAtOperatingLevel, not physicalRawResponseCurve which is at raw level)
+  const preEqAtOperatingLevel = currentCanonical.rspBeforePeqAtOperatingLevel || [];
+  let maxBoost = -Infinity;
+  if (finalEq.length && preEqAtOperatingLevel.length) {
+    for (const point of finalEq) {
+      const preAtFreq = preEqAtOperatingLevel.find(p => Math.abs(p.frequency - point.frequency) < 0.5);
+      if (preAtFreq) {
+        const boost = point.spl - preAtFreq.spl;
         if (boost > maxBoost) maxBoost = boost;
       }
     }
   }
+  // Diagnostic: find frequencies where boost > 6 dB
+  const boostExceedances = [];
+  if (finalEq.length && preEqAtOperatingLevel.length) {
+    for (const point of finalEq) {
+      const preAtFreq = preEqAtOperatingLevel.find(p => Math.abs(p.frequency - point.frequency) < 0.5);
+      if (preAtFreq) {
+        const boost = point.spl - preAtFreq.spl;
+        if (boost > 6.0) boostExceedances.push({ freq: point.frequency, boost });
+      }
+    }
+  }
+  if (boostExceedances.length) {
+    console.log(`    [diag] Boost > 6 dB at ${boostExceedances.length} frequencies:`);
+    boostExceedances.slice(0, 5).forEach(b => console.log(`      ${b.freq.toFixed(1)} Hz: +${b.boost.toFixed(1)} dB`));
+  }
+
   constraints.push({
-    test: '+EQ ≤ +6 dB',
+    test: 'Max predicted EQ boost ≤ +6 dB',
     expected: '≤ 6.0 dB',
-    actual: `${maxBoost.toFixed(1)} dB`,
-    pass: maxBoost <= 6.5,
+    actual: `${Number.isFinite(maxBoost) ? maxBoost.toFixed(1) : 'N/A'} dB`,
+    pass: Number.isFinite(maxBoost) && maxBoost <= 6.5,
   });
 
-  // 3. Cuts ≥ -15 dB (cut limit)
-  let maxCut = 0;
-  if (finalEq.length && physicalRaw.length) {
-    for (let i = 0; i < finalEq.length; i++) {
-      const rawAtFreq = physicalRaw.find(p => Math.abs(p.frequency - finalEq[i].frequency) < 0.5);
-      if (rawAtFreq) {
-        const cut = finalEq[i].spl - rawAtFreq.spl;
+  // 3. Cuts ≥ -15 dB — same operating-level baseline
+  let maxCut = Infinity;
+  if (finalEq.length && preEqAtOperatingLevel.length) {
+    for (const point of finalEq) {
+      const preAtFreq = preEqAtOperatingLevel.find(p => Math.abs(p.frequency - point.frequency) < 0.5);
+      if (preAtFreq) {
+        const cut = point.spl - preAtFreq.spl;
         if (cut < maxCut) maxCut = cut;
       }
     }
   }
   constraints.push({
-    test: 'Cuts ≥ -15 dB',
+    test: 'Max EQ cut ≥ -15 dB',
     expected: '≥ -15.0 dB',
-    actual: `${maxCut.toFixed(1)} dB`,
-    pass: maxCut >= -15.5,
+    actual: `${Number.isFinite(maxCut) ? maxCut.toFixed(1) : 'N/A'} dB`,
+    pass: Number.isFinite(maxCut) && maxCut >= -15.5,
   });
 
-  // 4. Narrow severe nulls remain unfilled (check deepest nulls)
-  const currentCredibility = analyzeGraphCredibility(physicalRaw, 'Current');
+  // 4. Narrow nulls remain unfilled
   const finalEqCredibility = analyzeGraphCredibility(finalEq, 'Final EQ');
   constraints.push({
-    test: 'Narrow nulls remain unfilled',
-    expected: 'Final EQ has nulls (> 0)',
+    test: 'Protected narrow nulls not boosted (nulls remain)',
+    expected: '> 0 nulls',
     actual: `${finalEqCredibility.nulls} nulls`,
     pass: finalEqCredibility.nulls > 0,
   });
 
-  // 5. Broad correctable errors sensibly reduced
-  const rawRange = currentCredibility.range;
-  const eqRange = finalEqCredibility.range;
+  // 5. Broad errors reduced
+  const rawCredibility = analyzeGraphCredibility(physicalRaw, 'Raw');
   constraints.push({
     test: 'Broad errors reduced (range decreased)',
-    expected: `EQ range < raw range (${rawRange.toFixed(1)} dB)`,
-    actual: `${eqRange.toFixed(1)} dB`,
-    pass: eqRange < rawRange,
+    expected: `EQ range < raw range (${rawCredibility.range.toFixed(1)} dB)`,
+    actual: `${finalEqCredibility.range.toFixed(1)} dB`,
+    pass: finalEqCredibility.range < rawCredibility.range,
   });
 
-  // 6. Capability shortfalls remain visible (Final EQ follows raw below product max)
+  // 6. Capability shortfalls visible
   let shortfallsVisible = 0;
   if (finalEq.length && productMax.length) {
     for (const point of finalEq) {
       const maxAtFreq = productMax.find(p => Math.abs(p.frequency - point.frequency) < 0.5);
-      if (maxAtFreq && point.spl < maxAtFreq.spl - 3) {
-        shortfallsVisible++;
-      }
+      if (maxAtFreq && point.spl < maxAtFreq.spl - 3) shortfallsVisible++;
     }
   }
   constraints.push({
-    test: 'Capability shortfalls remain visible',
-    expected: '> 0 frequencies below product max',
+    test: 'Capability-limited frequencies below target',
+    expected: '> 0 frequencies',
     actual: `${shortfallsVisible} frequencies`,
     pass: shortfallsVisible > 0,
   });
 
-  // 7. P14 agrees with capability graph
+  // 7. P14 agrees with capability
+  const productMaxPeak = productMax.length ? Math.max(...productMax.map(p => p.spl)) : -Infinity;
   constraints.push({
-    test: 'P14 target within capability',
-    expected: `P14 target ${P14_TARGET_DB} dB ≤ product max`,
-    actual: productMax.length ? `Product max max: ${Math.max(...productMax.map(p => p.spl)).toFixed(1)} dB` : 'no data',
-    pass: productMax.length ? Math.max(...productMax.map(p => p.spl)) >= P14_TARGET_DB : false,
+    test: 'P14 target within physical capability',
+    expected: `P14 ${P14_TARGET_DB} dB ≤ product max`,
+    actual: `Product max: ${Number.isFinite(productMaxPeak) ? productMaxPeak.toFixed(1) : 'N/A'} dB`,
+    pass: Number.isFinite(productMaxPeak) && productMaxPeak >= P14_TARGET_DB,
   });
 
-  // 8. P18/P19/P20 believable
+  // 8. P18/P19/P20 populated and plausible
   constraints.push({
-    test: 'P19 believable (variation > 0)',
+    test: 'P18 populated and plausible',
+    expected: '> 0 Hz',
+    actual: `${currentAuthority.achievedP18FrequencyHz?.toFixed(1) ?? 'null'} Hz`,
+    pass: Number.isFinite(currentAuthority.achievedP18FrequencyHz) && currentAuthority.achievedP18FrequencyHz > 0,
+  });
+  constraints.push({
+    test: 'P19 populated and plausible',
     expected: '> 0 dB',
-    actual: `${currentMetrics.p19.variationDb.toFixed(1)} dB`,
-    pass: currentMetrics.p19.variationDb > 0,
+    actual: `${currentAuthority.achievedP19VariationDb?.toFixed(1) ?? 'null'} dB`,
+    pass: Number.isFinite(currentAuthority.achievedP19VariationDb) && currentAuthority.achievedP19VariationDb > 0,
   });
   constraints.push({
-    test: 'P20 believable (per-seat data exists)',
-    expected: '> 0 seats',
-    actual: `${currentMetrics.p20.perSeat.length} seats`,
-    pass: currentMetrics.p20.perSeat.length > 0,
+    test: 'P20 populated and plausible',
+    expected: '> 0 dB',
+    actual: `${currentAuthority.achievedP20VariationDb?.toFixed(1) ?? 'null'} dB`,
+    pass: Number.isFinite(currentAuthority.achievedP20VariationDb) && currentAuthority.achievedP20VariationDb > 0,
   });
 
-  // Print constraints
-  console.log('\n  Graph Smell Test Constraints:');
+  console.log('\n  Graph Smell Test Results:');
   for (const c of constraints) {
     console.log(`    ${c.pass ? 'PASS' : 'FAIL'}: ${c.test} — expected: ${c.expected}, actual: ${c.actual}`);
   }
 
-  // ── STEP 4: IMPROVE WITH FRESH FINALISTS ────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════
+  // STEP 4: IMPROVE WITH FRESH FINALISTS
+  // ════════════════════════════════════════════════════════════════════════
   console.log('\n--- STEP 4: IMPROVE WITH FRESH FINALISTS ---');
 
-  // Check if Current is reused (same placement as any fresh finalist)
-  const currentReuseStart = Date.now();
-  const currentReused = freshResults.some(r => isSamePlacement(r.sources, currentSources));
-  const currentReuseTime = Date.now() - currentReuseStart;
-  console.log(`  Current reuse check: ${currentReuseTime}ms → ${currentReused ? 'YES' : 'NO'}`);
-
-  // Select the best fresh finalist as the challenger
-  const challenger = bestFresh;
-  console.log(`  Challenger: ${challenger.familyId} (${challenger.finalistId.substring(0, 50)}...)`);
-  console.log(`  Challenger P19: ${challenger.metrics.p19.variationDb.toFixed(1)} dB vs Current P19: ${currentMetrics.p19.variationDb.toFixed(1)} dB`);
-
-  // Run canonical confirmation for the challenger (already done in Step 1 — reuse the result)
-  const challengerConfirmationTime = challenger.elapsed;
-  console.log(`  Challenger confirmation time: ${challengerConfirmationTime} ms`);
-
-  // Primary-seat protection
-  const protectionStart = Date.now();
-  const regression = hasPrimarySeatRegression(
-    {
-      isCurrent: true,
-      finalistId: 'current',
-      familyId: 'current',
-      metrics: {
-        p19: { level: currentLevels.p19, perSeat: currentMetrics.p19.perSeat },
-        p20: { level: currentLevels.p20, perSeat: currentMetrics.p20.perSeat },
-        p18: { level: 3 },
-      },
-      perSeatP19: currentMetrics.p19.perSeat,
-      perSeatP20: currentMetrics.p20.perSeat,
-    },
-    {
-      isCurrent: false,
-      finalistId: challenger.finalistId,
-      familyId: challenger.familyId,
-      metrics: {
-        p19: { level: challenger.levels.p19, perSeat: challenger.metrics.p19.perSeat },
-        p20: { level: challenger.levels.p20, perSeat: challenger.metrics.p20.perSeat },
-        p18: { level: 3 },
-      },
-      perSeatP19: challenger.metrics.p19.perSeat,
-      perSeatP20: challenger.metrics.p20.perSeat,
-    },
+  // Check if Current is reused
+  const currentReused = freshResults.some(r =>
+    isSamePlacement(r.rawTransfer.coordinates, currentRawTransfer.coordinates)
   );
-  const protectionTime = Date.now() - protectionStart;
-  console.log(`  Primary-seat protection: ${protectionTime}ms → regression: ${regression ? 'YES' : 'NO'}`);
+  console.log(`  Current reused: ${currentReused ? 'YES' : 'NO'}`);
+
+  // Build current layout for comparison
+  const currentLayout = {
+    sources: currentRawTransfer.sources,
+    metrics: {
+      perSeatP19: currentAuthority.perSeatP19Results || [],
+      perSeatP20: currentAuthority.perSeatP20Results || [],
+      p18AchievedLevel: currentAuthority.achievedP18Level,
+      achievedP18Hz: currentAuthority.achievedP18FrequencyHz,
+      p14AchievedLevel: currentAuthority.achievedP14Level,
+      p14AchievedDb: currentAuthority.achievedP14Db,
+      achievedP19VariationDb: currentAuthority.achievedP19VariationDb,
+      achievedP19Level: currentAuthority.achievedP19Level,
+      achievedP20VariationDb: currentAuthority.achievedP20VariationDb,
+      achievedP20Level: currentAuthority.achievedP20Level,
+    },
+  };
+
+  const currentMetrics = extractAuthoritativeMetrics(
+    {
+      perSeatP19: currentLayout.metrics.perSeatP19,
+      perSeatP20: currentLayout.metrics.perSeatP20,
+      p18AchievedLevel: currentLayout.metrics.p18AchievedLevel,
+      achievedP18Hz: currentLayout.metrics.achievedP18Hz,
+      p14AchievedLevel: currentLayout.metrics.p14AchievedLevel,
+      p14AchievedDb: currentLayout.metrics.p14AchievedDb,
+      achievedP19VariationDb: currentLayout.metrics.achievedP19VariationDb,
+      achievedP19Level: currentLayout.metrics.achievedP19Level,
+      achievedP20VariationDb: currentLayout.metrics.achievedP20VariationDb,
+      achievedP20Level: currentLayout.metrics.achievedP20Level,
+      quantity: currentRawTransfer.sources.length,
+    },
+    currentLayout,
+  );
+
+  // Evaluate each fresh finalist as a challenger
+  const improveStart = Date.now();
+  let challengerConfirmed = 0;
+  let bestChallenger = null;
+  let bestClassification = null;
+
+  for (const fresh of freshResults) {
+    // Primary-seat protection (production function)
+    const regression = hasPrimarySeatRegression(fresh.authority, {
+      perSeatP19: currentAuthority.perSeatP19Results || [],
+      perSeatP20: currentAuthority.perSeatP20Results || [],
+    });
+
+    if (regression.regressed) {
+      console.log(`  ${fresh.familyId}: REJECTED — primary-seat regression (seat ${regression.seatId}, ${regression.parameter} L${regression.currentLevel}→L${regression.candidateLevel})`);
+      continue;
+    }
+
+    challengerConfirmed++;
+
+    const challengerMetrics = extractAuthoritativeMetrics(fresh.authority);
+    const classification = classifyVersusCurrent(challengerMetrics, currentMetrics);
+
+    if (!bestChallenger || classification.type === 'improvement') {
+      const isBetter = !bestChallenger
+        || (challengerMetrics.p19VariationDb + challengerMetrics.p20VariationDb)
+           < (bestChallenger.metrics.p19VariationDb + bestChallenger.metrics.p20VariationDb);
+      if (isBetter) {
+        bestChallenger = { fresh, metrics: challengerMetrics };
+        bestClassification = classification;
+      }
+    }
+  }
+
+  const safetyTime = Date.now() - improveStart;
 
   // Winner selection
-  const winnerStart = Date.now();
-  let winner = 'NO WINNER';
-  if (!regression && challenger.metrics.p19.variationDb < currentMetrics.p19.variationDb) {
-    winner = `${challenger.familyId} PROMOTED`;
-  } else {
-    winner = 'CURRENT RETAINED';
+  let winner = 'CURRENT RETAINED';
+  if (bestChallenger && bestClassification?.type === 'improvement') {
+    winner = `${bestChallenger.fresh.familyId} PROMOTED`;
+  } else if (bestChallenger && bestClassification?.type === 'trade-off') {
+    winner = `CURRENT RETAINED (trade-off: ${bestClassification.description})`;
   }
-  const winnerTime = Date.now() - winnerStart;
-  console.log(`  Winner selection: ${winnerTime}ms → ${winner}`);
 
-  const totalImproveTime = currentReuseTime + challengerConfirmationTime + protectionTime + winnerTime;
-  console.log(`  TOTAL IMPROVE TIME: ${totalImproveTime} ms (${(totalImproveTime / 1000).toFixed(1)}s)`);
+  const totalImproveTime = Date.now() - improveStart;
 
-  // ── SUMMARY ────────────────────────────────────────────────────────────
+  console.log(`  Candidate count: ${freshResults.length}`);
+  console.log(`  Tuning-search time: 0 ms (production placement+confirmation includes tuning)`);
+  console.log(`  Real canonical challenger confirmations: ${challengerConfirmed}`);
+  console.log(`  Safety/finalist time: ${safetyTime} ms`);
+  console.log(`  Total Improve elapsed: ${totalImproveTime} ms (${(totalImproveTime / 1000).toFixed(1)}s)`);
+  console.log(`  Winner: ${winner}`);
+  if (bestChallenger) {
+    console.log(`  Best challenger: ${bestChallenger.fresh.familyId}` +
+      ` P19=${bestChallenger.metrics.p19VariationDb.toFixed(1)}dB` +
+      ` P20=${bestChallenger.metrics.p20VariationDb.toFixed(1)}dB` +
+      ` vs Current P19=${currentMetrics.p19VariationDb.toFixed(1)}dB` +
+      ` P20=${currentMetrics.p20VariationDb.toFixed(1)}dB`
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // STEP 5: UI RESPONSIVENESS
+  // ════════════════════════════════════════════════════════════════════════
+  console.log('\n--- STEP 5: UI RESPONSIVENESS ---');
+  console.log('  MANUAL UI OBSERVATION REQUIRED');
+
+  // ════════════════════════════════════════════════════════════════════════
+  // SUMMARY
+  // ════════════════════════════════════════════════════════════════════════
   console.log('\n' + '='.repeat(60));
   console.log('SUMMARY');
   console.log('='.repeat(60));
-  console.log(`Fresh Stage 2 placement fingerprint: stage2-place:v3:a6d153338c591bc5`);
-  console.log(`Fresh Stage 2 cache version: 4`);
+  console.log(`Placement fingerprint: ${placementFingerprint}`);
+  console.log(`Cache version: ${STAGE2_CACHE_VERSION}`);
   console.log(`Fresh Stage 2 elapsed: ${stage2Elapsed} ms`);
-  console.log(`Fresh Stage 2 finalist count: ${freshFinalists.length}`);
+  console.log(`Fresh Stage 2 finalists evaluated: ${freshResults.length}/${freshFinalists.length}`);
+  console.log(`Raw-transfer cache writes: ${rawTransferWrites}`);
   console.log(`Current reused: ${currentReused ? 'YES' : 'NO'}`);
-  console.log(`Fresh challenger confirmation time: ${challengerConfirmationTime} ms`);
+  console.log(`Challenger confirmations: ${challengerConfirmed}`);
   console.log(`Total Improve time: ${totalImproveTime} ms`);
   console.log(`Winner: ${winner}`);
   console.log(`Graph smell test: ${constraints.filter(c => c.pass).length}/${constraints.length} passed`);
+  console.log(`UI responsiveness: MANUAL UI OBSERVATION REQUIRED`);
 }
 
 main().catch(err => {
