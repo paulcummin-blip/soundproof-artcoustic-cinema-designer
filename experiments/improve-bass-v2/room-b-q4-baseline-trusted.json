@@ -1,0 +1,212 @@
+{
+  "metadata": {
+    "experiment": "improve-bass-response-v2-read-only-sandbox",
+    "productionCodeModified": false,
+    "generatedAt": "2026-09-06T00:07:50.453Z",
+    "room": "Room B",
+    "quantity": 4,
+    "phase": "baseline",
+    "variant": "trusted",
+    "model": "SUB2-12",
+    "target": {
+      "p14TargetBasis": "minimum",
+      "p14TargetLevel": 2,
+      "p14TargetDb": 112,
+      "p18TargetBasis": "minimum"
+    },
+    "transitionHz": 162.65
+  },
+  "geometry": {
+    "roomDims": {
+      "widthM": 4,
+      "lengthM": 6.3,
+      "heightM": 2.4
+    },
+    "rspPosition": {
+      "id": "rsp",
+      "x": 2,
+      "y": 3.5,
+      "z": 1.2
+    },
+    "seatingPositions": [
+      {
+        "id": "primary-left",
+        "x": 1,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-centre",
+        "x": 2,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-right",
+        "x": 3,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "secondary-left",
+        "x": 1,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-centre",
+        "x": 2,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-right",
+        "x": 3,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      }
+    ]
+  },
+  "result": {
+    "label": "trusted saved finalist",
+    "positions": [
+      {
+        "x": 2,
+        "y": 0.1275,
+        "z": 0.35
+      },
+      {
+        "x": 1.3,
+        "y": 6.1725,
+        "z": 0.35
+      },
+      {
+        "x": 2,
+        "y": 6.1725,
+        "z": 0.35
+      },
+      {
+        "x": 2.7,
+        "y": 6.1725,
+        "z": 0.35
+      }
+    ],
+    "tuning": [
+      {
+        "delayMs": 10.807,
+        "gainDb": 0,
+        "polarity": "normal"
+      },
+      {
+        "delayMs": 0,
+        "gainDb": -1.64,
+        "polarity": "normal"
+      },
+      {
+        "delayMs": 7.162,
+        "gainDb": -0.902,
+        "polarity": "normal"
+      },
+      {
+        "delayMs": 0,
+        "gainDb": -1.574,
+        "polarity": "normal"
+      }
+    ],
+    "p14": {
+      "db": 119.323,
+      "level": 4,
+      "requestedPass": true
+    },
+    "p18": {
+      "cutoffHz": 15,
+      "level": 4,
+      "requestedPass": true
+    },
+    "p19": {
+      "rawDb": 5.219,
+      "level": 1,
+      "worstFrequencyHz": 22.967
+    },
+    "p20": {
+      "rawDb": 9.77,
+      "level": 1,
+      "worstSeat": "secondary-centre",
+      "worstFrequencyHz": 157.884
+    },
+    "diagnostic30To60": {
+      "p19RawDb": 3.533,
+      "p19Level": 3,
+      "p19WorstFrequencyHz": 30,
+      "p20RawDb": 5.718,
+      "p20Level": 1,
+      "p20WorstSeat": "secondary-left",
+      "p20WorstFrequencyHz": 33.191
+    },
+    "assessmentBandHz": [
+      15,
+      162.65
+    ],
+    "enabledEqFilters": [
+      {
+        "frequencyHz": 29.146,
+        "gainDb": -9.8,
+        "q": 1.054
+      },
+      {
+        "frequencyHz": 128.985,
+        "gainDb": -5.075,
+        "q": 3.492
+      },
+      {
+        "frequencyHz": 60.873,
+        "gainDb": 1.275,
+        "q": 7.2121
+      },
+      {
+        "frequencyHz": 108.463,
+        "gainDb": -10.759,
+        "q": 8.6514
+      },
+      {
+        "frequencyHz": 60.873,
+        "gainDb": 4.089,
+        "q": 2.4747
+      },
+      {
+        "frequencyHz": 27.51,
+        "gainDb": -5.586,
+        "q": 6
+      },
+      {
+        "frequencyHz": 200,
+        "gainDb": -3.548,
+        "q": 10
+      },
+      {
+        "frequencyHz": 81.844,
+        "gainDb": 2.246,
+        "q": 2
+      },
+      {
+        "frequencyHz": 85.468,
+        "gainDb": -6.58,
+        "q": 10
+      },
+      {
+        "frequencyHz": 119.137,
+        "gainDb": -0.922,
+        "q": 10
+      }
+    ],
+    "runtimeMs": 34122.3
+  },
+  "simulationMs": 29112.6,
+  "totalPhaseRuntimeMs": 63237.2
+}
