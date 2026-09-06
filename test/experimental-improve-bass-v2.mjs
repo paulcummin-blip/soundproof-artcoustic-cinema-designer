@@ -273,6 +273,18 @@ try {
         round(authority.assessmentStartHz),
         round(authority.assessmentEndHz),
       ],
+      perSeatP19: (authority.perSeatP19Results || []).map((seat) => ({
+        seatId: seat.seatId,
+        variationDbRaw: round(seat.variationDbRaw),
+        level: seat.level,
+        worstFrequencyHz: round(seat.worstFrequencyHz),
+      })),
+      perSeatP20: (authority.perSeatP20Results || []).map((seat) => ({
+        seatId: seat.seatId,
+        variationDbRaw: round(seat.variationDbRaw),
+        level: seat.level,
+        worstFrequencyHz: round(seat.worstFrequencyHz),
+      })),
       enabledEqFilters: (selection.selectedCandidate.generatedFilterBank || [])
         .filter((filter) => filter.enabled)
         .map((filter) => ({
