@@ -3,6 +3,16 @@
 // Replaces the V1 "Find Better Positions" flow with the full V2 workflow:
 // placement + delay + polarity + trim search, canonical confirmation,
 // primary-seat protection, and atomic apply.
+//
+// BLOCKER 3: Stale detection reads CURRENT project state via a ref, not a
+// render closure. The latest design inputs are stored in a ref that's updated
+// on every render, so the running engine always sees the latest state.
+//
+// BLOCKER 4: Null/empty worker results display a safe NO_WINNER message,
+// never a blank complete state.
+//
+// BLOCKER 7: Cancelled jobs can never publish or apply — the store gates
+// status transitions and the Apply button checks for a valid winner.
 
 import React, { useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -79,6 +89,20 @@ export default function ImproveBassResponseV2({
   const selectedSubModel = frontSubsCfg?.model || rearSubsCfg?.model || null;
   const subwooferBottomHeightM = frontSubsCfg?.bottomHeightM ?? rearSubsCfg?.bottomHeightM ?? 0;
 
+  // BLOCKER 3: Live stale detection — use a ref to always read the LATEST design
+  // inputs at stale-check time. The ref is updated on every render, so the
+  // running engine (which captured the callback at V2 start) always sees the
+  // current project state, not the state from the render that started V2.
+  const latestDesignRef = useRef({});
+  latestDesignRef.current = {
+    subwooferInstances,
+    roomDims,
+    seatingPositions,
+    rspPosition,
+    selectedSubModel,
+    p14Params,
+  };
+
   const canStart = shared?.hasCurrentResult === true && !state?.status === "running";
 
   const handleStart = useCallback(async () => {
@@ -124,20 +148,22 @@ export default function ImproveBassResponseV2({
       onBestSoFar: (bestSoFar) => {
         setBestSoFar(projectId, bestSoFar);
       },
-      // BLOCKER 2: Stale-job rejection — recompute the fingerprint from the
-      // CURRENT design state on each check. If the design changed during V2
-      // execution, the fingerprint will differ from the start fingerprint.
+      // BLOCKER 3: Stale-job rejection — recompute the fingerprint from the
+      // CURRENT design state on each check, reading from the ref (not the
+      // render closure). If the design changed during V2 execution, the
+      // fingerprint will differ from the start fingerprint.
       getCurrentFingerprint: () => {
         try {
+          const d = latestDesignRef.current;
           return computeV2DesignFingerprint({
-            subwooferInstances,
-            roomDims,
-            seatingPositions,
-            rspPosition,
-            selectedSubModel,
-            p14TargetBasis: p14Params.p14TargetBasis,
-            p14TargetLevel: p14Params.p14TargetLevel,
-            p14TargetDb: p14Params.p14TargetDb,
+            subwooferInstances: d.subwooferInstances,
+            roomDims: d.roomDims,
+            seatingPositions: d.seatingPositions,
+            rspPosition: d.rspPosition,
+            selectedSubModel: d.selectedSubModel,
+            p14TargetBasis: d.p14Params?.p14TargetBasis,
+            p14TargetLevel: d.p14Params?.p14TargetLevel,
+            p14TargetDb: d.p14Params?.p14TargetDb,
           });
         } catch {
           return null;
@@ -148,6 +174,7 @@ export default function ImproveBassResponseV2({
     try {
       const result = await runImproveBassV2(projectId, params, callbacks);
 
+      // BLOCKER 7: Cancelled jobs never publish a winner
       if (result.status === "cancelled") {
         setCancelled(projectId);
       } else if (result.status === "stale") {
@@ -155,7 +182,20 @@ export default function ImproveBassResponseV2({
       } else if (result.status === "error") {
         setError(projectId, result.error);
       } else if (result.status === "complete") {
-        setWinner(projectId, result.selection);
+        // BLOCKER 4: If selection is null/undefined, treat as NO_WINNER
+        // (Current retained), never blank complete
+        const selection = result.selection;
+        if (!selection) {
+          setWinner(projectId, {
+            isCurrent: true,
+            winner: null,
+            message: "No safer automatic improvement found — current design retained",
+            confirmedResults: result.confirmedResults || [],
+            currentResult: null,
+          });
+        } else {
+          setWinner(projectId, selection);
+        }
       }
     } catch (err) {
       setError(projectId, err.message);
@@ -175,6 +215,7 @@ export default function ImproveBassResponseV2({
   }, [projectId]);
 
   const handleApply = useCallback(() => {
+    // BLOCKER 7: Cancelled/stale jobs can never apply
     if (!state?.winner?.winner || !commitInstances || !hasCanonicalInstances) return;
     const modelKey = normaliseModelKey(selectedSubModel);
     const nextInstances = buildOptimisedInstances(

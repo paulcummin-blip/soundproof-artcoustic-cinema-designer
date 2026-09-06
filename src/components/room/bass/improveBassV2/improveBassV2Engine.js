@@ -28,7 +28,7 @@ import { searchDelayOnly, searchPolarity, searchGainOnly, resumWithTuning } from
 import { selectAuthoritativeFinalist, hasPrimarySeatRegression, detectMutedSubs } from "../best-layout/authoritativeFinalistSelection.js";
 import { getCachedRawTransfersForFingerprint } from "../stage2/stage2RawTransferCache.js";
 import { normaliseModelKey } from "../../../utils/modelKeyNormaliser.js";
-import { computeV2DesignFingerprint, isCurrentAuthorityNonStale, extractBaseFingerprint } from "./improveBassV2Fingerprint.js";
+import { computeV2DesignFingerprint, isCurrentAuthorityNonStale } from "./improveBassV2Fingerprint.js";
 
 const MAX_CHALLENGERS = 3;
 const YIELD_DELAY_MS = 0;
