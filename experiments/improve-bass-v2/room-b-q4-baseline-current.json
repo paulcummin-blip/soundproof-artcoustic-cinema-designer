@@ -1,0 +1,187 @@
+{
+  "metadata": {
+    "experiment": "improve-bass-response-v2-read-only-sandbox",
+    "productionCodeModified": false,
+    "generatedAt": "2026-09-06T00:06:01.017Z",
+    "room": "Room B",
+    "quantity": 4,
+    "phase": "baseline",
+    "variant": "current",
+    "model": "SUB2-12",
+    "target": {
+      "p14TargetBasis": "minimum",
+      "p14TargetLevel": 2,
+      "p14TargetDb": 112,
+      "p18TargetBasis": "minimum"
+    },
+    "transitionHz": 162.65
+  },
+  "geometry": {
+    "roomDims": {
+      "widthM": 4,
+      "lengthM": 6.3,
+      "heightM": 2.4
+    },
+    "rspPosition": {
+      "id": "rsp",
+      "x": 2,
+      "y": 3.5,
+      "z": 1.2
+    },
+    "seatingPositions": [
+      {
+        "id": "primary-left",
+        "x": 1,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-centre",
+        "x": 2,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-right",
+        "x": 3,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "secondary-left",
+        "x": 1,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-centre",
+        "x": 2,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-right",
+        "x": 3,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      }
+    ]
+  },
+  "result": {
+    "label": "current control",
+    "positions": [
+      {
+        "x": 1,
+        "y": 0.1,
+        "z": 0.35
+      },
+      {
+        "x": 3,
+        "y": 0.1,
+        "z": 0.35
+      },
+      {
+        "x": 1,
+        "y": 6.2,
+        "z": 0.35
+      },
+      {
+        "x": 3,
+        "y": 6.2,
+        "z": 0.35
+      }
+    ],
+    "tuning": [
+      {
+        "delayMs": 0,
+        "gainDb": 0,
+        "polarity": "normal"
+      },
+      {
+        "delayMs": 0,
+        "gainDb": 0,
+        "polarity": "normal"
+      },
+      {
+        "delayMs": 0,
+        "gainDb": 0,
+        "polarity": "normal"
+      },
+      {
+        "delayMs": 0,
+        "gainDb": 0,
+        "polarity": "normal"
+      }
+    ],
+    "p14": {
+      "db": 119.54,
+      "level": 4,
+      "requestedPass": true
+    },
+    "p18": {
+      "cutoffHz": 15,
+      "level": 4,
+      "requestedPass": true
+    },
+    "p19": {
+      "rawDb": 4.922,
+      "level": 2,
+      "worstFrequencyHz": 23.984
+    },
+    "p20": {
+      "rawDb": 18.501,
+      "level": 1,
+      "worstSeat": "secondary-left",
+      "worstFrequencyHz": 51.932
+    },
+    "diagnostic30To60": {
+      "p19RawDb": 3.529,
+      "p19Level": 3,
+      "p19WorstFrequencyHz": 30,
+      "p20RawDb": 18.501,
+      "p20Level": 1,
+      "p20WorstSeat": "secondary-left",
+      "p20WorstFrequencyHz": 51.932
+    },
+    "assessmentBandHz": [
+      15,
+      162.65
+    ],
+    "enabledEqFilters": [
+      {
+        "frequencyHz": 55.419,
+        "gainDb": -11.25,
+        "q": 5.3914
+      },
+      {
+        "frequencyHz": 86.087,
+        "gainDb": 4.139,
+        "q": 3.2582
+      },
+      {
+        "frequencyHz": 50.091,
+        "gainDb": -3.619,
+        "q": 5.4163
+      },
+      {
+        "frequencyHz": 86.087,
+        "gainDb": 2.571,
+        "q": 5.7325
+      },
+      {
+        "frequencyHz": 53.454,
+        "gainDb": -2.922,
+        "q": 6.3382
+      }
+    ],
+    "runtimeMs": 24716.4
+  },
+  "simulationMs": 29087.9,
+  "totalPhaseRuntimeMs": 53806.8
+}
