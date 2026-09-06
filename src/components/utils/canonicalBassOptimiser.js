@@ -442,7 +442,11 @@ function buildCanonicalCandidate({
     frequencyGrid: unconstrainedPostEqCurve.map((point) => point.frequency),
     targetCurve,
     activeSubs,
-    combinedEqCurve: eq.combinedEqCurve || [],
+    // Use the deterministic predictor's correction curve — NOT the iterative
+    // fitter's combinedEqCurve. This makes the product operating envelope
+    // consistent with the authoritative P14 (which also uses the predictor's
+    // positiveEqDemandCurve). The fitter's combinedEqCurve is diagnostic-only.
+    combinedEqCurve: realisticCorrectionCurve,
     selectedOperatingOutputDb,
     targetBasis: p14TargetBasis,
   });
