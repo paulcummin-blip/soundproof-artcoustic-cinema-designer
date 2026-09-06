@@ -12,6 +12,19 @@ const TUNING_TOLERANCE_DELAY_MS = 0.1;
 const TUNING_TOLERANCE_GAIN_DB = 0.1;
 
 /**
+ * Normalise a polarity value to -1 (inverted) or 0 (normal).
+ * Fixes the BLOCKER 4 precedence bug where (Number(t.polarity) || 0 < 0 ? -1 : 0)
+ * evaluated as (Number(t.polarity) || false) due to operator precedence.
+ *
+ * @param {*} value - raw polarity value (0, -1, 180, undefined, etc.)
+ * @returns {number} -1 for inverted, 0 for normal
+ */
+function normalisePolarity(value) {
+  const n = Number(value) || 0;
+  return n < 0 ? -1 : 0;
+}
+
+/**
  * Build optimised subwooferInstances from the V2 winner, preserving
  * existing instance IDs where possible and applying new positions,
  * rotation, delay, trim, and polarity.
@@ -92,7 +105,10 @@ export function isOptimisedApplied(currentInstances, winner, roomDims) {
 
     if (Math.abs(instDelay - (Number(t.delayMs) || 0)) > TUNING_TOLERANCE_DELAY_MS) return false;
     if (Math.abs(instGain - (Number(t.gainDb) || 0)) > TUNING_TOLERANCE_GAIN_DB) return false;
-    if ((instPolarity < 0 ? -1 : 0) !== (Number(t.polarity) || 0 < 0 ? -1 : 0)) return false;
+    // BLOCKER 4 fix: explicit, unambiguous polarity normalisation.
+    // The old code had a precedence bug: (Number(t.polarity) || 0 < 0 ? -1 : 0)
+    // evaluated as (Number(t.polarity) || false) due to < binding tighter than ||.
+    if (normalisePolarity(instPolarity) !== normalisePolarity(t.polarity)) return false;
   }
 
   return true;

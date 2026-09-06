@@ -13,7 +13,7 @@ const keyFor = (projectId) => String(projectId || "free");
 function emptyState(projectId) {
   return {
     projectId: keyFor(projectId),
-    status: "idle", // idle | running | complete | cancelled | error
+    status: "idle", // idle | running | complete | cancelled | error | stale
     phase: "idle", // reviewing | testing_positions | optimising_timing | testing_polarity | balancing_levels | confirming | finalising
     phaseLabel: "",
     progressCurrent: 0,
@@ -96,6 +96,14 @@ export function setWinner(projectId, winner) {
 export function setCancelled(projectId) {
   return publish(projectId, {
     status: "cancelled",
+    completedAtMs: Date.now(),
+  });
+}
+
+export function setStale(projectId, message) {
+  return publish(projectId, {
+    status: "stale",
+    error: message || "Design changed — optimisation result discarded",
     completedAtMs: Date.now(),
   });
 }

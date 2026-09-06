@@ -19,6 +19,7 @@ import {
   setBestSoFar,
   setWinner,
   setCancelled,
+  setStale,
   setError,
   requestCancel,
   isCancelRequested,
@@ -26,6 +27,7 @@ import {
   useImproveBassV2State,
 } from "./improveBassV2Store";
 import { buildOptimisedInstances } from "./improveBassV2Apply";
+import { computeV2DesignFingerprint } from "./improveBassV2Fingerprint";
 import ImproveBassV2Progress from "./ImproveBassV2Progress";
 import ImproveBassV2Results from "./ImproveBassV2Results";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
@@ -122,6 +124,25 @@ export default function ImproveBassResponseV2({
       onBestSoFar: (bestSoFar) => {
         setBestSoFar(projectId, bestSoFar);
       },
+      // BLOCKER 2: Stale-job rejection — recompute the fingerprint from the
+      // CURRENT design state on each check. If the design changed during V2
+      // execution, the fingerprint will differ from the start fingerprint.
+      getCurrentFingerprint: () => {
+        try {
+          return computeV2DesignFingerprint({
+            subwooferInstances,
+            roomDims,
+            seatingPositions,
+            rspPosition,
+            selectedSubModel,
+            p14TargetBasis: p14Params.p14TargetBasis,
+            p14TargetLevel: p14Params.p14TargetLevel,
+            p14TargetDb: p14Params.p14TargetDb,
+          });
+        } catch {
+          return null;
+        }
+      },
     };
 
     try {
@@ -129,6 +150,8 @@ export default function ImproveBassResponseV2({
 
       if (result.status === "cancelled") {
         setCancelled(projectId);
+      } else if (result.status === "stale") {
+        setStale(projectId, result.message);
       } else if (result.status === "error") {
         setError(projectId, result.error);
       } else if (result.status === "complete") {
@@ -173,6 +196,7 @@ export default function ImproveBassResponseV2({
   const isComplete = state?.status === "complete";
   const isError = state?.status === "error";
   const isCancelled = state?.status === "cancelled";
+  const isStale = state?.status === "stale";
 
   return (
     <div className="mt-3 rounded-lg border border-[#D9D5CE] bg-white px-4 py-4">
@@ -215,6 +239,22 @@ export default function ImproveBassResponseV2({
           </div>
           <p className="mt-1 text-[10px] leading-relaxed text-amber-700">
             Current design remains unchanged. Best-so-far results retained for diagnostics.
+          </p>
+          <Button type="button" size="sm" variant="outline" onClick={handleRetry} className="mt-2 text-[11px]">
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {isStale && (
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-700" />
+            <span className="text-[12px] font-semibold text-amber-800">Design changed — optimisation result discarded</span>
+          </div>
+          <p className="mt-1 text-[10px] leading-relaxed text-amber-700">
+            The room, seating, subwoofers, or target changed during optimisation. The result was rejected to prevent applying a stale recommendation. Current design remains untouched.
           </p>
           <Button type="button" size="sm" variant="outline" onClick={handleRetry} className="mt-2 text-[11px]">
             <RotateCcw className="h-3 w-3 mr-1" />
