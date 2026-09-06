@@ -203,6 +203,29 @@ for (let fi = 0; fi < FINALISTS.length; fi++) {
     ...src,
     sourceCurve: applyDerating(getSubwooferCurve(src.modelKey), ampAuth.sourceAuthorities[si]?.deratingDb ?? 0),
   }));
+
+  // Debug: compare source curves for finalist 0
+  if (fi === 0) {
+    const rawCurve = getSubwooferCurve(sources[0].modelKey);
+    const deratingDb = ampAuth.sourceAuthorities[0]?.deratingDb ?? 0;
+    const batchCurve = sourcesWithCurves[0].sourceCurve;
+    console.log(`  [DEBUG] modelKey=${sources[0].modelKey}  deratingDb=${deratingDb?.toFixed(6)}`);
+    console.log(`  [DEBUG] raw curve[0..2]: ${JSON.stringify(rawCurve?.slice(0, 3))}`);
+    console.log(`  [DEBUG] batch curve[0..2]: ${JSON.stringify(batchCurve?.slice(0, 3))}`);
+    // Check what production uses: subCurve + derating
+    const prodDeratedCurve = rawCurve?.map(p => ({ ...p, db: p.db + deratingDb }));
+    console.log(`  [DEBUG] prod derated[0..2]: ${JSON.stringify(prodDeratedCurve?.slice(0, 3))}`);
+    // Check if src already has a sourceCurve field
+    console.log(`  [DEBUG] src.sourceCurve before override: ${sources[0].sourceCurve ?? 'undefined'}`);
+    console.log(`  [DEBUG] src._sourceCurve: ${sources[0]._sourceCurve ?? 'undefined'}`);
+    // Check bassCapability
+    const bc = sources[0].bassCapability;
+    console.log(`  [DEBUG] bassCapability has freqResponseCurve: ${!!bc?.frequencyResponseCurve}  len=${bc?.frequencyResponseCurve?.length ?? 0}`);
+    if (bc?.frequencyResponseCurve?.length) {
+      console.log(`  [DEBUG] bassCapability curve[0..2]: ${JSON.stringify(bc.frequencyResponseCurve.slice(0, 3))}`);
+    }
+  }
+
   const listeners = [{ id: 'rsp', x: RSP_POSITION.x, y: RSP_POSITION.y, z: RSP_POSITION.z }, ...SEATING_POSITIONS];
   const batchEval = evaluateBatchModalTransfers({
     roomDims: ROOM_DIMS, sources: sourcesWithCurves, listeners,
