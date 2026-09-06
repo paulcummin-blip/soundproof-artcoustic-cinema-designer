@@ -979,12 +979,20 @@ export function generateCanonicalCandidatePool({
     const profileBankAllOk = eq.designEqFitProfile === "house_curve"
       ? eq.bankLimits?.allOk
       : eq.bankDiagnostics?.selectedBankLimits?.allOk;
-    const normalBankIsProvenValid =
-      eq.physicalEqAuthorityPassed === true
-      && (eq.bankValidationPassed === true || profileBankAllOk === true);
+    // The deterministic stub has no iterative fitter output to salvage —
+    // its physicalEqAuthorityPassed/bankValidationPassed are null (not
+    // evaluated), and its filter bank is empty by design. Skip salvage
+    // explicitly so null semantics don't trigger a pointless empty-bank
+    // salvage pass.
+    const isDeterministicStub = eq.designEqFitProfile === "deterministic";
+    const normalBankIsProvenValid = isDeterministicStub
+      ? true
+      : (eq.physicalEqAuthorityPassed === true
+        && (eq.bankValidationPassed === true || profileBankAllOk === true));
     const eqBankFails = !normalBankIsProvenValid;
     salvageTriggerDiagnosticsByProfile[baseProfile] = {
       designEqFitProfile: eq.designEqFitProfile,
+      isDeterministicStub,
       physicalEqAuthorityPassed: eq.physicalEqAuthorityPassed,
       bankValidationPassed: eq.bankValidationPassed,
       profileBankAllOk,
