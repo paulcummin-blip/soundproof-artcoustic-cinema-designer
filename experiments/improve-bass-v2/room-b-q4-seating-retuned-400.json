@@ -1,0 +1,236 @@
+{
+  "metadata": {
+    "experiment": "improve-bass-response-v2-read-only-sandbox",
+    "productionCodeModified": false,
+    "generatedAt": "2026-09-06T00:21:28.885Z",
+    "room": "Room B",
+    "quantity": 4,
+    "phase": "seating",
+    "variant": "retuned-400",
+    "model": "SUB2-12",
+    "target": {
+      "p14TargetBasis": "minimum",
+      "p14TargetLevel": 2,
+      "p14TargetDb": 112,
+      "p18TargetBasis": "minimum"
+    },
+    "transitionHz": 162.65
+  },
+  "geometry": {
+    "roomDims": {
+      "widthM": 4,
+      "lengthM": 6.3,
+      "heightM": 2.4
+    },
+    "rspPosition": {
+      "id": "rsp",
+      "x": 2,
+      "y": 3.5,
+      "z": 1.2
+    },
+    "seatingPositions": [
+      {
+        "id": "primary-left",
+        "x": 1,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-centre",
+        "x": 2,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-right",
+        "x": 3,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "secondary-left",
+        "x": 1,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-centre",
+        "x": 2,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-right",
+        "x": 3,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      }
+    ]
+  },
+  "result": {
+    "label": "seat moved 400 mm; polarity/delay/trim retuned",
+    "positions": [
+      {
+        "x": 2,
+        "y": 0.1275,
+        "z": 0.35
+      },
+      {
+        "x": 1.3,
+        "y": 6.1725,
+        "z": 0.35
+      },
+      {
+        "x": 2,
+        "y": 6.1725,
+        "z": 0.35
+      },
+      {
+        "x": 2.7,
+        "y": 6.1725,
+        "z": 0.35
+      }
+    ],
+    "tuning": [
+      {
+        "delayMs": 7.5,
+        "gainDb": 0,
+        "polarity": "normal"
+      },
+      {
+        "delayMs": 0,
+        "gainDb": -1,
+        "polarity": "inverted"
+      },
+      {
+        "delayMs": 10.5,
+        "gainDb": -5.5,
+        "polarity": "inverted"
+      },
+      {
+        "delayMs": 0,
+        "gainDb": 0,
+        "polarity": "normal"
+      }
+    ],
+    "p14": {
+      "db": 119.401,
+      "level": 4,
+      "requestedPass": true
+    },
+    "p18": {
+      "cutoffHz": 17.951,
+      "level": 4,
+      "requestedPass": true
+    },
+    "p19": {
+      "rawDb": 5.351,
+      "level": 1,
+      "worstFrequencyHz": 22.967
+    },
+    "p20": {
+      "rawDb": 16.117,
+      "level": 1,
+      "worstSeat": "secondary-right",
+      "worstFrequencyHz": 91.867
+    },
+    "diagnostic30To60": {
+      "p19RawDb": 3.533,
+      "p19Level": 3,
+      "p19WorstFrequencyHz": 30,
+      "p20RawDb": 15.361,
+      "p20Level": 1,
+      "p20WorstSeat": "secondary-left",
+      "p20WorstFrequencyHz": 41.818
+    },
+    "assessmentBandHz": [
+      17.951,
+      162.65
+    ],
+    "enabledEqFilters": [
+      {
+        "frequencyHz": 89.252,
+        "gainDb": -12.131,
+        "q": 1.0662
+      },
+      {
+        "frequencyHz": 27.709,
+        "gainDb": -12.373,
+        "q": 6.4885
+      },
+      {
+        "frequencyHz": 135.672,
+        "gainDb": 5.15,
+        "q": 2.2405
+      },
+      {
+        "frequencyHz": 24.157,
+        "gainDb": -10.246,
+        "q": 10
+      },
+      {
+        "frequencyHz": 70.329,
+        "gainDb": 3.662,
+        "q": 3
+      },
+      {
+        "frequencyHz": 135.672,
+        "gainDb": 1.62,
+        "q": 4
+      },
+      {
+        "frequencyHz": 53.454,
+        "gainDb": -6.372,
+        "q": 10
+      },
+      {
+        "frequencyHz": 43.044,
+        "gainDb": 3.05,
+        "q": 2.807
+      },
+      {
+        "frequencyHz": 55.02,
+        "gainDb": -2.511,
+        "q": 10
+      },
+      {
+        "frequencyHz": 20.023,
+        "gainDb": -3.675,
+        "q": 10
+      }
+    ],
+    "runtimeMs": 38052.6
+  },
+  "tuning": [
+    {
+      "delayMs": 7.5,
+      "gainDb": 0,
+      "polarity": 0
+    },
+    {
+      "delayMs": 0,
+      "gainDb": -1,
+      "polarity": -1
+    },
+    {
+      "delayMs": 10.5,
+      "gainDb": -5.5,
+      "polarity": -1
+    },
+    {
+      "delayMs": 0,
+      "gainDb": 0,
+      "polarity": 0
+    }
+  ],
+  "directAuthoritativeOffsetMm": 400,
+  "simulationMs": 27941.8,
+  "retuneSearchMs": 1069.3,
+  "totalPhaseRuntimeMs": 67066.2
+}
