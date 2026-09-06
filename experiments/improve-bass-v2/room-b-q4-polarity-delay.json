@@ -1,0 +1,210 @@
+{
+  "metadata": {
+    "experiment": "improve-bass-response-v2-read-only-sandbox",
+    "productionCodeModified": false,
+    "generatedAt": "2026-09-06T00:12:14.535Z",
+    "room": "Room B",
+    "quantity": 4,
+    "phase": "polarity",
+    "variant": "delay",
+    "model": "SUB2-12",
+    "target": {
+      "p14TargetBasis": "minimum",
+      "p14TargetLevel": 2,
+      "p14TargetDb": 112,
+      "p18TargetBasis": "minimum"
+    },
+    "transitionHz": 162.65
+  },
+  "geometry": {
+    "roomDims": {
+      "widthM": 4,
+      "lengthM": 6.3,
+      "heightM": 2.4
+    },
+    "rspPosition": {
+      "id": "rsp",
+      "x": 2,
+      "y": 3.5,
+      "z": 1.2
+    },
+    "seatingPositions": [
+      {
+        "id": "primary-left",
+        "x": 1,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-centre",
+        "x": 2,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-right",
+        "x": 3,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "secondary-left",
+        "x": 1,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-centre",
+        "x": 2,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-right",
+        "x": 3,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      }
+    ]
+  },
+  "result": {
+    "label": "polarity + delay",
+    "positions": [
+      {
+        "x": 2,
+        "y": 0.1275,
+        "z": 0.35
+      },
+      {
+        "x": 1.3,
+        "y": 6.1725,
+        "z": 0.35
+      },
+      {
+        "x": 2,
+        "y": 6.1725,
+        "z": 0.35
+      },
+      {
+        "x": 2.7,
+        "y": 6.1725,
+        "z": 0.35
+      }
+    ],
+    "tuning": [
+      {
+        "delayMs": 16.5,
+        "gainDb": 0,
+        "polarity": "normal"
+      },
+      {
+        "delayMs": 15,
+        "gainDb": 0,
+        "polarity": "inverted"
+      },
+      {
+        "delayMs": 8,
+        "gainDb": 0,
+        "polarity": "inverted"
+      },
+      {
+        "delayMs": 0,
+        "gainDb": 0,
+        "polarity": "inverted"
+      }
+    ],
+    "p14": {
+      "db": 119.67,
+      "level": 4,
+      "requestedPass": true
+    },
+    "p18": {
+      "cutoffHz": 15,
+      "level": 4,
+      "requestedPass": true
+    },
+    "p19": {
+      "rawDb": 4.767,
+      "level": 2,
+      "worstFrequencyHz": 19.879
+    },
+    "p20": {
+      "rawDb": 12.083,
+      "level": 1,
+      "worstSeat": "secondary-left",
+      "worstFrequencyHz": 45.933
+    },
+    "diagnostic30To60": {
+      "p19RawDb": 3.543,
+      "p19Level": 3,
+      "p19WorstFrequencyHz": 30,
+      "p20RawDb": 12.083,
+      "p20Level": 1,
+      "p20WorstSeat": "secondary-left",
+      "p20WorstFrequencyHz": 45.933
+    },
+    "assessmentBandHz": [
+      15,
+      162.65
+    ],
+    "enabledEqFilters": [
+      {
+        "frequencyHz": 128.985,
+        "gainDb": -8.082,
+        "q": 1.6018
+      }
+    ],
+    "runtimeMs": 54530.2
+  },
+  "simulationMs": 29014.6,
+  "searchRuntimeMs": 1169.7,
+  "combinations": {
+    "polarity": 8,
+    "polarityDelay": 16,
+    "polarityDelayTrim": 14
+  },
+  "selectedSearch": {
+    "pattern": [
+      1,
+      -1,
+      -1,
+      -1
+    ],
+    "tuning": [
+      {
+        "delayMs": 16.5,
+        "gainDb": 0,
+        "polarity": 0
+      },
+      {
+        "delayMs": 15,
+        "gainDb": 0,
+        "polarity": -1
+      },
+      {
+        "delayMs": 8,
+        "gainDb": 0,
+        "polarity": -1
+      },
+      {
+        "delayMs": 0,
+        "gainDb": 0,
+        "polarity": -1
+      }
+    ],
+    "proxy": {
+      "score": 77.06241365033081,
+      "rspPeakToPeakDb": 28.029901127195004,
+      "worstSeatDifferenceDb": 24.516256261567904,
+      "worstSeat": "primary-left",
+      "worstFrequencyHz": 123.51626839721902
+    }
+  },
+  "totalPhaseRuntimeMs": 84716.6
+}
