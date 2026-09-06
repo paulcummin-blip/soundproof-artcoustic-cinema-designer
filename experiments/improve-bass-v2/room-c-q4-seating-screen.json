@@ -1,0 +1,141 @@
+{
+  "metadata": {
+    "experiment": "improve-bass-response-v2-read-only-sandbox",
+    "productionCodeModified": false,
+    "generatedAt": "2026-09-06T00:55:00.188Z",
+    "room": "Room C",
+    "quantity": 4,
+    "phase": "seating",
+    "variant": "screen",
+    "model": "SUB2-12",
+    "target": {
+      "p14TargetBasis": "minimum",
+      "p14TargetLevel": 2,
+      "p14TargetDb": 112,
+      "p18TargetBasis": "minimum"
+    },
+    "transitionHz": 128.3
+  },
+  "geometry": {
+    "roomDims": {
+      "widthM": 4.8,
+      "lengthM": 7.5,
+      "heightM": 2.7
+    },
+    "rspPosition": {
+      "id": "rsp",
+      "x": 2.4,
+      "y": 4,
+      "z": 1.2
+    },
+    "seatingPositions": [
+      {
+        "id": "primary-left",
+        "x": 1.2,
+        "y": 4,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-centre",
+        "x": 2.4,
+        "y": 4,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-right",
+        "x": 3.6,
+        "y": 4,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "secondary-left",
+        "x": 1.2,
+        "y": 5.6,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-centre",
+        "x": 2.4,
+        "y": 5.6,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-right",
+        "x": 3.6,
+        "y": 5.6,
+        "z": 1.2,
+        "priority": "secondary"
+      }
+    ]
+  },
+  "result": null,
+  "search": {
+    "runtimeMs": 58572.3,
+    "coarseCount": 11,
+    "refineCount": 6,
+    "bestOffsetMm": -50,
+    "top": [
+      {
+        "offsetM": -0.05,
+        "proxy": {
+          "score": 45.8861869056074,
+          "rspPeakToPeakDb": 15.338589690234343,
+          "worstSeatDifferenceDb": 15.27379860768653,
+          "worstSeat": "secondary-left",
+          "worstFrequencyHz": 23.133162381119114
+        },
+        "screeningMs": 3288
+      },
+      {
+        "offsetM": 0,
+        "proxy": {
+          "score": 45.983118350569,
+          "rspPeakToPeakDb": 13.195473975776324,
+          "worstSeatDifferenceDb": 16.39382218739634,
+          "worstSeat": "secondary-left",
+          "worstFrequencyHz": 23.133162381119114
+        },
+        "screeningMs": 3442.2
+      },
+      {
+        "offsetM": 0.05,
+        "proxy": {
+          "score": 47.4392753972928,
+          "rspPeakToPeakDb": 13.032509907243067,
+          "worstSeatDifferenceDb": 17.203382745024868,
+          "worstSeat": "secondary-left",
+          "worstFrequencyHz": 23.133162381119114
+        },
+        "screeningMs": 3494.7
+      },
+      {
+        "offsetM": 0.1,
+        "proxy": {
+          "score": 48.26530964842567,
+          "rspPeakToPeakDb": 13.156985653937397,
+          "worstSeatDifferenceDb": 17.554161997244137,
+          "worstSeat": "secondary-left",
+          "worstFrequencyHz": 23.133162381119114
+        },
+        "screeningMs": 3129.3
+      },
+      {
+        "offsetM": -0.4,
+        "proxy": {
+          "score": 49.32163805543654,
+          "rspPeakToPeakDb": 17.418165368606125,
+          "worstSeatDifferenceDb": 15.951736343415206,
+          "worstSeat": "secondary-left",
+          "worstFrequencyHz": 65.43046395991546
+        },
+        "screeningMs": 3326.6
+      }
+    ]
+  },
+  "totalPhaseRuntimeMs": 58574.1
+}
