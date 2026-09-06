@@ -489,7 +489,7 @@ try {
     };
   }
 
-  function searchSeatBlock(finalist, fixedTuning) {
+  function searchSeatBlock(finalist, fixedTuning, confirmBest = true) {
     const started = now();
     const physicalSources = finalist.sources.map((source, index) => ({
       id: "seat-screen-" + index,
@@ -535,11 +535,13 @@ try {
       if (entry) refined.push(entry);
     }
     const ranked = [...coarse, ...refined].sort((a, b) => a.proxy.score - b.proxy.score);
-    const placement = simulatePlacement(finalist, movedGeometry(ranked[0].offsetM));
+    const placement = confirmBest
+      ? simulatePlacement(finalist, movedGeometry(ranked[0].offsetM))
+      : null;
     const best = {
       ...ranked[0],
-      raw: placement.raw,
-      simulationMs: placement.runtimeMs,
+      raw: placement?.raw || null,
+      simulationMs: placement?.runtimeMs || 0,
     };
     return {
       best,
@@ -701,23 +703,41 @@ try {
   }
 
   if (phase === "seating") {
-    const directMatch = variant.match(/^retuned-(-?\d+)$/);
+    if (variant === "screen") {
+      const search = searchSeatBlock(trustedFinalist, savedTuning, false);
+      savePhase({
+        result: null,
+        search: {
+          runtimeMs: round(search.runtimeMs, 1),
+          coarseCount: search.coarseCount,
+          refineCount: search.refineCount,
+          bestOffsetMm: round(search.best.offsetM * 1000, 0),
+          top: search.top,
+        },
+      });
+      await server.close();
+      process.exit(0);
+    }
+
+    const directMatch = variant.match(/^(fixed|retuned)-(-?\d+)$/);
     if (directMatch) {
-      const offsetMm = Number(directMatch[1]);
+      const directKind = directMatch[1];
+      const offsetMm = Number(directMatch[2]);
       const placement = simulatePlacement(trustedFinalist, movedGeometry(offsetMm / 1000));
-      const retune = searchPolarity(placement.raw);
-      const tuning = retune.best.polarityDelayTrim.tuning;
+      const retune = directKind === "retuned" ? searchPolarity(placement.raw) : null;
+      const tuning = retune ? retune.best.polarityDelayTrim.tuning : savedTuning;
       const result = canonical(
         placement.raw,
         tuning,
-        "seat moved " + offsetMm + " mm; polarity/delay/trim retuned",
+        "seat moved " + offsetMm + " mm; "
+          + (retune ? "polarity/delay/trim retuned" : "fixed prior tuning"),
       );
       savePhase({
         result,
         tuning,
         directAuthoritativeOffsetMm: offsetMm,
         simulationMs: round(placement.runtimeMs, 1),
-        retuneSearchMs: round(retune.runtimeMs, 1),
+        retuneSearchMs: round(retune?.runtimeMs || 0, 1),
       });
       await server.close();
       process.exit(0);
