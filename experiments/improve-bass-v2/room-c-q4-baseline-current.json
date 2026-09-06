@@ -2,7 +2,7 @@
   "metadata": {
     "experiment": "improve-bass-response-v2-read-only-sandbox",
     "productionCodeModified": false,
-    "generatedAt": "2026-09-06T00:41:02.843Z",
+    "generatedAt": "2026-09-06T01:24:07.917Z",
     "room": "Room C",
     "quantity": 4,
     "phase": "baseline",
@@ -153,6 +153,82 @@
       15,
       128.3
     ],
+    "perSeatP19": [
+      {
+        "seatId": "primary-left",
+        "variationDbRaw": 5.169,
+        "level": 1,
+        "worstFrequencyHz": 22.967
+      },
+      {
+        "seatId": "primary-centre",
+        "variationDbRaw": 5.169,
+        "level": 1,
+        "worstFrequencyHz": 22.967
+      },
+      {
+        "seatId": "primary-right",
+        "variationDbRaw": 5.169,
+        "level": 1,
+        "worstFrequencyHz": 22.967
+      },
+      {
+        "seatId": "secondary-left",
+        "variationDbRaw": 20.014,
+        "level": 0,
+        "worstFrequencyHz": 47.622
+      },
+      {
+        "seatId": "secondary-centre",
+        "variationDbRaw": 19.682,
+        "level": 0,
+        "worstFrequencyHz": 46.939
+      },
+      {
+        "seatId": "secondary-right",
+        "variationDbRaw": 20.014,
+        "level": 0,
+        "worstFrequencyHz": 47.622
+      }
+    ],
+    "perSeatP20": [
+      {
+        "seatId": "primary-left",
+        "variationDbRaw": 0.445,
+        "level": 4,
+        "worstFrequencyHz": 123.516
+      },
+      {
+        "seatId": "primary-centre",
+        "variationDbRaw": 0,
+        "level": 4,
+        "worstFrequencyHz": 91.206
+      },
+      {
+        "seatId": "primary-right",
+        "variationDbRaw": 0.445,
+        "level": 4,
+        "worstFrequencyHz": 123.516
+      },
+      {
+        "seatId": "secondary-left",
+        "variationDbRaw": 20.946,
+        "level": 1,
+        "worstFrequencyHz": 47.622
+      },
+      {
+        "seatId": "secondary-centre",
+        "variationDbRaw": 20.586,
+        "level": 1,
+        "worstFrequencyHz": 46.939
+      },
+      {
+        "seatId": "secondary-right",
+        "variationDbRaw": 20.946,
+        "level": 1,
+        "worstFrequencyHz": 47.622
+      }
+    ],
     "enabledEqFilters": [
       {
         "frequencyHz": 45.275,
@@ -200,8 +276,8 @@
         "q": 10
       }
     ],
-    "runtimeMs": 24324.8
+    "runtimeMs": 24358.6
   },
-  "simulationMs": 44595.3,
-  "totalPhaseRuntimeMs": 68921.9
+  "simulationMs": 46524.1,
+  "totalPhaseRuntimeMs": 70884.6
 }
