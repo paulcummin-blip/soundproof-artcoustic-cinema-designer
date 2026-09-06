@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Project } from '@/entities/Project';
+import { Project } from '@/api/entities/Project';
 import { Button } from '@/components/ui/button';
 import { Printer, Download, Users, Volume2, AlertTriangle } from 'lucide-react';
 import PlanViewDrawing from '../components/report/PlanViewDrawing';
