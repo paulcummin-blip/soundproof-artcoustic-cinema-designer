@@ -29,8 +29,16 @@ import { selectAuthoritativeFinalist, hasPrimarySeatRegression, detectMutedSubs 
 import { getCachedRawTransfersForFingerprint } from "../stage2/stage2RawTransferCache.js";
 import { normaliseModelKey } from "../../../utils/modelKeyNormaliser.js";
 import { computeV2DesignFingerprint, isCurrentAuthorityNonStale } from "./improveBassV2Fingerprint.js";
+import { runInWorker, isFatalLifecycleError, V2RunTimeoutError } from "./improveBassV2WorkerLifecycle.js";
+import { V2RuntimeMetrics } from "./improveBassV2RuntimeMetrics.js";
+import { subscribeImproveBassV2, getImproveBassV2State } from "./improveBassV2Store.js";
 
 const MAX_CHALLENGERS = 3;
+
+// TODO: replace with measured production threshold after Room B/C browser
+// runtime validation. 5 min is a deliberately generous provisional ceiling
+// that should not interfere with normal browser measurements.
+const V2_WHOLE_RUN_TIMEOUT_MS_PROVISIONAL = 300000;
 const YIELD_DELAY_MS = 0;
 
 // Scoring band for proxy P19 (worst-seat peak-to-peak). Matches the tuning
@@ -213,20 +221,8 @@ function isSamePlacement(finalist, currentFinalist, roomDims) {
 // Worker helper
 // ---------------------------------------------------------------------------
 
-function runInWorker(worker, phase, params) {
-  return new Promise((resolve, reject) => {
-    const requestId = `${phase}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
-    const handler = (event) => {
-      const data = event.data || {};
-      if (data.requestId !== requestId) return;
-      worker.removeEventListener("message", handler);
-      if (data.type === "complete") resolve(data.result);
-      else reject(new Error(data.error || "Worker failed"));
-    };
-    worker.addEventListener("message", handler);
-    worker.postMessage({ requestId, phase, ...params });
-  });
-}
+// runInWorker is imported from improveBassV2WorkerLifecycle.js — it provides
+// cancellation, per-call watchdog, and single-settlement guarantee.
 
 function yieldToUI() {
   return new Promise((resolve) => setTimeout(resolve, YIELD_DELAY_MS));
@@ -533,6 +529,38 @@ export async function runImproveBassV2(projectId, params, callbacks) {
 
   const worker = new Worker(new URL("./improveBassV2.worker.js", import.meta.url), { type: "module" });
 
+  // ── Run-owned AbortController (interruption mechanism) ──────────────────
+  // The store remains the write authority for cancellation. The AbortController
+  // is only the run-local interruption mechanism — it provides immediate worker
+  // termination when the user cancels or the whole-run deadline expires.
+  // Stale detection remains completely separate (isStale does NOT check signal).
+  const controller = new AbortController();
+  const metrics = new V2RuntimeMetrics(projectId);
+
+  // Subscribe to the V2 store for this project. When cancelRequested becomes
+  // true, abort the controller immediately (synchronous — same call stack as
+  // the user's click). Unsubscribe in finally.
+  const storeListener = () => {
+    const st = getImproveBassV2State(projectId);
+    if (st?.cancelRequested === true && !controller.signal.aborted) {
+      controller.abort();
+    }
+  };
+  const unsubscribe = subscribeImproveBassV2(storeListener);
+
+  // Whole-run elapsed timer. Uses the same AbortController as the interruption
+  // mechanism, but with a distinct V2RunTimeoutError reason so the engine can
+  // classify it as canonical error, not cancelled.
+  // TODO: replace with measured production threshold after Room B/C browser
+  // runtime validation.
+  let wholeRunTimer = setTimeout(() => {
+    if (!controller.signal.aborted) {
+      controller.abort(new V2RunTimeoutError(
+        `V2 whole-run exceeded ${V2_WHOLE_RUN_TIMEOUT_MS_PROVISIONAL}ms provisional limit`,
+      ));
+    }
+  }, V2_WHOLE_RUN_TIMEOUT_MS_PROVISIONAL);
+
   const startFingerprint = computeV2DesignFingerprint({
     subwooferInstances, roomDims, seatingPositions, rspPosition,
     selectedSubModel, p14TargetBasis, p14TargetLevel, p14TargetDb,
@@ -561,6 +589,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     const existingAuthority = authorityNonStale
       ? extractAuthorityForComparison(currentAuthority)
       : null;
+    metrics.recordCurrentReuse(authorityNonStale);
 
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot };
@@ -580,15 +609,21 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       onProgress("testing_positions", `Testing practical positions (${i + 1}/${candidates.length})`, i, candidates.length);
       if (!candidates[i].rawTransfer) {
         try {
+          const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
           candidates[i].rawTransfer = await runInWorker(worker, "placement", {
             finalist: candidates[i].finalist,
             roomDims, rspPosition, seatingPositions,
             selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
-          });
+          }, controller.signal);
+          metrics.recordWorkerCall("placement", candidates[i].id,
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
         } catch (err) {
+          if (isFatalLifecycleError(err)) throw err;
           candidates[i].rawTransfer = null;
           candidates[i].error = err.message;
         }
+      } else {
+        metrics.recordStage2TransferReused();
       }
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
       await yieldToUI();
@@ -600,7 +635,10 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     for (let i = 0; i < candidates.length; i++) {
       if (isCancelled()) return { status: "cancelled", snapshot };
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
+      const _proxyT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
       candidates[i].proxyResult = runProxySearch(candidates[i]);
+      metrics.recordProxySearch(candidates[i].id,
+        (typeof performance !== "undefined" ? performance.now() : Date.now()) - _proxyT0);
       onProgress("optimising_timing", `Optimising timing (${i + 1}/${candidates.length})`, i + 1, candidates.length);
       await yieldToUI();
     }
@@ -651,11 +689,16 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           }
           // If no cached transfer, run the worker for Current's placement
           if (!currentRawTransfer) {
+            const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
             currentRawTransfer = await runInWorker(worker, "placement", {
               finalist: currentFinalist,
               roomDims, rspPosition, seatingPositions,
               selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
-            });
+            }, controller.signal);
+            metrics.recordWorkerCall("placement", "current",
+              (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
+          } else {
+            metrics.recordStage2TransferReused();
           }
           if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
 
@@ -666,12 +709,15 @@ export async function runImproveBassV2(projectId, params, callbacks) {
             polarity: Number(t.polarity) || 0,
           }));
 
+          const _confirmT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
           const currentConfirmation = await runInWorker(worker, "confirmation", {
             rawTransfer: currentRawTransfer,
             tuning: installedTuning,
             tuningVariant: "delay-polarity-trim",
             p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
-          });
+          }, controller.signal);
+          metrics.recordWorkerCall("confirmation", "current",
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _confirmT0, false);
           if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
 
           // BLOCKER 4: null result → treat as missing, not blank complete
@@ -683,6 +729,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           }
         }
       } catch (err) {
+        if (isFatalLifecycleError(err)) throw err;
         // Current confirmation failed — continue with challengers only.
         // The existing authority (if any) will be used as fallback.
       }
@@ -694,12 +741,15 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
       try {
+        const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
         const result = await runInWorker(worker, "confirmation", {
           rawTransfer: promoted[i].rawTransfer,
           tuning: promoted[i].proxyResult?.tuning,
           tuningVariant: "delay-polarity-trim",
           p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
-        });
+        }, controller.signal);
+        metrics.recordWorkerCall("confirmation", promoted[i].id,
+          (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
         if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
         // BLOCKER 4: null worker result → skip, do NOT add as blank
         if (result) {
@@ -707,9 +757,11 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           result.isCurrent = false;
           result.appliedTuning = promoted[i].proxyResult?.tuning;
           confirmedResults.push(result);
+          metrics.recordChallengerConfirmed();
           onBestSoFar({ result, candidate: promoted[i] });
         }
       } catch (err) {
+        if (isFatalLifecycleError(err)) throw err;
         // Challenger confirmation failed — skip it, continue with others
       }
       onProgress("confirming", `Confirming best options (${i + 1 + (authorityNonStale ? 0 : 1)}/${promoted.length + (authorityNonStale ? 0 : 1)})`, i + 1 + (authorityNonStale ? 0 : 1), promoted.length + (authorityNonStale ? 0 : 1));
@@ -744,9 +796,19 @@ export async function runImproveBassV2(projectId, params, callbacks) {
 
     return { status: "complete", selection, snapshot, confirmedResults };
   } catch (error) {
+    // AbortError = user cancellation → canonical cancelled.
+    // V2RunTimeoutError / V2TimeoutError / generic Error → canonical error.
+    if (error?.name === "AbortError") {
+      return { status: "cancelled", snapshot: null };
+    }
     return { status: "error", error: error.message, snapshot: null };
   } finally {
-    worker.terminate();
+    // ── Cleanup: no leaked timer, listener, subscription, or worker ────────
+    unsubscribe();
+    if (wholeRunTimer) { clearTimeout(wholeRunTimer); wholeRunTimer = null; }
+    metrics.finish();
+    metrics.logReport();
+    try { worker.terminate(); } catch { /* idempotent on already-terminated worker */ }
   }
 }
 
