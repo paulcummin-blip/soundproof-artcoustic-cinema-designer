@@ -20,7 +20,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import BassTargetLevelControl from "@/components/room/bass/BassTargetLevelControl";
 import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
-import { buildNormalizedSeries } from "@/components/room/bass/normalizedSeriesBuilder";
 import { buildBassGraphSeries, detailedEqStatusText } from "@/components/room/bass/bassGraphDomainBuilder";
 import { usePublishBestSubLayoutInputs } from "@/components/room/bass/best-layout/usePublishBestSubLayoutInputs";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -339,11 +338,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // the graph and optimiser consume one calculation for the current geometry.
   usePublishBestSubLayoutInputs({ contextId: layoutContextId, physicsOptions: normalizedPhysicsOptions });
 
-  // Normalized RSP series for the live, pre-calibration room-response display.
-  // Phase 2B: label reflects the two-stage quality (preview / refining / refined).
+  // Stage 4: Consume the canonical Room Response from the finished
+  // authoritative graph output (persisted or freshly calculated). This is
+  // the single consistent graph representation — no normalized graph-only
+  // worker is started solely to regenerate this curve.
+  const canonicalRoomResponseCurve = optimisationResult?.finalOptimisedBassResponse?.roomResponseCurve;
   const normalizedSeries = useMemo(
-    () => buildNormalizedSeries(normalizedLive.result?.rspCurve, normalizedLive.quality, normalizedLive.isRefining),
-    [normalizedLive.result, normalizedLive.quality, normalizedLive.isRefining]
+    () => {
+      const curve = Array.isArray(canonicalRoomResponseCurve) && canonicalRoomResponseCurve.length
+        ? canonicalRoomResponseCurve
+        : null;
+      return curve ? { data: curve } : null;
+    },
+    [canonicalRoomResponseCurve]
   );
 
   // Graph readiness: a valid persisted graphPayload (structurally complete,
@@ -398,6 +405,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     if (series.kind === "raw") return false;
     return true;
   }), [multiSeriesForGraph, curveVisibility]);
+
+  // Stage 5: Derive actual layer availability from the built graph series.
+  // Selection (visibility) is separate from availability. A layer that has
+  // no corresponding series in the built graph is unavailable — the control
+  // must not imply a valid selected layer exists when the series is absent.
+  const layerAvailability = useMemo(() => {
+    const available = {};
+    for (const series of multiSeriesForGraph) {
+      if (!series?.data?.length) continue;
+      if (series.kind === "room-response") available.room = true;
+      else if (series.kind === "product-maximum") available.product = true;
+      else if (series.kind === "maximum-spl") available.combined = true;
+      else if (series.kind === "house-curve" || series.kind === "normalized-target") available.house = true;
+      else if (series.kind === "post-eq" || series.kind === "real-seat-overlay") available.finalEq = true;
+    }
+    return available;
+  }, [multiSeriesForGraph]);
 
   const rp22GraphMarkers = useMemo(
     () => buildRp22GraphMarkers(finalBassResponse),
@@ -729,6 +753,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
         <BassCurveVisibilityControls
           visibility={curveVisibility}
+          availability={layerAvailability}
           onChange={setCurveVisibility}
         />
 

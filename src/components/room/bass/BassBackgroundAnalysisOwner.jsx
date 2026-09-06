@@ -101,6 +101,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     roomDims, seatingPositions, rspPosition, sources, rspRawCurve, perSeatRawCurves,
     designEqSystemLimits, optimisationTransitionHz, requested, fingerprintInputs,
     fingerprints, payload: basePayload, inputsValid: baseInputsValid, includeDiagnostics,
+    canonicalRoomResponseCurve,
   } = authoritative;
   const calibrationFingerprint = fingerprints?.calibration ?? null;
   const normalizedPhysicsOptions = useNormalizedPhysicsOptions(authoritative);
@@ -434,7 +435,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         ? { ...selected.selectionDiagnostics, heavyPoolReused }
         : selected.selectionDiagnostics,
     };
-    const canonicalResult = buildFinalOptimisedBassResponse({ optimisationResult: baseResult, selectedLayout: sources });
+    const canonicalResult = buildFinalOptimisedBassResponse({ optimisationResult: baseResult, selectedLayout: sources, roomResponseCurve: canonicalRoomResponseCurve });
     const authority = evaluateCanonicalBassAuthority({
       canonicalResult,
       activeSubs: sources,
@@ -467,7 +468,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       resultSchemaVersion: matchingResult.resultSchemaVersion || null,
       metricSchemaVersion: matchingResult.metricSchemaVersion || null,
     } : null;
-    const finalOptimisedBassResponse = buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources });
+    const finalOptimisedBassResponse = buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources, roomResponseCurve: canonicalRoomResponseCurve });
     // C6.1B2 Gap 1: completedContractFingerprint MUST come from the completed
     // contract/store, NOT from the current request cacheKey.
     //   activeRequestFingerprint    = cacheKey (the current request fingerprint)

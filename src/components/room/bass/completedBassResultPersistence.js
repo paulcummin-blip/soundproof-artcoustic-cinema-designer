@@ -336,6 +336,9 @@ function buildGraphPayload(contract) {
     correctionStartHz: Number.isFinite(finalResponse.correctionStartHz) ? finalResponse.correctionStartHz : null,
     correctionEndHz: Number.isFinite(finalResponse.correctionEndHz) ? finalResponse.correctionEndHz : null,
     designEqFitProfile: candidate?.designEqFitProfile || null,
+    // Canonical unsmoothed flat-reference Room Response — carried through
+    // compaction so the finished graph restores on cold reopen.
+    roomResponseCurve: cloneCurve(finalResponse.roomResponseCurve),
   };
 }
 

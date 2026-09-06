@@ -74,6 +74,10 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
     finalSeatVariationData,
     assessmentStartHz: envelope?.assessmentStartHz ?? null,
     assessmentEndHz: envelope?.assessmentEndHz ?? null,
+    // Canonical Room Response restored from the persisted graph payload.
+    // Empty when the persisted contract predates this field (graceful
+    // degradation — the layer shows as unavailable, not stale).
+    roomResponseCurve: Array.isArray(gp.roomResponseCurve) ? gp.roomResponseCurve.map((p) => ({ ...p })) : [],
     // Graph-source identity fields consumed by buildGraphSourceIdentity
     // are recomputed above (postEqCurveSignature, filterBankSignature).
   };

@@ -13,6 +13,7 @@ import {
   getPerSubwooferAmplifierAuthority,
 } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "./authoritativeRspPosition";
+import { buildCanonicalRoomResponse, canonicalRoomResponseCurve as extractRoomResponseCurve } from "./buildCanonicalRoomResponse";
 
 const POSITION_LABELS = ["left", "right"];
 const EMPTY_SIMULATION_RESULT = Object.freeze({
@@ -317,6 +318,19 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       : [],
     [simulationResults],
   );
+  // Stage 1: Build the canonical unsmoothed flat-reference Room Response
+  // from the already-calculated perSourceRspComplexTransfers. Zero acoustic
+  // cost — combination only (~1 ms). This is the same 360-point, 15–200 Hz
+  // curve the legacy normalized engine produced, built from the same
+  // flat-source transfers the authoritative engine already computes.
+  const canonicalRoomResponseResult = useMemo(
+    () => buildCanonicalRoomResponse(perSourceRspComplexTransfers),
+    [perSourceRspComplexTransfers],
+  );
+  const canonicalRoomResponseCurve = useMemo(
+    () => extractRoomResponseCurve(canonicalRoomResponseResult),
+    [canonicalRoomResponseResult],
+  );
   const { rspRawCurve, perSeatRawCurves } = useMemo(() => {
     if (!simulationResults) return { rspRawCurve: [], perSeatRawCurves: [] };
     return buildAuthoritativeResponseCurves(simulationResults.seatResponses);
@@ -396,6 +410,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     roomDims, seatingPositions, splConfig, rspPosition, sources, subsForSimulation: sources, simulationResults,
     frontSubsLive, rearSubsLive,
     rspRawCurve, perSeatRawCurves, perSourceRspComplexTransfers,
+    canonicalRoomResponseCurve,
     designEqSystemLimits, optimisationTransitionHz, requested,
     fingerprintInputs, fingerprints, payload, inputsValid, physics, runSimulation,
     autoAlignEnabled, setAutoAlignEnabled, autoAlignDelays, roomDamping, setRoomDamping,

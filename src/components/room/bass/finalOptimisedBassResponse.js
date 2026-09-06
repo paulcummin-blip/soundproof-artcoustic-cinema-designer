@@ -2,7 +2,7 @@ import { buildCurveSignature, buildFilterBankSignature } from "@/components/room
 
 const cloneCurve = (curve) => (Array.isArray(curve) ? curve.map((point) => ({ ...point })) : []);
 
-export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLayout = [] }) {
+export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLayout = [], roomResponseCurve = null }) {
   const candidate = optimisationResult?.selectedCandidate;
   if (!candidate?.candidateId || !Array.isArray(candidate.finalPostEqCurve) || !candidate.finalPostEqCurve.length) return null;
 
@@ -108,6 +108,11 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     assessmentEndHz: candidate.assessmentEndHz ?? null,
     correctionStartHz: candidate.correctionStartHz ?? null,
     correctionEndHz: candidate.correctionEndHz ?? null,
+    // Canonical unsmoothed flat-reference Room Response — built from the
+    // already-calculated perSourceRspComplexTransfers during authoritative
+    // preparation. Persisted in the graph payload and hydrated on cold
+    // reopen so the graph renders without a new acoustic calculation.
+    roomResponseCurve: Array.isArray(roomResponseCurve) ? cloneCurve(roomResponseCurve) : [],
   };
 }
 

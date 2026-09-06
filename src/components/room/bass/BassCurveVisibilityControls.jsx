@@ -16,7 +16,7 @@ const CURVES = Object.freeze([
   { key: "finalEq", label: "Final EQ response", color: "#16A34A", dash: null },
 ]);
 
-export default function BassCurveVisibilityControls({ visibility, onChange }) {
+export default function BassCurveVisibilityControls({ visibility, availability, onChange }) {
   const setVisible = (key, nextValue) => {
     onChange?.({ ...DEFAULT_BASS_CURVE_VISIBILITY, ...(visibility || {}), [key]: nextValue });
   };
@@ -39,14 +39,17 @@ export default function BassCurveVisibilityControls({ visibility, onChange }) {
         Graph layers
       </legend>
       {CURVES.map((curve) => {
+        const isAvailable = availability?.[curve.key] === true;
         const checked = visibility?.[curve.key] !== false;
         return (
           <button
             key={curve.key}
             type="button"
             role="checkbox"
-            aria-checked={checked}
-            onClick={() => setVisible(curve.key, !checked)}
+            aria-checked={isAvailable ? checked : false}
+            aria-disabled={!isAvailable}
+            disabled={!isAvailable}
+            onClick={() => isAvailable && setVisible(curve.key, !checked)}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -54,14 +57,16 @@ export default function BassCurveVisibilityControls({ visibility, onChange }) {
               height: 28,
               padding: "0 10px",
               borderRadius: 999,
-              border: checked ? "1px solid #A8A39C" : "1px solid #DCDBD6",
-              background: checked ? "#FFFFFF" : "#F1F0EE",
-              color: checked ? "#1B1A1A" : "#8B7F76",
+              border: !isAvailable
+                ? "1px solid #E5E3DF"
+                : checked ? "1px solid #A8A39C" : "1px solid #DCDBD6",
+              background: !isAvailable ? "#F1F0EE" : checked ? "#FFFFFF" : "#F1F0EE",
+              color: !isAvailable ? "#B5B0A8" : checked ? "#1B1A1A" : "#8B7F76",
               fontSize: 10,
               fontFamily: "monospace",
-              fontWeight: checked ? 700 : 400,
-              cursor: "pointer",
-              opacity: checked ? 1 : 0.7,
+              fontWeight: !isAvailable ? 400 : checked ? 700 : 400,
+              cursor: isAvailable ? "pointer" : "not-allowed",
+              opacity: isAvailable ? (checked ? 1 : 0.7) : 0.45,
             }}
           >
             <svg width="26" height="8" aria-hidden="true">
@@ -70,13 +75,15 @@ export default function BassCurveVisibilityControls({ visibility, onChange }) {
                 y1="4"
                 x2="26"
                 y2="4"
-                stroke={checked ? curve.color : "#A8A39C"}
+                stroke={!isAvailable ? "#D9D5CE" : checked ? curve.color : "#A8A39C"}
                 strokeWidth="2"
                 strokeDasharray={curve.dash || undefined}
               />
             </svg>
             <span>{curve.label}</span>
-            <span aria-hidden="true" style={{ fontSize: 11 }}>{checked ? "✓" : "○"}</span>
+            <span aria-hidden="true" style={{ fontSize: 11 }}>
+              {!isAvailable ? "—" : checked ? "✓" : "○"}
+            </span>
           </button>
         );
       })}
