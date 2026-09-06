@@ -645,6 +645,22 @@ try {
       quantity,
     });
     const stage1RuntimeMs = now() - stage1Started;
+    if (variant === "screen") {
+      savePhase({
+        result: null,
+        stage1: {
+          runtimeMs: round(stage1RuntimeMs, 1),
+          candidateCount: stage1.candidateCount,
+          finalists: stage1.finalists.map((entry) => ({
+            id: entry.id,
+            familyId: entry.familyId,
+            positions: entry.sources.map((source) => ({ x: source.x, y: source.y })),
+          })),
+        },
+      });
+      await server.close();
+      process.exit(0);
+    }
     const finalist = stage1.finalists[0];
     const placement = simulatePlacement(finalist);
     const tuningSearch = bestExistingTuning(placement.raw);
