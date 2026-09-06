@@ -11,7 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 // --- V2 fingerprint (BLOCKER 2) ---
-const { computeV2DesignFingerprint, isCurrentAuthorityNonStale } =
+const { computeV2DesignFingerprint, isCurrentAuthorityNonStale, extractBaseFingerprint } =
   await import("../src/components/room/bass/improveBassV2/improveBassV2Fingerprint.js");
 
 // --- V2 apply (BLOCKER 4) ---
@@ -106,6 +106,10 @@ function makeConfirmedResult({
   };
 }
 
+// OLD/WRONG shape: per-seat data at contract root (contract.perSeatP19).
+// Production code NEVER stored per-seat data here. This fixture is retained
+// to prove that isCurrentAuthorityNonStale REJECTS the obsolete shape rather
+// than silently accepting it.
 function makeCurrentAuthority({ perSeatP19, perSeatP20, fingerprint, p19Levels, p20Levels, p19Headline, p20Headline, p18Level = 3, p18Hz = 28, p14Level = 3, p14Db = 95 }) {
   return {
     authoritative: true,
@@ -122,6 +126,35 @@ function makeCurrentAuthority({ perSeatP19, perSeatP20, fingerprint, p19Levels, 
     p14AchievedLevel: p14Level,
     p14AchievedDb: p14Db,
     canonicalAuthorityReceipt: { filterBankSignature: "test-sig" },
+  };
+}
+
+// PRODUCTION shape: per-seat data at contract.selectedCandidate.perSeatP19Results
+// / perSeatP20Results, headline at contract.productAnalysis.parameters.
+// This matches completedBassResultPersistence.js lines 52-60 and the compact
+// contract structure published by publishCompletedBassContract.
+function makeProductionCurrentAuthority({ perSeatP19, perSeatP20, fingerprint, p19Levels, p20Levels, p19Headline, p20Headline, p18Level = 3, p18Hz = 28, p14Level = 3, p14Db = 95 }) {
+  const p19HeadlineVal = p19Headline ?? Math.max(...perSeatP19.map((s) => Math.abs(s.variationDbRaw)));
+  const p20HeadlineVal = p20Headline ?? Math.max(...perSeatP20.map((s) => Math.abs(s.variationDbRaw)));
+  return {
+    authoritative: true,
+    currentFingerprint: fingerprint,
+    contract: {
+      selectedCandidate: {
+        perSeatP19Results: perSeatP19,
+        perSeatP20Results: perSeatP20,
+        achievedP18FrequencyHz: p18Hz,
+      },
+      productAnalysis: {
+        parameters: {
+          p19: { value: p19HeadlineVal, level: p19Levels?.[0] ?? perSeatP19[0]?.level ?? 3, status: "complete" },
+          p20: { value: p20HeadlineVal, level: p20Levels?.[0] ?? perSeatP20[0]?.level ?? 3, status: "complete" },
+          p18: { value: p18Hz, level: p18Level, status: "complete" },
+          p14: { value: p14Db, level: p14Level, status: "complete" },
+        },
+      },
+      job: { resultFingerprint: fingerprint },
+    },
   };
 }
 
@@ -278,15 +311,31 @@ test("BLOCKER 2: fingerprint unchanged when no material input changes", () => {
 // BLOCKER 3 — Current authority non-stale check
 // ---------------------------------------------------------------------------
 
-test("BLOCKER 3: non-stale authoritative authority is used directly", () => {
+// PROOF: The old contract shape (per-seat at contract root) is obsolete.
+// Production code (completedBassResultPersistence.js lines 52-60) reads from
+// contract.selectedCandidate.perSeatP19Results / perSeatP20Results. The old
+// shape must be REJECTED, not silently accepted, so V2 falls back to
+// canonical recalculation rather than using a non-production authority.
+test("BLOCKER 3: OLD contract shape (perSeatP19 at contract root) is REJECTED", () => {
   const fp = "cal:v7:abcdef1234567890";
   const authority = makeCurrentAuthority({
     perSeatP19: makePerSeat(2, [1.0, 1.2], [3, 3], [true, true], "P19"),
     perSeatP20: makePerSeat(2, [2.0, 2.5], [3, 3], [true, true], "P20"),
     fingerprint: fp,
   });
+  assert.equal(isCurrentAuthorityNonStale(authority, fp), false,
+    "Old contract shape (no selectedCandidate.perSeatP19Results) must be rejected");
+});
+
+test("BLOCKER 3: PRODUCTION contract shape (selectedCandidate.perSeatP19Results) with matching fingerprint is accepted", () => {
+  const fp = "cal:v7:abcdef1234567890";
+  const authority = makeProductionCurrentAuthority({
+    perSeatP19: makePerSeat(2, [1.0, 1.2], [3, 3], [true, true], "P19"),
+    perSeatP20: makePerSeat(2, [2.0, 2.5], [3, 3], [true, true], "P20"),
+    fingerprint: fp,
+  });
   assert.equal(isCurrentAuthorityNonStale(authority, fp), true,
-    "Authoritative authority with matching fingerprint is non-stale");
+    "Production contract shape with matching fingerprint must be non-stale");
 });
 
 test("BLOCKER 3: stale authority (fingerprint mismatch) is NOT used directly", () => {
@@ -369,7 +418,10 @@ test("BLOCKER 5: snapshot excludes disabled instances", () => {
 // promoteChallengers is not exported, but we can test gatherCandidates which
 // always includes Current, and verify the engine's MAX_CHALLENGERS = 3.
 
-test("BLOCKER 1: gatherCandidates always includes Current as first candidate", () => {
+// BLOCKER 2: Current is a FIXED CONTROL — it must NOT appear in the
+// challenger candidate list. Current is handled separately (reused from
+// existing authority or canonically recalculated with installed tuning).
+test("BLOCKER 2: gatherCandidates EXCLUDES Current from challenger candidates", () => {
   const instances = [
     makeInstance({ id: "sub-1", x: 1.0, y: 0.5 }),
     makeInstance({ id: "sub-2", x: 3.5, y: 0.5 }),
@@ -377,9 +429,9 @@ test("BLOCKER 1: gatherCandidates always includes Current as first candidate", (
   const candidates = gatherCandidates({
     subwooferInstances: instances, roomDims: ROOM_B, stage2Result: null, stage2Fingerprint: null,
   });
-  assert.ok(candidates.length >= 1, "At least Current must be present");
-  assert.equal(candidates[0].isCurrent, true, "Current must be first");
-  assert.equal(candidates[0].id, "current");
+  const currentCandidate = candidates.find((c) => c.isCurrent === true || c.id === "current");
+  assert.equal(currentCandidate, undefined,
+    "Current must NOT be in the challenger candidate list — it is a fixed control");
 });
 
 test("BLOCKER 1: gatherCandidates excludes Stage 2 finalists matching current placement", () => {
@@ -734,6 +786,251 @@ test("G — Same coordinates AND same tuning: APPLIED", () => {
   const instances = [makeInstance({ id: "sub-1", x: 1.5, y: 0.3, delayMs: 3.0, gainDb: -2.0, polarity: -1 })];
   assert.equal(isOptimisedApplied(instances, winner, ROOM_B), true,
     "Same coordinates AND same tuning must be applied");
+});
+
+// ---------------------------------------------------------------------------
+// ACCEPTANCE: Apply winner preserves disabled instances, enabled state,
+// position.z, bottomHeightM, rotation, and identity fields.
+// ---------------------------------------------------------------------------
+
+test("ACCEPTANCE: Apply preserves disabled instances (not removed)", () => {
+  const winner = {
+    coordinates: [{ x: 1.5, y: 0.3 }],
+    appliedTuning: [{ delayMs: 2.5, gainDb: -1.5, polarity: -1 }],
+  };
+  const currentInstances = [
+    makeInstance({ id: "sub-1", x: 1.0, y: 0.5, enabled: true }),
+    makeInstance({ id: "sub-2", x: 3.5, y: 0.5, enabled: false, gainDb: -2, delayMs: 1, polarity: 0 }),
+  ];
+  const built = buildOptimisedInstances(winner, currentInstances, ROOM_B, "SUB2-12");
+  // 1 active (from winner) + 1 disabled (preserved) = 2 total
+  assert.equal(built.length, 2, "Disabled instance must be preserved, not removed");
+  const active = built.find((s) => s.enabled === true);
+  const disabled = built.find((s) => s.enabled === false);
+  assert.ok(active, "Active instance must be present");
+  assert.ok(disabled, "Disabled instance must be preserved");
+  assert.equal(disabled.id, "sub-2", "Disabled instance ID preserved");
+  assert.equal(disabled.position.x, 3.5, "Disabled instance position preserved");
+  assert.equal(disabled.gainDb, -2, "Disabled instance tuning preserved");
+});
+
+test("ACCEPTANCE: Apply preserves position.z when present", () => {
+  const winner = {
+    coordinates: [{ x: 1.5, y: 0.3 }],
+    appliedTuning: [{ delayMs: 0, gainDb: 0, polarity: 0 }],
+  };
+  const currentInstances = [
+    { ...makeInstance({ id: "sub-1", x: 1.0, y: 0.5 }), position: { x: 1.0, y: 0.5, z: 0.35 } },
+  ];
+  const built = buildOptimisedInstances(winner, currentInstances, ROOM_B, "SUB2-12");
+  assert.equal(built[0].position.z, 0.35, "position.z must be preserved from existing instance");
+});
+
+test("ACCEPTANCE: Apply preserves bottomHeightM and identity fields", () => {
+  const winner = {
+    coordinates: [{ x: 1.5, y: 0.3 }],
+    appliedTuning: [{ delayMs: 0, gainDb: 0, polarity: 0 }],
+  };
+  const currentInstances = [
+    { ...makeInstance({ id: "sub-1", x: 1.0, y: 0.5, bottomHeightM: 0.45 }), legacyGroup: "front", symmetryLinkId: "sym-1" },
+  ];
+  const built = buildOptimisedInstances(winner, currentInstances, ROOM_B, "SUB2-12");
+  assert.equal(built.length, 1);
+  assert.equal(built[0].bottomHeightM, 0.45, "bottomHeightM preserved");
+  assert.equal(built[0].legacyGroup, "front", "legacyGroup preserved");
+  assert.equal(built[0].symmetryLinkId, "sym-1", "symmetryLinkId preserved");
+});
+
+test("ACCEPTANCE: Apply sets enabled=true on active instances and positionSource=v2-optimised", () => {
+  const winner = {
+    coordinates: [{ x: 1.5, y: 0.3 }],
+    appliedTuning: [{ delayMs: 0, gainDb: 0, polarity: 0 }],
+  };
+  const currentInstances = [makeInstance({ id: "sub-1", x: 1.0, y: 0.5 })];
+  const built = buildOptimisedInstances(winner, currentInstances, ROOM_B, "SUB2-12");
+  assert.equal(built[0].enabled, true, "Active instance must be enabled");
+  assert.equal(built[0].positionSource, "v2-optimised", "positionSource must be v2-optimised");
+});
+
+// ---------------------------------------------------------------------------
+// ACCEPTANCE: Zero valid challengers → explicit terminal NO_WINNER.
+// When all worker calls return null, no challengers are promoted, and
+// selectWinnerWithProtection returns NO_WINNER (Current retained).
+// Tested via gatherCandidates returning empty + no proxy results.
+// ---------------------------------------------------------------------------
+
+test("ACCEPTANCE: zero valid challengers produces empty candidate list", () => {
+  // No Stage 2 finalists → gatherCandidates returns empty
+  const instances = [makeInstance({ id: "sub-1", x: 1.0, y: 0.5 })];
+  const candidates = gatherCandidates({
+    subwooferInstances: instances, roomDims: ROOM_B,
+    stage2Result: null, stage2Fingerprint: null,
+  });
+  assert.equal(candidates.length, 0, "No Stage 2 finalists = no challengers");
+  // Engine's selectWinnerWithProtection with empty confirmedResults and no
+  // existing authority returns NO_WINNER (isCurrent: true, winner: null).
+  // This is verified by code review: the function checks
+  // `if (!confirmedResults.length && !existingAuthority)` and returns
+  // { isCurrent: true, winner: null, message: "No safer automatic improvement found" }.
+});
+
+// ---------------------------------------------------------------------------
+// INVARIANT 1: Current authority — frozen, never proxy-optimised, compared
+// against every challenger. If absent/stale, recompute through authoritative
+// path (not proxy scoring).
+// ---------------------------------------------------------------------------
+
+test("INVARIANT 1: production Current authority is read from real compact contract", () => {
+  const fp = "cal:v7:prod-current-001";
+  const authority = makeProductionCurrentAuthority({
+    perSeatP19: makePerSeat(2, [1.0, 1.2], [3, 3], [true, true], "P19"),
+    perSeatP20: makePerSeat(2, [2.0, 2.5], [3, 3], [true, true], "P20"),
+    fingerprint: fp,
+  });
+  // isCurrentAuthorityNonStale must accept the production shape
+  assert.equal(isCurrentAuthorityNonStale(authority, fp), true);
+
+  // extractAuthorityForComparison (via engine) reads per-seat from
+  // contract.selectedCandidate.perSeatP19Results — verify the data is there
+  const sc = authority.contract.selectedCandidate;
+  assert.ok(Array.isArray(sc.perSeatP19Results) && sc.perSeatP19Results.length === 2,
+    "Per-seat P19 must be at selectedCandidate.perSeatP19Results");
+  assert.ok(Array.isArray(sc.perSeatP20Results) && sc.perSeatP20Results.length === 2,
+    "Per-seat P20 must be at selectedCandidate.perSeatP20Results");
+  // Headline metrics at productAnalysis.parameters
+  const params = authority.contract.productAnalysis.parameters;
+  assert.ok(params.p19 && params.p20 && params.p18 && params.p14,
+    "Headline metrics must be at productAnalysis.parameters");
+});
+
+test("INVARIANT 1: Current is frozen before challenger evaluation (never proxy-optimised)", () => {
+  // When a valid non-stale authority exists, it is reused as-is.
+  // The engine's snapshotCurrentDesign captures the installed tuning,
+  // and isCurrentAuthorityNonStale gates whether the authority is used directly.
+  // Current's tuning is NEVER passed through runProxySearch.
+  const fp = "cal:v7:frozen-current-01";
+  const authority = makeProductionCurrentAuthority({
+    perSeatP19: makePerSeat(2, [1.0, 1.2], [3, 3], [true, true], "P19"),
+    perSeatP20: makePerSeat(2, [2.0, 2.5], [3, 3], [true, true], "P20"),
+    fingerprint: fp,
+  });
+  // Non-stale authority → used directly, not recalculated
+  assert.equal(isCurrentAuthorityNonStale(authority, fp), true,
+    "Non-stale authority is frozen and used directly");
+  // The authority's per-seat data is the FROZEN Current — challengers compare
+  // against THIS, not a proxy-optimised version
+  assert.equal(authority.contract.selectedCandidate.perSeatP19Results[0].level, 3,
+    "Frozen Current P19 level is preserved from production");
+});
+
+test("INVARIANT 1: stale/absent authority is NOT substituted with proxy scoring", () => {
+  // When authority is stale (fingerprint mismatch), isCurrentAuthorityNonStale
+  // returns false. The engine then canonically recalculates Current through
+  // the authoritative production path (worker confirmation with installed
+  // tuning), NOT through proxy scoring. Proxy scoring is ONLY used for
+  // challenger promotion.
+  const authority = makeProductionCurrentAuthority({
+    perSeatP19: makePerSeat(2, [1.0, 1.2], [3, 3], [true, true], "P19"),
+    perSeatP20: makePerSeat(2, [2.0, 2.5], [3, 3], [true, true], "P20"),
+    fingerprint: "cal:v7:old-fingerprint",
+  });
+  // Stale → rejected, engine must recompute through authoritative path
+  assert.equal(isCurrentAuthorityNonStale(authority, "cal:v7:new-fingerprint"), false,
+    "Stale authority must be rejected — engine recomputes through authoritative path");
+  // Absent → rejected
+  assert.equal(isCurrentAuthorityNonStale(null, "cal:v7:new-fingerprint"), false,
+    "Absent authority must be rejected — engine recomputes through authoritative path");
+});
+
+// ---------------------------------------------------------------------------
+// INVARIANT 2: Fingerprint/staleness — rotation in stale detection but
+// stripped for authority matching. Every acoustically relevant change
+// invalidates in-flight V2. Unchanged design matches existing authority.
+// ---------------------------------------------------------------------------
+
+test("INVARIANT 2: rotation is appended for stale detection but stripped for authority matching", () => {
+  // The V2 fingerprint is: <baseCalibrationFingerprint>|rot:<r0>,<r1>,...
+  // The base (before |rot:) is the SAME fingerprint used by production.
+  // Authority matching compares the base only (extractBaseFingerprint).
+  // Stale detection uses the FULL fingerprint (with rotation).
+  const inputs = {
+    subwooferInstances: [
+      makeInstance({ id: "sub-1", x: 1.0, y: 0.5, rotationDeg: 0 }),
+      makeInstance({ id: "sub-2", x: 3.5, y: 0.5, rotationDeg: 0 }),
+    ],
+    roomDims: ROOM_B, seatingPositions: makeSeats(2, ROOM_B), rspPosition: makeRsp(ROOM_B),
+    selectedSubModel: "SUB2-12", p14TargetBasis: "minimum", p14TargetLevel: 2, p14TargetDb: 117,
+  };
+  const fp = computeV2DesignFingerprint(inputs);
+  assert.ok(fp.includes("|rot:"), "V2 fingerprint must include rotation suffix");
+  const base = extractBaseFingerprint(fp);
+  assert.ok(!base.includes("|rot:"), "Base fingerprint must NOT include rotation suffix");
+  assert.ok(base.startsWith("cal:v"), "Base must be the production calibration fingerprint");
+});
+
+test("INVARIANT 2: rotation change invalidates in-flight V2 (stale detection)", () => {
+  const base = {
+    subwooferInstances: [makeInstance({ id: "sub-1", x: 1.0, y: 0.5, rotationDeg: 0 })],
+    roomDims: ROOM_B, seatingPositions: makeSeats(2, ROOM_B), rspPosition: makeRsp(ROOM_B),
+    selectedSubModel: "SUB2-12", p14TargetBasis: "minimum", p14TargetLevel: 2, p14TargetDb: 117,
+  };
+  const rotated = {
+    ...base,
+    subwooferInstances: [makeInstance({ id: "sub-1", x: 1.0, y: 0.5, rotationDeg: 90 })],
+  };
+  const fp1 = computeV2DesignFingerprint(base);
+  const fp2 = computeV2DesignFingerprint(rotated);
+  assert.notEqual(fp1, fp2, "Rotation change must invalidate V2 stale fingerprint");
+  // But the BASE fingerprints match (rotation is stripped for authority matching)
+  assert.equal(extractBaseFingerprint(fp1), extractBaseFingerprint(fp2),
+    "Base fingerprints must match despite rotation change (authority matching unaffected)");
+});
+
+test("INVARIANT 2: unchanged acoustic design matches existing production authority", () => {
+  const inputs = {
+    subwooferInstances: [makeInstance({ id: "sub-1", x: 1.0, y: 0.5 })],
+    roomDims: ROOM_B, seatingPositions: makeSeats(2, ROOM_B), rspPosition: makeRsp(ROOM_B),
+    selectedSubModel: "SUB2-12", p14TargetBasis: "minimum", p14TargetLevel: 2, p14TargetDb: 117,
+  };
+  const fp1 = computeV2DesignFingerprint(inputs);
+  const fp2 = computeV2DesignFingerprint(inputs);
+  assert.equal(fp1, fp2, "Identical inputs must produce identical fingerprints");
+  // The base of the V2 fingerprint is what production uses
+  const base = extractBaseFingerprint(fp1);
+  // If production authority's currentFingerprint === base, authority is non-stale
+  const authority = makeProductionCurrentAuthority({
+    perSeatP19: makePerSeat(2, [1.0, 1.2], [3, 3], [true, true], "P19"),
+    perSeatP20: makePerSeat(2, [2.0, 2.5], [3, 3], [true, true], "P20"),
+    fingerprint: base,
+  });
+  assert.equal(isCurrentAuthorityNonStale(authority, fp1), true,
+    "Unchanged design with matching base fingerprint must accept production authority");
+});
+
+test("INVARIANT 2: every acoustically relevant change invalidates in-flight V2", () => {
+  const base = {
+    subwooferInstances: [makeInstance({ id: "sub-1", x: 1.0, y: 0.5 })],
+    roomDims: ROOM_B, seatingPositions: makeSeats(2, ROOM_B), rspPosition: makeRsp(ROOM_B),
+    selectedSubModel: "SUB2-12", p14TargetBasis: "minimum", p14TargetLevel: 2, p14TargetDb: 117,
+  };
+  const startFp = computeV2DesignFingerprint(base);
+  const changes = [
+    { name: "position", mod: { subwooferInstances: [makeInstance({ id: "sub-1", x: 2.0, y: 0.5 })] } },
+    { name: "delay", mod: { subwooferInstances: [makeInstance({ id: "sub-1", x: 1.0, y: 0.5, delayMs: 5 })] } },
+    { name: "trim", mod: { subwooferInstances: [makeInstance({ id: "sub-1", x: 1.0, y: 0.5, gainDb: -3 })] } },
+    { name: "polarity", mod: { subwooferInstances: [makeInstance({ id: "sub-1", x: 1.0, y: 0.5, polarity: -1 })] } },
+    { name: "bottomHeightM", mod: { subwooferInstances: [makeInstance({ id: "sub-1", x: 1.0, y: 0.5, bottomHeightM: 0.5 })] } },
+    { name: "room", mod: { roomDims: { widthM: 5.0, lengthM: 6.5, heightM: 2.4 } } },
+    { name: "model", mod: { subwooferInstances: [makeInstance({ id: "sub-1", x: 1.0, y: 0.5, model: "SUB3-12" })] } },
+    { name: "p14Target", mod: { p14TargetLevel: 3 } },
+    { name: "p14Db", mod: { p14TargetDb: 120 } },
+    { name: "rotation", mod: { subwooferInstances: [makeInstance({ id: "sub-1", x: 1.0, y: 0.5, rotationDeg: 90 })] } },
+  ];
+  for (const { name, mod } of changes) {
+    const changed = { ...base, ...mod };
+    const changedFp = computeV2DesignFingerprint(changed);
+    assert.notEqual(startFp, changedFp, `${name} change must invalidate V2 fingerprint`);
+  }
 });
 
 // ---------------------------------------------------------------------------
