@@ -1120,7 +1120,6 @@ export function generateCanonicalCandidatePool({
         candidateAcceptanceDiagnosticsCount: eqTrace.candidateAcceptanceDiagnosticsCount ?? null,
         finalEnabledFilterCount: (eq.filters || []).filter((f) => f.enabled).length,
         finalFilterBankSignature: buildFilterBankSignature({ generatedFilterBank: eq.filters }),
-        fitterCombinedEqCurveLength: Array.isArray(eq.combinedEqCurve) ? eq.combinedEqCurve.length : 0,
         stopReason: eqTrace.stopReason ?? eq.stopReason ?? null,
         designEqCandidateAcceptanceDiagnosticsCountAfterMapping: Array.isArray(candidate?.designEqCandidateAcceptanceDiagnostics)
           ? candidate.designEqCandidateAcceptanceDiagnostics.length : null,
