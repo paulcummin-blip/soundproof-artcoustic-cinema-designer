@@ -119,86 +119,77 @@ function buildSeatingPositions(seatsPerRow, rowSpacing, roomDims) {
 
 function computeP19P20(seatResponses, seatingPositions) {
   const seatIds = Object.keys(seatResponses).filter(id => id !== 'rsp');
-  const perSeatP19 = [];
-  const perSeatP20 = [];
-  for (const seatId of seatIds) {
-    const response = seatResponses[seatId];
-    const spl = response.splDb || [];
-    const freqs = response.freqsHz || [];
-    const rspResponse = seatResponses['rsp'];
-    const rspSpl = rspResponse?.splDb || [];
+  const rspResponse = seatResponses['rsp'];
+  const rspSpl = rspResponse?.splDb || [];
+  const freqs = rspResponse?.freqsHz || [];
 
-    // P19: seat-to-seat variation (max deviation from mean across seats at each freq)
-    // P20: deviation from RSP at each freq
-    let maxP19 = 0;
-    let maxP20 = 0;
-    const assessmentStart = 20;
-    const assessmentEnd = 200;
-    for (let i = 0; i < freqs.length; i++) {
-      const f = freqs[i];
-      if (f < assessmentStart || f > assessmentEnd) continue;
-      // P20: deviation from RSP
-      if (rspSpl[i] != null && spl[i] != null) {
-        const delta = Math.abs(spl[i] - rspSpl[i]);
-        if (delta > maxP20) maxP20 = delta;
-      }
-    }
-    // P19 will be computed across all seats
-    const seat = seatingPositions.find(s => s.id === seatId);
-    perSeatP19.push({
-      seatId,
-      isPrimary: seat?.isPrimary || false,
-      variationDbRaw: 0, // will be filled below
-      level: 0,
-    });
-    perSeatP20.push({
-      seatId,
-      isPrimary: seat?.isPrimary || false,
-      variationDbRaw: maxP20,
-      level: 0,
-    });
-  }
-
-  // Compute P19: for each frequency, compute the max-min across seats
-  const freqs = seatResponses[seatIds[0]]?.freqsHz || [];
+  // P19: seat-to-seat variation — max(max-min across seats) over 20-200 Hz
   let maxP19Variation = 0;
   for (let i = 0; i < freqs.length; i++) {
     const f = freqs[i];
     if (f < 20 || f > 200) continue;
     const spls = seatIds.map(id => seatResponses[id].splDb?.[i]).filter(v => v != null);
     if (spls.length < 2) continue;
-    const max = Math.max(...spls);
-    const min = Math.min(...spls);
-    const variation = max - min;
+    const variation = Math.max(...spls) - Math.min(...spls);
     if (variation > maxP19Variation) maxP19Variation = variation;
   }
-  // Assign P19 to each seat
-  for (const p of perSeatP19) {
-    p.variationDbRaw = maxP19Variation;
+
+  // P20: deviation from RSP — per-seat max deviation over 20-200 Hz
+  const perSeatP20 = [];
+  for (const seatId of seatIds) {
+    const response = seatResponses[seatId];
+    const spl = response.splDb || [];
+    let maxP20 = 0;
+    for (let i = 0; i < freqs.length; i++) {
+      const f = freqs[i];
+      if (f < 20 || f > 200) continue;
+      if (rspSpl[i] != null && spl[i] != null) {
+        const delta = Math.abs(spl[i] - rspSpl[i]);
+        if (delta > maxP20) maxP20 = delta;
+      }
+    }
+    const seat = seatingPositions.find(s => s.id === seatId);
+    perSeatP20.push({
+      seatId,
+      isPrimary: seat?.isPrimary || false,
+      variationDbRaw: maxP20,
+      level: gradeP20FromRaw(maxP20),
+    });
   }
 
-  // Grade P19/P20
-  const p19Graded = gradeP19FromRaw(perSeatP19);
-  const p20Graded = gradeP20FromRaw(perSeatP20);
+  // Grade P19 (single value for the whole assessment)
+  const p19Level = gradeP19FromRaw(maxP19Variation);
+
+  // Build per-seat P19 (all seats share the same P19 variation value)
+  const perSeatP19 = seatIds.map(seatId => {
+    const seat = seatingPositions.find(s => s.id === seatId);
+    return {
+      seatId,
+      isPrimary: seat?.isPrimary || false,
+      variationDbRaw: maxP19Variation,
+      level: p19Level,
+    };
+  });
 
   return {
     p19: {
       variationDb: maxP19Variation,
-      perSeat: p19Graded,
+      level: p19Level,
+      perSeat: perSeatP19,
     },
     p20: {
-      perSeat: p20Graded,
+      perSeat: perSeatP20,
+      level: perSeatP20.length ? Math.min(...perSeatP20.map(s => s.level)) : null,
     },
   };
 }
 
 function extractP19P20Levels(metrics) {
   if (!metrics) return { p19: null, p20: null };
-  const p19Levels = metrics.p19?.perSeat?.map(s => s.level) || [];
-  const p20Levels = metrics.p20?.perSeat?.map(s => s.level) || [];
   return {
-    p19: p19Levels.length ? Math.min(...p19Levels) : null,
-    p20: p20Levels.length ? Math.min(...p20Levels) : null,
+    p19: metrics.p19?.level ?? null,
+    p20: metrics.p20?.level ?? null,
+    p19Variation: metrics.p19?.variationDb ?? null,
     p19PerSeat: metrics.p19?.perSeat?.map(s => ({ seatId: s.seatId, level: s.level, isPrimary: s.isPrimary })) || [],
     p20PerSeat: metrics.p20?.perSeat?.map(s => ({ seatId: s.seatId, level: s.level, isPrimary: s.isPrimary })) || [],
   };
