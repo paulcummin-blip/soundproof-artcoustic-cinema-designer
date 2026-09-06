@@ -22,9 +22,10 @@ import { buildOptimisedInstances } from '@/components/room/bass/improveBassV2/im
 import { computeV2DesignFingerprint } from '@/components/room/bass/improveBassV2/improveBassV2Fingerprint';
 import { gradeP19FromRaw, gradeP20FromRaw } from '@/components/room/bass/completedBassResultPersistence';
 import { SUBWOOFER_BASS_CAPABILITIES } from '@/components/data/subwooferBassCapabilities';
-import { base44 } from '@/api/base44Client';
+import { readFileSync } from 'node:fs';
 
 const PROJECT_ID = '6a917353f0f4315a0652781f';
+const TEST_DATA = JSON.parse(readFileSync(new URL('./_live-smoke-data.json', import.meta.url), 'utf8'));
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -219,9 +220,9 @@ async function main() {
   console.log('Project: Luxavo / Duffy - Cinema Room');
   console.log('==============================================');
 
-  // ── Load real project from DB ──────────────────────────────────────────
+  // ── Load real project from saved data ──────────────────────────────────
   console.log('\n--- LOADING PROJECT FROM DATABASE ---');
-  const project = await base44.entities.Project.get(PROJECT_ID);
+  const project = TEST_DATA.project;
   const roomDims = JSON.parse(project.roomDims);
   const subwooferInstances = project.subwooferInstances || [];
   const seatsPerRow = project.seats_per_row_by_row || [2, 3];
@@ -233,8 +234,10 @@ async function main() {
 
   // Build seating positions
   const seatingPositions = buildSeatingPositions(seatsPerRow, rowSpacing, roomDims);
-  const rspPosition = buildAuthoritativeRspPosition(roomDims, null, null, null);
-  rspPosition.id = 'rsp';
+  // RSP Y derived from screen geometry (auto_from_screen mode)
+  // For a length_front room, RSP is ~41% of room length from the screen wall
+  const mlpY_m = roomDims.lengthM * 0.41;
+  const rspPosition = buildAuthoritativeRspPosition(roomDims, mlpY_m, null, null);
 
   console.log(`  Room: ${roomDims.widthM} × ${roomDims.lengthM} × ${roomDims.heightM} m`);
   console.log(`  Config: ${project.dolby_config}, ${subwooferInstances.length}× ${selectedSubModel.toUpperCase()}`);
@@ -290,8 +293,7 @@ async function main() {
   // ── STAGE 2: Check Stage 2 finalists ───────────────────────────────────
   console.log('\n--- STAGE 2: FRESH FINALIST AVAILABILITY ---');
 
-  const stage2Cache = await base44.entities.Stage2PlacementCache.filter({ project_id: PROJECT_ID });
-  const stage2 = stage2Cache[0];
+  const stage2 = TEST_DATA.stage2;
   const fourSubFinalists = stage2?.four_sub_result?.evaluatedFinalists || [];
 
   console.log(`  Stage 2 cache status: ${stage2?.status}`);
