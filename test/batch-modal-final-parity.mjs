@@ -256,6 +256,13 @@ for (let fi = 0; fi < FINALISTS.length; fi++) {
   }
 
   console.log(`RSP Δ=${rspDelta.toExponential(4)}  per-seat Δ=${perSeatMaxDelta.toExponential(4)}  ${match ? '✓' : '✗'}  deepest null: ${deepestNullDb.toFixed(2)} dB @ ${deepestNullHz.toFixed(1)} Hz`);
+  if (transferMaxSplDelta > 0.01) {
+    console.log(`  TRANSFER: Re Δ=${transferMaxReDelta.toExponential(4)}  Im Δ=${transferMaxImDelta.toExponential(4)}  SPL Δ=${transferMaxSplDelta.toExponential(4)} dB`);
+    console.log(`  worst: src=${transferWorst.s} lis=${transferWorst.l} f=${transferWorst.f?.toFixed(2)} prod=${transferWorst.prod?.toFixed(4)} batch=${transferWorst.batch?.toFixed(4)}`);
+    console.log(`  prodRe=${transferWorst.prodRe?.toExponential(6)}  batchRe=${transferWorst.batchRe?.toExponential(6)}  ratio=${(transferWorst.batchRe / transferWorst.prodRe)?.toFixed(6)}`);
+    const deratingDb = ampAuth.sourceAuthorities[0]?.deratingDb ?? 0;
+    console.log(`  deratingDb=${deratingDb?.toFixed(4)}  bassCapability=${!!sources[0]?.bassCapability}  ampPower=${sources[0]?.subwooferAmplifierPowerW}`);
+  }
 
   rawCurveResults.push({ finalist, prodRaw, batchTransfers, match, rspDelta, perSeatMaxDelta, deepestNullDb, deepestNullHz });
 }
