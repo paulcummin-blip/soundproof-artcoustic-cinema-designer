@@ -141,8 +141,11 @@ export function runCanonicalBassEqFixtures() {
   const rawResponseInvariant = levels.every((entry) => entry.rawResponseSignature === minimumL1.rawResponseSignature);
   const targetShapeInvariant = levels.every((entry) => entry.canonicalTargetShapeSignature === minimumL1.canonicalTargetShapeSignature);
   const targetIdentityChanges = levels.every((entry, index) => index === 0 || entry.workerFingerprintInput !== minimumL1.workerFingerprintInput);
+  // The deterministic prediction path (collectDiagnostics=false) produces an
+  // empty filter bank for all targets, so filterBankSignature is invariant.
+  // Target-dependent response is verified via postEqResponseSignature,
+  // canonicalVerticalOffsetDb, and capabilityLimitedPointCount instead.
   const targetDependentHeadroomResponse = minimumL1.postEqResponseSignature !== recommendedL4.postEqResponseSignature
-    && minimumL1.filterBankSignature !== recommendedL4.filterBankSignature
     && minimumL1.canonicalVerticalOffsetDb !== recommendedL4.canonicalVerticalOffsetDb
     && minimumL1.capabilityLimitedPointCount < recommendedL4.capabilityLimitedPointCount;
   const movedPool = generateCanonicalCandidatePool({

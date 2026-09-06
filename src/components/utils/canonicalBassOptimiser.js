@@ -831,7 +831,15 @@ export function generateCanonicalCandidatePool({
     levelNormalisedRawCurve, domains.correctionStartHz, domains.correctionEndHz, verticalOffsetDb,
     activeSubs, usableLfHz, null, targetCurve,
   );
-  const totalTasks = FIT_PROFILES.length + 1;
+  // ── Iterative PEQ fitting: conditional on collectDiagnostics ──
+  // The default production path skips the expensive Standard/Accuracy/House
+  // iterative PEQ fitters. The production finalPostEqCurve is produced by
+  // predictRealisticPostCalibrationCorrection (the deterministic predictor)
+  // inside buildCanonicalCandidate — the fitter's filter bank is never applied
+  // to the response. The fitters run ONLY when collectDiagnostics=true, so
+  // dealer-facing diagnostic panels can display a representative PEQ bank.
+  const runIterativeFitters = !!collectDiagnostics;
+  const totalTasks = runIterativeFitters ? (FIT_PROFILES.length + 1) : 1;
   let completedTasks = 0;
   const report = (phase) => onProgress?.({ phase, completedTasks, totalTasks, completedRequests: completedTasks, totalRequests: totalTasks });
   report("Canonical target aligned");
@@ -849,44 +857,93 @@ export function generateCanonicalCandidatePool({
     requestedSystemOutputDb: selectedOperatingOutputDb,
   });
   const eqResults = [];
-  const standardFitStartedAt = nowMs();
-  const standardEq = calculateDesignEqCurve(levelNormalisedRawCurve, usableLfHz, activeSubs, fitOptions("standard"));
-  const standardFitTimeMs = nowMs() - standardFitStartedAt;
-  eqResults.push(standardEq);
-  completedTasks += 1;
-  report("Canonical standard fit complete");
-  // Seed the Accuracy and house-curve fitters from the standard fit's seed
-  // checkpoint — a physically valid checkpoint with enabled filters that
-  // improves RMS meaningfully without worsening max residual by more than a
-  // small tolerance. Falls back to the selected checkpoint filters only if no
-  // useful seed field exists. Never forces a seed when none qualified.
-  const seedSource = (standardEq.standardSeedFilters && standardEq.standardSeedFilters.length)
-    ? standardEq.standardSeedFilters
-    : (standardEq.bestSeedFilters && standardEq.bestSeedFilters.length)
-      ? standardEq.bestSeedFilters
-      : (standardEq.filters || []);
-  const seed = seedSource.filter((filter) => filter?.enabled);
-  const accuracyFitStartedAt = nowMs();
-  const accuracyEq = calculateDesignEqCurve(levelNormalisedRawCurve, usableLfHz, activeSubs, fitOptions("accuracy", seed));
-  const accuracyFitTimeMs = nowMs() - accuracyFitStartedAt;
-  eqResults.push(accuracyEq);
-  completedTasks += 1;
-  report("Canonical accuracy fit complete");
-  const houseCurveFitStartedAt = nowMs();
-  const houseEq = calculateHouseCurveEqCurve(levelNormalisedRawCurve, levelNormalisedSeats, usableLfHz, activeSubs, {
-    ...fitOptions("house_curve", seed),
-    assessmentStartHz: domains.p19StartHz,
-    assessmentEndHz: domains.p19EndHz,
-    fitStartHz: domains.correctionStartHz,
-    fitEndHz: domains.correctionEndHz,
-    correctionStartHz: domains.correctionStartHz,
-    correctionEndHz: domains.correctionEndHz,
-    reuseExactEvaluations: reuseExactHouseCurveEvaluations,
-  });
-  const houseCurveFitTimeMs = nowMs() - houseCurveFitStartedAt;
-  eqResults.push(houseEq);
-  completedTasks += 1;
-  report("Canonical house-curve fit complete");
+  let standardFitTimeMs = 0;
+  let accuracyFitTimeMs = 0;
+  let houseCurveFitTimeMs = 0;
+  let houseEq = null;
+
+  if (runIterativeFitters) {
+    const standardFitStartedAt = nowMs();
+    const standardEq = calculateDesignEqCurve(levelNormalisedRawCurve, usableLfHz, activeSubs, fitOptions("standard"));
+    standardFitTimeMs = nowMs() - standardFitStartedAt;
+    eqResults.push(standardEq);
+    completedTasks += 1;
+    report("Canonical standard fit complete");
+    // Seed the Accuracy and house-curve fitters from the standard fit's seed
+    // checkpoint — a physically valid checkpoint with enabled filters that
+    // improves RMS meaningfully without worsening max residual by more than a
+    // small tolerance. Falls back to the selected checkpoint filters only if no
+    // useful seed field exists. Never forces a seed when none qualified.
+    const seedSource = (standardEq.standardSeedFilters && standardEq.standardSeedFilters.length)
+      ? standardEq.standardSeedFilters
+      : (standardEq.bestSeedFilters && standardEq.bestSeedFilters.length)
+        ? standardEq.bestSeedFilters
+        : (standardEq.filters || []);
+    const seed = seedSource.filter((filter) => filter?.enabled);
+    const accuracyFitStartedAt = nowMs();
+    const accuracyEq = calculateDesignEqCurve(levelNormalisedRawCurve, usableLfHz, activeSubs, fitOptions("accuracy", seed));
+    accuracyFitTimeMs = nowMs() - accuracyFitStartedAt;
+    eqResults.push(accuracyEq);
+    completedTasks += 1;
+    report("Canonical accuracy fit complete");
+    const houseCurveFitStartedAt = nowMs();
+    houseEq = calculateHouseCurveEqCurve(levelNormalisedRawCurve, levelNormalisedSeats, usableLfHz, activeSubs, {
+      ...fitOptions("house_curve", seed),
+      assessmentStartHz: domains.p19StartHz,
+      assessmentEndHz: domains.p19EndHz,
+      fitStartHz: domains.correctionStartHz,
+      fitEndHz: domains.correctionEndHz,
+      correctionStartHz: domains.correctionStartHz,
+      correctionEndHz: domains.correctionEndHz,
+      reuseExactEvaluations: reuseExactHouseCurveEvaluations,
+    });
+    houseCurveFitTimeMs = nowMs() - houseCurveFitStartedAt;
+    eqResults.push(houseEq);
+    completedTasks += 1;
+    report("Canonical house-curve fit complete");
+  } else {
+    // Deterministic-only path: minimal eq stub. buildCanonicalCandidate uses
+    // predictRealisticPostCalibrationCorrection for the production curve —
+    // the eq object contributes only diagnostic fields (all empty/null here).
+    // The filter bank is empty; filterBankSignature reflects "no iterative
+    // fitting" so cache identity is deterministic and stable.
+    eqResults.push({
+      designEqFitProfile: "deterministic",
+      designEqFitProfileConfig: null,
+      selectedStart: "deterministic",
+      filters: [],
+      curve: levelNormalisedRawCurve.map((point) => ({ ...point })),
+      combinedEqCurve: [],
+      fitterHouseCurveTarget: targetCurve,
+      physicalEqAuthorityPassed: true,
+      physicalAuthorityViolations: [],
+      bankValidationPassed: true,
+      bankLimits: { allOk: true, boostLimitOk: true, cutLimitOk: true, sourceDomainHeadroomOk: true, maxAggregateBoostDb: 0, maxAggregateBoostHz: null, maxAggregateCutDb: 0, maxAggregateCutHz: null },
+      bankDiagnostics: { selectedBankLimits: { allOk: true, boostLimitOk: true, cutLimitOk: true, sourceDomainHeadroomOk: true, maxAggregateBoostDb: 0, maxAggregateBoostHz: null, maxAggregateCutDb: 0, maxAggregateCutHz: null } },
+      rspObjectiveMaxDeviationDb: null,
+      rspMaxDeviationDb: null,
+      rspRmsDeviationDb: null,
+      rspMeanSignedResidualDb: null,
+      rspShapeRmsDeviationDb: null,
+      iterationTrace: [],
+      detectedRegions: [],
+      candidateAcceptanceDiagnostics: [],
+      candidateSelectionDiagnostics: [],
+      filterDecisionDiagnostics: [],
+      rejectedEqCandidates: [],
+      seatToleranceAdjustedCandidates: [],
+      seatRegressionToleranceDiagnostics: null,
+      stopReason: "deterministic-prediction-no-iterative-fitting",
+      selectionReason: "Deterministic calibration prediction — iterative PEQ fitting skipped (collectDiagnostics=false)",
+      houseCurveDiagnostics: null,
+      worstSeatMaxDeviationDb: null,
+      meanSeatMaxDeviationDb: null,
+      rmsSeatTargetErrorDb: null,
+      perSeatMetrics: [],
+    });
+    completedTasks += 1;
+    report("Canonical deterministic prediction complete");
+  }
 
   const eqCandidates = eqResults.map((eq) => buildCanonicalCandidate({
     rawCurve, maximumSplCurveBeforeEq, levelNormalisedRawCurve,
@@ -1126,9 +1183,11 @@ export function generateCanonicalCandidatePool({
       requestCount: 1,
       profileCount: totalTasks,
       uniqueCoreFitCount: totalTasks,
-      standardFitCount: 1,
-      accuracyFitCount: 1,
-      houseCurveFitCount: 1,
+      iterativeFittingSkipped: !runIterativeFitters,
+      deterministicPredictionOnly: !runIterativeFitters,
+      standardFitCount: runIterativeFitters ? 1 : 0,
+      accuracyFitCount: runIterativeFitters ? 1 : 0,
+      houseCurveFitCount: runIterativeFitters ? 1 : 0,
       coreFitTimeMs: standardFitTimeMs + accuracyFitTimeMs + houseCurveFitTimeMs,
       selectedDiagnosticFitTimeMs: 0,
       standardFitTimeMs,
