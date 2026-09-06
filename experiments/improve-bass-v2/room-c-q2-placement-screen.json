@@ -1,0 +1,154 @@
+{
+  "metadata": {
+    "experiment": "improve-bass-response-v2-read-only-sandbox",
+    "productionCodeModified": false,
+    "generatedAt": "2026-09-06T01:10:33.610Z",
+    "room": "Room C",
+    "quantity": 2,
+    "phase": "placement",
+    "variant": "screen",
+    "model": "SUB2-12",
+    "target": {
+      "p14TargetBasis": "minimum",
+      "p14TargetLevel": 2,
+      "p14TargetDb": 112,
+      "p18TargetBasis": "minimum"
+    },
+    "transitionHz": 128.3
+  },
+  "geometry": {
+    "roomDims": {
+      "widthM": 4.8,
+      "lengthM": 7.5,
+      "heightM": 2.7
+    },
+    "rspPosition": {
+      "id": "rsp",
+      "x": 2.4,
+      "y": 4,
+      "z": 1.2
+    },
+    "seatingPositions": [
+      {
+        "id": "primary-left",
+        "x": 1.2,
+        "y": 4,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-centre",
+        "x": 2.4,
+        "y": 4,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-right",
+        "x": 3.6,
+        "y": 4,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "secondary-left",
+        "x": 1.2,
+        "y": 5.6,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-centre",
+        "x": 2.4,
+        "y": 5.6,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-right",
+        "x": 3.6,
+        "y": 5.6,
+        "z": 1.2,
+        "priority": "secondary"
+      }
+    ]
+  },
+  "result": null,
+  "stage1": {
+    "runtimeMs": 137392.2,
+    "candidateCount": 76,
+    "finalists": [
+      {
+        "id": "C_FRONT_PAIR:0.15_0|0.85_0",
+        "familyId": "C_FRONT_PAIR",
+        "positions": [
+          {
+            "x": 0.72,
+            "y": 0
+          },
+          {
+            "x": 4.08,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "id": "FRONT_THIRD_PAIR:0.23_0|0.77_0",
+        "familyId": "FRONT_THIRD_PAIR",
+        "positions": [
+          {
+            "x": 1.104,
+            "y": 0
+          },
+          {
+            "x": 3.696,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "id": "FRONT_CORNER_PAIR:0_0|1_0",
+        "familyId": "FRONT_CORNER_PAIR",
+        "positions": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 4.8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "id": "REAR_QUARTER_PAIR:0.15_1|0.85_1",
+        "familyId": "REAR_QUARTER_PAIR",
+        "positions": [
+          {
+            "x": 0.72,
+            "y": 7.5
+          },
+          {
+            "x": 4.08,
+            "y": 7.5
+          }
+        ]
+      },
+      {
+        "id": "REAR_THIRD_PAIR:0.23_1|0.77_1",
+        "familyId": "REAR_THIRD_PAIR",
+        "positions": [
+          {
+            "x": 1.104,
+            "y": 7.5
+          },
+          {
+            "x": 3.696,
+            "y": 7.5
+          }
+        ]
+      }
+    ]
+  },
+  "totalPhaseRuntimeMs": 137393.8
+}
