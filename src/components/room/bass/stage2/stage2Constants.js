@@ -2,10 +2,11 @@
 // Stage 2 Subwoofer Placement Optimiser — versions, caps, concurrency.
 // Product-aware, P14-aware canonical P19/P20 ranking of Stage 1 finalists.
 
-// Bumped to 3: two-phase architecture with physics-only placement fingerprint,
-// P18 grading view removed from fingerprints, selected-quantity-first lifecycle,
-// and persistent raw transfer cache. Old cache records are rejected.
-export const STAGE2_CACHE_VERSION = 3;
+// Bumped to 4: amplifier power added to placement fingerprint (raw transfers
+// include sourceAmplifierDeratingDb, so amplifier power is a transfer-identity
+// input). Old cache records are rejected — all Stage 2 raw-transfer caches
+// invalidate once.
+export const STAGE2_CACHE_VERSION = 4;
 export const STAGE2_RANKING_VERSION = "stage2-ranking-v1";
 // Confirmation layer version: P14-dependent EQ/canonical/P14/P18/P19/P20
 // authority pipeline. v5 exposes the already-authoritative P14/P18 outcomes
@@ -13,10 +14,10 @@ export const STAGE2_RANKING_VERSION = "stage2-ranking-v1";
 // older confirmation records that do not contain those presentation fields.
 export const STAGE2_CANONICAL_VERSION = "stage2-canonical-v5";
 export const STAGE2_PRODUCT_ENGINEERING_VERSION = "product-engineering-v5";
-// Placement layer version: P14-independent raw modal transfer. Bumped to v2:
-// placement fingerprint is now physics-only (canonicalVersion and
-// productEngineeringVersion removed — they are confirmation-layer concerns).
-export const STAGE2_PLACEMENT_VERSION = "stage2-placement-v2";
+// Placement layer version: P14-independent raw modal transfer. Bumped to v3:
+// amplifier power added to the placement fingerprint (raw transfers include
+// sourceAmplifierDeratingDb, so amplifier power is a transfer-identity input).
+export const STAGE2_PLACEMENT_VERSION = "stage2-placement-v3";
 
 // Maximum concurrent canonical finalist evaluation jobs.
 export const STAGE2_MAX_CONCURRENT_JOBS = 2;

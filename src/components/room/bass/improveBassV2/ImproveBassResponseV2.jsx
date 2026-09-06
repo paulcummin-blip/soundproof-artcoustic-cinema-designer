@@ -136,8 +136,9 @@ export default function ImproveBassResponseV2({
       p14TargetDb: p14Params.p14TargetDb,
       p18TargetBasis: p14Params.p18TargetBasis,
       currentAuthority: shared?.completedBassAuthority,
+      liveCacheKey: shared?.cacheKey,
       stage2Result: stage2,
-      stage2Fingerprint: stage2?.fingerprint,
+      placementFingerprint: stage2?.placementFingerprint,
     };
 
     const callbacks = {

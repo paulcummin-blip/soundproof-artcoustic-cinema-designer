@@ -29,10 +29,15 @@ export class V2RuntimeMetrics {
     this.challengersConfirmed = 0;
     this.workerCalls = [];
     this.proxySearches = [];
+    this.placementFingerprintUsed = null;
+    this.currentRecalculations = 0;
   }
 
   recordWorkerCall(phase, candidateId, durationMs, reused) {
     this.workerCalls.push({ phase, candidateId, durationMs, reused });
+    if (phase === "confirmation" && candidateId === "current") {
+      this.currentRecalculations++;
+    }
   }
 
   recordProxySearch(candidateId, durationMs) {
@@ -51,17 +56,26 @@ export class V2RuntimeMetrics {
     this.challengersConfirmed++;
   }
 
+  recordPlacementFingerprint(fp) {
+    this.placementFingerprintUsed = fp || null;
+  }
+
   finish() {
     this.endMs = now();
     this.totalWallClockMs = this.endMs - this.startMs;
   }
 
   toReport() {
+    const placementWorkerCalls = this.workerCalls.filter((c) => c.phase === "placement");
     return {
       projectId: this.projectId,
       totalWallClockMs: Math.round(this.totalWallClockMs || 0),
       currentReused: this.currentReused,
+      currentRecalculations: this.currentRecalculations,
       stage2TransfersReused: this.stage2TransfersReused,
+      rawTransferCacheHits: this.stage2TransfersReused,
+      rawTransferCacheMisses: placementWorkerCalls.length,
+      placementFingerprintUsed: this.placementFingerprintUsed,
       challengersConfirmed: this.challengersConfirmed,
       workerCallCount: this.workerCalls.length,
       workerCalls: this.workerCalls.map((c) => ({

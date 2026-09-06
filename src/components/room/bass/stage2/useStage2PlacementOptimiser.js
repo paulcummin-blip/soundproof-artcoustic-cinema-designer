@@ -141,6 +141,16 @@ export function useStage2PlacementOptimiser({
 
   const stage1Fingerprint = stage1State?.fingerprint || null;
 
+  // Resolved effective amplifier power — the same value the engine receives
+  // after defaults are applied. Used in both placement and legacy fingerprints
+  // so that explicit-default and implicit-default values resolving to the same
+  // effective power produce the same identity.
+  const resolvedAmplifierPowerPerSubW = useMemo(() => {
+    return Number.isFinite(Number(amplifierPowerPerSubW))
+      ? Number(amplifierPowerPerSubW)
+      : DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W;
+  }, [amplifierPowerPerSubW]);
+
   // Compute P14-independent placement fingerprint (raw transfer cache identity)
   const placementFingerprint = useMemo(() => {
     if (!stage1Fingerprint || !stage1Finalists || !selectedSubModel) return null;
@@ -149,8 +159,9 @@ export function useStage2PlacementOptimiser({
       stage1Finalists,
       selectedSubModel,
       subwooferBottomHeightM,
+      amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
     });
-  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, subwooferBottomHeightM]);
+  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, subwooferBottomHeightM, resolvedAmplifierPowerPerSubW]);
 
   // Compute P14-dependent confirmation fingerprint (placement + P14).
   // p18TargetBasis is NOT included — it is a presentation-only grading view.
@@ -176,8 +187,9 @@ export function useStage2PlacementOptimiser({
       p14TargetLevel: p14Target.level,
       p14TargetDb: p14Target.db,
       subwooferBottomHeightM,
+      amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
     });
-  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, p14Target, subwooferBottomHeightM]);
+  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, p14Target, subwooferBottomHeightM, resolvedAmplifierPowerPerSubW]);
 
   // Hydration on mount / project change
   useEffect(() => {
@@ -205,6 +217,7 @@ export function useStage2PlacementOptimiser({
   useEffect(() => {
     if (!hydrationDone || !isStage2CacheValid(hydratedCache, fingerprint)) return;
     publishHydratedStage2(projectId, fingerprint, {
+      placement_fingerprint: hydratedCache.placement_fingerprint,
       one_sub_result: hydratedCache.one_sub_result,
       two_sub_result: hydratedCache.two_sub_result,
       four_sub_result: hydratedCache.four_sub_result,
@@ -300,10 +313,6 @@ export function useStage2PlacementOptimiser({
 
     const seatPriorityMap = buildSeatPriorityMap(seatingPositions);
 
-    const amplifierPower = Number.isFinite(Number(amplifierPowerPerSubW))
-      ? Number(amplifierPowerPerSubW)
-      : DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W;
-
     stage2PlacementController.schedule({
       projectId,
       fingerprint,
@@ -317,7 +326,7 @@ export function useStage2PlacementOptimiser({
         rspPosition,
         seatingPositions,
         selectedSubModel,
-        amplifierPowerPerSubW: amplifierPower,
+        amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
         p14TargetBasis: p14Target.basis,
         p14TargetLevel: p14Target.level,
         p14TargetDb: p14Target.db,
@@ -328,7 +337,7 @@ export function useStage2PlacementOptimiser({
       quantityOrder,
       delay: STAGE2_START_DELAY_MS,
     });
-  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting, resolvedAmplifierPowerPerSubW]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return state;
 }

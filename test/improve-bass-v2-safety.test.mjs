@@ -997,14 +997,17 @@ test("INVARIANT 2: unchanged acoustic design matches existing production authori
   assert.equal(fp1, fp2, "Identical inputs must produce identical fingerprints");
   // The base of the V2 fingerprint is what production uses
   const base = extractBaseFingerprint(fp1);
-  // If production authority's currentFingerprint === base, authority is non-stale
+  // FIX 2: V2 now consumes the production-resolved liveCacheKey directly
+  // (same value the production UI uses for hasCurrentResult). When
+  // currentFingerprint === liveCacheKey AND authoritative === true, the
+  // authority belongs to the live design and is accepted directly.
   const authority = makeProductionCurrentAuthority({
     perSeatP19: makePerSeat(2, [1.0, 1.2], [3, 3], [true, true], "P19"),
     perSeatP20: makePerSeat(2, [2.0, 2.5], [3, 3], [true, true], "P20"),
     fingerprint: base,
   });
-  assert.equal(isCurrentAuthorityNonStale(authority, fp1), true,
-    "Unchanged design with matching base fingerprint must accept production authority");
+  assert.equal(isCurrentAuthorityNonStale(authority, base), true,
+    "Unchanged design with matching liveCacheKey must accept production authority");
 });
 
 test("INVARIANT 2: every acoustically relevant change invalidates in-flight V2", () => {

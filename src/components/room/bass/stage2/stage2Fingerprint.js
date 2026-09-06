@@ -59,6 +59,7 @@ export function computeStage2Fingerprint({
   p14TargetLevel,
   p14TargetDb,
   subwooferBottomHeightM,
+  amplifierPowerPerSubW,
 }) {
   if (!stage1Fingerprint) return null;
   if (!selectedSubModel) return null;
@@ -90,9 +91,15 @@ export function computeStage2Fingerprint({
     subwooferBottomHeightM: (subwooferBottomHeightM != null && Number.isFinite(Number(subwooferBottomHeightM)))
       ? Math.round(Number(subwooferBottomHeightM) * 1000) / 1000
       : "default",
+    // Amplifier power authority: raw transfers include sourceAmplifierDeratingDb.
+    // A power change alters the derating and thus the transfer — it must
+    // invalidate the combined Stage 2 cache. The RESOLVED effective value is used.
+    amplifierPowerPerSubW: Number.isFinite(Number(amplifierPowerPerSubW))
+      ? Math.round(Number(amplifierPowerPerSubW) * 100) / 100
+      : "default",
     resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION,
     metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
   };
 
-  return `stage2:v2:${hash64(stable(canonical))}`;
+  return `stage2:v3:${hash64(stable(canonical))}`;
 }

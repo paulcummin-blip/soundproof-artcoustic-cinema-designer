@@ -36,6 +36,7 @@ function emptyState(projectId) {
     projectId: String(projectId || "free"),
     status: "idle",
     fingerprint: null,
+    placementFingerprint: null,
     one_sub_result: null,
     two_sub_result: null,
     four_sub_result: null,
@@ -83,6 +84,7 @@ export function publishHydratedStage2(projectId, fingerprint, results) {
   return setMemory(projectId, {
     status: "complete",
     fingerprint,
+    placementFingerprint: results?.placement_fingerprint || null,
     one_sub_result: results?.one_sub_result || null,
     two_sub_result: results?.two_sub_result || null,
     four_sub_result: results?.four_sub_result || null,
@@ -144,10 +146,11 @@ export function markStage2Error(projectId, fingerprint, errorMessage) {
   });
 }
 
-function publishStage2Progress(projectId, fingerprint, results) {
+function publishStage2Progress(projectId, fingerprint, results, placementFingerprint) {
   return setMemory(projectId, {
     status: "updating",
     fingerprint,
+    placementFingerprint: placementFingerprint || null,
     one_sub_result: results?.one_sub_result || null,
     two_sub_result: results?.two_sub_result || null,
     four_sub_result: results?.four_sub_result || null,
@@ -164,10 +167,11 @@ function publishStage2Progress(projectId, fingerprint, results) {
   });
 }
 
-function publishStage2Complete(projectId, fingerprint, results) {
+function publishStage2Complete(projectId, fingerprint, results, placementFingerprint) {
   return setMemory(projectId, {
     status: "complete",
     fingerprint,
+    placementFingerprint: placementFingerprint || null,
     one_sub_result: results?.one_sub_result || null,
     two_sub_result: results?.two_sub_result || null,
     four_sub_result: results?.four_sub_result || null,
@@ -322,6 +326,7 @@ export class Stage2PlacementController {
       phase: this.queue.length > 0 ? "placement" : "confirmation",
       completedJobs: 0,
       totalJobsPlanned: this.totalJobsPlanned,
+      placementFingerprint: this.placementFingerprint,
     });
 
     if (this.queue.length === 0 && this.activeJobs.size === 0) {
@@ -795,7 +800,7 @@ export class Stage2PlacementController {
     } else {
       results.phase = Number.isFinite(nextQuantity) ? `evaluating_${nextQuantity}_sub` : "preparing";
     }
-    publishStage2Progress(this.projectId, this.currentFingerprint, results);
+    publishStage2Progress(this.projectId, this.currentFingerprint, results, this.placementFingerprint);
   }
 
   /**
@@ -917,7 +922,7 @@ export class Stage2PlacementController {
     results.b_failed_candidates = this.bFailedCandidates;
     results.b_result = this.bResult;
 
-    publishStage2Complete(this.projectId, this.currentFingerprint, results);
+    publishStage2Complete(this.projectId, this.currentFingerprint, results, this.placementFingerprint);
     this.persist(this.projectId, this.currentFingerprint, results);
     this.cancelAll("complete");
   }

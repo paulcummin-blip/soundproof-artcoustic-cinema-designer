@@ -139,30 +139,53 @@ export function extractBaseFingerprint(v2Fingerprint) {
  * Check whether the existing completed bass authority is non-stale and can be
  * used directly as the Current control (BLOCKER 1 + BLOCKER 3).
  *
- * The authority is non-stale when:
+ * The authority is non-stale when ALL are true:
  *   1. authoritative === true (publication verified)
  *   2. contract exists with per-seat P19/P20 data in the REAL production
  *      structure: contract.selectedCandidate.perSeatP19Results / perSeatP20Results
- *   3. the V2 start fingerprint's BASE matches the authority's currentFingerprint
+ *   3. persisted currentFingerprint matches the live production cacheKey
  *
- * If the fingerprints don't match (because V2 uses slightly different defaults
- * or the design changed), this returns false — the caller falls back to
- * canonical recalculation, which is always safe.
+ * FIX 2: V2 no longer reconstructs a partial calibration fingerprint. The
+ * production path (BassBackgroundAnalysisOwner) already resolves the live
+ * design identity: its stale-detection effect compares
+ * completedBassAuthority.currentFingerprint against cacheKey
+ * (buildBassResultCacheKey(liveCalibrationFingerprint)) on every render. If
+ * they mismatch, markBassAuthorityStale sets authoritative = false. Therefore
+ * authoritative === true already proves the persisted authority belongs to
+ * the live design. V2 consumes that production-resolved condition directly
+ * by checking authoritative === true AND currentFingerprint === liveCacheKey.
+ *
+ * This avoids both:
+ *   - the existing incomplete V2 fingerprint reconstruction (wrong z, missing
+ *     capability/SPL/EQ/profiles/versions);
+ *   - any transient stale-authority window before the React stale-marking
+ *     effect settles (the liveCacheKey comparison is explicit, not implicit
+ *     via the authoritative flag alone).
  *
  * @param {object} currentAuthority - completedBassAuthority from shared results
- * @param {string} v2StartFingerprint - V2 design fingerprint at start (with rotation suffix)
+ * @param {string} liveCacheKey - production cacheKey from shared bass results
+ *   (buildBassResultCacheKey(liveCalibrationFingerprint)). This is the same
+ *   value the production UI uses for hasCurrentResult.
  * @returns {boolean} true if the existing authority can be used directly
  */
-export function isCurrentAuthorityNonStale(currentAuthority, v2StartFingerprint) {
+export function isCurrentAuthorityNonStale(currentAuthority, liveCacheKey) {
   if (!currentAuthority) return false;
   if (currentAuthority.authoritative !== true) return false;
   if (!currentAuthority.contract) return false;
 
+  // Live design identity: persisted currentFingerprint must match the live
+  // production cacheKey. This is the same condition the production UI uses
+  // (hasCurrentResult in BassBackgroundAnalysisOwner). The stale-detection
+  // effect in BassBackgroundAnalysisOwner already downgrades authoritative
+  // to false when these mismatch, but we check explicitly for defence in depth
+  // and to avoid any transient stale-authority window.
+  if (!liveCacheKey || !currentAuthority.currentFingerprint) return false;
+  if (currentAuthority.currentFingerprint !== liveCacheKey) return false;
+
   const contract = currentAuthority.contract;
 
-  // BLOCKER 1: Read from the REAL production contract structure.
-  // Production stores per-seat P19/P20 at contract.selectedCandidate.perSeatP19Results
-  // / perSeatP20Results — NOT at contract.perSeatP19 / perSeatP20.
+  // Required per-seat metric authority: P19/P20 per-seat data must exist
+  // in the REAL production contract structure.
   const selectedCandidate = contract.selectedCandidate || {};
   const perSeatP19Results = Array.isArray(selectedCandidate.perSeatP19Results)
     ? selectedCandidate.perSeatP19Results
@@ -172,13 +195,5 @@ export function isCurrentAuthorityNonStale(currentAuthority, v2StartFingerprint)
     : [];
   if (perSeatP19Results.length === 0 || perSeatP20Results.length === 0) return false;
 
-  // Check fingerprint match — compare the BASE calibration fingerprint
-  // (without the V2 rotation suffix) against the authority's currentFingerprint.
-  // The base fingerprint is the same format the production path uses.
-  if (v2StartFingerprint && currentAuthority.currentFingerprint) {
-    const v2Base = extractBaseFingerprint(v2StartFingerprint);
-    return v2Base === currentAuthority.currentFingerprint;
-  }
-
-  return false;
+  return true;
 }

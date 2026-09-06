@@ -75,6 +75,7 @@ export function computeStage2PlacementFingerprint({
   stage1Finalists,
   selectedSubModel,
   subwooferBottomHeightM,
+  amplifierPowerPerSubW,
 }) {
   if (!stage1Fingerprint) return null;
   if (!selectedSubModel) return null;
@@ -83,6 +84,14 @@ export function computeStage2PlacementFingerprint({
   // EQ/canonical/product-engineering versions are NOT here — they are
   // confirmation-layer concerns. An EQ-only change must NOT invalidate
   // the placement cache; a physics/source-model change MUST.
+  //
+  // amplifierPowerPerSubW is included because Stage 2 raw transfers include
+  // sourceAmplifierDeratingDb (applied when rewSourceCurveMode === "product",
+  // which Stage 2 always uses). A power change alters the derating and thus
+  // the transfer — it must invalidate the placement cache. The RESOLVED
+  // effective value is used (after defaults), so explicit-default and
+  // implicit-default values resolving to the same effective power produce
+  // the same identity.
   const canonical = {
     cacheVersion: STAGE2_CACHE_VERSION,
     placementVersion: STAGE2_PLACEMENT_VERSION,
@@ -92,9 +101,12 @@ export function computeStage2PlacementFingerprint({
     subwooferBottomHeightM: (subwooferBottomHeightM != null && Number.isFinite(Number(subwooferBottomHeightM)))
       ? Math.round(Number(subwooferBottomHeightM) * 1000) / 1000
       : "default",
+    amplifierPowerPerSubW: Number.isFinite(Number(amplifierPowerPerSubW))
+      ? Math.round(Number(amplifierPowerPerSubW) * 100) / 100
+      : "default",
   };
 
-  return `stage2-place:v2:${hash64(stable(canonical))}`;
+  return `stage2-place:v3:${hash64(stable(canonical))}`;
 }
 
 /**

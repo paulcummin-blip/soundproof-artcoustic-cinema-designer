@@ -163,15 +163,19 @@ export function gatherCandidates({
   subwooferInstances,
   roomDims,
   stage2Result,
-  stage2Fingerprint,
+  placementFingerprint,
 }) {
   const candidates = [];
   const currentFinalist = buildCurrentFinalist(subwooferInstances, roomDims);
   const quantity = currentFinalist?.sources?.length;
 
   const stage2Finalists = extractStage2Finalists(stage2Result, quantity);
-  const cachedTransfers = stage2Fingerprint
-    ? getCachedRawTransfersForFingerprint(stage2Fingerprint)
+  // FIX 1: Use the P14-independent placementFingerprint (stage2-place:v3:) for
+  // raw-transfer cache retrieval — NOT the P14-dependent combined stage2
+  // fingerprint. The cache is keyed by placementFingerprint; using the wrong
+  // key produces a 100% cache miss.
+  const cachedTransfers = placementFingerprint
+    ? getCachedRawTransfersForFingerprint(placementFingerprint)
     : new Map();
 
   for (const finalist of stage2Finalists) {
@@ -524,7 +528,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     subwooferInstances, roomDims, seatingPositions, rspPosition,
     selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
     p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
-    currentAuthority, stage2Result, stage2Fingerprint,
+    currentAuthority, liveCacheKey, stage2Result, placementFingerprint,
   } = params;
 
   const worker = new Worker(new URL("./improveBassV2.worker.js", import.meta.url), { type: "module" });
@@ -585,11 +589,20 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     // non-stale. If so, reuse it as the Current control — do NOT recalculate
     // or retune Current. The existing authority is the REAL current design's
     // canonical result with actual positions, tuning, and metrics.
-    const authorityNonStale = isCurrentAuthorityNonStale(currentAuthority, startFingerprint);
+    // FIX 2: Consume the production-resolved live authority condition.
+    // The production path (BassBackgroundAnalysisOwner) already compares
+    // completedBassAuthority.currentFingerprint against the live cacheKey
+    // (buildBassResultCacheKey(calibrationFingerprint)) via its stale-detection
+    // effect. When authoritative === true AND currentFingerprint === liveCacheKey,
+    // the persisted authority belongs to the live design. V2 must NOT
+    // reconstruct a partial calibration fingerprint — it consumes the
+    // production-resolved condition directly.
+    const authorityNonStale = isCurrentAuthorityNonStale(currentAuthority, liveCacheKey);
     const existingAuthority = authorityNonStale
       ? extractAuthorityForComparison(currentAuthority)
       : null;
     metrics.recordCurrentReuse(authorityNonStale);
+    metrics.recordPlacementFingerprint(placementFingerprint);
 
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot };
@@ -597,7 +610,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
 
     // Phase 2: Testing practical positions (CHALLENGERS ONLY)
     onProgress("testing_positions", "Testing practical positions", 0, 1);
-    const candidates = gatherCandidates({ subwooferInstances, roomDims, stage2Result, stage2Fingerprint });
+    const candidates = gatherCandidates({ subwooferInstances, roomDims, stage2Result, placementFingerprint });
 
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot };
@@ -677,12 +690,27 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         if (currentFinalist) {
           // Compute Current's raw transfer (placement) if not already cached
           let currentRawTransfer = null;
-          // Try to find a matching cached transfer from Stage 2
-          const cachedTransfers = stage2Fingerprint
-            ? getCachedRawTransfersForFingerprint(stage2Fingerprint)
+          // Try to find a matching cached transfer from Stage 2.
+          // FIX 1: Use the P14-independent placementFingerprint for cache
+          // retrieval — NOT the P14-dependent combined stage2 fingerprint.
+          // FIX 3: Compare the actual cached transfer's sources against
+          // Current — NOT Current against itself. The previous code passed
+          // { sources: currentFinalist.sources } as the first arg, which
+          // compared Current against Current and always returned true,
+          // yielding the first cache entry regardless of whether it matched.
+          const cachedTransfers = placementFingerprint
+            ? getCachedRawTransfersForFingerprint(placementFingerprint)
             : new Map();
           for (const [fid, transfer] of cachedTransfers.entries()) {
-            if (isSamePlacement({ sources: currentFinalist.sources }, currentFinalist, roomDims)) {
+            if (!transfer?.sources) continue;
+            if (transfer.sources.length !== currentFinalist.sources.length) continue;
+            // Compare the cached transfer's coordinates against Current
+            if (isSamePlacement({ sources: transfer.sources }, currentFinalist, roomDims)) {
+              // Defence in depth: verify product model matches. The placement
+              // fingerprint already guarantees this (selectedSubModel is in the
+              // fingerprint), but this check prevents false reuse if a stale
+              // transfer with a different product somehow enters the cache.
+              if (transfer.selectedProduct && normaliseModelKey(selectedSubModel) !== transfer.selectedProduct) continue;
               currentRawTransfer = transfer;
               break;
             }
