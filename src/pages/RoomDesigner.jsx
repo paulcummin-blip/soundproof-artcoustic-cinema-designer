@@ -1941,7 +1941,7 @@ function RoomDesignerWithState() {
           onRecommendationsChange={setDesignRecommendations}
         />
       )}
-      <div className="flex flex-col h-full bg-[#F8F8F7]" style={{ minHeight: 0 }}>
+      <div className="flex flex-col bg-[#F8F8F7]" style={{ height: "100vh", minHeight: 0 }}>
         <style>{`
           .brand-btn{
             background:#213428 !important;

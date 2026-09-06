@@ -110,7 +110,7 @@ export default function ResizableTwoColumnLayout({
         />
       </div>
 
-      <div style={{ minWidth: minRightWidth, minHeight: 0, overflow: "hidden" }}>
+      <div style={{ minWidth: minRightWidth, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
         {rightContent}
       </div>
     </div>

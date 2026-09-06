@@ -142,9 +142,9 @@ export default function RoomDesignerControlsPanel({
   onViewModeChange,
 }) {
   return (
-    <aside className="relative z-30" style={{ minWidth: 0, minHeight: 0 }}>
+    <aside className="relative z-30" style={{ minWidth: 0, minHeight: 0, flex: 1, display: "flex", flexDirection: "column" }}>
       <div
-        style={{ height: "calc(100vh - 196px)", overflow: "auto", paddingRight: 8 }}
+        style={{ flex: 1, minHeight: 0, overflow: "auto", paddingRight: 8, paddingBottom: 12 }}
         className="space-y-3">
 
         {/* Workspace view selector — controls how the workspace is displayed.

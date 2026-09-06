@@ -42,7 +42,7 @@ export default function ViewModeLayout({
           display: "flex",
         }}
       >
-        <div style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden" }}>
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
           {rightContent}
         </div>
       </div>
