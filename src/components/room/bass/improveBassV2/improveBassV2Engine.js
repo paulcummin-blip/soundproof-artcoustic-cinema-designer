@@ -205,7 +205,7 @@ function extractStage2Finalists(stage2Result, quantity) {
   return result.finalists.filter((f) => f?.sources?.length === quantity);
 }
 
-function isSamePlacement(finalist, currentFinalist, roomDims) {
+export function isSamePlacement(finalist, currentFinalist, roomDims) {
   if (!currentFinalist?.sources?.length || !finalist?.sources?.length) return false;
   if (finalist.sources.length !== currentFinalist.sources.length) return false;
   const W = Number(roomDims?.widthM) || 0;
