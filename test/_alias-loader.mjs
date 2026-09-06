@@ -1,4 +1,3 @@
-
 import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import { transformSync } from 'esbuild';
@@ -28,6 +27,23 @@ export async function load(url, context, nextLoad) {
     const source = fs.readFileSync(new URL(url).pathname, 'utf8');
     const result = transformSync(source, { loader: 'jsx', format: 'esm', jsx: 'automatic' });
     return { format: 'module', source: result.code, shortCircuit: true };
+  }
+  if (url.endsWith('.js') && url.includes('/src/')) {
+    const source = fs.readFileSync(new URL(url).pathname, 'utf8');
+    let patched = source;
+    let needsPolyfill = false;
+    if (patched.includes('import.meta.env')) {
+      patched = patched.replace(/import\.meta\.env/g, '({VITE_BASE44_APP_ID:"",VITE_BASE44_BACKEND_URL:""})');
+      needsPolyfill = true;
+    }
+    if (patched.includes('window.') && !patched.includes('typeof window')) {
+      needsPolyfill = true;
+    }
+    if (needsPolyfill) {
+      const polyfill = 'const globalWindow = typeof window !== "undefined" ? window : { localStorage: new Map(), location: { href: "http://localhost/", search: "", pathname: "/", hash: "" }, history: { replaceState: () => {} } };\n';
+      patched = patched.replace(/(?<![a-zA-Z_.])window\./g, 'globalWindow.');
+      return { format: 'module', source: polyfill + patched, shortCircuit: true };
+    }
   }
   return nextLoad(url, context);
 }

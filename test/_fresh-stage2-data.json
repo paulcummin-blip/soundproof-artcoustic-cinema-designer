@@ -1,0 +1,315 @@
+{
+  "project": {
+    "id": "6a917353f0f4315a0652781f",
+    "name": "Luxavo",
+    "roomDims": "{\"widthM\":4,\"lengthM\":6.3,\"heightM\":2.4}",
+    "subwooferInstances": [
+      {
+        "id": "sub-front-1",
+        "model": "sub4-12",
+        "enabled": true,
+        "position": {
+          "x": 1,
+          "y": 0.14500000000000002
+        },
+        "bottomHeightM": 0.05,
+        "rotationDeg": 0,
+        "positionSource": "user",
+        "legacyGroup": "front",
+        "symmetryLinkId": null,
+        "gainDb": 0,
+        "delayMs": 0,
+        "polarity": 1
+      },
+      {
+        "id": "sub-front-2",
+        "model": "sub4-12",
+        "enabled": true,
+        "position": {
+          "x": 3,
+          "y": 0.14500000000000002
+        },
+        "bottomHeightM": 0.05,
+        "rotationDeg": 0,
+        "positionSource": "user",
+        "legacyGroup": "front",
+        "symmetryLinkId": null,
+        "gainDb": 0,
+        "delayMs": 0,
+        "polarity": 1
+      },
+      {
+        "id": "sub-rear-1",
+        "model": "sub4-12",
+        "enabled": true,
+        "position": {
+          "x": 1,
+          "y": 6.155
+        },
+        "bottomHeightM": 0.05,
+        "rotationDeg": 0,
+        "positionSource": "user",
+        "legacyGroup": "rear",
+        "symmetryLinkId": null,
+        "gainDb": 0,
+        "delayMs": 0,
+        "polarity": 1
+      },
+      {
+        "id": "sub-rear-2",
+        "model": "sub4-12",
+        "enabled": true,
+        "position": {
+          "x": 3,
+          "y": 6.155
+        },
+        "bottomHeightM": 0.05,
+        "rotationDeg": 0,
+        "positionSource": "user",
+        "legacyGroup": "rear",
+        "symmetryLinkId": null,
+        "gainDb": 0,
+        "delayMs": 0,
+        "polarity": 1
+      }
+    ],
+    "subwoofers": [],
+    "seating_positions": [
+      {
+        "id": "seat-r1-c1",
+        "x": 1.6,
+        "y": 2.59,
+        "z": 1.2,
+        "rowNumber": 1,
+        "isPrimary": true,
+        "isSecondary": false,
+        "platformHeightM": 0,
+        "priority": "primary"
+      },
+      {
+        "id": "seat-r1-c2",
+        "x": 2.4000000000000004,
+        "y": 2.59,
+        "z": 1.2,
+        "rowNumber": 1,
+        "isPrimary": false,
+        "isSecondary": false,
+        "platformHeightM": 0,
+        "priority": "primary"
+      },
+      {
+        "id": "seat-r2-c1",
+        "x": 1.2,
+        "y": 4.39,
+        "z": 1.5,
+        "rowNumber": 2,
+        "isPrimary": false,
+        "isSecondary": false,
+        "platformHeightM": 0.30000000000000004,
+        "priority": "secondary"
+      },
+      {
+        "id": "seat-r2-c2",
+        "x": 2,
+        "y": 4.39,
+        "z": 1.5,
+        "rowNumber": 2,
+        "isPrimary": false,
+        "isSecondary": false,
+        "platformHeightM": 0.30000000000000004,
+        "priority": "secondary"
+      },
+      {
+        "id": "seat-r2-c3",
+        "x": 2.8,
+        "y": 4.39,
+        "z": 1.5,
+        "rowNumber": 2,
+        "isPrimary": false,
+        "isSecondary": false,
+        "platformHeightM": 0.30000000000000004,
+        "priority": "secondary"
+      }
+    ],
+    "dolby_config": "9.1.6",
+    "target_spl": 105,
+    "amplifier_power": null
+  },
+  "stage1": {
+    "current_fingerprint": "stage1:v1:8bd378045939659a",
+    "four_sub_result": {
+      "finalists": [
+        {
+          "id": "RP22_E:0_0|1_0|0_1|1_1",
+          "familyId": "RP22_E",
+          "sources": [
+            {
+              "xNorm": 0,
+              "yNorm": 0,
+              "x": 0,
+              "y": 0,
+              "z": 0.05
+            },
+            {
+              "xNorm": 1,
+              "yNorm": 0,
+              "x": 4,
+              "y": 0,
+              "z": 0.05
+            },
+            {
+              "xNorm": 0,
+              "yNorm": 1,
+              "x": 0,
+              "y": 6.3,
+              "z": 0.05
+            },
+            {
+              "xNorm": 1,
+              "yNorm": 1,
+              "x": 4,
+              "y": 6.3,
+              "z": 0.05
+            }
+          ]
+        },
+        {
+          "id": "RP22_C:0.15_0|0.85_0|0.15_1|0.85_1",
+          "familyId": "RP22_C",
+          "sources": [
+            {
+              "xNorm": 0.15,
+              "yNorm": 0,
+              "x": 0.6,
+              "y": 0,
+              "z": 0.05
+            },
+            {
+              "xNorm": 0.85,
+              "yNorm": 0,
+              "x": 3.4,
+              "y": 0,
+              "z": 0.05
+            },
+            {
+              "xNorm": 0.15,
+              "yNorm": 1,
+              "x": 0.6,
+              "y": 6.3,
+              "z": 0.05
+            },
+            {
+              "xNorm": 0.85,
+              "yNorm": 1,
+              "x": 3.4,
+              "y": 6.3,
+              "z": 0.05
+            }
+          ]
+        },
+        {
+          "id": "FOUR_THIRD_PAIRS:0.23_0|0.77_0|0.23_1|0.77_1",
+          "familyId": "FOUR_THIRD_PAIRS",
+          "sources": [
+            {
+              "xNorm": 0.23,
+              "yNorm": 0,
+              "x": 0.92,
+              "y": 0,
+              "z": 0.05
+            },
+            {
+              "xNorm": 0.77,
+              "yNorm": 0,
+              "x": 3.08,
+              "y": 0,
+              "z": 0.05
+            },
+            {
+              "xNorm": 0.23,
+              "yNorm": 1,
+              "x": 0.92,
+              "y": 6.3,
+              "z": 0.05
+            },
+            {
+              "xNorm": 0.77,
+              "yNorm": 1,
+              "x": 3.08,
+              "y": 6.3,
+              "z": 0.05
+            }
+          ]
+        },
+        {
+          "id": "RP22_D:0_0.15|1_0.15|0_0.85|1_0.85",
+          "familyId": "RP22_D",
+          "sources": [
+            {
+              "xNorm": 0,
+              "yNorm": 0.15,
+              "x": 0,
+              "y": 0.945,
+              "z": 0.05
+            },
+            {
+              "xNorm": 1,
+              "yNorm": 0.15,
+              "x": 4,
+              "y": 0.945,
+              "z": 0.05
+            },
+            {
+              "xNorm": 0,
+              "yNorm": 0.85,
+              "x": 0,
+              "y": 5.355,
+              "z": 0.05
+            },
+            {
+              "xNorm": 1,
+              "yNorm": 0.85,
+              "x": 4,
+              "y": 5.355,
+              "z": 0.05
+            }
+          ]
+        },
+        {
+          "id": "FOUR_SYMMETRIC_BOUNDARY_CUSTOM:0.2_0|0.8_0|0.2_1|0.8_1",
+          "familyId": "FOUR_SYMMETRIC_BOUNDARY_CUSTOM",
+          "sources": [
+            {
+              "xNorm": 0.2,
+              "yNorm": 0,
+              "x": 0.8,
+              "y": 0,
+              "z": 0.05
+            },
+            {
+              "xNorm": 0.8,
+              "yNorm": 0,
+              "x": 3.2,
+              "y": 0,
+              "z": 0.05
+            },
+            {
+              "xNorm": 0.2,
+              "yNorm": 1,
+              "x": 0.8,
+              "y": 6.3,
+              "z": 0.05
+            },
+            {
+              "xNorm": 0.8,
+              "yNorm": 1,
+              "x": 3.2,
+              "y": 6.3,
+              "z": 0.05
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
