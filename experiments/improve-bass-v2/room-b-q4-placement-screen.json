@@ -1,0 +1,194 @@
+{
+  "metadata": {
+    "experiment": "improve-bass-response-v2-read-only-sandbox",
+    "productionCodeModified": false,
+    "generatedAt": "2026-09-06T01:07:13.250Z",
+    "room": "Room B",
+    "quantity": 4,
+    "phase": "placement",
+    "variant": "screen",
+    "model": "SUB2-12",
+    "target": {
+      "p14TargetBasis": "minimum",
+      "p14TargetLevel": 2,
+      "p14TargetDb": 112,
+      "p18TargetBasis": "minimum"
+    },
+    "transitionHz": 162.65
+  },
+  "geometry": {
+    "roomDims": {
+      "widthM": 4,
+      "lengthM": 6.3,
+      "heightM": 2.4
+    },
+    "rspPosition": {
+      "id": "rsp",
+      "x": 2,
+      "y": 3.5,
+      "z": 1.2
+    },
+    "seatingPositions": [
+      {
+        "id": "primary-left",
+        "x": 1,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-centre",
+        "x": 2,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "primary-right",
+        "x": 3,
+        "y": 3.5,
+        "z": 1.2,
+        "priority": "primary"
+      },
+      {
+        "id": "secondary-left",
+        "x": 1,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-centre",
+        "x": 2,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      },
+      {
+        "id": "secondary-right",
+        "x": 3,
+        "y": 4.8,
+        "z": 1.2,
+        "priority": "secondary"
+      }
+    ]
+  },
+  "result": null,
+  "stage1": {
+    "runtimeMs": 78624.8,
+    "candidateCount": 37,
+    "finalists": [
+      {
+        "id": "RP22_E:0_0|1_0|0_1|1_1",
+        "familyId": "RP22_E",
+        "positions": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 4,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 6.3
+          },
+          {
+            "x": 4,
+            "y": 6.3
+          }
+        ]
+      },
+      {
+        "id": "RP22_C:0.15_0|0.85_0|0.15_1|0.85_1",
+        "familyId": "RP22_C",
+        "positions": [
+          {
+            "x": 0.6,
+            "y": 0
+          },
+          {
+            "x": 3.4,
+            "y": 0
+          },
+          {
+            "x": 0.6,
+            "y": 6.3
+          },
+          {
+            "x": 3.4,
+            "y": 6.3
+          }
+        ]
+      },
+      {
+        "id": "FOUR_THIRD_PAIRS:0.23_0|0.77_0|0.23_1|0.77_1",
+        "familyId": "FOUR_THIRD_PAIRS",
+        "positions": [
+          {
+            "x": 0.92,
+            "y": 0
+          },
+          {
+            "x": 3.08,
+            "y": 0
+          },
+          {
+            "x": 0.92,
+            "y": 6.3
+          },
+          {
+            "x": 3.08,
+            "y": 6.3
+          }
+        ]
+      },
+      {
+        "id": "RP22_D:0_0.15|1_0.15|0_0.85|1_0.85",
+        "familyId": "RP22_D",
+        "positions": [
+          {
+            "x": 0,
+            "y": 0.945
+          },
+          {
+            "x": 4,
+            "y": 0.945
+          },
+          {
+            "x": 0,
+            "y": 5.355
+          },
+          {
+            "x": 4,
+            "y": 5.355
+          }
+        ]
+      },
+      {
+        "id": "FOUR_SYMMETRIC_BOUNDARY_CUSTOM:0.2_0|0.8_0|0.2_1|0.8_1",
+        "familyId": "FOUR_SYMMETRIC_BOUNDARY_CUSTOM",
+        "positions": [
+          {
+            "x": 0.8,
+            "y": 0
+          },
+          {
+            "x": 3.2,
+            "y": 0
+          },
+          {
+            "x": 0.8,
+            "y": 6.3
+          },
+          {
+            "x": 3.2,
+            "y": 6.3
+          }
+        ]
+      }
+    ]
+  },
+  "totalPhaseRuntimeMs": 78628.1
+}
