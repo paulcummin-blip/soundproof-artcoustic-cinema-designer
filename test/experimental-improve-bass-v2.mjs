@@ -701,21 +701,37 @@ try {
   }
 
   if (phase === "seating") {
+    const directMatch = variant.match(/^retuned-(-?\d+)$/);
+    if (directMatch) {
+      const offsetMm = Number(directMatch[1]);
+      const placement = simulatePlacement(trustedFinalist, movedGeometry(offsetMm / 1000));
+      const retune = searchPolarity(placement.raw);
+      const tuning = retune.best.polarityDelayTrim.tuning;
+      const result = canonical(
+        placement.raw,
+        tuning,
+        "seat moved " + offsetMm + " mm; polarity/delay/trim retuned",
+      );
+      savePhase({
+        result,
+        tuning,
+        directAuthoritativeOffsetMm: offsetMm,
+        simulationMs: round(placement.runtimeMs, 1),
+        retuneSearchMs: round(retune.runtimeMs, 1),
+      });
+      await server.close();
+      process.exit(0);
+    }
+
     const search = searchSeatBlock(trustedFinalist, savedTuning);
-    const useRetuned = variant === "retuned";
-    const retune = useRetuned ? searchPolarity(search.best.raw) : null;
-    const tuning = useRetuned
-      ? retune.best.polarityDelayTrim.tuning
-      : savedTuning;
     const result = canonical(
       search.best.raw,
-      tuning,
-      "seat moved " + round(search.best.offsetM * 1000, 0) + " mm; "
-        + (useRetuned ? "polarity/delay/trim retuned" : "fixed prior tuning"),
+      savedTuning,
+      "seat moved " + round(search.best.offsetM * 1000, 0) + " mm; fixed prior tuning",
     );
     savePhase({
       result,
-      tuning,
+      tuning: savedTuning,
       search: {
         runtimeMs: round(search.runtimeMs, 1),
         coarseCount: search.coarseCount,
@@ -724,7 +740,7 @@ try {
         top: search.top,
         bestFullSimulationMs: round(search.best.simulationMs, 1),
       },
-      retuneSearchMs: round(retune?.runtimeMs || 0, 1),
+      retuneSearchMs: 0,
     });
     await server.close();
     process.exit(0);
