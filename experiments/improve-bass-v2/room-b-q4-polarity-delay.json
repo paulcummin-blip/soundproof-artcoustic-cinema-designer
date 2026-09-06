@@ -158,37 +158,43 @@
         "seatId": "primary-left",
         "variationDbRaw": 7.926,
         "level": 0,
-        "worstFrequencyHz": 57.873
+        "worstFrequencyHz": 57.873,
+        "isPrimary": true
       },
       {
         "seatId": "primary-centre",
         "variationDbRaw": 4.767,
         "level": 2,
-        "worstFrequencyHz": 19.879
+        "worstFrequencyHz": 19.879,
+        "isPrimary": true
       },
       {
         "seatId": "primary-right",
         "variationDbRaw": 11.596,
         "level": 0,
-        "worstFrequencyHz": 44.305
+        "worstFrequencyHz": 44.305,
+        "isPrimary": true
       },
       {
         "seatId": "secondary-left",
         "variationDbRaw": 12.101,
         "level": 0,
-        "worstFrequencyHz": 45.933
+        "worstFrequencyHz": 45.933,
+        "isPrimary": false
       },
       {
         "seatId": "secondary-centre",
         "variationDbRaw": 9.105,
         "level": 0,
-        "worstFrequencyHz": 29.146
+        "worstFrequencyHz": 29.146,
+        "isPrimary": false
       },
       {
         "seatId": "secondary-right",
         "variationDbRaw": 12.012,
         "level": 0,
-        "worstFrequencyHz": 38.347
+        "worstFrequencyHz": 38.347,
+        "isPrimary": false
       }
     ],
     "perSeatP20": [
@@ -196,37 +202,43 @@
         "seatId": "primary-left",
         "variationDbRaw": 7.964,
         "level": 1,
-        "worstFrequencyHz": 57.873
+        "worstFrequencyHz": 57.873,
+        "isPrimary": true
       },
       {
         "seatId": "primary-centre",
         "variationDbRaw": 0,
         "level": 4,
-        "worstFrequencyHz": 25.966
+        "worstFrequencyHz": 25.966,
+        "isPrimary": true
       },
       {
         "seatId": "primary-right",
         "variationDbRaw": 11.597,
         "level": 1,
-        "worstFrequencyHz": 44.305
+        "worstFrequencyHz": 44.305,
+        "isPrimary": true
       },
       {
         "seatId": "secondary-left",
         "variationDbRaw": 12.083,
         "level": 1,
-        "worstFrequencyHz": 45.933
+        "worstFrequencyHz": 45.933,
+        "isPrimary": false
       },
       {
         "seatId": "secondary-centre",
         "variationDbRaw": 6.507,
         "level": 1,
-        "worstFrequencyHz": 151.191
+        "worstFrequencyHz": 151.191,
+        "isPrimary": false
       },
       {
         "seatId": "secondary-right",
         "variationDbRaw": 11.533,
         "level": 1,
-        "worstFrequencyHz": 39.757
+        "worstFrequencyHz": 39.757,
+        "isPrimary": false
       }
     ],
     "enabledEqFilters": [
