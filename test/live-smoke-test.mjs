@@ -12,9 +12,6 @@
 // No code changes to the app. This is a read-only test that exercises the
 // actual production modules.
 
-import { register } from './_alias-register.mjs';
-await register();
-
 import { simulateAuthoritativeBassResponse } from '@/components/room/bass/authoritativeBassResponseEngine';
 import { buildAuthoritativeRspPosition } from '@/components/room/bass/authoritativeRspPosition';
 import { resolveSubwooferBassCapability } from '@/components/utils/speakerModelResolver';
