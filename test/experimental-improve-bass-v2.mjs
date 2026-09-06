@@ -612,7 +612,7 @@ try {
     };
     writeFileSync(path, JSON.stringify(output, null, 2));
     console.log("RESULT " + path);
-    console.log(JSON.stringify(output, null, 2));
+    console.log(JSON.stringify({ metadata: output.metadata, result: output.result || null, totalPhaseRuntimeMs: output.totalPhaseRuntimeMs }, null, 2));
   }
 
   if (phase === "baseline") {
