@@ -915,9 +915,15 @@ export function generateCanonicalCandidatePool({
       curve: levelNormalisedRawCurve.map((point) => ({ ...point })),
       combinedEqCurve: [],
       fitterHouseCurveTarget: targetCurve,
-      physicalEqAuthorityPassed: true,
+      // Not-evaluated semantics: the iterative fitter never ran, so its own
+      // physical-authority and bank-validation gates were not exercised.
+      // The candidate's separate achieved-curve physicalEqAuthorityPassed
+      // (computed in buildCanonicalCandidate from the actual finalPostEqCurve)
+      // and bankValidationResult (from bankLimits on the actual empty bank)
+      // remain the real authorities — those ARE evaluated and are correct.
+      physicalEqAuthorityPassed: null,
       physicalAuthorityViolations: [],
-      bankValidationPassed: true,
+      bankValidationPassed: null,
       bankLimits: { allOk: true, boostLimitOk: true, cutLimitOk: true, sourceDomainHeadroomOk: true, maxAggregateBoostDb: 0, maxAggregateBoostHz: null, maxAggregateCutDb: 0, maxAggregateCutHz: null },
       bankDiagnostics: { selectedBankLimits: { allOk: true, boostLimitOk: true, cutLimitOk: true, sourceDomainHeadroomOk: true, maxAggregateBoostDb: 0, maxAggregateBoostHz: null, maxAggregateCutDb: 0, maxAggregateCutHz: null } },
       rspObjectiveMaxDeviationDb: null,
