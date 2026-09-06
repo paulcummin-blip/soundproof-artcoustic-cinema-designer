@@ -1295,7 +1295,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       // distance-based attenuation depending on modalSourceReferenceMode, which is not part of
       // the validated Case 071 formula and was causing the flattened response).
       if (options?.qStrategy === 'ab_corrected') {
-        const abSourceUnit = Math.pow(10, curveDb / 20);
+        const abSourceUnit = Math.pow(10, (curveDb + source.tuning.gainDb) / 20);
         // B7 removes the fixed Case 089 70–120 Hz Q boost from the corrected
         // production field. abMidbandQScale is retained only for reproducible historical
         // diagnostics; the physical default is 1.0.
