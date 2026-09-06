@@ -26,8 +26,9 @@ function isSamePlacement(sourcesA, sourcesB) {
   }
   return true;
 }
-import { base44 } from '@/api/base44Client';
 import { artcousticHouseCurveOffsetAt } from '@/components/utils/artcousticHouseCurve';
+import fs from 'node:fs';
+const DATA = JSON.parse(fs.readFileSync(new URL('./_fresh-stage2-data.json', import.meta.url), 'utf8'));
 
 const PROJECT_ID = '6a917353f0f4315a0652781f';
 const SELECTED_SUB_MODEL = 'sub4-12';
@@ -45,15 +46,27 @@ function parseRoomDims(project) {
 }
 
 function buildSeatingPositions(project, roomDims) {
-  const rows = project.seating_positions || [];
-  const positions = [];
+  const positions = project.seating_positions || [];
+  // The project stores seating_positions as a flat array of {id, x, y, z, isPrimary, ...}
+  if (Array.isArray(positions) && positions.length > 0 && positions[0].x != null) {
+    return positions.map(seat => ({
+      id: seat.id,
+      x: Number(seat.x),
+      y: Number(seat.y),
+      z: Number(seat.z ?? 1.2),
+      isPrimary: !!seat.isPrimary,
+    }));
+  }
+  // Fallback: nested rows structure
+  const rows = positions;
+  const result = [];
   for (const row of rows) {
     const seats = row.seats || row.positions || [];
     const y = row.y_position ?? row.y ?? (roomDims.lengthM * 0.5);
     for (let i = 0; i < seats.length; i++) {
       const seat = seats[i];
       const x = seat.x_position ?? seat.x ?? (roomDims.widthM * (i + 1) / (seats.length + 1));
-      positions.push({
+      result.push({
         id: seat.id || `seat-r${row.row_index ?? 0}-s${i}`,
         x: Number(x),
         y: Number(y),
@@ -62,7 +75,7 @@ function buildSeatingPositions(project, roomDims) {
       });
     }
   }
-  return positions;
+  return result;
 }
 
 function buildSourcesFromFinalist(finalist, roomDims, subModel, ampPowerW) {
@@ -208,8 +221,7 @@ async function main() {
   console.log('='.repeat(60));
 
   // ── Load project ──────────────────────────────────────────────────────
-  const projects = await base44.entities.Project.filter({ id: PROJECT_ID });
-  const project = projects[0];
+  const project = DATA.project;
   const roomDims = parseRoomDims(project);
   const seatingPositions = buildSeatingPositions(project, roomDims);
   const mlpY_m = roomDims.lengthM * 0.41;
@@ -219,17 +231,14 @@ async function main() {
   console.log(`Seats: ${seatingPositions.length}, RSP: (${rspPosition.x}, ${rspPosition.y.toFixed(3)}, ${rspPosition.z})`);
 
   // ── Read Stage 1 finalists ─────────────────────────────────────────────
-  const stage1Caches = await base44.entities.Stage1PlacementCache.filter({ project_id: PROJECT_ID });
-  const stage1 = stage1Caches[0];
+  const stage1 = DATA.stage1;
   const freshFinalists = stage1?.four_sub_result?.finalists || [];
   console.log(`Fresh Stage 1 finalists (4-sub): ${freshFinalists.length}`);
 
   // ── Build physics options ──────────────────────────────────────────────
   const physicsOptions = buildNormalizedPhysicsOptions({
     ...BASS_NORMALIZED_PHYSICS_DEFAULTS,
-    roomDims,
-    strategy: 'ab_corrected',
-    rewSourceCurveMode: 'product',
+    qStrategy: 'ab_corrected',
   });
 
   // ── STEP 1: FRESH STAGE 2 — Run all 5 finalists through the engine ──────
