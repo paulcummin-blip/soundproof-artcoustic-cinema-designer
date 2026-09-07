@@ -54,7 +54,7 @@ const SUBWOOFER_INSTANCES = [
 
 const SEATING_POSITIONS = [
   { id: 'seat-r1-c1', x: 1.6, y: 2.59, z: 1.2, rowNumber: 1, isPrimary: true,  priority: 'primary' },
-  { id: 'seat-r1-c2', x: 2.4, y: 2.59, z: 1.2, rowNumber: 1, isPrimary: false, priority: 'primary' },
+  { id: 'seat-r1-c2', x: 2.4, y: 2.59, z: 1.2, rowNumber: 1, isPrimary: true, priority: 'primary' },
   { id: 'seat-r2-c1', x: 1.2, y: 4.39, z: 1.5, rowNumber: 2, isPrimary: false, priority: 'secondary' },
   { id: 'seat-r2-c2', x: 2.0, y: 4.39, z: 1.5, rowNumber: 2, isPrimary: false, priority: 'secondary' },
   { id: 'seat-r2-c3', x: 2.8, y: 4.39, z: 1.5, rowNumber: 2, isPrimary: false, priority: 'secondary' },
@@ -75,7 +75,16 @@ const REAR_SUBS_CFG = {
   tuning: [], orientation: 'vertical', bottomHeightM: 0.05,
 };
 
-const PHYSICS = { ...BASS_NORMALIZED_PHYSICS_DEFAULTS };
+// Production physics — same overrides as useAuthoritativeBassResponse
+const PHYSICS = {
+  ...BASS_NORMALIZED_PHYSICS_DEFAULTS,
+  rewSourceCurveMode: 'product',
+  disableLateField: true,
+  disableModalPropagationPhase: true,
+  rewParityModalMagnitudeScale: 1,
+  debugModalPhaseConvention: 'normal',
+  debugModalHSign: 'normal',
+};
 
 // ════════════════════════════════════════════════════════════════════════
 // STEP 1: Compute RSP position (same as production)
