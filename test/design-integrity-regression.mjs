@@ -138,6 +138,17 @@ console.log('\nFIX 1 — Abfuser Recommendation Must Not Autosave');
 }
 
 // ─── FIX 2: NAVIGATION/HYDRATION GEOMETRY GUARDS ────────────────────────────
+//
+// Three geometry-writing effects in RoomDesigner.jsx must all guard against
+// hydration with `if (loadState?.phase !== 'loaded') return;` so that
+// navigation re-mounts do not persist derived geometry:
+//
+//   (a) LCR wall-lock effect — locks FL/FC/FR to front wall + z=1.2
+//   (b) FC centerline effect  — locks FC speaker to room centerline (X)
+//   (c) Speaker aiming effect  — rotates LCR/wides/surrounds toward MLP
+//
+// We verify each effect individually by locating its unique comment anchor
+// and confirming the guard appears within that effect's body.
 
 console.log('\nFIX 2 — Navigation/Hydration Geometry Guards');
 
@@ -147,24 +158,90 @@ console.log('\nFIX 2 — Navigation/Hydration Geometry Guards');
     'utf8'
   );
 
-  // LCR lock effect must guard against hydration
-  assert(
-    'LCR lock effect has loadState guard',
-    roomDesignerSource.includes("if (loadState?.phase !== 'loaded') return;"),
-    'no loadState guard found'
-  );
+  // ── Helper: extract the body of a useEffect block starting at a comment ──
+  // Returns the source from the comment line up to the matching `}, [...]);`
+  function extractEffectBody(source, commentAnchor) {
+    const anchorIdx = source.indexOf(commentAnchor);
+    if (anchorIdx === -1) return null;
+    // Find the next `useEffect(() => {` after the anchor
+    const effectIdx = source.indexOf('useEffect(() => {', anchorIdx);
+    if (effectIdx === -1) return null;
+    // Find the closing `}, [` (dependency array) after the effect opening
+    const depIdx = source.indexOf('}, [', effectIdx);
+    if (depIdx === -1) return null;
+    return source.slice(effectIdx, depIdx);
+  }
 
-  // Must use yHalfExtentM_physical (not yHalfExtentM) for persisted geometry
-  assert(
-    'LCR lock uses yHalfExtentM_physical',
-    roomDesignerSource.includes('yHalfExtentM_physical(depthM, widthM, targetYawDeg)'),
-    'still using stroke-contaminated yHalfExtentM'
+  // ── (a) LCR wall-lock effect ──
+  const lcrLockBody = extractEffectBody(
+    roomDesignerSource,
+    'Effect to lock LCR to front wall'
   );
-
   assert(
-    'LCR lock does NOT use stroke-contaminated yHalfExtentM',
-    !roomDesignerSource.includes('yHalfExtentM(depthM, widthM, targetYawDeg)'),
-    'still referencing stroke-contaminated yHalfExtentM'
+    'LCR wall-lock effect found in source',
+    lcrLockBody !== null,
+    'could not locate LCR wall-lock effect'
+  );
+  if (lcrLockBody) {
+    assert(
+      'LCR wall-lock effect does not persist during hydration',
+      lcrLockBody.includes("if (loadState?.phase !== 'loaded') return;"),
+      'no loadState hydration guard in LCR wall-lock effect'
+    );
+    assert(
+      'LCR wall-lock uses yHalfExtentM_physical',
+      lcrLockBody.includes('yHalfExtentM_physical(depthM, widthM, targetYawDeg)'),
+      'still using stroke-contaminated yHalfExtentM'
+    );
+    assert(
+      'LCR wall-lock does NOT use stroke-contaminated yHalfExtentM',
+      !lcrLockBody.includes('yHalfExtentM(depthM, widthM, targetYawDeg)'),
+      'still referencing stroke-contaminated yHalfExtentM'
+    );
+  }
+
+  // ── (b) FC centerline effect ──
+  const fcLockBody = extractEffectBody(
+    roomDesignerSource,
+    'Effect to lock FC speaker to room centerline'
+  );
+  assert(
+    'FC centerline effect found in source',
+    fcLockBody !== null,
+    'could not locate FC centerline effect'
+  );
+  if (fcLockBody) {
+    assert(
+      'FC centerline effect does not persist during hydration',
+      fcLockBody.includes("if (loadState?.phase !== 'loaded') return;"),
+      'no loadState hydration guard in FC centerline effect'
+    );
+  }
+
+  // ── (c) Speaker aiming effect ──
+  const aimingBody = extractEffectBody(
+    roomDesignerSource,
+    'Speaker aiming (inline, compacted)'
+  );
+  assert(
+    'Speaker aiming effect found in source',
+    aimingBody !== null,
+    'could not locate speaker aiming effect'
+  );
+  if (aimingBody) {
+    assert(
+      'Speaker aiming effect does not persist during hydration',
+      aimingBody.includes("if (loadState?.phase !== 'loaded') return;"),
+      'no loadState hydration guard in speaker aiming effect'
+    );
+  }
+
+  // ── Global: all three guards present in file ──
+  const guardCount = (roomDesignerSource.match(/if \(loadState\?\.phase !== 'loaded'\) return;/g) || []).length;
+  assert(
+    'at least 3 loadState hydration guards present in RoomDesigner',
+    guardCount >= 3,
+    `found ${guardCount} guards, expected >= 3`
   );
 }
 
