@@ -370,7 +370,7 @@ for (let i = 0; i < candidates.length; i++) {
   console.log(`   [${i + 1}/${candidates.length}] ${c.label}: proxy=${score?.toFixed(2)}dB, maxSeat=${maxSeatDev?.toFixed(2)}dB, ETA~${(remaining / 1000).toFixed(0)}s`);
 }
 
-console.log(`\n   Screening complete: ${(performance.now() - screenStart / 1000).toFixed(1)}s\n`);
+console.log(`\n   Screening complete: ${((performance.now() - screenStart) / 1000).toFixed(1)}s\n`);
 
 // Sort by proxy score (lower = better)
 screened.sort((a, b) => a.proxyScore - b.proxyScore);
