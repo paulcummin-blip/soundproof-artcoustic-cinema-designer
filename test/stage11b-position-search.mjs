@@ -34,6 +34,8 @@ import {
   resumWithTuning,
 } from '@/components/room/bass/stage2/stage2TuningSearch.js';
 import { isMaterialImprovement } from '@/components/room/bass/improveBassV2/materialityGate.js';
+import { subHalfExtents, deriveSubWallOrientation, CLEARANCE_M } from '@/components/room/rv/utils/subWallOrientation.js';
+import { resolveSeatPriority, PRIMARY as PRIORITY_PRIMARY } from '@/components/utils/seatPriorityAuthority.js';
 
 // ════════════════════════════════════════════════════════════════════════
 // PROJECT INPUTS — Luxavo / Duffy (same as Stage 11A)
@@ -47,14 +49,16 @@ const P14_TARGET_BASIS = 'minimum';
 const P14_TARGET_LEVEL = 2;
 const P14_TARGET_DB = P14_MINIMUM_THRESHOLDS.L2;
 
+// Physics matches production BASS_NORMALIZED_PHYSICS_DEFAULTS + production overrides.
+// debugModalHSign and debugModalPhaseConvention are NOT in production defaults;
+// including them caused fingerprint divergence. Removing them makes the harness
+// fingerprint identical to the production Calculate path.
 const PHYSICS = {
   ...BASS_NORMALIZED_PHYSICS_DEFAULTS,
   rewSourceCurveMode: 'product',
   disableLateField: true,
   disableModalPropagationPhase: true,
   rewParityModalMagnitudeScale: 1,
-  debugModalPhaseConvention: 'normal',
-  debugModalHSign: 'normal',
 };
 
 const SPL_CONFIG = {
@@ -78,10 +82,10 @@ const SEATING_POSITIONS = [
 // Current sub positions
 const CUR_FRONT = { x: 1.0, y: 0.16 };
 const CUR_REAR  = { x: 1.0, y: 6.14 };
-// SUB3-12: 600mm wide × 600mm high × 255mm deep
-const SUB_HALF_WIDTH_M = 0.3;   // half-width for X-axis clearance
-const SUB_HALF_DEPTH_M = 0.1275; // half-depth for Y-axis clearance
-const WALL_CLEARANCE_M = 0.02;   // minimal wall clearance
+// SUB3-12 cabinet dimensions from canonical speaker registry (not hardcoded)
+const SUB3_12_MODEL = MODELS.find(m => m.key === 'sub3-12');
+const SUB_WIDTH_M = (SUB3_12_MODEL?.widthMm || 600) / 1000;   // 0.600 m
+const SUB_DEPTH_M = (SUB3_12_MODEL?.depthMm || 255) / 1000;   // 0.255 m
 const STEP_M = 0.1;
 const MAX_STEPS = 3;
 
@@ -116,9 +120,18 @@ function buildSourcesForSubs(subInstances, rspPosition) {
   return buildAuthoritativeBassSources({ frontSubsLive, rearSubsLive, frontSubsCfg, rearSubsCfg, autoAlignDelays, amplifierPowerPerSubW: DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W });
 }
 
+// Uses canonical subWallOrientation authority: deriveSubWallOrientation + subHalfExtents.
+// Axis-specific half-extents are computed based on the sub's wall orientation,
+// so front/rear wall subs use halfDepth for Y clearance and halfWidth for X,
+// while side-wall subs (rotated 90°) swap the axes correctly.
 function isValidPosition(x, y) {
-  const minXY = SUB_CABINET_HALF_M + WALL_CLEARANCE_M;
-  return x >= minXY && x <= ROOM_DIMS.widthM - minXY && y >= minXY && y <= ROOM_DIMS.lengthM - minXY;
+  const { rotationDeg } = deriveSubWallOrientation({
+    x, y, widthM: ROOM_DIMS.widthM, lengthM: ROOM_DIMS.lengthM,
+    subWidthM: SUB_WIDTH_M, subDepthM: SUB_DEPTH_M,
+  });
+  const { halfX, halfY } = subHalfExtents(SUB_WIDTH_M, SUB_DEPTH_M, rotationDeg);
+  return x >= halfX + CLEARANCE_M && x <= ROOM_DIMS.widthM - halfX - CLEARANCE_M
+      && y >= halfY + CLEARANCE_M && y <= ROOM_DIMS.lengthM - halfY - CLEARANCE_M;
 }
 
 // Cheap proxy: peak-to-peak SPL variation on RSP curve in 20-200 Hz
@@ -157,12 +170,18 @@ function runCanonicalChain(seatResponses, roomResponseCurve, sources, label) {
   return { canonicalResult, authority, pool, selection };
 }
 
+// Uses canonical resolveSeatPriority authority — NOT the stale isPrimary boolean.
+// priority === "primary" is the project authority for primary-seat classification.
 function extractP19P20(authority) {
+  const isPrimarySeat = (seatId) => {
+    const seat = SEATING_POSITIONS.find(p => p.id === seatId);
+    return resolveSeatPriority(seat) === PRIORITY_PRIMARY;
+  };
   const p19Results = (authority?.perSeatP19Results || []).map(s => ({
-    ...s, isPrimary: SEATING_POSITIONS.find(p => p.id === s.seatId)?.isPrimary || false,
+    ...s, isPrimary: isPrimarySeat(s.seatId),
   }));
   const p20Results = (authority?.perSeatP20Results || []).map(s => ({
-    ...s, isPrimary: SEATING_POSITIONS.find(p => p.id === s.seatId)?.isPrimary || false,
+    ...s, isPrimary: isPrimarySeat(s.seatId),
   }));
   return {
     p19Results, p20Results,
@@ -175,6 +194,8 @@ function extractP19P20(authority) {
   };
 }
 
+// Primary-seat regression veto: uses canonical resolveSeatPriority via isPrimary
+// set in extractP19P20. Any level drop on ANY primary seat is a hard veto.
 function checkPrimaryRegression(currentMetrics, candidateMetrics) {
   for (const s of candidateMetrics.p19Results) {
     if (!s.isPrimary) continue;
