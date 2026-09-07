@@ -4,9 +4,12 @@
 // winner, error, snapshot, and cancellation.
 
 import { useSyncExternalStore } from "react";
+import { computeEta } from "./etaCalculator.js";
 
 const listeners = new Set();
 const states = new Map();
+
+const MAX_ETA_SAMPLES = 10;
 
 const keyFor = (projectId) => String(projectId || "free");
 
@@ -26,6 +29,10 @@ function emptyState(projectId) {
     startedAtMs: null,
     completedAtMs: null,
     cancelRequested: false,
+    etaStatus: "estimating",
+    etaSeconds: null,
+    unitTimes: [],
+    lastProgressAt: null,
   };
 }
 
@@ -67,11 +74,28 @@ export function startImproveBassV2(projectId, snapshot) {
 }
 
 export function updateProgress(projectId, phase, label, current, total) {
+  const state = getImproveBassV2State(projectId);
+  const now = Date.now();
+  const unitTimes = [...(state.unitTimes || [])];
+
+  // Track per-unit completion time when progress advances
+  if (state.lastProgressAt && current > (state.progressCurrent || 0)) {
+    const duration = now - state.lastProgressAt;
+    unitTimes.push(duration);
+    if (unitTimes.length > MAX_ETA_SAMPLES) unitTimes.shift();
+  }
+
+  const eta = computeEta(unitTimes, current || 0, total || 0);
+
   return publish(projectId, {
     phase,
     phaseLabel: label,
     progressCurrent: current || 0,
     progressTotal: total || 0,
+    lastProgressAt: now,
+    unitTimes,
+    etaStatus: eta.status,
+    etaSeconds: eta.etaSeconds,
   });
 }
 

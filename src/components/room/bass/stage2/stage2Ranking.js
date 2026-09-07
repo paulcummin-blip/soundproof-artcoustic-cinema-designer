@@ -107,8 +107,26 @@ export function buildStage2RankingTuple(result, seatPriorityMap) {
   // Family preference
   const familyRank = getFamilyPreferenceRank(result.familyId);
 
+  // Asymmetry: count sources without a mirror partner about the layout centre.
+  // Lower is better (more symmetric). Computed from coordinates only — no
+  // roomDims needed. The centre is estimated as the midpoint of min/max X.
+  const coords = result.coordinates || [];
+  let asymmetryCount = 0;
+  if (coords.length >= 2) {
+    const xs = coords.map((c) => Number(c.x) || 0);
+    const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    for (const c of coords) {
+      const mirrorX = 2 * centerX - (Number(c.x) || 0);
+      const hasMirror = coords.some((c2) =>
+        Math.abs((Number(c2.x) || 0) - mirrorX) < 0.05 &&
+        Math.abs((Number(c2.y) || 0) - (Number(c.y) || 0)) < 0.05,
+      );
+      if (!hasMirror) asymmetryCount++;
+    }
+  }
+
   // Deterministic coordinate key
-  const coordKey = (result.coordinates || [])
+  const coordKey = coords
     .map((c) => `${(c.x || 0).toFixed(3)},${(c.y || 0).toFixed(3)}`)
     .sort().join("|");
 
@@ -126,8 +144,8 @@ export function buildStage2RankingTuple(result, seatPriorityMap) {
     p14HeadroomDb,
     0, // efficiency loss — not yet available
     -familyRank,
-    0, // local displacement — not yet available
-    0, // asymmetry — not yet available
+    0, // local displacement — not yet available (needs current positions)
+    -asymmetryCount, // asymmetry — lower is better, negated for max-compare
     coordKey,
   ];
 

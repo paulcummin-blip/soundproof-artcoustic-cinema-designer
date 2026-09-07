@@ -37,6 +37,7 @@ import {
   useImproveBassV2State,
 } from "./improveBassV2Store";
 import { buildOptimisedInstances } from "./improveBassV2Apply";
+import { applyCalibrationTuning } from "./improveBassV2ApplyCalibration";
 import { computeV2DesignFingerprint } from "./improveBassV2Fingerprint";
 import ImproveBassV2Progress from "./ImproveBassV2Progress";
 import ImproveBassV2Results from "./ImproveBassV2Results";
@@ -232,6 +233,15 @@ export default function ImproveBassResponseV2({
   }, [state?.winner, commitInstances, hasCanonicalInstances, selectedSubModel,
     subwooferInstances, roomDims]);
 
+  const handleApplyCalibration = useCallback(() => {
+    if (!state?.winner?.calibrationTuning || !commitInstances) return;
+    const updated = applyCalibrationTuning(subwooferInstances, state.winner.calibrationTuning);
+    commitInstances(updated, {
+      front: { placementMode: "manual", isManual: true },
+      rear: { placementMode: "manual", isManual: true },
+    });
+  }, [state?.winner, commitInstances, subwooferInstances]);
+
   if (!shared?.hasCurrentResult) return null;
 
   const isRunning = state?.status === "running";
@@ -270,6 +280,7 @@ export default function ImproveBassResponseV2({
           currentInstances={subwooferInstances}
           roomDims={roomDims}
           onApply={handleApply}
+          onApplyCalibration={handleApplyCalibration}
         />
       )}
 

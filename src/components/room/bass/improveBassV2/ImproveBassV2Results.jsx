@@ -12,6 +12,7 @@ import SharedP19P20SeatResults from "@/components/room/bass/SharedP19P20SeatResu
 import { buildWhatChanged } from "./improveBassV2WhatChanged";
 import { buildTreatmentAdvisory, buildRemainingLimitation } from "./improveBassV2Treatment";
 import { isOptimisedApplied } from "./improveBassV2Apply";
+import CalibrationOnlyResults from "./CalibrationOnlyResults";
 
 function levelText(level) {
   if (!Number.isFinite(level)) return "—";
@@ -47,10 +48,36 @@ export default function ImproveBassV2Results({
   currentInstances,
   roomDims,
   onApply,
+  onApplyCalibration,
 }) {
   const [showChanges, setShowChanges] = useState(false);
 
   if (!selection) return null;
+
+  // Stage 11A: Show calibration-only result (tiers A and B) when available
+  if (selection.calibrationResult) {
+    return (
+      <>
+        <CalibrationOnlyResults
+          currentResult={selection.currentResult || snapshot}
+          calibrationResult={selection.calibrationResult}
+          calibrationMaterial={selection.calibrationMaterial}
+          calibrationTuning={selection.calibrationTuning}
+          currentInstances={currentInstances}
+          onApplyCalibration={onApplyCalibration}
+        />
+        {/* Stage 11B winner display (position optimised) — shown below calibration */}
+        {selection.winner && !selection.isCurrent && (
+          <div className="mt-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143] mb-1">
+              Optimised Position (Stage 11B)
+            </div>
+            {/* Existing winner display continues below */}
+          </div>
+        )}
+      </>
+    );
+  }
 
   // No safer improvement found
   if (selection.isCurrent || !selection.winner) {

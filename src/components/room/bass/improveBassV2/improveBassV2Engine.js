@@ -32,6 +32,8 @@ import { computeV2DesignFingerprint, isCurrentAuthorityNonStale } from "./improv
 import { runInWorker, isFatalLifecycleError, V2RunTimeoutError } from "./improveBassV2WorkerLifecycle.js";
 import { V2RuntimeMetrics } from "./improveBassV2RuntimeMetrics.js";
 import { subscribeImproveBassV2, getImproveBassV2State } from "./improveBassV2Store.js";
+import { runCalibrationOnlySearch } from "./calibrationOnlySearch.js";
+import { isMaterialImprovement } from "./materialityGate.js";
 
 const MAX_CHALLENGERS = 3;
 
@@ -608,6 +610,92 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     if (isCancelled()) return { status: "cancelled", snapshot };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
 
+    // ── Phase 1.5: Calibration-only search on Current positions (Stage 11A) ─
+    // Search delay/polarity/trim on the CURRENT installed positions before any
+    // physical movement. Produces the "Recommended Calibration" tier (B).
+    let calibrationResult = null;
+    let calibrationMaterial = null;
+    let calibrationTuning = null;
+
+    try {
+      onProgress("calibrating", "Searching calibration improvements", 0, 2);
+      const currentFinalist = buildCurrentFinalist(subwooferInstances, roomDims);
+      if (currentFinalist) {
+        // Get or compute Current's raw transfers (zero tuning)
+        let currentRawTransfer = null;
+        const cachedTransfers = placementFingerprint
+          ? getCachedRawTransfersForFingerprint(placementFingerprint)
+          : new Map();
+        for (const [fid, transfer] of cachedTransfers.entries()) {
+          if (!transfer?.sources) continue;
+          if (transfer.sources.length !== currentFinalist.sources.length) continue;
+          if (isSamePlacement({ sources: transfer.sources }, currentFinalist, roomDims)) {
+            if (transfer.selectedProduct && normaliseModelKey(selectedSubModel) !== transfer.selectedProduct) continue;
+            currentRawTransfer = transfer;
+            break;
+          }
+        }
+
+        if (!currentRawTransfer) {
+          const _calT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+          currentRawTransfer = await runInWorker(worker, "placement", {
+            finalist: currentFinalist,
+            roomDims, rspPosition, seatingPositions,
+            selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+          }, controller.signal);
+          metrics.recordWorkerCall("placement", "calibration-current",
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _calT0, false);
+        } else {
+          metrics.recordStage2TransferReused();
+        }
+
+        if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
+
+        // Run combined delay + polarity + trim search on Current's raw transfers
+        const calibrationSearch = runCalibrationOnlySearch(currentRawTransfer);
+        onProgress("calibrating", "Searching calibration improvements", 1, 2);
+
+        if (calibrationSearch?.bestTuning) {
+          // Confirm through the full canonical chain (EQ, P14, P18, P19, P20)
+          const _confirmT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+          const calibrationConfirmation = await runInWorker(worker, "confirmation", {
+            rawTransfer: currentRawTransfer,
+            tuning: calibrationSearch.bestTuning,
+            tuningVariant: "delay-polarity-trim",
+            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+          }, controller.signal);
+          metrics.recordWorkerCall("confirmation", "calibration",
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _confirmT0, false);
+
+          if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
+
+          if (calibrationConfirmation) {
+            calibrationConfirmation.candidateId = "calibration-only";
+            calibrationConfirmation.isCurrent = true;
+            calibrationConfirmation.appliedTuning = calibrationSearch.bestTuning;
+            calibrationTuning = calibrationSearch.bestTuning;
+            calibrationResult = calibrationConfirmation;
+
+            // Apply materiality gate against installed tuning
+            if (existingAuthority) {
+              calibrationMaterial = isMaterialImprovement(existingAuthority, calibrationConfirmation);
+            } else {
+              // No existing authority — first calibration result, always show it
+              calibrationMaterial = { material: true, reason: "First calibration result" };
+            }
+          }
+        }
+      }
+    } catch (err) {
+      if (isFatalLifecycleError(err)) throw err;
+      // Calibration-only search failed — continue with challenger flow
+    }
+
+    onProgress("calibrating", "Searching calibration improvements", 2, 2);
+    await yieldToUI();
+    if (isCancelled()) return { status: "cancelled", snapshot };
+    if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
+
     // Phase 2: Testing practical positions (CHALLENGERS ONLY)
     onProgress("testing_positions", "Testing practical positions", 0, 1);
     const candidates = gatherCandidates({ subwooferInstances, roomDims, stage2Result, placementFingerprint });
@@ -820,6 +908,13 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         snapshot,
         confirmedResults,
       };
+    }
+
+    // Stage 11A: Attach calibration-only result to the selection
+    if (calibrationResult) {
+      selection.calibrationResult = calibrationResult;
+      selection.calibrationMaterial = calibrationMaterial;
+      selection.calibrationTuning = calibrationTuning;
     }
 
     return { status: "complete", selection, snapshot, confirmedResults };

@@ -4,9 +4,11 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, X } from "lucide-react";
+import { formatEta } from "./etaCalculator.js";
 
 const PHASE_ORDER = [
   "reviewing",
+  "calibrating",
   "testing_positions",
   "optimising_timing",
   "testing_polarity",
@@ -16,7 +18,7 @@ const PHASE_ORDER = [
 ];
 
 export default function ImproveBassV2Progress({ state, onCancel }) {
-  const { phase, phaseLabel, progressCurrent, progressTotal } = state;
+  const { phase, phaseLabel, progressCurrent, progressTotal, etaStatus, etaSeconds } = state;
   const phaseIndex = PHASE_ORDER.indexOf(phase);
   const phaseCount = PHASE_ORDER.length;
   const overallPct = phaseIndex >= 0
@@ -50,6 +52,9 @@ export default function ImproveBassV2Progress({ state, onCancel }) {
       <div className="mt-1 flex justify-between text-[9px] text-[#8A7B6A]">
         <span>{phaseIndex >= 0 ? `Phase ${phaseIndex + 1} of ${phaseCount}` : ""}</span>
         <span>{overallPct}%</span>
+      </div>
+      <div className="mt-0.5 text-[9px] text-[#8A7B6A]">
+        {formatEta(etaStatus || "estimating", etaSeconds)}
       </div>
     </div>
   );
