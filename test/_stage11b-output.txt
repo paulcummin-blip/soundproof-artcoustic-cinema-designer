@@ -1,0 +1,31 @@
+═══════════════════════════════════════════════════════════════
+STAGE 11B — PHYSICAL SUBWOOFER POSITION OPTIMISATION
+Project: Luxavo / Duffy — 4.0 × 6.3 × 2.4 m, 4× SUB3-12
+P14: Minimum L2 / 112 dBC
+Primary seats: seat-r1-c1, seat-r1-c2
+═══════════════════════════════════════════════════════════════
+
+RSP: x=2, y=3.052885
+
+1. EVALUATING CURRENT BASELINE...
+   P19: L0, P20: L1, P14: 125.3dB
+   P19 per-seat:
+     seat-r1-c1: 6.90 dB (L0) @ 114.1 Hz [P]
+     seat-r1-c2: 6.90 dB (L0) @ 114.1 Hz [P]
+     seat-r2-c1: 10.51 dB (L0) @ 58.7 Hz
+     seat-r2-c2: 10.50 dB (L0) @ 58.7 Hz
+     seat-r2-c3: 10.51 dB (L0) @ 58.7 Hz
+   P20 per-seat:
+     seat-r1-c1: 6.92 dB (L1) @ 114.1 Hz [P]
+     seat-r1-c2: 6.92 dB (L1) @ 114.1 Hz [P]
+     seat-r2-c1: 11.33 dB (L1) @ 59.1 Hz
+     seat-r2-c2: 11.33 dB (L1) @ 59.1 Hz
+     seat-r2-c3: 11.33 dB (L1) @ 59.1 Hz
+   Proxy score (p-p): 36.47 dB
+
+2. GENERATING SYMMETRIC CANDIDATES (100mm steps, ±300mm)...
+   Generated 10 symmetric candidates
+
+3. CHEAP SCREENING (simulation + proxy score)...
+   Estimating time remaining...
+   [1/10] Front forward 0.2m: proxy=37.92dB, maxSeat=0.00dB, ETA~88s
