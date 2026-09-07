@@ -184,12 +184,16 @@ export default function ProjectsPage() {
       try {
         setLoading(true);
         setLoadError(null);
-        const projectList = await base44.entities.Project.list('-created_date', 100);
+        // Account-scoped query — explicit tenant scoping replaces the old
+        // filter(p => p.account_id) workaround. RLS enforces this server-side
+        // too, but we scope explicitly for correctness and clarity.
+        const userAccountId = user?.access_context?.account?.id;
+        const projectList = isAdmin
+          ? await base44.entities.Project.list('-created_date', 200)
+          : await base44.entities.Project.filter({ account_id: userAccountId }, '-created_date', 200);
         
         if (mounted) {
-          // Filter out legacy projects with no account_id, then map to UI format
-          const filtered = (projectList || []).filter(p => p.account_id);
-          const mapped = filtered.map(p => {
+          const mapped = (projectList || []).map(p => {
             try {
               return {
                 id: p.id,
@@ -356,6 +360,42 @@ export default function ProjectsPage() {
       console.error("[Projects] Failed to archive project:", err);
     }
     setAgeReviewProject(null);
+  }
+
+  // ---- Archive / Unarchive (manual lifecycle organisation) ----
+  const [archiveConfirm, setArchiveConfirm] = useState(null);
+
+  async function handleArchive(projectId) {
+    try {
+      await base44.entities.Project.update(projectId, {
+        lifecycle_status: "Archived",
+      });
+      setProjects((arr) =>
+        arr.map((p) =>
+          p.id === projectId ? { ...p, lifecycleStatus: "Archived" } : p
+        )
+      );
+    } catch (err) {
+      console.error("[Projects] Failed to archive project:", err);
+      alert("Failed to archive project. Please try again.");
+    }
+    setArchiveConfirm(null);
+  }
+
+  async function handleUnarchive(projectId) {
+    try {
+      await base44.entities.Project.update(projectId, {
+        lifecycle_status: "Draft",
+      });
+      setProjects((arr) =>
+        arr.map((p) =>
+          p.id === projectId ? { ...p, lifecycleStatus: "Draft" } : p
+        )
+      );
+    } catch (err) {
+      console.error("[Projects] Failed to unarchive project:", err);
+      alert("Failed to unarchive project. Please try again.");
+    }
   }
 
   // ---- UI bits ----
@@ -968,6 +1008,8 @@ export default function ProjectsPage() {
                 key={p.id}
                 p={p}
                 onEdit={handleEditProject}
+                onArchive={() => setArchiveConfirm(p)}
+                onUnarchive={() => handleUnarchive(p.id)}
                 statuses={statuses}
                 activeStatuses={activeStatuses}
                 dolbyLabelMap={dolbyLabelMap}
@@ -1148,6 +1190,72 @@ export default function ProjectsPage() {
         onArchive={handleAgeArchive}
         onCancel={() => setAgeReviewProject(null)}
       />
+
+      {/* Archive confirmation — lightweight, non-destructive styling */}
+      {archiveConfirm && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.35)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              width: "min(440px, 92vw)",
+              background: BRAND.card,
+              border: `1px solid ${BRAND.border}`,
+              borderRadius: 12,
+              padding: 24,
+              color: BRAND.text,
+            }}
+          >
+            <h2 style={{ margin: 0, fontSize: 18, marginBottom: 12 }}>
+              Archive this project?
+            </h2>
+            <p style={{ fontSize: 14, color: BRAND.subtext, lineHeight: 1.5, margin: "0 0 20px" }}>
+              It will be removed from your main Projects list but all project data will be retained.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setArchiveConfirm(null)}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 10,
+                  border: `1px solid ${BRAND.border}`,
+                  background: BRAND.card,
+                  color: BRAND.text,
+                  cursor: "pointer",
+                  fontSize: 14,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleArchive(archiveConfirm.id)}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 10,
+                  border: `1px solid ${BRAND.border}`,
+                  background: BRAND.btn,
+                  color: BRAND.btnText,
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontWeight: 500,
+                }}
+              >
+                Archive Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

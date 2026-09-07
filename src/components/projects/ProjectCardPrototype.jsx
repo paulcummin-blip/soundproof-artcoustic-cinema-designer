@@ -131,6 +131,8 @@ function buildSupportingDetail(p) {
 export default function ProjectCardPrototype({
   p,
   onEdit,
+  onArchive,
+  onUnarchive,
   statuses,
   activeStatuses,
   dolbyLabelMap,
@@ -383,6 +385,60 @@ export default function ProjectCardPrototype({
           >
             Edit
           </button>
+
+          {p.lifecycleStatus === "Archived" ? (
+            <button
+              type="button"
+              onClick={() => onUnarchive && onUnarchive()}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 6,
+                border: `1px solid ${BRAND.btnGhostBorder}`,
+                background: BRAND.btnGhost,
+                color: BRAND.subtext,
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "border-color 0.15s ease, color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#C5C0B8";
+                e.currentTarget.style.color = BRAND.text;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = BRAND.btnGhostBorder;
+                e.currentTarget.style.color = BRAND.subtext;
+              }}
+            >
+              Unarchive
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onArchive && onArchive()}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 6,
+                border: `1px solid ${BRAND.btnGhostBorder}`,
+                background: BRAND.btnGhost,
+                color: BRAND.subtext,
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "border-color 0.15s ease, color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#C5C0B8";
+                e.currentTarget.style.color = BRAND.text;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = BRAND.btnGhostBorder;
+                e.currentTarget.style.color = BRAND.subtext;
+              }}
+            >
+              Archive
+            </button>
+          )}
 
           <button
             type="button"
