@@ -319,9 +319,13 @@ for (const d of steps) {
 // A5: Coordinated front+rear depth (both toward center / both away)
 for (const d of steps) {
   // both toward center: front forward, rear forward
-  candidates.push({ label: `Both toward center ${d.toFixed(1)}m`, frontX: CUR_FRONT.x, frontY: CUR_FRONT.y + d, rearX: CUR_REAR.x, rearY: CUR_REAR.y - d, type: 'coord-depth' });
+  const fyF = CUR_FRONT.y + d, ryF = CUR_REAR.y - d;
+  if (isValidPosition(CUR_FRONT.x, fyF) && isValidPosition(CUR_REAR.x, ryF))
+    candidates.push({ label: `Both toward center ${d.toFixed(1)}m`, frontX: CUR_FRONT.x, frontY: fyF, rearX: CUR_REAR.x, rearY: ryF, type: 'coord-depth' });
   // both away from center: front backward, rear backward
-  candidates.push({ label: `Both away from center ${d.toFixed(1)}m`, frontX: CUR_FRONT.x, frontY: CUR_FRONT.y - d, rearX: CUR_REAR.x, rearY: CUR_REAR.y + d, type: 'coord-depth' });
+  const fyB = CUR_FRONT.y - d, ryB = CUR_REAR.y + d;
+  if (isValidPosition(CUR_FRONT.x, fyB) && isValidPosition(CUR_REAR.x, ryB))
+    candidates.push({ label: `Both away from center ${d.toFixed(1)}m`, frontX: CUR_FRONT.x, frontY: fyB, rearX: CUR_REAR.x, rearY: ryB, type: 'coord-depth' });
 }
 
 console.log(`   Generated ${candidates.length} symmetric candidates\n`);
@@ -465,7 +469,13 @@ for (let i = 0; i < topCandidates.length; i++) {
     .map(t => ({ seatId: 'rsp', points: t.points }));
 
   // Canonical confirmation of best tuning finalist only (efficiency)
-  // Pick the tuning with best proxy score
+  // Pick the tuning with best proxy score, but SKIP degenerate tunings
+  // (e.g. polarity inversions that cancel front+rear subs producing flat
+  // but very low-level response). A tuning is degenerate if its mean SPL
+  // is more than 15 dB below the zero-tuning baseline mean.
+  const zeroTuned = resumWithTuning(perSourcePerSeatSorted, dedupedTuning[0].tuning, seatIds);
+  const zeroBassSpls = (zeroTuned.rsp?.splDb || []).filter((_, idx) => (zeroTuned.rsp?.freqsHz?.[idx] || 0) >= 20 && (zeroTuned.rsp?.freqsHz?.[idx] || 0) <= 200);
+  const zeroMean = zeroBassSpls.length > 0 ? zeroBassSpls.reduce((a, b) => a + b, 0) / zeroBassSpls.length : 0;
   let bestTuning = dedupedTuning[0];
   let bestTuningScore = Infinity;
   for (const f of dedupedTuning) {
@@ -474,6 +484,9 @@ for (let i = 0; i < topCandidates.length; i++) {
     if (rsp && rsp.splDb) {
       const bassSpls = rsp.splDb.filter((_, idx) => rsp.freqsHz[idx] >= 20 && rsp.freqsHz[idx] <= 200);
       if (bassSpls.length < 2) continue;
+      const mean = bassSpls.reduce((a, b) => a + b, 0) / bassSpls.length;
+      // Skip degenerate tunings (cancelled response)
+      if (mean < zeroMean - 15) continue;
       const dev = Math.max(...bassSpls) - Math.min(...bassSpls);
       if (dev < bestTuningScore) { bestTuningScore = dev; bestTuning = f; }
     }
