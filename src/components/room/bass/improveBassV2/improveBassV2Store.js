@@ -33,6 +33,12 @@ function emptyState(projectId) {
     etaSeconds: null,
     unitTimes: [],
     lastProgressAt: null,
+    // Stage 11B position search state
+    positionSearchPhase: null, // null | "symmetric" | "asymmetric-pair" | "individual"
+    subOptimisationExhausted: false,
+    materialSubImprovementFound: false,
+    bestPracticalSubResult: null,
+    positionWinner: null,
   };
 }
 
@@ -115,6 +121,22 @@ export function setWinner(projectId, winner) {
     status: "complete",
     completedAtMs: Date.now(),
   });
+}
+
+export function setPositionSearchPhase(projectId, phase) {
+  return publish(projectId, { positionSearchPhase: phase });
+}
+
+export function setPositionExhaustion(projectId, exhausted, materialFound, bestPractical) {
+  return publish(projectId, {
+    subOptimisationExhausted: exhausted,
+    materialSubImprovementFound: materialFound,
+    bestPracticalSubResult: bestPractical,
+  });
+}
+
+export function setPositionWinner(projectId, positionWinner) {
+  return publish(projectId, { positionWinner });
 }
 
 export function setCancelled(projectId) {

@@ -34,6 +34,11 @@ import { V2RuntimeMetrics } from "./improveBassV2RuntimeMetrics.js";
 import { subscribeImproveBassV2, getImproveBassV2State } from "./improveBassV2Store.js";
 import { runCalibrationOnlySearch } from "./calibrationOnlySearch.js";
 import { isMaterialImprovement } from "./materialityGate.js";
+import { generateSymmetricCandidates, generateAsymmetricPairCandidates, generateIndividualCandidatesForPhase } from "./positionCandidateGenerator.js";
+import { screenPositionCandidates, promoteScreenedCandidates } from "./positionScreeningEngine.js";
+import { selectBestPositionCandidate } from "./positionRanking.js";
+import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { setPositionSearchPhase, setPositionExhaustion } from "./improveBassV2Store.js";
 
 const MAX_CHALLENGERS = 3;
 
