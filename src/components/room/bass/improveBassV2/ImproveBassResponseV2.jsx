@@ -279,6 +279,7 @@ export default function ImproveBassResponseV2({
           selection={state.winner}
           currentInstances={subwooferInstances}
           roomDims={roomDims}
+          seatingPositions={seatingPositions}
           onApply={handleApply}
           onApplyCalibration={handleApplyCalibration}
         />

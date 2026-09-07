@@ -17,6 +17,8 @@ import { buildWhatChanged } from "./improveBassV2WhatChanged";
 import { buildTreatmentAdvisory, buildRemainingLimitation } from "./improveBassV2Treatment";
 import { isOptimisedApplied, buildCalibrationSummary } from "./improveBassV2Apply";
 import CalibrationOnlyResults from "./CalibrationOnlyResults";
+import { buildP19SeatRows } from "@/components/room/bass/p19SeatPresentation";
+import { buildP20SeatRows } from "@/components/room/bass/p20SeatPresentation";
 
 function levelText(level) {
   if (!Number.isFinite(level)) return "—";
@@ -74,6 +76,7 @@ export default function ImproveBassV2Results({
   selection,
   currentInstances,
   roomDims,
+  seatingPositions,
   onApply,
   onApplyCalibration,
 }) {
@@ -134,6 +137,14 @@ export default function ImproveBassV2Results({
   const remainingLimitation = buildRemainingLimitation(winner);
   const calSummary = buildCalibrationSummary(winner);
   const applied = isOptimisedApplied(currentInstances, winner, roomDims);
+
+  // Adapt flat canonical per-seat arrays into row-grouped presentation for
+  // SharedP19P20SeatResults. The V2 winner stores perSeatP19/perSeatP20 as
+  // flat seat arrays; the shared component expects [{ row, seats: [...] }].
+  // Priority is resolved from the canonical seatingPositions via
+  // seatPriorityAuthority, not the result's isPrimary boolean.
+  const winnerP19Rows = buildP19SeatRows(seatingPositions, winner.perSeatP19 || []);
+  const winnerP20Rows = buildP20SeatRows(seatingPositions, winner.perSeatP20 || []);
 
   const movement = winner.movementDescription || "Position optimised";
   const phaseLabel = winner.positionPhase === "asymmetric-pair" ? "Asymmetric"
@@ -217,8 +228,8 @@ export default function ImproveBassV2Results({
           <div className="mt-3">
             <div className="text-[10px] font-semibold text-[#625143] mb-1.5">P19 / P20 seat results (optimised)</div>
             <SharedP19P20SeatResults
-              p19Rows={winner.perSeatP19 || []}
-              p20Rows={winner.perSeatP20 || []}
+              p19Rows={winnerP19Rows}
+              p20Rows={winnerP20Rows}
               publicationVerified
               authorityStatus="COMPLETE"
               p14TargetUnselected={false}
@@ -321,8 +332,8 @@ export default function ImproveBassV2Results({
           <div className="mt-3">
             <div className="text-[10px] font-semibold text-[#625143] mb-1.5">P19 / P20 seat results (optimised)</div>
             <SharedP19P20SeatResults
-              p19Rows={winner.perSeatP19 || []}
-              p20Rows={winner.perSeatP20 || []}
+              p19Rows={winnerP19Rows}
+              p20Rows={winnerP20Rows}
               publicationVerified
               authorityStatus="COMPLETE"
               p14TargetUnselected={false}
