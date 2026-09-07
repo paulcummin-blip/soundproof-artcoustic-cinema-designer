@@ -160,14 +160,19 @@ export function validateCachedBassResult(result, expectedIdentity = {}) {
   if (candidates.some((candidate) => candidate.filterBankSignature !== buildFilterBankSignature(candidate))) {
     return { valid: false, reason: "candidate-filter-signature-mismatch" };
   }
-  const houseCandidates = candidates.filter((candidate) => candidate.designEqFitProfile === "house_curve");
-  if (!houseCandidates.length) return { valid: false, reason: "house-curve-candidate-missing" };
-  const incompatibleHouseCandidate = houseCandidates.find((candidate) => (
-    candidateStartStrategy(candidate) !== "multi-start"
-    || candidate.designEqFitProfileConfig?.maximumCutDb !== HOUSE_CURVE_LIMITS.maximumCutDb
-    || candidate.designEqFitProfileConfig?.maximumAggregateBoostDb !== HOUSE_CURVE_LIMITS.maximumAggregateBoostDb
-  ));
-  if (incompatibleHouseCandidate) return { valid: false, reason: "house-curve-candidate-incompatible" };
+  if (result.collectDiagnostics === true) {
+    const houseCandidates = candidates.filter((candidate) => candidate.designEqFitProfile === "house_curve");
+    if (!houseCandidates.length) return { valid: false, reason: "house-curve-candidate-missing" };
+    const incompatibleHouseCandidate = houseCandidates.find((candidate) => (
+      candidateStartStrategy(candidate) !== "multi-start"
+      || candidate.designEqFitProfileConfig?.maximumCutDb !== HOUSE_CURVE_LIMITS.maximumCutDb
+      || candidate.designEqFitProfileConfig?.maximumAggregateBoostDb !== HOUSE_CURVE_LIMITS.maximumAggregateBoostDb
+    ));
+    if (incompatibleHouseCandidate) return { valid: false, reason: "house-curve-candidate-incompatible" };
+  } else {
+    const deterministicCandidates = candidates.filter((candidate) => candidate.designEqFitProfile === "deterministic");
+    if (!deterministicCandidates.length) return { valid: false, reason: "deterministic-candidate-missing" };
+  }
   if (result.contractCandidateId && result.productionCandidateId && result.contractCandidateId !== result.productionCandidateId) {
     return { valid: false, reason: "contract-production-candidate-mismatch" };
   }
