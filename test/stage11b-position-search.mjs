@@ -78,8 +78,10 @@ const SEATING_POSITIONS = [
 // Current sub positions
 const CUR_FRONT = { x: 1.0, y: 0.16 };
 const CUR_REAR  = { x: 1.0, y: 6.14 };
-const SUB_CABINET_HALF_M = 0.3; // SUB3-12 is 600mm
-const WALL_CLEARANCE_M = 0.05;
+// SUB3-12: 600mm wide × 600mm high × 255mm deep
+const SUB_HALF_WIDTH_M = 0.3;   // half-width for X-axis clearance
+const SUB_HALF_DEPTH_M = 0.1275; // half-depth for Y-axis clearance
+const WALL_CLEARANCE_M = 0.02;   // minimal wall clearance
 const STEP_M = 0.1;
 const MAX_STEPS = 3;
 
