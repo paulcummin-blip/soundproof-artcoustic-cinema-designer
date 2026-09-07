@@ -87,7 +87,10 @@ export const STROKE_HALF_M =
   Math.max(1, (typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1)) /
   96 * 0.0254;
 
-// Projected half-extent along Y for a rotated rectangle (VISUAL: includes stroke)
+// Projected half-extent along Y for a rotated rectangle (VISUAL: includes stroke).
+// Use ONLY for drawing / hit-testing. For persisted physical coordinates,
+// acoustic source positions, and wall clearance, use yHalfExtentM_physical
+// so that devicePixelRatio / CSS pixels never contaminate a saved value.
 export function yHalfExtentM(depthM, widthM, yawDeg = 0) {
   const t = Math.abs((yawDeg || 0) * RAD);
   return (depthM * 0.5) * Math.abs(Math.cos(t)) +

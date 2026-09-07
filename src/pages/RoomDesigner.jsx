@@ -30,7 +30,7 @@ import { placeSubsForFrontWall } from "@/components/room/utils/placeSubs";
 import { debug } from "@/components/utils/consolePolyfill";
 import { safeGroup, safeTable } from "@/components/utils/safeLog"; // NEW: Import safe logging
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry"; // NEW: For model metadata
-import { yHalfExtentM, isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives"; // NEW: For stroke-aware positioning
+import { yHalfExtentM_physical, isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives"; // PHYSICAL half-extent (no render stroke) for persisted geometry
 import { calculateLcrConstraints } from "@/components/room/constraints/lcrConstraints"; // NEW: For LCR constraints
 import { placeSubwoofers } from '@/components/room/placement/placeSubwoofers'; // NEW import // FIX: Added 'from' keyword
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones"; // NEW import
@@ -1315,8 +1315,11 @@ function RoomDesignerWithState() {
     }
   }, [placedSpeakers, _screen, _setScreen]);
 
-  // Effect to lock LCR to front wall + z=1.2, and drive screen clearance
+  // Effect to lock LCR to front wall + z=1.2, and drive screen clearance.
+  // GUARD: skip during hydration/load — derived geometry must not persist
+  // unless the user has performed an authorised design action.
   useEffect(() => {
+    if (loadState?.phase !== 'loaded') return;
     if (_isFrozen && _isFrozen('speakers')) return;
     if (!placedSpeakers || !placedSpeakers.length) return;
     if (!mlpAnchorEffective) return;
@@ -1338,7 +1341,7 @@ function RoomDesignerWithState() {
         const dy = mlpAnchorEffective.y - spk.position.y;
         targetYawDeg = Math.abs(Math.atan2(dx, dy) * 180 / Math.PI);
       }
-      const halfExtentM = yHalfExtentM(depthM, widthM, targetYawDeg);
+      const halfExtentM = yHalfExtentM_physical(depthM, widthM, targetYawDeg);
       const wallY = gapM + halfExtentM;
       const actualCentreY = Number.isFinite(spk.position?.y) ? spk.position.y : wallY;
       const willStayAtActual = spk.positionSource === 'user' && actualCentreY >= wallY - 0.001;
@@ -1373,10 +1376,12 @@ function RoomDesignerWithState() {
         if ((Number(_screen?.speakerClearanceM) || 0) < req) _setScreen(prev => ({ ...prev, speakerClearanceM: req }));
       }
     }
-  }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode, mlpAnchorEffective, _screen, _setScreen, appState?.splConfig?.lcrHeightM]);
+  }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode, mlpAnchorEffective, _screen, _setScreen, appState?.splConfig?.lcrHeightM, loadState?.phase]);
 
-  // NEW: Effect to lock FC speaker to room centerline
+  // NEW: Effect to lock FC speaker to room centerline.
+  // GUARD: skip during hydration/load — derived geometry must not persist.
   useEffect(() => {
+    if (loadState?.phase !== 'loaded') return;
     if (isDraggingRef.current) return; // Skip while drag is active
     if (!placedSpeakers.length || _isFrozen && _isFrozen('speakers') || !stableDimensions.width) return;
 
@@ -1392,10 +1397,12 @@ function RoomDesignerWithState() {
         return s;
       }));
     }
-  }, [placedSpeakers, _isFrozen, stableDimensions.width, setSpeakers]);
+  }, [placedSpeakers, _isFrozen, stableDimensions.width, setSpeakers, loadState?.phase]);
 
-  // Speaker aiming (inline, compacted)
+  // Speaker aiming (inline, compacted).
+  // GUARD: skip during hydration/load — derived aiming must not persist.
   useEffect(() => {
+    if (loadState?.phase !== 'loaded') return;
     if (isDraggingRef.current) return;
     if (!placedSpeakers.length || _isFrozen && _isFrozen('speakers') || !mlpAnchorEffective) return;
     const aimLCR = lcrAimMode === "angled"; const aimFW = appState?.aimFrontWidesAtMLP || false; const aimSide = appState?.aimSideSurroundsAtMLP || false; const aimRear = appState?.aimRearSurroundsAtMLP || false;
@@ -1419,7 +1426,7 @@ function RoomDesignerWithState() {
     });
     const changed = updated.some((spk, i) => Math.abs((spk?.rotation?.y || 0) - (placedSpeakers[i]?.rotation?.y || 0)) > 0.001);
     if (changed) setSpeakers((prev) => preserveSurroundModels(prev, updated, appState));
-  }, [placedSpeakers, mlpAnchorEffective, lcrAimMode, appState?.aimFrontWidesAtMLP, appState?.aimSideSurroundsAtMLP, appState?.aimRearSurroundsAtMLP, stableDimensions.width, stableDimensions.length, _isFrozen, setSpeakers]);
+  }, [placedSpeakers, mlpAnchorEffective, lcrAimMode, appState?.aimFrontWidesAtMLP, appState?.aimSideSurroundsAtMLP, appState?.aimRearSurroundsAtMLP, stableDimensions.width, stableDimensions.length, _isFrozen, setSpeakers, loadState?.phase]);
 
 
   // 7.x bed layout swap: inline (kept compact)

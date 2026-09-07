@@ -55,28 +55,24 @@ export default function OptionsPanel({
 }) {
   const [showDifficultyRating, setShowDifficultyRating] = React.useState(false);
 
-  // Source authority from app state — distinguishes auto-seeded ("recommended")
-  // from designer-manually-set ("user"). When "recommended", the selected
-  // quantity auto-follows recommendation changes. When "user", the designer's
-  // manual override is preserved.
+  // Source authority from app state — distinguishes recommendation-applied
+  // ("recommended") from designer-manually-set ("user"). The recommendation
+  // is display-only; quantity only changes via explicit Apply or manual entry.
   const { abfuserQtySource, setAbfuserQtySource } = useAppState() || {};
 
   const handleAcousticTreatmentToggle = (nextEnabled) => {
     setAcousticTreatmentEnabled(nextEnabled);
   };
 
-  // Auto-follow: when source is "recommended" (or legacy/null) and the
-  // recommendation changes, update selectedAbfuserQty to match. This covers
-  // both initial seeding (qty 0 → recommended) and recommendation changes
-  // (old recommended → new recommended). When source is "user", the
-  // designer's manual override is preserved.
-  React.useEffect(() => {
-    if (!acousticTreatmentEnabled || recommendedAbfuserQty <= 0) return;
-    if (abfuserQtySource === "user") return;
-    if (selectedAbfuserQty !== recommendedAbfuserQty) {
+  // RECOMMENDATION IS DISPLAY-ONLY — it must NOT mutate project quantity.
+  // An explicit user action (Apply button or manual quantity entry) is the
+  // only path that may persist an Abfuser quantity change.
+  const applyRecommendedQty = () => {
+    if (recommendedAbfuserQty > 0) {
       setSelectedAbfuserQty(recommendedAbfuserQty);
+      setAbfuserQtySource("user");
     }
-  }, [acousticTreatmentEnabled, selectedAbfuserQty, recommendedAbfuserQty, abfuserQtySource]);
+  };
 
   // Pricing is calculated once in RoomDesigner and passed to every surface.
   // This panel only edits canonical pricing inputs; it never creates a second
@@ -113,11 +109,21 @@ export default function OptionsPanel({
           />
         </div>
         {acousticTreatmentEnabled ? (
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <div className="text-xs text-[#625143]">
-              Recommended: {recommendedAbfuserQty} × Artcoustic Abfuser
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs text-[#625143]">
+                Recommended: {recommendedAbfuserQty} × Artcoustic Abfuser
+              </div>
+              <button
+                type="button"
+                onClick={applyRecommendedQty}
+                disabled={recommendedAbfuserQty <= 0 || selectedAbfuserQty === recommendedAbfuserQty}
+                className="text-xs px-2 py-1 rounded border border-[#DCDBD6] bg-white text-[#213428] hover:bg-[#F8F8F7] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Apply
+              </button>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2">
               <Label htmlFor="abfuser-qty" className="text-xs font-medium text-[#3E4349] whitespace-nowrap">Quantity</Label>
               <input
                 id="abfuser-qty"
