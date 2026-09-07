@@ -1,0 +1,42 @@
+{
+  "currentFingerprint": "cal:v7:8512db5db9a5a3b3|mode:canonical-physics-eq|protocol:bass-optimiser-protocol-v1|pool:bass-optimiser-pool-v40-p18-intent-aware-lf-target|engine:house-curve-shape-fit-v40-p18-intent-aware-lf-target|result-schema:32|metric-schema:11",
+  "achievedP14Db": 125.33904975246539,
+  "achievedP14Level": 4,
+  "achievedP18Hz": 20,
+  "achievedP18Level": 3,
+  "perSeatP19": [
+    {"seatId": "seat-r1-c1", "variationDbRaw": 6.900697748402251, "level": 0, "worstFrequencyHz": 114.08568180465004},
+    {"seatId": "seat-r1-c2", "variationDbRaw": 6.900697748402251, "level": 0, "worstFrequencyHz": 114.08568180465004},
+    {"seatId": "seat-r2-c1", "variationDbRaw": 10.478939251934094, "level": 0, "worstFrequencyHz": 60.43478473342222},
+    {"seatId": "seat-r2-c2", "variationDbRaw": 10.474848649120872, "level": 0, "worstFrequencyHz": 58.714323725262005},
+    {"seatId": "seat-r2-c3", "variationDbRaw": 10.478939251934094, "level": 0, "worstFrequencyHz": 60.43478473342222}
+  ],
+  "perSeatP20": [
+    {"seatId": "seat-r1-c1", "variationDbRaw": 6.921423657338224, "level": 1, "worstFrequencyHz": 114.08568180465004},
+    {"seatId": "seat-r1-c2", "variationDbRaw": 6.921423657338224, "level": 1, "worstFrequencyHz": 114.08568180465004},
+    {"seatId": "seat-r2-c1", "variationDbRaw": 11.321936258882928, "level": 1, "worstFrequencyHz": 59.139791918411255},
+    {"seatId": "seat-r2-c2", "variationDbRaw": 11.316612878269922, "level": 1, "worstFrequencyHz": 59.139791918411255},
+    {"seatId": "seat-r2-c3", "variationDbRaw": 11.321936258882928, "level": 1, "worstFrequencyHz": 59.139791918411255}
+  ],
+  "rspSamples": [
+    {"f": 20, "spl": 106.25404590780164},
+    {"f": 30, "spl": 106.89954011798375},
+    {"f": 40, "spl": 105.8981303587025},
+    {"f": 50, "spl": 104.89566482242265},
+    {"f": 55, "spl": 107.4548649913663},
+    {"f": 60, "spl": 104.13341915198183},
+    {"f": 70, "spl": 103.70059791115857},
+    {"f": 80, "spl": 103.38791146069335},
+    {"f": 90, "spl": 103.15262781940868},
+    {"f": 100, "spl": 102.89810960699913},
+    {"f": 110, "spl": 102.71466644444187},
+    {"f": 114, "spl": 102.55050787609635},
+    {"f": 120, "spl": 102.39707282258854},
+    {"f": 130, "spl": 102.29379776589433},
+    {"f": 150, "spl": 102.10182736853773},
+    {"f": 162, "spl": 102.31551481133957},
+    {"f": 200, "spl": 101.7026499212126}
+  ],
+  "assessmentStartHz": 20,
+  "assessmentEndHz": 162.65001215808886
+}
