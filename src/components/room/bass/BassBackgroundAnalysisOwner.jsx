@@ -672,7 +672,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // request fingerprint). Do NOT use contract.job.currentJobFingerprint —
     // that is the controller's in-flight fingerprint and may be stale/zombie.
     if (contract?.job?.status === "error") {
-      markBassAuthorityFailed(scopeId, cacheKey, contract?.job?.errorMessage);
+      const message =
+        contract?.job?.errorMessage
+        || lifecycle?.errorMessage
+        || "Bass calculation could not be completed. Please try again.";
+      markBassAuthorityFailed(scopeId, cacheKey, message);
+      setLastTerminalOutcome({ outcome: "error", fingerprint: cacheKey, message });
+      dispatchedManualRequestRef.current = null;
+      setManualAnalysisRequest(null);
       return;
     }
     const jobComplete = contract?.job?.status === "complete" || contract?.job?.status === "ready";
