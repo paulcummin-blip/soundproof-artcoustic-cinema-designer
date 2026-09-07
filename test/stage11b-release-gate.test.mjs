@@ -4,7 +4,7 @@
 //
 // Run: node --import ./_alias-register.mjs test/stage11b-release-gate.test.mjs
 
-import './test/_alias-register.mjs';
+import './_alias-register.mjs';
 
 import assert from "node:assert";
 import { generateSymmetricCandidates, generateAsymmetricPairCandidates, generateIndividualCandidatesForPhase, identifyLayout } from "../src/components/room/bass/improveBassV2/positionCandidateGenerator.js";
