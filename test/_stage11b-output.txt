@@ -45,3 +45,173 @@ RSP: x=2, y=3.052885
    [15/21] Front forward 0.3m: proxy=35.58dB, maxSeat=0.00dB, ETA~57s
    [16/21] Rear forward 0.1m: proxy=33.48dB, maxSeat=0.00dB, ETA~48s
    [17/21] Rear forward 0.2m: proxy=32.26dB, maxSeat=0.00dB, ETA~38s
+   [18/21] Rear forward 0.3m: proxy=33.26dB, maxSeat=0.00dB, ETA~29s
+   [19/21] Both toward center 0.1m: proxy=33.72dB, maxSeat=0.00dB, ETA~19s
+   [20/21] Both toward center 0.2m: proxy=30.70dB, maxSeat=0.00dB, ETA~10s
+   [21/21] Both toward center 0.3m: proxy=30.25dB, maxSeat=0.00dB, ETA~0s
+
+   Screening complete: 200.4s
+
+4. TOP 5 CANDIDATES FOR TUNING + CANONICAL CONFIRMATION:
+   Both toward center 0.3m: proxy=30.25dB, maxSeat=0.00dB
+   Both toward center 0.2m: proxy=30.70dB, maxSeat=0.00dB
+   Rear forward 0.2m: proxy=32.26dB, maxSeat=0.00dB
+   Rear forward 0.3m: proxy=33.26dB, maxSeat=0.00dB
+   Rear forward 0.1m: proxy=33.48dB, maxSeat=0.00dB
+
+5. TUNING SEARCH + CANONICAL CONFIRMATION...
+   Estimating time remaining...
+
+   [1/5] Both toward center 0.3m...
+      A. Delay-only search...
+         Finalists: 2, best: 21.99
+      B. Delay+Pol+Trim search...
+         Finalists: 2, best: 18.26
+      C. Polarity-only search...
+         Best polarity: [0,-1,-1,0], score: 0.00
+      Best tuning: delay(22.0) (proxy=25.04)
+      P14=126.2dB(L4) P19=L0 P20=L1 PrimaryReg=NO
+      ETA~40s remaining
+
+   [2/5] Both toward center 0.2m...
+      A. Delay-only search...
+         Finalists: 2, best: 20.38
+      B. Delay+Pol+Trim search...
+         Finalists: 2, best: 18.42
+      C. Polarity-only search...
+         Best polarity: [0,-1,-1,0], score: 0.00
+      Best tuning: dpt(18.4) (proxy=24.99)
+      P14=126.5dB(L4) P19=L0 P20=L1 PrimaryReg=NO
+      ETA~30s remaining
+
+   [3/5] Rear forward 0.2m...
+      A. Delay-only search...
+         Finalists: 2, best: 19.77
+      B. Delay+Pol+Trim search...
+         Finalists: 2, best: 18.57
+      C. Polarity-only search...
+         Best polarity: [0,-1,-1,0], score: 0.00
+      Best tuning: dpt(18.0) (proxy=32.18)
+      P14=124.7dB(L4) P19=L0 P20=L1 PrimaryReg=NO
+      ETA~20s remaining
+
+   [4/5] Rear forward 0.3m...
+      A. Delay-only search...
+         Finalists: 2, best: 20.26
+      B. Delay+Pol+Trim search...
+         Finalists: 2, best: 17.66
+      C. Polarity-only search...
+         Best polarity: [0,-1,-1,0], score: 0.00
+      Best tuning: dpt(17.7) (proxy=26.98)
+      P14=124.5dB(L4) P19=L0 P20=L1 PrimaryReg=NO
+      ETA~10s remaining
+
+   [5/5] Rear forward 0.1m...
+      A. Delay-only search...
+         Finalists: 2, best: 19.44
+      B. Delay+Pol+Trim search...
+         Finalists: 2, best: 18.33
+      C. Polarity-only search...
+         Best polarity: [0,-1,-1,0], score: 0.00
+      Best tuning: dpt(18.3) (proxy=29.81)
+      P14=126.1dB(L4) P19=L0 P20=L1 PrimaryReg=NO
+      ETA~0s remaining
+
+   Confirmation complete: 5 candidates confirmed
+
+6. MATERIALITY ASSESSMENT...
+   Both toward center 0.3m: not material — No material calibration improvement
+   Both toward center 0.2m: not material — No material calibration improvement
+   Rear forward 0.2m: not material — No material calibration improvement
+   Rear forward 0.3m: not material — No material calibration improvement
+   Rear forward 0.1m: not material — No material calibration improvement
+   Material candidates: 0
+
+═══════════════════════════════════════════════════════════════
+STAGE 11B — PHYSICAL POSITION OPTIMISATION RESULTS
+═══════════════════════════════════════════════════════════════
+
+1. CANDIDATES GENERATED
+   Phase A symmetric: 21
+   Phase B combinations: 0 (not required — Phase A sufficient)
+   Phase C asymmetric: 0 (not entered)
+
+2. SYMMETRIC SEARCH RESULT
+   Screened: 21 candidates
+   Top for confirmation: 5
+   Confirmed: 5
+
+3. ASYMMETRIC SEARCH REQUIRED
+   NO — symmetric search exhausted
+
+4. ALL CONFIRMED CANDIDATES
+   ┌────────────────────────────────┬───────┬───────┬───────┬──────────┬──────────┐
+   │ Candidate                      │ P19 L │ P20 L │ P14   │ PrimReg  │ Material │
+   ├────────────────────────────────┼───────┼───────┼───────┼──────────┼──────────┤
+   │ Current (zero tuning)          │ L0    │ L1    │ 125.3 │ NO        │ NO        │
+   │ Both toward center 0.3m        │ L0    │ L1    │ 126.2 │ NO        │ NO        │
+   │ Both toward center 0.2m        │ L0    │ L1    │ 126.5 │ NO        │ NO        │
+   │ Rear forward 0.2m              │ L0    │ L1    │ 124.7 │ NO        │ NO        │
+   │ Rear forward 0.3m              │ L0    │ L1    │ 124.5 │ NO        │ NO        │
+   │ Rear forward 0.1m              │ L0    │ L1    │ 126.1 │ NO        │ NO        │
+   └────────────────────────────────┴───────┴───────┴───────┴──────────┴──────────┘
+
+5. FINAL BEST SOLUTION
+   No material physical improvement found
+   Current position is the best practical solution
+
+8. P19 BEFORE/AFTER
+   seat-r1-c1: 6.90 dB (L0) [P]
+   seat-r1-c2: 6.90 dB (L0) [P]
+   seat-r2-c1: 10.51 dB (L0)
+   seat-r2-c2: 10.50 dB (L0)
+   seat-r2-c3: 10.51 dB (L0)
+
+9. P20 BEFORE/AFTER
+   seat-r1-c1: 6.92 dB (L1) [P]
+   seat-r1-c2: 6.92 dB (L1) [P]
+   seat-r2-c1: 11.33 dB (L1)
+   seat-r2-c2: 11.33 dB (L1)
+   seat-r2-c3: 11.33 dB (L1)
+
+10. P14/P18 BEFORE/AFTER
+   P14: 125.31 dB (L4) — no change
+   P18: 20.00 Hz (L3) — no change
+
+11. MATERIALITY
+   No material physical improvement found
+
+12. TOTAL TIME
+   Total: 259422 ms (259.4s)
+   Simulation total: 257815 ms
+   Canonical total: 1331 ms
+   Tuning total: 217 ms
+
+13. ETA BEHAVIOUR
+   Screening: 21 candidates, ~11.9s each
+   Confirmation: 5 candidates, ~9.8s each
+   ETA was measured from completed work, not fixed countdown
+
+14. CANCEL
+   Cancellation preserves current positions and tuning (no project writes in harness)
+
+15. PREVIEW/APPLY
+   Harness is read-only — no project writes
+   Production UI would show preview before apply
+
+16. SUB OPTIMISATION EXHAUSTED
+   YES
+
+17. STAGE 11C REQUIRED
+   YES — sub optimisation exhausted, seating changes would be next escalation
+
+18. BUILD/REGRESSIONS
+   No production code modified — harness only
+   All existing tests unaffected
+
+═══════════════════════════════════════════════════════════════
+STAGE 11B READY FOR HUMAN ACCEPTANCE
+   Sub optimisation exhausted — no material physical improvement
+   Current position is the best practical solution
+   Stage 11C (seating changes) is the next escalation gate
+═══════════════════════════════════════════════════════════════
