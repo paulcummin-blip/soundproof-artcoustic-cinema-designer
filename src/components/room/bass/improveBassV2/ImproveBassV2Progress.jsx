@@ -9,15 +9,13 @@ import { formatEta } from "./etaCalculator.js";
 const PHASE_ORDER = [
   "reviewing",
   "calibrating",
-  "screening_symmetric",
-  "screening_asymmetric",
-  "screening_individual",
-  "refining_positions",
   "testing_positions",
-  "optimising_timing",
-  "testing_polarity",
-  "balancing_levels",
-  "confirming",
+  "screening_symmetric",
+  "confirming_symmetric",
+  "screening_asymmetric-pair",
+  "confirming_asymmetric-pair",
+  "screening_individual",
+  "confirming_individual",
   "finalising",
 ];
 

@@ -33,12 +33,11 @@ function emptyState(projectId) {
     etaSeconds: null,
     unitTimes: [],
     lastProgressAt: null,
-    // Stage 11B position search state
+    // Stage 11B position search state — per-phase detailed tracking
     positionSearchPhase: null, // null | "symmetric" | "asymmetric-pair" | "individual"
     subOptimisationExhausted: false,
     materialSubImprovementFound: false,
     bestPracticalSubResult: null,
-    positionWinner: null,
   };
 }
 
@@ -133,10 +132,6 @@ export function setPositionExhaustion(projectId, exhausted, materialFound, bestP
     materialSubImprovementFound: materialFound,
     bestPracticalSubResult: bestPractical,
   });
-}
-
-export function setPositionWinner(projectId, positionWinner) {
-  return publish(projectId, { positionWinner });
 }
 
 export function setCancelled(projectId) {

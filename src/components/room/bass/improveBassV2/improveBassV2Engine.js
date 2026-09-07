@@ -34,10 +34,9 @@ import { V2RuntimeMetrics } from "./improveBassV2RuntimeMetrics.js";
 import { subscribeImproveBassV2, getImproveBassV2State } from "./improveBassV2Store.js";
 import { runCalibrationOnlySearch } from "./calibrationOnlySearch.js";
 import { isMaterialImprovement } from "./materialityGate.js";
-import { generateSymmetricCandidates, generateAsymmetricPairCandidates, generateIndividualCandidatesForPhase } from "./positionCandidateGenerator.js";
-import { screenPositionCandidates, promoteScreenedCandidates } from "./positionScreeningEngine.js";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { setPositionSearchPhase, setPositionExhaustion } from "./improveBassV2Store.js";
+import { runPositionScreenPhase, tagGlobalCandidates, checkPhaseMateriality, buildPositionOptimisationState } from "./improveBassV2Escalation.js";
 
 const MAX_CHALLENGERS = 3;
 
@@ -525,163 +524,10 @@ function selectWinnerWithProtection(confirmedResults, snapshot, existingAuthorit
 }
 
 // ---------------------------------------------------------------------------
-// Stage 11B: Local position candidate generation + fast screening
+// Stage 11B: Iterative position escalation is now in improveBassV2Escalation.js
+// The engine calls runPositionScreenPhase per phase, with canonical
+// confirmation and materiality testing between each phase.
 // ---------------------------------------------------------------------------
-
-/**
- * Generate Stage 11B local position candidates, screen them with the fast
- * batch modal evaluator, and convert promoted candidates to the same format
- * as gatherCandidates output so they merge into the unified candidate pool.
- *
- * Tiered escalation: symmetric → asymmetric pair → individual.
- * Screening-level materiality threshold stops escalation early if a phase
- * produces a clearly dominant candidate (>=1dB proxy improvement over current).
- *
- * @returns { candidates: [], positionMeta: {} }
- */
-function generateAndScreenPositionCandidates({
-  currentPositions, roomDims, cabinetDims, seatingPositions, rspPosition,
-  subwooferBottomHeightM, existingAuthority, projectId,
-}) {
-  const screeningPhysics = { qStrategy: "ab_corrected" };
-  const positionCandidates = [];
-  const phasesRun = [];
-  const candidateCounts = { symmetric: 0, asymmetricPair: 0, individual: 0 };
-  const timings = {};
-  let symmetricExhausted = false;
-  let asymmetricPairExhausted = false;
-  let individualExhausted = false;
-  let screeningMaterialFound = false;
-
-  // Phase A: Symmetric
-  setPositionSearchPhase(projectId, "symmetric");
-  const t0s = typeof performance !== "undefined" ? performance.now() : Date.now();
-  const symCandidates = generateSymmetricCandidates(currentPositions, roomDims, cabinetDims);
-  candidateCounts.symmetric = symCandidates.length;
-  let symPromoted = [];
-  if (symCandidates.length > 0) {
-    const symScreened = screenPositionCandidates(
-      symCandidates, roomDims, seatingPositions, rspPosition,
-      subwooferBottomHeightM, cabinetDims.heightM, screeningPhysics
-    );
-    symPromoted = promoteScreenedCandidates(symScreened.ranked, 3);
-  }
-  timings.symmetricMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0s;
-  phasesRun.push("symmetric");
-  symmetricExhausted = true;
-
-  // Check screening-level materiality for symmetric
-  if (symPromoted.length > 0 && existingAuthority) {
-    const bestProxy = symPromoted[0];
-    const currentP19 = existingAuthority.achievedP19VariationDb;
-    const currentP20 = existingAuthority.achievedP20VariationDb;
-    if (bestProxy?.screeningScore?.worstSeatP19 != null && currentP19 != null) {
-      const improvement = currentP19 - bestProxy.screeningScore.worstSeatP19;
-      if (improvement >= 1.0) screeningMaterialFound = true;
-    }
-  }
-
-  // Phase B: Asymmetric pair (skip if symmetric found material)
-  let asymPromoted = [];
-  if (!screeningMaterialFound) {
-    setPositionSearchPhase(projectId, "asymmetric-pair");
-    const t0a = typeof performance !== "undefined" ? performance.now() : Date.now();
-    const asymCandidates = generateAsymmetricPairCandidates(currentPositions, roomDims, cabinetDims);
-    candidateCounts.asymmetricPair = asymCandidates.length;
-    if (asymCandidates.length > 0) {
-      const asymScreened = screenPositionCandidates(
-        asymCandidates, roomDims, seatingPositions, rspPosition,
-        subwooferBottomHeightM, cabinetDims.heightM, screeningPhysics
-      );
-      asymPromoted = promoteScreenedCandidates(asymScreened.ranked, 3);
-    }
-    timings.asymmetricPairMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0a;
-    phasesRun.push("asymmetric-pair");
-    asymmetricPairExhausted = true;
-
-    if (asymPromoted.length > 0 && existingAuthority) {
-      const bestProxy = asymPromoted[0];
-      const currentP19 = existingAuthority.achievedP19VariationDb;
-      if (bestProxy?.screeningScore?.worstSeatP19 != null && currentP19 != null) {
-        const improvement = currentP19 - bestProxy.screeningScore.worstSeatP19;
-        if (improvement >= 1.0) screeningMaterialFound = true;
-      }
-    }
-  }
-
-  // Phase C: Individual (skip if asymmetric found material)
-  let indPromoted = [];
-  if (!screeningMaterialFound) {
-    setPositionSearchPhase(projectId, "individual");
-    const t0i = typeof performance !== "undefined" ? performance.now() : Date.now();
-    const indCandidates = generateIndividualCandidatesForPhase(currentPositions, roomDims, cabinetDims);
-    candidateCounts.individual = indCandidates.length;
-    if (indCandidates.length > 0) {
-      const indScreened = screenPositionCandidates(
-        indCandidates, roomDims, seatingPositions, rspPosition,
-        subwooferBottomHeightM, cabinetDims.heightM, screeningPhysics
-      );
-      indPromoted = promoteScreenedCandidates(indScreened.ranked, 3);
-    }
-    timings.individualMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0i;
-    phasesRun.push("individual");
-    individualExhausted = true;
-  }
-
-  // Convert all promoted candidates to gatherCandidates format
-  const W = Number(roomDims.widthM) || 0;
-  const L = Number(roomDims.lengthM) || 0;
-  const allPromoted = [
-    ...symPromoted.map((c) => ({ ...c, phase: "symmetric" })),
-    ...asymPromoted.map((c) => ({ ...c, phase: "asymmetric-pair" })),
-    ...indPromoted.map((c) => ({ ...c, phase: "individual" })),
-  ];
-
-  for (const promoted of allPromoted) {
-    // Skip if same as current placement
-    const finalist = {
-      id: promoted.id,
-      familyId: `position-${promoted.phase}`,
-      sources: promoted.coordinates.map((c) => ({
-        xNorm: W > 0 ? c.x / W : 0,
-        yNorm: L > 0 ? c.y / L : 0,
-      })),
-    };
-    // Check if this duplicates the current placement
-    const currentFinalist = {
-      sources: currentPositions.map((p) => ({
-        xNorm: W > 0 ? p.x / W : 0,
-        yNorm: L > 0 ? p.y / L : 0,
-      })),
-    };
-    if (isSamePlacement(finalist, currentFinalist, roomDims)) continue;
-
-    positionCandidates.push({
-      id: promoted.id,
-      finalist,
-      isCurrent: false,
-      rawTransfer: null, // will be computed by Phase 2
-      isPositionCandidate: true,
-      phase: promoted.phase,
-      movement: promoted.movement,
-      coordinates: promoted.coordinates,
-    });
-  }
-
-  return {
-    candidates: positionCandidates,
-    positionMeta: {
-      attempted: true,
-      phasesRun,
-      symmetricExhausted,
-      asymmetricPairExhausted,
-      individualExhausted,
-      candidateCounts,
-      timings,
-      promotedCount: positionCandidates.length,
-    },
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Main engine
@@ -859,75 +705,35 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     if (isCancelled()) return { status: "cancelled", snapshot };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
 
-    // ── Phase 1.7: Stage 11B position candidate generation + screening ────
-    // Local 100mm-grid subwoofer position search around the current layout.
-    // Three escalating tiers: symmetric → asymmetric pair → individual.
-    // Fast batch modal screening for discovery — NO full simulation during screening.
-    // Promoted candidates merge into the unified candidate pool for Phase 2-7.
-    let positionMeta = null;
-    let positionCandidates = [];
-    let subOptimisationExhausted = false;
-    let materialSubImprovementFound = false;
+    // ── Phase 2: Gather global Stage 2 candidates (GLOBAL challengers) ──
+    // These are the existing geometric finalist search results — they give
+    // the engine the ability to discover that the best answer is not merely
+    // a small movement around Current. They compete under the SAME canonical
+    // winner selection as local position candidates.
+    onProgress("testing_positions", "Testing recommended positions", 0, 1);
+    let allCandidates = tagGlobalCandidates(
+      gatherCandidates({ subwooferInstances, roomDims, stage2Result, placementFingerprint })
+    );
 
-    try {
-      const cabinetMeta = getSpeakerModelMeta(selectedSubModel);
-      const cabinetDims = {
-        widthM: Number(cabinetMeta?.widthM) || 0.5,
-        depthM: Number(cabinetMeta?.depthM) || 0.3,
-        heightM: Number(cabinetMeta?.heightM) || 0.5,
-      };
-      const currentPositions = (snapshot.positions || []).map((p) => ({ x: p.x, y: p.y }));
-
-      onProgress("screening_symmetric", "Testing symmetric positions", 0, 1);
-      const _posT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-      const posResult = generateAndScreenPositionCandidates({
-        currentPositions, roomDims, cabinetDims, seatingPositions, rspPosition,
-        subwooferBottomHeightM, existingAuthority, projectId,
-      });
-      const _posGenMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - _posT0;
-      positionMeta = { ...posResult.positionMeta, totalGenerationMs: _posGenMs };
-      positionCandidates = posResult.candidates || [];
-      onProgress("screening_symmetric", `Position candidates screened (${positionCandidates.length} promoted)`, 1, 1);
-      await yieldToUI();
+    // Compute raw transfers for global candidates (cached or worker)
+    for (let i = 0; i < allCandidates.length; i++) {
       if (isCancelled()) return { status: "cancelled", snapshot };
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
-    } catch (err) {
-      if (isFatalLifecycleError(err)) throw err;
-      // Position candidate generation failed — continue with Stage 2 only
-    }
-
-    // Phase 2: Testing practical positions (CHALLENGERS ONLY)
-    // Unified pool: Stage 2 global finalists + Stage 11B local position candidates
-    onProgress("testing_positions", "Testing practical positions", 0, 1);
-    const candidates = gatherCandidates({ subwooferInstances, roomDims, stage2Result, placementFingerprint });
-
-    // Merge Stage 11B position candidates into the unified pool
-    if (positionCandidates.length > 0) {
-      candidates.push(...positionCandidates);
-    }
-
-    await yieldToUI();
-    if (isCancelled()) return { status: "cancelled", snapshot };
-    if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
-
-    for (let i = 0; i < candidates.length; i++) {
-      if (isCancelled()) return { status: "cancelled", snapshot };
-      if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
-      onProgress("testing_positions", `Testing practical positions (${i + 1}/${candidates.length})`, i, candidates.length);
-      if (!candidates[i].rawTransfer) {
+      onProgress("testing_positions", `Testing recommended positions (${i + 1}/${allCandidates.length})`, i, allCandidates.length);
+      if (!allCandidates[i].rawTransfer) {
         try {
           const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-          candidates[i].rawTransfer = await runInWorker(worker, "placement", {
-            finalist: candidates[i].finalist,
+          allCandidates[i].rawTransfer = await runInWorker(worker, "placement", {
+            finalist: allCandidates[i].finalist,
             roomDims, rspPosition, seatingPositions,
             selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
           }, controller.signal);
-          metrics.recordWorkerCall("placement", candidates[i].id,
+          metrics.recordWorkerCall("placement", allCandidates[i].id,
             (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
         } catch (err) {
           if (isFatalLifecycleError(err)) throw err;
-          candidates[i].rawTransfer = null;
-          candidates[i].error = err.message;
+          allCandidates[i].rawTransfer = null;
+          allCandidates[i].error = err.message;
         }
       } else {
         metrics.recordStage2TransferReused();
@@ -936,80 +742,42 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       await yieldToUI();
     }
 
-    // Phase 3-5: Proxy search (delay + polarity + trim) — CHALLENGERS ONLY
+    // Proxy search (delay + polarity + trim) for global candidates
     // BLOCKER 2: Current NEVER enters the proxy search.
-    onProgress("optimising_timing", "Optimising timing", 0, candidates.length);
-    for (let i = 0; i < candidates.length; i++) {
+    for (let i = 0; i < allCandidates.length; i++) {
       if (isCancelled()) return { status: "cancelled", snapshot };
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
       const _proxyT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-      candidates[i].proxyResult = runProxySearch(candidates[i]);
-      metrics.recordProxySearch(candidates[i].id,
+      allCandidates[i].proxyResult = runProxySearch(allCandidates[i]);
+      metrics.recordProxySearch(allCandidates[i].id,
         (typeof performance !== "undefined" ? performance.now() : Date.now()) - _proxyT0);
-      onProgress("optimising_timing", `Optimising timing (${i + 1}/${candidates.length})`, i + 1, candidates.length);
+      onProgress("testing_positions", `Optimising timing (${i + 1}/${allCandidates.length})`, i + 1, allCandidates.length);
       await yieldToUI();
     }
 
-    onProgress("testing_polarity", "Testing polarity", 0, candidates.length);
-    for (let i = 0; i < candidates.length; i++) {
-      if (isCancelled()) return { status: "cancelled", snapshot };
-      if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
-      onProgress("testing_polarity", `Testing polarity (${i + 1}/${candidates.length})`, i + 1, candidates.length);
-      await yieldToUI();
-    }
-
-    onProgress("balancing_levels", "Balancing subwoofer levels", 0, candidates.length);
-    for (let i = 0; i < candidates.length; i++) {
-      if (isCancelled()) return { status: "cancelled", snapshot };
-      if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
-      onProgress("balancing_levels", `Balancing subwoofer levels (${i + 1}/${candidates.length})`, i + 1, candidates.length);
-      await yieldToUI();
-    }
-
-    // Phase 6: Promote challengers (Current NOT included)
-    const promoted = promoteChallengers(candidates, MAX_CHALLENGERS);
-
-    // Phase 7: Confirming best options (CHALLENGERS + optionally Current)
-    onProgress("confirming", "Confirming best options", 0, promoted.length + (authorityNonStale ? 0 : 1));
-    const confirmedResults = [];
-
+    // ── Confirm Current (if no existing authority) ──────────────────────
     // BLOCKER 2: If no valid authority exists, canonically recalculate Current
-    // with the EXACT installed tuning (no proxy optimisation). Current uses
-    // the installed delay/trim/polarity — never the proxy-searched tuning.
+    // with the EXACT installed tuning (no proxy optimisation).
+    const confirmedResults = [];
     if (!authorityNonStale) {
       if (isCancelled()) return { status: "cancelled", snapshot };
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
       try {
         const currentFinalist = buildCurrentFinalist(subwooferInstances, roomDims);
         if (currentFinalist) {
-          // Compute Current's raw transfer (placement) if not already cached
           let currentRawTransfer = null;
-          // Try to find a matching cached transfer from Stage 2.
-          // FIX 1: Use the P14-independent placementFingerprint for cache
-          // retrieval — NOT the P14-dependent combined stage2 fingerprint.
-          // FIX 3: Compare the actual cached transfer's sources against
-          // Current — NOT Current against itself. The previous code passed
-          // { sources: currentFinalist.sources } as the first arg, which
-          // compared Current against Current and always returned true,
-          // yielding the first cache entry regardless of whether it matched.
           const cachedTransfers = placementFingerprint
             ? getCachedRawTransfersForFingerprint(placementFingerprint)
             : new Map();
           for (const [fid, transfer] of cachedTransfers.entries()) {
             if (!transfer?.sources) continue;
             if (transfer.sources.length !== currentFinalist.sources.length) continue;
-            // Compare the cached transfer's coordinates against Current
             if (isSamePlacement({ sources: transfer.sources }, currentFinalist, roomDims)) {
-              // Defence in depth: verify product model matches. The placement
-              // fingerprint already guarantees this (selectedSubModel is in the
-              // fingerprint), but this check prevents false reuse if a stale
-              // transfer with a different product somehow enters the cache.
               if (transfer.selectedProduct && normaliseModelKey(selectedSubModel) !== transfer.selectedProduct) continue;
               currentRawTransfer = transfer;
               break;
             }
           }
-          // If no cached transfer, run the worker for Current's placement
           if (!currentRawTransfer) {
             const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
             currentRawTransfer = await runInWorker(worker, "placement", {
@@ -1024,7 +792,6 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           }
           if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
 
-          // BLOCKER 2: Use INSTALLED tuning for Current confirmation — NOT proxy-optimised
           const installedTuning = (snapshot.tuning || []).map((t) => ({
             delayMs: Number(t.delayMs) || 0,
             gainDb: Number(t.gainDb) || 0,
@@ -1042,7 +809,6 @@ export async function runImproveBassV2(projectId, params, callbacks) {
             (typeof performance !== "undefined" ? performance.now() : Date.now()) - _confirmT0, false);
           if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
 
-          // BLOCKER 4: null result → treat as missing, not blank complete
           if (currentConfirmation) {
             currentConfirmation.candidateId = "current";
             currentConfirmation.isCurrent = true;
@@ -1052,62 +818,181 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         }
       } catch (err) {
         if (isFatalLifecycleError(err)) throw err;
-        // Current confirmation failed — continue with challengers only.
-        // The existing authority (if any) will be used as fallback.
       }
-      onProgress("confirming", "Confirming best options (Current)", 1, promoted.length + 1);
       await yieldToUI();
     }
 
-    for (let i = 0; i < promoted.length; i++) {
+    // ── Stage 11B: Iterative position escalation ────────────────────────
+    // Symmetric → confirm → test materiality → only if not material:
+    // Asymmetric pair → confirm → test → only if not material:
+    // Individual → confirm → final winner selection.
+    //
+    // Each phase generates many candidates, fast-screens them, and promotes
+    // only 2-3 into the expensive V2 pipeline. The funnel ensures
+    // FULL_STAGE2_PLACEMENT_EVALUATIONS correspond to promoted candidates,
+    // NOT generated local candidates.
+    let materialSubImprovementFound = false;
+    let subOptimisationExhausted = false;
+    const phasesRun = [];
+    const funnel = {};
+    let cabinetDims = { widthM: 0.5, depthM: 0.3, heightM: 0.5 };
+
+    try {
+      const cabinetMeta = getSpeakerModelMeta(selectedSubModel);
+      cabinetDims = {
+        widthM: Number(cabinetMeta?.widthM) || 0.5,
+        depthM: Number(cabinetMeta?.depthM) || 0.3,
+        heightM: Number(cabinetMeta?.heightM) || 0.5,
+      };
+    } catch { /* registry lookup failed — use defaults */ }
+
+    const currentPositions = (snapshot.positions || []).map((p) => ({ x: p.x, y: p.y }));
+
+    const escalationPhases = [
+      { name: "symmetric", label: "Testing symmetric movements", confirmLabel: "Confirming symmetric solutions" },
+      { name: "asymmetric-pair", label: "Testing alternative positions", confirmLabel: "Confirming alternative solutions" },
+      { name: "individual", label: "Testing final position options", confirmLabel: "Confirming final solution" },
+    ];
+
+    for (const escPhase of escalationPhases) {
       if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
+      const funnelKey = escPhase.name === "asymmetric-pair" ? "asymmetricPair" : escPhase.name;
+
+      // ── Generate + screen + promote (fast batch modal — NO full simulation)
+      setPositionSearchPhase(projectId, escPhase.name);
+      onProgress(`screening_${escPhase.name}`, escPhase.label, 0, 1);
+
+      let phaseResult;
       try {
-        const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-        const result = await runInWorker(worker, "confirmation", {
-          rawTransfer: promoted[i].rawTransfer,
-          tuning: promoted[i].proxyResult?.tuning,
-          tuningVariant: "delay-polarity-trim",
-          p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
-        }, controller.signal);
-        metrics.recordWorkerCall("confirmation", promoted[i].id,
-          (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
-        if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
-        // BLOCKER 4: null worker result → skip, do NOT add as blank
-        if (result) {
-          result.candidateId = promoted[i].id;
-          result.isCurrent = false;
-          result.appliedTuning = promoted[i].proxyResult?.tuning;
-          // Carry Stage 11B position candidate metadata through confirmation
-          if (promoted[i].isPositionCandidate) {
-            result.isPositionCandidate = true;
-            result.positionPhase = promoted[i].phase;
-            result.movementDescription = promoted[i].movement;
-            result.positionCoordinates = promoted[i].coordinates;
-          }
-          confirmedResults.push(result);
-          metrics.recordChallengerConfirmed();
-          onBestSoFar({ result, candidate: promoted[i] });
-        }
+        phaseResult = runPositionScreenPhase(
+          escPhase.name, currentPositions, roomDims, cabinetDims,
+          seatingPositions, rspPosition, subwooferBottomHeightM,
+        );
       } catch (err) {
         if (isFatalLifecycleError(err)) throw err;
-        // Challenger confirmation failed — skip it, continue with others
+        phaseResult = { promoted: [], funnel: { generated: 0, screened: 0, promotedToV2: 0 }, timingMs: 0 };
       }
-      onProgress("confirming", `Confirming best options (${i + 1 + (authorityNonStale ? 0 : 1)}/${promoted.length + (authorityNonStale ? 0 : 1)})`, i + 1 + (authorityNonStale ? 0 : 1), promoted.length + (authorityNonStale ? 0 : 1));
+
+      funnel[funnelKey] = { ...phaseResult.funnel, confirmed: 0 };
+      phasesRun.push(escPhase.name);
+
+      onProgress(`screening_${escPhase.name}`,
+        phaseResult.promoted.length > 0
+          ? `${escPhase.label} (${phaseResult.funnel.generated} generated, ${phaseResult.funnel.promotedToV2} promoted)`
+          : `${escPhase.label} (no valid candidates)`,
+        1, 1);
       await yieldToUI();
+
+      if (phaseResult.promoted.length === 0) continue;
+
+      // ── Compute raw transfers for promoted local candidates (worker)
+      for (const c of phaseResult.promoted) {
+        if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+        if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+        try {
+          const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+          c.rawTransfer = await runInWorker(worker, "placement", {
+            finalist: c.finalist,
+            roomDims, rspPosition, seatingPositions,
+            selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+          }, controller.signal);
+          metrics.recordWorkerCall("placement", c.id,
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
+        } catch (err) {
+          if (isFatalLifecycleError(err)) throw err;
+          c.rawTransfer = null;
+          c.error = err.message;
+        }
+        await yieldToUI();
+      }
+
+      // ── Proxy search (delay + polarity + trim) for new local candidates
+      for (const c of phaseResult.promoted) {
+        if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+        const _proxyT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+        c.proxyResult = runProxySearch(c);
+        metrics.recordProxySearch(c.id,
+          (typeof performance !== "undefined" ? performance.now() : Date.now()) - _proxyT0);
+        await yieldToUI();
+      }
+
+      // ── Merge into unified candidate pool
+      allCandidates = [...allCandidates, ...phaseResult.promoted];
+
+      // ── Promote from merged pool (global + all local so far)
+      const promoted = promoteChallengers(allCandidates, MAX_CHALLENGERS);
+
+      // ── Confirm only NEW promoted candidates (skip already-confirmed)
+      const confirmedIds = new Set(confirmedResults.map((r) => r.candidateId));
+      const newPromoted = promoted.filter((p) => !confirmedIds.has(p.id));
+
+      onProgress(`confirming_${escPhase.name}`, escPhase.confirmLabel, 0, newPromoted.length);
+      let phaseConfirmedCount = 0;
+
+      for (let i = 0; i < newPromoted.length; i++) {
+        if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+        if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+        try {
+          const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+          const result = await runInWorker(worker, "confirmation", {
+            rawTransfer: newPromoted[i].rawTransfer,
+            tuning: newPromoted[i].proxyResult?.tuning,
+            tuningVariant: "delay-polarity-trim",
+            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+          }, controller.signal);
+          metrics.recordWorkerCall("confirmation", newPromoted[i].id,
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
+          if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+          if (result) {
+            result.candidateId = newPromoted[i].id;
+            result.isCurrent = false;
+            result.appliedTuning = newPromoted[i].proxyResult?.tuning;
+            // Carry position candidate metadata through confirmation
+            if (newPromoted[i].isPositionCandidate) {
+              result.isPositionCandidate = true;
+              result.positionPhase = newPromoted[i].phase;
+              result.movementDescription = newPromoted[i].movement;
+              result.positionCoordinates = newPromoted[i].coordinates;
+              result.candidateOrigin = newPromoted[i].candidateOrigin;
+            } else {
+              result.candidateOrigin = newPromoted[i].candidateOrigin || "global-placement";
+            }
+            confirmedResults.push(result);
+            phaseConfirmedCount++;
+            metrics.recordChallengerConfirmed();
+            onBestSoFar({ result, candidate: newPromoted[i] });
+          }
+        } catch (err) {
+          if (isFatalLifecycleError(err)) throw err;
+        }
+        onProgress(`confirming_${escPhase.name}`, `${escPhase.confirmLabel} (${i + 1}/${newPromoted.length})`, i + 1, newPromoted.length);
+        await yieldToUI();
+      }
+
+      funnel[funnelKey].confirmed = phaseConfirmedCount;
+
+      // ── Check CANONICAL materiality — proxy does NOT decide this
+      if (existingAuthority) {
+        const matCheck = checkPhaseMateriality(confirmedResults, existingAuthority);
+        if (matCheck.material) {
+          materialSubImprovementFound = true;
+          break; // STOP escalation — material improvement found
+        }
+      }
     }
 
     // BLOCKER 7: Final stale + cancel checks before publishing winner
     if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
 
-    // Phase 8: Finalising recommendation
+    // ── Phase 8: Final single winner selection ───────────────────────────
     onProgress("finalising", "Finalising recommendation", 0, 1);
     const selection = selectWinnerWithProtection(confirmedResults, snapshot, existingAuthority);
     await yieldToUI();
 
-    // BLOCKER 4: If selection is null/undefined (shouldn't happen, but guard),
-    // return NO_WINNER explicitly
+    // BLOCKER 4: If selection is null/undefined, return NO_WINNER explicitly
     if (!selection) {
       return {
         status: "complete",
@@ -1130,38 +1015,12 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       selection.calibrationTuning = calibrationTuning;
     }
 
-    // Stage 11B: Compute materiality and exhaustion from the unified winner
-    // The winner may be: Current, calibration-only, Stage 2 finalist, or a
-    // Stage 11B position candidate (symmetric/asymmetric/individual).
-    // All went through the SAME canonical confirmation pipeline.
-    if (selection.winner && existingAuthority) {
-      const winnerIsPositionCandidate = !!selection.winner.isPositionCandidate;
-      if (winnerIsPositionCandidate) {
-        const mat = isMaterialImprovement(existingAuthority, selection.winner);
-        materialSubImprovementFound = mat.material;
-      }
-    }
-    // Exhausted = all required tiers ran and no material position improvement found
-    const allTiersExhausted = !positionMeta || (
-      (positionMeta.symmetricExhausted || positionMeta.candidateCounts.symmetric === 0) &&
-      (positionMeta.asymmetricPairExhausted || positionMeta.candidateCounts.asymmetricPair === 0) &&
-      (positionMeta.individualExhausted || positionMeta.candidateCounts.individual === 0)
-    );
-    subOptimisationExhausted = allTiersExhausted && !materialSubImprovementFound;
+    // Stage 11B: Build per-phase exhaustion state from the unified winner
+    const positionOpt = buildPositionOptimisationState(phasesRun, funnel, existingAuthority, selection.winner);
+    materialSubImprovementFound = positionOpt.materialSubImprovementFound;
+    subOptimisationExhausted = positionOpt.subOptimisationExhausted;
     setPositionExhaustion(projectId, subOptimisationExhausted, materialSubImprovementFound, selection.winner);
-
-    selection.positionOptimisation = {
-      attempted: !!positionMeta,
-      phasesRun: positionMeta?.phasesRun || [],
-      symmetricExhausted: positionMeta?.symmetricExhausted || false,
-      asymmetricPairExhausted: positionMeta?.asymmetricPairExhausted || false,
-      individualExhausted: positionMeta?.individualExhausted || false,
-      subOptimisationExhausted,
-      materialSubImprovementFound,
-      bestPracticalSubResult: selection.winner || null,
-      candidateCounts: positionMeta?.candidateCounts || { symmetric: 0, asymmetricPair: 0, individual: 0 },
-      timings: positionMeta?.timings || {},
-    };
+    selection.positionOptimisation = positionOpt;
 
     return { status: "complete", selection, snapshot, confirmedResults };
   } catch (error) {

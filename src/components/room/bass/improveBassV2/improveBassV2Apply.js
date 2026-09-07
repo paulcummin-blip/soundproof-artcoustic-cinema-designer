@@ -50,7 +50,10 @@ function normalisePolarity(value) {
  * @returns {Array} new subwooferInstances array with ALL instances preserved
  */
 export function buildOptimisedInstances(winner, currentInstances, roomDims, modelKey) {
-  if (!winner?.coordinates?.length) return currentInstances || [];
+  // Winner may carry coordinates as `coordinates` (Stage 2) or
+  // `positionCoordinates` (Stage 11B position candidates).
+  const coords = winner?.positionCoordinates || winner?.coordinates;
+  if (!coords?.length) return currentInstances || [];
 
   const W = Number(roomDims?.widthM) || 0;
   const L = Number(roomDims?.lengthM) || 0;
@@ -65,7 +68,7 @@ export function buildOptimisedInstances(winner, currentInstances, roomDims, mode
   // BLOCKER 5: Build optimised active instances from winner coordinates.
   // Map winner coordinates to active instances by index.
   const usedIds = new Set(existingList.map((inst) => String(inst.id)));
-  const optimisedActive = winner.coordinates.map((coord, i) => {
+  const optimisedActive = coords.map((coord, i) => {
     const x = Number(coord.x);
     const y = Number(coord.y);
     const { rotationDeg } = deriveSubWallOrientation({
@@ -145,16 +148,17 @@ export function buildOptimisedInstances(winner, currentInstances, roomDims, mode
  * @returns {boolean} true only if active positions AND tuning match
  */
 export function isOptimisedApplied(currentInstances, winner, roomDims) {
-  if (!winner?.coordinates?.length || !currentInstances?.length) return false;
+  const coords = winner?.positionCoordinates || winner?.coordinates;
+  if (!coords?.length || !currentInstances?.length) return false;
 
   // Only check active instances against the winner
   const activeInstances = currentInstances.filter((inst) => inst.enabled !== false);
-  if (winner.coordinates.length !== activeInstances.length) return false;
+  if (coords.length !== activeInstances.length) return false;
 
   const tuning = winner.appliedTuning || winner.tuning || [];
 
-  for (let i = 0; i < winner.coordinates.length; i++) {
-    const wc = winner.coordinates[i];
+  for (let i = 0; i < coords.length; i++) {
+    const wc = coords[i];
     const inst = activeInstances[i];
     if (!inst) return false;
 
