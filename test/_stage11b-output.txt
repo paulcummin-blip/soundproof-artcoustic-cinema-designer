@@ -30,3 +30,17 @@ RSP: x=2, y=3.052885
    Estimating time remaining...
    [1/24] Front inward 0.1m: proxy=36.06dB, maxSeat=0.00dB, ETA~217s
    [2/24] Front outward 0.1m: proxy=38.12dB, maxSeat=0.00dB, ETA~206s
+   [3/24] Front inward 0.2m: proxy=37.35dB, maxSeat=0.00dB, ETA~199s
+   [4/24] Front outward 0.2m: proxy=42.49dB, maxSeat=0.00dB, ETA~190s
+   [5/24] Front inward 0.3m: proxy=40.84dB, maxSeat=0.00dB, ETA~181s
+   [6/24] Front outward 0.3m: proxy=56.80dB, maxSeat=0.00dB, ETA~171s
+   [7/24] Rear inward 0.1m: proxy=35.45dB, maxSeat=0.00dB, ETA~162s
+   [8/24] Rear outward 0.1m: proxy=39.48dB, maxSeat=0.00dB, ETA~152s
+   [9/24] Rear inward 0.2m: proxy=35.50dB, maxSeat=0.00dB, ETA~143s
+   [10/24] Rear outward 0.2m: proxy=48.30dB, maxSeat=0.00dB, ETA~133s
+   [11/24] Rear inward 0.3m: proxy=46.09dB, maxSeat=0.00dB, ETA~124s
+   [12/24] Rear outward 0.3m: proxy=53.92dB, maxSeat=0.00dB, ETA~114s
+   [13/24] Front forward 0.1m: proxy=38.17dB, maxSeat=0.00dB, ETA~105s
+   [14/24] Front forward 0.2m: proxy=37.92dB, maxSeat=0.00dB, ETA~95s
+   [15/24] Front forward 0.3m: proxy=35.58dB, maxSeat=0.00dB, ETA~86s
+   [16/24] Rear forward 0.1m: proxy=33.48dB, maxSeat=0.00dB, ETA~76s
