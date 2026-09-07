@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import HeightInput from '@/components/ui/HeightInput';
 import BassTerminalStatus from '@/components/room/bass/BassTerminalStatus';
-import BassPostCalculationActions from '@/components/room/bass/BassPostCalculationActions';
+import ImproveBassResponseV2 from '@/components/room/bass/improveBassV2/ImproveBassResponseV2';
 import BassPermanentPills from '@/components/room/bass/BassPermanentPills';
 import BassPermanentSeatResults from '@/components/room/bass/BassPermanentSeatResults';
 import CalculateAllTargetResults from '@/components/room/bass/CalculateAllTargetResults';
@@ -390,17 +390,16 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
             {/* Terminal status — error/notice messages only (no duplicated results) */}
             <BassTerminalStatus />
 
-            {/* Improve Bass Response — placement and quantity optimisation */}
-            <BassPostCalculationActions
+            {/* Improve Bass Response — V2 Stage 11B canonical optimisation */}
+            <ImproveBassResponseV2
               roomDims={roomDimensions}
               seatingPositions={seats}
-              currentSubs={appState?.subwooferInstances}
-              sourceHeightM={frontSubsCfg?.bottomHeightM ?? rearSubsCfg?.bottomHeightM}
+              subwooferInstances={appState?.subwooferInstances}
               frontSubsCfg={frontSubsCfg}
               rearSubsCfg={rearSubsCfg}
-              subwooferInstances={appState?.subwooferInstances}
               commitInstances={compat.commitInstances}
               hasCanonicalInstances={compat.hasCanonicalInstances}
+              appState={appState}
             />
           </div>
 
