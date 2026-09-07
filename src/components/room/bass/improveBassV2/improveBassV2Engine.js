@@ -526,6 +526,69 @@ function selectWinnerWithProtection(confirmedResults, snapshot, existingAuthorit
 }
 
 // ---------------------------------------------------------------------------
+// Stage 11B: Position search helper
+// ---------------------------------------------------------------------------
+
+async function confirmPositionFinalists({
+  promoted, worker, controller, roomDims, rspPosition, seatingPositions,
+  selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+  p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+  phase, isCancelled, isStale, onProgress, progressLabel, yieldToUI,
+}) {
+  const confirmed = [];
+  for (let i = 0; i < promoted.length; i++) {
+    if (isCancelled()) return { confirmed, cancelled: true };
+    if (isStale()) return { confirmed, stale: true };
+    onProgress("refining_positions", `${progressLabel} (${i + 1}/${promoted.length})`, i, promoted.length);
+
+    const finalist = {
+      id: promoted[i].id,
+      familyId: `position-${phase}`,
+      sources: promoted[i].coordinates.map((c) => ({
+        xNorm: c.x / Number(roomDims.widthM),
+        yNorm: c.y / Number(roomDims.lengthM),
+      })),
+    };
+
+    try {
+      const rawTransfer = await runInWorker(worker, "placement", {
+        finalist, roomDims, rspPosition, seatingPositions,
+        selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+      }, controller.signal);
+
+      const tuningResult = runCalibrationOnlySearch(rawTransfer);
+      if (!tuningResult?.bestTuning) continue;
+
+      const confirmation = await runInWorker(worker, "confirmation", {
+        rawTransfer, tuning: tuningResult.bestTuning,
+        tuningVariant: "delay-polarity-trim",
+        p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+      }, controller.signal);
+
+      if (confirmation) {
+        confirmation.candidateId = promoted[i].id;
+        confirmation.isCurrent = false;
+        confirmation.appliedTuning = tuningResult.bestTuning;
+        confirmation.coordinates = promoted[i].coordinates;
+        confirmation.movementDescription = promoted[i].movement;
+        confirmation.phase = phase;
+        confirmed.push({
+          result: confirmation,
+          coordinates: promoted[i].coordinates,
+          movement: promoted[i].movement,
+          phase,
+          appliedTuning: tuningResult.bestTuning,
+        });
+      }
+    } catch (err) {
+      if (isFatalLifecycleError(err)) throw err;
+    }
+    await yieldToUI();
+  }
+  return { confirmed };
+}
+
+// ---------------------------------------------------------------------------
 // Main engine
 // ---------------------------------------------------------------------------
 
@@ -700,6 +763,125 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
+
+    // ── Phase 1.7: Position search (Stage 11B) ────────────────────────────
+    // Local 100mm-grid subwoofer position search around the current layout.
+    // Three escalating tiers: symmetric → asymmetric pair → individual.
+    // Fast batch modal screening for discovery; canonical confirmation for finalists only.
+    let positionSearchResult = null;
+    let subOptimisationExhausted = false;
+    let materialSubImprovementFound = false;
+
+    try {
+      const cabinetMeta = getSpeakerModelMeta(selectedSubModel);
+      const cabinetDims = {
+        widthM: Number(cabinetMeta?.widthM) || 0.5,
+        depthM: Number(cabinetMeta?.depthM) || 0.3,
+        heightM: Number(cabinetMeta?.heightM) || 0.5,
+      };
+      const currentPositions = (snapshot.positions || []).map((p) => ({ x: p.x, y: p.y }));
+      const screeningPhysics = { qStrategy: "ab_corrected" };
+      const currentForComparison = existingAuthority || null;
+
+      const allPositionConfirmed = [];
+
+      // Helper to run a single search phase
+      async function runPhase(phaseName, generateFn, progressLabel) {
+        setPositionSearchPhase(projectId, phaseName);
+        onProgress(`screening_${phaseName === "symmetric" ? "symmetric" : phaseName === "asymmetric-pair" ? "asymmetric" : "individual"}`, `Testing ${progressLabel}`, 0, 1);
+
+        const candidates = generateFn(currentPositions, roomDims, cabinetDims);
+        if (!candidates.length) return [];
+
+        const screened = screenPositionCandidates(
+          candidates, roomDims, seatingPositions, rspPosition,
+          subwooferBottomHeightM, cabinetDims.heightM, screeningPhysics
+        );
+        const promoted = promoteScreenedCandidates(screened.ranked, 3);
+
+        onProgress(`screening_${phaseName === "symmetric" ? "symmetric" : phaseName === "asymmetric-pair" ? "asymmetric" : "individual"}`,
+          `${progressLabel} (${candidates.length} screened)`, 1, 1);
+        await yieldToUI();
+
+        const { confirmed, cancelled, stale } = await confirmPositionFinalists({
+          promoted, worker, controller, roomDims, rspPosition, seatingPositions,
+          selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+          p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+          phase: phaseName, isCancelled, isStale, onProgress, progressLabel, yieldToUI,
+        });
+        if (cancelled) return { cancelled: true };
+        if (stale) return { stale: true };
+        return confirmed;
+      }
+
+      // Phase A: Symmetric
+      const symResult = await runPhase("symmetric", generateSymmetricCandidates, "symmetric positions");
+      if (symResult?.cancelled) return { status: "cancelled", snapshot };
+      if (symResult?.stale) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
+      if (Array.isArray(symResult)) allPositionConfirmed.push(...symResult);
+
+      // Check materiality after symmetric
+      if (allPositionConfirmed.length > 0 && currentForComparison) {
+        const best = selectBestPositionCandidate(allPositionConfirmed, currentForComparison, currentPositions);
+        if (best) {
+          const mat = isMaterialImprovement(currentForComparison, best.result);
+          if (mat.material) materialSubImprovementFound = true;
+        }
+      }
+
+      // Phase B: Asymmetric pair (only if no material symmetric result)
+      if (!materialSubImprovementFound) {
+        const asymResult = await runPhase("asymmetric-pair", generateAsymmetricPairCandidates, "alternative positions");
+        if (asymResult?.cancelled) return { status: "cancelled", snapshot };
+        if (asymResult?.stale) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
+        if (Array.isArray(asymResult)) allPositionConfirmed.push(...asymResult);
+
+        if (allPositionConfirmed.length > 0 && currentForComparison) {
+          const best = selectBestPositionCandidate(allPositionConfirmed, currentForComparison, currentPositions);
+          if (best) {
+            const mat = isMaterialImprovement(currentForComparison, best.result);
+            if (mat.material) materialSubImprovementFound = true;
+          }
+        }
+      }
+
+      // Phase C: Individual (only if still no material result)
+      if (!materialSubImprovementFound) {
+        const indResult = await runPhase("individual", generateIndividualCandidatesForPhase, "individual positions");
+        if (indResult?.cancelled) return { status: "cancelled", snapshot };
+        if (indResult?.stale) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
+        if (Array.isArray(indResult)) allPositionConfirmed.push(...indResult);
+
+        if (allPositionConfirmed.length > 0 && currentForComparison) {
+          const best = selectBestPositionCandidate(allPositionConfirmed, currentForComparison, currentPositions);
+          if (best) {
+            const mat = isMaterialImprovement(currentForComparison, best.result);
+            if (mat.material) materialSubImprovementFound = true;
+          }
+        }
+      }
+
+      // Set exhaustion state
+      subOptimisationExhausted = !materialSubImprovementFound;
+      const bestPositionCandidate = allPositionConfirmed.length > 0 && currentForComparison
+        ? selectBestPositionCandidate(allPositionConfirmed, currentForComparison, currentPositions)
+        : null;
+      setPositionExhaustion(projectId, subOptimisationExhausted, materialSubImprovementFound, bestPositionCandidate?.result || null);
+
+      if (materialSubImprovementFound && bestPositionCandidate) {
+        positionSearchResult = {
+          winner: bestPositionCandidate.result,
+          movement: bestPositionCandidate.movement,
+          phase: bestPositionCandidate.phase,
+          subOptimisationExhausted: false,
+          materialSubImprovementFound: true,
+          currentResult: currentForComparison,
+        };
+      }
+    } catch (err) {
+      if (isFatalLifecycleError(err)) throw err;
+      // Position search failed — continue with Stage 2 finalist search
+    }
 
     // Phase 2: Testing practical positions (CHALLENGERS ONLY)
     onProgress("testing_positions", "Testing practical positions", 0, 1);
@@ -921,6 +1103,13 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       selection.calibrationMaterial = calibrationMaterial;
       selection.calibrationTuning = calibrationTuning;
     }
+
+    // Stage 11B: Attach position search result to the selection
+    if (positionSearchResult) {
+      selection.positionWinner = positionSearchResult;
+    }
+    selection.subOptimisationExhausted = subOptimisationExhausted;
+    selection.materialSubImprovementFound = materialSubImprovementFound;
 
     return { status: "complete", selection, snapshot, confirmedResults };
   } catch (error) {
