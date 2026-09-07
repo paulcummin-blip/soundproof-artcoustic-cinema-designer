@@ -269,6 +269,52 @@ function assert(condition, name) {
   assert(isCalibrationApplied(instances, wrongTuning) === false, "Test 12b: Non-matching tuning detected as not applied");
 }
 
+// ── Test 13: Headroom-only improvement is NOT material ────────────────────
+{
+  const current = {
+    achievedP19Level: 2, achievedP20Level: 2,
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    p14HeadroomDb: 3.0,
+  };
+  const candidate = {
+    achievedP19Level: 2, achievedP20Level: 2,
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    p14HeadroomDb: 5.0, // +2 dB headroom, nothing else changes
+  };
+  const result = isMaterialImprovement(current, candidate);
+  assert(result.material === false, "Test 13: Headroom-only improvement is NOT material (headroom is not standalone materiality)");
+}
+
+// ── Test 14: Severe null reduction >= 3 dB is material ───────────────────
+{
+  const current = {
+    achievedP19Level: 2, achievedP20Level: 2,
+    perSeatP19: [
+      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 },
+      { seatId: "s1", isPrimary: false, level: 1, variationDbRaw: -12.0 },
+    ],
+    perSeatP20: [
+      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 },
+      { seatId: "s1", isPrimary: false, level: 1, variationDbRaw: -10.0 },
+    ],
+  };
+  const candidate = {
+    achievedP19Level: 2, achievedP20Level: 2,
+    perSeatP19: [
+      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 },
+      { seatId: "s1", isPrimary: false, level: 2, variationDbRaw: -8.5 }, // 3.5 dB null reduction
+    ],
+    perSeatP20: [
+      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 },
+      { seatId: "s1", isPrimary: false, level: 2, variationDbRaw: -7.0 },
+    ],
+  };
+  const result = isMaterialImprovement(current, candidate);
+  assert(result.material === true, "Test 14: Severe null reduction 3.5 dB = material");
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

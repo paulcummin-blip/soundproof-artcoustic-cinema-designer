@@ -4,8 +4,11 @@
 // A candidate is MATERIAL when, without meaningful regression:
 //   A. any relevant P19/P20 displayed level improves;
 //   B. levels remain identical but worst-seat deviation improves by >= 1.0 dB;
-//   C. a severe response problem/null improves by >= 3 dB with no new significant problem;
-//   D. another demonstrably meaningful acoustic improvement (e.g. P14 headroom).
+//   C. a severe response problem/null improves by >= 3 dB with no new significant problem.
+//
+// Headroom (P14) is NOT an independent user-facing materiality qualifier.
+// It belongs in safety, ranking/tiebreaking, and avoiding excessive
+// calibration cost — but it must not independently cause MATERIAL = true.
 //
 // A 0.15 dB Pareto tolerance may remain internally for numerical comparisons.
 // Do NOT surface 0.2-0.5 dB cosmetic wins as a recommendation.
@@ -139,12 +142,11 @@ export function isMaterialImprovement(currentResult, candidateResult) {
     return { material: true, reason: `Severe null reduced by ${nullReduction.toFixed(1)} dB`, details: { currentWorstAll, candidateWorstAll, nullReduction } };
   }
 
-  // D. P14 headroom improvement >= 1.0 dB
-  const currentHeadroom = Number.isFinite(Number(currentResult.p14HeadroomDb)) ? Number(currentResult.p14HeadroomDb) : -Infinity;
-  const candidateHeadroom = Number.isFinite(Number(candidateResult.p14HeadroomDb)) ? Number(candidateResult.p14HeadroomDb) : -Infinity;
-  if (candidateHeadroom > currentHeadroom + WITHIN_LEVEL_THRESHOLD_DB) {
-    return { material: true, reason: `P14 headroom improved by ${(candidateHeadroom - currentHeadroom).toFixed(1)} dB` };
-  }
+  // D. Headroom is NOT an independent user-facing materiality qualifier.
+  // It belongs in safety, ranking/tiebreaking, and avoiding excessive
+  // calibration cost — but it must not independently cause MATERIAL = true.
+  // A recommendation that only improves headroom without any P19/P20 level
+  // or deviation improvement is NOT a user-facing recommendation.
 
   return { material: false, reason: "No material calibration improvement" };
 }
