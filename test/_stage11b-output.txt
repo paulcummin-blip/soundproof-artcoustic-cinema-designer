@@ -29,3 +29,56 @@ RSP: x=2, y=3.052885
 3. CHEAP SCREENING (simulation + proxy score)...
    Estimating time remaining...
    [1/10] Front forward 0.2m: proxy=37.92dB, maxSeat=0.00dB, ETA~88s
+   [2/10] Front forward 0.3m: proxy=35.58dB, maxSeat=0.00dB, ETA~79s
+   [3/10] Rear forward 0.2m: proxy=32.26dB, maxSeat=0.00dB, ETA~68s
+   [4/10] Rear forward 0.3m: proxy=33.26dB, maxSeat=0.00dB, ETA~59s
+   [5/10] Both toward center 0.1m: proxy=33.72dB, maxSeat=0.00dB, ETA~49s
+   [6/10] Both away from center 0.1m: proxy=38.08dB, maxSeat=0.00dB, ETA~39s
+   [7/10] Both toward center 0.2m: proxy=30.70dB, maxSeat=0.00dB, ETA~29s
+   [8/10] Both away from center 0.2m: proxy=38.24dB, maxSeat=0.00dB, ETA~20s
+   [9/10] Both toward center 0.3m: proxy=30.25dB, maxSeat=0.00dB, ETA~10s
+   [10/10] Both away from center 0.3m: proxy=36.95dB, maxSeat=0.00dB, ETA~0s
+
+   Screening complete: 108002.8s
+
+4. TOP 5 CANDIDATES FOR TUNING + CANONICAL CONFIRMATION:
+   Both toward center 0.3m: proxy=30.25dB, maxSeat=0.00dB
+   Both toward center 0.2m: proxy=30.70dB, maxSeat=0.00dB
+   Rear forward 0.2m: proxy=32.26dB, maxSeat=0.00dB
+   Rear forward 0.3m: proxy=33.26dB, maxSeat=0.00dB
+   Both toward center 0.1m: proxy=33.72dB, maxSeat=0.00dB
+
+5. TUNING SEARCH + CANONICAL CONFIRMATION...
+   Estimating time remaining...
+
+   [1/5] Both toward center 0.3m...
+      A. Delay-only search...
+         Finalists: 2, best: 21.99
+      B. Delay+Pol+Trim search...
+         Finalists: 2, best: 18.26
+      C. Polarity-only search...
+         Best polarity: [0,-1,-1,0], score: 0.00
+      Best tuning: pol(0.0) (proxy=16.97)
+      SKIP: degenerate (P14=-187.7, P19=L-Infinity, P20=L-Infinity)
+
+   [2/5] Both toward center 0.2m...
+      A. Delay-only search...
+         Finalists: 2, best: 20.38
+      B. Delay+Pol+Trim search...
+         Finalists: 2, best: 18.42
+      C. Polarity-only search...
+         Best polarity: [0,-1,-1,0], score: 0.00
+      Best tuning: pol(0.0) (proxy=19.45)
+      SKIP: degenerate (P14=-189.2, P19=L-Infinity, P20=L-Infinity)
+
+   [3/5] Rear forward 0.2m...
+      A. Delay-only search...
+         Finalists: 2, best: 19.77
+      B. Delay+Pol+Trim search...
+         Finalists: 2, best: 18.57
+      C. Polarity-only search...
+         Best polarity: [0,-1,-1,0], score: 0.00
+      Best tuning: pol(0.0) (proxy=19.45)
+      SKIP: degenerate (P14=-189.8, P19=L-Infinity, P20=L-Infinity)
+
+   [4/5] Rear forward 0.3m...
