@@ -15,8 +15,6 @@
 import React from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { PRIMARY } from "@/components/utils/seatPriorityAuthority";
-import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
-
 const REFERENCE_IDS = new Set(["rsp", "mlp", "synthetic-rsp", "synthetic_rsp"]);
 
 function isRealSeat(seat) {
@@ -34,14 +32,12 @@ function buildResultMap(results) {
 
 function formatP19Db(raw) {
   if (!Number.isFinite(Number(raw))) return "—";
-  const designVal = resolveRp22DesignValue(19, Math.abs(Number(raw)));
-  return `±${designVal} dB`;
+  return `±${Math.abs(Number(raw)).toFixed(1)} dB`;
 }
 
 function formatP20Db(raw) {
   if (!Number.isFinite(Number(raw))) return "—";
-  const designVal = resolveRp22DesignValue(20, Math.abs(Number(raw)));
-  return `±${designVal} dB`;
+  return `±${Math.abs(Number(raw)).toFixed(1)} dB`;
 }
 
 function p19LevelText(level) {
@@ -151,7 +147,7 @@ function SeatBeforeAfterCell({ seat, parameter, formatDb, levelTextFn }) {
 
 function SeatRow({ row, parameter, formatDb, levelTextFn }) {
   return (
-    <div key={row.row} className="flex flex-wrap justify-center gap-1">
+    <div key={row.row} className="grid gap-1" style={{ gridTemplateColumns: `repeat(${row.seats.length}, minmax(0, 1fr))` }}>
       {row.seats.map((seat) => (
         <SeatBeforeAfterCell
           key={seat.seatId}

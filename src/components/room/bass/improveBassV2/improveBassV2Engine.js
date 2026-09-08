@@ -1098,7 +1098,13 @@ function extractAuthorityForComparison(currentAuthority) {
   const p19Param = params.p19 || {};
   const p20Param = params.p20 || {};
   const p18Param = params.p18 || {};
-  const p14Param = params.p14 || {};
+
+  // P14 achieved capability: read from selectedCandidate (canonical achieved
+  // authority), NOT from productAnalysis.parameters.p14 (which carries the
+  // designer-selected TARGET semantics). Falls back to contract-level fields.
+  const p14AchievedLevel = selectedCandidate.achievedP14Level ?? contract.achievedP14Level ?? null;
+  const p14AchievedDbRaw = selectedCandidate.achievedP14Db ?? contract.achievedP14Db ?? null;
+  const p14AchievedDb = Number.isFinite(Number(p14AchievedDbRaw)) ? Number(p14AchievedDbRaw) : null;
 
   return {
     perSeatP19,
@@ -1111,7 +1117,7 @@ function extractAuthorityForComparison(currentAuthority) {
     achievedP18Hz: Number.isFinite(Number(selectedCandidate.achievedP18FrequencyHz))
       ? Number(selectedCandidate.achievedP18FrequencyHz)
       : (Number.isFinite(Number(p18Param.value)) ? Number(p18Param.value) : null),
-    p14AchievedLevel: p14Param.level ?? null,
-    p14AchievedDb: Number.isFinite(Number(p14Param.value)) ? Number(p14Param.value) : null,
+    p14AchievedLevel,
+    p14AchievedDb,
   };
 }

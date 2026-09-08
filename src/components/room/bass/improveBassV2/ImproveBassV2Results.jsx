@@ -51,7 +51,7 @@ function p14TargetLabel(level, db) {
   const lvl = numericLevel(level);
   const lt = lvl != null && lvl > 0 ? `L${lvl}` : "—";
   const dbText = Number.isFinite(Number(db)) ? `${Math.round(Number(db))} dBC` : "";
-  return dbText ? `${lt} / ${dbText}` : lt;
+  return dbText ? `Minimum ${lt} / ${dbText}` : lt;
 }
 
 function p18Label(level, hz) {
@@ -89,28 +89,36 @@ function P14TargetPill({ targetLevel, targetDb }) {
 }
 
 // ── P14 Capability (achieved before→after) ───────────────────────────────
-function P14CapabilityPill({ currentLevel, winnerLevel }) {
+function P14CapabilityPill({ currentLevel, currentDb, winnerLevel, winnerDb }) {
   const cur = numericLevel(currentLevel) || 0;
   const win = numericLevel(winnerLevel) || 0;
   const curText = cur > 0 ? `L${cur}` : "—";
   const winText = win > 0 ? `L${win}` : "—";
-  const changed = cur !== win;
+  const curDbText = Number.isFinite(Number(currentDb)) ? `${Number(currentDb).toFixed(1)} dBC` : "";
+  const winDbText = Number.isFinite(Number(winnerDb)) ? `${Number(winnerDb).toFixed(1)} dBC` : "";
+  const curDisplay = curDbText ? `${curDbText} / ${curText}` : curText;
+  const winDisplay = winDbText ? `${winDbText} / ${winText}` : winText;
+  const dbChanged = Number.isFinite(Number(currentDb)) && Number.isFinite(Number(winnerDb))
+    && Math.abs(Number(currentDb) - Number(winnerDb)) > 0.05;
+  const changed = cur !== win || dbChanged;
   return (
     <div className="flex flex-col items-center gap-1">
       <span className="text-[10px] font-semibold text-[#213428]">P14 Capability</span>
       <div className="flex items-center gap-1.5 w-full">
-        <RP22GradingPill level={cur} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
-          {curText}
-        </RP22GradingPill>
         {changed ? (
           <>
+            <RP22GradingPill level={cur} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
+              {curDisplay}
+            </RP22GradingPill>
             <span className="text-[10px] text-[#8A7B6A]">→</span>
             <RP22GradingPill level={win} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
-              {winText}
+              {winDisplay}
             </RP22GradingPill>
           </>
         ) : (
-          <span className="text-[9px] text-[#8A7B6A]" style={{ flex: 1, textAlign: "center" }}>unchanged</span>
+          <RP22GradingPill level={cur} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
+            {curDisplay}
+          </RP22GradingPill>
         )}
       </div>
     </div>
@@ -159,8 +167,9 @@ function MaterialityExplanation({ reason, currentResult, winner, seatingPosition
       const beforeRaw = Math.abs(Number(beforeP20.variationDbRaw) || 0);
       const afterRaw = Math.abs(Number(afterP20.variationDbRaw) || 0);
       const delta = afterRaw - beforeRaw;
+      const afterLevel = numericLevel(afterP20.level);
       if (delta > 0.05) {
-        tradeOffs.push({ seatId: id, parameter: "P20", beforeRaw, afterRaw, delta });
+        tradeOffs.push({ seatId: id, parameter: "P20", beforeRaw, afterRaw, delta, afterLevel });
       }
     }
 
@@ -170,8 +179,9 @@ function MaterialityExplanation({ reason, currentResult, winner, seatingPosition
       const beforeRaw = Math.abs(Number(beforeP19.variationDbRaw) || 0);
       const afterRaw = Math.abs(Number(afterP19.variationDbRaw) || 0);
       const delta = afterRaw - beforeRaw;
+      const afterLevel = numericLevel(afterP19.level);
       if (delta > 0.05) {
-        tradeOffs.push({ seatId: id, parameter: "P19", beforeRaw, afterRaw, delta });
+        tradeOffs.push({ seatId: id, parameter: "P19", beforeRaw, afterRaw, delta, afterLevel });
       }
     }
   });
@@ -183,8 +193,8 @@ function MaterialityExplanation({ reason, currentResult, winner, seatingPosition
       {tradeOffs.length > 0 && (
         <div className="mt-1.5 space-y-0.5">
           {tradeOffs.map((t, i) => (
-            <div key={i} className="text-[9px] text-amber-700">
-              Primary seat {t.seatId}: {t.parameter} {t.beforeRaw.toFixed(1)} → {t.afterRaw.toFixed(1)} dB (+{t.delta.toFixed(2)} dB)
+            <div key={i} className="text-[9px] text-[#625143]">
+              Primary seat {t.seatId}: {t.parameter} {t.beforeRaw.toFixed(1)} → {t.afterRaw.toFixed(1)} dB; remains L{t.afterLevel}
             </div>
           ))}
         </div>
@@ -198,9 +208,11 @@ function OptimisedHeadlineGrid({ snapshot, currentResult, winner }) {
   const p14TargetLevel = snapshot?.p14TargetLevel;
   const p14TargetDb = snapshot?.p14TargetDb;
   const currentP14Level = currentResult?.p14AchievedLevel ?? snapshot?.currentP14;
+  const currentP14Db = currentResult?.p14AchievedDb ?? null;
   const currentP18Level = currentResult?.p18AchievedLevel ?? snapshot?.currentP18;
   const currentP18Hz = currentResult?.achievedP18Hz;
   const afterP14Level = winner.p14AchievedLevel;
+  const afterP14Db = winner.p14AchievedDb;
   const afterP18Level = winner.p18AchievedLevel;
   const afterP18Hz = winner.achievedP18Hz;
 
@@ -209,7 +221,7 @@ function OptimisedHeadlineGrid({ snapshot, currentResult, winner }) {
       <SeatScopedHeadline label="P19" />
       <SeatScopedHeadline label="P20" />
       <P14TargetPill targetLevel={p14TargetLevel} targetDb={p14TargetDb} />
-      <P14CapabilityPill currentLevel={currentP14Level} winnerLevel={afterP14Level} />
+      <P14CapabilityPill currentLevel={currentP14Level} currentDb={currentP14Db} winnerLevel={afterP14Level} winnerDb={afterP14Db} />
       <P18BeforeAfter
         beforeLevel={currentP18Level}
         beforeHz={currentP18Hz}
@@ -241,6 +253,7 @@ export default function ImproveBassV2Results({
   const currentP19 = numericLevel(currentResult?.achievedP19Level ?? snapshot?.currentP19);
   const currentP20 = numericLevel(currentResult?.achievedP20Level ?? snapshot?.currentP20);
   const currentP14 = numericLevel(currentResult?.p14AchievedLevel ?? snapshot?.currentP14);
+  const currentP14Db = currentResult?.p14AchievedDb ?? null;
   const currentP18 = numericLevel(currentResult?.p18AchievedLevel ?? snapshot?.currentP18);
 
   // ── Tier B: RECOMMENDED CALIBRATION ──────────────────────────────────
@@ -299,11 +312,20 @@ export default function ImproveBassV2Results({
         <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Current Design</div>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <P14TargetPill targetLevel={snapshot?.p14TargetLevel} targetDb={snapshot?.p14TargetDb} />
-          <P14CapabilityPill currentLevel={currentP14} winnerLevel={currentP14} />
+          <P14CapabilityPill currentLevel={currentP14} currentDb={currentP14Db} winnerLevel={currentP14} winnerDb={currentP14Db} />
           <SeatScopedHeadline label="P19" />
           <SeatScopedHeadline label="P20" />
         </div>
       </div>
+
+      {/* ── Calibration immaterial notice ── */}
+      {selection.calibrationResult && !selection.calibrationMaterial?.material && (
+        <div className="rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-2">
+          <p className="text-[10px] leading-relaxed text-[#625143]">
+            Calibration alone did not materially improve the room, so Sound Proof tested subwoofer position changes.
+          </p>
+        </div>
+      )}
 
       {/* ── Tier B: Recommended Calibration ── */}
       {showCalibration && (

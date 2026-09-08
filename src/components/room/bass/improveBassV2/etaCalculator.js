@@ -31,6 +31,11 @@ export function computeEta(unitTimes, current, total, phase) {
     return { status: "finalising", etaSeconds: null };
   }
 
+  // Phase complete but more escalation phases may follow — don't show 0 sec
+  if (current >= total && total > 0) {
+    return { status: "preparing", etaSeconds: null };
+  }
+
   if (unitTimes.length < MIN_ETA_SAMPLES || total <= 0) {
     return { status: "estimating", etaSeconds: null };
   }
@@ -53,6 +58,7 @@ export function computeEta(unitTimes, current, total, phase) {
  * @returns {string}
  */
 export function formatEta(etaStatus, etaSeconds) {
+  if (etaStatus === "preparing") return "Preparing next step\u2026";
   if (etaStatus === "estimating") return "Estimating time remaining\u2026";
   if (etaStatus === "finalising") return "Finalising\u2026";
   if (etaSeconds == null || !Number.isFinite(etaSeconds)) return "Estimating time remaining\u2026";
