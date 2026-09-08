@@ -429,9 +429,12 @@ function assert(condition, name) {
   const etaSpam2 = computeEta(spamTimes, 3, total); // same current, no new unit
   assert(etaSpam.etaSeconds === etaSpam2.etaSeconds, "T6i: Progress spam without unit increment doesn't distort ETA");
 
-  // All substantive work complete → finalising
-  const etaDone = computeEta(unitTimes, 10, 10);
+  // All substantive work complete → finalising (only when phase is "finalising")
+  const etaDone = computeEta(unitTimes, 10, 10, "finalising");
   assert(etaDone.status === "finalising", "T6j: All units complete → finalising");
+  // Intermediate phase completion (current === total) must NOT show "finalising"
+  const etaMidComplete = computeEta(unitTimes, 10, 10, "confirming_symmetric");
+  assert(etaMidComplete.status !== "finalising", "T6j: Intermediate phase completion does not show finalising");
   assert(formatEta("finalising", null) === "Finalising\u2026", "T6k: Finalising format correct");
 
   // Estimated vs actual error: with 10 units of ~1000ms each, total ~10s

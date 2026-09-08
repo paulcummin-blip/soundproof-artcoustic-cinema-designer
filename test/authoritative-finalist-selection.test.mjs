@@ -207,7 +207,7 @@ test("Room C: P19-vs-P20 trade-off is labelled, not presented as universally bet
       makeFinalist({
         finalistId: "finalist-tradeoff",
         p19VariationBySeat: [0.8, 0.9],  // P19 improves by ~1.3 dB
-        p20VariationBySeat: [4.5, 4.8],  // P20 worsens by ~1.5 dB
+        p20VariationBySeat: [3.8, 4.0],  // P20 worsens by ~0.8 dB (within 1.0 dB primary guard)
       }),
     ],
   };
@@ -379,7 +379,7 @@ test("Room B/C: Pareto front correctly identifies non-dominated finalists", () =
       makeFinalist({
         finalistId: "finalist-p19-focused",
         p19VariationBySeat: [0.5, 0.6],  // excellent P19
-        p20VariationBySeat: [4.0, 4.5],  // poor P20
+        p20VariationBySeat: [3.5, 3.8],  // P20 worsens by ~0.8 dB (within 1.0 dB primary guard)
       }),
       makeFinalist({
         finalistId: "finalist-p20-focused",
@@ -517,7 +517,7 @@ test("Primary-seat-only metric cannot override canonical headline authority", ()
     evaluatedFinalists: [
       makeFinalist({
         finalistId: "finalist-good-headline",
-        p19VariationBySeat: [3.0, 3.5],  // worse per-seat P19
+        p19VariationBySeat: [2.0, 2.5],  // worse per-seat P19 (within 1.0 dB primary guard)
         p20VariationBySeat: [1.0, 1.2],
         p19Headline: 1.0,  // GOOD canonical RSP P19
         p20Headline: 1.0,
@@ -544,6 +544,8 @@ test("Room B 2-sub: delay-only trade-off is surfaced (not auto-replaced)", () =>
   // This is a trade-off — it must be eligible but does not have to replace current.
   const currentLayout = makeCurrentLayout({
     sources: [{ id: "sub-1", x: 0, y: 0 }, { id: "sub-2", x: 0, y: 6 }],
+    p19VariationBySeat: [3.5, 4.0],  // consistent with headline
+    p20VariationBySeat: [10.0, 10.5],  // consistent with headline
     p19Headline: 3.986,
     p20Headline: 10.717,
   });
@@ -578,6 +580,8 @@ test("Room B 4-sub: level+delay wins over current (big P20 improvement)", () => 
       { id: "sub-1", x: 0, y: 0 }, { id: "sub-2", x: 0, y: 6 },
       { id: "sub-3", x: 2, y: 0 }, { id: "sub-4", x: 2, y: 6 },
     ],
+    p19VariationBySeat: [4.5, 4.8],  // consistent with headline
+    p20VariationBySeat: [17.0, 18.0],  // consistent with headline
     p19Headline: 4.922,
     p20Headline: 18.501,
   });
@@ -640,6 +644,8 @@ test("Room C 4-sub: delay-only wins over current (big P20 improvement)", () => {
       { id: "sub-1", x: 0, y: 0 }, { id: "sub-2", x: 0, y: 7 },
       { id: "sub-3", x: 2, y: 0 }, { id: "sub-4", x: 2, y: 7 },
     ],
+    p19VariationBySeat: [5.0, 5.2],  // consistent with headline
+    p20VariationBySeat: [20.0, 21.0],  // consistent with headline
     p19Headline: 5.169,
     p20Headline: 20.946,
   });

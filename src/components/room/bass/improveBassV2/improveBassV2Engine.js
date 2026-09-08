@@ -72,6 +72,7 @@ export function snapshotCurrentDesign({
   currentAuthority,
   p14TargetBasis,
   p14TargetLevel,
+  p14TargetDb,
   p18TargetBasis,
 }) {
   const allInstances = Array.isArray(subwooferInstances) ? subwooferInstances : [];
@@ -129,6 +130,7 @@ export function snapshotCurrentDesign({
     perSeatP20: currentAuthority?.perSeatP20 || [],
     p14TargetBasis,
     p14TargetLevel,
+    p14TargetDb,
     p18TargetBasis,
     mutedInfo,
     fingerprint: currentAuthority?.canonicalAuthorityReceipt?.filterBankSignature || null,
@@ -514,12 +516,19 @@ function selectWinnerWithProtection(confirmedResults, snapshot, existingAuthorit
     }
   }
 
+  let materialityReason = null;
+  if (existingAuthority && winnerResult) {
+    const matCheck = isMaterialImprovement(existingAuthority, winnerResult);
+    materialityReason = matCheck.material ? matCheck.reason : null;
+  }
+
   return {
     isCurrent: false,
     winner: winnerResult,
     message: null,
     confirmedResults,
     currentResult: currentForRegression,
+    materialityReason,
   };
 }
 
@@ -593,7 +602,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     onProgress("reviewing", "Reviewing current design", 0, 1);
     const snapshot = snapshotCurrentDesign({
       subwooferInstances, roomDims, selectedSubModel, currentAuthority,
-      p14TargetBasis, p14TargetLevel, p18TargetBasis,
+      p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
     });
 
     // BLOCKER 1 + BLOCKER 2: Check if the existing production authority is

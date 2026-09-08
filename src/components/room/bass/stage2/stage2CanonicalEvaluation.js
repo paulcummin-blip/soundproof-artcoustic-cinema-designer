@@ -410,6 +410,8 @@ export function evaluateStage2Confirmation(rawTransfer, {
     // comparison. Do NOT use worst-primary-variation proxies for final selection.
     achievedP19VariationDb: authority.achievedP19VariationDb ?? null,
     achievedP20VariationDb: authority.achievedP20VariationDb ?? null,
+    achievedP19Level: authority.achievedP19Level ?? null,
+    achievedP20Level: authority.achievedP20Level ?? null,
     perSeatP19,
     perSeatP20,
     limited,

@@ -218,9 +218,12 @@ function assert(condition, name) {
   const slowEta = computeEta(slowTimes, 3, 10);
   assert(slowEta.etaSeconds === 70, `Test 10f: ETA reflects slower rate (got ${slowEta.etaSeconds})`);
 
-  // Finalising when complete
-  const doneEta = computeEta(times, 10, 10);
+  // Finalising when complete (only when phase is "finalising")
+  const doneEta = computeEta(times, 10, 10, "finalising");
   assert(doneEta.status === "finalising", "Test 10g: ETA finalising when complete");
+  // Intermediate phase completion must NOT show finalising
+  const midDoneEta = computeEta(times, 10, 10, "confirming_individual");
+  assert(midDoneEta.status !== "finalising", "Test 10g2: Intermediate completion not finalising");
 
   const doneFormatted = formatEta("finalising", null);
   assert(doneFormatted === "Finalising\u2026", "Test 10h: Finalising format correct");

@@ -46,6 +46,11 @@ function worstPrimarySeatDeviation(result) {
   return worst;
 }
 
+// Same-level raw-regression threshold: a primary seat that stays in the same
+// displayed level but whose raw deviation worsens by MORE than this is rejected.
+// Must match authoritativeFinalistSelection.js — do not create two tolerances.
+const PRIMARY_RAW_REGRESSION_THRESHOLD_DB = 1.0;
+
 function hasPrimarySeatRegression(currentResult, candidateResult) {
   const currentP19 = new Map((currentResult?.perSeatP19 || []).map(s => [String(s.seatId), s]));
   const currentP20 = new Map((currentResult?.perSeatP20 || []).map(s => [String(s.seatId), s]));
@@ -54,16 +59,41 @@ function hasPrimarySeatRegression(currentResult, candidateResult) {
     if (!seat.isPrimary) continue;
     const cur = currentP19.get(String(seat.seatId));
     if (!cur) continue;
-    if (numericLevel(seat.level) < numericLevel(cur.level)) {
-      return { regressed: true, seatId: seat.seatId, parameter: "P19", currentLevel: numericLevel(cur.level), candidateLevel: numericLevel(seat.level) };
+    const candidateLevel = numericLevel(seat.level);
+    const currentLevel = numericLevel(cur.level);
+    if (candidateLevel < currentLevel) {
+      return { regressed: true, seatId: seat.seatId, parameter: "P19", currentLevel, candidateLevel };
+    }
+    // Same-level raw-regression guard: reject if raw deviation worsens by
+    // > 1.0 dB while remaining in the same displayed level.
+    if (candidateLevel === currentLevel) {
+      const candRaw = Math.abs(Number(seat.variationDbRaw) || 0);
+      const curRaw = Math.abs(Number(cur.variationDbRaw) || 0);
+      if (Number.isFinite(candRaw) && Number.isFinite(curRaw)
+        && (candRaw - curRaw) > PRIMARY_RAW_REGRESSION_THRESHOLD_DB) {
+        return { regressed: true, seatId: seat.seatId, parameter: "P19", currentLevel, candidateLevel,
+          rawDeltaDb: candRaw - curRaw, reason: "same-level raw regression" };
+      }
     }
   }
   for (const seat of (candidateResult?.perSeatP20 || [])) {
     if (!seat.isPrimary) continue;
     const cur = currentP20.get(String(seat.seatId));
     if (!cur) continue;
-    if (numericLevel(seat.level) < numericLevel(cur.level)) {
-      return { regressed: true, seatId: seat.seatId, parameter: "P20", currentLevel: numericLevel(cur.level), candidateLevel: numericLevel(seat.level) };
+    const candidateLevel = numericLevel(seat.level);
+    const currentLevel = numericLevel(cur.level);
+    if (candidateLevel < currentLevel) {
+      return { regressed: true, seatId: seat.seatId, parameter: "P20", currentLevel, candidateLevel };
+    }
+    // Same-level raw-regression guard
+    if (candidateLevel === currentLevel) {
+      const candRaw = Math.abs(Number(seat.variationDbRaw) || 0);
+      const curRaw = Math.abs(Number(cur.variationDbRaw) || 0);
+      if (Number.isFinite(candRaw) && Number.isFinite(curRaw)
+        && (candRaw - curRaw) > PRIMARY_RAW_REGRESSION_THRESHOLD_DB) {
+        return { regressed: true, seatId: seat.seatId, parameter: "P20", currentLevel, candidateLevel,
+          rawDeltaDb: candRaw - curRaw, reason: "same-level raw regression" };
+      }
     }
   }
   return { regressed: false };
@@ -106,7 +136,9 @@ export function isMaterialImprovement(currentResult, candidateResult) {
   if (regression.regressed) {
     return {
       material: false,
-      reason: `Primary seat ${regression.seatId} ${regression.parameter} regression (L${regression.currentLevel} -> L${regression.candidateLevel})`,
+      reason: regression.reason
+        ? `Primary seat ${regression.seatId} ${regression.parameter} ${regression.reason} (+${(regression.rawDeltaDb || 0).toFixed(2)} dB)`
+        : `Primary seat ${regression.seatId} ${regression.parameter} regression (L${regression.currentLevel} -> L${regression.candidateLevel})`,
       details: regression,
     };
   }

@@ -496,6 +496,11 @@ export function selectAuthoritativeFinalist(quantityResult, roomDims, currentLay
  * @param {object} currentResult — current design result with perSeatP19/P20
  * @returns {{ regressed: boolean, seatId?: string, parameter?: string, currentLevel?: number, candidateLevel?: number }}
  */
+// Same-level raw-regression threshold: a primary seat that stays in the same
+// displayed level but whose raw deviation worsens by MORE than this is rejected.
+// Must match materialityGate.js — do not create two tolerances.
+const PRIMARY_RAW_REGRESSION_THRESHOLD_DB = 1.0;
+
 export function hasPrimarySeatRegression(candidateResult, currentResult) {
   const candidateP19 = Array.isArray(candidateResult?.perSeatP19) ? candidateResult.perSeatP19 : [];
   const candidateP20 = Array.isArray(candidateResult?.perSeatP20) ? candidateResult.perSeatP20 : [];
@@ -520,6 +525,24 @@ export function hasPrimarySeatRegression(candidateResult, currentResult) {
         candidateLevel,
       };
     }
+    // Same-level raw-regression guard: reject if raw deviation worsens by
+    // > 1.0 dB while remaining in the same displayed level.
+    if (candidateLevel === currentLevel) {
+      const candRaw = Math.abs(Number(seat.variationDbRaw) || 0);
+      const curRaw = Math.abs(Number(currentSeat.variationDbRaw) || 0);
+      if (Number.isFinite(candRaw) && Number.isFinite(curRaw)
+        && (candRaw - curRaw) > PRIMARY_RAW_REGRESSION_THRESHOLD_DB) {
+        return {
+          regressed: true,
+          seatId: seat.seatId,
+          parameter: "P19",
+          currentLevel,
+          candidateLevel,
+          rawDeltaDb: candRaw - curRaw,
+          reason: "same-level raw regression",
+        };
+      }
+    }
   }
 
   for (const seat of candidateP20) {
@@ -536,6 +559,23 @@ export function hasPrimarySeatRegression(candidateResult, currentResult) {
         currentLevel,
         candidateLevel,
       };
+    }
+    // Same-level raw-regression guard
+    if (candidateLevel === currentLevel) {
+      const candRaw = Math.abs(Number(seat.variationDbRaw) || 0);
+      const curRaw = Math.abs(Number(currentSeat.variationDbRaw) || 0);
+      if (Number.isFinite(candRaw) && Number.isFinite(curRaw)
+        && (candRaw - curRaw) > PRIMARY_RAW_REGRESSION_THRESHOLD_DB) {
+        return {
+          regressed: true,
+          seatId: seat.seatId,
+          parameter: "P20",
+          currentLevel,
+          candidateLevel,
+          rawDeltaDb: candRaw - curRaw,
+          reason: "same-level raw regression",
+        };
+      }
     }
   }
 

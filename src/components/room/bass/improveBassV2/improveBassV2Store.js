@@ -90,7 +90,7 @@ export function updateProgress(projectId, phase, label, current, total) {
     if (unitTimes.length > MAX_ETA_SAMPLES) unitTimes.shift();
   }
 
-  const eta = computeEta(unitTimes, current || 0, total || 0);
+  const eta = computeEta(unitTimes, current || 0, total || 0, phase);
 
   return publish(projectId, {
     phase,

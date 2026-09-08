@@ -119,6 +119,7 @@ export default function ImproveBassResponseV2({
       currentAuthority: shared?.completedBassAuthority,
       p14TargetBasis: p14Params.p14TargetBasis,
       p14TargetLevel: p14Params.p14TargetLevel,
+      p14TargetDb: p14Params.p14TargetDb,
       p18TargetBasis: p14Params.p18TargetBasis,
     };
 

@@ -21,10 +21,13 @@ export const MAX_ETA_SAMPLES = 10;
  * @param {number} total - expected total units
  * @returns {{ status: "estimating" | "measured" | "finalising", etaSeconds: number | null }}
  */
-export function computeEta(unitTimes, current, total) {
+export function computeEta(unitTimes, current, total, phase) {
   if (!Array.isArray(unitTimes)) unitTimes = [];
 
-  if (current >= total && total > 0) {
+  // Only show "Finalising…" when the actual engine phase is "finalising".
+  // Intermediate phase completions (current >= total) must NOT be read as
+  // run completion — more escalation phases may follow.
+  if (phase === "finalising") {
     return { status: "finalising", etaSeconds: null };
   }
 

@@ -4,21 +4,21 @@
 //   B. RECOMMENDED CALIBRATION — only if calibration-only produced material improvement
 //   C. OPTIMISED SUBWOOFER POSITION — shown if final winner changes physical positions
 //
-// Shows P19/P20 raw before→after, displayed level before→after,
-// meaningful physical changes, and calibration changes.
-// No internal candidate IDs or lowercase model identifiers shown.
+// P19/P20 headline = SEAT (per Sound Proof canonical presentation rule).
+// Per-seat before→after evidence shown underneath.
+// P14 target and capability are separated.
+// P18 shows comparable achieved values.
+// Materiality explanation surfaces the actual reason + primary-seat trade-offs.
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Wrench, Settings, AlertTriangle, FlaskConical, CheckCircle2, MapPin } from "lucide-react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
-import SharedP19P20SeatResults from "@/components/room/bass/SharedP19P20SeatResults";
 import { buildWhatChanged } from "./improveBassV2WhatChanged";
 import { buildTreatmentAdvisory, buildRemainingLimitation } from "./improveBassV2Treatment";
 import { isOptimisedApplied, buildCalibrationSummary } from "./improveBassV2Apply";
 import CalibrationOnlyResults from "./CalibrationOnlyResults";
-import { buildP19SeatRows } from "@/components/room/bass/p19SeatPresentation";
-import { buildP20SeatRows } from "@/components/room/bass/p20SeatPresentation";
+import V2SeatBeforeAfterGrid from "./V2SeatBeforeAfterGrid";
 
 function levelText(level) {
   if (!Number.isFinite(level)) return "—";
@@ -31,16 +31,105 @@ function numericLevel(value) {
   return match ? Number(match[1]) : null;
 }
 
-function BeforeAfterPill({ label, beforeLevel, afterLevel, beforeText, afterText }) {
+function deriveCurrentPositions(instances) {
+  return (Array.isArray(instances) ? instances : [])
+    .filter((s) => s.enabled !== false)
+    .map((inst) => ({ x: Number(inst.position?.x) || 0, y: Number(inst.position?.y) || 0 }));
+}
+
+function deriveCurrentTuning(instances) {
+  return (Array.isArray(instances) ? instances : [])
+    .filter((s) => s.enabled !== false)
+    .map((inst) => ({
+      delayMs: Number(inst.delayMs) || 0,
+      gainDb: Number(inst.gainDb) || 0,
+      polarity: Number(inst.polarity) || 0,
+    }));
+}
+
+function p14TargetLabel(level, db) {
+  const lvl = numericLevel(level);
+  const lt = lvl != null && lvl > 0 ? `L${lvl}` : "—";
+  const dbText = Number.isFinite(Number(db)) ? `${Math.round(Number(db))} dBC` : "";
+  return dbText ? `${lt} / ${dbText}` : lt;
+}
+
+function p18Label(level, hz) {
+  const lvl = numericLevel(level);
+  const lt = lvl != null && lvl > 0 ? `L${lvl}` : "—";
+  const hzText = Number.isFinite(Number(hz)) ? `${Math.round(Number(hz))} Hz` : "";
+  return hzText ? `${hzText} / ${lt}` : lt;
+}
+
+// ── SEAT-scoped headline (P19/P20) ──────────────────────────────────────
+function SeatScopedHeadline({ label }) {
   return (
     <div className="flex flex-col items-center gap-1">
       <span className="text-[10px] font-semibold text-[#213428]">{label}</span>
+      <div className="flex items-center justify-center w-full">
+        <span className="text-[11px] font-bold text-[#213428] bg-[#E7E4DF] rounded px-3 py-1">SEAT</span>
+      </div>
+    </div>
+  );
+}
+
+// ── P14 Target (designer-selected, not achieved) ─────────────────────────
+function P14TargetPill({ targetLevel, targetDb }) {
+  const lvl = numericLevel(targetLevel) || 0;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-[10px] font-semibold text-[#213428]">P14 Target</span>
+      <div className="flex items-center justify-center w-full">
+        <RP22GradingPill level={lvl} compact style={{ whiteSpace: "normal", minWidth: 0, flex: 1 }}>
+          {p14TargetLabel(targetLevel, targetDb)}
+        </RP22GradingPill>
+      </div>
+    </div>
+  );
+}
+
+// ── P14 Capability (achieved before→after) ───────────────────────────────
+function P14CapabilityPill({ currentLevel, winnerLevel }) {
+  const cur = numericLevel(currentLevel) || 0;
+  const win = numericLevel(winnerLevel) || 0;
+  const curText = cur > 0 ? `L${cur}` : "—";
+  const winText = win > 0 ? `L${win}` : "—";
+  const changed = cur !== win;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-[10px] font-semibold text-[#213428]">P14 Capability</span>
       <div className="flex items-center gap-1.5 w-full">
-        <RP22GradingPill level={beforeLevel} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
+        <RP22GradingPill level={cur} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
+          {curText}
+        </RP22GradingPill>
+        {changed ? (
+          <>
+            <span className="text-[10px] text-[#8A7B6A]">→</span>
+            <RP22GradingPill level={win} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
+              {winText}
+            </RP22GradingPill>
+          </>
+        ) : (
+          <span className="text-[9px] text-[#8A7B6A]" style={{ flex: 1, textAlign: "center" }}>unchanged</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── P18 achieved before→after ────────────────────────────────────────────
+function P18BeforeAfter({ beforeLevel, beforeHz, afterLevel, afterHz }) {
+  const beforeText = p18Label(beforeLevel, beforeHz);
+  const afterText = p18Label(afterLevel, afterHz);
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-[10px] font-semibold text-[#213428]">P18</span>
+      <div className="flex items-center gap-1.5 w-full">
+        <RP22GradingPill level={numericLevel(beforeLevel) || 0} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
           {beforeText}
         </RP22GradingPill>
         <span className="text-[10px] text-[#8A7B6A]">→</span>
-        <RP22GradingPill level={afterLevel} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
+        <RP22GradingPill level={numericLevel(afterLevel) || 0} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
           {afterText}
         </RP22GradingPill>
       </div>
@@ -48,25 +137,85 @@ function BeforeAfterPill({ label, beforeLevel, afterLevel, beforeText, afterText
   );
 }
 
-function BeforeAfterDb({ label, beforeLevel, afterLevel, beforeDb, afterDb }) {
-  const fmtDb = (v) => v != null && Number.isFinite(v) ? `${v.toFixed(1)} dB` : "—";
+// ── Materiality explanation + primary-seat trade-offs ────────────────────
+function MaterialityExplanation({ reason, currentResult, winner, seatingPositions }) {
+  if (!reason) return null;
+
+  const REF_IDS = new Set(["rsp", "mlp", "synthetic-rsp", "synthetic_rsp"]);
+  const tradeOffs = [];
+  const beforeP19Map = new Map((currentResult?.perSeatP19 || []).map((s) => [String(s.seatId), s]));
+  const afterP19Map = new Map((winner?.perSeatP19 || []).map((s) => [String(s.seatId), s]));
+  const beforeP20Map = new Map((currentResult?.perSeatP20 || []).map((s) => [String(s.seatId), s]));
+  const afterP20Map = new Map((winner?.perSeatP20 || []).map((s) => [String(s.seatId), s]));
+
+  (Array.isArray(seatingPositions) ? seatingPositions : []).forEach((seat) => {
+    const id = String(seat.id || seat.seatId || "");
+    if (!id || REF_IDS.has(id.toLowerCase())) return;
+    if (seat.priority === "secondary") return;
+
+    const beforeP20 = beforeP20Map.get(id);
+    const afterP20 = afterP20Map.get(id);
+    if (beforeP20 && afterP20) {
+      const beforeRaw = Math.abs(Number(beforeP20.variationDbRaw) || 0);
+      const afterRaw = Math.abs(Number(afterP20.variationDbRaw) || 0);
+      const delta = afterRaw - beforeRaw;
+      if (delta > 0.05) {
+        tradeOffs.push({ seatId: id, parameter: "P20", beforeRaw, afterRaw, delta });
+      }
+    }
+
+    const beforeP19 = beforeP19Map.get(id);
+    const afterP19 = afterP19Map.get(id);
+    if (beforeP19 && afterP19) {
+      const beforeRaw = Math.abs(Number(beforeP19.variationDbRaw) || 0);
+      const afterRaw = Math.abs(Number(afterP19.variationDbRaw) || 0);
+      const delta = afterRaw - beforeRaw;
+      if (delta > 0.05) {
+        tradeOffs.push({ seatId: id, parameter: "P19", beforeRaw, afterRaw, delta });
+      }
+    }
+  });
+
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-[10px] font-semibold text-[#213428]">{label}</span>
-      <div className="flex items-center gap-1.5 w-full">
-        <RP22GradingPill level={beforeLevel} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
-          {fmtDb(beforeDb)}
-        </RP22GradingPill>
-        <span className="text-[10px] text-[#8A7B6A]">→</span>
-        <RP22GradingPill level={afterLevel} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
-          {fmtDb(afterDb)}
-        </RP22GradingPill>
-      </div>
-      <div className="flex items-center gap-1.5 w-full text-[9px] text-[#8A7B6A]">
-        <span style={{ flex: 1, textAlign: "center" }}>{levelText(beforeLevel)}</span>
-        <span>→</span>
-        <span style={{ flex: 1, textAlign: "center" }}>{levelText(afterLevel)}</span>
-      </div>
+    <div className="mt-2 rounded-md border border-[#E0DDD7] bg-[#F8F7F4] p-2">
+      <div className="text-[10px] font-semibold text-[#213428]">Why this was recommended</div>
+      <p className="mt-0.5 text-[10px] leading-relaxed text-[#625143]">{reason}</p>
+      {tradeOffs.length > 0 && (
+        <div className="mt-1.5 space-y-0.5">
+          {tradeOffs.map((t, i) => (
+            <div key={i} className="text-[9px] text-amber-700">
+              Primary seat {t.seatId}: {t.parameter} {t.beforeRaw.toFixed(1)} → {t.afterRaw.toFixed(1)} dB (+{t.delta.toFixed(2)} dB)
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Optimised Design headline grid (shared by position + global winners) ─
+function OptimisedHeadlineGrid({ snapshot, currentResult, winner }) {
+  const p14TargetLevel = snapshot?.p14TargetLevel;
+  const p14TargetDb = snapshot?.p14TargetDb;
+  const currentP14Level = currentResult?.p14AchievedLevel ?? snapshot?.currentP14;
+  const currentP18Level = currentResult?.p18AchievedLevel ?? snapshot?.currentP18;
+  const currentP18Hz = currentResult?.achievedP18Hz;
+  const afterP14Level = winner.p14AchievedLevel;
+  const afterP18Level = winner.p18AchievedLevel;
+  const afterP18Hz = winner.achievedP18Hz;
+
+  return (
+    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <SeatScopedHeadline label="P19" />
+      <SeatScopedHeadline label="P20" />
+      <P14TargetPill targetLevel={p14TargetLevel} targetDb={p14TargetDb} />
+      <P14CapabilityPill currentLevel={currentP14Level} winnerLevel={afterP14Level} />
+      <P18BeforeAfter
+        beforeLevel={currentP18Level}
+        beforeHz={currentP18Hz}
+        afterLevel={afterP18Level}
+        afterHz={afterP18Hz}
+      />
     </div>
   );
 }
@@ -122,29 +271,21 @@ export default function ImproveBassV2Results({
     );
   }
 
-  // Winner values
-  const afterP14 = numericLevel(winner.p14AchievedLevel);
-  const afterP18 = numericLevel(winner.p18AchievedLevel);
-  const afterP19 = numericLevel(winner.achievedP19Level);
-  const afterP20 = numericLevel(winner.achievedP20Level);
-  const afterP19Db = winner.achievedP19VariationDb;
-  const afterP20Db = winner.achievedP20VariationDb;
-  const beforeP19Db = currentResult?.achievedP19VariationDb;
-  const beforeP20Db = currentResult?.achievedP20VariationDb;
+  // Derive current positions/tuning from currentInstances (startup snapshot
+  // lacks positions — this fixes "subs added" false messaging).
+  const currentPositions = deriveCurrentPositions(currentInstances);
+  const currentTuning = deriveCurrentTuning(currentInstances);
+  const augmentedSnapshot = {
+    ...snapshot,
+    positions: (snapshot?.positions && snapshot.positions.length > 0) ? snapshot.positions : currentPositions,
+    tuning: (snapshot?.tuning && snapshot.tuning.length > 0) ? snapshot.tuning : currentTuning,
+  };
 
-  const whatChanged = buildWhatChanged(snapshot, winner);
+  const whatChanged = buildWhatChanged(augmentedSnapshot, winner);
   const treatmentAdvisory = buildTreatmentAdvisory(winner, roomDims);
   const remainingLimitation = buildRemainingLimitation(winner);
   const calSummary = buildCalibrationSummary(winner);
   const applied = isOptimisedApplied(currentInstances, winner, roomDims);
-
-  // Adapt flat canonical per-seat arrays into row-grouped presentation for
-  // SharedP19P20SeatResults. The V2 winner stores perSeatP19/perSeatP20 as
-  // flat seat arrays; the shared component expects [{ row, seats: [...] }].
-  // Priority is resolved from the canonical seatingPositions via
-  // seatPriorityAuthority, not the result's isPrimary boolean.
-  const winnerP19Rows = buildP19SeatRows(seatingPositions, winner.perSeatP19 || []);
-  const winnerP20Rows = buildP20SeatRows(seatingPositions, winner.perSeatP20 || []);
 
   const movement = winner.movementDescription || "Position optimised";
   const phaseLabel = winner.positionPhase === "asymmetric-pair" ? "Asymmetric"
@@ -157,10 +298,10 @@ export default function ImproveBassV2Results({
       <div className="rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-3">
         <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Current Design</div>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <BeforeAfterPill label="P14" beforeLevel={currentP14} afterLevel={currentP14} beforeText={levelText(currentP14)} afterText={levelText(currentP14)} />
-          <BeforeAfterPill label="P18" beforeLevel={currentP18} afterLevel={currentP18} beforeText={levelText(currentP18)} afterText={levelText(currentP18)} />
-          <BeforeAfterPill label="P19" beforeLevel={currentP19} afterLevel={currentP19} beforeText={levelText(currentP19)} afterText={levelText(currentP19)} />
-          <BeforeAfterPill label="P20" beforeLevel={currentP20} afterLevel={currentP20} beforeText={levelText(currentP20)} afterText={levelText(currentP20)} />
+          <P14TargetPill targetLevel={snapshot?.p14TargetLevel} targetDb={snapshot?.p14TargetDb} />
+          <P14CapabilityPill currentLevel={currentP14} winnerLevel={currentP14} />
+          <SeatScopedHeadline label="P19" />
+          <SeatScopedHeadline label="P20" />
         </div>
       </div>
 
@@ -192,48 +333,26 @@ export default function ImproveBassV2Results({
           {/* Movement description */}
           <div className="mt-2 text-[11px] text-[#625143] font-medium">{movement}</div>
 
-          {/* Before → After with raw dB + displayed levels */}
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <BeforeAfterDb
-              label="P19"
-              beforeLevel={currentP19}
-              afterLevel={afterP19}
-              beforeDb={beforeP19Db}
-              afterDb={afterP19Db}
-            />
-            <BeforeAfterDb
-              label="P20"
-              beforeLevel={currentP20}
-              afterLevel={afterP20}
-              beforeDb={beforeP20Db}
-              afterDb={afterP20Db}
-            />
-            <BeforeAfterPill
-              label="P14"
-              beforeLevel={currentP14}
-              afterLevel={afterP14}
-              beforeText={levelText(currentP14)}
-              afterText={levelText(afterP14)}
-            />
-            <BeforeAfterPill
-              label="P18"
-              beforeLevel={currentP18}
-              afterLevel={afterP18}
-              beforeText={levelText(currentP18)}
-              afterText={levelText(afterP18)}
-            />
-          </div>
+          {/* SEAT-scoped headline + P14 target/capability + P18 */}
+          <OptimisedHeadlineGrid snapshot={snapshot} currentResult={currentResult} winner={winner} />
 
-          {/* P19/P20 per-seat results (After) */}
+          {/* Materiality explanation */}
+          <MaterialityExplanation
+            reason={selection.materialityReason}
+            currentResult={currentResult}
+            winner={winner}
+            seatingPositions={seatingPositions}
+          />
+
+          {/* Per-seat before→after evidence */}
           <div className="mt-3">
-            <div className="text-[10px] font-semibold text-[#625143] mb-1.5">P19 / P20 seat results (optimised)</div>
-            <SharedP19P20SeatResults
-              p19Rows={winnerP19Rows}
-              p20Rows={winnerP20Rows}
-              publicationVerified
-              authorityStatus="COMPLETE"
-              p14TargetUnselected={false}
-              compact
+            <div className="text-[10px] font-semibold text-[#625143] mb-1.5">P19 / P20 per-seat evidence (before → after)</div>
+            <V2SeatBeforeAfterGrid
+              seatingPositions={seatingPositions}
+              beforeP19={currentResult?.perSeatP19 || []}
+              afterP19={winner.perSeatP19 || []}
+              beforeP20={currentResult?.perSeatP20 || []}
+              afterP20={winner.perSeatP20 || []}
             />
           </div>
 
@@ -304,12 +423,11 @@ export default function ImproveBassV2Results({
             </div>
           )}
 
-          {/* Apply button */}
+          {/* Apply button — established Sound Proof primary action styling */}
           <div className="mt-3">
             <Button
               type="button"
-              size="sm"
-              className="w-full bg-[#213428] text-white hover:bg-[#3E4349]"
+              className="w-full bg-[#213428] text-white hover:bg-[#3E4349] font-semibold"
               onClick={onApply}
               disabled={applied}
             >
@@ -323,28 +441,31 @@ export default function ImproveBassV2Results({
       {!showPosition && !showCalibration && (
         <div className="rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-3">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Before → After</div>
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <BeforeAfterPill label="P14" beforeLevel={currentP14} afterLevel={afterP14} beforeText={levelText(currentP14)} afterText={levelText(afterP14)} />
-            <BeforeAfterPill label="P18" beforeLevel={currentP18} afterLevel={afterP18} beforeText={levelText(currentP18)} afterText={levelText(afterP18)} />
-            <BeforeAfterPill label="P19" beforeLevel={currentP19} afterLevel={afterP19} beforeText={levelText(currentP19)} afterText={levelText(afterP19)} />
-            <BeforeAfterPill label="P20" beforeLevel={currentP20} afterLevel={afterP20} beforeText={levelText(currentP20)} afterText={levelText(afterP20)} />
-          </div>
+          <OptimisedHeadlineGrid snapshot={snapshot} currentResult={currentResult} winner={winner} />
+
+          {/* Materiality explanation */}
+          <MaterialityExplanation
+            reason={selection.materialityReason}
+            currentResult={currentResult}
+            winner={winner}
+            seatingPositions={seatingPositions}
+          />
+
+          {/* Per-seat before→after evidence */}
           <div className="mt-3">
-            <div className="text-[10px] font-semibold text-[#625143] mb-1.5">P19 / P20 seat results (optimised)</div>
-            <SharedP19P20SeatResults
-              p19Rows={winnerP19Rows}
-              p20Rows={winnerP20Rows}
-              publicationVerified
-              authorityStatus="COMPLETE"
-              p14TargetUnselected={false}
-              compact
+            <div className="text-[10px] font-semibold text-[#625143] mb-1.5">P19 / P20 per-seat evidence (before → after)</div>
+            <V2SeatBeforeAfterGrid
+              seatingPositions={seatingPositions}
+              beforeP19={currentResult?.perSeatP19 || []}
+              afterP19={winner.perSeatP19 || []}
+              beforeP20={currentResult?.perSeatP20 || []}
+              afterP20={winner.perSeatP20 || []}
             />
           </div>
           <div className="mt-3">
             <Button
               type="button"
-              size="sm"
-              className="w-full bg-[#213428] text-white hover:bg-[#3E4349]"
+              className="w-full bg-[#213428] text-white hover:bg-[#3E4349] font-semibold"
               onClick={onApply}
               disabled={applied}
             >
