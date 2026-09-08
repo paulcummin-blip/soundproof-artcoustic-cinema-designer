@@ -1730,6 +1730,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     };
   }, [
     placedSpeakers,
+    visiblePlanSpeakers,
     seatingPositions,
     mlpBasis,
     mlpPointOverride?.x,
