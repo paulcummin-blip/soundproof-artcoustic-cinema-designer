@@ -436,7 +436,12 @@ export function buildSeatHudSnapshot({
     overheads: seatSplData?.uppers || {},
   };
 
-  // HUD-local P10 – Maximum SPL difference between upper speakers
+  // P10 — engine (computeP10RspNormalisedSpread) is the SOLE P10 authority.
+  // No local fallback: a raw max-min spread is a different metric (not
+  // RSP-normalised) and must not coexist as an alternative scoring authority.
+  // When the engine has not published P10, show a neutral uncalculated state
+  // with no achieved level. P10 is genuinely not applicable when no overhead
+  // speakers exist.
   if (!engineSeatRp22?.[10]) {
     if (!hasOverheads) {
       data.rp22.p10 = {
@@ -446,45 +451,9 @@ export function buildSeatHudSnapshot({
         status: 'not_applicable',
       };
     } else {
-      const upperEntries = seatSplData?.uppers
-        ? Object.values(seatSplData.uppers)
-        : [];
-
-      const upperValues = upperEntries
-        .map((o) =>
-          o && typeof o.value === 'number' && Number.isFinite(o.value)
-            ? o.value
-            : null
-        )
-        .filter((v) => typeof v === 'number' && Number.isFinite(v));
-
-      if (upperValues.length >= 2) {
-        const maxSpl = Math.max(...upperValues);
-        const minSpl = Math.min(...upperValues);
-        const delta  = Math.abs(maxSpl - minSpl);
-
-        // Round to 0.1 dB
-        const deltaRounded = Math.round(delta * 10) / 10;
-
-        // RP22 P10 thresholds
-        let level10 = 1;
-        if (deltaRounded <= 2)      level10 = 4;
-        else if (deltaRounded <= 5) level10 = 3;
-        else if (deltaRounded <= 8) level10 = 2;
-        else                        level10 = 1;
-
-        data.rp22.p10 = {
-          value:     deltaRounded,
-          formatted: `±${deltaRounded.toFixed(1)} dB`,
-          level:     level10,
-        };
-      } else {
-        data.rp22.p10 = {
-          value:     null,
-          formatted: 'Not Calculated',
-          level:     '—',
-        };
-      }
+      data.rp22.p10 = {
+        ...notCalculatedHud(),
+      };
     }
   }
 

@@ -21,14 +21,17 @@ const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 // Canonical upper channels per RP22 spec (exactly these six)
 export const P10_UPPER_ROLES = ['TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR'];
 
-// P10 thresholds (unchanged):
-// L4 ≤ 2 dB, L3 ≤ 5 dB, L2 ≤ 8 dB, L1 > 8 dB
-function gradeP10(spreadDb) {
+// P10 thresholds — canonical RP22 (matches levelP10_upperDelta in levels.jsx
+// and the RP22 catalog L1 = 12 dB):
+//   L4 ≤ 2 dB, L3 ≤ 5 dB, L2 ≤ 8 dB, L1 ≤ 12 dB, FAIL > 12 dB
+// Engine FAIL convention: 0 (numeric), consistent with P6 and RP22GradingPill.
+export function gradeP10(spreadDb) {
   if (!isNum(spreadDb)) return '—';
   if (spreadDb <= 2) return 4;
   if (spreadDb <= 5) return 3;
   if (spreadDb <= 8) return 2;
-  return 1;
+  if (spreadDb <= 12) return 1;
+  return 0;
 }
 
 /**
