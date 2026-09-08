@@ -1,16 +1,16 @@
 import React from "react";
+import {
+  WORKSPACE_VIEW_MODES,
+  normalizeWorkspaceView,
+} from "@/components/roomdesigner/workspaceViewModes";
 
 // ViewModeToggle — three workspace view modes for the Cinema Designer.
 // Split (default) | Plan (room design full page) | Technical (analysis full page).
 // Pure presentation switch; does not affect calculations, placement, or scoring.
-const MODES = [
-  { key: "split", label: "Split View" },
-  { key: "plan", label: "Plan View" },
-  { key: "technical", label: "Technical" },
-];
-
+// Mode definitions + normalisation live in workspaceViewModes.js (single source
+// of truth, shared with the persistent header and the regression test).
 export default function ViewModeToggle({ viewMode = "split", onViewModeChange }) {
-  const active = (viewMode && MODES.some((m) => m.key === viewMode)) ? viewMode : "split";
+  const active = normalizeWorkspaceView(viewMode);
   return (
     <div
       role="group"
@@ -24,7 +24,7 @@ export default function ViewModeToggle({ viewMode = "split", onViewModeChange })
         border: "1px solid #DCDBD6",
       }}
     >
-      {MODES.map((m) => {
+      {WORKSPACE_VIEW_MODES.map((m) => {
         const isActive = active === m.key;
         return (
           <button

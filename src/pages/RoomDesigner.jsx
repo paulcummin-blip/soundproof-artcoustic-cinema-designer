@@ -64,6 +64,7 @@ import { useInRoomDepths } from "@/components/hooks/useInRoomDepths";
 import RoomDesignerHeader from "@/components/roomdesigner/RoomDesignerHeader";
 import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanToolbar";
 import ViewModeLayout from "@/components/roomdesigner/ViewModeLayout";
+import ViewModeToggle from "@/components/roomdesigner/ViewModeToggle";
 import AimLoudspeakerControls from "@/components/roomdesigner/AimLoudspeakerControls";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import RoomDesignerControlsPanel from "@/components/roomdesigner/RoomDesignerControlsPanel";
@@ -1970,6 +1971,31 @@ function RoomDesignerWithState() {
         isProjectMode={isProjectMode}
       />
 
+      {/* Persistent Workspace View selector — always visible across all three
+          modes (Split / Plan / Technical). Mounted here, above ViewModeLayout,
+          so it is never removed when the right-hand content panel hides in
+          Plan View. One shared authority: viewMode state at the top of this
+          component. Pure presentation — does not affect calculations. */}
+      <div
+        role="group"
+        aria-label="Workspace view"
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 10,
+          padding: "8px 16px",
+          borderBottom: "1px solid #DCDBD6",
+          background: "#FAFAF8",
+          flex: "0 0 auto",
+        }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#625143" }}>
+          Workspace View
+        </span>
+        <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+      </div>
+
       <ViewModeLayout
         viewMode={viewMode}
         initialLeftWidth={720}
@@ -2273,8 +2299,6 @@ function RoomDesignerWithState() {
             selectedAbfuserQty={appState?.selectedAbfuserQty ?? 0}
             setSelectedAbfuserQty={appState?.setSelectedAbfuserQty}
             recommendedAbfuserQty={recommendedAbfuserQty}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
           />
         )}
       />
