@@ -94,8 +94,8 @@ function P14CapabilityPill({ currentLevel, currentDb, winnerLevel, winnerDb }) {
   const win = numericLevel(winnerLevel) || 0;
   const curText = cur > 0 ? `L${cur}` : "—";
   const winText = win > 0 ? `L${win}` : "—";
-  const curDbText = Number.isFinite(Number(currentDb)) ? `${Number(currentDb).toFixed(1)} dBC` : "";
-  const winDbText = Number.isFinite(Number(winnerDb)) ? `${Number(winnerDb).toFixed(1)} dBC` : "";
+  const curDbText = (currentDb != null && Number.isFinite(Number(currentDb))) ? `${Number(currentDb).toFixed(1)} dBC` : "";
+  const winDbText = (winnerDb != null && Number.isFinite(Number(winnerDb))) ? `${Number(winnerDb).toFixed(1)} dBC` : "";
   const curDisplay = curDbText ? `${curDbText} / ${curText}` : curText;
   const winDisplay = winDbText ? `${winDbText} / ${winText}` : winText;
   const dbChanged = Number.isFinite(Number(currentDb)) && Number.isFinite(Number(winnerDb))
@@ -145,9 +145,91 @@ function P18BeforeAfter({ beforeLevel, beforeHz, afterLevel, afterHz }) {
   );
 }
 
+// ── Derived materiality explanation (from canonical before/after metrics) ──
+// Used ONLY when the engine's materialityReason is null (e.g. compact-contract
+// per-seat results lack isPrimary, preventing the engine's Path B from firing).
+// This formats the SAME canonical before/after evidence the engine already
+// computed — it does NOT re-evaluate materiality or create a second gate.
+function deriveMaterialityExplanation(currentResult, winner, seatingPositions) {
+  if (!currentResult || !winner) return null;
+
+  const beforeP20 = Array.isArray(currentResult.perSeatP20) ? currentResult.perSeatP20 : [];
+  const afterP20 = Array.isArray(winner.perSeatP20) ? winner.perSeatP20 : [];
+  if (!beforeP20.length || !afterP20.length) return null;
+
+  const beforeMap = new Map(beforeP20.map((s) => [String(s.seatId), s]));
+  const afterMap = new Map(afterP20.map((s) => [String(s.seatId), s]));
+
+  // Worst-seat P20 (all seats, excluding RSP/synthetic)
+  const REF_IDS = new Set(["rsp", "mlp", "synthetic-rsp", "synthetic_rsp"]);
+  let worstBefore = 0;
+  let worstAfter = 0;
+  let worstSeatId = null;
+  for (const seat of afterP20) {
+    const id = String(seat.seatId || "");
+    if (REF_IDS.has(id.toLowerCase())) continue;
+    const beforeSeat = beforeMap.get(id);
+    if (!beforeSeat) continue;
+    const bRaw = Math.abs(Number(beforeSeat.variationDbRaw) || 0);
+    const aRaw = Math.abs(Number(seat.variationDbRaw) || 0);
+    if (aRaw > worstAfter) { worstAfter = aRaw; worstSeatId = id; }
+    if (bRaw > worstBefore) worstBefore = bRaw;
+  }
+  // Use the worst-seat's before value for the comparison
+  if (worstSeatId) {
+    const beforeSeat = beforeMap.get(worstSeatId);
+    if (beforeSeat) worstBefore = Math.abs(Number(beforeSeat.variationDbRaw) || 0);
+  }
+
+  const worstImprovement = worstBefore - worstAfter;
+  if (worstImprovement < 0.5) return null; // no meaningful improvement
+
+  // Primary seats: check they did not regress
+  const primarySeatIds = new Set(
+    (Array.isArray(seatingPositions) ? seatingPositions : [])
+      .filter((s) => s.priority !== "secondary")
+      .map((s) => String(s.id || s.seatId || ""))
+      .filter((id) => id && !REF_IDS.has(id.toLowerCase()))
+  );
+
+  let primaryImproved = 0;
+  let primarySame = 0;
+  let primaryRegressed = 0;
+  for (const id of primarySeatIds) {
+    const before = beforeMap.get(id);
+    const after = afterMap.get(id);
+    if (!before || !after) continue;
+    const bRaw = Math.abs(Number(before.variationDbRaw) || 0);
+    const aRaw = Math.abs(Number(after.variationDbRaw) || 0);
+    if (aRaw < bRaw - 0.05) primaryImproved++;
+    else if (Math.abs(aRaw - bRaw) <= 0.05) primarySame++;
+    else if (aRaw > bRaw + 0.05) primaryRegressed++;
+  }
+
+  if (primaryRegressed > 0) return null; // primary seats regressed — don't explain
+
+  const parts = [];
+  parts.push(`Seat-to-seat bass consistency improves materially. Worst-seat P20 reduces from ${worstBefore.toFixed(1)} dB to ${worstAfter.toFixed(1)} dB`);
+  if (primaryImproved > 0 && primarySame > 0) {
+    parts.push(`while ${primaryImproved} primary seat${primaryImproved > 1 ? "s" : ""} also improve${primaryImproved > 1 ? "" : "s"}`);
+  } else if (primaryImproved > 0) {
+    parts.push(`while all ${primaryImproved} primary seat${primaryImproved > 1 ? "s" : ""} improve${primaryImproved > 1 ? "" : "s"}`);
+  } else if (primarySame > 0) {
+    parts.push(`while ${primarySame} primary seat${primarySame > 1 ? "s" : ""} remain${primarySame > 1 ? "" : "s"} unchanged`);
+  }
+  parts.push(".");
+
+  return parts.join(", ").replace(/\.$/, ".");
+}
+
 // ── Materiality explanation + primary-seat trade-offs ────────────────────
 function MaterialityExplanation({ reason, currentResult, winner, seatingPositions }) {
-  if (!reason) return null;
+  // If the engine provided a canonical materiality reason, use it.
+  // Otherwise derive a presentation string from the canonical before/after
+  // metrics (option 2/3 in the authority hierarchy). This does NOT re-evaluate
+  // materiality — it formats the evidence the engine already computed.
+  const effectiveReason = reason || deriveMaterialityExplanation(currentResult, winner, seatingPositions);
+  if (!effectiveReason) return null;
 
   const REF_IDS = new Set(["rsp", "mlp", "synthetic-rsp", "synthetic_rsp"]);
   const tradeOffs = [];
@@ -189,7 +271,7 @@ function MaterialityExplanation({ reason, currentResult, winner, seatingPosition
   return (
     <div className="mt-2 rounded-md border border-[#E0DDD7] bg-[#F8F7F4] p-2">
       <div className="text-[10px] font-semibold text-[#213428]">Why this was recommended</div>
-      <p className="mt-0.5 text-[10px] leading-relaxed text-[#625143]">{reason}</p>
+      <p className="mt-0.5 text-[10px] leading-relaxed text-[#625143]">{effectiveReason}</p>
       {tradeOffs.length > 0 && (
         <div className="mt-1.5 space-y-0.5">
           {tradeOffs.map((t, i) => (

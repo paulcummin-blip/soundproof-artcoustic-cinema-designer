@@ -122,7 +122,9 @@ export function snapshotCurrentDesign({
     bottomHeightM: activeInstances.map((inst) => Number(inst.bottomHeightM) || 0),
     tuning,
     eqSignature: currentAuthority?.canonicalAuthorityReceipt?.filterBankSignature || null,
-    currentP14: currentAuthority?.p14AchievedLevel || null,
+    currentP14: currentAuthority?.p14AchievedLevel
+      || currentAuthority?.contract?.productAnalysis?.parameters?.p14?.achievedLevel
+      || null,
     currentP18: currentAuthority?.p18AchievedLevel || null,
     currentP19: currentAuthority?.achievedP19Level || null,
     currentP20: currentAuthority?.achievedP20Level || null,
@@ -1099,11 +1101,22 @@ function extractAuthorityForComparison(currentAuthority) {
   const p20Param = params.p20 || {};
   const p18Param = params.p18 || {};
 
-  // P14 achieved capability: read from selectedCandidate (canonical achieved
-  // authority), NOT from productAnalysis.parameters.p14 (which carries the
-  // designer-selected TARGET semantics). Falls back to contract-level fields.
-  const p14AchievedLevel = selectedCandidate.achievedP14Level ?? contract.achievedP14Level ?? null;
-  const p14AchievedDbRaw = selectedCandidate.achievedP14Db ?? contract.achievedP14Db ?? null;
+  // P14 achieved capability: read from selectedCandidate (full contract) or
+  // from productAnalysis.parameters.p14 (compact contract). In the compact
+  // contract, selectedCandidate.achievedP14Db/Level are stripped during
+  // compaction, but productAnalysis.parameters.p14 preserves the achieved
+  // data in achievedCapabilityDb and achievedLevel (NOT in .value/.level
+  // which carry the designer-selected TARGET semantics after buildBassTargetViews).
+  const p14Param = contract.productAnalysis?.parameters?.p14 || {};
+  const p14AchievedLevel = selectedCandidate.achievedP14Level
+    ?? contract.achievedP14Level
+    ?? p14Param.achievedLevel
+    ?? null;
+  const p14AchievedDbRaw = selectedCandidate.achievedP14Db
+    ?? contract.achievedP14Db
+    ?? p14Param.achievedCapabilityDb
+    ?? p14Param.availableCapabilityDb
+    ?? null;
   const p14AchievedDb = Number.isFinite(Number(p14AchievedDbRaw)) ? Number(p14AchievedDbRaw) : null;
 
   return {
