@@ -7,18 +7,7 @@ import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import SeatScopeBadge from "@/components/report/SeatScopeBadge";
 import { ChevronDown } from "lucide-react";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
-
-const LEVEL_ORD = { L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0 };
-
-const levelKey = (lvl) => {
-  const s = String(lvl).toUpperCase();
-  if (s === "L4" || lvl === 4) return "L4";
-  if (s === "L3" || lvl === 3) return "L3";
-  if (s === "L2" || lvl === 2) return "L2";
-  if (s === "L1" || lvl === 1) return "L1";
-  if (s === "FAIL" || lvl === 0) return "FAIL";
-  return "NV";
-};
+import { aggregateComplianceSummary } from "@/components/rp22/complianceSummaryAggregator";
 
 const deriveStatus = (achievedValue, paramId) => {
   const v = String(achievedValue || "");
@@ -60,40 +49,10 @@ export default function ComplianceParameterMatrix({
     [parameters, getLevelForParam, getValueForParam]
   );
 
-  const summary = useMemo(() => {
-    const counts = { L4: 0, L3: 0, L2: 0, L1: 0, fail: 0, notVerified: 0 };
-    let lowestOrd = null;
-    let active = 0;
-    let unavailable = 0;
-    let calculatedSeatParams = 0;
-    let seatParamCount = 0;
-    rowsData.forEach(({ lvl, isSeatScope, status }) => {
-      // Seat-scoped parameters are not aggregated into room compliance totals.
-      if (isSeatScope) {
-        seatParamCount++;
-        if (status.label === "Calculated") calculatedSeatParams++;
-        return;
-      }
-      const k = levelKey(lvl);
-      if (k === "L4") { counts.L4++; active++; }
-      else if (k === "L3") { counts.L3++; active++; }
-      else if (k === "L2") { counts.L2++; active++; }
-      else if (k === "L1") { counts.L1++; active++; }
-      else if (k === "FAIL") { counts.fail++; active++; }
-      else { counts.notVerified++; unavailable++; }
-      if (k in LEVEL_ORD) {
-        const ord = LEVEL_ORD[k];
-        if (lowestOrd === null || ord < lowestOrd) lowestOrd = ord;
-      }
-    });
-    const lowestLabel =
-      lowestOrd === 4 ? "L4" :
-      lowestOrd === 3 ? "L3" :
-      lowestOrd === 2 ? "L2" :
-      lowestOrd === 1 ? "L1" :
-      lowestOrd === 0 ? "Below L1" : "—";
-    return { counts, lowestLabel, active, unavailable, calculatedSeatParams, seatParamCount };
-  }, [rowsData]);
+  const summary = useMemo(
+    () => aggregateComplianceSummary(rowsData),
+    [rowsData]
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
