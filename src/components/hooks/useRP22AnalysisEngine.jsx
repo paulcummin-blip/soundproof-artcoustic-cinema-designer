@@ -34,6 +34,7 @@ import { gradeP1Distance } from "@/components/utils/rp22/p1LevelAuthority";
 import { computeP11Compliance } from "@/components/utils/rp22/computeP11Compliance";
 import { clampLcrZoneDepth, computeLcrZones, isCentreInZone } from "@/components/utils/rp22/lcrZoneAuthority";
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
+import { logRp22EngineDiagnostic } from "@/components/utils/rp22RuntimeDiagnostic";
 
 // TEMPORARY P18/P19 execution trace — display-only, no calculation control flow.
 let temporaryAnalysisRunId = 0;
@@ -400,7 +401,7 @@ const getCanonicalRole = (role) => String(role || "").toUpperCase();
 // so that the seatResponses reference never changes between unrelated renders.
 const EMPTY_SEAT_RESPONSES = Object.freeze([]);
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, assumedP15Level, screen, screenFrontPlaneM, dolbyLayout, visiblePlanSpeakers, includeBassAnalysis = true, diagnosticOwner = "unknown/unattributed" }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, assumedP15Level, screen, screenFrontPlaneM, dolbyLayout, visiblePlanSpeakers, includeBassAnalysis = true, diagnosticOwner = "unknown/unattributed", _diagnosticIsRspSettled = null, _diagnosticProjectInfo = null, _diagnosticEngineSpeakers = null, _diagnosticSettledPlacedSpeakersLength = null, _diagnosticAnalysisSpeakers = null } = {}) => {
   // Report consumers disable this calculation path and present only the completed bass authority.
   const liveSeatResponses = useSeatResponses(includeBassAnalysis);
   const seatResponses = includeBassAnalysis ? liveSeatResponses : EMPTY_SEAT_RESPONSES;
@@ -1262,6 +1263,84 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       allowedP17Roles,
     });
 
+    // ── TEMPORARY DIAGNOSTIC CAPTURE (read-only, no calculation change) ──
+    const _diag = {
+      projectId: _diagnosticProjectInfo?.id ?? null,
+      projectName: _diagnosticProjectInfo?.name ?? null,
+      isRspSettled: _diagnosticIsRspSettled,
+      engineSpeakersLength: Array.isArray(_diagnosticEngineSpeakers) ? _diagnosticEngineSpeakers.length : null,
+      placedSpeakersLength: safeSpeakers.length,
+      settledPlacedSpeakersLength: _diagnosticSettledPlacedSpeakersLength,
+      visiblePlanSpeakersLength: Array.isArray(visiblePlanSpeakers) ? visiblePlanSpeakers.length : null,
+      analysisSpeakersLength: Array.isArray(_diagnosticAnalysisSpeakers) ? _diagnosticAnalysisSpeakers.length : null,
+      seatsLength: safeSeats.length,
+      rspId: null,
+      rspX: null,
+      rspY: null,
+      rspZ: null,
+      placedSpeakersRef: safeSpeakers,
+      visiblePlanSpeakersRef: visiblePlanSpeakers,
+      analysisSpeakersRef: _diagnosticAnalysisSpeakers,
+      speakersWithResolvedOverheadsLength: speakersWithResolvedOverheads.length,
+      p5: {},
+      p9: {},
+      p10: { seats: {} },
+      p17: { seats: {} },
+      publication: {},
+      perSeatKeys: [],
+    };
+    if (mlp && isNum(mlp.x) && isNum(mlp.y)) {
+      _diag.rspX = mlp.x;
+      _diag.rspY = mlp.y;
+      _diag.rspZ = isNum(mlp.z) ? mlp.z : null;
+    }
+    // Capture P5 eligible surrounds from speakersWithResolvedOverheads
+    {
+      const eligible = speakersWithResolvedOverheads
+        .filter((s) => isEligibleP5Surround(String(s.role)))
+        .filter((s) => isNum(s?.position?.x) && isNum(s?.position?.y));
+      _diag.p5.eligibleCount = eligible.length;
+      _diag.p5.eligibleRoles = eligible.map((s) => String(s.role));
+    }
+    // Capture P17 speaker info
+    {
+      const p17Real = speakersWithResolvedOverheads.filter(hasRealModel);
+      _diag.p17.speakersWithResolvedOverheadsLength = speakersWithResolvedOverheads.length;
+      _diag.p17.realModelCount = p17Real.length;
+      const EXCLUDE_LCR_P17 = new Set(["FL","FC","FR","FCL","FCR"]);
+      const p17Spk = p17Real
+        .filter((s) => s && s.role && s.model)
+        .filter((s) => !EXCLUDE_LCR_P17.has(String(s.role).toUpperCase()))
+        .filter((s) => !allowedP17Roles || allowedP17Roles.has(getCanonicalRole(s.role)));
+      _diag.p17.p17SpeakersLength = p17Spk.length;
+      _diag.p17.p17SpeakerRoles = p17Spk.map((s) => String(s.role));
+      // Capture excluded non-LCR speakers with reasons
+      const excluded = [];
+      for (const s of speakersWithResolvedOverheads) {
+        if (!s || !s.role) continue;
+        const role = String(s.role).toUpperCase();
+        if (EXCLUDE_LCR_P17.has(role)) continue;
+        if (role.includes("LFE") || role.includes("SUB")) continue;
+        const canon = getCanonicalRole(s.role);
+        const allowed = !allowedP17Roles || allowedP17Roles.has(canon);
+        const hasModel = hasRealModel(s);
+        const posValid = s?.position && isNum(s.position.x) && isNum(s.position.y);
+        if (!allowed || !hasModel || !posValid) {
+          excluded.push({
+            role: String(s.role),
+            model: s.model ?? null,
+            positionValid: posValid,
+            canonicalRole: canon,
+            allowedRole: allowed,
+            hasRealModel: hasModel,
+            exclusionReason: !hasModel ? "no-real-model" : !posValid ? "invalid-position" : !allowed ? "role-not-in-allowedP17Roles" : "unknown",
+          });
+        }
+      }
+      _diag.p17.excludedSpeakers = excluded;
+    }
+    // ── END TEMPORARY DIAGNOSTIC INIT ──
+
     // Helper to get SPL at seat for a specific role
     const getSplAtSeat = (seatId, role) => {
       if (!seatSplMetrics) return null;
@@ -1359,6 +1438,15 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           getCanonicalRole,
         });
 
+        // ── TEMP DIAG: capture P5 for RSP/primary/secondary ──
+        if (seat.__isSyntheticMLP || seat.isPrimary || seat.isSecondary) {
+          if (!_diag.p5.ringGapsResult) {
+            _diag.p5.ringGapsResult = p5Result;
+            _diag.p5.worstGapDeg = Number.isFinite(p5Result.worstGapDeg) ? p5Result.worstGapDeg : null;
+          }
+        }
+        // ── END TEMP DIAG ──
+
         if (Number.isFinite(p5Result.worstGapDeg)) {
           const rawGap = p5Result.worstGapDeg;
 
@@ -1374,6 +1462,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             level: level5,
             formatted: `${flooredGap}°`
           };
+          // ── TEMP DIAG: capture P5 level ──
+          if (!_diag.p5.level) _diag.p5.level = level5;
+          // ── END TEMP DIAG ──
         }
       }
 
@@ -1463,6 +1554,30 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
       // P9 - Maximum vertical angle between adjacent upper speakers
       const upperSpeakers = getUpperSpeakersForSeat(seat, safeSpeakers, getCanonicalRole);
+
+      // ── TEMP DIAG: capture P9 upper entries for RSP/primary/secondary ──
+      if (seat.__isSyntheticMLP || seat.isPrimary || seat.isSecondary) {
+        if (!_diag.p9.upperEntries) {
+          const upperRoleSet = new Set(['TFL','TFR','TML','TMR','TBL','TBR','TRL','TRR','TL','TR']);
+          _diag.p9.upperEntries = safeSpeakers
+            .filter((spk) => upperRoleSet.has(getCanonicalRole(spk?.role)))
+            .map((spk) => {
+              const pos = spk?.position;
+              const role = getCanonicalRole(spk?.role);
+              const accepted = upperSpeakers.some((us) => us.role === role);
+              return {
+                role,
+                x: pos?.x,
+                y: pos?.y,
+                z: pos?.z,
+                accepted,
+              };
+            });
+          _diag.p9.upperSpeakersLength = upperSpeakers.length;
+        }
+      }
+      // ── END TEMP DIAG ──
+
       if (upperSpeakers.length >= 2) {
         const result = computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCenterX);
         const { maxVerticalGapDeg, gaps, worstGap, rowElevations } = result;
@@ -1483,6 +1598,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
               rowElevations,
             },
           };
+          // ── TEMP DIAG: capture P9 result ──
+          if (!_diag.p9.maxVerticalGapDeg) {
+            _diag.p9.maxVerticalGapDeg = maxVerticalGapDeg;
+            _diag.p9.level = level9;
+          }
+          // ── END TEMP DIAG ──
         }
       }
 
@@ -1492,6 +1613,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       // Upper channels: TFL, TFR, TML, TMR, TRL, TRR
       {
         let p10Result = null;
+        let _diagSeatUppers = null;
+        let _diagRspUppers = null;
 
         if (seatSplMetrics) {
           const seatSpl = getSeatSplMetrics(seatSplMetrics, seatId);
@@ -1509,6 +1632,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             seatSpl?.uppers,
             rspSpl?.uppers
           );
+          _diagSeatUppers = seatSpl?.uppers || null;
+          _diagRspUppers = rspSpl?.uppers || null;
         }
 
         if (p10Result) {
@@ -1517,6 +1642,22 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             formatted: p10Result.formatted,
             level: p10Result.level,
           };
+          // ── TEMP DIAG: capture P10 result ──
+          _diag.p10.seats[seatId] = {
+            seatUppersKeys: _diagSeatUppers ? Object.keys(_diagSeatUppers) : [],
+            rspUppersKeys: _diagRspUppers ? Object.keys(_diagRspUppers) : [],
+            seatUppers: _diagSeatUppers ? Object.fromEntries(
+              Object.entries(_diagSeatUppers).map(([k, v]) => [k, v?.value ?? null])
+            ) : {},
+            rspUppers: _diagRspUppers ? Object.fromEntries(
+              Object.entries(_diagRspUppers).map(([k, v]) => [k, v?.value ?? null])
+            ) : {},
+            normalisedDeltas: p10Result.normalisedDeltas,
+            result: p10Result,
+            level: p10Result.level,
+          };
+          if (!_diag.p10.level) _diag.p10.level = p10Result.level;
+          // ── END TEMP DIAG ──
         } else {
           // Less than 2 valid normalised upper SPL values – preserve insufficient-data behaviour
           metrics.p10 = {
@@ -1524,6 +1665,22 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             formatted: 'N/A (insufficient data)',
             level: '—',
           };
+          // ── TEMP DIAG: capture P10 null result ──
+          _diag.p10.seats[seatId] = {
+            seatUppersKeys: _diagSeatUppers ? Object.keys(_diagSeatUppers) : [],
+            rspUppersKeys: _diagRspUppers ? Object.keys(_diagRspUppers) : [],
+            seatUppers: _diagSeatUppers ? Object.fromEntries(
+              Object.entries(_diagSeatUppers).map(([k, v]) => [k, v?.value ?? null])
+            ) : {},
+            rspUppers: _diagRspUppers ? Object.fromEntries(
+              Object.entries(_diagRspUppers).map(([k, v]) => [k, v?.value ?? null])
+            ) : {},
+            normalisedDeltas: null,
+            result: null,
+            level: '—',
+            nullReason: 'computeP10RspNormalisedSpread returned null (< 2 valid channels)',
+          };
+          // ── END TEMP DIAG ──
         }
       }
 
@@ -1558,6 +1715,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
         const p17Data = p17Results[seatId];
 
+        // ── TEMP DIAG: capture P17 result for RSP/primary/secondary ──
+        if (seat.__isSyntheticMLP || seat.isPrimary || seat.isSecondary) {
+          _diag.p17.seats[seatId] = p17Data;
+        }
+        // ── END TEMP DIAG ──
+
         if (p17Data && isNum(p17Data.p17Db)) {
           const valueDb = p17Data.p17Db;
 
@@ -1578,6 +1741,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             perSpeaker: p17Data.perSpeaker || [],
             p17HasNaAngles: p17Data.p17HasNaAngles || false,
           };
+          // ── TEMP DIAG: capture P17 level ──
+          if (!_diag.p17.level) _diag.p17.level = level17;
+          // ── END TEMP DIAG ──
         } else {
           metrics.p17 = {
             value: null,
@@ -1657,6 +1823,27 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       if (metrics.p20) perSeatRp22[seatId].rp22[20] = metrics.p20;
     }
 
+    // ── TEMP DIAG: capture publication for RSP + one primary + one secondary ──
+    {
+      _diag.perSeatKeys = Object.keys(perSeatRp22);
+      const captureSeat = (sid) => {
+        if (sid && perSeatRp22[sid]) {
+          _diag.publication[sid] = {
+            perSeatRp22_p5: perSeatRp22[sid].rp22?.[5] ?? null,
+            perSeatRp22_p9: perSeatRp22[sid].rp22?.[9] ?? null,
+            perSeatRp22_p10: perSeatRp22[sid].rp22?.[10] ?? null,
+            perSeatRp22_p17: perSeatRp22[sid].rp22?.[17] ?? null,
+          };
+        }
+      };
+      captureSeat("mlp");
+      const firstPrimary = seatsWithRoles.find((s) => s.isPrimary);
+      const firstSecondary = seatsWithRoles.find((s) => s.isSecondary);
+      if (firstPrimary) captureSeat(firstPrimary.id || `seat-${firstPrimary.x}-${firstPrimary.y}`);
+      if (firstSecondary) captureSeat(firstSecondary.id || `seat-${firstSecondary.x}-${firstSecondary.y}`);
+    }
+    // ── END TEMP DIAG ──
+
     // Build perSeatRp23 - RP23 horizontal viewing angle for each seat
     // Use the SAME calculation as buildSeatHudSnapshot to ensure consistency
     const perSeatRp23 = {};
@@ -1710,6 +1897,10 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     }
 
 
+
+    // ── TEMP DIAG: emit the structured diagnostic snapshot (read-only) ──
+    logRp22EngineDiagnostic(_diag);
+    // ── END TEMP DIAG ──
 
     return {
       gradedParameters,

@@ -950,6 +950,13 @@ function RoomDesignerWithState() {
     includeBassAnalysis: false,
     placedSpeakers: _effectivePlacedSpeakers,
     visiblePlanSpeakers: _effectiveVisiblePlanSpeakers,
+    // ── TEMP DIAG: pass diagnostic-only params (no calculation effect) ──
+    _diagnosticIsRspSettled: _isRspSettled,
+    _diagnosticProjectInfo: { id: resolvedProjectId, name: appState?.projectName },
+    _diagnosticEngineSpeakers: engineSpeakers,
+    _diagnosticSettledPlacedSpeakersLength: _settled?.placedSpeakers?.length,
+    _diagnosticAnalysisSpeakers: analysisSpeakers,
+    // ── END TEMP DIAG ──
     seatingPositions: seats,
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)
     mlpBasis: "front", // fixed stable value — does not vary with seating arrangement
