@@ -15,7 +15,7 @@ import { buildPostEqBassCapabilityOutcome } from "@/components/utils/postEqBassC
 import { assessP18AgainstRequiredExtension, buildBassTargetWarning } from "@/components/utils/bassDesignPhilosophyAuthority";
 import { assessP18Extension, normalizeP18TargetBasis, p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
 import { isCanonicalP19Ready } from "@/components/room/bass/p19Readiness";
-import { buildSmoothCapabilityEnvelope, buildPracticalCalibrationTarget, applyP18IntentAwareLfOverlay, computeP18ReferenceDb } from "@/components/utils/practicalCalibrationTarget";
+import { buildSmoothCapabilityEnvelope, buildPracticalCalibrationTarget } from "@/components/utils/practicalCalibrationTarget";
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 import { getProductCurveFrequencyRange } from "@/components/models/speakers/registry";
 
@@ -368,17 +368,15 @@ export function evaluateCanonicalBassAuthority({
   const idealHouseTarget = (Array.isArray(canonicalResult.canonicalTargetCurve) && canonicalResult.canonicalTargetCurve.length)
     ? canonicalResult.canonicalTargetCurve
     : [];
-  const p18DesignHz = p18ThresholdHzForLevel(p14TargetBasis, requestedLevel);
-  const p18ReferenceDb = computeP18ReferenceDb(idealHouseTarget);
+  // P19 grading target = the SAME practical calibration target the predictor
+  // was asked to achieve. P18 is NOT used to construct the target — it is an
+  // achieved result graded afterward. The fallback rebuild mirrors the
+  // production path: capability-aware target with NO P18 LF overlay.
   const practicalCalibrationTarget = (Array.isArray(canonicalResult.practicalCalibrationTarget) && canonicalResult.practicalCalibrationTarget.length)
     ? canonicalResult.practicalCalibrationTarget
-    : applyP18IntentAwareLfOverlay({
-        practicalTargetA: buildPracticalCalibrationTarget({
-          idealTargetCurve: idealHouseTarget,
-          capabilityEnvelope: buildSmoothCapabilityEnvelope(canonicalResult.maximumSplCurveAfterEq || canonicalResult.maximumSplCurveBeforeEq || []),
-        }),
-        p18DesignHz,
-        p18ReferenceDb,
+    : buildPracticalCalibrationTarget({
+        idealTargetCurve: idealHouseTarget,
+        capabilityEnvelope: buildSmoothCapabilityEnvelope(canonicalResult.maximumSplCurveAfterEq || canonicalResult.maximumSplCurveBeforeEq || []),
       });
   const p19TargetCurve = practicalCalibrationTarget.length ? practicalCalibrationTarget : idealHouseTarget;
 

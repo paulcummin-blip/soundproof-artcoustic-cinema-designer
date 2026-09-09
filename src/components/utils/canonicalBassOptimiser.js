@@ -21,9 +21,7 @@ import { salvagePartialBank, buildSalvageEqResult } from "@/components/utils/des
 import { calculatePairedP14P18ProductionAuthority } from "@/components/utils/pairedP14P18ProductionAuthority";
 import { buildPairedP14P18CandidateSummary } from "@/components/utils/pairedP14P18CandidateSummary";
 import { predictRealisticPostCalibrationCorrection } from "@/components/utils/realisticPostCalibrationPrediction";
-import { buildPracticalCalibrationTargetFromCapability, computeP18ReferenceDb } from "@/components/utils/practicalCalibrationTarget";
-import { p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
-
+import { buildPracticalCalibrationTargetFromCapability } from "@/components/utils/practicalCalibrationTarget";
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
 const PRODUCT_EXTENSION_REFERENCE_TOLERANCE_DB = 1.5;
@@ -753,19 +751,18 @@ export function generateCanonicalCandidatePool({
   // T(f) is derived from SMOOTH capability only (1-octave envelope) — it never
   // follows narrow modal nulls, seat-specific structure, or post-EQ irregularities.
   // P18 continues to measure extension against the ideal targetCurve H(f).
-  // ── P18-intent-aware LF target (Fd from selected target combination) ──
-  // Fd = the P18 design frequency for the CURRENT target combination, derived
-  // from the P14 target basis + level (Minimum/Recommended × L1–L4). This is
-  // NOT the L1-only fallback. Each of the 8 target combinations gets its own
-  // deterministic target shape.
-  const p18DesignHz = p18ThresholdHzForLevel(p14TargetBasis, p14TargetLevel);
-  const p18ReferenceDb = computeP18ReferenceDb(targetCurve);
+  // ── Practical Calibration Target (capability-aware, NO P18 overlay) ──
+  // P18 is an ACHIEVED RESULT, not a desired LF roll-off shape. The practical
+  // target starts from the House target H(f) and is reduced ONLY where genuine
+  // capability/EQ feasibility requires it (combined product+room maximum, +6 dB
+  // boost ceiling, −15 dB cut, protected nulls). The P18 level boundary itself
+  // does NOT impose a roll-off — if an L1 system is physically capable of 20 Hz
+  // or 15 Hz, it is allowed to achieve that. P18 is graded afterward from the
+  // achieved −3 dB extension of the final calibrated response.
   const { capabilityEnvelope: practicalCapabilityEnvelope, practicalCalibrationTarget } =
     buildPracticalCalibrationTargetFromCapability({
       idealTargetCurve: targetCurve,
       maximumSplCurve: maximumSplCurveBeforeEq,
-      p18DesignHz,
-      p18ReferenceDb,
     });
   const capabilityConstrainedFitTarget = practicalCalibrationTarget;
   // ── Source output before and after global trim ──
