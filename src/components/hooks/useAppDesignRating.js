@@ -35,6 +35,18 @@ const SEAT_PARAM_KEY_MAP = {
   19: 'p19', 20: 'p20',
 };
 
+// Extract a numeric raw value from a seat HUD metric (same field priority as
+// buildDesignRatingInput.extractRawValue). Used to capture retained bass
+// inputs when bass is authoritative.
+const extractMetricRawValue = (metric) => {
+  if (!metric || typeof metric !== 'object') return null;
+  for (const key of ['value', 'valueM', 'valueDb', 'valueDeg', 'valueHz']) {
+    const v = Number(metric[key]);
+    if (Number.isFinite(v)) return v;
+  }
+  return null;
+};
+
 /**
  * Build a lightweight reportSeatHudById from analysisResult.perSeatRp22.
  * Maps numeric RP22 keys to string keys and computes rp23 viewing angles.
@@ -223,6 +235,38 @@ export function useAppDesignRating({
     [seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results]
   );
 
+  // ── Bass readiness gate ── (moved before roomRating so retainedFromRefresh
+  // can be passed to buildDesignRatingInput as retainedBass)
+  const expectedProjectKey = String(projectId || 'free');
+  const projectIdMatch = String(completedBassAuthority?.projectId || 'free') === expectedProjectKey;
+  const p14SelectionState = useMemo(
+    () => resolveP14TargetSelectionState(appState?.splConfig),
+    [appState?.splConfig?.selectedP14TargetBasis, appState?.splConfig?.selectedP14Level]
+  );
+  const bassReadiness = useMemo(
+    () => {
+      if (!projectIdMatch) {
+        return { ready: false, pending: true, reason: 'project-id-mismatch', fingerprint: null };
+      }
+      return resolveBassReadiness(completedBassAuthority, minimumSystemMet, !p14SelectionState.noP14TargetSelected);
+    },
+    [completedBassAuthority, minimumSystemMet, projectIdMatch, p14SelectionState.noP14TargetSelected]
+  );
+
+  // Retained bass: previously verified same-fingerprint bass inputs, used when
+  // current bass publication is temporarily unavailable (e.g. during a refresh).
+  // Only bass parameters (P14/P18/P19/P20) may be retained; non-bass parameters
+  // always come from the current analysis. The ref is updated in a useEffect
+  // after roomRating settles, so on the render where bass transitions from
+  // ready → not-ready, lastVerifiedBassRef.current still holds the values from
+  // the last ready render.
+  const lastVerifiedBassRef = useRef(null);
+
+  const retainedFromRefresh = !bassReadiness.ready
+    && lastVerifiedBassRef.current?.fingerprint != null
+    && bassReadiness.fingerprint != null
+    && lastVerifiedBassRef.current.fingerprint === bassReadiness.fingerprint;
+
   const roomRating = useMemo(() => {
     if (!minimumSystemMet) return null;
     try {
@@ -240,6 +284,7 @@ export function useAppDesignRating({
         placedSpeakers,
         assumedP15Level: appState?.assumedP15Level || null,
         assumedP21Level: appState?.assumedP21Level || null,
+        retainedBass: retainedFromRefresh ? lastVerifiedBassRef.current : null,
       });
       const authority = buildArtcousticDesignRatingAuthority(input);
       const rating = calculateRoomDesignRating(authority);
@@ -284,59 +329,36 @@ export function useAppDesignRating({
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;
     }
-  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, minimumSystemMet, appState?.assumedP15Level, appState?.assumedP21Level]);
+  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, minimumSystemMet, appState?.assumedP15Level, appState?.assumedP21Level, retainedFromRefresh]);
 
-  // ── Bass readiness gate ──
-  // A rating is final only when the completed bass contract is authoritative
-  // and belongs to the current fingerprint. While pending, the partial
-  // non-bass index must not be presented as final. If a verified
-  // same-fingerprint rating already exists (e.g. a refresh is running over
-  // the same design), it is retained until the new bass authority settles.
-  //
-  // bassApplicable: when the minimum 5.1 system is met (subwoofer present),
-  // UNCALCULATED means the bass analysis has not been computed yet, not that
-  // bass is inapplicable. This prevents a provisional partial ASDR from
-  // publishing during the hydration window before the foreground optimiser
-  // produces the authoritative result.
-  //
-  // projectIdMatch: the hydrated authority must belong to the active project.
-  // A mismatch (e.g. during navigation between projects) keeps the rating
-  // pending until the correct project's authority arrives.
-  const expectedProjectKey = String(projectId || 'free');
-  const projectIdMatch = String(completedBassAuthority?.projectId || 'free') === expectedProjectKey;
-  const p14SelectionState = useMemo(
-    () => resolveP14TargetSelectionState(appState?.splConfig),
-    [appState?.splConfig?.selectedP14TargetBasis, appState?.splConfig?.selectedP14Level]
-  );
-  const bassReadiness = useMemo(
-    () => {
-      if (!projectIdMatch) {
-        return { ready: false, pending: true, reason: 'project-id-mismatch', fingerprint: null };
-      }
-      return resolveBassReadiness(completedBassAuthority, minimumSystemMet, !p14SelectionState.noP14TargetSelected);
-    },
-    [completedBassAuthority, minimumSystemMet, projectIdMatch, p14SelectionState.noP14TargetSelected]
-  );
-
-  const lastFinalRatingRef = useRef(null);
-
+  // Capture bass-specific inputs when bass is authoritative, for same-fingerprint
+  // retention during a temporary bass refresh. Only bass parameters
+  // (P14/P18/P19/P20) may be retained; non-bass parameters always come from
+  // the current analysis.
   useEffect(() => {
     if (bassReadiness.ready && roomRating) {
-      lastFinalRatingRef.current = {
+      const p19BySeat = {};
+      const p20BySeat = {};
+      for (const [seatId, hud] of Object.entries(reportSeatHudById || {})) {
+        const p19Raw = extractMetricRawValue(hud?.rp22?.p19);
+        const p20Raw = extractMetricRawValue(hud?.rp22?.p20);
+        if (p19Raw != null) p19BySeat[seatId] = p19Raw;
+        if (p20Raw != null) p20BySeat[seatId] = p20Raw;
+      }
+      lastVerifiedBassRef.current = {
         fingerprint: bassReadiness.fingerprint,
-        rating: roomRating,
+        p14Raw: completedBassPresentation?.parameters?.p14?.rawValue ?? null,
+        p14Mode: reportP14Mode,
+        p18Raw: completedBassPresentation?.parameters?.p18?.rawValue ?? null,
+        p18Mode: reportP18Mode,
+        p18Qualified: completedBassPresentation?.parameters?.p18?.qualifiedAtSelectedP14Output !== false,
+        p19BySeat,
+        p20BySeat,
       };
     }
-  }, [bassReadiness.ready, bassReadiness.fingerprint, roomRating]);
+  }, [bassReadiness.ready, bassReadiness.fingerprint, roomRating, reportSeatHudById, completedBassPresentation, reportP14Mode, reportP18Mode]);
 
-  const retainedFromRefresh = !bassReadiness.ready
-    && lastFinalRatingRef.current?.fingerprint != null
-    && bassReadiness.fingerprint != null
-    && lastFinalRatingRef.current.fingerprint === bassReadiness.fingerprint;
-
-  const effectiveRating = bassReadiness.ready
-    ? roomRating
-    : (retainedFromRefresh ? lastFinalRatingRef.current.rating : roomRating);
+  const effectiveRating = roomRating;
 
   if (!minimumSystemMet) return null;
   if (!effectiveRating) return null;

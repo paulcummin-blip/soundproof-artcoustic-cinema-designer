@@ -92,8 +92,15 @@ export function buildDesignRatingInput({
   placedSpeakers = [],
   assumedP15Level = null,
   assumedP21Level = null,
+  retainedBass = null,
 }) {
   const bassVerified = isBassPublicationVerified(completedBassAuthority);
+  // Retained bass: previously verified same-fingerprint bass inputs, used when
+  // current bass publication is temporarily unavailable (e.g. during a refresh).
+  // Only bass parameters (P14/P18/P19/P20) may be retained; non-bass parameters
+  // always come from the current analysis.
+  const retainedBassActive = !bassVerified && retainedBass != null && retainedBass.fingerprint != null;
+  const effectiveBassVerified = bassVerified || retainedBassActive;
   const seatIds = (Array.isArray(seats) ? seats : []).map((s) => s?.id).filter(Boolean);
   const room = analysisResult?.gradedParameters?.primary || {};
 
@@ -137,22 +144,38 @@ export function buildDesignRatingInput({
     ? { rawValue: room[13].value, mode: reportP13Mode }
     : null;
 
-  // P14: Bass SPL capability — from completed bass authority (publication-verified)
-  const p14Raw = completedBassPresentation?.parameters?.p14?.rawValue;
+  // P14: Bass SPL capability — from completed bass authority (publication-verified),
+  // or retained same-fingerprint bass when current publication is temporarily
+  // unavailable. Only bass parameters may be retained.
+  const p14Raw = bassVerified
+    ? completedBassPresentation?.parameters?.p14?.rawValue
+    : (retainedBassActive ? retainedBass.p14Raw : null);
+  const p14Mode = bassVerified
+    ? reportP14Mode
+    : (retainedBassActive ? (retainedBass.p14Mode || reportP14Mode) : reportP14Mode);
   const p14 =
-    bassVerified && isNum(p14Raw)
-      ? { rawValue: p14Raw, verified: true, mode: reportP14Mode }
+    effectiveBassVerified && isNum(p14Raw)
+      ? { rawValue: p14Raw, verified: true, mode: p14Mode }
       : null;
 
-  // P18: Bass extension — from completed bass authority (publication-verified)
-  const p18Raw = completedBassPresentation?.parameters?.p18?.rawValue;
+  // P18: Bass extension — from completed bass authority (publication-verified),
+  // or retained same-fingerprint bass (see P14 above).
+  const p18Raw = bassVerified
+    ? completedBassPresentation?.parameters?.p18?.rawValue
+    : (retainedBassActive ? retainedBass.p18Raw : null);
+  const p18Mode = bassVerified
+    ? reportP18Mode
+    : (retainedBassActive ? (retainedBass.p18Mode || reportP18Mode) : reportP18Mode);
+  const p18Qualified = bassVerified
+    ? completedBassPresentation?.parameters?.p18?.qualifiedAtSelectedP14Output !== false
+    : (retainedBassActive ? retainedBass.p18Qualified !== false : true);
   const p18 =
-    bassVerified && isNum(p18Raw)
+    effectiveBassVerified && isNum(p18Raw)
       ? {
           rawValue: p18Raw,
           verified: true,
-          mode: reportP18Mode,
-          qualified: completedBassPresentation?.parameters?.p18?.qualifiedAtSelectedP14Output !== false,
+          mode: p18Mode,
+          qualified: p18Qualified,
         }
       : null;
 
@@ -172,7 +195,15 @@ export function buildDesignRatingInput({
 
       const metric = hud.rp22?.[key];
       if (!metric) {
-        seatScope[key][seatId] = null;
+        // Bass seat-scope (P19/P20): fall back to retained same-fingerprint bass
+        // when current publication is temporarily unavailable.
+        if ((key === "p19" || key === "p20") && retainedBassActive) {
+          const retainedMap = key === 'p19' ? retainedBass.p19BySeat : retainedBass.p20BySeat;
+          const retainedVal = retainedMap?.[seatId];
+          seatScope[key][seatId] = isNum(retainedVal) ? { rawValue: retainedVal, verified: true } : null;
+        } else {
+          seatScope[key][seatId] = null;
+        }
         continue;
       }
 
@@ -185,11 +216,17 @@ export function buildDesignRatingInput({
       const rawValue = extractRawValue(metric);
 
       if (key === "p19" || key === "p20") {
-        // Bass seat-scope: only pass with verified: true when publication is verified
-        seatScope[key][seatId] =
-          bassVerified && isNum(rawValue)
-            ? { rawValue, verified: true }
-            : null;
+        // Bass seat-scope: use current verified bass, or retained same-fingerprint
+        // bass when current publication is temporarily unavailable.
+        if (bassVerified && isNum(rawValue)) {
+          seatScope[key][seatId] = { rawValue, verified: true };
+        } else if (retainedBassActive) {
+          const retainedMap = key === 'p19' ? retainedBass.p19BySeat : retainedBass.p20BySeat;
+          const retainedVal = retainedMap?.[seatId];
+          seatScope[key][seatId] = isNum(retainedVal) ? { rawValue: retainedVal, verified: true } : null;
+        } else {
+          seatScope[key][seatId] = null;
+        }
       } else {
         seatScope[key][seatId] = isNum(rawValue) ? rawValue : null;
       }
