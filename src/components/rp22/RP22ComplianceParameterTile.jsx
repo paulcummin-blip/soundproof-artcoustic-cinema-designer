@@ -6,6 +6,7 @@ import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTo
 import SeatScopeBadge from "@/components/report/SeatScopeBadge";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { normalizeLevelForDisplay } from "@/components/utils/rp22LevelDisplay";
 
 /* ---------- Shared style tokens (mirrored from RP22CompliancePanel) ---------- */
 const card  = { border: "1px solid #DCDBD6", background: "#fff", borderRadius: 8 };
@@ -116,7 +117,7 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
                     </td>
                     <td className="py-1 text-right text-[#3E4349]">{seat.value || "—"}</td>
                     <td className="py-1 text-right">
-                      <RP22GradingPill level={seat.level || "—"} compact />
+                      <RP22GradingPill level={normalizeLevelForDisplay(seat.level)} compact />
                     </td>
                   </tr>
                 ))

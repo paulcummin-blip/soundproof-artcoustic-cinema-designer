@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import RP22GradingPill from '../ui/RP22GradingPill';
+import { normalizeLevelForDisplay } from '../utils/rp22LevelDisplay';
 import SeatComplianceSummary from './SeatComplianceSummary';
 import { formatSeatLabel } from '../utils/seatLabel';
 
@@ -119,7 +120,7 @@ export default function ReportSeatParametersCard({
                                                             </span>
                                                         </div>
                                                         <RP22GradingPill
-                                                            level={metric ? (typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—')) : '—'}
+                                                            level={metric ? normalizeLevelForDisplay(metric.level) : '—'}
                                                         />
                                                     </div>
                                                     {metric && key === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (

@@ -16,6 +16,7 @@
 import React from "react";
 import { useAppState } from "@/components/AppStateProvider";
 import { getLevelColors } from "@/components/utils/rp22Colors";
+import { normalizeLevelForDisplay } from "@/components/utils/rp22LevelDisplay";
 import { getP21PresetResult } from "@/components/utils/rp22/levels";
 import {
   resolveParamThresholds,
@@ -189,7 +190,7 @@ export function useParameterGridAuthority({
 
     const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
     const metric = snap?.rp22?.[`p${pid}`];
-    return getMetricDisplayState(metric, pid).level || "—";
+    return normalizeLevelForDisplay(getMetricDisplayState(metric, pid).level);
   }, [analysisResult, assumedP15Level, assumedP21Level, seatSnapshotsById, lockedSeatId, mlpSeatId, p12Mode, p13Mode, p14Mode, bassPresentation]);
 
   /* ----- getHudValueForParam ----- */
@@ -347,7 +348,7 @@ export function useParameterGridAuthority({
               const snap = getSnapshotForSeat(seat);
               const metric = snap?.rp22?.[pKey];
               const display = getMetricDisplayState(metric, pId);
-              const lvl = display.level === 'N/A' || display.text === 'N/A' ? 'N/A' : (display.level || metric?.level || "—");
+              const lvl = display.level === 'N/A' || display.text === 'N/A' ? 'N/A' : normalizeLevelForDisplay(display.level ?? metric?.level);
               const isPrimary = !!seat?.isPrimary;
               const compact = getCompactPillState(lvl);
               const compactColors = (compact.n === -1 || compact.n === -2)
@@ -436,7 +437,7 @@ export function useParameterGridAuthority({
         return {
           id: seat?.id,
           indexInRow: extractSeatIndexInRow(seat, idx),
-          level: display.level || metric?.level || "—",
+          level: normalizeLevelForDisplay(display.level ?? metric?.level),
           value: display.text || "—",
           isPrimary: !!seat?.isPrimary,
         };

@@ -416,9 +416,19 @@ function buildCanonicalCandidate({
   // operating response O(f) = M(f) + globalTrimDb. The EQ correction is then
   // computed from the residual error = target - O(f). This models a real
   // calibrator who first sets the master volume, then EQs the response shape.
+  // DEFECT 1 FIX: The predictor must optimize against the SAME canonical
+  // practical target that P19 subsequently grades against. Previously the
+  // predictor received the ideal house target H(f) while P19 graded against
+  // the practical calibration target T(f), creating an ~8 dB mismatch.
+  // Now both paths use practicalCalibrationTarget (T(f) with P18 LF overlay).
+  // The ideal targetCurve H(f) remains the authority for P18 extension and
+  // physical capability checks (buildProductOperatingEnvelope, etc.).
+  const predictorTargetCurve = (Array.isArray(practicalCalibrationTarget) && practicalCalibrationTarget.length)
+    ? practicalCalibrationTarget
+    : targetCurve;
   const realisticResult = predictRealisticPostCalibrationCorrection({
     maximumCapabilityCurve: maximumSplCurveBeforeEq,
-    targetCurve,
+    targetCurve: predictorTargetCurve,
     assessmentStartHz: domains.p19StartHz,
     assessmentEndHz: domains.p19EndHz,
     protectedNullRegions,
@@ -532,12 +542,15 @@ function buildCanonicalCandidate({
   const seatsForMetrics = perSeatPostEqCurves.length
     ? perSeatPostEqCurves
     : [{ seatId: "rsp", isPrimary: true, responseData: finalPostEqCurve }];
+  // Candidate-level seat metrics must also use the practical target so
+  // candidate selection/ranking is consistent with the authoritative P19
+  // (which grades against practicalCalibrationTarget in evaluateCanonicalBassAuthority).
   const seatMetrics = calculateAllSeatMetricsFromCorrected(
     seatsForMetrics,
     domains.p19StartHz,
     domains.p19EndHz,
     verticalOffsetDb,
-    targetCurve,
+    predictorTargetCurve,
   );
   const limits = bankLimits(eq);
   const positiveEqDemandCurve = realisticCorrectionCurve.map((point) => ({
@@ -602,6 +615,11 @@ function buildCanonicalCandidate({
     pairedP14P18Summary,
     productionHouseCurveTarget: targetCurve.map((point) => ({ ...point })),
     practicalCalibrationTarget: (Array.isArray(practicalCalibrationTarget) ? practicalCalibrationTarget : targetCurve).map((point) => ({ ...point })),
+    // Explicit P19 target identity: confirms the predictor and P19 grading
+    // both use the same practical calibration target authority.
+    p19TargetIdentity: (Array.isArray(practicalCalibrationTarget) && practicalCalibrationTarget.length)
+      ? "practical-calibration-target"
+      : "ideal-house-target",
     fitterHouseCurveTarget: (eq.fitterHouseCurveTarget || targetCurve).map((point) => ({ ...point })),
     canonicalHouseCurveShape: targetShape.map((point) => ({ ...point })),
     canonicalVerticalOffsetDb: verticalOffsetDb,

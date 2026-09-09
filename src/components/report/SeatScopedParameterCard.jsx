@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
+import { normalizeLevelForDisplay } from '@/components/utils/rp22LevelDisplay';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 /**
@@ -99,7 +100,7 @@ export default function SeatScopedParameterCard({ param, perSeatResults, seatCou
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="text-[#625143]">Level:</span>
-              <RP22GradingPill level={selected.level || '—'} compact />
+              <RP22GradingPill level={normalizeLevelForDisplay(selected.level)} compact />
             </div>
           </div>
         )}
@@ -133,7 +134,7 @@ export default function SeatScopedParameterCard({ param, perSeatResults, seatCou
                     </td>
                     <td className="py-1 text-right text-[#3E4349]">{result?.valueFormatted ?? '—'}</td>
                     <td className="py-1 text-right">
-                      <RP22GradingPill level={result?.level || '—'} compact />
+                      <RP22GradingPill level={normalizeLevelForDisplay(result?.level)} compact />
                     </td>
                   </tr>
                 ))}

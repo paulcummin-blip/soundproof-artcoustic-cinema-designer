@@ -19,6 +19,7 @@ import ComplianceParameterMatrix from "@/components/rp22/ComplianceParameterMatr
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
 import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
+import { normalizeLevelForDisplay } from "@/components/utils/rp22LevelDisplay";
 import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl";
 import {
   getAssumedP15DisplayValue,
@@ -390,7 +391,7 @@ export default function RP22CompliancePanel({
               const snap = getSnapshotForSeat(seat);
               const metric = snap?.rp22?.[pKey];
               const display = getMetricDisplayState(metric);
-              const lvl = display.text === 'N/A' ? 'N/A' : (metric?.level || "—");
+              const lvl = display.text === 'N/A' ? 'N/A' : normalizeLevelForDisplay(metric?.level);
               const isPrimary = !!seat?.isPrimary;
 
               return (
@@ -624,7 +625,7 @@ export default function RP22CompliancePanel({
 
       const key = `p${pid}`;
       const metric = snap?.rp22?.[key];
-      return getMetricDisplayState(metric).level || "—";
+      return normalizeLevelForDisplay(getMetricDisplayState(metric).level);
     }
 
     return "—";
