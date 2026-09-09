@@ -1,8 +1,8 @@
 // _p14-cache-loader.mjs — Custom loader for P14 target cache durability tests.
 //
-// Extends the alias loader (_alias-loader.mjs) with a mock @/api/base44Client
-// so tests can exercise the REAL p14TargetCache.js module (including its
-// persistence path) without the @base44/sdk browser dependency.
+// Extends the alias loader with a mock @/api/base44Client so tests can
+// exercise the REAL p14TargetCache.js module (including its persistence
+// path) without the @base44/sdk browser dependency.
 //
 // The mock stores records in globalThis.__P14_CACHE_MOCK_DB__ (a Map keyed by
 // project_id). Tests can configure write failures via
@@ -16,21 +16,14 @@ const srcDir = new URL('../src/', import.meta.url).pathname;
 
 function tryResolve(basePath) {
   const candidates = [basePath, basePath + '.js', basePath + '.jsx', basePath + '.json', basePath + '/index.js', basePath + '/index.jsx'];
-  for (const c of candidates) { try { if (fs.existsSync(c)) return c; } catch (e) {} }
+  for (const c of candidates) {
+    try { if (fs.existsSync(c)) return c; } catch (e) {}
+  }
   return null;
-}
-
-// Initialise the mock DB on first load.
-if (!globalThis.__P14_CACHE_MOCK_DB__) {
-  globalThis.__P14_CACHE_MOCK_DB__ = new Map();
-}
-if (globalThis.__P14_CACHE_MOCK_FAIL__ === undefined) {
-  globalThis.__P14_CACHE_MOCK_FAIL__ = false;
 }
 
 const MOCK_BASE44_SOURCE = `
 // Initialise the mock DB in the MAIN thread (not the loader thread).
-// The loader runs in a separate worker; globalThis there is NOT shared.
 if (!globalThis.__P14_CACHE_MOCK_DB__) {
   globalThis.__P14_CACHE_MOCK_DB__ = new Map();
 }
@@ -78,7 +71,6 @@ export const base44 = {
 `;
 
 export async function resolve(specifier, context, nextResolve) {
-  // Intercept @/api/base44Client — return a synthetic module URL
   if (specifier === '@/api/base44Client') {
     return nextResolve('mock:base44Client', context);
   }
@@ -86,19 +78,15 @@ export async function resolve(specifier, context, nextResolve) {
     const resolved = tryResolve(srcDir + specifier.slice(2));
     if (resolved) return nextResolve(pathToFileURL(resolved).href, context);
   }
-  if (specifier.startsWith('./') || specifier.startsWith('../')) {
-    const lastSegment = specifier.split('/').pop();
-    if (!lastSegment.includes('.') && context.parentURL) {
-      const basePath = new URL(specifier, context.parentURL).pathname;
-      const resolved = tryResolve(basePath);
-      if (resolved) return nextResolve(pathToFileURL(resolved).href, context);
-    }
+  if ((specifier.startsWith('./') || specifier.startsWith('../')) && context.parentURL) {
+    const basePath = new URL(specifier, context.parentURL).pathname;
+    const resolved = tryResolve(basePath);
+    if (resolved) return nextResolve(pathToFileURL(resolved).href, context);
   }
   return nextResolve(specifier, context);
 }
 
 export async function load(url, context, nextLoad) {
-  // Serve the mock base44Client module
   if (url === 'mock:base44Client' || url.endsWith('mock:base44Client')) {
     return { format: 'module', source: MOCK_BASE44_SOURCE, shortCircuit: true };
   }
@@ -113,9 +101,6 @@ export async function load(url, context, nextLoad) {
     let needsPolyfill = false;
     if (patched.includes('import.meta.env')) {
       patched = patched.replace(/import\.meta\.env/g, '({VITE_BASE44_APP_ID:"",VITE_BASE44_BACKEND_URL:""})');
-      needsPolyfill = true;
-    }
-    if (patched.includes('window.') && !patched.includes('typeof window')) {
       needsPolyfill = true;
     }
     if (needsPolyfill) {
