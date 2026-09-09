@@ -254,6 +254,11 @@ export class P14TargetBackgroundScheduler {
       } else {
         safeConsole.log("p14-bg", `sweep complete: ${progress.ready}/${progress.total} cached (${limitedCount} limited)`);
       }
+      // DURABILITY FIX: Final belt-and-braces consistency flush of the complete
+      // target cache. Each target was already persisted immediately on
+      // completion (immediate: true); this final write guarantees the full
+      // 8/8 snapshot is consistent even if an individual immediate write was
+      // coalesced or the last write is still in-flight.
       flushTargetCachePersistence(this.projectId);
       return;
     }
@@ -529,11 +534,12 @@ export class P14TargetBackgroundScheduler {
     // Attempt insertion into the target cache.
     //   - AUTHORITATIVE contracts → setTargetCacheEntry
     //   - LIMITED contracts → setLimitedTargetCacheEntry (separate path)
-    // FIX 8: Each verified target is persisted immediately (debounced 2s) via
-    // deferPersistence: false. This ensures verified results survive app
-    // close, browser refresh, interaction cancellation, and partial failure.
-    // The previous deferPersistence: true only flushed on sweep completion or
-    // cancel — losing results if the app closed mid-sweep.
+    // DURABILITY FIX: Each verified target is persisted IMMEDIATELY (bypasses
+    // the 2-second debounce) via immediate: true. This ensures each completed
+    // target is durably saved before the user can close the page. The previous
+    // deferPersistence: false relied on a 2s debounce that kept resetting
+    // during a sweep (targets ~1.5s apart), delaying persistence until 2s after
+    // the final target — losing results if the app closed mid-sweep.
     const insertResult = compactContract
       ? (isLimited
         ? time("cacheInsert", () => setLimitedTargetCacheEntry(
@@ -541,14 +547,14 @@ export class P14TargetBackgroundScheduler {
             this.currentBaseDesignFingerprint,
             target.key,
             compactContract,
-            { deferPersistence: false },
+            { immediate: true },
           ))
         : time("cacheInsert", () => setTargetCacheEntry(
             this.projectId,
             this.currentBaseDesignFingerprint,
             target.key,
             compactContract,
-            { deferPersistence: false },
+            { immediate: true },
           )))
       : false;
 

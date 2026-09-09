@@ -16,6 +16,7 @@ import { isAuthoritativeBassContract } from "./completedBassResultPersistence";
 import { hasGraphPayload } from "./finishedGraphAdapter";
 import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
+import { safeConsole } from "@/components/utils/safeConsole";
 
 const cacheByProject = new Map();
 const listeners = new Set();
@@ -23,6 +24,9 @@ const writeQueues = new Map();
 const persistedSignatures = new Map();
 const persistenceTimers = new Map();
 const dirtyProjects = new Set();
+// Tracks the last persistence failure per project so callers/diagnostics can
+// detect that a completed target is NOT durably saved. Cleared on successful write.
+const persistenceFailures = new Map();
 const TARGET_CACHE_WRITE_DEBOUNCE_MS = 2000;
 let cacheRevision = 0;
 
@@ -70,7 +74,7 @@ export function getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey)
  * achieved. It is stored separately from authoritative contracts and does
  * NOT pass the authoritative cache gate.
  */
-export function setLimitedTargetCacheEntry(projectId, baseDesignFingerprint, targetKey, limitedContract, { deferPersistence = false } = {}) {
+export function setLimitedTargetCacheEntry(projectId, baseDesignFingerprint, targetKey, limitedContract, { deferPersistence = false, immediate = false } = {}) {
   if (!baseDesignFingerprint || !targetKey || !limitedContract) return false;
   if (!isValidLimitedP14Contract(limitedContract)) return false;
   const cache = ensureCache(projectId);
@@ -83,7 +87,7 @@ export function setLimitedTargetCacheEntry(projectId, baseDesignFingerprint, tar
   // Mark the entry so isLimitedP14Entry can identify it without re-validating
   cache.targets[targetKey] = { ...limitedContract, __p14Limited: true };
   notify();
-  scheduleSync(projectId, { deferPersistence });
+  scheduleSync(projectId, { deferPersistence, immediate });
   return true;
 }
 
@@ -130,7 +134,7 @@ export function getTargetCacheProgress(projectId, baseDesignFingerprint, allTarg
 /**
  * Store a compact contract for a target. Resets the cache if the design changed.
  */
-export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey, compactContract, { deferPersistence = false } = {}) {
+export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey, compactContract, { deferPersistence = false, immediate = false } = {}) {
   if (!baseDesignFingerprint || !targetKey || !compactContract) return false;
   if (!isAuthoritativeBassContract(compactContract)) return false;
   // Stage 3: reject contracts without the required finished graph payload.
@@ -147,7 +151,7 @@ export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey,
   }
   cache.targets[targetKey] = compactContract;
   notify();
-  scheduleSync(projectId, { deferPersistence });
+  scheduleSync(projectId, { deferPersistence, immediate });
   return true;
 }
 
@@ -194,7 +198,21 @@ export async function hydrateTargetCache(projectId) {
   }
 }
 
-function scheduleSync(projectId, { deferPersistence = false } = {}) {
+/**
+ * Schedule a persistence write for the target cache.
+ *
+ * Options:
+ *   deferPersistence — mark dirty but do NOT schedule a write (non-terminal
+ *     mutations; a later terminal mutation or explicit flush will persist).
+ *   immediate — bypass the 2-second debounce and write NOW. Used for target
+ *     completion so each verified target is durable before the user can close
+ *     the page. The write is fire-and-forget (errors are logged in flush);
+ *     callers that need to await may call flushTargetCachePersistence directly.
+ *
+ * The debounce remains for non-terminal cache mutations (e.g. design-clear)
+ * where coalescing is safe and no completed target is at risk of being lost.
+ */
+function scheduleSync(projectId, { deferPersistence = false, immediate = false } = {}) {
   const key = projectKey(projectId);
   if (key === "free") return;
   dirtyProjects.add(key);
@@ -202,6 +220,13 @@ function scheduleSync(projectId, { deferPersistence = false } = {}) {
   if (previousTimer != null) clearTimeout(previousTimer);
   persistenceTimers.delete(key);
   if (deferPersistence) return;
+  if (immediate) {
+    // Bypass the debounce — write immediately so the completed target is
+    // durable before the user can close the page. Fire-and-forget; errors
+    // are logged inside flushTargetCachePersistence.
+    flushTargetCachePersistence(key).catch(() => { /* already logged */ });
+    return;
+  }
   persistenceTimers.set(key, setTimeout(() => {
     persistenceTimers.delete(key);
     flushTargetCachePersistence(key);
@@ -239,10 +264,20 @@ export function flushTargetCachePersistence(projectId) {
         await base44.entities.ProjectAnalysisCache.create({ project_id: key, ...payload });
       }
       persistedSignatures.set(key, signature);
+      // Write succeeded — clear any previous failure record for this project.
+      persistenceFailures.delete(key);
     } catch (e) {
       // Preserve the dirty marker so the next target, explicit sweep flush, or
-      // navigation cleanup retries the latest in-memory snapshot.
+      // navigation cleanup retries the latest in-memory snapshot. The completed
+      // result remains in memory and available for immediate use — it is NOT
+      // falsely treated as durably saved.
       dirtyProjects.add(key);
+      persistenceFailures.set(key, {
+        error: e?.message || String(e),
+        timestamp: Date.now(),
+        targetCount: Object.keys(snapshot?.targets || {}).length,
+      });
+      safeConsole.warn("p14-cache", `target_cache persistence FAILED for project ${key}: ${e?.message || e}. ${Object.keys(snapshot?.targets || {}).length} target(s) retained in memory; dirty marker set for retry.`);
     }
     if (JSON.stringify(ensureCache(key)) !== persistedSignatures.get(key)) {
       dirtyProjects.add(key);
@@ -250,6 +285,44 @@ export function flushTargetCachePersistence(projectId) {
   });
   writeQueues.set(key, queued);
   return queued;
+}
+
+/**
+ * Returns the last persistence failure for a project, or null if the last
+ * write succeeded. Used by diagnostics to detect that completed targets are
+ * NOT durably saved — do not falsely treat the cache as durable when this
+ * returns non-null.
+ */
+export function getPersistenceFailure(projectId) {
+  const key = projectKey(projectId);
+  return persistenceFailures.get(key) || null;
+}
+
+/**
+ * Returns true when the in-memory cache has unwritten changes (dirty). Used
+ * by diagnostics and tests to verify the dirty/retry state is retained after
+ * a write failure.
+ */
+export function isTargetCacheDirty(projectId) {
+  const key = projectKey(projectId);
+  return dirtyProjects.has(key);
+}
+
+/**
+ * Test-only: reset all in-memory cache state. Simulates a fresh app restart
+ * so durability/hydration tests can verify the DB → memory restore path
+ * without lingering in-memory state from a previous test.
+ */
+export function _resetTargetCacheForTest() {
+  cacheByProject.clear();
+  persistedSignatures.clear();
+  persistenceTimers.forEach((t) => clearTimeout(t));
+  persistenceTimers.clear();
+  dirtyProjects.clear();
+  persistenceFailures.clear();
+  writeQueues.clear();
+  cacheRevision = 0;
+  notify();
 }
 
 // ── React hook for reactive cache reads ──────────────────────────────────

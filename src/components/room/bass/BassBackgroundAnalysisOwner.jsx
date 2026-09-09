@@ -654,7 +654,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
           && isAuthoritativeBassContract(restoredContract)
           && bassContractMatchesRequestedP14(restoredContract, requested)
         ) {
-          setTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey, restoredContract);
+          setTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey, restoredContract, { immediate: true });
         }
       }
       return;
@@ -746,7 +746,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // contain only 7 targets. Gated on canPersistCurrent so only a fully
     // verified current foreground contract enters the family.
     if (published && baseDesignFingerprint && targetKey && canPersistCurrent) {
-      setTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey, completedContract);
+      setTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey, completedContract, { immediate: true });
     }
     // Record contract-published ONLY when publishCompletedBassContract returned
     // true — not when authority is merely marked updating.
