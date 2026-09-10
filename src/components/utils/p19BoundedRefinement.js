@@ -2,455 +2,186 @@
 // ------------------------
 // Bounded post-calibration P19 refinement.
 //
-// The existing deterministic predictor (predictRealisticPostCalibrationCorrection)
-// performs ONE global normalisation (globalTrimDb = median of target − smoothed
-// maximum over the P19 band) followed by pointwise correction/capability clamping.
+// This module searches a bounded neighbourhood of globalTrimDb values around
+// the Pass-1 result. For each candidate, it calls a SHARED candidate evaluator
+// (supplied by canonicalBassOptimiser.js) that:
+//   - runs the SAME correction logic with the candidate globalTrimDb
+//   - rebuilds the product operating envelope from THAT candidate's correction
+//   - builds the post-EQ curve (clamped to capability + product envelope)
+//   - builds per-seat post-EQ curves
+//   - verifies P14 via calculatePairedP14P18ProductionAuthority
+//   - evaluates P18 via assessP18AgainstRequiredExtension + assessP18Extension
+//   - resolves the assessment band with the REAL p14Pass
+//   - evaluates P19 and P20 over the recalculated band
+//   - checks primary-seat safety for ALL primary seats (P19 and P20)
 //
-// This module performs a CHEAP bounded search over a neighbourhood of
-// globalTrimDb values around the Pass-1 result. For each candidate it re-runs
-// the SAME existing correction logic (via predictRealisticPostCalibrationCorrection
-// with globalTrimDbOverride), rebuilds the post-EQ curve, and evaluates the
-// FINAL official P19 over the RECALCULATED assessment band (based on the
-// candidate's own P18).
+// This module does NOT duplicate any cap/envelope/P14/P18/P19/P20 maths.
+// It varies only the search variable (globalTrimDb) and ranks candidates
+// using the comprehensive evaluation returned by the shared evaluator.
 //
-// Hard constraints (all enforced by reusing the existing correction engine):
-//   - P14 output preserved (P14 is from maximumSplCurveAfterEq, independent of globalTrimDb)
-//   - +6 dB maximum boost
-//   - -15 dB maximum cut
-//   - Protected-null rules
-//   - Product/source capability guard
-//
-// Additional refinement-level constraints:
-//   - P18 achieved level not worse than Pass-1
-//   - P18 achieved extension Hz not materially worse than Pass-1
-//   - Primary-seat safety preserved (no prohibited primary-seat P19 regression)
-//
-// This is NOT another acoustic simulation. It operates on already-calculated
-// response/calibration data.
-
-import { predictRealisticPostCalibrationCorrection } from "@/components/utils/realisticPostCalibrationPrediction";
-import { assessP18AgainstRequiredExtension } from "@/components/utils/bassDesignPhilosophyAuthority";
-import { computeOfficialP19Assessment, computeOfficialPerSeatP19Assessment } from "@/components/utils/bassAuthoritativeAssessment";
-import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
-import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
+// Ranking hierarchy:
+//   1. P14 valid
+//   2. P18 not worsened (level not worse, extension Hz not materially worse)
+//   3. Primary-seat safety (no P19 or P20 regression for ANY primary seat)
+//   4. Lowest recalculated official P19
+//   5. P20 / multi-seat behaviour (worst P20 not materially worse)
+//   6. Headroom (p14MarginDb)
+//   7. Smallest departure from Pass-1
 
 const finite = (v) => v !== null && v !== "" && Number.isFinite(Number(v));
 
-// ── Post-EQ curve building (mirrors buildCanonicalCandidate logic) ──
-// These are the SAME cap functions used in canonicalBassOptimiser.js, extracted
-// here so the refinement can rebuild the post-EQ curve for each candidate
-// without touching the acoustic simulator.
+// P18 extension materiality tolerance: a candidate whose extension Hz is
+// higher (worse) than Pass-1 by more than this is rejected.
+const P18_EXTENSION_TOLERANCE_HZ = 1.0;
 
-function interpolateCorrection(curve, frequency) {
-  if (!Array.isArray(curve) || !curve.length) return 0;
-  if (frequency <= curve[0].frequency) return curve[0].spl;
-  if (frequency >= curve.at(-1).frequency) return curve.at(-1).spl;
-  const upperIndex = curve.findIndex((point) => point.frequency >= frequency);
-  const low = curve[upperIndex - 1];
-  const high = curve[upperIndex];
-  const ratio = (frequency - low.frequency) / (high.frequency - low.frequency);
-  return low.spl + (high.spl - low.spl) * ratio;
+// P20 multi-seat materiality tolerance: a candidate whose worst P20 is worse
+// than Pass-1 by more than this is rejected (multi-seat damage guard).
+const P20_MULTI_SEAT_TOLERANCE_DB = 1.0;
+
+// P19 improvement materiality threshold: improvements below this are cosmetic.
+const P19_IMPROVEMENT_THRESHOLD_DB = 0.1;
+
+/**
+ * Check if a candidate is eligible (passes hard constraints relative to Pass-1).
+ */
+function isEligible(evaluation, pass1) {
+  if (!evaluation) return false;
+  // 1. P14 valid
+  if (evaluation.p14Pass !== true) return false;
+  // 2. P18 not worsened
+  const p18Level = finite(evaluation.achievedP18Level) ? Number(evaluation.achievedP18Level) : 0;
+  const pass1P18Level = finite(pass1.achievedP18Level) ? Number(pass1.achievedP18Level) : 0;
+  if (p18Level < pass1P18Level) return false;
+  if (finite(evaluation.achievedP18Hz) && finite(pass1.achievedP18Hz)
+    && evaluation.achievedP18Hz > pass1.achievedP18Hz + P18_EXTENSION_TOLERANCE_HZ) return false;
+  // 3. Primary-seat safety
+  if (evaluation.primarySeatSafety?.regressed === true) return false;
+  return true;
 }
 
-function capCurveToEnvelope(requestedCurve, maximumCurve) {
-  if (!Array.isArray(maximumCurve) || !maximumCurve.length) {
-    return (Array.isArray(requestedCurve) ? requestedCurve : []).map((p) => ({ ...p }));
+/**
+ * Compare two ELIGIBLE candidates using the full ranking hierarchy.
+ * Returns negative if candidateA ranks better, positive if candidateB ranks better.
+ */
+function compareCandidates(a, b, pass1) {
+  // 4. Lowest recalculated official P19
+  if (finite(a.p19Db) && finite(b.p19Db) && Math.abs(a.p19Db - b.p19Db) > 0.01) {
+    return a.p19Db - b.p19Db; // lower is better
   }
-  return (Array.isArray(requestedCurve) ? requestedCurve : []).map((point) => {
-    const maximumSpl = interpolateCorrection(maximumCurve, point.frequency);
-    const requestedSpl = Number(point?.spl);
-    if (!Number.isFinite(requestedSpl) || !Number.isFinite(maximumSpl)) return { ...point };
-    return {
-      ...point,
-      spl: Math.min(requestedSpl, maximumSpl),
-      capabilityLimited: requestedSpl > maximumSpl + 0.05,
-    };
-  });
+
+  // 5. P20 / multi-seat behaviour — worst P20 not materially worse, then lower
+  const aP20 = finite(a.p20Db) ? Number(a.p20Db) : Infinity;
+  const bP20 = finite(b.p20Db) ? Number(b.p20Db) : Infinity;
+  const pass1P20 = finite(pass1.p20Db) ? Number(pass1.p20Db) : Infinity;
+  const aP20Worse = aP20 > pass1P20 + P20_MULTI_SEAT_TOLERANCE_DB;
+  const bP20Worse = bP20 > pass1P20 + P20_MULTI_SEAT_TOLERANCE_DB;
+  if (aP20Worse !== bP20Worse) return aP20Worse ? 1 : -1;
+  if (Math.abs(aP20 - bP20) > 0.01) return aP20 - bP20;
+
+  // 6. Headroom — higher p14MarginDb is better
+  const aHeadroom = finite(a.p14MarginDb) ? Number(a.p14MarginDb) : -Infinity;
+  const bHeadroom = finite(b.p14MarginDb) ? Number(b.p14MarginDb) : -Infinity;
+  if (Math.abs(aHeadroom - bHeadroom) > 0.01) return bHeadroom - aHeadroom;
+
+  // 7. Smallest departure from Pass-1
+  const aDeparture = Math.abs(Number(a.globalTrimDb) - Number(pass1.globalTrimDb));
+  const bDeparture = Math.abs(Number(b.globalTrimDb) - Number(pass1.globalTrimDb));
+  return aDeparture - bDeparture;
 }
 
-function capCurveToProductOperatingEnvelope(requestedCurve, productEnvelope) {
-  if (!Array.isArray(productEnvelope) || !productEnvelope.length) {
-    return (Array.isArray(requestedCurve) ? requestedCurve : []).map((p) => ({ ...p }));
-  }
-  const extensionBandEndHz = Number(productEnvelope.find((p) => finite(p?.extensionBandEndHz))?.extensionBandEndHz);
-  return (Array.isArray(requestedCurve) ? requestedCurve : []).map((point) => {
-    if (!finite(point?.frequency) || !finite(extensionBandEndHz) || point.frequency > extensionBandEndHz) return { ...point };
-    const productLimitSpl = interpolateCorrection(productEnvelope, point.frequency);
-    if (!finite(productLimitSpl) || !finite(point?.spl)) return { ...point };
-    return { ...point, spl: Math.min(point.spl, productLimitSpl) };
-  });
-}
-
-function applyBankToSeats(seats, correction) {
-  return (Array.isArray(seats) ? seats : []).filter((s) => s?.seatId !== "rsp" && Array.isArray(s?.responseData))
-    .map((seat) => ({
-      seatId: seat.seatId,
-      isPrimary: !!seat.isPrimary,
-      responseData: seat.responseData.map((point) => ({
-        frequency: point.frequency,
-        spl: point.spl + interpolateCorrection(correction, point.frequency),
-      })),
-    }));
-}
-
-// ── Candidate evaluation ──
-
-function evaluateCandidate({
-  candidateGlobalTrimDb,
-  maximumSplCurveBeforeEq,
-  predictorTargetCurve,
-  p18TargetCurve,
-  protectedNullRegions,
-  activeSubs,
-  usableLfHz,
-  selectedOperatingOutputDb,
-  productOperatingEnvelopeCurve,
-  perSeatMaximumSplCurves,
-  selectedP14TargetDb,
-  requiredExtensionHz,
-  p18CutoffDb,
-  configuredUsableLfHz,
-  productCurveMinHz,
-  transitionHz,
-  pass1P18ExtensionHz,
-  pass1P18Level,
-}) {
-  // 1. Re-run the SAME correction logic with the candidate globalTrimDb
-  const realisticResult = predictRealisticPostCalibrationCorrection({
-    maximumCapabilityCurve: maximumSplCurveBeforeEq,
-    targetCurve: predictorTargetCurve,
-    assessmentStartHz: 20,
-    assessmentEndHz: transitionHz,
-    protectedNullRegions,
-    activeSubs,
-    usableLfHz,
-    requestedSystemOutputDb: selectedOperatingOutputDb,
-    globalTrimDbOverride: candidateGlobalTrimDb,
-  });
-  const correctionCurve = realisticResult.correctionCurve;
-  const globalTrimDb = realisticResult.globalTrimDb;
-
-  // 2. Build the post-EQ curve (same cap logic as buildCanonicalCandidate)
-  const operatingPreEqCurve = maximumSplCurveBeforeEq.map((point) => ({
-    frequency: point.frequency,
-    spl: finite(point.spl) ? point.spl + globalTrimDb : point.spl,
-  }));
-  const unconstrainedPostEqCurve = operatingPreEqCurve.map((point) => ({
-    frequency: point.frequency,
-    spl: point.spl + interpolateCorrection(correctionCurve, point.frequency),
-  }));
-  const maximumClampedPostEqCurve = capCurveToEnvelope(unconstrainedPostEqCurve, maximumSplCurveBeforeEq);
-  const finalPostEqCurve = capCurveToProductOperatingEnvelope(maximumClampedPostEqCurve, productOperatingEnvelopeCurve);
-
-  // 3. Build per-seat post-EQ curves (same logic as buildCanonicalCandidate)
-  const perSeatPostEqCurves = applyBankToSeats(perSeatMaximumSplCurves, correctionCurve)
-    .map((seat) => ({
-      ...seat,
-      responseData: seat.responseData.map((point) => ({
-        ...point,
-        spl: finite(point.spl) ? point.spl + globalTrimDb : point.spl,
-      })),
-    }))
-    .map((seat) => {
-      const maxSpl = perSeatMaximumSplCurves.find((s) => s?.seatId === seat.seatId);
-      const capabilityClamped = maxSpl
-        ? capCurveToEnvelope(seat.responseData, maxSpl.responseData)
-        : seat.responseData;
-      return {
-        ...seat,
-        responseData: capCurveToProductOperatingEnvelope(capabilityClamped, productOperatingEnvelopeCurve),
-      };
-    });
-
-  // 4. Evaluate P18 from the post-EQ curve
-  const p18Assessment = assessP18AgainstRequiredExtension({
-    rspPostEqCurve: finalPostEqCurve,
-    canonicalTargetCurve: p18TargetCurve,
-    perSeatPostEqCurves,
-    selectedP14TargetDb,
-    requiredExtensionHz,
-    p18CutoffDb,
-    configuredUsableLfHz,
-    productCurveMinHz,
-  });
-  const achievedP18Hz = p18Assessment?.achievedExtensionHz ?? null;
-  const achievedP18Level = p18Assessment?.level ?? 0;
-
-  // 5. Resolve the RECALCULATED assessment band
-  const assessmentBand = resolveBassAssessmentBand({
-    p14Pass: true, // P14 is preserved (independent of globalTrimDb)
-    achievedP18Hz,
-    transitionHz,
-  });
-
-  // 6. Evaluate P19 over the recalculated band
-  let p19Db = null;
-  let p19Level = null;
-  let p19WorstFrequencyHz = null;
-  if (assessmentBand.valid) {
-    const p19 = computeOfficialP19Assessment({
-      rspPostEqCurve: finalPostEqCurve,
-      canonicalTargetCurve: predictorTargetCurve,
-      assessmentStartHz: assessmentBand.lowerHz,
-      assessmentEndHz: assessmentBand.upperHz,
-    });
-    p19Db = p19?.variationDbRaw ?? null;
-    p19Level = houseCurveP19Level(p19Db);
-    p19WorstFrequencyHz = p19?.worstFrequencyHz ?? null;
-  }
-
-  // 7. Evaluate per-seat P19 (for primary-seat safety)
-  let primarySeatP19Db = null;
-  if (assessmentBand.valid && perSeatPostEqCurves.length > 0) {
-    const perSeatP19 = computeOfficialPerSeatP19Assessment({
-      perSeatPostEqCurves,
-      canonicalTargetCurve: predictorTargetCurve,
-      assessmentStartHz: assessmentBand.lowerHz,
-      assessmentEndHz: assessmentBand.upperHz,
-    });
-    const primarySeat = perSeatP19.find((s) => s.isPrimary) || perSeatP19[0];
-    primarySeatP19Db = primarySeat?.variationDbRaw ?? null;
-  }
-
-  // 8. Check boost/cut limits
-  const maxBoost = Math.max(0, ...correctionCurve.map((p) => Number(p.spl) || 0));
-  const maxCut = Math.min(0, ...correctionCurve.map((p) => Number(p.spl) || 0));
-
-  return {
-    candidateGlobalTrimDb,
-    correctionCurve,
-    globalTrimDb,
-    finalPostEqCurve,
-    perSeatPostEqCurves,
-    achievedP18Hz,
-    achievedP18Level,
-    p19Db,
-    p19Level,
-    p19WorstFrequencyHz,
-    primarySeatP19Db,
-    assessmentBand,
-    maxBoostDb: maxBoost,
-    maxCutDb: maxCut,
-  };
-}
-
-// ── Constraint validation ──
-
-const P18_EXTENSION_TOLERANCE_HZ = 1.0; // Materiality tolerance for P18 extension
-
-function validateCandidate(candidate, pass1) {
-  const violations = [];
-
-  // P18 level not worse
-  if (candidate.achievedP18Level < pass1.achievedP18Level) {
-    violations.push("p18-level-worse");
-  }
-
-  // P18 extension not materially worse
-  if (finite(pass1.achievedP18Hz) && finite(candidate.achievedP18Hz)) {
-    if (candidate.achievedP18Hz > pass1.achievedP18Hz + P18_EXTENSION_TOLERANCE_HZ) {
-      violations.push("p18-extension-worse");
-    }
-  }
-
-  // Primary-seat safety: no prohibited regression
-  if (finite(pass1.primarySeatP19Db) && finite(candidate.primarySeatP19Db)) {
-    if (candidate.primarySeatP19Db > pass1.primarySeatP19Db + 0.5) {
-      violations.push("primary-seat-regression");
-    }
-  }
-
-  return { valid: violations.length === 0, violations };
-}
-
-// ── Main refinement function ──
-
+/**
+ * Bounded P19 refinement over globalTrimDb.
+ *
+ * @param {object} params
+ * @param {function} params.evaluateCandidate - callback(globalTrimDb) => evaluation object
+ * @param {number} params.pass1GlobalTrimDb - Pass-1 auto-derived global trim
+ * @param {object} params.pass1Evaluation - evaluation object from Pass-1 (via same evaluator)
+ * @returns {object} refinement result with diagnostics
+ */
 export function refineP19GlobalNormalisation({
-  maximumSplCurveBeforeEq,
-  predictorTargetCurve,
-  p18TargetCurve,
-  protectedNullRegions = [],
-  activeSubs = [],
-  usableLfHz = null,
-  selectedOperatingOutputDb = null,
-  productOperatingEnvelopeCurve = [],
-  perSeatMaximumSplCurves = [],
-  selectedP14TargetDb = null,
-  requiredExtensionHz = 20,
-  p18CutoffDb = null,
-  configuredUsableLfHz = null,
-  productCurveMinHz = null,
-  transitionHz = 120,
-  pass1GlobalTrimDb = 0,
-  pass1CorrectionCurve = [],
-  pass1FinalPostEqCurve = [],
-  pass1AchievedP18Hz = null,
-  pass1AchievedP18Level = 0,
-  pass1P19Db = null,
-  pass1PrimarySeatP19Db = null,
+  evaluateCandidate,
+  pass1GlobalTrimDb,
+  pass1Evaluation,
 }) {
   const nowMs = () => typeof performance !== "undefined" ? performance.now() : Date.now();
   const startedAt = nowMs();
 
-  if (!Array.isArray(maximumSplCurveBeforeEq) || !maximumSplCurveBeforeEq.length) {
-    return { refinementAttempted: false, reason: "no-maximum-capability-curve" };
+  if (typeof evaluateCandidate !== "function" || !pass1Evaluation) {
+    return { refinementAttempted: false, reason: "missing-evaluator-or-pass1" };
   }
 
-  // ── Evaluate Pass-1 for baseline ──
-  const pass1Candidate = evaluateCandidate({
-    candidateGlobalTrimDb: pass1GlobalTrimDb,
-    maximumSplCurveBeforeEq,
-    predictorTargetCurve,
-    p18TargetCurve,
-    protectedNullRegions,
-    activeSubs,
-    usableLfHz,
-    selectedOperatingOutputDb,
-    productOperatingEnvelopeCurve,
-    perSeatMaximumSplCurves,
-    selectedP14TargetDb,
-    requiredExtensionHz,
-    p18CutoffDb,
-    configuredUsableLfHz,
-    productCurveMinHz,
-    transitionHz,
-    pass1P18ExtensionHz: pass1AchievedP18Hz,
-    pass1P18Level: pass1AchievedP18Level,
-  });
-
-  const pass1P19 = finite(pass1P19Db) ? pass1P19Db : pass1Candidate.p19Db;
-  const pass1P18Hz = finite(pass1AchievedP18Hz) ? pass1AchievedP18Hz : pass1Candidate.achievedP18Hz;
-  const pass1P18Lvl = pass1AchievedP18Level || pass1Candidate.achievedP18Level;
-  const pass1PrimP19 = finite(pass1PrimarySeatP19Db) ? pass1PrimarySeatP19Db : pass1Candidate.primarySeatP19Db;
+  const pass1 = pass1Evaluation;
+  const pass1P19 = finite(pass1.p19Db) ? Number(pass1.p19Db) : null;
 
   // ── Derive bounded search range ──
-  // The globalTrimDb is ≤ 0. Search a small neighbourhood around Pass-1.
-  // Upper bound: 0 (can't be positive). Lower bound: pass1 - 6 dB (deliberately small).
   const searchUpper = 0;
   const searchLower = Math.max(-12, pass1GlobalTrimDb - 6);
-  const coarseStep = 1.0; // 1 dB coarse steps
+  const coarseStep = 1.0;
 
-  // Coarse candidates
+  // ── Coarse search ──
+  const coarseStart = nowMs();
   const coarseCandidates = [];
   for (let trim = searchLower; trim <= searchUpper + 0.001; trim += coarseStep) {
     coarseCandidates.push(Math.round(trim * 1000) / 1000);
   }
-  // Always include Pass-1
-  if (!coarseCandidates.includes(Math.round(pass1GlobalTrimDb * 1000) / 1000)) {
-    coarseCandidates.push(Math.round(pass1GlobalTrimDb * 1000) / 1000);
+  const pass1Rounded = Math.round(pass1GlobalTrimDb * 1000) / 1000;
+  if (!coarseCandidates.includes(pass1Rounded)) {
+    coarseCandidates.push(pass1Rounded);
   }
 
-  const coarseStart = nowMs();
-  const coarseResults = [];
+  const coarseEvaluations = [];
   for (const trim of coarseCandidates) {
-    const candidate = evaluateCandidate({
-      candidateGlobalTrimDb: trim,
-      maximumSplCurveBeforeEq,
-      predictorTargetCurve,
-      p18TargetCurve,
-      protectedNullRegions,
-      activeSubs,
-      usableLfHz,
-      selectedOperatingOutputDb,
-      productOperatingEnvelopeCurve,
-      perSeatMaximumSplCurves,
-      selectedP14TargetDb,
-      requiredExtensionHz,
-      p18CutoffDb,
-      configuredUsableLfHz,
-      productCurveMinHz,
-      transitionHz,
-      pass1P18ExtensionHz: pass1P18Hz,
-      pass1P18Level: pass1P18Lvl,
-    });
-    const validation = validateCandidate(candidate, {
-      achievedP18Level: pass1P18Lvl,
-      achievedP18Hz: pass1P18Hz,
-      primarySeatP19Db: pass1PrimP19,
-    });
-    coarseResults.push({ candidate, validation });
+    const evaluation = evaluateCandidate(trim);
+    if (evaluation) coarseEvaluations.push(evaluation);
   }
   const coarseTimeMs = nowMs() - coarseStart;
 
-  // Find best coarse candidate (lowest P19, subject to constraints)
-  const validCoarse = coarseResults.filter((r) => r.validation.valid && finite(r.candidate.p19Db));
+  // Find best eligible coarse candidate
   let bestCoarse = null;
-  if (validCoarse.length > 0) {
-    bestCoarse = validCoarse.reduce((best, entry) => {
-      if (!best || entry.candidate.p19Db < best.candidate.p19Db - 0.01) return entry;
-      // Tie-breaking: prefer smaller departure from Pass-1
-      if (best && Math.abs(entry.candidate.globalTrimDb - pass1GlobalTrimDb) < Math.abs(best.candidate.globalTrimDb - pass1GlobalTrimDb)) {
-        return entry;
-      }
-      return best;
-    }, null);
+  for (const evaluation of coarseEvaluations) {
+    if (!isEligible(evaluation, pass1)) continue;
+    if (!bestCoarse || compareCandidates(evaluation, bestCoarse, pass1) < 0) {
+      bestCoarse = evaluation;
+    }
   }
 
   // ── Fine search around best coarse candidate ──
   const fineStart = nowMs();
   let bestFine = bestCoarse;
   if (bestCoarse) {
-    const fineCentre = bestCoarse.candidate.globalTrimDb;
-    const fineRange = 1.5; // ±1.5 dB
-    const fineStep = 0.25; // 0.25 dB fine steps
+    const fineCentre = Number(bestCoarse.globalTrimDb);
+    const fineRange = 1.5;
+    const fineStep = 0.25;
     for (let trim = fineCentre - fineRange; trim <= fineCentre + fineRange + 0.001; trim += fineStep) {
       const rounded = Math.round(trim * 1000) / 1000;
       if (rounded > searchUpper + 0.001 || rounded < searchLower - 0.001) continue;
-      if (rounded === Math.round(fineCentre * 1000) / 1000) continue; // Already evaluated
-      const candidate = evaluateCandidate({
-        candidateGlobalTrimDb: rounded,
-        maximumSplCurveBeforeEq,
-        predictorTargetCurve,
-        p18TargetCurve,
-        protectedNullRegions,
-        activeSubs,
-        usableLfHz,
-        selectedOperatingOutputDb,
-        productOperatingEnvelopeCurve,
-        perSeatMaximumSplCurves,
-        selectedP14TargetDb,
-        requiredExtensionHz,
-        p18CutoffDb,
-        configuredUsableLfHz,
-        productCurveMinHz,
-        transitionHz,
-        pass1P18ExtensionHz: pass1P18Hz,
-        pass1P18Level: pass1P18Lvl,
-      });
-      const validation = validateCandidate(candidate, {
-        achievedP18Level: pass1P18Lvl,
-        achievedP18Hz: pass1P18Hz,
-        primarySeatP19Db: pass1PrimP19,
-      });
-      if (validation.valid && finite(candidate.p19Db)) {
-        if (!bestFine || candidate.p19Db < bestFine.candidate.p19Db - 0.05) {
-          bestFine = { candidate, validation };
-        }
+      if (rounded === Math.round(fineCentre * 1000) / 1000) continue;
+      const evaluation = evaluateCandidate(rounded);
+      if (!evaluation || !isEligible(evaluation, pass1)) continue;
+      if (!bestFine || compareCandidates(evaluation, bestFine, pass1) < 0) {
+        bestFine = evaluation;
       }
     }
   }
   const fineTimeMs = nowMs() - fineStart;
 
-  const totalCandidates = coarseCandidates.length + (bestCoarse ? Math.ceil(3.0 / 0.25) : 0);
+  const fineCandidatesTested = bestCoarse ? Math.ceil(3.0 / 0.25) : 0;
+  const totalCandidates = coarseCandidates.length + fineCandidatesTested;
   const totalTimeMs = nowMs() - startedAt;
 
   // ── Select winner ──
-  const pass1P19Value = finite(pass1P19) ? pass1P19 : pass1Candidate.p19Db;
-  const refinedP19 = bestFine?.candidate?.p19Db ?? pass1P19Value;
-  const improvementDb = finite(pass1P19Value) && finite(refinedP19) ? pass1P19Value - refinedP19 : 0;
-
-  // Determine if refinement found a materially better result
-  const MATERIALITY_THRESHOLD_DB = 0.1;
-  const refinementImproved = bestFine && improvementDb > MATERIALITY_THRESHOLD_DB;
+  const refinedP19 = bestFine ? Number(bestFine.p19Db) : pass1P19;
+  const improvementDb = finite(pass1P19) && finite(refinedP19) ? pass1P19 - refinedP19 : 0;
+  const refinementImproved = bestFine && improvementDb > P19_IMPROVEMENT_THRESHOLD_DB;
 
   // ── Binding constraint diagnostics ──
   let bindingConstraint = null;
   if (refinementImproved && bestFine) {
-    const c = bestFine.candidate;
-    if (c.maxBoostDb >= 5.95) bindingConstraint = "boost-limit";
-    else if (c.maxCutDb <= -14.95) bindingConstraint = "cut-limit";
+    const c = bestFine;
+    if (finite(c.maxBoostDb) && c.maxBoostDb >= 5.95) bindingConstraint = "boost-limit";
+    else if (finite(c.maxCutDb) && c.maxCutDb <= -14.95) bindingConstraint = "cut-limit";
     else if (!c.assessmentBand?.valid) bindingConstraint = "assessment-band-invalid";
-    else bindingConstraint = "current-model-capability-limit";
+    else bindingConstraint = "CURRENT MODEL CAPABILITY LIMIT";
   } else if (!bestFine) {
     bindingConstraint = "no-valid-candidate-found";
   } else {
@@ -460,30 +191,42 @@ export function refineP19GlobalNormalisation({
   return {
     refinementAttempted: true,
     refinementImproved,
-    pass1P19Db: finite(pass1P19Value) ? Number(pass1P19Value) : null,
+    pass1GlobalTrimDb: Number(pass1GlobalTrimDb),
+    refinedGlobalTrimDb: refinementImproved ? Number(bestFine.globalTrimDb) : Number(pass1GlobalTrimDb),
+    pass1P19Db: finite(pass1P19) ? Number(pass1P19) : null,
     refinedP19Db: finite(refinedP19) ? Number(refinedP19) : null,
     improvementDb: Number(improvementDb) || 0,
-    pass1GlobalTrimDb: Number(pass1GlobalTrimDb),
-    refinedGlobalTrimDb: refinementImproved ? Number(bestFine.candidate.globalTrimDb) : Number(pass1GlobalTrimDb),
-    refinedCorrectionCurve: refinementImproved ? bestFine.candidate.correctionCurve : pass1CorrectionCurve,
-    refinedFinalPostEqCurve: refinementImproved ? bestFine.candidate.finalPostEqCurve : pass1FinalPostEqCurve,
-    refinedPerSeatPostEqCurves: refinementImproved ? bestFine.candidate.perSeatPostEqCurves : null,
-    refinedP18Hz: refinementImproved ? bestFine.candidate.achievedP18Hz : pass1P18Hz,
-    refinedP18Level: refinementImproved ? bestFine.candidate.achievedP18Level : pass1P18Lvl,
-    selectedP14Db: finite(selectedP14TargetDb) ? Number(selectedP14TargetDb) : null,
-    pass1P18Hz: finite(pass1P18Hz) ? Number(pass1P18Hz) : null,
-    refinedAssessmentBand: refinementImproved ? bestFine.candidate.assessmentBand : pass1Candidate.assessmentBand,
-    pass1AssessmentBand: pass1Candidate.assessmentBand,
-    maxBoostDb: refinementImproved ? bestFine.candidate.maxBoostDb : pass1Candidate.maxBoostDb,
-    maxCutDb: refinementImproved ? bestFine.candidate.maxCutDb : pass1Candidate.maxCutDb,
+    pass1P18Hz: finite(pass1.achievedP18Hz) ? Number(pass1.achievedP18Hz) : null,
+    refinedP18Hz: refinementImproved && finite(bestFine.achievedP18Hz) ? Number(bestFine.achievedP18Hz) : (finite(pass1.achievedP18Hz) ? Number(pass1.achievedP18Hz) : null),
+    pass1P18Level: finite(pass1.achievedP18Level) ? Number(pass1.achievedP18Level) : 0,
+    refinedP18Level: refinementImproved && finite(bestFine.achievedP18Level) ? Number(bestFine.achievedP18Level) : (finite(pass1.achievedP18Level) ? Number(pass1.achievedP18Level) : 0),
+    pass1P14Pass: pass1.p14Pass === true,
+    refinedP14Pass: refinementImproved ? bestFine.p14Pass === true : pass1.p14Pass === true,
+    pass1P14MarginDb: finite(pass1.p14MarginDb) ? Number(pass1.p14MarginDb) : null,
+    refinedP14MarginDb: refinementImproved && finite(bestFine.p14MarginDb) ? Number(bestFine.p14MarginDb) : (finite(pass1.p14MarginDb) ? Number(pass1.p14MarginDb) : null),
+    pass1P20Db: finite(pass1.p20Db) ? Number(pass1.p20Db) : null,
+    refinedP20Db: refinementImproved && finite(bestFine.p20Db) ? Number(bestFine.p20Db) : (finite(pass1.p20Db) ? Number(pass1.p20Db) : null),
+    pass1AssessmentBand: pass1.assessmentBand || null,
+    refinedAssessmentBand: refinementImproved ? bestFine.assessmentBand : pass1.assessmentBand || null,
+    maxBoostDb: refinementImproved ? bestFine.maxBoostDb : pass1.maxBoostDb,
+    maxCutDb: refinementImproved ? bestFine.maxCutDb : pass1.maxCutDb,
     bindingConstraint,
     candidatesTested: totalCandidates,
     coarseCandidatesTested: coarseCandidates.length,
-    fineCandidatesTested: bestCoarse ? Math.ceil(3.0 / 0.25) : 0,
+    fineCandidatesTested,
     coarseRefinementTimeMs: coarseTimeMs,
     fineRefinementTimeMs: fineTimeMs,
     totalAddedLatencyMs: totalTimeMs,
-    primarySeatP19Db: refinementImproved ? bestFine.candidate.primarySeatP19Db : pass1PrimP19,
-    pass1PrimarySeatP19Db: finite(pass1PrimP19) ? Number(pass1PrimP19) : null,
+    // Refined response curves (for updating the candidate)
+    refinedCorrectionCurve: refinementImproved ? bestFine.correctionCurve : null,
+    refinedFinalPostEqCurve: refinementImproved ? bestFine.finalPostEqCurve : null,
+    refinedOperatingPreEqCurve: refinementImproved ? bestFine.operatingPreEqCurve : null,
+    refinedAchievedPreEqCurve: refinementImproved ? bestFine.achievedPreEqCurve : null,
+    refinedUnconstrainedPostEqCurve: refinementImproved ? bestFine.unconstrainedPostEqCurve : null,
+    refinedPerSeatPostEqCurves: refinementImproved ? bestFine.perSeatPostEqCurves : null,
+    refinedProductOperatingEnvelope: refinementImproved ? bestFine.productOperatingEnvelope : null,
+    // Full evaluations for diagnostics
+    pass1Evaluation,
+    refinedEvaluation: refinementImproved ? bestFine : null,
   };
 }

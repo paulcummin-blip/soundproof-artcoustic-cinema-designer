@@ -24,6 +24,15 @@ import { predictRealisticPostCalibrationCorrection } from "@/components/utils/re
 import { buildPracticalCalibrationTargetFromCapability } from "@/components/utils/practicalCalibrationTarget";
 import { refineP19GlobalNormalisation } from "@/components/utils/p19BoundedRefinement";
 import { getProductCurveFrequencyRange } from "@/components/models/speakers/registry";
+import { assessP18AgainstRequiredExtension } from "@/components/utils/bassDesignPhilosophyAuthority";
+import { assessP18Extension, p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
+import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
+import {
+  computeOfficialP19Assessment,
+  computeOfficialPerSeatP19Assessment,
+  computeOfficialP20Assessment,
+} from "@/components/utils/bassAuthoritativeAssessment";
+import { hasPrimarySeatRegression } from "@/components/room/bass/improveBassV2/materialityGate";
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
 const PRODUCT_EXTENSION_REFERENCE_TOLERANCE_DB = 1.5;
@@ -406,7 +415,7 @@ function buildCanonicalCandidate({
   verticalOffsetDb, protectedNullRegions, baseRequestedSystemOutputDb,
   operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb,
   operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis, usableLfHz,
-  practicalCalibrationTarget,
+  practicalCalibrationTarget, p18RequiredExtensionHz, p18TargetBasis,
 }) {
   const requestedPreEqCurve = (levelNormalisedRawCurve || []).map((point) => ({ ...point }));
   // The realistic post-calibration predictor works from the Product + room
