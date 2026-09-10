@@ -303,6 +303,7 @@ export function refineP19GlobalNormalisation({
     refinedFinalOperatingOutputDb: refinementImproved && finite(bestFine.finalOperatingOutputDb) ? Number(bestFine.finalOperatingOutputDb) : (finite(pass1.finalOperatingOutputDb) ? Number(pass1.finalOperatingOutputDb) : null),
     refinedOperatingOutputErrorDb: refinementImproved && finite(bestFine.operatingOutputErrorDb) ? Number(bestFine.operatingOutputErrorDb) : (finite(pass1.operatingOutputErrorDb) ? Number(pass1.operatingOutputErrorDb) : null),
     refinedOperatingOutputValid: refinementImproved ? bestFine.operatingOutputValid === true : pass1.operatingOutputValid === true,
+    operatingOutputBandHz: pass1.operatingOutputBandHz || null,
     candidatesTested: totalEvaluationsRun,
     coarseCandidatesTested: coarseEvaluationsRun,
     fineCandidatesTested: fineEvaluationsRun,

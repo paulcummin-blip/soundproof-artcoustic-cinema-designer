@@ -14,7 +14,7 @@ import {
 import { identifyProtectedNullRegions, isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { findAggregatePeakBoostViolations } from "@/components/utils/designEqPhysicsAuthority";
 import { normaliseHouseCurveToP14Total, integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
-import { assessP14Capability } from "@/components/utils/p14CapabilityAuthority";
+import { assessP14Capability, P14_EQ_ASSESSMENT_RANGE_HZ } from "@/components/utils/p14CapabilityAuthority";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getCurrentSystemSourceOutput, getSystemSourceCapability, getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { salvagePartialBank, buildSalvageEqResult } from "@/components/utils/designEqPartialBankSalvage";
@@ -608,10 +608,22 @@ function buildCanonicalCandidate({
     // (e.g. 112 dBC) within a tight tolerance. This is a separate hard gate
     // from P14 capability — both must pass. CAPABILITY PASS does NOT imply
     // OPERATING LEVEL PASS.
+    //
+    // P14 OUTPUT BAND IS DECOUPLED FROM P18 EXTENSION.
+    // The P14 operating-output integration uses the established P14 LFE
+    // assessment band (20–120 Hz, P14_EQ_ASSESSMENT_RANGE_HZ) — NOT the P18
+    // required extension. The P18 requirement (e.g. 30 Hz for Yarm) is a
+    // design requirement for low-frequency extension; it must never change
+    // how the P14 operating output itself is integrated. These are separate
+    // concepts: P14 = fixed LFE output band; P18 = achieved -3 dB extension.
+    const operatingOutputBandHz = {
+      lowerHz: P14_EQ_ASSESSMENT_RANGE_HZ.lowerHz,
+      upperHz: P14_EQ_ASSESSMENT_RANGE_HZ.upperHz,
+    };
     const finalOperatingOutputDb = integrateRawResponseLevelDbC({
       rawCurve: finalPost,
-      lowerHz: resolvedP18RequiredExtensionHz,
-      upperHz: 120,
+      lowerHz: operatingOutputBandHz.lowerHz,
+      upperHz: operatingOutputBandHz.upperHz,
     });
     const operatingOutputErrorDb = (finalOperatingOutputDb !== null && Number.isFinite(selectedOperatingOutputDb))
       ? finalOperatingOutputDb - selectedOperatingOutputDb
@@ -638,6 +650,7 @@ function buildCanonicalCandidate({
       p20Available, p20Db, p20Level, perSeatP20,
       maxBoostDb, maxCutDb, physicalEqAuthorityPassed, physicalAuthorityViolations,
       selectedOperatingOutputDb, finalOperatingOutputDb, operatingOutputErrorDb, operatingOutputValid,
+      operatingOutputBandHz,
       primarySeatSafety: null,
     };
   };
