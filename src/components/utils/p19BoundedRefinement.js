@@ -19,14 +19,19 @@
 // It varies only the search variable (globalTrimDb) and ranks candidates
 // using the comprehensive evaluation returned by the shared evaluator.
 //
-// Ranking hierarchy:
-//   1. P14 valid
-//   2. P18 not worsened (level not worse, extension Hz not materially worse)
-//   3. Primary-seat safety (no P19 or P20 regression for ANY primary seat)
-//   4. Lowest recalculated official P19
-//   5. P20 / multi-seat behaviour (worst P20 not materially worse)
-//   6. Headroom (p14MarginDb)
-//   7. Smallest departure from Pass-1
+// Eligibility gates (all hard, fail closed):
+//   1. P14 valid (p14Pass === true)
+//   2. Physical authority (physicalEqAuthorityPassed === true)
+//   2b. Boost ≤ +6 dB + tolerance, cut ≥ −15 dB − tolerance
+//   3. P18 not worsened (level not worse, extension Hz not materially worse)
+//   4. Primary-seat safety (no P19 or P20 regression for ANY primary seat)
+//   5. P20 multi-seat damage guard (worst P20 not > Pass-1 + 1.0 dB)
+//
+// Ranking hierarchy (among ELIGIBLE candidates):
+//   1. Lowest recalculated official P19
+//   2. P20 / multi-seat behaviour (worst P20 lower is better)
+//   3. Headroom (p14MarginDb)
+//   4. Smallest departure from Pass-1
 
 const finite = (v) => v !== null && v !== "" && Number.isFinite(Number(v));
 
@@ -41,21 +46,40 @@ const P20_MULTI_SEAT_TOLERANCE_DB = 1.0;
 // P19 improvement materiality threshold: improvements below this are cosmetic.
 const P19_IMPROVEMENT_THRESHOLD_DB = 0.1;
 
+// Hard physical limits (fail closed with tiny numeric tolerance).
+const MAX_BOOST_LIMIT_DB = 6.0;
+const MAX_BOOST_TOLERANCE_DB = 0.05;
+const MAX_CUT_LIMIT_DB = -15.0;
+const MAX_CUT_TOLERANCE_DB = 0.05;
+
 /**
  * Check if a candidate is eligible (passes hard constraints relative to Pass-1).
+ * Physical authority, boost/cut limits, and P20 damage are ALL eligibility
+ * gates — not just diagnostics.
  */
 function isEligible(evaluation, pass1) {
   if (!evaluation) return false;
   // 1. P14 valid
   if (evaluation.p14Pass !== true) return false;
-  // 2. P18 not worsened
+  // 2. Physical authority (protected-null + peak-boost violations)
+  if (evaluation.physicalEqAuthorityPassed !== true) return false;
+  // 2b. Hard boost/cut limits (fail closed)
+  if (finite(evaluation.maxBoostDb) && Number(evaluation.maxBoostDb) > MAX_BOOST_LIMIT_DB + MAX_BOOST_TOLERANCE_DB) return false;
+  if (finite(evaluation.maxCutDb) && Number(evaluation.maxCutDb) < MAX_CUT_LIMIT_DB - MAX_CUT_TOLERANCE_DB) return false;
+  // 3. P18 not worsened
   const p18Level = finite(evaluation.achievedP18Level) ? Number(evaluation.achievedP18Level) : 0;
   const pass1P18Level = finite(pass1.achievedP18Level) ? Number(pass1.achievedP18Level) : 0;
   if (p18Level < pass1P18Level) return false;
   if (finite(evaluation.achievedP18Hz) && finite(pass1.achievedP18Hz)
-    && evaluation.achievedP18Hz > pass1.achievedP18Hz + P18_EXTENSION_TOLERANCE_HZ) return false;
-  // 3. Primary-seat safety
+    && Number(evaluation.achievedP18Hz) > Number(pass1.achievedP18Hz) + P18_EXTENSION_TOLERANCE_HZ) return false;
+  // 4. Primary-seat safety (all primary seats, P19 + P20)
   if (evaluation.primarySeatSafety?.regressed === true) return false;
+  // 5. P20 multi-seat damage guard — eligibility, not just tiebreaker.
+  // If Pass-1 P20 is valid AND candidate P20 is valid AND candidate worst P20
+  // exceeds Pass-1 by more than the tolerance, the candidate is ineligible.
+  if (pass1.p20Available === true && evaluation.p20Available === true
+    && finite(pass1.p20Db) && finite(evaluation.p20Db)
+    && Number(evaluation.p20Db) > Number(pass1.p20Db) + P20_MULTI_SEAT_TOLERANCE_DB) return false;
   return true;
 }
 
@@ -64,26 +88,22 @@ function isEligible(evaluation, pass1) {
  * Returns negative if candidateA ranks better, positive if candidateB ranks better.
  */
 function compareCandidates(a, b, pass1) {
-  // 4. Lowest recalculated official P19
+  // 1. Lowest recalculated official P19
   if (finite(a.p19Db) && finite(b.p19Db) && Math.abs(a.p19Db - b.p19Db) > 0.01) {
     return a.p19Db - b.p19Db; // lower is better
   }
 
-  // 5. P20 / multi-seat behaviour — worst P20 not materially worse, then lower
+  // 2. P20 / multi-seat behaviour — lower worst P20 is better
   const aP20 = finite(a.p20Db) ? Number(a.p20Db) : Infinity;
   const bP20 = finite(b.p20Db) ? Number(b.p20Db) : Infinity;
-  const pass1P20 = finite(pass1.p20Db) ? Number(pass1.p20Db) : Infinity;
-  const aP20Worse = aP20 > pass1P20 + P20_MULTI_SEAT_TOLERANCE_DB;
-  const bP20Worse = bP20 > pass1P20 + P20_MULTI_SEAT_TOLERANCE_DB;
-  if (aP20Worse !== bP20Worse) return aP20Worse ? 1 : -1;
   if (Math.abs(aP20 - bP20) > 0.01) return aP20 - bP20;
 
-  // 6. Headroom — higher p14MarginDb is better
+  // 3. Headroom — higher p14MarginDb is better
   const aHeadroom = finite(a.p14MarginDb) ? Number(a.p14MarginDb) : -Infinity;
   const bHeadroom = finite(b.p14MarginDb) ? Number(b.p14MarginDb) : -Infinity;
   if (Math.abs(aHeadroom - bHeadroom) > 0.01) return bHeadroom - aHeadroom;
 
-  // 7. Smallest departure from Pass-1
+  // 4. Smallest departure from Pass-1
   const aDeparture = Math.abs(Number(a.globalTrimDb) - Number(pass1.globalTrimDb));
   const bDeparture = Math.abs(Number(b.globalTrimDb) - Number(pass1.globalTrimDb));
   return aDeparture - bDeparture;
@@ -110,6 +130,46 @@ export function refineP19GlobalNormalisation({
     return { refinementAttempted: false, reason: "missing-evaluator-or-pass1" };
   }
 
+  // ── Pass-1 validity check ──
+  // Pass 1 must have valid P14 AND physical authority to serve as
+  // an optimisation baseline. If it doesn't, refinement must NOT
+  // manufacture a refined authority from an invalid baseline.
+  if (pass1Evaluation.p14Pass !== true || pass1Evaluation.physicalEqAuthorityPassed !== true) {
+    return {
+      refinementAttempted: true,
+      refinementImproved: false,
+      reason: "pass1-invalid-for-refinement",
+      pass1P14Pass: pass1Evaluation.p14Pass === true,
+      pass1PhysicalEqAuthorityPassed: pass1Evaluation.physicalEqAuthorityPassed === true,
+      pass1GlobalTrimDb: Number(pass1GlobalTrimDb),
+      refinedGlobalTrimDb: Number(pass1GlobalTrimDb),
+      pass1P19Db: finite(pass1Evaluation.p19Db) ? Number(pass1Evaluation.p19Db) : null,
+      refinedP19Db: finite(pass1Evaluation.p19Db) ? Number(pass1Evaluation.p19Db) : null,
+      improvementDb: 0,
+      pass1P18Hz: finite(pass1Evaluation.achievedP18Hz) ? Number(pass1Evaluation.achievedP18Hz) : null,
+      refinedP18Hz: finite(pass1Evaluation.achievedP18Hz) ? Number(pass1Evaluation.achievedP18Hz) : null,
+      pass1P18Level: finite(pass1Evaluation.achievedP18Level) ? Number(pass1Evaluation.achievedP18Level) : 0,
+      refinedP18Level: finite(pass1Evaluation.achievedP18Level) ? Number(pass1Evaluation.achievedP18Level) : 0,
+      pass1P14MarginDb: finite(pass1Evaluation.p14MarginDb) ? Number(pass1Evaluation.p14MarginDb) : null,
+      refinedP14MarginDb: finite(pass1Evaluation.p14MarginDb) ? Number(pass1Evaluation.p14MarginDb) : null,
+      pass1P20Db: finite(pass1Evaluation.p20Db) ? Number(pass1Evaluation.p20Db) : null,
+      refinedP20Db: finite(pass1Evaluation.p20Db) ? Number(pass1Evaluation.p20Db) : null,
+      pass1AssessmentBand: pass1Evaluation.assessmentBand || null,
+      refinedAssessmentBand: pass1Evaluation.assessmentBand || null,
+      maxBoostDb: pass1Evaluation.maxBoostDb ?? null,
+      maxCutDb: pass1Evaluation.maxCutDb ?? null,
+      bindingConstraint: "pass1-invalid-for-refinement",
+      candidatesTested: 0,
+      coarseCandidatesTested: 0,
+      fineCandidatesTested: 0,
+      coarseRefinementTimeMs: 0,
+      fineRefinementTimeMs: 0,
+      totalAddedLatencyMs: nowMs() - startedAt,
+      pass1Evaluation,
+      refinedEvaluation: null,
+    };
+  }
+
   const pass1 = pass1Evaluation;
   const pass1P19 = finite(pass1.p19Db) ? Number(pass1.p19Db) : null;
 
@@ -129,9 +189,11 @@ export function refineP19GlobalNormalisation({
     coarseCandidates.push(pass1Rounded);
   }
 
+  let coarseEvaluationsRun = 0;
   const coarseEvaluations = [];
   for (const trim of coarseCandidates) {
     const evaluation = evaluateCandidate(trim);
+    coarseEvaluationsRun++;
     if (evaluation) coarseEvaluations.push(evaluation);
   }
   const coarseTimeMs = nowMs() - coarseStart;
@@ -148,6 +210,7 @@ export function refineP19GlobalNormalisation({
   // ── Fine search around best coarse candidate ──
   const fineStart = nowMs();
   let bestFine = bestCoarse;
+  let fineEvaluationsRun = 0;
   if (bestCoarse) {
     const fineCentre = Number(bestCoarse.globalTrimDb);
     const fineRange = 1.5;
@@ -157,6 +220,7 @@ export function refineP19GlobalNormalisation({
       if (rounded > searchUpper + 0.001 || rounded < searchLower - 0.001) continue;
       if (rounded === Math.round(fineCentre * 1000) / 1000) continue;
       const evaluation = evaluateCandidate(rounded);
+      fineEvaluationsRun++;
       if (!evaluation || !isEligible(evaluation, pass1)) continue;
       if (!bestFine || compareCandidates(evaluation, bestFine, pass1) < 0) {
         bestFine = evaluation;
@@ -165,8 +229,7 @@ export function refineP19GlobalNormalisation({
   }
   const fineTimeMs = nowMs() - fineStart;
 
-  const fineCandidatesTested = bestCoarse ? Math.ceil(3.0 / 0.25) : 0;
-  const totalCandidates = coarseCandidates.length + fineCandidatesTested;
+  const totalEvaluationsRun = coarseEvaluationsRun + fineEvaluationsRun;
   const totalTimeMs = nowMs() - startedAt;
 
   // ── Select winner ──
@@ -211,9 +274,9 @@ export function refineP19GlobalNormalisation({
     maxBoostDb: refinementImproved ? bestFine.maxBoostDb : pass1.maxBoostDb,
     maxCutDb: refinementImproved ? bestFine.maxCutDb : pass1.maxCutDb,
     bindingConstraint,
-    candidatesTested: totalCandidates,
-    coarseCandidatesTested: coarseCandidates.length,
-    fineCandidatesTested,
+    candidatesTested: totalEvaluationsRun,
+    coarseCandidatesTested: coarseEvaluationsRun,
+    fineCandidatesTested: fineEvaluationsRun,
     coarseRefinementTimeMs: coarseTimeMs,
     fineRefinementTimeMs: fineTimeMs,
     totalAddedLatencyMs: totalTimeMs,

@@ -1233,6 +1233,9 @@ export function generateCanonicalCandidatePool({
         verticalOffsetDb, protectedNullRegions,
         baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
         selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis,
+        usableLfHz, practicalCalibrationTarget,
+        p18RequiredExtensionHz: selectedP18RequiredExtensionHz || p18ThresholdHzForLevel(p18TargetBasis, 1),
+        p18TargetBasis,
       }));
     }
     if (salvage.cutOnlyFilters.length > 0 && salvage.cutOnlyBankLimits.allOk) {
@@ -1254,6 +1257,9 @@ export function generateCanonicalCandidatePool({
         verticalOffsetDb, protectedNullRegions,
         baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
         selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis,
+        usableLfHz, practicalCalibrationTarget,
+        p18RequiredExtensionHz: selectedP18RequiredExtensionHz || p18ThresholdHzForLevel(p18TargetBasis, 1),
+        p18TargetBasis,
       }));
     }
   }
@@ -1302,6 +1308,9 @@ export function generateCanonicalCandidatePool({
     eq: identityEq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
     baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
     selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis, usableLfHz,
+    practicalCalibrationTarget,
+    p18RequiredExtensionHz: selectedP18RequiredExtensionHz || p18ThresholdHzForLevel(p18TargetBasis, 1),
+    p18TargetBasis,
   });
   const candidates = annotateCandidatePoolForHouseCurveRanking([...eqCandidates, ...salvagedCandidates, identityCandidate]);
   const __canonicalTrace__ = {
