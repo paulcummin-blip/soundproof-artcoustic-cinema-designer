@@ -51,7 +51,7 @@ function worstPrimarySeatDeviation(result) {
 // Must match authoritativeFinalistSelection.js — do not create two tolerances.
 const PRIMARY_RAW_REGRESSION_THRESHOLD_DB = 1.0;
 
-function hasPrimarySeatRegression(currentResult, candidateResult) {
+export function hasPrimarySeatRegression(currentResult, candidateResult) {
   const currentP19 = new Map((currentResult?.perSeatP19 || []).map(s => [String(s.seatId), s]));
   const currentP20 = new Map((currentResult?.perSeatP20 || []).map(s => [String(s.seatId), s]));
 
