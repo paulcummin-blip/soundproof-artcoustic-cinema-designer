@@ -22,6 +22,8 @@ import { calculatePairedP14P18ProductionAuthority } from "@/components/utils/pai
 import { buildPairedP14P18CandidateSummary } from "@/components/utils/pairedP14P18CandidateSummary";
 import { predictRealisticPostCalibrationCorrection } from "@/components/utils/realisticPostCalibrationPrediction";
 import { buildPracticalCalibrationTargetFromCapability } from "@/components/utils/practicalCalibrationTarget";
+import { refineP19GlobalNormalisation } from "@/components/utils/p19BoundedRefinement";
+import { getProductCurveFrequencyRange } from "@/components/models/speakers/registry";
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
 const PRODUCT_EXTENSION_REFERENCE_TOLERANCE_DB = 1.5;
@@ -462,10 +464,93 @@ function buildCanonicalCandidate({
   // (the boost headroom limit already guarantees this, but enforce explicitly),
   // then to the product operating envelope for deep-LF extension limits.
   const maximumClampedPostEqCurve = capCurveToEnvelope(unconstrainedPostEqCurve, maximumSplCurveBeforeEq);
-  const finalPostEqCurve = capCurveToProductOperatingEnvelope(
+  const pass1FinalPostEqCurve = capCurveToProductOperatingEnvelope(
     maximumClampedPostEqCurve,
     productOperatingEnvelope.curve,
   );
+
+  // ── Bounded P19 refinement (Pass 2) ──
+  // The deterministic predictor (Pass 1) uses ONE global normalisation
+  // (globalTrimDb = median of target − smoothed maximum). This cheap
+  // post-pass searches a bounded neighbourhood of globalTrimDb values around
+  // the Pass-1 result, re-running the SAME correction logic for each
+  // candidate and evaluating the FINAL official P19 over the RECALCULATED
+  // assessment band. If a materially better legal result is found, the
+  // refined correction curve replaces the Pass-1 correction. All existing
+  // constraints (P14 output, +6/-15 dB, protected nulls, capability, P18
+  // not worsened, primary-seat safety) remain hard.
+  const productCurveMinHzValues = (activeSubs || [])
+    .map((sub) => getProductCurveFrequencyRange(sub?.modelKey ?? sub?.model)?.minHz)
+    .filter(Number.isFinite);
+  const refinementProductCurveMinHz = productCurveMinHzValues.length ? Math.max(...productCurveMinHzValues) : null;
+  const refinementResult = refineP19GlobalNormalisation({
+    maximumSplCurveBeforeEq,
+    predictorTargetCurve,
+    p18TargetCurve: targetCurve,
+    protectedNullRegions,
+    activeSubs,
+    usableLfHz,
+    selectedOperatingOutputDb,
+    productOperatingEnvelopeCurve: productOperatingEnvelope.curve,
+    perSeatMaximumSplCurves,
+    selectedP14TargetDb: selectedOperatingOutputDb,
+    requiredExtensionHz: 20,
+    p18CutoffDb: null,
+    configuredUsableLfHz: usableLfHz,
+    productCurveMinHz: refinementProductCurveMinHz,
+    transitionHz: domains.p19EndHz,
+    pass1GlobalTrimDb: realisticGlobalTrimDb,
+    pass1CorrectionCurve: realisticCorrectionCurve,
+    pass1FinalPostEqCurve,
+    pass1AchievedP18Hz: null,
+    pass1AchievedP18Level: 0,
+    pass1P19Db: null,
+    pass1PrimarySeatP19Db: null,
+  });
+
+  let finalPostEqCurve = pass1FinalPostEqCurve;
+  let p19BoundedRefinementDiagnostics = null;
+  if (refinementResult?.refinementAttempted) {
+    p19BoundedRefinementDiagnostics = {
+      refinementAttempted: true,
+      refinementImproved: refinementResult.refinementImproved,
+      pass1P19Db: refinementResult.pass1P19Db,
+      refinedP19Db: refinementResult.refinedP19Db,
+      improvementDb: refinementResult.improvementDb,
+      pass1GlobalTrimDb: refinementResult.pass1GlobalTrimDb,
+      refinedGlobalTrimDb: refinementResult.refinedGlobalTrimDb,
+      refinedP18Hz: refinementResult.refinedP18Hz,
+      selectedP14Db: refinementResult.selectedP14Db,
+      bindingConstraint: refinementResult.bindingConstraint,
+      candidatesTested: refinementResult.candidatesTested,
+      coarseRefinementTimeMs: refinementResult.coarseRefinementTimeMs,
+      fineRefinementTimeMs: refinementResult.fineRefinementTimeMs,
+      totalAddedLatencyMs: refinementResult.totalAddedLatencyMs,
+      pass1AssessmentBand: refinementResult.pass1AssessmentBand,
+      refinedAssessmentBand: refinementResult.refinedAssessmentBand,
+      maxBoostDb: refinementResult.maxBoostDb,
+      maxCutDb: refinementResult.maxCutDb,
+    };
+    if (refinementResult.refinementImproved) {
+      realisticCorrectionCurve = refinementResult.refinedCorrectionCurve;
+      realisticGlobalTrimDb = refinementResult.refinedGlobalTrimDb;
+      realisticOperatingPreEqCurve = maximumSplCurveBeforeEq.map((point) => ({
+        frequency: point.frequency,
+        spl: Number.isFinite(point.spl) ? point.spl + realisticGlobalTrimDb : point.spl,
+      }));
+      achievedPreEqCurve = realisticOperatingPreEqCurve.map((point) => ({ ...point }));
+      unconstrainedPostEqCurve = realisticOperatingPreEqCurve.map((point) => ({
+        frequency: point.frequency,
+        spl: point.spl + interpolateCorrection(realisticCorrectionCurve, point.frequency),
+      }));
+      const refinedMaximumClamped = capCurveToEnvelope(unconstrainedPostEqCurve, maximumSplCurveBeforeEq);
+      finalPostEqCurve = capCurveToProductOperatingEnvelope(
+        refinedMaximumClamped,
+        productOperatingEnvelope.curve,
+      );
+    }
+  }
+
   // Candidate authority judges the response that can actually be delivered.
   // The fitter's requested curve may use local positive EQ up to the fixed
   // product-plus-room ceiling; anything above that ceiling is capability

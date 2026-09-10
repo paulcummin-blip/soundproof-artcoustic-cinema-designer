@@ -186,15 +186,22 @@ export function predictRealisticPostCalibrationCorrection({
   activeSubs = [],
   usableLfHz = null,
   requestedSystemOutputDb = null,
+  globalTrimDbOverride = null,
 }) {
   if (!Array.isArray(maximumCapabilityCurve) || !maximumCapabilityCurve.length) {
     return { correctionCurve: [], globalTrimDb: 0, operatingPreEqCurve: [] };
   }
 
   // ── Stage 1: Global operating-level normalisation ──
-  const globalTrimDb = computeGlobalOperatingTrimDb({
-    maximumCapabilityCurve, targetCurve, assessmentStartHz, assessmentEndHz, protectedNullRegions,
-  });
+  // When globalTrimDbOverride is provided (bounded P19 refinement), skip the
+  // median-based computation and use the candidate value directly. This lets
+  // the refinement search a bounded neighbourhood of global normalisation
+  // values without changing any other part of the correction logic.
+  const globalTrimDb = Number.isFinite(globalTrimDbOverride)
+    ? Math.min(0, Number(globalTrimDbOverride))
+    : computeGlobalOperatingTrimDb({
+        maximumCapabilityCurve, targetCurve, assessmentStartHz, assessmentEndHz, protectedNullRegions,
+      });
 
   // ── Stage 2: Operating response O(f) = M(f) + globalTrimDb ──
   const operatingPreEqCurve = maximumCapabilityCurve.map((point) => ({
