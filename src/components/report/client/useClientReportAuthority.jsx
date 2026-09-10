@@ -19,6 +19,8 @@ import { base44 } from "@/api/base44Client";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { useAnalysisSpeakers } from "@/components/hooks/useAnalysisSpeakers";
 import { useEffectiveRsp } from "@/components/room/rsp/useEffectiveRsp";
+import { resolveDesignatedRspSeat } from "@/components/room/rsp/rspInputResolver";
+import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from "@/components/room/rsp/screenGeometryResolver";
 import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 import { computeSurroundRingGaps, rp22LevelForP5 } from "@/components/utils/p5SurroundGaps";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
@@ -175,6 +177,8 @@ export function useClientReportAuthority(projectId) {
         setExtraSurroundCount: app.setExtraSurroundCount,
         setRspMode: app.setRspMode,
         setManualRspY_m: app.setManualRspY_m,
+        setManualRspX_m: app.setManualRspX_m,
+        setDesignatedRspSeatId: app.setDesignatedRspSeatId,
       });
       setHydratedProjectId(p.id);
       setHydrating(false);
@@ -218,13 +222,10 @@ export function useClientReportAuthority(projectId) {
     [screenVisibleWidthInches]
   );
 
-  const screenFrontPlaneM = useMemo(() => {
-    const raw = Number(app?.screenFrontPlaneM);
-    if (Number.isFinite(raw) && raw > 0) return raw;
-    const floatDepth = Number(screen?.floatDepthM);
-    if (Number.isFinite(floatDepth) && floatDepth > 0) return floatDepth;
-    return 0.20;
-  }, [app?.screenFrontPlaneM, screen?.floatDepthM]);
+  const screenFrontPlaneM = useMemo(
+    () => resolveRspScreenFrontPlaneM(app?.screenFrontPlaneM, screen),
+    [app?.screenFrontPlaneM, screen?.floatDepthM, screen?.screenPlaneY_m]
+  );
 
   // ── 3) Seating + row-derived RSP Y by mode ───────────────────────────────
   const seatingPositions = useMemo(
@@ -254,6 +255,12 @@ export function useClientReportAuthority(projectId) {
 
   const manualRspX_m = app?.manualRspX_m ?? null;
 
+  // ── Designated RSP seat (seat_bound mode) — resolved from appState ──────
+  const designatedRspSeat = useMemo(
+    () => resolveDesignatedRspSeat(app?.designatedRspSeatId, seatingPositions),
+    [app?.designatedRspSeatId, seatingPositions]
+  );
+
   const { effectiveRspX_m, effectiveRspY_m, rspSourceLabel } = useEffectiveRsp({
     rspMode,
     manualRspY_m,
@@ -265,6 +272,7 @@ export function useClientReportAuthority(projectId) {
     seatingPositions,
     currentMlpY_m,
     rowDerivedRspYByMode,
+    designatedRspSeat,
   });
 
   // Stage B1: RSP uses canonical green-dot X (effectiveRspX_m) — no centreline reconstruction.

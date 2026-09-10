@@ -15,6 +15,8 @@ import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import RvRp22AnglesOverlay from "@/components/room/rv/render/RvRp22AnglesOverlay";
 import { useAppState } from "@/components/AppStateProvider";
 import { timeNowMs } from "@/components/utils/timeNow";
+import { resolveDesignatedRspSeat, resolveRowDerivedRspYByMode } from "@/components/room/rsp/rspInputResolver";
+import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from "@/components/room/rsp/screenGeometryResolver";
 import { calculateViewingAngle, rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 import CanvasMessages from "@/components/room/CanvasMessages";
 import RvRoomElementsLayer from "@/components/room/rv/render/RvRoomElementsLayer";
@@ -290,15 +292,30 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   // read-path: manual_position wins when manualRspY_m is finite.
   // Both X and Y are resolved here — X is room centreline in AUTO, or
   // manualRspX_m in manual_position.
+  // ── Canonical RSP inputs (shared resolver — identical to reports) ───────
+  // designatedRspSeat and rowDerivedRspYByMode are resolved from the same
+  // appState + seatingPositions that reports use, so seat_bound and row-derived
+  // modes produce the same coordinate in every view.
+  const designatedRspSeat = useMemo(
+    () => resolveDesignatedRspSeat(appState?.designatedRspSeatId, seatingPositions),
+    [appState?.designatedRspSeatId, seatingPositions]
+  );
+
+  const rowDerivedRspYByMode = useMemo(
+    () => resolveRowDerivedRspYByMode(seatingPositions, widthM, lengthM),
+    [seatingPositions, widthM, lengthM]
+  );
+
   const { effectiveRspY_m, effectiveRspX_m } = useEffectiveRsp({
     rspMode,
     manualRspY_m,
     manualRspX_m,
     roomWidthM: widthM,
-    screenFrontPlaneM: Number.isFinite(Number(appState?.screenFrontPlaneM)) ? Number(appState.screenFrontPlaneM) : 0,
-    screenWidthM: Number(screen?.visibleWidthM ?? (Number(screen?.visibleWidthInches || 100) * 0.0254)),
+    screenFrontPlaneM: resolveRspScreenFrontPlaneM(appState?.screenFrontPlaneM, screen),
+    screenWidthM: resolveRspScreenWidthM(screen),
     currentMlpY_m: appState?.mlpY_m ?? null,
-    rowDerivedRspYByMode: {},
+    rowDerivedRspYByMode,
+    designatedRspSeat,
   });
   const _fixedRspY = Number.isFinite(effectiveRspY_m) ? effectiveRspY_m : undefined;
   const _fixedRspX = Number.isFinite(effectiveRspX_m) ? effectiveRspX_m : undefined;
