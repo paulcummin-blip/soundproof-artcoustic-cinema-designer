@@ -37,6 +37,7 @@ import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
 import { SHOW_DEBUG_LOGS } from '../components/utils/diagnostics'; // NEW: Import SHOW_DEBUG_LOGS
 import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/seatingUtils';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
+import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from '@/components/room/rsp/screenGeometryResolver';
 import { useStage1PlacementOptimiser } from '@/components/room/bass/stage1/useStage1PlacementOptimiser';
 import { useStage2PlacementOptimiser } from '@/components/room/bass/stage2/useStage2PlacementOptimiser';
 import { useBassHeavyAction, markBassHeavyActionRunning, markBassHeavyActionComplete, markBassHeavyActionError } from '@/components/room/bass/bassHeavyActionStore';
@@ -568,8 +569,8 @@ function RoomDesignerWithState() {
     manualRspY_m: appState?.manualRspY_m ?? null,
     manualRspX_m: appState?.manualRspX_m ?? null,
     roomWidthM: Number(stableDimensions?.width) || 0,
-    screenFrontPlaneM: appState?.screenFrontPlaneM,
-    screenWidthM: _rspScreenWidthM,
+    screenFrontPlaneM: resolveRspScreenFrontPlaneM(appState?.screenFrontPlaneM, _screen),
+    screenWidthM: resolveRspScreenWidthM(_screen),
     rowCentersM: appState?.rowCentersM || [],
     seatingPositions: appState?.seatingPositions || [],
     currentMlpY_m: appState?.mlpY_m ?? null,
