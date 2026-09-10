@@ -57,6 +57,10 @@ function makeEvaluation(overrides = {}) {
     maxCutDb: -5.0,
     physicalEqAuthorityPassed: true,
     physicalAuthorityViolations: [],
+    selectedOperatingOutputDb: 112,
+    finalOperatingOutputDb: 112.0,
+    operatingOutputErrorDb: 0.0,
+    operatingOutputValid: true,
     primarySeatSafety: { regressed: false },
     ...overrides,
   };

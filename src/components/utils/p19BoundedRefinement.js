@@ -80,6 +80,11 @@ function isEligible(evaluation, pass1) {
   if (pass1.p20Available === true && evaluation.p20Available === true
     && finite(pass1.p20Db) && finite(evaluation.p20Db)
     && Number(evaluation.p20Db) > Number(pass1.p20Db) + P20_MULTI_SEAT_TOLERANCE_DB) return false;
+  // 6. Operating-level authority — the final post-EQ curve must integrate to
+  // the selected operating output (e.g. 112 dBC). P14 capability PASS does NOT
+  // imply operating-level PASS. A candidate that overshoots the target (e.g.
+  // 118.6 dBC at 112 target) is ineligible regardless of P19/P20 improvement.
+  if (evaluation.operatingOutputValid !== true) return false;
   return true;
 }
 
@@ -134,13 +139,15 @@ export function refineP19GlobalNormalisation({
   // Pass 1 must have valid P14 AND physical authority to serve as
   // an optimisation baseline. If it doesn't, refinement must NOT
   // manufacture a refined authority from an invalid baseline.
-  if (pass1Evaluation.p14Pass !== true || pass1Evaluation.physicalEqAuthorityPassed !== true) {
+  if (pass1Evaluation.p14Pass !== true || pass1Evaluation.physicalEqAuthorityPassed !== true
+    || pass1Evaluation.operatingOutputValid !== true) {
     return {
       refinementAttempted: true,
       refinementImproved: false,
       reason: "pass1-invalid-for-refinement",
       pass1P14Pass: pass1Evaluation.p14Pass === true,
       pass1PhysicalEqAuthorityPassed: pass1Evaluation.physicalEqAuthorityPassed === true,
+      pass1OperatingOutputValid: pass1Evaluation.operatingOutputValid === true,
       pass1GlobalTrimDb: Number(pass1GlobalTrimDb),
       refinedGlobalTrimDb: Number(pass1GlobalTrimDb),
       pass1P19Db: finite(pass1Evaluation.p19Db) ? Number(pass1Evaluation.p19Db) : null,
@@ -159,6 +166,13 @@ export function refineP19GlobalNormalisation({
       maxBoostDb: pass1Evaluation.maxBoostDb ?? null,
       maxCutDb: pass1Evaluation.maxCutDb ?? null,
       bindingConstraint: "pass1-invalid-for-refinement",
+      selectedOperatingOutputDb: finite(pass1Evaluation.selectedOperatingOutputDb) ? Number(pass1Evaluation.selectedOperatingOutputDb) : null,
+      pass1FinalOperatingOutputDb: finite(pass1Evaluation.finalOperatingOutputDb) ? Number(pass1Evaluation.finalOperatingOutputDb) : null,
+      pass1OperatingOutputErrorDb: finite(pass1Evaluation.operatingOutputErrorDb) ? Number(pass1Evaluation.operatingOutputErrorDb) : null,
+      pass1OperatingOutputValid: pass1Evaluation.operatingOutputValid === true,
+      refinedFinalOperatingOutputDb: finite(pass1Evaluation.finalOperatingOutputDb) ? Number(pass1Evaluation.finalOperatingOutputDb) : null,
+      refinedOperatingOutputErrorDb: finite(pass1Evaluation.operatingOutputErrorDb) ? Number(pass1Evaluation.operatingOutputErrorDb) : null,
+      refinedOperatingOutputValid: pass1Evaluation.operatingOutputValid === true,
       candidatesTested: 0,
       coarseCandidatesTested: 0,
       fineCandidatesTested: 0,
@@ -174,8 +188,12 @@ export function refineP19GlobalNormalisation({
   const pass1P19 = finite(pass1.p19Db) ? Number(pass1.p19Db) : null;
 
   // ── Derive bounded search range ──
+  // Search the full bounded Pass-1 → 0 region. The lower bound is the auto
+  // Pass-1 trim (e.g. -19.4 dB); the upper bound is 0 dB (no trim). This
+  // ensures the legal optimum (e.g. ~-12.25 dB) is naturally included — the
+  // previous hard -12 dB floor incorrectly excluded it.
   const searchUpper = 0;
-  const searchLower = Math.max(-12, pass1GlobalTrimDb - 6);
+  const searchLower = pass1GlobalTrimDb;
   const coarseStep = 1.0;
 
   // ── Coarse search ──
@@ -187,6 +205,10 @@ export function refineP19GlobalNormalisation({
   const pass1Rounded = Math.round(pass1GlobalTrimDb * 1000) / 1000;
   if (!coarseCandidates.includes(pass1Rounded)) {
     coarseCandidates.push(pass1Rounded);
+  }
+  // Ensure 0 dB (upper bound) is always tested
+  if (!coarseCandidates.includes(0)) {
+    coarseCandidates.push(0);
   }
 
   let coarseEvaluationsRun = 0;
@@ -274,6 +296,13 @@ export function refineP19GlobalNormalisation({
     maxBoostDb: refinementImproved ? bestFine.maxBoostDb : pass1.maxBoostDb,
     maxCutDb: refinementImproved ? bestFine.maxCutDb : pass1.maxCutDb,
     bindingConstraint,
+    selectedOperatingOutputDb: finite(pass1.selectedOperatingOutputDb) ? Number(pass1.selectedOperatingOutputDb) : null,
+    pass1FinalOperatingOutputDb: finite(pass1.finalOperatingOutputDb) ? Number(pass1.finalOperatingOutputDb) : null,
+    pass1OperatingOutputErrorDb: finite(pass1.operatingOutputErrorDb) ? Number(pass1.operatingOutputErrorDb) : null,
+    pass1OperatingOutputValid: pass1.operatingOutputValid === true,
+    refinedFinalOperatingOutputDb: refinementImproved && finite(bestFine.finalOperatingOutputDb) ? Number(bestFine.finalOperatingOutputDb) : (finite(pass1.finalOperatingOutputDb) ? Number(pass1.finalOperatingOutputDb) : null),
+    refinedOperatingOutputErrorDb: refinementImproved && finite(bestFine.operatingOutputErrorDb) ? Number(bestFine.operatingOutputErrorDb) : (finite(pass1.operatingOutputErrorDb) ? Number(pass1.operatingOutputErrorDb) : null),
+    refinedOperatingOutputValid: refinementImproved ? bestFine.operatingOutputValid === true : pass1.operatingOutputValid === true,
     candidatesTested: totalEvaluationsRun,
     coarseCandidatesTested: coarseEvaluationsRun,
     fineCandidatesTested: fineEvaluationsRun,

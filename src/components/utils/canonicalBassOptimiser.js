@@ -13,7 +13,7 @@ import {
 } from "@/components/utils/houseCurveTargetAuthority";
 import { identifyProtectedNullRegions, isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { findAggregatePeakBoostViolations } from "@/components/utils/designEqPhysicsAuthority";
-import { normaliseHouseCurveToP14Total } from "@/components/utils/p14HouseCurveNormalisation";
+import { normaliseHouseCurveToP14Total, integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
 import { assessP14Capability } from "@/components/utils/p14CapabilityAuthority";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getCurrentSystemSourceOutput, getSystemSourceCapability, getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
@@ -36,6 +36,15 @@ import { hasPrimarySeatRegression } from "@/components/room/bass/improveBassV2/m
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
 const PRODUCT_EXTENSION_REFERENCE_TOLERANCE_DB = 1.5;
+// Operating-level authority tolerance: the final post-EQ curve must integrate
+// to the selected operating output (e.g. 112 dBC) within this tolerance.
+// This is a tight numerical simulation tolerance — NOT a multi-dB tolerance.
+// It catches gross normalisation errors (e.g. 118.6 vs 112 = +6.6 dB error)
+// while allowing for small numerical/clamping variations in the EQ process.
+// The ideal house curve integration tolerance is 0.05 dB (diagnoseHouseCurveP14Integration);
+// the actual post-EQ response has EQ clamping and modal variations, so 0.5 dB
+// is the tight practical tolerance for the simulated calibrated response.
+const OPERATING_OUTPUT_TOLERANCE_DB = 0.5;
 const OPERATING_WINDOW_MAX_BOOST_DB = DESIGN_EQ_FIT_PROFILES.accuracy.maximumAggregateBoostDb;
 const OPERATING_WINDOW_MAX_CUT_DB = DESIGN_EQ_FIT_PROFILES.accuracy.maximumCutDb;
 
@@ -463,7 +472,8 @@ function buildCanonicalCandidate({
       activeSubs,
       usableLfHz,
       requestedSystemOutputDb: selectedOperatingOutputDb,
-      ...(Number.isFinite(Number(globalTrimDbOverride)) ? { globalTrimDbOverride: Number(globalTrimDbOverride) } : {}),
+      ...((globalTrimDbOverride !== null && globalTrimDbOverride !== undefined && Number.isFinite(Number(globalTrimDbOverride)))
+        ? { globalTrimDbOverride: Number(globalTrimDbOverride) } : {}),
     });
     const correctionCurve = realisticResult.correctionCurve;
     const globalTrimDb = realisticResult.globalTrimDb;
@@ -591,6 +601,24 @@ function buildCanonicalCandidate({
       }));
     }
 
+    // ── Operating-level authority ──
+    // P14 capability proves the system CAN deliver the target. It does NOT
+    // prove the simulated calibrated response IS operating at that level.
+    // The final post-EQ curve must integrate to the selected operating output
+    // (e.g. 112 dBC) within a tight tolerance. This is a separate hard gate
+    // from P14 capability — both must pass. CAPABILITY PASS does NOT imply
+    // OPERATING LEVEL PASS.
+    const finalOperatingOutputDb = integrateRawResponseLevelDbC({
+      rawCurve: finalPost,
+      lowerHz: resolvedP18RequiredExtensionHz,
+      upperHz: 120,
+    });
+    const operatingOutputErrorDb = (finalOperatingOutputDb !== null && Number.isFinite(selectedOperatingOutputDb))
+      ? finalOperatingOutputDb - selectedOperatingOutputDb
+      : null;
+    const operatingOutputValid = operatingOutputErrorDb !== null
+      && Math.abs(operatingOutputErrorDb) <= OPERATING_OUTPUT_TOLERANCE_DB;
+
     const maxBoostDb = Math.max(0, ...correctionCurve.map((p) => Number(p.spl) || 0));
     const maxCutDb = Math.min(0, ...correctionCurve.map((p) => Number(p.spl) || 0));
     const peakBoostViolations = findAggregatePeakBoostViolations(achievedPre, finalPost, targetCurve);
@@ -609,6 +637,7 @@ function buildCanonicalCandidate({
       assessmentBand, p19Db, p19Level, p19WorstFrequencyHz, perSeatP19,
       p20Available, p20Db, p20Level, perSeatP20,
       maxBoostDb, maxCutDb, physicalEqAuthorityPassed, physicalAuthorityViolations,
+      selectedOperatingOutputDb, finalOperatingOutputDb, operatingOutputErrorDb, operatingOutputValid,
       primarySeatSafety: null,
     };
   };
@@ -671,6 +700,13 @@ function buildCanonicalCandidate({
       refinedAssessmentBand: refinementResult.refinedAssessmentBand,
       maxBoostDb: refinementResult.maxBoostDb,
       maxCutDb: refinementResult.maxCutDb,
+      selectedOperatingOutputDb: refinementResult.selectedOperatingOutputDb,
+      pass1FinalOperatingOutputDb: refinementResult.pass1FinalOperatingOutputDb,
+      pass1OperatingOutputErrorDb: refinementResult.pass1OperatingOutputErrorDb,
+      pass1OperatingOutputValid: refinementResult.pass1OperatingOutputValid,
+      refinedFinalOperatingOutputDb: refinementResult.refinedFinalOperatingOutputDb,
+      refinedOperatingOutputErrorDb: refinementResult.refinedOperatingOutputErrorDb,
+      refinedOperatingOutputValid: refinementResult.refinedOperatingOutputValid,
     };
     if (refinementResult.refinementImproved && refinementResult.refinedEvaluation) {
       const refined = refinementResult.refinedEvaluation;

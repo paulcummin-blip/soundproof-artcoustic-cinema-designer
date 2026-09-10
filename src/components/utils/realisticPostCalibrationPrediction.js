@@ -193,11 +193,14 @@ export function predictRealisticPostCalibrationCorrection({
   }
 
   // ── Stage 1: Global operating-level normalisation ──
-  // When globalTrimDbOverride is provided (bounded P19 refinement), skip the
-  // median-based computation and use the candidate value directly. This lets
-  // the refinement search a bounded neighbourhood of global normalisation
-  // values without changing any other part of the correction logic.
-  const globalTrimDb = Number.isFinite(globalTrimDbOverride)
+  // Explicit nullish/finite test: null/undefined = AUTO (compute median-based
+  // trim), 0 = explicit 0 dB override, finite negative = explicit refinement
+  // candidate. Do NOT use Number(null) (=== 0) to determine whether an override
+  // exists — that would treat null as an explicit 0 dB trim.
+  const hasExplicitTrim = globalTrimDbOverride !== null
+    && globalTrimDbOverride !== undefined
+    && Number.isFinite(Number(globalTrimDbOverride));
+  const globalTrimDb = hasExplicitTrim
     ? Math.min(0, Number(globalTrimDbOverride))
     : computeGlobalOperatingTrimDb({
         maximumCapabilityCurve, targetCurve, assessmentStartHz, assessmentEndHz, protectedNullRegions,
