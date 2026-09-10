@@ -28,24 +28,26 @@ const OPERATING_OUTPUT_TOLERANCE_DB = 0.5;
 const SELECTED_OPERATING_OUTPUT_DB = 112;
 
 // ── Synthetic Yarm-style Pass-1 final post-EQ curve ──
-// Calibrated to give ~111.8 dBC over 20–120 and ~111.1 dBC over 30–120,
-// matching the confirmed Yarm defect pattern.
+// Calibrated to give ~111.86 dBC over 20–120 (VALID) and ~111.22 dBC over
+// 30–120 (INVALID), matching the confirmed Yarm defect pattern where the
+// 30 Hz P18 requirement was incorrectly used as the P14 integration lower
+// bound, causing false rejection of a valid Pass-1.
 const yarmFinalPost = [
-  { frequency: 15, spl: 88.0 },
-  { frequency: 18, spl: 98.0 },
-  { frequency: 20, spl: 106.0 },
-  { frequency: 22, spl: 109.0 },
-  { frequency: 25, spl: 110.5 },
-  { frequency: 28, spl: 111.3 },
-  { frequency: 30, spl: 111.7 },
-  { frequency: 31.5, spl: 111.9 },
-  { frequency: 35, spl: 112.0 },
-  { frequency: 40, spl: 112.1 },
-  { frequency: 50, spl: 112.2 },
-  { frequency: 63, spl: 112.1 },
-  { frequency: 80, spl: 112.0 },
-  { frequency: 100, spl: 111.9 },
-  { frequency: 120, spl: 111.7 },
+  { frequency: 15, spl: 80.5 },
+  { frequency: 18, spl: 90.5 },
+  { frequency: 20, spl: 104.5 },
+  { frequency: 22, spl: 105.5 },
+  { frequency: 25, spl: 106.0 },
+  { frequency: 28, spl: 105.5 },
+  { frequency: 30, spl: 105.0 },
+  { frequency: 31.5, spl: 104.8 },
+  { frequency: 35, spl: 104.5 },
+  { frequency: 40, spl: 104.5 },
+  { frequency: 50, spl: 104.7 },
+  { frequency: 63, spl: 104.8 },
+  { frequency: 80, spl: 104.7 },
+  { frequency: 100, spl: 104.5 },
+  { frequency: 120, spl: 104.0 },
 ];
 
 // ── Test 1: 20–120 integration (the CORRECT P14 band) ──
