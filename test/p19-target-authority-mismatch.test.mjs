@@ -261,20 +261,22 @@ describe("P19 Target Authority Mismatch — Defect 1", () => {
   });
 
   test("7. Bass authority version bumped to invalidate old cached results", () => {
-    // The P19 target change alters the resulting calibrated curves and P19
-    // results. Old cached bass results produced with the mismatched target
+    // The P18 overlay removal alters the resulting calibrated curves and P19
+    // results. Old cached bass results produced with the P18-shaped target
     // must NOT continue to hydrate as current authority.
-    assert.equal(BASS_ANALYSIS_CONTRACT_VERSION, 16, "BASS_ANALYSIS_CONTRACT_VERSION must be 16");
-    assert.equal(RP22_BASS_METRIC_SCHEMA_VERSION, 12, "RP22_BASS_METRIC_SCHEMA_VERSION must be 12");
+    assert.equal(BASS_ANALYSIS_CONTRACT_VERSION, 17, "BASS_ANALYSIS_CONTRACT_VERSION must be 17");
+    assert.equal(RP22_BASS_METRIC_SCHEMA_VERSION, 13, "RP22_BASS_METRIC_SCHEMA_VERSION must be 13");
   });
 
-  test("8. P18-intent-aware LF overlay is applied to the practical target", () => {
+  test("8. P18-intent-aware LF overlay is NOT applied to the practical target", () => {
+    // P18 is an achieved result, not a design constraint. The practical
+    // calibration target must NOT be shaped by the P18 level boundary.
     const idealTarget = makeIdealTarget(100, FREQS);
     const maxSpl = makeMaxSplCurve(100, FREQS, 25);
     const p18DesignHz = 30;
     const p18ReferenceDb = computeP18ReferenceDb(idealTarget);
 
-    const { practicalCalibrationTarget: withOverlay } = buildPracticalCalibrationTargetFromCapability({
+    const { practicalCalibrationTarget: withOverlayParam } = buildPracticalCalibrationTargetFromCapability({
       idealTargetCurve: idealTarget,
       maximumSplCurve: maxSpl,
       p18DesignHz,
@@ -287,18 +289,18 @@ describe("P19 Target Authority Mismatch — Defect 1", () => {
       p18DesignHz: null,
     });
 
-    // The overlay should modify the target below Fd × √2
+    // The overlay must NOT modify the target — passing p18DesignHz is a no-op
     const kneeHz = p18DesignHz * Math.SQRT2;
-    let differsBelowKnee = false;
-    for (const p of withOverlay) {
+    for (const p of withOverlayParam) {
       if (p.frequency < kneeHz) {
         const without = interpolateCurve(withoutOverlay, p.frequency);
-        if (without !== null && Math.abs(p.spl - without) > 0.1) {
-          differsBelowKnee = true;
-          break;
+        if (without !== null) {
+          assert.ok(
+            Math.abs(p.spl - without) < 0.01,
+            `LF overlay must not modify target at ${p.frequency} Hz: withParam=${p.spl} without=${without}`,
+          );
         }
       }
     }
-    assert.ok(differsBelowKnee, "LF overlay should modify the target below Fd × √2");
   });
 });

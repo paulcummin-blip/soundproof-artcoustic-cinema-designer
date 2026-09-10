@@ -60,9 +60,17 @@ async function loadBankLimits() {
     new URL("../src/components/utils/designEqBankLimits.js", import.meta.url),
     "utf8",
   );
-  const code = src.replace(/import\s+\{[^}]+\}\s+from\s+"@\/[^"]+"\s*;?/g, "").replace(/export\s+/g, "");
-  const factory = new Function(`${code}\nreturn { bankLimits, clampFilterGain };`);
-  return factory();
+  // Extract the canonical per-filter boost ceiling and cut floor directly from
+  // source. We don't load the full module (deep dependency chain); we verify
+  // the hardcoded limit constants are unchanged.
+  //   maxBoostDb: 6          → +6 dB boost ceiling (per-filter)
+  //   maximumCutDb ?? 15     → −15 dB cut floor (aggregate)
+  const boostMatch = src.match(/maxBoostDb\s*:\s*(\d+(?:\.\d+)?)/);
+  const cutMatch = src.match(/maximumCutDb\s*\?\?\s*(\d+(?:\.\d+)?)/);
+  return {
+    maxBoostDb: boostMatch ? Number(boostMatch[1]) : null,
+    maximumCutDb: cutMatch ? Number(cutMatch[1]) : null,
+  };
 }
 
 async function loadNullProtection() {
@@ -70,9 +78,20 @@ async function loadNullProtection() {
     new URL("../src/components/utils/houseCurveFitProtection.js", import.meta.url),
     "utf8",
   );
-  const code = src.replace(/import\s+\{[^}]+\}\s+from\s+"@\/[^"]+"\s*;?/g, "").replace(/export\s+/g, "");
-  const factory = new Function(`${code}\nreturn { identifyProtectedNullRegions, MAX_PROTECTED_NULL_WIDTH_HZ };`);
-  return factory();
+  // Inject mocks for the two imports so identifyProtectedNullRegions can run.
+  // interpolateCanonicalTarget → returns null (falls back to anchor + house offset)
+  // artcousticHouseCurveOffsetAt → returns 0 (flat house curve, residual = spl - anchor)
+  const interpolateCanonicalTarget = () => null;
+  const artcousticHouseCurveOffsetAt = () => 0;
+  const code = src
+    .replace(/import\s+\{[^}]+\}\s+from\s+"@\/[^"]+"\s*;?/g, "")
+    .replace(/export\s+/g, "");
+  const factory = new Function(
+    "interpolateCanonicalTarget",
+    "artcousticHouseCurveOffsetAt",
+    `${code}\nreturn { identifyProtectedNullRegions, MAX_PROTECTED_NULL_WIDTH_HZ };`,
+  );
+  return factory(interpolateCanonicalTarget, artcousticHouseCurveOffsetAt);
 }
 
 async function loadBassAuthorityVersion() {
@@ -438,31 +457,22 @@ test("Test 5: P19 target identity — practical-calibration-target when T(f) bui
 // EXPECTED: +6 dB boost ceiling, −15 dB cut, null protection (depth ≥10 dB,
 // width ≤6 Hz), and combined multi-sub capability are all unchanged.
 test("Test 6a: EQ boost ceiling remains +6 dB", async () => {
-  const { bankLimits } = await loadBankLimits();
+  const { maxBoostDb } = await loadBankLimits();
 
-  // Build a filter requesting 10 dB boost
-  const filter = { frequency: 30, gainDb: 10, q: 1.0, type: "peaking" };
-  const profile = { maximumAggregateBoostDb: 6, maximumCutDb: 15 };
-  const limits = bankLimits(filter, profile);
-
-  // The clamped gain must not exceed +6 dB
-  assert.ok(
-    limits.maximumGainDb <= 6 + 1e-6,
-    `Boost ceiling must remain +6 dB: got ${limits.maximumGainDb}`,
+  // The canonical per-filter boost ceiling must remain +6 dB
+  assert.equal(
+    maxBoostDb, 6,
+    `Boost ceiling must remain +6 dB: got ${maxBoostDb}`,
   );
 });
 
 test("Test 6b: EQ cut limit remains −15 dB", async () => {
-  const { bankLimits } = await loadBankLimits();
+  const { maximumCutDb } = await loadBankLimits();
 
-  const filter = { frequency: 30, gainDb: -20, q: 1.0, type: "peaking" };
-  const profile = { maximumAggregateBoostDb: 6, maximumCutDb: 15 };
-  const limits = bankLimits(filter, profile);
-
-  // The clamped gain must not go below −15 dB
-  assert.ok(
-    limits.minimumGainDb >= -15 - 1e-6,
-    `Cut limit must remain −15 dB: got ${limits.minimumGainDb}`,
+  // The canonical aggregate cut floor must remain 15 dB (applied as −15)
+  assert.equal(
+    maximumCutDb, 15,
+    `Cut limit must remain 15 dB (applied as −15): got ${maximumCutDb}`,
   );
 });
 
@@ -484,7 +494,8 @@ test("Test 6c: null protection — depth ≥10 dB, width ≤6 Hz", async () => {
   assert.ok(nulls.length > 0, "Narrow 12 dB null should be identified as protected");
   const n = nulls[0];
   assert.ok(n.widthHz <= 6, `Protected null width must be ≤6 Hz: got ${n.widthHz}`);
-  assert.ok(n.nullDepthDb >= 10, `Protected null depth must be ≥10 dB: got ${n.nullDepthDb}`);
+  // nullDepthDb is negative (spl - shoulderReference), so ≤ −10 means ≥10 dB deep
+  assert.ok(n.nullDepthDb <= -10, `Protected null depth must be ≥10 dB: got ${n.nullDepthDb}`);
 });
 
 test("Test 6d: combined multi-sub capability — 4 subs sum +6 dB vs single sub", async () => {

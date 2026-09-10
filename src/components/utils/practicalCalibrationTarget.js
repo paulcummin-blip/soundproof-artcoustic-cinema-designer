@@ -215,9 +215,12 @@ export function applyP18IntentAwareLfOverlay({ practicalTargetA, p18DesignHz, p1
 // raw max SPL curve and the ideal target. Returns { capabilityEnvelope,
 // practicalCalibrationTarget } so callers can persist both identities.
 //
-// When p18DesignHz (Fd) is provided, the P18-intent-aware LF overlay is applied
-// to the practical calibration target. This makes the target shape deterministic
-// for the selected target combination (Minimum/Recommended × L1–L4).
+// P18 is an ACHIEVED RESULT, not a design constraint. The practical calibration
+// target is NEVER shaped by the P18 level boundary — it follows the ideal house
+// curve where physically achievable and rolls smoothly with broad LF capability
+// where not. The p18DesignHz/p18ReferenceDb parameters are accepted for backward
+// compatibility but are no longer applied (no-op). The overlay function
+// applyP18IntentAwareLfOverlay remains exported for historical test fixtures.
 export function buildPracticalCalibrationTargetFromCapability({
   idealTargetCurve,
   maximumSplCurve,
@@ -227,14 +230,11 @@ export function buildPracticalCalibrationTargetFromCapability({
   p18ReferenceDb = null,
 }) {
   const capabilityEnvelope = buildSmoothCapabilityEnvelope(maximumSplCurve);
-  const baseTarget = buildPracticalCalibrationTarget({
+  const practicalCalibrationTarget = buildPracticalCalibrationTarget({
     idealTargetCurve,
     capabilityEnvelope,
     requiredHeadroomDb,
     blendScaleDb,
   });
-  const practicalCalibrationTarget = (Number.isFinite(p18DesignHz) && p18DesignHz > 0)
-    ? applyP18IntentAwareLfOverlay({ practicalTargetA: baseTarget, p18DesignHz, p18ReferenceDb })
-    : baseTarget;
   return { capabilityEnvelope, practicalCalibrationTarget };
 }
