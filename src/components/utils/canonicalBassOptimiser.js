@@ -435,90 +435,214 @@ function buildCanonicalCandidate({
   const predictorTargetCurve = (Array.isArray(practicalCalibrationTarget) && practicalCalibrationTarget.length)
     ? practicalCalibrationTarget
     : targetCurve;
-  const realisticResult = predictRealisticPostCalibrationCorrection({
-    maximumCapabilityCurve: maximumSplCurveBeforeEq,
-    targetCurve: predictorTargetCurve,
-    assessmentStartHz: domains.p19StartHz,
-    assessmentEndHz: domains.p19EndHz,
-    protectedNullRegions,
-    activeSubs,
-    usableLfHz,
-    requestedSystemOutputDb: selectedOperatingOutputDb,
-  });
-  const realisticCorrectionCurve = realisticResult.correctionCurve;
-  const realisticGlobalTrimDb = realisticResult.globalTrimDb;
-  const realisticOperatingPreEqCurve = realisticResult.operatingPreEqCurve;
-  // The achieved pre-EQ for violation detection is the operating response
-  // O(f) = M(f) + globalTrimDb, so boost/null violations compare like-for-like
-  // against the post-EQ curve (O(f) + correction).
-  const achievedPreEqCurve = realisticOperatingPreEqCurve.map((point) => ({ ...point }));
   const maximumAfterEq = buildMaximumSplCurveAfterEq(maximumSplCurveBeforeEq);
-  const unconstrainedPostEqCurve = realisticOperatingPreEqCurve.map((point) => ({
-    frequency: point.frequency,
-    spl: point.spl + interpolateCorrection(realisticCorrectionCurve, point.frequency),
-  }));
-  const productOperatingEnvelope = buildProductOperatingEnvelope({
-    frequencyGrid: unconstrainedPostEqCurve.map((point) => point.frequency),
-    targetCurve,
-    activeSubs,
-    // Use the deterministic predictor's correction curve — NOT the iterative
-    // fitter's combinedEqCurve. This makes the product operating envelope
-    // consistent with the authoritative P14 (which also uses the predictor's
-    // positiveEqDemandCurve). The fitter's combinedEqCurve is diagnostic-only.
-    combinedEqCurve: realisticCorrectionCurve,
-    selectedOperatingOutputDb,
-    targetBasis: p14TargetBasis,
-  });
-  // Final EQ = O(f) + correction, first clamped to the physical ceiling M(f)
-  // (the boost headroom limit already guarantees this, but enforce explicitly),
-  // then to the product operating envelope for deep-LF extension limits.
-  const maximumClampedPostEqCurve = capCurveToEnvelope(unconstrainedPostEqCurve, maximumSplCurveBeforeEq);
-  const pass1FinalPostEqCurve = capCurveToProductOperatingEnvelope(
-    maximumClampedPostEqCurve,
-    productOperatingEnvelope.curve,
-  );
 
-  // ── Bounded P19 refinement (Pass 2) ──
-  // The deterministic predictor (Pass 1) uses ONE global normalisation
-  // (globalTrimDb = median of target − smoothed maximum). This cheap
-  // post-pass searches a bounded neighbourhood of globalTrimDb values around
-  // the Pass-1 result, re-running the SAME correction logic for each
-  // candidate and evaluating the FINAL official P19 over the RECALCULATED
-  // assessment band. If a materially better legal result is found, the
-  // refined correction curve replaces the Pass-1 correction. All existing
-  // constraints (P14 output, +6/-15 dB, protected nulls, capability, P18
-  // not worsened, primary-seat safety) remain hard.
+  // ── Product curve min Hz (for P18 assessment) ──
   const productCurveMinHzValues = (activeSubs || [])
     .map((sub) => getProductCurveFrequencyRange(sub?.modelKey ?? sub?.model)?.minHz)
     .filter(Number.isFinite);
   const refinementProductCurveMinHz = productCurveMinHzValues.length ? Math.max(...productCurveMinHzValues) : null;
+
+  // ── Shared candidate evaluator ──
+  // ONE evaluator used for BOTH Pass-1 and all refinement candidates.
+  // It varies only globalTrimDb and calls the SAME production helpers for
+  // correction, product envelope, post-EQ clamp, P14, P18, P19, P20, and
+  // primary-seat safety. No duplicated maths — see p19BoundedRefinement.js.
+  const selectedP18Basis = p18TargetBasis || p14TargetBasis;
+  const resolvedP18RequiredExtensionHz = Number.isFinite(Number(p18RequiredExtensionHz))
+    ? Number(p18RequiredExtensionHz)
+    : p18ThresholdHzForLevel(selectedP18Basis, 1);
+
+  const evaluateCandidate = (globalTrimDbOverride) => {
+    const realisticResult = predictRealisticPostCalibrationCorrection({
+      maximumCapabilityCurve: maximumSplCurveBeforeEq,
+      targetCurve: predictorTargetCurve,
+      assessmentStartHz: domains.p19StartHz,
+      assessmentEndHz: domains.p19EndHz,
+      protectedNullRegions,
+      activeSubs,
+      usableLfHz,
+      requestedSystemOutputDb: selectedOperatingOutputDb,
+      ...(Number.isFinite(Number(globalTrimDbOverride)) ? { globalTrimDbOverride: Number(globalTrimDbOverride) } : {}),
+    });
+    const correctionCurve = realisticResult.correctionCurve;
+    const globalTrimDb = realisticResult.globalTrimDb;
+    const operatingPreEqCurve = realisticResult.operatingPreEqCurve;
+    const achievedPre = operatingPreEqCurve.map((point) => ({ ...point }));
+
+    // Build the product operating envelope from THIS candidate's correction
+    const envelope = buildProductOperatingEnvelope({
+      frequencyGrid: operatingPreEqCurve.map((point) => point.frequency),
+      targetCurve,
+      activeSubs,
+      combinedEqCurve: correctionCurve,
+      selectedOperatingOutputDb,
+      targetBasis: p14TargetBasis,
+    });
+
+    // Build the post-EQ curve (clamped to capability + product envelope)
+    const unconstrainedPost = operatingPreEqCurve.map((point) => ({
+      frequency: point.frequency,
+      spl: point.spl + interpolateCorrection(correctionCurve, point.frequency),
+    }));
+    const maxClamped = capCurveToEnvelope(unconstrainedPost, maximumSplCurveBeforeEq);
+    const finalPost = capCurveToProductOperatingEnvelope(maxClamped, envelope.curve);
+
+    // Build per-seat post-EQ curves (same logic as production)
+    const candidatePerSeatMaxSplMap = new Map();
+    for (const seat of (Array.isArray(perSeatMaximumSplCurves) ? perSeatMaximumSplCurves : [])) {
+      if (seat?.seatId && seat.seatId !== "rsp" && Array.isArray(seat?.responseData)) {
+        candidatePerSeatMaxSplMap.set(seat.seatId, seat.responseData);
+      }
+    }
+    const requestedPerSeat = applyBankToSeats(perSeatMaximumSplCurves, correctionCurve)
+      .map((seat) => ({
+        ...seat,
+        responseData: seat.responseData.map((point) => ({
+          ...point,
+          spl: Number.isFinite(point.spl) ? point.spl + globalTrimDb : point.spl,
+        })),
+      }));
+    const candidatePerSeatCurves = requestedPerSeat.map((seat) => {
+      const maxSpl = candidatePerSeatMaxSplMap.get(seat.seatId);
+      const capabilityClamped = maxSpl
+        ? capCurveToEnvelope(seat.responseData, maxSpl)
+        : seat.responseData;
+      return {
+        ...seat,
+        responseData: capCurveToProductOperatingEnvelope(capabilityClamped, envelope.curve),
+      };
+    });
+
+    // P14 via the SAME paired authority used by production
+    const pairedP14P18Authority = calculatePairedP14P18ProductionAuthority({
+      ...(pairedAuthorityInputs || {}),
+      combinedEqCurve: correctionCurve,
+      selectedEqBankIdentity: buildFilterBankSignature({ generatedFilterBank: eq.filters || [] }),
+    });
+    const p14Pass = pairedP14P18Authority?.status === "PASS";
+    const p14MarginDb = pairedP14P18Authority?.limitingResult?.marginDb ?? null;
+    const p14AchievedDb = pairedP14P18Authority?.limitingResult?.worstCapabilityDb ?? null;
+    const p14TargetDb = pairedP14P18Authority?.requested?.targetSplDb ?? selectedOperatingOutputDb;
+
+    // P18 via the SAME authority used by production
+    const p18Assessment = assessP18AgainstRequiredExtension({
+      rspPostEqCurve: finalPost,
+      canonicalTargetCurve: targetCurve,
+      perSeatPostEqCurves: candidatePerSeatCurves,
+      selectedP14TargetDb: selectedOperatingOutputDb,
+      requiredExtensionHz: resolvedP18RequiredExtensionHz,
+      p18CutoffDb: null,
+      configuredUsableLfHz: usableLfHz,
+      productCurveMinHz: refinementProductCurveMinHz,
+    });
+    const achievedP18Hz = p18Assessment?.achievedExtensionHz ?? null;
+    const achievedP18Bounded = p18Assessment?.achievedExtensionBounded ?? false;
+    const p18Passes = p18Assessment?.passes ?? false;
+    const p18ExtensionResult = assessP18Extension(achievedP18Hz, selectedP18Basis);
+    const achievedP18Level = p18ExtensionResult?.level ?? 0;
+
+    // Assessment band with the REAL p14Pass
+    const assessmentBand = resolveBassAssessmentBand({
+      p14Pass,
+      achievedP18Hz,
+      transitionHz: domains.p19EndHz,
+    });
+
+    // P19 and P20 over the recalculated band
+    let p19Db = null, p19Level = null, p19WorstFrequencyHz = null;
+    let perSeatP19 = [];
+    let p20Db = null, p20Level = null, p20Available = false;
+    let perSeatP20 = [];
+    if (assessmentBand.valid) {
+      const p19 = computeOfficialP19Assessment({
+        rspPostEqCurve: finalPost,
+        canonicalTargetCurve: predictorTargetCurve,
+        assessmentStartHz: assessmentBand.lowerHz,
+        assessmentEndHz: assessmentBand.upperHz,
+      });
+      p19Db = p19?.variationDbRaw ?? null;
+      p19Level = p19?.level ?? null;
+      p19WorstFrequencyHz = p19?.worstFrequencyHz ?? null;
+
+      const rawPerSeatP19 = computeOfficialPerSeatP19Assessment({
+        perSeatPostEqCurves: candidatePerSeatCurves,
+        canonicalTargetCurve: predictorTargetCurve,
+        assessmentStartHz: assessmentBand.lowerHz,
+        assessmentEndHz: assessmentBand.upperHz,
+      });
+      perSeatP19 = rawPerSeatP19.map((seat) => ({
+        ...seat,
+        isPrimary: !!(candidatePerSeatCurves.find((s) => s.seatId === seat.seatId)?.isPrimary),
+      }));
+
+      const p20 = computeOfficialP20Assessment({
+        rspPostEqCurve: finalPost,
+        perSeatPostEqCurves: candidatePerSeatCurves,
+        assessmentStartHz: assessmentBand.lowerHz,
+        assessmentEndHz: assessmentBand.upperHz,
+      });
+      p20Available = p20?.available ?? false;
+      p20Db = p20?.worstSeat?.variationDbRaw ?? null;
+      p20Level = p20?.worstSeat?.level ?? null;
+      perSeatP20 = (p20?.perSeatResults || []).map((seat) => ({
+        ...seat,
+        isPrimary: !!(candidatePerSeatCurves.find((s) => s.seatId === seat.seatId)?.isPrimary),
+      }));
+    }
+
+    const maxBoostDb = Math.max(0, ...correctionCurve.map((p) => Number(p.spl) || 0));
+    const maxCutDb = Math.min(0, ...correctionCurve.map((p) => Number(p.spl) || 0));
+    const peakBoostViolations = findAggregatePeakBoostViolations(achievedPre, finalPost, targetCurve);
+    const protectedNullViolations = findAchievedProtectedNullBoostViolations(achievedPre, finalPost, protectedNullRegions);
+    const physicalAuthorityViolations = [...peakBoostViolations, ...protectedNullViolations];
+    const physicalEqAuthorityPassed = physicalAuthorityViolations.length === 0;
+
+    return {
+      globalTrimDb, correctionCurve, operatingPreEqCurve,
+      achievedPreEqCurve: achievedPre, unconstrainedPostEqCurve: unconstrainedPost,
+      finalPostEqCurve: finalPost, perSeatPostEqCurves: candidatePerSeatCurves,
+      productOperatingEnvelope: envelope,
+      p14Pass, p14Status: pairedP14P18Authority?.status ?? null,
+      p14AchievedDb, p14TargetDb, p14MarginDb, pairedP14P18Authority,
+      achievedP18Hz, achievedP18Level, achievedP18Bounded, p18Passes,
+      assessmentBand, p19Db, p19Level, p19WorstFrequencyHz, perSeatP19,
+      p20Available, p20Db, p20Level, perSeatP20,
+      maxBoostDb, maxCutDb, physicalEqAuthorityPassed, physicalAuthorityViolations,
+      primarySeatSafety: null,
+    };
+  };
+
+  // ── Pass-1 evaluation (through the SAME evaluator) ──
+  const pass1Evaluation = evaluateCandidate(null);
+  pass1Evaluation.primarySeatSafety = { regressed: false };
+
+  // ── Bounded P19 refinement (Pass 2) ──
   const refinementResult = refineP19GlobalNormalisation({
-    maximumSplCurveBeforeEq,
-    predictorTargetCurve,
-    p18TargetCurve: targetCurve,
-    protectedNullRegions,
-    activeSubs,
-    usableLfHz,
-    selectedOperatingOutputDb,
-    productOperatingEnvelopeCurve: productOperatingEnvelope.curve,
-    perSeatMaximumSplCurves,
-    selectedP14TargetDb: selectedOperatingOutputDb,
-    requiredExtensionHz: 20,
-    p18CutoffDb: null,
-    configuredUsableLfHz: usableLfHz,
-    productCurveMinHz: refinementProductCurveMinHz,
-    transitionHz: domains.p19EndHz,
-    pass1GlobalTrimDb: realisticGlobalTrimDb,
-    pass1CorrectionCurve: realisticCorrectionCurve,
-    pass1FinalPostEqCurve,
-    pass1AchievedP18Hz: null,
-    pass1AchievedP18Level: 0,
-    pass1P19Db: null,
-    pass1PrimarySeatP19Db: null,
+    evaluateCandidate: (trim) => {
+      const evaluation = evaluateCandidate(trim);
+      if (!evaluation) return null;
+      evaluation.primarySeatSafety = hasPrimarySeatRegression(
+        { perSeatP19: pass1Evaluation.perSeatP19, perSeatP20: pass1Evaluation.perSeatP20 },
+        { perSeatP19: evaluation.perSeatP19, perSeatP20: evaluation.perSeatP20 },
+      );
+      return evaluation;
+    },
+    pass1GlobalTrimDb: pass1Evaluation.globalTrimDb,
+    pass1Evaluation,
   });
 
-  let finalPostEqCurve = pass1FinalPostEqCurve;
+  // ── Select final response ──
+  let realisticCorrectionCurve = pass1Evaluation.correctionCurve;
+  let realisticGlobalTrimDb = pass1Evaluation.globalTrimDb;
+  let realisticOperatingPreEqCurve = pass1Evaluation.operatingPreEqCurve;
+  let achievedPreEqCurve = pass1Evaluation.achievedPreEqCurve;
+  let unconstrainedPostEqCurve = pass1Evaluation.unconstrainedPostEqCurve;
+  let productOperatingEnvelope = pass1Evaluation.productOperatingEnvelope;
+  let finalPostEqCurve = pass1Evaluation.finalPostEqCurve;
+  let perSeatPostEqCurves = pass1Evaluation.perSeatPostEqCurves;
   let p19BoundedRefinementDiagnostics = null;
+
   if (refinementResult?.refinementAttempted) {
     p19BoundedRefinementDiagnostics = {
       refinementAttempted: true,
@@ -528,8 +652,16 @@ function buildCanonicalCandidate({
       improvementDb: refinementResult.improvementDb,
       pass1GlobalTrimDb: refinementResult.pass1GlobalTrimDb,
       refinedGlobalTrimDb: refinementResult.refinedGlobalTrimDb,
+      pass1P18Hz: refinementResult.pass1P18Hz,
       refinedP18Hz: refinementResult.refinedP18Hz,
-      selectedP14Db: refinementResult.selectedP14Db,
+      pass1P18Level: refinementResult.pass1P18Level,
+      refinedP18Level: refinementResult.refinedP18Level,
+      pass1P14Pass: refinementResult.pass1P14Pass,
+      refinedP14Pass: refinementResult.refinedP14Pass,
+      pass1P14MarginDb: refinementResult.pass1P14MarginDb,
+      refinedP14MarginDb: refinementResult.refinedP14MarginDb,
+      pass1P20Db: refinementResult.pass1P20Db,
+      refinedP20Db: refinementResult.refinedP20Db,
       bindingConstraint: refinementResult.bindingConstraint,
       candidatesTested: refinementResult.candidatesTested,
       coarseRefinementTimeMs: refinementResult.coarseRefinementTimeMs,
@@ -540,23 +672,16 @@ function buildCanonicalCandidate({
       maxBoostDb: refinementResult.maxBoostDb,
       maxCutDb: refinementResult.maxCutDb,
     };
-    if (refinementResult.refinementImproved) {
-      realisticCorrectionCurve = refinementResult.refinedCorrectionCurve;
-      realisticGlobalTrimDb = refinementResult.refinedGlobalTrimDb;
-      realisticOperatingPreEqCurve = maximumSplCurveBeforeEq.map((point) => ({
-        frequency: point.frequency,
-        spl: Number.isFinite(point.spl) ? point.spl + realisticGlobalTrimDb : point.spl,
-      }));
-      achievedPreEqCurve = realisticOperatingPreEqCurve.map((point) => ({ ...point }));
-      unconstrainedPostEqCurve = realisticOperatingPreEqCurve.map((point) => ({
-        frequency: point.frequency,
-        spl: point.spl + interpolateCorrection(realisticCorrectionCurve, point.frequency),
-      }));
-      const refinedMaximumClamped = capCurveToEnvelope(unconstrainedPostEqCurve, maximumSplCurveBeforeEq);
-      finalPostEqCurve = capCurveToProductOperatingEnvelope(
-        refinedMaximumClamped,
-        productOperatingEnvelope.curve,
-      );
+    if (refinementResult.refinementImproved && refinementResult.refinedEvaluation) {
+      const refined = refinementResult.refinedEvaluation;
+      realisticCorrectionCurve = refined.correctionCurve;
+      realisticGlobalTrimDb = refined.globalTrimDb;
+      realisticOperatingPreEqCurve = refined.operatingPreEqCurve;
+      achievedPreEqCurve = refined.achievedPreEqCurve;
+      unconstrainedPostEqCurve = refined.unconstrainedPostEqCurve;
+      productOperatingEnvelope = refined.productOperatingEnvelope;
+      finalPostEqCurve = refined.finalPostEqCurve;
+      perSeatPostEqCurves = refined.perSeatPostEqCurves;
     }
   }
 
@@ -584,30 +709,7 @@ function buildCanonicalCandidate({
   // started from level-normalised curves; it introduced a constant offset
   // equal to operatingLevelOffsetDb on every seat, producing a false
   // systematic P20 floor even when seatRaw == rspRaw.
-  const perSeatOperatingOffsetDb = realisticGlobalTrimDb;
-  // Build a seatId → safety-margin-aware capability map for clamping. This
-  // mirrors the RSP's maximumSplCurveBeforeEq (rawCurve − SAFETY_MARGIN) so
-  // each seat is clamped to its own capability ceiling, not just the product
-  // operating envelope. When seatRaw == rspRaw, the clamp targets are
-  // identical and P20 = 0 for coincident positions.
-  const perSeatMaxSplMap = new Map();
-  for (const seat of (Array.isArray(perSeatMaximumSplCurves) ? perSeatMaximumSplCurves : [])) {
-    if (seat?.seatId && seat.seatId !== "rsp" && Array.isArray(seat?.responseData)) {
-      perSeatMaxSplMap.set(seat.seatId, seat.responseData);
-    }
-  }
-  // Start each seat from the SAME safety-margin-aware capability curve used
-  // for the RSP (perSeatMaximumSplCurves = seatRaw − SAFETY_MARGIN), not the
-  // raw seat response. This removes the false ~2 dB systematic P20 floor
-  // caused by the RSP starting 2 dB lower than the seats.
-  const requestedPerSeatPostEqCurves = applyBankToSeats(perSeatMaximumSplCurves, realisticCorrectionCurve)
-    .map((seat) => ({
-      ...seat,
-      responseData: seat.responseData.map((point) => ({
-        ...point,
-        spl: Number.isFinite(point.spl) ? point.spl + perSeatOperatingOffsetDb : point.spl,
-      })),
-    }));
+  // maximumPerSeatAfterEqCurves is product-only (no correction/trim dependency).
   const maximumPerSeatAfterEqCurves = (Array.isArray(perSeatMaximumSplCurves) ? perSeatMaximumSplCurves : [])
     .filter((seat) => seat?.seatId !== "rsp" && Array.isArray(seat?.responseData))
     .map((seat) => ({
@@ -615,22 +717,6 @@ function buildCanonicalCandidate({
       isPrimary: !!seat.isPrimary,
       responseData: buildMaximumSplCurveAfterEq(seat.responseData).curve,
     }));
-  // Clamp each seat to its safety-margin-aware capability envelope (mirroring
-  // the RSP's capCurveToEnvelope against maximumSplCurveBeforeEq), then to
-  // the product operating envelope. Both paths now use identical construction.
-  const perSeatPostEqCurves = requestedPerSeatPostEqCurves.map((seat) => {
-    const maxSpl = perSeatMaxSplMap.get(seat.seatId);
-    const capabilityClamped = maxSpl
-      ? capCurveToEnvelope(seat.responseData, maxSpl)
-      : seat.responseData;
-    return {
-      ...seat,
-      responseData: capCurveToProductOperatingEnvelope(
-        capabilityClamped,
-        productOperatingEnvelope.curve,
-      ),
-    };
-  });
   const seatsForMetrics = perSeatPostEqCurves.length
     ? perSeatPostEqCurves
     : [{ seatId: "rsp", isPrimary: true, responseData: finalPostEqCurve }];
@@ -756,6 +842,7 @@ function buildCanonicalCandidate({
     designEqSelectionReason: eq.selectionReason || null,
     designEqBankDiagnostics: eq.bankDiagnostics || null,
     houseCurveDiagnostics: eq.houseCurveDiagnostics || null,
+    p19BoundedRefinementDiagnostics,
   };
 }
 
@@ -1068,6 +1155,8 @@ export function generateCanonicalCandidatePool({
     baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
     selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs, activeSubs, p14TargetBasis, usableLfHz,
     practicalCalibrationTarget,
+    p18RequiredExtensionHz: selectedP18RequiredExtensionHz || p18ThresholdHzForLevel(p18TargetBasis, 1),
+    p18TargetBasis,
   }));
 
   // ── Partial-bank salvage ──
