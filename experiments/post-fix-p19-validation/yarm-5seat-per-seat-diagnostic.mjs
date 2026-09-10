@@ -94,11 +94,13 @@ const poolDebug = {
 const selection = selectCandidateFromPool(pool);
 const candidate = selection?.selectedCandidate || selection;
 
-const finalPost = candidate?.finalPostEqCurve || [];
-const perSeat = candidate?.perSeatPostEqCurves || [];
-const target = candidate?.productionHouseCurveTarget || [];
-const assessmentStartHz = candidate?.assessmentStartHz;
-const assessmentEndHz = candidate?.assessmentEndHz;
+// Locate the per-seat curves, target, and assessment band wherever they live
+// in the selection/candidate/canonical structure.
+const finalPost = selection?.finalPostEqCurve || candidate?.finalPostEqCurve || candidate?.canonical?.finalPostEqCurve || [];
+const perSeat = candidate?.perSeatPostEqCurves || candidate?.canonical?.perSeatPostEqCurves || selection?.perSeatPostEqCurves || [];
+const target = candidate?.productionHouseCurveTarget || candidate?.canonical?.productionHouseCurveTarget || selection?.productionHouseCurveTarget || [];
+const assessmentStartHz = candidate?.assessmentStartHz || candidate?.canonical?.assessmentStartHz || selection?.assessmentStartHz;
+const assessmentEndHz = candidate?.assessmentEndHz || candidate?.canonical?.assessmentEndHz || selection?.assessmentEndHz;
 
 const p19 = computeOfficialP19Assessment({
   rspPostEqCurve: finalPost, canonicalTargetCurve: target,
@@ -131,10 +133,16 @@ const p20PerSeat = (p20?.perSeatResults || []).map((s) => ({
 
 console.log(JSON.stringify({
   targetDb: TARGET_DB,
-  poolDebug,
-  candidateType: candidate ? typeof candidate : null,
-  candidateKeys: candidate ? Object.keys(candidate).slice(0, 30) : null,
-  candidateId: candidate?.candidateId ?? null,
+  fieldLocations: {
+    finalPostLen: finalPost.length,
+    perSeatLen: perSeat.length,
+    targetLen: target.length,
+    assessmentStartHz,
+    assessmentEndHz,
+    selectionKeys: Object.keys(selection || {}).slice(0, 50),
+    candidateKeys: candidate ? Object.keys(candidate).slice(0, 50) : null,
+    canonicalKeys: candidate?.canonical ? Object.keys(candidate.canonical).slice(0, 50) : null,
+  },
   rspP19: p19?.variationDbRaw ?? null,
   rspP19WorstHz: p19?.worstFrequencyHz ?? null,
   p20Primary: p20?.primaryVariationDb ?? null,

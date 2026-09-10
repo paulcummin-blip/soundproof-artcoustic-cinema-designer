@@ -1,0 +1,160 @@
+{
+  "targetDb": 115,
+  "fieldLocations": {
+    "finalPostLen": 360,
+    "perSeatLen": 5,
+    "targetLen": 360,
+    "assessmentStartHz": 20,
+    "assessmentEndHz": 163.29931618554522,
+    "selectionKeys": [
+      "selectedMode",
+      "selectedCandidate",
+      "selectedCandidateId",
+      "productionCandidateId",
+      "filterBankSignature",
+      "postEqCurveSignature",
+      "rawResponseSignature",
+      "selectedFilters",
+      "finalPostEqCurve",
+      "canonicalVerticalOffsetDb",
+      "canonicalHouseCurveShape",
+      "positiveEqDemandCurve",
+      "fitMetrics",
+      "protectedNullRegions",
+      "physicalValidation",
+      "selectedFitProfile",
+      "selectedFitProfileConfig",
+      "candidates",
+      "displayCandidates",
+      "rejectedCandidates",
+      "selectedByMode",
+      "primaryLimitation",
+      "isBestCalibratedAttempt",
+      "warningMessage",
+      "performanceSummary",
+      "selectionReason",
+      "selectionDiagnostics",
+      "priorityRerankTimeMs",
+      "heavyPoolReused",
+      "workerStarted",
+      "poolId",
+      "generatedCandidateCount",
+      "physicallyCredibleCount",
+      "standardFitCount",
+      "accuracyFitCount",
+      "houseCurveFitCount"
+    ],
+    "candidateKeys": [
+      "canonical",
+      "designEqFitProfile",
+      "designEqFitProfileConfig",
+      "startStrategy",
+      "selectedStart",
+      "rawResponseCurve",
+      "maximumSplCurveBeforeEq",
+      "maximumSplCurveAfterEq",
+      "productOperatingEnvelopeCurve",
+      "productLimitAttenuationCurve",
+      "productOperatingEnvelopeAuthority",
+      "productOperatingMarginDb",
+      "productOperatingHeadroomDb",
+      "productOperatingShortfallDb",
+      "productExtensionBandEndHz",
+      "productOperatingReferenceCapabilityDb",
+      "maximumSplSafetyMarginDb",
+      "maximumSplGlobalEqTrimDb",
+      "maximumSplAuthority",
+      "requestedPreEqOperatingCurve",
+      "rspBeforePeqAtOperatingLevel",
+      "realisticGlobalTrimDb",
+      "operatingPreEqCurve",
+      "operatingLevelOffsetDb",
+      "requestedOperatingLevelOffsetDb",
+      "baseRequestedSystemOutputDb",
+      "operatingSystemOutputDb",
+      "selectedOperatingOutputDb",
+      "operatingOutputDiagnostics",
+      "rawResponseSignature",
+      "generatedFilterBank",
+      "unconstrainedPostEqCurve",
+      "finalPostEqCurve",
+      "combinedEqCurve",
+      "perSeatPostEqCurves",
+      "maximumPerSeatPostEqCurves",
+      "capabilityLimitedRegions",
+      "capabilityLimitedPointCount",
+      "pairedP14P18Authority",
+      "pairedP14P18Summary",
+      "productionHouseCurveTarget",
+      "practicalCalibrationTarget",
+      "p19TargetIdentity",
+      "fitterHouseCurveTarget",
+      "canonicalHouseCurveShape",
+      "canonicalVerticalOffsetDb",
+      "positiveEqDemandCurve",
+      "protectedNullRegions",
+      "assessmentStartHz",
+      "assessmentEndHz"
+    ],
+    "canonicalKeys": []
+  },
+  "rspP19": 6.762201167889657,
+  "rspP19WorstHz": 20.022597812550515,
+  "p20Primary": null,
+  "p20Max": null,
+  "seatP19": [
+    {
+      "seatId": "r1-c1",
+      "p19VariationDb": 15.214224334184635,
+      "p19WorstHz": 99.46087804608523,
+      "spl15Hz": 97.95491390700842
+    },
+    {
+      "seatId": "r1-c2",
+      "p19VariationDb": 6.808770123425958,
+      "p19WorstHz": 20.022597812550515,
+      "spl15Hz": 98.12549149366788
+    },
+    {
+      "seatId": "r1-c3",
+      "p19VariationDb": 6.807293514866231,
+      "p19WorstHz": 20.022597812550515,
+      "spl15Hz": 98.12638286116349
+    },
+    {
+      "seatId": "r2-c1",
+      "p19VariationDb": 20.106113122176367,
+      "p19WorstHz": 64.02842404060942,
+      "spl15Hz": 97.4611715724993
+    },
+    {
+      "seatId": "r2-c2",
+      "p19VariationDb": 20.13333675488697,
+      "p19WorstHz": 64.02842404060942,
+      "spl15Hz": 97.46141922124268
+    }
+  ],
+  "p20PerSeat": [
+    {
+      "seatId": "r1-c1",
+      "p20VariationDb": 15.063231584735718
+    },
+    {
+      "seatId": "r1-c2",
+      "p20VariationDb": 2.760806835583992
+    },
+    {
+      "seatId": "r1-c3",
+      "p20VariationDb": 2.7474964112846294
+    },
+    {
+      "seatId": "r2-c1",
+      "p20VariationDb": 20.824075878325957
+    },
+    {
+      "seatId": "r2-c2",
+      "p20VariationDb": 20.851299511036558
+    }
+  ],
+  "allSeatsIdenticalP19": false
+}
