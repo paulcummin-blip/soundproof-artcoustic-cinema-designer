@@ -309,6 +309,73 @@ function capCurveToProductOperatingEnvelope(requestedCurve, productEnvelope) {
   });
 }
 
+// Build the common RSP product-limit attenuation curve.
+// attenuationDb(f) = max(0, rspBeforeProductEnvelope(f) - rspAfterProductEnvelope(f))
+// This is the ACTUAL dB the authoritative RSP lost to the product operating
+// envelope at each frequency. It is a source-side, frequency-dependent
+// limitation that must be mapped consistently to every receiver.
+export function buildProductLimitAttenuationCurve(rspBeforeProductEnvelope, rspFinalAfterProductEnvelope) {
+  if (!Array.isArray(rspBeforeProductEnvelope) || !Array.isArray(rspFinalAfterProductEnvelope)) return [];
+  const afterByFrequency = new Map();
+  for (const point of rspFinalAfterProductEnvelope) {
+    if (point?.frequency && Number.isFinite(Number(point?.spl))) {
+      afterByFrequency.set(Number(point.frequency), Number(point.spl));
+    }
+  }
+  return rspBeforeProductEnvelope
+    .filter((point) => point?.frequency && Number.isFinite(Number(point?.spl)))
+    .map((point) => {
+      const frequency = Number(point.frequency);
+      const before = Number(point.spl);
+      const after = afterByFrequency.get(frequency);
+      if (!Number.isFinite(after)) {
+        return { frequency, attenuationDb: 0, rspBeforeProductLimit: before, rspAfterProductLimit: null };
+      }
+      return {
+        frequency,
+        attenuationDb: Math.max(0, before - after),
+        rspBeforeProductLimit: before,
+        rspAfterProductLimit: after,
+      };
+    });
+}
+
+// Interpolate the attenuation dB at an arbitrary frequency. Returns 0 outside
+// the RSP grid range — no limiting is imposed where the RSP has no data.
+export function interpolateAttenuationDb(attenuationCurve, frequency) {
+  if (!Array.isArray(attenuationCurve) || !attenuationCurve.length) return 0;
+  if (frequency < attenuationCurve[0].frequency || frequency > attenuationCurve.at(-1).frequency) return 0;
+  const upperIndex = attenuationCurve.findIndex((point) => point.frequency >= frequency);
+  if (upperIndex <= 0) return attenuationCurve[0].attenuationDb || 0;
+  const low = attenuationCurve[upperIndex - 1];
+  const high = attenuationCurve[upperIndex];
+  const span = high.frequency - low.frequency;
+  if (span <= 0) return low.attenuationDb || 0;
+  const fraction = (frequency - low.frequency) / span;
+  return (low.attenuationDb || 0) + fraction * ((high.attenuationDb || 0) - (low.attenuationDb || 0));
+}
+
+// Apply the common RSP product-limit attenuation to a seat curve.
+// seatFinal(f) = seatCapabilityClampedSpl(f) - attenuationDb(f)
+// This NEVER increases SPL (attenuation >= 0) and NEVER boosts. It preserves
+// each seat's received-domain room-transfer differences while mapping the
+// same source-side limitation consistently.
+export function applyProductLimitAttenuation(curve, attenuationCurve) {
+  if (!Array.isArray(attenuationCurve) || !attenuationCurve.length) {
+    return (Array.isArray(curve) ? curve : []).map((point) => ({ ...point }));
+  }
+  return (Array.isArray(curve) ? curve : []).map((point) => {
+    if (!point?.frequency || !Number.isFinite(Number(point?.spl))) return { ...point };
+    const attenuationDb = interpolateAttenuationDb(attenuationCurve, Number(point.frequency));
+    if (!Number.isFinite(attenuationDb) || attenuationDb <= 0) return { ...point };
+    return {
+      ...point,
+      spl: Number(point.spl) - attenuationDb,
+      productLimitAttenuationDb: attenuationDb,
+    };
+  });
+}
+
 function findAchievedProtectedNullBoostViolations(beforeCurve, afterCurve, protectedNullRegions) {
   return (Array.isArray(afterCurve) ? afterCurve : []).map((point) => {
     const region = (Array.isArray(protectedNullRegions) ? protectedNullRegions : [])
@@ -513,6 +580,14 @@ function buildCanonicalCandidate({
           spl: Number.isFinite(point.spl) ? point.spl + globalTrimDb : point.spl,
         })),
       }));
+    // Common RSP product-limit attenuation: the dB the authoritative RSP
+    // actually lost to the product operating envelope at each frequency.
+    // Applied identically to every real seat AFTER its own seat-specific
+    // capability clamp. This maps a source-side frequency-dependent
+    // limitation consistently to every receiver, preserving each seat's
+    // received-domain room-transfer differences. The RSP path (finalPost)
+    // is unchanged — it still uses the absolute product envelope clamp.
+    const productLimitAttenuationCurve = buildProductLimitAttenuationCurve(maxClamped, finalPost);
     const candidatePerSeatCurves = requestedPerSeat.map((seat) => {
       const maxSpl = candidatePerSeatMaxSplMap.get(seat.seatId);
       const capabilityClamped = maxSpl
@@ -520,7 +595,7 @@ function buildCanonicalCandidate({
         : seat.responseData;
       return {
         ...seat,
-        responseData: capCurveToProductOperatingEnvelope(capabilityClamped, envelope.curve),
+        responseData: applyProductLimitAttenuation(capabilityClamped, productLimitAttenuationCurve),
       };
     });
 
@@ -643,6 +718,7 @@ function buildCanonicalCandidate({
       achievedPreEqCurve: achievedPre, unconstrainedPostEqCurve: unconstrainedPost,
       finalPostEqCurve: finalPost, perSeatPostEqCurves: candidatePerSeatCurves,
       productOperatingEnvelope: envelope,
+      productLimitAttenuationCurve,
       p14Pass, p14Status: pairedP14P18Authority?.status ?? null,
       p14AchievedDb, p14TargetDb, p14MarginDb, pairedP14P18Authority,
       achievedP18Hz, achievedP18Level, achievedP18Bounded, p18Passes,
@@ -681,6 +757,7 @@ function buildCanonicalCandidate({
   let achievedPreEqCurve = pass1Evaluation.achievedPreEqCurve;
   let unconstrainedPostEqCurve = pass1Evaluation.unconstrainedPostEqCurve;
   let productOperatingEnvelope = pass1Evaluation.productOperatingEnvelope;
+  let productLimitAttenuationCurve = pass1Evaluation.productLimitAttenuationCurve || [];
   let finalPostEqCurve = pass1Evaluation.finalPostEqCurve;
   let perSeatPostEqCurves = pass1Evaluation.perSeatPostEqCurves;
   let p19BoundedRefinementDiagnostics = null;
@@ -729,6 +806,7 @@ function buildCanonicalCandidate({
       achievedPreEqCurve = refined.achievedPreEqCurve;
       unconstrainedPostEqCurve = refined.unconstrainedPostEqCurve;
       productOperatingEnvelope = refined.productOperatingEnvelope;
+      productLimitAttenuationCurve = refined.productLimitAttenuationCurve || [];
       finalPostEqCurve = refined.finalPostEqCurve;
       perSeatPostEqCurves = refined.perSeatPostEqCurves;
     }
@@ -803,6 +881,12 @@ function buildCanonicalCandidate({
     maximumSplCurveBeforeEq: (maximumSplCurveBeforeEq || []).map((point) => ({ ...point })),
     maximumSplCurveAfterEq: maximumAfterEq.curve.map((point) => ({ ...point })),
     productOperatingEnvelopeCurve: productOperatingEnvelope.curve.map((point) => ({ ...point })),
+    productLimitAttenuationCurve: (productLimitAttenuationCurve || []).map((point) => ({
+      frequency: point.frequency,
+      attenuationDb: point.attenuationDb,
+      rspBeforeProductLimit: point.rspBeforeProductLimit,
+      rspAfterProductLimit: point.rspAfterProductLimit,
+    })),
     productOperatingEnvelopeAuthority: productOperatingEnvelope.authority || null,
     productOperatingMarginDb: productOperatingEnvelope.operatingMarginDb,
     productOperatingHeadroomDb: productOperatingEnvelope.operatingHeadroomDb,
