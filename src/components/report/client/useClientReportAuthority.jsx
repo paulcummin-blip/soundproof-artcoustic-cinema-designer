@@ -218,8 +218,8 @@ export function useClientReportAuthority(projectId) {
   );
 
   const screenWidthM = useMemo(
-    () => Number(screenVisibleWidthInches) * 0.0254,
-    [screenVisibleWidthInches]
+    () => resolveRspScreenWidthM(screen),
+    [screen?.tvPresetKey, screen?.tvWidthMm, screen?.visibleWidthInches, screen?.manualWidthM, screen?.manualHeightM, screen?.aspectRatio, screen?.manualSize]
   );
 
   const screenFrontPlaneM = useMemo(

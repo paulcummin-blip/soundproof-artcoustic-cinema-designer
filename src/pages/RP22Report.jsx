@@ -22,6 +22,8 @@ import { useAllSeatSplMetrics } from '@/components/hooks/useAllSeatSplMetrics';
 import { useSubwooferSync } from '@/components/hooks/useSubwooferSync';
 import { base44 } from '@/api/base44Client';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
+import { resolveDesignatedRspSeat } from '@/components/room/rsp/rspInputResolver';
+import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from '@/components/room/rsp/screenGeometryResolver';
 import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 
 // Extracted child components
@@ -293,6 +295,8 @@ function RP22ReportInner() {
                 setFreeMoveLcr: app.setFreeMoveLcr,
                 setRspMode: app.setRspMode,
                 setManualRspY_m: app.setManualRspY_m,
+                setManualRspX_m: app.setManualRspX_m,
+                setDesignatedRspSeatId: app.setDesignatedRspSeatId,
             });
             setReportReadyProjectId(p.id);
             setReportHydrating(false);
@@ -555,25 +559,46 @@ function RP22ReportInner() {
         }
     }, [seats, stableDimensions.width, stableDimensions.length]);
 
-    const { effectiveRspY_m } = useEffectiveRsp({
+    // ── Designated RSP seat (seat_bound mode) ──────────────────────────────
+    const designatedRspSeat = React.useMemo(
+        () => resolveDesignatedRspSeat(app?.designatedRspSeatId, seats),
+        [app?.designatedRspSeatId, seats]
+    );
+
+    // ── Canonical RSP via shared screen-geometry resolver ──────────────────
+    // Uses resolveRspScreenFrontPlaneM / resolveRspScreenWidthM so the RSP
+    // coordinate matches RoomVisualisation and useClientReportAuthority exactly.
+    const rspScreenFrontPlaneM = React.useMemo(
+        () => resolveRspScreenFrontPlaneM(app?.screenFrontPlaneM, screen),
+        [app?.screenFrontPlaneM, screen?.floatDepthM, screen?.screenPlaneY_m]
+    );
+    const rspScreenWidthM = React.useMemo(
+        () => resolveRspScreenWidthM(screen),
+        [screen?.tvPresetKey, screen?.tvWidthMm, screen?.visibleWidthInches, screen?.manualWidthM, screen?.manualHeightM, screen?.aspectRatio, screen?.manualSize]
+    );
+
+    const { effectiveRspY_m, effectiveRspX_m } = useEffectiveRsp({
         rspMode,
         manualRspY_m,
-        screenFrontPlaneM: reportScreenFrontPlaneM,
-        screenWidthM: reportScreenWidthM,
+        manualRspX_m: app?.manualRspX_m ?? null,
+        roomWidthM: stableDimensions.width,
+        screenFrontPlaneM: rspScreenFrontPlaneM,
+        screenWidthM: rspScreenWidthM,
         rowCentersM: app?.rowCentersM || [],
         seatingPositions: seats,
         currentMlpY_m: app?.mlpY_m ?? null,
         rowDerivedRspYByMode,
+        designatedRspSeat,
     });
 
     const reportMlpAnchorEffective = React.useMemo(() => {
-        const cx = stableDimensions.width / 2;
+        const cx = Number.isFinite(effectiveRspX_m) ? effectiveRspX_m : (stableDimensions.width / 2);
         const y = Number.isFinite(effectiveRspY_m) ? effectiveRspY_m : app?.mlpY_m;
         if (Number.isFinite(y)) {
             return { x: cx, y, z: 1.2 };
         }
         return app?.mlp || null;
-    }, [effectiveRspY_m, app?.mlpY_m, stableDimensions.width, app?.mlp]);
+    }, [effectiveRspX_m, effectiveRspY_m, app?.mlpY_m, stableDimensions.width, app?.mlp]);
 
     const primarySeatingPosition = reportMlpAnchorEffective || app?.mlp || null;
 

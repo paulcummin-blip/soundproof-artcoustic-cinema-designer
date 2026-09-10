@@ -23,6 +23,8 @@ import RvMlpMarker from "@/components/room/rv/render/RvMlpMarker";
 
 // Safe geometry hooks (pure computation, no engine, no appState writes)
 import { useEffectiveRsp } from "@/components/room/rsp/useEffectiveRsp";
+import { resolveDesignatedRspSeat, resolveRowDerivedRspYByMode } from "@/components/room/rsp/rspInputResolver";
+import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from "@/components/room/rsp/screenGeometryResolver";
 import { useMlpCalculation } from "@/components/room/rv/hooks/useMlpCalculation";
 import { useRoomGeometry } from "@/components/room/rv/hooks/useRoomGeometry";
 import { useFrontWideZonesComputed } from "@/components/room/rv/hooks/useFrontWideZonesComputed";
@@ -151,21 +153,39 @@ export default function RvStaticCanvas({
   }, [screenFrontPlaneM]);
 
   // ── RSP / MLP (safe hooks — pure computation) ───────────────────────────────
-  const screenWidthM = Number(
-    screen?.visibleWidthM ??
-      (Number(screen?.visibleWidthInches || 100) * 0.0254)
+  // Uses the SAME shared resolver as RoomVisualisation and reports so every
+  // surface produces the same RSP coordinate for seat_bound, row-derived, and
+  // auto_from_screen modes.
+  const designatedRspSeat = useMemo(
+    () => resolveDesignatedRspSeat(appState?.designatedRspSeatId, seatingPositions),
+    [appState?.designatedRspSeatId, seatingPositions]
   );
 
-  const { effectiveRspY_m } = useEffectiveRsp({
+  const rowDerivedRspYByMode = useMemo(
+    () => resolveRowDerivedRspYByMode(seatingPositions, widthM, lengthM),
+    [seatingPositions, widthM, lengthM]
+  );
+
+  const rspScreenFrontPlaneM = resolveRspScreenFrontPlaneM(
+    Number.isFinite(Number(propScreenFrontPlaneM)) ? Number(propScreenFrontPlaneM) : appState?.screenFrontPlaneM,
+    screen
+  );
+  const rspScreenWidthM = resolveRspScreenWidthM(screen);
+
+  const { effectiveRspY_m, effectiveRspX_m } = useEffectiveRsp({
     rspMode,
     manualRspY_m,
-    screenFrontPlaneM,
-    screenWidthM,
+    manualRspX_m: appState?.manualRspX_m ?? null,
+    roomWidthM: widthM,
+    screenFrontPlaneM: rspScreenFrontPlaneM,
+    screenWidthM: rspScreenWidthM,
     currentMlpY_m: appState?.mlpY_m ?? null,
-    rowDerivedRspYByMode: {},
+    rowDerivedRspYByMode,
+    designatedRspSeat,
   });
 
   const lockedMlpY = Number.isFinite(effectiveRspY_m) ? effectiveRspY_m : undefined;
+  const lockedMlpX = Number.isFinite(effectiveRspX_m) ? effectiveRspX_m : undefined;
 
   const mlp = useMlpCalculation({
     mlpPoint,
@@ -175,6 +195,7 @@ export default function RvStaticCanvas({
     roomLengthM: lengthM,
     seatingBlockOffset: 0,
     lockedMlpY,
+    lockedMlpX,
   });
 
   const mlpDotX_m = mlp?.x;
