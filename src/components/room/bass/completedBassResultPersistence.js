@@ -339,6 +339,11 @@ function buildGraphPayload(contract) {
     // Canonical unsmoothed flat-reference Room Response — carried through
     // compaction so the finished graph restores on cold reopen.
     roomResponseCurve: cloneCurve(finalResponse.roomResponseCurve),
+    // Raw per-seat room response curves (before EQ). Persisted so the graph
+    // can show raw → EQ → target for any selected seat after cached reopen.
+    perSeatRoomResponseCurves: (Array.isArray(finalResponse.perSeatRawCurves) ? finalResponse.perSeatRawCurves : [])
+      .map((seat) => ({ seatId: seat.seatId, responseData: cloneCurve(seat.responseData) }))
+      .filter((seat) => seat.seatId && seat.responseData.length),
   };
 }
 

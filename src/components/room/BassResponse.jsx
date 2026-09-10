@@ -240,12 +240,27 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     [runSimulation, overlayProduction]
   );
 
+  // Merge live per-seat raw curves with restored curves from the persisted
+  // graph payload. On cached reopen, live curves are absent; restored curves
+  // fill in so the graph can show raw → EQ → target for any selected seat.
+  const mergedPerSeatRawCurves = useMemo(() => {
+    const live = perSeatRawCurves || [];
+    const restored = optimisationResult?.finalOptimisedBassResponse?.perSeatRawCurves || [];
+    const liveMap = new Map(live.map((seat) => [seat.seatId, seat.responseData]));
+    const restoredMap = new Map(restored.map((seat) => [seat.seatId, seat.responseData]));
+    const allSeatIds = new Set([...liveMap.keys(), ...restoredMap.keys()]);
+    return [...allSeatIds].map((seatId) => ({
+      seatId,
+      responseData: liveMap.get(seatId) || restoredMap.get(seatId) || [],
+    })).filter((seat) => seat.responseData.length > 0);
+  }, [perSeatRawCurves, optimisationResult?.finalOptimisedBassResponse?.perSeatRawCurves]);
+
   // Build graph series: RSP is always the first (authoritative) series, followed by
   // selected real-seat display overlays. The optimiser never reads from this list —
   // it reads rspRawCurve directly. Graph visibility never affects P14/P18/P19.
   const multiSeries = useMemo(() => {
     const responses = simulationResults.seatResponses;
-    const storedSeatCurves = new Map((perSeatRawCurves || []).map((seat) => [seat.seatId, seat.responseData]));
+    const storedSeatCurves = new Map((mergedPerSeatRawCurves || []).map((seat) => [seat.seatId, seat.responseData]));
     const series = [];
 
     // RSP — always first, green, labelled
@@ -283,7 +298,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }
 
     return series;
-  }, [selectedSeatIds, simulationResults.seatResponses, perSeatRawCurves, orderedSeats, isDraggingSub, showRsp, showRealSeatOverlays, rspRawCurve]);
+  }, [selectedSeatIds, simulationResults.seatResponses, mergedPerSeatRawCurves, orderedSeats, isDraggingSub, showRsp, showRealSeatOverlays, rspRawCurve]);
 
   // Parse pasted REW CSV into a series object
   const rewOverlaySeries = useMemo(() => {
@@ -423,9 +438,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return available;
   }, [multiSeriesForGraph]);
 
+  // Pass the primary selected seat so P19/P20 markers reflect that seat's
+  // worst frequency, not the RSP/overall worst. RSP selection uses the
+  // established RSP presentation.
+  const selectedSeatForMarkers = selectedSeatIds[0] || null;
   const rp22GraphMarkers = useMemo(
-    () => buildRp22GraphMarkers(finalBassResponse),
-    [finalBassResponse]
+    () => buildRp22GraphMarkers(finalBassResponse, selectedSeatForMarkers),
+    [finalBassResponse, selectedSeatForMarkers]
   );
 
   // C6.1A/C6.1B2: Graph boundary hash check — compare the ACTUAL rendered-series

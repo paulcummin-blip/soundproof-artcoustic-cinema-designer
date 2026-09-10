@@ -50,9 +50,12 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
   const perSeatP20Results = Array.isArray(compactContract.selectedCandidate?.perSeatP20Results)
     ? compactContract.selectedCandidate.perSeatP20Results.map((seat) => ({ ...seat }))
     : [];
+  const perSeatP19Results = Array.isArray(compactContract.selectedCandidate?.perSeatP19Results)
+    ? compactContract.selectedCandidate.perSeatP19Results.map((seat) => ({ ...seat }))
+    : [];
   const finalSeatVariationData = candidateId ? {
     p18: { candidateId, level: null, extensionHz: envelope?.achievedP18FrequencyHz ?? null, achievedExtensionBounded: envelope?.achievedP18Bounded === true, authority: null },
-    p19: { candidateId, level: null, variationDb: null, worstFrequencyHz: envelope?.officialP19WorstFrequencyHz ?? null },
+    p19: { candidateId, level: null, variationDb: null, worstFrequencyHz: envelope?.officialP19WorstFrequencyHz ?? null, perSeatResults: perSeatP19Results },
     p20: { candidateId, level: null, variationDb: null, worstSeatId: envelope?.p20WorstSeatId ?? null, perSeatResults: perSeatP20Results },
   } : null;
 
@@ -78,6 +81,14 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
     // Empty when the persisted contract predates this field (graceful
     // degradation — the layer shows as unavailable, not stale).
     roomResponseCurve: Array.isArray(gp.roomResponseCurve) ? gp.roomResponseCurve.map((p) => ({ ...p })) : [],
+    // Raw per-seat room response curves restored from the persisted graph
+    // payload. Empty when the persisted contract predates this field — the
+    // raw layer for that seat is unavailable, but the post-EQ curve still
+    // renders (decoupled selection, not gated by raw availability).
+    perSeatRawCurves: Array.isArray(gp.perSeatRoomResponseCurves) ? gp.perSeatRoomResponseCurves.map((seat) => ({
+      seatId: seat.seatId,
+      responseData: Array.isArray(seat.responseData) ? seat.responseData.map((p) => ({ ...p })) : [],
+    })).filter((seat) => seat.seatId && seat.responseData.length) : [],
     // Graph-source identity fields consumed by buildGraphSourceIdentity
     // are recomputed above (postEqCurveSignature, filterBankSignature).
   };

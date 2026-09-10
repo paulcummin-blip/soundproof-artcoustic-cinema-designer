@@ -190,34 +190,54 @@ export function buildBassGraphSeries({
     if (target) series.push(target);
   } else {
     const selectedRealIds = selectedSeatIds.filter((id) => id !== "rsp");
-    const selectedRawSeats = selectedRealIds.map((id) => multiSeries.find((item) => item.id === id)).filter(Boolean);
     const postEqBySeat = new Map((finalResponse?.postEqPerSeatCurves || []).map((seat) => [seat.seatId, seat]));
-    const seatValidationActive = selectedRawSeats.length > 0;
+    const rawBySeat = new Map((multiSeries || []).map((item) => [item.id, item]));
+    // Decouple Final EQ seat selection from raw Room-response availability.
+    // A selected seat is graph-active if it has EITHER a raw room curve OR a
+    // saved post-EQ curve. A missing raw curve (cached reopen) must never
+    // force a valid saved post-EQ seat curve back to RSP.
+    const selectedPostEqSeats = selectedRealIds.filter((id) => postEqBySeat.has(id));
+    const selectedRawSeats = selectedRealIds.map((id) => rawBySeat.get(id)).filter(Boolean);
+    const seatValidationActive = selectedPostEqSeats.length > 0;
     // Blue curve authority: the product-aware physical response from the
     // room engine. The RP22 target is demand only and must never vertically
     // normalise this curve.
     const storedRspBeforePeq = finalResponse?.physicalRawResponseCurve;
     const hasStoredBlueCurve = Array.isArray(storedRspBeforePeq) && storedRspBeforePeq.length > 0;
-    series = seatValidationActive
-      ? selectedRawSeats.map((seat) => ({ ...seat, id: `${seat.id}-raw`, kind: "raw", label: `${seat.id} before EQ`, tooltipLabel: `${seat.id} before EQ`, strokeDasharray: "6 4", strokeWidth: 1.5, data: applyBassSmoothing(seat.data, smoothingMode) }))
-      : (hasStoredBlueCurve
-        ? [{ id: "rsp-raw", kind: "raw", label: "Physical RSP before EQ", tooltipLabel: "Product-aware physical RSP before EQ", color: "#64748B", strokeWidth: 1.75, strokeDasharray: "6 4", data: applyBassSmoothing(storedRspBeforePeq, smoothingMode) }]
-        : (rspRawCurve.length ? [rawRspSeries(rspRawCurve, smoothingMode)] : []));
+    // Raw "before EQ" layer: show selected seats' raw curves when available.
+    // A seat selected via its saved post-EQ curve (cached reopen, no raw)
+    // simply shows no raw layer — its Final EQ curve still renders.
+    if (seatValidationActive && selectedRawSeats.length > 0) {
+      series = selectedRawSeats.map((seat) => ({ ...seat, id: `${seat.id}-raw`, kind: "raw", label: `${seat.id} before EQ`, tooltipLabel: `${seat.id} before EQ`, strokeDasharray: "6 4", strokeWidth: 1.5, data: applyBassSmoothing(seat.data, smoothingMode) }));
+    } else if (seatValidationActive) {
+      // Seats selected via post-EQ only — no raw layer.
+      series = [];
+    } else if (hasStoredBlueCurve) {
+      series = [{ id: "rsp-raw", kind: "raw", label: "Physical RSP before EQ", tooltipLabel: "Product-aware physical RSP before EQ", color: "#64748B", strokeWidth: 1.75, strokeDasharray: "6 4", data: applyBassSmoothing(storedRspBeforePeq, smoothingMode) }];
+    } else if (rspRawCurve.length) {
+      series = [rawRspSeries(rspRawCurve, smoothingMode)];
+    } else {
+      series = [];
+    }
     const roomResponse = buildRoomResponseSeries(normalizedSeries, smoothingMode, optimisationResult);
     if (roomResponse) series.push(roomResponse);
     if (hasMatchingDetailedResult && finalResponse?.postEqRspCurve?.length) {
       if (seatValidationActive) {
-        series.push(...selectedRawSeats.map((seat, index) => {
-          const postEq = postEqBySeat.get(seat.id);
+        // Post-EQ for any selected seat that has a saved post-EQ curve,
+        // independent of raw curve availability. A seat with post-EQ but no
+        // raw (cached reopen) still renders its Final EQ curve.
+        series.push(...selectedRealIds.map((seatId, index) => {
+          const postEq = postEqBySeat.get(seatId);
           if (!postEq) return null;
-          return { id: `${seat.id}-eq`, kind: "post-eq", label: `${seat.id} after EQ`, tooltipLabel: `${seat.id} after EQ`,
+          const rawSeat = rawBySeat.get(seatId);
+          return { id: `${seatId}-eq`, kind: "post-eq", label: `${seatId} after EQ`, tooltipLabel: `${seatId} after EQ`,
             candidateId: finalResponse.selectedCandidateId, filterBankSignature: finalResponse.filterBankSignature,
             sourcePostEqCurveHash: graphIdentity?.postEqCurveHash || null,
             sourceCandidateId: graphIdentity?.candidateId || null,
             sourceFilterBankSignature: graphIdentity?.filterBankSignature || null,
             sourceFingerprint: graphIdentity?.fingerprint || null,
             sourceCalibrationFingerprint: graphIdentity?.calibrationFingerprint || null,
-            color: seat.color || ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"][index % 6],
+            color: rawSeat?.color || ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"][index % 6],
             strokeWidth: 2.25, data: applyBassSmoothing(postEq.responseData, smoothingMode) };
         }).filter(Boolean));
       } else {

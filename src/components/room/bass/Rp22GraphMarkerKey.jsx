@@ -1,4 +1,5 @@
 import React from "react";
+import { formatP18MarkerLabel } from "@/components/room/bass/rp22GraphMarkers";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
@@ -21,8 +22,6 @@ const MarkerItem = ({ color, dash, children }) => (
 
 export default function Rp22GraphMarkerKey({ markers }) {
   const hasP18 = finite(markers?.p18FrequencyHz);
-  const p18MeasuredHz = hasP18 ? Number(markers.p18FrequencyHz) : null;
-  const p18Rp22Hz = hasP18 ? Math.floor(p18MeasuredHz) : null;
   const hasBand = finite(markers?.p19StartHz) && finite(markers?.p19EndHz);
   const hasP19Worst = finite(markers?.p19WorstFrequencyHz);
   const hasP20Worst = finite(markers?.p20WorstFrequencyHz);
@@ -48,11 +47,21 @@ export default function Rp22GraphMarkerKey({ markers }) {
       }}
     >
       <strong style={{ color: "#1B1A1A" }}>RP22 markers</strong>
-      {hasP18 && (
-        <MarkerItem color="#2563EB" dash="5 4">
-          P18 achieved extension · {p18Rp22Hz} Hz RP22 ({p18MeasuredHz.toFixed(1)} Hz measured)
-        </MarkerItem>
-      )}
+      {hasP18 && (() => {
+        const p18Label = formatP18MarkerLabel(markers);
+        return (
+          <>
+            <MarkerItem color="#2563EB" dash="5 4">
+              {p18Label.short}
+            </MarkerItem>
+            {p18Label.detail && (
+              <span style={{ color: "#64748B" }}>
+                {p18Label.detail}
+              </span>
+            )}
+          </>
+        );
+      })()}
       {hasBand && (
         <span>
           P19 / P20 assessment band · {Math.round(Number(markers.p19StartHz))}–{Math.round(Number(markers.p19EndHz))} Hz

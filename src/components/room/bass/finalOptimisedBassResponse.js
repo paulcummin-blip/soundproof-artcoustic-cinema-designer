@@ -2,7 +2,7 @@ import { buildCurveSignature, buildFilterBankSignature } from "@/components/room
 
 const cloneCurve = (curve) => (Array.isArray(curve) ? curve.map((point) => ({ ...point })) : []);
 
-export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLayout = [], roomResponseCurve = null }) {
+export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLayout = [], roomResponseCurve = null, perSeatRawCurves = [] }) {
   const candidate = optimisationResult?.selectedCandidate;
   if (!candidate?.candidateId || !Array.isArray(candidate.finalPostEqCurve) || !candidate.finalPostEqCurve.length) return null;
 
@@ -94,6 +94,8 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
         level: candidate.achievedP19Level ?? null,
         variationDb: candidate.achievedP19VariationDb ?? null,
         worstFrequencyHz: candidate.officialP19WorstFrequencyHz ?? null,
+        perSeatResults: (Array.isArray(candidate.perSeatP19Results) ? candidate.perSeatP19Results : [])
+          .map((seat) => ({ ...seat, candidateId: candidate.candidateId })),
       },
       p20: {
         candidateId: candidate.candidateId,
@@ -104,6 +106,12 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
           .map((seat) => ({ ...seat, candidateId: candidate.candidateId })),
       },
     },
+    // Raw per-seat room response curves (before EQ). Persisted in the graph
+    // payload so the graph can show raw → EQ → target for any selected seat
+    // after cached reopen, even when the live simulation has not re-run.
+    perSeatRawCurves: (Array.isArray(perSeatRawCurves) ? perSeatRawCurves : [])
+      .map((seat) => ({ seatId: seat.seatId, responseData: cloneCurve(seat.responseData) }))
+      .filter((seat) => seat.seatId && seat.responseData.length),
     assessmentStartHz: candidate.assessmentStartHz ?? null,
     assessmentEndHz: candidate.assessmentEndHz ?? null,
     correctionStartHz: candidate.correctionStartHz ?? null,
@@ -166,6 +174,8 @@ export function applyAuthorityToCanonicalResult(canonicalResult, authorityBearin
         level: candidate.achievedP19Level ?? null,
         variationDb: candidate.achievedP19VariationDb ?? null,
         worstFrequencyHz: candidate.officialP19WorstFrequencyHz ?? null,
+        perSeatResults: (Array.isArray(candidate.perSeatP19Results) ? candidate.perSeatP19Results : [])
+          .map((seat) => ({ ...seat, candidateId: candidate.candidateId })),
       },
       p20: {
         candidateId: candidate.candidateId,
