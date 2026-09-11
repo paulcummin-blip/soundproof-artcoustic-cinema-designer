@@ -21,7 +21,8 @@ import {
   ASSUMED_P21_OPTIONS,
   getAssumedP15DisplayValue,
   getAssumedP21DisplayValue,
-  isAssumedLevelSet,
+  resolveAssumedP15Level,
+  resolveAssumedP21Level,
 } from "@/components/utils/assumedParameterAuthority";
 
 const LABEL_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -34,7 +35,7 @@ export default function P15P21AssumptionControl({
 }) {
   const isP15 = Number(paramId) === 15;
   const options = isP15 ? ASSUMED_P15_OPTIONS : ASSUMED_P21_OPTIONS;
-  const currentLevel = isAssumedLevelSet(value) ? String(value).toUpperCase() : null;
+  const currentLevel = isP15 ? resolveAssumedP15Level(value) : resolveAssumedP21Level(value);
   const displayValue = isP15
     ? getAssumedP15DisplayValue(value)
     : getAssumedP21DisplayValue(value);

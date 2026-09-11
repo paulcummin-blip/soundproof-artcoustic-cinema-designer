@@ -16,6 +16,7 @@
  */
 
 import { isBassPublicationVerified } from "./artcousticSystemDesignRating";
+import { getEffectiveAssumedLevel } from "@/components/utils/assumedParameterAuthority";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
@@ -251,7 +252,7 @@ export function buildDesignRatingInput({
     p12,
     p13,
     p14,
-    p15: assumedP15Level || null,
+    p15: getEffectiveAssumedLevel(assumedP15Level),
     p18,
     // Seat-scope
     p1: seatScope.p1,
@@ -264,7 +265,7 @@ export function buildDesignRatingInput({
     p17: seatScope.p17,
     p19: seatScope.p19,
     p20: seatScope.p20,
-    p21: assumedP21Level || null,
+    p21: getEffectiveAssumedLevel(assumedP21Level),
     screen: screenInput,
   };
 }

@@ -24,7 +24,8 @@ import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl
 import {
   getAssumedP15DisplayValue,
   getAssumedP21DisplayValue,
-  isAssumedLevelSet,
+  resolveAssumedP15Level,
+  resolveAssumedP21Level,
 } from "@/components/utils/assumedParameterAuthority";
 
 /* ---------- Helpers */
@@ -602,11 +603,11 @@ export default function RP22CompliancePanel({
       if (pid === 11) return "L4";
 
       if (pid === 15) {
-        return isAssumedLevelSet(assumedP15Level) ? assumedP15Level : "—";
+        return resolveAssumedP15Level(assumedP15Level);
       }
 
       if (pid === 21) {
-        return isAssumedLevelSet(assumedP21Level) ? assumedP21Level : "—";
+        return resolveAssumedP21Level(assumedP21Level);
       }
 
       return "—";

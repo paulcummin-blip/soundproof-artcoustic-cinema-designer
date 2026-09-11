@@ -11,7 +11,7 @@
 
 import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
 import { p18ThresholdsForBasis } from "@/components/utils/p18ExtensionAuthority";
-import { normalizeAssumedLevel } from "@/components/utils/assumedParameterAuthority";
+import { resolveAssumedP15Level, resolveAssumedP21Level } from "@/components/utils/assumedParameterAuthority";
 
 /* ---------- P12/P13/P14 mode-aware threshold resolver ---------- */
 
@@ -136,7 +136,7 @@ export function resolveRoomParameterLevel(paramId, {
   }
   if (pid === 8) return "L4";
   if (pid === 11) return "L4";
-  if (pid === 15) return normalizeAssumedLevel(assumedP15Level) || "—";
-  if (pid === 21) return normalizeAssumedLevel(assumedP21Level) || "—";
+  if (pid === 15) return resolveAssumedP15Level(assumedP15Level);
+  if (pid === 21) return resolveAssumedP21Level(assumedP21Level);
   return "—";
 }

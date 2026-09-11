@@ -36,7 +36,7 @@ import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 import gradeP1Distance from "@/components/utils/rp22/p1LevelAuthority";
 import { isAuthoritativeBassContract } from "@/components/room/bass/completedBassResultPersistence";
 import { assessP18Extension } from "@/components/utils/p18ExtensionAuthority";
-import { normalizeAssumedLevel } from "@/components/utils/assumedParameterAuthority";
+import { getEffectiveAssumedLevel } from "@/components/utils/assumedParameterAuthority";
 
 // ═══════════════════════════════════════════════════════════════
 // Fixed V1 constants
@@ -349,14 +349,12 @@ function scoreScreen(angleDeg) {
 // IS the authority — no acoustic calculation is involved. The rating engine
 // consumes the assumed level directly as the scored level.
 function scoreP15Assumed(assumedLevel) {
-  const lvl = normalizeAssumedLevel(assumedLevel);
-  if (!lvl) return { level: null, provisional: true };
+  const lvl = getEffectiveAssumedLevel(assumedLevel);
   return { level: lvl };
 }
 
 function scoreP21Assumed(assumedLevel) {
-  const lvl = normalizeAssumedLevel(assumedLevel);
-  if (!lvl) return { level: null, provisional: true };
+  const lvl = getEffectiveAssumedLevel(assumedLevel);
   return { level: lvl };
 }
 
