@@ -650,3 +650,16 @@ export function useCompletedBassAuthority(projectId) {
 export function useCompletedBassContract(projectId) {
   return useCompletedBassAuthority(projectId).contract;
 }
+
+/**
+ * Test-only: reset all in-memory completed bass authority state. Simulates
+ * a fresh app restart so lifecycle tests can verify cache→authority promotion
+ * without lingering state from a previous test.
+ */
+export function _resetCompletedBassStoreForTest() {
+  memoryByProject.clear();
+  writeQueues.clear();
+  syncSignatures.clear();
+  projectAuthorityState.clear();
+  notify();
+}

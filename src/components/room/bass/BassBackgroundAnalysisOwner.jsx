@@ -601,7 +601,15 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // publish, no authority marking, no cache seeding.
     if (!isProjectHydrationReady || !targetKey) return;
     // ── Cache hit: publish cached compact contract directly, skip optimiser ──
-    if (cachedContract && manualRequestMatchesCurrent) {
+    // Two cases:
+    // 1. Manual calculate for current target (manualRequestMatchesCurrent) —
+    //    publish cache hit instead of running the optimiser.
+    // 2. P14 target switch with no manual request (!manualAnalysisRequest) —
+    //    hydrate the cached contract immediately so the UI shows the prepared
+    //    result without recalculation. publishCachedCompactBassContract
+    //    validates fingerprint + P14 identity, so a stale/wrong contract is
+    //    never published.
+    if (cachedContract && (manualRequestMatchesCurrent || !manualAnalysisRequest)) {
       // LIMITED cache hit: the requested P14 dBC is physically unattainable.
       // Publish as a LIMITED authority (not AUTHORITATIVE) so the UI can show
       // the P14 capability shortfall without running the optimiser again.
@@ -842,6 +850,15 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // contract whose fingerprint equals the current cacheKey and whose P14
   // identity matches the current selection, AND that same contract must be
   // the current completed authority (currentFingerprint === cacheKey).
+  // PATH A — EXISTING CACHED CURRENT TARGET:
+  //   The cached contract itself is the proof that the foreground target is
+  //   ready. We do NOT require completedBassAuthority.currentFingerprint ===
+  //   cacheKey here because the publish effect promotes the cached contract
+  //   asynchronously — requiring the store to already match would prevent
+  //   the background scheduler from starting on the first render after a P14
+  //   target switch (chicken-and-egg: scheduler needs foregroundReady, but
+  //   foregroundReady needs the store to match, but the store is only updated
+  //   by the publish effect which runs after render).
   const foregroundReadyPathA = isProjectHydrationReady
     && targetCacheHydrated
     && !!cachedContract
@@ -849,13 +866,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && !!cachedContract?.job?.resultFingerprint
     && cachedContract.job.resultFingerprint === cacheKey
     && (
-      // AUTHORITATIVE: full P14/P18/P19/P20 authority with graph payload
       (isAuthoritativeBassContract(cachedContract)
-        && hasGraphPayload(cachedContract)
-        && !!completedBassAuthority?.authoritative
-        && completedBassAuthority?.currentFingerprint === cacheKey)
-      // LIMITED: terminal P14 capability shortfall (no P19). The foreground
-      // target is resolved — the scheduler may proceed to fill the family.
+        && hasGraphPayload(cachedContract))
       || isValidLimitedP14Contract(cachedContract)
     );
   const foregroundReadyPathB = isProjectHydrationReady
@@ -1014,10 +1026,48 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     });
   }, [scopeId, baseDesignFingerprint, targetKey, foregroundReady, backgroundInputsReady, manualAnalysisRequest, heavyActionRunning, stage2Updating, targetFamilyProgress.resolved, targetFamilyProgress.total, calcAllTargetsRequest, allTargets]);
 
+  // ── Auto-calculate missing target on P14 switch (foreground priority) ──
+  // When the user switches to a missing (uncached) target:
+  //   a. While the background scheduler is running: auto-start a foreground
+  //      calculation (promote to foreground priority). onCalculate() pauses
+  //      the scheduler, the foreground calculation runs and publishes, then
+  //      the resume effect (below) restarts the scheduler for remaining targets.
+  //   b. On project reopen with a partial cache: auto-calculate the missing
+  //      foreground target, then the scheduler fills the remaining targets.
+  //   c. If the scheduler is already calculating this target (it was in the
+  //      queue and the user switched to it): do nothing — the scheduler's job
+  //      is reused, and the publish effect publishes the result when it completes.
+  // Prevents duplicate jobs: at most one calculation per base fingerprint + target.
+  const autoCalculatedKeyRef = useRef(null);
+  useEffect(() => {
+    if (!isProjectHydrationReady || !targetKey || !canCalculate) return;
+    if (manualAnalysisRequest || calculationInProgress) return;
+    if (cachedContract) return; // Already cached — publish effect handles it
+    // Only auto-calculate once per target key + base design fingerprint
+    const autoKey = `${targetKey}|${baseDesignFingerprint}`;
+    if (autoCalculatedKeyRef.current === autoKey) return;
+    const scheduler = getP14TargetBackgroundScheduler();
+    // c. Scheduler is already calculating this target — reuse the job
+    if (scheduler.currentTarget?.key === targetKey) return;
+    // a. Scheduler is running OR b. partial cache on reopen
+    const hasPartialCache = targetFamilyProgress.resolved > 0
+      && targetFamilyProgress.resolved < targetFamilyProgress.total;
+    if (scheduler.hasActiveBatchWork() || hasPartialCache) {
+      const result = onCalculate();
+      if (result?.action === "queued") {
+        autoCalculatedKeyRef.current = autoKey;
+      }
+    }
+  }, [isProjectHydrationReady, targetKey, canCalculate, manualAnalysisRequest, calculationInProgress, cachedContract, targetFamilyProgress.resolved, targetFamilyProgress.total, baseDesignFingerprint, onCalculate]);
+
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target
   // identity may still be in pre-hydration/default/transitional state.
-  const visibleCachedContract = manualRequestMatchesCurrent ? cachedContract : null;
+  // Show cached contract on BOTH manual calculate (manualRequestMatchesCurrent)
+  // AND P14 target switch (!manualAnalysisRequest). This gives the UI the
+  // cached contract on the FIRST render after a target switch — before the
+  // publish effect has promoted it to the live authority store.
+  const visibleCachedContract = (manualRequestMatchesCurrent || !manualAnalysisRequest) ? cachedContract : null;
   const effectiveContract = isProjectHydrationReady
     ? (visibleCachedContract || contract || (completedContractMatches ? completedContract : null))
     : null;
@@ -1112,15 +1162,27 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // FIX 2: Explicit terminal calculation outcome. Distinguishes success,
   // error, timeout, cancelled, stale, and rejected — never implies success
   // merely because the button returned to idle.
+  // When a valid cached contract exists for the current target (P14 target
+  // switch with no manual request), the outcome is "success" immediately —
+  // do not wait for the publish effect to promote the cached contract to the
+  // live authority store. This prevents a transient "stale" / "idle" flash
+  // when switching to a prepared target.
+  const hasValidCachedContractForOutcome = !calculationInProgress
+    && !!cachedContract
+    && !manualAnalysisRequest
+    && bassContractMatchesRequestedP14(cachedContract, requested)
+    && cachedContract?.job?.resultFingerprint === cacheKey
+    && (isAuthoritativeBassContract(cachedContract) || isValidLimitedP14Contract(cachedContract));
   const calculationOutcome = calculationInProgress
     ? calculationPhase  // "preparing" | "optimising" | "finalising"
-    : (lastTerminalOutcome?.outcome
-        || (completedBassAuthority?.authorityStatus === "AUTHORITATIVE" ? "success"
-          : completedBassAuthority?.authorityStatus === "LIMITED" ? "success"
-          : completedBassAuthority?.authorityStatus === "STALE" ? "stale"
-          : completedBassAuthority?.authorityStatus === "ERROR" ? "error"
-          : completedBassAuthority?.authorityStatus === "NOT_VERIFIED" ? "rejected"
-          : "idle"));
+    : (hasValidCachedContractForOutcome ? "success"
+        : (lastTerminalOutcome?.outcome
+          || (completedBassAuthority?.authorityStatus === "AUTHORITATIVE" ? "success"
+            : completedBassAuthority?.authorityStatus === "LIMITED" ? "success"
+            : completedBassAuthority?.authorityStatus === "STALE" ? "stale"
+            : completedBassAuthority?.authorityStatus === "ERROR" ? "error"
+            : completedBassAuthority?.authorityStatus === "NOT_VERIFIED" ? "rejected"
+            : "idle")));
   const terminalMessage = calculationOutcome === "error"
     ? (lastTerminalOutcome?.message || "Bass calculation could not be completed. Please try again.")
     : calculationOutcome === "timeout"
