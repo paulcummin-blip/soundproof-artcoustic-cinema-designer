@@ -125,7 +125,7 @@ export function assessP18AgainstRequiredExtension({
   // product capability validity floor when the active subwoofers have no
   // authoritative engineering data below that point. A response still above
   // the -3 dB cutoff at this floor is a BOUNDED result (extension is at or
-  // below the floor), not a measured crossing — see computeInRoomF3FromResponseCurve.
+  // below the floor), not a measured crossing — see computeResponseTargetF3.
   const simulationMinHz = 15;
   const productFloorHz = Number.isFinite(Number(productCurveMinHz)) ? Number(productCurveMinHz) : null;
   const validMinHz = productFloorHz != null ? Math.max(simulationMinHz, productFloorHz) : simulationMinHz;

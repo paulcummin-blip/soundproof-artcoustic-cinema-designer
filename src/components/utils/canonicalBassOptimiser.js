@@ -620,6 +620,7 @@ function buildCanonicalCandidate({
       p18CutoffDb: null,
       configuredUsableLfHz: usableLfHz,
       productCurveMinHz: refinementProductCurveMinHz,
+      activeSubs,
     });
     const achievedP18Hz = p18Assessment?.achievedExtensionHz ?? null;
     const achievedP18Bounded = p18Assessment?.achievedExtensionBounded ?? false;

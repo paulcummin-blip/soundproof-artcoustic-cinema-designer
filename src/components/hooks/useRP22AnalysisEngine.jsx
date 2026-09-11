@@ -968,7 +968,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           p14Value: bassP14?.value ?? null,
         };
         temporaryP18ExecutionCount += 1;
-        bassP18 = computeParam18BassExtension(p18InputCurve, bassP14);
+        bassP18 = computeParam18BassExtension(
+          p18InputCurve,
+          bassP14,
+          designEqSystemLimits.activeSubs,
+          designEqSystemLimits.usableLfHz,
+        );
         temporaryTrace.p18ExecutionCount = temporaryP18ExecutionCount;
         temporaryTrace.p18 = { value: bassP18?.value ?? null, formatted: bassP18?.formatted ?? null, level: bassP18?.level ?? null };
         __p18DebugData.targets = bassP18?.targets ?? null;
@@ -1013,6 +1018,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             perSeatResponses: usableSeatResponses,
             transitionHz,
             rspSeatId: rspSeatIdForBass,
+            lowerHz: achievedP18Hz,
           });
         }
       }

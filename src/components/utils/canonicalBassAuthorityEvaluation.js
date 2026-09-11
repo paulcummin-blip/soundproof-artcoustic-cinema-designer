@@ -318,6 +318,7 @@ export function evaluateCanonicalBassAuthority({
     p18CutoffDb: requested?.p18CutoffDb,
     configuredUsableLfHz: usableLfHz,
     productCurveMinHz,
+    activeSubs,
   });
   const extensionShapePass = extensionAssessment?.passes ?? null;
   const requestedP18Pass = extensionShapePass;
