@@ -171,8 +171,10 @@ export function assessP14Capability({ activeSubs = [], productCapabilityDb = nul
 
   return {
     p14CapabilityDb,
+    safeCapabilityDb: p14CapabilityDb,
     limitingFrequency: limitingPoint?.frequency ?? null,
     rawCapabilityDb: rawAssessment.value,
+    capabilityReserveDb: P14_SAFETY_MARGIN_DB,
     eqHeadroomConsumedDb,
     safetyMarginDb: P14_SAFETY_MARGIN_DB,
     capabilityCurve,

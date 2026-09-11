@@ -273,8 +273,11 @@ export function buildProductOperatingEnvelope({
   const curve = capabilities.map((point) => {
     const targetSpl = interpolateCorrection(targetCurve, point.frequency);
     const productRelativeCapabilityDb = point.capabilityDb - referenceCapabilityDb;
+    // operatingMarginDb already contains the 3 dB reserve (p14CapabilityDb
+    // is safe capability = raw − BASS_CAPABILITY_RESERVE_DB). Do NOT subtract
+    // another margin here — that was the 5 dB double-application defect.
     const relativeProductLimitDb = productRelativeCapabilityDb
-      + operatingMarginDb - MAXIMUM_SPL_SAFETY_MARGIN_DB;
+      + operatingMarginDb;
     return {
       frequency: point.frequency,
       spl: Number.isFinite(targetSpl) ? targetSpl + relativeProductLimitDb : point.capabilityDb,
@@ -288,6 +291,8 @@ export function buildProductOperatingEnvelope({
   return {
     curve,
     p14CapabilityDb,
+    rawP14CapabilityDb: productP14?.rawCapabilityDb ?? null,
+    capabilityReserveDb: BASS_CAPABILITY_RESERVE_DB,
     operatingMarginDb,
     operatingHeadroomDb,
     p14ShortfallDb,
@@ -906,7 +911,7 @@ function buildCanonicalCandidate({
     productOperatingShortfallDb: productOperatingEnvelope.p14ShortfallDb,
     productExtensionBandEndHz: productOperatingEnvelope.extensionBandEndHz,
     productOperatingReferenceCapabilityDb: productOperatingEnvelope.referenceCapabilityDb,
-    maximumSplSafetyMarginDb: MAXIMUM_SPL_SAFETY_MARGIN_DB,
+    maximumSplSafetyMarginDb: BASS_CAPABILITY_RESERVE_DB,
     maximumSplGlobalEqTrimDb: maximumAfterEq.globalEqTrimDb,
     maximumSplAuthority: {
       method: "authoritative-position-aware-engine-envelope",
@@ -914,7 +919,7 @@ function buildCanonicalCandidate({
       includesRoomGeometry: true,
       includesProductFrequencyResponse: true,
       includesProductOutputLimit: true,
-      safetyMarginDb: MAXIMUM_SPL_SAFETY_MARGIN_DB,
+      safetyMarginDb: BASS_CAPABILITY_RESERVE_DB,
     },
     requestedPreEqOperatingCurve: requestedPreEqCurve,
     rspBeforePeqAtOperatingLevel: achievedPreEqCurve,

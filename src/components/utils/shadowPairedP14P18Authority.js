@@ -1,5 +1,5 @@
 import { getApprovedContinuousSplDb, getApprovedFrequencyRangeHz, getSubwooferCurve, normaliseModelKey } from "@/components/models/speakers/registry";
-import { p14ThresholdsForBasis, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
+import { p14ThresholdsForBasis, normalizeP14TargetBasis, P14_SAFETY_MARGIN_DB } from "@/components/utils/p14CapabilityAuthority";
 import { smoothThirdOctavePowerMean } from "@/components/utils/thirdOctavePowerMean";
 import { P18_THRESHOLDS_BY_BASIS } from "@/components/utils/p18ExtensionAuthority";
 
@@ -185,14 +185,18 @@ export function assessShadowPairedP14P18({ activeSubs = [], perSourceComplexTran
   }
   if (!rawDeliveredCurve.length) return { status: "INCOMPLETE DATA", reason: "No shared product-and-transfer frequency range is available.", targetBasis: basis, levelResults: [] };
 
-  // The product-plus-room capability envelope is independent of the
-  // operating-level EQ bank. EQ shapes the requested response toward the house
-  // curve and is capped by this envelope elsewhere in the canonical optimiser;
-  // it must not move the maximum-capability authority itself.
+  // Apply the canonical 3 dB capability reserve ONCE to the raw position-aware
+  // delivered curve. The rawDeliveredCurve is raw product × room transfer with
+  // no reserve. The P14 target thresholds (e.g. 109 for L1 minimum) are the
+  // required SAFE capability levels, so the delivered curve must be derated
+  // before comparison. This is the same single 3 dB reserve used by scalar P14,
+  // the product operating envelope, and the EQ boost allowance — NOT a
+  // separate margin.
   const postEqDeliveredCurve = rawDeliveredCurve.map((point) => ({
     frequency: point.frequency,
-    spl: point.spl,
+    spl: point.spl - P14_SAFETY_MARGIN_DB,
     positiveEqCostDb: 0,
+    rawCapabilityDb: point.spl,
   }));
   const smoothedDeliveredCurve = smoothThirdOctavePowerMean(postEqDeliveredCurve);
   const thresholds = p14ThresholdsForBasis(basis);
@@ -221,6 +225,7 @@ export function assessShadowPairedP14P18({ activeSubs = [], perSourceComplexTran
     targetBasis: basis,
     pairedP14Grade: winner?.level ?? "FAIL",
     pairedP18Grade: winner?.level ?? "FAIL",
+    capabilityReserveDb: P14_SAFETY_MARGIN_DB,
     rawDeliveredCurve,
     postEqDeliveredCurve,
     smoothedDeliveredCurve,
