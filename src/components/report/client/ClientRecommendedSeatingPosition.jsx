@@ -32,9 +32,6 @@ const ZONES = [
 
 const LEGEND_ITEMS = ZONES.map((z) => ({ label: z.label, fill: z.fill }));
 
-const CLIENT_EXPLANATION =
-  "The two centre seats sit within the preferred listening area, giving them the greatest separation from the room boundaries. The outer seats remain good listening positions, while their closer proximity to the side walls slightly reduces their spatial performance.";
-
 export default function ClientRecommendedSeatingPosition({
   roomDims,
   seats,
@@ -424,20 +421,6 @@ export default function ClientRecommendedSeatingPosition({
       </div>
       </>)}
 
-      {/* ── Client explanation (screen only — print uses the result region) ── */}
-      {!print && (
-        <p style={{
-          fontSize: 13,
-          color: "#625143",
-          textAlign: "center",
-          maxWidth: 520,
-          lineHeight: 1.5,
-          margin: 0,
-          fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-        }}>
-          {CLIENT_EXPLANATION}
-        </p>
-      )}
     </div>
   );
 }

@@ -354,14 +354,6 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 printPart="support"
               />
             </div>
-            <div className="client-report-print-result">
-              <div className="client-report-print-result__content">
-                <div className="client-report-print-result__label">Recommended Seating Position</div>
-                <div className="client-report-print-result__explanation">
-                  The two centre seats sit within the preferred listening area, giving them the greatest separation from the room boundaries. The outer seats remain good listening positions, while their closer proximity to the side walls slightly reduces their spatial performance.
-                </div>
-              </div>
-            </div>
           </>
         )}
       </div>
