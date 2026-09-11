@@ -63,6 +63,10 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   // Local live drag state for sub dragging — avoids calling onFrontSubMoved on every mousemove
   const [liveDragSubs, setLiveDragSubs] = useState(null); // { [index]: {x, z} } | null
   const liveDragSubsRef = useRef(null); // readable in mouseup without stale closure
+  // Local live drag state for LCR dragging — avoids calling onLcrSpeakerMoved on every mousemove.
+  // Preview-only during drag; one authoritative commit on release.
+  const [liveDragLcr, setLiveDragLcr] = useState(null); // { FL: {x,z}, FC: {x,z}, FR: {x,z} } | null
+  const liveDragLcrRef = useRef(null); // readable in mouseup without stale closure
   // Live refs so mousemove handler can read current speaker positions without stale closure
   const lcrSpeakersRef = useRef([]);
   const subItemsRef = useRef([]);
@@ -166,7 +170,35 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         liveDragSubsRef.current = liveMap;
         setLiveDragSubs({ ...liveMap });
       } else {
-        onMovedRef.current?.({ role: drag.role, newX: snappedX, newZ: snappedZ, axis: drag.axisLocked });
+        // LCR local preview — do NOT call onLcrSpeakerMoved here.
+        // Pairing logic mirrors handleLcrSpeakerMoved's setSpeakers logic.
+        const liveMap = { ...(liveDragLcrRef.current || {}) };
+        liveMap[drag.role] = { x: snappedX, z: snappedZ };
+        if (drag.axisLocked === 'x' && drag.role === 'FL') {
+          const frSpk = lcrSpeakersRef.current.find(s => s.role === 'FR');
+          liveMap['FR'] = { x: rW - snappedX, z: liveMap['FR']?.z ?? frSpk?.z ?? snappedZ };
+        }
+        if (drag.axisLocked === 'x' && drag.role === 'FR') {
+          const flSpk = lcrSpeakersRef.current.find(s => s.role === 'FL');
+          liveMap['FL'] = { x: rW - snappedX, z: liveMap['FL']?.z ?? flSpk?.z ?? snappedZ };
+        }
+        if (drag.axisLocked === 'z') {
+          const flSpk = lcrSpeakersRef.current.find(s => s.role === 'FL');
+          const fcSpk = lcrSpeakersRef.current.find(s => s.role === 'FC');
+          const frSpk = lcrSpeakersRef.current.find(s => s.role === 'FR');
+          const allSameModel = flSpk && fcSpk && frSpk && flSpk.modelKey === fcSpk.modelKey && fcSpk.modelKey === frSpk.modelKey;
+          if (allSameModel) {
+            liveMap['FL'] = { x: liveMap['FL']?.x ?? flSpk?.x ?? snappedX, z: snappedZ };
+            liveMap['FC'] = { x: liveMap['FC']?.x ?? fcSpk?.x ?? snappedX, z: snappedZ };
+            liveMap['FR'] = { x: liveMap['FR']?.x ?? frSpk?.x ?? snappedX, z: snappedZ };
+          } else if (drag.role === 'FL' || drag.role === 'FR') {
+            const otherRole = drag.role === 'FL' ? 'FR' : 'FL';
+            const otherSpk = lcrSpeakersRef.current.find(s => s.role === otherRole);
+            liveMap[otherRole] = { x: liveMap[otherRole]?.x ?? otherSpk?.x ?? snappedX, z: snappedZ };
+          }
+        }
+        liveDragLcrRef.current = liveMap;
+        setLiveDragLcr({ ...liveMap });
         if (drag.axisLocked === 'z') {
           setAlignGuideRef.current?.({ draggingRole: drag.role, liveZ: snappedZ });
           // Update TV centre snap state for FL/FR
@@ -198,6 +230,17 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         }
         liveDragSubsRef.current = null;
         setLiveDragSubs(null);
+      } else {
+        // LCR commit: one authoritative call on release (not on every mousemove).
+        const liveMap = liveDragLcrRef.current;
+        if (liveMap && drag.axisLocked) {
+          const live = liveMap[drag.role];
+          if (live) {
+            onMovedRef.current?.({ role: drag.role, newX: live.x, newZ: live.z, axis: drag.axisLocked });
+          }
+        }
+        liveDragLcrRef.current = null;
+        setLiveDragLcr(null);
       }
       dragRef.current = null;
       if (isDraggingRef) isDraggingRef.current = false;
@@ -238,12 +281,16 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         const meta = getSpeakerModelMeta(s?.model, tvPresetKey);
         const wM = (meta && !meta.notFound && meta.widthM) ? meta.widthM : 0.20;
         const hM = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.20;
-        const x = Number.isFinite(s?.position?.x) ? s.position.x : roomW / 2;
-        const z = Number.isFinite(s?.position?.z) ? s.position.z : 1.2;
+        const baseX = Number.isFinite(s?.position?.x) ? s.position.x : roomW / 2;
+        const baseZ = Number.isFinite(s?.position?.z) ? s.position.z : 1.2;
+        const role = canonFront(s.role);
+        const liveOverride = liveDragLcr?.[role];
+        const x = liveOverride ? liveOverride.x : baseX;
+        const z = liveOverride ? liveOverride.z : baseZ;
         const modelKey = normaliseModelKey(s?.model);
-        return { role: canonFront(s.role), x, z, wM, hM, label: canonFront(s.role), modelKey };
+        return { role, x, z, wM, hM, label: role, modelKey };
       });
-  }, [placedSpeakers, roomW, tvPresetKey]);
+  }, [placedSpeakers, roomW, tvPresetKey, liveDragLcr]);
 
   // Front subs — always returns a plain array
   const subItems = useMemo(() => {

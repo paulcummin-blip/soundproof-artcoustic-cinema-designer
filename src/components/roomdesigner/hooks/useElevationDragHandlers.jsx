@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { safeCanon } from "@/components/room/utils/speakerHelpers";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { detectFrontStageMode, resolveLcrHeightAuthority } from "@/components/roomdesigner/utils/lcrHeightAuthority";
 
 /**
  * Provides drag callbacks for the Front Elevation and Side Elevation views.
@@ -64,7 +65,9 @@ export function useElevationDragHandlers({
     }));
 
     if (axis === 'z') {
-      appState?.updateGlobalSpl?.({ lcrHeightM: newZ });
+      const frontStageMode = detectFrontStageMode(placedSpeakers);
+      const patch = resolveLcrHeightAuthority({ role, newZ, frontStageMode });
+      appState?.updateGlobalSpl?.(patch);
     }
   }, [setSpeakers, stableDimensions.widthM, stableDimensions.width, placedSpeakers, appState?.updateGlobalSpl]);
 
