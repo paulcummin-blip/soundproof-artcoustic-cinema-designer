@@ -123,7 +123,14 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
   // direct-path-only results that are NOT a room transfer. buildNormalizedPhysicsOptions
   // forces all the same values the old normalized-refinement path used, guaranteeing
   // numerical equivalence with the legacy transfers.
-  const flatTransferPhysics = buildNormalizedPhysicsOptions(physics);
+  // CRITICAL FIX: pass qStrategy from qStrategyOverride so the flat-source
+  // transfers use the same AB-corrected room-field authority as the main
+  // product-aware simulation (engineOptionsBase above). Without this, the
+  // companion flat Room-response graph layer falls back to the legacy modal
+  // room-field construction while the product-aware path uses AB-corrected,
+  // creating apparent contradictions of tens of dB between the purple Room
+  // response and the orange Product + room maximum.
+  const flatTransferPhysics = buildNormalizedPhysicsOptions({ ...physics, qStrategy: qStrategyOverride });
   const perSourceRspComplexTransfers = [];
   if (rspPosition && Number.isFinite(rspPosition.x) && Number.isFinite(rspPosition.y)) {
     const rspListenerZ = Number.isFinite(Number(rspPosition.z)) ? Number(rspPosition.z) : 1.2;
