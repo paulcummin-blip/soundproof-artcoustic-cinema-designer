@@ -505,7 +505,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     setFrontStageMode(nextMode);
     setSoundbarModel(nextSoundbarModel);
     applyFrontStage(lcrModel, nextMode, nextSoundbarModel);
-  }, [applyFrontStage, lcrModel, soundbarModel, splConfig?.lcrLRHeightM, splConfig?.lcrHeightM, defaultLcrHeightM, clampLcrHeight, updateGlobalSpl]);
+  }, [applyFrontStage, lcrModel, soundbarModel, splConfig?.lcrLRHeightM, splConfig?.lcrHeightM, defaultLcrHeightM, clampLcrHeight, updateGlobalSpl, tvVerticalCentreM]);
 
   const onChooseSoundbarModel = useCallback((modelLabel) => {
     if (!soundbarOptions.some(opt => opt.label === modelLabel)) return;
