@@ -293,19 +293,29 @@ export function MultiSoundbarArtworkFaceIcon({ x, y, width, height }) {
       y={y}
       width={width}
       height={height}
-      viewBox="0 0 1872 100"
+      viewBox="0 0 1558 90"
       xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="none"
       style={{ overflow: 'visible' }}
     >
+      <defs>
+        <filter id="multi-bw-83" color-interpolation-filters="sRGB">
+          <feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0"/>
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues="0 0 0 0 0 0 0 0 1 1"/>
+            <feFuncG type="table" tableValues="0 0 0 0 0 0 0 0 1 1"/>
+            <feFuncB type="table" tableValues="0 0 0 0 0 0 0 0 1 1"/>
+          </feComponentTransfer>
+        </filter>
+      </defs>
       <image
         x={0}
         y={0}
-        width={1872}
-        height={100}
+        width={1558}
+        height={90}
         href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/2e7972c70_Screenshot2026-09-11at171928.png"
-        preserveAspectRatio="xMidYMid meet"
-        style={{ filter: 'grayscale(1) contrast(2) brightness(0.9)' }}
+        preserveAspectRatio="none"
+        filter="url(#multi-bw-83)"
       />
     </svg>
   );
@@ -333,19 +343,29 @@ export function MultiSoundbar77ArtworkFaceIcon({ x, y, width, height }) {
       y={y}
       width={width}
       height={height}
-      viewBox="0 0 1711 100"
+      viewBox="0 0 1588 106"
       xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="none"
       style={{ overflow: 'visible' }}
     >
+      <defs>
+        <filter id="multi-bw-77" color-interpolation-filters="sRGB">
+          <feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0"/>
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues="0 0 0 0 0 0 0 0 1 1"/>
+            <feFuncG type="table" tableValues="0 0 0 0 0 0 0 0 1 1"/>
+            <feFuncB type="table" tableValues="0 0 0 0 0 0 0 0 1 1"/>
+          </feComponentTransfer>
+        </filter>
+      </defs>
       <image
         x={0}
         y={0}
-        width={1711}
-        height={100}
+        width={1588}
+        height={106}
         href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/0916b89aa_Screenshot2026-09-11at172124.png"
-        preserveAspectRatio="xMidYMid meet"
-        style={{ filter: 'grayscale(1) contrast(2) brightness(0.9)' }}
+        preserveAspectRatio="none"
+        filter="url(#multi-bw-77)"
       />
     </svg>
   );
@@ -373,19 +393,29 @@ export function MultiSoundbar65ArtworkFaceIcon({ x, y, width, height }) {
       y={y}
       width={width}
       height={height}
-      viewBox="0 0 1411 100"
+      viewBox="0 0 1544 118"
       xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="none"
       style={{ overflow: 'visible' }}
     >
+      <defs>
+        <filter id="multi-bw-65" color-interpolation-filters="sRGB">
+          <feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0"/>
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues="0 0 0 0 0 0 0 0 1 1"/>
+            <feFuncG type="table" tableValues="0 0 0 0 0 0 0 0 1 1"/>
+            <feFuncB type="table" tableValues="0 0 0 0 0 0 0 0 1 1"/>
+          </feComponentTransfer>
+        </filter>
+      </defs>
       <image
         x={0}
         y={0}
-        width={1411}
-        height={100}
+        width={1544}
+        height={118}
         href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/59627c502_Screenshot2026-09-11at172257.png"
-        preserveAspectRatio="xMidYMid meet"
-        style={{ filter: 'grayscale(1) contrast(2) brightness(0.9)' }}
+        preserveAspectRatio="none"
+        filter="url(#multi-bw-65)"
       />
     </svg>
   );
@@ -413,19 +443,29 @@ export function MultiSoundbar100ArtworkFaceIcon({ x, y, width, height }) {
       y={y}
       width={width}
       height={height}
-      viewBox="0 0 2230 100"
+      viewBox="0 0 1722 90"
       xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="none"
       style={{ overflow: 'visible' }}
     >
+      <defs>
+        <filter id="multi-bw-100" color-interpolation-filters="sRGB">
+          <feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0"/>
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues="0 0 0 0 0 0 0 0 1 1"/>
+            <feFuncG type="table" tableValues="0 0 0 0 0 0 0 0 1 1"/>
+            <feFuncB type="table" tableValues="0 0 0 0 0 0 0 0 1 1"/>
+          </feComponentTransfer>
+        </filter>
+      </defs>
       <image
         x={0}
         y={0}
-        width={2230}
-        height={100}
+        width={1722}
+        height={90}
         href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/63cbb5139_Screenshot2026-09-11at172359.png"
-        preserveAspectRatio="xMidYMid meet"
-        style={{ filter: 'grayscale(1) contrast(2) brightness(0.9)' }}
+        preserveAspectRatio="none"
+        filter="url(#multi-bw-100)"
       />
     </svg>
   );

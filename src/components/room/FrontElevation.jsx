@@ -446,13 +446,14 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const useMultiArtwork = useMulti65Artwork || useMulti83Artwork || useMulti77Artwork || useMulti100Artwork;
 
     // Full-width Multi Soundbar artwork — renders the dedicated technical line
-    // drawing at exactly the screen's rendered width. Separate preserved
-    // source drawings are used for 65" (1411×100mm), 77" (1711×100mm),
-    // 83"/Manual (1872×100mm), and 100" (2230×100mm), each retaining its own
-    // original geometry.
+    // drawing at exactly the screen's rendered width. ViewBox and aspect
+    // ratios match each source image's NATIVE pixel dimensions to prevent
+    // preserveAspectRatio="meet" from letterboxing the artwork inside the
+    // screen-width container. SVG threshold filters (not CSS filters) produce
+    // pure black-and-white from the grey source screenshots.
     if (useMultiArtwork) {
       const screenOW = (overallW / roomW) * drawW;
-      const aspectRatio = useMulti65Artwork ? (1411 / 100) : useMulti77Artwork ? (1711 / 100) : useMulti100Artwork ? (2230 / 100) : (1872 / 100);
+      const aspectRatio = useMulti65Artwork ? (1544 / 118) : useMulti77Artwork ? (1588 / 106) : useMulti100Artwork ? (1722 / 90) : (1558 / 90);
       const artworkW = screenOW;
       const artworkH = screenOW / aspectRatio;
       const artworkX = rx(screenCenterX) - artworkW / 2;
