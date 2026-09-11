@@ -630,7 +630,7 @@ export default function RP22CompliancePanel({
     }
 
     return "—";
-  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation]);
+  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation, assumedP15Level, assumedP21Level]);
 
   const getHudValueForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
@@ -743,7 +743,7 @@ export default function RP22CompliancePanel({
     }
 
     return "—";
-  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation]);
+  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation, assumedP15Level, assumedP21Level]);
 
   // Full per-parameter detail card (title, description, achieved, scope, thresholds,
   // per-seat pills, notes, debug). Rendered only when a matrix row is expanded.
