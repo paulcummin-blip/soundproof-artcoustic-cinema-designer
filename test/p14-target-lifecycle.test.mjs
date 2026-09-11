@@ -431,24 +431,21 @@ test("K: P18 grading toggle — P18 basis does not affect base design fingerprin
 // TEST L: Schema change — old target results rejected
 // ═══════════════════════════════════════════════════════════════
 
-test("L: Schema change — old metric schema version rejected by cache", () => {
+test("L: Schema change — old metric schema version rejected by isAuthoritativeBassContract", () => {
   const contract = makeAuthoritativeContract({ targetKey: 'minimum-L2', fingerprint: 'fp-min-L2' });
   // Corrupt the metric schema version to simulate an old schema
   contract.metricSchemaVersion = 0;  // Old version
+  contract.job.metricSchemaVersion = 0;  // Also corrupt job-level schema
 
+  // setTargetCacheEntry calls isAuthoritativeBassContract which checks
+  // contract.metricSchemaVersion === RP22_BASS_METRIC_SCHEMA_VERSION.
+  // An old schema version is rejected — the contract is NOT stored.
   const inserted = setTargetCacheEntry(PROJECT_ID, BASE_DESIGN_FP_1, 'minimum-L2', contract, { immediate: true });
-  // The cache entry is stored regardless (setTargetCacheEntry checks isAuthoritativeBassContract,
-  // not the schema version directly). But getTargetCacheEntry checks the cache's
-  // metricSchemaVersion against the current RP22_BASS_METRIC_SCHEMA_VERSION.
-  // Since the cache was initialized with the current version, and the contract
-  // has an old version, the contract is stored but the cache's version is current.
-  // The real schema check happens in hydrateTargetCache which compares the stored
-  // cache's metricSchemaVersion.
-  assert.equal(inserted, true, "Contract with old schema is still stored (schema check is at cache level)");
+  assert.equal(inserted, false, "Contract with old metric schema version must be rejected");
 
-  // Verify the contract is retrievable (cache version is current)
+  // The contract must NOT be in the cache
   const retrieved = getTargetCacheEntry(PROJECT_ID, BASE_DESIGN_FP_1, 'minimum-L2');
-  assert.ok(retrieved, "Contract is retrievable while cache version is current");
+  assert.equal(retrieved, null, "Old-schema contract must not be retrievable from cache");
 });
 
 // ═══════════════════════════════════════════════════════════════
