@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import { useAppState } from '@/components/AppStateProvider';
 import OverheadChannelSelector from '@/components/speakers/OverheadChannelSelector';
@@ -76,72 +77,114 @@ export default function OverheadChannelsPanel({
 
   return (
     <CollapsiblePanel title="Overhead Channels" defaultOpen={false}>
-      <div className="space-y-3 p-2">
-        <OverheadChannelSelector
-          overheadCount={overheadCount}
-          globalModel={overheadGlobalModel}
-          onGlobalModelChange={setOverheadGlobalModel}
-          frontOverride={overheadFrontOverride}
-          midOverride={overheadMidOverride}
-          rearOverride={overheadRearOverride}
-          onFrontOverrideChange={setOverheadFrontOverride}
-          onMidOverrideChange={setOverheadMidOverride}
-          onRearOverrideChange={setOverheadRearOverride}
-          useFrontGlobal={useFrontGlobal}
-          useMidGlobal={useMidGlobal}
-          useRearGlobal={useRearGlobal}
-          onUseFrontGlobalChange={setUseFrontGlobal}
-          onUseMidGlobalChange={setUseMidGlobal}
-          onUseRearGlobalChange={setUseRearGlobal}
-          disabled={disabled}
-        />
-
-        <div style={{ marginTop: 8 }}>
-          <OverheadSplStrip
-            allSeatSplMetrics={allSeatSplMetrics}
-            mlpSeat={mlpSeat}
-            dolbyLayout={effectivePreset}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Left column: configuration and mounting */}
+        <div className="space-y-3">
+          <OverheadChannelSelector
+            overheadCount={overheadCount}
+            globalModel={overheadGlobalModel}
+            onGlobalModelChange={setOverheadGlobalModel}
+            frontOverride={overheadFrontOverride}
+            midOverride={overheadMidOverride}
+            rearOverride={overheadRearOverride}
+            onFrontOverrideChange={setOverheadFrontOverride}
+            onMidOverrideChange={setOverheadMidOverride}
+            onRearOverrideChange={setOverheadRearOverride}
+            useFrontGlobal={useFrontGlobal}
+            useMidGlobal={useMidGlobal}
+            useRearGlobal={useRearGlobal}
+            onUseFrontGlobalChange={setUseFrontGlobal}
+            onUseMidGlobalChange={setUseMidGlobal}
+            onUseRearGlobalChange={setUseRearGlobal}
+            disabled={disabled}
           />
         </div>
 
-        <div className="space-y-2 mt-4">
-          <Label className="text-xs text-[#625143]">Amplifier Power (Overheads)</Label>
-          <div className="relative">
-            <Input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={overheadsPowerInputValue}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                if (newValue !== '' && !/^\d+$/.test(newValue)) return;
-                setOverheadsPowerInputValue(newValue);
-                if (newValue === '') return;
-                const val = parseInt(newValue, 10);
-                if (Number.isFinite(val) && val >= 1 && val <= 5000) {
-                  updateGlobalSpl?.({ overheadsW: val });
-                }
-              }}
-              onBlur={(e) => {
-                const val = parseInt(e.target.value, 10);
-                if (!Number.isFinite(val) || val < 1 || val > 5000) {
-                  setOverheadsPowerInputValue(String(splConfig?.overheadsW || 100));
-                } else {
-                  const clamped = Math.max(1, Math.min(5000, val));
-                  setOverheadsPowerInputValue(String(clamped));
-                  if (clamped !== (splConfig?.overheadsW || 100)) {
-                    updateGlobalSpl?.({ overheadsW: clamped });
-                  }
-                }
-              }}
-              disabled={disabled}
-              className="pr-8"
+        {/* Right column: performance */}
+        <div className="space-y-3">
+          <div>
+            <OverheadSplStrip
+              allSeatSplMetrics={allSeatSplMetrics}
+              mlpSeat={mlpSeat}
+              dolbyLayout={effectivePreset}
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">W</span>
           </div>
-        </div>
 
-        {p13Pill}
+          {/* Amplifier Power (Overheads) */}
+          <div className="space-y-2 mt-4">
+            <Label className="text-xs text-[#625143]">Amplifier Power (Overheads)</Label>
+            <div className="relative">
+              <Input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={overheadsPowerInputValue}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  if (newValue !== '' && !/^\d+$/.test(newValue)) return;
+                  setOverheadsPowerInputValue(newValue);
+                  if (newValue === '') return;
+                  const val = parseInt(newValue, 10);
+                  if (Number.isFinite(val) && val >= 1 && val <= 5000) {
+                    updateGlobalSpl?.({ overheadsW: val });
+                  }
+                }}
+                onBlur={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!Number.isFinite(val) || val < 1 || val > 5000) {
+                    setOverheadsPowerInputValue(String(splConfig?.overheadsW || 100));
+                  } else {
+                    const clamped = Math.max(1, Math.min(5000, val));
+                    setOverheadsPowerInputValue(String(clamped));
+                    if (clamped !== (splConfig?.overheadsW || 100)) {
+                      updateGlobalSpl?.({ overheadsW: clamped });
+                    }
+                  }
+                }}
+                disabled={disabled}
+                className="pr-8"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">W</span>
+            </div>
+          </div>
+
+          {/* P13 Mode toggle (matching Surrounds structure) */}
+          <div className="space-y-2 mt-4">
+            <Label className="text-xs text-[#625143]">Parameter 13. Non-screen speakers SPL capability at RSP</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={splConfig?.p13Mode === 'minimum' || !splConfig?.p13Mode ? 'default' : 'outline'}
+                className={
+                  splConfig?.p13Mode === 'minimum' || !splConfig?.p13Mode
+                    ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                    : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+                }
+                onClick={() => updateGlobalSpl?.({ p13Mode: 'minimum' })}
+                disabled={disabled}
+              >
+                Minimum
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={splConfig?.p13Mode === 'recommended' ? 'default' : 'outline'}
+                className={
+                  splConfig?.p13Mode === 'recommended'
+                    ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                    : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+                }
+                onClick={() => updateGlobalSpl?.({ p13Mode: 'recommended' })}
+                disabled={disabled}
+              >
+                Recommended
+              </Button>
+            </div>
+          </div>
+
+          {p13Pill}
+        </div>
       </div>
     </CollapsiblePanel>
   );
