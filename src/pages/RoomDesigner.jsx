@@ -17,7 +17,8 @@ import {
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
 import { useActiveProjectId } from "@/components/state/project-session";
-import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator } from "@/components/state/designReviewHandoff";
+import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint } from "@/components/state/designReviewHandoff";
+import { buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
 
 // Hooks and utils (kept eager; they are light and provide guards below)
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
@@ -1828,7 +1829,14 @@ function RoomDesignerWithState() {
       return;
     }
 
-    if (!appDesignRating || appDesignRating?.isPendingBass === true) {
+    // Previously, a pending-bass rating was blocked from publication entirely.
+    // That left a STALE scoped rating visible when seat priorities changed while
+    // bass was pending. Now we always publish the current rating so the non-bass
+    // seat-scoped categories reflect the current priority scope. The separate
+    // bass-pending indicator lets the sidebar show "Calculating bass analysis…"
+    // independently. The isPendingBass flag remains on the rating for consumers
+    // that need it, but it no longer gates publication.
+    if (!appDesignRating) {
       return;
     }
 
@@ -1849,6 +1857,22 @@ function RoomDesignerWithState() {
       priceData: publishedPriceData,
     });
   }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState, _seatingPositions, placedSpeakers, frontSubsForRendering, rearSubsForRendering, _screen, dolbyPreset, mlpAnchorEffective, publishedPriceData, loadState?.phase, appState?.isProjectHydrationReady, minimumSystemMet]);
+
+  // Publish the current live seat-priority fingerprint so the sidebar can
+  // detect when a published scoped rating was calculated from a different
+  // priority set than the current one. This is a lightweight indicator (NOT a
+  // rating) published to a separate window property, updated on every seating
+  // change — including priority toggles that do not trigger acoustic
+  // recalculation.
+  React.useEffect(() => {
+    const fpProjectId = resolvedProjectId || projectIdState || null;
+    if (!fpProjectId) return;
+    const fp = buildSeatPriorityFingerprint(_seatingPositions);
+    publishSeatPriorityFingerprint(fpProjectId, fp);
+    return () => {
+      clearSeatPriorityFingerprint(fpProjectId);
+    };
+  }, [_seatingPositions, resolvedProjectId, projectIdState]);
 
   // Publish a lightweight bass-pending indicator (NOT a rating) so the
   // sidebar can show "Calculating bass analysis…" during initial bass

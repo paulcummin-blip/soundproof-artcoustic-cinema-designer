@@ -188,6 +188,7 @@ export default function DesignRatingSummary({
   bassPending = false,
   asdrUnavailable = false,
   p14TargetUnselected = false,
+  staleScope = false,
 }) {
   if (!showAsdr) return null;
 
@@ -213,6 +214,12 @@ export default function DesignRatingSummary({
   if (asdrUnavailable) return unavailableCard('Add LCR, surrounds and subwoofer to calculate rating');
   if (p14TargetUnselected && !rating) return unavailableCard('Select Bass Target to complete design rating');
   if (bassPending && !rating) return unavailableCard('Calculating bass analysis…');
+
+  // Stale-scope guard: the published rating was calculated from a different
+  // seat-priority set than the current live one. Do not display its
+  // Primary/Secondary floors as current — show "Updating…" until a rating
+  // calculated with the current priority set is available.
+  if (staleScope && rating) return unavailableCard('Updating seat priorities…');
 
   const scopedRatings = rating?.scopedRatings || null;
   const primaryRating = scopedRatings?.primary || null;

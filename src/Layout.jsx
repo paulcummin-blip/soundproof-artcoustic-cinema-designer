@@ -25,7 +25,7 @@ import BrandIntroOverlay from "@/components/ui/BrandIntroOverlay";
 import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
 import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
-import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUnselectedIndicator } from "@/components/state/designReviewHandoff";
+import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUnselectedIndicator, readSeatPriorityFingerprint } from "@/components/state/designReviewHandoff";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
@@ -79,6 +79,7 @@ export default function Layout({ children, currentPageName }) {
   const [bassPending, setBassPending] = React.useState(false);
   const [asdrUnavailable, setAsdrUnavailable] = React.useState(false);
   const [p14TargetUnselected, setP14TargetUnselected] = React.useState(false);
+  const [staleScope, setStaleScope] = React.useState(false);
 
   // Active project meta for sidebar (name + client)
   const [activeProjectSummary, setActiveProjectSummary] = React.useState({
@@ -175,6 +176,19 @@ export default function Layout({ children, currentPageName }) {
       if (unavailable) {
         setAsdrRating(null);
         setAsdrRecommendations(null);
+      }
+
+      // Stale-scope detection: compare the published rating's seat-priority
+      // fingerprint against the current live fingerprint. If they differ, the
+      // published scoped rating was calculated from a different priority set
+      // than the current one — do not display its Primary/Secondary floors as
+      // current.
+      const liveFp = readSeatPriorityFingerprint(activeProjectId);
+      const publishedFp = asdrRating?.seatPriorityFingerprint ?? null;
+      if (liveFp && publishedFp && liveFp !== publishedFp) {
+        setStaleScope(true);
+      } else {
+        setStaleScope(false);
       }
     }, 500); // Poll every 500ms for updates
     
@@ -457,6 +471,7 @@ export default function Layout({ children, currentPageName }) {
                   bassPending={bassPending}
                   asdrUnavailable={asdrUnavailable}
                   p14TargetUnselected={p14TargetUnselected}
+                  staleScope={staleScope}
                 />
               </div>
             )}

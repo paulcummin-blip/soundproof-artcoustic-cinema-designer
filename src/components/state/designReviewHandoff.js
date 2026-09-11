@@ -81,6 +81,39 @@ export function clearBassPendingIndicator(projectId) {
   }
 }
 
+const SEAT_PRIORITY_FP_KEY = "__ROOM_DESIGNER_SEAT_PRIORITY_FP__";
+
+/**
+ * Publish the current live seat-priority fingerprint so the sidebar can
+ * detect when a published scoped rating was calculated from a different
+ * priority set than the current one. This is a lightweight indicator (NOT a
+ * rating) published to a separate window property.
+ */
+export function publishSeatPriorityFingerprint(projectId, fingerprint) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  if (!pid) return;
+  window[SEAT_PRIORITY_FP_KEY] = { projectId: pid, fingerprint: fingerprint || '', ts: Date.now() };
+}
+
+export function readSeatPriorityFingerprint(projectId) {
+  if (typeof window === "undefined") return null;
+  const pid = normaliseProjectId(projectId);
+  const indicator = window[SEAT_PRIORITY_FP_KEY];
+  if (!indicator || normaliseProjectId(indicator.projectId) !== pid) return null;
+  return indicator.fingerprint || '';
+}
+
+export function clearSeatPriorityFingerprint(projectId) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  if (!pid) return;
+  const indicator = window[SEAT_PRIORITY_FP_KEY];
+  if (indicator && normaliseProjectId(indicator.projectId) === pid) {
+    window[SEAT_PRIORITY_FP_KEY] = { projectId: pid, fingerprint: '', ts: Date.now() };
+  }
+}
+
 const ASDR_UNAVAILABLE_KEY = "__ROOM_DESIGNER_ASDR_UNAVAILABLE__";
 
 /**
@@ -141,11 +174,14 @@ export function publishDesignReviewHandoff(snapshot) {
   const projectId = normaliseProjectId(snapshot?.projectId);
   if (!projectId) return null;
 
-  // Do not publish a pending rating. isPendingBass is the authoritative gate:
-  // false for both final ratings and retained same-fingerprint ratings (which
-  // are valid final results from a previous calculation, held during refresh).
-  if (snapshot?.rating?.isPendingBass === true) return null;
-
+  // Previously, a pending-bass rating was blocked from publication entirely.
+  // That left a STALE scoped rating visible when seat priorities changed while
+  // bass was pending. Now we always publish the current rating so the non-bass
+  // seat-scoped categories (Spatial Resolution, Screen/Viewing) reflect the
+  // current priority scope. The separate bass-pending indicator
+  // (publishBassPendingIndicator) lets the sidebar show "Calculating bass
+  // analysis…" independently. The isPendingBass flag remains on the rating for
+  // consumers that need it, but it no longer gates publication.
   const published = {
     ...snapshot,
     projectId,
@@ -162,6 +198,7 @@ export function publishDesignReviewHandoff(snapshot) {
     publishedAt: published.publishedAt,
     showAsdr: published.showAsdr,
     rating: published.rating,
+    seatPriorityFingerprint: published.rating?.seatPriorityFingerprint ?? null,
     analysisResult: published.analysisResult,
     seatingPositions: published.seatingPositions,
     placedSpeakers: published.placedSpeakers,

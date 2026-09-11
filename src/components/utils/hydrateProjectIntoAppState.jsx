@@ -4,6 +4,7 @@
 // Do not add logic here; keep it a pure pass-through to existing setters.
 
 import { parseProjectJson } from "@/components/roomdesigner/RoomDesignerHelpers";
+import { normaliseSeatPriorities } from "@/components/utils/seatScopeAuthority";
 import {
   normaliseLegacySubwoofers,
   bassInputAdapter,
@@ -229,9 +230,10 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   }
   if (typeof setOverlays === "function") setOverlays(normalisedOverlays);
 
-  // 6) SEATING
+  // 6) SEATING — normalise priorities once so no active seat reaches scoped-rating
+  //    calculation with undefined/null/empty-string priority.
   const sp = parseMaybe(p?.seating_positions, []);
-  if (Array.isArray(sp) && typeof setSeatingPositions === "function") setSeatingPositions(sp);
+  if (Array.isArray(sp) && typeof setSeatingPositions === "function") setSeatingPositions(normaliseSeatPriorities(sp));
 
   // 7) ROOM ELEMENTS
   const re = parseMaybe(p?.room_elements, []);

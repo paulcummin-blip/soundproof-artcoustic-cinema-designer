@@ -24,7 +24,7 @@ import {
   calculateScopedRoomDesignRating,
 } from '@/components/report/technical/artcousticSystemDesignRating';
 import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
-import { getPrimarySeats, getSecondarySeats } from '@/components/utils/seatPriorityAuthority';
+import { getScopedSeatIds, buildSeatPriorityFingerprint } from '@/components/utils/seatScopeAuthority';
 import { hasMinimumSystemForAsdr } from '@/components/utils/minimumSystemForAsdr';
 import { resolveP14TargetSelectionState } from '@/components/room/bass/p14TargetSelectionState';
 
@@ -295,13 +295,17 @@ export function useAppDesignRating({
       // returns NOT_CONFIGURED. No second authority build; no duplicated
       // scoring logic — calculateScopedRoomDesignRating delegates to the same
       // internal core as calculateRoomDesignRating.
-      const primarySeatIds = getPrimarySeats(seats).map((s) => s.id).filter(Boolean);
-      const secondarySeatIds = getSecondarySeats(seats).map((s) => s.id).filter(Boolean);
+      const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(seats);
       const scopedRatings = {
         primary: calculateScopedRoomDesignRating(authority, primarySeatIds),
         secondary: calculateScopedRoomDesignRating(authority, secondarySeatIds),
         all: rating,
       };
+
+      // Scope-identity stamp: deterministic fingerprint of the seat-priority set
+      // this rating was calculated from. Consumers compare this against the live
+      // fingerprint to detect stale scoped ratings.
+      const seatPriorityFingerprint = buildSeatPriorityFingerprint(seats);
 
       // Stage B: expose per-seat levels + P12/P13 raw for RSP reach classification.
       // No formula change — reuses the authority's already-computed per-seat levels
@@ -324,7 +328,7 @@ export function useAppDesignRating({
         ? Number(analysisResult.gradedParameters.primary[13].value)
         : null;
 
-      return { ...rating, seatLevels, p12RawDb, p13RawDb, scopedRatings };
+      return { ...rating, seatLevels, p12RawDb, p13RawDb, scopedRatings, seatPriorityFingerprint };
     } catch (e) {
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;
