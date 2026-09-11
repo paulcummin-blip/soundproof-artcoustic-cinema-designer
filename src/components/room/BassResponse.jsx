@@ -51,6 +51,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const authoritative = sharedBassResults.authoritative;
   const hasCurrentBassResult = sharedBassResults?.hasCurrentResult === true;
   const bassAuthorityStatus = sharedBassResults?.completedBassAuthority?.authorityStatus || "UNCALCULATED";
+  // Must be declared before any useMemo/callback that references it (e.g. mergedPerSeatRawCurves).
+  // Previously declared ~300 lines lower, causing a temporal-dead-zone crash in production builds.
+  const optimisationResult = sharedBassResults.optimisationResult;
   const {
     roomDims, seatingPositions, splConfig, rspPosition, subsForSimulation, simulationResults,
     rspRawCurve, perSeatRawCurves, designEqSystemLimits, optimisationTransitionHz,
@@ -344,7 +347,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const detailedLifecycle = sharedBassResults.lifecycle;
   const detailedStatus = sharedBassResults.detailedStatus;
   const detailedError = sharedBassResults.detailedError;
-  const optimisationResult = sharedBassResults.optimisationResult;
   const bassAnalysisContract = sharedBassResults.contract;
   const optimiserPriorityMode = sharedBassResults.selectedPriorityMode;
   const setOptimiserPriorityMode = sharedBassResults.onPriorityChange;
