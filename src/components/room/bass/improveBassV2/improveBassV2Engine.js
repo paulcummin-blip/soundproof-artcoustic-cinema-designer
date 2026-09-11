@@ -35,7 +35,7 @@ import { subscribeImproveBassV2, getImproveBassV2State } from "./improveBassV2St
 import { runCalibrationOnlySearch } from "./calibrationOnlySearch.js";
 import { isMaterialImprovement } from "./materialityGate.js";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
-import { setPositionSearchPhase, setPositionExhaustion } from "./improveBassV2Store.js";
+import { setPositionSearchPhase, setPositionExhaustion, setStageVerdict } from "./improveBassV2Store.js";
 import { runPositionScreenPhase, tagGlobalCandidates, checkPhaseMateriality, buildPositionOptimisationState } from "./improveBassV2Escalation.js";
 
 const MAX_CHALLENGERS = 3;
@@ -745,6 +745,13 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     }
 
     onProgress("calibrating", "Searching calibration improvements", 2, 2);
+    // Publish stage verdicts for the combined calibration search (phase/delay/gain
+    // are tested together in searchDelayPolarityTrim — all three share the same
+    // verdict). Purely observational — does not change any logic.
+    const calVerdict = calibrationMaterial?.material ? "improvement" : "no_improvement";
+    setStageVerdict(projectId, "phase_polarity", calVerdict);
+    setStageVerdict(projectId, "delays", calVerdict);
+    setStageVerdict(projectId, "gain", calVerdict);
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
@@ -1031,9 +1038,14 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
 
+    // Publish sub_positions stage verdict (purely observational)
+    setStageVerdict(projectId, "sub_positions", materialSubImprovementFound ? "improvement" : "no_improvement");
+
     // ── Phase 8: Final single winner selection ───────────────────────────
     onProgress("finalising", "Finalising recommendation", 0, 1);
+    setStageVerdict(projectId, "comparing", "done");
     const selection = selectWinnerWithProtection(confirmedResults, snapshot, existingAuthority);
+    setStageVerdict(projectId, "preparing", "done");
     await yieldToUI();
 
     // BLOCKER 4: If selection is null/undefined, return NO_WINNER explicitly

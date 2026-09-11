@@ -1,24 +1,24 @@
 // ImproveBassV2Results.jsx
-// Three-tier results display for the V2 workflow:
-//   A. CURRENT DESIGN — always shown
-//   B. RECOMMENDED CALIBRATION — only if calibration-only produced material improvement
-//   C. OPTIMISED SUBWOOFER POSITION — shown if final winner changes physical positions
+// Ranked recommendation cards for the V2 Improve Bass Response results.
 //
-// P19/P20 headline = SEAT (per Sound Proof canonical presentation rule).
-// Per-seat before→after evidence shown underneath.
-// P14 target and capability are separated.
-// P18 shows comparable achieved values.
-// Materiality explanation surfaces the actual reason + primary-seat trade-offs.
+// Shows:
+//   - Current Design summary (always)
+//   - Calibration immaterial notice (if calibration found nothing)
+//   - Ranked recommendation cards (level change > raw improvement > practical priority)
+//   - Per-seat before→after evidence for the winner
+//   - Remaining limitation + treatment advisory for the winner
+//
+// The canonical winner from selectWinnerWithProtection is always #1.
+// Other material improvements are ranked below using the user's hierarchy.
 
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Wrench, Settings, AlertTriangle, FlaskConical, CheckCircle2, MapPin } from "lucide-react";
+import React from "react";
+import { AlertTriangle, FlaskConical, CheckCircle2 } from "lucide-react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
-import { buildWhatChanged } from "./improveBassV2WhatChanged";
 import { buildTreatmentAdvisory, buildRemainingLimitation } from "./improveBassV2Treatment";
-import { isOptimisedApplied, buildCalibrationSummary } from "./improveBassV2Apply";
-import CalibrationOnlyResults from "./CalibrationOnlyResults";
+import { isOptimisedApplied } from "./improveBassV2Apply";
 import V2SeatBeforeAfterGrid from "./V2SeatBeforeAfterGrid";
+import RecommendationCard from "./RecommendationCard";
+import { rankRecommendations } from "./recommendationRanker.js";
 
 function levelText(level) {
   if (!Number.isFinite(level)) return "—";
@@ -323,26 +323,14 @@ export default function ImproveBassV2Results({
   onApply,
   onApplyCalibration,
 }) {
-  const [showChanges, setShowChanges] = useState(false);
-
   if (!selection) return null;
 
   const winner = selection.winner;
   const currentResult = selection.currentResult;
-  const isPositionWinner = winner && !selection.isCurrent && winner.isPositionCandidate;
 
-  // ── Tier A: CURRENT DESIGN — always shown ────────────────────────────
-  const currentP19 = numericLevel(currentResult?.achievedP19Level ?? snapshot?.currentP19);
-  const currentP20 = numericLevel(currentResult?.achievedP20Level ?? snapshot?.currentP20);
+  // ── Current Design metrics ───────────────────────────────────────────
   const currentP14 = numericLevel(currentResult?.p14AchievedLevel ?? snapshot?.currentP14);
   const currentP14Db = currentResult?.p14AchievedDb ?? null;
-  const currentP18 = numericLevel(currentResult?.p18AchievedLevel ?? snapshot?.currentP18);
-
-  // ── Tier B: RECOMMENDED CALIBRATION ──────────────────────────────────
-  const showCalibration = selection.calibrationResult && selection.calibrationMaterial?.material;
-
-  // ── Tier C: OPTIMISED SUBWOOFER POSITION ──────────────────────────────
-  const showPosition = isPositionWinner;
 
   // No safer improvement found
   if (selection.isCurrent || !winner) {
@@ -376,20 +364,17 @@ export default function ImproveBassV2Results({
     tuning: (snapshot?.tuning && snapshot.tuning.length > 0) ? snapshot.tuning : currentTuning,
   };
 
-  const whatChanged = buildWhatChanged(augmentedSnapshot, winner);
-  const treatmentAdvisory = buildTreatmentAdvisory(winner, roomDims);
-  const remainingLimitation = buildRemainingLimitation(winner);
-  const calSummary = buildCalibrationSummary(winner);
   const applied = isOptimisedApplied(currentInstances, winner, roomDims);
 
-  const movement = winner.movementDescription || "Position optimised";
-  const phaseLabel = winner.positionPhase === "asymmetric-pair" ? "Asymmetric"
-    : winner.positionPhase === "individual" ? "Individual"
-    : "Symmetric";
+  // ── Ranked recommendation cards ─────────────────────────────────────
+  // Build the ranked list from all material confirmed results + calibration.
+  // The canonical winner is always #1. Other material improvements are ranked
+  // below by: level change > raw improvement > practical priority.
+  const recommendations = rankRecommendations(selection);
 
   return (
     <div className="mt-3 space-y-3">
-      {/* ── Tier A: Current Design ── */}
+      {/* ── Current Design summary ── */}
       <div className="rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-3">
         <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Current Design</div>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -409,175 +394,66 @@ export default function ImproveBassV2Results({
         </div>
       )}
 
-      {/* ── Tier B: Recommended Calibration ── */}
-      {showCalibration && (
-        <CalibrationOnlyResults
-          currentResult={currentResult || snapshot}
-          calibrationResult={selection.calibrationResult}
-          calibrationMaterial={selection.calibrationMaterial}
-          calibrationTuning={selection.calibrationTuning}
-          currentInstances={currentInstances}
-          onApplyCalibration={onApplyCalibration}
-        />
-      )}
-
-      {/* ── Tier C: Optimised Subwoofer Position ── */}
-      {showPosition && (
-        <div className="rounded-md border border-[#213428] bg-[#F8F7F4] p-3">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-[#213428]" />
-            <span className="text-[12px] font-semibold text-[#213428]">Optimised Subwoofer Position</span>
-            {winner.positionPhase !== "symmetric" && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">
-                {phaseLabel}
-              </span>
-            )}
-          </div>
-
-          {/* Movement description */}
-          <div className="mt-2 text-[11px] text-[#625143] font-medium">{movement}</div>
-
-          {/* SEAT-scoped headline + P14 target/capability + P18 */}
-          <OptimisedHeadlineGrid snapshot={snapshot} currentResult={currentResult} winner={winner} />
-
-          {/* Materiality explanation */}
-          <MaterialityExplanation
-            reason={selection.materialityReason}
-            currentResult={currentResult}
-            winner={winner}
-            seatingPositions={seatingPositions}
-          />
-
-          {/* Per-seat before→after evidence */}
-          <div className="mt-3">
-            <div className="text-[10px] font-semibold text-[#625143] mb-1.5">P19 / P20 per-seat evidence (before → after)</div>
-            <V2SeatBeforeAfterGrid
-              seatingPositions={seatingPositions}
-              beforeP19={currentResult?.perSeatP19 || []}
-              afterP19={winner.perSeatP19 || []}
-              beforeP20={currentResult?.perSeatP20 || []}
-              afterP20={winner.perSeatP20 || []}
+      {/* ── Ranked recommendation cards ── */}
+      {recommendations.length > 0 && (
+        <div className="space-y-2">
+          {recommendations.map((rec) => (
+            <RecommendationCard
+              key={rec.rank}
+              recommendation={rec}
+              snapshot={augmentedSnapshot}
+              currentInstances={currentInstances}
+              onApply={onApply}
+              onApplyCalibration={onApplyCalibration}
+              isApplied={applied && rec.isWinner}
             />
-          </div>
-
-          {/* Physical changes + Calibration settings */}
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={() => setShowChanges(!showChanges)}
-              className="flex items-center gap-1.5 text-[11px] font-semibold text-[#213428] hover:underline"
-            >
-              {showChanges ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              What changed
-            </button>
-            {showChanges && (
-              <div className="mt-2 space-y-2">
-                {whatChanged.designChanges.length > 0 && (
-                  <div className="rounded-md border border-[#E0DDD7] bg-white p-2">
-                    <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[#213428]">
-                      <Wrench className="h-3 w-3" />
-                      Design changes
-                    </div>
-                    <ul className="mt-1 space-y-0.5">
-                      {whatChanged.designChanges.map((change, i) => (
-                        <li key={i} className="text-[10px] leading-relaxed text-[#625143]">• {change}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {whatChanged.calibrationChanges.length > 0 && (
-                  <div className="rounded-md border border-[#E0DDD7] bg-white p-2">
-                    <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[#213428]">
-                      <Settings className="h-3 w-3" />
-                      Calibration settings
-                    </div>
-                    <ul className="mt-1 space-y-0.5">
-                      {whatChanged.calibrationChanges.map((change, i) => (
-                        <li key={i} className="text-[10px] leading-relaxed text-[#625143]">• {change}</li>
-                      ))}
-                    </ul>
-                    <p className="mt-1.5 text-[9px] italic text-[#8A7B6A]">
-                      Calibration settings are reproduced in the processor by the installer.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Remaining limitation */}
-          {remainingLimitation && (
-            <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2">
-              <AlertTriangle className="h-3.5 w-3.5 text-amber-700 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="text-[10px] font-semibold text-amber-800">Remaining limitation</div>
-                <p className="text-[10px] leading-relaxed text-amber-700">{remainingLimitation}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Treatment advisory */}
-          {treatmentAdvisory?.showAdvisory && (
-            <div className="mt-2 flex items-start gap-2 rounded-md border border-[#E0DDD7] bg-white p-2">
-              <FlaskConical className="h-3.5 w-3.5 text-[#625143] mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="text-[10px] font-semibold text-[#213428]">{treatmentAdvisory.title}</div>
-                <p className="text-[10px] leading-relaxed text-[#625143]">{treatmentAdvisory.body}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Apply button — established Sound Proof primary action styling */}
-          <div className="mt-3">
-            <Button
-              type="button"
-              className="w-full bg-[#213428] text-white hover:bg-[#3E4349] font-semibold"
-              onClick={onApply}
-              disabled={applied}
-            >
-              {applied ? "Applied" : "Apply Optimised Design"}
-            </Button>
-          </div>
+          ))}
         </div>
       )}
 
-      {/* Non-position winner (global placement) — show in original format */}
-      {!showPosition && !showCalibration && (
+      {/* ── Per-seat evidence for the winner ── */}
+      {recommendations.length > 0 && recommendations[0]?.isWinner && (
         <div className="rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Before → After</div>
-          <OptimisedHeadlineGrid snapshot={snapshot} currentResult={currentResult} winner={winner} />
-
-          {/* Materiality explanation */}
-          <MaterialityExplanation
-            reason={selection.materialityReason}
-            currentResult={currentResult}
-            winner={winner}
+          <div className="text-[10px] font-semibold text-[#625143] mb-1.5">
+            P19 / P20 per-seat evidence (before → after) — {recommendations[0].interventionLabel}
+          </div>
+          <V2SeatBeforeAfterGrid
             seatingPositions={seatingPositions}
+            beforeP19={currentResult?.perSeatP19 || []}
+            afterP19={winner.perSeatP19 || []}
+            beforeP20={currentResult?.perSeatP20 || []}
+            afterP20={winner.perSeatP20 || []}
           />
-
-          {/* Per-seat before→after evidence */}
-          <div className="mt-3">
-            <div className="text-[10px] font-semibold text-[#625143] mb-1.5">P19 / P20 per-seat evidence (before → after)</div>
-            <V2SeatBeforeAfterGrid
-              seatingPositions={seatingPositions}
-              beforeP19={currentResult?.perSeatP19 || []}
-              afterP19={winner.perSeatP19 || []}
-              beforeP20={currentResult?.perSeatP20 || []}
-              afterP20={winner.perSeatP20 || []}
-            />
-          </div>
-          <div className="mt-3">
-            <Button
-              type="button"
-              className="w-full bg-[#213428] text-white hover:bg-[#3E4349] font-semibold"
-              onClick={onApply}
-              disabled={applied}
-            >
-              {applied ? "Applied" : "Apply Optimised Design"}
-            </Button>
-          </div>
         </div>
       )}
+
+      {/* ── Remaining limitation + treatment advisory for the winner ── */}
+      {(() => {
+        const treatmentAdvisory = buildTreatmentAdvisory(winner, roomDims);
+        const remainingLimitation = buildRemainingLimitation(winner);
+        return (
+          <>
+            {remainingLimitation && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-700 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-[10px] font-semibold text-amber-800">Remaining limitation</div>
+                  <p className="text-[10px] leading-relaxed text-amber-700">{remainingLimitation}</p>
+                </div>
+              </div>
+            )}
+            {treatmentAdvisory?.showAdvisory && (
+              <div className="flex items-start gap-2 rounded-md border border-[#E0DDD7] bg-white p-2">
+                <FlaskConical className="h-3.5 w-3.5 text-[#625143] mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-[10px] font-semibold text-[#213428]">{treatmentAdvisory.title}</div>
+                  <p className="text-[10px] leading-relaxed text-[#625143]">{treatmentAdvisory.body}</p>
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }

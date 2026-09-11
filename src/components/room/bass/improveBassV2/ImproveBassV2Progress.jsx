@@ -1,38 +1,30 @@
 // ImproveBassV2Progress.jsx
-// Progress bar with phase labels and Cancel button for the V2 workflow.
+// Stage checklist progress display for the V2 Improve Bass Response workflow.
+//
+// Shows the 7 user-facing stages with completed/active/pending/not-tested
+// states. Completed stages show a verdict (improvement found / no material
+// improvement). The active stage is obvious with a spinner. Pending stages
+// show a hollow circle. Seating positions show "Not tested" since Stage 11C
+// is not implemented.
+//
+// Progress is driven by the ACTUAL engine phase progression — no fake timers
+// or animations. The stage mapping is in improveBassV2StageMapping.js.
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, X } from "lucide-react";
-import { formatEta } from "./etaCalculator.js";
-
-const PHASE_ORDER = [
-  "reviewing",
-  "calibrating",
-  "testing_positions",
-  "screening_symmetric",
-  "confirming_symmetric",
-  "screening_asymmetric-pair",
-  "confirming_asymmetric-pair",
-  "screening_individual",
-  "confirming_individual",
-  "finalising",
-];
+import { Loader2, X, CheckCircle2, Circle, Minus } from "lucide-react";
+import { buildStageDisplay, formatStageVerdict } from "./improveBassV2StageMapping.js";
 
 export default function ImproveBassV2Progress({ state, onCancel }) {
-  const { phase, phaseLabel, progressCurrent, progressTotal, etaStatus, etaSeconds } = state;
-  const phaseIndex = PHASE_ORDER.indexOf(phase);
-  const phaseCount = PHASE_ORDER.length;
-  const overallPct = phaseIndex >= 0
-    ? Math.round(((phaseIndex + (progressTotal > 0 ? progressCurrent / progressTotal : 0)) / phaseCount) * 100)
-    : 0;
+  const display = buildStageDisplay(state);
 
   return (
     <div className="mt-3 rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-3">
+      {/* Header + Cancel */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin text-[#213428]" />
-          <span className="text-[12px] font-semibold text-[#213428]">{phaseLabel || "Working…"}</span>
+          <span className="text-[12px] font-semibold text-[#213428]">{display.headerLabel}</span>
         </div>
         <Button
           type="button"
@@ -45,18 +37,76 @@ export default function ImproveBassV2Progress({ state, onCancel }) {
           Cancel
         </Button>
       </div>
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#E0DDD7]">
-        <div
-          className="h-full rounded-full bg-[#213428] transition-all duration-300"
-          style={{ width: `${Math.max(2, overallPct)}%` }}
-        />
+
+      {/* Stage checklist */}
+      <div className="mt-3 space-y-1.5">
+        {display.stages.map((stage) => (
+          <StageRow key={stage.key} stage={stage} />
+        ))}
       </div>
-      <div className="mt-1 flex justify-between text-[9px] text-[#8A7B6A]">
-        <span>{phaseIndex >= 0 ? `Phase ${phaseIndex + 1} of ${phaseCount}` : ""}</span>
-        <span>{overallPct}%</span>
+
+      {/* Supporting text */}
+      <div className="mt-2.5 border-t border-[#E0DDD7] pt-2">
+        <p className="text-[10px] leading-relaxed text-[#8A7B6A]">
+          {display.supportingText}
+        </p>
       </div>
-      <div className="mt-0.5 text-[9px] text-[#8A7B6A]">
-        {formatEta(etaStatus || "estimating", etaSeconds)}
+    </div>
+  );
+}
+
+function StageRow({ stage }) {
+  const { status, label, supportingText, verdict, subStageLabel } = stage;
+
+  if (status === 'not_tested') {
+    return (
+      <div className="flex items-start gap-2">
+        <Minus className="h-3.5 w-3.5 text-[#B0A89B] mt-0.5 flex-shrink-0" />
+        <div className="min-w-0">
+          <div className="text-[11px] text-[#B0A89B]">{label} — Not tested</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'completed') {
+    const verdictText = formatStageVerdict(verdict);
+    return (
+      <div className="flex items-start gap-2">
+        <CheckCircle2 className="h-3.5 w-3.5 text-[#213428] mt-0.5 flex-shrink-0" />
+        <div className="min-w-0">
+          <div className="text-[11px] text-[#213428] font-medium">
+            {label.replace('Checking ', '')} checked
+            {verdictText && (
+              <span className="font-normal text-[#8A7B6A]"> — {verdictText}</span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'active') {
+    return (
+      <div className="flex items-start gap-2">
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#213428] mt-0.5 flex-shrink-0" />
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold text-[#213428]">{label}...</div>
+          {subStageLabel && (
+            <div className="text-[10px] text-[#625143] mt-0.5">{subStageLabel}...</div>
+          )}
+          <div className="text-[10px] text-[#8A7B6A] mt-0.5">{supportingText}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // pending
+  return (
+    <div className="flex items-start gap-2">
+      <Circle className="h-3.5 w-3.5 text-[#D0CBC2] mt-0.5 flex-shrink-0" />
+      <div className="min-w-0">
+        <div className="text-[11px] text-[#B0A89B]">{label}</div>
       </div>
     </div>
   );

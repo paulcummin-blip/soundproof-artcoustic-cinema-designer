@@ -38,6 +38,10 @@ function emptyState(projectId) {
     subOptimisationExhausted: false,
     materialSubImprovementFound: false,
     bestPracticalSubResult: null,
+    // User-facing stage verdicts — published by the engine at stage transitions.
+    // Keys: 'phase_polarity' | 'delays' | 'gain' | 'sub_positions' | 'seating_positions' | 'comparing' | 'preparing'
+    // Values: 'improvement' | 'no_improvement' | 'done' | null
+    stageVerdicts: {},
     // Runtime metrics from the last V2 run (placementFingerprintUsed,
     // stage2TransfersReused, etc.) — set when the run reaches a terminal state.
     runtimeMetrics: null,
@@ -157,6 +161,13 @@ export function setPositionExhaustion(projectId, exhausted, materialFound, bestP
     materialSubImprovementFound: materialFound,
     bestPracticalSubResult: bestPractical,
   });
+}
+
+export function setStageVerdict(projectId, stageKey, verdict) {
+  const state = getImproveBassV2State(projectId);
+  const stageVerdicts = { ...(state.stageVerdicts || {}) };
+  stageVerdicts[stageKey] = verdict;
+  return publish(projectId, { stageVerdicts });
 }
 
 export function setCancelled(projectId) {
