@@ -272,12 +272,45 @@ export function MultiSoundbar77FaceIcon({ x, y, width, height }) {
 }
 
 /**
- * Multi Soundbar — 83" TV variant.
- * Widest enclosure (1872mm). Two clusters only — left and right — with a wide
- * empty centre section. Each cluster has two square-framed woofers with corner
- * bolts flanking a central tweeter. Small dots at the far ends and two dots
- * in the centre gap at roughly 1/3 and 2/3 of the bar.
+ * Multi Soundbar — Full-width artwork rendering using the original technical
+ * line drawing. The uploaded source image is rendered with CSS filters to
+ * normalise grey-on-light-grey to clean black-and-white. The viewBox matches
+ * the physical 1872×100mm aspect ratio so the drawing scales proportionally
+ * with width changes. preserveAspectRatio="xMidYMid meet" guarantees the
+ * native drawing geometry is never stretched, squashed, or distorted.
+ *
+ * Used only for:
+ *   - 83" TV + Multi Soundbar
+ *   - Manual screen size + Multi Soundbar
+ *
+ * The rendered width is controlled by the caller (set to match the screen
+ * width); height follows automatically from the locked 18.72:1 aspect ratio.
  */
+export function MultiSoundbarArtworkFaceIcon({ x, y, width, height }) {
+  return (
+    <svg
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      viewBox="0 0 1872 100"
+      xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid meet"
+      style={{ overflow: 'visible' }}
+    >
+      <image
+        x={0}
+        y={0}
+        width={1872}
+        height={100}
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/2e7972c70_Screenshot2026-09-11at171928.png"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ filter: 'grayscale(1) contrast(2) brightness(0.9)' }}
+      />
+    </svg>
+  );
+}
+
 export function MultiSoundbar83FaceIcon({ x, y, width, height }) {
   // viewBox matches the 1872mm × 100mm physical aspect ratio (~18.7:1)
   const clusterCentres = [65, 295];
