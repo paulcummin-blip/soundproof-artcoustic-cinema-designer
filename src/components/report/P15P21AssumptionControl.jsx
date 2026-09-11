@@ -56,19 +56,13 @@ export default function P15P21AssumptionControl({
           lineHeight: 1.3,
         }}
       >
-        {currentLevel ? (
-          <>
-            <span style={{ fontWeight: 600, color: "#1B1A1A" }}>
-              Assumed · {currentLevel}
-            </span>
-            {displayValue && (
-              <span style={{ color: "#625143", marginLeft: 4 }}>
-                — Design target: {displayValue}
-              </span>
-            )}
-          </>
-        ) : (
-          <span style={{ fontWeight: 600, color: "#8B7F76" }}>NOT CALCULATED</span>
+        <span style={{ fontWeight: 600, color: "#1B1A1A" }}>
+          Assumed · {currentLevel}
+        </span>
+        {displayValue && (
+          <span style={{ color: "#625143", marginLeft: 4 }}>
+            — Design target: {displayValue}
+          </span>
         )}
       </div>
     );
@@ -98,19 +92,6 @@ export default function P15P21AssumptionControl({
         >
           Assumed Performance Level
         </span>
-        {!currentLevel && (
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              color: "#8B7F76",
-              fontStyle: "italic",
-              marginLeft: 8,
-            }}
-          >
-            NOT CALCULATED
-          </span>
-        )}
       </div>
       <div style={{ display: "flex", gap: 6 }}>
         {options.map((opt) => {
