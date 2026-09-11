@@ -1,6 +1,6 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { isReferenceSeatIdentity } from "@/components/room/bass/normalizedRoomInputAdapters";
-import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
+import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { levelP19_lfResponse, levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
@@ -34,40 +34,62 @@ function curveValueAt(curve, frequency) {
   return null;
 }
 
-function maximumTargetDeviation(curve, targetCurve, excludedRegions = []) {
-  let variationDbRaw = null;
+/**
+ * Canonical P19 span authority.
+ *
+ * residual(f) = smoothedResponse(f) − houseCurveShape(f)
+ * spanDb = max(residual) − min(residual)
+ * p19RawDb = spanDb / 2
+ *
+ * The house-curve SHAPE (artcousticHouseCurveOffsetAt) is used, not the
+ * vertically-anchored target. A constant vertical offset shifts min and max
+ * equally and leaves the span unchanged — so P19 is independent of target
+ * centring.
+ *
+ * Protected null regions are excluded from the min/max so that narrow/deep
+ * cancellations a calibrator would not equalise do not distort the span.
+ */
+function residualSpan(curve, excludedRegions = []) {
+  let maxResidual = -Infinity;
+  let minResidual = Infinity;
   let worstFrequencyHz = null;
   curve.forEach((point) => {
     if (excludedRegions.some((region) => point.frequency >= region.startHz && point.frequency <= region.endHz)) return;
-    const targetSpl = interpolateCanonicalTarget(targetCurve, point.frequency);
-    if (!finite(targetSpl)) return;
-    // RP22 ±dB is the maximum absolute deviation from the target curve.
-    // A +4 dB peak (or -4 dB dip) is a ±4 dB result — not halved to ±2 dB.
-    const deviation = Math.abs(point.spl - targetSpl);
-    if (variationDbRaw == null || deviation > variationDbRaw) {
-      variationDbRaw = deviation;
+    const shapeOffset = artcousticHouseCurveOffsetAt(point.frequency);
+    if (!Number.isFinite(shapeOffset)) return;
+    const residual = point.spl - shapeOffset;
+    if (residual > maxResidual) {
+      maxResidual = residual;
       worstFrequencyHz = point.frequency;
     }
+    if (residual < minResidual) {
+      minResidual = residual;
+    }
   });
-  const displayVariationDb = variationDbRaw == null ? null : Number(variationDbRaw);
+  if (!Number.isFinite(maxResidual) || !Number.isFinite(minResidual)) return null;
+  const spanDb = maxResidual - minResidual;
+  const p19RawDb = spanDb / 2;
   return {
-    variationDbRaw,
-    totalRspToTargetDifferenceDbRaw: variationDbRaw == null ? null : Number(variationDbRaw),
-    displayVariationDb,
-    level: displayVariationDb == null ? null : numericRp22Level(levelP19_lfResponse(displayVariationDb)),
+    variationDbRaw: p19RawDb,
+    totalRspToTargetDifferenceDbRaw: p19RawDb,
+    displayVariationDb: p19RawDb,
+    level: numericRp22Level(levelP19_lfResponse(p19RawDb)),
     worstFrequencyHz,
+    spanDb,
+    maxResidual,
+    minResidual,
   };
 }
 
 export function computeOfficialP19Assessment({ rspPostEqCurve, canonicalTargetCurve, assessmentStartHz, assessmentEndHz }) {
   const sourceCurve = smoothedAssessmentCurve(rspPostEqCurve, assessmentStartHz, assessmentEndHz);
-  const result = maximumTargetDeviation(sourceCurve, canonicalTargetCurve);
+  const result = residualSpan(sourceCurve);
   return { ...result, sourceCurve, label: "P19 RSP" };
 }
 
 /**
- * Per-seat P19 assessment — same maximumTargetDeviation maths as the RSP P19,
- * applied to each real seat's post-EQ curve versus the canonical target.
+ * Per-seat P19 assessment — same residualSpan maths as the RSP P19,
+ * applied to each real seat's post-EQ curve.
  * Returns an array of per-seat P19 results with seatId, level, variationDbRaw.
  */
 export function computeOfficialPerSeatP19Assessment({ perSeatPostEqCurves, canonicalTargetCurve, assessmentStartHz, assessmentEndHz }) {
@@ -76,8 +98,8 @@ export function computeOfficialPerSeatP19Assessment({ perSeatPostEqCurves, canon
     .map((seat) => {
       const seatCurve = smoothedAssessmentCurve(seat.responseData, assessmentStartHz, assessmentEndHz);
       if (!seatCurve.length) return null;
-      const result = maximumTargetDeviation(seatCurve, canonicalTargetCurve);
-      if (result.variationDbRaw == null) return null;
+      const result = residualSpan(seatCurve);
+      if (!result || result.variationDbRaw == null) return null;
       return {
         seatId: seat.seatId,
         variationDbRaw: result.variationDbRaw,
@@ -92,7 +114,7 @@ export function computeOfficialPerSeatP19Assessment({ perSeatPostEqCurves, canon
 
 export function computeCorrectableP19Diagnostic({ rspPostEqCurve, canonicalTargetCurve, assessmentStartHz, assessmentEndHz, protectedNullRegions = [] }) {
   const sourceCurve = smoothedAssessmentCurve(rspPostEqCurve, assessmentStartHz, assessmentEndHz);
-  const result = maximumTargetDeviation(sourceCurve, canonicalTargetCurve, protectedNullRegions);
+  const result = residualSpan(sourceCurve, protectedNullRegions);
   return { ...result, sourceCurve, label: "Correctable P19 — optimiser diagnostic" };
 }
 
@@ -115,8 +137,7 @@ export function computeOfficialP20Assessment({ rspPostEqCurve, perSeatPostEqCurv
         const seatSpl = curveValueAt(seatCurve, rspPoint.frequency);
         if (!finite(rspPoint.spl) || !finite(seatSpl)) return;
         comparisonPointCount += 1;
-        // RP22 ±dB is the maximum absolute seat-to-RSP deviation.
-        // An 8 dB difference is ±8 dB — not halved to ±4 dB.
+        // RP22 P20 ±dB is the maximum absolute seat-to-RSP deviation.
         const variation = Math.abs(seatSpl - rspPoint.spl);
         if (variationDbRaw == null || variation > variationDbRaw) {
           variationDbRaw = variation;

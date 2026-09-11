@@ -76,6 +76,44 @@ function effectiveActiveCount(layout) {
   return activeCount;
 }
 
+/**
+ * Level-preservation gate: reject candidates that regress P14, P18, or
+ * (when the RSP is already good) P19 levels versus the current design.
+ *
+ * Priority: P14 capability → P18 extension → good RSP P19 (L3 or better).
+ * A candidate that drops any of these levels is rejected before the Pareto
+ * filter — these are hard gates, not preferences.
+ */
+function hasLevelRegression(candidateMetrics, currentMetrics) {
+  if (!currentMetrics) return { regressed: false };
+  if (candidateMetrics.p14Level < currentMetrics.p14Level) {
+    return { regressed: true, parameter: "P14", current: currentMetrics.p14Level, candidate: candidateMetrics.p14Level };
+  }
+  if (candidateMetrics.p18Level < currentMetrics.p18Level) {
+    return { regressed: true, parameter: "P18", current: currentMetrics.p18Level, candidate: candidateMetrics.p18Level };
+  }
+  // Preserve good RSP P19 (L3 or better) — don't trade RSP quality for P20
+  if (currentMetrics.p19Level >= 3 && candidateMetrics.p19Level < currentMetrics.p19Level) {
+    return { regressed: true, parameter: "P19", current: currentMetrics.p19Level, candidate: candidateMetrics.p19Level };
+  }
+  return { regressed: false };
+}
+
+/**
+ * Lexicographic comparison: P20 first (primary objective), then P19 (secondary).
+ * Returns negative if a is better, positive if b is better, 0 if tied.
+ * This ensures P20 is minimised first — a small P19 improvement cannot
+ * justify a materially worse P20.
+ */
+function lexCompareP20First(a, b) {
+  if (a.p20VariationDb < b.p20VariationDb - PARETO_TOLERANCE_DB) return -1;
+  if (a.p20VariationDb > b.p20VariationDb + PARETO_TOLERANCE_DB) return 1;
+  // P20 within tolerance — decide on P19
+  if (a.p19VariationDb < b.p19VariationDb - PARETO_TOLERANCE_DB) return -1;
+  if (a.p19VariationDb > b.p19VariationDb + PARETO_TOLERANCE_DB) return 1;
+  return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Authoritative metric extraction
 // ---------------------------------------------------------------------------
@@ -335,6 +373,15 @@ export function selectAuthoritativeFinalist(quantityResult, roomDims, currentLay
       const regression = hasPrimarySeatRegression(c.result, currentForProtection.result);
       return !regression.regressed;
     });
+    // Level-preservation gate: reject candidates that regress P14, P18, or
+    // good RSP P19 (L3+) levels. These are hard gates — a candidate that
+    // drops capability, extension, or excellent RSP response is rejected
+    // before the Pareto filter, even if P20 improves.
+    scored = scored.filter((c) => {
+      if (c.isCurrent) return true;
+      const regression = hasLevelRegression(c.metrics, currentForProtection.metrics);
+      return !regression.regressed;
+    });
   }
 
   // Pareto-filter
@@ -403,8 +450,7 @@ export function selectAuthoritativeFinalist(quantityResult, roomDims, currentLay
       }
       if (practical.length === 0) pool = jointlyImproving;
       winner = pool.reduce((best, c) =>
-        (c.metrics.p19VariationDb + c.metrics.p20VariationDb) <
-        (best.metrics.p19VariationDb + best.metrics.p20VariationDb) ? c : best
+        lexCompareP20First(c.metrics, best.metrics) < 0 ? c : best
       );
     } else {
       // No joint improvement — check for trade-offs

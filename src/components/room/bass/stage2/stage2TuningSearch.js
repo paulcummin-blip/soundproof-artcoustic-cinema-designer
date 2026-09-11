@@ -684,21 +684,21 @@ export function searchDelayPolarityTrim(perSourceRspTransfers, sources) {
     };
   }
 
-  // Phase 1: Delay search (coordinate descent, polarity=0, gain=0)
-  const delayResult = searchDelayOnly(perSourceRspTransfers, sources);
-  const bestDelays = delayResult.finalists[0]?.delays || new Array(sourceCount).fill(0);
-
-  // Phase 2: Polarity search (enumeration, given best delays, gain=0)
-  const polarityResult = searchPolarity(perSourceRspTransfers, bestDelays, null);
+  // Phase 1: Polarity search (enumeration, delay=0, gain=0) — least invasive
+  const polarityResult = searchPolarity(perSourceRspTransfers, new Array(sourceCount).fill(0), null);
   const bestPolarities = polarityResult.polarities;
+
+  // Phase 2: Delay search (coordinate descent, given best polarities, gain=0)
+  const refIndex = 0;
+  const bestDelays = coordinateDescentDelayWithPolarityGain(
+    perSourceRspTransfers, sourceCount, refIndex, new Array(sourceCount).fill(0), bestPolarities, new Array(sourceCount).fill(0),
+  );
 
   // Phase 3: Trim search (coordinate descent on gains, given best delays + polarities)
   const trimResult = searchGainOnly(perSourceRspTransfers, sources, bestDelays, bestPolarities);
   const bestGains = trimResult.finalists[0]?.gains || new Array(sourceCount).fill(0);
 
   // Phase 4: Re-optimise delays (coordinate descent, given best polarities + gains)
-  // Build transfers with polarity and gain applied, then search delays
-  const refIndex = 0;
   const reOptDelays = coordinateDescentDelayWithPolarityGain(
     perSourceRspTransfers, sourceCount, refIndex, bestDelays, bestPolarities, bestGains,
   );

@@ -24,7 +24,7 @@
 //
 // BLOCKER 7: Cancelled jobs can never publish, apply, or replace Current.
 
-import { searchDelayOnly, searchPolarity, searchGainOnly, resumWithTuning } from "../stage2/stage2TuningSearch.js";
+import { searchDelayOnly, searchPolarity, searchGainOnly, searchDelayPolarityTrim, resumWithTuning } from "../stage2/stage2TuningSearch.js";
 import { selectAuthoritativeFinalist, hasPrimarySeatRegression, detectMutedSubs } from "../best-layout/authoritativeFinalistSelection.js";
 import { getCachedRawTransfersForFingerprint } from "../stage2/stage2RawTransferCache.js";
 import { normaliseModelKey } from "../../../utils/modelKeyNormaliser.js";
@@ -281,29 +281,20 @@ function runProxySearch(candidate) {
     };
   }
 
-  const delayResult = searchDelayOnly(rspTransfers, sources);
-  const bestDelays = delayResult.finalists[0]?.delays || new Array(sourceCount).fill(0);
+  // Polarity-first combined search: polarity → delay → trim → re-optimise delay.
+  // This respects the actuator priority (polarity/phase first, then delay,
+  // then gain) and produces a better-optimised proxy tuning than the old
+  // sequential delay→polarity→gain approach.
+  const searchResult = searchDelayPolarityTrim(rspTransfers, sources);
+  const best = searchResult.finalists?.[0];
+  if (!best?.tuning) return null;
 
-  const polarityResult = searchPolarity(rspTransfers, bestDelays, null);
-  const bestPolarities = polarityResult.polarities;
-
-  const trimResult = searchGainOnly(rspTransfers, sources, bestDelays, bestPolarities);
-  const bestGains = trimResult.finalists[0]?.gains || new Array(sourceCount).fill(0);
-
-  const tuning = [];
-  for (let i = 0; i < sourceCount; i++) {
-    tuning.push({
-      delayMs: bestDelays[i] || 0,
-      gainDb: bestGains[i] || 0,
-      polarity: bestPolarities[i] || 0,
-    });
-  }
-
+  const tuning = best.tuning;
   const proxyMetrics = computeProxyMetrics(rawTransfer, tuning);
 
   return {
-    tuning, delays: bestDelays, gains: bestGains, polarities: bestPolarities,
-    score: trimResult.finalists[0]?.score || Infinity,
+    tuning, delays: best.delays, gains: best.gains, polarities: best.polarities,
+    score: best.score || Infinity,
     proxyP19: proxyMetrics.proxyP19,
     proxyP20: proxyMetrics.proxyP20,
     proxyBalanced: proxyMetrics.proxyBalanced,

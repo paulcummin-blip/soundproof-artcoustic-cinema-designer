@@ -1121,35 +1121,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         </div>
       )}
 
-      {/* ── Deep null warning — always visible ── */}
-      {multiSeries.length > 0 && (() => {
-        const data = multiSeries[0]?.data;
-        if (!Array.isArray(data) || data.length === 0) return null;
-        // Find raw minimum in 20–120 Hz band
-        const band = data.filter(p => p.frequency >= 20 && p.frequency <= 120 && Number.isFinite(p.spl));
-        if (band.length === 0) return null;
-        const minSpl = Math.min(...band.map(p => p.spl));
-        // Find local peak within ±1.5 octaves of the null
-        const nullPt = band.find(p => p.spl === minSpl);
-        const loHz = nullPt.frequency / Math.pow(2, 1.5);
-        const hiHz = nullPt.frequency * Math.pow(2, 1.5);
-        const peak = Math.max(...data.filter(p => p.frequency >= loHz && p.frequency <= hiHz && Number.isFinite(p.spl)).map(p => p.spl));
-        const depth = minSpl - peak;
-        if (depth > -12) return null;
-        return (
-          <div style={{ border: '2px solid #b45309', borderRadius: 8, background: '#fffbeb', padding: '10px 14px', marginBottom: 8 }}>
-            <div style={{ fontWeight: 700, color: '#92400e', fontSize: 13, marginBottom: 4 }}>
-              ⚠ Potential bass null detected
-            </div>
-            <div style={{ color: '#78350f', fontSize: 12, lineHeight: 1.5 }}>
-              Raw null depth: <strong>{depth.toFixed(1)} dB</strong> at <strong>{nullPt.frequency.toFixed(1)} Hz</strong>.
-              A null this deep ({depth < -20 ? 'severe' : 'significant'}) is unlikely to be fully resolved by EQ alone.
-              Consider adjusting subwoofer placement before applying EQ correction.
-            </div>
-          </div>
-        );
-      })()}
-
       {/* Simulation Assumptions — room acoustics, useful but not the first thing a dealer needs */}
       <CollapsiblePanel title="Simulation Assumptions" defaultOpen={false}>
         <div className="pt-3">

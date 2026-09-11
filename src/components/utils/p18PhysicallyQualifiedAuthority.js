@@ -41,6 +41,7 @@ import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { getSubwooferCurve, getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { P14_SAFETY_MARGIN_DB } from "@/components/utils/p14CapabilityAuthority";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
@@ -208,7 +209,11 @@ export function computeCapabilityTargetF3(activeSubs, p14TargetDb, validMinHz = 
   if (!product || !product.curve.length) {
     return { f3Hz: null, bounded: false, upperBoundHz: null };
   }
-  const adjusted = adjustForHouseCurve(product.curve);
+  // 3 dB safety reserve: derate the product capability curve before computing
+  // the F3 crossing. The −3 dB cutoff below is the F3 DEFINITION (not the
+  // safety reserve) — it is NOT changed. Only the product curve is derated.
+  const deratedCurve = product.curve.map((p) => ({ frequency: p.frequency, spl: p.spl - P14_SAFETY_MARGIN_DB }));
+  const adjusted = adjustForHouseCurve(deratedCurve);
   const flatCutoffDb = Number(p14TargetDb) - 3;
   return findTargetRelativeF3Adjusted(adjusted, flatCutoffDb, validMinHz);
 }

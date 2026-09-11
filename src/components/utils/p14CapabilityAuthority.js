@@ -30,7 +30,7 @@ export function combinedApprovedP14Capability(activeSubs) {
 }
 
 export const P14_EQ_ASSESSMENT_RANGE_HZ = Object.freeze({ lowerHz: 20, upperHz: 120 });
-export const P14_SAFETY_MARGIN_DB = 2;
+export const P14_SAFETY_MARGIN_DB = 3;
 export const P14_CAPABILITY_REGIONS = Object.freeze([
   Object.freeze({ key: "extension", label: "20–30 Hz extension", lowerHz: 20, upperHz: 30, weight: 0.2 }),
   Object.freeze({ key: "primary", label: "30–80 Hz primary LFE", lowerHz: 30, upperHz: 80, weight: 0.6 }),

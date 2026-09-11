@@ -1,4 +1,5 @@
 import { MODELS, getApprovedFrequencyRangeHz, getSubwooferCurve, normaliseModelKey } from "@/components/models/speakers/registry";
+import { P14_SAFETY_MARGIN_DB } from "@/components/utils/p14CapabilityAuthority";
 
 const isFiniteNumber = (value) => Number.isFinite(Number(value));
 const isPositivePower = (value) => value !== null
@@ -117,8 +118,12 @@ export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, act
   const currentSystemSourceOutputDb = isFiniteNumber(requestedSystemOutputDb)
     ? Number(requestedSystemOutputDb)
     : configuredSystemOutputDb;
+  // 3 dB total design reserve: the boost allowance is clamped to the safely
+  // derated capability (raw maximum − P14_SAFETY_MARGIN_DB), not the raw
+  // product ceiling. This is a single 3 dB reserve, NOT 3 dB stacked on top
+  // of the existing P14 margin — P14_SAFETY_MARGIN_DB IS the total reserve.
   const availableHeadroomDb = isFiniteNumber(systemCapabilityDb) && isFiniteNumber(currentSystemSourceOutputDb)
-    ? systemCapabilityDb - currentSystemSourceOutputDb : null;
+    ? (systemCapabilityDb - P14_SAFETY_MARGIN_DB) - currentSystemSourceOutputDb : null;
   const normalAllowedBoostDb = availableHeadroomDb == null ? Math.min(requested, maxBoostDb) : Math.max(0, Math.min(requested, maxBoostDb, availableHeadroomDb));
   const evaluationHz = Number(frequency);
   const sourceCoverage = (activeSubs || []).map((sub) => {
