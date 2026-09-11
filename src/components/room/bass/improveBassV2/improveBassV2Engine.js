@@ -630,6 +630,8 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     return current !== startFingerprint;
   }
 
+  let runResult = null;
+
   try {
     // Phase 1: Reviewing current design
     onProgress("reviewing", "Reviewing current design", 0, 1);
@@ -1036,7 +1038,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
 
     // BLOCKER 4: If selection is null/undefined, return NO_WINNER explicitly
     if (!selection) {
-      return {
+      runResult = {
         status: "complete",
         selection: {
           isCurrent: true,
@@ -1048,6 +1050,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         snapshot,
         confirmedResults,
       };
+      return runResult;
     }
 
     // Stage 11A: Attach calibration-only result to the selection
@@ -1064,20 +1067,28 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     setPositionExhaustion(projectId, subOptimisationExhausted, materialSubImprovementFound, selection.winner);
     selection.positionOptimisation = positionOpt;
 
-    return { status: "complete", selection, snapshot, confirmedResults };
+    runResult = { status: "complete", selection, snapshot, confirmedResults };
+    return runResult;
   } catch (error) {
     // AbortError = user cancellation → canonical cancelled.
     // V2RunTimeoutError / V2TimeoutError / generic Error → canonical error.
     if (error?.name === "AbortError") {
-      return { status: "cancelled", snapshot: null };
+      runResult = { status: "cancelled", snapshot: null };
+    } else {
+      runResult = { status: "error", error: error.message, snapshot: null };
     }
-    return { status: "error", error: error.message, snapshot: null };
+    return runResult;
   } finally {
     // ── Cleanup: no leaked timer, listener, subscription, or worker ────────
     unsubscribe();
     if (wholeRunTimer) { clearTimeout(wholeRunTimer); wholeRunTimer = null; }
     metrics.finish();
     metrics.logReport();
+    // Attach runtime metrics to the result so callers can verify placement
+    // fingerprint usage and Stage 2 transfer reuse without console scraping.
+    if (runResult) {
+      runResult.runtimeMetrics = metrics.toReport();
+    }
     try { worker.terminate(); } catch { /* idempotent on already-terminated worker */ }
   }
 }

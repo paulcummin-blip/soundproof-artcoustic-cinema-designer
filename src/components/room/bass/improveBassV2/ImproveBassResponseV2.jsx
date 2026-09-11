@@ -29,6 +29,7 @@ import {
   updateProgress,
   setBestSoFar,
   setWinner,
+  setRuntimeMetrics,
   setCancelled,
   setStale,
   setError,
@@ -273,6 +274,10 @@ export default function ImproveBassResponseV2({
           setWinner(projectId, selection);
         }
       }
+      // Store runtime metrics for acceptance verification
+      if (result.runtimeMetrics) {
+        setRuntimeMetrics(projectId, result.runtimeMetrics);
+      }
     } catch (err) {
       setError(projectId, err.message);
     } finally {
@@ -284,6 +289,9 @@ export default function ImproveBassResponseV2({
 
   const handleCancel = useCallback(() => {
     requestCancel(projectId);
+    // If Stage 2 is being generated, cancel the heavy action so the
+    // orchestrator's store listener fires and resolves the wait promise.
+    cancelBassHeavyAction(projectId, "Improve Bass cancelled");
   }, [projectId]);
 
   const handleRetry = useCallback(() => {
@@ -319,10 +327,12 @@ export default function ImproveBassResponseV2({
   if (!shared?.hasCurrentResult) return null;
 
   const isRunning = state?.status === "running";
+  const isAwaitingStage2 = state?.status === "awaiting_stage2";
   const isComplete = state?.status === "complete";
   const isError = state?.status === "error";
   const isCancelled = state?.status === "cancelled";
   const isStale = state?.status === "stale";
+  const isBusy = isRunning || isAwaitingStage2;
 
   return (
     <div className="mt-3 rounded-lg border border-[#D9D5CE] bg-white px-4 py-4">
@@ -336,14 +346,14 @@ export default function ImproveBassResponseV2({
           type="button"
           className="w-full bg-[#213428] text-white hover:bg-[#3E4349]"
           onClick={handleStart}
-          disabled={isRunning || !rspPosition || !selectedSubModel}
+          disabled={isBusy || !rspPosition || !selectedSubModel}
         >
           <Sparkles className="h-4 w-4 mr-1.5" />
-          {isRunning ? "Optimising…" : "Improve Bass Response"}
+          {isAwaitingStage2 ? "Preparing placement…" : isRunning ? "Optimising…" : "Improve Bass Response"}
         </Button>
       </div>
 
-      {isRunning && (
+      {isBusy && (
         <ImproveBassV2Progress state={state} onCancel={handleCancel} />
       )}
 

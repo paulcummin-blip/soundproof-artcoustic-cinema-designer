@@ -80,6 +80,13 @@ export function subscribeStage2(listener) {
   return () => listeners.delete(listener);
 }
 
+// Test-only helper: directly set Stage 2 state for unit tests.
+// Not used in production — production state transitions go through
+// markStage2Updating / publishStage2Complete / publishStage2Error.
+export function setStage2StateForTest(projectId, patch) {
+  return setMemory(projectId, patch);
+}
+
 export function publishHydratedStage2(projectId, fingerprint, results) {
   return setMemory(projectId, {
     status: "complete",

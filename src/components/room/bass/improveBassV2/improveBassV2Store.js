@@ -38,6 +38,9 @@ function emptyState(projectId) {
     subOptimisationExhausted: false,
     materialSubImprovementFound: false,
     bestPracticalSubResult: null,
+    // Runtime metrics from the last V2 run (placementFingerprintUsed,
+    // stage2TransfersReused, etc.) — set when the run reaches a terminal state.
+    runtimeMetrics: null,
   };
 }
 
@@ -138,6 +141,10 @@ export function setWinner(projectId, winner) {
     status: "complete",
     completedAtMs: Date.now(),
   });
+}
+
+export function setRuntimeMetrics(projectId, runtimeMetrics) {
+  return publish(projectId, { runtimeMetrics });
 }
 
 export function setPositionSearchPhase(projectId, phase) {
