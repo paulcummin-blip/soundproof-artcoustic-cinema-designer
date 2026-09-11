@@ -9,9 +9,9 @@
 // calculated acoustic results.
 //
 // One project-level value per parameter (assumed_p15_level / assumed_p21_level).
-// null = NOT CALCULATED (no silent default). Both Compliance Report and
-// Technical Report read and write the same shared value. The rating engine
-// consumes the same level.
+// null = no explicit user selection; the effective level defaults to L2.
+// Both Compliance Report and Technical Report read and write the same shared
+// value. The rating engine consumes the same effective level.
 //
 // Presentation only — no thresholds or grading maths of its own; the level
 // mapping below mirrors the existing RP22 catalog definitions.
@@ -66,34 +66,46 @@ export function normalizeAssumedLevel(raw) {
   return m ? `L${m[1]}` : null;
 }
 
-/** Derive the P15 display value (e.g. "NCB 22") from an assumed level, or null. */
+/** Default assumed level when the designer has not made a selection. */
+export const DEFAULT_ASSUMED_LEVEL = "L2";
+
+/**
+ * Resolve the effective assumed level, defaulting to L2 when the designer
+ * has not made an explicit selection. This is the single canonical
+ * effective-value authority — every consumer should call this (or one of
+ * the resolveAssumed* wrappers) rather than normalizeAssumedLevel directly
+ * when it needs the level that actually applies.
+ */
+export function getEffectiveAssumedLevel(level) {
+  return normalizeAssumedLevel(level) || DEFAULT_ASSUMED_LEVEL;
+}
+
+/** Derive the P15 display value (e.g. "NCB 22") from an assumed level. Defaults to L2 / NCB 22. */
 export function getAssumedP15DisplayValue(level) {
-  const lvl = normalizeAssumedLevel(level);
-  if (!lvl) return null;
+  const lvl = getEffectiveAssumedLevel(level);
   return `NCB ${P15_LEVEL_TO_NCB[lvl]}`;
 }
 
-/** Derive the P21 display value (e.g. "−10 dB" or "N/A") from an assumed level, or null. */
+/** Derive the P21 display value (e.g. "−10 dB" or "N/A") from an assumed level. Defaults to L2 / −8 dB. */
 export function getAssumedP21DisplayValue(level) {
-  const lvl = normalizeAssumedLevel(level);
-  if (!lvl) return null;
+  const lvl = getEffectiveAssumedLevel(level);
   if (lvl === "L1") return "N/A";
   const db = P21_LEVEL_TO_DB[lvl];
   if (!Number.isFinite(db)) return null;
   return `${db} dB`;
 }
 
-/** Resolve the RP22 level string for P15 from the assumed level, or "—" (NOT CALCULATED). */
+/** Resolve the RP22 level string for P15 from the assumed level. Defaults to L2. */
 export function resolveAssumedP15Level(level) {
-  return normalizeAssumedLevel(level) || "—";
+  return getEffectiveAssumedLevel(level);
 }
 
-/** Resolve the RP22 level string for P21 from the assumed level, or "—" (NOT CALCULATED). */
+/** Resolve the RP22 level string for P21 from the assumed level. Defaults to L2. */
 export function resolveAssumedP21Level(level) {
-  return normalizeAssumedLevel(level) || "—";
+  return getEffectiveAssumedLevel(level);
 }
 
-/** Get the assumed level for rating-engine consumption, or null (provisional). */
+/** Get the effective assumed level for rating-engine consumption. Defaults to L2. */
 export function getAssumedLevelForRating(level) {
-  return normalizeAssumedLevel(level);
+  return getEffectiveAssumedLevel(level);
 }
