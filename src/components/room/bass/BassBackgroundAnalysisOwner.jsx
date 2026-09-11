@@ -1038,6 +1038,15 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   //      queue and the user switched to it): do nothing — the scheduler's job
   //      is reused, and the publish effect publishes the result when it completes.
   // Prevents duplicate jobs: at most one calculation per base fingerprint + target.
+  // Declare this before the effect below because it is read in both the effect
+  // body and dependency array. A later const declaration triggers a runtime TDZ.
+  const calculationInProgress = !!manualAnalysisRequest
+    && manualRequestMatchesCurrent
+    && (
+      dispatchedManualRequestRef.current !== manualAnalysisRequest.id
+      || lifecycle.status === "queued"
+      || lifecycle.status === "calculating"
+    );
   const autoCalculatedKeyRef = useRef(null);
   useEffect(() => {
     if (!isProjectHydrationReady || !targetKey || !canCalculate) return;
@@ -1095,13 +1104,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   //   "Finalising results…" — publication/fingerprint validation
   // No worker names, calculation counts, frequency samples, or implementation
   // detail. The designer remains interactive throughout.
-  const calculationInProgress = !!manualAnalysisRequest
-    && manualRequestMatchesCurrent
-    && (
-      dispatchedManualRequestRef.current !== manualAnalysisRequest.id
-      || lifecycle.status === "queued"
-      || lifecycle.status === "calculating"
-    );
   const calculationPhase = !calculationInProgress ? null
     : dispatchedManualRequestRef.current !== manualAnalysisRequest.id
       ? "preparing"   // Authoritative simulation in flight
