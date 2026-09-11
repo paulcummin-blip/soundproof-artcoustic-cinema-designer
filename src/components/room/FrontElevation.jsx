@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
-import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon, MultiSoundbarFaceIcon, MultiSoundbar77FaceIcon } from "@/components/report/SpeakerFaceIcons";
+import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon, MultiSoundbarFaceIcon, MultiSoundbar77FaceIcon, MultiSoundbar83FaceIcon } from "@/components/report/SpeakerFaceIcons";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolveEffectiveScreen";
 
@@ -389,7 +389,8 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const isMultiSoundbar = mk.includes("multi-lcr") || mk.includes("multi-mono");
     const isTv65 = speakerTvPreset === "tv65";
     const isTv77 = speakerTvPreset === "tv77";
-    const showMultiSoundbarIcon = isMultiSoundbar && (isTv65 || isTv77);
+    const isTv83 = speakerTvPreset === "tv83";
+    const showMultiSoundbarIcon = isMultiSoundbar && (isTv65 || isTv77 || isTv83);
     const hasFaceIcon = isQ43 || isQ45 || isQ85 || isQ63 || isEv11 || isEv21 || isEv31 || isEv42 || isEv63 || isEv84 || isC41 || showMultiSoundbarIcon;
 
     // C4-1 and Multi Soundbar vector icons fill edge-to-edge — no transparent padding, so ratio = 1.0.
@@ -402,6 +403,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const adjustedY = hasFaceIcon ? sy - (adjustedH - sh) / 2 : sy;
 
     const renderFaceIcon = () => {
+      if (showMultiSoundbarIcon && isTv83) return <MultiSoundbar83FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (showMultiSoundbarIcon && isTv77) return <MultiSoundbar77FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (showMultiSoundbarIcon) return <MultiSoundbarFaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isC41) return <C41FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;

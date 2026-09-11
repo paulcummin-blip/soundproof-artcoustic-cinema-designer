@@ -270,3 +270,53 @@ export function MultiSoundbar77FaceIcon({ x, y, width, height }) {
     </svg>
   );
 }
+
+/**
+ * Multi Soundbar — 83" TV variant.
+ * Widest enclosure (1872mm). Two clusters only — left and right — with a wide
+ * empty centre section. Each cluster has two square-framed woofers with corner
+ * bolts flanking a central tweeter. Small dots at the far ends and two dots
+ * in the centre gap at roughly 1/3 and 2/3 of the bar.
+ */
+export function MultiSoundbar83FaceIcon({ x, y, width, height }) {
+  // viewBox matches the 1872mm × 100mm physical aspect ratio (~18.7:1)
+  const clusterCentres = [65, 295];
+  const tinyCircles = [20, 120, 240, 340];
+  return (
+    <svg
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      viewBox="0 0 360 20"
+      xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {/* Outer chassis */}
+      <rect x="1" y="1" width="358" height="18" rx="1" fill="none" stroke={STROKE} strokeWidth="0.8" />
+
+      {/* Two driver clusters — left and right */}
+      {clusterCentres.map((cx, i) => (
+        <g key={`cluster83-${i}`}>
+          {/* Left woofer with corner bolts */}
+          <rect x={cx - 11} y="5" width="10" height="10" fill="none" stroke={STROKE} strokeWidth="0.7" />
+          <CornerBolts x={cx - 11} y={5} w={10} h={10} inset={1.5} r={0.5} />
+          <WooferCircles cx={cx - 6} cy={10} r1={3.5} r2={2.2} r3={0.7} />
+
+          {/* Right woofer with corner bolts */}
+          <rect x={cx + 1} y="5" width="10" height="10" fill="none" stroke={STROKE} strokeWidth="0.7" />
+          <CornerBolts x={cx + 1} y={5} w={10} h={10} inset={1.5} r={0.5} />
+          <WooferCircles cx={cx + 6} cy={10} r1={3.5} r2={2.2} r3={0.7} />
+
+          {/* Central tweeter */}
+          <TweeterCircles cx={cx} cy={10} r1={2.2} r2={1.3} />
+        </g>
+      ))}
+
+      {/* Tiny dots — far ends and two in the centre gap at ~1/3 and ~2/3 */}
+      {tinyCircles.map((tx, i) => (
+        <circle key={`tiny83-${i}`} cx={tx} cy={10} r="1.5" fill="none" stroke={STROKE} strokeWidth="0.5" />
+      ))}
+    </svg>
+  );
+}
