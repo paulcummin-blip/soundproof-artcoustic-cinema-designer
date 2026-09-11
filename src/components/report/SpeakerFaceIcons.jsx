@@ -175,3 +175,50 @@ export function C41FaceIcon({ x, y, width, height }) {
     </svg>
   );
 }
+
+/**
+ * Multi Soundbar — wide integrated LCR/center soundbar.
+ * Normalised black-and-white line art matching the WooferCircles/TweeterCircles
+ * primitives used by other face icons. Three driver clusters (left, center,
+ * right), each with two square-framed woofers flanking a central tweeter, with
+ * small single drivers between clusters and at the ends.
+ */
+export function MultiSoundbarFaceIcon({ x, y, width, height }) {
+  const clusterCentres = [55, 150, 245];
+  const tinyCircles = [18, 102, 198, 282];
+  return (
+    <svg
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      viewBox="0 0 300 24"
+      xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {/* Outer chassis */}
+      <rect x="1" y="1" width="298" height="22" rx="1.5" fill="none" stroke={STROKE} strokeWidth="0.8" />
+
+      {/* Three driver clusters */}
+      {clusterCentres.map((cx, i) => (
+        <g key={`cluster-${i}`}>
+          {/* Left woofer — square frame + concentric circles */}
+          <rect x={cx - 14} y="6" width="12" height="12" fill="none" stroke={STROKE} strokeWidth="0.7" />
+          <WooferCircles cx={cx - 8} cy={12} r1={4.5} r2={3} r3={1} />
+
+          {/* Right woofer — square frame + concentric circles */}
+          <rect x={cx + 2} y="6" width="12" height="12" fill="none" stroke={STROKE} strokeWidth="0.7" />
+          <WooferCircles cx={cx + 8} cy={12} r1={4.5} r2={3} r3={1} />
+
+          {/* Central tweeter */}
+          <TweeterCircles cx={cx} cy={12} r1={3} r2={1.8} />
+        </g>
+      ))}
+
+      {/* Tiny single drivers between clusters and at the ends */}
+      {tinyCircles.map((tx, i) => (
+        <circle key={`tiny-${i}`} cx={tx} cy={12} r="1.8" fill="none" stroke={STROKE} strokeWidth="0.5" />
+      ))}
+    </svg>
+  );
+}

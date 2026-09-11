@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
-import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon } from "@/components/report/SpeakerFaceIcons";
+import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon, MultiSoundbarFaceIcon } from "@/components/report/SpeakerFaceIcons";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolveEffectiveScreen";
 
@@ -369,7 +369,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
    * @param {number}  zM     - acoustic centre height in metres (for z= annotation)
    * @param {boolean} labelInsideBox - if true, centre label inside the shape; if false, above
    */
-  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey, labelInsideBox = false, labelY, onMouseDown }) => {
+  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey, tvPresetKey: speakerTvPreset, labelInsideBox = false, labelY, onMouseDown }) => {
     const sx = cx - sw / 2;
     const sy = cy - sh / 2;
 
@@ -386,18 +386,22 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const isEv63 = !isEv31 && mk.includes("evolve-6-3");
     const isEv84 = mk.includes("evolve-8-4");
     const isC41 = mk.includes("c4-1");
-    const hasFaceIcon = isQ43 || isQ45 || isQ85 || isQ63 || isEv11 || isEv21 || isEv31 || isEv42 || isEv63 || isEv84 || isC41;
+    const isMultiSoundbar = mk.includes("multi-lcr") || mk.includes("multi-mono");
+    const isTv65 = speakerTvPreset === "tv65";
+    const showMultiSoundbarIcon = isMultiSoundbar && isTv65;
+    const hasFaceIcon = isQ43 || isQ45 || isQ85 || isQ63 || isEv11 || isEv21 || isEv31 || isEv42 || isEv63 || isEv84 || isC41 || showMultiSoundbarIcon;
 
-    // C4-1 image fills edge-to-edge — no transparent padding, so ratio = 1.0 (no expansion).
+    // C4-1 and Multi Soundbar vector icons fill edge-to-edge — no transparent padding, so ratio = 1.0.
     // All other Artcoustic PNG assets have internal transparent padding; enlarge them so
     // the visible cabinet drawing fills the speaker boundary box with ~2–4px clearance.
-    const FACE_ICON_VISIBLE_RATIO = isC41 ? 1.0 : 0.72;
+    const FACE_ICON_VISIBLE_RATIO = (isC41 || showMultiSoundbarIcon) ? 1.0 : 0.72;
     const adjustedW = hasFaceIcon ? sw / FACE_ICON_VISIBLE_RATIO : sw;
     const adjustedH = hasFaceIcon ? sh / FACE_ICON_VISIBLE_RATIO : sh;
     const adjustedX = hasFaceIcon ? sx - (adjustedW - sw) / 2 : sx;
     const adjustedY = hasFaceIcon ? sy - (adjustedH - sh) / 2 : sy;
 
     const renderFaceIcon = () => {
+      if (showMultiSoundbarIcon) return <MultiSoundbarFaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isC41) return <C41FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isQ43) return <Q43FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isQ45) return <Q45FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
@@ -654,6 +658,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 label: spk.label,
                 zM: spk.z,
                 modelKey: spk.modelKey ?? "",
+                tvPresetKey: tvPresetKey,
                 labelY: annotation.label.y,
                 onMouseDown: onLcrSpeakerMoved ? (e) => handleLcrMouseDown(e, spk.role, spk.x, spk.z) : undefined,
               })}
