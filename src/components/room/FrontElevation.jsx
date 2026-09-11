@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
-import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
+import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 
@@ -437,24 +437,27 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const isTv65 = speakerTvPreset === "tv65";
     const isTv77 = speakerTvPreset === "tv77";
     const isTv83 = speakerTvPreset === "tv83";
+    const isTv100 = speakerTvPreset === "tv100";
     const isManualScreen = isManualOverrideActive(screen);
     const useMulti65Artwork = isMultiSoundbar && isTv65;
     const useMulti83Artwork = isMultiSoundbar && (isTv83 || isManualScreen);
     const useMulti77Artwork = isMultiSoundbar && isTv77;
-    const useMultiArtwork = useMulti65Artwork || useMulti83Artwork || useMulti77Artwork;
+    const useMulti100Artwork = isMultiSoundbar && isTv100;
+    const useMultiArtwork = useMulti65Artwork || useMulti83Artwork || useMulti77Artwork || useMulti100Artwork;
 
     // Full-width Multi Soundbar artwork — renders the dedicated technical line
     // drawing at exactly the screen's rendered width. Separate preserved
-    // source drawings are used for 65" (1411×100mm), 77" (1711×100mm), and
-    // 83"/Manual (1872×100mm), each retaining its own original geometry.
+    // source drawings are used for 65" (1411×100mm), 77" (1711×100mm),
+    // 83"/Manual (1872×100mm), and 100" (2230×100mm), each retaining its own
+    // original geometry.
     if (useMultiArtwork) {
       const screenOW = (overallW / roomW) * drawW;
-      const aspectRatio = useMulti65Artwork ? (1411 / 100) : useMulti77Artwork ? (1711 / 100) : (1872 / 100);
+      const aspectRatio = useMulti65Artwork ? (1411 / 100) : useMulti77Artwork ? (1711 / 100) : useMulti100Artwork ? (2230 / 100) : (1872 / 100);
       const artworkW = screenOW;
       const artworkH = screenOW / aspectRatio;
       const artworkX = rx(screenCenterX) - artworkW / 2;
       const artworkY = cy - artworkH / 2;
-      const ArtworkComponent = useMulti65Artwork ? MultiSoundbar65ArtworkFaceIcon : useMulti77Artwork ? MultiSoundbar77ArtworkFaceIcon : MultiSoundbarArtworkFaceIcon;
+      const ArtworkComponent = useMulti65Artwork ? MultiSoundbar65ArtworkFaceIcon : useMulti77Artwork ? MultiSoundbar77ArtworkFaceIcon : useMulti100Artwork ? MultiSoundbar100ArtworkFaceIcon : MultiSoundbarArtworkFaceIcon;
       return (
         <g key={key} onMouseDown={onMouseDown} style={onMouseDown ? { cursor: 'grab', userSelect: 'none' } : undefined}>
           <ArtworkComponent x={artworkX} y={artworkY} width={artworkW} height={artworkH} />

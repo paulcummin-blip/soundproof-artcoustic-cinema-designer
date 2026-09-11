@@ -391,6 +391,46 @@ export function MultiSoundbar65ArtworkFaceIcon({ x, y, width, height }) {
   );
 }
 
+/**
+ * Multi Soundbar — 100" TV dedicated artwork rendering using the original
+ * technical line drawing for the 100" configuration. The uploaded source
+ * image is rendered with CSS filters to normalise grey-on-light-grey to
+ * clean black-and-white. The viewBox matches the physical 2230×100mm
+ * aspect ratio so the drawing scales proportionally with width changes.
+ * preserveAspectRatio="xMidYMid meet" guarantees the native drawing
+ * geometry is never stretched, squashed, or distorted.
+ *
+ * Used ONLY for:
+ *   - 100" TV + Multi Soundbar
+ *
+ * The 65", 77", and 83"/Manual Multi assets remain separate and unchanged.
+ * Each drawing retains its own original geometry.
+ */
+export function MultiSoundbar100ArtworkFaceIcon({ x, y, width, height }) {
+  return (
+    <svg
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      viewBox="0 0 2230 100"
+      xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid meet"
+      style={{ overflow: 'visible' }}
+    >
+      <image
+        x={0}
+        y={0}
+        width={2230}
+        height={100}
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/63cbb5139_Screenshot2026-09-11at172359.png"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ filter: 'grayscale(1) contrast(2) brightness(0.9)' }}
+      />
+    </svg>
+  );
+}
+
 export function MultiSoundbar83FaceIcon({ x, y, width, height }) {
   // viewBox matches the 1872mm × 100mm physical aspect ratio (~18.7:1)
   const clusterCentres = [65, 295];
