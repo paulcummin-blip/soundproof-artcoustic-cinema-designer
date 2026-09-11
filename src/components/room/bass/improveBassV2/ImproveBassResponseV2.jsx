@@ -25,6 +25,7 @@ import { buildAuthoritativeRspPosition } from "@/components/room/bass/authoritat
 import { runImproveBassV2 } from "./improveBassV2Engine";
 import {
   startImproveBassV2,
+  setAwaitingStage2,
   updateProgress,
   setBestSoFar,
   setWinner,
@@ -36,6 +37,8 @@ import {
   resetImproveBassV2,
   useImproveBassV2State,
 } from "./improveBassV2Store";
+import { requestBassHeavyAction, cancelBassHeavyAction } from "../bassHeavyActionStore";
+import { isStage2ReadyForConsumption, waitForStage2Terminal } from "./stage2LifecycleOrchestrator";
 import { buildOptimisedInstances } from "./improveBassV2Apply";
 import { applyCalibrationTuning } from "./improveBassV2ApplyCalibration";
 import { computeV2DesignFingerprint } from "./improveBassV2Fingerprint";
@@ -123,6 +126,92 @@ export default function ImproveBassResponseV2({
       p18TargetBasis: p14Params.p18TargetBasis,
     };
 
+    const startFingerprint = (() => {
+      try {
+        return computeV2DesignFingerprint({
+          subwooferInstances,
+          roomDims,
+          seatingPositions,
+          rspPosition,
+          selectedSubModel,
+          p14TargetBasis: p14Params.p14TargetBasis,
+          p14TargetLevel: p14Params.p14TargetLevel,
+          p14TargetDb: p14Params.p14TargetDb,
+        });
+      } catch {
+        return null;
+      }
+    })();
+
+    const getCurrentFingerprint = () => {
+      try {
+        const d = latestDesignRef.current;
+        return computeV2DesignFingerprint({
+          subwooferInstances: d.subwooferInstances,
+          roomDims: d.roomDims,
+          seatingPositions: d.seatingPositions,
+          rspPosition: d.rspPosition,
+          selectedSubModel: d.selectedSubModel,
+          p14TargetBasis: d.p14Params?.p14TargetBasis,
+          p14TargetLevel: d.p14Params?.p14TargetLevel,
+          p14TargetDb: d.p14Params?.p14TargetDb,
+        });
+      } catch {
+        return null;
+      }
+    };
+
+    // ── Stage 2 lifecycle: reuse or request ───────────────────────────
+    // Case A: valid current Stage 2 authority exists → reuse immediately.
+    // Case B: no valid authority → request heavy action, wait for Stage 2
+    //         to complete, then continue into V2 optimisation.
+    let stage2Result = stage2;
+    let placementFingerprint = stage2?.placementFingerprint;
+
+    if (!isStage2ReadyForConsumption(stage2)) {
+      // Case B: request Stage 2 through the existing heavy action lifecycle
+      if (!shared.cacheKey) {
+        setError(projectId, "Bass result is not ready — calculate parameter results first.");
+        runningRef.current = false;
+        return;
+      }
+
+      setAwaitingStage2(projectId, snapshot);
+      requestBassHeavyAction(projectId, "optimise", shared.cacheKey);
+
+      const waitResult = await waitForStage2Terminal(projectId, {
+        isCancelled: () => isCancelRequested(projectId),
+        getCurrentFingerprint,
+        startFingerprint,
+      });
+
+      if (waitResult.status === "cancelled") {
+        setCancelled(projectId);
+        runningRef.current = false;
+        return;
+      }
+      if (waitResult.status === "stale") {
+        setStale(projectId, waitResult.message);
+        runningRef.current = false;
+        return;
+      }
+      if (waitResult.status === "error") {
+        setError(projectId, waitResult.error);
+        runningRef.current = false;
+        return;
+      }
+      if (waitResult.status === "timeout") {
+        setError(projectId, waitResult.error);
+        runningRef.current = false;
+        return;
+      }
+
+      // Stage 2 complete — consume the new authority
+      stage2Result = waitResult.stage2;
+      placementFingerprint = waitResult.stage2?.placementFingerprint;
+    }
+
+    // ── Continue into V2 finalist/local optimisation ──────────────────
     startImproveBassV2(projectId, snapshot);
 
     const params = {
@@ -139,8 +228,8 @@ export default function ImproveBassResponseV2({
       p18TargetBasis: p14Params.p18TargetBasis,
       currentAuthority: shared?.completedBassAuthority,
       liveCacheKey: shared?.cacheKey,
-      stage2Result: stage2,
-      placementFingerprint: stage2?.placementFingerprint,
+      stage2Result,
+      placementFingerprint,
     };
 
     const callbacks = {
@@ -155,23 +244,7 @@ export default function ImproveBassResponseV2({
       // CURRENT design state on each check, reading from the ref (not the
       // render closure). If the design changed during V2 execution, the
       // fingerprint will differ from the start fingerprint.
-      getCurrentFingerprint: () => {
-        try {
-          const d = latestDesignRef.current;
-          return computeV2DesignFingerprint({
-            subwooferInstances: d.subwooferInstances,
-            roomDims: d.roomDims,
-            seatingPositions: d.seatingPositions,
-            rspPosition: d.rspPosition,
-            selectedSubModel: d.selectedSubModel,
-            p14TargetBasis: d.p14Params?.p14TargetBasis,
-            p14TargetLevel: d.p14Params?.p14TargetLevel,
-            p14TargetDb: d.p14Params?.p14TargetDb,
-          });
-        } catch {
-          return null;
-        }
-      },
+      getCurrentFingerprint,
     };
 
     try {

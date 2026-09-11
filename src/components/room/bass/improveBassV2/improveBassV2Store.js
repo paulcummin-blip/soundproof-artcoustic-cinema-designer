@@ -16,7 +16,7 @@ const keyFor = (projectId) => String(projectId || "free");
 function emptyState(projectId) {
   return {
     projectId: keyFor(projectId),
-    status: "idle", // idle | running | complete | cancelled | error | stale
+    status: "idle", // idle | awaiting_stage2 | running | complete | cancelled | error | stale
     phase: "idle", // reviewing | testing_positions | optimising_timing | testing_polarity | balancing_levels | confirming | finalising
     phaseLabel: "",
     progressCurrent: 0,
@@ -58,6 +58,24 @@ function publish(projectId, patch) {
   states.set(key, { ...current, ...patch, projectId: key });
   listeners.forEach((l) => l());
   return states.get(key);
+}
+
+export function setAwaitingStage2(projectId, snapshot) {
+  return publish(projectId, {
+    status: "awaiting_stage2",
+    phase: "awaiting_stage2",
+    phaseLabel: "Improving bass response",
+    progressCurrent: 0,
+    progressTotal: 0,
+    bestSoFar: null,
+    confirmedChallengers: [],
+    winner: null,
+    error: null,
+    snapshot,
+    startedAtMs: Date.now(),
+    completedAtMs: null,
+    cancelRequested: false,
+  });
 }
 
 export function startImproveBassV2(projectId, snapshot) {
