@@ -301,10 +301,13 @@ export function createBassAnalysisResult() {
 // ---------------------------------------------------------------------------
 // 4. Current-result adapter (extracted to bassAnalysisAdapter.js)
 // ---------------------------------------------------------------------------
-
+//
 // The adapter function and its helpers live in bassAnalysisAdapter.js to keep
-// this module under 600 lines. Re-exported here for backward compatibility.
-export { adaptCurrentBassOptimisationResult } from "@/components/room/bass/bassAnalysisAdapter";
+// this module under 600 lines. The backward-compatibility re-export that was
+// here has been removed to break a circular import (contract → adapter →
+// contract) that caused a TDZ ReferenceError when the BassResponse lazy
+// chunk loaded. All consumers import adaptCurrentBassOptimisationResult
+// directly from bassAnalysisAdapter.js.
 
 // ---------------------------------------------------------------------------
 // 5. Structured-clone safety validation
