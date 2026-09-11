@@ -35,6 +35,7 @@ import { computeP11Compliance } from "@/components/utils/rp22/computeP11Complian
 import { clampLcrZoneDepth, computeLcrZones, isCentreInZone } from "@/components/utils/rp22/lcrZoneAuthority";
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 import { logRp22EngineDiagnostic } from "@/components/utils/rp22RuntimeDiagnostic";
+import { getEffectiveAssumedLevel, P15_LEVEL_TO_NCB as ASSUMED_P15_NCB_MAP } from "@/components/utils/assumedParameterAuthority";
 
 // TEMPORARY P18/P19 execution trace — display-only, no calculation control flow.
 let temporaryAnalysisRunId = 0;
@@ -856,33 +857,19 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     // RP22 Parameter 15 — Background noise floor (designer-assumed level)
     // Consumes the single shared project-level assumedP15Level (L1–L4).
-    // null = NOT CALCULATED (no silent default).
+    // null defaults to L2 (NCB 22) via the canonical effective-level authority.
     const p15CatalogEntry = RP22_CATALOG["15"];
-    const P15_LEVEL_TO_NCB = { L1: 26, L2: 22, L3: 18, L4: 15 };
-    const p15Level = (assumedP15Level && /^L[1-4]$/.test(String(assumedP15Level).toUpperCase()))
-      ? String(assumedP15Level).toUpperCase()
-      : null;
+    const p15Level = getEffectiveAssumedLevel(assumedP15Level);
+    const p15Value = ASSUMED_P15_NCB_MAP[p15Level];
 
-    if (p15Level) {
-      const p15Value = P15_LEVEL_TO_NCB[p15Level];
-      gradedParameters.primary[15] = {
-        title: p15CatalogEntry?.title || "Background noise floor",
-        level: p15Level,
-        value: p15Value,
-        formatted: `NCB ${p15Value}`,
-        unit: p15CatalogEntry?.unit || "NCB",
-        status: "ok"
-      };
-    } else {
-      gradedParameters.primary[15] = {
-        title: p15CatalogEntry?.title || "Background noise floor",
-        level: null,
-        value: null,
-        formatted: "Not Calculated",
-        unit: p15CatalogEntry?.unit || "NCB",
-        status: "no_data"
-      };
-    }
+    gradedParameters.primary[15] = {
+      title: p15CatalogEntry?.title || "Background noise floor",
+      level: p15Level,
+      value: p15Value,
+      formatted: `NCB ${p15Value}`,
+      unit: p15CatalogEntry?.unit || "NCB",
+      status: "ok"
+    };
 
     gradedParameters.secondary = null;
 
