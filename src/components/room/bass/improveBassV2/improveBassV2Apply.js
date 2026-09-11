@@ -100,6 +100,12 @@ export function buildOptimisedInstances(winner, currentInstances, roomDims, mode
       // BLOCKER 5: rotation from wall-aware derivation
       rotationDeg,
       positionSource: "v2-optimised",
+      // Mark tuning as V2-optimised so the production bass engine bypasses
+      // auto-align for this applied state. The V2 delays are the FINAL effective
+      // delays (graded on transfers with embedded geometric arrivals). Adding
+      // auto-align after Apply would double-compensate and produce a different
+      // acoustic state than what was graded.
+      tuningSource: "v2-optimised",
       // BLOCKER 5: delay, trim, polarity from winner tuning
       gainDb: Number(t.gainDb) || 0,
       delayMs: Number(t.delayMs) || 0,

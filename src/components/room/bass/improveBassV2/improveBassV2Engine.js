@@ -178,7 +178,7 @@ export function gatherCandidates({
   const currentFinalist = buildCurrentFinalist(subwooferInstances, roomDims);
   const quantity = currentFinalist?.sources?.length;
 
-  const stage2Finalists = extractStage2Finalists(stage2Result, quantity);
+  const stage2Finalists = extractStage2Finalists(stage2Result, quantity, roomDims);
   // FIX 1: Use the P14-independent placementFingerprint (stage2-place:v3:) for
   // raw-transfer cache retrieval — NOT the P14-dependent combined stage2
   // fingerprint. The cache is keyed by placementFingerprint; using the wrong
@@ -201,7 +201,7 @@ export function gatherCandidates({
   return candidates;
 }
 
-function extractStage2Finalists(stage2Result, quantity) {
+function extractStage2Finalists(stage2Result, quantity, roomDims) {
   if (!stage2Result) return [];
   const result = quantity === 1
     ? stage2Result.one_sub_result
@@ -210,8 +210,28 @@ function extractStage2Finalists(stage2Result, quantity) {
       : quantity === 4
         ? stage2Result.four_sub_result
         : null;
-  if (!result?.finalists) return [];
-  return result.finalists.filter((f) => f?.sources?.length === quantity);
+  // FIX: Stage 2 publishes `evaluatedFinalists` (canonical confirmation results),
+  // not `finalists`. Reading `finalists` produced zero global challengers reaching
+  // final optimisation. Map evaluatedFinalists to the {id, sources} format that
+  // gatherCandidates expects, reconstructing normalised sources from coordinates.
+  if (!result?.evaluatedFinalists) return [];
+  const W = Number(roomDims?.widthM) || 0;
+  const L = Number(roomDims?.lengthM) || 0;
+  const seen = new Set();
+  const mapped = [];
+  for (const f of result.evaluatedFinalists) {
+    if (!f) continue;
+    const id = f.finalistId || f.id;
+    if (!id || seen.has(id)) continue;
+    const coords = Array.isArray(f.coordinates) ? f.coordinates : null;
+    if (!coords || coords.length !== quantity) continue;
+    seen.add(id);
+    const sources = (W > 0 && L > 0)
+      ? coords.map((c) => ({ xNorm: Number(c.x) / W, yNorm: Number(c.y) / L }))
+      : coords.map(() => ({ xNorm: 0, yNorm: 0 }));
+    mapped.push({ ...f, id, sources });
+  }
+  return mapped;
 }
 
 export function isSamePlacement(finalist, currentFinalist, roomDims) {
@@ -415,7 +435,7 @@ function promoteChallengers(candidates, maxChallengers) {
 // Winner selection with primary-seat protection
 // ---------------------------------------------------------------------------
 
-function selectWinnerWithProtection(confirmedResults, snapshot, existingAuthority) {
+export function selectWinnerWithProtection(confirmedResults, snapshot, existingAuthority) {
   // BLOCKER 4: If no confirmed results and no existing authority, NO_WINNER.
   if (!confirmedResults.length && !existingAuthority) {
     return {
@@ -518,10 +538,30 @@ function selectWinnerWithProtection(confirmedResults, snapshot, existingAuthorit
     }
   }
 
-  let materialityReason = null;
+  // Enforce the canonical material-improvement gate: a candidate that fails
+  // isMaterialImprovement MUST NOT become the visible recommendation, even if
+  // it ranks first among weak candidates. The correct outcome is then
+  // "No verified material automatic improvement found".
   if (existingAuthority && winnerResult) {
     const matCheck = isMaterialImprovement(existingAuthority, winnerResult);
-    materialityReason = matCheck.material ? matCheck.reason : null;
+    if (!matCheck.material) {
+      return {
+        isCurrent: true,
+        winner: null,
+        message: "No verified material automatic improvement found",
+        materialityReason: matCheck.reason,
+        confirmedResults,
+        currentResult: currentForRegression,
+      };
+    }
+    return {
+      isCurrent: false,
+      winner: winnerResult,
+      message: null,
+      confirmedResults,
+      currentResult: currentForRegression,
+      materialityReason: matCheck.reason,
+    };
   }
 
   return {
@@ -530,7 +570,7 @@ function selectWinnerWithProtection(confirmedResults, snapshot, existingAuthorit
     message: null,
     confirmedResults,
     currentResult: currentForRegression,
-    materialityReason,
+    materialityReason: null,
   };
 }
 

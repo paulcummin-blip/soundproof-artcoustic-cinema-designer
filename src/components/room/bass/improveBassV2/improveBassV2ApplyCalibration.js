@@ -41,6 +41,10 @@ export function applyCalibrationTuning(currentInstances, calibrationTuning) {
     const t = calibrationTuning[i] || { delayMs: 0, gainDb: 0, polarity: 0 };
     return {
       ...inst,
+      // Mark tuning as V2-optimised so the production bass engine bypasses
+      // auto-align for this applied state. The V2 calibration delays are the
+      // FINAL effective delays — adding auto-align would double-compensate.
+      tuningSource: "v2-optimised",
       delayMs: Number(t.delayMs) || 0,
       gainDb: Number(t.gainDb) || 0,
       polarity: Number(t.polarity) || 0,

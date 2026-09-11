@@ -37,6 +37,13 @@ function resolveSubGroup(subId, fallbackGroup) {
 
 export function buildAuthoritativeAutoAlignDelays({ enabled, rspPosition, frontSubsLive, rearSubsLive, frontSubsCfg, rearSubsCfg }) {
   if (!enabled || !rspPosition) return {};
+  // Bypass auto-align when V2 optimiser tuning is applied. The V2 delays are
+  // the FINAL effective delays (graded on transfers with embedded geometric
+  // arrivals). Adding auto-align after Apply would double-compensate and
+  // produce a different acoustic state than what was graded.
+  const allLive = [...(Array.isArray(frontSubsLive) ? frontSubsLive : []), ...(Array.isArray(rearSubsLive) ? rearSubsLive : [])];
+  const hasV2Tuning = allLive.some((sub) => sub?.tuningSource === "v2-optimised");
+  if (hasV2Tuning) return {};
   const arrivals = [];
   const processGroup = (cfg, liveSubs, group) => {
     const live = Array.isArray(liveSubs) ? liveSubs : [];
