@@ -222,3 +222,51 @@ export function MultiSoundbarFaceIcon({ x, y, width, height }) {
     </svg>
   );
 }
+
+/**
+ * Multi Soundbar — 77" TV variant.
+ * Wider enclosure (1711mm vs 1411mm for 65"). Cluster layout matches the
+ * reference: left cluster, center-right cluster (similar spacing), and a
+ * right-most cluster positioned toward the end of the bar. Small single
+ * drivers at the far left and in the two inter-cluster gaps.
+ */
+export function MultiSoundbar77FaceIcon({ x, y, width, height }) {
+  // viewBox matches the 1711mm × 100mm physical aspect ratio (~17:1)
+  const clusterCentres = [50, 150, 290];
+  const tinyCircles = [15, 100, 220];
+  return (
+    <svg
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      viewBox="0 0 340 20"
+      xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {/* Outer chassis */}
+      <rect x="1" y="1" width="338" height="18" rx="1" fill="none" stroke={STROKE} strokeWidth="0.8" />
+
+      {/* Three driver clusters — left, center-right, far-right */}
+      {clusterCentres.map((cx, i) => (
+        <g key={`cluster77-${i}`}>
+          {/* Left woofer */}
+          <rect x={cx - 11} y="5" width="10" height="10" fill="none" stroke={STROKE} strokeWidth="0.7" />
+          <WooferCircles cx={cx - 6} cy={10} r1={3.5} r2={2.2} r3={0.7} />
+
+          {/* Right woofer */}
+          <rect x={cx + 1} y="5" width="10" height="10" fill="none" stroke={STROKE} strokeWidth="0.7" />
+          <WooferCircles cx={cx + 6} cy={10} r1={3.5} r2={2.2} r3={0.7} />
+
+          {/* Central tweeter */}
+          <TweeterCircles cx={cx} cy={10} r1={2.2} r2={1.3} />
+        </g>
+      ))}
+
+      {/* Tiny single drivers — far left and between clusters */}
+      {tinyCircles.map((tx, i) => (
+        <circle key={`tiny77-${i}`} cx={tx} cy={10} r="1.5" fill="none" stroke={STROKE} strokeWidth="0.5" />
+      ))}
+    </svg>
+  );
+}
