@@ -14,7 +14,7 @@ import {
 import { identifyProtectedNullRegions, isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { findAggregatePeakBoostViolations } from "@/components/utils/designEqPhysicsAuthority";
 import { normaliseHouseCurveToP14Total, integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
-import { assessP14Capability, P14_EQ_ASSESSMENT_RANGE_HZ } from "@/components/utils/p14CapabilityAuthority";
+import { assessP14Capability, P14_EQ_ASSESSMENT_RANGE_HZ, P14_SAFETY_MARGIN_DB } from "@/components/utils/p14CapabilityAuthority";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getCurrentSystemSourceOutput, getSystemSourceCapability, getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { salvagePartialBank, buildSalvageEqResult } from "@/components/utils/designEqPartialBankSalvage";
@@ -34,7 +34,12 @@ import {
 } from "@/components/utils/bassAuthoritativeAssessment";
 import { hasPrimarySeatRegression } from "@/components/room/bass/improveBassV2/materialityGate";
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
-const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
+// Canonical bass capability reserve — ONE shared 3 dB authority.
+// All physical capability paths (scalar P14, position-aware maximum, product
+// operating envelope, paired P14/P18, P18 capability curve, EQ boost allowance,
+// global operating offset, optimiser feasibility) resolve through this single
+// constant. No path may subtract a separate local margin on top of it.
+const BASS_CAPABILITY_RESERVE_DB = P14_SAFETY_MARGIN_DB;
 const PRODUCT_EXTENSION_REFERENCE_TOLERANCE_DB = 1.5;
 // Operating-level authority tolerance: the final post-EQ curve must integrate
 // to the selected operating output (e.g. 112 dBC) within this tolerance.
@@ -62,11 +67,14 @@ function clampPositiveOperatingOffset(requestedOffsetDb, activeSubs, baseRequest
     .filter((frequency) => frequency >= requiredExtensionHz && frequency <= 120);
   let maximumSafePositiveOffsetDb = Infinity;
   for (const frequency of bandFrequencies) {
-    const capabilityDb = getSystemSourceCapability(activeSubs, frequency);
-    if (!Number.isFinite(capabilityDb)) continue;
+    const rawCapabilityDb = getSystemSourceCapability(activeSubs, frequency);
+    if (!Number.isFinite(rawCapabilityDb)) continue;
+    // Apply the canonical 3 dB reserve ONCE: the operating level must not
+    // rise into the protected reserve. safeCapability = raw − reserve.
+    const safeCapabilityDb = rawCapabilityDb - BASS_CAPABILITY_RESERVE_DB;
     maximumSafePositiveOffsetDb = Math.min(
       maximumSafePositiveOffsetDb,
-      capabilityDb - baseRequestedSystemOutputDb,
+      safeCapabilityDb - baseRequestedSystemOutputDb,
     );
   }
   if (!Number.isFinite(maximumSafePositiveOffsetDb) || maximumSafePositiveOffsetDb <= 0) return 0;
@@ -173,9 +181,13 @@ function applyBankToSeats(seats, correction) {
 }
 
 function applyMaximumSplSafetyMargin(curve) {
+  // Apply the canonical 3 dB capability reserve ONCE to the raw room response.
+  // The raw curve is the un-reserved position-aware room transfer; this
+  // produces the safe in-room maximum. No downstream consumer may subtract
+  // another margin — the reserve is already applied here.
   return (Array.isArray(curve) ? curve : []).map((point) => ({
     ...point,
-    spl: Number.isFinite(point?.spl) ? point.spl - MAXIMUM_SPL_SAFETY_MARGIN_DB : point?.spl,
+    spl: Number.isFinite(point?.spl) ? point.spl - BASS_CAPABILITY_RESERVE_DB : point?.spl,
   }));
 }
 
