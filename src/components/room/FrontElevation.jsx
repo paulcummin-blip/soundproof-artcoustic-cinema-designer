@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
-import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon, MultiSoundbarFaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
+import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 
@@ -437,25 +437,24 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const isTv65 = speakerTvPreset === "tv65";
     const isTv77 = speakerTvPreset === "tv77";
     const isTv83 = speakerTvPreset === "tv83";
-    const showMultiSoundbarIcon = isMultiSoundbar && isTv65;
     const isManualScreen = isManualOverrideActive(screen);
+    const useMulti65Artwork = isMultiSoundbar && isTv65;
     const useMulti83Artwork = isMultiSoundbar && (isTv83 || isManualScreen);
     const useMulti77Artwork = isMultiSoundbar && isTv77;
-    const useMultiArtwork = useMulti83Artwork || useMulti77Artwork;
+    const useMultiArtwork = useMulti65Artwork || useMulti83Artwork || useMulti77Artwork;
 
     // Full-width Multi Soundbar artwork — renders the dedicated technical line
     // drawing at exactly the screen's rendered width. Separate preserved
-    // source drawings are used for 77" (1711×100mm) and 83"/Manual (1872×100mm),
-    // each retaining its own original geometry. The 65" TV variant uses its
-    // existing vector icon and is NOT affected by this path.
+    // source drawings are used for 65" (1411×100mm), 77" (1711×100mm), and
+    // 83"/Manual (1872×100mm), each retaining its own original geometry.
     if (useMultiArtwork) {
       const screenOW = (overallW / roomW) * drawW;
-      const aspectRatio = useMulti77Artwork ? (1711 / 100) : (1872 / 100);
+      const aspectRatio = useMulti65Artwork ? (1411 / 100) : useMulti77Artwork ? (1711 / 100) : (1872 / 100);
       const artworkW = screenOW;
       const artworkH = screenOW / aspectRatio;
       const artworkX = rx(screenCenterX) - artworkW / 2;
       const artworkY = cy - artworkH / 2;
-      const ArtworkComponent = useMulti77Artwork ? MultiSoundbar77ArtworkFaceIcon : MultiSoundbarArtworkFaceIcon;
+      const ArtworkComponent = useMulti65Artwork ? MultiSoundbar65ArtworkFaceIcon : useMulti77Artwork ? MultiSoundbar77ArtworkFaceIcon : MultiSoundbarArtworkFaceIcon;
       return (
         <g key={key} onMouseDown={onMouseDown} style={onMouseDown ? { cursor: 'grab', userSelect: 'none' } : undefined}>
           <ArtworkComponent x={artworkX} y={artworkY} width={artworkW} height={artworkH} />
@@ -466,19 +465,18 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       );
     }
 
-    const hasFaceIcon = isQ43 || isQ45 || isQ85 || isQ63 || isEv11 || isEv21 || isEv31 || isEv42 || isEv63 || isEv84 || isC41 || showMultiSoundbarIcon;
+    const hasFaceIcon = isQ43 || isQ45 || isQ85 || isQ63 || isEv11 || isEv21 || isEv31 || isEv42 || isEv63 || isEv84 || isC41;
 
     // C4-1 and Multi Soundbar vector icons fill edge-to-edge — no transparent padding, so ratio = 1.0.
     // All other Artcoustic PNG assets have internal transparent padding; enlarge them so
     // the visible cabinet drawing fills the speaker boundary box with ~2–4px clearance.
-    const FACE_ICON_VISIBLE_RATIO = (isC41 || showMultiSoundbarIcon) ? 1.0 : 0.72;
+    const FACE_ICON_VISIBLE_RATIO = isC41 ? 1.0 : 0.72;
     const adjustedW = hasFaceIcon ? sw / FACE_ICON_VISIBLE_RATIO : sw;
     const adjustedH = hasFaceIcon ? sh / FACE_ICON_VISIBLE_RATIO : sh;
     const adjustedX = hasFaceIcon ? sx - (adjustedW - sw) / 2 : sx;
     const adjustedY = hasFaceIcon ? sy - (adjustedH - sh) / 2 : sy;
 
     const renderFaceIcon = () => {
-      if (showMultiSoundbarIcon) return <MultiSoundbarFaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isC41) return <C41FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isQ43) return <Q43FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isQ45) return <Q45FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
