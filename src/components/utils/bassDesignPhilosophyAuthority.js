@@ -36,7 +36,7 @@
 
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { requiredP14ExtensionHz } from "@/components/utils/p14HouseCurveNormalisation";
-import { computeInRoomF3FromResponseCurve } from "@/components/utils/rp22BassMetrics";
+import { computeResponseTargetF3, computeCapabilityTargetF3 } from "@/components/utils/p18PhysicallyQualifiedAuthority";
 
 export const BASS_DESIGN_PHILOSOPHY = Object.freeze({
   rule: "The selected RP22 house curve is the immutable design target.",
@@ -103,6 +103,7 @@ export function assessP18AgainstRequiredExtension({
   configuredUsableLfHz = null,
   upperLfeHz = 120,
   productCurveMinHz = null,
+  activeSubs = [],
 }) {
   if (!Array.isArray(rspPostEqCurve) || !rspPostEqCurve.length) return null;
   const targetDb = Number(selectedP14TargetDb);
@@ -129,29 +130,49 @@ export function assessP18AgainstRequiredExtension({
   const productFloorHz = Number.isFinite(Number(productCurveMinHz)) ? Number(productCurveMinHz) : null;
   const validMinHz = productFloorHz != null ? Math.max(simulationMinHz, productFloorHz) : simulationMinHz;
 
-  // P18 F3 = achieved in-room −3 dB extension of the confirmed operating
-  // response at the selected P14 SPL. Uses the shared 60–200 Hz median
-  // authority (METHOD A) — refDb = median of 1/3-octave-smoothed response over
-  // 60–200 Hz, cutoffDb = refDb − 3, F3 = sustained extension walk.
+  // P18 F3 = physically qualified operating-target F3 (Method C).
   //
-  // The 60–200 Hz band is fixed and NOT capped at the room transition.
-  // Diagnostic evidence confirmed this is robust to isolated modes, broad
-  // modal humps, and small-room transition bleed. P18 reference-band selection
-  // and P19/P20 grading-band selection are separate authorities.
-  const rspF3 = computeInRoomF3FromResponseCurve(rspPostEqCurve, validMinHz);
-  const rspBounded = rspF3.achievedExtensionBounded === true;
-  const rspExtensionHz = rspBounded ? rspF3.extensionUpperBoundHz : rspF3.f3Hz;
-  const rspRefDb = rspF3.refDb;
-  const rspCutoffDb = rspF3.cutoffDb;
+  // response F3: lowest f where response(f) >= target(f) - 3
+  //   where target(f) = selectedP14TargetDb + artcousticHouseCurveOffsetAt(f)
+  //
+  // capability F3: lowest f where productLimit(f) >= target(f) - 3
+  //
+  // achieved P18 = max(responseF3, capabilityF3) — the more restrictive.
+  const rspF3 = computeResponseTargetF3(rspPostEqCurve, targetDb, validMinHz);
+  const rspBounded = rspF3.bounded === true;
+  const rspExtensionHz = rspBounded ? rspF3.upperBoundHz : rspF3.f3Hz;
+
+  // Capability-target F3 (when active subs are available).
+  const capF3 = (Array.isArray(activeSubs) && activeSubs.length > 0)
+    ? computeCapabilityTargetF3(activeSubs, targetDb, validMinHz)
+    : null;
+  const capBounded = capF3?.bounded === true;
+  const capExtensionHz = capF3 == null ? null : (capBounded ? capF3.upperBoundHz : capF3.f3Hz);
+
+  // Achieved P18 = max(response, capability) — the more restrictive crossing.
+  let achievedExtensionHz = null;
+  let achievedExtensionBounded = false;
+  let extensionUpperBoundHz = null;
+  if (rspExtensionHz != null && capExtensionHz != null) {
+    achievedExtensionHz = Math.max(rspExtensionHz, capExtensionHz);
+    achievedExtensionBounded = rspBounded && capBounded;
+    extensionUpperBoundHz = achievedExtensionBounded ? achievedExtensionHz : null;
+  } else if (rspExtensionHz != null) {
+    achievedExtensionHz = rspExtensionHz;
+    achievedExtensionBounded = rspBounded;
+    extensionUpperBoundHz = rspBounded ? rspExtensionHz : null;
+  } else if (capExtensionHz != null) {
+    achievedExtensionHz = capExtensionHz;
+    achievedExtensionBounded = capBounded;
+    extensionUpperBoundHz = capBounded ? capExtensionHz : null;
+  }
 
   const seatResults = seatCurves.map((seat) => {
-    const seatF3 = computeInRoomF3FromResponseCurve(seat.responseData, validMinHz);
-    const seatBounded = seatF3.achievedExtensionBounded === true;
+    const seatF3 = computeResponseTargetF3(seat.responseData, targetDb, validMinHz);
+    const seatBounded = seatF3.bounded === true;
     return {
       seatId: seat.seatId,
-      extensionHz: seatBounded ? seatF3.extensionUpperBoundHz : seatF3.f3Hz,
-      refDb: seatF3.refDb,
-      cutoffDb: seatF3.cutoffDb,
+      extensionHz: seatBounded ? seatF3.upperBoundHz : seatF3.f3Hz,
       achievedExtensionBounded: seatBounded,
     };
   });
@@ -159,9 +180,6 @@ export function assessP18AgainstRequiredExtension({
   const worstSeatExtensionHz = validSeatExtensions.length ? Math.max(...validSeatExtensions) : null;
   const worstSeatId = seatResults.filter((seat) => isFiniteNumber(seat.extensionHz))
     .sort((a, b) => b.extensionHz - a.extensionHz)[0]?.seatId ?? null;
-  const achievedExtensionHz = rspExtensionHz;
-  const achievedExtensionBounded = rspBounded;
-  const extensionUpperBoundHz = rspBounded ? rspF3.extensionUpperBoundHz : null;
   const passes = isFiniteNumber(achievedExtensionHz) && achievedExtensionHz <= requiredHz;
   const shortfallHz = passes
     ? null
@@ -171,13 +189,12 @@ export function assessP18AgainstRequiredExtension({
     selectedP14TargetDb: Number.isFinite(targetDb) ? targetDb : null,
     requiredExtensionHz: requiredHz,
     p18CutoffDb: absoluteCutoffDb,
-    // The achieved in-room F3 uses the response's own 60–200 Hz median, NOT
-    // p18CutoffDb. This field is retained for diagnostic compatibility only.
-    rspRefDb,
-    rspCutoffDb,
+    rspRefDb: null,
+    rspCutoffDb: null,
     relativeCutoffDb: -3,
     configuredUsableLfHz: usableLfHz,
     rspExtensionHz,
+    capabilityExtensionHz: capExtensionHz,
     worstSeatExtensionHz,
     worstSeatId,
     seatResults,
@@ -189,9 +206,9 @@ export function assessP18AgainstRequiredExtension({
     productCurveMinHz: productFloorHz,
     passes,
     shortfallHz,
-    assessmentSource: rspBounded
-      ? "in-room-60-200-median-bounded-at-product-validity-floor"
-      : "in-room-60-200-median-sustained-extension",
+    assessmentSource: achievedExtensionBounded
+      ? "physically-qualified-target-f3-bounded-at-product-validity-floor"
+      : "physically-qualified-target-f3-sustained-extension",
   };
 }
 

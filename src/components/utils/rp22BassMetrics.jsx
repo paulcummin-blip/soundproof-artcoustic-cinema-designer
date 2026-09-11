@@ -15,6 +15,7 @@ import { getSpeakerModelMeta, getSubwooferCurve } from "@/components/models/spea
 import { levelP19_lfResponse, levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
+import { computePhysicallyQualifiedP18Extension, computeResponseTargetF3 } from "@/components/utils/p18PhysicallyQualifiedAuthority";
 export { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 
 export { applyDesignEqCurve, calculateDesignEqCurve };
@@ -410,15 +411,29 @@ function sustainedExtensionAtCutoff(curve, cutoffDb, upperHz = 120) {
   return null;
 }
 
+// P18 achieved extension — Method C (physically qualified operating-target F3).
+//
+// Replaces the former Method A (60–200 Hz self-referenced median). The achieved
+// P18 is now the more restrictive of:
+//   - response-target F3: lowest f where response(f) >= target(f) - 3
+//   - capability-target F3: lowest f where productLimit(f) >= target(f) - 3
+//
+// Per-seat extensions are retained as diagnostics but do NOT override the RSP
+// response F3 in the achieved P18. P20 handles seat-to-seat consistency.
 export function computeParam18AchievedExtension({ rspPostEqCurve, perSeatPostEqCurves = [], activeSubs = [], configuredUsableLfHz = null, p14TargetBasis = "minimum" }) {
   if (!Array.isArray(rspPostEqCurve) || !rspPostEqCurve.length) return null;
-  const product = computeParam18ProductExtension(activeSubs, configuredUsableLfHz, p14TargetBasis);
-  if (!product) return null;
+
+  // Delegate to the canonical Method C authority.
+  const methodC = computePhysicallyQualifiedP18Extension({
+    rspPostEqCurve,
+    activeSubs,
+    configuredUsableLfHz,
+    p14TargetBasis,
+  });
+  if (!methodC) return null;
+
+  // Compute per-seat target-relative F3s as diagnostics (not authoritative for P18).
   const seatCurves = (perSeatPostEqCurves || []).filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
-  const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
-  // Product capability validity floor: the highest (worst) lowest engineering
-  // frequency among active subwoofers. P18 must not claim a measured crossing
-  // below this floor — the product has no authoritative SPL data there.
   const productMinHzValues = (activeSubs || [])
     .map((sub) => {
       const curve = getSubwooferCurve(sub?.modelKey ?? sub?.model);
@@ -429,77 +444,95 @@ export function computeParam18AchievedExtension({ rspPostEqCurve, perSeatPostEqC
     .filter(Number.isFinite);
   const productCurveMinHz = productMinHzValues.length ? Math.max(...productMinHzValues) : null;
   const validMinHz = Number.isFinite(productCurveMinHz) ? Math.max(15, productCurveMinHz) : null;
-  // P18 F3 is derived from the response's own 60–200 Hz median (METHOD A),
-  // NOT from definition.p18CutoffDb (= P14Target − 3) as an absolute SPL floor.
-  // The 60–200 Hz median is a single shared authority — see computeInRoomF3FromResponseCurve.
-  const rspF3 = computeInRoomF3FromResponseCurve(rspPostEqCurve, validMinHz);
-  const rspExtensionHz = rspF3.achievedExtensionBounded ? rspF3.extensionUpperBoundHz : rspF3.f3Hz;
-  const rspBounded = rspF3.achievedExtensionBounded;
   const seatF3Results = seatCurves.map((seat) => {
-    const seatF3 = computeInRoomF3FromResponseCurve(seat.responseData, validMinHz);
-    const seatExtensionHz = seatF3.achievedExtensionBounded ? seatF3.extensionUpperBoundHz : seatF3.f3Hz;
-    return { seatId: seat.seatId, extensionHz: seatExtensionHz, refDb: seatF3.refDb, cutoffDb: seatF3.cutoffDb, achievedExtensionBounded: seatF3.achievedExtensionBounded };
+    const seatF3 = computeResponseTargetF3(seat.responseData, methodC.targets[0]?.p14TargetDb, validMinHz);
+    const seatExtensionHz = seatF3.bounded ? seatF3.upperBoundHz : seatF3.f3Hz;
+    return { seatId: seat.seatId, extensionHz: seatExtensionHz, achievedExtensionBounded: seatF3.bounded };
   });
-  const targets = definitions.map((definition) => {
+
+  // Merge per-seat diagnostics into the Method C targets.
+  const targets = methodC.targets.map((target) => {
     const seatExtensions = seatF3Results.map((seat) => ({ seatId: seat.seatId, extensionHz: seat.extensionHz }));
-    const productTarget = product.targets.find((target) => target.level === definition.level);
-    const sourceExtensions = [productTarget?.extensionHz, rspExtensionHz, ...seatExtensions.map((seat) => seat.extensionHz)];
-    const complete = sourceExtensions.every(isNum);
-    const extensionHz = complete ? Math.max(...sourceExtensions) : null;
     const worstSeat = seatExtensions.filter((seat) => isNum(seat.extensionHz)).sort((a, b) => b.extensionHz - a.extensionHz)[0] || null;
-    const designHz = resolveRp22DesignValue(18, extensionHz);
-    return { level: definition.level, cutoffDb: rspF3.cutoffDb, refDb: rspF3.refDb, limitHz: definition.p18LimitHz, extensionHz: designHz,
-      extensionHzRaw: extensionHz,
-      rspExtensionHz, productExtensionHz: productTarget?.extensionHz ?? null, worstSeatId: worstSeat?.seatId ?? null,
-      worstSeatExtensionHz: worstSeat?.extensionHz ?? null, passesFrequency: designHz != null && designHz <= definition.p18LimitHz };
+    return {
+      ...target,
+      worstSeatId: worstSeat?.seatId ?? null,
+      worstSeatExtensionHz: worstSeat?.extensionHz ?? null,
+    };
   });
-  const winningTarget = targets.slice().reverse().find((target) => target.passesFrequency) || null;
-  return { targets, level: winningTarget?.level || null, value: winningTarget?.extensionHz ?? null,
-    formatted: winningTarget ? `${winningTarget.extensionHz} Hz` : null,
-    refDb: rspF3.refDb, cutoffDb: rspF3.cutoffDb,
-    productCapability: product, source: "post-eq-rsp-worst-seat-achieved-extension",
-    note: "Achieved in-room extension from post-EQ RSP using 60–200 Hz median (METHOD A), conservatively bounded by product capability and worst-seat post-EQ response." };
+
+  const winningTarget = targets.slice().reverse().find((t) => t.passesFrequency) || null;
+  return {
+    targets,
+    level: winningTarget?.level || methodC.level,
+    value: winningTarget?.extensionHz ?? methodC.value,
+    formatted: methodC.formatted,
+    refDb: null,
+    cutoffDb: null,
+    responseTargetF3Hz: methodC.responseTargetF3Hz,
+    capabilityTargetF3Hz: methodC.capabilityTargetF3Hz,
+    achievedExtensionBounded: methodC.achievedExtensionBounded,
+    extensionUpperBoundHz: methodC.extensionUpperBoundHz,
+    productCapability: { productCapabilityCurve: null, source: "physically-qualified-authority" },
+    source: methodC.source,
+    note: methodC.note,
+  };
 }
 
-// Legacy in-room extension helper retained for non-authoritative simulation consumers.
-// Uses the shared 60–200 Hz median F3 authority (METHOD A) — NOT p18CutoffDb.
-// Accepts an optional productCurveMinHz so callers with product context can
-// bound the P18 search to the valid product data range.
-export function computeParam18BassExtension(rspResponse, productCurveMinHz = null) {
+// P18 in-room extension authority — Method C (physically qualified operating-target F3).
+//
+// Replaces the former Method A (60–200 Hz self-referenced median). The achieved
+// P18 is now the more restrictive of:
+//   - response-target F3: lowest f where response(f) >= target(f) - 3
+//   - capability-target F3: lowest f where productLimit(f) >= target(f) - 3
+//
+// The second positional argument is retained for backward compatibility with
+// callers that passed bassP14 or productCurveMinHz; it is no longer used.
+// activeSubs and configuredUsableLfHz enable the capability-target F3.
+// When activeSubs is empty, the result uses the response-target F3 alone.
+export function computeParam18BassExtension(rspResponse, _legacyArg = null, activeSubs = [], configuredUsableLfHz = null, p14TargetBasis = "minimum") {
   if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
-  const validMinHz = Number.isFinite(Number(productCurveMinHz)) && Number(productCurveMinHz) > 0
-    ? Math.max(15, Number(productCurveMinHz))
-    : null;
-  const f3 = computeInRoomF3FromResponseCurve(rspResponse, validMinHz);
-  const extensionHz = f3.achievedExtensionBounded ? f3.extensionUpperBoundHz : f3.f3Hz;
-  const refDb = f3.refDb;
-  const cutoffDb = f3.cutoffDb;
-  if (!isNum(extensionHz)) return { targets: [], level: null, value: null, formatted: null, refDb, cutoffDb, note: "Predicted design-stage extension from the shared calibrated response; independently graded from P14." };
 
-  const targets = getRp22BassOperatingDefinitions().map((definition) => {
+  // Delegate to the canonical Method C authority when active subs are available.
+  const subs = Array.isArray(activeSubs) ? activeSubs : [];
+  if (subs.length > 0) {
+    return computePhysicallyQualifiedP18Extension({
+      rspPostEqCurve: rspResponse,
+      activeSubs: subs,
+      configuredUsableLfHz,
+      p14TargetBasis,
+    });
+  }
+
+  // Response-only fallback (no active subs → no capability F3).
+  // Still uses the target-relative F3 (Method C response path), NOT Method A.
+  const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
+  const targets = definitions.map((definition) => {
+    const responseF3 = computeResponseTargetF3(rspResponse, definition.p14TargetDb, null);
+    const extensionHz = responseF3.bounded ? responseF3.upperBoundHz : responseF3.f3Hz;
     const designHz = resolveRp22DesignValue(18, extensionHz);
     return {
       level: definition.level,
       targetSplDb: definition.p14TargetDb,
-      cutoffDb,
-      refDb,
+      cutoffDb: definition.p14TargetDb - 3,
+      refDb: null,
       limitHz: definition.p18LimitHz,
       extensionHz: designHz,
       extensionHzRaw: extensionHz,
-      bounded: false,
+      bounded: responseF3.bounded,
       passesFrequency: designHz != null && designHz <= definition.p18LimitHz,
     };
   });
-
-  const winningTarget = targets.slice().reverse().find((target) => target.passesFrequency) || null;
+  const winningTarget = targets.slice().reverse().find((t) => t.passesFrequency) || null;
   return {
     targets,
     level: winningTarget?.level || null,
     value: winningTarget?.extensionHz ?? null,
-    formatted: winningTarget == null ? null : `${winningTarget.extensionHz} Hz`,
-    refDb,
-    cutoffDb,
-    note: "Predicted design-stage extension from the shared calibrated response (60–200 Hz median, METHOD A); independently graded from P14.",
+    formatted: winningTarget ? `${winningTarget.extensionHz} Hz` : null,
+    refDb: null,
+    cutoffDb: null,
+    source: "physically-qualified-operating-target-f3-response-only",
+    note: "Achieved P18 from response-target F3 (Method C). No capability F3 — no active subwoofers provided.",
   };
 }
 
