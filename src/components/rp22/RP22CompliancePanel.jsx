@@ -688,13 +688,14 @@ export default function RP22CompliancePanel({
       if (pid === 8) return "No";
       if (pid === 11) return "0";
 
-      // P15 / P21 are assumed design parameters — show the derived display value
+      // P15 / P21 are assumed design parameters — show the derived display value.
+      // The canonical authority defaults to L2 when no selection has been made.
       if (pid === 15) {
-        return getAssumedP15DisplayValue(assumedP15Level) || "Not Calculated";
+        return getAssumedP15DisplayValue(assumedP15Level);
       }
 
       if (pid === 21) {
-        return getAssumedP21DisplayValue(assumedP21Level) || "Not Calculated";
+        return getAssumedP21DisplayValue(assumedP21Level);
       }
 
       return "—";

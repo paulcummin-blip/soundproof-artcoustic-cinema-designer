@@ -323,7 +323,7 @@ export function serializeProject(input = {}) {
     selected_abfuser_qty: acousticTreatmentEnabled ? (Math.max(0, Math.floor(Number(selectedAbfuserQty) || 0))) : 0,
     abfuser_qty_source: acousticTreatmentEnabled ? (abfuserQtySource || "recommended") : "recommended",
 
-    // P15/P21 assumed design levels (null = NOT CALCULATED)
+    // P15/P21 assumed design levels (null = not yet assumed; effective default is L2)
     assumed_p15_level: assumedP15Level || null,
     assumed_p21_level: assumedP21Level || null,
 

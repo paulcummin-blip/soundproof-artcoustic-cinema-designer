@@ -238,8 +238,8 @@ export function useParameterGridAuthority({
       }
       if (pid === 8) return "No";
       if (pid === 11) return "0";
-      if (pid === 15) return getAssumedP15DisplayValue(assumedP15Level) || "Not Calculated";
-      if (pid === 21) return getAssumedP21DisplayValue(assumedP21Level) || "Not Calculated";
+      if (pid === 15) return getAssumedP15DisplayValue(assumedP15Level);
+      if (pid === 21) return getAssumedP21DisplayValue(assumedP21Level);
       return "—";
     }
 

@@ -9,9 +9,9 @@
  * and persisted via the normal autosave path. A change immediately updates
  * the single shared project assumption — last change wins everywhere.
  *
- * null = NOT CALCULATED (no silent default). Once the designer selects a
- * level, the status becomes "Assumed" and the derived display value (NCB / dB)
- * is shown.
+ * null defaults to L2 via the canonical effective-level authority. Once the
+ * designer selects a level, the status becomes "Assumed" and the derived
+ * display value (NCB / dB) is shown.
  *
  * No local state — pure presentation of the shared authority.
  */
