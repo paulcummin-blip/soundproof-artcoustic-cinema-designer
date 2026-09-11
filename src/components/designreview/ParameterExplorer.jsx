@@ -30,7 +30,8 @@ import { useParameterGridAuthority } from "@/components/report/technical/usePara
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import { getCategoryForParam, getHumanTitleForParam } from "@/components/report/technical/technicalParameterMeta";
 import ExpandedParameterDetail from "@/components/designreview/ExpandedParameterDetail";
-import { normalizeLevel, LEVEL_TEXT_COLORS } from "@/components/designreview/needsAttentionAuthority";
+import { normalizeLevel } from "@/components/designreview/needsAttentionAuthority";
+import { getLevelColors } from "@/components/utils/rp22Colors";
 
 const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
 
@@ -85,10 +86,11 @@ function buildSeatHudFromAnalysis(analysisResult, seats) {
   return out;
 }
 
-/** Neutral coloured level text (identifies the level, no judgement). */
-function levelColor(norm) {
-  if (!norm) return COLORS.muted;
-  return LEVEL_TEXT_COLORS[norm] || COLORS.body;
+/** Canonical level pill colours from the single Sound Proof authority. */
+function levelPillColors(norm) {
+  if (!norm || norm === "N/A") return null;
+  const n = norm === "FAIL" ? 0 : parseInt(norm.replace("L", ""), 10);
+  return getLevelColors(n);
 }
 
 /** Render a single room-scope level as neutral coloured text. */
@@ -103,8 +105,20 @@ function RoomLevelText({ param, level, value }) {
   if (!norm || norm === "N/A") {
     return <span style={{ fontSize: 11, color: COLORS.label, fontFamily: FONT_BODY }}>N/A</span>;
   }
+  const colors = levelPillColors(norm);
   return (
-    <span style={{ fontSize: 11, fontWeight: 700, color: levelColor(norm), fontFamily: FONT_BODY }}>
+    <span style={{
+      border: `1px solid ${colors.border}`,
+      borderRadius: 4,
+      padding: "2px 7px",
+      fontSize: 10,
+      fontWeight: 700,
+      background: colors.bg,
+      color: colors.text,
+      fontFamily: FONT_BODY,
+      lineHeight: 1.1,
+      whiteSpace: "nowrap",
+    }}>
       {norm}
     </span>
   );
@@ -143,13 +157,29 @@ function DistributionText({ gridData }) {
         whiteSpace: "nowrap",
       }}
     >
-      {parts.map((p, i) => (
-        <span key={p.label} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          {i > 0 && <span style={{ color: "#C1B6AD" }}>·</span>}
-          <span style={{ color: COLORS.body }}>{p.count}×</span>
-          <span style={{ fontWeight: 700, color: levelColor(p.label) }}>{p.label}</span>
-        </span>
-      ))}
+      {parts.map((p, i) => {
+        const colors = levelPillColors(p.label);
+        return (
+          <span key={p.label} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {i > 0 && <span style={{ color: "#C1B6AD" }}>·</span>}
+            <span style={{ color: COLORS.body }}>{p.count}×</span>
+            <span style={{
+              border: `1px solid ${colors.border}`,
+              borderRadius: 3,
+              padding: "1px 5px",
+              fontSize: 9,
+              fontWeight: 700,
+              background: colors.bg,
+              color: colors.text,
+              fontFamily: FONT_BODY,
+              lineHeight: 1.1,
+              whiteSpace: "nowrap",
+            }}>
+              {p.label}
+            </span>
+          </span>
+        );
+      })}
     </span>
   );
 }

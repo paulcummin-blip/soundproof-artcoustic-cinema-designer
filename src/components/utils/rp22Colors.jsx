@@ -54,6 +54,53 @@ export function getRp22ResultStyle(value, target) {
   }
 }
 
+/** Convert a #RRGGBB hex string to an rgba() string with the given alpha. */
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
+ * Semantic accent colour for each level — the strongest identifiable colour
+ * for that level. Used for seat-highlight borders/rings and legible text on
+ * translucent fills. Derived entirely from RP22_LEVEL_COLORS (no new shades).
+ */
+const LEVEL_ACCENT = {
+  4: RP22_LEVEL_COLORS[4].border,    // #213428
+  3: RP22_LEVEL_COLORS[3].border,    // #625143
+  2: RP22_LEVEL_COLORS[2].border,    // #C1B6AD
+  1: RP22_LEVEL_COLORS[1].border,    // #4A230F
+  fail: RP22_LEVEL_COLORS.fail.text, // #DC2626
+};
+
+/**
+ * Get translucent highlight colours for a level — for seat backgrounds and
+ * other areas where a solid fill would be too dominant. Returns a light
+ * translucent fill derived from the canonical level colour, a full-opacity
+ * border in the same semantic colour, and a legible text colour.
+ *
+ * @param {number|string} level - The level (1-4), 0/null/'FAIL' for fail
+ * @returns {{ fill: string, border: string, text: string }}
+ */
+export function getLevelHighlightColors(level) {
+  const isFail = String(level || "").toUpperCase() === "FAIL" || level === 0;
+  const n = typeof level === "number" && level >= 1 && level <= 4 ? level : null;
+  if (isFail) {
+    const accent = LEVEL_ACCENT.fail;
+    return { fill: hexToRgba(accent, 0.12), border: accent, text: accent };
+  }
+  if (n) {
+    const accent = LEVEL_ACCENT[n];
+    // For light levels (L2), use the canonical dark text colour for legibility
+    // on the translucent fill; for dark levels, the accent itself is legible.
+    const text = n === 2 ? RP22_LEVEL_COLORS[2].text : accent;
+    return { fill: hexToRgba(accent, 0.15), border: accent, text };
+  }
+  return { fill: "rgba(156,163,175,0.12)", border: "#9CA3AF", text: "#9CA3AF" };
+}
+
 /**
  * Optional DOM helper for inline style usage.
  * Example: <span style={getRp22DomStyle(value, target)}>{...}</span>

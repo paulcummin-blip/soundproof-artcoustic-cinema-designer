@@ -21,8 +21,8 @@ import { getCategoryForParam, getHumanTitleForParam } from "@/components/report/
 import {
   getLowestPerformanceResults,
   normalizeLevel,
-  LEVEL_TEXT_COLORS,
 } from "@/components/designreview/needsAttentionAuthority";
+import { getLevelColors } from "@/components/utils/rp22Colors";
 import {
   getRoomDesignRatingDesignation,
   getDesignPerformanceIndex,
@@ -121,9 +121,11 @@ function DpiScopeSummary({ label, rating, emphasize }) {
   );
 }
 
-function levelColor(norm) {
-  if (!norm) return COLORS.muted;
-  return LEVEL_TEXT_COLORS[norm] || COLORS.body;
+/** Canonical level pill colours from the single Sound Proof authority. */
+function levelPillColors(norm) {
+  if (!norm || norm === "N/A") return null;
+  const n = norm === "FAIL" ? 0 : parseInt(norm.replace("L", ""), 10);
+  return getLevelColors(n);
 }
 
 function formatPoints(earned, maximum) {
@@ -139,7 +141,7 @@ function formatPoints(earned, maximum) {
 
 function LowestResultRow({ contrib, onParamClick }) {
   const norm = normalizeLevel(contrib.resultLevel);
-  const color = levelColor(norm);
+  const colors = levelPillColors(norm);
 
   return (
     <div
@@ -179,17 +181,26 @@ function LowestResultRow({ contrib, onParamClick }) {
       >
         {getParamLabel(contrib)}
       </div>
-      <div
-        style={{
-          fontSize: 11,
+      {colors ? (
+        <span style={{
+          border: `1px solid ${colors.border}`,
+          borderRadius: 4,
+          padding: "2px 8px",
+          fontSize: 10,
           fontWeight: 700,
-          color,
+          background: colors.bg,
+          color: colors.text,
           fontFamily: FONT_BODY,
           whiteSpace: "nowrap",
-        }}
-      >
-        {contrib.resultLevel || "—"}
-      </div>
+          lineHeight: 1.1,
+        }}>
+          {contrib.resultLevel}
+        </span>
+      ) : (
+        <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.muted, fontFamily: FONT_BODY, whiteSpace: "nowrap" }}>
+          {contrib.resultLevel || "—"}
+        </div>
+      )}
     </div>
   );
 }
@@ -237,10 +248,29 @@ function ScorecardGroup({ pillar, contribs }) {
             <div style={{ color: COLORS.primary, fontWeight: 600 }}>
               {getParamLabel(contrib)}
             </div>
-            <div style={{ color: levelColor(norm), fontWeight: 700 }}>
-              {contrib.resultLevel || "—"}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {(() => {
+                const colors = levelPillColors(norm);
+                if (!colors) return <span style={{ color: COLORS.muted, fontWeight: 700 }}>{contrib.resultLevel || "—"}</span>;
+                return (
+                  <span style={{
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 4,
+                    padding: "2px 7px",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    background: colors.bg,
+                    color: colors.text,
+                    fontFamily: FONT_BODY,
+                    whiteSpace: "nowrap",
+                    lineHeight: 1.1,
+                  }}>
+                    {contrib.resultLevel}
+                  </span>
+                );
+              })()}
               {contrib.mode === "recommended" && (
-                <span style={{ marginLeft: 6, color: COLORS.secondary, fontSize: 9, fontWeight: 400 }}>
+                <span style={{ color: COLORS.secondary, fontSize: 9, fontWeight: 400 }}>
                   Recommended
                 </span>
               )}

@@ -24,7 +24,7 @@
  */
 
 import React, { useMemo } from "react";
-import { getLevelColors } from "@/components/utils/rp22Colors";
+import { getLevelColors, getLevelHighlightColors } from "@/components/utils/rp22Colors";
 import { normalizeLevel } from "@/components/designreview/needsAttentionAuthority";
 
 const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -34,19 +34,20 @@ const finiteNumber = (value, fallback = 0) => {
   return Number.isFinite(numeric) ? numeric : fallback;
 };
 
-/** Map a raw level to a compact label + canonical level colours. */
+/** Map a raw level to a compact label + canonical level colours + translucent highlight. */
 function levelVisuals(level) {
   const norm = normalizeLevel(level);
-  if (norm === "L4") return { label: "L4", ...getLevelColors(4) };
-  if (norm === "L3") return { label: "L3", ...getLevelColors(3) };
-  if (norm === "L2") return { label: "L2", ...getLevelColors(2) };
-  if (norm === "L1") return { label: "L1", ...getLevelColors(1) };
-  if (norm === "FAIL") return { label: "FAIL", ...getLevelColors(0) };
+  if (norm === "L4") return { label: "L4", ...getLevelColors(4), highlight: getLevelHighlightColors(4) };
+  if (norm === "L3") return { label: "L3", ...getLevelColors(3), highlight: getLevelHighlightColors(3) };
+  if (norm === "L2") return { label: "L2", ...getLevelColors(2), highlight: getLevelHighlightColors(2) };
+  if (norm === "L1") return { label: "L1", ...getLevelColors(1), highlight: getLevelHighlightColors(1) };
+  if (norm === "FAIL") return { label: "FAIL", ...getLevelColors(0), highlight: getLevelHighlightColors(0) };
   return {
     label: norm === "N/A" ? "N/A" : "—",
     bg: "#F3F4F6",
     text: "#9CA3AF",
     border: "#E5E7EB",
+    highlight: { fill: "rgba(156,163,175,0.12)", border: "#9CA3AF", text: "#9CA3AF" },
   };
 }
 
@@ -168,9 +169,9 @@ export default function SeatResultLayout({
                       minWidth: 28,
                       padding: "2px 6px",
                       borderRadius: 4,
-                      border: `1px solid ${colors.border}`,
-                      background: colors.bg,
-                      color: colors.text,
+                      border: `1.5px solid ${colors.highlight.border}`,
+                      background: colors.highlight.fill,
+                      color: colors.highlight.text,
                       fontSize: 10,
                       fontWeight: 700,
                       fontFamily: BODY_FONT,
