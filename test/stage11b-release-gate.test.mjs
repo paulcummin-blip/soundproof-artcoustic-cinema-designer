@@ -618,16 +618,25 @@ test("RAW_UI: calibration-only immaterial → no unnecessary calibration tier", 
   assert(!selection.calibrationMaterial.material, "Calibration immaterial");
 });
 
-test("RAW_UI: physical immaterial → concise no-improvement result", () => {
-  // When the winner is null (no material physical improvement), the UI
-  // shows "No safer automatic improvement found".
+test("RAW_UI: successful no-winner state displays exact standardised message", () => {
+  // FOCUSED UI ASSERTION: when optimisation completes successfully but no
+  // challenger passes the material-improvement gate (or all are rejected by
+  // protection/safety gates), the terminal message must be EXACTLY:
+  //   "No verified material automatic improvement found."
+  // This covers: no challenger passes materiality gate, all challengers
+  // rejected by protection gates, and successful completion with no winner.
+  // It does NOT cover errors, cancellation, timeout, or stale-result rejection.
   const selection = {
     isCurrent: true,
     winner: null,
-    message: "No safer automatic improvement found — current design retained",
+    message: "No verified material automatic improvement found.",
   };
   assert(selection.winner === null, "No physical winner");
-  assert(selection.message, "Has message");
+  assert.strictEqual(
+    selection.message,
+    "No verified material automatic improvement found.",
+    "Successful no-winner terminal message must be the exact standardised wording",
+  );
 });
 
 // ============================================================

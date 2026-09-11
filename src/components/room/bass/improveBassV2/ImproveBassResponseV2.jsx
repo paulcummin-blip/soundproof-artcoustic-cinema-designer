@@ -266,7 +266,7 @@ export default function ImproveBassResponseV2({
           setWinner(projectId, {
             isCurrent: true,
             winner: null,
-            message: "No safer automatic improvement found — current design retained",
+            message: "No verified material automatic improvement found.",
             confirmedResults: result.confirmedResults || [],
             currentResult: null,
           });

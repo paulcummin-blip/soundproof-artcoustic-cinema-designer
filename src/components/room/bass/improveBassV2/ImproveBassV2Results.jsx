@@ -351,7 +351,7 @@ export default function ImproveBassV2Results({
         <div className="flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 text-[#213428]" />
           <span className="text-[12px] font-semibold text-[#213428]">
-            {selection.message || "No safer automatic improvement found — current design retained"}
+            {selection.message || "No verified material automatic improvement found."}
           </span>
         </div>
         {selection.rejectionReason && (

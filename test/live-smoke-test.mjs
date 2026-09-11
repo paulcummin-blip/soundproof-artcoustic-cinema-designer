@@ -442,7 +442,7 @@ async function main() {
     winnerResult = {
       isCurrent: true,
       winner: null,
-      message: `No safer automatic improvement found — primary seat ${regression.seatId} ${regression.parameter} regression (L${regression.currentLevel}→L${regression.candidateLevel})`,
+      message: `No verified material automatic improvement found. Primary seat ${regression.seatId} ${regression.parameter} regression (L${regression.currentLevel}→L${regression.candidateLevel})`,
     };
   } else {
     // Use the production finalist selection
@@ -459,7 +459,7 @@ async function main() {
       if (challengerP19 >= currentP19 && challengerP20 >= currentP20) {
         winnerResult = { isCurrent: false, winner: challengerForComparison, message: null };
       } else {
-        winnerResult = { isCurrent: true, winner: null, message: 'No safer automatic improvement found' };
+        winnerResult = { isCurrent: true, winner: null, message: 'No verified material automatic improvement found.' };
       }
     }
   }

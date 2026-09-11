@@ -442,7 +442,7 @@ const currentConfirmation = currentAuthority
 let winner = null;
 let winnerMessage = null;
 if (confirmedResults.length === 0) {
-  winnerMessage = 'No safer automatic improvement found — current design retained';
+  winnerMessage = 'No verified material automatic improvement found.';
 } else {
   // Use the production selectAuthoritativeFinalist
   const quantityResult = {
@@ -464,13 +464,13 @@ if (confirmedResults.length === 0) {
 
   const selection = selectAuthoritativeFinalist(quantityResult, null, currentLayout);
   if (selection.isCurrent || !selection.winner) {
-    winnerMessage = 'No safer automatic improvement found — current design retained';
+    winnerMessage = 'No verified material automatic improvement found.';
   } else {
     // Primary-seat protection
     if (currentConfirmation) {
       const regression = hasPrimarySeatRegression(selection.winner, currentConfirmation);
       if (regression.regressed) {
-        winnerMessage = `No safer automatic improvement found — primary seat ${regression.seatId} ${regression.parameter} regression`;
+        winnerMessage = `No verified material automatic improvement found. Primary seat ${regression.seatId} ${regression.parameter} regression`;
       } else {
         winner = selection.winner;
       }

@@ -871,7 +871,7 @@ test("ACCEPTANCE: zero valid challengers produces empty candidate list", () => {
   // existing authority returns NO_WINNER (isCurrent: true, winner: null).
   // This is verified by code review: the function checks
   // `if (!confirmedResults.length && !existingAuthority)` and returns
-  // { isCurrent: true, winner: null, message: "No safer automatic improvement found" }.
+  // { isCurrent: true, winner: null, message: "No verified material automatic improvement found." }.
 });
 
 // ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@
 //   7. Canonical confirmation on promoted challengers (worker — EQ, P14/P18/P19/P20)
 //   8. If no valid authority existed, confirm Current with INSTALLED tuning (no search)
 //   9. Primary-seat protection (reject candidates that damage primary seats)
-//   10. Winner selection or "No safer automatic improvement found"
+//   10. Winner selection or "No verified material automatic improvement found."
 //
 // BLOCKER 2: Current is a FIXED CONTROL. It NEVER enters the delay/polarity/trim
 // search. If a valid non-stale authority exists, it is reused as-is. If not,
@@ -432,7 +432,7 @@ export function selectWinnerWithProtection(confirmedResults, snapshot, existingA
     return {
       isCurrent: true,
       winner: null,
-      message: "No safer automatic improvement found — current design retained",
+      message: "No verified material automatic improvement found.",
       confirmedResults,
       currentResult: null,
     };
@@ -488,7 +488,7 @@ export function selectWinnerWithProtection(confirmedResults, snapshot, existingA
     return {
       isCurrent: true,
       winner: null,
-      message: "No safer automatic improvement found — current design retained",
+      message: "No verified material automatic improvement found.",
       confirmedResults,
       currentResult: recalculatedCurrent || existingAuthority,
     };
@@ -507,7 +507,7 @@ export function selectWinnerWithProtection(confirmedResults, snapshot, existingA
     return {
       isCurrent: true,
       winner: null,
-      message: "No safer automatic improvement found — current design retained",
+      message: "No verified material automatic improvement found.",
       confirmedResults,
       currentResult: recalculatedCurrent || existingAuthority,
     };
@@ -521,7 +521,7 @@ export function selectWinnerWithProtection(confirmedResults, snapshot, existingA
       return {
         isCurrent: true,
         winner: null,
-        message: "No safer automatic improvement found — current design retained",
+        message: "No verified material automatic improvement found.",
         rejectionReason: `Candidate improved headline but damaged primary seat ${regression.seatId} ${regression.parameter} (L${regression.currentLevel} → L${regression.candidateLevel})`,
         confirmedResults,
         currentResult: currentForRegression,
@@ -539,7 +539,7 @@ export function selectWinnerWithProtection(confirmedResults, snapshot, existingA
       return {
         isCurrent: true,
         winner: null,
-        message: "No verified material automatic improvement found",
+        message: "No verified material automatic improvement found.",
         materialityReason: matCheck.reason,
         confirmedResults,
         currentResult: currentForRegression,
@@ -1043,7 +1043,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         selection: {
           isCurrent: true,
           winner: null,
-          message: "No safer automatic improvement found — current design retained",
+          message: "No verified material automatic improvement found.",
           confirmedResults,
           currentResult: existingAuthority,
         },

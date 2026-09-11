@@ -220,12 +220,12 @@ const currentAuth = stage2Results.length > 0 ? stage2Results[0].best : null;
 
 let winner = null, winnerMsg = null;
 if (confirmed.length === 0) {
-  winnerMsg = 'No safer automatic improvement found — current design retained';
+  winnerMsg = 'No verified material automatic improvement found.';
 } else {
   const qr = { evaluatedFinalists: confirmed.map((r) => ({ ...r, finalistId: r.candidateId })) };
   const cl = currentAuth ? { metrics: { perSeatP19: currentAuth.perSeatP19 || [], perSeatP20: currentAuth.perSeatP20 || [], achievedP19VariationDb: currentAuth.achievedP19VariationDb, achievedP19Level: currentAuth.achievedP19Level, achievedP20VariationDb: currentAuth.achievedP20VariationDb, achievedP20Level: currentAuth.achievedP20Level } } : null;
   const sel = selectAuthoritativeFinalist(qr, null, cl);
-  if (sel.isCurrent || !sel.winner) { winnerMsg = 'No safer automatic improvement found — current design retained'; }
+  if (sel.isCurrent || !sel.winner) { winnerMsg = 'No verified material automatic improvement found.'; }
   else if (currentAuth) {
     const reg = hasPrimarySeatRegression(sel.winner, currentAuth);
     if (reg.regressed) { winnerMsg = `Primary seat ${reg.seatId} ${reg.parameter} regression`; }
