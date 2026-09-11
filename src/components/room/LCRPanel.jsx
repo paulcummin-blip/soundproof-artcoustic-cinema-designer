@@ -15,6 +15,7 @@ import { calculateTvFrontStageHeightGuidance } from '@/components/utils/acoustic
 import { P12_MODE_RECOMMENDED } from '@/components/utils/p12ModeAuthority';
 import { Switch } from '@/components/ui/switch';
 import LcrAcousticCentreGuidanceCard from '@/components/room/LcrAcousticCentreGuidanceCard';
+import { computeTvVerticalCentreM } from '@/components/roomdesigner/utils/lcrHeightAuthority';
 import {
   CENTER_ONLY_SOUNDBAR_LABELS,
   INTEGRATED_LCR_SOUNDBAR_LABELS,
@@ -159,6 +160,14 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     : roomH * 0.5;
   const clampLcrHeight = useCallback((value) => Math.max(0.2, Math.min(roomH - 0.2, value)), [roomH]);
 
+  // TV vertical centre — the canonical FL/FR auto-height target in center_only
+  // mode. Derived from the same resolved screen geometry that draws the TV in
+  // Front Elevation. NEVER depends on the centre/soundbar height.
+  const tvVerticalCentreM = useMemo(
+    () => clampLcrHeight(computeTvVerticalCentreM(screen, dimensions)),
+    [screen, dimensions, clampLcrHeight],
+  );
+
   // LCR acoustic-centre height: auto-follow the recommended value by default;
   // a manual override lets the designer lock a custom height.
   // Legacy projects (no explicit flag) preserve a saved height as manual so
@@ -170,6 +179,17 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     : splConfig?.lcrHeightManual === false
       ? false
       : hasSavedLcrHeight;
+
+  // FL/FR manual flag (center_only mode). Default: auto (follow TV centre).
+  // Legacy projects with a saved lcrLRHeightM but no explicit flag preserve
+  // their saved height as manual so existing projects are not silently
+  // re-steered; new projects default to auto-follow.
+  const hasSavedLrHeight = Number.isFinite(Number(splConfig?.lcrLRHeightM));
+  const lcrLRHeightManual = splConfig?.lcrLRHeightManual === true
+    ? true
+    : splConfig?.lcrLRHeightManual === false
+      ? false
+      : hasSavedLrHeight;
 
   const [lcrModel, setLcrModel] = useState(initialModel);
   const [frontStageMode, setFrontStageMode] = useState(derivedFrontStageMode);
@@ -343,6 +363,9 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   // - Auto (default): lock to recommendedLcrHeightM; update splConfig + placed
   //   speakers whenever the recommendation changes (room/screen/seating edits).
   // - Manual: follow the saved splConfig.lcrHeightM value; do not auto-reset.
+  // In center_only mode this effect governs ONLY the centre/FC authority —
+  // it must not move FL/FR (those follow the TV centreline via the separate
+  // lcrLRHeightM auto-follow effect below).
   useEffect(() => {
     if (lcrHeightManual) {
       const stored = Number.isFinite(Number(splConfig?.lcrHeightM)) ? Number(splConfig.lcrHeightM) : recommendedLcrHeightM;
@@ -355,9 +378,37 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     const stored = Number(splConfig?.lcrHeightM);
     if (!Number.isFinite(stored) || Math.abs(stored - target) > 0.005) {
       updateGlobalSpl?.({ lcrHeightM: target, lcrHeightManual: false });
-      updatePlacedLcrHeight?.(target);
+      if (frontStageMode === 'center_only') {
+        updatePlacedFCHeight?.(target);
+      } else {
+        updatePlacedLcrHeight?.(target);
+      }
     }
-  }, [lcrHeightManual, recommendedLcrHeightM, splConfig?.lcrHeightM, clampLcrHeight, updateGlobalSpl, updatePlacedLcrHeight]);
+  }, [lcrHeightManual, recommendedLcrHeightM, splConfig?.lcrHeightM, clampLcrHeight, updateGlobalSpl, updatePlacedLcrHeight, updatePlacedFCHeight, frontStageMode]);
+
+  // FL/FR auto-follow (center_only mode only):
+  // - Auto (default): lock lcrLRHeightM to the TV vertical centre; update
+  //   splConfig + placed FL/FR whenever the screen geometry changes.
+  // - Manual: follow the saved splConfig.lcrLRHeightM; do not auto-reset.
+  // This effect is completely independent from the centre authority above —
+  // a manual centre override writes lcrHeightM only and never touches
+  // lcrLRHeightM or FL/FR positions.
+  useEffect(() => {
+    if (frontStageMode !== 'center_only') return;
+    if (lcrLRHeightManual) {
+      const stored = Number.isFinite(Number(splConfig?.lcrLRHeightM)) ? Number(splConfig.lcrLRHeightM) : tvVerticalCentreM;
+      const next = clampLcrHeight(stored);
+      setLrHeightInputValue(String(Number(next.toFixed(2))));
+      return;
+    }
+    const target = tvVerticalCentreM;
+    setLrHeightInputValue(String(Number(target.toFixed(2))));
+    const stored = Number(splConfig?.lcrLRHeightM);
+    if (!Number.isFinite(stored) || Math.abs(stored - target) > 0.005) {
+      updateGlobalSpl?.({ lcrLRHeightM: target, lcrLRHeightManual: false });
+      updatePlacedLRHeight?.(target);
+    }
+  }, [frontStageMode, lcrLRHeightManual, tvVerticalCentreM, splConfig?.lcrLRHeightM, clampLcrHeight, updateGlobalSpl, updatePlacedLRHeight]);
 
   const handleLcrHeightChange = useCallback((e) => {
     const newValue = e.target.value;
@@ -391,12 +442,17 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
       setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
     } else {
       // Leaving manual: reset to the current recommended acoustic-centre height.
+      // In center_only mode this moves ONLY FC — FL/FR have their own authority.
       const target = recommendedLcrHeightM;
       updateGlobalSpl?.({ lcrHeightManual: false, lcrHeightM: target });
-      updatePlacedLcrHeight?.(target);
+      if (frontStageMode === 'center_only') {
+        updatePlacedFCHeight?.(target);
+      } else {
+        updatePlacedLcrHeight?.(target);
+      }
       setLcrHeightInputValue(String(Number(target.toFixed(2))));
     }
-  }, [lcrHeightInputValue, recommendedLcrHeightM, clampLcrHeight, updateGlobalSpl, updatePlacedLcrHeight]);
+  }, [lcrHeightInputValue, recommendedLcrHeightM, clampLcrHeight, updateGlobalSpl, updatePlacedLcrHeight, updatePlacedFCHeight, frontStageMode]);
 
   const applyFrontStage = useCallback((nextBaseModel, nextMode, nextSoundbarModel) => {
     buildFrontStageSeed({
@@ -438,11 +494,12 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         ? (CENTER_ONLY_SOUNDBAR_LABELS.includes(soundbarModel) ? soundbarModel : CENTER_ONLY_SOUNDBAR_LABELS[0])
         : (INTEGRATED_LCR_SOUNDBAR_LABELS.includes(soundbarModel) ? soundbarModel : INTEGRATED_LCR_SOUNDBAR_LABELS[0]);
 
-    // When entering center_only mode, seed L/R height from the current shared height if not yet set
+    // When entering center_only mode, seed L/R height from the TV vertical
+    // centre (NOT the centre/soundbar height) if not yet set.
     if (nextMode === 'center_only' && !Number.isFinite(Number(splConfig?.lcrLRHeightM))) {
-      const currentH = clampLcrHeight(Number.isFinite(Number(splConfig?.lcrHeightM)) ? Number(splConfig.lcrHeightM) : defaultLcrHeightM);
-      setLrHeightInputValue(String(Number(currentH.toFixed(2))));
-      updateGlobalSpl?.({ lcrLRHeightM: currentH });
+      const tvCentre = clampLcrHeight(tvVerticalCentreM);
+      setLrHeightInputValue(String(Number(tvCentre.toFixed(2))));
+      updateGlobalSpl?.({ lcrLRHeightM: tvCentre, lcrLRHeightManual: false });
     }
 
     setFrontStageMode(nextMode);
@@ -635,20 +692,42 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
               {frontStageMode === 'center_only' ? (
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <Label className="text-[11px] text-[#625143]">Left / Right height from floor (to middle of speaker)</Label>
-                    <StepperInput
-                      value={Number(lrHeightInputValue) || 0}
-                      step={0.01}
-                      min={0.2}
-                      max={roomH - 0.2}
-                      disabled={disabled}
-                      onChange={(val) => {
-                        const clamped = clampLcrHeight(val);
-                        setLrHeightInputValue(String(Number(clamped.toFixed(2))));
-                        updateGlobalSpl?.({ lcrLRHeightM: clamped });
-                        updatePlacedLRHeight(clamped);
-                      }}
-                    />
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[11px] text-[#625143]">Left / Right height from floor (to middle of speaker)</Label>
+                      <span className="text-[11px] text-[#625143]">
+                        {lcrLRHeightManual ? 'Manual' : `Auto: ${formatHeightM(tvVerticalCentreM)}`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StepperInput
+                        value={Number(lrHeightInputValue) || 0}
+                        step={0.01}
+                        min={0.2}
+                        max={roomH - 0.2}
+                        disabled={disabled}
+                        onChange={(val) => {
+                          const clamped = clampLcrHeight(val);
+                          setLrHeightInputValue(String(Number(clamped.toFixed(2))));
+                          updateGlobalSpl?.({ lcrLRHeightM: clamped, lcrLRHeightManual: true });
+                          updatePlacedLRHeight(clamped);
+                        }}
+                      />
+                      {lcrLRHeightManual && (
+                        <button
+                          type="button"
+                          className="text-[11px] text-[#213428] underline underline-offset-2 hover:no-underline whitespace-nowrap"
+                          onClick={() => {
+                            const target = clampLcrHeight(tvVerticalCentreM);
+                            updateGlobalSpl?.({ lcrLRHeightM: target, lcrLRHeightManual: false });
+                            setLrHeightInputValue(String(Number(target.toFixed(2))));
+                            updatePlacedLRHeight(target);
+                          }}
+                          disabled={disabled}
+                        >
+                          Auto
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label className="text-[11px] text-[#625143]">Centre soundbar height from floor (to middle of speaker)</Label>

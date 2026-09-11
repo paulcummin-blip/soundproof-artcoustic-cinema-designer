@@ -13,6 +13,7 @@
 // the auto-height effect does not fight the user's drag.
 
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolveEffectiveScreen";
 
 function canonRole(role) {
   const r = String(role || "").toUpperCase();
@@ -41,10 +42,33 @@ export function detectFrontStageMode(placedSpeakers) {
  * centre_only + FC    → { lcrHeightM, lcrHeightManual: true }
  * standard/integrated → { lcrHeightM, lcrHeightManual: true }
  */
+/**
+ * Compute the TV vertical centre (acoustic-centre height) from the resolved
+ * screen geometry. This is the canonical FL/FR auto-height target in
+ * center_only mode — it NEVER derives from the centre/soundbar height.
+ *
+ * TV centre Y = screenBottom + (viewable height / 2)
+ *
+ * Returns null when screen geometry is unavailable.
+ */
+export function computeTvVerticalCentreM(screen, dimensions) {
+  const roomH = Number(dimensions?.height ?? dimensions?.heightM) || 2.8;
+  const screenBottom = Number(screen?.heightFromFloorM);
+  const viewable = resolveEffectiveViewableDimsM(screen);
+  const viewableHeightM = Number(viewable?.heightM);
+  if (Number.isFinite(screenBottom) && Number.isFinite(viewableHeightM) && viewableHeightM > 0) {
+    return screenBottom + viewableHeightM / 2;
+  }
+  // Fallback to room mid-height when screen geometry is unavailable.
+  return roomH * 0.5;
+}
+
 export function resolveLcrHeightAuthority({ role, newZ, frontStageMode }) {
   if (frontStageMode === "center_only") {
     if (role === "FL" || role === "FR") {
-      return { lcrLRHeightM: newZ };
+      // FL/FR drag enters manual mode so the TV-centre auto-follow does not
+      // fight the user's drag.
+      return { lcrLRHeightM: newZ, lcrLRHeightManual: true };
     }
     if (role === "FC") {
       return { lcrHeightM: newZ, lcrHeightManual: true };

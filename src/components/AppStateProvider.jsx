@@ -1149,6 +1149,8 @@ function useDesignerState() {
         // Separate L/R and centre heights for center_only soundbar override mode
         lcrHeightM: autosaveConfig.lcrHeightM,
         lcrLRHeightM: autosaveConfig.lcrLRHeightM,
+        lcrHeightManual: autosaveConfig.lcrHeightManual,
+        lcrLRHeightManual: autosaveConfig.lcrLRHeightManual,
       };
     });
 

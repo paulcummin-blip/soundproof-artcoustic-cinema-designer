@@ -4,6 +4,7 @@
 
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
+import { computeTvVerticalCentreM } from '@/components/roomdesigner/utils/lcrHeightAuthority';
 
 export const CENTER_ONLY_SOUNDBAR_LABELS = ['C-1', 'C4-1', 'Multi (Mono)', 'HSPL (Mono)'];
 export const INTEGRATED_LCR_SOUNDBAR_LABELS = ['Multi (LCR)', 'HSPL (LCR)'];
@@ -95,11 +96,14 @@ export function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarMo
     const defaultY = 0.20;
     const lcrHeightM = Number(splConfig?.lcrHeightM);
     const lcrLRHeightM = Number(splConfig?.lcrLRHeightM);
+    // TV vertical centre — the canonical FL/FR auto-height target.
+    const tvCentreM = computeTvVerticalCentreM(screen, dimensions);
     const defaultZ = Number.isFinite(lcrHeightM) ? lcrHeightM : roomH * 0.5;
-    // In center_only mode, L/R use their own stored height if available
+    // In center_only mode, L/R use their own stored height if available,
+    // otherwise fall back to the TV vertical centre (NOT the centre height).
     const defaultLRZ = (frontStageMode === 'center_only' && Number.isFinite(lcrLRHeightM))
       ? lcrLRHeightM
-      : defaultZ;
+      : (frontStageMode === 'center_only' ? tvCentreM : defaultZ);
     const spread = Math.min(1.2, roomW * 0.22);
     const midX = roomW / 2;
 
