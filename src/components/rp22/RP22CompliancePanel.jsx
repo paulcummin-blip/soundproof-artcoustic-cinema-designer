@@ -27,6 +27,7 @@ import {
   getAssumedP21DisplayValue,
   resolveAssumedP15Level,
   resolveAssumedP21Level,
+  normalizeAssumedLevel,
 } from "@/components/utils/assumedParameterAuthority";
 
 /* ---------- Helpers */
@@ -616,12 +617,16 @@ export default function RP22CompliancePanel({
       if (pid === 8) return "L4";
       if (pid === 11) return "L4";
 
+      // P15/P21: null (not yet assumed) = NOT CALCULATED → return null so the
+      // matrix displays "—" and the Design Rating excludes it from the floor.
+      // Only a genuine designer selection is a scored result. This keeps
+      // Compliance and Design Rating in agreement on eligibility.
       if (pid === 15) {
-        return resolveAssumedP15Level(assumedP15Level);
+        return normalizeAssumedLevel(assumedP15Level);
       }
 
       if (pid === 21) {
-        return resolveAssumedP21Level(assumedP21Level);
+        return normalizeAssumedLevel(assumedP21Level);
       }
 
       return "—";
@@ -694,14 +699,18 @@ export default function RP22CompliancePanel({
       if (pid === 8) return "No";
       if (pid === 11) return "0";
 
-      // P15 / P21 are assumed design parameters — show the derived display value.
-      // The canonical authority defaults to L2 when no selection has been made.
+      // P15 / P21 are assumed design parameters. null (not yet assumed) =
+      // NOT CALCULATED — show "Not Calculated" instead of a default L2 value.
       if (pid === 15) {
-        return getAssumedP15DisplayValue(assumedP15Level);
+        return normalizeAssumedLevel(assumedP15Level)
+          ? getAssumedP15DisplayValue(assumedP15Level)
+          : "Not Calculated";
       }
 
       if (pid === 21) {
-        return getAssumedP21DisplayValue(assumedP21Level);
+        return normalizeAssumedLevel(assumedP21Level)
+          ? getAssumedP21DisplayValue(assumedP21Level)
+          : "Not Calculated";
       }
 
       return "—";

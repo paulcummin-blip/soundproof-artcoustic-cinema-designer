@@ -23,6 +23,7 @@ import {
   getAssumedP21DisplayValue,
   resolveAssumedP15Level,
   resolveAssumedP21Level,
+  normalizeAssumedLevel,
 } from "@/components/utils/assumedParameterAuthority";
 
 const LABEL_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -35,10 +36,13 @@ export default function P15P21AssumptionControl({
 }) {
   const isP15 = Number(paramId) === 15;
   const options = isP15 ? ASSUMED_P15_OPTIONS : ASSUMED_P21_OPTIONS;
-  const currentLevel = isP15 ? resolveAssumedP15Level(value) : resolveAssumedP21Level(value);
-  const displayValue = isP15
-    ? getAssumedP15DisplayValue(value)
-    : getAssumedP21DisplayValue(value);
+  // null (not yet assumed) = NOT CALCULATED. No button is selected — the
+  // designer has not yet made a selection. This keeps the selector in
+  // agreement with the Compliance matrix and the Design Rating floor.
+  const currentLevel = normalizeAssumedLevel(value);
+  const displayValue = currentLevel
+    ? (isP15 ? getAssumedP15DisplayValue(value) : getAssumedP21DisplayValue(value))
+    : null;
 
   // ── Print mode: read-only descriptive text ──
   if (variant === "print") {
@@ -57,7 +61,7 @@ export default function P15P21AssumptionControl({
         }}
       >
         <span style={{ fontWeight: 600, color: "#1B1A1A" }}>
-          Assumed · {currentLevel}
+          {currentLevel ? `Assumed · ${currentLevel}` : "Not Calculated"}
         </span>
         {displayValue && (
           <span style={{ color: "#625143", marginLeft: 4 }}>

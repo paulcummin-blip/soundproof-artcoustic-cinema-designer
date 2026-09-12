@@ -27,6 +27,7 @@ import {
   getAssumedP15DisplayValue,
   getAssumedP21DisplayValue,
   isAssumedLevelSet,
+  normalizeAssumedLevel,
 } from "@/components/utils/assumedParameterAuthority";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
@@ -238,8 +239,9 @@ export function useParameterGridAuthority({
       }
       if (pid === 8) return "No";
       if (pid === 11) return "0";
-      if (pid === 15) return getAssumedP15DisplayValue(assumedP15Level);
-      if (pid === 21) return getAssumedP21DisplayValue(assumedP21Level);
+      // P15 / P21: null (not yet assumed) = NOT CALCULATED.
+      if (pid === 15) return normalizeAssumedLevel(assumedP15Level) ? getAssumedP15DisplayValue(assumedP15Level) : "Not Calculated";
+      if (pid === 21) return normalizeAssumedLevel(assumedP21Level) ? getAssumedP21DisplayValue(assumedP21Level) : "Not Calculated";
       return "—";
     }
 

@@ -8,6 +8,7 @@ import {
   getAssumedP21DisplayValue,
   resolveAssumedP15Level,
   resolveAssumedP21Level,
+  normalizeAssumedLevel,
 } from '@/components/utils/assumedParameterAuthority';
 
 export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null, assumedP15Level, assumedP21Level, displayedLevel = null }) {
@@ -44,12 +45,12 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
     };
 
     // P15/P21 are designer-assumed levels — the selected level IS the authority.
-    // No local state, no "estimate" wording. The display value is the canonical
-    // RP22 design target for the selected level, not a Sound Proof calculation.
-    const p15Level = resolveAssumedP15Level(assumedP15Level);
-    const p21Level = resolveAssumedP21Level(assumedP21Level);
-    const p15Display = getAssumedP15DisplayValue(assumedP15Level);
-    const p21Display = getAssumedP21DisplayValue(assumedP21Level);
+    // null (not yet assumed) = NOT CALCULATED — show "Not Calculated" and a
+    // "—" pill, consistent with the Compliance matrix and the Design Rating.
+    const p15Level = normalizeAssumedLevel(assumedP15Level);
+    const p21Level = normalizeAssumedLevel(assumedP21Level);
+    const p15Display = p15Level ? getAssumedP15DisplayValue(assumedP15Level) : null;
+    const p21Display = p21Level ? getAssumedP21DisplayValue(assumedP21Level) : null;
 
     return (
         <Card className="border bg-white border-[#DCDBD6] h-full">
@@ -299,16 +300,16 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                         ) : parameter.id === 15 ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-bold text-[#1B1A1A]">
-                                    Assumed · {p15Level}
+                                    {p15Level ? `Assumed · ${p15Level}` : 'Not Calculated'}
                                 </span>
-                                <RP22GradingPill level={p15Level} />
+                                {p15Level ? <RP22GradingPill level={p15Level} /> : renderLevelBadge('—')}
                             </div>
                         ) : parameter.id === 21 ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-bold text-[#1B1A1A]">
-                                    Assumed · {p21Level}
+                                    {p21Level ? `Assumed · ${p21Level}` : 'Not Calculated'}
                                 </span>
-                                <RP22GradingPill level={p21Level} />
+                                {p21Level ? <RP22GradingPill level={p21Level} /> : renderLevelBadge('—')}
                             </div>
                         ) : hasRoomResult && roomResult.status !== 'no_data' ? (
                             <div className="flex justify-between items-center">
