@@ -1,3 +1,4 @@
+import { STAGE2_CANONICAL_VERSION } from "../stage2/stage2Constants.js";
 // improveBassV2Fingerprint.js
 // V2 stale-job rejection fingerprint.
 //
@@ -117,7 +118,14 @@ export function computeV2DesignFingerprint(params) {
     })
     .join(",");
 
-  return `${baseFingerprint}${ROTATION_SUFFIX_SEPARATOR}${rotationComponent}`;
+  const applyIdentity = JSON.stringify({
+    timing: STAGE2_CANONICAL_VERSION,
+    provenance: instances.map((inst) => [inst.id, inst.tuningSource || "manual"]),
+    priorities: (seatingPositions || []).map((seat) => [seat.id, seat.isPrimary, seat.priority]),
+    amplifierPowerPerSubW: params?.amplifierPowerPerSubW ?? null,
+    p18TargetBasis: params?.p18TargetBasis ?? null,
+  });
+  return `${baseFingerprint}${ROTATION_SUFFIX_SEPARATOR}${rotationComponent}|apply:${applyIdentity}`;
 }
 
 /**
