@@ -43,6 +43,7 @@ import { isStage2ReadyForConsumption, waitForStage2Terminal } from "./stage2Life
 import { buildOptimisedInstances } from "./improveBassV2Apply";
 import { applyCalibrationTuning } from "./improveBassV2ApplyCalibration";
 import { computeV2DesignFingerprint } from "./improveBassV2Fingerprint";
+import { buildProvenance } from "./appliedProvenance";
 import ImproveBassV2Progress from "./ImproveBassV2Progress";
 import ImproveBassV2StageResults from "./ImproveBassV2StageResults";
 import ImproveBassV2CompletedInvestigation from "./ImproveBassV2CompletedInvestigation";
@@ -352,9 +353,14 @@ export default function ImproveBassResponseV2({
        rec.result.inputIdentity!==fingerprint){
       setStale(projectId,"Design changed — recalculate the recommendation before Apply");return;
     }
+    const _provenance=buildProvenance(
+      rec.interventionType==="calibration"?"calibration":"subPositions",
+      rec.result.candidateId,
+      selection.applyFingerprint,
+      fingerprint);
     const next=rec.interventionType==="calibration"
-      ? applyCalibrationTuning(subwooferInstances,rec.result.appliedTuning)
-      : buildOptimisedInstances(rec.result,subwooferInstances,roomDims,selectedSubModel);
+      ? applyCalibrationTuning(subwooferInstances,rec.result.appliedTuning,_provenance)
+      : buildOptimisedInstances(rec.result,subwooferInstances,roomDims,selectedSubModel,_provenance);
     commitInstances(next,{front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
   },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,subwooferInstances,roomDims,selectedSubModel]);
   const handleApplyCalibration=handleApply;
@@ -374,11 +380,13 @@ export default function ImproveBassResponseV2({
 
     if (stageKey === "delay" || stageKey === "gain") {
       // Apply calibration tuning (delay or gain)
-      const next = applyCalibrationTuning(subwooferInstances, result.appliedTuning || result.tuning || []);
+      const _provenance = buildProvenance(stageKey, result.candidateId, state.winner.applyFingerprint, fingerprint);
+      const next = applyCalibrationTuning(subwooferInstances, result.appliedTuning || result.tuning || [], _provenance);
       commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
     } else if (stageKey === "subPositions") {
       // Apply subwoofer position change
-      const next = buildOptimisedInstances(result, subwooferInstances, roomDims, selectedSubModel);
+      const _provenance = buildProvenance(stageKey, result.candidateId, state.winner.applyFingerprint, fingerprint);
+      const next = buildOptimisedInstances(result, subwooferInstances, roomDims, selectedSubModel, _provenance);
       commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
     } else if (stageKey === "seating") {
       // Apply seating position change

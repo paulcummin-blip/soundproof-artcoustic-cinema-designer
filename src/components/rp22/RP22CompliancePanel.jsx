@@ -452,20 +452,30 @@ export default function RP22CompliancePanel({
   // 2) any seat flagged isPrimary in seatingPositions
   // 3) "mlp" if present in cache
   // 4) first available seat in cache
+  // A1 — Derive the reporting seat from the canonical seating authority
+  // (seatingPositions), NOT from the UI cache (seatSnapshotsById). The cache
+  // may be empty when Plan/RoomVisualisation is not mounted, which previously
+  // caused valid fresh engine results to be presented as "Not Calculated / N/A"
+  // because reportSource fell back to "room" and the seat branch was never
+  // entered. The cache remains a fallback DATA SOURCE inside
+  // resolveSeatMetricHelper — it must not decide whether a canonical seat
+  // EXISTS.
   const lockedSeatId = React.useMemo(() => {
-    const fromProp = String(mlpSeatId || "").trim();
-    if (fromProp && seatSnapshotsById?.[fromProp]) return fromProp;
-
+    // 1. Canonical Primary/RSP/MLP seat from seatingPositions
     const primaryFromSeats = (Array.isArray(seatingPositions) ? seatingPositions : [])
       .find(s => s?.isPrimary && s?.id);
     const primaryId = String(primaryFromSeats?.id || "").trim();
-    if (primaryId && seatSnapshotsById?.[primaryId]) return primaryId;
+    if (primaryId) return primaryId;
 
-    if (seatSnapshotsById?.["mlp"]) return "mlp";
+    // 2. mlpSeatId if provided and valid
+    const fromProp = String(mlpSeatId || "").trim();
+    if (fromProp) return fromProp;
 
-    const first = Object.keys(seatSnapshotsById || {})[0];
-    return first || "";
-  }, [mlpSeatId, seatingPositions, seatSnapshotsById]);
+    // 3. First valid seat as established fallback
+    const firstSeat = (Array.isArray(seatingPositions) ? seatingPositions : [])
+      .find(s => s?.id);
+    return String(firstSeat?.id || "").trim();
+  }, [mlpSeatId, seatingPositions]);
 
   const reportSource = React.useMemo(() => {
     return lockedSeatId ? `seat:${lockedSeatId}` : "room";

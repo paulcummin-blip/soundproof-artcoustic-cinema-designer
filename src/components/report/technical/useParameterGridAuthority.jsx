@@ -39,6 +39,7 @@ import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
 import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
+import { resolveSeatMetric as resolveSeatMetricHelper } from "@/components/rp22/resolveSeatMetric";
 
 const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
 
@@ -160,15 +161,22 @@ export function useParameterGridAuthority({
     return byId;
   }, [seatHudSnapshots]);
 
+  // B1 — Derive the reporting seat from the canonical seating authority
+  // (seatingPositions), NOT from the UI cache (seatSnapshotsById). The cache
+  // may be empty when Plan/RoomVisualisation is not mounted, which previously
+  // caused valid fresh engine results to be presented as "Not Calculated / N/A"
+  // because the seat branch was never entered. The cache remains a fallback
+  // DATA SOURCE inside resolveSeatMetricHelper — it must not decide whether a
+  // canonical seat EXISTS.
   const lockedSeatId = React.useMemo(() => {
-    const fromProp = String(mlpSeatId || "").trim();
-    if (fromProp && seatSnapshotsById?.[fromProp]) return fromProp;
     const primaryFromSeats = (Array.isArray(seatingPositions) ? seatingPositions : []).find(s => s?.isPrimary && s?.id);
     const primaryId = String(primaryFromSeats?.id || "").trim();
-    if (primaryId && seatSnapshotsById?.[primaryId]) return primaryId;
-    if (seatSnapshotsById?.["mlp"]) return "mlp";
-    return Object.keys(seatSnapshotsById || {})[0] || "";
-  }, [mlpSeatId, seatingPositions, seatSnapshotsById]);
+    if (primaryId) return primaryId;
+    const fromProp = String(mlpSeatId || "").trim();
+    if (fromProp) return fromProp;
+    const firstSeat = (Array.isArray(seatingPositions) ? seatingPositions : []).find(s => s?.id);
+    return String(firstSeat?.id || "").trim();
+  }, [mlpSeatId, seatingPositions]);
 
   /* ----- getHudLevelForParam ----- */
   const getHudLevelForParam = React.useCallback((param) => {
@@ -189,8 +197,10 @@ export function useParameterGridAuthority({
       });
     }
 
-    const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
-    const metric = snap?.rp22?.[`p${pid}`];
+    // B1 — Resolve from the canonical engine authority (analysisResult.perSeatRp22)
+    // via resolveSeatMetricHelper, with the UI cache as fallback. This unifies
+    // the Technical Report with Compliance / ASDR on the same data source.
+    const metric = resolveSeatMetricHelper(lockedSeatId, `p${pid}`, analysisResult, seatSnapshotsById, mlpSeatId);
     return normalizeLevelForDisplay(getMetricDisplayState(metric, pid).level);
   }, [analysisResult, assumedP15Level, assumedP21Level, seatSnapshotsById, lockedSeatId, mlpSeatId, p12Mode, p13Mode, p14Mode, bassPresentation]);
 
@@ -245,8 +255,8 @@ export function useParameterGridAuthority({
       return "—";
     }
 
-    const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
-    const metric = snap?.rp22?.[`p${pid}`];
+    // B1 — Resolve from the canonical engine authority via resolveSeatMetricHelper
+    const metric = resolveSeatMetricHelper(lockedSeatId, `p${pid}`, analysisResult, seatSnapshotsById, mlpSeatId);
     if (!metric) return "Not Calculated";
     if (pid === 17) {
       const display = getMetricDisplayState(metric, pid);
@@ -347,8 +357,8 @@ export function useParameterGridAuthority({
         {rows.map(rowObj => (
           <div key={`row-${rowObj.row}`} style={{ display: "grid", gridAutoFlow: "column", gridAutoColumns: "min-content", justifyContent: "end", gap: denseSeatGrid ? 3 : 6 }}>
             {rowObj.seats.map(seat => {
-              const snap = getSnapshotForSeat(seat);
-              const metric = snap?.rp22?.[pKey];
+              // B1 — Resolve from canonical engine authority via resolveSeatMetricHelper
+              const metric = resolveSeatMetricHelper(seat?.id, pKey, analysisResult, seatSnapshotsById, mlpSeatId);
               const display = getMetricDisplayState(metric, pId);
               const lvl = display.level === 'N/A' || display.text === 'N/A' ? 'N/A' : normalizeLevelForDisplay(display.level ?? metric?.level);
               const isPrimary = !!seat?.isPrimary;
@@ -383,7 +393,7 @@ export function useParameterGridAuthority({
         ))}
       </div>
     );
-  }, [rows, denseSeatGrid, getSnapshotForSeat, bassPresentation.perSeatP19Results, bassPresentation.perSeatP20Results, bassPresentation.publicationVerified, bassPresentation.p14TargetUnselected, bassPresentation.parameters.p19.status, bassPresentation.parameters.p20.status, seats]);
+  }, [rows, denseSeatGrid, getSnapshotForSeat, analysisResult, seatSnapshotsById, mlpSeatId, bassPresentation.perSeatP19Results, bassPresentation.perSeatP20Results, bassPresentation.publicationVerified, bassPresentation.p14TargetUnselected, bassPresentation.parameters.p19.status, bassPresentation.parameters.p20.status, seats]);
 
   /* ----- Build per-seat grid data for TechnicalParameterCard ----- */
   const buildSeatGridData = React.useCallback((paramId) => {
@@ -433,8 +443,8 @@ export function useParameterGridAuthority({
     return rows.map(rowObj => ({
       row: rowObj.row,
       seats: rowObj.seats.map((seat, idx) => {
-        const snap = getSnapshotForSeat(seat);
-        const metric = snap?.rp22?.[pKey];
+        // B1 — Resolve from canonical engine authority via resolveSeatMetricHelper
+        const metric = resolveSeatMetricHelper(seat?.id, pKey, analysisResult, seatSnapshotsById, mlpSeatId);
         const display = getMetricDisplayState(metric, paramId);
         return {
           id: seat?.id,
@@ -445,7 +455,7 @@ export function useParameterGridAuthority({
         };
       }),
     }));
-  }, [rows, getSnapshotForSeat, bassPresentation.perSeatP19Results, bassPresentation.perSeatP20Results]);
+  }, [rows, getSnapshotForSeat, analysisResult, seatSnapshotsById, mlpSeatId, bassPresentation.perSeatP19Results, bassPresentation.perSeatP20Results]);
 
   /* ----- Build ASDR footer string for a parameter card ----- */
   const buildAsdrFooter = React.useCallback((paramId) => {

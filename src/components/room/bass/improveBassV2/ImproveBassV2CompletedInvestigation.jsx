@@ -19,6 +19,7 @@ import { buildStageDisplay, formatStageVerdict } from "./improveBassV2StageMappi
 import { delayMsToAcousticDistance } from "./acousticDistance";
 import { isCalibrationApplied } from "./improveBassV2ApplyCalibration.js";
 import { isOptimisedApplied } from "./improveBassV2Apply.js";
+import { isProvenanceApplied, getActiveProvenance } from "./appliedProvenance.js";
 import { buildStageResults } from "./improveBassV2StageAuthority.js";
 
 // Map the display stage keys (from buildStageDisplay) to the stage authority
@@ -252,6 +253,27 @@ export function buildStageDetails(selection) {
  */
 function isStageResultApplied(stageKey, stage, currentInstances, roomDims) {
   if (!stage?.result || !currentInstances) return false;
+
+  // C3 — APPLIED must match the action record for that stage/candidate.
+  // Check provenance FIRST. Only if provenance exists and matches is the
+  // stage truly APPLIED. Do NOT infer APPLIED solely from current sub values.
+  const candidateId = stage.result.candidateId;
+  if (candidateId) {
+    if (isProvenanceApplied(currentInstances, stageKey, candidateId)) {
+      return true;
+    }
+    // Provenance exists but doesn't match this candidate → NOT applied.
+    // This is the false-positive control: matching values without a matching
+    // provenance record do NOT show APPLIED.
+    const activeProv = getActiveProvenance(currentInstances);
+    if (activeProv) {
+      // Some other candidate was applied — this one was not.
+      return false;
+    }
+    // No provenance at all — fall through to legacy value-matching check
+    // for backward compatibility with instances that predate provenance.
+  }
+
   if (stageKey === "delay" || stageKey === "gain") {
     return isCalibrationApplied(
       currentInstances,
@@ -262,16 +284,7 @@ function isStageResultApplied(stageKey, stage, currentInstances, roomDims) {
     return isOptimisedApplied(currentInstances, stage.result, roomDims);
   }
   if (stageKey === "seating") {
-    // Seating apply check: the seating offset is "applied" when the current
-    // seating positions match the result's moved positions. We check this
-    // by comparing the offset — if the result's offset is 0, it's "current"
-    // (no change). A non-zero offset is "applied" only when the seats have
-    // actually moved. Since we don't have the original seating positions
-    // here, we rely on the stale flag: if the result is not stale, the
-    // seating hasn't been applied yet (Apply hasn't happened). After Apply,
-    // the result becomes stale and the seats have moved. We check the
-    // seating positions directly if available.
-    return false; // Seating apply is tracked via the stage results component
+    return false;
   }
   return false;
 }

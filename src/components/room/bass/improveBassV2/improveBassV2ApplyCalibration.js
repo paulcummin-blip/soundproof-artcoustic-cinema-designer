@@ -50,7 +50,7 @@ function normalisePolarity(value) {
  * @param {Array} calibrationTuning - [{ delayMs, gainDb, polarity }] per active sub
  * @returns {Array} new subwooferInstances with tuning applied
  */
-export function applyCalibrationTuning(currentInstances, calibrationTuning) {
+export function applyCalibrationTuning(currentInstances, calibrationTuning, provenance) {
   if (!Array.isArray(currentInstances) || !Array.isArray(calibrationTuning)) {
     return currentInstances || [];
   }
@@ -69,6 +69,9 @@ export function applyCalibrationTuning(currentInstances, calibrationTuning) {
       gainDb: Number(t.gainDb) || 0,
       // Canonical persisted instances require +1 normal / -1 inverted.
       polarity: normalisePolarity(t.polarity) < 0 ? -1 : 1,
+      // C1 — Stamp provenance so APPLIED is identified by the actual action,
+      // not by coincidental value matching.
+      appliedV2Provenance: provenance || inst.appliedV2Provenance || null,
     };
   });
 }

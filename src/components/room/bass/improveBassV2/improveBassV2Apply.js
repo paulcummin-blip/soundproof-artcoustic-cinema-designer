@@ -47,7 +47,7 @@ function normalisePolarity(value) {
  * @param {string} modelKey - subwoofer model key
  * @returns {Array} new subwooferInstances array with ALL instances preserved
  */
-export function buildOptimisedInstances(winner, currentInstances, roomDims, modelKey) {
+export function buildOptimisedInstances(winner, currentInstances, roomDims, modelKey, provenance) {
   // Winner may carry coordinates as `coordinates` (Stage 2) or
   // `positionCoordinates` (Stage 11B position candidates).
   const coords = winner?.positionCoordinates || winner?.coordinates;
@@ -59,7 +59,7 @@ export function buildOptimisedInstances(winner, currentInstances, roomDims, mode
     throw new Error("Cannot Apply positions to changed source identities");
   }
   const coordsById = new Map(ordered.map((inst, i) => [inst.id, coords[i]]));
-  return applyCalibrationTuning(currentInstances, tuning).map((inst) => {
+  return applyCalibrationTuning(currentInstances, tuning, provenance).map((inst) => {
     if (inst.enabled === false) return inst;
     const coord = coordsById.get(inst.id);
     if (!Number.isFinite(Number(coord?.x)) || !Number.isFinite(Number(coord?.y))) {
