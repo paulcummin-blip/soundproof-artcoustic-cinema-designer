@@ -1,3 +1,4 @@
+import { bindTuningToSourceIds } from "./improveBassV2ApplyCalibration.js";
 // improveBassV2Engine.js
 // Core V2 Improve Bass Response engine.
 //
@@ -725,8 +726,8 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           if (calibrationConfirmation) {
             calibrationConfirmation.candidateId = "calibration-only";
             calibrationConfirmation.isCurrent = true;
-            calibrationConfirmation.appliedTuning = calibrationSearch.bestTuning;
-            calibrationTuning = calibrationSearch.bestTuning;
+            calibrationConfirmation.appliedTuning = bindTuningToSourceIds(calibrationSearch.bestTuning, snapshot.instanceIds);
+            calibrationTuning = calibrationConfirmation.appliedTuning;
             calibrationResult = calibrationConfirmation;
 
             // Apply materiality gate against installed tuning
@@ -999,7 +1000,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           if (result) {
             result.candidateId = newPromoted[i].id;
             result.isCurrent = false;
-            result.appliedTuning = newPromoted[i].proxyResult?.tuning;
+            result.appliedTuning = bindTuningToSourceIds(newPromoted[i].proxyResult?.tuning, snapshot.instanceIds);
             // Carry position candidate metadata through confirmation
             if (newPromoted[i].isPositionCandidate) {
               result.isPositionCandidate = true;
