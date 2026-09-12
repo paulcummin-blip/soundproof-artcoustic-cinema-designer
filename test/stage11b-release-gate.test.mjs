@@ -46,12 +46,12 @@ const existingAuthority = {
   achievedP19VariationDb: 6.0,
   achievedP20VariationDb: 5.0,
   perSeatP19: [
-    { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: 6.0 },
-    { seatId: "seat-r1-c2", isPrimary: true, level: 2, variationDbRaw: 6.5 },
+    { seatId: "rsp", isPrimary: true, level: 0, variationDbRaw: 6.0 },
+    { seatId: "seat-r1-c2", isPrimary: true, level: 0, variationDbRaw: 6.5 },
   ],
   perSeatP20: [
-    { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: 5.0 },
-    { seatId: "seat-r1-c2", isPrimary: true, level: 2, variationDbRaw: 5.5 },
+    { seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 },
+    { seatId: "seat-r1-c2", isPrimary: true, level: 1, variationDbRaw: 5.5 },
   ],
   p14AchievedLevel: 2,
   p18AchievedLevel: 2,
@@ -139,8 +139,8 @@ test("SINGLE_WINNER: all origins flow through same authority", () => {
     candidateOrigin: origin,
     achievedP19Level: 2 + i,
     achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2 + i, variationDbRaw: 6.0 - i }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: 5.0 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 0 + i, variationDbRaw: 6.0 - i }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
   }));
 
   // All are treated equally — no origin-specific winner selection
@@ -202,9 +202,9 @@ test("ESCALATION_CASE_D: all tiers immaterial → subOptimisationExhausted = tru
   const state = buildPositionOptimisationState(
     ["symmetric", "asymmetric-pair", "individual"],
     {
-      symmetric: { generated: 20, screened: 20, promotedToV2: 3, confirmed: 3 },
-      asymmetricPair: { generated: 15, screened: 15, promotedToV2: 2, confirmed: 2 },
-      individual: { generated: 30, screened: 30, promotedToV2: 3, confirmed: 3 },
+      symmetric: { generated: 20, screened: 20, promotedToV2: 3, confirmed: 3, completed: true },
+      asymmetricPair: { generated: 15, screened: 15, promotedToV2: 2, confirmed: 2, completed: true },
+      individual: { generated: 30, screened: 30, promotedToV2: 3, confirmed: 3, completed: true },
     },
     existingAuthority,
     null // no winner
@@ -340,22 +340,23 @@ test("BATCH_SCREENING: position-sensitive — different positions produce differ
 test("PRIMARY_SEATS: two primary seats — regression rejected", () => {
   // Two primary seats: rsp and seat-r1-c2
   // Candidate improves rsp but degrades seat-r1-c2 by one level
-  const currentResult = existingAuthority;
+  const currentResult = {...existingAuthority, perSeatP19: existingAuthority.perSeatP19.map(row=>({...row,variationDbRaw:4.5,level:2}))};
   const candidateResult = {
     achievedP19Level: 3, // headline improves
     achievedP20Level: 2,
     perSeatP19: [
-      { seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: 4.0 }, // improved
-      { seatId: "seat-r1-c2", isPrimary: true, level: 1, variationDbRaw: 8.0 }, // DEGRADED L2→L1
+      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: 4.0 }, // improved
+      { seatId: "seat-r1-c2", isPrimary: true, level: 0, variationDbRaw: 8.0 }, // DEGRADED L2→L1
     ],
     perSeatP20: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: 5.0 },
-      { seatId: "seat-r1-c2", isPrimary: true, level: 2, variationDbRaw: 5.5 },
+      { seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 },
+      { seatId: "seat-r1-c2", isPrimary: true, level: 1, variationDbRaw: 5.5 },
     ],
   };
 
   // The materiality gate checks per-seat regression
   const mat = isMaterialImprovement(currentResult, candidateResult);
+  assert(!mat.material, "Primary-seat regression remains a hard rejection");
   // If the gate detects the primary-seat regression, it should reject.
   // The exact behavior depends on the gate's implementation, but the
   // hasPrimarySeatRegression function in authoritativeFinalistSelection
@@ -484,8 +485,8 @@ test("MATERIALITY: checkPhaseMateriality uses canonical only", () => {
       achievedP19Level: 3,
       achievedP20Level: 3,
       achievedP20VariationDb: 3.0,
-      perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: 4.0 }],
-      perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: 3.0 }],
+      perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: 4.0 },{ seatId: "seat-r1-c2", isPrimary:true,level:2,variationDbRaw:4.5 }],
+      perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: 3.0 },{seatId:"seat-r1-c2",isPrimary:true,level:3,variationDbRaw:3.5}],
     },
   ];
   const mat = checkPhaseMateriality(confirmedResults, existingAuthority);
@@ -596,7 +597,7 @@ test("RAW_UI: selection carries confirmedResults with raw P19/P20", () => {
       achievedP20Level: 3,
       achievedP19VariationDb: 4.0,
       achievedP20VariationDb: 3.0,
-      perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: 4.0 }],
+      perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: 4.0 }],
       perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: 3.0 }],
     },
     currentResult: existingAuthority,
