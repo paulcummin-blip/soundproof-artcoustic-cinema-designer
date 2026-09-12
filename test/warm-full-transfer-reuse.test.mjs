@@ -21,8 +21,12 @@ const raw = evaluateStage2Placement(params);
 const make = (cache, p = params, extra = {}) => cache.getOrCompute({ projectId: "synthetic-A", params: p,
   runId: "run-1", compute: () => clone(raw), ...extra });
 const target = { p14TargetBasis: "minimum", p14TargetLevel: 3, p14TargetDb: 115, p18TargetBasis: "minimum" };
-const confirm = (r, t = target) => evaluateStage2ConfirmationWithTuning(r, {
-  tuning: r.autoAlignTuning, tuningVariant: "placement-only", ...t });
+const confirm = (r, t = target) => {
+  const { runtimeMs, ...authority } = evaluateStage2ConfirmationWithTuning(r, {
+    tuning: r.autoAlignTuning, tuningVariant: "placement-only", ...t });
+  assert.ok(Number.isFinite(runtimeMs)); // Wall time is not an acoustic output.
+  return authority;
+};
 
 test("A: exact full acoustic entry reused; all transfer and canonical values unchanged", async () => {
   const c = createFullTransferReuseCache(); let calls = 0; const ops = [];
