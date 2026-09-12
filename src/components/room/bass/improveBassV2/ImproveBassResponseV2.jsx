@@ -106,6 +106,7 @@ export default function ImproveBassResponseV2({
     rspPosition,
     selectedSubModel,
     p14Params,
+    amplifierPowerPerSubW: amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0,
   };
 
   const canStart = shared?.hasCurrentResult === true && !state?.status === "running";
@@ -138,6 +139,8 @@ export default function ImproveBassResponseV2({
           p14TargetBasis: p14Params.p14TargetBasis,
           p14TargetLevel: p14Params.p14TargetLevel,
           p14TargetDb: p14Params.p14TargetDb,
+          p18TargetBasis: p14Params.p18TargetBasis,
+          amplifierPowerPerSubW: amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0,
         });
       } catch {
         return null;
@@ -156,6 +159,8 @@ export default function ImproveBassResponseV2({
           p14TargetBasis: d.p14Params?.p14TargetBasis,
           p14TargetLevel: d.p14Params?.p14TargetLevel,
           p14TargetDb: d.p14Params?.p14TargetDb,
+          p18TargetBasis: d.p14Params?.p18TargetBasis,
+          amplifierPowerPerSubW: d.amplifierPowerPerSubW,
         });
       } catch {
         return null;
@@ -271,7 +276,9 @@ export default function ImproveBassResponseV2({
             currentResult: null,
           });
         } else {
-          setWinner(projectId, selection);
+          setWinner(projectId, { ...selection, applyFingerprint: startFingerprint,
+            applyCandidateId: selection.winner?.candidateId ?? null,
+            applyCalibrationId: selection.calibrationResult?.candidateId ?? null });
         }
       }
       // Store runtime metrics for acceptance verification
@@ -298,9 +305,28 @@ export default function ImproveBassResponseV2({
     resetImproveBassV2(projectId);
   }, [projectId]);
 
+  // Recheck at the point of mutation, including changes after completion.
+  const canApplyCurrentResult = useCallback((calibrationOnly = false) => {
+    const d = latestDesignRef.current;
+    const selection = state?.winner;
+    const candidateId = calibrationOnly
+      ? selection?.calibrationResult?.candidateId : selection?.winner?.candidateId;
+    const capturedId = calibrationOnly ? selection?.applyCalibrationId : selection?.applyCandidateId;
+    const currentFingerprint = computeV2DesignFingerprint({
+      ...d, ...d.p14Params,
+    });
+    if (state?.status !== "complete" || !candidateId || candidateId !== capturedId ||
+        !selection?.applyFingerprint || currentFingerprint !== selection.applyFingerprint) {
+      setStale(projectId, "Design changed — recalculate the recommendation before Apply");
+      return false;
+    }
+    return true;
+  }, [state?.status, state?.winner, projectId]);
+
   const handleApply = useCallback(() => {
     // BLOCKER 7: Cancelled/stale jobs can never apply
     if (!state?.winner?.winner || !commitInstances || !hasCanonicalInstances) return;
+    if (!canApplyCurrentResult()) return;
     const modelKey = normaliseModelKey(selectedSubModel);
     const nextInstances = buildOptimisedInstances(
       state.winner.winner,
@@ -312,17 +338,18 @@ export default function ImproveBassResponseV2({
       front: { placementMode: "manual", isManual: true },
       rear: { placementMode: "manual", isManual: true },
     });
-  }, [state?.winner, commitInstances, hasCanonicalInstances, selectedSubModel,
+  }, [state?.winner, canApplyCurrentResult, commitInstances, hasCanonicalInstances, selectedSubModel,
     subwooferInstances, roomDims]);
 
   const handleApplyCalibration = useCallback(() => {
     if (!state?.winner?.calibrationTuning || !commitInstances) return;
+    if (!canApplyCurrentResult(true)) return;
     const updated = applyCalibrationTuning(subwooferInstances, state.winner.calibrationTuning);
     commitInstances(updated, {
       front: { placementMode: "manual", isManual: true },
       rear: { placementMode: "manual", isManual: true },
     });
-  }, [state?.winner, commitInstances, subwooferInstances]);
+  }, [state?.winner, canApplyCurrentResult, commitInstances, subwooferInstances]);
 
   if (!shared?.hasCurrentResult) return null;
 
