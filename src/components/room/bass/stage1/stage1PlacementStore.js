@@ -121,6 +121,17 @@ export function markStage1Error(projectId, fingerprint, errorMessage) {
   });
 }
 
+// Settle cancelled/superseded work without changing completed acoustic results.
+function markStage1Stopped(request, outcome) {
+  if (!request) return;
+  setMemory(request.projectId, {
+    status: outcome === "superseded" || outcome === "request-fingerprint-stale" ? "stale" : "cancelled",
+    fingerprint: request.fingerprint,
+    isUpdating: false,
+    errorMessage: null,
+  });
+}
+
 // ── Worker controller ───────────────────────────────────────────────────
 
 class Stage1PlacementController {
@@ -129,6 +140,7 @@ class Stage1PlacementController {
     this.activeRequest = null;
     this.requestSequence = 0;
     this.timer = null;
+    this.pendingRequest = null;
     this.debounceMs = STAGE1_DEBOUNCE_MS;
     this.startDelayMs = STAGE1_START_DELAY_MS;
   }
@@ -156,8 +168,10 @@ class Stage1PlacementController {
     markStage1Updating(projectId, fingerprint);
 
     const waitMs = Number.isFinite(delay) ? delay : this.startDelayMs;
+    this.pendingRequest = { projectId, fingerprint };
     this.timer = setTimeout(() => {
       this.timer = null;
+      this.pendingRequest = null;
       this.start({ projectId, fingerprint, payload });
     }, waitMs);
   }
@@ -171,14 +185,19 @@ class Stage1PlacementController {
 
     try {
       if (!this.worker) {
-        this.worker = new Worker(new URL("./stage1Placement.worker.js", import.meta.url), { type: "module" });
-        this.worker.onmessage = (event) => this.handleMessage(event.data || {});
-        this.worker.onerror = (event) => this.handleError(event?.message || "Worker error");
+        const worker = new Worker(new URL("./stage1Placement.worker.js", import.meta.url), { type: "module" });
+        this.worker = worker;
+        worker.onmessage = (event) => {
+          if (this.worker === worker) this.handleMessage(event.data || {});
+        };
+        worker.onerror = (event) => {
+          if (this.worker === worker) this.handleError(event?.message || "Worker error", true);
+        };
       }
 
       this.worker.postMessage({ requestId, generationId: requestId, fingerprint, payload });
     } catch (error) {
-      this.handleError(error?.message || String(error));
+      this.handleError(error?.message || String(error), true);
     }
   }
 
@@ -191,7 +210,8 @@ class Stage1PlacementController {
     if (message.fingerprint !== active.fingerprint) return; // stale fingerprint
 
     if (message.type === "cancelled") {
-      // Worker was cancelled — do nothing (newer request is active)
+      this.activeRequest = null;
+      markStage1Stopped(active, "cancelled");
       return;
     }
 
@@ -208,7 +228,11 @@ class Stage1PlacementController {
     }
   }
 
-  handleError(errorMessage) {
+  handleError(errorMessage, retireWorker = false) {
+    if (retireWorker && this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
     const active = this.activeRequest;
     if (!active) return;
     this.activeRequest = null;
@@ -219,6 +243,8 @@ class Stage1PlacementController {
    * Cancel the active worker and pending timer.
    */
   cancelActive(outcome = "cancelled") {
+    const request = this.activeRequest || this.pendingRequest;
+    this.pendingRequest = null;
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
     if (this.worker && this.activeRequest) {
       // Send cancel message to worker
@@ -230,6 +256,7 @@ class Stage1PlacementController {
       this.worker = null;
     }
     this.activeRequest = null;
+    markStage1Stopped(request, outcome);
   }
 
   /**
@@ -245,6 +272,10 @@ class Stage1PlacementController {
 
   dispose() {
     this.cancelActive("disposed");
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
   }
 }
 
