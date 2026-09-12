@@ -1,4 +1,5 @@
 import { bindTuningToSourceIds } from "./improveBassV2ApplyCalibration.js";
+import { buildAuthoritativeAutoAlignDelays } from "../useAuthoritativeBassResponse.js";
 // improveBassV2Engine.js
 // Core V2 Improve Bass Response engine.
 //
@@ -576,6 +577,30 @@ export function selectWinnerWithProtection(confirmedResults, snapshot, existingA
 // Main engine
 // ---------------------------------------------------------------------------
 
+
+/** Current records are manual unless explicitly marked as evaluated effective tuning. */
+export function resolveInstalledEffectiveTuning(rawTransfer, instances, rspPosition) {
+  const active = (instances || []).filter((inst) => inst.enabled !== false);
+  if (active.length !== rawTransfer?.sources?.length) {
+    throw new Error("Current source identities do not match captured transfers");
+  }
+  const live = rawTransfer.sources.map((source, i) => ({
+    id: active[i].id,
+    position: { x: source.x, y: source.y, z: source.z },
+    delay: Number(active[i].delayMs) || 0,
+    tuningSource: active[i].tuningSource,
+  }));
+  const auto = buildAuthoritativeAutoAlignDelays({
+    enabled: true, rspPosition, frontSubsLive: live, rearSubsLive: [],
+  });
+  return live.map((source, i) => ({
+    sourceId: source.id,
+    delayMs: source.delay + (auto[source.id] || 0),
+    gainDb: Number(active[i].gainDb) || 0,
+    polarity: Number(active[i].polarity) < 0 || Number(active[i].polarity) === 180 ? -1 : 0,
+  }));
+}
+
 export async function runImproveBassV2(projectId, params, callbacks) {
   const { onProgress, isCancelled, onBestSoFar, getCurrentFingerprint } = callbacks;
   const {
@@ -844,11 +869,9 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           }
           if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
 
-          const installedTuning = (snapshot.tuning || []).map((t) => ({
-            delayMs: Number(t.delayMs) || 0,
-            gainDb: Number(t.gainDb) || 0,
-            polarity: Number(t.polarity) || 0,
-          }));
+          const installedTuning = resolveInstalledEffectiveTuning(
+            currentRawTransfer, subwooferInstances, rspPosition,
+          );
 
           const _confirmT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
           const currentConfirmation = await runInWorker(worker, "confirmation", {
