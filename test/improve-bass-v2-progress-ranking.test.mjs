@@ -69,20 +69,20 @@ describe("A + B — Progress sequence follows actual work", () => {
     assert.equal(completedStages.length, 0, "no stage should be completed during reviewing");
   });
 
-  it("calibrating phase — phase_polarity active, delays+gain pending", () => {
+  it("calibrating phase — phase not_available, delays active, gain pending", () => {
     const display = buildStageDisplay({ phase: "calibrating", status: "running" });
     const phaseStage = display.stages.find((s) => s.key === "phase_polarity");
-    assert.equal(phaseStage.status, "active");
+    assert.equal(phaseStage.status, "not_available");
     const delaysStage = display.stages.find((s) => s.key === "delays");
-    assert.equal(delaysStage.status, "pending");
+    assert.equal(delaysStage.status, "active");
     const gainStage = display.stages.find((s) => s.key === "gain");
     assert.equal(gainStage.status, "pending");
   });
 
-  it("testing_positions phase — calibration stages completed, sub_positions active", () => {
+  it("testing_positions phase — delays+gain completed, phase not_available, sub_positions active", () => {
     const display = buildStageDisplay({ phase: "testing_positions", status: "running" });
     const phaseStage = display.stages.find((s) => s.key === "phase_polarity");
-    assert.equal(phaseStage.status, "completed");
+    assert.equal(phaseStage.status, "not_available");
     const delaysStage = display.stages.find((s) => s.key === "delays");
     assert.equal(delaysStage.status, "completed");
     const gainStage = display.stages.find((s) => s.key === "gain");
@@ -110,10 +110,14 @@ describe("A + B — Progress sequence follows actual work", () => {
     assert.equal(comparingStage.status, "active");
   });
 
-  it("complete status — all stages completed (except seating)", () => {
+  it("complete status — all implementable stages completed (phase not_available, seating not_tested)", () => {
     const display = buildStageDisplay({ phase: "finalising", status: "complete" });
     const completedStages = display.stages.filter((s) => s.status === "completed");
-    assert.ok(completedStages.length >= 6, "all stages except seating should be completed");
+    // delays, gain, sub_positions, comparing, preparing = 5 completed
+    // phase is not_available, seating is not_tested (no verdict in this scenario)
+    assert.ok(completedStages.length >= 5, "delays+gain+sub+comparing+preparing should be completed");
+    const phaseStage = display.stages.find((s) => s.key === "phase_polarity");
+    assert.equal(phaseStage.status, "not_available");
     const seatingStage = display.stages.find((s) => s.key === "seating_positions");
     assert.equal(seatingStage.status, "not_tested");
   });
@@ -127,25 +131,43 @@ describe("A + B — Progress sequence follows actual work", () => {
   });
 
   it("stage labels use correct terminology", () => {
-    assert.equal(STAGE_LABELS.phase_polarity, "Checking phase / polarity");
-    assert.equal(STAGE_LABELS.sub_positions, "Checking subwoofer positions");
-    assert.equal(STAGE_LABELS.seating_positions, "Checking seating positions");
+    assert.equal(STAGE_LABELS.phase_polarity, "Phase");
+    assert.equal(STAGE_LABELS.delays, "Delay");
+    assert.equal(STAGE_LABELS.gain, "Gain");
+    assert.equal(STAGE_LABELS.sub_positions, "Subwoofer positions");
+    assert.equal(STAGE_LABELS.seating_positions, "Seating positions");
   });
 });
 
 // ── F: Seating remains last physical intervention ──────────────────────
 
 describe("F — Seating remains last physical intervention", () => {
-  it("seating_positions is always not_tested regardless of phase", () => {
-    for (const phase of ["reviewing", "calibrating", "testing_positions", "finalising"]) {
+  it("seating_positions is pending during run, not_tested after complete without verdict", () => {
+    // During the run (before seating stage), seating is pending.
+    for (const phase of ["reviewing", "calibrating", "testing_positions"]) {
       const display = buildStageDisplay({ phase, status: "running" });
       const seatingStage = display.stages.find((s) => s.key === "seating_positions");
-      assert.equal(seatingStage.status, "not_tested", `seating should be not_tested during ${phase}`);
+      assert.equal(seatingStage.status, "pending", `seating should be pending during ${phase}`);
     }
+    // After the run completes without a seating verdict, it is not_tested.
+    const displayComplete = buildStageDisplay({ phase: "finalising", status: "complete" });
+    const seatingComplete = displayComplete.stages.find((s) => s.key === "seating_positions");
+    assert.equal(seatingComplete.status, "not_tested");
   });
 
-  it("seating_positions is not_tested even when run is complete", () => {
-    const display = buildStageDisplay({ phase: "finalising", status: "complete" });
+  it("seating_positions is completed when it has a verdict", () => {
+    const display = buildStageDisplay({
+      phase: "finalising",
+      status: "complete",
+      stageVerdicts: { seating_positions: "no_improvement" },
+    });
+    const seatingStage = display.stages.find((s) => s.key === "seating_positions");
+    assert.equal(seatingStage.status, "completed");
+    assert.equal(seatingStage.verdict, "no_improvement");
+  });
+
+  it("seating_positions is not_tested in cancelled state", () => {
+    const display = buildStageDisplay({ phase: "calibrating", status: "cancelled" });
     const seatingStage = display.stages.find((s) => s.key === "seating_positions");
     assert.equal(seatingStage.status, "not_tested");
   });

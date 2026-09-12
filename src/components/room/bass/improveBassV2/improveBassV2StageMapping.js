@@ -56,7 +56,7 @@ const PHASE_TO_ACTIVE_STAGE = {
   reviewing: null,
   awaiting_stage2: null,
   idle: null,
-  calibrating: 'phase_polarity', // combined calibration — phase/polarity is first
+  calibrating: 'delays', // combined calibration — delays is the first real stage (phase is not_available)
   testing_positions: 'sub_positions',
   screening_symmetric: 'sub_positions',
   confirming_symmetric: 'sub_positions',
@@ -139,6 +139,9 @@ export function buildStageDisplay(state) {
       } else if (runComplete) {
         // Completed run with no seating verdict — seating was evaluated but
         // produced no verdict (not tested / not applicable).
+        stageStatus = 'not_tested';
+      } else if (status === 'cancelled' || status === 'error' || status === 'stale') {
+        // Cancelled/error/stale run — seating was never reached.
         stageStatus = 'not_tested';
       } else {
         stageStatus = 'pending';

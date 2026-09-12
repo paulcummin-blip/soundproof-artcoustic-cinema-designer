@@ -148,7 +148,7 @@ describe("C — No material recommendation: stage details computed", () => {
 // ── D. Material recommendation: detail has numerical results ───────────
 
 describe("D — Material recommendation: numerical results in detail", () => {
-  it("buildStageDetails shows 'Best result' when calibration is material", () => {
+  it("buildStageDetails shows P19/P20 before→after when calibration is material", () => {
     const selection = makeSelection({
       calibrationResult: {
         perSeatP19: [makeSeat("s1", true, 0.4, 4)],
@@ -157,9 +157,11 @@ describe("D — Material recommendation: numerical results in detail", () => {
       calibrationMaterial: { material: true, reason: "improvement" },
     });
     const details = buildStageDetails(selection);
-    assert.ok(details.delays.includes("Best result"));
+    assert.ok(details.delays, "delays detail should exist");
     assert.ok(details.delays.includes("0.40"), "should show after P19");
     assert.ok(details.delays.includes("0.23"), "should show after P20");
+    assert.ok(details.delays.includes("P19"), "should mention P19");
+    assert.ok(details.delays.includes("P20"), "should mention P20");
   });
 });
 
