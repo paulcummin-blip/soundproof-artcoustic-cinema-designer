@@ -46,6 +46,7 @@ import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
 import { buildLightweightSeatHudById } from "@/components/hooks/useAppDesignRating";
 import { buildDesignRatingInput } from "@/components/report/technical/buildDesignRatingInput";
 import { buildArtcousticDesignRatingAuthority } from "@/components/report/technical/artcousticSystemDesignRating";
+import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
 
 export default function RP22ClientReport() {
   const navigate = useNavigate();
@@ -305,7 +306,7 @@ export default function RP22ClientReport() {
         },
       });
     }
-    if (p5Snapshot) {
+    if (p5Snapshot && isAssessedLevel(p5Snapshot.level)) {
       pages.push({
         id: "p5-spatial-resolution",
         visual: (
@@ -325,8 +326,9 @@ export default function RP22ClientReport() {
         },
       });
     }
-    // P9 only when an actual overhead visual exists (not the no-overhead empty-state)
-    if (p9Snapshot && p9Snapshot.reason !== "no_overhead_speakers") {
+    // P9 only when at least one seat has a genuine assessed result (L1-L4 or FAIL).
+    // Excludes N/A / Not assessed / Not calculated (e.g. single overhead row).
+    if (p9Overhead.hasAnyValidResult) {
       pages.push({
         id: "p9-spatial-resolution",
         visual: (
@@ -351,9 +353,8 @@ export default function RP22ClientReport() {
         },
       });
     }
-    // Best Listening Area (after P9 when P9 exists, otherwise after P5;
-    // before Design Highlights and Recommended Seating Position)
-    if (bestListeningArea.hasAny) {
+    // Best Listening Area — only when at least one seat has a genuine assessed result
+    if (bestListeningArea.hasAnyValidResult) {
       pages.push({
         id: "best-listening-area",
         visual: (

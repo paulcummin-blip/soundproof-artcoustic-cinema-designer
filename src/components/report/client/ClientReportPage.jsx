@@ -22,14 +22,13 @@ import ClientFrontSoundstageDynamicRange from "@/components/report/client/Client
 import ClientNonScreenDynamicRange from "@/components/report/client/ClientNonScreenDynamicRange";
 import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
 import Rp22SeatCoverageSentence from "@/components/report/Rp22SeatCoverageSentence";
+import { getSeatGradeColors } from "@/components/report/client/visualReportSeatStyle";
 
-// Level → brand colour for P12/P13 print result badges (mirrors shared card)
-const PRINT_LEVEL_COLOR = {
-  L4: "#213428", L3: "#3E4349", L2: "#625143", L1: "#4A230F",
-  FAIL: "#4A230F", default: "#C1B6AD",
-};
+// Level → canonical grade colour for P12/P13 print result badges.
+// Derived from RP22_GRADE_TOKENS — the same authority as grading pills.
 function printLevelColor(lvl) {
-  return PRINT_LEVEL_COLOR[lvl] || PRINT_LEVEL_COLOR.default;
+  const grade = getSeatGradeColors(lvl);
+  return grade.isFail ? grade.border : grade.text;
 }
 
 export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId, printData }) {

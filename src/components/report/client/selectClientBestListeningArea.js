@@ -173,7 +173,7 @@ export function selectClientBestListeningArea({ analysisResult, seatingPositions
       id: entry.seatId,
       x,
       y,
-      isPrimary: !!(originalSeat?.isPrimary || seatData?.isPrimary),
+      isPrimary: !!originalSeat?.isPrimary,
       categoryKey: cat.key,
       category: cat.category,
       wording: cat.wording,
@@ -202,6 +202,7 @@ export function selectClientBestListeningArea({ analysisResult, seatingPositions
 
   const hasPrimary = (counts.primary || 0) > 0;
   const hasAny = seats.length > 0;
+  const hasAnyValidResult = seats.some((s) => s.worstLevel !== null);
 
   const primaryCount = counts.primary || 0;
   const explanation = !hasAny
@@ -210,5 +211,5 @@ export function selectClientBestListeningArea({ analysisResult, seatingPositions
       ? `The ${primaryCount === 1 ? "centre seat" : `${primaryCount} centre seats`} achieve the strongest balance across the screen, surround and overhead speaker layers. The outer seats remain enjoyable listening positions, with the surround layer creating the main difference in performance.`
       : "The seating area provides a range of listening positions, with the strongest available seats highlighted.";
 
-  return { seats, rsp: rspPoint, counts, hasAny, hasPrimary, explanation };
+  return { seats, rsp: rspPoint, counts, hasAny, hasAnyValidResult, hasPrimary, explanation };
 }
