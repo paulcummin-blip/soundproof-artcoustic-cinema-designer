@@ -60,14 +60,6 @@ export class V2RuntimeMetrics {
     this.placementFingerprintUsed = fp || null;
   }
 
-  recordModeBankReused() {
-    this.modeBankReused = (this.modeBankReused || 0) + 1;
-  }
-
-  recordModeBankPrecompute(durationMs) {
-    this.modeBankPrecomputeMs = (this.modeBankPrecomputeMs || 0) + Math.round(durationMs);
-  }
-
   finish() {
     this.endMs = now();
     this.totalWallClockMs = this.endMs - this.startMs;
@@ -84,8 +76,6 @@ export class V2RuntimeMetrics {
       rawTransferCacheHits: this.stage2TransfersReused,
       rawTransferCacheMisses: placementWorkerCalls.length,
       placementFingerprintUsed: this.placementFingerprintUsed,
-      modeBankReused: this.modeBankReused || 0,
-      modeBankPrecomputeMs: this.modeBankPrecomputeMs || 0,
       challengersConfirmed: this.challengersConfirmed,
       workerCallCount: this.workerCalls.length,
       workerCalls: this.workerCalls.map((c) => ({

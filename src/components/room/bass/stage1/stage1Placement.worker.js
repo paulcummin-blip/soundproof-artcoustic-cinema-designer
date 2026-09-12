@@ -1,26 +1,20 @@
 // stage1Placement.worker.js
 // Background worker for Stage 1 placement search.
-// The dispatcher lives for the worker lifetime; cancellation belongs to a job.
-// Search is synchronous: queued jobs run serially. Active UI cancellation still
-// terminates the worker in the controller, rather than waiting for this event loop.
+// Handles cancellation via generation ID — stale results are never published.
 
 import { runFullStage1Search } from "./stage1PlacementEngine";
 
-let activeJob = null;
-
 self.onmessage = (event) => {
-  const message = event.data || {};
-  if (message.type === "cancel") {
-    if (activeJob?.requestId === message.requestId) {
-      activeJob.cancellationChecker.cancelled = true;
-    }
-    return;
-  }
-  // Existing job messages have no type; control messages are not search jobs.
-  if (message.type || !message.requestId) return;
-  const { requestId, fingerprint, payload } = message;
+  const { requestId, generationId, fingerprint, payload } = event.data || {};
   const cancellationChecker = { cancelled: false };
-  activeJob = { requestId, cancellationChecker };
+
+  // Set up cancellation listener — if a new message arrives, mark as cancelled
+  self.onmessage = (nextEvent) => {
+    const next = nextEvent.data || {};
+    if (next.type === "cancel" && next.requestId === requestId) {
+      cancellationChecker.cancelled = true;
+    }
+  };
 
   try {
     const result = runFullStage1Search({
@@ -43,7 +37,5 @@ self.onmessage = (event) => {
       return;
     }
     self.postMessage({ type: "error", requestId, fingerprint, error: error?.message || String(error) });
-  } finally {
-    activeJob = null;
   }
 };
