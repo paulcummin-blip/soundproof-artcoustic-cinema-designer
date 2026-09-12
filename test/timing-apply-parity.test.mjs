@@ -68,3 +68,10 @@ test("incompatible design, priority, P18 and amplifier changes invalidate a comp
  const p={subwooferInstances:instances,roomDims:{widthM:6,lengthM:6,heightM:2.4},seatingPositions:[{id:"seat",x:3,y:4,z:1.2,isPrimary:true}],rspPosition:{x:3,y:4,z:1.2},p18TargetBasis:"minimum",amplifierPowerPerSubW:1000};
  for(const mod of [{roomDims:{...p.roomDims,lengthM:7}},{p18TargetBasis:"recommended"},{amplifierPowerPerSubW:500},{seatingPositions:[{...p.seatingPositions[0],isPrimary:false}]}])assert.notEqual(computeV2DesignFingerprint(p),computeV2DesignFingerprint({...p,...mod}));
 });
+
+test("Apply emits valid canonical stored polarity (+1/-1) for actual hydration",()=>{
+ const out=applyCalibrationTuning(instances,tuning);
+ for(const inst of out)assert.ok(inst.polarity===1||inst.polarity===-1);
+ assert.equal(out.find(s=>s.id==="front").polarity,-1);
+ assert.equal(out.find(s=>s.id==="rear").polarity,1);
+});
