@@ -13,8 +13,8 @@
  *   P10: analysisResult.perSeatRp22[seat.id].rp22[10]
  *
  * No interpolation, no regrading, no local SPL recomputation.
- * "Primary seating" is a report presentation category only — it does NOT
- * alter or overwrite any seat's stored isPrimary property.
+ * The "primary" category (L3/L4) is a report presentation category only — it
+ * does NOT alter or overwrite any seat's stored isPrimary property.
  */
 import { selectClientSeatCoverage } from "./selectClientSeatCoverage";
 import { resolveCoordinate } from "./selectClientSpeakerBalance";
