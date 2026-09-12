@@ -16,6 +16,7 @@ import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPr
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 import { resolveParamThresholds, resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import ComplianceParameterMatrix from "@/components/rp22/ComplianceParameterMatrix";
+import { resolveSeatMetric as resolveSeatMetricHelper } from "@/components/rp22/resolveSeatMetric";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
 import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
@@ -389,8 +390,7 @@ export default function RP22CompliancePanel({
             }}
           >
             {rowObj.seats.map((seat) => {
-              const snap = getSnapshotForSeat(seat);
-              const metric = snap?.rp22?.[pKey];
+              const metric = resolveSeatMetric(seat?.id, pKey);
               const display = getMetricDisplayState(metric);
               const lvl = display.text === 'N/A' ? 'N/A' : normalizeLevelForDisplay(metric?.level);
               const isPrimary = !!seat?.isPrimary;
@@ -469,6 +469,20 @@ export default function RP22CompliancePanel({
   const reportSource = React.useMemo(() => {
     return lockedSeatId ? `seat:${lockedSeatId}` : "room";
   }, [lockedSeatId]);
+
+  // Resolve a seat-scoped RP22 metric, preferring the FRESH engine authority
+  // (analysisResult.perSeatRp22 — the same source the Design Rating consumes)
+  // over the UI-view-dependent cache (seatSnapshotsById). This eliminates the
+  // data-source mismatch where Compliance showed a stale "Not Calculated"
+  // while the Design Rating showed the fresh engine grade (e.g. P5 90° = L1).
+  //
+  // The UI cache is retained as a fallback for locally-computed metrics (P16,
+  // P6, P1, P4) that buildSeatHudSnapshot derives from live plan-view geometry
+  // and which the engine may not have published.
+  const resolveSeatMetric = React.useCallback(
+    (seatId, paramKey) => resolveSeatMetricHelper(seatId, paramKey, analysisResult, seatSnapshotsById, mlpSeatId),
+    [analysisResult, seatSnapshotsById, mlpSeatId]
+  );
 
   // Pull a usable numeric value out of HUD metric objects.
   // Metrics often store numbers as valueM/valueDb/valueDeg/etc (not metric.value).
@@ -616,21 +630,13 @@ export default function RP22CompliancePanel({
     // Seat-level
     if (String(reportSource).startsWith("seat:")) {
       const seatId = String(reportSource).split(":")[1];
-      const snap =
-        seatSnapshotsById?.[seatId] ||
-        seatSnapshotsById?.["mlp"] ||
-        (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) ||
-        // Fallback: if seatId is "mlp", read directly from analysisResult.perSeatRp22["mlp"]
-        (seatId === "mlp" ? analysisResult?.perSeatRp22?.["mlp"] : null) ||
-        null;
-
       const key = `p${pid}`;
-      const metric = snap?.rp22?.[key];
+      const metric = resolveSeatMetric(seatId, key);
       return normalizeLevelForDisplay(getMetricDisplayState(metric).level);
     }
 
     return "—";
-  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation, assumedP15Level, assumedP21Level]);
+  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation, assumedP15Level, assumedP21Level, resolveSeatMetric]);
 
   const getHudValueForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
@@ -704,16 +710,8 @@ export default function RP22CompliancePanel({
     // Seat-level
     if (String(reportSource).startsWith("seat:")) {
       const seatId = String(reportSource).split(":")[1];
-      const snap =
-        seatSnapshotsById?.[seatId] ||
-        seatSnapshotsById?.["mlp"] ||
-        (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) ||
-        // Fallback: if seatId is "mlp", read directly from analysisResult.perSeatRp22["mlp"]
-        (seatId === "mlp" ? analysisResult?.perSeatRp22?.["mlp"] : null) ||
-        null;
-
       const key = `p${pid}`;
-      const metric = snap?.rp22?.[key];
+      const metric = resolveSeatMetric(seatId, key);
       if (!metric) return "Not Calculated";
 
       if (pid === 17) {
@@ -743,7 +741,7 @@ export default function RP22CompliancePanel({
     }
 
     return "—";
-  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation, assumedP15Level, assumedP21Level]);
+  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation, assumedP15Level, assumedP21Level, resolveSeatMetric]);
 
   // Full per-parameter detail card (title, description, achieved, scope, thresholds,
   // per-seat pills, notes, debug). Rendered only when a matrix row is expanded.
@@ -769,13 +767,7 @@ export default function RP22CompliancePanel({
     const debugMetric = String(reportSource).startsWith("seat:")
       ? (() => {
           const seatId = String(reportSource).split(":")[1];
-          const snap =
-            seatSnapshotsById?.[seatId] ||
-            seatSnapshotsById?.["mlp"] ||
-            (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) ||
-            (seatId === "mlp" ? analysisResult?.perSeatRp22?.["mlp"] : null) ||
-            null;
-          return snap?.rp22?.[`p${p.id}`] || null;
+          return resolveSeatMetric(seatId, `p${p.id}`);
         })()
       : null;
     const debugText = getMetricDebugText(p.id, debugMetric);
