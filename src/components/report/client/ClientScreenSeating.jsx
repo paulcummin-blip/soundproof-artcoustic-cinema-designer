@@ -16,6 +16,8 @@
 
 import React, { useMemo } from "react";
 import { LEVEL_FILLS, LEVEL_LABEL_COLORS, zoneLabelPosition } from "./levelFills";
+import { PositionMarker } from "./SeatMarker";
+import { computeHaloRadiusPx } from "./seatMarkerGeometry";
 
 // Below L1 is intentionally absent from the RP23 legend — outside the valid
 // L1 viewing envelope is left visually empty (room background), not coloured.
@@ -91,6 +93,10 @@ export default function ClientScreenSeating({
 
   const roomTopLeft = toPx(0, 0);
   const roomBottomRight = toPx(W, L);
+
+  // Compute spacing-aware common halo radius from actual seat centres.
+  const seatPointsPx = plotSeats.map((s) => toPx(s.x, s.y));
+  const haloRadius = computeHaloRadiusPx(seatPointsPx);
 
   if (!rspValid || plotSeats.length === 0) return null;
 
@@ -263,35 +269,16 @@ export default function ClientScreenSeating({
           SCREEN
         </text>
 
-        {/* ── Seats ── */}
+        {/* ── Seats — compact spacing-aware position markers ── */}
         {plotSeats.map((seat) => {
           const sp = toPx(seat.x, seat.y);
-          const isRspSeat =
-            rspMatchesSeat && Math.abs(seat.x - rspX) < 0.01 && Math.abs(seat.y - rspY) < 0.01;
-          if (seat.isStrongest) {
-            return (
-              <g key={seat.id}>
-                <circle cx={sp.px} cy={sp.py} r={13} fill="none" stroke="#213428" strokeWidth={2.5} opacity={0.9} />
-                <circle
-                  cx={sp.px}
-                  cy={sp.py}
-                  r={isRspSeat ? 10 : 9}
-                  fill="#213428"
-                  stroke="#F8F8F7"
-                  strokeWidth={1.5}
-                />
-              </g>
-            );
-          }
           return (
-            <circle
+            <PositionMarker
               key={seat.id}
               cx={sp.px}
               cy={sp.py}
-              r={isRspSeat ? 9 : 7}
-              fill="#625143"
-              stroke="#F8F8F7"
-              strokeWidth={1.5}
+              haloRadius={haloRadius}
+              isPrimary={seat.isStrongest}
             />
           );
         })}

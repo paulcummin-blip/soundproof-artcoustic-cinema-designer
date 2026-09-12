@@ -102,14 +102,14 @@ export function hasAnyAssessedSeat(seats, levelKey) {
 export const PRIORITY_LEGEND = [
   {
     key: "primary",
-    label: "Primary seating",
+    label: "Primary seat",
     stroke: "#213428",
     strokeWidth: PRIMARY_STROKE_WIDTH,
     fill: "none",
   },
   {
-    key: "other",
-    label: "Other seating",
+    key: "secondary",
+    label: "Secondary seat",
     stroke: "#625143",
     strokeWidth: SECONDARY_STROKE_WIDTH,
     fill: "none",

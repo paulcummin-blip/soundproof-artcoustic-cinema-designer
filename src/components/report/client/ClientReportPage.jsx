@@ -143,7 +143,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
               <div className="client-report-print-result__content">
                 <div className="client-report-print-result__label">Best Listening Area</div>
                 <div className="client-report-print-result__explanation">
-                  {printData.explanation || "Seats are shaded by their lowest achieved level across RP22 Parameters 4, 6 and 10."}
+                  Lowest achieved level across RP22 Parameters 4, 6 and 10 at each seating position.
                 </div>
               </div>
             </div>

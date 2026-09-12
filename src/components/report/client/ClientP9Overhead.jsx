@@ -21,10 +21,10 @@
 
 import React from "react";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
-import { getSeatCircleStyle, getSeatGradeColors, PRIORITY_LEGEND } from "./visualReportSeatStyle";
+import { getSeatGradeColors, PRIORITY_LEGEND } from "./visualReportSeatStyle";
+import SeatMarker from "./SeatMarker";
+import { computeHaloRadiusPx, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry";
 
-// Seat zone radius in meters (broad translucent halo)
-const ZONE_RADIUS_M = 0.55;
 const RSP_RING_R = 8;
 const RSP_DOT_R = 3;
 
@@ -100,12 +100,15 @@ export default function ClientP9Overhead({
   const SVG_W = 760;
   const SVG_H = Math.round(SVG_W * (totalL / totalW));
   const SCALE = SVG_W / totalW;
-  const ZONE_R_PX = ZONE_RADIUS_M * SCALE;
 
   const toPx = (x, y) => ({
     px: (x + PADDING_M) * SCALE,
     py: (y + PADDING_M) * SCALE,
   });
+
+  // Compute spacing-aware common halo radius from actual seat centres.
+  const seatPointsPx = (seats || []).map((seat) => toPx(seat.x, seat.y));
+  const haloRadius = computeHaloRadiusPx(seatPointsPx);
 
   // Screen geometry
   const screenY = Number(screenFrontPlaneM) || 0.2;
@@ -220,31 +223,19 @@ export default function ClientP9Overhead({
           SCREEN
         </text>
 
-        {/* Seat zones — canonical grade colour + priority outline */}
+        {/* Seat markers — compact spacing-aware single-result halo.
+             Primary seats get an additional bold dark outer keyline. */}
         {seats.map((seat) => {
           const sp = toPx(seat.x, seat.y);
-          const style = getSeatCircleStyle(seat.p9Level, seat.isPrimary);
           return (
-            <g key={seat.id}>
-              {/* Translucent zone — grade colour, priority outline weight */}
-              <circle
-                cx={sp.px}
-                cy={sp.py}
-                r={ZONE_R_PX}
-                fill={style.zoneFill}
-                stroke={style.zoneStroke}
-                strokeWidth={style.zoneStrokeWidth}
-              />
-              {/* Seat dot — grade colour fill */}
-              <circle
-                cx={sp.px}
-                cy={sp.py}
-                r={style.dotR}
-                fill={style.dotFill}
-                stroke={style.dotStroke}
-                strokeWidth={style.dotStrokeWidth}
-              />
-            </g>
+            <SeatMarker
+              key={seat.id}
+              cx={sp.px}
+              cy={sp.py}
+              haloRadius={haloRadius}
+              isPrimary={seat.isPrimary}
+              singleLevel={seat.p9Level}
+            />
           );
         })}
 
@@ -252,7 +243,7 @@ export default function ClientP9Overhead({
         {rspPx && (() => {
           const seatCircles = seats.map((seat) => {
             const sp = toPx(seat.x, seat.y);
-            return { cx: sp.px, cy: sp.py, r: ZONE_R_PX };
+            return { cx: sp.px, cy: sp.py, r: haloRadius + PRIMARY_STROKE_WIDTH };
           });
           const screenCx = (screenLeftPx.px + screenRightPx.px) / 2;
           const screenRect = {

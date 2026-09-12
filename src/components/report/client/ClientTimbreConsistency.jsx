@@ -21,10 +21,9 @@
 
 import React from "react";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
-import { getSeatCircleStyle, getSeatGradeColors, PRIORITY_LEGEND } from "./visualReportSeatStyle";
-
-// Seat zone radius in meters (broad translucent halo)
-const ZONE_RADIUS_M = 0.55;
+import { getSeatGradeColors, PRIORITY_LEGEND } from "./visualReportSeatStyle";
+import SeatMarker from "./SeatMarker";
+import { computeHaloRadiusPx, TWO_SEGMENT_LAYOUT, TWO_SEGMENT_LEGEND, PRIMARY_STROKE_WIDTH, buildRingSegmentPath } from "./seatMarkerGeometry";
 
 // RSP marker geometry — same as ClientSpeakerBalance
 const RSP_RING_R = 8;
@@ -133,12 +132,15 @@ export default function ClientTimbreConsistency({
   const SVG_W = 760;
   const SVG_H = Math.round(SVG_W * (totalL / totalW));
   const SCALE = SVG_W / totalW;
-  const ZONE_R_PX = ZONE_RADIUS_M * SCALE;
 
   const toPx = (x, y) => ({
     px: (x + PADDING_M) * SCALE,
     py: (y + PADDING_M) * SCALE,
   });
+
+  // Compute spacing-aware common halo radius from actual seat centres.
+  const seatPointsPx = (seats || []).map((seat) => toPx(seat.x, seat.y));
+  const haloRadius = computeHaloRadiusPx(seatPointsPx);
 
   // Screen geometry (same authority as ClientSpeakerBalance)
   const screenY = Number(screenFrontPlaneM) || 0.2;
@@ -165,7 +167,7 @@ export default function ClientTimbreConsistency({
   const otherCount = seats.length - primaryCount;
   const countEntries = [];
   if (primaryCount > 0) countEntries.push(`${primaryCount} Primary ${primaryCount === 1 ? "seat" : "seats"}`);
-  if (otherCount > 0) countEntries.push(`${otherCount} Other ${otherCount === 1 ? "seat" : "seats"}`);
+  if (otherCount > 0) countEntries.push(`${otherCount} Secondary ${otherCount === 1 ? "seat" : "seats"}`);
   const countSummary = countEntries.join(" · ");
 
   // Physical row grouping + best-category for matrix emphasis
@@ -267,31 +269,26 @@ export default function ClientTimbreConsistency({
           SCREEN
         </text>
 
-        {/* Seat zones — canonical grade colour + priority outline */}
+        {/* Seat markers — compact spacing-aware two-segment halo.
+             UPPER = P16 Screen, LOWER = P17 Surround & Overhead.
+             Primary seats get an additional bold dark outer keyline. */}
         {seats.map((seat) => {
           const sp = toPx(seat.x, seat.y);
-          const style = getSeatCircleStyle(seat.worstLevel, seat.isPrimary);
+          const segments = TWO_SEGMENT_LAYOUT.map((seg) => ({
+            key: seg.key,
+            level: seat[`${seg.key}Level`],
+            startAngle: seg.startAngle,
+            endAngle: seg.endAngle,
+          }));
           return (
-            <g key={seat.id}>
-              {/* Translucent zone — grade colour, priority outline weight */}
-              <circle
-                cx={sp.px}
-                cy={sp.py}
-                r={ZONE_R_PX}
-                fill={style.zoneFill}
-                stroke={style.zoneStroke}
-                strokeWidth={style.zoneStrokeWidth}
-              />
-              {/* Seat dot — grade colour fill */}
-              <circle
-                cx={sp.px}
-                cy={sp.py}
-                r={style.dotR}
-                fill={style.dotFill}
-                stroke={style.dotStroke}
-                strokeWidth={style.dotStrokeWidth}
-              />
-            </g>
+            <SeatMarker
+              key={seat.id}
+              cx={sp.px}
+              cy={sp.py}
+              haloRadius={haloRadius}
+              isPrimary={seat.isPrimary}
+              segments={segments}
+            />
           );
         })}
 
@@ -301,7 +298,7 @@ export default function ClientTimbreConsistency({
         {rspPx && (() => {
           const seatCircles = seats.map((seat) => {
             const sp = toPx(seat.x, seat.y);
-            return { cx: sp.px, cy: sp.py, r: ZONE_R_PX };
+            return { cx: sp.px, cy: sp.py, r: haloRadius + PRIMARY_STROKE_WIDTH };
           });
           const screenCx = (screenLeftPx.px + screenRightPx.px) / 2;
           const screenRect = {
@@ -335,12 +332,11 @@ export default function ClientTimbreConsistency({
       )}
 
       {showSupport && (<>
-      {/* ── Priority key (outline weight = priority, NOT grade colour) ── */}
+      {/* ── Priority + segment-position key ── */}
       <div style={{
         display: "flex",
-        flexWrap: "wrap",
-        justifyContent: "center",
-        gap: 16,
+        flexDirection: "column",
+        gap: 8,
         padding: "12px 16px",
         background: "#F1F0EE",
         borderRadius: 8,
@@ -349,23 +345,51 @@ export default function ClientTimbreConsistency({
         maxWidth: print ? "100%" : 600,
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
       }}>
-        {PRIORITY_LEGEND.map((entry) => (
-          <div key={entry.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <svg width={20} height={20} viewBox="0 0 20 20">
-              <circle
-                cx={10}
-                cy={10}
-                r={8}
-                fill="none"
-                stroke={entry.stroke}
-                strokeWidth={entry.strokeWidth}
-              />
-            </svg>
-            <span style={{ fontSize: 12, color: "#3E4349", letterSpacing: "0.02em" }}>
-              {entry.label}
-            </span>
-          </div>
-        ))}
+        {/* Priority (outline weight = priority, NOT grade colour) */}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 16 }}>
+          {PRIORITY_LEGEND.map((entry) => (
+            <div key={entry.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <svg width={20} height={20} viewBox="0 0 20 20">
+                <circle
+                  cx={10}
+                  cy={10}
+                  r={8}
+                  fill="none"
+                  stroke={entry.stroke}
+                  strokeWidth={entry.strokeWidth}
+                />
+              </svg>
+              <span style={{ fontSize: 12, color: "#3E4349", letterSpacing: "0.02em" }}>
+                {entry.label}
+              </span>
+            </div>
+          ))}
+        </div>
+        {/* Divider */}
+        <div style={{ height: 1, background: "#DCDBD6", width: "100%" }} />
+        {/* Segment position key — which parameter occupies each halo segment */}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 14 }}>
+          {TWO_SEGMENT_LEGEND.map((entry) => {
+            const seg = TWO_SEGMENT_LAYOUT.find((s) => s.key === entry.key);
+            return (
+              <div key={entry.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <svg width={18} height={18} viewBox="0 0 20 20">
+                  <circle cx={10} cy={10} r={6.5} fill="none" stroke="#E8E8E5" strokeWidth={2.5} />
+                  {seg && (
+                    <path
+                      d={buildRingSegmentPath(10, 10, 4.5, 8, seg.startAngle, seg.endAngle)}
+                      fill="#625143"
+                      stroke="none"
+                    />
+                  )}
+                </svg>
+                <span style={{ fontSize: 11, color: "#3E4349", letterSpacing: "0.02em" }}>
+                  {entry.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Count summary ── */}
