@@ -23,7 +23,7 @@ function makeConfirmationResult({ p19Level, p20Level, p19Db = 6.0, p20Db = 8.0, 
     achievedP20Level: p20Level,
     achievedP19VariationDb: p19Db,
     achievedP20VariationDb: p20Db,
-    perSeatP19,
+    perSeatP19: perSeatP19.length ? perSeatP19 : perSeatP20.map(s=>({seatId:s.seatId,isPrimary:true,variationDbRaw:6.5,level:0})),
     perSeatP20,
   };
 }
@@ -44,7 +44,7 @@ test("Path A: P19 FAIL → L1 is detected as material improvement", () => {
   const candidate = makeConfirmationResult({
     p19Level: 1, p20Level: 1,
     p19Db: 3.5,
-    perSeatP19: [makePrimarySeat("r1-c1", 3.5, 1, "P19")],
+    perSeatP19: [makePrimarySeat("r1-c1", 5.5, 1, "P19")],
     perSeatP20: [makePrimarySeat("r1-c1", 6.9, 1)],
   });
 
@@ -64,7 +64,7 @@ test("Path A: P20 L1 → L2 is detected as material improvement", () => {
   const candidate = makeConfirmationResult({
     p19Level: 0, p20Level: 2,
     p20Db: 3.5,
-    perSeatP20: [makePrimarySeat("r1-c1", 3.5, 2)],
+    perSeatP20: [makePrimarySeat("r1-c1", 4.5, 2)],
   });
 
   const mat = isMaterialImprovement(current, candidate);
@@ -114,7 +114,7 @@ test("Confirmation result with achievedP19Level=undefined no longer silently pas
     "With undefined achievedP19Level, path A cannot fire — documents the bug");
 });
 
-test("Confirmation result with achievedP19Level populated correctly triggers path A", () => {
+test("Headline level alone cannot qualify empty seat assessments", () => {
   // After fix: confirmation result has achievedP19Level set from authority
   const current = {
     achievedP19Level: 0, achievedP20Level: 1,
@@ -129,7 +129,7 @@ test("Confirmation result with achievedP19Level populated correctly triggers pat
   };
 
   const mat = isMaterialImprovement(current, candidateFixed);
-  assert.strictEqual(mat.material, true,
-    "With achievedP19Level=1, path A should fire");
-  assert.ok(mat.reason.includes("P19"), `Expected P19 in reason: ${mat.reason}`);
+  assert.strictEqual(mat.material, false,
+    "A headline level cannot qualify missing seat results");
+  assert.ok(mat.reason.includes("Invalid or incomplete"), `Expected invalid seat data in reason: ${mat.reason}`);
 });
