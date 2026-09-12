@@ -92,8 +92,8 @@ check(
 );
 
 check(
-  "V2 component does NOT invoke requestBassHeavyAction",
-  !v2Comp.includes("requestBassHeavyAction"),
+  "V2 prepares cold Stage 2 through the optimise request and then runs V2",
+  v2Comp.includes("requestBassHeavyAction") && v2Comp.includes("waitForStage2Terminal") && v2Comp.includes("runImproveBassV2"),
 );
 
 check(
