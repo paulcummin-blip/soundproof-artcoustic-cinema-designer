@@ -57,6 +57,7 @@ export default function ImproveBassResponseV2({
   rearSubsCfg,
   commitInstances,
   commitSeating,
+  commitSeatingProvenance,
   hasCanonicalInstances,
   appState,
   amplifierPowerPerSubW,
@@ -389,12 +390,16 @@ export default function ImproveBassResponseV2({
       const next = buildOptimisedInstances(result, subwooferInstances, roomDims, selectedSubModel, _provenance);
       commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
     } else if (stageKey === "seating") {
-      // Apply seating position change
+      // Apply seating position change — stamp provenance on successful apply.
+      // Seating mutates seatingPositions (not subwooferInstances), so provenance
+      // is stored at the project level via commitSeatingProvenance.
       if (commitSeating && result.seatingPositions) {
+        const _provenance = buildProvenance(stageKey, result.candidateId, state.winner.applyFingerprint, fingerprint);
         commitSeating(result.seatingPositions);
+        if (commitSeatingProvenance) commitSeatingProvenance(_provenance);
       }
     }
-  }, [state?.status, state?.winner, commitInstances, commitSeating, hasCanonicalInstances, projectId, subwooferInstances, roomDims, selectedSubModel]);
+  }, [state?.status, state?.winner, commitInstances, commitSeating, commitSeatingProvenance, hasCanonicalInstances, projectId, subwooferInstances, roomDims, selectedSubModel]);
 
   if (!shared?.hasCurrentResult) return null;
 
