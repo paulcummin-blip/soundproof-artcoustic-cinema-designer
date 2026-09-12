@@ -215,5 +215,6 @@ export function formatStageVerdict(verdict) {
   if (verdict === 'improvement') return 'improvement found';
   if (verdict === 'no_improvement') return 'no material improvement';
   if (verdict === 'done') return 'done';
+  if (verdict === 'incomplete') return 'evaluation incomplete';
   return null;
 }
