@@ -360,6 +360,10 @@ test("DEFECT 2: graded effective delays == post-Apply effective delays", () => {
 
 function makeAuthorityResult({ p19Level, p20Level, p19Db, p20Db, perSeatP19 = [], perSeatP20 = [] }) {
   return {
+    assessmentStartHz: 26, assessmentEndHz: 151, achievedP18Hz: 26, p18AchievedLevel: 2,
+    p14AchievedDb: 119, p14AchievedLevel: 4, p14TargetDb: 115, operatingOutputDb: 115, requestedP14Pass: true,
+    physicalValidation: {passed:true}, timingVersion: "stage2-canonical-v6-delay-lag",
+    canonicalAuthorityReceipt: {selectedCandidateId:"test-canonical",postEqCurveSignature:"test-curve"},
     achievedP19Level: p19Level,
     achievedP20Level: p20Level,
     achievedP19VariationDb: p19Db,
@@ -377,9 +381,9 @@ test("DEFECT 3: best-ranked candidate PASSES materiality → recommendation allo
   const existingAuthority = makeAuthorityResult({
     p19Level: "L1",
     p20Level: "L1",
-    p19Db: 10.0,
+    p19Db: 5.8,
     p20Db: 12.0,
-    perSeatP19: [makePrimarySeat("seat-1", 10.0, "L1")],
+    perSeatP19: [makePrimarySeat("seat-1", 5.8, "L1")],
     perSeatP20: [makePrimarySeat("seat-1", 12.0, "L1")],
   });
 
@@ -387,9 +391,9 @@ test("DEFECT 3: best-ranked candidate PASSES materiality → recommendation allo
   const winnerResult = makeAuthorityResult({
     p19Level: "L2",
     p20Level: "L1",
-    p19Db: 5.0,
+    p19Db: 4.8,
     p20Db: 12.0,
-    perSeatP19: [makePrimarySeat("seat-1", 5.0, "L2")],
+    perSeatP19: [makePrimarySeat("seat-1", 4.8, "L2")],
     perSeatP20: [makePrimarySeat("seat-1", 12.0, "L1")],
   });
 
@@ -417,9 +421,9 @@ test("DEFECT 3: best-ranked candidate FAILS materiality → no recommendation", 
   const existingAuthority = makeAuthorityResult({
     p19Level: "L2",
     p20Level: "L1",
-    p19Db: 5.0,
+    p19Db: 4.8,
     p20Db: 7.0,
-    perSeatP19: [makePrimarySeat("seat-1", 5.0, "L2")],
+    perSeatP19: [makePrimarySeat("seat-1", 4.8, "L2")],
     perSeatP20: [makePrimarySeat("seat-1", 7.0, "L1")],
   });
 
@@ -427,9 +431,9 @@ test("DEFECT 3: best-ranked candidate FAILS materiality → no recommendation", 
   const winnerResult = makeAuthorityResult({
     p19Level: "L2",
     p20Level: "L1",
-    p19Db: 4.7,
+    p19Db: 4.5,
     p20Db: 7.0,
-    perSeatP19: [makePrimarySeat("seat-1", 4.7, "L2")],
+    perSeatP19: [makePrimarySeat("seat-1", 4.5, "L2")],
     perSeatP20: [makePrimarySeat("seat-1", 7.0, "L1")],
   });
 
@@ -454,8 +458,8 @@ test("DEFECT 3: best-ranked candidate FAILS materiality → no recommendation", 
   assert.equal(selection.winner, null, "Winner must be null for non-material candidate");
   assert.equal(
     selection.message,
-    "No verified material automatic improvement found",
-    "Correct message for non-material candidate",
+    "Valid changes were below the material-improvement threshold.",
+    "A completed valid 0.3 dB change is below materiality, not incomplete",
   );
 });
 
@@ -463,10 +467,10 @@ test("DEFECT 3: worse P20 cannot be hidden by a small P19 improvement to one fro
   const existingAuthority = makeAuthorityResult({
     p19Level: "L2",
     p20Level: "L2",
-    p19Db: 5.0,
+    p19Db: 4.8,
     p20Db: 6.0,
     perSeatP19: [
-      makePrimarySeat("seat-1", 5.0, "L2"),
+      makePrimarySeat("seat-1", 4.8, "L2"),
       makePrimarySeat("seat-2", 5.5, "L2"),
     ],
     perSeatP20: [
