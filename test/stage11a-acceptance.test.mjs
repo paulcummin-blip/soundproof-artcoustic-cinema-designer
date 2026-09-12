@@ -45,18 +45,18 @@ function assert(condition, name) {
     achievedP19Level: 2,
     achievedP20Level: 2,
     perSeatP19: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.2 },
-      { seatId: "s1", isPrimary: false, level: 2, variationDbRaw: -6.8 },
-      { seatId: "s2", isPrimary: false, level: 2, variationDbRaw: -7.1 },
-      { seatId: "s3", isPrimary: false, level: 2, variationDbRaw: -6.3 },
-      { seatId: "s4", isPrimary: false, level: 2, variationDbRaw: -5.9 },
+      { seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.2 },
+      { seatId: "s1", isPrimary: false, level: 0, variationDbRaw: 6.8 },
+      { seatId: "s2", isPrimary: false, level: 0, variationDbRaw: 7.1 },
+      { seatId: "s3", isPrimary: false, level: 0, variationDbRaw: 6.3 },
+      { seatId: "s4", isPrimary: false, level: 1, variationDbRaw: 5.9 },
     ],
     perSeatP20: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -3.1 },
-      { seatId: "s1", isPrimary: false, level: 2, variationDbRaw: -4.2 },
-      { seatId: "s2", isPrimary: false, level: 2, variationDbRaw: -4.5 },
-      { seatId: "s3", isPrimary: false, level: 2, variationDbRaw: -3.8 },
-      { seatId: "s4", isPrimary: false, level: 2, variationDbRaw: -3.5 },
+      { seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: 3.1 },
+      { seatId: "s1", isPrimary: false, level: 2, variationDbRaw: 4.2 },
+      { seatId: "s2", isPrimary: false, level: 2, variationDbRaw: 4.5 },
+      { seatId: "s3", isPrimary: false, level: 3, variationDbRaw: 3.8 },
+      { seatId: "s4", isPrimary: false, level: 3, variationDbRaw: 3.5 },
     ],
     p14HeadroomDb: 3.0,
   };
@@ -66,18 +66,18 @@ function assert(condition, name) {
     achievedP19Level: 2,
     achievedP20Level: 2,
     perSeatP19: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 },
-      { seatId: "s1", isPrimary: false, level: 2, variationDbRaw: -6.5 },
-      { seatId: "s2", isPrimary: false, level: 2, variationDbRaw: -6.8 },
-      { seatId: "s3", isPrimary: false, level: 2, variationDbRaw: -6.0 },
-      { seatId: "s4", isPrimary: false, level: 2, variationDbRaw: -5.6 },
+      { seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 },
+      { seatId: "s1", isPrimary: false, level: 0, variationDbRaw: 6.5 },
+      { seatId: "s2", isPrimary: false, level: 0, variationDbRaw: 6.8 },
+      { seatId: "s3", isPrimary: false, level: 0, variationDbRaw: 6.0 },
+      { seatId: "s4", isPrimary: false, level: 1, variationDbRaw: 5.6 },
     ],
     perSeatP20: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -3.0 },
-      { seatId: "s1", isPrimary: false, level: 2, variationDbRaw: -4.0 },
-      { seatId: "s2", isPrimary: false, level: 2, variationDbRaw: -4.3 },
-      { seatId: "s3", isPrimary: false, level: 2, variationDbRaw: -3.6 },
-      { seatId: "s4", isPrimary: false, level: 2, variationDbRaw: -3.3 },
+      { seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: 3.0 },
+      { seatId: "s1", isPrimary: false, level: 2, variationDbRaw: 4.0 },
+      { seatId: "s2", isPrimary: false, level: 2, variationDbRaw: 4.3 },
+      { seatId: "s3", isPrimary: false, level: 3, variationDbRaw: 3.6 },
+      { seatId: "s4", isPrimary: false, level: 3, variationDbRaw: 3.3 },
     ],
     p14HeadroomDb: 4.5,
   };
@@ -93,18 +93,18 @@ function assert(condition, name) {
     achievedP19Level: 2,
     achievedP20Level: 2,
     perSeatP19: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -3.7 },
-      { seatId: "s1", isPrimary: false, level: 2, variationDbRaw: -5.3 },
-      { seatId: "s2", isPrimary: false, level: 2, variationDbRaw: -5.6 },
-      { seatId: "s3", isPrimary: false, level: 2, variationDbRaw: -4.8 },
-      { seatId: "s4", isPrimary: false, level: 2, variationDbRaw: -4.4 },
+      { seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: 3.7 },
+      { seatId: "s1", isPrimary: false, level: 1, variationDbRaw: 5.3 },
+      { seatId: "s2", isPrimary: false, level: 1, variationDbRaw: 5.6 },
+      { seatId: "s3", isPrimary: false, level: 2, variationDbRaw: 4.8 },
+      { seatId: "s4", isPrimary: false, level: 2, variationDbRaw: 4.4 },
     ],
     perSeatP20: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -2.0 },
-      { seatId: "s1", isPrimary: false, level: 2, variationDbRaw: -3.0 },
-      { seatId: "s2", isPrimary: false, level: 2, variationDbRaw: -3.3 },
-      { seatId: "s3", isPrimary: false, level: 2, variationDbRaw: -2.6 },
-      { seatId: "s4", isPrimary: false, level: 2, variationDbRaw: -2.3 },
+      { seatId: "rsp", isPrimary: true, level: 4, variationDbRaw: 2.0 },
+      { seatId: "s1", isPrimary: false, level: 3, variationDbRaw: 3.0 },
+      { seatId: "s2", isPrimary: false, level: 3, variationDbRaw: 3.3 },
+      { seatId: "s3", isPrimary: false, level: 4, variationDbRaw: 2.6 },
+      { seatId: "s4", isPrimary: false, level: 4, variationDbRaw: 2.3 },
     ],
     p14HeadroomDb: 4.5,
   };
@@ -179,12 +179,12 @@ function assert(condition, name) {
   // Sub 1: was 3.5ms delay → now 2.0ms (NOT 3.5 + 2.0 = 5.5)
   assert(applied[0].delayMs === 2.0, `T3a: Delay replaced not added (got ${applied[0].delayMs}, expected 2.0 not 5.5)`);
   assert(applied[0].gainDb === -1.0, `T3b: Gain replaced not added (got ${applied[0].gainDb}, expected -1.0 not -3.0)`);
-  assert(applied[0].polarity === 0, `T3c: Polarity replaced not combined (got ${applied[0].polarity}, expected 0)`);
+  assert(applied[0].polarity === 1, `T3c: Polarity replaced not combined (got ${applied[0].polarity}, expected 1)`);
 
   // Sub 2: was 0/0/0 → now 0/0/0 (no double application)
   assert(applied[1].delayMs === 0, "T3d: Sub 2 delay unchanged (no double tuning)");
   assert(applied[1].gainDb === 0, "T3e: Sub 2 gain unchanged");
-  assert(applied[1].polarity === 0, "T3f: Sub 2 polarity unchanged");
+  assert(applied[1].polarity === 1, "T3f: Sub 2 polarity unchanged");
 
   // The raw transfer used by calibrationOnlySearch is zero-tuning (captured
   // without delay/gain/polarity). The search applies tuning ONCE during
@@ -203,23 +203,23 @@ function assert(condition, name) {
   const currentA = {
     achievedP19Level: 2, achievedP20Level: 2,
     perSeatP19: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 },
-      { seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -4.0 },
+      { seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 },
+      { seatId: "s1", isPrimary: true, level: 2, variationDbRaw: 4.0 },
     ],
     perSeatP20: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -3.0 },
-      { seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -2.5 },
+      { seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: 3.0 },
+      { seatId: "s1", isPrimary: true, level: 4, variationDbRaw: 2.5 },
     ],
   };
   const candidateA = {
     achievedP19Level: 3, achievedP20Level: 3, // headline improves
     perSeatP19: [
-      { seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: -3.0 },
-      { seatId: "s1", isPrimary: true, level: 1, variationDbRaw: -10.0 }, // primary seat regresses!
+      { seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: 3.0 },
+      { seatId: "s1", isPrimary: true, level: 0, variationDbRaw: 10.0 }, // primary seat regresses!
     ],
     perSeatP20: [
-      { seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: -2.0 },
-      { seatId: "s1", isPrimary: true, level: 1, variationDbRaw: -8.0 },
+      { seatId: "rsp", isPrimary: true, level: 4, variationDbRaw: 2.0 },
+      { seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 8.0 },
     ],
   };
   const resultA = isMaterialImprovement(currentA, candidateA);
@@ -230,12 +230,12 @@ function assert(condition, name) {
   const candidateB = {
     achievedP19Level: 2, achievedP20Level: 3,
     perSeatP19: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 },
-      { seatId: "s1", isPrimary: true, level: 1, variationDbRaw: -10.0 }, // P19 regresses
+      { seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 },
+      { seatId: "s1", isPrimary: true, level: 0, variationDbRaw: 10.0 }, // P19 regresses
     ],
     perSeatP20: [
-      { seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: -2.0 },
-      { seatId: "s1", isPrimary: true, level: 3, variationDbRaw: -1.5 },
+      { seatId: "rsp", isPrimary: true, level: 4, variationDbRaw: 2.0 },
+      { seatId: "s1", isPrimary: true, level: 4, variationDbRaw: 1.5 },
     ],
   };
   const resultB = isMaterialImprovement(currentA, candidateB);
@@ -245,32 +245,32 @@ function assert(condition, name) {
   const candidateC = {
     achievedP19Level: 2, achievedP20Level: 2,
     perSeatP19: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }, // identical
-      { seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -4.0 },  // identical
+      { seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }, // identical
+      { seatId: "s1", isPrimary: true, level: 2, variationDbRaw: 4.0 },  // identical
     ],
     perSeatP20: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -3.0 }, // identical
-      { seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -2.5 },  // identical
+      { seatId: "rsp", isPrimary: true, level: 3, variationDbRaw: 3.0 }, // identical
+      { seatId: "s1", isPrimary: true, level: 4, variationDbRaw: 2.5 },  // identical
     ],
   };
   // Add a secondary seat that improves
-  currentA.perSeatP19.push({ seatId: "s2", isPrimary: false, level: 1, variationDbRaw: -12.0 });
-  currentA.perSeatP20.push({ seatId: "s2", isPrimary: false, level: 1, variationDbRaw: -10.0 });
-  candidateC.perSeatP19.push({ seatId: "s2", isPrimary: false, level: 2, variationDbRaw: -6.0 });
-  candidateC.perSeatP20.push({ seatId: "s2", isPrimary: false, level: 2, variationDbRaw: -5.0 });
+  currentA.perSeatP19.push({ seatId: "s2", isPrimary: false, level: 0, variationDbRaw: 12.0 });
+  currentA.perSeatP20.push({ seatId: "s2", isPrimary: false, level: 1, variationDbRaw: 10.0 });
+  candidateC.perSeatP19.push({ seatId: "s2", isPrimary: false, level: 0, variationDbRaw: 6.0 });
+  candidateC.perSeatP20.push({ seatId: "s2", isPrimary: false, level: 1, variationDbRaw: 5.0 });
   const resultC = isMaterialImprovement(currentA, candidateC);
   assert(resultC.material === true, "T4d: Candidate improving secondary seats with primary identical → allowed if material");
 
   // Case D: numerical improvement inside same level obeys materiality threshold
   const currentD = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.5 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 4, variationDbRaw: 2.5 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 4, variationDbRaw: 2.0 }],
   };
   const candidateD = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -4.8 }], // 0.7 dB
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -4.3 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 4, variationDbRaw: 1.8 }], // 0.7 dB
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 4, variationDbRaw: 1.3 }],
   };
   const resultD = isMaterialImprovement(currentD, candidateD);
   assert(resultD.material === false, "T4e: 0.7 dB within-level improvement → immaterial (below 1.0 dB threshold)");
@@ -283,13 +283,13 @@ function assert(condition, name) {
   // A. P19 FAIL → L1, P20 unchanged = MATERIAL
   const currentA = {
     achievedP19Level: 0, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 0, variationDbRaw: -15.0 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 0, variationDbRaw: 15.0 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
   };
   const candidateA = {
     achievedP19Level: 1, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: -8.0 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 0, variationDbRaw: 8.0 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
   };
   const resultA = isMaterialImprovement(currentA, candidateA);
   assert(resultA.material === true, "T5a: P19 L0→L1, P20 unchanged = MATERIAL");
@@ -297,13 +297,13 @@ function assert(condition, name) {
   // B. P20 L1 → L2, P19 unchanged = MATERIAL
   const currentB = {
     achievedP19Level: 2, achievedP20Level: 1,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: -8.0 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 8.0 }],
   };
   const candidateB = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
   };
   const resultB = isMaterialImprovement(currentB, candidateB);
   assert(resultB.material === true, "T5b: P20 L1→L2, P19 unchanged = MATERIAL");
@@ -311,13 +311,13 @@ function assert(condition, name) {
   // C. same levels, worst relevant deviation improves 1.2 dB = MATERIAL
   const currentC = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -6.2 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.5 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 0, variationDbRaw: 6.2 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.5 }],
   };
   const candidateC = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -4.3 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: 4.3 }],
   };
   const resultC = isMaterialImprovement(currentC, candidateC);
   assert(resultC.material === true, "T5c: Same levels, 1.2 dB worst-seat improvement = MATERIAL");
@@ -325,13 +325,13 @@ function assert(condition, name) {
   // D. same levels, improves 0.3 dB = IMMATERIAL
   const currentD = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.5 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.3 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.5 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.3 }],
   };
   const candidateD = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.2 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.2 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
   };
   const resultD = isMaterialImprovement(currentD, candidateD);
   assert(resultD.material === false, "T5d: Same levels, 0.3 dB improvement = IMMATERIAL");
@@ -339,14 +339,14 @@ function assert(condition, name) {
   // E. same P19/P20, P14 headroom improves 2 dB = IMMATERIAL as user-facing recommendation
   const currentE = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
     p14HeadroomDb: 3.0,
   };
   const candidateE = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
     p14HeadroomDb: 5.0, // +2 dB headroom, nothing else changes
   };
   const resultE = isMaterialImprovement(currentE, candidateE);
@@ -356,23 +356,23 @@ function assert(condition, name) {
   const currentF = {
     achievedP19Level: 2, achievedP20Level: 2,
     perSeatP19: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 },
-      { seatId: "s1", isPrimary: false, level: 1, variationDbRaw: -12.0 },
+      { seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 },
+      { seatId: "s1", isPrimary: false, level: 0, variationDbRaw: 12.0 },
     ],
     perSeatP20: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 },
-      { seatId: "s1", isPrimary: false, level: 1, variationDbRaw: -10.0 },
+      { seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 },
+      { seatId: "s1", isPrimary: false, level: 1, variationDbRaw: 10.0 },
     ],
   };
   const candidateF = {
     achievedP19Level: 2, achievedP20Level: 2,
     perSeatP19: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 },
-      { seatId: "s1", isPrimary: false, level: 2, variationDbRaw: -8.5 }, // 3.5 dB improvement
+      { seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 },
+      { seatId: "s1", isPrimary: false, level: 0, variationDbRaw: 8.5 }, // 3.5 dB improvement
     ],
     perSeatP20: [
-      { seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: -5.0 },
-      { seatId: "s1", isPrimary: false, level: 2, variationDbRaw: -7.0 }, // 3.0 dB improvement
+      { seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 },
+      { seatId: "s1", isPrimary: false, level: 1, variationDbRaw: 7.0 }, // 3.0 dB improvement
     ],
   };
   const resultF = isMaterialImprovement(currentF, candidateF);
@@ -506,7 +506,7 @@ function assert(condition, name) {
   // After Apply: ONLY delay, polarity, trim may change
   assert(applied[0].delayMs === 2.5, "T8b: Sub 1 delay changed");
   assert(applied[0].gainDb === -1.0, "T8c: Sub 1 gain changed");
-  assert(applied[0].polarity === 0, "T8d: Sub 1 polarity (0, unchanged)");
+  assert(applied[0].polarity === 1, "T8d: Sub 1 normal polarity persisted as +1");
 
   assert(applied[2].delayMs === 5.0, "T8e: Sub 3 delay changed");
   assert(applied[2].gainDb === -0.5, "T8f: Sub 3 gain changed");
@@ -549,26 +549,26 @@ function assert(condition, name) {
   // Level improvement still material
   const current1 = {
     achievedP19Level: 0, achievedP20Level: 1,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 0, variationDbRaw: -15 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: -8 }],
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 0, variationDbRaw: 15.0 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 8.0 }],
   };
   const candidate1 = {
     achievedP19Level: 1, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: -8 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5 }],
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 0, variationDbRaw: 8.0 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
   };
   assert(isMaterialImprovement(current1, candidate1).material === true, "T9a: Level improvement still material");
 
   // 1.0 dB within-level still material
   const current2 = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -6.5 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -6.0 }],
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 0, variationDbRaw: 6.5 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 6.0 }],
   };
   const candidate2 = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -4.5 }],
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: 4.5 }],
   };
   // worst primary deviation: current 6.5, candidate 5.0 → 1.5 dB → material
   assert(isMaterialImprovement(current2, candidate2).material === true, "T9b: 1.5 dB within-level still material");
@@ -576,40 +576,40 @@ function assert(condition, name) {
   // 0.3 dB cosmetic win still suppressed
   const current3 = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.5 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.3 }],
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.5 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.3 }],
   };
   const candidate3 = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.2 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.2 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
   };
   assert(isMaterialImprovement(current3, candidate3).material === false, "T9c: 0.3 dB cosmetic win still suppressed");
 
   // Primary-seat regression still rejected
   const current4 = {
     achievedP19Level: 1, achievedP20Level: 1,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: -8 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: -8 }],
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 0, variationDbRaw: 8.0 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 8.0 }],
   };
   const candidate4 = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5 }],
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
   };
   assert(isMaterialImprovement(current4, candidate4).material === true, "T9d: No regression + level improvement still material");
 
   // Headroom-only improvement now correctly rejected (was previously material)
   const current5 = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
     p14HeadroomDb: 3.0,
   };
   const candidate5 = {
     achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: -5.0 }],
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
     p14HeadroomDb: 6.0, // +3 dB headroom only
   };
   assert(isMaterialImprovement(current5, candidate5).material === false, "T9e: Headroom-only improvement now correctly IMMATERIAL (fix verified)");
