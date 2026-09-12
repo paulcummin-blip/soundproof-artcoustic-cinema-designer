@@ -4,6 +4,7 @@
 // (EQ pool, P14/P18/P19/P20 authority) off the main thread.
 
 import { evaluateStage2Placement, evaluateStage2ConfirmationWithTuning } from "../stage2/stage2CanonicalEvaluation";
+import { evaluateSeatingBatch } from "../stage2/stage2SeatingBatchEvaluation.js";
 
 import { runGroupedDelaySearch } from "./groupedDelaySearch.js";
 import { runGroupedGainSearch } from "./groupedGainSearch.js";
@@ -18,6 +19,9 @@ self.onmessage = (event) => {
     if (phase === "placement") {
       const result = evaluateStage2Placement(params);
       self.postMessage({ type: "complete", requestId, phase: "placement", result });
+    } else if (phase === "seating-batch") {
+      const result = evaluateSeatingBatch(params);
+      self.postMessage({ type: "complete", requestId, phase: "seating-batch", result });
     } else if (phase === "grouped-delay") {
       const result = runGroupedDelaySearch(params);
       self.postMessage({ type: "complete", requestId, phase, result });

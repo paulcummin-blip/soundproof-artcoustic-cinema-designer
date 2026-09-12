@@ -23,7 +23,8 @@ import {
 } from "./stage2CanonicalEvaluation";
 import { resumWithTuning } from "./stage2TuningSearch";
 import { buildAuthoritativeAutoAlignDelays } from "../useAuthoritativeBassResponse";
-import { normaliseModelKey } from "@/components/models/speakers/registry";
+import { normaliseModelKey, getSubwooferCurve } from "@/components/models/speakers/registry";
+import { getPerSubwooferAmplifierAuthority } from "@/components/utils/subwooferCapability";
 
 const STAGE2_POSITION_LABELS = ["left", "right"];
 
@@ -75,12 +76,29 @@ export function evaluateSeatingBatch({
   // This computes all receiver-invariant modal terms: mode×frequency response,
   // source×mode coupling, mode weights, source×frequency amplitudes, tuning
   // rotations. These terms do NOT depend on listener coordinates.
-  const batchSources = sources.map((s) => ({
-    x: s.x, y: s.y, z: s.z,
-    modelKey: s.modelKey,
-    sourceCurve: s.sourceCurve || s._sourceCurve,
-    tuning: { gainDb: 0, delayMs: 0, polarity: 0 },
-  }));
+  // Build derated product curves — matches simulateAuthoritativeBassResponse's
+  // buildDeratedProductCurve exactly. Without this, sourceFreqAmplitude would
+  // be computed from an undefined curve, producing wrong complex transfers.
+  const amplifierAuthority = getPerSubwooferAmplifierAuthority(sources);
+  const batchSources = sources.map((s, sourceIndex) => {
+    const subCurve = getSubwooferCurve(s.modelKey);
+    const deratingDb = amplifierAuthority.sourceAuthorities[sourceIndex]?.deratingDb ?? 0;
+    const deratedCurve = (Number.isFinite(deratingDb) && deratingDb !== 0 && subCurve)
+      ? subCurve.map((point) => {
+          const spl = Number(point?.spl);
+          const db = Number(point?.db);
+          if (Number.isFinite(spl)) return { ...point, spl: spl + deratingDb };
+          if (Number.isFinite(db)) return { ...point, db: db + deratingDb };
+          return { ...point };
+        })
+      : subCurve;
+    return {
+      x: s.x, y: s.y, z: s.z,
+      modelKey: s.modelKey,
+      sourceCurve: deratedCurve,
+      tuning: { gainDb: 0, delayMs: 0, polarity: 0 },
+    };
+  });
 
   const physics = {
     ...BASS_NORMALIZED_PHYSICS_DEFAULTS,
@@ -89,6 +107,9 @@ export function evaluateSeatingBatch({
     disableModalPropagationPhase: true,
   };
 
+  // Match simulateAuthoritativeBassResponse's engineOptionsBase EXACTLY so
+  // prepareModeBank produces the same mode list. Missing fields cause
+  // prepareModeBank to use different defaults, producing different modes.
   const engineOptionsBase = {
     surfaceAbsorption: physics.surfaceAbsorption,
     freqMinHz: 15,
@@ -101,6 +122,27 @@ export function evaluateSeatingBatch({
     rewParityFieldMode: physics.rewParityFieldMode,
     abApplyModeMultiplicity: true,
     roomIsSealed: true,
+    abMidbandQScale: 1,
+    overrideConstantAxialQ: physics.overrideConstantAxialQ,
+    overrideAbsorptionAxialQ: physics.overrideAbsorptionAxialQ,
+    debugMode200Multiplier: physics.debugMode200Multiplier,
+    debugModalPhaseConvention: "normal",
+    reflectionGainScale: physics.reflectionGainScale,
+    debugModalHSign: "normal",
+    rewParityModalMagnitudeScale: 1,
+    modalCoherenceMode: physics.modalCoherenceMode,
+    highOrderAxialScale: physics.highOrderAxialScale,
+    mute68HzAxialMode: physics.mute68HzAxialMode,
+    debugDisableModalContribution: physics.debugDisableModalContribution,
+    disableReflectionPhaseJitter: physics.disableReflectionPhaseJitter,
+    disableReflectionCoherenceWeight: physics.disableReflectionCoherenceWeight,
+    disableLateField: physics.disableLateField,
+    disableModalPropagationPhase: physics.disableModalPropagationPhase,
+    modalSourceReferenceMode: physics.modalSourceReferenceMode,
+    modalGainScalar: physics.modalGainScalar,
+    modalDistanceBlend: physics.modalDistanceBlend,
+    modalStorageMode: physics.modalStorageMode,
+    propagationPhaseScale: physics.propagationPhaseScale,
   };
 
   const precomputedModes = prepareModeBank(roomDims, { ...engineOptionsBase, enableModes: true });
@@ -161,11 +203,14 @@ export function evaluateSeatingBatch({
       });
     }
 
-    // Compute auto-align delays for the MOVED RSP position
+    // Compute auto-align delays for the MOVED RSP position.
+    // CRITICAL: include z coordinate — buildAuthoritativeAutoAlignDelays uses
+    // 3D distance (Math.hypot(x-rsp.x, y-rsp.y, z-rsp.z)). Missing z falls back
+    // to 0.35 instead of the subwoofer's centreZ, producing wrong delays.
     const frontSubsLive = [];
     const rearSubsLive = [];
     finalist.sources.forEach((s, i) => {
-      const entry = { position: { x: sources[i].x, y: sources[i].y } };
+      const entry = { position: { x: sources[i].x, y: sources[i].y, z: sources[i].z } };
       if (s.yNorm < 0.5) frontSubsLive.push(entry);
       else rearSubsLive.push(entry);
     });

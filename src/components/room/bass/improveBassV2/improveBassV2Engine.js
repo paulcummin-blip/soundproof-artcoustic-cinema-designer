@@ -1068,6 +1068,12 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     // Move the complete seating layout together along the room length axis.
     // Test ±500 mm in 100 mm steps. Use proxy metrics to rank, then canonically
     // confirm only the best candidate.
+    //
+    // BATCH OPTIMISATION: The 10 individual placement worker calls are replaced
+    // by a single seating-batch worker call. The worker prepares the source/room
+    // field ONCE (prepareSourceRoomField) and reuses it for all 10 offsets,
+    // computing only listener-dependent terms per offset. Parity-verified:
+    // complex transfers, curves, and winner are bit-identical to the old path.
     let seatingResult = null;
     let seatingMaterial = null;
     let seatingDiagnostics = { status: "incomplete", tested: 0, valid: 0, best: null };
@@ -1085,46 +1091,72 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         let bestSeatingProxy = null;
         let bestSeatingOffset = 0;
 
-        for (const candidate of validCandidates) {
-          if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
-          if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
-          try {
-            // Run placement worker with moved seats
-            const movedRsp = { ...rspPosition, y: (rspPosition?.y || 0) + candidate.effectiveOffsetM };
-            const _proxyPrepT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-            const seatingTransfer = await runInWorker(worker, "placement", {
-              finalist: currentFinalist, roomDims, rspPosition: movedRsp,
-              seatingPositions: candidate.seatingPositions,
-              selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
-            }, controller.signal);
-            const _proxyPrepMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - _proxyPrepT0;
-            if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+        // ── Single seating-batch worker call ──────────────────────────
+        // Replaces 10 individual placement worker calls. The worker prepares
+        // the source/room field ONCE and reuses it for all 10 offsets.
+        // Cancellation: worker.terminate() kills the batch immediately
+        // (existing lifecycle). No partial winner is returned.
+        if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+        if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
 
-            // Compute proxy metrics for this seating offset
-            if (seatingTransfer?.perSourcePerSeatComplexTransfers?.length) {
-              const _proxyEvalT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-              const effectiveTuning = existingAuthority?.appliedTuning || savedEffectiveBaseline || [];
-              const proxyMetrics = computeProxyMetrics(seatingTransfer, effectiveTuning);
-              const _proxyEvalMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - _proxyEvalT0;
-              seatingProfiler.recordCandidate(candidate.offsetMm, {
-                proxyPrepMs: _proxyPrepMs,
-                proxyEvalMs: _proxyEvalMs,
-                cacheHit: false,
-              });
-              if (proxyMetrics && (!bestSeatingProxy || proxyMetrics.proxyP19 < bestSeatingProxy.proxyP19)) {
-                bestSeatingProxy = proxyMetrics;
-                bestSeatingOffset = candidate.offsetMm;
-                bestSeatingProxy._seatingTransfer = seatingTransfer;
-                bestSeatingProxy._seatingOffset = candidate.offsetMm;
-                bestSeatingProxy._seatingPositions = candidate.seatingPositions;
+        try {
+          const batchT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+          const batchResult = await runInWorker(worker, "seating-batch", {
+            finalist: currentFinalist, roomDims, rspPosition,
+            candidates: validCandidates,
+            selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+          }, controller.signal);
+          const batchMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - batchT0;
+
+          if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
+          // Record batch timing in profiler
+          seatingProfiler.recordBatchTiming({
+            preparedSourceRoomMs: batchResult?.timing?.preparedSourceRoomMs || 0,
+            batchWorkerMs: batchMs,
+            perOffsetMs: batchResult?.timing?.perOffsetMs || [],
+          });
+
+          // ── Compute proxy metrics for each offset, find best ────────
+          // Results are in deterministic offset order (same as validCandidates).
+          // No sorting inside the worker — the engine ranks by proxy P19.
+          if (batchResult?.candidates) {
+            for (let i = 0; i < batchResult.candidates.length; i++) {
+              if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+              if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
+              const candidateResult = batchResult.candidates[i];
+              const seatingTransfer = candidateResult?.rawTransfer;
+              const offsetMm = candidateResult?.offsetMm;
+              const receiverEvalMs = batchResult.timing?.perOffsetMs?.[i] || 0;
+
+              if (seatingTransfer?.perSourcePerSeatComplexTransfers?.length) {
+                const _proxyEvalT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+                const effectiveTuning = existingAuthority?.appliedTuning || savedEffectiveBaseline || [];
+                const proxyMetrics = computeProxyMetrics(seatingTransfer, effectiveTuning);
+                const _proxyEvalMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - _proxyEvalT0;
+
+                seatingProfiler.recordCandidate(offsetMm, {
+                  proxyEvalMs: _proxyEvalMs,
+                  receiverEvalMs,
+                });
+
+                if (proxyMetrics && (!bestSeatingProxy || proxyMetrics.proxyP19 < bestSeatingProxy.proxyP19)) {
+                  bestSeatingProxy = proxyMetrics;
+                  bestSeatingOffset = offsetMm;
+                  bestSeatingProxy._seatingTransfer = seatingTransfer;
+                  bestSeatingProxy._seatingOffset = offsetMm;
+                  bestSeatingProxy._seatingPositions = validCandidates[i].seatingPositions;
+                }
               }
+
+              onProgress("finalising", "Testing seating position changes", i + 1, validCandidates.length);
+              await yieldToUI();
             }
-          } catch (err) {
-            if (isFatalLifecycleError(err)) throw err;
-            evaluationIssues.push({ stage: "seating", offsetMm: candidate.offsetMm, error: err.message });
           }
-          onProgress("finalising", "Testing seating position changes", validCandidates.indexOf(candidate) + 1, validCandidates.length);
-          await yieldToUI();
+        } catch (err) {
+          if (isFatalLifecycleError(err)) throw err;
+          evaluationIssues.push({ stage: "seating", error: err.message });
         }
 
         // Canonically confirm the best seating candidate

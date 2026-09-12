@@ -1,20 +1,21 @@
 // seatingStageProfiler.js
 // Lightweight instrumentation for the seating position search stage.
 //
-// Records per-candidate timing for the 11 seating offsets:
-//   - proxy preparation time (placement worker call)
-//   - transfer preparation time (inside placement worker)
-//   - proxy evaluation time (computeProxyMetrics)
-//   - canonical confirmation time (confirmation worker call)
-//   - cache hit/miss
+// Records timing for the seating-batch worker phase:
+//   - preparedSourceRoomMs: time to prepare the immutable source/room field
+//   - receiverEvaluationMs per offset: time to evaluate receivers from prepared field
+//   - batchWorkerMs: total worker round-trip time
+//   - proxyEvalMs: time to compute proxy metrics per offset
+//   - confirmationMs: canonical confirmation time
 //
 // This is a read-only profiler — it does NOT alter the search algorithm,
 // candidate generation, or ranking. It only records timings for diagnostic
-// purposes so we can identify the exact bottleneck in the ~5.87 s seating stage.
+// purposes.
 //
 // Usage:
 //   const profiler = createSeatingProfiler();
-//   profiler.recordCandidate(offsetMm, { proxyPrepMs, proxyEvalMs, cacheHit });
+//   profiler.recordBatchTiming({ preparedSourceRoomMs, batchWorkerMs, perOffsetMs });
+//   profiler.recordCandidate(offsetMm, { proxyEvalMs });
 //   profiler.recordConfirmation(offsetMm, { confirmMs });
 //   const report = profiler.getReport();
 
@@ -23,17 +24,24 @@
  */
 export function createSeatingProfiler() {
   const candidates = [];
+  let batchTiming = null;
   let confirmationRecorded = null;
 
   return {
-    recordCandidate(offsetMm, { proxyPrepMs, proxyEvalMs, cacheHit, transferPrepMs }) {
+    recordCandidate(offsetMm, { proxyEvalMs, receiverEvalMs }) {
       candidates.push({
         offsetMm,
-        proxyPrepMs: Number(proxyPrepMs) || 0,
         proxyEvalMs: Number(proxyEvalMs) || 0,
-        transferPrepMs: Number(transferPrepMs) || 0,
-        cacheHit: !!cacheHit,
+        receiverEvalMs: Number(receiverEvalMs) || 0,
       });
+    },
+
+    recordBatchTiming({ preparedSourceRoomMs, batchWorkerMs, perOffsetMs }) {
+      batchTiming = {
+        preparedSourceRoomMs: Number(preparedSourceRoomMs) || 0,
+        batchWorkerMs: Number(batchWorkerMs) || 0,
+        perOffsetMs: Array.isArray(perOffsetMs) ? perOffsetMs.map((t) => Number(t) || 0) : [],
+      };
     },
 
     recordConfirmation(offsetMm, { confirmMs }) {
@@ -41,29 +49,27 @@ export function createSeatingProfiler() {
     },
 
     getReport() {
-      const totalProxyPrep = candidates.reduce((s, c) => s + c.proxyPrepMs, 0);
       const totalProxyEval = candidates.reduce((s, c) => s + c.proxyEvalMs, 0);
-      const totalTransferPrep = candidates.reduce((s, c) => s + c.transferPrepMs, 0);
-      const cacheHits = candidates.filter((c) => c.cacheHit).length;
-      const cacheMisses = candidates.length - cacheHits;
+      const totalReceiverEval = candidates.reduce((s, c) => s + c.receiverEvalMs, 0);
+      const confirmationMs = confirmationRecorded?.confirmMs || 0;
+      const preparedSourceRoomMs = batchTiming?.preparedSourceRoomMs || 0;
+      const batchWorkerMs = batchTiming?.batchWorkerMs || 0;
 
       return {
         candidateCount: candidates.length,
-        totalProxyPrepMs: totalProxyPrep,
+        preparedSourceRoomMs,
+        batchWorkerMs,
+        totalReceiverEvalMs: totalReceiverEval,
         totalProxyEvalMs: totalProxyEval,
-        totalTransferPrepMs: totalTransferPrep,
-        confirmationMs: confirmationRecorded?.confirmMs || 0,
+        confirmationMs,
         confirmationOffsetMm: confirmationRecorded?.offsetMm ?? null,
-        cacheHits,
-        cacheMisses,
-        totalMs: totalProxyPrep + totalProxyEval + (confirmationRecorded?.confirmMs || 0),
+        totalMs: batchWorkerMs + totalProxyEval + confirmationMs,
         perCandidate: candidates.map((c) => ({
           offsetMm: c.offsetMm,
-          proxyPrepMs: c.proxyPrepMs,
           proxyEvalMs: c.proxyEvalMs,
-          transferPrepMs: c.transferPrepMs,
-          cacheHit: c.cacheHit,
+          receiverEvalMs: c.receiverEvalMs,
         })),
+        perOffsetMs: batchTiming?.perOffsetMs || [],
       };
     },
   };
@@ -78,16 +84,16 @@ export function formatSeatingProfileReport(report) {
     `Seating Stage Profile:`,
     `  Candidates: ${report.candidateCount}`,
     `  Total: ${report.totalMs.toFixed(1)} ms`,
-    `  Proxy prep (placement worker): ${report.totalProxyPrepMs.toFixed(1)} ms`,
+    `  Prepared source/room field: ${report.preparedSourceRoomMs.toFixed(1)} ms`,
+    `  Batch worker (round-trip): ${report.batchWorkerMs.toFixed(1)} ms`,
+    `  Receiver evaluation (per-offset total): ${report.totalReceiverEvalMs.toFixed(1)} ms`,
     `  Proxy eval (computeProxyMetrics): ${report.totalProxyEvalMs.toFixed(1)} ms`,
-    `  Transfer prep (inside worker): ${report.totalTransferPrepMs.toFixed(1)} ms`,
     `  Canonical confirmation: ${report.confirmationMs.toFixed(1)} ms (offset ${report.confirmationOffsetMm} mm)`,
-    `  Cache: ${report.cacheHits} hits / ${report.cacheMisses} misses`,
     `  Per-candidate:`,
   ];
   for (const c of report.perCandidate) {
     lines.push(
-      `    ${c.offsetMm >= 0 ? "+" : ""}${c.offsetMm} mm: prep=${c.proxyPrepMs.toFixed(1)}ms eval=${c.proxyEvalMs.toFixed(1)}ms ${c.cacheHit ? "[cached]" : "[fresh]"}`,
+      `    ${c.offsetMm >= 0 ? "+" : ""}${c.offsetMm} mm: receiver=${c.receiverEvalMs.toFixed(1)}ms proxy=${c.proxyEvalMs.toFixed(1)}ms`,
     );
   }
   return lines.join("\n");
