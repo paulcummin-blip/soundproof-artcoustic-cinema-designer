@@ -45,6 +45,10 @@ export function runCalibrationOnlySearch(rawTransfer) {
   if (!bestFinalist?.tuning) return null;
 
   return {
+    // Preserve every finalist already returned by the existing search.
+    candidates: searchResult.finalists,
+    retainedCandidateCount: searchResult.finalists.length,
+    shortlistComplete: false, // coordinate-descent trials are not retained
     bestTuning: bestFinalist.tuning,
     searchScore: bestFinalist.score ?? Infinity,
     delays: bestFinalist.delays || [],
