@@ -41,6 +41,7 @@ import { isMaterialImprovement } from "./materialityGate.js";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { setPositionSearchPhase, setPositionExhaustion, setStageVerdict } from "./improveBassV2Store.js";
 import { runPositionScreenPhase, tagGlobalCandidates, checkPhaseMateriality, buildPositionOptimisationState } from "./improveBassV2Escalation.js";
+import { generateSeatingCandidates, describeSeatingChange } from "./seatingPositionSearch.js";
 
 import { attachCurrentCanonicalValidation } from "./currentAuthorityValidation.js";
 
@@ -602,6 +603,12 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     const calibrationCandidates = [];
     const evaluationIssues = [];
     const calibrationDiagnostics = {status:"incomplete",retained:0,confirmed:0,valid:0,invalid:0,shortlistComplete:false,options:[]};
+    // Gain search state (Stage 11A-gain)
+    let gainResult = null;
+    let gainMaterial = null;
+    let gainDiagnostics = {status:"incomplete",retained:0,confirmed:0,valid:0,invalid:0,options:[]};
+    let savedCurrentRawTransfer = null;
+    let savedEffectiveBaseline = null;
     function bindConfirmation(result, tuning, candidate, kind) {
       const appliedTuning=bindTuningToSourceIds(tuning,snapshot.instanceIds);
       const positions=candidate.coordinates || result.coordinates || snapshot.positions;
@@ -647,6 +654,8 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         // once. All recombination and canonical confirmation run in the worker.
         const effectiveBaseline=existingAuthority?.appliedTuning || bindTuningToSourceIds(
           resolveInstalledEffectiveTuning(currentRawTransfer,subwooferInstances,rspPosition),snapshot.instanceIds);
+        savedCurrentRawTransfer = currentRawTransfer;
+        savedEffectiveBaseline = effectiveBaseline;
         onProgress("calibrating", "Testing grouped delay adjustments", 0, 61);
         const groupedStarted=performance.now();
         const calibrationSearch=await runInWorker(worker,"grouped-delay",{
@@ -693,12 +702,85 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     }
 
     onProgress("calibrating", "Searching calibration improvements", 2, 2);
-    // This calibration phase changes grouped delay only. Gain and polarity
-    // remain frozen; their verdicts must not imply they were searched.
+    // Phase/polarity: NOT AVAILABLE YET — the intended 5-degree grouped phase
+    // search requires an all-pass or processor phase control model. Only
+    // binary polarity (0°/180°) is currently implemented. Do NOT fake it.
     const calVerdict = calibrationDiagnostics.invalid || calibrationDiagnostics.error || !calibrationDiagnostics.valid ? "incomplete" : "done";
-    setStageVerdict(projectId, "phase_polarity", "skipped");
+    setStageVerdict(projectId, "phase_polarity", "not_available");
     setStageVerdict(projectId, "delays", calibrationDiagnostics.status==="skipped"?"skipped":calVerdict);
+    await yieldToUI();
+    if (isCancelled()) return { status: "cancelled", snapshot };
+    if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
+
+    // ── Phase 1.6: Grouped gain (trim) search on Current positions ──────
+    // Search grouped gain with the same raw transfer and effective baseline
+    // as the delay search. Delays and polarities are held fixed at the
+    // effective baseline; only gain is adjusted.
     setStageVerdict(projectId, "gain", "skipped");
+    if (savedCurrentRawTransfer && savedEffectiveBaseline && existingAuthority) {
+      try {
+        onProgress("calibrating", "Testing grouped gain adjustments", 0, 1);
+        const gainStarted = performance.now();
+        const gainSearch = await runInWorker(worker, "grouped-gain", {
+          rawTransfer: savedCurrentRawTransfer, instances: subwooferInstances,
+          roomDims, effectiveBaseline: savedEffectiveBaseline,
+        }, controller.signal);
+        metrics.recordWorkerCall("grouped-gain", "gain-current", performance.now() - gainStarted, false);
+        if (isStale()) return {status: "stale", snapshot};
+        const gainRetained = gainSearch?.candidates || [];
+        Object.assign(gainDiagnostics, {
+          grouping: gainSearch?.grouping,
+          coarseCount: gainSearch?.coarseCount, fineCount: gainSearch?.fineCount,
+          retained: gainRetained.length,
+          options: gainRetained.map(f => ({candidateId: f.id, tuning: f.tuning, proxy: f.proxy})),
+          status: gainSearch?.status || "incomplete",
+        });
+        const gainCandidates = [];
+        for (let gi = 0; gi < gainRetained.length; gi++) {
+          if (isCancelled()) return {status: "cancelled", snapshot};
+          if (isStale()) return {status: "stale", snapshot};
+          onProgress("calibrating", "Confirming grouped gain options", gi, gainRetained.length);
+          const gConfirmT0 = performance.now();
+          const gResponse = await runInWorker(worker, "confirmation", {
+            rawTransfer: savedCurrentRawTransfer, tuning: gainRetained[gi].tuning,
+            tuningVariant: "delay-polarity-trim",
+            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+          }, controller.signal);
+          metrics.recordWorkerCall("confirmation", "gain:"+gi, performance.now() - gConfirmT0, false);
+          if (isStale()) return {status: "stale", snapshot};
+          if (gResponse) {
+            const gBound = bindConfirmation(gResponse, gainRetained[gi].tuning,
+              {...buildCurrentFinalist(subwooferInstances, roomDims), groupedDelay: gainRetained[gi]}, "calibration");
+            gBound.candidateKind = "gain";
+            gBound.candidateId = "gain:" + (gainRetained[gi].id || gi);
+            const gCheck = validateConfirmedCandidate(gBound, validationContext);
+            gainDiagnostics.confirmed++;
+            gainDiagnostics.options[gi].validity = {valid: gCheck.valid, issues: gCheck.issues};
+            gainDiagnostics.options[gi].canonical = gBound;
+            if (gCheck.valid) {
+              gainCandidates.push(gCheck.result);
+              gainDiagnostics.valid++;
+            } else {
+              gainDiagnostics.invalid++;
+            }
+          }
+        }
+        // Select best gain candidate by canonical ranking
+        if (gainCandidates.length > 0 && existingAuthority) {
+          const gainSelection = selectConfirmedRecommendations(gainCandidates, snapshot, existingAuthority);
+          gainResult = gainSelection.winner;
+          gainMaterial = {material: !!gainResult, reason: gainSelection.materialityReason};
+          gainDiagnostics.evaluations = gainSelection.evaluations;
+        }
+        const gainVerdict = gainMaterial?.material ? "improvement" :
+          gainDiagnostics.invalid || gainDiagnostics.error || !gainDiagnostics.valid ? "incomplete" : "no_improvement";
+        setStageVerdict(projectId, "gain", gainDiagnostics.status === "skipped" ? "skipped" : gainVerdict);
+      } catch (err) {
+        if (isFatalLifecycleError(err)) throw err;
+        gainDiagnostics.error = err.message;
+        setStageVerdict(projectId, "gain", "incomplete");
+      }
+    }
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
@@ -981,6 +1063,108 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     // Publish sub_positions stage verdict (purely observational)
     setStageVerdict(projectId, "sub_positions", materialSubImprovementFound ? "improvement" : evaluationIssues.some(e=>e.stage!=="calibration") ? "incomplete" : "no_improvement");
 
+    // ── Phase 9: Seating position search (Stage 11C) ────────────────────
+    // Move the complete seating layout together along the room length axis.
+    // Test ±500 mm in 100 mm steps. Use proxy metrics to rank, then canonically
+    // confirm only the best candidate.
+    let seatingResult = null;
+    let seatingMaterial = null;
+    let seatingDiagnostics = { status: "incomplete", tested: 0, valid: 0, best: null };
+    setStageVerdict(projectId, "seating_positions", "skipped");
+    try {
+      const screenWall = "front"; // default; could be derived from project
+      const seatingCandidates = generateSeatingCandidates(seatingPositions, roomDims, screenWall);
+      const validCandidates = seatingCandidates.filter((c) => c.valid && c.offsetMm !== 0);
+      seatingDiagnostics.tested = validCandidates.length;
+
+      if (validCandidates.length > 0 && existingAuthority) {
+        onProgress("finalising", "Testing seating position changes", 0, validCandidates.length);
+        const currentFinalist = buildCurrentFinalist(subwooferInstances, roomDims);
+        let bestSeatingProxy = null;
+        let bestSeatingOffset = 0;
+
+        for (const candidate of validCandidates) {
+          if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+          if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+          try {
+            // Run placement worker with moved seats
+            const movedRsp = { ...rspPosition, y: (rspPosition?.y || 0) + candidate.effectiveOffsetM };
+            const seatingTransfer = await runInWorker(worker, "placement", {
+              finalist: currentFinalist, roomDims, rspPosition: movedRsp,
+              seatingPositions: candidate.seatingPositions,
+              selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+            }, controller.signal);
+            if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
+            // Compute proxy metrics for this seating offset
+            if (seatingTransfer?.perSourcePerSeatComplexTransfers?.length) {
+              const effectiveTuning = existingAuthority?.appliedTuning || savedEffectiveBaseline || [];
+              const proxyMetrics = computeProxyMetrics(seatingTransfer, effectiveTuning);
+              if (proxyMetrics && (!bestSeatingProxy || proxyMetrics.proxyP19 < bestSeatingProxy.proxyP19)) {
+                bestSeatingProxy = proxyMetrics;
+                bestSeatingOffset = candidate.offsetMm;
+                bestSeatingProxy._seatingTransfer = seatingTransfer;
+                bestSeatingProxy._seatingOffset = candidate.offsetMm;
+                bestSeatingProxy._seatingPositions = candidate.seatingPositions;
+              }
+            }
+          } catch (err) {
+            if (isFatalLifecycleError(err)) throw err;
+            evaluationIssues.push({ stage: "seating", offsetMm: candidate.offsetMm, error: err.message });
+          }
+          onProgress("finalising", "Testing seating position changes", validCandidates.indexOf(candidate) + 1, validCandidates.length);
+          await yieldToUI();
+        }
+
+        // Canonically confirm the best seating candidate
+        if (bestSeatingProxy?._seatingTransfer && existingAuthority) {
+          try {
+            const seatingConfirmT0 = performance.now();
+            const seatingConfirmation = await runInWorker(worker, "confirmation", {
+              rawTransfer: bestSeatingProxy._seatingTransfer,
+              tuning: existingAuthority?.appliedTuning || savedEffectiveBaseline || [],
+              tuningVariant: "delay-polarity-trim",
+              p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+            }, controller.signal);
+            metrics.recordWorkerCall("confirmation", "seating-best", performance.now() - seatingConfirmT0, false);
+            if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+            if (seatingConfirmation) {
+              const sBound = bindConfirmation(seatingConfirmation,
+                existingAuthority?.appliedTuning || savedEffectiveBaseline || [],
+                currentFinalist, "current");
+              sBound.candidateKind = "seating";
+              sBound.candidateId = "seating:" + bestSeatingProxy._seatingOffset;
+              sBound.seatingOffsetMm = bestSeatingProxy._seatingOffset;
+              sBound.seatingPositions = bestSeatingProxy._seatingPositions;
+              const sCheck = validateConfirmedCandidate(sBound, validationContext);
+              seatingDiagnostics.valid = sCheck.valid ? 1 : 0;
+              if (sCheck.valid) {
+                const sMat = isMaterialImprovement(existingAuthority, sCheck.result);
+                seatingMaterial = { material: sMat.material, reason: sMat.reason };
+                if (sMat.material) {
+                  seatingResult = sCheck.result;
+                  seatingResult.seatingOffsetMm = bestSeatingProxy._seatingOffset;
+                  seatingResult.seatingPositions = bestSeatingProxy._seatingPositions;
+                }
+              }
+            }
+          } catch (err) {
+            if (isFatalLifecycleError(err)) throw err;
+            evaluationIssues.push({ stage: "seating", error: err.message });
+          }
+        }
+        seatingDiagnostics.best = bestSeatingProxy ? { offsetMm: bestSeatingProxy._seatingOffset, proxyP19: bestSeatingProxy.proxyP19 } : null;
+        seatingDiagnostics.status = seatingDiagnostics.tested > 0 ? "completed" : "incomplete";
+      }
+      const seatingVerdict = seatingMaterial?.material ? "improvement" :
+        seatingDiagnostics.tested === 0 ? "skipped" : "no_improvement";
+      setStageVerdict(projectId, "seating_positions", seatingVerdict);
+    } catch (err) {
+      if (isFatalLifecycleError(err)) throw err;
+      evaluationIssues.push({ stage: "seating", error: err.message });
+      setStageVerdict(projectId, "seating_positions", "incomplete");
+    }
+
     // ── Phase 8: Final single winner selection ───────────────────────────
     onProgress("finalising", "Finalising recommendation", 0, 1);
     setStageVerdict(projectId, "comparing", "done");
@@ -988,6 +1172,12 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     const selection = selectWinnerWithProtection([...confirmedResults,...calibrationCandidates], snapshot, existingAuthority);
     selection.calibrationDiagnostics=calibrationDiagnostics;
     selection.evaluationIssues=evaluationIssues;
+    selection.gainResult=gainResult;
+    selection.gainMaterial=gainMaterial;
+    selection.gainDiagnostics=gainDiagnostics;
+    selection.seatingResult=seatingResult;
+    selection.seatingMaterial=seatingMaterial;
+    selection.seatingDiagnostics=seatingDiagnostics;
     setStageVerdict(projectId, "preparing", "done");
     await yieldToUI();
 
@@ -1001,6 +1191,8 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           message: "No verified material automatic improvement found.",
           confirmedResults,
           currentResult: existingAuthority,
+          gainResult, gainMaterial, gainDiagnostics,
+          seatingResult, seatingMaterial, seatingDiagnostics,
         },
         snapshot,
         confirmedResults,

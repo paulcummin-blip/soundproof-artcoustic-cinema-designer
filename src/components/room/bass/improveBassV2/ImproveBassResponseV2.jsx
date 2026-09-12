@@ -44,7 +44,7 @@ import { buildOptimisedInstances } from "./improveBassV2Apply";
 import { applyCalibrationTuning } from "./improveBassV2ApplyCalibration";
 import { computeV2DesignFingerprint } from "./improveBassV2Fingerprint";
 import ImproveBassV2Progress from "./ImproveBassV2Progress";
-import ImproveBassV2Results from "./ImproveBassV2Results";
+import ImproveBassV2StageResults from "./ImproveBassV2StageResults";
 import ImproveBassV2CompletedInvestigation from "./ImproveBassV2CompletedInvestigation";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
 
@@ -55,6 +55,7 @@ export default function ImproveBassResponseV2({
   frontSubsCfg,
   rearSubsCfg,
   commitInstances,
+  commitSeating,
   hasCanonicalInstances,
   appState,
   amplifierPowerPerSubW,
@@ -358,6 +359,35 @@ export default function ImproveBassResponseV2({
   },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,subwooferInstances,roomDims,selectedSubModel]);
   const handleApplyCalibration=handleApply;
 
+  // ── Per-stage Apply handler ──────────────────────────────────────────
+  // Each stage has its own independent Apply action. The user may choose
+  // independently which improvement to apply. Applying one stage does NOT
+  // silently combine another recommendation.
+  const handleApplyStage = useCallback((stageKey, result) => {
+    if (!result || !commitInstances || !hasCanonicalInstances) return;
+    const d = latestDesignRef.current;
+    const fingerprint = computeV2DesignFingerprint({...d, ...d.p14Params});
+    if (state?.status !== "complete" || !state?.winner?.applyFingerprint || fingerprint !== state.winner.applyFingerprint) {
+      setStale(projectId, "Design changed — recalculate the recommendation before Apply");
+      return;
+    }
+
+    if (stageKey === "delay" || stageKey === "gain") {
+      // Apply calibration tuning (delay or gain)
+      const next = applyCalibrationTuning(subwooferInstances, result.appliedTuning || result.tuning || []);
+      commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
+    } else if (stageKey === "subPositions") {
+      // Apply subwoofer position change
+      const next = buildOptimisedInstances(result, subwooferInstances, roomDims, selectedSubModel);
+      commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
+    } else if (stageKey === "seating") {
+      // Apply seating position change
+      if (commitSeating && result.seatingPositions) {
+        commitSeating(result.seatingPositions);
+      }
+    }
+  }, [state?.status, state?.winner, commitInstances, commitSeating, hasCanonicalInstances, projectId, subwooferInstances, roomDims, selectedSubModel]);
+
   if (!shared?.hasCurrentResult) return null;
 
   const isRunning = state?.status === "running";
@@ -403,14 +433,14 @@ export default function ImproveBassResponseV2({
       )}
 
       {isComplete && state?.winner && !completedResultStale && (
-        <ImproveBassV2Results
-          snapshot={state.snapshot}
+        <ImproveBassV2StageResults
           selection={state.winner}
+          snapshot={state.snapshot}
           currentInstances={subwooferInstances}
           roomDims={roomDims}
           seatingPositions={seatingPositions}
-          onApply={handleApply}
-          onApplyCalibration={handleApplyCalibration}
+          onApplyStage={handleApplyStage}
+          stale={completedResultStale}
         />
       )}
 

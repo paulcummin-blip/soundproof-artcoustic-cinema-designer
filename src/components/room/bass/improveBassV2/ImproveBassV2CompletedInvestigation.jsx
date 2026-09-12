@@ -153,6 +153,55 @@ export function buildStageDetails(selection) {
     }
   }
 
+  // ── Gain stage ─────────────────────────────────────────────────────
+  const gainDiag = selection.gainDiagnostics;
+  if (gainDiag) {
+    const parts = [];
+    const tested = Number(gainDiag.tested) || gainDiag.options?.length || 0;
+    if (tested > 0) parts.push(`Checked ${tested} grouped-gain options`);
+    const gainRes = selection.gainResult;
+    const currentRes = selection.currentResult;
+    if (gainRes && currentRes) {
+      const beforeP19 = primarySeatMetric(currentRes.perSeatP19);
+      const afterP19 = primarySeatMetric(gainRes.perSeatP19);
+      if (beforeP19 && afterP19) {
+        parts.push(`Best result: P19 primary ${fmtDb(beforeP19.variationDbRaw)} → ${fmtDb(afterP19.variationDbRaw)} dB`);
+      }
+    } else if (gainDiag.status === "skipped") {
+      parts.push("Skipped — single source or symmetric pair");
+    } else {
+      parts.push("No material gain improvement found");
+    }
+    if (parts.length) details.gain = parts.join(". ");
+  }
+
+  // ── Seating positions stage ───────────────────────────────────────
+  const seatingDiag = selection.seatingDiagnostics;
+  if (seatingDiag) {
+    const parts = [];
+    const tested = Number(seatingDiag.tested) || 0;
+    if (tested > 0) parts.push(`Checked ${tested} seating offsets (±500 mm)`);
+    const seatingRes = selection.seatingResult;
+    if (seatingRes) {
+      const offset = seatingRes.seatingOffsetMm || 0;
+      const dir = offset < 0 ? "toward screen" : "away from screen";
+      parts.push(`Best result: move ${Math.abs(offset)} mm ${dir}`);
+      const beforeP19 = primarySeatMetric(selection.currentResult?.perSeatP19);
+      const afterP19 = primarySeatMetric(seatingRes.perSeatP19);
+      if (beforeP19 && afterP19) {
+        parts.push(`P19 primary ${fmtDb(beforeP19.variationDbRaw)} → ${fmtDb(afterP19.variationDbRaw)} dB`);
+      }
+    } else if (tested > 0) {
+      parts.push("No material seating improvement found");
+    } else {
+      parts.push("Not tested");
+    }
+    if (parts.length) details.seating_positions = parts.join(". ");
+  }
+
+  // ── Phase stage ───────────────────────────────────────────────────
+  details.phase_polarity = "Not available yet — 5-degree grouped phase search requires an all-pass or processor phase control model.";
+
   return details;
 }
 
@@ -167,8 +216,26 @@ function CompletedStageRow({ stage, detail }) {
         <Minus className="h-3.5 w-3.5 text-[#B0A89B] mt-0.5 flex-shrink-0" />
         <div className="min-w-0">
           <div className="text-[11px] text-[#B0A89B]">
-            {label.replace("Checking ", "")} — Not tested
+            {label} — Not tested
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "not_available") {
+    return (
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="h-3.5 w-3.5 text-[#8A7B6A] mt-0.5 flex-shrink-0" />
+        <div className="min-w-0">
+          <div className="text-[11px] text-[#625143]">
+            {label} — Not available yet
+          </div>
+          {detail && (
+            <div className="text-[10px] text-[#8A7B6A] mt-0.5 leading-relaxed">
+              {detail}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -181,7 +248,7 @@ function CompletedStageRow({ stage, detail }) {
         <CheckCircle2 className="h-3.5 w-3.5 text-[#213428] mt-0.5 flex-shrink-0" />
         <div className="min-w-0">
           <div className="text-[11px] text-[#213428] font-medium">
-            {label.replace("Checking ", "")} checked
+            {label} checked
             {verdictText && (
               <span className="font-normal text-[#8A7B6A]"> — {verdictText}</span>
             )}

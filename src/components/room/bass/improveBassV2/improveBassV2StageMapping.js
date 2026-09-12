@@ -31,19 +31,19 @@ export const STAGE_KEYS = [
 ];
 
 export const STAGE_LABELS = {
-  phase_polarity: 'Checking phase / polarity',
-  delays: 'Checking delays',
-  gain: 'Checking gain',
-  sub_positions: 'Checking subwoofer positions',
-  seating_positions: 'Checking seating positions',
+  phase_polarity: 'Phase',
+  delays: 'Delay',
+  gain: 'Gain',
+  sub_positions: 'Subwoofer positions',
+  seating_positions: 'Seating positions',
   comparing: 'Comparing improvements',
   preparing: 'Preparing recommendations',
 };
 
 export const STAGE_SUPPORTING_TEXT = {
-  phase_polarity: 'Testing polarity states between subwoofers.',
-  delays: 'Testing timing alignment between subwoofers.',
-  gain: 'Testing level balance between subwoofers.',
+  phase_polarity: 'Grouped phase search (5-degree resolution) — not yet available.',
+  delays: 'Testing grouped timing alignment between subwoofers.',
+  gain: 'Testing grouped level balance between subwoofers.',
   sub_positions: 'Testing practical placement changes.',
   seating_positions: 'Testing whether small seating changes could improve bass consistency.',
   comparing: 'Comparing all tested improvements.',
@@ -128,29 +128,40 @@ export function buildStageDisplay(state) {
   const stages = STAGE_KEYS.map((key) => {
     let stageStatus = 'pending';
 
-    // Seating positions — Stage 11C not implemented, always not_tested
+    // Seating positions — will be tested by the new seating search stage
     if (key === 'seating_positions') {
-      stageStatus = 'not_tested';
+      if (stageVerdicts[key] === 'improvement' || stageVerdicts[key] === 'no_improvement') {
+        stageStatus = 'completed';
+      } else if (activeStageKey === 'seating_positions') {
+        stageStatus = 'active';
+      } else if (stageVerdicts[key] === 'skipped') {
+        stageStatus = 'not_tested';
+      } else {
+        stageStatus = 'pending';
+      }
     }
 
-    // Calibration stages (phase_polarity, delays, gain) — completed together
-    // when the combined searchDelayPolarityTrim finishes. During the search,
-    // only phase_polarity is shown as active (it's the first sub-stage of the
-    // polarity→delay→trim combined search). Delays and gain remain pending
-    // until the combined search completes, at which point all three are
-    // marked completed together.
+    // Phase — always not_available (no 5-degree phase control implemented)
     if (key === 'phase_polarity') {
+      stageStatus = 'not_available';
+    }
+
+    // Calibration stages (delays, gain)
+    if (key === 'delays') {
       if (calibratingDone) {
         stageStatus = 'completed';
-      } else if (activeStageKey === 'phase_polarity') {
+      } else if (activeStageKey === 'delays') {
         stageStatus = 'active';
       }
     }
-    if (key === 'delays' || key === 'gain') {
-      if (calibratingDone) {
+    if (key === 'gain') {
+      if (stageVerdicts[key] === 'improvement' || stageVerdicts[key] === 'no_improvement') {
+        stageStatus = 'completed';
+      } else if (stageVerdicts[key] === 'skipped') {
+        stageStatus = 'not_tested';
+      } else if (calibratingDone) {
         stageStatus = 'completed';
       }
-      // stays pending during calibrating — only phase_polarity is active
     }
 
     // Sub positions
@@ -180,9 +191,9 @@ export function buildStageDisplay(state) {
       }
     }
 
-    if (groupedDelayOnly && (key === 'phase_polarity' || key === 'gain')) stageStatus = 'not_tested';
+    if (groupedDelayOnly && key === 'gain' && stageVerdicts[key] === 'skipped') stageStatus = 'not_tested';
     if (key === 'delays' && activeStageKey === 'delays') stageStatus = 'active';
-    if (stageVerdicts[key] === 'skipped') stageStatus = 'not_tested';
+    if (stageVerdicts[key] === 'skipped' && key !== 'phase_polarity') stageStatus = 'not_tested';
 
     // Show the actual grouped scan / canonical confirmation count.
     let subStageLabel = key === 'delays' && stageStatus === 'active'
@@ -220,8 +231,9 @@ export function buildStageDisplay(state) {
  */
 export function formatStageVerdict(verdict) {
   if (verdict === 'improvement') return 'improvement found';
-  if (verdict === 'no_improvement') return 'no material improvement';
+  if (verdict === 'no_improvement') return 'no improvement';
   if (verdict === 'done') return 'done';
   if (verdict === 'incomplete') return 'evaluation incomplete';
+  if (verdict === 'not_available') return 'not available yet';
   return null;
 }
