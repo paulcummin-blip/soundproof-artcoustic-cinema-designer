@@ -59,4 +59,3 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
     calibrationMaterial:{material:eligible.some(r=>r.candidateKind==="calibration")},
   };
 }
-
