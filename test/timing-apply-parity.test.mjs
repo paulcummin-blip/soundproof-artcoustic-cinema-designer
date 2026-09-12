@@ -87,3 +87,11 @@ test("Current fallback resolves manual plus auto against the captured geometry",
  const effective=resolveInstalledEffectiveTuning(raw,manual.map(s=>({...s,tuningSource:"v2-optimised"})),rsp);
  assert.deepEqual(effective.map(s=>s.delayMs),[2,1]);
 });
+test("matching manual numbers are not already-applied effective tuning",()=>{
+ const one=[{...instances[2],delayMs:0,gainDb:0,polarity:1}];
+ const bound=bindTuningToSourceIds([t()],["front"]);
+ assert.equal(isCalibrationApplied(one,bound),false);
+ assert.equal(isOptimisedApplied(one,{coordinates:[one[0].position],appliedTuning:bound}),false);
+ assert.equal(isCalibrationApplied(applyCalibrationTuning(one,bound),bound),true);
+});
+
