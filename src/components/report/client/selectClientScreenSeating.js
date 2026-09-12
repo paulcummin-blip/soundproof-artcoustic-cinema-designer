@@ -154,18 +154,21 @@ function buildExplanation(seats) {
   const belowCount = seats.filter((s) => s.level === "below-l1").length;
 
   if (l4Count === seats.length) {
-    return "The screen size is well matched to the seating area, placing all seats within the preferred viewing range for an immersive, comfortable experience.";
+    return `All ${seats.length} seat${seats.length === 1 ? "" : "s"} are within the Level 4 viewing range.`;
   }
   if (l4Count > 0 && belowCount === 0) {
-    return "The screen size is well matched to the seating area, placing the main listening positions within the preferred viewing range while showing how viewing experience changes across the row.";
+    return `${l4Count} of ${seats.length} seats are within the Level 4 viewing range; the remainder are within Level 3.`;
   }
   if (l4Count > 0) {
-    return "The centre seats sit within the preferred viewing range, while some outer seats are closer to the limits of comfortable viewing.";
+    return `${l4Count} of ${seats.length} seats are within the Level 4 viewing range; ${belowCount} are below Level 1.`;
   }
   if (l3Count > 0 && belowCount === 0) {
-    return "The seating area falls within a good viewing range, though the screen size could be adjusted to bring more seats into the preferred viewing position.";
+    return `All seats are within the Level 3 viewing range.`;
   }
-  return "The current screen size places the seating area outside the preferred viewing range. Adjusting the screen size or seating position would improve the viewing experience.";
+  if (belowCount > 0) {
+    return `${belowCount} of ${seats.length} seat${belowCount === 1 ? "" : "s"} are below the Level 1 viewing range.`;
+  }
+  return "";
 }
 
 export function selectClientScreenSeating({

@@ -107,35 +107,35 @@ function categoryForLevel(level) {
     return {
       key: "not_assessed",
       category: "Not assessed",
-      wording: "Insufficient information is available for this seat.",
+      wording: "No assessed result for this seat.",
     };
   }
   if (level === "FAIL") {
     return {
       key: "improvement",
-      category: "Improvement recommended",
-      wording: "Speaker level balance needs improving.",
+      category: "Does not achieve Level 1",
+      wording: "Lowest achieved level across P4, P6 and P10 does not achieve Level 1.",
     };
   }
   if (level === "L1") {
     return {
       key: "acceptable",
-      category: "Secondary seating",
-      wording: "Overall speaker level balance remains acceptable.",
+      category: "Level 1",
+      wording: "Lowest achieved level across P4, P6 and P10 is Level 1.",
     };
   }
   if (level === "L2") {
     return {
       key: "good",
-      category: "Good seating",
-      wording: "Most applicable speaker layers remain well balanced.",
+      category: "Level 2",
+      wording: "Lowest achieved level across P4, P6 and P10 is Level 2.",
     };
   }
   // L3 or L4
   return {
     key: "primary",
-    category: "Primary seating",
-    wording: "Screen, surround and overhead speaker levels are well balanced.",
+    category: "Level 3 or 4",
+    wording: "Lowest achieved level across P4, P6 and P10 is Level 3 or 4.",
   };
 }
 
@@ -208,8 +208,8 @@ export function selectClientBestListeningArea({ analysisResult, seatingPositions
   const explanation = !hasAny
     ? ""
     : hasPrimary
-      ? `The ${primaryCount === 1 ? "centre seat" : `${primaryCount} centre seats`} achieve the strongest balance across the screen, surround and overhead speaker layers. The outer seats remain enjoyable listening positions, with the surround layer creating the main difference in performance.`
-      : "The seating area provides a range of listening positions, with the strongest available seats highlighted.";
+      ? `${primaryCount === 1 ? "One seat" : `${primaryCount} seats`} achieve the highest level across P4, P6 and P10. Remaining seats are shaded by their lowest achieved level.`
+      : "Seats are shaded by their lowest achieved level across RP22 Parameters 4, 6 and 10.";
 
   return { seats, rsp: rspPoint, counts, hasAny, hasAnyValidResult, hasPrimary, explanation };
 }

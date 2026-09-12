@@ -52,15 +52,15 @@ function gradeP13ForBasis(value, p13Mode) {
 }
 
 const RESULT_HEADINGS = {
-  L4: "Exceptional surround capability",
-  L3: "Strong surround capability",
-  L2: "Good surround capability",
-  L1: "Basic surround capability",
-  FAIL: "Additional surround capability recommended",
+  L4: "Level 4",
+  L3: "Level 3",
+  L2: "Level 2",
+  L1: "Level 1",
+  FAIL: "Does not achieve Level 1",
 };
 
 const RESULT_EXPLANATION =
-  "The surround and overhead speakers maintain consistent impact and clarity across the listening area, preserving the immersion of demanding movie soundtracks at the reference seating position.";
+  "Minimum SPL capability of the surround and overhead speakers at the reference seating position.";
 
 function ceilDb(v) {
   const n = Number(v);

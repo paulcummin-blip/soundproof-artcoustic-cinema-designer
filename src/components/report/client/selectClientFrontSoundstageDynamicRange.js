@@ -84,15 +84,15 @@ function buildP12BandLabels(p12Mode) {
 }
 
 const RESULT_HEADINGS = {
-  L4: "Exceptional dynamic capability",
-  L3: "Strong cinema-level dynamic capability",
-  L2: "Good dynamic capability",
-  L1: "Basic dynamic capability",
-  FAIL: "Additional dynamic capability recommended",
+  L4: "Level 4",
+  L3: "Level 3",
+  L2: "Level 2",
+  L1: "Level 1",
+  FAIL: "Does not achieve Level 1",
 };
 
 const RESULT_EXPLANATION =
-  "The left, centre and right speakers operate together as a single acoustic system, maintaining clear dialogue and preserving the impact of demanding movie soundtracks at the reference seating position.";
+  "Minimum SPL capability of the left, centre and right screen speakers at the reference seating position.";
 
 function ceilDb(v) {
   const n = Number(v);

@@ -20,34 +20,34 @@ import { isEligibleP5Surround } from "@/components/utils/p5SurroundGaps";
 // ── Status copy ────────────────────────────────────────────────────────────
 const STATUS_COPY = {
   L4: {
-    label: "Excellent spatial continuity",
+    label: "Level 4",
     color: "#213428",
-    explanation: "The speaker layout creates smooth, precise movement around the listening position.",
+    explanation: "Maximum horizontal angle between adjacent surround speakers.",
   },
   L3: {
-    label: "Very good spatial continuity",
+    label: "Level 3",
     color: "#3E4349",
-    explanation: "The speaker layout creates smooth movement around the listening position, with well-controlled spacing between channels.",
+    explanation: "Maximum horizontal angle between adjacent surround speakers.",
   },
   L2: {
-    label: "Good spatial continuity",
+    label: "Level 2",
     color: "#625143",
-    explanation: "The layout provides clear movement around the listening position, with slightly wider spacing between some channels.",
+    explanation: "Maximum horizontal angle between adjacent surround speakers.",
   },
   L1: {
-    label: "Further refinement recommended",
+    label: "Level 1",
     color: "#4A230F",
-    explanation: "Reducing the widest gap between the surround channels would create smoother movement around the listener.",
+    explanation: "Maximum horizontal angle between adjacent surround speakers.",
   },
   Fail: {
-    label: "Further refinement recommended",
+    label: "Does not achieve Level 1",
     color: "#4A230F",
-    explanation: "Reducing the widest gap between the surround channels would create smoother movement around the listener.",
+    explanation: "Maximum horizontal angle between adjacent surround speakers.",
   },
   "—": {
-    label: "Further refinement recommended",
+    label: "—",
     color: "#C1B6AD",
-    explanation: "Reducing the widest gap between the surround channels would create smoother movement around the listener.",
+    explanation: "Maximum horizontal angle between adjacent surround speakers.",
   },
 };
 

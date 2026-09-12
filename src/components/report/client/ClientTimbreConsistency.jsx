@@ -499,10 +499,10 @@ export default function ClientTimbreConsistency({
         >
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 16, fontWeight: 600, color: "#213428", marginBottom: 4 }}>
-              Consistent Sound Across the Seats
+              Tonal Consistency Across Seats
             </div>
             <div style={{ fontSize: 13, color: "#3E4349", lineHeight: 1.5 }}>
-              The system is designed to maintain a consistent tonal character across the seating area, preserving clarity and detail as listeners move away from the reference position.
+              Tonal balance consistency between screen and surround/overhead channels at each seating position.
             </div>
           </div>
         </div>

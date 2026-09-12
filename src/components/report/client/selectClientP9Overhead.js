@@ -85,7 +85,7 @@ function buildSummary(seats) {
   const primaryBest = primary.length > 0 && primary.every((s) => s.p9Level === best);
 
   if (primaryBest && best !== worst) {
-    return `Overhead continuity is strongest through the primary seating (${best}), with ${worstCount} seat${worstCount > 1 ? "s" : ""} achieving ${worst}.`;
+    return `Overhead spacing achieves ${best} at the primary seating, with ${worstCount} seat${worstCount > 1 ? "s" : ""} achieving ${worst}.`;
   }
 
   return `${bestCount} of ${assessed.length} seats achieve ${best} overhead spacing, with ${worstCount} at ${worst}.`;

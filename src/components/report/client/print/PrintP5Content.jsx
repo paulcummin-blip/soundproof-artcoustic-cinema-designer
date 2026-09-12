@@ -17,12 +17,12 @@ import { isEligibleP5Surround } from "@/components/utils/p5SurroundGaps";
 
 // ── Status copy (frozen — matches ClientSoundAroundListener) ───────────────
 const STATUS_COPY = {
-  L4: { label: "Excellent spatial continuity", color: "#213428", explanation: "The speaker layout creates smooth, precise movement around the listening position." },
-  L3: { label: "Very good spatial continuity", color: "#3E4349", explanation: "The speaker layout creates smooth movement around the listening position, with well-controlled spacing between channels." },
-  L2: { label: "Good spatial continuity", color: "#625143", explanation: "The layout provides clear movement around the listening position, with slightly wider spacing between some channels." },
-  L1: { label: "Further refinement recommended", color: "#4A230F", explanation: "Reducing the widest gap between the surround channels would create smoother movement around the listener." },
-  Fail: { label: "Further refinement recommended", color: "#4A230F", explanation: "Reducing the widest gap between the surround channels would create smoother movement around the listener." },
-  "—": { label: "Further refinement recommended", color: "#C1B6AD", explanation: "Reducing the widest gap between the surround channels would create smoother movement around the listener." },
+  L4: { label: "Level 4", color: "#213428", explanation: "Maximum horizontal angle between adjacent surround speakers." },
+  L3: { label: "Level 3", color: "#3E4349", explanation: "Maximum horizontal angle between adjacent surround speakers." },
+  L2: { label: "Level 2", color: "#625143", explanation: "Maximum horizontal angle between adjacent surround speakers." },
+  L1: { label: "Level 1", color: "#4A230F", explanation: "Maximum horizontal angle between adjacent surround speakers." },
+  Fail: { label: "Does not achieve Level 1", color: "#4A230F", explanation: "Maximum horizontal angle between adjacent surround speakers." },
+  "—": { label: "—", color: "#C1B6AD", explanation: "Maximum horizontal angle between adjacent surround speakers." },
 };
 
 function getStatusInfo(level) {

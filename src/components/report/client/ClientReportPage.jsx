@@ -143,7 +143,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
               <div className="client-report-print-result__content">
                 <div className="client-report-print-result__label">Best Listening Area</div>
                 <div className="client-report-print-result__explanation">
-                  {printData.explanation || "The seating area provides a range of listening positions, with the strongest available seats highlighted."}
+                  {printData.explanation || "Seats are shaded by their lowest achieved level across RP22 Parameters 4, 6 and 10."}
                 </div>
               </div>
             </div>
@@ -183,7 +183,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
               <div className="client-report-print-result__content">
                 <div className="client-report-print-result__label">Consistent Sound Across the Seats</div>
                 <div className="client-report-print-result__explanation">
-                  The system is designed to maintain a consistent tonal character across the seating area, preserving clarity and detail as listeners move away from the reference position.
+                  Tonal balance consistency between screen and surround/overhead channels at each seating position.
                 </div>
               </div>
             </div>
@@ -317,7 +317,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
               <div className="client-report-print-result__content">
                 <div className="client-report-print-result__label">Screen Size and Seating</div>
                 <div className="client-report-print-result__explanation">
-                  {printData.explanation || "The screen size is well matched to the seating area, placing the main listening positions within the preferred viewing range."}
+                  {printData.explanation || "Viewing angle range for each seating position relative to the screen."}
                 </div>
               </div>
             </div>

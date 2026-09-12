@@ -123,19 +123,19 @@ function categoryForLevel(level) {
     return { key: "not_assessed", label: "Not assessed" };
   }
   if (level === "FAIL") {
-    return { key: "improvement", label: "Improvement recommended" };
+    return { key: "improvement", label: "Does not achieve Level 1" };
   }
   if (level === "L1") {
-    return { key: "acceptable", label: "Acceptable" };
+    return { key: "acceptable", label: "Level 1" };
   }
   if (level === "L2") {
-    return { key: "consistent", label: "Consistent" };
+    return { key: "consistent", label: "Level 2" };
   }
   if (level === "L3") {
-    return { key: "very_consistent", label: "Very consistent" };
+    return { key: "very_consistent", label: "Level 3" };
   }
   // L4
-  return { key: "highly_consistent", label: "Highly consistent" };
+  return { key: "highly_consistent", label: "Level 4" };
 }
 
 /**
