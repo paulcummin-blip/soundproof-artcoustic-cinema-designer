@@ -257,6 +257,15 @@ export default function RP22ClientReport() {
 
   const hasSeatingPosition = recommendedSeatingPosition.hasAny && !!rsp;
 
+  // ── Bass Performance (P14/P18/P19/P20) — current applied design ──
+  // Uses the canonical completed bass authority, not optimiser proposal data.
+  // P14/P18 are room-scope; P19/P20 are seat-scope with per-seat results.
+  // Omitted entirely when no genuine assessed bass result exists.
+  const bassPerformance = useMemo(() => {
+    if (hydrating || !completedBassAuthority) return null;
+    return selectClientBassPerformance(completedBassAuthority, bassPresentation, seatingPositions);
+  }, [hydrating, completedBassAuthority, bassPresentation, seatingPositions]);
+
   // ── Active pages collection — drives both screen and PDF rendering order ──
   const activePages = useMemo(() => {
     const pages = [];
@@ -515,6 +524,33 @@ export default function RP22ClientReport() {
         },
       });
     }
+    // Bass Performance (P14/P18/P19/P20) — only when at least one genuine
+    // assessed bass result exists. P14/P18 are room-scope; P19/P20 show
+    // per-seat results. FAIL is included; N/A/Not calculated are excluded.
+    if (bassPerformance) {
+      pages.push({
+        id: "bass-performance",
+        visual: (
+          <ClientBassPerformance
+            bassPerformance={bassPerformance}
+            roomDims={roomDims}
+            seatingPositions={seatingPositions}
+            rsp={rsp}
+            screenFrontPlaneM={screenFrontPlaneM}
+            screenWidthM={screenWidthM}
+          />
+        ),
+        printData: {
+          type: "bass-performance",
+          bassPerformance,
+          roomDims,
+          seatingPositions,
+          rsp,
+          screenFrontPlaneM,
+          screenWidthM,
+        },
+      });
+    }
     // Acoustic Treatment (always last — only when enabled)
     if (appState?.acousticTreatmentEnabled && Number(appState?.selectedAbfuserQty) > 0) {
       pages.push({
@@ -541,7 +577,7 @@ export default function RP22ClientReport() {
       });
     }
     return pages;
-  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence]);
+  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,

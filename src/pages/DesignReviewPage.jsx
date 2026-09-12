@@ -30,6 +30,7 @@ import DesignOverviewBlock from "@/components/designreview/DesignOverviewBlock";
 import ParameterExplorer from "@/components/designreview/ParameterExplorer";
 import DrawingsBlock from "@/components/designreview/DrawingsBlock";
 import RecommendationsBlock from "@/components/designreview/RecommendationsBlock";
+import TechnicalInstalledCalibration from "@/components/report/technical/TechnicalInstalledCalibration";
 import DesignReviewActions from "@/components/designreview/DesignReviewActions";
 import ProjectSummaryCard from "@/components/designreview/ProjectSummaryCard";
 import { BarChart3, PenTool, ListChecks, Package } from "lucide-react";
@@ -250,6 +251,15 @@ export default function DesignReviewPage() {
           isOpen={recsOpen}
           onToggle={() => setRecsOpen(prev => !prev)}
         >
+          <TechnicalInstalledCalibration
+            subwooferInstances={projectDetails?.subwooferInstances || []}
+            roomDims={{
+              widthM: projectDetails?.room_width,
+              lengthM: projectDetails?.room_length,
+              heightM: projectDetails?.room_height,
+            }}
+          />
+          <div style={{ height: 12 }} />
           <RecommendationsBlock asdrData={asdrData} priceData={priceData} />
         </CollapsiblePanel>
       </div>

@@ -42,6 +42,7 @@ import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { setPositionSearchPhase, setPositionExhaustion, setStageVerdict } from "./improveBassV2Store.js";
 import { runPositionScreenPhase, tagGlobalCandidates, checkPhaseMateriality, buildPositionOptimisationState } from "./improveBassV2Escalation.js";
 import { generateSeatingCandidates, describeSeatingChange } from "./seatingPositionSearch.js";
+import { createSeatingProfiler } from "./seatingStageProfiler.js";
 
 import { attachCurrentCanonicalValidation } from "./currentAuthorityValidation.js";
 
@@ -1070,6 +1071,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     let seatingResult = null;
     let seatingMaterial = null;
     let seatingDiagnostics = { status: "incomplete", tested: 0, valid: 0, best: null };
+    let seatingProfiler = createSeatingProfiler();
     setStageVerdict(projectId, "seating_positions", "skipped");
     try {
       const screenWall = "front"; // default; could be derived from project
@@ -1089,17 +1091,26 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           try {
             // Run placement worker with moved seats
             const movedRsp = { ...rspPosition, y: (rspPosition?.y || 0) + candidate.effectiveOffsetM };
+            const _proxyPrepT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
             const seatingTransfer = await runInWorker(worker, "placement", {
               finalist: currentFinalist, roomDims, rspPosition: movedRsp,
               seatingPositions: candidate.seatingPositions,
               selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
             }, controller.signal);
+            const _proxyPrepMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - _proxyPrepT0;
             if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
 
             // Compute proxy metrics for this seating offset
             if (seatingTransfer?.perSourcePerSeatComplexTransfers?.length) {
+              const _proxyEvalT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
               const effectiveTuning = existingAuthority?.appliedTuning || savedEffectiveBaseline || [];
               const proxyMetrics = computeProxyMetrics(seatingTransfer, effectiveTuning);
+              const _proxyEvalMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - _proxyEvalT0;
+              seatingProfiler.recordCandidate(candidate.offsetMm, {
+                proxyPrepMs: _proxyPrepMs,
+                proxyEvalMs: _proxyEvalMs,
+                cacheHit: false,
+              });
               if (proxyMetrics && (!bestSeatingProxy || proxyMetrics.proxyP19 < bestSeatingProxy.proxyP19)) {
                 bestSeatingProxy = proxyMetrics;
                 bestSeatingOffset = candidate.offsetMm;
@@ -1127,6 +1138,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
               p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
             }, controller.signal);
             metrics.recordWorkerCall("confirmation", "seating-best", performance.now() - seatingConfirmT0, false);
+            seatingProfiler.recordConfirmation(bestSeatingProxy._seatingOffset, { confirmMs: performance.now() - seatingConfirmT0 });
             if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
             if (seatingConfirmation) {
               const sBound = bindConfirmation(seatingConfirmation,
@@ -1178,6 +1190,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     selection.seatingResult=seatingResult;
     selection.seatingMaterial=seatingMaterial;
     selection.seatingDiagnostics=seatingDiagnostics;
+    selection.seatingProfile=seatingProfiler.getReport();
     setStageVerdict(projectId, "preparing", "done");
     await yieldToUI();
 
