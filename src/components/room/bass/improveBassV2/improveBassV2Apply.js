@@ -15,9 +15,7 @@
 // optimisation only used active ones. Optimisation may ignore disabled
 // instances acoustically, but Apply must preserve them in project state.
 
-import { generateStableId } from "../../../utils/stableIdGenerator.js";
-import { deriveSubWallOrientation, subHalfExtents } from "../../rv/utils/subWallOrientation.js";
-import { normaliseModelKey } from "../../../utils/modelKeyNormaliser.js";
+import { applyCalibrationTuning, resolveTuningInstances } from "./improveBassV2ApplyCalibration.js";
 
 const COORDINATE_TOLERANCE_M = 0.01; // 10 mm
 
@@ -55,89 +53,24 @@ export function buildOptimisedInstances(winner, currentInstances, roomDims, mode
   const coords = winner?.positionCoordinates || winner?.coordinates;
   if (!coords?.length) return currentInstances || [];
 
-  const W = Number(roomDims?.widthM) || 0;
-  const L = Number(roomDims?.lengthM) || 0;
-  const normalisedModel = normaliseModelKey(modelKey);
   const tuning = winner.appliedTuning || winner.tuning || [];
-  const existingList = Array.isArray(currentInstances) ? currentInstances : [];
-
-  // BLOCKER 6: Separate ALL instances into active and disabled.
-  const activeInstances = existingList.filter((inst) => inst.enabled !== false);
-  const disabledInstances = existingList.filter((inst) => inst.enabled === false);
-
-  // BLOCKER 5: Build optimised active instances from winner coordinates.
-  // Map winner coordinates to active instances by index.
-  const usedIds = new Set(existingList.map((inst) => String(inst.id)));
-  const optimisedActive = coords.map((coord, i) => {
-    const x = Number(coord.x);
-    const y = Number(coord.y);
-    const { rotationDeg } = deriveSubWallOrientation({
-      x, y, widthM: W, lengthM: L, subWidthM: 0.3, subDepthM: 0.3,
-    });
-
-    const t = tuning[i] || { delayMs: 0, gainDb: 0, polarity: 0 };
-    const existing = activeInstances[i];
-    const id = existing?.id
-      ? existing.id
-      : generateStableId(usedIds, "sub");
-
+  const ordered = resolveTuningInstances(currentInstances, tuning);
+  if (!ordered || coords.length !== ordered.length) {
+    throw new Error("Cannot Apply positions to changed source identities");
+  }
+  const coordsById = new Map(ordered.map((inst, i) => [inst.id, coords[i]]));
+  return applyCalibrationTuning(currentInstances, tuning).map((inst) => {
+    if (inst.enabled === false) return inst;
+    const coord = coordsById.get(inst.id);
+    if (!Number.isFinite(Number(coord?.x)) || !Number.isFinite(Number(coord?.y))) {
+      throw new Error("Confirmed position is invalid");
+    }
     return {
-      id,
-      model: normalisedModel,
-      // BLOCKER 5: enabled state is explicitly set
-      enabled: true,
-      // BLOCKER 5: position.z preserved from existing instance where canonical
-      // schema uses it. The canonical subwooferInstance stores position as {x, y}
-      // with z derived from bottomHeightM. We preserve position.z if the existing
-      // instance had one, otherwise omit it (matching the canonical schema).
-      position: {
-        x,
-        y,
-        ...(existing?.position?.z != null ? { z: Number(existing.position.z) } : {}),
-      },
-      // BLOCKER 5: bottomHeightM preserved from existing instance
-      bottomHeightM: Number(existing?.bottomHeightM) || 0,
-      // BLOCKER 5: rotation from wall-aware derivation
-      rotationDeg,
+      ...inst,
+      position: { ...inst.position, x: Number(coord.x), y: Number(coord.y) },
       positionSource: "v2-optimised",
-      // Mark tuning as V2-optimised so the production bass engine bypasses
-      // auto-align for this applied state. The V2 delays are the FINAL effective
-      // delays (graded on transfers with embedded geometric arrivals). Adding
-      // auto-align after Apply would double-compensate and produce a different
-      // acoustic state than what was graded.
-      tuningSource: "v2-optimised",
-      // BLOCKER 5: delay, trim, polarity from winner tuning
-      gainDb: Number(t.gainDb) || 0,
-      delayMs: Number(t.delayMs) || 0,
-      polarity: Number(t.polarity) || 0,
-      // Preserve identity fields from existing instance
-      ...(existing?.legacyGroup != null ? { legacyGroup: existing.legacyGroup } : {}),
-      ...(existing?.symmetryLinkId != null ? { symmetryLinkId: existing.symmetryLinkId } : {}),
     };
   });
-
-  // BLOCKER 5: Append disabled instances unchanged — they must NOT disappear
-  // merely because optimisation only used active ones.
-  const disabledPreserved = disabledInstances.map((inst) => ({
-    id: inst.id,
-    model: inst.model,
-    enabled: false,
-    position: {
-      x: Number(inst.position?.x) || 0,
-      y: Number(inst.position?.y) || 0,
-      ...(inst.position?.z != null ? { z: Number(inst.position.z) } : {}),
-    },
-    bottomHeightM: Number(inst.bottomHeightM) || 0,
-    rotationDeg: Number(inst.rotationDeg) || 0,
-    positionSource: inst.positionSource || null,
-    gainDb: Number(inst.gainDb) || 0,
-    delayMs: Number(inst.delayMs) || 0,
-    polarity: Number(inst.polarity) || 0,
-    ...(inst.legacyGroup != null ? { legacyGroup: inst.legacyGroup } : {}),
-    ...(inst.symmetryLinkId != null ? { symmetryLinkId: inst.symmetryLinkId } : {}),
-  }));
-
-  return [...optimisedActive, ...disabledPreserved];
 }
 
 /**
@@ -158,10 +91,9 @@ export function isOptimisedApplied(currentInstances, winner, roomDims) {
   if (!coords?.length || !currentInstances?.length) return false;
 
   // Only check active instances against the winner
-  const activeInstances = currentInstances.filter((inst) => inst.enabled !== false);
-  if (coords.length !== activeInstances.length) return false;
-
   const tuning = winner.appliedTuning || winner.tuning || [];
+  const activeInstances = resolveTuningInstances(currentInstances, tuning);
+  if (!activeInstances || coords.length !== activeInstances.length) return false;
 
   for (let i = 0; i < coords.length; i++) {
     const wc = coords[i];
