@@ -483,6 +483,17 @@
       "type": "boolean",
       "default": true,
       "description": "When true, editing Ear Height or Platform Height for a seating row applies the same delta to both, preserving their relative offset. When false, each is edited independently. Persisted per-project so the preference survives across sessions, browsers, and users."
+    },
+    "appliedSeatingProvenance": {
+      "type": "object",
+      "description": "Durable Apply provenance for the V2 Improve Bass Seating Position stage. Seating Apply mutates seatingPositions (not subwooferInstances), so provenance cannot be stamped on sub instances. This project-level field records the actual Apply action: { stageKey, candidateId, baselineFingerprint, appliedFingerprint }. Null when no Seating Apply has occurred. Cleared when the design changes (stale detection). Used by isStageResultApplied to distinguish a genuine Apply from coincidental value matching.",
+      "nullable": true,
+      "properties": {
+        "stageKey": { "type": "string" },
+        "candidateId": { "type": "string" },
+        "baselineFingerprint": { "type": "string" },
+        "appliedFingerprint": { "type": "string" }
+      }
     }
   },
   "required": [
