@@ -592,7 +592,9 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     }
 
     try {
-      onProgress("calibrating", "Searching calibration improvements", 0, 2);
+      setStageVerdict(projectId, "phase_polarity", "skipped");
+      setStageVerdict(projectId, "gain", "skipped");
+      onProgress("calibrating", "Preparing grouped delay search", 0, 1);
       const currentFinalist = buildCurrentFinalist(subwooferInstances, roomDims);
       if (currentFinalist) {
         // Get or compute Current's raw transfers (zero tuning)
