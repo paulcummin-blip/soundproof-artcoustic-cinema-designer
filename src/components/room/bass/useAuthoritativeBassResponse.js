@@ -37,13 +37,8 @@ function resolveSubGroup(subId, fallbackGroup) {
 
 export function buildAuthoritativeAutoAlignDelays({ enabled, rspPosition, frontSubsLive, rearSubsLive, frontSubsCfg, rearSubsCfg }) {
   if (!enabled || !rspPosition) return {};
-  // Bypass auto-align when V2 optimiser tuning is applied. The V2 delays are
-  // the FINAL effective delays (graded on transfers with embedded geometric
-  // arrivals). Adding auto-align after Apply would double-compensate and
-  // produce a different acoustic state than what was graded.
-  const allLive = [...(Array.isArray(frontSubsLive) ? frontSubsLive : []), ...(Array.isArray(rearSubsLive) ? rearSubsLive : [])];
-  const hasV2Tuning = allLive.some((sub) => sub?.tuningSource === "v2-optimised");
-  if (hasV2Tuning) return {};
+  // Ordinary records retain manual + automatic alignment semantics. V2
+  // records carry absolute effective delay; suppress only their contribution.
   const arrivals = [];
   const processGroup = (cfg, liveSubs, group) => {
     const live = Array.isArray(liveSubs) ? liveSubs : [];
@@ -61,7 +56,8 @@ export function buildAuthoritativeAutoAlignDelays({ enabled, rspPosition, frontS
       const manualDelayMsRaw = Number(liveEntry?.delay ?? liveEntry?.delayMs);
       const manualDelayMs = Number.isFinite(manualDelayMsRaw) ? manualDelayMsRaw : 0;
       arrivals.push({
-        subId: `${group}-sub-${POSITION_LABELS[index] ?? index}`,
+        subId: liveEntry?.id ?? `${group}-sub-${POSITION_LABELS[index] ?? index}`,
+        effectiveTuning: liveEntry?.tuningSource === "v2-optimised",
         // Align the effective arrival, including any stored/manual delay.
         // The auto-delay is later added to this same manual value.
         arrivalMs: (Math.hypot(x - rspPosition.x, y - rspPosition.y, z - rspPosition.z) / 343 * 1000) + manualDelayMs,
@@ -72,7 +68,7 @@ export function buildAuthoritativeAutoAlignDelays({ enabled, rspPosition, frontS
   processGroup(rearSubsCfg, rearSubsLive, "rear");
   if (!arrivals.length) return {};
   const latest = Math.max(...arrivals.map((item) => item.arrivalMs));
-  return Object.fromEntries(arrivals.map((item) => [item.subId, Math.max(0, latest - item.arrivalMs)]));
+  return Object.fromEntries(arrivals.map((item) => [item.subId, item.effectiveTuning ? 0 : Math.max(0, latest - item.arrivalMs)]));
 }
 
 export function buildAuthoritativeBassSources({
@@ -111,8 +107,8 @@ export function buildAuthoritativeBassSources({
       z: Number.isFinite(Number(position?.z)) ? Number(position.z) : 0.35,
       tuning: {
         gainDb: Number.isFinite(instGainDb) ? instGainDb : 0,
-        delayMs: (Number.isFinite(instDelayMs) ? instDelayMs : 0) + resolveAutoDelay(id, resolvedGroup, resolvedIndex),
-        polarity: instPolarity === -1 ? 180 : 0,
+        delayMs: (Number.isFinite(instDelayMs) ? instDelayMs : 0) + (item?.tuningSource === "v2-optimised" ? 0 : resolveAutoDelay(id, resolvedGroup, resolvedIndex)),
+        polarity: instPolarity === -1 || Number(instPolarity) === 180 ? 180 : 0,
       },
     };
   };
