@@ -25,7 +25,7 @@ import { evaluateCanonicalBassAuthority } from "@/components/utils/canonicalBass
 import { resolveSubwooferBassCapability } from "@/components/utils/speakerModelResolver";
 import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from "../bassPhysicsDefaults";
-import { STAGE2_FALLBACK_SOURCE_HEIGHT_M, STAGE2_PRODUCT_ENGINEERING_VERSION } from "./stage2Constants";
+import { STAGE2_FALLBACK_SOURCE_HEIGHT_M, STAGE2_PRODUCT_ENGINEERING_VERSION, STAGE2_CANONICAL_VERSION } from "./stage2Constants";
 import { deriveCentreZ } from "@/components/utils/subwooferInstanceMigration";
 import { gradeP19FromRaw, gradeP20FromRaw } from "../completedBassResultPersistence";
 import { buildAuthoritativeAutoAlignDelays } from "../useAuthoritativeBassResponse";
@@ -397,6 +397,10 @@ export function evaluateStage2Confirmation(rawTransfer, {
     p14TargetLevel,
     p14TargetDb,
     p14AchievedDb,
+    operatingOutputDb: canonicalResult.selectedOperatingOutputDb,
+    requestedP14Pass: authority.requestedP14Pass,
+    physicalValidation: selection.selectedCandidate.physicalValidation,
+    timingVersion: STAGE2_CANONICAL_VERSION,
     p14AchievedLevel: authority.achievedP14Level ?? canonicalResult.achievedP14Level ?? null,
     p14ShortfallDb,
     p14HeadroomDb,
