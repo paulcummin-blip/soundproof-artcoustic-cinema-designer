@@ -2,16 +2,16 @@
  * SeatScopeBadge.jsx
  * ------------------
  * Neutral "SEAT" scope badge for seat-scoped RP22 parameters.
- *
- * White background, black text, subtle border — no performance colour.
- * Used in both screen (RP22ComplianceParameterTile) and print
- * (TechnicalParameterCard) variants to replace the single L-level badge
- * that was incorrectly shown for seat-scoped parameters.
+ * Uses the canonical SEAT token from RP22_GRADE_TOKENS so the neutral
+ * treatment is consistent with the rest of the pill system.
  *
  * Props:
  *   variant — "screen" (default) or "print"
  */
+import { RP22_GRADE_TOKENS } from "@/components/utils/rp22Colors";
+
 export default function SeatScopeBadge({ variant = "screen" }) {
+  const t = RP22_GRADE_TOKENS.SEAT;
   const s = variant === "print"
     ? { padding: "4px 8px", fontSize: "10pt", rad: 4, bw: 1 }
     : { padding: "4px 10px", fontSize: "11px", rad: 6, bw: 1 };
@@ -19,13 +19,13 @@ export default function SeatScopeBadge({ variant = "screen" }) {
   return (
     <span
       style={{
-        border: `${s.bw}px solid #D9D5CE`,
+        border: `${s.bw}px solid ${t.border}`,
         borderRadius: s.rad,
         padding: s.padding,
         fontSize: s.fontSize,
         fontWeight: 600,
-        background: "#FFFFFF",
-        color: "#1B1A1A",
+        background: t.bg,
+        color: t.text,
         whiteSpace: "nowrap",
         lineHeight: "1.2",
         letterSpacing: "0.04em",

@@ -1,32 +1,140 @@
+/**
+ * rp22Colors.jsx — CANONICAL RP22 GRADING-PILL AUTHORITY
+ * -------------------------------------------------------
+ * The single source of truth for RP22 / RP23 performance-level colour tokens
+ * across the entire Sound Proof app and all report surfaces.
+ *
+ * Every pill, badge, seat card, compliance tile, visual-report cell and
+ * technical-report badge must derive its semantic colours from
+ * RP22_GRADE_TOKENS below.  Only size/context variants are permitted —
+ * the semantic colour treatment is invariant.
+ *
+ * Visual direction:
+ *   L1–L4  — faded brand-colour background (~10-15%), medium border (~45-60%),
+ *             full-strength brand-colour text.  Refined, not heavy.
+ *   FAIL   — SOLID deep burgundy-brown fill, white text.  Exceptional weight.
+ *   SEAT   — neutral white, fine border, dark text.
+ *   N/A / NOT CALCULATED / — — neutral, muted.  Never a performance colour.
+ *
+ * L1 vs FAIL:
+ *   L1   is a VALID achieved level — warm bronze / clay (golden-brown hue),
+ *        light faded treatment.
+ *   FAIL is a failure state — deep burgundy-brown (#4A230F), solid fill.
+ *   They differ in BOTH hue AND treatment so nobody reads L1 as "almost FAIL".
+ */
+
 export const BRAND_RP22 = {
-  green: "#2A6E3F",  // success (meets/exceeds)
-  amber: "#935F1A",  // within 3 dB
-  red: "#7A1E19",    // below -3 dB
+  green: "#2A6E3F",  // success (meets/exceeds) — SPL value colouring only
+  amber: "#935F1A",  // within 3 dB — SPL value colouring only
+  red: "#7A1E19",    // below -3 dB — SPL value colouring only
   text: "#1B1A1A",   // default text
 };
 
 /**
- * RP22/RP23 Level Colors - Single Source of Truth
- * Used for all level indicators: HUD pills, menu bars, tooltips, reports
+ * CANONICAL GRADE TOKENS — the single design-system authority.
+ * Each entry: { bg, border, text, solid? }
+ *   solid = true  → solid fill (FAIL only).  Pills render with white text on
+ *                   a full-strength background and a matching border.
+ *   solid = false → faded treatment.  Light background, medium border,
+ *                   full-strength brand-colour text.
  */
-export const RP22_LEVEL_COLORS = {
-  4: { bg: "#213428", text: "#FFFFFF", border: "#213428" },  // Level 4 - brand green, light text
-  3: { bg: "#625143", text: "#FFFFFF", border: "#625143" },  // Level 3 - warm brown, light text
-  2: { bg: "#C1B6AD", text: "#1B1A1A", border: "#C1B6AD" },  // Level 2 - light warm grey, dark text
-  1: { bg: "#4A230F", text: "#FFFFFF", border: "#4A230F" },  // Level 1 - dark chocolate, light text
-  fail: { bg: "#F8F8F7", text: "#DC2626", border: "#E6E4DD" },  // Fail - neutral background, red text
+export const RP22_GRADE_TOKENS = {
+  L4: { bg: "#E8EFEB", border: "#4A7560", text: "#213428", solid: false }, // Sound Proof green
+  L3: { bg: "#EDEEEF", border: "#7B8088", text: "#3E4349", solid: false }, // slate / charcoal
+  L2: { bg: "#F2EEE9", border: "#B3A89B", text: "#6B5F54", solid: false }, // warm stone / taupe
+  L1: { bg: "#F4EBDC", border: "#B58E5C", text: "#7A4F1A", solid: false }, // warm bronze / clay
+  FAIL: { bg: "#4A230F", border: "#4A230F", text: "#FFFFFF", solid: true }, // deep burgundy-brown, solid
+  SEAT: { bg: "#FFFFFF", border: "#D9D5CE", text: "#1B1A1A", solid: false }, // neutral white
+  NA: { bg: "#F5F4F1", border: "#D9D5CE", text: "#8A8580", solid: false }, // neutral
+  NOT_CALCULATED: { bg: "#F5F4F1", border: "#D9D5CE", text: "#8A8580", solid: false }, // neutral
+  DASH: { bg: "#F5F4F1", border: "#D9D5CE", text: "#8A8580", solid: false }, // neutral —
 };
 
 /**
- * Get background and text colors for an RP22/RP23 level.
- * @param {number} level - The level (1-4) or 0/null/'FAIL' for fail state
- * @returns {{ bg: string, text: string, border?: string }} Color object
+ * Resolve any level input to a canonical token key.
+ * Accepts: 1-4, "L1"-"L4", 0/null/"FAIL", "SEAT", "N/A", "NOT CALCULATED", "—"/"-"/undefined.
+ * @returns {key, token, label}
+ */
+export function resolveGradeToken(level) {
+  const str = String(level ?? "").trim().toUpperCase();
+  if (str === "L4" || level === 4) return { key: "L4", token: RP22_GRADE_TOKENS.L4, label: "L4" };
+  if (str === "L3" || level === 3) return { key: "L3", token: RP22_GRADE_TOKENS.L3, label: "L3" };
+  if (str === "L2" || level === 2) return { key: "L2", token: RP22_GRADE_TOKENS.L2, label: "L2" };
+  if (str === "L1" || level === 1) return { key: "L1", token: RP22_GRADE_TOKENS.L1, label: "L1" };
+  if (str === "FAIL" || level === 0) return { key: "FAIL", token: RP22_GRADE_TOKENS.FAIL, label: "FAIL" };
+  if (str === "SEAT") return { key: "SEAT", token: RP22_GRADE_TOKENS.SEAT, label: "SEAT" };
+  if (str === "N/A" || str === "NA") return { key: "NA", token: RP22_GRADE_TOKENS.NA, label: "N/A" };
+  if (str === "NOT CALCULATED" || str === "NOT_CALCULATED") return { key: "NOT_CALCULATED", token: RP22_GRADE_TOKENS.NOT_CALCULATED, label: "NOT CALCULATED" };
+  return { key: "DASH", token: RP22_GRADE_TOKENS.DASH, label: "—" };
+}
+
+/**
+ * Backward-compatible RP22_LEVEL_COLORS map.
+ * Kept for legacy consumers that read the map directly; now derived entirely
+ * from RP22_GRADE_TOKENS so there is one authority.
+ */
+export const RP22_LEVEL_COLORS = {
+  4: { bg: RP22_GRADE_TOKENS.L4.bg, text: RP22_GRADE_TOKENS.L4.text, border: RP22_GRADE_TOKENS.L4.border },
+  3: { bg: RP22_GRADE_TOKENS.L3.bg, text: RP22_GRADE_TOKENS.L3.text, border: RP22_GRADE_TOKENS.L3.border },
+  2: { bg: RP22_GRADE_TOKENS.L2.bg, text: RP22_GRADE_TOKENS.L2.text, border: RP22_GRADE_TOKENS.L2.border },
+  1: { bg: RP22_GRADE_TOKENS.L1.bg, text: RP22_GRADE_TOKENS.L1.text, border: RP22_GRADE_TOKENS.L1.border },
+  fail: { bg: RP22_GRADE_TOKENS.FAIL.bg, text: RP22_GRADE_TOKENS.FAIL.text, border: RP22_GRADE_TOKENS.FAIL.border },
+};
+
+/**
+ * Get background, text and border colours for an RP22/RP23 level.
+ * Legacy public API — returns { bg, text, border } from the canonical tokens.
+ * @param {number|string} level - 1-4, 0/null/'FAIL'
+ * @returns {{ bg: string, text: string, border: string }}
  */
 export function getLevelColors(level) {
-  if (typeof level !== 'number' || level < 1 || level > 4) {
-    return RP22_LEVEL_COLORS.fail;
+  const { token } = resolveGradeToken(level);
+  return { bg: token.bg, text: token.text, border: token.border };
+}
+
+/** Convert a #RRGGBB hex string to an rgba() string with the given alpha. */
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
+ * Semantic accent colour for each level — the strongest identifiable colour
+ * for that level.  Used for seat-highlight borders/rings and legible text on
+ * translucent fills.  Derived entirely from RP22_GRADE_TOKENS.
+ */
+const LEVEL_ACCENT = {
+  4: RP22_GRADE_TOKENS.L4.text,
+  3: RP22_GRADE_TOKENS.L3.text,
+  2: RP22_GRADE_TOKENS.L2.text,
+  1: RP22_GRADE_TOKENS.L1.text,
+  fail: RP22_GRADE_TOKENS.FAIL.bg,
+};
+
+/**
+ * Get translucent highlight colours for a level — for seat backgrounds and
+ * other areas where a solid fill would be too dominant.  Returns a light
+ * translucent fill derived from the canonical accent colour, a full-opacity
+ * border in the same semantic colour, and a legible text colour.
+ *
+ * @param {number|string} level - 1-4, 0/null/'FAIL'
+ * @returns {{ fill: string, border: string, text: string }}
+ */
+export function getLevelHighlightColors(level) {
+  const isFail = String(level || "").toUpperCase() === "FAIL" || level === 0;
+  const n = typeof level === "number" && level >= 1 && level <= 4 ? level : null;
+  if (isFail) {
+    const accent = LEVEL_ACCENT.fail;
+    return { fill: hexToRgba(accent, 0.10), border: accent, text: "#FFFFFF" };
   }
-  return RP22_LEVEL_COLORS[level];
+  if (n) {
+    const accent = LEVEL_ACCENT[n];
+    const text = RP22_GRADE_TOKENS[`L${n}`].text;
+    return { fill: hexToRgba(accent, 0.12), border: accent, text };
+  }
+  return { fill: "rgba(138,133,128,0.10)", border: "#D9D5CE", text: "#8A8580" };
 }
 
 /**
@@ -37,6 +145,9 @@ export function getLevelColors(level) {
  * Returns:
  *   { text: string, styles: { textColor: string } }
  * 'styles.textColor' is convenient for PDF libs; for DOM, use styles.color.
+ *
+ * NOTE: This is for SPL *value* colouring (green/amber/red against a target),
+ * NOT for level pills.  Level pills always use RP22_GRADE_TOKENS.
  */
 export function getRp22ResultStyle(value, target) {
   const v = Number(value);
@@ -52,53 +163,6 @@ export function getRp22ResultStyle(value, target) {
   } else {
     return { text: `${v.toFixed(1)} dB`, styles: { textColor: BRAND_RP22.red } };
   }
-}
-
-/** Convert a #RRGGBB hex string to an rgba() string with the given alpha. */
-function hexToRgba(hex, alpha) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-/**
- * Semantic accent colour for each level — the strongest identifiable colour
- * for that level. Used for seat-highlight borders/rings and legible text on
- * translucent fills. Derived entirely from RP22_LEVEL_COLORS (no new shades).
- */
-const LEVEL_ACCENT = {
-  4: RP22_LEVEL_COLORS[4].border,    // #213428
-  3: RP22_LEVEL_COLORS[3].border,    // #625143
-  2: RP22_LEVEL_COLORS[2].border,    // #C1B6AD
-  1: RP22_LEVEL_COLORS[1].border,    // #4A230F
-  fail: RP22_LEVEL_COLORS.fail.text, // #DC2626
-};
-
-/**
- * Get translucent highlight colours for a level — for seat backgrounds and
- * other areas where a solid fill would be too dominant. Returns a light
- * translucent fill derived from the canonical level colour, a full-opacity
- * border in the same semantic colour, and a legible text colour.
- *
- * @param {number|string} level - The level (1-4), 0/null/'FAIL' for fail
- * @returns {{ fill: string, border: string, text: string }}
- */
-export function getLevelHighlightColors(level) {
-  const isFail = String(level || "").toUpperCase() === "FAIL" || level === 0;
-  const n = typeof level === "number" && level >= 1 && level <= 4 ? level : null;
-  if (isFail) {
-    const accent = LEVEL_ACCENT.fail;
-    return { fill: hexToRgba(accent, 0.12), border: accent, text: accent };
-  }
-  if (n) {
-    const accent = LEVEL_ACCENT[n];
-    // For light levels (L2), use the canonical dark text colour for legibility
-    // on the translucent fill; for dark levels, the accent itself is legible.
-    const text = n === 2 ? RP22_LEVEL_COLORS[2].text : accent;
-    return { fill: hexToRgba(accent, 0.15), border: accent, text };
-  }
-  return { fill: "rgba(156,163,175,0.12)", border: "#9CA3AF", text: "#9CA3AF" };
 }
 
 /**

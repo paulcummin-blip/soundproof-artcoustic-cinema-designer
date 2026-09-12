@@ -4,13 +4,16 @@
  * Rectangular level badge for the Technical Report parameter cards.
  * Never circular — always a flat rectangle per the design specification.
  *
+ * Semantic colours come from the canonical RP22_GRADE_TOKENS authority
+ * (same tokens as the app pill).  Only the form factor is distinct.
+ *
  * Sizes:
  *   "normal" — 38×28px (card result area)
  *   "small"  — 26×18px (seat grid cells)
  */
 
 import React from "react";
-import { getLevelColors } from "@/components/utils/rp22Colors";
+import { resolveGradeToken } from "@/components/utils/rp22Colors";
 
 const normalizeLevel = (lvl) => {
   if (typeof lvl === "number" && lvl >= 1 && lvl <= 4) return lvl;
@@ -22,12 +25,7 @@ const normalizeLevel = (lvl) => {
 export default function TechnicalLevelBadge({ level, size = "normal" }) {
   const n = normalizeLevel(level);
   const isFail = String(level || "").trim().toUpperCase() === "FAIL";
-  const colors = isFail
-    ? { bg: "#F8F8F7", text: "#DC2626", border: "#E6E4DD" }
-    : n
-    ? getLevelColors(n)
-    : { bg: "#F3F4F6", text: "#9CA3AF", border: "#E5E7EB" };
-
+  const { token } = resolveGradeToken(isFail ? "FAIL" : n ?? "—");
   const label = n ? `L${n}` : isFail ? "FAIL" : "—";
 
   const dims =
@@ -43,14 +41,14 @@ export default function TechnicalLevelBadge({ level, size = "normal" }) {
         height: dims.h,
         minWidth: dims.w,
         borderRadius: dims.rad,
-        border: `${dims.bw}px solid ${colors.border}`,
-        background: colors.bg,
-        color: colors.text,
+        border: `${dims.bw}px solid ${token.border}`,
+        background: token.bg,
+        color: token.text,
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: dims.fs,
-        fontWeight: 700,
+        fontWeight: token.solid ? 700 : 700,
         fontFamily: "'Futura PT Light', 'Century Gothic', sans-serif",
         flexShrink: 0,
         lineHeight: 1,
