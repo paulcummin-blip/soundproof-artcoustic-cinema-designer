@@ -139,14 +139,6 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 printPart="support"
               />
             </div>
-            <div className="client-report-print-result">
-              <div className="client-report-print-result__content">
-                <div className="client-report-print-result__label">Best Listening Area</div>
-                <div className="client-report-print-result__explanation">
-                  Lowest achieved level across RP22 Parameters 4, 6 and 10 at each seating position.
-                </div>
-              </div>
-            </div>
           </>
         )}
         {printData?.type === "timbre-consistency" && (

@@ -70,7 +70,7 @@ export default function ClientScreenSeating({
             y,
             levelLabel: s.levelLabel,
             formatted: s.formatted,
-            isStrongest: s.isStrongest === true,
+            isPrimary: s.isPrimary === true,
           };
         })
         .filter(Boolean),
@@ -278,7 +278,7 @@ export default function ClientScreenSeating({
               cx={sp.px}
               cy={sp.py}
               haloRadius={haloRadius}
-              isPrimary={seat.isStrongest}
+              isPrimary={seat.isPrimary}
             />
           );
         })}
@@ -416,8 +416,8 @@ export default function ClientScreenSeating({
                   style={{
                     padding: "4px 12px",
                     textAlign: "center",
-                    fontWeight: seat.isStrongest ? 700 : 500,
-                    color: seat.isStrongest ? "#213428" : "#625143",
+                    fontWeight: seat.isPrimary ? 700 : 500,
+                    color: seat.isPrimary ? "#213428" : "#625143",
                     borderBottom: "1px solid #DCDBD6",
                   }}
                 >
@@ -437,8 +437,8 @@ export default function ClientScreenSeating({
                   style={{
                     padding: "4px 12px",
                     textAlign: "center",
-                    fontWeight: seat.isStrongest ? 700 : 500,
-                    color: seat.isStrongest ? "#213428" : "#3E4349",
+                    fontWeight: seat.isPrimary ? 700 : 500,
+                    color: seat.isPrimary ? "#213428" : "#3E4349",
                   }}
                 >
                   {seat.levelLabel ?? "—"}

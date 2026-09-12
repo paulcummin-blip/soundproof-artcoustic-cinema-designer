@@ -76,7 +76,7 @@ export default function ClientRecommendedSeatingPosition({
             distanceM: s.distanceM,
             formatted: s.formatted,
             level: s.level,
-            isStrongest: s.isStrongest === true,
+            isPrimary: s.isPrimary === true,
           };
         })
         .filter(Boolean),
@@ -282,7 +282,7 @@ export default function ClientRecommendedSeatingPosition({
               cx={sp.px}
               cy={sp.py}
               haloRadius={haloRadius}
-              isPrimary={seat.isStrongest}
+              isPrimary={seat.isPrimary}
             />
           );
         })}
@@ -361,8 +361,8 @@ export default function ClientRecommendedSeatingPosition({
                   style={{
                     padding: "4px 12px",
                     textAlign: "center",
-                    fontWeight: seat.isStrongest ? 700 : 500,
-                    color: seat.isStrongest ? "#213428" : "#625143",
+                    fontWeight: seat.isPrimary ? 700 : 500,
+                    color: seat.isPrimary ? "#213428" : "#625143",
                     borderBottom: "1px solid #DCDBD6",
                   }}
                 >
@@ -380,8 +380,8 @@ export default function ClientRecommendedSeatingPosition({
                   style={{
                     padding: "4px 12px",
                     textAlign: "center",
-                    fontWeight: seat.isStrongest ? 700 : 500,
-                    color: seat.isStrongest ? "#213428" : "#3E4349",
+                    fontWeight: seat.isPrimary ? 700 : 500,
+                    color: seat.isPrimary ? "#213428" : "#3E4349",
                   }}
                 >
                   {seat.level ?? "—"}

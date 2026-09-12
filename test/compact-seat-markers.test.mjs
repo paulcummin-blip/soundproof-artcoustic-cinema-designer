@@ -273,19 +273,27 @@ test("BLA editorial explanation paragraph removed from screen render", () => {
   assert.ok(!src.includes("{explanation}"), "explanation variable render removed");
 });
 
-test("BLA print fallback uses factual text (not editorial explanation)", () => {
+test("BLA print fallback text removed (no explanatory prose beneath diagram)", () => {
   const src = fs.readFileSync(
     path.join(CLIENT_DIR, "ClientReportPage.jsx"),
     "utf8"
   );
   assert.ok(
-    src.includes("Lowest achieved level across RP22 Parameters 4, 6 and 10"),
-    "print fallback must use factual measurement description"
+    !src.includes("Lowest achieved level across RP22 Parameters 4, 6 and 10"),
+    "BLA print fallback text must be removed — no explanatory prose beneath diagram"
   );
   assert.ok(
     !src.includes("Seats are shaded by their lowest achieved level"),
     "old editorial fallback removed"
   );
+  // The BLA section (type === "best-listening-area") must not have a print-result block
+  // Other page types (timbre, soundstage, etc.) still use print-result — that's correct.
+  const blaStart = src.indexOf('printData?.type === "best-listening-area"');
+  const nextStart = src.indexOf('printData?.type === "timbre-consistency"');
+  assert.ok(blaStart > -1 && nextStart > blaStart, "BLA section must exist and be followed by Timbre");
+  const blaSection = src.slice(blaStart, nextStart);
+  assert.ok(!blaSection.includes("client-report-print-result"),
+    "BLA section must not contain a print-result block");
 });
 
 // ── M: getSeatCircleStyle no longer imported by seat pages ──────────────────

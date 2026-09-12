@@ -218,7 +218,9 @@ export function selectClientScreenSeating({
         level,
         levelLabel: levelToLabel(levelStr),
         formatted: `${angleDeg.toFixed(1)}°`,
-        isStrongest: levelStr === "L4",
+        // Canonical seat-priority authority — isPrimary from the seating position.
+        // The bold ring on RP23 markers means PRIMARY SEAT, not best/strongest.
+        isPrimary: s.isPrimary === true || s.priority === "primary",
       };
     })
     .filter(Boolean);

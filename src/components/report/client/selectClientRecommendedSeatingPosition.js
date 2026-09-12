@@ -12,7 +12,7 @@
  *
  * Returns:
  *   {
- *     seats: [{ id, x, y, distanceM, formatted, level, levelRaw, rank, isStrongest }],
+ *     seats: [{ id, x, y, distanceM, formatted, level, levelRaw, rank, isPrimary }],
  *     rsp,
  *     hasAny: boolean
  *   }
@@ -40,6 +40,9 @@ function normalizeSeat(seat) {
     id: seat.id || `seat-${x.toFixed(2)}-${y.toFixed(2)}`,
     x,
     y,
+    // Canonical seat-priority authority — isPrimary from the seating position.
+    // The bold ring on P1/RP23 markers means PRIMARY SEAT, not best/strongest.
+    isPrimary: seat.isPrimary === true || seat.priority === "primary",
   };
 }
 
@@ -67,10 +70,6 @@ export function selectClientRecommendedSeatingPosition({ analysisResult, seating
     .filter(Boolean);
 
   const valid = seats.filter((s) => s.rank >= 0);
-  const bestRank = valid.length ? Math.max(...valid.map((s) => s.rank)) : -1;
-  valid.forEach((s) => {
-    s.isStrongest = bestRank > 0 && s.rank === bestRank;
-  });
 
   return { seats: valid, rsp, hasAny: valid.length > 0 };
 }
