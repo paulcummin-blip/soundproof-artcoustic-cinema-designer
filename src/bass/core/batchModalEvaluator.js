@@ -224,63 +224,60 @@ function computeTuningRotation(delayMs, polarity, freqsHz) {
  * @param {boolean} [params.collectDiagnostics=false]
  * @returns {{ freqsHz, perSourcePerListenerTransfers, diagnostics }}
  */
-export function evaluateBatchModalTransfers({
+// ── PREPARED SOURCE/ROOM FIELD ────────────────────────────────────────────
+// The prepared field contains ALL receiver-independent terms:
+//   abModes, modeFreq, sourceModeCoupling, modeWeight,
+//   sourceFreqAmplitude, sourceTuningCos/Sin, invSqrtV, freqsHz.
+// It MUST NOT contain listener-mode coupling, transfer matrix, or any
+// receiver-specific data. Reuse it across many receiver sets.
+
+/**
+ * Prepare the receiver-invariant source/room field.
+ * All terms that do NOT depend on listener coordinates.
+ *
+ * @returns {object} preparedField — pass to evaluateReceiversFromPreparedField
+ */
+export function prepareSourceRoomField({
   roomDims,
   sources,
-  listeners,
   precomputedModes,
   physics,
   qStrategyOverride,
   freqMinHz = 15,
   freqMaxHz = 200,
-  collectDiagnostics = false,
 }) {
   const widthM = Number(roomDims.widthM);
   const lengthM = Number(roomDims.lengthM);
   const heightM = Number(roomDims.heightM);
   const roomVolumeM3 = widthM * lengthM * heightM;
   const abSqrtVScale = Math.sqrt(Math.max(roomVolumeM3, 1e-6));
-  const invSqrtV = 1 / abSqrtVScale; // = √V / V = 1/√V
+  const invSqrtV = 1 / abSqrtVScale;
 
   const isAbCorrected = qStrategyOverride === 'ab_corrected';
   const applyModeMultiplicity = isAbCorrected ? true : physics.abApplyModeMultiplicity;
   const roomIsSealed = isAbCorrected ? true : physics.roomIsSealed;
-  const abGlobalQScale = 1; // production default
-  const abMidbandQScale = 1; // from engineOptionsBase
+  const abGlobalQScale = 1;
+  const abMidbandQScale = 1;
 
-  // Build frequency axis (same as simulateBassResponseRewCore)
   const freqsHz = buildFrequencyAxis(freqMinHz, freqMaxHz, undefined);
   const nFreqs = freqsHz.length;
 
-  // Build AB-corrected mode list (with sealed zero mode + Q scaling)
   const abModes = buildAbModes(precomputedModes, {
     abGlobalQScale, abMidbandQScale, roomIsSealed, applyModeMultiplicity,
   });
   const nModes = abModes.length;
 
-  // ── PRECOMPUTE FACTORED ARRAYS ──────────────────────────────────────────
-
   const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
-  // 1. Mode-frequency complex response H_n(f) — MODE × FREQUENCY
   const modeFreq = computeModeFrequencyResponse(abModes, freqsHz);
   const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
-  // 2. Source-mode coupling Ψ_n(s) — SOURCE × MODE
   const sourceModeCoupling = computeSourceModeCoupling(sources, abModes, { widthM, lengthM, heightM });
   const t2 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
-  // 3. Listener-mode coupling Ψ_n(r) — LISTENER × MODE
-  const listenerModeCoupling = computeListenerModeCoupling(listeners, abModes, { widthM, lengthM, heightM });
+  const modeWeight = computeModeWeights(abModes, applyModeMultiplicity);
   const t3 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
-  // 4. Mode weights M_n × W_n — MODE
-  const modeWeight = computeModeWeights(abModes, applyModeMultiplicity);
-  const t4 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-
-  // 5. Source-frequency amplitude A_s(f) — SOURCE × FREQUENCY
-  //    For each source, compute the derated product curve and interpolate.
-  //    Also compute the tuning rotation (identity for zero tuning).
   const nSources = sources.length;
   const sourceFreqAmplitude = new Array(nSources);
   const sourceTuningCos = new Array(nSources);
@@ -297,18 +294,59 @@ export function evaluateBatchModalTransfers({
     sourceTuningCos[si] = tuning.cos;
     sourceTuningSin[si] = tuning.sin;
   }
-  const t5 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  const t4 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
-  // ── COMPUTE TRANSFER MATRIX ─────────────────────────────────────────────
-  // For each (source, listener, frequency):
-  //   rawSumRe = Σ_n [ S[si][n] * L[li][n] * MW[n] * HRe[n][f] ]
-  //   rawSumIm = Σ_n [ S[si][n] * L[li][n] * MW[n] * HIm[n][f] ]
-  //   P_re = A_s(f) * invSqrtV * (rawSumRe * cos - rawSumIm * sin)
-  //   P_im = A_s(f) * invSqrtV * (rawSumRe * sin + rawSumIm * cos)
-  //
-  // For zero tuning: cos=1, sin=0, so P_re = A_s(f) * invSqrtV * rawSumRe
+  return {
+    _kind: 'preparedSourceRoomField',
+    abModes,
+    modeFreq,
+    sourceModeCoupling,
+    modeWeight,
+    sourceFreqAmplitude,
+    sourceTuningCos,
+    sourceTuningSin,
+    invSqrtV,
+    freqsHz,
+    nModes,
+    nFreqs,
+    nSources,
+    roomDims: { widthM, lengthM, heightM },
+    timing: {
+      modeFreqMs: t1 - t0,
+      sourceModeMs: t2 - t1,
+      modeWeightMs: t3 - t2,
+      sourceFreqMs: t4 - t3,
+      totalPrepMs: t4 - t0,
+    },
+  };
+}
+
+/**
+ * Evaluate per-source per-listener complex transfers from a prepared
+ * source/room field and a set of listener (receiver) positions.
+ * Only listener-dependent terms (listener-mode coupling + transfer matrix)
+ * are computed here.
+ *
+ * @param {object} preparedField — from prepareSourceRoomField
+ * @param {Array} listeners — [{ id, x, y, z }]
+ * @returns {{ freqsHz, perSourcePerListenerTransfers, timing }}
+ */
+export function evaluateReceiversFromPreparedField(preparedField, listeners) {
+  const {
+    modeFreq, sourceModeCoupling, modeWeight,
+    sourceFreqAmplitude, sourceTuningCos, sourceTuningSin,
+    invSqrtV, freqsHz, nModes, nFreqs, nSources,
+    roomDims, abModes,
+  } = preparedField;
 
   const nListeners = listeners.length;
+
+  const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
+  const listenerModeCoupling = computeListenerModeCoupling(listeners, abModes, roomDims);
+
+  const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
   const perSourcePerListenerTransfers = [];
 
   for (let si = 0; si < nSources; si++) {
@@ -332,11 +370,8 @@ export function evaluateBatchModalTransfers({
           rawSumIm += coupling * modeFreq.im[mfIdx];
         }
 
-        // Apply source amplitude and room scalar
         const amplitude = sourceFreqAmplitude[si][fi];
         const scalar = amplitude * invSqrtV;
-
-        // Apply tuning rotation (identity for zero tuning)
         const tCos = sourceTuningCos[si][fi];
         const tSin = sourceTuningSin[si][fi];
         reOut[fi] = scalar * (rawSumRe * tCos - rawSumIm * tSin);
@@ -355,36 +390,72 @@ export function evaluateBatchModalTransfers({
     }
   }
 
-  const t6 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-
-  const diagnostics = collectDiagnostics ? {
-    nModes,
-    nFreqs,
-    nSources,
-    nListeners,
-    timing: {
-      modeFreqMs: t1 - t0,
-      sourceModeMs: t2 - t1,
-      listenerModeMs: t3 - t2,
-      modeWeightMs: t4 - t3,
-      sourceFreqMs: t5 - t4,
-      transferMatrixMs: t6 - t5,
-      totalMs: t6 - t0,
-    },
-    memory: {
-      modeFreqRe: modeFreq.re.byteLength,
-      modeFreqIm: modeFreq.im.byteLength,
-      sourceModeCoupling: sourceModeCoupling.byteLength,
-      listenerModeCoupling: listenerModeCoupling.byteLength,
-      modeWeight: modeWeight.byteLength,
-      sourceFreqAmplitude: sourceFreqAmplitude.reduce((s, a) => s + a.byteLength, 0),
-      perSourcePerListenerTransfers: perSourcePerListenerTransfers.length * nFreqs * 2 * 8,
-    },
-  } : null;
+  const t2 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
   return {
     freqsHz,
     perSourcePerListenerTransfers,
+    timing: {
+      listenerModeMs: t1 - t0,
+      transferMatrixMs: t2 - t1,
+    },
+  };
+}
+
+/**
+ * Evaluate per-source per-listener complex transfers using the factored modal
+ * dot product. This is the EXACT equivalent of calling
+ * simulateBassResponseRewCore 120 times (20 sources × 6 listeners) with the
+ * AB-corrected path, product source curve, and zero tuning.
+ *
+ * Now delegates to prepareSourceRoomField + evaluateReceiversFromPreparedField
+ * so the invariant field can be reused across receiver sets.
+ */
+export function evaluateBatchModalTransfers({
+  roomDims,
+  sources,
+  listeners,
+  precomputedModes,
+  physics,
+  qStrategyOverride,
+  freqMinHz = 15,
+  freqMaxHz = 200,
+  collectDiagnostics = false,
+}) {
+  const prepared = prepareSourceRoomField({
+    roomDims, sources, precomputedModes, physics, qStrategyOverride, freqMinHz, freqMaxHz,
+  });
+
+  const receiverResult = evaluateReceiversFromPreparedField(prepared, listeners);
+
+  const diagnostics = collectDiagnostics ? {
+    nModes: prepared.nModes,
+    nFreqs: prepared.nFreqs,
+    nSources: prepared.nSources,
+    nListeners: listeners.length,
+    timing: {
+      modeFreqMs: prepared.timing.modeFreqMs,
+      sourceModeMs: prepared.timing.sourceModeMs,
+      listenerModeMs: receiverResult.timing.listenerModeMs,
+      modeWeightMs: prepared.timing.modeWeightMs,
+      sourceFreqMs: prepared.timing.sourceFreqMs,
+      transferMatrixMs: receiverResult.timing.transferMatrixMs,
+      totalMs: prepared.timing.totalPrepMs + receiverResult.timing.listenerModeMs + receiverResult.timing.transferMatrixMs,
+    },
+    memory: {
+      modeFreqRe: prepared.modeFreq.re.byteLength,
+      modeFreqIm: prepared.modeFreq.im.byteLength,
+      sourceModeCoupling: prepared.sourceModeCoupling.byteLength,
+      listenerModeCoupling: listeners.length * prepared.nModes * 8,
+      modeWeight: prepared.modeWeight.byteLength,
+      sourceFreqAmplitude: prepared.sourceFreqAmplitude.reduce((s, a) => s + a.byteLength, 0),
+      perSourcePerListenerTransfers: receiverResult.perSourcePerListenerTransfers.length * prepared.nFreqs * 2 * 8,
+    },
+  } : null;
+
+  return {
+    freqsHz: receiverResult.freqsHz,
+    perSourcePerListenerTransfers: receiverResult.perSourcePerListenerTransfers,
     diagnostics,
   };
 }

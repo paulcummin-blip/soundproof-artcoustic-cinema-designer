@@ -41,7 +41,7 @@ function responseCurve(response) {
   return raw.filter((point, index) => !raw[index + 1] || Math.abs(point.frequency - raw[index + 1].frequency) >= 1e-9);
 }
 
-function buildResponseCurves(seatResponses) {
+export function buildResponseCurves(seatResponses) {
   return {
     rspRawCurve: responseCurve(seatResponses?.rsp),
     perSeatRawCurves: Object.entries(seatResponses || {})
@@ -73,7 +73,7 @@ function buildStage2Physics() {
 // for sub ID generation (front-sub-left, front-sub-right, rear-sub-left, ...).
 const STAGE2_POSITION_LABELS = ["left", "right"];
 
-function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, rspPosition, zeroTuning = false) {
+export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, rspPosition, zeroTuning = false) {
   const W = Number(roomDims.widthM);
   const L = Number(roomDims.lengthM);
   const bottomHeightM = (subwooferBottomHeightM != null && Number.isFinite(Number(subwooferBottomHeightM)))
@@ -140,21 +140,21 @@ function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPower
 
 // ── Usable LF / transition ───────────────────────────────────────────────
 
-function computeUsableLfHz(sources) {
+export function computeUsableLfHz(sources) {
   const usable = sources
     .map((sub) => MODELS.find((model) => model.key === normaliseModelKey(sub.modelKey))?.approvedUsableLfHzMinus6dB)
     .filter(Number.isFinite);
   return usable.length ? Math.max(...usable) : null;
 }
 
-function computeTransitionHz(roomDims) {
+export function computeTransitionHz(roomDims) {
   const volume = Number(roomDims?.widthM) * Number(roomDims?.lengthM) * Number(roomDims?.heightM);
   return volume > 0 ? 2000 * Math.sqrt(0.4 / volume) : 120;
 }
 
 // ── Seat priority map ────────────────────────────────────────────────────
 
-function buildSeatPriorityMap(seatingPositions) {
+export function buildSeatPriorityMap(seatingPositions) {
   const map = new Map();
   (Array.isArray(seatingPositions) ? seatingPositions : []).forEach((seat) => {
     const id = String(seat.id || `${seat.x}-${seat.y}`);
