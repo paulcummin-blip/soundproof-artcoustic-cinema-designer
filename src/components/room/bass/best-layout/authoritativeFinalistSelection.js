@@ -84,7 +84,7 @@ function effectiveActiveCount(layout) {
  * A candidate that drops any of these levels is rejected before the Pareto
  * filter — these are hard gates, not preferences.
  */
-function hasLevelRegression(candidateMetrics, currentMetrics) {
+export function hasLevelRegression(candidateMetrics, currentMetrics) {
   if (!currentMetrics) return { regressed: false };
   if (candidateMetrics.p14Level < currentMetrics.p14Level) {
     return { regressed: true, parameter: "P14", current: currentMetrics.p14Level, candidate: candidateMetrics.p14Level };
