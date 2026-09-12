@@ -75,3 +75,15 @@ test("Apply emits valid canonical stored polarity (+1/-1) for actual hydration",
  assert.equal(out.find(s=>s.id==="front").polarity,-1);
  assert.equal(out.find(s=>s.id==="rear").polarity,1);
 });
+
+test("Current fallback resolves manual plus auto against the captured geometry", async()=>{
+ const { resolveInstalledEffectiveTuning } = await import("../src/components/room/bass/improveBassV2/improveBassV2Engine.js");
+ const raw={sources:[{x:0,y:0,z:0},{x:0,y:1,z:0}]},rsp={x:0,y:2,z:0};
+ const manual=[{id:"far",delayMs:2,gainDb:-1,polarity:1},{id:"near",delayMs:1,gainDb:0,polarity:-1}];
+ const resolved=resolveInstalledEffectiveTuning(raw,manual,rsp);
+ near(resolved[0].delayMs,2);near(resolved[1].delayMs,2+1000/343);assert.equal(resolved[1].polarity,-1);
+ const mixed=resolveInstalledEffectiveTuning(raw,[{...manual[0],tuningSource:"v2-optimised"},manual[1]],rsp);
+ near(mixed[0].delayMs,2);near(mixed[1].delayMs,2+1000/343);
+ const effective=resolveInstalledEffectiveTuning(raw,manual.map(s=>({...s,tuningSource:"v2-optimised"})),rsp);
+ assert.deepEqual(effective.map(s=>s.delayMs),[2,1]);
+});
