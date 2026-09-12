@@ -1,3 +1,5 @@
+import { validateConfirmedCandidate, effectiveConfigurationKey } from "./confirmedCandidateValidity.js";
+import { selectConfirmedRecommendations } from "./confirmedRecommendationSelection.js";
 import { bindTuningToSourceIds } from "./improveBassV2ApplyCalibration.js";
 import { buildAuthoritativeAutoAlignDelays } from "../useAuthoritativeBassResponse.js";
 // improveBassV2Engine.js
@@ -296,7 +298,8 @@ function runProxySearch(candidate) {
 
   return {
     tuning, delays: best.delays, gains: best.gains, polarities: best.polarities,
-    score: best.score || Infinity,
+    score: best.score ?? Infinity,
+    alternatives: searchResult.finalists.slice(1),
     proxyP19: proxyMetrics.proxyP19,
     proxyP20: proxyMetrics.proxyP20,
     proxyBalanced: proxyMetrics.proxyBalanced,
@@ -429,142 +432,8 @@ function promoteChallengers(candidates, maxChallengers) {
 // ---------------------------------------------------------------------------
 
 export function selectWinnerWithProtection(confirmedResults, snapshot, existingAuthority) {
-  // BLOCKER 4: If no confirmed results and no existing authority, NO_WINNER.
-  if (!confirmedResults.length && !existingAuthority) {
-    return {
-      isCurrent: true,
-      winner: null,
-      message: "No verified material automatic improvement found.",
-      confirmedResults,
-      currentResult: null,
-    };
-  }
-
-  const challengerResults = confirmedResults.filter((r) => !r.isCurrent);
-
-  // BLOCKER 2: Use the existing authority as the Current control when available.
-  // The existing authority is the REAL current design's canonical result.
-  const useExistingAuthority = !!existingAuthority;
-
-  const currentLayout = useExistingAuthority
-    ? {
-        metrics: {
-          perSeatP19: existingAuthority.perSeatP19 || [],
-          perSeatP20: existingAuthority.perSeatP20 || [],
-          achievedP19VariationDb: existingAuthority.achievedP19VariationDb,
-          achievedP19Level: existingAuthority.achievedP19Level,
-          achievedP20VariationDb: existingAuthority.achievedP20VariationDb,
-          achievedP20Level: existingAuthority.achievedP20Level,
-          p18AchievedLevel: existingAuthority.p18AchievedLevel,
-          achievedP18Hz: existingAuthority.achievedP18Hz,
-          p14AchievedLevel: existingAuthority.p14AchievedLevel,
-          p14AchievedDb: existingAuthority.p14AchievedDb,
-        },
-        sources: (snapshot.positions || []).map((pos, i) => ({
-          id: snapshot.instanceIds?.[i] || `sub-${i + 1}`,
-          tuning: snapshot.tuning?.[i] || { gainDb: 0 },
-        })),
-      }
-    : null;
-
-  // If there's a canonically recalculated Current (from confirmation), use it
-  // for the layout. Otherwise use the existing authority.
-  const recalculatedCurrent = confirmedResults.find((r) => r.isCurrent);
-  if (recalculatedCurrent) {
-    currentLayout.metrics = {
-      perSeatP19: recalculatedCurrent.perSeatP19 || [],
-      perSeatP20: recalculatedCurrent.perSeatP20 || [],
-      achievedP19VariationDb: recalculatedCurrent.achievedP19VariationDb,
-      achievedP19Level: recalculatedCurrent.achievedP19Level,
-      achievedP20VariationDb: recalculatedCurrent.achievedP20VariationDb,
-      achievedP20Level: recalculatedCurrent.achievedP20Level,
-      p18AchievedLevel: recalculatedCurrent.p18AchievedLevel,
-      achievedP18Hz: recalculatedCurrent.achievedP18Hz,
-      p14AchievedLevel: recalculatedCurrent.p14AchievedLevel,
-      p14AchievedDb: recalculatedCurrent.p14AchievedDb,
-    };
-  }
-
-  // BLOCKER 4: No challengers → NO_WINNER (Current retained)
-  if (!challengerResults.length) {
-    return {
-      isCurrent: true,
-      winner: null,
-      message: "No verified material automatic improvement found.",
-      confirmedResults,
-      currentResult: recalculatedCurrent || existingAuthority,
-    };
-  }
-
-  const quantityResult = {
-    evaluatedFinalists: challengerResults.map((r) => ({
-      ...r,
-      finalistId: r.candidateId || r.finalistId,
-    })),
-  };
-
-  const selection = selectAuthoritativeFinalist(quantityResult, null, currentLayout);
-
-  if (selection.isCurrent || !selection.winner) {
-    return {
-      isCurrent: true,
-      winner: null,
-      message: "No verified material automatic improvement found.",
-      confirmedResults,
-      currentResult: recalculatedCurrent || existingAuthority,
-    };
-  }
-
-  const winnerResult = selection.winner;
-  const currentForRegression = recalculatedCurrent || existingAuthority;
-  if (currentForRegression) {
-    const regression = hasPrimarySeatRegression(winnerResult, currentForRegression);
-    if (regression.regressed) {
-      return {
-        isCurrent: true,
-        winner: null,
-        message: "No verified material automatic improvement found.",
-        rejectionReason: `Candidate improved headline but damaged primary seat ${regression.seatId} ${regression.parameter} (L${regression.currentLevel} → L${regression.candidateLevel})`,
-        confirmedResults,
-        currentResult: currentForRegression,
-      };
-    }
-  }
-
-  // Enforce the canonical material-improvement gate: a candidate that fails
-  // isMaterialImprovement MUST NOT become the visible recommendation, even if
-  // it ranks first among weak candidates. The correct outcome is then
-  // "No verified material automatic improvement found".
-  if (existingAuthority && winnerResult) {
-    const matCheck = isMaterialImprovement(existingAuthority, winnerResult);
-    if (!matCheck.material) {
-      return {
-        isCurrent: true,
-        winner: null,
-        message: "No verified material automatic improvement found.",
-        materialityReason: matCheck.reason,
-        confirmedResults,
-        currentResult: currentForRegression,
-      };
-    }
-    return {
-      isCurrent: false,
-      winner: winnerResult,
-      message: null,
-      confirmedResults,
-      currentResult: currentForRegression,
-      materialityReason: matCheck.reason,
-    };
-  }
-
-  return {
-    isCurrent: false,
-    winner: winnerResult,
-    message: null,
-    confirmedResults,
-    currentResult: currentForRegression,
-    materialityReason: null,
-  };
+  const current = existingAuthority || confirmedResults.find(r=>r.candidateKind === "current" || r.candidateId === "current");
+  return selectConfirmedRecommendations(confirmedResults,snapshot,current);
 }
 
 // ---------------------------------------------------------------------------
@@ -680,10 +549,17 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     // reconstruct a partial calibration fingerprint — it consumes the
     // production-resolved condition directly.
     const authorityNonStale = isCurrentAuthorityNonStale(currentAuthority, liveCacheKey);
-    const existingAuthority = authorityNonStale
+    let existingAuthority = authorityNonStale
       ? extractAuthorityForComparison(currentAuthority)
       : null;
-    metrics.recordCurrentReuse(authorityNonStale);
+    const validationContext = {seats:seatingPositions,sourceIds:snapshot.instanceIds,inputIdentity:startFingerprint};
+    snapshot.validationContext = validationContext;
+    if (existingAuthority) {
+      existingAuthority.inputIdentity=startFingerprint;
+      const check=validateConfirmedCandidate(existingAuthority,validationContext);
+      existingAuthority=check.valid?check.result:null;
+    }
+    metrics.recordCurrentReuse(!!existingAuthority);
     metrics.recordPlacementFingerprint(placementFingerprint);
 
     await yieldToUI();
@@ -696,6 +572,19 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     let calibrationResult = null;
     let calibrationMaterial = null;
     let calibrationTuning = null;
+    const calibrationCandidates = [];
+    const evaluationIssues = [];
+    const calibrationDiagnostics = {status:"incomplete",retained:0,confirmed:0,valid:0,invalid:0,shortlistComplete:false,options:[]};
+    function bindConfirmation(result, tuning, candidate, kind) {
+      const appliedTuning=bindTuningToSourceIds(tuning,snapshot.instanceIds);
+      const positions=candidate.coordinates || result.coordinates || snapshot.positions;
+      const instances=snapshot.allInstances.filter(s=>s.enabled!==false).map((s,i)=>({...s,position:{...s.position,...positions[i]}}));
+      const configurationKey=effectiveConfigurationKey(instances,appliedTuning);
+      let hash=2166136261;for(const ch of configurationKey)hash=Math.imul(hash^ch.charCodeAt(0),16777619);
+      return {...result,appliedTuning,configurationKey,inputIdentity:startFingerprint,candidateKind:kind,
+        candidateId:kind==="current"?"current":kind==="calibration"?"calibration:"+(hash>>>0).toString(16):candidate.id,
+        isCurrent:kind==="current",candidateOrigin:kind==="calibration"?"calibration-only":candidate.candidateOrigin};
+    }
 
     try {
       onProgress("calibrating", "Searching calibration improvements", 0, 2);
@@ -735,47 +624,41 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         const calibrationSearch = runCalibrationOnlySearch(currentRawTransfer);
         onProgress("calibrating", "Searching calibration improvements", 1, 2);
 
-        if (calibrationSearch?.bestTuning) {
-          // Confirm through the full canonical chain (EQ, P14, P18, P19, P20)
-          const _confirmT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-          const calibrationConfirmation = await runInWorker(worker, "confirmation", {
-            rawTransfer: currentRawTransfer,
-            tuning: calibrationSearch.bestTuning,
-            tuningVariant: "delay-polarity-trim",
-            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
-          }, controller.signal);
-          metrics.recordWorkerCall("confirmation", "calibration",
-            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _confirmT0, false);
-
-          if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
-
-          if (calibrationConfirmation) {
-            calibrationConfirmation.candidateId = "calibration-only";
-            calibrationConfirmation.isCurrent = true;
-            calibrationConfirmation.appliedTuning = bindTuningToSourceIds(calibrationSearch.bestTuning, snapshot.instanceIds);
-            calibrationTuning = calibrationConfirmation.appliedTuning;
-            calibrationResult = calibrationConfirmation;
-
-            // Apply materiality gate against installed tuning
-            if (existingAuthority) {
-              calibrationMaterial = isMaterialImprovement(existingAuthority, calibrationConfirmation);
-            } else {
-              // No existing authority — first calibration result, always show it
-              calibrationMaterial = { material: true, reason: "First calibration result" };
-            }
-          }
+        const retained=calibrationSearch?.candidates || (calibrationSearch?.bestTuning?[{tuning:calibrationSearch.bestTuning,score:calibrationSearch.searchScore}]:[]);
+        calibrationDiagnostics.retained=retained.length;
+        calibrationDiagnostics.options=retained.map(f=>({tuning:f.tuning,proxyScore:f.score}));
+        for (let index=0;index<retained.length;index++) {
+          if(isCancelled()) return {status:"cancelled",snapshot};
+          if(isStale()) return {status:"stale",snapshot};
+          const _confirmT0=performance.now();
+          const response=await runInWorker(worker,"confirmation",{
+            rawTransfer:currentRawTransfer,tuning:retained[index].tuning,tuningVariant:"delay-polarity-trim",
+            p14TargetBasis,p14TargetLevel,p14TargetDb,p18TargetBasis,
+          },controller.signal);
+          metrics.recordWorkerCall("confirmation","calibration:"+index,performance.now()-_confirmT0,false);
+          if(isStale()) return {status:"stale",snapshot};
+          const result=response?bindConfirmation(response,retained[index].tuning,currentFinalist,"calibration"):null;
+          const check=validateConfirmedCandidate(result,validationContext);
+          calibrationDiagnostics.confirmed++;
+          calibrationDiagnostics.options[index].validity={valid:check.valid,issues:check.issues};
+          if(check.valid){calibrationCandidates.push(check.result);calibrationDiagnostics.valid++;}
+          else {calibrationDiagnostics.invalid++;evaluationIssues.push({stage:"calibration",index,issues:check.issues});}
         }
+        calibrationDiagnostics.status=calibrationDiagnostics.valid?"completed-shortlist":"incomplete";
+
       }
     } catch (err) {
       if (isFatalLifecycleError(err)) throw err;
-      // Calibration-only search failed — continue with challenger flow
+      calibrationDiagnostics.error=err.message;
+      evaluationIssues.push({stage:"calibration",error:err.message});
+      // Preserve the failed evaluation while continuing the existing position flow.
     }
 
     onProgress("calibrating", "Searching calibration improvements", 2, 2);
     // Publish stage verdicts for the combined calibration search (phase/delay/gain
     // are tested together in searchDelayPolarityTrim — all three share the same
     // verdict). Purely observational — does not change any logic.
-    const calVerdict = calibrationMaterial?.material ? "improvement" : "no_improvement";
+    const calVerdict = calibrationDiagnostics.invalid || calibrationDiagnostics.error || !calibrationDiagnostics.valid ? "incomplete" : "done";
     setStageVerdict(projectId, "phase_polarity", calVerdict);
     setStageVerdict(projectId, "delays", calVerdict);
     setStageVerdict(projectId, "gain", calVerdict);
@@ -812,6 +695,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           if (isFatalLifecycleError(err)) throw err;
           allCandidates[i].rawTransfer = null;
           allCandidates[i].error = err.message;
+          evaluationIssues.push({stage:"global",candidateId:allCandidates[i].id,error:err.message});
         }
       } else {
         metrics.recordStage2TransferReused();
@@ -837,7 +721,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     // BLOCKER 2: If no valid authority exists, canonically recalculate Current
     // with the EXACT installed tuning (no proxy optimisation).
     const confirmedResults = [];
-    if (!authorityNonStale) {
+    if (!existingAuthority) {
       if (isCancelled()) return { status: "cancelled", snapshot };
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
       try {
@@ -886,10 +770,10 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
 
           if (currentConfirmation) {
-            currentConfirmation.candidateId = "current";
-            currentConfirmation.isCurrent = true;
-            currentConfirmation.appliedTuning = installedTuning;
-            confirmedResults.push(currentConfirmation);
+            const current=bindConfirmation(currentConfirmation,installedTuning,currentFinalist,"current");
+            const check=validateConfirmedCandidate(current,validationContext);
+            if(check.valid){existingAuthority=check.result;confirmedResults.push(existingAuthority);}
+            else evaluationIssues.push({stage:"current",issues:check.issues});
           }
         }
       } catch (err) {
@@ -897,6 +781,19 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       }
       await yieldToUI();
     }
+
+    if(existingAuthority){
+      snapshot.effectiveTuning=existingAuthority.appliedTuning;
+      snapshot.effectiveConfiguration=effectiveConfigurationKey(snapshot.allInstances,existingAuthority.appliedTuning);
+      const calSelection=selectConfirmedRecommendations(calibrationCandidates,snapshot,existingAuthority);
+      calibrationResult=calSelection.winner;
+      calibrationTuning=calibrationResult?.appliedTuning || null;
+      calibrationMaterial={material:!!calibrationResult,reason:calSelection.materialityReason};
+      calibrationDiagnostics.evaluations=calSelection.evaluations;
+      for(const stage of ["phase_polarity","delays","gain"])setStageVerdict(projectId,stage,
+        calibrationResult?"improvement":calibrationDiagnostics.invalid || calibrationDiagnostics.error || !calibrationDiagnostics.valid?"incomplete":"no_improvement");
+    }
+    const attemptedConfirmationIds=new Set();
 
     // ── Stage 11B: Iterative position escalation ────────────────────────
     // Symmetric → confirm → test materiality → only if not material:
@@ -948,10 +845,11 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         );
       } catch (err) {
         if (isFatalLifecycleError(err)) throw err;
+        evaluationIssues.push({stage:escPhase.name,error:err.message});
         phaseResult = { promoted: [], funnel: { generated: 0, screened: 0, promotedToV2: 0 }, timingMs: 0 };
       }
 
-      funnel[funnelKey] = { ...phaseResult.funnel, confirmed: 0 };
+      funnel[funnelKey] = { ...phaseResult.funnel, confirmed: 0, confirmationAttempts:0, completed:!evaluationIssues.some(e=>e.stage===escPhase.name) };
       phasesRun.push(escPhase.name);
 
       onProgress(`screening_${escPhase.name}`,
@@ -980,6 +878,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           if (isFatalLifecycleError(err)) throw err;
           c.rawTransfer = null;
           c.error = err.message;
+          evaluationIssues.push({stage:escPhase.name,candidateId:c.id,error:err.message});
         }
         await yieldToUI();
       }
@@ -1002,7 +901,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
 
       // ── Confirm only NEW promoted candidates (skip already-confirmed)
       const confirmedIds = new Set(confirmedResults.map((r) => r.candidateId));
-      const newPromoted = promoted.filter((p) => !confirmedIds.has(p.id));
+      const newPromoted = promoted.filter((p) => !confirmedIds.has(p.id) && !attemptedConfirmationIds.has(p.id));
 
       onProgress(`confirming_${escPhase.name}`, escPhase.confirmLabel, 0, newPromoted.length);
       let phaseConfirmedCount = 0;
@@ -1012,9 +911,13 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
         try {
           const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+          attemptedConfirmationIds.add(newPromoted[i].id);
+          const options=[newPromoted[i].proxyResult,...(newPromoted[i].proxyResult?.alternatives || [])];
+          for (const option of options) {
+          funnel[funnelKey].confirmationAttempts++;
           const result = await runInWorker(worker, "confirmation", {
             rawTransfer: newPromoted[i].rawTransfer,
-            tuning: newPromoted[i].proxyResult?.tuning,
+            tuning: option?.tuning,
             tuningVariant: "delay-polarity-trim",
             p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
           }, controller.signal);
@@ -1022,36 +925,32 @@ export async function runImproveBassV2(projectId, params, callbacks) {
             (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
           if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
           if (result) {
-            result.candidateId = newPromoted[i].id;
-            result.isCurrent = false;
-            result.appliedTuning = bindTuningToSourceIds(newPromoted[i].proxyResult?.tuning, snapshot.instanceIds);
-            // Carry position candidate metadata through confirmation
-            if (newPromoted[i].isPositionCandidate) {
-              result.isPositionCandidate = true;
-              result.positionPhase = newPromoted[i].phase;
-              result.movementDescription = newPromoted[i].movement;
-              result.positionCoordinates = newPromoted[i].coordinates;
-              result.candidateOrigin = newPromoted[i].candidateOrigin;
-            } else {
-              result.candidateOrigin = newPromoted[i].candidateOrigin || "global-placement";
-            }
-            confirmedResults.push(result);
-            phaseConfirmedCount++;
-            metrics.recordChallengerConfirmed();
-            onBestSoFar({ result, candidate: newPromoted[i] });
+            const candidate=newPromoted[i];
+            const bound=bindConfirmation(result,option?.tuning,candidate,"position");
+            Object.assign(bound,{isPositionCandidate:true,positionPhase:candidate.phase,
+              movementDescription:candidate.movement,positionCoordinates:candidate.coordinates || result.coordinates,
+              candidateOrigin:candidate.candidateOrigin || "global-placement"});
+            const check=validateConfirmedCandidate(bound,validationContext);
+            if(check.valid){confirmedResults.push(check.result);phaseConfirmedCount++;metrics.recordChallengerConfirmed();onBestSoFar({result:check.result,candidate});break;}
+            else evaluationIssues.push({stage:escPhase.name,candidateId:candidate.id,issues:check.issues});
+          } else evaluationIssues.push({stage:escPhase.name,candidateId:newPromoted[i].id,issues:["Missing confirmation"]});
           }
         } catch (err) {
           if (isFatalLifecycleError(err)) throw err;
+          evaluationIssues.push({stage:escPhase.name,candidateId:newPromoted[i].id,error:err.message});
         }
         onProgress(`confirming_${escPhase.name}`, `${escPhase.confirmLabel} (${i + 1}/${newPromoted.length})`, i + 1, newPromoted.length);
         await yieldToUI();
       }
 
       funnel[funnelKey].confirmed = phaseConfirmedCount;
+      funnel[funnelKey].completed = !evaluationIssues.some(e=>e.stage===escPhase.name);
+      funnel[funnelKey].invalid = evaluationIssues.filter(e=>e.stage===escPhase.name).length;
 
       // ── Check CANONICAL materiality — proxy does NOT decide this
       if (existingAuthority) {
-        const matCheck = checkPhaseMateriality(confirmedResults, existingAuthority);
+        const chosen = selectConfirmedRecommendations(confirmedResults,snapshot,existingAuthority);
+        const matCheck = {material:!!chosen.winner,winner:chosen.winner};
         if (matCheck.material) {
           materialSubImprovementFound = true;
           break; // STOP escalation — material improvement found
@@ -1064,12 +963,15 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
 
     // Publish sub_positions stage verdict (purely observational)
-    setStageVerdict(projectId, "sub_positions", materialSubImprovementFound ? "improvement" : "no_improvement");
+    setStageVerdict(projectId, "sub_positions", materialSubImprovementFound ? "improvement" : evaluationIssues.some(e=>e.stage!=="calibration") ? "incomplete" : "no_improvement");
 
     // ── Phase 8: Final single winner selection ───────────────────────────
     onProgress("finalising", "Finalising recommendation", 0, 1);
     setStageVerdict(projectId, "comparing", "done");
-    const selection = selectWinnerWithProtection(confirmedResults, snapshot, existingAuthority);
+    snapshot.evaluationIncomplete=evaluationIssues.length>0;
+    const selection = selectWinnerWithProtection([...confirmedResults,...calibrationCandidates], snapshot, existingAuthority);
+    selection.calibrationDiagnostics=calibrationDiagnostics;
+    selection.evaluationIssues=evaluationIssues;
     setStageVerdict(projectId, "preparing", "done");
     await yieldToUI();
 
@@ -1090,15 +992,12 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       return runResult;
     }
 
-    // Stage 11A: Attach calibration-only result to the selection
-    if (calibrationResult) {
-      selection.calibrationResult = calibrationResult;
-      selection.calibrationMaterial = calibrationMaterial;
-      selection.calibrationTuning = calibrationTuning;
-    }
+    selection.calibrationTuning=selection.calibrationResult?.appliedTuning || null;
 
     // Stage 11B: Build per-phase exhaustion state from the unified winner
     const positionOpt = buildPositionOptimisationState(phasesRun, funnel, existingAuthority, selection.winner);
+    if (evaluationIssues.length || calibrationDiagnostics.status === "incomplete") positionOpt.subOptimisationExhausted=false;
+    selection.evaluationCounts={calibration:calibrationDiagnostics,...funnel};
     materialSubImprovementFound = positionOpt.materialSubImprovementFound;
     subOptimisationExhausted = positionOpt.subOptimisationExhausted;
     setPositionExhaustion(projectId, subOptimisationExhausted, materialSubImprovementFound, selection.winner);
