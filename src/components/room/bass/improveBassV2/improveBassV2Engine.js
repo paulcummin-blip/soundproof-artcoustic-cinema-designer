@@ -647,6 +647,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
   const startFingerprint = computeV2DesignFingerprint({
     subwooferInstances, roomDims, seatingPositions, rspPosition,
     selectedSubModel, p14TargetBasis, p14TargetLevel, p14TargetDb,
+    p18TargetBasis, amplifierPowerPerSubW,
   });
 
   function isStale() {
