@@ -117,4 +117,3 @@ test("mounted engine identity agrees with UI amplifier/P18 inputs and still reje
   }
  } finally {globalThis.Worker=OriginalWorker;}
 });
-
