@@ -13,6 +13,27 @@
 //   - treatment
 //   - product selection
 
+// New confirmations bind tuning to the frozen source order once. Legacy helper
+// inputs without IDs remain readable; mounted Apply accepts only a fresh result.
+export function bindTuningToSourceIds(tuning, sourceIds) {
+  if (!Array.isArray(tuning) || tuning.length !== sourceIds?.length ||
+      new Set(sourceIds).size !== sourceIds.length || sourceIds.some((id) => !id)) {
+    throw new Error("Confirmed tuning does not match the captured source identities");
+  }
+  return tuning.map((t, i) => ({ ...t, sourceId: sourceIds[i] }));
+}
+
+export function resolveTuningInstances(currentInstances, tuning) {
+  const active = (currentInstances || []).filter((s) => s.enabled !== false);
+  if (active.length !== tuning?.length) return null;
+  const hasIds = tuning.some((t) => t?.sourceId != null);
+  if (!hasIds) return active; // Legacy pure-helper input; never emitted by V2.
+  const byId = new Map(active.map((s) => [s.id, s]));
+  if (byId.size !== active.length || new Set(tuning.map((t) => t.sourceId)).size !== tuning.length) return null;
+  const ordered = tuning.map((t) => byId.get(t.sourceId));
+  return ordered.every(Boolean) ? ordered : null;
+}
+
 const TUNING_TOLERANCE_DELAY_MS = 0.1;
 const TUNING_TOLERANCE_GAIN_DB = 0.1;
 
@@ -34,24 +55,21 @@ export function applyCalibrationTuning(currentInstances, calibrationTuning) {
     return currentInstances || [];
   }
 
-  const activeInstances = currentInstances.filter((s) => s.enabled !== false);
-  const disabledInstances = currentInstances.filter((s) => s.enabled === false);
-
-  const updated = activeInstances.map((inst, i) => {
-    const t = calibrationTuning[i] || { delayMs: 0, gainDb: 0, polarity: 0 };
+  const ordered = resolveTuningInstances(currentInstances, calibrationTuning);
+  if (!ordered) throw new Error("Cannot Apply tuning to changed source identities");
+  const byId = new Map(ordered.map((inst, i) => [inst.id, calibrationTuning[i]]));
+  return currentInstances.map((inst) => {
+    if (inst.enabled === false) return inst;
+    const t = byId.get(inst.id);
     return {
       ...inst,
-      // Mark tuning as V2-optimised so the production bass engine bypasses
-      // auto-align for this applied state. The V2 calibration delays are the
-      // FINAL effective delays — adding auto-align would double-compensate.
+      // Absolute effective delay, evaluated on untuned source transfers.
       tuningSource: "v2-optimised",
       delayMs: Number(t.delayMs) || 0,
       gainDb: Number(t.gainDb) || 0,
-      polarity: Number(t.polarity) || 0,
+      polarity: normalisePolarity(t.polarity),
     };
   });
-
-  return [...updated, ...disabledInstances];
 }
 
 /**
@@ -65,8 +83,8 @@ export function applyCalibrationTuning(currentInstances, calibrationTuning) {
 export function isCalibrationApplied(currentInstances, calibrationTuning) {
   if (!Array.isArray(currentInstances) || !Array.isArray(calibrationTuning)) return false;
 
-  const activeInstances = currentInstances.filter((s) => s.enabled !== false);
-  if (activeInstances.length !== calibrationTuning.length) return false;
+  const activeInstances = resolveTuningInstances(currentInstances, calibrationTuning);
+  if (!activeInstances) return false;
 
   for (let i = 0; i < calibrationTuning.length; i++) {
     const t = calibrationTuning[i] || { delayMs: 0, gainDb: 0, polarity: 0 };
@@ -91,7 +109,8 @@ export function isCalibrationApplied(currentInstances, calibrationTuning) {
 export function buildCalibrationChangeSummary(currentInstances, calibrationTuning) {
   if (!Array.isArray(currentInstances) || !Array.isArray(calibrationTuning)) return null;
 
-  const activeInstances = currentInstances.filter((s) => s.enabled !== false);
+  const activeInstances = resolveTuningInstances(currentInstances, calibrationTuning);
+  if (!activeInstances) return null;
   const changes = { delays: [], trims: [], polarities: [] };
 
   for (let i = 0; i < calibrationTuning.length; i++) {
