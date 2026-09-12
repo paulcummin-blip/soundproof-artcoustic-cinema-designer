@@ -39,7 +39,7 @@ export function createGroupedDelayCandidate(grouping, baseline, direction, adjus
 }
 
 export function generateGroupedCoarseCandidates(grouping, baseline, processorDelayLimitMs=null) {
-  if(!Array.isArray(baseline)||!baseline.length||new Set(baseline.map(t=>t.sourceId)).size!==baseline.length||baseline.some(t=>!t.sourceId||!Number.isFinite(t.delayMs)||t.delayMs<0||!Number.isFinite(t.gainDb)||![0,1,-1,180].includes(t.polarity)))throw Error("Missing valid frozen effective source tuning");
+  if(!Array.isArray(baseline)||!baseline.length||new Set(baseline.map(t=>t?.sourceId)).size!==baseline.length||baseline.some(t=>!t?.sourceId||!Number.isFinite(t.delayMs)||t.delayMs<0||!Number.isFinite(t.gainDb)||![0,1,-1,180].includes(t.polarity)))throw Error("Missing valid frozen effective source tuning");
   const rows=[createGroupedDelayCandidate(grouping,baseline,"current",0,processorDelayLimitMs)];
   if(grouping.status!=="eligible")return rows;
   const groupedIds=grouping.groups.flatMap(g=>g.sourceIds);
