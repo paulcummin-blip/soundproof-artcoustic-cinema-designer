@@ -67,7 +67,8 @@ export function applyCalibrationTuning(currentInstances, calibrationTuning) {
       tuningSource: "v2-optimised",
       delayMs: Number(t.delayMs) || 0,
       gainDb: Number(t.gainDb) || 0,
-      polarity: normalisePolarity(t.polarity),
+      // Canonical persisted instances require +1 normal / -1 inverted.
+      polarity: normalisePolarity(t.polarity) < 0 ? -1 : 1,
     };
   });
 }
