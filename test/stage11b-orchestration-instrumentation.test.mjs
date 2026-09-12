@@ -26,12 +26,12 @@ const existingAuthority = {
   achievedP19VariationDb: 6.0,
   achievedP20VariationDb: 5.0,
   perSeatP19: [
-    { seatId: "seat-r1-c1", isPrimary: true, level: 2, variationDbRaw: 6.0 },
-    { seatId: "seat-r1-c2", isPrimary: true, level: 2, variationDbRaw: 6.5 },
+    { seatId: "seat-r1-c1", isPrimary: true, level: 0, variationDbRaw: 6.0 },
+    { seatId: "seat-r1-c2", isPrimary: true, level: 0, variationDbRaw: 6.5 },
   ],
   perSeatP20: [
-    { seatId: "seat-r1-c1", isPrimary: true, level: 2, variationDbRaw: 5.0 },
-    { seatId: "seat-r1-c2", isPrimary: true, level: 2, variationDbRaw: 5.5 },
+    { seatId: "seat-r1-c1", isPrimary: true, level: 1, variationDbRaw: 5.0 },
+    { seatId: "seat-r1-c2", isPrimary: true, level: 1, variationDbRaw: 5.5 },
   ],
   p14AchievedLevel: 2,
   p18AchievedLevel: 2,
@@ -49,12 +49,12 @@ const regressionCandidate = {
   achievedP19VariationDb: 4.0,
   achievedP20VariationDb: 5.0,
   perSeatP19: [
-    { seatId: "seat-r1-c1", isPrimary: true, level: 3, variationDbRaw: 4.0 }, // improved
-    { seatId: "seat-r1-c2", isPrimary: true, level: 1, variationDbRaw: 8.0 }, // DEGRADED L2→L1
+    { seatId: "seat-r1-c1", isPrimary: true, level: 2, variationDbRaw: 4.0 }, // improved
+    { seatId: "seat-r1-c2", isPrimary: true, level: 0, variationDbRaw: 8.0 }, // DEGRADED L2→L1
   ],
   perSeatP20: [
-    { seatId: "seat-r1-c1", isPrimary: true, level: 2, variationDbRaw: 5.0 },
-    { seatId: "seat-r1-c2", isPrimary: true, level: 2, variationDbRaw: 5.5 },
+    { seatId: "seat-r1-c1", isPrimary: true, level: 1, variationDbRaw: 5.0 },
+    { seatId: "seat-r1-c2", isPrimary: true, level: 1, variationDbRaw: 5.5 },
   ],
   p14AchievedLevel: 2,
   p18AchievedLevel: 2,
@@ -73,8 +73,8 @@ const safeCandidate = {
   achievedP19VariationDb: 4.0,
   achievedP20VariationDb: 3.0,
   perSeatP19: [
-    { seatId: "seat-r1-c1", isPrimary: true, level: 3, variationDbRaw: 4.0 },
-    { seatId: "seat-r1-c2", isPrimary: true, level: 3, variationDbRaw: 4.5 },
+    { seatId: "seat-r1-c1", isPrimary: true, level: 2, variationDbRaw: 4.0 },
+    { seatId: "seat-r1-c2", isPrimary: true, level: 2, variationDbRaw: 4.5 },
   ],
   perSeatP20: [
     { seatId: "seat-r1-c1", isPrimary: true, level: 3, variationDbRaw: 3.0 },
@@ -97,16 +97,16 @@ const globalBetter = {
   isCurrent: false, candidateId: "global-1", candidateOrigin: "global-placement",
   achievedP19Level: 3, achievedP20Level: 3,
   achievedP19VariationDb: 4.0, achievedP20VariationDb: 3.0,
-  perSeatP19: [{ seatId: "seat-r1-c1", isPrimary: true, level: 3, variationDbRaw: 4.0 }],
-  perSeatP20: [{ seatId: "seat-r1-c1", isPrimary: true, level: 3, variationDbRaw: 3.0 }],
+  perSeatP19: [{ seatId: "seat-r1-c1", isPrimary: true, level: 2, variationDbRaw: 4.0 }, { seatId: "seat-r1-c2", isPrimary: true, level: 2, variationDbRaw: 4.0 }],
+  perSeatP20: [{ seatId: "seat-r1-c1", isPrimary: true, level: 3, variationDbRaw: 3.0 }, { seatId: "seat-r1-c2", isPrimary: true, level: 3, variationDbRaw: 3.0 }],
   p14AchievedLevel: 2, p18AchievedLevel: 2,
 };
 const localWorse = {
   isCurrent: false, candidateId: "local-1", candidateOrigin: "local-symmetric",
   achievedP19Level: 2, achievedP20Level: 2,
   achievedP19VariationDb: 6.0, achievedP20VariationDb: 5.0,
-  perSeatP19: [{ seatId: "seat-r1-c1", isPrimary: true, level: 2, variationDbRaw: 6.0 }],
-  perSeatP20: [{ seatId: "seat-r1-c1", isPrimary: true, level: 2, variationDbRaw: 5.0 }],
+  perSeatP19: [{ seatId: "seat-r1-c1", isPrimary: true, level: 0, variationDbRaw: 6.0 }, { seatId: "seat-r1-c2", isPrimary: true, level: 0, variationDbRaw: 6.0 }],
+  perSeatP20: [{ seatId: "seat-r1-c1", isPrimary: true, level: 1, variationDbRaw: 5.0 }, { seatId: "seat-r1-c2", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
   p14AchievedLevel: 2, p18AchievedLevel: 2,
 };
 const confirmedA = [globalBetter, localWorse];
@@ -122,16 +122,16 @@ const globalWorse = {
   isCurrent: false, candidateId: "global-2", candidateOrigin: "global-placement",
   achievedP19Level: 2, achievedP20Level: 2,
   achievedP19VariationDb: 6.0, achievedP20VariationDb: 5.0,
-  perSeatP19: [{ seatId: "seat-r1-c1", isPrimary: true, level: 2, variationDbRaw: 6.0 }],
-  perSeatP20: [{ seatId: "seat-r1-c1", isPrimary: true, level: 2, variationDbRaw: 5.0 }],
+  perSeatP19: [{ seatId: "seat-r1-c1", isPrimary: true, level: 0, variationDbRaw: 6.0 }, { seatId: "seat-r1-c2", isPrimary: true, level: 0, variationDbRaw: 6.0 }],
+  perSeatP20: [{ seatId: "seat-r1-c1", isPrimary: true, level: 1, variationDbRaw: 5.0 }, { seatId: "seat-r1-c2", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
   p14AchievedLevel: 2, p18AchievedLevel: 2,
 };
 const localBetter = {
   isCurrent: false, candidateId: "local-2", candidateOrigin: "local-symmetric",
   achievedP19Level: 3, achievedP20Level: 3,
   achievedP19VariationDb: 4.0, achievedP20VariationDb: 3.0,
-  perSeatP19: [{ seatId: "seat-r1-c1", isPrimary: true, level: 3, variationDbRaw: 4.0 }],
-  perSeatP20: [{ seatId: "seat-r1-c1", isPrimary: true, level: 3, variationDbRaw: 3.0 }],
+  perSeatP19: [{ seatId: "seat-r1-c1", isPrimary: true, level: 2, variationDbRaw: 4.0 }, { seatId: "seat-r1-c2", isPrimary: true, level: 2, variationDbRaw: 4.0 }],
+  perSeatP20: [{ seatId: "seat-r1-c1", isPrimary: true, level: 3, variationDbRaw: 3.0 }, { seatId: "seat-r1-c2", isPrimary: true, level: 3, variationDbRaw: 3.0 }],
   p14AchievedLevel: 2, p18AchievedLevel: 2,
 };
 const confirmedB = [globalWorse, localBetter];
@@ -154,7 +154,7 @@ console.log("\n═══ 7 — ESCALATION EXECUTION ═══");
 
 // CASE A: material symmetric → asymmetric/individual not started
 const phaseA = ["symmetric"];
-const funnelA = { symmetric: { generated: 36, screened: 36, promotedToV2: 3, confirmed: 3 } };
+const funnelA = { symmetric: { generated: 36, screened: 36, promotedToV2: 3, confirmed: 3, completed: true } };
 const stateA = buildPositionOptimisationState(phaseA, funnelA, existingAuthority,
   { isPositionCandidate: true, ...safeCandidate });
 ok("CASE A: symmetric material → asymmetric NOT attempted",
@@ -169,8 +169,8 @@ ok("CASE A: NOT exhausted (material found)",
 // CASE B: symmetric immaterial, asymmetric material → individual not started
 const phaseB = ["symmetric", "asymmetric-pair"];
 const funnelB = {
-  symmetric: { generated: 36, screened: 36, promotedToV2: 3, confirmed: 3 },
-  asymmetricPair: { generated: 20, screened: 20, promotedToV2: 2, confirmed: 2 },
+  symmetric: { generated: 36, screened: 36, promotedToV2: 3, confirmed: 3, completed: true },
+  asymmetricPair: { generated: 20, screened: 20, promotedToV2: 2, confirmed: 2, completed: true },
 };
 const stateB = buildPositionOptimisationState(phaseB, funnelB, existingAuthority,
   { isPositionCandidate: true, ...safeCandidate });
@@ -182,9 +182,9 @@ ok("CASE B: materialSubImprovementFound = true",
 // CASE C: symmetric + asymmetric immaterial → individual starts
 const phaseC = ["symmetric", "asymmetric-pair", "individual"];
 const funnelC = {
-  symmetric: { generated: 36, screened: 36, promotedToV2: 3, confirmed: 3 },
-  asymmetricPair: { generated: 20, screened: 20, promotedToV2: 2, confirmed: 2 },
-  individual: { generated: 30, screened: 30, promotedToV2: 3, confirmed: 3 },
+  symmetric: { generated: 36, screened: 36, promotedToV2: 3, confirmed: 3, completed: true },
+  asymmetricPair: { generated: 20, screened: 20, promotedToV2: 2, confirmed: 2, completed: true },
+  individual: { generated: 30, screened: 30, promotedToV2: 3, confirmed: 3, completed: true },
 };
 const stateC = buildPositionOptimisationState(phaseC, funnelC, existingAuthority, null);
 ok("CASE C: individual attempted",
