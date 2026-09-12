@@ -83,27 +83,28 @@ function StageVerdictBadge({ verdict }) {
   );
 }
 
-function DelayDetail({ result, currentResult }) {
+function DelayDetail({ result, currentResult, groupLabel, adjustmentMs }) {
   const tuning = result?.appliedTuning || result?.tuning || [];
   if (!tuning.length) return null;
 
-  // Find the group with the largest delay change
   const beforeP19 = primarySeatMetric(currentResult?.perSeatP19);
   const afterP19 = primarySeatMetric(result.perSeatP19);
   const beforeP20 = primarySeatMetric(currentResult?.perSeatP20);
   const afterP20 = primarySeatMetric(result.perSeatP20);
 
-  // Summarise the delay adjustment
+  // Use the group label and adjustment from the stage authority (extracted
+  // from calibration diagnostics). Fall back to computing from tuning.
   const maxDelay = Math.max(...tuning.map((t) => Number(t.delayMs) || 0));
   const minDelay = Math.min(...tuning.map((t) => Number(t.delayMs) || 0));
-  const range = maxDelay - minDelay;
+  const range = adjustmentMs || (maxDelay - minDelay);
+  const label = groupLabel || "Grouped delay";
 
   return (
     <div className="mt-1.5 space-y-1">
       {range > 0.1 && (
         <div className="text-[10px] text-[#625143]">
-          Grouped delay: {range.toFixed(1)} ms relative adjustment
-          <span className="ml-1.5 text-[#8A7B6A]">{formatAcousticPath(range)}</span>
+          {label} +{range.toFixed(1)} ms
+          <span className="ml-1.5 text-[#8A7B6A]">{formatAcousticPath(range)} (timing equivalent)</span>
         </div>
       )}
       <div className="grid grid-cols-2 gap-1.5">
@@ -247,7 +248,7 @@ export default function ImproveBassV2StageRow({
       {/* Improvement detail */}
       {verdict === "improvement" && result && (
         <>
-          {stageKey === "delay" && <DelayDetail result={result} currentResult={currentResult} />}
+          {stageKey === "delay" && <DelayDetail result={result} currentResult={currentResult} groupLabel={stage.delayGroupLabel} adjustmentMs={stage.delayAdjustmentMs} />}
           {stageKey === "gain" && <GainDetail result={result} currentResult={currentResult} />}
           {stageKey === "subPositions" && (
             <PositionDetail result={result} currentResult={currentResult} currentInstances={currentInstances} />

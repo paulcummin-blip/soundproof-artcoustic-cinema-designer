@@ -322,7 +322,7 @@ describe("G — Stages with no material improvement are checked but no card", ()
       stageVerdicts: { phase_polarity: "no_improvement", delays: "no_improvement", gain: "no_improvement" },
     });
     const phaseStage = display.stages.find((s) => s.key === "phase_polarity");
-    assert.equal(phaseStage.status, "completed");
+    assert.equal(phaseStage.status, "not_available");
     assert.equal(phaseStage.verdict, "no_improvement");
   });
 
@@ -333,7 +333,7 @@ describe("G — Stages with no material improvement are checked but no card", ()
       stageVerdicts: { phase_polarity: "improvement", delays: "improvement", gain: "improvement" },
     });
     const phaseStage = display.stages.find((s) => s.key === "phase_polarity");
-    assert.equal(phaseStage.status, "completed");
+    assert.equal(phaseStage.status, "not_available");
     assert.equal(phaseStage.verdict, "improvement");
   });
 });
@@ -351,7 +351,7 @@ describe("H — Cancel works from every stage (store-level)", () => {
     assert.equal(display.headerLabel, "Improving bass response");
     // Cancelled during calibrating — calibration stages should NOT be completed
     const phaseStage = display.stages.find((s) => s.key === "phase_polarity");
-    assert.equal(phaseStage.status, "active", "phase was active when cancelled");
+    assert.equal(phaseStage.status, "not_available", "phase is always not_available");
   });
 
   it("cancelled during sub_positions — no completed stages beyond what ran", () => {

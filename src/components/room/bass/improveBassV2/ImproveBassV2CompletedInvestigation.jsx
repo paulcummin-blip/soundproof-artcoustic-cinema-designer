@@ -16,6 +16,7 @@
 import React from "react";
 import { CheckCircle2, AlertCircle, AlertTriangle, Minus, Circle } from "lucide-react";
 import { buildStageDisplay, formatStageVerdict } from "./improveBassV2StageMapping.js";
+import { delayMsToAcousticDistance } from "./acousticDistance";
 
 // ── Pure helpers (exported for testing) ──────────────────────────────────
 
@@ -91,18 +92,37 @@ export function buildStageDetails(selection) {
     const currentResult = selection.currentResult;
 
     if (calResult && currentResult) {
-      // Material calibration winner exists
+      // Material calibration winner exists — show group label + delay + acoustic path
+      const delayTuning = calResult.appliedTuning || calResult.tuning || [];
+      const grouping = calDiag.grouping;
+      if (grouping?.groups?.length && delayTuning.length) {
+        const maxDelay = Math.max(...delayTuning.map((t) => Number(t.delayMs) || 0));
+        const minDelay = Math.min(...delayTuning.map((t) => Number(t.delayMs) || 0));
+        const range = maxDelay - minDelay;
+        if (range > 0.01) {
+          const adjustedSources = delayTuning
+            .filter((t) => Math.abs(Number(t.delayMs) - maxDelay) < 0.01)
+            .map((t) => t.sourceId);
+          const adjustedGroup = grouping.groups.find(
+            (g) => adjustedSources.length > 0 && adjustedSources.every((id) => g.sourceIds.includes(id)),
+          );
+          const groupLabel = adjustedGroup?.label || "Grouped delay";
+          const acousticM = delayMsToAcousticDistance(range);
+          parts.push(`${groupLabel} +${range.toFixed(1)} ms`);
+          parts.push(`Equivalent acoustic path +${acousticM.toFixed(2)} m (timing equivalent)`);
+        }
+      }
+
       const beforeP19 = primarySeatMetric(currentResult.perSeatP19);
       const afterP19 = primarySeatMetric(calResult.perSeatP19);
       const beforeP20 = primarySeatMetric(currentResult.perSeatP20);
       const afterP20 = primarySeatMetric(calResult.perSeatP20);
 
-      parts.push("Best result:");
       if (beforeP19 && afterP19) {
-        parts.push(`P19 primary ${fmtDb(beforeP19.variationDbRaw)} → ${fmtDb(afterP19.variationDbRaw)} dB`);
+        parts.push(`P19 ${fmtDb(beforeP19.variationDbRaw)} → ${fmtDb(afterP19.variationDbRaw)} dB`);
       }
       if (beforeP20 && afterP20) {
-        parts.push(`P20 primary ${fmtDb(beforeP20.variationDbRaw)} → ${fmtDb(afterP20.variationDbRaw)} dB`);
+        parts.push(`P20 ${fmtDb(beforeP20.variationDbRaw)} → ${fmtDb(afterP20.variationDbRaw)} dB`);
       }
     } else if (currentResult) {
       // No material winner — find the best valid option

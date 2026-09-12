@@ -61,10 +61,33 @@ export function buildStageResults(selection) {
   // The engine's calibrationResult is the delay-only search winner.
   const delayResult = selection.calibrationResult || null;
   const delayMaterial = selection.calibrationMaterial?.material === true;
+
+  // Extract group label and adjustment from the tuning + calibration diagnostics
+  const delayGrouping = selection.calibrationDiagnostics?.grouping;
+  const delayTuning = delayResult?.appliedTuning || delayResult?.tuning || [];
+  let delayGroupLabel = null;
+  let delayAdjustmentMs = 0;
+  if (delayGrouping?.groups?.length && delayTuning.length) {
+    const maxDelay = Math.max(...delayTuning.map((t) => Number(t.delayMs) || 0));
+    const minDelay = Math.min(...delayTuning.map((t) => Number(t.delayMs) || 0));
+    delayAdjustmentMs = maxDelay - minDelay;
+    if (delayAdjustmentMs > 0.01) {
+      const adjustedSources = delayTuning
+        .filter((t) => Math.abs(Number(t.delayMs) - maxDelay) < 0.01)
+        .map((t) => t.sourceId);
+      const adjustedGroup = delayGrouping.groups.find(
+        (g) => adjustedSources.length > 0 && adjustedSources.every((id) => g.sourceIds.includes(id)),
+      );
+      delayGroupLabel = adjustedGroup?.label || null;
+    }
+  }
+
   const delay = {
     verdict: delayMaterial && delayResult ? "improvement" : "no_improvement",
     result: delayMaterial ? delayResult : null,
     reason: delayMaterial ? null : "No material delay improvement found.",
+    delayGroupLabel,
+    delayAdjustmentMs,
   };
 
   // ── 3. GAIN — best grouped-gain result ────────────────────────────

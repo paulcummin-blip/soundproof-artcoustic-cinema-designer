@@ -180,11 +180,11 @@ describe("E — Seating positions always not_tested", () => {
     assert.equal(seating.status, "not_tested");
   });
 
-  it("skipped phase_polarity shows as not_tested", () => {
+  it("skipped phase_polarity shows as not_available", () => {
     const state = makeCompletedState();
     const display = buildStageDisplay(state);
     const phase = display.stages.find((s) => s.key === "phase_polarity");
-    assert.equal(phase.status, "not_tested");
+    assert.equal(phase.status, "not_available");
   });
 });
 

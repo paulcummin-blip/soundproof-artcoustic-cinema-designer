@@ -142,10 +142,10 @@ test("LRU and byte budget bound entries without clearing another valid project",
   const small = createFullTransferReuseCache({ maxBytes: 10 }); await make(small); assert.equal(small.stats().entries, 0);
   assert.ok(c.stats().bytes <= c.stats().maxBytes);
 });
-test("all four mounted V2 placement consumers use exact reuse; canonical/search paths remain present", () => {
+test("all five mounted V2 placement consumers use exact reuse; canonical/search paths remain present", () => {
   const source = readFileSync(new URL("../src/components/room/bass/improveBassV2/improveBassV2Engine.js", import.meta.url), "utf8");
   assert.equal((source.match(/await prepareFullTransfer\(/g) || []).length, 4);
-  assert.equal((source.match(/runInWorker\(worker, "placement"/g) || []).length, 1);
+  assert.equal((source.match(/runInWorker\(worker, "placement"/g) || []).length, 2);
   assert.ok(source.includes('"grouped-delay"')); assert.ok(source.includes('"confirmation"'));
   assert.ok(source.includes("runPositionScreenPhase")); assert.ok(source.includes("selectConfirmedRecommendations"));
 });

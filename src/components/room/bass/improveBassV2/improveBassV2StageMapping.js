@@ -128,13 +128,17 @@ export function buildStageDisplay(state) {
   const stages = STAGE_KEYS.map((key) => {
     let stageStatus = 'pending';
 
-    // Seating positions — will be tested by the new seating search stage
+    // Seating positions — tested by the seating search stage
     if (key === 'seating_positions') {
       if (stageVerdicts[key] === 'improvement' || stageVerdicts[key] === 'no_improvement') {
         stageStatus = 'completed';
       } else if (activeStageKey === 'seating_positions') {
         stageStatus = 'active';
-      } else if (stageVerdicts[key] === 'skipped') {
+      } else if (stageVerdicts[key] === 'skipped' || stageVerdicts[key] === 'incomplete') {
+        stageStatus = 'not_tested';
+      } else if (runComplete) {
+        // Completed run with no seating verdict — seating was evaluated but
+        // produced no verdict (not tested / not applicable).
         stageStatus = 'not_tested';
       } else {
         stageStatus = 'pending';
