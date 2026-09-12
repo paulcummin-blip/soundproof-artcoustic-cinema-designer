@@ -1,3 +1,4 @@
+import V2SeatBeforeAfterGrid from "./V2SeatBeforeAfterGrid.jsx";
 // RecommendationCard.jsx
 // A single ranked recommendation card for the Improve Bass V2 results.
 //
@@ -141,6 +142,8 @@ export default function RecommendationCard({
   onApply,
   onApplyCalibration,
   isApplied,
+  currentResult,
+  seatingPositions,
 }) {
   const rec = recommendation;
   const isWinner = rec.isWinner;
@@ -149,7 +152,7 @@ export default function RecommendationCard({
     : 'border-[#E7E4DF] bg-[#F8F7F4]';
 
   return (
-    <div className={`rounded-md border ${tierColor} p-3`}>
+    <div data-candidate-id={rec.result.candidateId} className={`rounded-md border ${tierColor} p-3`}>
       {/* Tier label + intervention */}
       <div className="flex items-center gap-2">
         <InterventionIcon type={rec.interventionType} />
@@ -186,7 +189,8 @@ export default function RecommendationCard({
           <Button
             type="button"
             className="w-full bg-[#213428] text-white hover:bg-[#3E4349] font-semibold"
-            onClick={rec.interventionType === 'calibration' ? onApplyCalibration : onApply}
+            data-apply-candidate-id={rec.result.candidateId}
+            onClick={() => (rec.interventionType === 'calibration' ? onApplyCalibration : onApply)?.(rec.result.candidateId)}
             disabled={isApplied}
           >
             {isApplied ? (
@@ -201,12 +205,13 @@ export default function RecommendationCard({
         </div>
       )}
 
-      {/* Preview-only note for non-winner recommendations */}
-      {!isWinner && (
-        <div className="mt-2 text-[9px] italic text-[#8A7B6A]">
-          Preview only — apply the best recommendation first.
-        </div>
-      )}
+      <details data-comparison-candidate-id={rec.result.candidateId} className="mt-2 text-[10px]">
+        <summary>P19 / P20 — per-seat comparison</summary>
+        <V2SeatBeforeAfterGrid seatingPositions={seatingPositions}
+          beforeP19={currentResult?.perSeatP19 || []} afterP19={rec.result.perSeatP19}
+          beforeP20={currentResult?.perSeatP20 || []} afterP20={rec.result.perSeatP20} />
+      </details>
+
     </div>
   );
 }
