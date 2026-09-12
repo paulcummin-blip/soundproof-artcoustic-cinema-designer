@@ -658,6 +658,8 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           const check=validateConfirmedCandidate(result,validationContext);
           calibrationDiagnostics.confirmed++;
           calibrationDiagnostics.options[index].validity={valid:check.valid,issues:check.issues};
+          calibrationDiagnostics.options[index].canonical=result;
+          calibrationDiagnostics.options[index].canonicalMs=performance.now()-_confirmT0;
           if(check.valid){calibrationCandidates.push(check.result);calibrationDiagnostics.valid++;}
           else {calibrationDiagnostics.invalid++;evaluationIssues.push({stage:"calibration",index,issues:check.issues});}
         }
