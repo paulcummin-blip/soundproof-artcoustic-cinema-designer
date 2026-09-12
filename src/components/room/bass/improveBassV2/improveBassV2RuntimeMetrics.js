@@ -31,6 +31,7 @@ export class V2RuntimeMetrics {
     this.proxySearches = [];
     this.placementFingerprintUsed = null;
     this.currentRecalculations = 0;
+    this.transferOperations = [];
   }
 
   recordWorkerCall(phase, candidateId, durationMs, reused) {
@@ -38,6 +39,10 @@ export class V2RuntimeMetrics {
     if (phase === "confirmation" && candidateId === "current") {
       this.currentRecalculations++;
     }
+  }
+
+  recordTransferOperation(operation) {
+    this.transferOperations.push(operation);
   }
 
   recordProxySearch(candidateId, durationMs) {
@@ -73,7 +78,9 @@ export class V2RuntimeMetrics {
       currentReused: this.currentReused,
       currentRecalculations: this.currentRecalculations,
       stage2TransfersReused: this.stage2TransfersReused,
-      rawTransferCacheHits: this.stage2TransfersReused,
+      rawTransferCacheHits: this.stage2TransfersReused + this.transferOperations.filter(o => o.lookup === "hit").length,
+      fullTransferReuseHits: this.transferOperations.filter(o => o.lookup === "hit").length,
+      transferOperations: this.transferOperations,
       rawTransferCacheMisses: placementWorkerCalls.length,
       placementFingerprintUsed: this.placementFingerprintUsed,
       challengersConfirmed: this.challengersConfirmed,
