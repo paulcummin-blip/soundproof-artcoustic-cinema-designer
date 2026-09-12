@@ -254,8 +254,8 @@ test("CALIBRATION_IMMATERIAL: message shown when calibration ran but was immater
     "Immaterial calibration message present",
   );
   assert.ok(
-    source.includes("selection.calibrationResult && !selection.calibrationMaterial?.material"),
-    "Condition checks calibrationResult exists AND material is false",
+    source.includes("selection.calibrationDiagnostics?.valid > 0") && source.includes("!selection.calibrationDiagnostics?.invalid") && source.includes("!selection.calibrationMaterial?.material"),
+    "Condition requires valid completed calibration evidence and immateriality",
   );
 });
 
