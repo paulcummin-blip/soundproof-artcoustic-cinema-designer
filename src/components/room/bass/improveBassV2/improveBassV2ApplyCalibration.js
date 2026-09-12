@@ -92,7 +92,7 @@ export function isCalibrationApplied(currentInstances, calibrationTuning) {
     const inst = activeInstances[i];
     if (!inst) return false;
     // Matching numbers in an old manual record are not an applied effective proposal.
-    if (tuningSourceBound && inst.tuningSource !== "v2-optimised") return false;
+    if ((t?.sourceId != null) && inst.tuningSource !== "v2-optimised") return false;
 
     if (Math.abs((Number(inst.delayMs) || 0) - (Number(t.delayMs) || 0)) > TUNING_TOLERANCE_DELAY_MS) return false;
     if (Math.abs((Number(inst.gainDb) || 0) - (Number(t.gainDb) || 0)) > TUNING_TOLERANCE_GAIN_DB) return false;
