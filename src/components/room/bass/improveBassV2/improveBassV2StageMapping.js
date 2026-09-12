@@ -122,7 +122,8 @@ export function buildStageDisplay(state) {
   const runComplete = status === 'complete';
   const finalisingActive = phase === 'finalising';
 
-  const activeStageKey = PHASE_TO_ACTIVE_STAGE[phase] ?? null;
+  const groupedDelayOnly = stageVerdicts.phase_polarity === 'skipped' && stageVerdicts.gain === 'skipped';
+  const activeStageKey = phase === 'calibrating' && groupedDelayOnly ? 'delays' : PHASE_TO_ACTIVE_STAGE[phase] ?? null;
 
   const stages = STAGE_KEYS.map((key) => {
     let stageStatus = 'pending';
@@ -179,8 +180,14 @@ export function buildStageDisplay(state) {
       }
     }
 
-    // Sub-stage label for sub_positions
-    let subStageLabel = null;
+    if (groupedDelayOnly && (key === 'phase_polarity' || key === 'gain')) stageStatus = 'not_tested';
+    if (key === 'delays' && activeStageKey === 'delays') stageStatus = 'active';
+    if (stageVerdicts[key] === 'skipped') stageStatus = 'not_tested';
+
+    // Show the actual grouped scan / canonical confirmation count.
+    let subStageLabel = key === 'delays' && stageStatus === 'active'
+      ? `${state.phaseLabel || 'Testing grouped delay options'} (${state.progressCurrent || 0} of ${state.progressTotal || 0})`
+      : null;
     if (key === 'sub_positions' && stageStatus === 'active') {
       subStageLabel = SUB_POSITION_SUB_LABELS[phase]
         || SUB_POSITION_SUB_LABELS[positionSearchPhase]
