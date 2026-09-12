@@ -77,8 +77,13 @@ check(
 );
 
 check(
-  "V2 component renders ImproveBassV2Results",
-  v2Comp.includes("ImproveBassV2Results"),
+  "V2 component renders ImproveBassV2StageResults (one-per-stage UI)",
+  v2Comp.includes("ImproveBassV2StageResults"),
+);
+
+check(
+  "V2 component does NOT render old ImproveBassV2Results (ranked cards)",
+  !v2Comp.includes("<ImproveBassV2Results"),
 );
 
 check(
@@ -145,17 +150,30 @@ check(
   progress.includes("onCancel") || progress.includes("Cancel"),
 );
 
-// --- Results component verification ---
-const results = readSrc("components/room/bass/improveBassV2/ImproveBassV2Results.jsx");
+// --- Stage Results component verification (one-per-stage) ---
+const stageResults = readSrc("components/room/bass/improveBassV2/ImproveBassV2StageResults.jsx");
 
 check(
-  "ImproveBassV2Results renders CURRENT DESIGN section",
-  results.includes("CURRENT") || results.includes("Current") || results.includes("current"),
+  "ImproveBassV2StageResults uses buildStageResults (one-per-stage authority)",
+  stageResults.includes("buildStageResults"),
 );
 
 check(
-  "ImproveBassV2Results has onApply prop (single V2 apply authority)",
-  results.includes("onApply"),
+  "ImproveBassV2StageResults renders STAGE_ORDER (5 stages)",
+  stageResults.includes("STAGE_ORDER") && stageResults.includes("ImproveBassV2StageRow"),
+);
+
+check(
+  "ImproveBassV2StageResults has onApplyStage prop (per-stage apply authority)",
+  stageResults.includes("onApplyStage"),
+);
+
+// --- Old ranked-cards Results component (retained but not mounted) ---
+const results = readSrc("components/room/bass/improveBassV2/ImproveBassV2Results.jsx");
+
+check(
+  "ImproveBassV2Results (old ranked cards) still exists but is not mounted by V2",
+  results.includes("export default") && !v2Comp.includes("<ImproveBassV2Results"),
 );
 
 // --- Summary ---
