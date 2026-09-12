@@ -21,59 +21,7 @@
 
 import React from "react";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
-
-// ── Level visual styles (plan-view halos + dot fills) ──
-const LEVEL_STYLES = {
-  L4: {
-    fill: "rgba(33, 52, 40, 0.32)",
-    stroke: "#213428",
-    strokeWidth: 2.5,
-    dasharray: "none",
-    dotFill: "#213428",
-    dotStroke: "#F8F8F7",
-  },
-  L3: {
-    fill: "rgba(62, 67, 73, 0.18)",
-    stroke: "#3E4349",
-    strokeWidth: 2,
-    dasharray: "none",
-    dotFill: "#3E4349",
-    dotStroke: "#F8F8F7",
-  },
-  L2: {
-    fill: "rgba(98, 81, 67, 0.18)",
-    stroke: "#625143",
-    strokeWidth: 2,
-    dasharray: "none",
-    dotFill: "#625143",
-    dotStroke: "#F8F8F7",
-  },
-  FAIL: {
-    fill: "rgba(74, 35, 15, 0.18)",
-    stroke: "#4A230F",
-    strokeWidth: 2,
-    dasharray: "none",
-    dotFill: "#4A230F",
-    dotStroke: "#F8F8F7",
-  },
-  not_assessed: {
-    fill: "rgba(193, 182, 173, 0.08)",
-    stroke: "#C1B6AD",
-    strokeWidth: 1.5,
-    dasharray: "4 3",
-    dotFill: "#C1B6AD",
-    dotStroke: "#F8F8F7",
-  },
-};
-
-const LEVEL_ORDER = ["L4", "L3", "L2", "FAIL", "not_assessed"];
-const LEVEL_LABELS = {
-  L4: "Level 4",
-  L3: "Level 3",
-  L2: "Level 2",
-  FAIL: "Below target",
-  not_assessed: "Not assessed",
-};
+import { getSeatCircleStyle, getSeatGradeColors, PRIORITY_LEGEND } from "./visualReportSeatStyle";
 
 // Seat zone radius in meters (broad translucent halo)
 const ZONE_RADIUS_M = 0.55;
@@ -112,7 +60,7 @@ function P9SeatBadge({ level, degrees }) {
   if (!level) {
     return <span style={{ color: "#C1B6AD", fontSize: 11 }}>—</span>;
   }
-  const style = LEVEL_STYLES[level] || LEVEL_STYLES.not_assessed;
+  const grade = getSeatGradeColors(level);
   const degText = degrees != null ? ` ${Math.round(degrees)}°` : "";
   return (
     <span
@@ -122,9 +70,9 @@ function P9SeatBadge({ level, degrees }) {
         borderRadius: 4,
         fontSize: 11,
         fontWeight: 600,
-        background: "#F1F0EE",
-        color: style.dotFill,
-        border: `1px solid ${style.stroke}`,
+        background: grade.fill,
+        color: grade.text,
+        border: `1px solid ${grade.border}`,
         letterSpacing: "0.02em",
         whiteSpace: "nowrap",
       }}
@@ -192,9 +140,6 @@ export default function ClientP9Overhead({
       </div>
     );
   }
-
-  // Categories present in the project (for key)
-  const activeLevels = LEVEL_ORDER.filter((key) => (counts?.[key] || 0) > 0);
 
   // Physical row grouping for the seat result grid
   const matrixRows = buildSeatRows(seats);
@@ -275,44 +220,30 @@ export default function ClientP9Overhead({
           SCREEN
         </text>
 
-        {/* Seat zones — broad translucent halos with level colours */}
+        {/* Seat zones — canonical grade colour + priority outline */}
         {seats.map((seat) => {
           const sp = toPx(seat.x, seat.y);
-          const levelKey = seat.p9Level || "not_assessed";
-          const style = LEVEL_STYLES[levelKey] || LEVEL_STYLES.not_assessed;
-          const isPrimary = seat.isPrimary;
+          const style = getSeatCircleStyle(seat.p9Level, seat.isPrimary);
           return (
             <g key={seat.id}>
-              {/* Translucent zone */}
+              {/* Translucent zone — grade colour, priority outline weight */}
               <circle
                 cx={sp.px}
                 cy={sp.py}
                 r={ZONE_R_PX}
-                fill={style.fill}
-                stroke={style.stroke}
-                strokeWidth={style.strokeWidth}
-                strokeDasharray={style.dasharray}
+                fill={style.zoneFill}
+                stroke={style.zoneStroke}
+                strokeWidth={style.zoneStrokeWidth}
               />
-              {/* Seat dot — primary: larger solid, secondary: smaller ring */}
-              {isPrimary ? (
-                <circle
-                  cx={sp.px}
-                  cy={sp.py}
-                  r={7}
-                  fill={style.dotFill}
-                  stroke={style.dotStroke}
-                  strokeWidth={1.5}
-                />
-              ) : (
-                <circle
-                  cx={sp.px}
-                  cy={sp.py}
-                  r={5}
-                  fill="#F8F8F7"
-                  stroke={style.dotFill}
-                  strokeWidth={2}
-                />
-              )}
+              {/* Seat dot — grade colour fill */}
+              <circle
+                cx={sp.px}
+                cy={sp.py}
+                r={style.dotR}
+                fill={style.dotFill}
+                stroke={style.dotStroke}
+                strokeWidth={style.dotStrokeWidth}
+              />
             </g>
           );
         })}
@@ -353,7 +284,7 @@ export default function ClientP9Overhead({
         })()}
       </svg>
 
-      {/* ── Level key (only levels that exist) ── */}
+      {/* ── Priority key (outline weight = priority, NOT grade colour) ── */}
       <div style={{
         display: "flex",
         flexWrap: "wrap",
@@ -367,28 +298,23 @@ export default function ClientP9Overhead({
         maxWidth: 600,
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
       }}>
-        {activeLevels.map((key) => {
-          const style = LEVEL_STYLES[key];
-          const label = LEVEL_LABELS[key];
-          return (
-            <div key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <svg width={20} height={20} viewBox="0 0 20 20">
-                <circle
-                  cx={10}
-                  cy={10}
-                  r={8}
-                  fill={style.fill}
-                  stroke={style.stroke}
-                  strokeWidth={style.strokeWidth}
-                  strokeDasharray={style.dasharray}
-                />
-              </svg>
-              <span style={{ fontSize: 12, color: "#3E4349", letterSpacing: "0.02em" }}>
-                {label}
-              </span>
-            </div>
-          );
-        })}
+        {PRIORITY_LEGEND.map((entry) => (
+          <div key={entry.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <svg width={20} height={20} viewBox="0 0 20 20">
+              <circle
+                cx={10}
+                cy={10}
+                r={8}
+                fill="none"
+                stroke={entry.stroke}
+                strokeWidth={entry.strokeWidth}
+              />
+            </svg>
+            <span style={{ fontSize: 12, color: "#3E4349", letterSpacing: "0.02em" }}>
+              {entry.label}
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* ── Seat result grid ── */}

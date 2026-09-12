@@ -173,6 +173,7 @@ export function selectClientBestListeningArea({ analysisResult, seatingPositions
       id: entry.seatId,
       x,
       y,
+      isPrimary: !!(originalSeat?.isPrimary || seatData?.isPrimary),
       categoryKey: cat.key,
       category: cat.category,
       wording: cat.wording,

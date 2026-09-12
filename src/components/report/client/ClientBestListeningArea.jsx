@@ -21,69 +21,7 @@
 
 import React from "react";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
-
-// ── Category visual styles ──
-// Restrained brand-aligned palette — no bright traffic-light colours.
-// Shape/border treatment supplements colour for accessibility.
-const CATEGORY_STYLES = {
-  primary: {
-    fill: "rgba(33, 52, 40, 0.28)",
-    stroke: "#213428",
-    strokeWidth: 2.5,
-    dasharray: "none",
-    dotFill: "#213428",
-    dotStroke: "#F8F8F7",
-  },
-  good: {
-    fill: "rgba(33, 52, 40, 0.12)",
-    stroke: "#3E4349",
-    strokeWidth: 2,
-    dasharray: "none",
-    dotFill: "#3E4349",
-    dotStroke: "#F8F8F7",
-  },
-  acceptable: {
-    fill: "rgba(98, 81, 67, 0.14)",
-    stroke: "#625143",
-    strokeWidth: 2,
-    dasharray: "none",
-    dotFill: "#625143",
-    dotStroke: "#F8F8F7",
-  },
-  improvement: {
-    fill: "rgba(74, 35, 15, 0.18)",
-    stroke: "#4A230F",
-    strokeWidth: 2,
-    dasharray: "none",
-    dotFill: "#4A230F",
-    dotStroke: "#F8F8F7",
-  },
-  not_assessed: {
-    fill: "rgba(193, 182, 173, 0.08)",
-    stroke: "#C1B6AD",
-    strokeWidth: 1.5,
-    dasharray: "4 3",
-    dotFill: "#C1B6AD",
-    dotStroke: "#F8F8F7",
-  },
-};
-
-// Category display order for key and counts
-const CATEGORY_ORDER = ["primary", "good", "acceptable", "improvement", "not_assessed"];
-const CATEGORY_LABELS = {
-  primary: "Primary seating",
-  good: "Good seating",
-  acceptable: "Secondary seating",
-  improvement: "Improvement recommended",
-  not_assessed: "Not assessed",
-};
-const CATEGORY_COUNT_LABELS = {
-  primary: "Primary",
-  good: "Good",
-  acceptable: "Secondary",
-  improvement: "Improvement recommended",
-  not_assessed: "Not assessed",
-};
+import { getSeatCircleStyle, getSeatGradeColors, PRIORITY_LEGEND } from "./visualReportSeatStyle";
 
 // Seat zone radius in meters (broad translucent halo)
 const ZONE_RADIUS_M = 0.55;
@@ -151,6 +89,7 @@ function MatrixLevelBadge({ level, strong }) {
   if (!level) {
     return <span style={{ color: "#C1B6AD", fontSize: 11 }}>—</span>;
   }
+  const grade = getSeatGradeColors(level);
   return (
     <span
       style={{
@@ -158,10 +97,10 @@ function MatrixLevelBadge({ level, strong }) {
         padding: "2px 8px",
         borderRadius: 4,
         fontSize: 11,
-        fontWeight: strong ? 700 : 500,
-        background: strong ? "#E5E1D9" : "#F1F0EE",
-        color: "#213428",
-        border: strong ? "1px solid #213428" : "1px solid #DCDBD6",
+        fontWeight: strong ? 700 : 600,
+        background: grade.fill,
+        color: grade.text,
+        border: `1px solid ${grade.border}`,
         letterSpacing: "0.02em",
         whiteSpace: "nowrap",
       }}
@@ -218,19 +157,13 @@ export default function ClientBestListeningArea({
   // Guard: no valid seats
   if (!seats || seats.length === 0) return null;
 
-  // Build count summary string
-  const countEntries = CATEGORY_ORDER
-    .filter((key) => (counts?.[key] || 0) > 0)
-    .map((key) => {
-      const n = counts[key];
-      const label = CATEGORY_COUNT_LABELS[key];
-      const seatWord = n === 1 ? "seat" : "seats";
-      return `${n} ${label} ${seatWord}`;
-    });
+  // Build count summary string — priority counts (Primary / Other), not grade labels
+  const primaryCount = seats.filter((s) => s.isPrimary).length;
+  const otherCount = seats.length - primaryCount;
+  const countEntries = [];
+  if (primaryCount > 0) countEntries.push(`${primaryCount} Primary ${primaryCount === 1 ? "seat" : "seats"}`);
+  if (otherCount > 0) countEntries.push(`${otherCount} Other ${otherCount === 1 ? "seat" : "seats"}`);
   const countSummary = countEntries.join(" · ");
-
-  // Categories present in the project (for key)
-  const activeCategories = CATEGORY_ORDER.filter((key) => (counts?.[key] || 0) > 0);
 
   // Physical row grouping + best-category for matrix emphasis
   const matrixRows = buildSeatRows(seats);
@@ -344,30 +277,29 @@ export default function ClientBestListeningArea({
           SCREEN
         </text>
 
-        {/* Seat zones — broad translucent halos with category colours */}
+        {/* Seat zones — canonical grade colour + priority outline */}
         {seats.map((seat) => {
           const sp = toPx(seat.x, seat.y);
-          const style = CATEGORY_STYLES[seat.categoryKey] || CATEGORY_STYLES.not_assessed;
+          const style = getSeatCircleStyle(seat.worstLevel, seat.isPrimary);
           return (
             <g key={seat.id}>
-              {/* Translucent zone */}
+              {/* Translucent zone — grade colour, priority outline weight */}
               <circle
                 cx={sp.px}
                 cy={sp.py}
                 r={ZONE_R_PX}
-                fill={style.fill}
-                stroke={style.stroke}
-                strokeWidth={style.strokeWidth}
-                strokeDasharray={style.dasharray}
+                fill={style.zoneFill}
+                stroke={style.zoneStroke}
+                strokeWidth={style.zoneStrokeWidth}
               />
-              {/* Seat dot */}
+              {/* Seat dot — grade colour fill */}
               <circle
                 cx={sp.px}
                 cy={sp.py}
-                r={6}
+                r={style.dotR}
                 fill={style.dotFill}
                 stroke={style.dotStroke}
-                strokeWidth={1.5}
+                strokeWidth={style.dotStrokeWidth}
               />
             </g>
           );
@@ -413,7 +345,7 @@ export default function ClientBestListeningArea({
       )}
 
       {showSupport && (<>
-      {/* ── Category key (only categories that exist) ── */}
+      {/* ── Priority key (outline weight = priority, NOT grade colour) ── */}
       <div style={{
         display: "flex",
         flexWrap: "wrap",
@@ -427,28 +359,23 @@ export default function ClientBestListeningArea({
         maxWidth: print ? "100%" : 600,
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
       }}>
-        {activeCategories.map((key) => {
-          const style = CATEGORY_STYLES[key];
-          const label = CATEGORY_LABELS[key];
-          return (
-            <div key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <svg width={20} height={20} viewBox="0 0 20 20">
-                <circle
-                  cx={10}
-                  cy={10}
-                  r={8}
-                  fill={style.fill}
-                  stroke={style.stroke}
-                  strokeWidth={style.strokeWidth}
-                  strokeDasharray={style.dasharray}
-                />
-              </svg>
-              <span style={{ fontSize: 12, color: "#3E4349", letterSpacing: "0.02em" }}>
-                {label}
-              </span>
-            </div>
-          );
-        })}
+        {PRIORITY_LEGEND.map((entry) => (
+          <div key={entry.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <svg width={20} height={20} viewBox="0 0 20 20">
+              <circle
+                cx={10}
+                cy={10}
+                r={8}
+                fill="none"
+                stroke={entry.stroke}
+                strokeWidth={entry.strokeWidth}
+              />
+            </svg>
+            <span style={{ fontSize: 12, color: "#3E4349", letterSpacing: "0.02em" }}>
+              {entry.label}
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* ── Count summary ── */}

@@ -196,6 +196,7 @@ export function selectClientTimbreConsistency({ analysisResult, seatingPositions
       id: seat.id,
       x,
       y,
+      isPrimary: !!(seat.isPrimary || seatData?.isPrimary),
       p16: rawP16,
       p17: rawP17,
       p16Level: isApplicableParam(rawP16) ? normalizeLevel(rawP16.level) : null,
