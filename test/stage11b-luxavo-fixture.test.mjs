@@ -113,6 +113,7 @@ test("Luxavo 1.18 dB trade-off: REJECTED by primary raw-regression guard", () =>
     perSeatP20: [
       { seatId: "r1-c1", isPrimary: true, variationDbRaw: 8.10, level: 1 },
       { seatId: "r1-c2", isPrimary: true, variationDbRaw: 5.0, level: 1 },
+      ...winner.perSeatP20.filter(s=>!s.isPrimary),
     ],
   };
   const reg = hasPrimarySeatRegression(winnerRejected, currentAuthority);
@@ -128,6 +129,7 @@ test("Luxavo 1.18 dB trade-off: NOT material", () => {
     perSeatP20: [
       { seatId: "r1-c1", isPrimary: true, variationDbRaw: 8.10, level: 1 },
       { seatId: "r1-c2", isPrimary: true, variationDbRaw: 5.0, level: 1 },
+      ...winner.perSeatP20.filter(s=>!s.isPrimary),
     ],
   };
   const mat = isMaterialImprovement(currentAuthority, winnerRejected);
