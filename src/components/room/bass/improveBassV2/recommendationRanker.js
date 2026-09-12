@@ -62,23 +62,26 @@ function worstPrimarySeatDeviation(result) {
 
 function classifyIntervention(result) {
   if (!result) return 'position';
-  if (result.isCurrent || result.candidateId === 'calibration-only') return 'calibration';
+  if (result.candidateKind === 'calibration' || result.candidateId === 'calibration-only') return 'calibration';
   if (result.isPositionCandidate) return 'position';
   return 'position'; // global placement also moves positions
 }
 
 function computeLevelChanges(currentResult, candidateResult) {
-  const curP19 = numericLevel(currentResult?.achievedP19Level);
-  const candP19 = numericLevel(candidateResult?.achievedP19Level);
-  const curP20 = numericLevel(currentResult?.achievedP20Level);
-  const candP20 = numericLevel(candidateResult?.achievedP20Level);
-
-  const p19Jump = Math.max(0, candP19 - curP19);
-  const p20Jump = Math.max(0, candP20 - curP20);
+  const changes = ["perSeatP19","perSeatP20"].map(field => {
+    const before = new Map((currentResult?.[field] || []).map(s=>[String(s.seatId),s]));
+    const seats=(candidateResult?.[field] || []).map(s=>({seatId:s.seatId,from:numericLevel(before.get(String(s.seatId))?.level),to:numericLevel(s.level)}));
+    const improved=seats.filter(s=>s.to>s.from);
+    const jump=improved.reduce((n,s)=>n+s.to-s.from,0);
+    const lead=improved[0] || seats[0] || {from:0,to:0};
+    return {...lead,jump,seats,fromLabel:levelText(lead.from),toLabel:levelText(lead.to)};
+  });
+  const [p19,p20]=changes;
+  const p19Jump=p19.jump,p20Jump=p20.jump;
 
   return {
-    p19: { from: curP19, to: candP19, fromLabel: levelText(curP19), toLabel: levelText(candP19), jump: p19Jump },
-    p20: { from: curP20, to: candP20, fromLabel: levelText(curP20), toLabel: levelText(candP20), jump: p20Jump },
+    p19,
+    p20,
     totalJumps: p19Jump + p20Jump,
     paramCount: (p19Jump > 0 ? 1 : 0) + (p20Jump > 0 ? 1 : 0),
     hasLevelChange: p19Jump > 0 || p20Jump > 0,
@@ -92,11 +95,10 @@ function computeRawImprovement(currentResult, candidateResult) {
 }
 
 function sameLevel(currentResult, candidateResult) {
-  const curP19 = numericLevel(currentResult?.achievedP19Level);
-  const candP19 = numericLevel(candidateResult?.achievedP19Level);
-  const curP20 = numericLevel(currentResult?.achievedP20Level);
-  const candP20 = numericLevel(candidateResult?.achievedP20Level);
-  return curP19 === candP19 && curP20 === candP20;
+  return ["perSeatP19","perSeatP20"].every(field => {
+    const before=new Map((currentResult?.[field] || []).map(s=>[String(s.seatId),s]));
+    return (candidateResult?.[field] || []).every(s=>numericLevel(before.get(String(s.seatId))?.level)===numericLevel(s.level));
+  });
 }
 
 /**
@@ -112,6 +114,7 @@ function sameLevel(currentResult, candidateResult) {
  */
 export function rankRecommendations(selection) {
   if (!selection) return [];
+  if (Array.isArray(selection.recommendations)) return selection.recommendations;
 
   const {
     confirmedResults = [],
@@ -126,7 +129,7 @@ export function rankRecommendations(selection) {
   const recommendations = [];
 
   // Add calibration-only result if material
-  if (calibrationResult && calibrationMaterial?.material) {
+  if (calibrationResult && calibrationMaterial?.material && isMaterialImprovement(currentResult, calibrationResult).material) {
     const levelChanges = computeLevelChanges(currentResult, calibrationResult);
     const rawImprovement = computeRawImprovement(currentResult, calibrationResult);
     recommendations.push({
@@ -144,7 +147,8 @@ export function rankRecommendations(selection) {
 
   // Add confirmed challenger results that are material
   for (const result of confirmedResults) {
-    if (result.isCurrent) continue; // skip current/calibration-only (added above)
+    if (result.candidateKind === "current" || result.candidateId === "current") continue;
+    if (result === calibrationResult) continue;
     if (!currentResult) continue;
 
     const mat = isMaterialImprovement(currentResult, result);
