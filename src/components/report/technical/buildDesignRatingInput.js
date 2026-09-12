@@ -16,7 +16,7 @@
  */
 
 import { isBassPublicationVerified } from "./artcousticSystemDesignRating";
-import { getEffectiveAssumedLevel } from "@/components/utils/assumedParameterAuthority";
+import { normalizeAssumedLevel } from "@/components/utils/assumedParameterAuthority";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
@@ -305,7 +305,7 @@ export function buildDesignRatingInput({
     p12,
     p13,
     p14,
-    p15: getEffectiveAssumedLevel(assumedP15Level),
+    p15: normalizeAssumedLevel(assumedP15Level),
     p18,
     // Seat-scope
     p1: seatScope.p1,
@@ -318,7 +318,12 @@ export function buildDesignRatingInput({
     p17: seatScope.p17,
     p19: seatScope.p19,
     p20: seatScope.p20,
-    p21: getEffectiveAssumedLevel(assumedP21Level),
+    // P15/P21: pass the RAW assumed level (null or "L1"–"L4"). The rating
+    // authority treats null as provisional (NOT CALCULATED → excluded from
+    // floor). Only a genuine designer selection is scored. This ensures
+    // Compliance and Design Rating agree: null = not calculated for both.
+    p15: normalizeAssumedLevel(assumedP15Level),
+    p21: normalizeAssumedLevel(assumedP21Level),
     screen: screenInput,
   };
 }

@@ -784,11 +784,15 @@ export function getCategoryModalSummaries(roomDesignRating) {
 // category, separately per seating scope. This is the conservative governing
 // floor — NOT an average and NOT the modal/most-common level.
 //
-// Category membership (floor authority):
+// Category membership (floor authority) — matches the canonical RP22
+// CATEGORY_GROUPS mapping exactly:
 //   Spatial Resolution:  P1–P11
-//   Dynamic Range:        P12–P14   (P15 silently excluded)
-//   Timbre Matching:      P16–P20   (P21 silently excluded)
+//   Dynamic Range:        P12–P15
+//   Timbre Matching:      P16–P21
 //   Screen / Viewing Geometry: RP23 (separately governed, not floored)
+// P15 and P21 are designer-assumed levels; they contribute to the floor ONLY
+// when genuinely assumed (non-null). Null assumed levels are excluded as
+// NOT CALCULATED — they never default to L1 or any fallback grade.
 //
 // For each included parameter:
 //   - Room-scoped: the room level applies equally to every seat.
@@ -798,8 +802,8 @@ export function getCategoryModalSummaries(roomDesignRating) {
 
 const FLOOR_CATEGORY_RANGES = [
   { label: "Spatial Resolution", range: [1, 11] },
-  { label: "Dynamic Range", range: [12, 14] },
-  { label: "Timbre Matching", range: [16, 20] },
+  { label: "Dynamic Range", range: [12, 15] },
+  { label: "Timbre Matching", range: [16, 21] },
   { label: "Screen / Viewing Geometry", range: null },
 ];
 
@@ -825,8 +829,11 @@ function getFloorGroupForContrib(contrib) {
  * Screen / Viewing Geometry is separately governed by RP23 and returns the
  * authoritative RP23 level (worst achieved) without flooring.
  *
- * P15 and P21 are silently excluded (not in the category ranges). P8 is
- * V1-excluded by the rating authority and never appears in contributions.
+ * P15 and P21 are included in their respective category ranges (Dynamic Range
+ * P12–P15, Timbre Matching P16–P21). They contribute ONLY when genuinely
+ * assumed (non-null) — the rating authority returns provisional for null
+ * assumed levels, excluding them from contributions. P8 is V1-excluded by the
+ * rating authority and never appears in contributions.
  *
  * @param {Object} roomDesignRating — a scoped rating (e.g. scopedRatings.primary)
  * @returns {Array<{ label, hasContribs, isScreen?, screenLevel?, floorLevel?, hasFail?, paramDetails? }>}

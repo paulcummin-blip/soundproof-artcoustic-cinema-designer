@@ -36,7 +36,7 @@ import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 import gradeP1Distance from "@/components/utils/rp22/p1LevelAuthority";
 import { isAuthoritativeBassContract } from "@/components/room/bass/completedBassResultPersistence";
 import { assessP18Extension } from "@/components/utils/p18ExtensionAuthority";
-import { getEffectiveAssumedLevel } from "@/components/utils/assumedParameterAuthority";
+import { getEffectiveAssumedLevel, normalizeAssumedLevel } from "@/components/utils/assumedParameterAuthority";
 
 // ═══════════════════════════════════════════════════════════════
 // Fixed V1 constants
@@ -360,14 +360,22 @@ function scoreScreen(angleDeg) {
 // P15 / P21 are designer-assumed RP22 performance levels. The selected level
 // IS the authority — no acoustic calculation is involved. The rating engine
 // consumes the assumed level directly as the scored level.
+//
+// FUNDAMENTAL ELIGIBILITY RULE: null (not yet assumed) is NOT a calculated
+// result. It must NEVER influence the category floor — it must not default
+// to L1, L2, FAIL, or any fallback grade. Null → provisional (excluded from
+// contributions, floors, tooltips, and distributions). Only a genuine
+// designer selection (L1–L4) is a scored result.
 function scoreP15Assumed(assumedLevel) {
-  const lvl = getEffectiveAssumedLevel(assumedLevel);
-  return { level: lvl };
+  const normalized = normalizeAssumedLevel(assumedLevel);
+  if (normalized == null) return { level: null, provisional: true };
+  return { level: normalized };
 }
 
 function scoreP21Assumed(assumedLevel) {
-  const lvl = getEffectiveAssumedLevel(assumedLevel);
-  return { level: lvl };
+  const normalized = normalizeAssumedLevel(assumedLevel);
+  if (normalized == null) return { level: null, provisional: true };
+  return { level: normalized };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -577,10 +585,13 @@ export function buildArtcousticDesignRatingAuthority(input) {
  * Calculate the room Artcoustic System Design Rating.
  *
  * Room-scope: use the room result once.
- * Seat-scope: every applicable physical seat must have a definitive result.
- *   If any applicable seat is provisional/missing, exclude the WHOLE parameter
- *   from numerator and denominator, and mark the room rating provisional.
- *   If complete, average the seat multipliers.
+ * Seat-scope: each seat is evaluated independently. N/A and provisional
+ *   (not-calculated/missing) seats are skipped INDIVIDUALLY — they never
+ *   cause the whole parameter to be excluded. Only the genuinely calculated
+ *   seats contribute. If ALL seats in the scope are ineligible (N/A or
+ *   provisional), the parameter contributes nothing. This is the
+ *   fundamental eligibility rule: ineligible seats never lower, raise, or
+ *   default the parameter level.
  *
  * metric contribution = average multiplier × weight
  * maximum metric contribution = 12 × weight
@@ -636,14 +647,14 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
       const applicableSeats = [];
       for (const id of scopedSeatIds) {
         const sa = param.seats?.[id];
-        if (!sa || sa.state === "na") continue;
+        if (!sa || sa.state === "na") continue; // N/A seat — skip individually
+        if (sa.state === "provisional") {
+          hasProvisional = true; // diagnostic only — does not affect status
+          continue; // not-calculated/missing seat — skip individually
+        }
         applicableSeats.push(sa);
       }
-      if (applicableSeats.length === 0) continue;
-      if (applicableSeats.some((s) => s.state === "provisional")) {
-        hasProvisional = true; // diagnostic only
-        continue;
-      }
+      if (applicableSeats.length === 0) continue; // all seats ineligible → param contributes nothing
       const sum = applicableSeats.reduce((acc, s) => acc + (s.multiplier ?? 0), 0);
       multiplier = sum / applicableSeats.length;
       resultLevel = buildSeatDistribution(param.seats, scopedSeatIds);
