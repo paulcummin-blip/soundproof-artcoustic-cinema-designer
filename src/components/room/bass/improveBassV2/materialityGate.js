@@ -1,3 +1,4 @@
+import { validateSeatResults, canonicalLevel } from "./confirmedCandidateValidity.js";
 // materialityGate.js
 // Canonical user-facing materiality assessment for calibration-only improvements.
 //
@@ -131,6 +132,10 @@ export function isMaterialImprovement(currentResult, candidateResult) {
     return { material: false, reason: "Missing result data" };
   }
 
+  const seats = (currentResult.perSeatP19 || []).map(s=>({id:s.seatId,isPrimary:s.isPrimary}));
+  const baseline = validateSeatResults(currentResult,seats), candidate = validateSeatResults(candidateResult,seats);
+  if (!baseline.valid || !candidate.valid) return {material:false,valid:false,reason:"Invalid or incomplete canonical seat data",details:{baseline,candidate}};
+
   // Check for primary-seat regression (hard veto)
   const regression = hasPrimarySeatRegression(currentResult, candidateResult);
   if (regression.regressed) {
@@ -143,21 +148,17 @@ export function isMaterialImprovement(currentResult, candidateResult) {
     };
   }
 
-  const currentP19Level = numericLevel(currentResult.achievedP19Level);
-  const candidateP19Level = numericLevel(candidateResult.achievedP19Level);
-  const currentP20Level = numericLevel(currentResult.achievedP20Level);
-  const candidateP20Level = numericLevel(candidateResult.achievedP20Level);
-
-  // A. Any relevant P19/P20 displayed level improves
-  if (candidateP19Level > currentP19Level || candidateP20Level > currentP20Level) {
-    const improvements = [];
-    if (candidateP19Level > currentP19Level) improvements.push(`P19 L${currentP19Level} -> L${candidateP19Level}`);
-    if (candidateP20Level > currentP20Level) improvements.push(`P20 L${currentP20Level} -> L${candidateP20Level}`);
-    return { material: true, reason: `Level improvement: ${improvements.join(", ")}` };
-  }
+  // Use the actual matched seats. The P19/P20 headline remains SEAT.
+  const pairs = ["perSeatP19","perSeatP20"].flatMap(field=>candidateResult[field].map(seat=>({
+    parameter:field==="perSeatP19"?"P19":"P20",seatId:seat.seatId,
+    before:currentResult[field].find(s=>String(s.seatId)===String(seat.seatId)),after:seat,
+  })));
+  const improvements=pairs.filter(p=>canonicalLevel(p.after.level)>canonicalLevel(p.before.level));
+  if(improvements.length) return {material:true,reason:"Level improvement: "+improvements.map(p=>p.seatId+" "+p.parameter+" L"+canonicalLevel(p.before.level)+" -> L"+canonicalLevel(p.after.level)).join(", "),details:{seats:improvements}};
+  const sameLevels = pairs.every(p=>canonicalLevel(p.after.level)===canonicalLevel(p.before.level));
 
   // B. Same levels, worst-seat deviation improves by >= 1.0 dB
-  if (candidateP19Level === currentP19Level && candidateP20Level === currentP20Level) {
+  if (sameLevels) {
     const currentWorst = worstPrimarySeatDeviation(currentResult);
     const candidateWorst = worstPrimarySeatDeviation(candidateResult);
     const improvement = currentWorst - candidateWorst;
