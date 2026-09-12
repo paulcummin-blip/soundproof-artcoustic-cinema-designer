@@ -233,6 +233,8 @@ export default function ImproveBassResponseV2({
       p14TargetDb: p14Params.p14TargetDb,
       p18TargetBasis: p14Params.p18TargetBasis,
       currentAuthority: shared?.completedBassAuthority,
+      currentCanonicalResult: shared?.optimisationResult,
+      currentSources: shared?.authoritative?.sources,
       liveCacheKey: shared?.cacheKey,
       stage2Result,
       placementFingerprint,
