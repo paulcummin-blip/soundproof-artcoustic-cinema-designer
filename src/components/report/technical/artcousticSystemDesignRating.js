@@ -195,16 +195,28 @@ function normalizeInput(input, requireVerified = false) {
 /**
  * Wrap an existing RP22 level mapper.
  * If the mapper returns a valid level (L4-L1), use it.
- * If the mapper returns N/A for a finite value and canFail is true, return FAIL.
- * If the mapper returns N/A for a finite value and canFail is false, return L1
- * (open-ended lowest band — should not normally happen for finite values).
+ * If the mapper returns N/A for a finite value, do NOT default to FAIL or L1 —
+ * a missing level from an uncalculated/N/A metric is not a failure and not a
+ * fallback grade. Return { level: null, provisional: true } so the parameter
+ * is excluded from the floor (treated as provisional, not scored).
+ *
+ * Exception: when canFail is true and the mapper explicitly returns ok:true
+ * with a non-L1-L4 level (e.g. a bounded parameter where the value exceeds the
+ * L1 threshold), the value IS a genuine calculated FAIL — the mapper confirmed
+ * the value is applicable but below all performance levels.
  */
 function applyMapper(rawValue, mapperFn, canFail) {
   const result = mapperFn(rawValue);
   if (result.ok && result.level && /^L[1-4]$/.test(result.level)) {
     return { level: result.level };
   }
-  return { level: canFail ? "FAIL" : "L1" };
+  // Mapper confirmed the value is applicable but below all levels → genuine FAIL
+  if (result.ok === false && canFail && result.level && result.level !== "N/A") {
+    return { level: "FAIL" };
+  }
+  // Mapper says N/A or value is not applicable — do NOT default to L1 or FAIL.
+  // Return provisional so the parameter is excluded from the floor.
+  return { level: null, provisional: true };
 }
 
 /**
@@ -455,8 +467,8 @@ function scoreSeatParam(key, input) {
     default: return { state: "provisional", level: null, multiplier: null, reason: "unknown-seat-param" };
   }
 
-  if (scored.provisional) {
-    return { state: "provisional", level: null, multiplier: null, reason: "no-data" };
+  if (scored.provisional || scored.level == null) {
+    return { state: "provisional", level: null, multiplier: null, reason: "no-genuine-calculated-grade" };
   }
   return { state: "scored", level: scored.level, multiplier: multiplierForLevel(scored.level), reason: null };
 }

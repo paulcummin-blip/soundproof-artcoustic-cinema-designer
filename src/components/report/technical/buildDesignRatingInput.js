@@ -54,13 +54,41 @@ function extractRawValue(metric) {
 }
 
 /**
- * Check if a metric is genuinely N/A (not applicable to this layout).
+ * Check if a metric is genuinely N/A or otherwise ineligible (not calculated,
+ * calculating, updating, missing, etc.). Ineligible metrics must be EXCLUDED
+ * from the design rating floor — never converted to FAIL, L1, 0, or any
+ * fallback grade.
+ *
+ * Ineligible states: N/A, NOT APPLICABLE, NOT CALCULATED, UNCALCULATED,
+ * CALCULATING, UPDATING, missing, undefined, null.
  */
-function isMetricNa(metric) {
-  if (!metric || typeof metric !== "object") return false;
+function isMetricIneligible(metric) {
+  if (!metric || typeof metric !== "object") return true; // missing → ineligible
   const status = String(metric.status || "").toLowerCase();
   const formatted = String(metric.formatted || "").toUpperCase().trim();
-  return status === "not_applicable" || formatted === "N/A";
+
+  // Explicit N/A or not-applicable
+  if (status === "not_applicable" || status === "na") return true;
+  if (formatted === "N/A" || formatted === "NOT APPLICABLE") return true;
+
+  // Not-calculated family — applicable but not yet computed
+  if (/not.?calculated|uncalculated|calculating|updating|no.?data|incomplete/.test(status)) return true;
+  if (/^not.?calculated$/i.test(formatted) || formatted === "CALCULATING" || formatted === "UPDATING") return true;
+
+  // Dash / empty formatted with no real value
+  if (formatted === "—" || formatted === "-" || formatted === "") {
+    // Check if there's a genuine numeric value field
+    const hasRealNum = ["value", "valueM", "valueDb", "valueDeg", "valueHz"].some(
+      (k) => typeof metric[k] === "number" && Number.isFinite(metric[k])
+    );
+    if (!hasRealNum) return true;
+  }
+
+  // Level is explicitly N/A or dash (no genuine calculated grade)
+  const lvl = metric.level;
+  if (lvl === "N/A" || lvl === "—" || lvl === "-" || lvl === "NO DATA") return true;
+
+  return false;
 }
 
 /**
@@ -185,8 +213,33 @@ export function buildDesignRatingInput({
   const seatParamKeys = ["p1", "p4", "p5", "p6", "p9", "p10", "p16", "p17", "p19", "p20"];
   const seatScope = {};
 
+  // Room-level guard: some seat-scope parameters also have a room-level
+  // evaluation in gradedParameters.primary (currently P5). When the room-level
+  // evaluation is null (Not calculated), the per-seat values must also be
+  // excluded — the Compliance Report and the rating engine must consume the
+  // same canonical status/applicability semantics. This is a general rule:
+  // for any seat-scope key with a numeric ID present in gradedParameters.primary
+  // as null, ALL per-seat values are treated as na (excluded from the floor).
+  const roomLevelNullSeatKeys = new Set();
+  for (const key of seatParamKeys) {
+    const pid = Number(key.replace("p", ""));
+    if (Number.isFinite(pid) && pid in room && room[pid] == null) {
+      roomLevelNullSeatKeys.add(key);
+    }
+  }
+
   for (const key of seatParamKeys) {
     seatScope[key] = {};
+
+    // If the room-level evaluation for this seat-scope parameter is null
+    // (Not calculated), exclude ALL per-seat values.
+    if (roomLevelNullSeatKeys.has(key)) {
+      for (const seatId of seatIds) {
+        seatScope[key][seatId] = "na";
+      }
+      continue;
+    }
+
     for (const seatId of seatIds) {
       const hud = reportSeatHudById?.[seatId];
       if (!hud) {
@@ -208,8 +261,8 @@ export function buildDesignRatingInput({
         continue;
       }
 
-      // N/A check (e.g. P9/P10 when no overheads)
-      if (isMetricNa(metric)) {
+      // Ineligible check (N/A, Not calculated, calculating, updating, etc.)
+      if (isMetricIneligible(metric)) {
         seatScope[key][seatId] = "na";
         continue;
       }
