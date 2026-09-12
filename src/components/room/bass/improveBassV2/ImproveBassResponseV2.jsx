@@ -74,7 +74,7 @@ export default function ImproveBassResponseV2({
     const authority = shared?.completedBassAuthority || {};
     return {
       p14TargetBasis: requested.p14TargetBasis || authority.p14TargetBasis || "minimum",
-      p14TargetLevel: requested.p14TargetLevel || requested.selectedP14TargetLevel || authority.p14TargetLevel || 2,
+      p14TargetLevel: requested.requestedLevel || requested.selectedP14Level || requested.p14TargetLevel || requested.selectedP14TargetLevel || authority.p14TargetLevel || 2,
       p14TargetDb: requested.selectedP14TargetDb || authority.p14TargetDb || 117,
       p18TargetBasis: requested.p18TargetBasis || requested.selectedP18TargetBasis || authority.p18TargetBasis || "minimum",
     };
