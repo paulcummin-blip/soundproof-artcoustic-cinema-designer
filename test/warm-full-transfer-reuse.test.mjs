@@ -21,7 +21,7 @@ const raw = evaluateStage2Placement(params);
 const make = (cache, p = params, extra = {}) => cache.getOrCompute({ projectId: "synthetic-A", params: p,
   runId: "run-1", compute: () => clone(raw), ...extra });
 const target = { p14TargetBasis: "minimum", p14TargetLevel: 3, p14TargetDb: 115, p18TargetBasis: "minimum" };
-const confirm = (r, t = target) => evaluateStage2ConfirmationWithTuning({ rawTransfer: r,
+const confirm = (r, t = target) => evaluateStage2ConfirmationWithTuning(r, {
   tuning: r.autoAlignTuning, tuningVariant: "placement-only", ...t });
 
 test("A: exact full acoustic entry reused; all transfer and canonical values unchanged", async () => {
