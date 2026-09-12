@@ -310,16 +310,17 @@ function assert(condition, name) {
 
   // C. same levels, worst relevant deviation improves 1.2 dB = MATERIAL
   const currentC = {
-    achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 0, variationDbRaw: 6.2 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.5 }],
+    achievedP19Level: 4, achievedP20Level: 4,
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 4, variationDbRaw: 2.2 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 4, variationDbRaw: 1.5 }],
   };
   const candidateC = {
-    achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
-    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 2, variationDbRaw: 4.3 }],
+    achievedP19Level: 4, achievedP20Level: 4,
+    perSeatP19: [{ seatId: "rsp", isPrimary: true, level: 4, variationDbRaw: 1.0 }],
+    perSeatP20: [{ seatId: "rsp", isPrimary: true, level: 4, variationDbRaw: 0.3 }],
   };
   const resultC = isMaterialImprovement(currentC, candidateC);
+  assert(Math.abs(resultC.details?.improvement - 1.2) < 1e-9, "T5c-path: same-level path");
   assert(resultC.material === true, "T5c: Same levels, 1.2 dB worst-seat improvement = MATERIAL");
 
   // D. same levels, improves 0.3 dB = IMMATERIAL
