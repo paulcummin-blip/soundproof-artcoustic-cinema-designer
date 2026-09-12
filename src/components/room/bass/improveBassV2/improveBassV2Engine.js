@@ -30,6 +30,7 @@ import { buildAuthoritativeAutoAlignDelays } from "../useAuthoritativeBassRespon
 
 import { searchDelayOnly, searchPolarity, searchGainOnly, searchDelayPolarityTrim, resumWithTuning } from "../stage2/stage2TuningSearch.js";
 import { selectAuthoritativeFinalist, hasPrimarySeatRegression, detectMutedSubs } from "../best-layout/authoritativeFinalistSelection.js";
+import { fullTransferReuseCache } from "../stage2/stage2FullTransferReuse.js";
 import { getCachedRawTransfersForFingerprint } from "../stage2/stage2RawTransferCache.js";
 import { normaliseModelKey } from "../../../utils/modelKeyNormaliser.js";
 import { computeV2DesignFingerprint, isCurrentAuthorityNonStale } from "./improveBassV2Fingerprint.js";
@@ -527,6 +528,28 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     return current !== startFingerprint;
   }
 
+  // Completed untuned acoustics only. Every consumer still runs its existing
+  // proxy/tuning/promotion/canonical checks using this request's targets.
+  const transferRunId = {};
+  async function prepareFullTransfer(finalist, candidateId, consumer) {
+    return fullTransferReuseCache.getOrCompute({
+      projectId, runId: transferRunId, signal: controller.signal, isStale,
+      params: { finalist, roomDims, rspPosition, seatingPositions,
+        selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM },
+      compute: () => runInWorker(worker, "placement", {
+        finalist, roomDims, rspPosition, seatingPositions,
+        selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+      }, controller.signal),
+      onOperation: operation => {
+        metrics.recordTransferOperation({ ...operation, logicalCandidateId: candidateId,
+          consumer, decisionIdentity: { p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+            priorities: seatingPositions.map(s => [s.id, s.priority]) } });
+        if (operation.computationEnd != null) metrics.recordWorkerCall("placement", candidateId,
+          operation.computationEnd - operation.computationStart, false);
+      },
+    });
+  }
+
   let runResult = null;
 
   try {
@@ -613,14 +636,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         }
 
         if (!currentRawTransfer) {
-          const _calT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-          currentRawTransfer = await runInWorker(worker, "placement", {
-            finalist: currentFinalist,
-            roomDims, rspPosition, seatingPositions,
-            selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
-          }, controller.signal);
-          metrics.recordWorkerCall("placement", "calibration-current",
-            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _calT0, false);
+          currentRawTransfer = await prepareFullTransfer(currentFinalist, "calibration-current", "grouped-delay and canonical confirmation");
         } else {
           metrics.recordStage2TransferReused();
         }
@@ -704,14 +720,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       onProgress("testing_positions", `Testing recommended positions (${i + 1}/${allCandidates.length})`, i, allCandidates.length);
       if (!allCandidates[i].rawTransfer) {
         try {
-          const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-          allCandidates[i].rawTransfer = await runInWorker(worker, "placement", {
-            finalist: allCandidates[i].finalist,
-            roomDims, rspPosition, seatingPositions,
-            selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
-          }, controller.signal);
-          metrics.recordWorkerCall("placement", allCandidates[i].id,
-            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
+          allCandidates[i].rawTransfer = await prepareFullTransfer(allCandidates[i].finalist, allCandidates[i].id, "global proxy and promotion");
         } catch (err) {
           if (isFatalLifecycleError(err)) throw err;
           allCandidates[i].rawTransfer = null;
@@ -762,14 +771,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
             }
           }
           if (!currentRawTransfer) {
-            const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-            currentRawTransfer = await runInWorker(worker, "placement", {
-              finalist: currentFinalist,
-              roomDims, rspPosition, seatingPositions,
-              selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
-            }, controller.signal);
-            metrics.recordWorkerCall("placement", "current",
-              (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
+            currentRawTransfer = await prepareFullTransfer(currentFinalist, "current", "installed Current canonical confirmation");
           } else {
             metrics.recordStage2TransferReused();
           }
@@ -887,14 +889,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
         if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
         try {
-          const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-          c.rawTransfer = await runInWorker(worker, "placement", {
-            finalist: c.finalist,
-            roomDims, rspPosition, seatingPositions,
-            selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
-          }, controller.signal);
-          metrics.recordWorkerCall("placement", c.id,
-            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
+          c.rawTransfer = await prepareFullTransfer(c.finalist, c.id, `${escPhase.name} proxy and promotion`);
         } catch (err) {
           if (isFatalLifecycleError(err)) throw err;
           c.rawTransfer = null;
