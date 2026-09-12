@@ -560,6 +560,7 @@ function useDesignerState() {
     }
     return [];
   });
+  const [appliedSeatingProvenance, setAppliedSeatingProvenance] = useState(null);
   const [baselineSeatingPositions, setBaselineSeatingPositions] = useState([]);
   const [seatingRows, setSeatingRows] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.seatingRows === "number") ? __autosavePayload.seatingRows : 1
@@ -1480,6 +1481,7 @@ function useDesignerState() {
         const dims = p.roomDims || p.roomDimensions || roomDims || null;
         const normalised = normaliseSeatingPositions(p.seatingPositions, dims);
         setSeatingPositions(enforceOnePrimary(normalised, dims, p.mlpBasis || "front"));
+    if (p.appliedSeatingProvenance !== undefined) setAppliedSeatingProvenance(p.appliedSeatingProvenance || null);
       }
       if (p.screen) setScreen(p.screen);
 
@@ -1710,6 +1712,7 @@ function useDesignerState() {
         const dims = p.roomDims || p.roomDimensions || roomDims || null;
         const normalised = normaliseSeatingPositions(p.seatingPositions, dims);
         setSeatingPositions(enforceOnePrimary(normalised, dims, p.mlpBasis || "front"));
+    if (p.appliedSeatingProvenance !== undefined) setAppliedSeatingProvenance(p.appliedSeatingProvenance || null);
       }
       if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
       // Restore sub configs explicitly (even if count = 0)
@@ -2040,7 +2043,8 @@ function useDesignerState() {
     screen, setScreen, screenHeight, setScreenHeight,
     screenWall, setScreenWall, dolbyConfig, setDolbyConfig, dolbyLayout, setDolbyLayout,
     seededChannels, setSeededChannels, sevenBedLayoutType, setSevenBedLayoutType,
-    seatingPositions, setSeatingPositions, 
+    seatingPositions, setSeatingPositions,
+    appliedSeatingProvenance, setAppliedSeatingProvenance, 
     baselineSeatingPositions, setBaselineSeatingPositions,
     seatingRows, setSeatingRows,
     seatsPerRow, setSeatsPerRow,
@@ -2151,7 +2155,8 @@ function useDesignerState() {
     screenWall, setScreenWall, dolbyConfig, setDolbyConfig, 
     dolbyLayout, setDolbyLayout,
     seededChannels, setSeededChannels, sevenBedLayoutType, setSevenBedLayoutType,
-    seatingPositions, setSeatingPositions, 
+    seatingPositions, setSeatingPositions,
+    appliedSeatingProvenance, setAppliedSeatingProvenance, 
     baselineSeatingPositions, setBaselineSeatingPositions,
     seatingRows, setSeatingRows,
     seatsPerRow, setSeatsPerRow,
