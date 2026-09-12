@@ -94,4 +94,3 @@ test("matching manual numbers are not already-applied effective tuning",()=>{
  assert.equal(isOptimisedApplied(one,{coordinates:[one[0].position],appliedTuning:bound}),false);
  assert.equal(isCalibrationApplied(applyCalibrationTuning(one,bound),bound),true);
 });
-
