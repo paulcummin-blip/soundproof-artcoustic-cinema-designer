@@ -23,7 +23,7 @@ function makeResult({ p19Level, p20Level, perSeatP19 = [], perSeatP20 = [] }) {
     achievedP20Level: p20Level,
     achievedP19VariationDb: 6.1,
     achievedP20VariationDb: 11.3,
-    perSeatP19,
+    perSeatP19: perSeatP19.length ? perSeatP19 : perSeatP20.map(s=>({seatId:s.seatId,isPrimary:s.isPrimary,variationDbRaw:6.5,level:0})),
     perSeatP20,
   };
 }
