@@ -121,7 +121,7 @@ test('real worker thread and full acoustic engine complete two queued jobs on on
     const ready=await once(w,'message');assert.equal(ready[0].type,'ready');
     const received=[];w.on('message',m=>received.push(m));
     w.postMessage(job());w.postMessage(job('B','fp-B'));w.postMessage({type:'cancel',requestId:'A'});
-    while(received.length<2)await once(w,'message');
+    while(received.length<2)await once(w,'message',{signal:AbortSignal.timeout(30000)});
     assert.deepEqual(received.map(x=>[x.requestId,x.type]),[['A','complete'],['B','complete']]);
     for(const result of received)for(const key of ['one_sub_result','two_sub_result','four_sub_result'])assert.ok(result.result.results[key].finalists.length>0,key);
   }finally{await w.terminate();}
