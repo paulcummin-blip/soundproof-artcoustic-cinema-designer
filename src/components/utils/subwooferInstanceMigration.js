@@ -280,7 +280,9 @@ export function bassInputAdapter(instances, orientationMeta) {
         phaseAdjust: 0,
         polarity: inst.polarity ?? 1,
         // Instance metadata
-        positionSource: inst.positionSource || "default",
+        // Preserve the distinction between installed manual and effective V2 delay.
+      tuningSource: inst.tuningSource,
+      positionSource: inst.positionSource || "default",
         legacyGroup: group,
         symmetryLinkId: inst.symmetryLinkId ?? null,
       };
