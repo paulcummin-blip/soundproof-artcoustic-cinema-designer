@@ -42,6 +42,8 @@ import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { setPositionSearchPhase, setPositionExhaustion, setStageVerdict } from "./improveBassV2Store.js";
 import { runPositionScreenPhase, tagGlobalCandidates, checkPhaseMateriality, buildPositionOptimisationState } from "./improveBassV2Escalation.js";
 
+import { attachCurrentCanonicalValidation } from "./currentAuthorityValidation.js";
+
 const MAX_CHALLENGERS = 3;
 
 // TODO: replace with measured production threshold after Room B/C browser
@@ -476,7 +478,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     subwooferInstances, roomDims, seatingPositions, rspPosition,
     selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
     p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
-    currentAuthority, liveCacheKey, stage2Result, placementFingerprint,
+    currentAuthority, currentCanonicalResult, currentSources, liveCacheKey, stage2Result, placementFingerprint,
   } = params;
 
   const worker = new Worker(new URL("./improveBassV2.worker.js", import.meta.url), { type: "module" });
@@ -550,7 +552,10 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     // production-resolved condition directly.
     const authorityNonStale = isCurrentAuthorityNonStale(currentAuthority, liveCacheKey);
     let existingAuthority = authorityNonStale
-      ? extractAuthorityForComparison(currentAuthority)
+      ? attachCurrentCanonicalValidation(extractAuthorityForComparison(currentAuthority), {
+          authority: currentAuthority, canonical: currentCanonicalResult, sources: currentSources,
+          liveCacheKey, sourceIds: snapshot.instanceIds,
+        })
       : null;
     const validationContext = {seats:seatingPositions,sourceIds:snapshot.instanceIds,inputIdentity:startFingerprint};
     snapshot.validationContext = validationContext;
