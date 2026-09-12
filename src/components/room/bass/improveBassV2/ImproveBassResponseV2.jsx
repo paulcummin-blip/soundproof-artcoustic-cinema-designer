@@ -58,6 +58,7 @@ export default function ImproveBassResponseV2({
   commitInstances,
   commitSeating,
   commitSeatingProvenance,
+  appliedSeatingProvenance,
   hasCanonicalInstances,
   appState,
   amplifierPowerPerSubW,
@@ -393,9 +394,41 @@ export default function ImproveBassResponseV2({
       // Apply seating position change — stamp provenance on successful apply.
       // Seating mutates seatingPositions (not subwooferInstances), so provenance
       // is stored at the project level via commitSeatingProvenance.
+      //
+      // CRITICAL TIMING: The appliedFingerprint must be the POST-mutation
+      // fingerprint (the new current design fingerprint after seating moves),
+      // NOT the pre-mutation fingerprint or the candidate preview fingerprint.
+      // Sequence: validate baseline → commit seating → derive new fingerprint
+      // → persist provenance with new fingerprint.
       if (commitSeating && result.seatingPositions) {
-        const _provenance = buildProvenance(stageKey, result.candidateId, state.winner.applyFingerprint, fingerprint);
+        // Step C: Commit the seating coordinates
         commitSeating(result.seatingPositions);
+
+        // Step D: Derive the NEW current design fingerprint from the moved
+        // seating positions. We compute it synchronously from the new array
+        // since commitSeating is a React state setter that won't reflect in
+        // the current render cycle.
+        const postMutationFingerprint = (() => {
+          try {
+            return computeV2DesignFingerprint({
+              ...d,
+              seatingPositions: result.seatingPositions,
+              ...d.p14Params,
+            });
+          } catch {
+            return null;
+          }
+        })();
+
+        // Step F: Persist seating Apply provenance with the NEW fingerprint.
+        // baselineFingerprint = run-start fingerprint (state.winner.applyFingerprint)
+        // appliedFingerprint = post-mutation current design fingerprint
+        const _provenance = buildProvenance(
+          "seating_positions",
+          result.candidateId,
+          state.winner.applyFingerprint,
+          postMutationFingerprint,
+        );
         if (commitSeatingProvenance) commitSeatingProvenance(_provenance);
       }
     }
@@ -444,6 +477,7 @@ export default function ImproveBassResponseV2({
           stale={completedResultStale}
           currentInstances={subwooferInstances}
           roomDims={roomDims}
+          appliedSeatingProvenance={appliedSeatingProvenance}
         />
       )}
 
@@ -461,7 +495,7 @@ export default function ImproveBassResponseV2({
 
       {isCancelled && (
         <>
-          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} currentInstances={subwooferInstances} roomDims={roomDims} />
+          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} currentInstances={subwooferInstances} roomDims={roomDims} appliedSeatingProvenance={appliedSeatingProvenance} />
           <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-amber-700" />
@@ -480,7 +514,7 @@ export default function ImproveBassResponseV2({
 
       {isStale && (
         <>
-          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} currentInstances={subwooferInstances} roomDims={roomDims} />
+          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} currentInstances={subwooferInstances} roomDims={roomDims} appliedSeatingProvenance={appliedSeatingProvenance} />
           <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-amber-700" />
@@ -499,7 +533,7 @@ export default function ImproveBassResponseV2({
 
       {isError && (
         <>
-          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} currentInstances={subwooferInstances} roomDims={roomDims} />
+          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} currentInstances={subwooferInstances} roomDims={roomDims} appliedSeatingProvenance={appliedSeatingProvenance} />
           <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-red-700" />

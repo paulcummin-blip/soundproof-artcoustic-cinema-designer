@@ -20,6 +20,7 @@ import { delayMsToAcousticDistance } from "./acousticDistance";
 import { isCalibrationApplied } from "./improveBassV2ApplyCalibration.js";
 import { isOptimisedApplied } from "./improveBassV2Apply.js";
 import { isProvenanceApplied, getActiveProvenance } from "./appliedProvenance.js";
+import { isSeatingProvenanceApplied } from "./seatingProvenanceAuthority.js";
 import { buildStageResults } from "./improveBassV2StageAuthority.js";
 
 // Map the display stage keys (from buildStageDisplay) to the stage authority
@@ -250,9 +251,20 @@ export function buildStageDetails(selection) {
 /**
  * Check whether a stage's result has been applied to the current instances.
  * Uses the same authority as the live Apply check.
+ *
+ * For Seating, provenance is project-level (appliedSeatingProvenance), NOT
+ * on subwooferInstances. The function must NOT inspect subwooferInstances
+ * for the Seating stage.
  */
-function isStageResultApplied(stageKey, stage, currentInstances, roomDims) {
-  if (!stage?.result || !currentInstances) return false;
+function isStageResultApplied(stageKey, stage, currentInstances, roomDims, appliedSeatingProvenance, winnerApplyFingerprint) {
+  if (!stage?.result) return false;
+
+  // Seating stage — project-level provenance authority
+  if (stageKey === "seating") {
+    return isSeatingProvenanceApplied(appliedSeatingProvenance, stage, winnerApplyFingerprint);
+  }
+
+  if (!currentInstances) return false;
 
   // C3 — APPLIED must match the action record for that stage/candidate.
   // Check provenance FIRST. Only if provenance exists and matches is the
@@ -282,9 +294,6 @@ function isStageResultApplied(stageKey, stage, currentInstances, roomDims) {
   }
   if (stageKey === "subPositions") {
     return isOptimisedApplied(currentInstances, stage.result, roomDims);
-  }
-  if (stageKey === "seating") {
-    return false;
   }
   return false;
 }
@@ -372,7 +381,7 @@ function CompletedStageRow({ stage, detail, applied }) {
  * @param {boolean} stale - true when the completed result is stale due to
  *   a bass-relevant design change after completion
  */
-export default function ImproveBassV2CompletedInvestigation({ state, selection, stale, currentInstances, roomDims }) {
+export default function ImproveBassV2CompletedInvestigation({ state, selection, stale, currentInstances, roomDims, appliedSeatingProvenance }) {
   const display = buildStageDisplay(state);
   const status = state?.status || "idle";
 
@@ -428,7 +437,7 @@ export default function ImproveBassV2CompletedInvestigation({ state, selection, 
         {display.stages.map((stage) => {
           const stageKey = mapDisplayKeyToStageKey(stage.key);
           const stageResult = stagesFromSelection?.[stageKey];
-          const applied = isStageResultApplied(stageKey, stageResult, currentInstances, roomDims);
+          const applied = isStageResultApplied(stageKey, stageResult, currentInstances, roomDims, appliedSeatingProvenance, state?.winner?.applyFingerprint);
           return (
             <CompletedStageRow
               key={stage.key}
