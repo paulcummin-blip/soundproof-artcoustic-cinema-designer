@@ -36,7 +36,6 @@ import { computeV2DesignFingerprint, isCurrentAuthorityNonStale } from "./improv
 import { runInWorker, isFatalLifecycleError, V2RunTimeoutError } from "./improveBassV2WorkerLifecycle.js";
 import { V2RuntimeMetrics } from "./improveBassV2RuntimeMetrics.js";
 import { subscribeImproveBassV2, getImproveBassV2State } from "./improveBassV2Store.js";
-import { runCalibrationOnlySearch } from "./calibrationOnlySearch.js";
 import { isMaterialImprovement } from "./materialityGate.js";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { setPositionSearchPhase, setPositionExhaustion, setStageVerdict } from "./improveBassV2Store.js";
@@ -587,7 +586,8 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       const configurationKey=effectiveConfigurationKey(instances,appliedTuning);
       let hash=2166136261;for(const ch of configurationKey)hash=Math.imul(hash^ch.charCodeAt(0),16777619);
       return {...result,appliedTuning,configurationKey,inputIdentity:startFingerprint,candidateKind:kind,
-        candidateId:kind==="current"?"current":kind==="calibration"?"calibration:"+(hash>>>0).toString(16):candidate.id,
+        candidateId:kind==="current"?"current":kind==="calibration"?(candidate.groupedDelay?.id || "calibration:"+(hash>>>0).toString(16)):candidate.id,
+        groupedDelay:candidate.groupedDelay || null,
         isCurrent:kind==="current",candidateOrigin:kind==="calibration"?"calibration-only":candidate.candidateOrigin};
     }
 
@@ -625,31 +625,44 @@ export async function runImproveBassV2(projectId, params, callbacks) {
 
         if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
 
-        // Run combined delay + polarity + trim search on Current's raw transfers
-        const calibrationSearch = runCalibrationOnlySearch(currentRawTransfer);
-        onProgress("calibrating", "Searching calibration improvements", 1, 2);
-
-        const retained=calibrationSearch?.candidates || (calibrationSearch?.bestTuning?[{tuning:calibrationSearch.bestTuning,score:calibrationSearch.searchScore}]:[]);
+        // Freeze installed EFFECTIVE tuning; grouped trials add an adjustment
+        // once. All recombination and canonical confirmation run in the worker.
+        const effectiveBaseline=existingAuthority?.appliedTuning || bindTuningToSourceIds(
+          resolveInstalledEffectiveTuning(currentRawTransfer,subwooferInstances,rspPosition),snapshot.instanceIds);
+        onProgress("calibrating", "Testing grouped delay adjustments", 0, 61);
+        const groupedStarted=performance.now();
+        const calibrationSearch=await runInWorker(worker,"grouped-delay",{
+          rawTransfer:currentRawTransfer,instances:subwooferInstances,roomDims,effectiveBaseline,
+        },controller.signal);
+        metrics.recordWorkerCall("grouped-delay","calibration-current",performance.now()-groupedStarted,false);
+        if(isStale()) return {status:"stale",snapshot};
+        const retained=calibrationSearch?.candidates || [];
+        Object.assign(calibrationDiagnostics,{grouping:calibrationSearch?.grouping,
+          coarseCount:calibrationSearch?.coarseCount,fineCount:calibrationSearch?.fineCount,
+          ledger:calibrationSearch?.ledger,timings:calibrationSearch?.timings,searchStatus:calibrationSearch?.status});
+        if(calibrationSearch?.status==="ambiguous")evaluationIssues.push({stage:"calibration",error:calibrationSearch.grouping.reason});
         calibrationDiagnostics.retained=retained.length;
-        calibrationDiagnostics.options=retained.map(f=>({tuning:f.tuning,proxyScore:f.score}));
+        calibrationDiagnostics.options=retained.map(f=>({candidateId:f.id,tuning:f.tuning,proxy:f.proxy}));
         for (let index=0;index<retained.length;index++) {
           if(isCancelled()) return {status:"cancelled",snapshot};
           if(isStale()) return {status:"stale",snapshot};
+          onProgress("calibrating", "Confirming grouped delay options", index, retained.length);
           const _confirmT0=performance.now();
           const response=await runInWorker(worker,"confirmation",{
-            rawTransfer:currentRawTransfer,tuning:retained[index].tuning,tuningVariant:"delay-polarity-trim",
+            rawTransfer:currentRawTransfer,tuning:retained[index].tuning,tuningVariant:"delay-only",
             p14TargetBasis,p14TargetLevel,p14TargetDb,p18TargetBasis,
           },controller.signal);
           metrics.recordWorkerCall("confirmation","calibration:"+index,performance.now()-_confirmT0,false);
           if(isStale()) return {status:"stale",snapshot};
-          const result=response?bindConfirmation(response,retained[index].tuning,currentFinalist,"calibration"):null;
+          const result=response?bindConfirmation(response,retained[index].tuning,{...currentFinalist,groupedDelay:retained[index]},"calibration"):null;
           const check=validateConfirmedCandidate(result,validationContext);
           calibrationDiagnostics.confirmed++;
           calibrationDiagnostics.options[index].validity={valid:check.valid,issues:check.issues};
           if(check.valid){calibrationCandidates.push(check.result);calibrationDiagnostics.valid++;}
           else {calibrationDiagnostics.invalid++;evaluationIssues.push({stage:"calibration",index,issues:check.issues});}
         }
-        calibrationDiagnostics.status=calibrationDiagnostics.valid?"completed-shortlist":"incomplete";
+        calibrationDiagnostics.status=calibrationSearch?.status==="skipped"?"skipped":calibrationDiagnostics.valid?"completed-shortlist":"incomplete";
+        onProgress("calibrating", "Grouped delay confirmation complete", retained.length, retained.length);
 
       }
     } catch (err) {
@@ -660,13 +673,12 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     }
 
     onProgress("calibrating", "Searching calibration improvements", 2, 2);
-    // Publish stage verdicts for the combined calibration search (phase/delay/gain
-    // are tested together in searchDelayPolarityTrim — all three share the same
-    // verdict). Purely observational — does not change any logic.
+    // This calibration phase changes grouped delay only. Gain and polarity
+    // remain frozen; their verdicts must not imply they were searched.
     const calVerdict = calibrationDiagnostics.invalid || calibrationDiagnostics.error || !calibrationDiagnostics.valid ? "incomplete" : "done";
-    setStageVerdict(projectId, "phase_polarity", calVerdict);
-    setStageVerdict(projectId, "delays", calVerdict);
-    setStageVerdict(projectId, "gain", calVerdict);
+    setStageVerdict(projectId, "phase_polarity", "skipped");
+    setStageVerdict(projectId, "delays", calibrationDiagnostics.status==="skipped"?"skipped":calVerdict);
+    setStageVerdict(projectId, "gain", "skipped");
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
@@ -795,7 +807,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       calibrationTuning=calibrationResult?.appliedTuning || null;
       calibrationMaterial={material:!!calibrationResult,reason:calSelection.materialityReason};
       calibrationDiagnostics.evaluations=calSelection.evaluations;
-      for(const stage of ["phase_polarity","delays","gain"])setStageVerdict(projectId,stage,
+      setStageVerdict(projectId,"delays",calibrationDiagnostics.status==="skipped"?"skipped":
         calibrationResult?"improvement":calibrationDiagnostics.invalid || calibrationDiagnostics.error || !calibrationDiagnostics.valid?"incomplete":"no_improvement");
     }
     const attemptedConfirmationIds=new Set();
