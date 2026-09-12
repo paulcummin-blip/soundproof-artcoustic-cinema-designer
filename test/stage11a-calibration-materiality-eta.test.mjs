@@ -117,16 +117,17 @@ function assert(condition, name) {
 // ── Test 5: Materiality - >= 1 dB within-level accepted ───────────────────
 {
   const current = {
-    achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 0, variationDbRaw: 6.5 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 6.0 }],
+    achievedP19Level: 4, achievedP20Level: 4,
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 4, variationDbRaw: 2.5 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 4, variationDbRaw: 2.0 }],
   };
   const candidate = {
-    achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: 4.5 }],
+    achievedP19Level: 4, achievedP20Level: 4,
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 4, variationDbRaw: 1.0 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 4, variationDbRaw: 0.5 }],
   };
   const result = isMaterialImprovement(current, candidate);
+  assert(result.details?.improvement === 1.5, "Test 5b: actual same-level path remains 1.5 dB");
   assert(result.material === true, "Test 5: >= 1.0 dB within-level accepted as material");
 }
 
