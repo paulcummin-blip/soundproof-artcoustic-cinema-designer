@@ -243,14 +243,14 @@ console.log("\n=== VISUAL REPORT SEAT AUTHORITY ===\n");
 
 // --- R. PRIORITY_LEGEND explains priority, not grade colour ---
 {
-  check("R: PRIORITY_LEGEND has 2 entries (Primary / Other)",
+  check("R: PRIORITY_LEGEND has 2 entries (Primary / Secondary)",
     PRIORITY_LEGEND.length === 2,
     `got ${PRIORITY_LEGEND.length}`);
-  check("R: First entry is 'Primary seating'",
-    PRIORITY_LEGEND[0].label === "Primary seating",
+  check("R: First entry is 'Primary seat'",
+    PRIORITY_LEGEND[0].label === "Primary seat",
     `got ${PRIORITY_LEGEND[0].label}`);
-  check("R: Second entry is 'Other seating'",
-    PRIORITY_LEGEND[1].label === "Other seating",
+  check("R: Second entry is 'Secondary seat'",
+    PRIORITY_LEGEND[1].label === "Secondary seat",
     `got ${PRIORITY_LEGEND[1].label}`);
   check("R: Primary stroke is heavier than Other",
     PRIORITY_LEGEND[0].strokeWidth > PRIORITY_LEGEND[1].strokeWidth,
