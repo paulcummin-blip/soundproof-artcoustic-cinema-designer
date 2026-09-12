@@ -1,28 +1,5 @@
-// recommendationRanker.js
-// Pure ranking of confirmed Improve Bass V2 results into ordered
-// recommendation cards.
-//
-// Ranking hierarchy (per user spec):
-//   1. RP22 LEVEL CHANGE — any recommendation that improves an actual displayed
-//      RP22 parameter level outranks one that only improves raw dB within the
-//      same level. More parameter-level improvements first, then larger level
-//      jump.
-//   2. SAME-LEVEL — rank by the largest MATERIAL useful improvement (raw
-//      worst-seat deviation reduction). A materially better raw result
-//      outranks a weaker same-level result.
-//   3. SAME-LEVEL BROADLY EQUIVALENT — practical priority:
-//      calibration (phase/delay/gain) < subwoofer position < seating position.
-//      The least disruptive solution wins when the acoustic outcome is
-//      effectively equivalent.
-//
-// IMPORTANT: The engine tests phase/delay/gain TOGETHER in a combined
-// searchDelayPolarityTrim call. They are NOT tested separately. The
-// calibration recommendation is a single combined "Adjust calibration" card,
-// not separate phase/delay/gain cards.
-//
-// The canonical winner from selectWinnerWithProtection remains the authority.
-// It is always shown as the #1 recommendation. Other material improvements are
-// ranked below using the hierarchy above.
+// One ordering for safety-eligible, material canonical recommendations.
+// P19, then P20, then P18, then P14. Seat priorities remain explicit.
 
 import { isMaterialImprovement } from './materialityGate.js';
 
@@ -36,7 +13,27 @@ const PRACTICAL_PRIORITY = {
 // Threshold for "broadly equivalent" raw improvements.
 // If the difference in raw improvement is <= this, practical priority decides.
 // If the difference is > this, the larger improvement wins.
-const BROADLY_EQUIVALENT_THRESHOLD_DB = 0.5;
+// Signed ascending tuple. Worst primary-seat grade/raw first, then worst
+// secondary-seat grade/raw, separately for P19 and P20. These internal
+// comparisons do not create aggregate grades for display.
+export function canonicalRecommendationTuple(result) {
+  const tuple=[];
+  for(const field of ["perSeatP19","perSeatP20"]){
+    const rows=result?.[field] || [];
+    for(const primary of [true,false]){
+      const scope=rows.filter(s=>!!s.isPrimary===primary);
+      tuple.push(scope.length?-Math.min(...scope.map(s=>numericLevel(s.level))):0);
+      tuple.push(scope.length?Math.max(...scope.map(s=>s.variationDbRaw)):0);
+    }
+  }
+  return [...tuple,-numericLevel(result?.p18AchievedLevel),result?.achievedP18Hz,
+    -numericLevel(result?.p14AchievedLevel),-result?.p14AchievedDb];
+}
+export function compareCanonicalRecommendations(a,b) {
+  const left=canonicalRecommendationTuple(a),right=canonicalRecommendationTuple(b);
+  for(let i=0;i<left.length;i++)if(Math.abs(left[i]-right[i])>1e-8)return left[i]-right[i];
+  return 0;
+}
 
 function numericLevel(value) {
   if (Number.isFinite(Number(value))) return Math.max(0, Math.min(4, Number(value)));
@@ -171,29 +168,9 @@ export function rankRecommendations(selection) {
     });
   }
 
-  // Sort by the user's hierarchy:
-  // 1. Level change: more parameter-level improvements first, then larger total jump
-  // 2. Same level: larger raw improvement (unless broadly equivalent)
-  // 3. Same-level broadly equivalent: practical priority (calibration < position)
-  recommendations.sort((a, b) => {
-    // 1a. More parameter-level improvements first
-    if (a.levelChanges.paramCount !== b.levelChanges.paramCount) {
-      return b.levelChanges.paramCount - a.levelChanges.paramCount;
-    }
-    // 1b. Larger total level jump first
-    if (a.levelChanges.totalJumps !== b.levelChanges.totalJumps) {
-      return b.levelChanges.totalJumps - a.levelChanges.totalJumps;
-    }
-    // 2. Same level: larger raw improvement (unless broadly equivalent)
-    const rawDiff = b.rawImprovement - a.rawImprovement;
-    if (Math.abs(rawDiff) > BROADLY_EQUIVALENT_THRESHOLD_DB) {
-      return rawDiff; // materially better raw result wins
-    }
-    // 3. Same-level broadly equivalent: practical priority (lower = less disruptive)
-    const aPri = PRACTICAL_PRIORITY[a.interventionType] || 99;
-    const bPri = PRACTICAL_PRIORITY[b.interventionType] || 99;
-    return aPri - bPri;
-  });
+  recommendations.sort((a,b) => compareCanonicalRecommendations(a.result,b.result)
+    || (PRACTICAL_PRIORITY[a.interventionType] || 99)-(PRACTICAL_PRIORITY[b.interventionType] || 99)
+    || String(a.result.candidateId).localeCompare(String(b.result.candidateId)));
 
   // Ensure the canonical winner is always #1 (authority override)
   if (winner) {
