@@ -54,7 +54,7 @@ const currentResult = makeResult({
   isCurrent: true,
   achievedP19Level: 0, // FAIL
   achievedP20Level: 1, // L1
-  perSeatP19: [makeSeat("s1", true, 8.0, 0), makeSeat("s2", true, 7.5, 0)],
+  perSeatP19: [makeSeat("s1", true, 9.0, 0), makeSeat("s2", true, 8.5, 0)],
   perSeatP20: [makeSeat("s1", true, 6.0, 1), makeSeat("s2", true, 5.5, 1)],
 });
 
@@ -160,7 +160,7 @@ describe("C — Level-changing recommendation outranks same-level dB", () => {
       isPositionCandidate: true,
       achievedP19Level: 1, // L1 (was FAIL=0)
       achievedP20Level: 1, // same
-      perSeatP19: [makeSeat("s1", true, 4.0, 1), makeSeat("s2", true, 3.5, 1)],
+      perSeatP19: [makeSeat("s1", true, 5.5, 1), makeSeat("s2", true, 5.2, 1)],
       perSeatP20: [makeSeat("s1", true, 6.0, 1), makeSeat("s2", true, 5.5, 1)],
     });
 
@@ -169,7 +169,7 @@ describe("C — Level-changing recommendation outranks same-level dB", () => {
       isCurrent: false,
       achievedP19Level: 0, // same FAIL
       achievedP20Level: 1, // same L1
-      perSeatP19: [makeSeat("s1", true, 6.0, 0), makeSeat("s2", true, 5.5, 0)],
+      perSeatP19: [makeSeat("s1", true, 7.0, 0), makeSeat("s2", true, 6.5, 0)],
       perSeatP20: [makeSeat("s1", true, 6.0, 1), makeSeat("s2", true, 5.5, 1)],
     });
 
@@ -191,8 +191,8 @@ describe("C — Level-changing recommendation outranks same-level dB", () => {
       isPositionCandidate: true,
       achievedP19Level: 0, // same
       achievedP20Level: 2, // L2 (was L1)
-      perSeatP19: [makeSeat("s1", true, 8.0, 0), makeSeat("s2", true, 7.5, 0)],
-      perSeatP20: [makeSeat("s1", true, 4.0, 2), makeSeat("s2", true, 3.5, 2)],
+      perSeatP19: [makeSeat("s1", true, 9.0, 0), makeSeat("s2", true, 8.5, 0)],
+      perSeatP20: [makeSeat("s1", true, 4.8, 2), makeSeat("s2", true, 4.5, 2)],
     });
 
     const sameLevelResult = makeResult({
@@ -200,8 +200,8 @@ describe("C — Level-changing recommendation outranks same-level dB", () => {
       isCurrent: false,
       achievedP19Level: 0,
       achievedP20Level: 1, // same L1
-      perSeatP19: [makeSeat("s1", true, 8.0, 0), makeSeat("s2", true, 7.5, 0)],
-      perSeatP20: [makeSeat("s1", true, 4.5, 1), makeSeat("s2", true, 4.0, 1)],
+      perSeatP19: [makeSeat("s1", true, 9.0, 0), makeSeat("s2", true, 8.5, 0)],
+      perSeatP20: [makeSeat("s1", true, 5.4, 1), makeSeat("s2", true, 5.0, 1)],
     });
 
     const selection = {
@@ -225,7 +225,7 @@ describe("D — Same-level broadly equivalent prefers calibration over position"
       isCurrent: true,
       achievedP19Level: 0,
       achievedP20Level: 1,
-      perSeatP19: [makeSeat("s1", true, 6.8, 0), makeSeat("s2", true, 6.3, 0)],
+      perSeatP19: [makeSeat("s1", true, 7.8, 0), makeSeat("s2", true, 7.3, 0)],
       perSeatP20: [makeSeat("s1", true, 6.0, 1), makeSeat("s2", true, 5.5, 1)],
     });
 
@@ -234,7 +234,7 @@ describe("D — Same-level broadly equivalent prefers calibration over position"
       isPositionCandidate: true,
       achievedP19Level: 0,
       achievedP20Level: 1,
-      perSeatP19: [makeSeat("s1", true, 6.8, 0), makeSeat("s2", true, 6.3, 0)],
+      perSeatP19: [makeSeat("s1", true, 7.8, 0), makeSeat("s2", true, 7.3, 0)],
       perSeatP20: [makeSeat("s1", true, 6.0, 1), makeSeat("s2", true, 5.5, 1)],
     });
 
@@ -262,7 +262,7 @@ describe("E — Materially better raw result outranks weaker same-level", () => 
       isCurrent: true,
       achievedP19Level: 0,
       achievedP20Level: 1,
-      perSeatP19: [makeSeat("s1", true, 7.5, 0), makeSeat("s2", true, 7.0, 0)],
+      perSeatP19: [makeSeat("s1", true, 8.5, 0), makeSeat("s2", true, 7.0, 0)],
       perSeatP20: [makeSeat("s1", true, 6.0, 1), makeSeat("s2", true, 5.5, 1)],
     });
 
@@ -271,7 +271,7 @@ describe("E — Materially better raw result outranks weaker same-level", () => 
       isPositionCandidate: true,
       achievedP19Level: 0,
       achievedP20Level: 1,
-      perSeatP19: [makeSeat("s1", true, 6.0, 0), makeSeat("s2", true, 5.5, 0)],
+      perSeatP19: [makeSeat("s1", true, 7.0, 0), makeSeat("s2", true, 6.5, 0)],
       perSeatP20: [makeSeat("s1", true, 6.0, 1), makeSeat("s2", true, 5.5, 1)],
     });
 
@@ -423,8 +423,8 @@ describe("Winner authority — canonical winner is always #1", () => {
       isPositionCandidate: true,
       achievedP19Level: 0, // same level
       achievedP20Level: 1, // same level
-      perSeatP19: [makeSeat("s1", true, 6.0, 0)], // 2.0 dB improvement
-      perSeatP20: [makeSeat("s1", true, 4.0, 1)],
+      perSeatP19: [makeSeat("s1", true, 7.0, 0), makeSeat("s2", true, 6.5, 0)], // 2.0 dB improvement
+      perSeatP20: [makeSeat("s1", true, 5.5, 1), makeSeat("s2", true, 5.0, 1)],
     });
 
     const better = makeResult({
@@ -432,8 +432,8 @@ describe("Winner authority — canonical winner is always #1", () => {
       isPositionCandidate: true,
       achievedP19Level: 0,
       achievedP20Level: 1,
-      perSeatP19: [makeSeat("s1", true, 5.5, 0)], // 2.5 dB improvement
-      perSeatP20: [makeSeat("s1", true, 4.0, 1)],
+      perSeatP19: [makeSeat("s1", true, 6.5, 0), makeSeat("s2", true, 6.2, 0)], // 2.5 dB improvement
+      perSeatP20: [makeSeat("s1", true, 5.5, 1), makeSeat("s2", true, 5.0, 1)],
     });
 
     const selection = {
