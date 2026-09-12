@@ -5,6 +5,8 @@
 
 import { evaluateStage2Placement, evaluateStage2ConfirmationWithTuning } from "../stage2/stage2CanonicalEvaluation";
 
+import { runGroupedDelaySearch } from "./groupedDelaySearch.js";
+
 self.onmessage = (event) => {
   const { requestId, phase, ...params } = event.data || {};
   if (!requestId) {
@@ -15,6 +17,9 @@ self.onmessage = (event) => {
     if (phase === "placement") {
       const result = evaluateStage2Placement(params);
       self.postMessage({ type: "complete", requestId, phase: "placement", result });
+    } else if (phase === "grouped-delay") {
+      const result = runGroupedDelaySearch(params);
+      self.postMessage({ type: "complete", requestId, phase, result });
     } else if (phase === "confirmation") {
       const { rawTransfer, tuning, tuningVariant, ...p14Params } = params;
       const result = evaluateStage2ConfirmationWithTuning(rawTransfer, {
