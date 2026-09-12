@@ -12,7 +12,7 @@ export const STAGE2_RANKING_VERSION = "stage2-ranking-v1";
 // authority pipeline. v5 exposes the already-authoritative P14/P18 outcomes
 // on each comparison result. The equations are unchanged; this invalidates
 // older confirmation records that do not contain those presentation fields.
-export const STAGE2_CANONICAL_VERSION = "stage2-canonical-v5";
+export const STAGE2_CANONICAL_VERSION = "stage2-canonical-v6-delay-lag";
 export const STAGE2_PRODUCT_ENGINEERING_VERSION = "product-engineering-v5";
 // Placement layer version: P14-independent raw modal transfer. Bumped to v3:
 // amplifier power added to the placement fingerprint (raw transfers include
