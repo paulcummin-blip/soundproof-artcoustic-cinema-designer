@@ -561,16 +561,17 @@ function assert(condition, name) {
 
   // 1.0 dB within-level still material
   const current2 = {
-    achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 0, variationDbRaw: 6.5 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 6.0 }],
+    achievedP19Level: 4, achievedP20Level: 4,
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 4, variationDbRaw: 2.5 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 4, variationDbRaw: 2.0 }],
   };
   const candidate2 = {
-    achievedP19Level: 2, achievedP20Level: 2,
-    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 1, variationDbRaw: 5.0 }],
-    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 2, variationDbRaw: 4.5 }],
+    achievedP19Level: 4, achievedP20Level: 4,
+    perSeatP19: [{ seatId: "s1", isPrimary: true, level: 4, variationDbRaw: 1.0 }],
+    perSeatP20: [{ seatId: "s1", isPrimary: true, level: 4, variationDbRaw: 0.5 }],
   };
-  // worst primary deviation: current 6.5, candidate 5.0 → 1.5 dB → material
+  // worst primary deviation: current 2.5, candidate 1.0 → 1.5 dB → material
+  assert(isMaterialImprovement(current2, candidate2).details?.improvement === 1.5, "T9b-path: same-level path");
   assert(isMaterialImprovement(current2, candidate2).material === true, "T9b: 1.5 dB within-level still material");
 
   // 0.3 dB cosmetic win still suppressed
