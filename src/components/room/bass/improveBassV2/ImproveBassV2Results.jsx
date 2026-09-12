@@ -327,13 +327,14 @@ export default function ImproveBassV2Results({
 
   const winner = selection.winner;
   const currentResult = selection.currentResult;
+  const recommendations = rankRecommendations(selection);
 
   // ── Current Design metrics ───────────────────────────────────────────
   const currentP14 = numericLevel(currentResult?.p14AchievedLevel ?? snapshot?.currentP14);
   const currentP14Db = currentResult?.p14AchievedDb ?? null;
 
   // No safer improvement found
-  if (selection.isCurrent || !winner) {
+  if (recommendations.length === 0) {
     return (
       <div className="mt-3 rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-3">
         <div className="flex items-center gap-2">
@@ -347,7 +348,7 @@ export default function ImproveBassV2Results({
         )}
         {selection.positionOptimisation?.subOptimisationExhausted && !selection.positionOptimisation?.materialSubImprovementFound && (
           <p className="mt-1.5 text-[10px] italic text-[#8A7B6A]">
-            All practical subwoofer search tiers exhausted. Consider seating adjustments or additional subwoofers.
+            The completed checks cover the evaluated options only; they do not establish a global optimum.
           </p>
         )}
       </div>
@@ -361,7 +362,7 @@ export default function ImproveBassV2Results({
   const augmentedSnapshot = {
     ...snapshot,
     positions: (snapshot?.positions && snapshot.positions.length > 0) ? snapshot.positions : currentPositions,
-    tuning: (snapshot?.tuning && snapshot.tuning.length > 0) ? snapshot.tuning : currentTuning,
+    tuning: currentResult?.appliedTuning || snapshot?.effectiveTuning || snapshot?.tuning || currentTuning,
   };
 
   const applied = isOptimisedApplied(currentInstances, winner, roomDims);
@@ -370,8 +371,6 @@ export default function ImproveBassV2Results({
   // Build the ranked list from all material confirmed results + calibration.
   // The canonical winner is always #1. Other material improvements are ranked
   // below by: level change > raw improvement > practical priority.
-  const recommendations = rankRecommendations(selection);
-
   return (
     <div className="mt-3 space-y-3">
       {/* ── Current Design summary ── */}
@@ -385,8 +384,12 @@ export default function ImproveBassV2Results({
         </div>
       </div>
 
+      {(selection.calibrationDiagnostics?.invalid > 0 || selection.calibrationDiagnostics?.error) && (
+        <p className="text-[10px] text-[#625143]">Some calibration options could not be validated. Recommendations below use only confirmed valid results; calibration is not exhausted.</p>
+      )}
+
       {/* ── Calibration immaterial notice ── */}
-      {selection.calibrationResult && !selection.calibrationMaterial?.material && (
+      {selection.calibrationDiagnostics?.valid > 0 && !selection.calibrationDiagnostics?.invalid && !selection.calibrationDiagnostics?.error && !selection.calibrationMaterial?.material && (
         <div className="rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-2">
           <p className="text-[10px] leading-relaxed text-[#625143]">
             Calibration alone did not materially improve the room, so Sound Proof tested subwoofer position changes.
@@ -399,13 +402,15 @@ export default function ImproveBassV2Results({
         <div className="space-y-2">
           {recommendations.map((rec) => (
             <RecommendationCard
-              key={rec.rank}
+              key={rec.result.candidateId}
               recommendation={rec}
               snapshot={augmentedSnapshot}
               currentInstances={currentInstances}
               onApply={onApply}
               onApplyCalibration={onApplyCalibration}
-              isApplied={applied && rec.isWinner}
+              isApplied={isOptimisedApplied(currentInstances,rec.result,roomDims)}
+              currentResult={currentResult}
+              seatingPositions={seatingPositions}
             />
           ))}
         </div>
@@ -413,7 +418,7 @@ export default function ImproveBassV2Results({
 
       {/* ── Per-seat evidence for the winner ── */}
       {recommendations.length > 0 && recommendations[0]?.isWinner && (
-        <div className="rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-3">
+        <div data-comparison-candidate-id={winner.candidateId} className="rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-3">
           <div className="text-[10px] font-semibold text-[#625143] mb-1.5">
             P19 / P20 per-seat evidence (before → after) — {recommendations[0].interventionLabel}
           </div>
