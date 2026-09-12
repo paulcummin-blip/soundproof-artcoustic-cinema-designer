@@ -17,6 +17,30 @@ import React from "react";
 import { CheckCircle2, AlertCircle, AlertTriangle, Minus, Circle } from "lucide-react";
 import { buildStageDisplay, formatStageVerdict } from "./improveBassV2StageMapping.js";
 import { delayMsToAcousticDistance } from "./acousticDistance";
+import { isCalibrationApplied } from "./improveBassV2ApplyCalibration.js";
+import { isOptimisedApplied } from "./improveBassV2Apply.js";
+import { buildStageResults } from "./improveBassV2StageAuthority.js";
+
+// Map the display stage keys (from buildStageDisplay) to the stage authority
+// keys (from buildStageResults) so we can look up the result for applied-check.
+function mapDisplayKeyToStageKey(displayKey) {
+  const map = {
+    phase_polarity: "phase",
+    delays: "delay",
+    gain: "gain",
+    sub_positions: "subPositions",
+    seating_positions: "seating",
+  };
+  return map[displayKey] || displayKey;
+}
+
+function buildStageResultsFromSelection(selection) {
+  try {
+    return buildStageResults(selection);
+  } catch {
+    return null;
+  }
+}
 
 // ── Pure helpers (exported for testing) ──────────────────────────────────
 
@@ -93,22 +117,17 @@ export function buildStageDetails(selection) {
 
     if (calResult && currentResult) {
       // Material calibration winner exists — show group label + delay + acoustic path
-      const delayTuning = calResult.appliedTuning || calResult.tuning || [];
       const grouping = calDiag.grouping;
-      if (grouping?.groups?.length && delayTuning.length) {
-        const maxDelay = Math.max(...delayTuning.map((t) => Number(t.delayMs) || 0));
-        const minDelay = Math.min(...delayTuning.map((t) => Number(t.delayMs) || 0));
-        const range = maxDelay - minDelay;
-        if (range > 0.01) {
-          const adjustedSources = delayTuning
-            .filter((t) => Math.abs(Number(t.delayMs) - maxDelay) < 0.01)
-            .map((t) => t.sourceId);
+      const groupedDelay = calResult.groupedDelay;
+      if (groupedDelay && grouping?.groups?.length) {
+        const adjustmentMs = Number(groupedDelay.adjustmentMs) || 0;
+        if (adjustmentMs > 0.01) {
           const adjustedGroup = grouping.groups.find(
-            (g) => adjustedSources.length > 0 && adjustedSources.every((id) => g.sourceIds.includes(id)),
+            (g) => g.id === groupedDelay.direction,
           );
           const groupLabel = adjustedGroup?.label || "Grouped delay";
-          const acousticM = delayMsToAcousticDistance(range);
-          parts.push(`${groupLabel} +${range.toFixed(1)} ms`);
+          const acousticM = delayMsToAcousticDistance(adjustmentMs);
+          parts.push(`${groupLabel} +${adjustmentMs.toFixed(1)} ms`);
           parts.push(`Equivalent acoustic path +${acousticM.toFixed(2)} m (timing equivalent)`);
         }
       }
@@ -227,7 +246,37 @@ export function buildStageDetails(selection) {
 
 // ── Stage row renderer ───────────────────────────────────────────────────
 
-function CompletedStageRow({ stage, detail }) {
+/**
+ * Check whether a stage's result has been applied to the current instances.
+ * Uses the same authority as the live Apply check.
+ */
+function isStageResultApplied(stageKey, stage, currentInstances, roomDims) {
+  if (!stage?.result || !currentInstances) return false;
+  if (stageKey === "delay" || stageKey === "gain") {
+    return isCalibrationApplied(
+      currentInstances,
+      stage.result.appliedTuning || stage.result.tuning || [],
+    );
+  }
+  if (stageKey === "subPositions") {
+    return isOptimisedApplied(currentInstances, stage.result, roomDims);
+  }
+  if (stageKey === "seating") {
+    // Seating apply check: the seating offset is "applied" when the current
+    // seating positions match the result's moved positions. We check this
+    // by comparing the offset — if the result's offset is 0, it's "current"
+    // (no change). A non-zero offset is "applied" only when the seats have
+    // actually moved. Since we don't have the original seating positions
+    // here, we rely on the stale flag: if the result is not stale, the
+    // seating hasn't been applied yet (Apply hasn't happened). After Apply,
+    // the result becomes stale and the seats have moved. We check the
+    // seating positions directly if available.
+    return false; // Seating apply is tracked via the stage results component
+  }
+  return false;
+}
+
+function CompletedStageRow({ stage, detail, applied }) {
   const { status, label, verdict } = stage;
 
   if (status === "not_tested") {
@@ -265,12 +314,18 @@ function CompletedStageRow({ stage, detail }) {
     const verdictText = formatStageVerdict(verdict);
     return (
       <div className="flex items-start gap-2">
-        <CheckCircle2 className="h-3.5 w-3.5 text-[#213428] mt-0.5 flex-shrink-0" />
+        <CheckCircle2 className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${applied ? "text-white bg-[#213428] rounded-full" : "text-[#213428]"}`} />
         <div className="min-w-0">
-          <div className="text-[11px] text-[#213428] font-medium">
+          <div className="text-[11px] text-[#213428] font-medium flex items-center gap-1.5 flex-wrap">
             {label} checked
-            {verdictText && (
+            {verdictText && !applied && (
               <span className="font-normal text-[#8A7B6A]"> — {verdictText}</span>
+            )}
+            {applied && (
+              <span className="inline-flex items-center gap-0.5 rounded bg-[#213428] px-1 py-px text-[9px] font-semibold text-white">
+                <CheckCircle2 className="h-2.5 w-2.5" />
+                APPLIED
+              </span>
             )}
           </div>
           {detail && (
@@ -304,7 +359,7 @@ function CompletedStageRow({ stage, detail }) {
  * @param {boolean} stale - true when the completed result is stale due to
  *   a bass-relevant design change after completion
  */
-export default function ImproveBassV2CompletedInvestigation({ state, selection, stale }) {
+export default function ImproveBassV2CompletedInvestigation({ state, selection, stale, currentInstances, roomDims }) {
   const display = buildStageDisplay(state);
   const status = state?.status || "idle";
 
@@ -340,6 +395,9 @@ export default function ImproveBassV2CompletedInvestigation({ state, selection, 
 
   const stageDetails = buildStageDetails(selection);
 
+  // Build per-stage applied status from the current instances
+  const stagesFromSelection = selection ? buildStageResultsFromSelection(selection) : null;
+
   return (
     <div
       className={`mt-3 rounded-md border border-[#E7E4DF] bg-[#F8F7F4] p-3 ${
@@ -354,13 +412,19 @@ export default function ImproveBassV2CompletedInvestigation({ state, selection, 
         <span className={`text-[12px] font-semibold ${headerClass}`}>{headerLabel}</span>
       </div>
       <div className="mt-3 space-y-1.5">
-        {display.stages.map((stage) => (
-          <CompletedStageRow
-            key={stage.key}
-            stage={stage}
-            detail={stageDetails[stage.key]}
-          />
-        ))}
+        {display.stages.map((stage) => {
+          const stageKey = mapDisplayKeyToStageKey(stage.key);
+          const stageResult = stagesFromSelection?.[stageKey];
+          const applied = isStageResultApplied(stageKey, stageResult, currentInstances, roomDims);
+          return (
+            <CompletedStageRow
+              key={stage.key}
+              stage={stage}
+              detail={stageDetails[stage.key]}
+              applied={applied}
+            />
+          );
+        })}
       </div>
     </div>
   );

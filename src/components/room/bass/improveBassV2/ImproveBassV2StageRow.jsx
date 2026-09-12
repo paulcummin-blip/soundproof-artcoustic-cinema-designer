@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Minus, AlertCircle, Lock } from "lucide-react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { formatAcousticPath } from "./acousticDistance";
+import { buildGainRationale, extractGainAdjustmentDb, extractGainGroupLabel } from "./gainRationaleBuilder";
 
 function numericLevel(value) {
   if (Number.isFinite(Number(value))) return Math.max(0, Math.min(4, Number(value)));
@@ -92,18 +93,19 @@ function DelayDetail({ result, currentResult, groupLabel, adjustmentMs }) {
   const beforeP20 = primarySeatMetric(currentResult?.perSeatP20);
   const afterP20 = primarySeatMetric(result.perSeatP20);
 
-  // Use the group label and adjustment from the stage authority (extracted
-  // from calibration diagnostics). Fall back to computing from tuning.
-  const maxDelay = Math.max(...tuning.map((t) => Number(t.delayMs) || 0));
-  const minDelay = Math.min(...tuning.map((t) => Number(t.delayMs) || 0));
-  const range = adjustmentMs || (maxDelay - minDelay);
+  // Use the ACTUAL adjustment from the grouped delay candidate — the real
+  // delta being applied. Do NOT compute maxDelay - minDelay from the tuning;
+  // that gives the intergroup difference, not the applied adjustment.
+  const groupedDelay = result?.groupedDelay;
+  const range = Number(adjustmentMs) || Number(groupedDelay?.adjustmentMs) || 0;
   const label = groupLabel || "Grouped delay";
 
   return (
     <div className="mt-1.5 space-y-1">
       {range > 0.1 && (
         <div className="text-[10px] text-[#625143]">
-          {label} +{range.toFixed(1)} ms
+          <span className="font-semibold">{label}</span>
+          <span className="ml-1">Delay adjustment: +{range.toFixed(1)} ms</span>
           <span className="ml-1.5 text-[#8A7B6A]">{formatAcousticPath(range)} (timing equivalent)</span>
         </div>
       )}
@@ -115,7 +117,7 @@ function DelayDetail({ result, currentResult, groupLabel, adjustmentMs }) {
   );
 }
 
-function GainDetail({ result, currentResult }) {
+function GainDetail({ result, currentResult, grouping }) {
   const tuning = result?.appliedTuning || result?.tuning || [];
   if (!tuning.length) return null;
 
@@ -124,23 +126,32 @@ function GainDetail({ result, currentResult }) {
   const beforeP20 = primarySeatMetric(currentResult?.perSeatP20);
   const afterP20 = primarySeatMetric(result.perSeatP20);
 
-  // Summarise the gain adjustment
-  const gains = tuning.map((t) => Number(t.gainDb) || 0);
-  const maxGain = Math.max(...gains);
-  const minGain = Math.min(...gains);
-  const range = maxGain - minGain;
+  // Use the ACTUAL adjustment from the grouped gain candidate — the real
+  // delta being applied. Do NOT compute maxGain - minGain from the tuning.
+  const adjustmentDb = extractGainAdjustmentDb(result);
+  const groupLabel = extractGainGroupLabel(result, grouping);
+
+  // Build the ranking rationale using the canonical authority
+  const rationale = buildGainRationale(currentResult, result, grouping);
 
   return (
     <div className="mt-1.5 space-y-1">
-      {range > 0.1 && (
+      {Math.abs(adjustmentDb) > 0.1 && (
         <div className="text-[10px] text-[#625143]">
-          Grouped trim: {range.toFixed(1)} dB relative adjustment
+          {groupLabel && <span className="font-semibold">{groupLabel}: </span>}
+          <span>{adjustmentDb > 0 ? "+" : ""}{adjustmentDb.toFixed(1)} dB</span>
         </div>
       )}
       <div className="grid grid-cols-2 gap-1.5">
         <MetricBeforeAfter label="P19" before={beforeP19} after={afterP19} />
         <MetricBeforeAfter label="P20" before={beforeP20} after={afterP20} />
       </div>
+      {rationale && (
+        <div className="text-[10px] leading-relaxed text-[#8A7B6A] mt-1">
+          <span className="font-semibold text-[#625143]">Why this helps: </span>
+          {rationale}
+        </div>
+      )}
     </div>
   );
 }
@@ -249,7 +260,7 @@ export default function ImproveBassV2StageRow({
       {verdict === "improvement" && result && (
         <>
           {stageKey === "delay" && <DelayDetail result={result} currentResult={currentResult} groupLabel={stage.delayGroupLabel} adjustmentMs={stage.delayAdjustmentMs} />}
-          {stageKey === "gain" && <GainDetail result={result} currentResult={currentResult} />}
+          {stageKey === "gain" && <GainDetail result={result} currentResult={currentResult} grouping={stage.grouping} />}
           {stageKey === "subPositions" && (
             <PositionDetail result={result} currentResult={currentResult} currentInstances={currentInstances} />
           )}

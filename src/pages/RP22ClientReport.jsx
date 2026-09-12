@@ -36,6 +36,8 @@ import { selectClientNonScreenDynamicRange } from "@/components/report/client/se
 import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
 import { selectClientScreenSeating } from "@/components/report/client/selectClientScreenSeating";
 import ClientAcousticTreatment from "@/components/report/client/ClientAcousticTreatment";
+import ClientBassPerformance from "@/components/report/client/ClientBassPerformance";
+import { selectClientBassPerformance } from "@/components/report/client/selectClientBassPerformance";
 import ClientRecommendationFooter from "@/components/report/client/ClientRecommendationFooter";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";

@@ -429,6 +429,8 @@ export default function ImproveBassResponseV2({
           state={state}
           selection={state?.winner}
           stale={completedResultStale}
+          currentInstances={subwooferInstances}
+          roomDims={roomDims}
         />
       )}
 
@@ -446,7 +448,7 @@ export default function ImproveBassResponseV2({
 
       {isCancelled && (
         <>
-          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} />
+          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} currentInstances={subwooferInstances} roomDims={roomDims} />
           <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-amber-700" />
@@ -465,7 +467,7 @@ export default function ImproveBassResponseV2({
 
       {isStale && (
         <>
-          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} />
+          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} currentInstances={subwooferInstances} roomDims={roomDims} />
           <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-amber-700" />
@@ -484,7 +486,7 @@ export default function ImproveBassResponseV2({
 
       {isError && (
         <>
-          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} />
+          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} currentInstances={subwooferInstances} roomDims={roomDims} />
           <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-red-700" />

@@ -62,21 +62,20 @@ export function buildStageResults(selection) {
   const delayResult = selection.calibrationResult || null;
   const delayMaterial = selection.calibrationMaterial?.material === true;
 
-  // Extract group label and adjustment from the tuning + calibration diagnostics
+  // Extract the ACTUAL adjustment from the grouped delay candidate.
+  // The candidate's adjustmentMs is the real delta being applied to the
+  // adjusted group. Do NOT compute maxDelay - minDelay from the tuning —
+  // that gives the intergroup difference, which can differ from the actual
+  // adjustment when the baseline already has non-zero delays.
   const delayGrouping = selection.calibrationDiagnostics?.grouping;
-  const delayTuning = delayResult?.appliedTuning || delayResult?.tuning || [];
+  const groupedDelay = delayResult?.groupedDelay;
   let delayGroupLabel = null;
   let delayAdjustmentMs = 0;
-  if (delayGrouping?.groups?.length && delayTuning.length) {
-    const maxDelay = Math.max(...delayTuning.map((t) => Number(t.delayMs) || 0));
-    const minDelay = Math.min(...delayTuning.map((t) => Number(t.delayMs) || 0));
-    delayAdjustmentMs = maxDelay - minDelay;
+  if (groupedDelay && delayGrouping?.groups?.length) {
+    delayAdjustmentMs = Number(groupedDelay.adjustmentMs) || 0;
     if (delayAdjustmentMs > 0.01) {
-      const adjustedSources = delayTuning
-        .filter((t) => Math.abs(Number(t.delayMs) - maxDelay) < 0.01)
-        .map((t) => t.sourceId);
       const adjustedGroup = delayGrouping.groups.find(
-        (g) => adjustedSources.length > 0 && adjustedSources.every((id) => g.sourceIds.includes(id)),
+        (g) => g.id === groupedDelay.direction,
       );
       delayGroupLabel = adjustedGroup?.label || null;
     }
@@ -94,10 +93,12 @@ export function buildStageResults(selection) {
   // The engine's gainResult is the gain-only search winner (new stage).
   const gainResult = selection.gainResult || null;
   const gainMaterial = selection.gainMaterial?.material === true;
+  const gainGrouping = selection.gainDiagnostics?.grouping || null;
   const gain = {
     verdict: gainMaterial && gainResult ? "improvement" : "no_improvement",
     result: gainMaterial ? gainResult : null,
     reason: gainMaterial ? null : "No material gain improvement found.",
+    grouping: gainGrouping,
   };
 
   // ── 4. SUBWOOFER POSITIONS — best position candidate ──────────────
