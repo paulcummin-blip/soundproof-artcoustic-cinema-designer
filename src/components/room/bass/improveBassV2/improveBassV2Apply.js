@@ -100,7 +100,7 @@ export function isOptimisedApplied(currentInstances, winner, roomDims) {
     const inst = activeInstances[i];
     if (!inst) return false;
     // Matching numbers in an old manual record are not an applied effective proposal.
-    if (tuningSourceBound && inst.tuningSource !== "v2-optimised") return false;
+    if ((tuning[i]?.sourceId != null) && inst.tuningSource !== "v2-optimised") return false;
 
     // Position match
     const dx = Math.abs(Number(inst.position?.x) - Number(wc.x));
