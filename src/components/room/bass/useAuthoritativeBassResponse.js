@@ -68,7 +68,8 @@ export function buildAuthoritativeAutoAlignDelays({ enabled, rspPosition, frontS
   processGroup(rearSubsCfg, rearSubsLive, "rear");
   if (!arrivals.length) return {};
   const latest = Math.max(...arrivals.map((item) => item.arrivalMs));
-  return Object.fromEntries(arrivals.map((item) => [item.subId, item.effectiveTuning ? 0 : Math.max(0, latest - item.arrivalMs)]));
+  return Object.fromEntries(arrivals.filter((item) => !item.effectiveTuning)
+    .map((item) => [item.subId, Math.max(0, latest - item.arrivalMs)]));
 }
 
 export function buildAuthoritativeBassSources({
