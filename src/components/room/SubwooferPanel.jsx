@@ -398,6 +398,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               frontSubsCfg={frontSubsCfg}
               rearSubsCfg={rearSubsCfg}
               commitInstances={compat.commitInstances}
+              commitSeating={appState?.setSeatingPositions}
               hasCanonicalInstances={compat.hasCanonicalInstances}
               appState={appState}
             />

@@ -50,7 +50,9 @@ export function generateSeatingCandidates(seatingPositions, roomDims, screenWall
     const effectiveOffset = isScreenFront ? offsetM : -offsetM;
     const movedSeats = seatingPositions.map((seat) => ({
       ...seat,
-      y_m: Number(seat.y_m || seat.y || 0) + effectiveOffset,
+      // App state uses flat `y` coordinate (not y_m). Preserve all other
+      // properties (id, rowNumber, priority, x, z, earHeight, platformHeight).
+      y: Number(seat.y ?? seat.y_m ?? 0) + effectiveOffset,
     }));
 
     // Check constraints
@@ -76,8 +78,8 @@ function validateSeatingConstraints(movedSeats, roomDims, screenWall, offsetM) {
   if (L <= 0 || W <= 0) return "Invalid room dimensions";
 
   for (const seat of movedSeats) {
-    const y = Number(seat.y_m || seat.y || 0);
-    const x = Number(seat.x_m || seat.x || 0);
+    const y = Number(seat.y ?? seat.y_m ?? 0);
+    const x = Number(seat.x ?? seat.x_m ?? 0);
 
     // Room boundary checks
     if (y < BOUNDARY_MARGIN_M) return `Seat ${seat.id || "?"} too close to front wall (${(y * 100).toFixed(0)} cm)`;

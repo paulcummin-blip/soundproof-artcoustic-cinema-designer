@@ -12,7 +12,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, X, CheckCircle2, Circle, Minus } from "lucide-react";
+import { Loader2, X, CheckCircle2, Circle, Minus, Lock } from "lucide-react";
 import { buildStageDisplay, formatStageVerdict } from "./improveBassV2StageMapping.js";
 
 export default function ImproveBassV2Progress({ state, onCancel }) {
@@ -57,6 +57,20 @@ export default function ImproveBassV2Progress({ state, onCancel }) {
 
 function StageRow({ stage }) {
   const { status, label, supportingText, verdict, subStageLabel } = stage;
+
+  if (status === 'not_available') {
+    return (
+      <div className="flex items-start gap-2">
+        <Lock className="h-3.5 w-3.5 text-[#8A7B6A] mt-0.5 flex-shrink-0" />
+        <div className="min-w-0">
+          <div className="text-[11px] text-[#8A7B6A]">{label} — Not available yet</div>
+          {supportingText && (
+            <div className="text-[10px] text-[#B0A89B] mt-0.5">{supportingText}</div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (status === 'not_tested') {
     return (
