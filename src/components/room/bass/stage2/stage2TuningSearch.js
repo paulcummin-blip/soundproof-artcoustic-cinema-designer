@@ -64,7 +64,7 @@ const SECOND_FINALIST_SCORE_MARGIN = 1.5; // second must be within 1.5x best sco
 function applyTuning(points, delayMs, gainDb, polarity) {
   const delayS = Number(delayMs) / 1000;
   const gainLinear = Math.pow(10, Number(gainDb) / 20);
-  const sign = polarity < 0 ? -1 : 1;
+  const sign = polarity < 0 || Number(polarity) === 180 ? -1 : 1;
   return points.map((p) => {
     const freq = Number(p.frequency);
     if (!Number.isFinite(freq) || !Number.isFinite(p.re) || !Number.isFinite(p.im)) {
@@ -73,8 +73,9 @@ function applyTuning(points, delayMs, gainDb, polarity) {
     const theta = -2 * Math.PI * freq * delayS;
     const cosT = Math.cos(theta);
     const sinT = Math.sin(theta);
-    const reTuned = (p.re * cosT + p.im * sinT) * gainLinear * sign;
-    const imTuned = (-p.re * sinT + p.im * cosT) * gainLinear * sign;
+    // Positive delay is phase lag: H(f) * exp(-j * 2π * f * delay).
+    const reTuned = (p.re * cosT - p.im * sinT) * gainLinear * sign;
+    const imTuned = (p.re * sinT + p.im * cosT) * gainLinear * sign;
     return { re: reTuned, im: imTuned };
   });
 }
