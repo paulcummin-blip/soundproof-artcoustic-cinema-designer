@@ -30,7 +30,7 @@ import { buildAuthoritativeAutoAlignDelays } from "../useAuthoritativeBassRespon
 
 import { searchDelayOnly, searchPolarity, searchGainOnly, searchDelayPolarityTrim, resumWithTuning } from "../stage2/stage2TuningSearch.js";
 import { selectAuthoritativeFinalist, hasPrimarySeatRegression, detectMutedSubs } from "../best-layout/authoritativeFinalistSelection.js";
-import { getCachedRawTransfersForFingerprint } from "../stage2/stage2RawTransferCache.js";
+import { getCachedRawTransfersForFingerprint, getCachedRawTransfer, setCachedRawTransfer } from "../stage2/stage2RawTransferCache.js";
 import { normaliseModelKey } from "../../../utils/modelKeyNormaliser.js";
 import { computeV2DesignFingerprint, isCurrentAuthorityNonStale } from "./improveBassV2Fingerprint.js";
 import { runInWorker, isFatalLifecycleError, V2RunTimeoutError } from "./improveBassV2WorkerLifecycle.js";
@@ -883,23 +883,36 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       if (phaseResult.promoted.length === 0) continue;
 
       // ── Compute raw transfers for promoted local candidates (worker)
+      // Reuse cached transfers from stage2RawTransferCache across warm runs.
+      // Position candidate IDs are deterministic (e.g. sym-front-inward-100),
+      // and the placementFingerprint is stable for the same design — so the
+      // same cache key produces the same transfer without recomputing physics.
       for (const c of phaseResult.promoted) {
         if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
         if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
-        try {
-          const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-          c.rawTransfer = await runInWorker(worker, "placement", {
-            finalist: c.finalist,
-            roomDims, rspPosition, seatingPositions,
-            selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
-          }, controller.signal);
-          metrics.recordWorkerCall("placement", c.id,
-            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
-        } catch (err) {
-          if (isFatalLifecycleError(err)) throw err;
-          c.rawTransfer = null;
-          c.error = err.message;
-          evaluationIssues.push({stage:escPhase.name,candidateId:c.id,error:err.message});
+        const cachedTransfer = placementFingerprint ? getCachedRawTransfer(placementFingerprint, c.id) : null;
+        if (cachedTransfer) {
+          c.rawTransfer = cachedTransfer;
+          metrics.recordStage2TransferReused();
+        } else {
+          try {
+            const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+            c.rawTransfer = await runInWorker(worker, "placement", {
+              finalist: c.finalist,
+              roomDims, rspPosition, seatingPositions,
+              selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+            }, controller.signal);
+            metrics.recordWorkerCall("placement", c.id,
+              (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
+            if (c.rawTransfer && placementFingerprint) {
+              setCachedRawTransfer(placementFingerprint, c.id, c.rawTransfer);
+            }
+          } catch (err) {
+            if (isFatalLifecycleError(err)) throw err;
+            c.rawTransfer = null;
+            c.error = err.message;
+            evaluationIssues.push({stage:escPhase.name,candidateId:c.id,error:err.message});
+          }
         }
         await yieldToUI();
       }

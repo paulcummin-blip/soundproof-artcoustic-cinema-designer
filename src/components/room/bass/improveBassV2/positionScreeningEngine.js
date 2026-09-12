@@ -25,6 +25,41 @@ const NULL_DEPTH_THRESHOLD_DB = 8;
 const NULL_MIN_CONTIGUOUS = 2;
 const SMOOTHING_RADIUS = 1;
 
+// ── Mode-bank cache (single-entry, bounded) ──────────────────────────────
+// prepareModeBank depends only on room geometry + physics options (qStrategy,
+// freq range, smoothing) — NOT on source positions. It is identical across
+// all screening phases and across warm runs for the same room. Caching it
+// avoids recomputing the room's modal response 3× per V2 run (once per
+// symmetric/asymmetric/individual phase).
+let _modeBankCache = null;
+let _modeBankCacheKey = null;
+
+function modeBankCacheKey(roomDims, batchPhysics) {
+  return JSON.stringify({
+    w: Number(roomDims?.widthM) || 0,
+    l: Number(roomDims?.lengthM) || 0,
+    h: Number(roomDims?.heightM) || 0,
+    q: batchPhysics?.qStrategy || "",
+    fmin: batchPhysics?.freqMinHz || 0,
+    fmax: batchPhysics?.freqMaxHz || 0,
+    sm: batchPhysics?.smoothing || "",
+    em: true,
+  });
+}
+
+function getOrComputeModeBank(roomDims, batchPhysics) {
+  const key = modeBankCacheKey(roomDims, batchPhysics);
+  if (_modeBankCacheKey === key && _modeBankCache) return { modes: _modeBankCache, reused: true };
+  _modeBankCache = prepareModeBank(roomDims, { ...batchPhysics, enableModes: true });
+  _modeBankCacheKey = key;
+  return { modes: _modeBankCache, reused: false };
+}
+
+export function clearModeBankCache() {
+  _modeBankCache = null;
+  _modeBankCacheKey = null;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 function mean(values) {
@@ -232,14 +267,16 @@ export function screenPositionCandidates(candidates, roomDims, seatingPositions,
   const seatPriorityMap = buildSeatPriorityMap(seatingPositions);
   const seatIds = listeners.map((l) => l.id);
 
-  // Precompute mode bank ONCE — reused for all candidates
+  // Precompute mode bank ONCE — reused for all candidates within this call
+  // AND across screening phases / warm runs via the single-entry cache.
   const batchPhysics = {
     ...physics,
     freqMinHz: SCREEN_FREQ_MIN_HZ,
     freqMaxHz: SCREEN_FREQ_MAX_HZ,
     smoothing: "none",
   };
-  const precomputedModes = prepareModeBank(roomDims, { ...batchPhysics, enableModes: true });
+  const modeBankResult = getOrComputeModeBank(roomDims, batchPhysics);
+  const precomputedModes = modeBankResult.modes;
 
   const t1 = typeof performance !== "undefined" ? performance.now() : Date.now();
 
@@ -289,6 +326,7 @@ export function screenPositionCandidates(candidates, roomDims, seatingPositions,
     ranked: results,
     precomputeTimeMs: t1 - t0,
     screenTimeMs: t2 - t1,
+    modeBankReused: modeBankResult.reused,
   };
 }
 
