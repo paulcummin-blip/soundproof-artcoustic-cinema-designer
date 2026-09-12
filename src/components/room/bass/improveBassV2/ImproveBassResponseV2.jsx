@@ -305,51 +305,24 @@ export default function ImproveBassResponseV2({
     resetImproveBassV2(projectId);
   }, [projectId]);
 
-  // Recheck at the point of mutation, including changes after completion.
-  const canApplyCurrentResult = useCallback((calibrationOnly = false) => {
-    const d = latestDesignRef.current;
-    const selection = state?.winner;
-    const candidateId = calibrationOnly
-      ? selection?.calibrationResult?.candidateId : selection?.winner?.candidateId;
-    const capturedId = calibrationOnly ? selection?.applyCalibrationId : selection?.applyCandidateId;
-    const currentFingerprint = computeV2DesignFingerprint({
-      ...d, ...d.p14Params,
-    });
-    if (state?.status !== "complete" || !candidateId || candidateId !== capturedId ||
-        !selection?.applyFingerprint || currentFingerprint !== selection.applyFingerprint) {
-      setStale(projectId, "Design changed — recalculate the recommendation before Apply");
-      return false;
+  // A card supplies its own ID; look it up in the one confirmed collection.
+  // Recheck the live design at mutation time, including edits after completion.
+  const handleApply = useCallback((candidateId) => {
+    const selection=state?.winner;
+    const rec=selection?.recommendations?.find(r=>r.result.candidateId===candidateId);
+    if(!rec || candidateId!==selection.winner?.candidateId || !rec.isWinner || !commitInstances || !hasCanonicalInstances) return;
+    const d=latestDesignRef.current;
+    const fingerprint=computeV2DesignFingerprint({...d,...d.p14Params});
+    if(state?.status!=="complete" || !selection.applyFingerprint || fingerprint!==selection.applyFingerprint ||
+       rec.result.inputIdentity!==fingerprint){
+      setStale(projectId,"Design changed — recalculate the recommendation before Apply");return;
     }
-    return true;
-  }, [state?.status, state?.winner, projectId]);
-
-  const handleApply = useCallback(() => {
-    // BLOCKER 7: Cancelled/stale jobs can never apply
-    if (!state?.winner?.winner || !commitInstances || !hasCanonicalInstances) return;
-    if (!canApplyCurrentResult()) return;
-    const modelKey = normaliseModelKey(selectedSubModel);
-    const nextInstances = buildOptimisedInstances(
-      state.winner.winner,
-      subwooferInstances,
-      roomDims,
-      modelKey,
-    );
-    commitInstances(nextInstances, {
-      front: { placementMode: "manual", isManual: true },
-      rear: { placementMode: "manual", isManual: true },
-    });
-  }, [state?.winner, canApplyCurrentResult, commitInstances, hasCanonicalInstances, selectedSubModel,
-    subwooferInstances, roomDims]);
-
-  const handleApplyCalibration = useCallback(() => {
-    if (!state?.winner?.calibrationTuning || !commitInstances) return;
-    if (!canApplyCurrentResult(true)) return;
-    const updated = applyCalibrationTuning(subwooferInstances, state.winner.calibrationTuning);
-    commitInstances(updated, {
-      front: { placementMode: "manual", isManual: true },
-      rear: { placementMode: "manual", isManual: true },
-    });
-  }, [state?.winner, canApplyCurrentResult, commitInstances, subwooferInstances]);
+    const next=rec.interventionType==="calibration"
+      ? applyCalibrationTuning(subwooferInstances,rec.result.appliedTuning)
+      : buildOptimisedInstances(rec.result,subwooferInstances,roomDims,selectedSubModel);
+    commitInstances(next,{front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
+  },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,subwooferInstances,roomDims,selectedSubModel]);
+  const handleApplyCalibration=handleApply;
 
   if (!shared?.hasCurrentResult) return null;
 
