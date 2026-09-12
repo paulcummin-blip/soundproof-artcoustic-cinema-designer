@@ -694,7 +694,7 @@ test("F — Apply builds instances with positions, delay, trim, polarity", () =>
   assert.equal(built[0].delayMs, 2.5);
   assert.equal(built[0].gainDb, -1.5);
   assert.equal(built[0].polarity, -1);
-  assert.equal(built[0].model, "sub2-12");
+  assert.equal(built[0].model, currentInstances[0].model);
   assert.equal(built[0].enabled, true);
   assert.equal(built[0].positionSource, "v2-optimised");
   // bottomHeightM preserved from existing
