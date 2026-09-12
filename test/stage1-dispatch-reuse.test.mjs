@@ -115,8 +115,8 @@ test('pending request cancellation and supersession settle without starting obso
   assert.equal(x.get('pending').status,'stale');assert.equal(x.workers.length,1);x.c.worker.emit();assert.equal(x.publications.length,1);x.c.dispose();
 });
 test('real worker thread and full acoustic engine complete two queued jobs on one worker', {timeout:60000}, async()=>{
-  const url=new URL('../'+workerPath,import.meta.url).href;
-  const w=new NodeWorker(`const {parentPort}=require('node:worker_threads');globalThis.self={postMessage:m=>parentPort.postMessage(m)};import(${JSON.stringify(url)}).then(()=>{parentPort.on('message',data=>self.onmessage({data}));parentPort.postMessage({type:'ready'});}).catch(e=>{throw e;});`,{eval:true,execArgv:['--import',new URL('./_alias-register.mjs',import.meta.url).href]});
+  const realBundle=(await build({entryPoints:[workerPath],bundle:true,write:false,format:'iife',platform:'node',loader:{'.js':'jsx'},alias:{'@':new URL('../src',import.meta.url).pathname}})).outputFiles[0].text;
+  const w=new NodeWorker(`const {parentPort}=require('node:worker_threads');globalThis.self={postMessage:m=>parentPort.postMessage(m)};${realBundle}\nparentPort.on('message',data=>self.onmessage({data}));parentPort.postMessage({type:'ready'});`,{eval:true,execArgv:[]});
   try{
     const ready=await once(w,'message');assert.equal(ready[0].type,'ready');
     const received=[];w.on('message',m=>received.push(m));
