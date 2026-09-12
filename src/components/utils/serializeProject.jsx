@@ -100,6 +100,7 @@ export function serializeProject(input = {}) {
 
     // Stage 1: Canonical subwoofer instance array (new authority)
     subwooferInstances = null,
+  appliedSeatingProvenance = null,
 
     // P12 result (from app state, written by LCRPanel)
     p12Mode = null,
@@ -207,6 +208,7 @@ export function serializeProject(input = {}) {
 
     // Seating & layout
     seating_positions: asArray(seatingPositions),
+    applied_seating_provenance: appliedSeatingProvenance || null,
     row_spacing_m: Number(rowSpacingM) || 1.8,
     seats_per_row_by_row: asArray(seatsPerRowByRow),
     seating_rows: Number(seatingRows) || 1,
