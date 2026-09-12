@@ -100,6 +100,13 @@ export function startImproveBassV2(projectId, snapshot) {
     startedAtMs: Date.now(),
     completedAtMs: null,
     cancelRequested: false,
+    // Reset previous-run investigation state so the new run starts clean.
+    stageVerdicts: {},
+    positionSearchPhase: null,
+    subOptimisationExhausted: false,
+    materialSubImprovementFound: false,
+    bestPracticalSubResult: null,
+    runtimeMetrics: null,
   });
 }
 

@@ -45,6 +45,7 @@ import { applyCalibrationTuning } from "./improveBassV2ApplyCalibration";
 import { computeV2DesignFingerprint } from "./improveBassV2Fingerprint";
 import ImproveBassV2Progress from "./ImproveBassV2Progress";
 import ImproveBassV2Results from "./ImproveBassV2Results";
+import ImproveBassV2CompletedInvestigation from "./ImproveBassV2CompletedInvestigation";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
 
 export default function ImproveBassResponseV2({
@@ -110,6 +111,37 @@ export default function ImproveBassResponseV2({
   };
 
   const canStart = shared?.hasCurrentResult === true && !state?.status === "running";
+
+  // ── Post-completion stale detection ──────────────────────────────────
+  // After the run completes, a bass-relevant design change invalidates the
+  // completed result. We compute the current design fingerprint and compare
+  // it to the winner's applyFingerprint. If they differ, the completed
+  // investigation is shown greyed and Apply controls are hidden.
+  const currentDesignFingerprint = useMemo(() => {
+    try {
+      return computeV2DesignFingerprint({
+        subwooferInstances,
+        roomDims,
+        seatingPositions,
+        rspPosition,
+        selectedSubModel,
+        p14TargetBasis: p14Params.p14TargetBasis,
+        p14TargetLevel: p14Params.p14TargetLevel,
+        p14TargetDb: p14Params.p14TargetDb,
+        p18TargetBasis: p14Params.p18TargetBasis,
+        amplifierPowerPerSubW: amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0,
+      });
+    } catch {
+      return null;
+    }
+  }, [subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel,
+    p14Params, amplifierPowerPerSubW, frontSubsCfg]);
+
+  const completedResultStale =
+    state?.status === "complete"
+    && !!state?.winner?.applyFingerprint
+    && !!currentDesignFingerprint
+    && currentDesignFingerprint !== state.winner.applyFingerprint;
 
   const handleStart = useCallback(async () => {
     if (runningRef.current) return;
@@ -359,7 +391,18 @@ export default function ImproveBassResponseV2({
         <ImproveBassV2Progress state={state} onCancel={handleCancel} />
       )}
 
-      {isComplete && state?.winner && (
+      {/* ── Completed investigation — persists in all terminal states ── */}
+      {/* Shows the full stage checklist with verdicts + numerical results. */}
+      {/* Mounted alongside the results (complete) or error messages. */}
+      {isComplete && (
+        <ImproveBassV2CompletedInvestigation
+          state={state}
+          selection={state?.winner}
+          stale={completedResultStale}
+        />
+      )}
+
+      {isComplete && state?.winner && !completedResultStale && (
         <ImproveBassV2Results
           snapshot={state.snapshot}
           selection={state.winner}
@@ -372,49 +415,58 @@ export default function ImproveBassResponseV2({
       )}
 
       {isCancelled && (
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-amber-700" />
-            <span className="text-[12px] font-semibold text-amber-800">Optimisation cancelled</span>
+        <>
+          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} />
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-700" />
+              <span className="text-[12px] font-semibold text-amber-800">Optimisation cancelled</span>
+            </div>
+            <p className="mt-1 text-[10px] leading-relaxed text-amber-700">
+              Current design remains unchanged. Best-so-far results retained for diagnostics.
+            </p>
+            <Button type="button" size="sm" variant="outline" onClick={handleRetry} className="mt-2 text-[11px]">
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Retry
+            </Button>
           </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-amber-700">
-            Current design remains unchanged. Best-so-far results retained for diagnostics.
-          </p>
-          <Button type="button" size="sm" variant="outline" onClick={handleRetry} className="mt-2 text-[11px]">
-            <RotateCcw className="h-3 w-3 mr-1" />
-            Retry
-          </Button>
-        </div>
+        </>
       )}
 
       {isStale && (
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-amber-700" />
-            <span className="text-[12px] font-semibold text-amber-800">Design changed — optimisation result discarded</span>
+        <>
+          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} />
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-700" />
+              <span className="text-[12px] font-semibold text-amber-800">Design changed — optimisation result discarded</span>
+            </div>
+            <p className="mt-1 text-[10px] leading-relaxed text-amber-700">
+              The room, seating, subwoofers, or target changed during optimisation. The result was rejected to prevent applying a stale recommendation. Current design remains untouched.
+            </p>
+            <Button type="button" size="sm" variant="outline" onClick={handleRetry} className="mt-2 text-[11px]">
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Retry
+            </Button>
           </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-amber-700">
-            The room, seating, subwoofers, or target changed during optimisation. The result was rejected to prevent applying a stale recommendation. Current design remains untouched.
-          </p>
-          <Button type="button" size="sm" variant="outline" onClick={handleRetry} className="mt-2 text-[11px]">
-            <RotateCcw className="h-3 w-3 mr-1" />
-            Retry
-          </Button>
-        </div>
+        </>
       )}
 
       {isError && (
-        <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-red-700" />
-            <span className="text-[12px] font-semibold text-red-800">Optimisation incomplete — retry</span>
+        <>
+          <ImproveBassV2CompletedInvestigation state={state} selection={state?.winner} />
+          <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-red-700" />
+              <span className="text-[12px] font-semibold text-red-800">Optimisation incomplete — retry</span>
+            </div>
+            <p className="mt-1 text-[10px] leading-relaxed text-red-700">{state?.error}</p>
+            <Button type="button" size="sm" variant="outline" onClick={handleRetry} className="mt-2 text-[11px]">
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Retry
+            </Button>
           </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-red-700">{state?.error}</p>
-          <Button type="button" size="sm" variant="outline" onClick={handleRetry} className="mt-2 text-[11px]">
-            <RotateCcw className="h-3 w-3 mr-1" />
-            Retry
-          </Button>
-        </div>
+        </>
       )}
     </div>
   );
