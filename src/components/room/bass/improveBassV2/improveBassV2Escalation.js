@@ -157,7 +157,7 @@ export function buildPositionOptimisationState(phasesRun, funnel, existingAuthor
       screened: funnel.symmetric?.screened || 0,
       promoted: funnel.symmetric?.promotedToV2 || 0,
       confirmed: funnel.symmetric?.confirmed || 0,
-      exhausted: phasesRun.includes("symmetric"),
+      exhausted: phasesRun.includes("symmetric") && funnel.symmetric?.completed === true,
     },
     asymmetricPair: {
       attempted: phasesRun.includes("asymmetric-pair"),
@@ -165,7 +165,7 @@ export function buildPositionOptimisationState(phasesRun, funnel, existingAuthor
       screened: funnel.asymmetricPair?.screened || 0,
       promoted: funnel.asymmetricPair?.promotedToV2 || 0,
       confirmed: funnel.asymmetricPair?.confirmed || 0,
-      exhausted: phasesRun.includes("asymmetric-pair"),
+      exhausted: phasesRun.includes("asymmetric-pair") && funnel.asymmetricPair?.completed === true,
     },
     individual: {
       attempted: phasesRun.includes("individual"),
@@ -173,7 +173,7 @@ export function buildPositionOptimisationState(phasesRun, funnel, existingAuthor
       screened: funnel.individual?.screened || 0,
       promoted: funnel.individual?.promotedToV2 || 0,
       confirmed: funnel.individual?.confirmed || 0,
-      exhausted: phasesRun.includes("individual"),
+      exhausted: phasesRun.includes("individual") && funnel.individual?.completed === true,
     },
     materialSubImprovementFound: false,
     subOptimisationExhausted: false,
@@ -191,9 +191,9 @@ export function buildPositionOptimisationState(phasesRun, funnel, existingAuthor
   // Exhaustion: all attempted phases are exhausted AND no material improvement
   // If a material symmetric winner stopped escalation, that is NOT "exhausted"
   const allAttemptedExhausted =
-    (!state.symmetric.attempted || state.symmetric.exhausted) &&
-    (!state.asymmetricPair.attempted || state.asymmetricPair.exhausted) &&
-    (!state.individual.attempted || state.individual.exhausted);
+    state.symmetric.attempted && state.symmetric.exhausted &&
+    state.asymmetricPair.attempted && state.asymmetricPair.exhausted &&
+    state.individual.attempted && state.individual.exhausted;
 
   state.subOptimisationExhausted = allAttemptedExhausted && !state.materialSubImprovementFound;
 
