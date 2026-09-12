@@ -94,3 +94,27 @@ test("matching manual numbers are not already-applied effective tuning",()=>{
  assert.equal(isOptimisedApplied(one,{coordinates:[one[0].position],appliedTuning:bound}),false);
  assert.equal(isCalibrationApplied(applyCalibrationTuning(one,bound),bound),true);
 });
+
+test("mounted engine identity agrees with UI amplifier/P18 inputs and still rejects changes", async()=>{
+ const { runImproveBassV2 } = await import("../src/components/room/bass/improveBassV2/improveBassV2Engine.js");
+ const OriginalWorker=globalThis.Worker;
+ globalThis.Worker=class { terminate(){} };
+ const p={subwooferInstances:[],roomDims:{widthM:5.5,lengthM:5.29,heightM:2.4},
+  seatingPositions:[{id:"seat",x:2.75,y:4.35,z:1.2,isPrimary:true}],
+  rspPosition:{x:2.75,y:4.36,z:1.2},selectedSubModel:"sub2-12",
+  p14TargetBasis:"minimum",p14TargetLevel:3,p14TargetDb:115,
+  p18TargetBasis:"minimum",amplifierPowerPerSubW:1000};
+ try {
+  for(const changed of [false,true]){
+   const phases=[];let stop=false;
+   const result=await runImproveBassV2("identity-regression-"+changed,p,{
+    onProgress:phase=>{phases.push(phase);if(phase==="calibrating")stop=true;},
+    isCancelled:()=>stop,
+    getCurrentFingerprint:()=>computeV2DesignFingerprint(changed?{...p,amplifierPowerPerSubW:500}:p)
+   });
+   if(changed){assert.equal(result.status,"stale");assert.equal(phases.includes("calibrating"),false);}
+   else {assert.ok(phases.includes("calibrating"),"Unchanged mounted inputs must reach calibration");assert.equal(result.status,"cancelled");}
+  }
+ } finally {globalThis.Worker=OriginalWorker;}
+});
+
