@@ -69,4 +69,3 @@ export function effectiveConfigurationKey(instances, tuning) {
       t.delayMs,t.gainDb,t.polarity===-1||t.polarity===180?-1:1];
   }).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
 }
-
