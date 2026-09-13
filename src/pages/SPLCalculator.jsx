@@ -346,7 +346,15 @@ export default function SPLCalculatorPage() {
   };
 
   const updateSelectedCompetitor = (index, id) => {
-    setSelectedCompetitorIds((prev) => prev.map((v, i) => i === index ? id : v));
+    setSelectedCompetitorIds((prev) => {
+      const next = prev.map((v, i) => i === index ? id : v);
+      const hasBlankRow = next.some((v) => !v);
+      const selectedCount = next.filter(Boolean).length;
+      if (id && !hasBlankRow && selectedCount < 5) {
+        next.push("");
+      }
+      return next;
+    });
   };
 
   const handleImportFile = async (file) => {
