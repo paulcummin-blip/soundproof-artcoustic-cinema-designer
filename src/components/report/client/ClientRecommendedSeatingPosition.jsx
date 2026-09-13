@@ -20,7 +20,8 @@
 import React, { useMemo } from "react";
 import { LEVEL_FILLS, LEVEL_LABEL_COLORS, zoneLabelPosition } from "./levelFills";
 import { PositionMarker } from "./SeatMarker";
-import { computeHaloRadiusPx } from "./seatMarkerGeometry";
+import { computeHaloRadiusPx, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry";
+import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 
 // ── Wall-distance zones (metres inward from each room wall) ──
 // Thresholds match the canonical P1 grading authority.
@@ -295,21 +296,30 @@ export default function ClientRecommendedSeatingPosition({
           </g>
         )}
 
-        {/* RSP label */}
-        {rspPx && (
-          <text
-            x={rspPx.px}
-            y={rspPx.py + 28}
-            fill="#213428"
-            fontSize={12}
-            textAnchor="middle"
-            fontWeight={600}
-            fontFamily="Didact Gothic, Century Gothic, sans-serif"
-            letterSpacing="0.08em"
-          >
-            RSP
-          </text>
-        )}
+        {/* RSP label — placed above the seat marker with a clear gap */}
+        {rspPx && (() => {
+          const markerR = rspMatchesSeat ? (haloRadius + PRIMARY_STROKE_WIDTH) : 12;
+          const seatCircles = plotSeats.map((s) => {
+            const sp = toPx(s.x, s.y);
+            return { cx: sp.px, cy: sp.py, r: haloRadius + PRIMARY_STROKE_WIDTH };
+          });
+          const placement = resolveRspLabelPlacement(rspPx, seatCircles, [], null, { w: svgW, h: svgH }, { markerRadius: markerR });
+          return (
+            <text
+              x={placement.x}
+              y={placement.y}
+              fill="#213428"
+              fontSize={12}
+              textAnchor={placement.anchor}
+              dominantBaseline="middle"
+              fontWeight={600}
+              fontFamily="Didact Gothic, Century Gothic, sans-serif"
+              letterSpacing="0.08em"
+            >
+              RSP
+            </text>
+          );
+        })()}
       </svg>
       )}
 

@@ -17,6 +17,7 @@ import React, { useMemo } from "react";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { isEligibleP5Surround } from "@/components/utils/p5SurroundGaps";
 import { resolveGradeToken } from "@/components/utils/rp22Colors";
+import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 
 // ── Status copy ────────────────────────────────────────────────────────────
 const STATUS_COPY = {
@@ -456,18 +457,24 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
               r={4}
               fill="#FFFFFF"
             />
-            <text
-              x={rspPx.px}
-              y={rspPx.py + 24}
-              fill="#213428"
-              fontSize={11}
-              textAnchor="middle"
-              fontFamily="Didact Gothic, Century Gothic, sans-serif"
-              fontWeight={600}
-              letterSpacing="0.08em"
-            >
-              RSP
-            </text>
+            {(() => {
+              const placement = resolveRspLabelPlacement(rspPx, [], [], null, { w: SVG_W, h: SVG_H }, { markerRadius: 8 });
+              return (
+                <text
+                  x={placement.x}
+                  y={placement.y}
+                  fill="#213428"
+                  fontSize={11}
+                  textAnchor={placement.anchor}
+                  dominantBaseline="middle"
+                  fontFamily="Didact Gothic, Century Gothic, sans-serif"
+                  fontWeight={600}
+                  letterSpacing="0.08em"
+                >
+                  RSP
+                </text>
+              );
+            })()}
           </g>
         </svg>
       </div>

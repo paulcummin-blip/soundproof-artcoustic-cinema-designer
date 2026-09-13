@@ -49,6 +49,11 @@ const RSP_DOT_R = 3;
 const RSP_LABEL_W = 30;
 const RSP_LABEL_H = 14;
 
+// Clear visual gap between the marker outer edge and the label.
+// Roughly one text-height at 12px report scale — keeps the RSP letters
+// from touching the seat circle while remaining visually associated.
+const RSP_LABEL_GAP_PX = 14;
+
 // ── Pure intersection helpers ──────────────────────────────────────────────
 function rectsIntersect(a, b) {
   return !(a.x2 < b.x1 || b.x2 < a.x1 || a.y2 < b.y1 || b.y2 < a.y1);
@@ -77,23 +82,29 @@ function circleRectIntersect(cx, cy, r, rect) {
  * @param {Array}  badgeRects  - [{ x1, y1, x2, y2 }] badge rectangle obstacles
  * @param {Object} screenRect  - { x1, y1, x2, y2 } screen line + label bounds
  * @param {Object} svgBounds   - { w, h } SVG dimensions
+ * @param {Object} [options]  - { markerRadius?: number } outer radius of the
+ *                               marker at the RSP position (seat halo or RSP
+ *                               ring). Defaults to RSP_RING_R. The label is
+ *                               placed RSP_LABEL_GAP_PX outside this radius.
  * @returns {Object} { x, y, anchor } label anchor position + text-anchor
  */
-export function resolveRspLabelPlacement(rspPx, seatCircles, badgeRects, screenRect, svgBounds) {
+export function resolveRspLabelPlacement(rspPx, seatCircles, badgeRects, screenRect, svgBounds, options = {}) {
   const cx = rspPx.px;
   const cy = rspPx.py;
   const hw = RSP_LABEL_W / 2;
   const hh = RSP_LABEL_H / 2;
+  const markerR = options.markerRadius ?? RSP_RING_R;
+  const gap = RSP_LABEL_GAP_PX;
 
   const candidates = [
-    { name: "above", x: cx, y: cy - RSP_RING_R - hh - 4, anchor: "middle",
-      rect: { x1: cx - hw, y1: cy - RSP_RING_R - RSP_LABEL_H - 4, x2: cx + hw, y2: cy - RSP_RING_R - 4 } },
-    { name: "left", x: cx - RSP_RING_R - hw - 4, y: cy, anchor: "end",
-      rect: { x1: cx - RSP_RING_R - RSP_LABEL_W - 4, y1: cy - hh, x2: cx - RSP_RING_R - 4, y2: cy + hh } },
-    { name: "right", x: cx + RSP_RING_R + hw + 4, y: cy, anchor: "start",
-      rect: { x1: cx + RSP_RING_R + 4, y1: cy - hh, x2: cx + RSP_RING_R + RSP_LABEL_W + 4, y2: cy + hh } },
-    { name: "below", x: cx, y: cy + RSP_RING_R + hh + 4, anchor: "middle",
-      rect: { x1: cx - hw, y1: cy + RSP_RING_R + 4, x2: cx + hw, y2: cy + RSP_RING_R + RSP_LABEL_H + 4 } },
+    { name: "above", x: cx, y: cy - markerR - gap - hh, anchor: "middle",
+      rect: { x1: cx - hw, y1: cy - markerR - gap - RSP_LABEL_H, x2: cx + hw, y2: cy - markerR - gap } },
+    { name: "left", x: cx - markerR - gap - hw, y: cy, anchor: "end",
+      rect: { x1: cx - markerR - gap - RSP_LABEL_W, y1: cy - hh, x2: cx - markerR - gap, y2: cy + hh } },
+    { name: "right", x: cx + markerR + gap + hw, y: cy, anchor: "start",
+      rect: { x1: cx + markerR + gap, y1: cy - hh, x2: cx + markerR + gap + RSP_LABEL_W, y2: cy + hh } },
+    { name: "below", x: cx, y: cy + markerR + gap + hh, anchor: "middle",
+      rect: { x1: cx - hw, y1: cy + markerR + gap, x2: cx + hw, y2: cy + markerR + gap + RSP_LABEL_H } },
   ];
 
   for (const c of candidates) {
@@ -116,7 +127,7 @@ export function resolveRspLabelPlacement(rspPx, seatCircles, badgeRects, screenR
   }
 
   // Fallback: above (even if it collides — best effort)
-  return { x: cx, y: cy - RSP_RING_R - hh - 4, anchor: "middle", name: "above-fallback" };
+  return { x: cx, y: cy - markerR - gap - hh, anchor: "middle", name: "above-fallback" };
 }
 
 export default function ClientSpeakerBalance({
@@ -343,7 +354,7 @@ export default function ClientSpeakerBalance({
             x2: Math.max(screenRightPx.px, screenCx + 25),
             y2: screenLeftPx.py + 3,
           };
-          const placement = resolveRspLabelPlacement(rspPx, seatCircles, badgeRects, screenRect, { w: SVG_W, h: SVG_H });
+          const placement = resolveRspLabelPlacement(rspPx, seatCircles, badgeRects, screenRect, { w: SVG_W, h: SVG_H }, { markerRadius: 7 });
           return (
             <g>
               <circle cx={rspPx.px} cy={rspPx.py} r={RSP_RING_R} fill="none" stroke="#213428" strokeWidth={2.5} />

@@ -252,7 +252,7 @@ export default function ClientP9Overhead({
             x2: Math.max(screenRightPx.px, screenCx + 25),
             y2: screenLeftPx.py + 3,
           };
-          const placement = resolveRspLabelPlacement(rspPx, seatCircles, [], screenRect, { w: SVG_W, h: SVG_H });
+          const placement = resolveRspLabelPlacement(rspPx, seatCircles, [], screenRect, { w: SVG_W, h: SVG_H }, { markerRadius: haloRadius + PRIMARY_STROKE_WIDTH });
           return (
             <g>
               <circle cx={rspPx.px} cy={rspPx.py} r={RSP_RING_R} fill="none" stroke="#213428" strokeWidth={2.5} />
