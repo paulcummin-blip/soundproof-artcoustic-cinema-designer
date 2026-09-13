@@ -24,5 +24,5 @@ test('server authority keeps engineering linkage separate from commercial identi
   assert.match(saveAuthority, /engineering_key: engineeringKey/);
   assert.match(saveAuthority, /ProductPrice\.update\(productId, payload\)/);
   assert.match(saveAuthority, /ProductPrice\.create\(payload\)/);
-  assert.doesNotMatch(saveAuthority, /Speaker\.update|Engineering|MODELS/);
+  assert.doesNotMatch(saveAuthority, /Speaker\.update|Speaker\.delete|MODELS/);
 });
