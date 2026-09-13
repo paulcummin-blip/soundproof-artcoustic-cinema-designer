@@ -40,7 +40,7 @@ export default function ImproveBassV2StageResults({
   // Determine which stages are already applied
   function isStageApplied(stageKey, stage) {
     if (!stage?.result || !currentInstances) return false;
-    if (stageKey === "delay" || stageKey === "gain") {
+    if (stageKey === "phase" || stageKey === "delay" || stageKey === "gain") {
       return isCalibrationApplied(currentInstances, stage.result.appliedTuning || stage.result.tuning || []);
     }
     if (stageKey === "subPositions") {
