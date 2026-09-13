@@ -98,6 +98,7 @@ function sortById(arr) {
 
 // Geometry-only source fields: position, height, relative tuning. NO model.
 function normalizeSourceGeometry(s) {
+  const phaseControlDeg = num(s?.tuning?.phaseControlDeg ?? s?.tuning?.phaseAdjust, 3);
   return {
     id: s?.id || null,
     x: num(s?.x),
@@ -106,6 +107,9 @@ function normalizeSourceGeometry(s) {
     gainDb: num(s?.tuning?.gainDb),
     delayMs: num(s?.tuning?.delayMs, 3),
     polarity: s?.tuning?.polarity ?? 0,
+    // Preserve every existing zero-phase fingerprint/cache identity. A
+    // non-zero all-pass setting becomes part of the calibration identity.
+    ...(phaseControlDeg ? { phaseControlDeg } : {}),
   };
 }
 
@@ -229,6 +233,7 @@ function sortSourcesByPosition(arr) {
 }
 
 function normalizeSourceGeometryNoId(s) {
+  const phaseControlDeg = num(s?.tuning?.phaseControlDeg ?? s?.tuning?.phaseAdjust, 3);
   return {
     x: num(s?.x),
     y: num(s?.y),
@@ -237,6 +242,7 @@ function normalizeSourceGeometryNoId(s) {
     gainDb: num(s?.tuning?.gainDb),
     delayMs: num(s?.tuning?.delayMs, 3),
     polarity: s?.tuning?.polarity ?? 0,
+    ...(phaseControlDeg ? { phaseControlDeg } : {}),
   };
 }
 
