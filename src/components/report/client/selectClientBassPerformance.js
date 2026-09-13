@@ -27,12 +27,19 @@ export function selectClientBassPerformance(completedBassAuthority, bassPresenta
   const presentationParams = bassPresentation?.parameters || {};
 
   // P14 — LFE total SPL capability (room-scope)
+  // The headline level is the USER-SELECTED target level (selectedLevel),
+  // matching the Room Designer / Compliance authority (bassCompliancePresentation
+  // overrides level to selectedLevel). The capability-derived achievedLevel
+  // (e.g. L4 from 118.8 dBC) is never used as the Visual Report headline —
+  // the Visual Report must not independently re-grade raw capability dB.
+  // Available capability dB is retained as supporting engineering information.
   const p14Param = params.p14 || null;
   const p14Presentation = presentationParams.p14 || null;
   const p14 = p14Param ? {
     achievedCapabilityDb: Number.isFinite(Number(p14Param.achievedCapabilityDb))
       ? Number(p14Param.achievedCapabilityDb) : null,
-    achievedLevel: p14Param.achievedLevel ?? null,
+    achievedLevel: p14Param.selectedLevel ?? p14Param.achievedLevel ?? null,
+    selectedLevel: p14Param.selectedLevel ?? null,
     requestedTargetDb: Number.isFinite(Number(p14Param.requestedTargetDb))
       ? Number(p14Param.requestedTargetDb) : null,
     headroomOrShortfallDb: Number.isFinite(Number(p14Param.headroomOrShortfallDb))
