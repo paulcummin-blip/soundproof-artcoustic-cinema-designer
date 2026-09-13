@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Loader2, Pencil, Plus, Search, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useProductMaster } from '@/components/products/useProductMaster';
+import ProductDangerZone from '@/components/products/ProductDangerZone';
 import {
   defaultProductRolesForEngineeringKey,
   effectiveProductRoles,
@@ -100,7 +101,10 @@ function ProductEditor({ product, records, onClose, onSaved }) {
       setError('Select the verified engineering model before saving this acoustic product.');
       return;
     }
-    if (records.some((record) => record.id !== product?.id && String(record.sku).toLowerCase() === sku)) {
+    if (isNew && records.some((record) => (
+      record.trashed !== true
+      && String(record.sku || '').trim().toLowerCase() === sku
+    ))) {
       setError('That Product ID / SKU already exists.');
       return;
     }
@@ -230,6 +234,13 @@ function ProductEditor({ product, records, onClose, onSaved }) {
           </section>
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
+
+          {!isNew && (
+            <ProductDangerZone
+              product={product}
+              onDone={async () => { await onSaved(); onClose(); }}
+            />
+          )}
         </div>
 
         <div className="sticky bottom-0 flex justify-end gap-3 border-t border-[#E7E5E1] bg-white px-6 py-4">
