@@ -3,20 +3,21 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
-import { getModelsByCategoryOrdered } from "@/components/models/speakers/registry";
+import { useProductRoleOptions } from "@/components/products/useProductMaster";
+import { PRODUCT_ROLES } from "@/components/products/productMaster";
 import { adjustSourceForCabinet, designMatchesRecommendation } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 import { subwooferModelKey, subwooferDisplayLabel } from "@/components/utils/subwooferDisplayLabel";
 
 const PADDING_FRACTION = 0.125;
-const SUBWOOFER_MODELS = getModelsByCategoryOrdered().SUBWOOFERS;
-const DEFAULT_SUB_MODEL = SUBWOOFER_MODELS[0]?.key || "sub2-12";
 
 export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomDims, subModel, onApply, currentSources, currentModel, applying }) {
-  const [selectedModel, setSelectedModel] = useState(subwooferModelKey(subModel) || DEFAULT_SUB_MODEL);
+  const { options: subwooferModels } = useProductRoleOptions(PRODUCT_ROLES.SUBWOOFER);
+  const defaultSubModel = subwooferModels[0]?.key || "sub2-12";
+  const [selectedModel, setSelectedModel] = useState(subwooferModelKey(subModel) || defaultSubModel);
 
   useEffect(() => {
-    if (open) setSelectedModel(subwooferModelKey(subModel) || DEFAULT_SUB_MODEL);
-  }, [open, subModel]);
+    if (open) setSelectedModel(subwooferModelKey(subModel) || defaultSubModel);
+  }, [open, subModel, defaultSubModel]);
 
   // Applied state includes MODEL match: the current canonical design must
   // match the recommendation positions AND the selected dialog model.
@@ -120,7 +121,7 @@ export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomD
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {SUBWOOFER_MODELS.map((model) => (
+              {subwooferModels.map((model) => (
                 <SelectItem key={model.key} value={model.key}>{model.label}</SelectItem>
               ))}
             </SelectContent>
