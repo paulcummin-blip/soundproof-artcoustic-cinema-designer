@@ -16,7 +16,7 @@
  *   - Seat result grid (P9 level + degrees per seat)
  *   - Summary card with actual distribution wording (no single RSP badge)
  *
- * P9 thresholds: L4 <= 50°, L3 <= 60°, L2 <= 80°, >80° = FAIL (L1 is N/A).
+ * P9 thresholds: L4 <= 50°, L3 <= 60°, L2 <= 80°, >80° = L1 (open-ended — no upper L1 threshold).
  */
 
 import React from "react";

@@ -9,7 +9,7 @@
  *   P9: analysisResult.perSeatRp22[seat.id].rp22[9]
  *
  * P9 thresholds (RP22):
- *   L4 <= 50°, L3 <= 60°, L2 <= 80°, >80° = FAIL (Level 1 is N/A for P9)
+ *   L4 <= 50°, L3 <= 60°, L2 <= 80°, >80° = L1 (open-ended — no upper L1 threshold)
  *
  * No interpolation, no regrading, no local recomputation.
  * Reads perSeatRp22 directly — does not recalculate P9.
@@ -18,11 +18,12 @@
  */
 import { resolveCoordinate } from "./selectClientSpeakerBalance";
 
-const LEVEL_RANK = { L4: 4, L3: 3, L2: 2, FAIL: 1 };
+const LEVEL_RANK = { L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0 };
 
 /**
  * Map a raw engine P9 level to a display level.
- * Engine produces numeric 1 for >80°, but RP22 P9 Level 1 is N/A — display as FAIL.
+ * Engine produces numeric 1 for >80° — this is open-ended L1, NOT FAIL.
+ * P9 has no separate numeric L1 threshold; L1 continues upward indefinitely.
  */
 function normalizeP9Level(rawLevel) {
   if (rawLevel === null || rawLevel === undefined) return null;
@@ -33,7 +34,7 @@ function normalizeP9Level(rawLevel) {
     if (n === 4) return "L4";
     if (n === 3) return "L3";
     if (n === 2) return "L2";
-    if (n === 1) return "FAIL"; // >80° — below L2, not L1
+    if (n === 1) return "L1"; // >80° — open-ended L1, not FAIL
   }
   const s = String(rawLevel).trim().toUpperCase();
   if (s === "FAIL") return "FAIL";
@@ -51,8 +52,9 @@ function isApplicableP9(param) {
   if (param.applicable === false) return false;
   const level = normalizeP9Level(param.level);
   if (level === null) return false;
-  if (level === "FAIL") return true;
-  return resolveDegrees(param) !== null;
+  // L1–L4 and FAIL are all valid assessed results for P9.
+  // Degrees (the angle) are secondary display data, not a gating condition.
+  return true;
 }
 
 /**
