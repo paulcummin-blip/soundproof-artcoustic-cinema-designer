@@ -409,7 +409,9 @@ export default function SPLCalculatorPage() {
     const preferredKey = speaker.p12Key || speaker.p13Key || normaliseModelKey(speaker.model || speaker.id);
     const baseKey = String(preferredKey || '').replace(/_s$/, '');
     const rec = priceMap?.get(preferredKey) || priceMap?.get(baseKey);
-    return Number.isFinite(Number(rec?.price_ex_vat)) ? Number(rec.price_ex_vat) * 1.2 : null;
+    return rec?.price_ex_vat != null && Number.isFinite(Number(rec.price_ex_vat))
+      ? Number(rec.price_ex_vat) * 1.2
+      : null;
   }, [priceMap]);
 
   const calculateArtResult = useCallback((speaker) => {
