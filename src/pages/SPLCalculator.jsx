@@ -501,6 +501,51 @@ export default function SPLCalculatorPage() {
           )}
         </div>
 
+        <div style={{ marginTop: 14, background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.text }}>RP22 reference</div>
+            <div style={{ fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}>Reference only</div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+            <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 12, padding: 16, background: "#FFF" }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.text, marginBottom: 5 }}>P12 · Screen speakers SPL capability at RSP</div>
+              <div style={{ fontSize: 12, color: BRAND.subtext, lineHeight: 1.45, marginBottom: 12 }}>
+                Post calibration EQ, within assigned bandwidth, without clipping.
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "90px repeat(4, 1fr)", border: `1px solid ${BRAND.border}`, borderRadius: 9, overflow: "hidden", fontSize: 12 }}>
+                <div style={{ padding: "8px 9px", background: BRAND.soft, fontWeight: 700 }}>Target</div>
+                {["L1", "L2", "L3", "L4"].map((level) => <div key={`p12h-${level}`} style={{ padding: "8px 9px", background: BRAND.soft, fontWeight: 700, textAlign: "center" }}>{level}</div>)}
+                <div style={{ padding: "8px 9px", borderTop: `1px solid ${BRAND.border}` }}>Minimum</div>
+                {[99, 102, 105, 108].map((value) => <div key={`p12m-${value}`} style={{ padding: "8px 9px", borderTop: `1px solid ${BRAND.border}`, textAlign: "center", fontWeight: 600 }}>{value}</div>)}
+                <div style={{ padding: "8px 9px", borderTop: `1px solid ${BRAND.border}` }}>Recommended</div>
+                {[102, 105, 108, 111].map((value) => <div key={`p12r-${value}`} style={{ padding: "8px 9px", borderTop: `1px solid ${BRAND.border}`, textAlign: "center", fontWeight: 600 }}>{value}</div>)}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 11, color: BRAND.hint }}>Unit: dB SPL (C) · Room parameter</div>
+            </div>
+
+            <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 12, padding: 16, background: "#FFF" }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.text, marginBottom: 5 }}>P13 · Non-screen speakers SPL capability at RSP</div>
+              <div style={{ fontSize: 12, color: BRAND.subtext, lineHeight: 1.45, marginBottom: 12 }}>
+                Post calibration EQ within assigned bandwidth, without clipping, including amplifier headroom.
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "90px repeat(4, 1fr)", border: `1px solid ${BRAND.border}`, borderRadius: 9, overflow: "hidden", fontSize: 12 }}>
+                <div style={{ padding: "8px 9px", background: BRAND.soft, fontWeight: 700 }}>Target</div>
+                {["L1", "L2", "L3", "L4"].map((level) => <div key={`p13h-${level}`} style={{ padding: "8px 9px", background: BRAND.soft, fontWeight: 700, textAlign: "center" }}>{level}</div>)}
+                <div style={{ padding: "8px 9px", borderTop: `1px solid ${BRAND.border}` }}>Minimum</div>
+                {[96, 99, 102, 105].map((value) => <div key={`p13m-${value}`} style={{ padding: "8px 9px", borderTop: `1px solid ${BRAND.border}`, textAlign: "center", fontWeight: 600 }}>{value}</div>)}
+                <div style={{ padding: "8px 9px", borderTop: `1px solid ${BRAND.border}` }}>Recommended</div>
+                {[99, 102, 105, 108].map((value) => <div key={`p13r-${value}`} style={{ padding: "8px 9px", borderTop: `1px solid ${BRAND.border}`, textAlign: "center", fontWeight: 600 }}>{value}</div>)}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 11, color: BRAND.hint }}>Unit: dB SPL (C) · Room parameter</div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12, fontSize: 11, color: BRAND.subtext, lineHeight: 1.5 }}>
+            Sound Pressure Level at the Reference Seating Position is the recommended minimum long-term SPL according to AES75-2022 or ANSI-CTA-2034-A, Section 8. Additional speaker SPL capability should be considered at bass frequencies for bass contours and for positive EQ.
+          </div>
+        </div>
+
         {canManageCompetitors && (
         <div style={{ marginTop: 14, background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14 }}>
           <button type="button" onClick={() => setAdminOpen((v) => !v)} style={{ width: "100%", border: 0, background: "transparent", padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: BRAND.text }}>
