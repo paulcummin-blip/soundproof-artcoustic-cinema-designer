@@ -41,7 +41,7 @@ export const STAGE_LABELS = {
 };
 
 export const STAGE_SUPPORTING_TEXT = {
-  phase_polarity: 'Grouped phase search (5-degree resolution) — not yet available.',
+  phase_polarity: 'Testing a unity-gain all-pass phase control in 5-degree steps at 80 Hz.',
   delays: 'Testing grouped timing alignment between subwoofers.',
   gain: 'Testing grouped level balance between subwoofers.',
   sub_positions: 'Testing practical placement changes.',
@@ -56,7 +56,7 @@ const PHASE_TO_ACTIVE_STAGE = {
   reviewing: null,
   awaiting_stage2: null,
   idle: null,
-  calibrating: 'delays', // combined calibration — delays is the first real stage (phase is not_available)
+  calibrating: 'delays', // phaseLabel refines this to phase or delay/gain below
   testing_positions: 'sub_positions',
   screening_symmetric: 'sub_positions',
   confirming_symmetric: 'sub_positions',
@@ -122,8 +122,17 @@ export function buildStageDisplay(state) {
   const runComplete = status === 'complete';
   const finalisingActive = phase === 'finalising';
 
+  const phaseLabel = String(state?.phaseLabel || '');
+  const phaseSearchActive = phase === 'calibrating' && /phase/i.test(phaseLabel);
+  const gainSearchActive = phase === 'calibrating' && /gain/i.test(phaseLabel);
   const groupedDelayOnly = stageVerdicts.phase_polarity === 'skipped' && stageVerdicts.gain === 'skipped';
-  const activeStageKey = phase === 'calibrating' && groupedDelayOnly ? 'delays' : PHASE_TO_ACTIVE_STAGE[phase] ?? null;
+  const activeStageKey = phaseSearchActive
+    ? 'phase_polarity'
+    : gainSearchActive
+      ? 'gain'
+      : phase === 'calibrating' && groupedDelayOnly
+        ? 'delays'
+        : PHASE_TO_ACTIVE_STAGE[phase] ?? null;
 
   const stages = STAGE_KEYS.map((key) => {
     let stageStatus = 'pending';
@@ -148,9 +157,17 @@ export function buildStageDisplay(state) {
       }
     }
 
-    // Phase — always not_available (no 5-degree phase control implemented)
+    // Phase — a real grouped all-pass search, never a display-only claim.
     if (key === 'phase_polarity') {
-      stageStatus = 'not_available';
+      if (stageVerdicts[key] === 'improvement' || stageVerdicts[key] === 'no_improvement' || stageVerdicts[key] === 'done') {
+        stageStatus = 'completed';
+      } else if (activeStageKey === 'phase_polarity') {
+        stageStatus = 'active';
+      } else if (stageVerdicts[key] === 'skipped') {
+        stageStatus = 'not_tested';
+      } else if (calibratingDone) {
+        stageStatus = 'completed';
+      }
     }
 
     // Calibration stages (delays, gain)
@@ -203,8 +220,8 @@ export function buildStageDisplay(state) {
     if (stageVerdicts[key] === 'skipped' && key !== 'phase_polarity') stageStatus = 'not_tested';
 
     // Show the actual grouped scan / canonical confirmation count.
-    let subStageLabel = key === 'delays' && stageStatus === 'active'
-      ? `${state.phaseLabel || 'Testing grouped delay options'} (${state.progressCurrent || 0} of ${state.progressTotal || 0})`
+    let subStageLabel = (key === 'delays' || key === 'phase_polarity' || key === 'gain') && stageStatus === 'active'
+      ? `${state.phaseLabel || 'Testing calibration options'} (${state.progressCurrent || 0} of ${state.progressTotal || 0})`
       : null;
     if (key === 'sub_positions' && stageStatus === 'active') {
       subStageLabel = SUB_POSITION_SUB_LABELS[phase]
