@@ -70,6 +70,7 @@ export function computeV2DesignFingerprint(params) {
       gainDb: Number(inst.gainDb) || 0,
       delayMs: Number(inst.delayMs) || 0,
       polarity: Number(inst.polarity) || 0,
+      phaseControlDeg: Number(inst.phaseControlDeg ?? inst.phaseAdjust) || 0,
     },
     modelKey: normaliseModelKey(inst.model || selectedSubModel),
   }));
