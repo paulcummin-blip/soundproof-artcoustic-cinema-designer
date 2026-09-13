@@ -16,6 +16,7 @@
 import React, { useMemo } from "react";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { isEligibleP5Surround } from "@/components/utils/p5SurroundGaps";
+import { resolveGradeToken } from "@/components/utils/rp22Colors";
 
 // ── Status copy ────────────────────────────────────────────────────────────
 const STATUS_COPY = {
@@ -52,7 +53,9 @@ const STATUS_COPY = {
 };
 
 function getStatusInfo(level) {
-  return STATUS_COPY[level] || STATUS_COPY["—"];
+  const copy = STATUS_COPY[level] || STATUS_COPY["—"];
+  const { token } = resolveGradeToken(level);
+  return { ...copy, color: token.border, tokenBg: token.bg, tokenText: token.text, tokenSolid: token.solid };
 }
 
 // ── Role label colours ─────────────────────────────────────────────────────
@@ -186,20 +189,27 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
       const midPt = polarToSvg(rspPx.px, rspPx.py, ARC_RADIUS_M + 0.35, midTheta);
 
       const isWorst = Number.isFinite(geometryWorstGapDeg) && Math.abs(gap.deg - geometryWorstGapDeg) < 0.01;
-      const arcColor = isWorst ? "#4A230F" : "#625143";
+      const gradeToken = resolveGradeToken(level);
+      const arcColor = isWorst ? gradeToken.token.border : "#625143";
+      const sectorFill = isWorst ? gradeToken.token.bg : null;
+      const sectorPath = isWorst
+        ? `M ${rspPx.px} ${rspPx.py} L ${startPt.x} ${startPt.y} A ${ARC_RADIUS_M * SCALE} ${ARC_RADIUS_M * SCALE} 0 ${largeArc} 1 ${endPt.x} ${endPt.y} Z`
+        : null;
 
       return {
         id: i,
         path: `M ${startPt.x} ${startPt.y} A ${ARC_RADIUS_M * SCALE} ${ARC_RADIUS_M * SCALE} 0 ${largeArc} 1 ${endPt.x} ${endPt.y}`,
+        sectorPath,
         midPt,
         deg: gap.deg,
         fromRole: gap.fromRole,
         toRole: gap.toRole,
         isWorst,
         arcColor,
+        sectorFill,
       };
       });
-      }, [rspPx, surroundsWithTheta, gaps, geometryWorstGapDeg, SHADING_RADIUS_M, SCALE]);
+      }, [rspPx, surroundsWithTheta, gaps, geometryWorstGapDeg, level, SHADING_RADIUS_M, SCALE]);
 
   // ── Loading / empty state ────────────────────────────────────────────────
   if (!p5Snapshot || !rspPx) {
@@ -315,19 +325,27 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
             );
           })()}
 
-          {/* ── Angular-continuity shading ── */}
+          {/* ── Angular-continuity shading (neutral context, not measured parameter) ── */}
           {continuityPath && (
             <path
               d={continuityPath}
-              fill="#213428"
-              fillOpacity={0.06}
+              fill="#625143"
+              fillOpacity={0.05}
               stroke="none"
             />
           )}
 
-          {/* ── Gap arcs ── */}
+          {/* ── Gap arcs (worst gap inherits achieved P5 level colour) ── */}
           {gapArcs.map((arc) => (
             <g key={`gap-${arc.id}`}>
+              {arc.isWorst && arc.sectorPath && (
+                <path
+                  d={arc.sectorPath}
+                  fill={arc.sectorFill}
+                  fillOpacity={0.35}
+                  stroke="none"
+                />
+              )}
               <path
                 d={arc.path}
                 fill="none"
@@ -468,14 +486,14 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
           width: 48,
           height: 48,
           borderRadius: 8,
-          background: `${statusInfo.color}25`,
+          background: statusInfo.tokenBg,
           border: `2px solid ${statusInfo.color}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontSize: 18,
           fontWeight: 700,
-          color: statusInfo.color,
+          color: statusInfo.tokenText,
           fontFamily: "Futura PT Light, Century Gothic, sans-serif",
           flexShrink: 0,
         }}>
