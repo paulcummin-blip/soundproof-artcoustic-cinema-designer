@@ -126,8 +126,11 @@ function ProductEditor({ product, records, onClose, onSaved }) {
     setSaving(true);
     setError('');
     try {
-      if (isNew) await base44.entities.ProductPrice.create(payload);
-      else await base44.entities.ProductPrice.update(product.id, payload);
+      const response = await base44.functions.invoke('saveProductMaster', {
+        product_id: isNew ? null : product.id,
+        product: payload,
+      });
+      if (response?.data?.error) throw new Error(response.data.error);
       await onSaved();
       onClose();
     } catch (saveError) {
