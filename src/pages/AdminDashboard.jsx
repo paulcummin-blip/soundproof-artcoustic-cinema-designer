@@ -64,8 +64,8 @@ export default function AdminDashboard() {
       href: "/admin/accounts",
     },
     {
-      title: "Products",
-      description: "Speaker, subwoofer and accessory registry.",
+      title: "Engineering Database",
+      description: "Read-only acoustic specifications and measured product data.",
       status: "Healthy",
       count: "—",
       href: "/SpeakerDatabase",
@@ -78,11 +78,11 @@ export default function AdminDashboard() {
       href: "/admin/datasets",
     },
     {
-      title: "Product Prices",
-      description: "Canonical retail price authority for all commercial products.",
+      title: "Product Master",
+      description: "Product names, availability, Sound Proof roles and retail pricing.",
       status: "Healthy",
       count: "—",
-      href: "/admin/product-prices",
+      href: "/PriceList",
     },
     {
       title: "RP22 Configuration",
