@@ -5,7 +5,7 @@ import { useActiveProjectId } from "@/components/state/project-session";
 import { useRoomDimensions } from "@/components/hooks/useRoomDimensions";
 import { useProductMaster } from "@/components/products/useProductMaster";
 import { PRODUCT_ROLES } from "@/components/products/productMaster";
-import { normaliseModelKey } from "@/components/models/speakers/registry";
+import { getModelsByCategoryOrdered, normaliseModelKey } from "@/components/models/speakers/registry";
 import { computeSpeakerCapabilityAtDistance } from "@/components/utils/spl/centralSplEngine";
 import { resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import { normalizeCompetitor, competitorMetaForComparison } from "@/components/utils/spl/competitorNormalization";
@@ -380,16 +380,19 @@ export default function SPLCalculatorPage() {
       if (!existing.sourceMeta || capability === 'p12') existing.sourceMeta = item;
       merged.set(labelKey, existing);
     };
-    [
-      ...(roleOptions?.[PRODUCT_ROLES.LCR] || []),
-      ...(roleOptions?.[PRODUCT_ROLES.CENTRE_SOUNDBAR] || []),
-    ].forEach((item) => add(item, 'p12'));
+
+    // P12: exact same LCR selector authority as the Room Designer.
+    const canonicalSelectors = getModelsByCategoryOrdered() || {};
+    (canonicalSelectors.LCR || []).forEach((item) => add(item, 'p12'));
+
+    // P13: exact same live Product Master role options as Surrounds and Overheads.
     [
       ...(roleOptions?.[PRODUCT_ROLES.SURROUND] || []),
       ...(roleOptions?.[PRODUCT_ROLES.REAR_SURROUND] || []),
       ...(roleOptions?.[PRODUCT_ROLES.FRONT_WIDE] || []),
       ...(roleOptions?.[PRODUCT_ROLES.OVERHEAD] || []),
     ].forEach((item) => add(item, 'p13'));
+
     return Array.from(merged.values());
   }, [roleOptions]);
 
