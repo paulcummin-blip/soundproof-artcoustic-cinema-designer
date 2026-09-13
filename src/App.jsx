@@ -18,7 +18,6 @@ import AdminPlaceholderPage from './pages/AdminPlaceholderPage';
 import AdminDatasetManager from './pages/AdminDatasetManager';
 import AdminProjectLicensing from './pages/AdminProjectLicensing';
 import AdminUserLicensingDetail from './pages/AdminUserLicensingDetail';
-import AdminProductPrices from './pages/AdminProductPrices';
 import RP22ClientReport from './pages/RP22ClientReport';
 import DesignReviewPage from './pages/DesignReviewPage';
 import PurchaseProjects from './pages/PurchaseProjects';
@@ -114,7 +113,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/project-licensing" element={<AccessGate masterAdmin><AdminProjectLicensing /></AccessGate>} />
         <Route path="/admin/project-licensing/:userId" element={<AccessGate masterAdmin><AdminUserLicensingDetail /></AccessGate>} />
         <Route path="/admin/pricing" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Pricing" description="Price lists, discounts and difficulty multipliers." /></AccessGate>} />
-        <Route path="/admin/product-prices" element={<AccessGate masterAdmin><AdminProductPrices /></AccessGate>} />
+        <Route path="/admin/product-prices" element={<AccessGate masterAdmin><Navigate to="/PriceList" replace /></AccessGate>} />
         <Route path="/admin/rp22-config" element={<AccessGate masterAdmin><AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." /></AccessGate>} />
         <Route path="/admin/audit-log" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Audit Log" description="Track changes made across the platform." /></AccessGate>} />
         <Route path="/admin/billing" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Billing" description="Subscription plans and payment configuration." /></AccessGate>} />
