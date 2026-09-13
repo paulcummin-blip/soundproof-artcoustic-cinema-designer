@@ -26,7 +26,17 @@ const BRAND = {
   accent: "#C1B6AD",
 };
 
-const LEVEL_RANK = { "—": 0, FAIL: 0, L1: 1, L2: 2, L3: 3, L4: 4 };
+const LEVEL_RANK = { "—": 0, "N/A": 0, FAIL: 0, L1: 1, L2: 2, L3: 3, L4: 4 };
+
+function isP13OnlyArtcousticSpeaker(speaker) {
+  const model = String(speaker?.model || "").trim().toLowerCase();
+  return [
+    "architect 2-1",
+    "architect 4-2",
+    "architect pas2-2",
+    "architect mikro",
+  ].includes(model);
+}
 
 function isSubwooferEntry(s) {
   const cat = String(s?.type || s?.category || "").toLowerCase();
@@ -53,7 +63,13 @@ function gradeFromSpl(spl, basis) {
 }
 
 function Rp22Pill({ parameter, level }) {
-  const normalized = /^L[1-4]$/.test(String(level)) ? String(level) : level === "FAIL" ? "FAIL" : null;
+  const normalized = /^L[1-4]$/.test(String(level))
+    ? String(level)
+    : level === "FAIL"
+      ? "FAIL"
+      : level === "N/A"
+        ? "N/A"
+        : null;
   const colorLevel = normalized?.startsWith("L") ? Number(normalized.slice(1)) : normalized;
   const colors = getLevelColors(colorLevel);
   return (
@@ -388,7 +404,9 @@ export default function SPLCalculatorPage() {
       powerW: p,
       roomVolumeM3,
     });
-    return { ...capability, grades: gradeFromSpl(capability.spl, basis) };
+    const grades = gradeFromSpl(capability.spl, basis);
+    if (isP13OnlyArtcousticSpeaker(speaker)) grades.p12 = "N/A";
+    return { ...capability, grades };
   }, [d, p, roomVolumeM3, basis]);
 
   const artResult = useMemo(() => calculateArtResult(art), [art, calculateArtResult]);
