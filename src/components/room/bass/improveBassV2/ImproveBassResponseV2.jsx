@@ -405,8 +405,8 @@ export default function ImproveBassResponseV2({
       return;
     }
 
-    if (stageKey === "delay" || stageKey === "gain") {
-      // Apply calibration tuning (delay or gain)
+    if (stageKey === "phase" || stageKey === "delay" || stageKey === "gain") {
+      // Apply calibration tuning (phase, delay or gain)
       const _provenance = buildProvenance(stageKey, result.candidateId, state.winner.applyFingerprint, fingerprint);
       const next = applyCalibrationTuning(subwooferInstances, result.appliedTuning || result.tuning || [], _provenance);
       commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
