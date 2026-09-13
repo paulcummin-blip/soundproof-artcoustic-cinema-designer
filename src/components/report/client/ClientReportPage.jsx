@@ -16,6 +16,8 @@ import PrintP5Content from "@/components/report/client/print/PrintP5Content";
 import PrintP9Content from "@/components/report/client/print/PrintP9Content";
 import PrintBassCapabilityContent from "@/components/report/client/print/PrintBassCapabilityContent";
 import PrintBassResponseContent from "@/components/report/client/print/PrintBassResponseContent";
+import PrintP2Content from "@/components/report/client/print/PrintP2Content";
+import PrintP7Content from "@/components/report/client/print/PrintP7Content";
 import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
 import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
@@ -317,6 +319,25 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
               </div>
             </div>
           </>
+        )}
+        {printData?.type === "p2-system-architecture" && (
+          <PrintP2Content
+            p2Data={printData.p2Data}
+            roomDims={printData.roomDims}
+            seatingPositions={printData.seatingPositions}
+            rsp={printData.rsp}
+            screenFrontPlaneM={printData.screenFrontPlaneM}
+            screenWidthM={printData.screenWidthM}
+            placedSpeakers={printData.placedSpeakers}
+          />
+        )}
+        {printData?.type === "p7-front-wides" && (
+          <PrintP7Content
+            p7Data={printData.p7Data}
+            roomDims={printData.roomDims}
+            screenFrontPlaneM={printData.screenFrontPlaneM}
+            screenWidthM={printData.screenWidthM}
+          />
         )}
         {printData?.type === "seating-position" && (
           <>

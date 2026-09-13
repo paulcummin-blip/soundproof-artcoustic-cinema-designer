@@ -39,6 +39,10 @@ import ClientAcousticTreatment from "@/components/report/client/ClientAcousticTr
 import ClientBassCapability from "@/components/report/client/ClientBassCapability";
 import ClientBassResponse from "@/components/report/client/ClientBassResponse";
 import { selectClientBassPerformance } from "@/components/report/client/selectClientBassPerformance";
+import ClientP2SystemArchitecture from "@/components/report/client/ClientP2SystemArchitecture";
+import { selectClientP2SystemArchitecture } from "@/components/report/client/selectClientP2SystemArchitecture";
+import ClientP7FrontWides from "@/components/report/client/ClientP7FrontWides";
+import { selectClientP7FrontWides } from "@/components/report/client/selectClientP7FrontWides";
 import ClientRecommendationFooter from "@/components/report/client/ClientRecommendationFooter";
 import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
 import { LOGO_URL } from "@/components/report/ReportCover";
@@ -211,6 +215,19 @@ export default function RP22ClientReport() {
     return selectClientP9Overhead({ analysisResult, seatingPositions });
   }, [hydrating, analysisResult, seatingPositions]);
 
+  // ── P2 System Architecture (pure selector — reads canonical gradedParameters.primary[2]) ──
+  const p2SystemArchitecture = useMemo(() => {
+    if (hydrating || !analysisResult || !Array.isArray(placedSpeakers)) return null;
+    return selectClientP2SystemArchitecture(analysisResult, placedSpeakers);
+  }, [hydrating, analysisResult, placedSpeakers]);
+
+  // ── P7 Front Wides (pure selector — reads canonical gradedParameters.primary[7]) ──
+  // Only returns data when front wides are actually present.
+  const p7FrontWides = useMemo(() => {
+    if (hydrating || !analysisResult || !Array.isArray(placedSpeakers) || !rsp) return null;
+    return selectClientP7FrontWides(analysisResult, placedSpeakers, rsp);
+  }, [hydrating, analysisResult, placedSpeakers, rsp]);
+
   // ── Recommended seating position (pure selector, no new analysis) ──
   const recommendedSeatingPosition = useMemo(() => {
     if (hydrating || !analysisResult || !Array.isArray(seatingPositions)) {
@@ -319,6 +336,33 @@ export default function RP22ClientReport() {
         },
       });
     }
+    // P2 System Architecture — after Viewing Experience, before P5
+    if (p2SystemArchitecture) {
+      pages.push({
+        id: "p2-system-architecture",
+        visual: (
+          <ClientP2SystemArchitecture
+            p2Data={p2SystemArchitecture}
+            roomDims={roomDims}
+            seatingPositions={seatingPositions}
+            rsp={rsp}
+            screenFrontPlaneM={screenFrontPlaneM}
+            screenWidthM={screenWidthM}
+            placedSpeakers={placedSpeakers}
+          />
+        ),
+        printData: {
+          type: "p2-system-architecture",
+          p2Data: p2SystemArchitecture,
+          roomDims,
+          seatingPositions,
+          rsp,
+          screenFrontPlaneM,
+          screenWidthM,
+          placedSpeakers,
+        },
+      });
+    }
     if (p5Snapshot && isAssessedLevel(p5Snapshot.level)) {
       pages.push({
         id: "p5-spatial-resolution",
@@ -336,6 +380,27 @@ export default function RP22ClientReport() {
           roomDims,
           screen,
           screenFrontPlaneM,
+        },
+      });
+    }
+    // P7 Front Wides — only when front wides are present
+    if (p7FrontWides) {
+      pages.push({
+        id: "p7-front-wides",
+        visual: (
+          <ClientP7FrontWides
+            p7Data={p7FrontWides}
+            roomDims={roomDims}
+            screenFrontPlaneM={screenFrontPlaneM}
+            screenWidthM={screenWidthM}
+          />
+        ),
+        printData: {
+          type: "p7-front-wides",
+          p7Data: p7FrontWides,
+          roomDims,
+          screenFrontPlaneM,
+          screenWidthM,
         },
       });
     }
