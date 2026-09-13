@@ -38,10 +38,11 @@ const P2_THRESHOLDS = [
 
 /**
  * @param {Object} analysisResult - from useRP22AnalysisEngine
- * @param {Array} placedSpeakers - actual placed speaker array
+ * @param {Array} placedSpeakers - actual placed speaker array (bed + overhead, no subs)
+ * @param {Array} [subwooferInstances] - canonical subwoofer instances from app.subwooferInstances
  * @returns {Object|null} P2 system architecture data or null
  */
-export function selectClientP2SystemArchitecture(analysisResult, placedSpeakers) {
+export function selectClientP2SystemArchitecture(analysisResult, placedSpeakers, subwooferInstances) {
   if (!analysisResult) return null;
 
   const p2Param = analysisResult?.gradedParameters?.primary?.[2];
@@ -51,22 +52,35 @@ export function selectClientP2SystemArchitecture(analysisResult, placedSpeakers)
   const discreteCount = Number.isFinite(p2Param.value) ? p2Param.value : null;
   const configuration = p2Param.configuration || null;
 
-  // Count actual placed speakers by category
+  // Count actual placed speakers by category (bed + overhead only — subs are separate)
   const speakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
   let bedCount = 0;
   let overheadCount = 0;
-  let subCount = 0;
 
   for (const s of speakers) {
     const canon = getCanonicalRole(s?.role);
     if (isSubwooferRole(canon)) {
-      subCount++;
+      // Defensive: subs should not be in placedSpeakers, but skip if present
+      continue;
     } else if (isOverheadRole(canon)) {
       overheadCount++;
     } else {
       bedCount++;
     }
   }
+
+  // Count subwoofers from the canonical subwoofer-instance authority.
+  // Only enabled instances count. Subwoofers never affect P2 level.
+  const instances = Array.isArray(subwooferInstances) ? subwooferInstances : [];
+  const enabledSubs = instances.filter((sub) => sub?.enabled !== false && sub?.position);
+  const subCount = enabledSubs.length;
+
+  // Subwoofer positions for plan-view rendering (descriptive only)
+  const subwoofers = enabledSubs.map((sub) => ({
+    id: sub.id || `sub-${sub.position.x?.toFixed(2)}-${sub.position.y?.toFixed(2)}`,
+    x: Number(sub.position.x),
+    y: Number(sub.position.y),
+  }));
 
   // Upgrade path — based on discrete main channel count
   let upgradePath = null;
@@ -95,6 +109,7 @@ export function selectClientP2SystemArchitecture(analysisResult, placedSpeakers)
     bedCount,
     overheadCount,
     subCount,
+    subwoofers,
     upgradePath,
   };
 }

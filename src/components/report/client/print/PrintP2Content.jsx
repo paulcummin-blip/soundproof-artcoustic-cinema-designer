@@ -21,6 +21,7 @@ export default function PrintP2Content({
   screenFrontPlaneM,
   screenWidthM,
   placedSpeakers,
+  subwooferInstances,
 }) {
   if (!p2Data) return null;
 
@@ -39,6 +40,7 @@ export default function PrintP2Content({
           screenFrontPlaneM={screenFrontPlaneM}
           screenWidthM={screenWidthM}
           placedSpeakers={placedSpeakers}
+          subwooferInstances={subwooferInstances}
           print
           printPart="drawing"
         />
@@ -52,6 +54,7 @@ export default function PrintP2Content({
           screenFrontPlaneM={screenFrontPlaneM}
           screenWidthM={screenWidthM}
           placedSpeakers={placedSpeakers}
+          subwooferInstances={subwooferInstances}
           print
           printPart="support"
         />

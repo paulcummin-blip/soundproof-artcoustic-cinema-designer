@@ -329,6 +329,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             screenFrontPlaneM={printData.screenFrontPlaneM}
             screenWidthM={printData.screenWidthM}
             placedSpeakers={printData.placedSpeakers}
+            subwooferInstances={printData.subwooferInstances}
           />
         )}
         {printData?.type === "p7-front-wides" && (

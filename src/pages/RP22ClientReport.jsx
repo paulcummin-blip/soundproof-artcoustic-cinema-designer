@@ -90,6 +90,7 @@ export default function RP22ClientReport() {
     rspSourceLabel,
     seatingPositions,
     placedSpeakers,
+    subwooferInstances,
     analysisResult,
     completedBassAuthority,
     bassPresentation,
@@ -218,8 +219,8 @@ export default function RP22ClientReport() {
   // ── P2 System Architecture (pure selector — reads canonical gradedParameters.primary[2]) ──
   const p2SystemArchitecture = useMemo(() => {
     if (hydrating || !analysisResult || !Array.isArray(placedSpeakers)) return null;
-    return selectClientP2SystemArchitecture(analysisResult, placedSpeakers);
-  }, [hydrating, analysisResult, placedSpeakers]);
+    return selectClientP2SystemArchitecture(analysisResult, placedSpeakers, subwooferInstances);
+  }, [hydrating, analysisResult, placedSpeakers, subwooferInstances]);
 
   // ── P7 Front Wides (pure selector — reads canonical gradedParameters.primary[7]) ──
   // Only returns data when front wides are actually present.
@@ -349,6 +350,7 @@ export default function RP22ClientReport() {
             screenFrontPlaneM={screenFrontPlaneM}
             screenWidthM={screenWidthM}
             placedSpeakers={placedSpeakers}
+            subwooferInstances={subwooferInstances}
           />
         ),
         printData: {
@@ -360,6 +362,7 @@ export default function RP22ClientReport() {
           screenFrontPlaneM,
           screenWidthM,
           placedSpeakers,
+          subwooferInstances,
         },
       });
     }

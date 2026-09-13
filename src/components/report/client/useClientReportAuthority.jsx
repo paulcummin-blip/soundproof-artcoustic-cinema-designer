@@ -692,5 +692,6 @@ export function useClientReportAuthority(projectId) {
     authoritativeSeat,
     seatingPositions,
     placedSpeakers,
+    subwooferInstances: Array.isArray(app?.subwooferInstances) ? app.subwooferInstances : [],
   };
 }

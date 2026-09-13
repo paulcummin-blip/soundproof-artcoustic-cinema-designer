@@ -68,7 +68,7 @@ export default function ClientP2SystemArchitecture({
 }) {
   if (!p2Data) return null;
 
-  const { level, discreteCount, configuration, bedCount, overheadCount, subCount, upgradePath } = p2Data;
+  const { level, discreteCount, configuration, bedCount, overheadCount, subCount, subwoofers, upgradePath } = p2Data;
 
   const levelLabel = levelToLabel(level);
   const color = levelColor(level);
@@ -327,6 +327,37 @@ export default function ClientP2SystemArchitecture({
               </g>
             );
           })()}
+
+          {/* Subwoofers — rendered from canonical subwooferInstances (descriptive only) */}
+          {(Array.isArray(subwoofers) ? subwoofers : []).map((sub, i) => {
+            const sp = toPx(sub.x, sub.y);
+            return (
+              <g key={`sub-${sub.id || i}`}>
+                <rect
+                  x={sp.px - 7}
+                  y={sp.py - 5}
+                  width={14}
+                  height={10}
+                  rx={2}
+                  fill={SUB_COLOR}
+                  stroke="#F8F8F7"
+                  strokeWidth={1.5}
+                />
+                <text
+                  x={sp.px}
+                  y={sp.py + 18}
+                  fill={SUB_COLOR}
+                  fontSize={9}
+                  textAnchor="middle"
+                  fontFamily={BODY_FONT}
+                  fontWeight={600}
+                  letterSpacing="0.04em"
+                >
+                  SUB
+                </text>
+              </g>
+            );
+          })}
         </svg>
       )}
 
