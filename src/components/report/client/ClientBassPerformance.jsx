@@ -41,7 +41,7 @@ function fmtHz(hz) {
   return `${Number(hz).toFixed(1)} Hz`;
 }
 
-function BassParameterCard({ title, subtitle, level, valueText, children }) {
+function BassParameterCard({ title, subtitle, level, children }) {
   return (
     <div style={{
       background: "#FFFFFF",
@@ -72,9 +72,7 @@ function BassParameterCard({ title, subtitle, level, valueText, children }) {
           )}
         </div>
         {level != null && isAssessedLevel(level) && (
-          <RP22GradingPill level={levelToPillLevel(level)} variant="report">
-            {valueText}
-          </RP22GradingPill>
+          <RP22GradingPill level={levelToPillLevel(level)} variant="report" />
         )}
       </div>
       {children}
@@ -140,11 +138,19 @@ function PerSeatResults({ perSeatResults, seatLabelMap, paramLabel }) {
                 }}>
                   {scope}
                 </div>
+                {s.variationDbRaw != null && Number.isFinite(Number(s.variationDbRaw)) && (
+                  <div style={{
+                    fontSize: 9,
+                    color: "#8A7B6A",
+                    fontFamily: BODY_FONT,
+                    marginTop: 2,
+                  }}>
+                    ±{Math.abs(Number(s.variationDbRaw)).toFixed(2)} dB
+                  </div>
+                )}
               </div>
               {isAssessedLevel(s.level) && (
-                <RP22GradingPill level={pillLevel} compact>
-                  {Math.abs(Number(s.variationDbRaw) || 0).toFixed(2)}
-                </RP22GradingPill>
+                <RP22GradingPill level={pillLevel} compact />
               )}
             </div>
           );
@@ -193,17 +199,19 @@ export default function ClientBassPerformance({ bassPerformance, roomDims, seati
             title="P14 — LFE Total SPL Capability"
             subtitle="Maximum low-frequency output at the listening position"
             level={p14.achievedLevel}
-            valueText={p14.achievedCapabilityDb != null ? `${p14.achievedCapabilityDb.toFixed(1)} dB` : "—"}
           >
             <div style={{ fontSize: 11, color: "#625143", fontFamily: BODY_FONT, marginTop: 4 }}>
-              {p14.headroomOrShortfallDb != null && (
-                <span>
-                  {p14.headroomOrShortfallDb >= 0 ? "Headroom" : "Shortfall"}: {Math.abs(p14.headroomOrShortfallDb).toFixed(1)} dB
-                </span>
+              {p14.achievedCapabilityDb != null && (
+                <span>{p14.achievedCapabilityDb.toFixed(1)} dBC available</span>
               )}
               {p14.requestedTargetDb != null && (
                 <span style={{ marginLeft: 12 }}>
-                  Target: {p14.requestedTargetDb.toFixed(1)} dB
+                  Target: {p14.requestedTargetDb.toFixed(1)} dBC
+                </span>
+              )}
+              {p14.headroomOrShortfallDb != null && (
+                <span style={{ marginLeft: 12 }}>
+                  {p14.headroomOrShortfallDb >= 0 ? "Headroom" : "Shortfall"}: {Math.abs(p14.headroomOrShortfallDb).toFixed(1)} dB
                 </span>
               )}
             </div>
@@ -218,11 +226,15 @@ export default function ClientBassPerformance({ bassPerformance, roomDims, seati
             title="P18 — Low-Frequency Extension"
             subtitle="Lowest frequency the system reproduces at target level"
             level={p18.achievedLevel}
-            valueText={p18.achievedHz != null ? `${p18.achievedHz.toFixed(1)} Hz` : "—"}
           >
             <div style={{ fontSize: 11, color: "#625143", fontFamily: BODY_FONT, marginTop: 4 }}>
+              {p18.achievedHz != null && (
+                <span>{p18.achievedHz.toFixed(1)} Hz achieved</span>
+              )}
               {p18.designHz != null && (
-                <span>Design target: {p18.designHz.toFixed(1)} Hz</span>
+                <span style={{ marginLeft: 12 }}>
+                  Design target: {p18.designHz.toFixed(1)} Hz
+                </span>
               )}
             </div>
           </BassParameterCard>
@@ -236,8 +248,12 @@ export default function ClientBassPerformance({ bassPerformance, roomDims, seati
             title="P19 — Response Below Transition"
             subtitle="Low-frequency response smoothness at each seating position"
             level={p19.achievedLevel}
-            valueText={p19.achievedVariationDb != null ? `${p19.achievedVariationDb.toFixed(2)} dB` : "—"}
           >
+            {p19.achievedVariationDb != null && (
+              <div style={{ fontSize: 11, color: "#625143", fontFamily: BODY_FONT, marginTop: 4, marginBottom: 8 }}>
+                ±{p19.achievedVariationDb.toFixed(2)} dB
+              </div>
+            )}
             <PerSeatResults
               perSeatResults={p19.perSeatResults}
               seatLabelMap={seatLabelMap}
@@ -254,8 +270,12 @@ export default function ClientBassPerformance({ bassPerformance, roomDims, seati
             title="P20 — Seat-to-Seat Variance"
             subtitle="Consistency of low-frequency response between seating positions"
             level={p20.achievedLevel}
-            valueText={p20.achievedVariationDb != null ? `${p20.achievedVariationDb.toFixed(2)} dB` : "—"}
           >
+            {p20.achievedVariationDb != null && (
+              <div style={{ fontSize: 11, color: "#625143", fontFamily: BODY_FONT, marginTop: 4, marginBottom: 8 }}>
+                ±{p20.achievedVariationDb.toFixed(2)} dB
+              </div>
+            )}
             <PerSeatResults
               perSeatResults={p20.perSeatResults}
               seatLabelMap={seatLabelMap}
