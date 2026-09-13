@@ -126,7 +126,9 @@ function normalizeImportedRow(row, index) {
   const continuousPower = numeric(firstValue(row, ["Continuous / RMS / AES Power W", "Continuous Power W", "continuous_power_w", "Max Power (W)"]));
   const publishedContinuous = numeric(firstValue(row, ["Published Max Continuous SPL dB @1m", "published_max_continuous_spl_db_1m"]));
 
-  const measurementSpace = String(firstValue(row, ["Measurement Space Basis", "SPL Measurement Basis", "Published SPL Measurement Basis", "Measurement Basis", "Measurement Space", "Full Space / Half Space", "measurement_space_basis"]) ?? "").trim();
+  const sensitivityBasis = String(firstValue(row, ["Sensitivity Measurement Basis", "sensitivity_measurement_basis", "Sensitivity Space Basis"]) ?? "").trim();
+  const maxSplBasis = String(firstValue(row, ["Max SPL Measurement Basis", "max_spl_measurement_basis", "Max SPL Space Basis", "SPL Measurement Basis"]) ?? "").trim();
+  const legacyMeasurementSpace = String(firstValue(row, ["Measurement Space Basis", "Measurement Basis", "Measurement Space", "Full Space / Half Space", "measurement_space_basis"]) ?? "").trim();
   const normalized = normalizeCompetitor({
       manufacturer,
       model,
@@ -155,7 +157,9 @@ function normalizeImportedRow(row, index) {
       datasheet_url: String(firstValue(row, ["Datasheet URL", "datasheet_url"]) || "").trim(),
       date_checked: String(firstValue(row, ["Date Checked", "date_checked"]) || "").trim(),
       notes: String(firstValue(row, ["Notes", "notes"]) || "").trim(),
-      measurement_space_basis: measurementSpace,
+      measurement_space_basis: legacyMeasurementSpace,
+      sensitivity_measurement_basis: sensitivityBasis,
+      max_spl_measurement_basis: maxSplBasis,
       active: true,
   });
   return {
@@ -227,7 +231,15 @@ export default function SPLCalculatorPage() {
     setLoadingCompetitors(true);
     try {
       const rows = await base44.entities.CompetitorSpeaker.list("manufacturer", 500);
-      setCompetitorRows((rows || []).filter((r) => r.active !== false).map(normalizeCompetitor));
+      const sorted = (rows || [])
+        .filter((r) => r.active !== false)
+        .map(normalizeCompetitor)
+        .sort((a, b) => {
+          const manufacturerCompare = String(a.manufacturer || "").localeCompare(String(b.manufacturer || ""), undefined, { sensitivity: "base" });
+          if (manufacturerCompare !== 0) return manufacturerCompare;
+          return String(a.model || "").localeCompare(String(b.model || ""), undefined, { sensitivity: "base" });
+        });
+      setCompetitorRows(sorted);
     } catch (error) {
       console.warn("[RP22 Speaker Capability] competitor data unavailable", error);
       setCompetitorRows([]);
@@ -333,9 +345,8 @@ export default function SPLCalculatorPage() {
   }, [art, artResult, competitorResults, artcousticVisible, calculateArtResult, artPrice]);
 
   const addCompetitor = () => {
-    if (selectedCompetitorIds.length >= 5) return;
-    const next = competitorRows.find((r) => !selectedCompetitorIds.includes(r.id));
-    if (next) setSelectedCompetitorIds((prev) => [...prev, next.id]);
+    if (selectedCompetitorIds.length >= 5 || competitorRows.length === 0) return;
+    setSelectedCompetitorIds((prev) => [...prev, ""]);
   };
 
   const updateSelectedCompetitor = (index, id) => {
@@ -387,7 +398,6 @@ export default function SPLCalculatorPage() {
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 28, fontWeight: 400, margin: 0, letterSpacing: "0.01em" }}>RP22 Speaker Capability</h1>
-          <p style={{ margin: "5px 0 0", color: BRAND.subtext, fontSize: 14 }}>Compare predicted RP22 P12 and P13 performance using the same Artcoustic SPL authority as the main Sound Proof design.</p>
         </div>
 
         <div style={{ background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18, marginBottom: 16 }}>
@@ -421,18 +431,19 @@ export default function SPLCalculatorPage() {
         </div>
 
         <div style={{ background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) auto auto auto", gap: 12, alignItems: "end", padding: "0 16px 8px", fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-            <div>Speaker</div><div>Retail inc VAT</div><div>P12</div><div>P13</div>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 28px", gap: 12, alignItems: "end", padding: "0 16px 8px", fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}>
+            <div>Speaker</div><div style={{ textAlign: "right" }}>Retail inc VAT</div><div style={{ textAlign: "center" }}>P12</div><div style={{ textAlign: "center" }}>P13</div><div />
           </div>
 
           <div style={{ marginBottom: 8 }}>
-            <div style={{ marginBottom: 7, display: "grid", gridTemplateColumns: "minmax(260px, 1fr) auto auto auto", gap: 12, alignItems: "center" }}>
+            <div style={{ marginBottom: 7, display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 28px", gap: 12, alignItems: "center" }}>
               <select value={art?.id || ""} onChange={(e) => setArtId(e.target.value)} style={{ border: `1px solid ${BRAND.border}`, borderRadius: 10, padding: "10px 12px", background: "#FFF", fontWeight: 700, color: BRAND.text }}>
                 {artcousticVisible.map((s) => <option key={s.id} value={s.id}>Artcoustic · {s.model}</option>)}
               </select>
-              <div style={{ fontWeight: 600, textAlign: "right", minWidth: 92 }}>{formatPrice(artPrice(art))}</div>
+              <div style={{ fontWeight: 600, textAlign: "right" }}>{formatPrice(artPrice(art))}</div>
               <Rp22Pill parameter="P12" level={artResult?.grades?.p12} />
               <Rp22Pill parameter="P13" level={artResult?.grades?.p13} />
+              <div />
             </div>
           </div>
 
@@ -470,20 +481,19 @@ export default function SPLCalculatorPage() {
                 const item = competitorResults.find((x) => x.record.id === id);
                 return (
                   <div key={`${id}-${index}`}>
-                    <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) auto auto auto", gap: 12, alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}>
-                      <select value={id} onChange={(e) => updateSelectedCompetitor(index, e.target.value)} style={{ border: 0, background: "transparent", fontSize: 15, fontWeight: 700, color: BRAND.text, minWidth: 0 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 28px", gap: 12, alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}>
+                      <select value={id} onChange={(e) => updateSelectedCompetitor(index, e.target.value)} style={{ border: 0, background: "transparent", fontSize: 15, fontWeight: 700, color: id ? BRAND.text : BRAND.subtext, minWidth: 0 }}>
+                        <option value="">Choose alternative speaker</option>
                         {competitorRows.map((r) => <option key={r.id} value={r.id}>{r.manufacturer} · {r.model}</option>)}
                       </select>
-                      <div style={{ fontWeight: 600, textAlign: "right", minWidth: 92 }}>{formatPrice(numeric(record?.retail_price_inc_vat))}</div>
+                      <div style={{ fontWeight: 600, textAlign: "right" }}>{record ? formatPrice(numeric(record?.retail_price_inc_vat)) : "—"}</div>
                       <Rp22Pill parameter="P12" level={item?.result?.grades?.p12} />
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <Rp22Pill parameter="P13" level={item?.result?.grades?.p13} />
-                        <button type="button" onClick={() => setSelectedCompetitorIds((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>
-                      </div>
+                      <Rp22Pill parameter="P13" level={item?.result?.grades?.p13} />
+                      <button type="button" onClick={() => setSelectedCompetitorIds((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>
                     </div>
                     {record?.normalization_warnings?.length > 0 && (
                       <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
-                        {record.measurement_basis_status === "Needs confirmation" ? "Measurement basis needs confirmation" : "Speaker specification needs confirmation"}
+                        Speaker specification needs confirmation
                       </div>
                     )}
                   </div>

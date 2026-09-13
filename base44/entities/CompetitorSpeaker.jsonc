@@ -128,7 +128,23 @@
     },
     "measurement_space_basis": {
       "type": "string",
-      "description": "Raw spreadsheet declaration: Full Space or Half Space, applying to sensitivity and published SPL. Blank/ambiguous values require confirmation."
+      "description": "Legacy combined measurement basis (Full Space or Half Space). Superseded by the independent sensitivity_measurement_basis and max_spl_measurement_basis fields. Retained for backward compatibility \u2014 used as fallback when the independent fields are blank."
+    },
+    "sensitivity_measurement_basis": {
+      "type": "string",
+      "description": "Independent sensitivity measurement basis: Full Space or Half Space. Blank/Unknown/unstated assumes Half Space (0 dB correction). Full Space receives +6 dB once to convert to Artcoustic half-space."
+    },
+    "max_spl_measurement_basis": {
+      "type": "string",
+      "description": "Independent max SPL measurement basis: Full Space or Half Space. Blank/Unknown/unstated assumes Half Space (0 dB correction). Full Space receives +6 dB once to convert to Artcoustic half-space."
+    },
+    "sensitivity_space_provenance": {
+      "type": "string",
+      "description": "Provenance of the sensitivity space correction: half_space_published, half_space_assumed, or full_space_published_converted."
+    },
+    "max_spl_space_provenance": {
+      "type": "string",
+      "description": "Provenance of the max SPL space correction: half_space_published, half_space_assumed, or full_space_published_converted."
     },
     "measurement_basis_status": {
       "type": "string"
