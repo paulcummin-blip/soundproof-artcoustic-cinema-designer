@@ -7,7 +7,9 @@ import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 export default function SurroundsSelector({
   layout,
   choices,
-  overrideChoices,
+  sideChoices,
+  rearChoices,
+  wideChoices,
   value,
   override,
   onChange,
@@ -17,8 +19,9 @@ export default function SurroundsSelector({
   onExtraSurroundCountChange,
   allowExtraSurrounds
 }) {
-  // Fall back to full choices if overrideChoices not provided
-  const filteredOverrideChoices = overrideChoices || choices;
+  const filteredSideChoices = sideChoices || choices;
+  const filteredRearChoices = rearChoices || choices;
+  const filteredWideChoices = wideChoices || choices;
   const [showSurroundOverrides, setShowSurroundOverrides] = React.useState(false);
 
   const rolesReady = Array.isArray(activeRoles) && activeRoles.length > 0;
@@ -192,7 +195,7 @@ export default function SurroundsSelector({
                         <span style={{ color: sideModel === 'off' ? '#9B9890' : '#1B1A1A' }}>{sideModel === 'off' ? 'Select surround model' : getModelLabel(sideModel)}</span>
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
-                     {(filteredOverrideChoices || []).map((choice) => (
+                     {(filteredSideChoices || []).map((choice) => (
                        <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
                          {choice.label}
                        </SelectItem>
@@ -239,7 +242,7 @@ export default function SurroundsSelector({
                         <span style={{ color: rearModel === 'off' ? '#9B9890' : '#1B1A1A' }}>{rearModel === 'off' ? 'Select surround model' : getModelLabel(rearModel)}</span>
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
-                     {(filteredOverrideChoices || []).map((choice) => (
+                     {(filteredRearChoices || []).map((choice) => (
                        <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
                          {choice.label}
                        </SelectItem>
@@ -286,7 +289,7 @@ export default function SurroundsSelector({
                         <span style={{ color: wideModel === 'off' ? '#9B9890' : '#1B1A1A' }}>{wideModel === 'off' ? 'Select surround model' : getModelLabel(wideModel)}</span>
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
-                     {(filteredOverrideChoices || []).map((choice) => (
+                     {(filteredWideChoices || []).map((choice) => (
                        <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
                          {choice.label}
                        </SelectItem>
