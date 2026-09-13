@@ -15,15 +15,13 @@
  */
 
 import React, { useMemo } from "react";
-import { zoneLabelPosition } from "./levelFills";
+import { zoneLabelPosition, LEVEL_FILLS, LEVEL_LABEL_COLORS } from "./levelFills";
 import { PositionMarker } from "./SeatMarker";
 import { computeHaloRadiusPx, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { RP22_GRADE_TOKENS } from "@/components/utils/rp22Colors";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 
-// Below L1 is intentionally absent from the RP23 legend — outside the valid
-// L1 viewing envelope is left visually empty (room background), not coloured.
 const LEGEND_LEVELS = ["L1", "L2", "L3", "L4"];
 
 // Maps zone.level keys from selectClientScreenSeating to canonical grade-token keys.
@@ -194,20 +192,33 @@ export default function ClientScreenSeating({
           stroke="none"
         />
 
-        {/* ── Banded RP23 viewing zones (longitudinal, opaque) ── */}
-        {/* Below L1 zones are intentionally skipped — outside the valid L1
-            viewing envelope the room background shows through as empty space. */}
+        {/* ── Banded RP23 viewing zones (longitudinal) ── */}
+        {/* Below L1 zones are rendered with a subtle diluted fill and a clear
+            outer boundary line, so the client can see where seats fall outside
+            the minimum recommended (Level 1) viewing range. */}
         {(Array.isArray(zones) ? zones : []).map((zone) => {
-          if (zone.level === "below-l1") return null;
           const yStart = Math.max(0, zone.yStart);
           const yEnd = Math.min(L, zone.yEnd);
           if (yEnd <= yStart) return null;
           const tl = toPx(0, yStart);
           const br = toPx(W, yEnd);
           const heightPx = br.py - tl.py;
+          const isBelowL1 = zone.level === "below-l1";
           const tokenKey = ZONE_TOKEN[zone.level];
           const token = tokenKey ? RP22_GRADE_TOKENS[tokenKey] : null;
           const isL4 = zone.level === "l4";
+          const zoneFill = isBelowL1
+            ? LEVEL_FILLS["below-l1"]
+            : isL4
+            ? token.bg
+            : "#F8F8F7";
+          const zoneFillOpacity = isBelowL1 ? 1 : isL4 ? 0.35 : 1;
+          const lineColor = isBelowL1
+            ? RP22_GRADE_TOKENS.FAIL.border
+            : token?.border || "#D9D5CE";
+          const labelColor = isBelowL1
+            ? LEVEL_LABEL_COLORS["below-l1"]
+            : token?.text || "#3E4349";
           return (
             <g key={zone.key}>
               <rect
@@ -215,18 +226,18 @@ export default function ClientScreenSeating({
                 y={tl.py}
                 width={br.px - tl.px}
                 height={heightPx}
-                fill={isL4 ? token.bg : "#F8F8F7"}
-                fillOpacity={isL4 ? 0.35 : 1}
+                fill={zoneFill}
+                fillOpacity={zoneFillOpacity}
                 stroke="none"
               />
-              {/* Slim horizontal zone-transition line in canonical border colour */}
+              {/* Horizontal zone-transition line — the outer L1 limit for below-l1 zones */}
               <line
                 x1={tl.px}
                 y1={tl.py}
                 x2={br.px}
                 y2={tl.py}
-                stroke={token?.border || "#D9D5CE"}
-                strokeWidth={1}
+                stroke={lineColor}
+                strokeWidth={isBelowL1 ? 1.5 : 1}
               />
               {(() => {
                 const fontSize = print ? 9 : 11;
@@ -236,7 +247,7 @@ export default function ClientScreenSeating({
                   <text
                     x={pos.x}
                     y={pos.y}
-                    fill={token?.text || "#3E4349"}
+                    fill={labelColor}
                     fontSize={fontSize}
                     textAnchor={pos.textAnchor}
                     fontFamily="Didact Gothic, Century Gothic, sans-serif"
@@ -349,6 +360,32 @@ export default function ClientScreenSeating({
             <RP22GradingPill level={lvl} variant="report" />
           </div>
         ))}
+        {/* Below L1 — custom swatch matching the diluted zone fill + dark border */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{
+              display: "inline-block",
+              width: 28,
+              height: 14,
+              background: LEVEL_FILLS["below-l1"],
+              border: `1px solid ${RP22_GRADE_TOKENS.FAIL.border}`,
+              borderRadius: 4,
+              boxSizing: "border-box",
+            }}
+          />
+          <span
+            style={{
+              fontSize: print ? 10 : 12,
+              color: LEVEL_LABEL_COLORS["below-l1"],
+              fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+              fontWeight: 600,
+              letterSpacing: "0.01em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Below L1
+          </span>
+        </div>
       </div>
 
       {/* ── Projector light output note (between drawing and seat matrix) ── */}
