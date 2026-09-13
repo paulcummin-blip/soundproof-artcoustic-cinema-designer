@@ -15,18 +15,18 @@
  */
 
 import React, { useMemo } from "react";
-import { LEVEL_FILLS, LEVEL_LABEL_COLORS, zoneLabelPosition } from "./levelFills";
+import { zoneLabelPosition } from "./levelFills";
 import { PositionMarker } from "./SeatMarker";
 import { computeHaloRadiusPx } from "./seatMarkerGeometry";
+import { RP22_GRADE_TOKENS } from "@/components/utils/rp22Colors";
+import RP22GradingPill from "@/components/ui/RP22GradingPill";
 
 // Below L1 is intentionally absent from the RP23 legend — outside the valid
 // L1 viewing envelope is left visually empty (room background), not coloured.
-const LEGEND_ITEMS = [
-  { label: "L1", fill: LEVEL_FILLS["l1"] },
-  { label: "L2", fill: LEVEL_FILLS["l2"] },
-  { label: "L3", fill: LEVEL_FILLS["l3"] },
-  { label: "L4", fill: LEVEL_FILLS["l4"] },
-];
+const LEGEND_LEVELS = ["L1", "L2", "L3", "L4"];
+
+// Maps zone.level keys from selectClientScreenSeating to canonical grade-token keys.
+const ZONE_TOKEN = { l1: "L1", l2: "L2", l3: "L3", l4: "L4" };
 
 export default function ClientScreenSeating({
   roomDims,
@@ -204,6 +204,9 @@ export default function ClientScreenSeating({
           const tl = toPx(0, yStart);
           const br = toPx(W, yEnd);
           const heightPx = br.py - tl.py;
+          const tokenKey = ZONE_TOKEN[zone.level];
+          const token = tokenKey ? RP22_GRADE_TOKENS[tokenKey] : null;
+          const isL4 = zone.level === "l4";
           return (
             <g key={zone.key}>
               <rect
@@ -211,8 +214,18 @@ export default function ClientScreenSeating({
                 y={tl.py}
                 width={br.px - tl.px}
                 height={heightPx}
-                fill={LEVEL_FILLS[zone.level]}
+                fill={isL4 ? token.bg : "#F8F8F7"}
+                fillOpacity={isL4 ? 0.35 : 1}
                 stroke="none"
+              />
+              {/* Slim horizontal zone-transition line in canonical border colour */}
+              <line
+                x1={tl.px}
+                y1={tl.py}
+                x2={br.px}
+                y2={tl.py}
+                stroke={token?.border || "#D9D5CE"}
+                strokeWidth={1}
               />
               {(() => {
                 const fontSize = print ? 9 : 11;
@@ -222,7 +235,7 @@ export default function ClientScreenSeating({
                   <text
                     x={pos.x}
                     y={pos.y}
-                    fill={LEVEL_LABEL_COLORS[zone.level] || "#3E4349"}
+                    fill={token?.text || "#3E4349"}
                     fontSize={fontSize}
                     textAnchor={pos.textAnchor}
                     fontFamily="Didact Gothic, Century Gothic, sans-serif"
@@ -321,21 +334,9 @@ export default function ClientScreenSeating({
           fontFamily: "Didact Gothic, Century Gothic, sans-serif",
         }}
       >
-        {LEGEND_ITEMS.map((item) => (
-          <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span
-              style={{
-                display: "inline-block",
-                width: 14,
-                height: 14,
-                borderRadius: 3,
-                background: item.fill,
-                border: "1px solid #DCDBD6",
-              }}
-            />
-            <span style={{ fontSize: print ? 9 : 11, color: "#625143", letterSpacing: "0.04em" }}>
-              {item.label}
-            </span>
+        {LEGEND_LEVELS.map((lvl) => (
+          <div key={lvl} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <RP22GradingPill level={lvl} variant="report" />
           </div>
         ))}
       </div>
@@ -466,22 +467,6 @@ export default function ClientScreenSeating({
       </div>
       </>)}
 
-      {/* ── Client explanation (screen only — print uses the result region) ── */}
-      {!print && (
-        <p
-          style={{
-            fontSize: 13,
-            color: "#625143",
-            textAlign: "center",
-            maxWidth: 520,
-            lineHeight: 1.5,
-            margin: 0,
-            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-          }}
-        >
-          {explanation}
-        </p>
-      )}
     </div>
   );
 }

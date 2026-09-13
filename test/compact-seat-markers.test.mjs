@@ -338,7 +338,7 @@ test("P1 distance zones and RP23 viewing zones are preserved", () => {
   assert.ok(p1Src.includes("ZONES"), "P1 still has ZONES constant");
   assert.ok(p1Src.includes("LEVEL_FILLS"), "P1 still uses LEVEL_FILLS");
   assert.ok(rp23Src.includes("zones"), "RP23 still renders zones");
-  assert.ok(rp23Src.includes("LEVEL_FILLS"), "RP23 still uses LEVEL_FILLS");
+  assert.ok(rp23Src.includes("RP22_GRADE_TOKENS"), "RP23 uses canonical grade tokens");
 });
 
 // ── O: RSP coordinate unchanged ─────────────────────────────────────────────
