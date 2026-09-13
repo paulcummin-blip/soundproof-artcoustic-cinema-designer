@@ -3,8 +3,9 @@ import { Plus, Trash2, Upload, ChevronDown, ChevronUp, Info } from "lucide-react
 import { base44 } from "@/api/base44Client";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useRoomDimensions } from "@/components/hooks/useRoomDimensions";
-import { useProductPriceMap } from "@/components/pricing/useProductPriceMap";
-import { getModelsByCategoryOrdered, normaliseModelKey } from "@/components/models/speakers/registry";
+import { useProductMaster } from "@/components/products/useProductMaster";
+import { PRODUCT_ROLES } from "@/components/products/productMaster";
+import { normaliseModelKey } from "@/components/models/speakers/registry";
 import { computeSpeakerCapabilityAtDistance } from "@/components/utils/spl/centralSplEngine";
 import { resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import { normalizeCompetitor, competitorMetaForComparison } from "@/components/utils/spl/competitorNormalization";
@@ -327,7 +328,7 @@ export default function SPLCalculatorPage() {
   const { user } = useAuth();
   const canManageCompetitors = isMasterAdmin(user);
   const { dims, loadDims } = useRoomDimensions(activeId);
-  const { priceMap } = useProductPriceMap(true);
+  const { priceMap, roleOptions } = useProductMaster(true);
 
   const [distance, setDistance] = useState("3.0");
   const [ampPower, setAmpPower] = useState("100");
@@ -361,7 +362,6 @@ export default function SPLCalculatorPage() {
   useEffect(() => { loadCompetitors(); }, [loadCompetitors]);
 
   const artcousticVisible = useMemo(() => {
-    const byCategory = getModelsByCategoryOrdered() || {};
     const merged = new Map();
     const add = (item, capability) => {
       if (!item) return;
@@ -380,11 +380,18 @@ export default function SPLCalculatorPage() {
       if (!existing.sourceMeta || capability === 'p12') existing.sourceMeta = item;
       merged.set(labelKey, existing);
     };
-    (byCategory.LCR || []).forEach((item) => add(item, 'p12'));
-    (byCategory.SURROUNDS || []).forEach((item) => add(item, 'p13'));
-    (byCategory.ARCHITECT || []).forEach((item) => add(item, 'p13'));
+    [
+      ...(roleOptions?.[PRODUCT_ROLES.LCR] || []),
+      ...(roleOptions?.[PRODUCT_ROLES.CENTRE_SOUNDBAR] || []),
+    ].forEach((item) => add(item, 'p12'));
+    [
+      ...(roleOptions?.[PRODUCT_ROLES.SURROUND] || []),
+      ...(roleOptions?.[PRODUCT_ROLES.REAR_SURROUND] || []),
+      ...(roleOptions?.[PRODUCT_ROLES.FRONT_WIDE] || []),
+      ...(roleOptions?.[PRODUCT_ROLES.OVERHEAD] || []),
+    ].forEach((item) => add(item, 'p13'));
     return Array.from(merged.values());
-  }, []);
+  }, [roleOptions]);
 
   useEffect(() => {
     if (!artId && artcousticVisible.length) setArtId(artcousticVisible[0].id);
@@ -402,9 +409,7 @@ export default function SPLCalculatorPage() {
     const preferredKey = speaker.p12Key || speaker.p13Key || normaliseModelKey(speaker.model || speaker.id);
     const baseKey = String(preferredKey || '').replace(/_s$/, '');
     const rec = priceMap?.get(preferredKey) || priceMap?.get(baseKey);
-    if (Number.isFinite(Number(rec?.price_ex_vat))) return Number(rec.price_ex_vat) * 1.2;
-    const fallback = speaker.sourceMeta?.retailPriceGBP ?? speaker.sourceMeta?.price_gbp_exVat;
-    return Number.isFinite(Number(fallback)) ? Number(fallback) : null;
+    return Number.isFinite(Number(rec?.price_ex_vat)) ? Number(rec.price_ex_vat) * 1.2 : null;
   }, [priceMap]);
 
   const calculateArtResult = useCallback((speaker) => {
