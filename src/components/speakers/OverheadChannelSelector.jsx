@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getModelsByCategoryOrdered, getSpeakerModelMeta } from '@/components/models/speakers/registry';
+import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
+import { useProductRoleOptions } from '@/components/products/useProductMaster';
+import { PRODUCT_ROLES } from '@/components/products/productMaster';
 
 export default function OverheadChannelSelector({
   overheadCount,
@@ -23,11 +25,7 @@ export default function OverheadChannelSelector({
   disabled
 }) {
   const [showIndividualOverheads, setShowIndividualOverheads] = useState(false);
-  
-  const overheadModels = useMemo(() => {
-    const byCategory = getModelsByCategoryOrdered();
-    return byCategory.ARCHITECT || [];
-  }, []);
+  const { options: overheadModels } = useProductRoleOptions(PRODUCT_ROLES.OVERHEAD);
 
   const showFront = overheadCount === 4 || overheadCount === 6;
   const showMid = overheadCount === 2 || overheadCount === 6;
