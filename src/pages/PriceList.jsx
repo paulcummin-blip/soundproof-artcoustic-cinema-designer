@@ -232,7 +232,7 @@ function ProductEditor({ product, records, onClose, onSaved }) {
           {!isNew && (
             <ProductDangerZone
               product={product}
-              onDone={() => { onSaved().then(() => onClose()); }}
+              onDone={async () => { await onSaved(); onClose(); }}
             />
           )}
         </div>
@@ -428,7 +428,7 @@ export default function PriceList() {
         )}
       </div>
 
-      {editorProduct !== undefined && (
+      {master.canEdit && editorProduct !== undefined && (
         <ProductEditor product={editorProduct} records={master.products} onClose={closeEditor} onSaved={master.refetch} />
       )}
     </div>
