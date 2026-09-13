@@ -17,6 +17,7 @@ import {
   isCalibrationApplied,
 } from "../src/components/room/bass/improveBassV2/improveBassV2ApplyCalibration.js";
 import { buildStageDisplay } from "../src/components/room/bass/improveBassV2/improveBassV2StageMapping.js";
+import { simulateBassResponseRewCore } from "../src/bass/core/rewBassEngine.js";
 
 const room = { widthM: 6, lengthM: 7, heightM: 2.7 };
 const instances = [
@@ -139,6 +140,42 @@ test("Apply persists phase and the applied-state check includes it", () => {
   assert.equal(applied[1].phaseControlDeg, 75);
   assert.equal(isCalibrationApplied(applied, tuning), true);
   assert.equal(isCalibrationApplied(current, tuning), false);
+});
+
+test("a single source keeps identical magnitude when only its all-pass phase changes", () => {
+  const roomDims = { widthM: 6, lengthM: 7, heightM: 2.7 };
+  const seat = { x: 3, y: 4, z: 1.2 };
+  const productCurve = [{ hz: 10, db: 100 }, { hz: 200, db: 100 }];
+  const source = {
+    modelKey: "test",
+    x: 1,
+    y: 0.3,
+    z: 0.3,
+    tuning: { delayMs: 0, gainDb: 0, polarity: 0, phaseControlDeg: 0 },
+  };
+  const options = {
+    freqMinHz: 20,
+    freqMaxHz: 120,
+    pointsPerOctave: 12,
+    enableModes: true,
+    enableReflections: true,
+  };
+  const baselineResult = simulateBassResponseRewCore(
+    roomDims, seat, source, productCurve, options,
+  );
+  const phaseResult = simulateBassResponseRewCore(
+    roomDims,
+    seat,
+    { ...source, tuning: { ...source.tuning, phaseControlDeg: 90 } },
+    productCurve,
+    options,
+  );
+  const maxMagnitudeDeltaDb = Math.max(
+    ...baselineResult.splDbRaw.map(
+      (value, index) => Math.abs(value - phaseResult.splDbRaw[index]),
+    ),
+  );
+  assert.ok(maxMagnitudeDeltaDb < 1e-9);
 });
 
 test("phase progress is active during search and terminal after a real verdict", () => {
