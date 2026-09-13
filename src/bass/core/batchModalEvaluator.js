@@ -246,6 +246,7 @@ export function prepareSourceRoomField({
   qStrategyOverride,
   freqMinHz = 15,
   freqMaxHz = 200,
+  precomputedFreqsHz,
 }) {
   const widthM = Number(roomDims.widthM);
   const lengthM = Number(roomDims.lengthM);
@@ -260,7 +261,9 @@ export function prepareSourceRoomField({
   const abGlobalQScale = 1;
   const abMidbandQScale = 1;
 
-  const freqsHz = buildFrequencyAxis(freqMinHz, freqMaxHz, undefined);
+  const freqsHz = Array.isArray(precomputedFreqsHz) && precomputedFreqsHz.length
+    ? precomputedFreqsHz
+    : buildFrequencyAxis(freqMinHz, freqMaxHz, undefined);
   const nFreqs = freqsHz.length;
 
   const abModes = buildAbModes(precomputedModes, {
@@ -425,9 +428,10 @@ export function evaluateBatchModalTransfers({
   freqMinHz = 15,
   freqMaxHz = 200,
   collectDiagnostics = false,
+  precomputedFreqsHz,
 }) {
   const prepared = prepareSourceRoomField({
-    roomDims, sources, precomputedModes, physics, qStrategyOverride, freqMinHz, freqMaxHz,
+    roomDims, sources, precomputedModes, physics, qStrategyOverride, freqMinHz, freqMaxHz, precomputedFreqsHz,
   });
 
   const receiverResult = evaluateReceiversFromPreparedField(prepared, listeners);

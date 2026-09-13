@@ -1,5 +1,6 @@
 import { simulateBassResponseRewCore, simulateBassResponseRewParityField, prepareModeBank } from "@/bass/core/rewBassEngine";
 import { evaluateBatchModalTransfers } from "@/bass/core/batchModalEvaluator";
+import { buildFrequencyAxis } from "@/bass/core/rewCorePrimitives";
 import { getSubwooferCurve } from "@/components/models/speakers/registry";
 import { REW_SOURCE_CURVES } from "./rewSourceCurves";
 import { getPerSubwooferAmplifierAuthority } from "@/components/utils/subwooferCapability";
@@ -173,6 +174,7 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
   const useBatchPath = isBatchModalEligible({ qStrategyOverride, physics, sources });
 
   if (useBatchPath) {
+    const canonicalFreqsHz = buildFrequencyAxis(15, 200, undefined);
     const batchSources = sources.map((sub, sourceIndex) => ({
       ...sub,
       sourceCurve: buildDeratedProductCurve(sub, sourceIndex, amplifierAuthority),
@@ -185,6 +187,7 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
     const batchResult = evaluateBatchModalTransfers({
       roomDims, sources: batchSources, listeners: batchListeners,
       precomputedModes, physics, qStrategyOverride,
+      precomputedFreqsHz: canonicalFreqsHz,
     });
 
     // Assemble seat responses by summing per-source complex pressures.
