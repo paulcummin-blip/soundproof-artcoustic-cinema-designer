@@ -8,6 +8,7 @@ import { useProductPriceMap } from "@/components/pricing/useProductPriceMap";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
 import { computeSpeakerCapabilityAtDistance } from "@/components/utils/spl/centralSplEngine";
 import { resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
+import { normalizeCompetitor, competitorMetaForComparison } from "@/components/utils/spl/competitorNormalization";
 import { getLevelColors } from "@/components/utils/rp22Colors";
 import { resolveSpeakerSplMeta } from "@/components/utils/spl/speakerSplMeta";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
@@ -120,26 +121,13 @@ function normalizeImportedRow(row, index) {
   const model = String(firstValue(row, ["Model", "model"]) || "").trim();
   const ratedImpedance = numeric(firstValue(row, ["Rated Impedance Ω", "Rated Impedance Ohm", "rated_impedance_ohm", "Nominal Impedance Ω"]));
   const sensitivityValue = numeric(firstValue(row, ["Sensitivity Value dB", "sensitivity_value_db", "Sensitivity (dB)"]));
-  const sensitivityReference = String(firstValue(row, ["Sensitivity Reference", "sensitivity_reference", "Sensitivity Spec"]) || "1W/1m").trim();
+  const sensitivityReference = String(firstValue(row, ["Sensitivity Reference", "sensitivity_reference", "Sensitivity Spec"]) || "").trim();
   const sensitivityImpedance = numeric(firstValue(row, ["Sensitivity Impedance Used Ω", "sensitivity_impedance_used_ohm"])) || ratedImpedance;
   const continuousPower = numeric(firstValue(row, ["Continuous / RMS / AES Power W", "Continuous Power W", "continuous_power_w", "Max Power (W)"]));
   const publishedContinuous = numeric(firstValue(row, ["Published Max Continuous SPL dB @1m", "published_max_continuous_spl_db_1m"]));
 
-  let normalizedSensitivity = sensitivityValue;
-  if (/2\.83|2,83|volt/i.test(sensitivityReference) && Number.isFinite(sensitivityValue) && Number.isFinite(sensitivityImpedance) && sensitivityImpedance > 0) {
-    const wattsAt283 = (2.83 * 2.83) / sensitivityImpedance;
-    normalizedSensitivity = sensitivityValue - 10 * Math.log10(wattsAt283);
-  }
-
-  const calculatedCap = Number.isFinite(normalizedSensitivity) && Number.isFinite(continuousPower) && continuousPower > 0
-    ? normalizedSensitivity + 10 * Math.log10(continuousPower)
-    : null;
-  const authority = Number.isFinite(publishedContinuous) ? "Published continuous SPL" : Number.isFinite(calculatedCap) ? "Calculated from sensitivity + power" : "Incomplete";
-  const eligible = Number.isFinite(normalizedSensitivity) && Number.isFinite(continuousPower) && continuousPower > 0;
-
-  return {
-    rowNumber: index + 2,
-    record: {
+  const measurementSpace = String(firstValue(row, ["Measurement Space Basis", "SPL Measurement Basis", "Published SPL Measurement Basis", "Measurement Basis", "Measurement Space", "Full Space / Half Space", "measurement_space_basis"]) ?? "").trim();
+  const normalized = normalizeCompetitor({
       manufacturer,
       model,
       product_type: String(firstValue(row, ["Product Type", "product_type"]) || "").trim(),
@@ -167,20 +155,16 @@ function normalizeImportedRow(row, index) {
       datasheet_url: String(firstValue(row, ["Datasheet URL", "datasheet_url"]) || "").trim(),
       date_checked: String(firstValue(row, ["Date Checked", "date_checked"]) || "").trim(),
       notes: String(firstValue(row, ["Notes", "notes"]) || "").trim(),
-      normalized_sensitivity_db_1w_1m: Number.isFinite(normalizedSensitivity) ? normalizedSensitivity : null,
-      normalized_continuous_power_w: continuousPower,
-      calculated_max_continuous_spl_db_1m: Number.isFinite(calculatedCap) ? calculatedCap : null,
-      spl_authority: authority,
-      data_confidence: eligible ? (Number.isFinite(publishedContinuous) ? "High" : "Medium") : "Low",
-      p12_p13_eligible: eligible,
+      measurement_space_basis: measurementSpace,
       active: true,
-    },
+  });
+  return {
+    rowNumber: index + 2,
+    record: normalized,
     warnings: [
       !manufacturer ? "Missing manufacturer" : null,
       !model ? "Missing model" : null,
-      !Number.isFinite(sensitivityValue) ? "Missing sensitivity" : null,
-      /2\.83|2,83|volt/i.test(sensitivityReference) && !Number.isFinite(sensitivityImpedance) ? "2.83 V sensitivity has no impedance" : null,
-      !Number.isFinite(continuousPower) ? "Missing continuous/RMS/AES power" : null,
+      ...normalized.normalization_warnings,
     ].filter(Boolean),
   };
 }
@@ -243,7 +227,7 @@ export default function SPLCalculatorPage() {
     setLoadingCompetitors(true);
     try {
       const rows = await base44.entities.CompetitorSpeaker.list("manufacturer", 500);
-      setCompetitorRows((rows || []).filter((r) => r.active !== false && r.p12_p13_eligible !== false));
+      setCompetitorRows((rows || []).filter((r) => r.active !== false).map(normalizeCompetitor));
     } catch (error) {
       console.warn("[RP22 Speaker Capability] competitor data unavailable", error);
       setCompetitorRows([]);
@@ -296,22 +280,14 @@ export default function SPLCalculatorPage() {
 
   const competitorResultFor = useCallback((record) => {
     if (!record || !Number.isFinite(d) || !Number.isFinite(p)) return { spl: null, grades: { p12: "—", p13: "—" } };
-    const sens = numeric(record.normalized_sensitivity_db_1w_1m);
-    const maxPower = numeric(record.normalized_continuous_power_w ?? record.continuous_power_w);
-    const cap = numeric(record.published_max_continuous_spl_db_1m) ?? numeric(record.calculated_max_continuous_spl_db_1m);
+    const speakerMeta = competitorMetaForComparison(record);
+    if (!speakerMeta) return { spl: null, grades: { p12: "—", p13: "—" } };
     const capability = computeSpeakerCapabilityAtDistance({
       speakerModelId: `competitor:${record.id}`,
       distance_m: d,
       powerW: p,
       roomVolumeM3,
-      speakerMeta: {
-        id: `competitor:${record.id}`,
-        model: `${record.manufacturer} ${record.model}`,
-        sensitivity_db_1w_1m: sens,
-        power_handling_w: maxPower,
-        max_spl_cont_db_1m_halfspace: cap,
-        isLineSource: false,
-      },
+      speakerMeta,
     });
     return { ...capability, grades: gradeFromSpl(capability.spl, basis) };
   }, [d, p, roomVolumeM3, basis]);
@@ -505,6 +481,11 @@ export default function SPLCalculatorPage() {
                         <button type="button" onClick={() => setSelectedCompetitorIds((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>
                       </div>
                     </div>
+                    {record?.normalization_warnings?.length > 0 && (
+                      <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
+                        {record.measurement_basis_status === "Needs confirmation" ? "Measurement basis needs confirmation" : "Speaker specification needs confirmation"}
+                      </div>
+                    )}
                   </div>
                 );
               })}
