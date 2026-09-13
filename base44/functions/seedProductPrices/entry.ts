@@ -66,6 +66,9 @@ const SEED_DATA = [
   // These are selectable in the app but have no entry in the runtime price constants.
   // Seeded as null so Admin can identify and set a price via the Admin Product Prices page.
   { sku: "architect-mikro",   label: "MIKRO Ci",              category: "Loudspeaker", price_ex_vat: null },
+  // Standalone MIKRO is deliberately seeded without a selector role.
+  // Admin chooses its tested application(s) in Product Master before it enters a design selector.
+  { sku: "mikro",             label: "MIKRO",                 category: "Loudspeaker", price_ex_vat: null, roles: [] },
   { sku: "spitfire-cloud",    label: "SPITFIRE CLOUD",        category: "Loudspeaker", price_ex_vat: null },
   { sku: "architect-4-2-mk2", label: "ARCHITECT 4-2 mk II",   category: "Loudspeaker", price_ex_vat: null },
   { sku: "evolve-1-1_s",      label: "EVOLVE 1-1 (Surround)", category: "Loudspeaker", price_ex_vat: null },
@@ -81,6 +84,7 @@ function engineeringKey(sku) {
 }
 
 function defaultRoles(seed) {
+  if (Array.isArray(seed.roles)) return [...new Set(seed.roles)];
   const key = String(seed.sku || '').split(':')[0];
   const linkedKey = engineeringKey(seed.sku);
   if (seed.category === 'Subwoofer') return ['subwoofer'];
