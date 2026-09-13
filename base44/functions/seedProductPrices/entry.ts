@@ -4,9 +4,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 //   FIXED_RETAIL_PRICES_EX_VAT  (usePriceCalculation.jsx:10-38)
 //   SOUNDBAR_PRICE_OPTIONS     (usePriceCalculation.jsx:40-73)
 //   CPH_1000D_PRICE_EX_VAT     (usePriceCalculation.jsx:8)
-// Stage 1: this function is the seed source only; it does NOT rewire runtime pricing.
-// CREATE-ONLY: missing SKUs are created; existing SKUs are NEVER overwritten.
-// This protects Admin-edited prices from being reset by re-running the seed.
+// Product Master migration source.
+// Missing SKUs are created. Existing commercial fields (name, category, price,
+// active state) are NEVER overwritten. Only absent Product Master linkage fields
+// are backfilled, preserving every Admin decision.
 const SEED_DATA = [
   // ── Fixed retail prices (LCR + surrounds + architect + center + subs + amp + abfuser) ──
   { sku: "q4-3",             label: "Q4-3",                     category: "Loudspeaker",        price_ex_vat: 1516.67 },
@@ -70,6 +71,40 @@ const SEED_DATA = [
   { sku: "evolve-1-1_s",      label: "EVOLVE 1-1 (Surround)", category: "Loudspeaker", price_ex_vat: null },
 ];
 
+const SURROUND_ROLES = ['surround', 'rear_surround', 'front_wide'];
+const SOUNDBAR_MODELS = new Set(['c-1', 'c4-1', 'multi-lcr', 'multi-mono', 'hspl-lcr', 'hspl-mono']);
+const OVERHEAD_MODELS = new Set(['architect-mikro', 'architect-2-1', 'spitfire-cloud', 'architect-4-2-mk2']);
+
+function engineeringKey(sku) {
+  const key = String(sku || '').split(':')[0];
+  return key.endsWith('_s') ? key.slice(0, -2) : key;
+}
+
+function defaultRoles(seed) {
+  const key = String(seed.sku || '').split(':')[0];
+  const linkedKey = engineeringKey(seed.sku);
+  if (seed.category === 'Subwoofer') return ['subwoofer'];
+  if (key.endsWith('_s')) return SURROUND_ROLES;
+  if (SOUNDBAR_MODELS.has(linkedKey)) return ['centre_soundbar'];
+  if (OVERHEAD_MODELS.has(linkedKey)) return ['overhead'];
+  if (seed.category === 'Loudspeaker') {
+    // Legacy ARCHITECT 4-2 and PAS2-2 were deliberately hidden from selectors.
+    if (linkedKey === 'architect-4-2' || linkedKey === 'architect-pas2-2') return [];
+    return ['lcr'];
+  }
+  return [];
+}
+
+function masterDefaults(seed, selectorOrder) {
+  const acousticProduct = seed.category === 'Loudspeaker' || seed.category === 'Subwoofer';
+  return {
+    engineering_key: acousticProduct ? engineeringKey(seed.sku) : null,
+    roles: defaultRoles(seed),
+    selector_order: selectorOrder,
+    catalog_version: 1,
+  };
+}
+
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -89,13 +124,25 @@ export default async function(req) {
     let unchanged = 0;
     const details = [];
 
-    for (const seed of SEED_DATA) {
+    for (let index = 0; index < SEED_DATA.length; index++) {
+      const seed = SEED_DATA[index];
+      const defaults = masterDefaults(seed, index);
       const existingRec = existingBySku.get(seed.sku);
       if (existingRec) {
-        // Create-only seed: never overwrite an existing record.
-        // This protects Admin-edited prices from being reset by re-running the seed.
-        unchanged++;
-        details.push({ sku: seed.sku, action: 'unchanged' });
+        const patch = {};
+        if (existingRec.engineering_key === undefined) patch.engineering_key = defaults.engineering_key;
+        if (!Array.isArray(existingRec.roles)) patch.roles = defaults.roles;
+        if (!Number.isFinite(Number(existingRec.selector_order))) patch.selector_order = defaults.selector_order;
+        if (!Number.isFinite(Number(existingRec.catalog_version))) patch.catalog_version = defaults.catalog_version;
+
+        if (Object.keys(patch).length > 0) {
+          await base44.asServiceRole.entities.ProductPrice.update(existingRec.id, patch);
+          updated++;
+          details.push({ sku: seed.sku, action: 'migrated', fields: Object.keys(patch) });
+        } else {
+          unchanged++;
+          details.push({ sku: seed.sku, action: 'unchanged' });
+        }
       } else {
         await base44.asServiceRole.entities.ProductPrice.create({
           sku: seed.sku,
@@ -103,6 +150,7 @@ export default async function(req) {
           category: seed.category,
           price_ex_vat: seed.price_ex_vat,
           active: true,
+          ...defaults,
         });
         created++;
         details.push({ sku: seed.sku, action: 'created' });
