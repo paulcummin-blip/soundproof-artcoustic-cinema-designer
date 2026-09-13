@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Upload, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { artcousticSpeakers } from "@/components/data/speakerData";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useRoomDimensions } from "@/components/hooks/useRoomDimensions";
 import { useProductPriceMap } from "@/components/pricing/useProductPriceMap";
-import { normaliseModelKey } from "@/components/models/speakers/registry";
+import { getModelsByCategoryOrdered, normaliseModelKey } from "@/components/models/speakers/registry";
 import { computeSpeakerCapabilityAtDistance } from "@/components/utils/spl/centralSplEngine";
 import { resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import { normalizeCompetitor, competitorMetaForComparison } from "@/components/utils/spl/competitorNormalization";
@@ -27,16 +26,6 @@ const BRAND = {
 };
 
 const LEVEL_RANK = { "—": 0, "N/A": 0, FAIL: 0, L1: 1, L2: 2, L3: 3, L4: 4 };
-
-function isP13OnlyArtcousticSpeaker(speaker) {
-  const model = String(speaker?.model || "").trim().toLowerCase();
-  return [
-    "architect 2-1",
-    "architect 4-2",
-    "architect pas2-2",
-    "architect mikro",
-  ].includes(model);
-}
 
 function isSubwooferEntry(s) {
   const cat = String(s?.type || s?.category || "").toLowerCase();
@@ -116,24 +105,24 @@ function infoValue(value, suffix = "") {
 
 function artcousticInfoRows(speaker, price) {
   if (!speaker) return [];
+  const key = speaker.p12Key || speaker.p13Key || speaker.id;
+  const meta = resolveSpeakerSplMeta(key);
   return [
-    ["Manufacturer", speaker.brand || "Artcoustic"],
+    ["Manufacturer", "Artcoustic"],
     ["Model", speaker.model],
+    ["Sound Proof role availability", [speaker.p12Key ? "Screen / P12" : null, speaker.p13Key ? "Non-screen / P13" : null].filter(Boolean).join(" · ")],
     ["Retail inc VAT", formatPrice(price)],
-    ["Sensitivity 1 W / 1 m", infoValue(speaker.sensitivity_db_1w_1m ?? speaker.sensitivity, " dB")],
-    ["Sensitivity 2.83 V / 1 m", infoValue(speaker.sensitivity_db_2v83_1m, " dB")],
-    ["Nominal impedance", infoValue(speaker.impedance_ohm ?? speaker.impedance, " Ω")],
-    ["Continuous power", infoValue(speaker.power_handling_w ?? speaker.max_power, " W")],
-    ["Continuous SPL @ 1 m · Half Space", infoValue(speaker.max_spl_cont_db_1m_halfspace ?? speaker.max_spl_cont_db_1m ?? speaker.max_spl, " dB")],
-    ["Peak SPL @ 1 m · Half Space", infoValue(speaker.max_spl_peak_db_cf6_1m_halfspace ?? speaker.max_spl_peak_db_cf6_1m, " dB")],
-    ["Continuous SPL @ 1 m · Anechoic", infoValue(speaker.max_spl_cont_db_1m_anechoic, " dB")],
-    ["Peak SPL @ 1 m · Anechoic", infoValue(speaker.max_spl_peak_db_cf6_1m_anechoic, " dB")],
-    ["Frequency range", Array.isArray(speaker.frequency_range_hz) ? `${speaker.frequency_range_hz[0]} – ${speaker.frequency_range_hz[1]} Hz` : "—"],
-    ["Usable LF response (-6 dB)", infoValue(speaker.usable_lf_response_hz_minus6, " Hz")],
-    ["Horizontal coverage", infoValue(speaker.horizontal_dispersion_angle ?? speaker.coverage_deg?.horizontal, "°")],
-    ["Vertical coverage", infoValue(speaker.vertical_dispersion_angle ?? speaker.coverage_deg?.vertical, "°")],
+    ["Sensitivity 1 W / 1 m", infoValue(meta?.sensitivity_db_1w_1m, " dB")],
+    ["Sensitivity 2.83 V / 1 m", infoValue(meta?.sensitivity_dB_2p83, " dB")],
+    ["Nominal impedance", infoValue(meta?.nominalOhms, " Ω")],
+    ["Continuous power", infoValue(meta?.power_handling_w ?? meta?.max_power, " W")],
+    ["Continuous SPL @ 1 m · Half Space", infoValue(meta?.max_spl_cont_db_1m_halfspace ?? meta?.max_spl_cont_db_1m ?? meta?.max_spl, " dB")],
+    ["Peak SPL @ 1 m · Half Space", infoValue(meta?.max_spl_peak_db_cf6_1m_halfspace ?? meta?.max_spl_peak_db_cf6_1m ?? meta?.peak_spl, " dB")],
+    ["Continuous SPL @ 1 m · Anechoic", infoValue(meta?.max_spl_cont_db_1m_anechoic, " dB")],
+    ["Peak SPL @ 1 m · Anechoic", infoValue(meta?.max_spl_peak_db_cf6_1m_anechoic, " dB")],
+    ["Usable LF response (-6 dB)", infoValue(meta?.usable_lf_hz_minus6db, " Hz")],
     ["Measurement basis", "Artcoustic published Half Space authority"],
-    ["Source", "Sound Proof Artcoustic technical dataset"],
+    ["Source", "Canonical Sound Proof speaker registry"],
   ];
 }
 
@@ -371,10 +360,31 @@ export default function SPLCalculatorPage() {
 
   useEffect(() => { loadCompetitors(); }, [loadCompetitors]);
 
-  const artcousticVisible = useMemo(
-    () => artcousticSpeakers.filter((s) => !isSubwooferEntry(s) && !s.hidden),
-    [],
-  );
+  const artcousticVisible = useMemo(() => {
+    const byCategory = getModelsByCategoryOrdered() || {};
+    const merged = new Map();
+    const add = (item, capability) => {
+      if (!item) return;
+      const labelKey = String(item.label || item.key || '').trim().toLowerCase();
+      if (!labelKey) return;
+      const existing = merged.get(labelKey) || {
+        id: item.key,
+        brand: 'Artcoustic',
+        model: item.label,
+        p12Key: null,
+        p13Key: null,
+        sourceMeta: item,
+      };
+      if (capability === 'p12' && !existing.p12Key) existing.p12Key = item.key;
+      if (capability === 'p13' && !existing.p13Key) existing.p13Key = item.key;
+      if (!existing.sourceMeta || capability === 'p12') existing.sourceMeta = item;
+      merged.set(labelKey, existing);
+    };
+    (byCategory.LCR || []).forEach((item) => add(item, 'p12'));
+    (byCategory.SURROUNDS || []).forEach((item) => add(item, 'p13'));
+    (byCategory.ARCHITECT || []).forEach((item) => add(item, 'p13'));
+    return Array.from(merged.values());
+  }, []);
 
   useEffect(() => {
     if (!artId && artcousticVisible.length) setArtId(artcousticVisible[0].id);
@@ -389,24 +399,43 @@ export default function SPLCalculatorPage() {
 
   const artPrice = useCallback((speaker) => {
     if (!speaker) return null;
-    const key = normaliseModelKey(speaker.model || speaker.id);
-    const rec = priceMap?.get(key);
+    const preferredKey = speaker.p12Key || speaker.p13Key || normaliseModelKey(speaker.model || speaker.id);
+    const baseKey = String(preferredKey || '').replace(/_s$/, '');
+    const rec = priceMap?.get(preferredKey) || priceMap?.get(baseKey);
     if (Number.isFinite(Number(rec?.price_ex_vat))) return Number(rec.price_ex_vat) * 1.2;
-    return Number.isFinite(Number(speaker.price)) ? Number(speaker.price) : null;
+    const fallback = speaker.sourceMeta?.retailPriceGBP ?? speaker.sourceMeta?.price_gbp_exVat;
+    return Number.isFinite(Number(fallback)) ? Number(fallback) : null;
   }, [priceMap]);
 
   const calculateArtResult = useCallback((speaker) => {
     if (!speaker || !Number.isFinite(d) || !Number.isFinite(p)) return { spl: null, grades: { p12: "—", p13: "—" } };
-    const capability = computeSpeakerCapabilityAtDistance({
-      speakerModelId: normaliseModelKey(speaker.model || speaker.id),
-      speakerMeta: resolveSpeakerSplMeta(normaliseModelKey(speaker.model || speaker.id)),
-      distance_m: d,
-      powerW: p,
-      roomVolumeM3,
-    });
-    const grades = gradeFromSpl(capability.spl, basis);
-    if (isP13OnlyArtcousticSpeaker(speaker)) grades.p12 = "N/A";
-    return { ...capability, grades };
+
+    const runForKey = (modelKey) => {
+      if (!modelKey) return null;
+      return computeSpeakerCapabilityAtDistance({
+        speakerModelId: modelKey,
+        speakerMeta: resolveSpeakerSplMeta(modelKey),
+        distance_m: d,
+        powerW: p,
+        roomVolumeM3,
+      });
+    };
+
+    const p12Capability = runForKey(speaker.p12Key);
+    const p13Capability = runForKey(speaker.p13Key);
+    const p12Grade = speaker.p12Key
+      ? gradeFromSpl(p12Capability?.spl, basis).p12
+      : "N/A";
+    const p13Grade = speaker.p13Key
+      ? gradeFromSpl(p13Capability?.spl, basis).p13
+      : "N/A";
+
+    return {
+      spl: p12Capability?.spl ?? p13Capability?.spl ?? null,
+      p12Capability,
+      p13Capability,
+      grades: { p12: p12Grade, p13: p13Grade },
+    };
   }, [d, p, roomVolumeM3, basis]);
 
   const artResult = useMemo(() => calculateArtResult(art), [art, calculateArtResult]);
