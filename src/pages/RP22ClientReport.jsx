@@ -38,6 +38,7 @@ import { selectClientScreenSeating } from "@/components/report/client/selectClie
 import ClientAcousticTreatment from "@/components/report/client/ClientAcousticTreatment";
 import ClientBassCapability from "@/components/report/client/ClientBassCapability";
 import ClientBassResponse from "@/components/report/client/ClientBassResponse";
+import ClientP19HeatMap from "@/components/report/client/ClientP19HeatMap";
 import { selectClientBassPerformance } from "@/components/report/client/selectClientBassPerformance";
 import ClientP2SystemArchitecture from "@/components/report/client/ClientP2SystemArchitecture";
 import { selectClientP2SystemArchitecture } from "@/components/report/client/selectClientP2SystemArchitecture";
@@ -96,6 +97,7 @@ export default function RP22ClientReport() {
     completedBassAuthority,
     bassPresentation,
     allSeatSplMetrics,
+    earHeightM,
   } = authority;
 
   // Use the same completed-bass readiness gate as the Technical Report.
@@ -618,6 +620,35 @@ export default function RP22ClientReport() {
           rsp,
           screenFrontPlaneM,
           screenWidthM,
+        },
+      });
+      // P19 Heat Map — dedicated spatial response-quality page
+      pages.push({
+        id: "p19-heatmap",
+        visual: (
+          <ClientP19HeatMap
+            completedBassAuthority={completedBassAuthority}
+            bassPerformance={bassPerformance}
+            roomDims={roomDims}
+            seatingPositions={seatingPositions}
+            rsp={rsp}
+            screenFrontPlaneM={screenFrontPlaneM}
+            screenWidthM={screenWidthM}
+            subwooferInstances={subwooferInstances}
+            earHeightM={earHeightM}
+          />
+        ),
+        printData: {
+          type: "p19-heatmap",
+          completedBassAuthority,
+          bassPerformance,
+          roomDims,
+          seatingPositions,
+          rsp,
+          screenFrontPlaneM,
+          screenWidthM,
+          subwooferInstances,
+          earHeightM,
         },
       });
     }

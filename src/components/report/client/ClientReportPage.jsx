@@ -16,6 +16,7 @@ import PrintP5Content from "@/components/report/client/print/PrintP5Content";
 import PrintP9Content from "@/components/report/client/print/PrintP9Content";
 import PrintBassCapabilityContent from "@/components/report/client/print/PrintBassCapabilityContent";
 import PrintBassResponseContent from "@/components/report/client/print/PrintBassResponseContent";
+import ClientP19HeatMap from "@/components/report/client/ClientP19HeatMap";
 import PrintP2Content from "@/components/report/client/print/PrintP2Content";
 import PrintP7Content from "@/components/report/client/print/PrintP7Content";
 import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
@@ -384,6 +385,28 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             screenFrontPlaneM={printData.screenFrontPlaneM}
             screenWidthM={printData.screenWidthM}
           />
+        )}
+        {printData?.type === "p19-heatmap" && (
+          <>
+            <div className="client-report-print-heading">
+              <h1 className="client-report-print-heading__title">Bass Performance</h1>
+              <p className="client-report-print-heading__subtitle">RP22 Parameter 19 — Response Quality Across the Room</p>
+            </div>
+            <div className="client-report-print-drawing">
+              <ClientP19HeatMap
+                completedBassAuthority={printData.completedBassAuthority}
+                bassPerformance={printData.bassPerformance}
+                roomDims={printData.roomDims}
+                seatingPositions={printData.seatingPositions}
+                rsp={printData.rsp}
+                screenFrontPlaneM={printData.screenFrontPlaneM}
+                screenWidthM={printData.screenWidthM}
+                subwooferInstances={printData.subwooferInstances}
+                earHeightM={printData.earHeightM}
+                print
+              />
+            </div>
+          </>
         )}
         {printData?.type === "about-sound-proof" && (
           <AboutSoundProofReportPage />
