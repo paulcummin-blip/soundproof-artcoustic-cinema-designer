@@ -1,0 +1,137 @@
+{
+  "type": "object",
+  "properties": {
+    "manufacturer": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "product_type": {
+      "type": "string"
+    },
+    "retail_price_inc_vat": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "rated_impedance_ohm": {
+      "type": "number"
+    },
+    "minimum_impedance_ohm": {
+      "type": "number"
+    },
+    "sensitivity_value_db": {
+      "type": "number"
+    },
+    "sensitivity_reference": {
+      "type": "string"
+    },
+    "sensitivity_impedance_used_ohm": {
+      "type": "number"
+    },
+    "sensitivity_band_conditions": {
+      "type": "string"
+    },
+    "continuous_power_w": {
+      "type": "number"
+    },
+    "power_rating_type": {
+      "type": "string"
+    },
+    "program_power_w": {
+      "type": "number"
+    },
+    "peak_power_w": {
+      "type": "number"
+    },
+    "published_max_continuous_spl_db_1m": {
+      "type": "number"
+    },
+    "published_max_peak_spl_db_1m": {
+      "type": "number"
+    },
+    "max_spl_test_conditions": {
+      "type": "string"
+    },
+    "frequency_range": {
+      "type": "string"
+    },
+    "usable_lf_minus6db_hz": {
+      "type": "number"
+    },
+    "horizontal_coverage_deg": {
+      "type": "number"
+    },
+    "vertical_coverage_deg": {
+      "type": "number"
+    },
+    "recommended_amplifier_power_w": {
+      "type": "number"
+    },
+    "source_url": {
+      "type": "string"
+    },
+    "datasheet_url": {
+      "type": "string"
+    },
+    "date_checked": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "normalized_sensitivity_db_1w_1m": {
+      "type": "number"
+    },
+    "normalized_continuous_power_w": {
+      "type": "number"
+    },
+    "calculated_max_continuous_spl_db_1m": {
+      "type": "number"
+    },
+    "spl_authority": {
+      "type": "string"
+    },
+    "data_confidence": {
+      "type": "string"
+    },
+    "p12_p13_eligible": {
+      "type": "boolean"
+    },
+    "import_batch": {
+      "type": "string"
+    },
+    "active": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "manufacturer",
+    "model"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  },
+  "name": "CompetitorSpeaker"
+}
