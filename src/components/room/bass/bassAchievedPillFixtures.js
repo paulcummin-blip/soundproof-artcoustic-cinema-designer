@@ -2,7 +2,7 @@ import { formatOfficialBassResults } from "./bassResultsPresentation.js";
 import {
   BASS_ANALYSIS_CONTRACT_VERSION,
   RP22_BASS_METRIC_SCHEMA_VERSION,
-} from "../../../../base44/shared/bassAuthorityVersion.js";
+} from "../../../lib/bassAuthorityVersion.js";
 
 function completedAuthority() {
   const fingerprint = "cal:v5:1234567890abcdef|engine:v31";
