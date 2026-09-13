@@ -534,6 +534,7 @@ export default function SPLCalculatorPage() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );
