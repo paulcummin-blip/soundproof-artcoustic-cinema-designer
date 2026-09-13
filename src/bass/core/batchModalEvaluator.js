@@ -26,6 +26,7 @@
 
 import { modeShapeValueLocal } from './modalCalculations';
 import { buildFrequencyAxis, interpolateCurveDb } from './rewCorePrimitives';
+import { tuningPhaseRadians } from './subwooferPhaseControl.js';
 
 const SPEED_OF_SOUND_MPS = 343;
 
@@ -194,12 +195,12 @@ function computeModeWeights(abModes, applyModeMultiplicity) {
  * Mirrors lines 166-168 of abCorrectedModalTransferLocal.
  * For zero tuning (delayMs=0, polarity=0), this is identity: cos=1, sin=0.
  */
-function computeTuningRotation(delayMs, polarity, freqsHz) {
+function computeTuningRotation(delayMs, polarity, phaseControlDeg, freqsHz) {
   const cos = new Float64Array(freqsHz.length);
   const sin = new Float64Array(freqsHz.length);
   for (let fi = 0; fi < freqsHz.length; fi++) {
     const f = freqsHz[fi];
-    const tuningPhase = (-2 * Math.PI * f * (delayMs / 1000)) + (polarity === 180 ? Math.PI : 0);
+    const tuningPhase = tuningPhaseRadians(f, { delayMs, polarity, phaseControlDeg });
     cos[fi] = Math.cos(tuningPhase);
     sin[fi] = Math.sin(tuningPhase);
   }
@@ -214,7 +215,7 @@ function computeTuningRotation(delayMs, polarity, freqsHz) {
  *
  * @param {object} params
  * @param {object} params.roomDims — { widthM, lengthM, heightM }
- * @param {Array} params.sources — [{ x, y, z, modelKey, tuning: { gainDb, delayMs, polarity }, deratingDb, sourceCurve }]
+ * @param {Array} params.sources — [{ x, y, z, modelKey, tuning: { gainDb, delayMs, polarity, phaseControlDeg }, deratingDb, sourceCurve }]
  * @param {Array} params.listeners — [{ id, x, y, z }]
  * @param {Array} params.precomputedModes — from prepareModeBank
  * @param {object} params.physics — physics options (from buildStage2Physics)
@@ -289,7 +290,10 @@ export function prepareSourceRoomField({
       sourceCurve, src.tuning?.gainDb ?? 0, freqsHz
     );
     const tuning = computeTuningRotation(
-      src.tuning?.delayMs ?? 0, src.tuning?.polarity ?? 0, freqsHz
+      src.tuning?.delayMs ?? 0,
+      src.tuning?.polarity ?? 0,
+      src.tuning?.phaseControlDeg ?? src.tuning?.phaseAdjust ?? 0,
+      freqsHz,
     );
     sourceTuningCos[si] = tuning.cos;
     sourceTuningSin[si] = tuning.sin;
