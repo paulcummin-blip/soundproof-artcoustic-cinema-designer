@@ -9,6 +9,8 @@ import { normaliseModelKey } from "@/components/models/speakers/registry";
 import { computeSpeakerCapabilityAtDistance } from "@/components/utils/spl/centralSplEngine";
 import { resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import { getLevelColors } from "@/components/utils/rp22Colors";
+import { resolveSpeakerSplMeta } from "@/components/utils/spl/speakerSplMeta";
+import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 
 const BRAND = {
   bg: "#F8F8F7",
@@ -38,9 +40,8 @@ function numeric(v) {
 function gradeFromSpl(spl, basis) {
   if (!Number.isFinite(spl)) return { p12: "—", p13: "—" };
   // Main Sound Proof P12/P13 presentation grades the whole-dB design value.
-  const designValue = Math.ceil(spl);
-  const p12 = resolveP12P13DualLevels(12, designValue);
-  const p13 = resolveP12P13DualLevels(13, designValue);
+  const p12 = resolveP12P13DualLevels(12, resolveRp22DesignValue(12, spl));
+  const p13 = resolveP12P13DualLevels(13, resolveRp22DesignValue(13, spl));
   const key = basis === "recommended" ? "recommended" : "minimum";
   return {
     p12: p12?.[key] === "—" ? "FAIL" : p12?.[key] || "—",
@@ -280,7 +281,8 @@ export default function SPLCalculatorPage() {
   const calculateArtResult = useCallback((speaker) => {
     if (!speaker || !Number.isFinite(d) || !Number.isFinite(p)) return { spl: null, grades: { p12: "—", p13: "—" } };
     const capability = computeSpeakerCapabilityAtDistance({
-      speakerModelId: speaker.id,
+      speakerModelId: normaliseModelKey(speaker.model || speaker.id),
+      speakerMeta: resolveSpeakerSplMeta(normaliseModelKey(speaker.model || speaker.id)),
       distance_m: d,
       powerW: p,
       roomVolumeM3,
