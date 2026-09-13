@@ -37,20 +37,24 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
       continue;
     }
     const materiality = isMaterialImprovement(baseline,result);
-    if (materiality.material) {
+    // Check for verified trade-off regardless of materiality — a candidate
+    // that materially improves one objective while materially worsening another
+    // is a trade-off (designer choice), NOT a normal recommendation.
+    const tradeOff = classifyVerifiedTradeOff(baseline, result);
+    if (tradeOff.isTradeOff) {
+      evaluations.push({candidateId:result.candidateId,status:"trade-off",tradeOff});
+      tradeOffs.push({ result, tradeOff, candidateId: result.candidateId });
+    } else if (materiality.material) {
       evaluations.push({candidateId:result.candidateId,status:"material",materiality});
       eligible.push(result);
     } else {
-      // Not a pure material improvement — check for verified trade-off
-      const tradeOff = classifyVerifiedTradeOff(baseline, result);
-      if (tradeOff.isTradeOff) {
-        evaluations.push({candidateId:result.candidateId,status:"trade-off",tradeOff});
-        tradeOffs.push({ result, tradeOff, candidateId: result.candidateId });
-      } else {
-        evaluations.push({candidateId:result.candidateId,status:"below-materiality",materiality});
-      }
+      evaluations.push({candidateId:result.candidateId,status:"below-materiality",materiality});
     }
   }
+  // ── Limit trade-offs to at most 1: the best primary-priority alternative ──
+  // Do not flood the UI with every Pareto alternative. One representative
+  // verified trade-off is enough for the first implementation.
+  const limitedTradeOffs = tradeOffs.length > 1 ? tradeOffs.slice(0, 1) : tradeOffs;
   // The established presentation ordering runs once, here. Presentation and
   // Apply consume this exact confirmed collection; neither selects another winner.
   const seed = {currentResult:baseline,confirmedResults:eligible,winner:null};
@@ -59,7 +63,7 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
   const incomplete = evaluations.some(e=>e.status==="invalid") || snapshot.evaluationIncomplete === true;
   const rejected = evaluations.some(e=>e.status==="safety-rejected");
   const below = evaluations.some(e=>e.status==="below-materiality");
-  const hasTradeOffs = tradeOffs.length > 0;
+  const hasTradeOffs = limitedTradeOffs.length > 0;
   const terminalOutcome = winner ? "material" : hasTradeOffs ? "trade-off" : incomplete ? "incomplete" : rejected ? "safety-rejected" : below ? "below-materiality" : "no-better-evaluated";
   const messages = {
     incomplete:"Evaluation incomplete — one or more options could not be validated.",
@@ -73,6 +77,6 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
     materialityReason:recommendations[0]?.materialityReason || null,
     calibrationResult:eligible.find(r=>r.candidateKind==="calibration") || null,
     calibrationMaterial:{material:eligible.some(r=>r.candidateKind==="calibration")},
-    tradeOffs,
+    tradeOffs: limitedTradeOffs,
   };
 }
