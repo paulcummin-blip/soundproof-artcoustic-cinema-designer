@@ -14,6 +14,7 @@
 //     gainDb: number,
 //     delayMs: number,
 //     polarity: number,      — 1 or -1
+//     phaseControlDeg: number — first-order all-pass lag at 80 Hz (0..175)
 //   }
 //
 // At rendering and engine boundaries, derive centre/acoustic height:
@@ -204,6 +205,7 @@ export function normaliseLegacySubwoofers(frontSubsCfg, rearSubsCfg, roomDims, s
         gainDb: 0,
         delayMs: 0,
         polarity: 1,
+        phaseControlDeg: 0,
       };
     });
   };
@@ -273,11 +275,15 @@ export function bassInputAdapter(instances, orientationMeta) {
           gainDb: inst.gainDb ?? 0,
           delayMs: inst.delayMs ?? 0,
           polarity: inst.polarity ?? 1,
+          phaseControlDeg: inst.phaseControlDeg ?? inst.phaseAdjust ?? 0,
         },
         // Root-level tuning fields for useSeatResponses
         gainDb: inst.gainDb ?? 0,
         delay: inst.delayMs ?? 0,
-        phaseAdjust: 0,
+        phaseControlDeg: inst.phaseControlDeg ?? inst.phaseAdjust ?? 0,
+        // Legacy display alias. The authoritative engine interprets this as
+        // all-pass lag at 80 Hz, not a constant phase rotation.
+        phaseAdjust: inst.phaseControlDeg ?? inst.phaseAdjust ?? 0,
         polarity: inst.polarity ?? 1,
         // Instance metadata
         // Preserve the distinction between installed manual and effective V2 delay.
@@ -355,6 +361,11 @@ export function validateInstances(instances) {
     // delayMs must be finite
     if (!Number.isFinite(Number(inst.delayMs))) {
       errors.push(`instance[${i}].delayMs is not finite`);
+    }
+    // Optional phase control must be a physical 0..175-degree all-pass setting.
+    if (inst.phaseControlDeg != null &&
+        (!Number.isFinite(Number(inst.phaseControlDeg)) || Number(inst.phaseControlDeg) < 0 || Number(inst.phaseControlDeg) > 175)) {
+      errors.push(`instance[${i}].phaseControlDeg is outside 0..175 degrees`);
     }
     // polarity must be 1 or -1
     if (inst.polarity !== 1 && inst.polarity !== -1) {
