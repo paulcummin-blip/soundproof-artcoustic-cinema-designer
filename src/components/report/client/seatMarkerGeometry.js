@@ -151,6 +151,24 @@ export const TWO_SEGMENT_LEGEND = [
   { key: "p17", label: "Lower — P17 Surround & Overhead" },
 ];
 
+/**
+ * Two-segment halo (Bass Response: P19 / P20).
+ *   UPPER = P19 Response Quality   (upper half)
+ *   LOWER = P20 Seat Consistency  (lower half)
+ *
+ * Same angle layout as the Timbre two-segment halo.
+ */
+export const BASS_TWO_SEGMENT_LAYOUT = [
+  { key: "p19", label: "P19 Response",    startAngle: 185, endAngle: 355 },  // upper
+  { key: "p20", label: "P20 Consistency", startAngle: 5,   endAngle: 175 },  // lower
+];
+
+/** Legend entries for the two-segment Bass Response halo. */
+export const BASS_TWO_SEGMENT_LEGEND = [
+  { key: "p19", label: "Upper — P19 Response" },
+  { key: "p20", label: "Lower — P20 Consistency" },
+];
+
 // ── Geometry computation ──
 
 /**

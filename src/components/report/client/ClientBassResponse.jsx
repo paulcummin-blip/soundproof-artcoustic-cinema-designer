@@ -21,8 +21,8 @@ import { getSeatGradeColors, PRIORITY_LEGEND, isAssessedLevel } from "./visualRe
 import SeatMarker from "./SeatMarker";
 import {
   computeHaloRadiusPx,
-  TWO_SEGMENT_LAYOUT,
-  TWO_SEGMENT_LEGEND,
+  BASS_TWO_SEGMENT_LAYOUT,
+  BASS_TWO_SEGMENT_LEGEND,
   PRIMARY_STROKE_WIDTH,
   buildRingSegmentPath,
 } from "./seatMarkerGeometry";
@@ -175,10 +175,12 @@ export default function ClientBassResponse({
 
   const { p19, p20, seatLabelMap } = bassPerformance;
 
-  // NOT CALCULATED guard
+  // NOT CALCULATED guard — screen only. In print mode, the print content
+  // component (PrintBassResponseContent) handles the NOT CALCULATED state
+  // at the page level to avoid duplicate headings.
   const hasP19 = p19 && isAssessedLevel(p19.achievedLevel);
   const hasP20 = p20 && isAssessedLevel(p20.achievedLevel);
-  if (!hasP19 && !hasP20) {
+  if (!hasP19 && !hasP20 && !print) {
     return (
       <div style={{
         background: "#FFFFFF",
@@ -222,6 +224,8 @@ export default function ClientBassResponse({
       </div>
     );
   }
+  // Print mode with no assessed P19/P20 — return null (print content handles it)
+  if (!hasP19 && !hasP20 && print) return null;
 
   const seats = buildBassSeats(
     seatingPositions,
@@ -387,7 +391,7 @@ export default function ClientBassResponse({
           {/* Seat markers — two-segment halo: UPPER = P19, LOWER = P20 */}
           {seats.map((seat) => {
             const sp = toPx(seat.x, seat.y);
-            const segments = TWO_SEGMENT_LAYOUT.map((seg) => ({
+            const segments = BASS_TWO_SEGMENT_LAYOUT.map((seg) => ({
               key: seg.key,
               level: seat[`${seg.key}Level`],
               startAngle: seg.startAngle,
@@ -481,8 +485,8 @@ export default function ClientBassResponse({
             <div style={{ height: 1, background: "#DCDBD6", width: "100%" }} />
             {/* Segment position key */}
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 14 }}>
-              {TWO_SEGMENT_LEGEND.map((entry) => {
-                const seg = TWO_SEGMENT_LAYOUT.find((s) => s.key === entry.key);
+              {BASS_TWO_SEGMENT_LEGEND.map((entry) => {
+                const seg = BASS_TWO_SEGMENT_LAYOUT.find((s) => s.key === entry.key);
                 return (
                   <div key={entry.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <svg width={18} height={18} viewBox="0 0 20 20">
