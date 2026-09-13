@@ -69,20 +69,20 @@ describe("A + B — Progress sequence follows actual work", () => {
     assert.equal(completedStages.length, 0, "no stage should be completed during reviewing");
   });
 
-  it("calibrating phase — phase not_available, delays active, gain pending", () => {
+  it("calibrating phase — phase pending before its labelled search, delays active, gain pending", () => {
     const display = buildStageDisplay({ phase: "calibrating", status: "running" });
     const phaseStage = display.stages.find((s) => s.key === "phase_polarity");
-    assert.equal(phaseStage.status, "not_available");
+    assert.equal(phaseStage.status, "pending");
     const delaysStage = display.stages.find((s) => s.key === "delays");
     assert.equal(delaysStage.status, "active");
     const gainStage = display.stages.find((s) => s.key === "gain");
     assert.equal(gainStage.status, "pending");
   });
 
-  it("testing_positions phase — delays+gain completed, phase not_available, sub_positions active", () => {
+  it("testing_positions phase — phase+delay+gain completed, sub_positions active", () => {
     const display = buildStageDisplay({ phase: "testing_positions", status: "running" });
     const phaseStage = display.stages.find((s) => s.key === "phase_polarity");
-    assert.equal(phaseStage.status, "not_available");
+    assert.equal(phaseStage.status, "completed");
     const delaysStage = display.stages.find((s) => s.key === "delays");
     assert.equal(delaysStage.status, "completed");
     const gainStage = display.stages.find((s) => s.key === "gain");
@@ -110,14 +110,13 @@ describe("A + B — Progress sequence follows actual work", () => {
     assert.equal(comparingStage.status, "active");
   });
 
-  it("complete status — all implementable stages completed (phase not_available, seating not_tested)", () => {
+  it("complete status — all implementable stages completed (seating not_tested)", () => {
     const display = buildStageDisplay({ phase: "finalising", status: "complete" });
     const completedStages = display.stages.filter((s) => s.status === "completed");
-    // delays, gain, sub_positions, comparing, preparing = 5 completed
-    // phase is not_available, seating is not_tested (no verdict in this scenario)
-    assert.ok(completedStages.length >= 5, "delays+gain+sub+comparing+preparing should be completed");
+    // phase, delay, gain, sub_positions, comparing, preparing = 6 completed
+    assert.ok(completedStages.length >= 6, "phase+delay+gain+sub+comparing+preparing should be completed");
     const phaseStage = display.stages.find((s) => s.key === "phase_polarity");
-    assert.equal(phaseStage.status, "not_available");
+    assert.equal(phaseStage.status, "completed");
     const seatingStage = display.stages.find((s) => s.key === "seating_positions");
     assert.equal(seatingStage.status, "not_tested");
   });
@@ -344,7 +343,7 @@ describe("G — Stages with no material improvement are checked but no card", ()
       stageVerdicts: { phase_polarity: "no_improvement", delays: "no_improvement", gain: "no_improvement" },
     });
     const phaseStage = display.stages.find((s) => s.key === "phase_polarity");
-    assert.equal(phaseStage.status, "not_available");
+    assert.equal(phaseStage.status, "completed");
     assert.equal(phaseStage.verdict, "no_improvement");
   });
 
@@ -355,7 +354,7 @@ describe("G — Stages with no material improvement are checked but no card", ()
       stageVerdicts: { phase_polarity: "improvement", delays: "improvement", gain: "improvement" },
     });
     const phaseStage = display.stages.find((s) => s.key === "phase_polarity");
-    assert.equal(phaseStage.status, "not_available");
+    assert.equal(phaseStage.status, "completed");
     assert.equal(phaseStage.verdict, "improvement");
   });
 });
@@ -373,7 +372,7 @@ describe("H — Cancel works from every stage (store-level)", () => {
     assert.equal(display.headerLabel, "Improving bass response");
     // Cancelled during calibrating — calibration stages should NOT be completed
     const phaseStage = display.stages.find((s) => s.key === "phase_polarity");
-    assert.equal(phaseStage.status, "not_available", "phase is always not_available");
+    assert.equal(phaseStage.status, "pending", "cancelled before the phase verdict remains pending");
   });
 
   it("cancelled during sub_positions — no completed stages beyond what ran", () => {
