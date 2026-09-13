@@ -6,10 +6,10 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { getModelsByCategoryOrdered } from "@/components/models/speakers/registry";
+import { useProductRoleOptions } from "@/components/products/useProductMaster";
+import { PRODUCT_ROLES } from "@/components/products/productMaster";
 import { subwooferDisplayLabel } from "@/components/utils/subwooferDisplayLabel";
 
-const SUB_MODELS = getModelsByCategoryOrdered().SUBWOOFERS;
 
 /**
  * cfg: { count?: number, items?: Array<{ model: string }> }
@@ -18,6 +18,7 @@ const SUB_MODELS = getModelsByCategoryOrdered().SUBWOOFERS;
  */
 export default function SubwooferSelector({ title, cfg, onChange, disabled = false }) {
   const appState = useAppState();
+  const { options: subModels } = useProductRoleOptions(PRODUCT_ROLES.SUBWOOFER);
   const isFront = String(title || "").toLowerCase().includes("front");
   const screenPlaneLocked = appState?.screenPlaneLocked ?? false;
   const safeCount = Math.max(0, Math.min(4, Number(cfg?.count ?? 0)));
@@ -100,7 +101,7 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {SUB_MODELS.map(m => (
+            {subModels.map(m => (
               <SelectItem key={m.key} value={m.key}>{m.label}</SelectItem>
             ))}
           </SelectContent>
