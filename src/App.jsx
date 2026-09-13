@@ -98,7 +98,7 @@ const AuthenticatedApp = () => {
               element={<AccessGate capability="soundProof"><Page /></AccessGate>}
             />
           ))}
-        <Route path="/SPLCalculator" element={<AdminOnlyRoute redirectTo="/Projects"><Pages.SPLCalculator /></AdminOnlyRoute>} />
+        <Route path="/SPLCalculator" element={<AccessGate capability="soundProof"><Pages.SPLCalculator /></AccessGate>} />
         <Route path="/SPLCalculatorV2" element={<AdminOnlyRoute redirectTo="/Projects"><Pages.SPLCalculatorV2 /></AdminOnlyRoute>} />
         <Route path="/RP22ClientReport" element={<AccessGate capability="soundProof"><RP22ClientReport /></AccessGate>} />
         <Route path="/DesignReview" element={<AccessGate capability="soundProof"><DesignReviewPage /></AccessGate>} />
