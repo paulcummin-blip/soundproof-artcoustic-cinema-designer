@@ -544,12 +544,12 @@ export default function SPLCalculatorPage() {
         </div>
 
         <div style={{ background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 64px", gap: 12, alignItems: "end", padding: "0 16px 8px", fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 64px", gap: 12, alignItems: "end", padding: "0 16px 8px", fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}>
             <div>Speaker</div><div style={{ textAlign: "right" }}>Retail inc VAT</div><div style={{ textAlign: "center" }}>P12</div><div style={{ textAlign: "center" }}>P13</div><div />
           </div>
 
           <div style={{ marginBottom: 8 }}>
-            <div style={{ marginBottom: 7, display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 64px", gap: 12, alignItems: "center" }}
+            <div style={{ marginBottom: 7, display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 64px", gap: 12, alignItems: "center" }}>
               <select value={art?.id || ""} onChange={(e) => setArtId(e.target.value)} style={{ border: `1px solid ${BRAND.border}`, borderRadius: 10, padding: "10px 12px", background: "#FFF", fontWeight: 700, color: BRAND.text }}>
                 {artcousticVisible.map((s) => <option key={s.id} value={s.id}>Artcoustic · {s.model}</option>)}
               </select>
@@ -595,7 +595,7 @@ export default function SPLCalculatorPage() {
                 const item = competitorResults.find((x) => x.record.id === id);
                 return (
                   <div key={`${id}-${index}`}>
-                    <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 64px", gap: 12, alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 64px", gap: 12, alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}>
                       <select value={id} onChange={(e) => updateSelectedCompetitor(index, e.target.value)} style={{ border: 0, background: "transparent", fontSize: 15, fontWeight: 700, color: id ? BRAND.text : BRAND.subtext, minWidth: 0 }}>
                         <option value="">Choose alternative speaker</option>
                         {competitorRows.map((r) => <option key={r.id} value={r.id}>{r.manufacturer} · {r.model}</option>)}
