@@ -241,7 +241,39 @@ export function buildStageDetails(selection) {
   }
 
   // ── Phase stage ───────────────────────────────────────────────────
-  details.phase_polarity = "Not available yet — 5-degree grouped phase search requires an all-pass or processor phase control model.";
+  const phaseDiag = selection.phaseDiagnostics;
+  if (phaseDiag) {
+    const parts = [];
+    const tested = Number(phaseDiag.optionCount) || Number(phaseDiag.tested) || 0;
+    if (tested > 0) parts.push(`Checked ${tested} grouped all-pass phase options in 5° steps`);
+    const phaseRes = selection.phaseResult;
+    const currentRes = selection.currentResult;
+    if (phaseRes && currentRes) {
+      const grouped = phaseRes.groupedPhase || {};
+      const group = phaseDiag.grouping?.groups?.find((entry) => entry.id === grouped.direction);
+      const phaseDeg = Number(grouped.phaseAtReferenceDeg) || 0;
+      const referenceHz = Number(grouped.phaseReferenceHz) || Number(phaseDiag.phaseReferenceHz) || 80;
+      if (phaseDeg > 0) {
+        parts.push(`${group?.label || "Selected group"}: ${phaseDeg.toFixed(0)}° lag at ${referenceHz.toFixed(0)} Hz`);
+        parts.push("Unity-gain first-order all-pass control");
+      }
+      const beforeP19 = primarySeatMetric(currentRes.perSeatP19);
+      const afterP19 = primarySeatMetric(phaseRes.perSeatP19);
+      const beforeP20 = primarySeatMetric(currentRes.perSeatP20);
+      const afterP20 = primarySeatMetric(phaseRes.perSeatP20);
+      if (beforeP19 && afterP19) {
+        parts.push(`P19 ${fmtDb(beforeP19.variationDbRaw)} → ${fmtDb(afterP19.variationDbRaw)} dB`);
+      }
+      if (beforeP20 && afterP20) {
+        parts.push(`P20 ${fmtDb(beforeP20.variationDbRaw)} → ${fmtDb(afterP20.variationDbRaw)} dB`);
+      }
+    } else if (phaseDiag.status === "skipped" || phaseDiag.searchStatus === "skipped") {
+      parts.push(phaseDiag.grouping?.reason || "No differential phase group is applicable");
+    } else {
+      parts.push("No material all-pass phase improvement found");
+    }
+    if (parts.length) details.phase_polarity = parts.join(". ");
+  }
 
   return details;
 }
@@ -286,7 +318,7 @@ function isStageResultApplied(stageKey, stage, currentInstances, roomDims, appli
     // for backward compatibility with instances that predate provenance.
   }
 
-  if (stageKey === "delay" || stageKey === "gain") {
+  if (stageKey === "phase" || stageKey === "delay" || stageKey === "gain") {
     return isCalibrationApplied(
       currentInstances,
       stage.result.appliedTuning || stage.result.tuning || [],
