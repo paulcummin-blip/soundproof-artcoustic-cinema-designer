@@ -37,7 +37,7 @@ export default function ClientReportPrintStyles() {
       /* ── Pre-print measurement phase: body class added before window.print() ── */
       body.client-report-printing {
         background: #FFFFFF !important;
-        --client-report-logo-height: 16mm;
+        --client-report-logo-height: 23mm;
       }
 
       body.client-report-printing .client-report-screen-only {
@@ -87,18 +87,18 @@ export default function ClientReportPrintStyles() {
       body.client-report-printing .client-report-page__header {
         grid-row: 1;
         align-self: start;
-        max-height: 34mm;
+        max-height: 44mm;
         overflow: hidden;
-        padding-bottom: 3mm;
+        padding-bottom: 2mm;
         border-bottom: 1px solid #DCDBD6;
-        margin-bottom: 4mm;
+        margin-bottom: 3mm;
       }
 
       body.client-report-printing .client-report-page__header img {
-        height: var(--client-report-logo-height, 16mm);
+        height: var(--client-report-logo-height, 23mm);
         width: auto;
         object-fit: contain;
-        margin-bottom: 4mm;
+        margin-bottom: 2mm;
         margin-left: auto;
         margin-right: auto;
         display: block;
@@ -371,18 +371,18 @@ export default function ClientReportPrintStyles() {
         .client-report-page__header {
           grid-row: 1;
           align-self: start;
-          max-height: 34mm;
+          max-height: 44mm;
           overflow: hidden;
-          padding-bottom: 3mm;
+          padding-bottom: 2mm;
           border-bottom: 1px solid #DCDBD6;
-          margin-bottom: 4mm;
+          margin-bottom: 3mm;
         }
 
         .client-report-page__header img {
-          height: var(--client-report-logo-height, 16mm);
+          height: var(--client-report-logo-height, 23mm);
           width: auto;
           object-fit: contain;
-          margin-bottom: 4mm;
+          margin-bottom: 2mm;
           margin-left: auto;
           margin-right: auto;
           display: block;
@@ -426,7 +426,7 @@ export default function ClientReportPrintStyles() {
         /* ── Heading region ── */
         .client-report-print-heading {
           flex-shrink: 0;
-          padding-bottom: 3mm;
+          padding-bottom: 2mm;
         }
 
         .client-report-print-heading__title {

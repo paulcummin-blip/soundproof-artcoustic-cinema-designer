@@ -19,6 +19,7 @@
 import React, { useMemo } from "react";
 import { MessageCircle, Headphones, ChevronUp, Waves, Zap } from "lucide-react";
 import Rp22SeatCoverageSentence from "@/components/report/Rp22SeatCoverageSentence";
+import { LOGO_URL } from "@/components/report/ReportCover";
 
 const ICONS = { MessageCircle, Headphones, ChevronUp, Waves, Zap };
 
@@ -75,7 +76,12 @@ export default function ClientDesignHighlights({ highlights, print, recommendati
   return (
     <div style={containerStyle}>
       {!print && (
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 20 }}>
+          <img
+            src={LOGO_URL}
+            alt="Sound Proof"
+            style={{ width: 290, height: "auto", objectFit: "contain", marginBottom: 12, alignSelf: "center" }}
+          />
           <h1 style={{
             margin: 0,
             fontSize: 34,
