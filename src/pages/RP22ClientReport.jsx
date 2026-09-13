@@ -51,7 +51,8 @@ import { ArrowLeft, FileText, Download } from "lucide-react";
 import { useAppState } from "@/components/AppStateProvider";
 import { buildRp22SeatCoverageResult } from "@/components/utils/rp22SeatCoverageSentence";
 import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
-import { buildLightweightSeatHudById } from "@/components/hooks/useAppDesignRating";
+import { buildLightweightSeatHudById, resolveBassReadiness } from "@/components/hooks/useAppDesignRating";
+import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { buildDesignRatingInput } from "@/components/report/technical/buildDesignRatingInput";
 import { buildArtcousticDesignRatingAuthority } from "@/components/report/technical/artcousticSystemDesignRating";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
@@ -96,6 +97,19 @@ export default function RP22ClientReport() {
     bassPresentation,
     allSeatSplMetrics,
   } = authority;
+
+  // Use the same completed-bass readiness gate as the Technical Report.
+  // A pending contract is not evidence that this project has no bass pages.
+  const p14Selection = resolveP14TargetSelectionState(appState?.splConfig);
+  const bassApplicable = Number(appState?.frontSubsCfg?.count) > 0
+    || Number(appState?.rearSubsCfg?.count) > 0
+    || subwooferInstances?.length > 0
+    || appState?.subwoofers?.length > 0;
+  const bassReadiness = resolveBassReadiness(
+    completedBassAuthority, bassApplicable, !p14Selection.noP14TargetSelected
+  );
+  const bassReportPending = !!projectId && bassApplicable && bassReadiness.pending;
+  const reportPending = hydrating || bassReportPending;
 
   // ── Design Summary (static intro — pure selector, no analysis) ──
   const highlights = useMemo(() => selectClientDesignHighlights(), []);
@@ -679,7 +693,7 @@ export default function RP22ClientReport() {
   }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
-    activePageCount: activePages.length,
+    activePageCount: reportPending ? 0 : activePages.length,
     projectName: projectDetails?.name,
     logoUrl: LOGO_URL,
   });
@@ -767,7 +781,7 @@ export default function RP22ClientReport() {
           <Button
             type="button"
             onClick={handleExport}
-            disabled={hydrating || activePages.length === 0 || exporting}
+            disabled={reportPending || activePages.length === 0 || exporting}
             className="client-report-screen-only"
             style={{
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",
@@ -791,7 +805,7 @@ export default function RP22ClientReport() {
         maxWidth: 900,
         margin: "0 auto",
       }}>
-        {hydrating ? (
+        {reportPending ? (
           <div className="client-report-screen-only" style={{
             background: "#FFFFFF",
             borderRadius: 16,
@@ -802,7 +816,9 @@ export default function RP22ClientReport() {
             boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
             border: "1px solid #DCDBD6",
           }}>
-            Preparing Visual Report…
+            {bassReportPending && !hydrating
+              ? "Bass results are not ready for this design. Return to the project, wait for Analysis ready, then reopen the Visual Report."
+              : "Preparing Visual Report…"}
           </div>
         ) : !projectId ? (
           <div className="client-report-screen-only" style={{
