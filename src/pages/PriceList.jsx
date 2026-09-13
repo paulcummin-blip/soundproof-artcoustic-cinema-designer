@@ -171,6 +171,19 @@ function ProductEditor({ product, records, onClose, onSaved }) {
             <div className="mt-3 text-xs text-[#625143]">
               Engineering link: <span className="font-mono">{draft.engineering_key || String(draft.sku || '').split(':')[0] || 'Not linked'}</span>
             </div>
+            {technical.details.length > 0 && (
+              <dl className="mt-3 grid gap-x-4 gap-y-1 text-xs text-[#3E4349] sm:grid-cols-2">
+                {technical.details.map((detail) => {
+                  const [label, ...valueParts] = detail.split(':');
+                  return (
+                    <div key={detail} className="flex gap-1">
+                      <dt className="font-semibold">{label}:</dt>
+                      <dd>{valueParts.join(':').trim()}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            )}
             {(technical.missing.length > 0 || technical.warnings.length > 0) && (
               <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-[#625143]">
                 {technical.missing.map((item) => <li key={item}>Required: {item}</li>)}
@@ -350,7 +363,12 @@ export default function PriceList() {
                                 <div>
                                   <div className="font-semibold text-[#1B1A1A]">{technical.message}</div>
                                   <div className="mt-1 text-xs">Engineering link: <span className="font-mono">{item.engineering_key || String(item.sku).split(':')[0] || 'Not linked'}</span></div>
-                                  {technical.missing.length > 0 && <div className="mt-1 text-xs">Missing: {technical.missing.join(', ')}</div>}
+                                  {technical.details.length > 0 && (
+                                    <div className="mt-3 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2 lg:grid-cols-3">
+                                      {technical.details.map((detail) => <div key={detail}>{detail}</div>)}
+                                    </div>
+                                  )}
+                                  {technical.missing.length > 0 && <div className="mt-2 text-xs">Missing: {technical.missing.join(', ')}</div>}
                                   {technical.warnings.length > 0 && <div className="mt-1 text-xs">Optional completion: {technical.warnings.join(', ')}</div>}
                                 </div>
                               </div>
