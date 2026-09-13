@@ -39,6 +39,7 @@ export function selectClientBassPerformance(completedBassAuthority, bassPresenta
     achievedCapabilityDb: Number.isFinite(Number(p14Param.achievedCapabilityDb))
       ? Number(p14Param.achievedCapabilityDb) : null,
     achievedLevel: p14Param.selectedLevel ?? p14Param.achievedLevel ?? null,
+    rawAchievedLevel: p14Param.achievedLevel ?? null,
     selectedLevel: p14Param.selectedLevel ?? null,
     requestedTargetDb: Number.isFinite(Number(p14Param.requestedTargetDb))
       ? Number(p14Param.requestedTargetDb) : null,
@@ -46,6 +47,7 @@ export function selectClientBassPerformance(completedBassAuthority, bassPresenta
       ? Number(p14Param.headroomOrShortfallDb) : null,
     pass: p14Param.pass ?? null,
     targetBasis: p14Presentation?.targetBasis || null,
+    targetBasisLabel: p14Presentation?.targetBasis === "recommended" ? "Recommended" : "Minimum",
     publicationVerified: p14Presentation?.publicationVerified ?? false,
   } : null;
 
@@ -57,6 +59,7 @@ export function selectClientBassPerformance(completedBassAuthority, bassPresenta
     achievedHz: Number.isFinite(Number(p18Param.value)) ? Number(p18Param.value) : null,
     designHz: Number.isFinite(Number(p18Param.designHz)) ? Number(p18Param.designHz) : null,
     targetBasis: p18Presentation?.targetBasis || null,
+    targetBasisLabel: p18Presentation?.targetBasis === "recommended" ? "Recommended" : "Minimum",
     publicationVerified: p18Presentation?.publicationVerified ?? false,
   } : null;
 

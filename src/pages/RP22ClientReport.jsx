@@ -36,7 +36,8 @@ import { selectClientNonScreenDynamicRange } from "@/components/report/client/se
 import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
 import { selectClientScreenSeating } from "@/components/report/client/selectClientScreenSeating";
 import ClientAcousticTreatment from "@/components/report/client/ClientAcousticTreatment";
-import ClientBassPerformance from "@/components/report/client/ClientBassPerformance";
+import ClientBassCapability from "@/components/report/client/ClientBassCapability";
+import ClientBassResponse from "@/components/report/client/ClientBassResponse";
 import { selectClientBassPerformance } from "@/components/report/client/selectClientBassPerformance";
 import ClientRecommendationFooter from "@/components/report/client/ClientRecommendationFooter";
 import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
@@ -499,6 +500,45 @@ export default function RP22ClientReport() {
         },
       });
     }
+    // Bass Performance — two adjacent pages:
+    //   Page 1: P14/P18 — Output Capability and Low-Frequency Extension
+    //   Page 2: P19/P20 — Response Quality and Seat Consistency
+    // Both consume the same canonical bass authority. Only included when at
+    // least one genuine assessed bass result exists.
+    if (bassPerformance) {
+      pages.push({
+        id: "bass-capability",
+        visual: (
+          <ClientBassCapability bassPerformance={bassPerformance} />
+        ),
+        printData: {
+          type: "bass-capability",
+          bassPerformance,
+        },
+      });
+      pages.push({
+        id: "bass-response",
+        visual: (
+          <ClientBassResponse
+            bassPerformance={bassPerformance}
+            roomDims={roomDims}
+            seatingPositions={seatingPositions}
+            rsp={rsp}
+            screenFrontPlaneM={screenFrontPlaneM}
+            screenWidthM={screenWidthM}
+          />
+        ),
+        printData: {
+          type: "bass-response",
+          bassPerformance,
+          roomDims,
+          seatingPositions,
+          rsp,
+          screenFrontPlaneM,
+          screenWidthM,
+        },
+      });
+    }
     // Recommended Seating Position (only when valid geometry + seats + RSP)
     if (hasSeatingPosition) {
       pages.push({
@@ -522,33 +562,6 @@ export default function RP22ClientReport() {
           screenFrontPlaneM,
           screenWidthM,
           screen,
-        },
-      });
-    }
-    // Bass Performance (P14/P18/P19/P20) — only when at least one genuine
-    // assessed bass result exists. P14/P18 are room-scope; P19/P20 show
-    // per-seat results. FAIL is included; N/A/Not calculated are excluded.
-    if (bassPerformance) {
-      pages.push({
-        id: "bass-performance",
-        visual: (
-          <ClientBassPerformance
-            bassPerformance={bassPerformance}
-            roomDims={roomDims}
-            seatingPositions={seatingPositions}
-            rsp={rsp}
-            screenFrontPlaneM={screenFrontPlaneM}
-            screenWidthM={screenWidthM}
-          />
-        ),
-        printData: {
-          type: "bass-performance",
-          bassPerformance,
-          roomDims,
-          seatingPositions,
-          rsp,
-          screenFrontPlaneM,
-          screenWidthM,
         },
       });
     }
