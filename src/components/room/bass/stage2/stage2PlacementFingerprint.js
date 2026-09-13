@@ -19,7 +19,7 @@ import {
   STAGE2_PLACEMENT_VERSION,
 } from "./stage2Constants";
 import { BASS_RESULT_SCHEMA_VERSION } from "../bassOptimiserWorkerProtocol";
-import { RP22_BASS_METRIC_SCHEMA_VERSION } from "../../../../../base44/shared/bassAuthorityVersion.js";
+import { RP22_BASS_METRIC_SCHEMA_VERSION } from "../../../../lib/bassAuthorityVersion.js";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
 
 // NOTE: p18TargetBasis (Minimum/Recommended) is a PRESENTATION-ONLY grading
