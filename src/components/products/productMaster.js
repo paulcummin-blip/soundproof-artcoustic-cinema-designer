@@ -30,16 +30,49 @@ const LEGACY_OVERHEAD = new Set(['architect-mikro', 'architect-2-1', 'spitfire-c
 const LEGACY_SOUNDBARS = new Set(['c-1', 'c4-1', 'multi-lcr', 'multi-mono', 'hspl-lcr', 'hspl-mono']);
 const ALL_SURROUND_ROLES = [PRODUCT_ROLES.SURROUND, PRODUCT_ROLES.REAR_SURROUND, PRODUCT_ROLES.FRONT_WIDE];
 
+const ENGINEERING_CATEGORY_LABELS = Object.freeze({
+  LCR: 'LCR / front stage',
+  SURROUNDS: 'Surround / effects',
+  ARCHITECT: 'Architect / overhead',
+  SUBWOOFERS: 'Subwoofer',
+});
+
+export const PRODUCT_ENGINEERING_OPTIONS = MODELS
+  .filter((model) => !String(model.key).endsWith('_s'))
+  .map((model) => ({
+    value: model.key,
+    label: model.label,
+    application: ENGINEERING_CATEGORY_LABELS[model.category] || model.category,
+    category: model.category,
+  }));
+
+export function defaultProductRolesForEngineeringKey(engineeringKey) {
+  const key = normaliseModelKey(engineeringKey);
+  const meta = MODELS.find((model) => model.key === key);
+  if (!meta) return [];
+  if (meta.category === 'SUBWOOFERS') return [PRODUCT_ROLES.SUBWOOFER];
+  if (meta.category === 'ARCHITECT') return [PRODUCT_ROLES.OVERHEAD];
+  if (meta.category === 'SURROUNDS') return [...ALL_SURROUND_ROLES];
+  if (meta.frontStageType) return [PRODUCT_ROLES.CENTRE_SOUNDBAR];
+  return [PRODUCT_ROLES.LCR];
+}
+
 export function productEngineeringKey(product) {
   if (product?.engineering_key) return normaliseModelKey(product.engineering_key);
   const sku = String(product?.sku || '').split(':')[0];
   return normaliseModelKey(sku.endsWith('_s') ? sku.slice(0, -2) : sku);
 }
 
-export function productSelectorKey(product) {
+export function productSelectorKey(product, role = null) {
   const sku = normaliseModelKey(String(product?.sku || '').split(':')[0]);
   if (sku.endsWith('_s')) return sku;
-  return productEngineeringKey(product);
+
+  const engineeringKey = productEngineeringKey(product);
+  if (ALL_SURROUND_ROLES.includes(role)) {
+    const surroundKey = engineeringKey.endsWith('_s') ? engineeringKey : `${engineeringKey}_s`;
+    if (MODELS.some((model) => model.key === surroundKey)) return surroundKey;
+  }
+  return engineeringKey;
 }
 
 export function legacyRolesForProduct(product) {
@@ -49,6 +82,10 @@ export function legacyRolesForProduct(product) {
   if (rawSku.endsWith('_s')) return ALL_SURROUND_ROLES;
   if (LEGACY_SOUNDBARS.has(key)) return [PRODUCT_ROLES.CENTRE_SOUNDBAR];
   if (LEGACY_OVERHEAD.has(key)) return [PRODUCT_ROLES.OVERHEAD];
+  const meta = MODELS.find((model) => model.key === rawSku)
+    || MODELS.find((model) => model.key === key);
+  if (meta?.category === 'SURROUNDS') return ALL_SURROUND_ROLES;
+  if (meta?.category === 'ARCHITECT') return [PRODUCT_ROLES.OVERHEAD];
   if (product?.category === 'Loudspeaker') {
     if (key === 'architect-4-2' || key === 'architect-pas2-2') return [];
     return [PRODUCT_ROLES.LCR];
@@ -77,6 +114,12 @@ function positive(...values) {
 function firstPositive(...values) {
   const value = values.find((candidate) => Number.isFinite(Number(candidate)) && Number(candidate) > 0);
   return value === undefined ? null : Number(value);
+}
+
+function formatFrequency(value) {
+  if (!Number.isFinite(Number(value))) return '—';
+  const frequency = Number(value);
+  return frequency >= 1000 ? `${frequency / 1000} kHz` : `${frequency} Hz`;
 }
 
 function technicalDetails(meta, staticSpeaker, capability, isSubwoofer) {
@@ -117,14 +160,25 @@ function technicalDetails(meta, staticSpeaker, capability, isSubwoofer) {
   );
   if (maxSpl) details.push(`Maximum continuous SPL: ${maxSpl} dB at 1 m`);
 
+  const responseLow = firstPositive(meta.frequency_response_low, staticSpeaker?.frequency_response_low);
+  const responseHigh = firstPositive(meta.frequency_response_high, staticSpeaker?.frequency_response_high);
+  if (responseLow || responseHigh) {
+    details.push(`Frequency range: ${formatFrequency(responseLow)} – ${formatFrequency(responseHigh)}`);
+  }
+
   const lowLimit = firstPositive(
     capability?.usableLF_neg6dB,
     meta.usable_lf_hz_minus6db,
-    meta.frequency_response_low,
-    staticSpeaker?.usable_lf_response_hz_minus6,
-    staticSpeaker?.frequency_response_low
+    staticSpeaker?.usable_lf_response_hz_minus6
   );
-  if (lowLimit) details.push(`Usable low-frequency limit: ${lowLimit} Hz`);
+  if (lowLimit) details.push(`Usable LF response (−6 dB): ${lowLimit} Hz`);
+
+  const nominalCoverage = meta.coverage_deg || staticSpeaker?.coverage_deg;
+  const nominalHorizontal = firstPositive(nominalCoverage?.horizontal, staticSpeaker?.horizontal_dispersion_angle);
+  const nominalVertical = firstPositive(nominalCoverage?.vertical, staticSpeaker?.vertical_dispersion_angle);
+  if (nominalHorizontal || nominalVertical) {
+    details.push(`Nominal coverage: ${nominalHorizontal ? `H ${nominalHorizontal}°` : ''}${nominalHorizontal && nominalVertical ? ' / ' : ''}${nominalVertical ? `V ${nominalVertical}°` : ''}`);
+  }
 
   const horizontal = firstPositive(meta.dispersion?.horizontal?.minus3dB);
   const vertical = firstPositive(meta.dispersion?.vertical?.minus3dB);
@@ -217,7 +271,7 @@ export function getProductTechnicalStatus(product) {
         staticSpeaker?.usable_lf_response_hz_minus6
       )) warnings.push('verified frequency range');
 
-      if (!meta.dispersion && !meta.polarModel && !staticSpeaker?.coverage_deg) {
+      if (!meta.coverage_deg && !meta.dispersion && !meta.polarModel && !staticSpeaker?.coverage_deg) {
         warnings.push('dispersion / directivity');
       }
     }
@@ -256,7 +310,7 @@ export function buildProductRoleOptions(products, role) {
 
   const byKey = new Map();
   for (const product of candidates) {
-    const key = productSelectorKey(product);
+    const key = productSelectorKey(product, role);
     if (!key || byKey.has(key)) continue;
     const technical = getProductTechnicalStatus(product);
     if (!technical.calculable) continue;
