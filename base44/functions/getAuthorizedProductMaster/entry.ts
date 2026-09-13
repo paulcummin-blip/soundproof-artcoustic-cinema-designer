@@ -20,7 +20,7 @@ export default async function(req) {
 
     if (!context?.allowed || (!canUseSoundProof && !canViewPrices)) forbidden();
 
-    const products = await base44.asServiceRole.entities.ProductPrice.list('selector_order', 500);
+    const products = await base44.asServiceRole.entities.ProductPrice.filter({ trashed: { $ne: true } }, 'selector_order', 500);
     const safeProducts = (Array.isArray(products) ? products : []).map((record) => {
       if (canViewPrices) return record;
       const { price_ex_vat: _redactedPrice, ...redacted } = record;

@@ -32,6 +32,11 @@
       "default": true,
       "description": "Inactive products remain available to historical projects but are excluded from new selections and active price lookups."
     },
+    "trashed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Trashed products are hidden from the Product Master entirely but preserved in the database for audit. Only unreferenced products can be trashed. Hard delete is not available."
+    },
     "engineering_key": {
       "type": "string",
       "nullable": true,
