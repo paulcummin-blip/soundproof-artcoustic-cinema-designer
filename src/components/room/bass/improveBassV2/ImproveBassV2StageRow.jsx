@@ -84,6 +84,36 @@ function StageVerdictBadge({ verdict }) {
   );
 }
 
+function PhaseDetail({ result, currentResult, groupLabel, phaseAtReferenceDeg, phaseReferenceHz }) {
+  const tuning = result?.appliedTuning || result?.tuning || [];
+  if (!tuning.length) return null;
+
+  const beforeP19 = primarySeatMetric(currentResult?.perSeatP19);
+  const afterP19 = primarySeatMetric(result.perSeatP19);
+  const beforeP20 = primarySeatMetric(currentResult?.perSeatP20);
+  const afterP20 = primarySeatMetric(result.perSeatP20);
+  const grouped = result?.groupedPhase || {};
+  const phaseDeg = Number(phaseAtReferenceDeg) || Number(grouped.phaseAtReferenceDeg) || 0;
+  const referenceHz = Number(phaseReferenceHz) || Number(grouped.phaseReferenceHz) || 80;
+  const label = groupLabel || "Selected group";
+
+  return (
+    <div className="mt-1.5 space-y-1">
+      {phaseDeg > 0 && (
+        <div className="text-[10px] text-[#625143]">
+          <span className="font-semibold">{label}</span>
+          <span className="ml-1">{phaseDeg.toFixed(0)}° lag at {referenceHz.toFixed(0)} Hz</span>
+          <span className="ml-1.5 text-[#8A7B6A]">unity-gain first-order all-pass</span>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-1.5">
+        <MetricBeforeAfter label="P19" before={beforeP19} after={afterP19} />
+        <MetricBeforeAfter label="P20" before={beforeP20} after={afterP20} />
+      </div>
+    </div>
+  );
+}
+
 function DelayDetail({ result, currentResult, groupLabel, adjustmentMs }) {
   const tuning = result?.appliedTuning || result?.tuning || [];
   if (!tuning.length) return null;
@@ -259,6 +289,13 @@ export default function ImproveBassV2StageRow({
       {/* Improvement detail */}
       {verdict === "improvement" && result && (
         <>
+          {stageKey === "phase" && <PhaseDetail
+            result={result}
+            currentResult={currentResult}
+            groupLabel={stage.phaseGroupLabel}
+            phaseAtReferenceDeg={stage.phaseAtReferenceDeg}
+            phaseReferenceHz={stage.phaseReferenceHz}
+          />}
           {stageKey === "delay" && <DelayDetail result={result} currentResult={currentResult} groupLabel={stage.delayGroupLabel} adjustmentMs={stage.delayAdjustmentMs} />}
           {stageKey === "gain" && <GainDetail result={result} currentResult={currentResult} grouping={stage.grouping} />}
           {stageKey === "subPositions" && (
