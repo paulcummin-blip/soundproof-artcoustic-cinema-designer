@@ -1,7 +1,8 @@
 // improveBassV2ApplyCalibration.js
-// Apply calibration-only tuning (delay, polarity, trim) to subwoofer instances.
+// Apply calibration-only tuning (all-pass phase, delay, polarity, trim) to subwoofer instances.
 //
 // Apply Calibration may update ONLY:
+//   - all-pass phase setting at 80 Hz
 //   - subwoofer delay
 //   - polarity
 //   - trim/gain
@@ -12,6 +13,8 @@
 //   - speaker geometry
 //   - treatment
 //   - product selection
+
+import { normalisePhaseControlDeg } from "../../../../bass/core/subwooferPhaseControl.js";
 
 // New confirmations bind tuning to the frozen source order once. Legacy helper
 // inputs without IDs remain readable; mounted Apply accepts only a fresh result.
@@ -36,6 +39,7 @@ export function resolveTuningInstances(currentInstances, tuning) {
 
 const TUNING_TOLERANCE_DELAY_MS = 0.1;
 const TUNING_TOLERANCE_GAIN_DB = 0.1;
+const TUNING_TOLERANCE_PHASE_DEG = 0.1;
 
 function normalisePolarity(value) {
   const n = Number(value) || 0;
@@ -67,6 +71,8 @@ export function applyCalibrationTuning(currentInstances, calibrationTuning, prov
       tuningSource: "v2-optimised",
       delayMs: Number(t.delayMs) || 0,
       gainDb: Number(t.gainDb) || 0,
+      // Unity-gain first-order all-pass lag specified at the 80 Hz reference.
+      phaseControlDeg: normalisePhaseControlDeg(t.phaseControlDeg ?? t.phaseAdjust),
       // Canonical persisted instances require +1 normal / -1 inverted.
       polarity: normalisePolarity(t.polarity) < 0 ? -1 : 1,
       // C1 — Stamp provenance so APPLIED is identified by the actual action,
@@ -99,6 +105,7 @@ export function isCalibrationApplied(currentInstances, calibrationTuning) {
 
     if (Math.abs((Number(inst.delayMs) || 0) - (Number(t.delayMs) || 0)) > TUNING_TOLERANCE_DELAY_MS) return false;
     if (Math.abs((Number(inst.gainDb) || 0) - (Number(t.gainDb) || 0)) > TUNING_TOLERANCE_GAIN_DB) return false;
+    if (Math.abs(normalisePhaseControlDeg(inst.phaseControlDeg ?? inst.phaseAdjust) - normalisePhaseControlDeg(t.phaseControlDeg ?? t.phaseAdjust)) > TUNING_TOLERANCE_PHASE_DEG) return false;
     if (normalisePolarity(inst.polarity) !== normalisePolarity(t.polarity)) return false;
   }
 
@@ -117,12 +124,18 @@ export function buildCalibrationChangeSummary(currentInstances, calibrationTunin
 
   const activeInstances = resolveTuningInstances(currentInstances, calibrationTuning);
   if (!activeInstances) return null;
-  const changes = { delays: [], trims: [], polarities: [] };
+  const changes = { phases: [], delays: [], trims: [], polarities: [] };
 
   for (let i = 0; i < calibrationTuning.length; i++) {
     const t = calibrationTuning[i] || { delayMs: 0, gainDb: 0, polarity: 0 };
     const inst = activeInstances[i];
     if (!inst) continue;
+
+    const currentPhase = normalisePhaseControlDeg(inst.phaseControlDeg ?? inst.phaseAdjust);
+    const newPhase = normalisePhaseControlDeg(t.phaseControlDeg ?? t.phaseAdjust);
+    if (Math.abs(newPhase - currentPhase) > TUNING_TOLERANCE_PHASE_DEG) {
+      changes.phases.push(`Sub ${i + 1}: ${newPhase.toFixed(0)}° at 80 Hz`);
+    }
 
     const currentDelay = Number(inst.delayMs) || 0;
     const newDelay = Number(t.delayMs) || 0;
