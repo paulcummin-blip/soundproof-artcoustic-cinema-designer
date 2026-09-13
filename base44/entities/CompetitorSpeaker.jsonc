@@ -83,13 +83,15 @@
       "type": "string"
     },
     "normalized_sensitivity_db_1w_1m": {
-      "type": "number"
+      "type": "number",
+      "description": "Voltage-to-watt normalization only, in the raw published measurement space."
     },
     "normalized_continuous_power_w": {
       "type": "number"
     },
     "calculated_max_continuous_spl_db_1m": {
-      "type": "number"
+      "type": "number",
+      "description": "Sensitivity plus continuous power in the raw published space; comparison uses the separate halfspace field."
     },
     "spl_authority": {
       "type": "string"
@@ -105,6 +107,37 @@
     },
     "active": {
       "type": "boolean"
+    },
+    "voltage_to_1w_correction_db": {
+      "type": "number"
+    },
+    "space_correction_db": {
+      "type": "number"
+    },
+    "halfspace_sensitivity_db_1w_1m": {
+      "type": "number"
+    },
+    "halfspace_published_max_continuous_spl_db_1m": {
+      "type": "number"
+    },
+    "halfspace_published_max_peak_spl_db_1m": {
+      "type": "number"
+    },
+    "halfspace_calculated_max_continuous_spl_db_1m": {
+      "type": "number"
+    },
+    "measurement_space_basis": {
+      "type": "string",
+      "description": "Raw spreadsheet declaration: Full Space or Half Space, applying to sensitivity and published SPL. Blank/ambiguous values require confirmation."
+    },
+    "measurement_basis_status": {
+      "type": "string"
+    },
+    "normalization_warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   },
   "required": [
