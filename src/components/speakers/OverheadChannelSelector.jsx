@@ -42,13 +42,12 @@ export default function OverheadChannelSelector({
   const getModelLabel = (modelKey) => {
     if (!modelKey || modelKey === 'OFF') return 'OFF — (no overheads active)';
     
-    // Use speaker registry as source of truth for labels
+    const product = overheadModels.find(m => m.key === modelKey);
+    if (product?.label) return product.label;
+
+    // Historical inactive products still resolve through the engineering registry.
     const meta = getSpeakerModelMeta(modelKey);
-    if (meta && meta.label && !meta.notFound) return meta.label;
-    
-    // Fallback to overhead models array
-    const model = overheadModels.find(m => m.key === modelKey);
-    return model?.label || modelKey;
+    return meta?.label && !meta.notFound ? meta.label : modelKey;
   };
 
   if (overheadCount === 0) {
