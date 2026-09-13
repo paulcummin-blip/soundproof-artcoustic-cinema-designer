@@ -3,8 +3,11 @@ import { AlertTriangle, Check, ChevronDown, ChevronUp, Loader2, Pencil, Plus, Se
 import { base44 } from '@/api/base44Client';
 import { useProductMaster } from '@/components/products/useProductMaster';
 import {
+  defaultProductRolesForEngineeringKey,
   effectiveProductRoles,
   getProductTechnicalStatus,
+  productEngineeringKey,
+  PRODUCT_ENGINEERING_OPTIONS,
   PRODUCT_ROLE_LABELS,
   PRODUCT_ROLE_OPTIONS,
 } from '@/components/products/productMaster';
@@ -38,6 +41,7 @@ function emptyDraft(records) {
     category: 'Loudspeaker',
     price_ex_vat: '',
     active: true,
+    engineering_key: '',
     roles: [],
     selector_order: maxOrder + 1,
     catalog_version: 1,
@@ -51,6 +55,7 @@ function draftFromProduct(product) {
       ? ''
       : String(product.price_ex_vat),
     active: product.active !== false,
+    engineering_key: product.engineering_key || productEngineeringKey(product),
     roles: effectiveProductRoles(product),
   };
 }
@@ -60,7 +65,20 @@ function ProductEditor({ product, records, onClose, onSaved }) {
   const [draft, setDraft] = useState(() => isNew ? emptyDraft(records) : draftFromProduct(product));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const needsEngineering = draft.category === 'Loudspeaker' || draft.category === 'Subwoofer';
   const technical = getProductTechnicalStatus(draft);
+
+  const selectEngineeringModel = (engineeringKey) => {
+    const option = PRODUCT_ENGINEERING_OPTIONS.find((candidate) => candidate.value === engineeringKey);
+    setDraft((current) => ({
+      ...current,
+      engineering_key: engineeringKey,
+      category: option ? (option.category === 'SUBWOOFERS' ? 'Subwoofer' : 'Loudspeaker') : current.category,
+      label: isNew && !current.label ? (option?.label || current.label) : current.label,
+      sku: isNew && !current.sku ? engineeringKey : current.sku,
+      roles: current.roles.length ? current.roles : defaultProductRolesForEngineeringKey(engineeringKey),
+    }));
+  };
 
   const toggleRole = (role) => {
     setDraft((current) => ({
@@ -76,6 +94,10 @@ function ProductEditor({ product, records, onClose, onSaved }) {
     const label = String(draft.label || '').trim();
     if (!sku || !label) {
       setError('Product ID / SKU and product name are required.');
+      return;
+    }
+    if (needsEngineering && !String(draft.engineering_key || '').trim()) {
+      setError('Select the verified engineering model before saving this acoustic product.');
       return;
     }
     if (records.some((record) => record.id !== product?.id && String(record.sku).toLowerCase() === sku)) {
@@ -94,7 +116,8 @@ function ProductEditor({ product, records, onClose, onSaved }) {
       category: draft.category,
       price_ex_vat: price,
       active: draft.active !== false,
-      roles: draft.roles,
+      engineering_key: needsEngineering ? String(draft.engineering_key).trim() : null,
+      roles: needsEngineering ? draft.roles : [],
       selector_order: Number(draft.selector_order),
       catalog_version: 1,
     };
@@ -142,12 +165,23 @@ function ProductEditor({ product, records, onClose, onSaved }) {
               <label className="text-sm font-medium">Retail price ex VAT
                 <input type="number" min="0" step="0.01" value={draft.price_ex_vat} onChange={(event) => setDraft({ ...draft, price_ex_vat: event.target.value })} placeholder="Price on request" className="mt-1 w-full rounded-lg border border-[#DCDBD6] px-3 py-2 font-normal" />
               </label>
+              {needsEngineering && (
+                <label className="text-sm font-medium sm:col-span-2">Verified engineering model
+                  <select value={draft.engineering_key || ''} onChange={(event) => selectEngineeringModel(event.target.value)} className="mt-1 w-full rounded-lg border border-[#DCDBD6] bg-white px-3 py-2 font-normal">
+                    <option value="">Select the acoustic model used by calculations</option>
+                    {PRODUCT_ENGINEERING_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label} — {option.application}</option>
+                    ))}
+                  </select>
+                  <span className="mt-1 block text-xs font-normal text-[#625143]">Links this commercial SKU to existing verified acoustic data; it does not copy or invent specifications.</span>
+                </label>
+              )}
             </div>
           </section>
 
           <section>
-            <h3 className="mb-1 text-sm font-bold uppercase tracking-wide">Available in Sound Proof</h3>
-            <p className="mb-3 text-xs text-[#625143]">Active controls commercial availability. Roles control the exact new-design selectors.</p>
+            <h3 className="mb-1 text-sm font-bold uppercase tracking-wide">Applications in Sound Proof</h3>
+            <p className="mb-3 text-xs text-[#625143]">Choose exactly where this product may be selected in new designs. Active controls commercial availability.</p>
             <label className="mb-4 flex items-center gap-3 rounded-lg border border-[#DCDBD6] p-3 text-sm font-semibold">
               <input type="checkbox" checked={draft.active} onChange={(event) => setDraft({ ...draft, active: event.target.checked })} className="h-4 w-4" />
               Active product
