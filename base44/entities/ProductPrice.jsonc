@@ -62,7 +62,12 @@
     "catalog_version": {
       "type": "number",
       "default": 1,
-      "description": "Product Master migration/version marker."
+      "description": "Product Master schema version marker."
+    },
+    "role_migration_version": {
+      "type": "number",
+      "nullable": true,
+      "description": "Set by the idempotent legacy selector-role migration. No default, so unmigrated records remain detectable."
     }
   },
   "required": [
