@@ -1,246 +1,145 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Archive, Loader2, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Loader2, PowerOff, Trash2, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { effectiveProductRoles, PRODUCT_ROLE_LABELS } from '@/components/products/productMaster';
+
+function formatPrice(value) {
+  if (value === null || value === undefined || value === '') return 'Price on request';
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return 'Price on request';
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    minimumFractionDigits: 2,
+  }).format(amount);
+}
 
 /**
- * Admin-only Danger Zone for the Product Master edit modal.
- * Provides Deactivate (toggle active) and Move to Trash (with reference check).
- * Hard delete is intentionally not available.
- * Non-admins never reach this component — the edit modal is admin-gated upstream.
+ * Admin-only Product Master lifecycle controls.
+ * The edit modal is only mounted when the Product Master authority returns can_edit.
+ * The backend function independently verifies the caller is an administrator.
  */
 export default function ProductDangerZone({ product, onDone }) {
-  const [phase, setPhase] = useState('idle');
-  const [action, setAction] = useState(null);
-  const [referenceData, setReferenceData] = useState(null);
+  const [workingAction, setWorkingAction] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [error, setError] = useState('');
 
-  const isActive = product?.active !== false;
-  const roles = effectiveProductRoles(product);
-  const roleLabels = roles.length
-    ? roles.map((r) => PRODUCT_ROLE_LABELS[r] || r).join(', ')
-    : 'Not used in Room Designer';
+  if (!product?.id) return null;
 
-  const checkReferences = async () => {
-    setPhase('checking');
+  const isActive = product.active !== false;
+  const busy = Boolean(workingAction);
+
+  const execute = async (action) => {
+    setWorkingAction(action);
     setError('');
     try {
       const response = await base44.functions.invoke('manageProductLifecycle', {
-        action: 'check_references',
+        action,
         product_id: product.id,
-        sku: product.sku,
       });
-      const data = response?.data || {};
-      setReferenceData(data);
-      return data;
-    } catch (err) {
-      setError(err?.message || 'Could not check product references.');
-      setPhase('idle');
-      return null;
-    }
-  };
-
-  const handleDeactivate = async () => {
-    setAction('deactivate');
-    const data = await checkReferences();
-    if (data) setPhase('confirm');
-  };
-
-  const handleTrash = async () => {
-    setAction('trash');
-    const data = await checkReferences();
-    if (!data) return;
-    setPhase(data.can_trash ? 'confirm' : 'blocked');
-  };
-
-  const executeDeactivate = async () => {
-    setPhase('working');
-    setError('');
-    try {
-      await base44.entities.ProductPrice.update(product.id, { active: !isActive });
-      onDone();
-    } catch (err) {
-      setError(err?.message || 'Could not update the product.');
-      setPhase('confirm');
-    }
-  };
-
-  const executeTrash = async () => {
-    setPhase('working');
-    setError('');
-    try {
-      const response = await base44.functions.invoke('manageProductLifecycle', {
-        action: 'trash',
-        product_id: product.id,
-        sku: product.sku,
-      });
-      if (response?.data?.trashed) {
-        onDone();
-      } else {
-        throw new Error(response?.data?.error || 'Could not trash the product.');
+      if (response?.data?.success !== true) {
+        throw new Error(response?.data?.error || `Could not ${action} the product.`);
       }
-    } catch (err) {
-      setError(err?.message || 'Could not trash the product.');
-      setPhase('confirm');
+      await onDone?.();
+    } catch (actionError) {
+      setError(actionError?.message || `Could not ${action} the product.`);
+    } finally {
+      setWorkingAction('');
     }
   };
-
-  const reset = () => {
-    setPhase('idle');
-    setAction(null);
-    setReferenceData(null);
-    setError('');
-  };
-
-  const busy = phase === 'checking' || phase === 'working';
 
   return (
-    <section className="rounded-xl border border-red-200 bg-red-50/40 p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4 text-red-700" />
-        <h3 className="text-sm font-bold uppercase tracking-wide text-red-800">Danger Zone</h3>
-      </div>
+    <>
+      <section className="rounded-xl border border-red-200 bg-red-50/40 p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-red-700" />
+          <h3 className="text-sm font-bold uppercase tracking-wide text-red-800">Catalogue management</h3>
+        </div>
 
-      {phase === 'idle' && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#DCDBD6] bg-white p-3">
-            <div className="text-xs text-[#3E4349]">
-              <div className="text-sm font-semibold text-[#1B1A1A]">
-                {isActive ? 'Deactivate product' : 'Activate product'}
-              </div>
-              <p className="mt-0.5">
-                {isActive
-                  ? 'Removes the product from new-design selectors and hides it from the active Price List. Historical projects are preserved.'
-                  : 'Restores the product to new-design selectors and the active Price List.'}
-              </p>
+            <div className="max-w-md text-xs text-[#3E4349]">
+              <div className="text-sm font-semibold text-[#1B1A1A]">Deactivate Product</div>
+              <p className="mt-0.5">Removes it from the active Price List and all new-design selectors while keeping the Product Master record.</p>
             </div>
             <button
-              onClick={handleDeactivate}
-              className="whitespace-nowrap rounded-lg border border-[#DCDBD6] bg-white px-3 py-2 text-sm font-semibold text-[#3E4349] hover:bg-[#F4F3F1]"
+              type="button"
+              disabled={busy || !isActive}
+              onClick={() => execute('deactivate')}
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isActive ? 'Deactivate product' : 'Activate product'}
+              {workingAction === 'deactivate' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PowerOff className="h-4 w-4" />}
+              {isActive ? 'Deactivate Product' : 'Product is inactive'}
             </button>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-white p-3">
-            <div className="text-xs text-[#3E4349]">
-              <div className="text-sm font-semibold text-[#1B1A1A]">Move to Trash</div>
-              <p className="mt-0.5">
-                Removes the product from the Product Master entirely. Only available for products not referenced by any saved project. Hard delete is not available.
-              </p>
+            <div className="max-w-md text-xs text-[#3E4349]">
+              <div className="text-sm font-semibold text-[#1B1A1A]">Delete Product</div>
+              <p className="mt-0.5">Permanently removes only this commercial Product Master record. Linked engineering registry data is left unchanged.</p>
             </div>
             <button
-              onClick={handleTrash}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setError('');
+                setDeleteConfirmOpen(true);
+              }}
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"
             >
-              <Trash2 className="h-4 w-4" /> Move to Trash
+              <Trash2 className="h-4 w-4" /> Delete Product
             </button>
           </div>
         </div>
-      )}
 
-      {busy && (
-        <div className="flex items-center gap-2 p-4 text-sm text-[#3E4349]">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          {phase === 'checking' ? 'Checking references…' : 'Processing…'}
-        </div>
-      )}
+        {error && (
+          <div className="mt-3 rounded-lg border border-red-200 bg-white p-3 text-sm text-red-800">{error}</div>
+        )}
+      </section>
 
-      {phase === 'confirm' && referenceData && (
-        <div className="space-y-3">
-          <div className="rounded-lg border border-[#DCDBD6] bg-white p-4 text-sm">
-            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-[#625143]">
-              {action === 'deactivate'
-                ? (isActive ? 'Confirm deactivation' : 'Confirm activation')
-                : 'Confirm move to trash'}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4" role="alertdialog" aria-modal="true" aria-labelledby="delete-product-title">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-red-100 p-2 text-red-700"><Trash2 className="h-5 w-5" /></div>
+                <div>
+                  <h2 id="delete-product-title" className="text-lg font-bold text-[#1B1A1A]">Delete this product permanently?</h2>
+                  <p className="mt-1 text-sm text-[#625143]">This cannot be undone from the Product Master.</p>
+                </div>
+              </div>
+              <button type="button" disabled={busy} onClick={() => setDeleteConfirmOpen(false)} className="rounded-lg p-1.5 hover:bg-[#F4F3F1] disabled:opacity-50" aria-label="Close delete confirmation">
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <dl className="space-y-1.5 text-sm">
-              <div className="flex gap-2">
-                <dt className="font-semibold text-[#625143]">Product name:</dt>
-                <dd>{product.label}</dd>
+
+            <dl className="mt-5 space-y-3 rounded-xl border border-[#E7E5E1] bg-[#F8F8F7] p-4 text-sm">
+              <div className="grid grid-cols-[90px_1fr] gap-3">
+                <dt className="font-semibold text-[#625143]">Product</dt>
+                <dd>{product.label || 'Unnamed product'}</dd>
               </div>
-              <div className="flex gap-2">
-                <dt className="font-semibold text-[#625143]">SKU:</dt>
-                <dd className="font-mono">{product.sku}</dd>
+              <div className="grid grid-cols-[90px_1fr] gap-3">
+                <dt className="font-semibold text-[#625143]">SKU</dt>
+                <dd className="font-mono">{product.sku || '—'}</dd>
               </div>
-              <div className="flex gap-2">
-                <dt className="font-semibold text-[#625143]">Current roles:</dt>
-                <dd>{roleLabels}</dd>
-              </div>
-              <div className="flex gap-2">
-                <dt className="font-semibold text-[#625143]">Reference count:</dt>
-                <dd>
-                  {referenceData.reference_count} saved project{referenceData.reference_count === 1 ? '' : 's'}
-                  {action === 'deactivate' && (
-                    <span className="ml-1 text-xs text-[#625143]">(preserved for historical projects)</span>
-                  )}
-                </dd>
+              <div className="grid grid-cols-[90px_1fr] gap-3">
+                <dt className="font-semibold text-[#625143]">Price</dt>
+                <dd>{formatPrice(product.price_ex_vat)} ex VAT</dd>
               </div>
             </dl>
-            {action === 'trash' && (
-              <p className="mt-3 rounded-md bg-red-50 p-2 text-xs text-red-800">
-                This will hide the product from the Product Master. The record is preserved in the database but no longer visible. Hard delete is not available.
-              </p>
-            )}
-          </div>
-          <div className="flex justify-end gap-2">
-            <button onClick={reset} className="rounded-lg border border-[#DCDBD6] px-4 py-2 text-sm font-semibold">
-              Cancel
-            </button>
-            <button
-              onClick={action === 'deactivate' ? executeDeactivate : executeTrash}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                action === 'trash' ? 'bg-red-700 hover:bg-red-800' : 'bg-[#213428] hover:bg-[#1a2a20]'
-              }`}
-            >
-              {action === 'trash' ? <Trash2 className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
-              {action === 'deactivate'
-                ? (isActive ? 'Confirm deactivate' : 'Confirm activate')
-                : 'Confirm move to trash'}
-            </button>
-          </div>
-        </div>
-      )}
 
-      {phase === 'blocked' && referenceData && (
-        <div className="space-y-3">
-          <div className="rounded-lg border border-red-200 bg-white p-4 text-sm">
-            <div className="mb-2 flex items-center gap-2 font-bold text-red-800">
-              <X className="h-4 w-4" /> Cannot move to trash
+            <p className="mt-4 text-xs text-[#625143]">The linked engineering registry record will not be deleted.</p>
+            {error && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" disabled={busy} onClick={() => setDeleteConfirmOpen(false)} className="rounded-lg border border-[#DCDBD6] px-4 py-2 text-sm font-semibold disabled:opacity-50">Cancel</button>
+              <button type="button" disabled={busy} onClick={() => execute('delete')} className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50">
+                {workingAction === 'delete' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Delete Product Permanently
+              </button>
             </div>
-            <p className="text-[#3E4349]">
-              This product is referenced by <strong>{referenceData.reference_count}</strong> saved project{referenceData.reference_count === 1 ? '' : 's'} and cannot be trashed.
-            </p>
-            <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto text-xs text-[#3E4349]">
-              {referenceData.references.map((ref) => (
-                <li key={ref.project_id} className="flex gap-1">
-                  <span className="font-semibold">{ref.project_name || 'Untitled'}</span>
-                  {ref.client_name && <span className="text-[#625143]">— {ref.client_name}</span>}
-                  <span className="text-[#625143]">({ref.fields.join(', ')})</span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-xs text-[#625143]">
-              Deactivate it instead to preserve historical projects while removing it from new selections.
-            </p>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button onClick={reset} className="rounded-lg border border-[#DCDBD6] px-4 py-2 text-sm font-semibold">
-              Close
-            </button>
-            <button
-              onClick={reset}
-              className="rounded-lg bg-[#213428] px-4 py-2 text-sm font-semibold text-white"
-            >
-              Deactivate instead
-            </button>
           </div>
         </div>
       )}
-
-      {error && (
-        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>
-      )}
-    </section>
+    </>
   );
 }
