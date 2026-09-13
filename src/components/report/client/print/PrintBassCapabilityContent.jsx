@@ -115,7 +115,7 @@ function P18FrequencyScale({ achievedHz, targetBasis }) {
   }));
 
   return (
-    <div style={{ width: "100%", maxWidth: 420, marginTop: 10 }}>
+    <div style={{ width: "100%", maxWidth: 430, marginTop: 10, padding: "0 10px", boxSizing: "border-box" }}>
       <div style={{ position: "relative", height: 22, marginBottom: 2 }}>
         <div style={{
           position: "absolute",
@@ -161,7 +161,7 @@ function P18FrequencyScale({ achievedHz, targetBasis }) {
             <div key={tick} style={{
               position: "absolute",
               left: `${pct}%`,
-              transform: "translateX(-50%)",
+              transform: tick === SCALE_MIN ? "translateX(0)" : tick === SCALE_MAX ? "translateX(-100%)" : "translateX(-50%)",
               fontSize: 8,
               color: "#8A8580",
               fontFamily: BODY_FONT,
@@ -171,16 +171,15 @@ function P18FrequencyScale({ achievedHz, targetBasis }) {
             </div>
           );
         })}
-        <div style={{
-          position: "absolute",
-          right: 0,
-          top: 0,
-          fontSize: 8,
-          color: "#8A8580",
-          fontFamily: BODY_FONT,
-        }}>
-          Hz
-        </div>
+      </div>
+      <div style={{
+        marginTop: 2,
+        textAlign: "right",
+        fontSize: 8,
+        color: "#8A8580",
+        fontFamily: BODY_FONT,
+      }}>
+        Frequency (Hz)
       </div>
     </div>
   );
