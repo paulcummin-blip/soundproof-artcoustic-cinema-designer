@@ -32,7 +32,7 @@ const stageAuthority = readSrc("components/room/bass/improveBassV2/improveBassV2
 check("buildStageResults returns 5 stage keys", stageAuthority.includes("phase") && stageAuthority.includes("delay") && stageAuthority.includes("gain") && stageAuthority.includes("subPositions") && stageAuthority.includes("seating"));
 check("STAGE_ORDER has exactly 5 stages", stageAuthority.includes('["phase", "delay", "gain", "subPositions", "seating"]'));
 check("Each stage has at most ONE result (verdict + result)", stageAuthority.includes("verdict:") && stageAuthority.includes("result:"));
-check("Phase is NOT AVAILABLE (not faked)", stageAuthority.includes('verdict: "not_available"') && stageAuthority.includes("phase control model"));
+check("Phase is physically implemented and mapped from phaseResult", stageAuthority.includes("selection.phaseResult") && stageAuthority.includes("groupedPhase") && stageAuthority.includes("phaseMaterial"));
 
 const stageResults = readSrc("components/room/bass/improveBassV2/ImproveBassV2StageResults.jsx");
 check("StageResults renders STAGE_ORDER (one row per stage)", stageResults.includes("STAGE_ORDER.map"));
@@ -49,9 +49,9 @@ check("V2 component passes onApplyStage (per-stage apply)", v2Comp.includes("onA
 console.log("\n=== CHECKPOINT 2: APPLY FIELD ISOLATION ===\n");
 
 const applyCal = readSrc("components/room/bass/improveBassV2/improveBassV2ApplyCalibration.js");
-// A. APPLY DELAY / GAIN
-check("applyCalibrationTuning only changes delayMs, gainDb, polarity, tuningSource", 
-  applyCal.includes("delayMs:") && applyCal.includes("gainDb:") && applyCal.includes("polarity:") && applyCal.includes("tuningSource:"));
+// A. APPLY PHASE / DELAY / GAIN
+check("applyCalibrationTuning only changes phaseControlDeg, delayMs, gainDb, polarity, tuningSource", 
+  applyCal.includes("phaseControlDeg:") && applyCal.includes("delayMs:") && applyCal.includes("gainDb:") && applyCal.includes("polarity:") && applyCal.includes("tuningSource:"));
 check("applyCalibrationTuning preserves position (spreads ...inst)", 
   applyCal.includes("...inst") && applyCal.includes("position:") === false); // position is NOT explicitly set — preserved via spread
 check("applyCalibrationTuning does NOT change model", !applyCal.includes("model:"));
@@ -153,7 +153,8 @@ check("V2 store is NOT persisted (resets on reopen)",
   !readSrc("components/room/bass/improveBassV2/improveBassV2Store.js").includes("sessionStorage"));
 check("Apply writes to project entity (commitInstances/commitSeating), not V2 store", 
   v2Comp.includes("commitInstances") && v2Comp.includes("commitSeating"));
-check("subwooferInstances carry delayMs/gainDb/polarity (persisted fields)", 
+check("subwooferInstances carry phaseControlDeg/delayMs/gainDb/polarity (persisted fields)", 
+  readSrc("components/room/bass/improveBassV2/improveBassV2ApplyCalibration.js").includes("phaseControlDeg:") && 
   readSrc("components/room/bass/improveBassV2/improveBassV2ApplyCalibration.js").includes("delayMs:") && 
   readSrc("components/room/bass/improveBassV2/improveBassV2ApplyCalibration.js").includes("gainDb:") && 
   readSrc("components/room/bass/improveBassV2/improveBassV2ApplyCalibration.js").includes("polarity:"));
