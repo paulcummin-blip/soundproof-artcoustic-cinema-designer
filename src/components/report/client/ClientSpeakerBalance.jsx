@@ -18,13 +18,14 @@
  */
 
 import React from "react";
+import { RP22_GRADE_TOKENS } from "@/components/utils/rp22Colors";
 
-// ── L-level badge styles (text + fill + border, readable without colour) ──
+// ── L-level badge styles — derived from canonical RP22_GRADE_TOKENS ──
 const LEVEL_STYLES = {
-  4: { fill: "#213428", textColor: "#FFFFFF", borderColor: "#213428", label: "L4" },
-  3: { fill: "#3E4349", textColor: "#FFFFFF", borderColor: "#3E4349", label: "L3" },
-  2: { fill: "#F8F8F7", textColor: "#625143", borderColor: "#625143", label: "L2" },
-  1: { fill: "#F8F8F7", textColor: "#4A230F", borderColor: "#4A230F", label: "L1" },
+  4: { fill: RP22_GRADE_TOKENS.L4.bg, textColor: RP22_GRADE_TOKENS.L4.text, borderColor: RP22_GRADE_TOKENS.L4.border, label: "L4" },
+  3: { fill: RP22_GRADE_TOKENS.L3.bg, textColor: RP22_GRADE_TOKENS.L3.text, borderColor: RP22_GRADE_TOKENS.L3.border, label: "L3" },
+  2: { fill: RP22_GRADE_TOKENS.L2.bg, textColor: RP22_GRADE_TOKENS.L2.text, borderColor: RP22_GRADE_TOKENS.L2.border, label: "L2" },
+  1: { fill: RP22_GRADE_TOKENS.L1.bg, textColor: RP22_GRADE_TOKENS.L1.text, borderColor: RP22_GRADE_TOKENS.L1.border, label: "L1" },
 };
 
 function levelStyle(level) {

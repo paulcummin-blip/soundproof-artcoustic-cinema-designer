@@ -19,12 +19,12 @@ import { resolveRspLabelPlacement } from "../ClientSpeakerBalance";
 
 // ── Status copy (frozen — matches ClientSoundAroundListener) ───────────────
 const STATUS_COPY = {
-  L4: { label: "Level 4", color: "#213428", explanation: "Maximum horizontal angle between adjacent surround speakers." },
-  L3: { label: "Level 3", color: "#3E4349", explanation: "Maximum horizontal angle between adjacent surround speakers." },
-  L2: { label: "Level 2", color: "#625143", explanation: "Maximum horizontal angle between adjacent surround speakers." },
-  L1: { label: "Level 1", color: "#4A230F", explanation: "Maximum horizontal angle between adjacent surround speakers." },
-  Fail: { label: "Does not achieve Level 1", color: "#4A230F", explanation: "Maximum horizontal angle between adjacent surround speakers." },
-  "—": { label: "—", color: "#C1B6AD", explanation: "Maximum horizontal angle between adjacent surround speakers." },
+  L4: { label: "Level 4", explanation: "Maximum horizontal angle between adjacent surround speakers." },
+  L3: { label: "Level 3", explanation: "Maximum horizontal angle between adjacent surround speakers." },
+  L2: { label: "Level 2", explanation: "Maximum horizontal angle between adjacent surround speakers." },
+  L1: { label: "Level 1", explanation: "Maximum horizontal angle between adjacent surround speakers." },
+  Fail: { label: "Does not achieve Level 1", explanation: "Maximum horizontal angle between adjacent surround speakers." },
+  "—": { label: "—", explanation: "Maximum horizontal angle between adjacent surround speakers." },
 };
 
 function getStatusInfo(level) {

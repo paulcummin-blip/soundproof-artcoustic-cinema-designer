@@ -19,20 +19,13 @@
  */
 
 import React, { useMemo } from "react";
+import { resolveGradeToken } from "@/components/utils/rp22Colors";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 
-// ── Level → brand colour (mirrors P5 / P9 STATUS_COPY) ──
-const LEVEL_COLOR = {
-  L4: "#213428",
-  L3: "#3E4349",
-  L2: "#625143",
-  L1: "#4A230F",
-  FAIL: "#4A230F",
-  default: "#C1B6AD",
-};
-
+// ── Level → canonical grade colour (derived from RP22_GRADE_TOKENS) ──
 function levelColor(lvl) {
-  return LEVEL_COLOR[lvl] || LEVEL_COLOR.default;
+  const { token } = resolveGradeToken(lvl);
+  return token.solid ? token.border : token.text;
 }
 
 // ── Speaker role colours (brand-aligned, same as P5) ──

@@ -14,17 +14,18 @@
 
 import React, { useMemo } from "react";
 import P9RowLabelStack, { P9_ROW_COLORS as ROW_COLORS } from "@/components/report/client/p9RowLabelStack";
+import { resolveGradeToken } from "@/components/utils/rp22Colors";
 import { resolveRspLabelPlacement } from "../ClientSpeakerBalance";
 
 // ── Status copy (frozen — matches ClientSoundAboveListener) ───────────────
 const STATUS_COPY = {
-  L4: { label: "Excellent overhead continuity", color: "#213428", explanation: "The overhead rows are correctly spaced for smooth, precise movement above the listening position." },
-  L3: { label: "Very good overhead continuity", color: "#3E4349", explanation: "The overhead rows are well positioned and create smooth movement above the listener." },
-  L2: { label: "Good overhead continuity", color: "#625143", explanation: "The overhead layout provides clear movement above the listener. Bringing the rows slightly closer together would improve continuity." },
-  L1: { label: "Further refinement recommended", color: "#4A230F", explanation: "Bringing the overhead rows closer together would create smoother movement above the listener." },
-  Fail: { label: "Further refinement recommended", color: "#4A230F", explanation: "Bringing the overhead rows closer together would create smoother movement above the listener." },
-  "N/A": { label: "Single overhead row", color: "#625143", explanation: "This layout uses one overhead row, so spacing between rows is not assessed." },
-  "—": { label: "Further refinement recommended", color: "#C1B6AD", explanation: "Bringing the overhead rows closer together would create smoother movement above the listener." },
+  L4: { label: "Excellent overhead continuity", explanation: "The overhead rows are correctly spaced for smooth, precise movement above the listening position." },
+  L3: { label: "Very good overhead continuity", explanation: "The overhead rows are well positioned and create smooth movement above the listener." },
+  L2: { label: "Good overhead continuity", explanation: "The overhead layout provides clear movement above the listener. Bringing the rows slightly closer together would improve continuity." },
+  L1: { label: "Further refinement recommended", explanation: "Bringing the overhead rows closer together would create smoother movement above the listener." },
+  Fail: { label: "Further refinement recommended", explanation: "Bringing the overhead rows closer together would create smoother movement above the listener." },
+  "N/A": { label: "Single overhead row", explanation: "This layout uses one overhead row, so spacing between rows is not assessed." },
+  "—": { label: "Further refinement recommended", explanation: "Bringing the overhead rows closer together would create smoother movement above the listener." },
 };
 
 const L4_BOUNDARY_DEG = 50;
@@ -34,10 +35,12 @@ const L3_NEAR_BOUNDARY_EXPLANATION =
 
 function getStatusInfo(level, value) {
   const base = STATUS_COPY[level] || STATUS_COPY["—"];
+  const { token } = resolveGradeToken(level);
+  const overridden = { ...base, color: token.border, tokenBg: token.bg, tokenText: token.text, tokenSolid: token.solid };
   if (level === "L3" && Number.isFinite(value) && value <= L4_BOUNDARY_DEG + NEAR_BOUNDARY_TOLERANCE_DEG) {
-    return { ...base, explanation: L3_NEAR_BOUNDARY_EXPLANATION };
+    return { ...overridden, explanation: L3_NEAR_BOUNDARY_EXPLANATION };
   }
-  return base;
+  return overridden;
 }
 
 function getL1Advice(representativeGaps, worstGapDeg) {
@@ -312,8 +315,8 @@ export default function PrintP9Content({ p9Snapshot, roomDims }) {
       <div className="client-report-print-result" style={{ borderColor: `${statusInfo.color}40` }}>
         <div className="client-report-print-result__badge" style={{
           borderColor: statusInfo.color,
-          background: `${statusInfo.color}25`,
-          color: statusInfo.color,
+          background: statusInfo.tokenBg,
+          color: statusInfo.tokenText,
         }}>
           {displayLevel}
         </div>
