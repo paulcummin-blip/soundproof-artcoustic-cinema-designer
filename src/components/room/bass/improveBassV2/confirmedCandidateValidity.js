@@ -1,5 +1,6 @@
 import { gradeP19FromRaw, gradeP20FromRaw } from "../completedBassResultPersistence.js";
 import { STAGE2_CANONICAL_VERSION } from "../stage2/stage2Constants.js";
+import { normalisePhaseControlDeg } from "../../../../bass/core/subwooferPhaseControl.js";
 
 export const RECOMMENDATION_CONTRACT_VERSION = "improve-bass-confirmed-v1";
 const finite = value => typeof value === "number" && Number.isFinite(value);
@@ -52,7 +53,10 @@ export function validateConfirmedCandidate(result, context = {}) {
     if (!Array.isArray(tuning) || tuning.length !== context.sourceIds.length ||
         new Set(tuning.map(t=>t.sourceId)).size !== context.sourceIds.length ||
         tuning.some(t => !context.sourceIds.includes(t.sourceId) || !finite(t.delayMs) || t.delayMs < 0 ||
-          !finite(t.gainDb) || ![0,1,-1,180].includes(t.polarity))) issues.push("Invalid effective source tuning");
+          !finite(t.gainDb) || ![0,1,-1,180].includes(t.polarity) ||
+          !finite(Number(t.phaseControlDeg ?? t.phaseAdjust ?? 0)) ||
+          Number(t.phaseControlDeg ?? t.phaseAdjust ?? 0) < 0 ||
+          Number(t.phaseControlDeg ?? t.phaseAdjust ?? 0) > 175)) issues.push("Invalid effective source tuning");
   }
   const priority = new Map(requiredSeats(context.seats).map(s => [s.id,s.isPrimary]));
   const value = result ? { ...result,
@@ -66,6 +70,7 @@ export function effectiveConfigurationKey(instances, tuning) {
   return JSON.stringify((instances || []).filter(s=>s.enabled!==false).map((s,i)=>{
     const t=byId.get(s.id) || tuning?.[i] || {};
     return [s.id,s.position?.x ?? s.x,s.position?.y ?? s.y,s.bottomHeightM,
-      t.delayMs,t.gainDb,t.polarity===-1||t.polarity===180?-1:1];
+      t.delayMs,t.gainDb,t.polarity===-1||t.polarity===180?-1:1,
+      normalisePhaseControlDeg(t.phaseControlDeg ?? t.phaseAdjust)];
   }).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
 }
