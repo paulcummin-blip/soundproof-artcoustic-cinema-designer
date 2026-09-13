@@ -12,6 +12,8 @@ import { normalizeCompetitor, competitorMetaForComparison } from "@/components/u
 import { getLevelColors } from "@/components/utils/rp22Colors";
 import { resolveSpeakerSplMeta } from "@/components/utils/spl/speakerSplMeta";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { useAuth } from "@/lib/AuthContext";
+import { isMasterAdmin } from "@/lib/accountAccess";
 
 const BRAND = {
   bg: "#F8F8F7",
@@ -208,6 +210,8 @@ function SpeakerRow({ eyebrow, name, price, result, accent = false, note = null,
 
 export default function SPLCalculatorPage() {
   const activeId = useActiveProjectId();
+  const { user } = useAuth();
+  const canManageCompetitors = isMasterAdmin(user);
   const { dims, loadDims } = useRoomDimensions(activeId);
   const { priceMap } = useProductPriceMap(true);
 
@@ -497,6 +501,7 @@ export default function SPLCalculatorPage() {
           )}
         </div>
 
+        {canManageCompetitors && (
         <div style={{ marginTop: 14, background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14 }}>
           <button type="button" onClick={() => setAdminOpen((v) => !v)} style={{ width: "100%", border: 0, background: "transparent", padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: BRAND.text }}>
             <span style={{ fontWeight: 700 }}>Admin · Competitor speaker data</span>
