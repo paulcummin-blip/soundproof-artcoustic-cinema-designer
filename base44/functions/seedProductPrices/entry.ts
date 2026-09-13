@@ -102,6 +102,7 @@ function masterDefaults(seed, selectorOrder) {
     roles: defaultRoles(seed),
     selector_order: selectorOrder,
     catalog_version: 1,
+    role_migration_version: 1,
   };
 }
 
@@ -130,9 +131,15 @@ export default async function(req) {
       const existingRec = existingBySku.get(seed.sku);
       if (existingRec) {
         const patch = {};
-        if (existingRec.engineering_key === undefined) patch.engineering_key = defaults.engineering_key;
-        if (!Array.isArray(existingRec.roles)) patch.roles = defaults.roles;
-        if (!Number.isFinite(Number(existingRec.selector_order))) patch.selector_order = defaults.selector_order;
+        const needsRoleMigration = Number(existingRec.role_migration_version) !== 1;
+        if (needsRoleMigration) {
+          patch.engineering_key = existingRec.engineering_key || defaults.engineering_key;
+          patch.roles = defaults.roles;
+          patch.selector_order = Number.isFinite(Number(existingRec.selector_order))
+            ? Number(existingRec.selector_order)
+            : defaults.selector_order;
+          patch.role_migration_version = 1;
+        }
         if (!Number.isFinite(Number(existingRec.catalog_version))) patch.catalog_version = defaults.catalog_version;
 
         if (Object.keys(patch).length > 0) {
