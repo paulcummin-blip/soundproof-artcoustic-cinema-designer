@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Upload, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Upload, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { artcousticSpeakers } from "@/components/data/speakerData";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -89,6 +89,114 @@ function resultRank(result) {
     p12: LEVEL_RANK[result?.grades?.p12] || 0,
     p13: LEVEL_RANK[result?.grades?.p13] || 0,
   };
+}
+
+function infoValue(value, suffix = "") {
+  if (value === null || value === undefined || value === "") return "—";
+  if (Array.isArray(value)) return value.join(" – ") + suffix;
+  if (typeof value === "number" && Number.isFinite(value)) return `${Number(value.toFixed(3))}${suffix}`;
+  return `${value}${suffix}`;
+}
+
+function artcousticInfoRows(speaker, price) {
+  if (!speaker) return [];
+  return [
+    ["Manufacturer", speaker.brand || "Artcoustic"],
+    ["Model", speaker.model],
+    ["Retail inc VAT", formatPrice(price)],
+    ["Sensitivity 1 W / 1 m", infoValue(speaker.sensitivity_db_1w_1m ?? speaker.sensitivity, " dB")],
+    ["Sensitivity 2.83 V / 1 m", infoValue(speaker.sensitivity_db_2v83_1m, " dB")],
+    ["Nominal impedance", infoValue(speaker.impedance_ohm ?? speaker.impedance, " Ω")],
+    ["Continuous power", infoValue(speaker.power_handling_w ?? speaker.max_power, " W")],
+    ["Continuous SPL @ 1 m · Half Space", infoValue(speaker.max_spl_cont_db_1m_halfspace ?? speaker.max_spl_cont_db_1m ?? speaker.max_spl, " dB")],
+    ["Peak SPL @ 1 m · Half Space", infoValue(speaker.max_spl_peak_db_cf6_1m_halfspace ?? speaker.max_spl_peak_db_cf6_1m, " dB")],
+    ["Continuous SPL @ 1 m · Anechoic", infoValue(speaker.max_spl_cont_db_1m_anechoic, " dB")],
+    ["Peak SPL @ 1 m · Anechoic", infoValue(speaker.max_spl_peak_db_cf6_1m_anechoic, " dB")],
+    ["Frequency range", Array.isArray(speaker.frequency_range_hz) ? `${speaker.frequency_range_hz[0]} – ${speaker.frequency_range_hz[1]} Hz` : "—"],
+    ["Usable LF response (-6 dB)", infoValue(speaker.usable_lf_response_hz_minus6, " Hz")],
+    ["Horizontal coverage", infoValue(speaker.horizontal_dispersion_angle ?? speaker.coverage_deg?.horizontal, "°")],
+    ["Vertical coverage", infoValue(speaker.vertical_dispersion_angle ?? speaker.coverage_deg?.vertical, "°")],
+    ["Measurement basis", "Artcoustic published Half Space authority"],
+    ["Source", "Sound Proof Artcoustic technical dataset"],
+  ];
+}
+
+function competitorInfoRows(record) {
+  if (!record) return [];
+  return [
+    ["Manufacturer", record.manufacturer],
+    ["Model", record.model],
+    ["Product type", record.product_type],
+    ["Retail inc VAT", formatPrice(numeric(record.retail_price_inc_vat))],
+    ["Published sensitivity", infoValue(record.sensitivity_value_db, " dB")],
+    ["Sensitivity reference", record.sensitivity_reference || "—"],
+    ["Sensitivity measurement basis", record.sensitivity_measurement_basis || "Unstated → assumed Half Space"],
+    ["Rated impedance", infoValue(record.rated_impedance_ohm, " Ω")],
+    ["Minimum impedance", infoValue(record.minimum_impedance_ohm, " Ω")],
+    ["Continuous / RMS / AES power", infoValue(record.continuous_power_w, " W")],
+    ["Power rating type / standard", record.power_rating_type || "—"],
+    ["Program power", infoValue(record.program_power_w, " W")],
+    ["Peak power", infoValue(record.peak_power_w, " W")],
+    ["Published max continuous SPL @ 1 m", infoValue(record.published_max_continuous_spl_db_1m, " dB")],
+    ["Published max peak SPL @ 1 m", infoValue(record.published_max_peak_spl_db_1m, " dB")],
+    ["Max SPL measurement basis", record.max_spl_measurement_basis || "Unstated → assumed Half Space"],
+    ["Normalised sensitivity 1 W / 1 m", infoValue(record.normalized_sensitivity_db_1w_1m, " dB")],
+    ["Half-space sensitivity 1 W / 1 m", infoValue(record.halfspace_sensitivity_db_1w_1m, " dB")],
+    ["Half-space max continuous SPL @ 1 m", infoValue(record.halfspace_published_max_continuous_spl_db_1m ?? record.halfspace_calculated_max_continuous_spl_db_1m, " dB")],
+    ["Sensitivity basis provenance", record.sensitivity_space_provenance || "—"],
+    ["Max SPL basis provenance", record.max_spl_space_provenance || "—"],
+    ["Frequency range", record.frequency_range || "—"],
+    ["Usable LF response (-6 dB)", infoValue(record.usable_lf_minus6db_hz, " Hz")],
+    ["Horizontal coverage", infoValue(record.horizontal_coverage_deg, "°")],
+    ["Vertical coverage", infoValue(record.vertical_coverage_deg, "°")],
+    ["Recommended amplifier power", infoValue(record.recommended_amplifier_power_w, " W")],
+    ["SPL authority", record.spl_authority || "—"],
+    ["Data confidence", record.data_confidence || "—"],
+    ["Date checked", record.date_checked || "—"],
+    ["Notes", record.notes || "—"],
+  ];
+}
+
+function SpeakerInfo({ rows, sourceUrl = null, datasheetUrl = null }) {
+  const [open, setOpen] = useState(false);
+  if (!Array.isArray(rows) || rows.length === 0) return <div />;
+  return (
+    <div
+      style={{ position: "relative", display: "inline-flex", justifyContent: "center" }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        aria-label="Show source speaker data"
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onClick={() => setOpen((v) => !v)}
+        style={{ width: 26, height: 26, borderRadius: 999, border: `1px solid ${BRAND.border}`, background: "#FFF", color: BRAND.hint, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}
+      >
+        <Info size={14} />
+      </button>
+      {open && (
+        <div style={{ position: "absolute", zIndex: 100, right: 0, top: 32, width: 390, maxHeight: 500, overflowY: "auto", background: "#FFF", border: `1px solid ${BRAND.border}`, borderRadius: 12, padding: 14, boxShadow: "0 12px 30px rgba(0,0,0,0.14)", color: BRAND.text }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Published / comparison data</div>
+          <div style={{ display: "grid", gap: 0 }}>
+            {rows.map(([label, value], idx) => (
+              <div key={`${label}-${idx}`} style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 10, padding: "6px 0", borderTop: idx === 0 ? 0 : `1px solid ${BRAND.soft}`, fontSize: 11, lineHeight: 1.35 }}>
+                <div style={{ color: BRAND.subtext }}>{label}</div>
+                <div style={{ fontWeight: 600, overflowWrap: "anywhere" }}>{value || "—"}</div>
+              </div>
+            ))}
+          </div>
+          {(sourceUrl || datasheetUrl) && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BRAND.border}`, display: "flex", gap: 12, flexWrap: "wrap", fontSize: 11 }}>
+              {sourceUrl && <a href={sourceUrl} target="_blank" rel="noreferrer" style={{ color: BRAND.hint, textDecoration: "underline" }}>Manufacturer source</a>}
+              {datasheetUrl && <a href={datasheetUrl} target="_blank" rel="noreferrer" style={{ color: BRAND.hint, textDecoration: "underline" }}>Datasheet</a>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function loadSheetJs() {
