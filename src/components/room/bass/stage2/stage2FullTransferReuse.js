@@ -68,7 +68,7 @@ function completeFullTransfer(raw, params) {
   const grid = raw.rspRawCurve;
   if (grid?.length !== 360 || grid[0]?.frequency !== 15 || Math.abs(grid.at(-1)?.frequency - 200) > 1e-10 ||
       !grid.every(p => Number.isFinite(p.frequency) && Number.isFinite(p.spl))) return false;
-  if (sources.some(s => s.tuning?.delayMs !== 0 || s.tuning?.gainDb !== 0 || s.tuning?.polarity !== 0)) return false;
+  if (sources.some(s => s.tuning?.delayMs !== 0 || s.tuning?.gainDb !== 0 || s.tuning?.polarity !== 0 || Number(s.tuning?.phaseControlDeg ?? s.tuning?.phaseAdjust ?? 0) !== 0)) return false;
   if (raw.perSeatRawCurves?.length !== seats.length - 1 || !raw.perSeatRawCurves.every(s =>
       seats.includes(s.seatId) && s.responseData?.length === grid.length && s.responseData.every((p,i) =>
         p.frequency === grid[i].frequency && Number.isFinite(p.spl)))) return false;
