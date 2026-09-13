@@ -11,14 +11,13 @@
 //   6. Comparing improvements
 //   7. Preparing recommendations
 //
-// IMPORTANT: The engine tests phase/delay/gain TOGETHER in a combined
-// searchDelayPolarityTrim call (polarity → delay → trim → re-optimise delay).
-// They are NOT tested separately. This mapping preserves the actual engine
-// behaviour: all three calibration stages become active together during the
-// `calibrating` phase and complete together when it finishes.
+// IMPORTANT: Phase, delay and gain are separate bounded searches. Phase uses
+// a unity-gain first-order all-pass control in 5-degree steps at 80 Hz; delay
+// and gain keep their existing grouped controls. The phaseLabel identifies
+// which calibration stage is currently active.
 //
-// Stage 11C (seating position search) is NOT implemented. The seating stage
-// is always shown as "not_tested" — never faked as completed.
+// Seating is evaluated only when the engine reaches its seating search. A
+// cancelled, skipped or incomplete search remains not_tested.
 
 export const STAGE_KEYS = [
   'phase_polarity',
