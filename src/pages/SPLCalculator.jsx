@@ -341,9 +341,8 @@ export default function SPLCalculatorPage() {
   }, [art, artResult, competitorResults, artcousticVisible, calculateArtResult, artPrice]);
 
   const addCompetitor = () => {
-    if (selectedCompetitorIds.length >= 5) return;
-    const next = competitorRows.find((r) => !selectedCompetitorIds.includes(r.id));
-    if (next) setSelectedCompetitorIds((prev) => [...prev, next.id]);
+    if (selectedCompetitorIds.length >= 5 || competitorRows.length === 0) return;
+    setSelectedCompetitorIds((prev) => [...prev, ""]);
   };
 
   const updateSelectedCompetitor = (index, id) => {
@@ -478,7 +477,8 @@ export default function SPLCalculatorPage() {
                 return (
                   <div key={`${id}-${index}`}>
                     <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 28px", gap: 12, alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}>
-                      <select value={id} onChange={(e) => updateSelectedCompetitor(index, e.target.value)} style={{ border: 0, background: "transparent", fontSize: 15, fontWeight: 700, color: BRAND.text, minWidth: 0 }}>
+                      <select value={id} onChange={(e) => updateSelectedCompetitor(index, e.target.value)} style={{ border: 0, background: "transparent", fontSize: 15, fontWeight: 700, color: id ? BRAND.text : BRAND.subtext, minWidth: 0 }}>
+                        <option value="">Choose alternative speaker</option>
                         {competitorRows.map((r) => <option key={r.id} value={r.id}>{r.manufacturer} · {r.model}</option>)}
                       </select>
                       <div style={{ fontWeight: 600, textAlign: "right" }}>{record ? formatPrice(numeric(record?.retail_price_inc_vat)) : "—"}</div>
