@@ -24,11 +24,11 @@
 // level object — this only normalises for display/ranking.
 const LEVEL_LABELS = {
   L4: "L4", L3: "L3", L2: "L2", L1: "L1", FAIL: "Below L1",
-  4: "L4", 3: "L3", 2: "L2", 1: "L1",
+  4: "L4", 3: "L3", 2: "L2", 1: "L1", 0: "Below L1", // numeric 0 = FAIL (canonical)
 };
 const LEVEL_RANK = {
   L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0,
-  4: 4, 3: 3, 2: 2, 1: 1,
+  4: 4, 3: 3, 2: 2, 1: 1, 0: 0, // numeric 0 = FAIL (canonical)
 };
 
 function normalizeSeat(seat) {

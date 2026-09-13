@@ -31,6 +31,7 @@ function normalizeP9Level(rawLevel) {
     ? rawLevel
     : parseInt(String(rawLevel).replace(/[^0-9]/g, ""), 10);
   if (Number.isFinite(n)) {
+    if (n === 0) return "FAIL"; // numeric 0 = FAIL (canonical — same as resolveGradeToken)
     if (n === 4) return "L4";
     if (n === 3) return "L3";
     if (n === 2) return "L2";

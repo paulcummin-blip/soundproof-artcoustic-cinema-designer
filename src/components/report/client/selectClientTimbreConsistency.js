@@ -28,6 +28,9 @@ const LEVEL_RANK = { L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0 };
  */
 function normalizeLevel(level) {
   if (level === null || level === undefined) return null;
+  // Numeric 0 = FAIL (canonical — same authority as resolveGradeToken in rp22Colors).
+  // Must NOT be treated as absent; a valid calculated FAIL is a real result.
+  if (level === 0) return "FAIL";
   const str = String(level).trim().toUpperCase();
   if (str === "FAIL") return "FAIL";
   if (str === "N/A" || str === "—" || str === "-") return null;
