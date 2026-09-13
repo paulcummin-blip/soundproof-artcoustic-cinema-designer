@@ -25,7 +25,7 @@
 export function createSeatingProfiler() {
   const candidates = [];
   let batchTiming = null;
-  let confirmationRecorded = null;
+  const confirmations = [];
 
   return {
     recordCandidate(offsetMm, { proxyEvalMs, receiverEvalMs }) {
@@ -45,31 +45,37 @@ export function createSeatingProfiler() {
     },
 
     recordConfirmation(offsetMm, { confirmMs }) {
-      confirmationRecorded = { offsetMm, confirmMs: Number(confirmMs) || 0 };
+      confirmations.push({ offsetMm, confirmMs: Number(confirmMs) || 0 });
     },
 
     getReport() {
       const totalProxyEval = candidates.reduce((s, c) => s + c.proxyEvalMs, 0);
       const totalReceiverEval = candidates.reduce((s, c) => s + c.receiverEvalMs, 0);
-      const confirmationMs = confirmationRecorded?.confirmMs || 0;
+      const totalConfirmationMs = confirmations.reduce((s, c) => s + c.confirmMs, 0);
       const preparedSourceRoomMs = batchTiming?.preparedSourceRoomMs || 0;
       const batchWorkerMs = batchTiming?.batchWorkerMs || 0;
 
       return {
         candidateCount: candidates.length,
+        shortlistSize: confirmations.length,
         preparedSourceRoomMs,
         batchWorkerMs,
         totalReceiverEvalMs: totalReceiverEval,
         totalProxyEvalMs: totalProxyEval,
-        confirmationMs,
-        confirmationOffsetMm: confirmationRecorded?.offsetMm ?? null,
-        totalMs: batchWorkerMs + totalProxyEval + confirmationMs,
+        confirmationMs: totalConfirmationMs,
+        confirmationCount: confirmations.length,
+        confirmationOffsetMm: confirmations[0]?.offsetMm ?? null,
+        totalMs: batchWorkerMs + totalProxyEval + totalConfirmationMs,
         perCandidate: candidates.map((c) => ({
           offsetMm: c.offsetMm,
           proxyEvalMs: c.proxyEvalMs,
           receiverEvalMs: c.receiverEvalMs,
         })),
         perOffsetMs: batchTiming?.perOffsetMs || [],
+        perConfirmation: confirmations.map((c) => ({
+          offsetMm: c.offsetMm,
+          confirmMs: c.confirmMs,
+        })),
       };
     },
   };

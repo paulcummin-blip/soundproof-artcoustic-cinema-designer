@@ -43,6 +43,7 @@ import { setPositionSearchPhase, setPositionExhaustion, setStageVerdict } from "
 import { runPositionScreenPhase, tagGlobalCandidates, checkPhaseMateriality, buildPositionOptimisationState } from "./improveBassV2Escalation.js";
 import { generateSeatingCandidates, describeSeatingChange } from "./seatingPositionSearch.js";
 import { createSeatingProfiler } from "./seatingStageProfiler.js";
+import { selectSeatingShortlist, selectSeatingWinner, SEATING_SHORTLIST_SIZE } from "./seatingShortlistPolicy.js";
 
 import { attachCurrentCanonicalValidation } from "./currentAuthorityValidation.js";
 
@@ -1088,8 +1089,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       if (validCandidates.length > 0 && existingAuthority) {
         onProgress("finalising", "Testing seating position changes", 0, validCandidates.length);
         const currentFinalist = buildCurrentFinalist(subwooferInstances, roomDims);
-        let bestSeatingProxy = null;
-        let bestSeatingOffset = 0;
+        const proxyResults = [];
 
         // ── Single seating-batch worker call ──────────────────────────
         // Replaces 10 individual placement worker calls. The worker prepares
@@ -1117,9 +1117,10 @@ export async function runImproveBassV2(projectId, params, callbacks) {
             perOffsetMs: batchResult?.timing?.perOffsetMs || [],
           });
 
-          // ── Compute proxy metrics for each offset, find best ────────
+          // ── Compute proxy metrics for each offset ───────────────────
           // Results are in deterministic offset order (same as validCandidates).
-          // No sorting inside the worker — the engine ranks by proxy P19.
+          // All proxy results are collected — the shortlist policy selects
+          // the top N=8 for canonical confirmation.
           if (batchResult?.candidates) {
             for (let i = 0; i < batchResult.candidates.length; i++) {
               if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
@@ -1141,12 +1142,15 @@ export async function runImproveBassV2(projectId, params, callbacks) {
                   receiverEvalMs,
                 });
 
-                if (proxyMetrics && (!bestSeatingProxy || proxyMetrics.proxyP19 < bestSeatingProxy.proxyP19)) {
-                  bestSeatingProxy = proxyMetrics;
-                  bestSeatingOffset = offsetMm;
-                  bestSeatingProxy._seatingTransfer = seatingTransfer;
-                  bestSeatingProxy._seatingOffset = offsetMm;
-                  bestSeatingProxy._seatingPositions = validCandidates[i].seatingPositions;
+                if (proxyMetrics && Number.isFinite(proxyMetrics.proxyP19)) {
+                  proxyResults.push({
+                    offsetMm,
+                    proxyP19: proxyMetrics.proxyP19,
+                    proxyP20: proxyMetrics.proxyP20,
+                    proxyBalanced: proxyMetrics.proxyBalanced,
+                    seatingTransfer,
+                    seatingPositions: validCandidates[i].seatingPositions,
+                  });
                 }
               }
 
@@ -1159,45 +1163,101 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           evaluationIssues.push({ stage: "seating", error: err.message });
         }
 
-        // Canonically confirm the best seating candidate
-        if (bestSeatingProxy?._seatingTransfer && existingAuthority) {
+        // ── Select top N=8 by proxy P19 for canonical confirmation ────
+        // The proxy is a PRUNING stage only — it ranks and selects the
+        // shortlist. Final authority belongs to canonical confirmation.
+        const shortlist = selectSeatingShortlist(proxyResults, SEATING_SHORTLIST_SIZE);
+        seatingDiagnostics.shortlistSize = shortlist.length;
+        seatingDiagnostics.tested = validCandidates.length;
+
+        // ── Canonically confirm ALL shortlisted candidates ────────────
+        const confirmedSeatingCandidates = [];
+
+        for (let i = 0; i < shortlist.length; i++) {
+          if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+          if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
+          const sc = shortlist[i];
+          onProgress("finalising", `Confirming seating options (${i + 1}/${shortlist.length})`, i, shortlist.length);
+
           try {
             const seatingConfirmT0 = performance.now();
             const seatingConfirmation = await runInWorker(worker, "confirmation", {
-              rawTransfer: bestSeatingProxy._seatingTransfer,
+              rawTransfer: sc.seatingTransfer,
               tuning: existingAuthority?.appliedTuning || savedEffectiveBaseline || [],
               tuningVariant: "delay-polarity-trim",
               p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
             }, controller.signal);
-            metrics.recordWorkerCall("confirmation", "seating-best", performance.now() - seatingConfirmT0, false);
-            seatingProfiler.recordConfirmation(bestSeatingProxy._seatingOffset, { confirmMs: performance.now() - seatingConfirmT0 });
+            const confirmMs = performance.now() - seatingConfirmT0;
+            metrics.recordWorkerCall("confirmation", `seating-${i}`, confirmMs, false);
+            seatingProfiler.recordConfirmation(sc.offsetMm, { confirmMs });
+
             if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
             if (seatingConfirmation) {
               const sBound = bindConfirmation(seatingConfirmation,
                 existingAuthority?.appliedTuning || savedEffectiveBaseline || [],
                 currentFinalist, "current");
               sBound.candidateKind = "seating";
-              sBound.candidateId = "seating:" + bestSeatingProxy._seatingOffset;
-              sBound.seatingOffsetMm = bestSeatingProxy._seatingOffset;
-              sBound.seatingPositions = bestSeatingProxy._seatingPositions;
+              sBound.candidateId = "seating:" + sc.offsetMm;
+              sBound.seatingOffsetMm = sc.offsetMm;
+              sBound.seatingPositions = sc.seatingPositions;
               const sCheck = validateConfirmedCandidate(sBound, validationContext);
-              seatingDiagnostics.valid = sCheck.valid ? 1 : 0;
               if (sCheck.valid) {
-                const sMat = isMaterialImprovement(existingAuthority, sCheck.result);
-                seatingMaterial = { material: sMat.material, reason: sMat.reason };
-                if (sMat.material) {
-                  seatingResult = sCheck.result;
-                  seatingResult.seatingOffsetMm = bestSeatingProxy._seatingOffset;
-                  seatingResult.seatingPositions = bestSeatingProxy._seatingPositions;
-                }
+                confirmedSeatingCandidates.push({
+                  result: sCheck.result,
+                  seatingOffsetMm: sc.offsetMm,
+                  seatingPositions: sc.seatingPositions,
+                });
               }
             }
           } catch (err) {
             if (isFatalLifecycleError(err)) throw err;
-            evaluationIssues.push({ stage: "seating", error: err.message });
+            evaluationIssues.push({ stage: "seating", candidateId: `seating:${sc.offsetMm}`, error: err.message });
+          }
+
+          await yieldToUI();
+        }
+
+        seatingDiagnostics.confirmed = confirmedSeatingCandidates.length;
+
+        // ── Select winner: grade-first canonical comparison ───────────
+        // Applies Primary safety protection, materiality gate, grade-first
+        // canonical ordering, and smaller-movement tie-break (direction-
+        // agnostic). The proxy does NOT decide the winner.
+        if (confirmedSeatingCandidates.length > 0 && existingAuthority) {
+          const seatingSelection = selectSeatingWinner(confirmedSeatingCandidates, existingAuthority);
+          seatingDiagnostics.evaluations = seatingSelection.evaluations;
+          seatingDiagnostics.valid = seatingSelection.evaluations.filter((e) => e.status === "material").length;
+
+          if (seatingSelection.winner) {
+            seatingResult = seatingSelection.winner.result;
+            seatingResult.seatingOffsetMm = seatingSelection.winner.seatingOffsetMm;
+            seatingResult.seatingPositions = seatingSelection.winner.seatingPositions;
+            const winnerEval = seatingSelection.evaluations.find(
+              (e) => e.candidateId === seatingSelection.winner.result.candidateId,
+            );
+            seatingMaterial = {
+              material: true,
+              reason: winnerEval?.materiality?.reason || "Material seating improvement",
+            };
+          } else {
+            const belowMateriality = seatingSelection.evaluations.some((e) => e.status === "below-materiality");
+            const safetyRejected = seatingSelection.evaluations.some((e) => e.status === "safety-rejected");
+            seatingMaterial = {
+              material: false,
+              reason: safetyRejected
+                ? "Seating candidates did not meet Primary-seat safety checks"
+                : belowMateriality
+                  ? "Valid seating changes were below the material-improvement threshold"
+                  : "No material seating improvement among confirmed candidates",
+            };
           }
         }
-        seatingDiagnostics.best = bestSeatingProxy ? { offsetMm: bestSeatingProxy._seatingOffset, proxyP19: bestSeatingProxy.proxyP19 } : null;
+
+        seatingDiagnostics.best = shortlist.length > 0
+          ? { offsetMm: shortlist[0].offsetMm, proxyP19: shortlist[0].proxyP19 }
+          : null;
         seatingDiagnostics.status = seatingDiagnostics.tested > 0 ? "completed" : "incomplete";
       }
       const seatingVerdict = seatingMaterial?.material ? "improvement" :
