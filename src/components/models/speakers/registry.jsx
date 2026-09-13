@@ -12,7 +12,7 @@ export const CATEGORY_ORDER = ["LCR", "SURROUNDS", "ARCHITECT", "SUBWOOFERS"];
 
 export const MODELS = [
   // LCR — EXACT ORDER
-  { key: "q4-3", label: "Q4-3", category: "LCR", widthMm: 280, heightMm: 210, depthMm: 110, sensitivity_dB_1w1m: 96, sensitivity_dB_2p83: 99, nominalOhms: 8, max_power: 120, max_spl_cont_db_1m_halfspace: 114, max_spl_peak_db_cf6_1m_halfspace: 120, max_spl_cont_db_1m_anechoic: 108, max_spl_peak_db_cf6_1m_anechoic: 114, price_gbp_exVat: 1820, retailPriceGBP: 1820.00, currency: "GBP", vatIncluded: true, vatRate: 0.20, hfOffAxis16k: { minus3deg: 35, minus5deg: 45 }, dispersion: { horizontal: { minus1p5dB: 38, minus3dB: 54, minus5dB: 72 } } },
+  { key: "q4-3", label: "Q4-3", category: "LCR", widthMm: 280, heightMm: 210, depthMm: 110, sensitivity_dB_1w1m: 98, sensitivity_dB_2p83: 101, nominalOhms: 4, max_power: 120, max_spl_cont_db_1m_halfspace: 114, max_spl_peak_db_cf6_1m_halfspace: 120, max_spl_cont_db_1m_anechoic: 108, max_spl_peak_db_cf6_1m_anechoic: 114, frequency_response_low: 100, usable_lf_hz_minus6db: 97, coverage_deg: { horizontal: 90, vertical: 45 }, price_gbp_exVat: 1820, retailPriceGBP: 1820.00, currency: "GBP", vatIncluded: true, vatRate: 0.20, hfOffAxis16k: { minus3deg: 35, minus5deg: 45 }, dispersion: { horizontal: { minus1p5dB: 38, minus3dB: 54, minus5dB: 72 } } },
   { key: "q6-3", label: "Q6-3", category: "LCR", widthMm: 280, heightMm: 280, depthMm: 110, sensitivity_dB_1w1m: 100, sensitivity_dB_2p83: 100, nominalOhms: 10, max_power: 120, max_spl_cont_db_1m_halfspace: 118, max_spl_peak_db_cf6_1m_halfspace: 124, max_spl_cont_db_1m_anechoic: 112, max_spl_peak_db_cf6_1m_anechoic: 118, price_gbp_exVat: 2090, retailPriceGBP: 2090.00, currency: "GBP", vatIncluded: true, vatRate: 0.20, hfOffAxis16k: { minus3deg: 35, minus5deg: 45 }, dispersion: { horizontal: { minus1p5dB: 39, minus3dB: 48, minus5dB: 64 } } },
   { key: "q4-5", label: "Q4-5", category: "LCR", widthMm: 500, heightMm: 400, depthMm: 160, sensitivity_dB_1w1m: 99, sensitivity_dB_2p83: 99, nominalOhms: 8, max_power: 400, max_spl_cont_db_1m_halfspace: 122, max_spl_peak_db_cf6_1m_halfspace: 128, max_spl_cont_db_1m_anechoic: 116, max_spl_peak_db_cf6_1m_anechoic: 122, price_gbp_exVat: 3910, retailPriceGBP: 3910.00, currency: "GBP", vatIncluded: true, vatRate: 0.20, hfOffAxis16k: { minus3deg: 40, minus5deg: 50 }, dispersion: { horizontal: { minus1p5dB: 38, minus3dB: 54, minus5dB: 72 } } },
   { key: "q8-5", label: "Q8-5", category: "LCR", widthMm: 500, heightMm: 600, depthMm: 160, sensitivity_dB_1w1m: 103, sensitivity_dB_2p83: 106, nominalOhms: 4, max_power: 800, max_spl_cont_db_1m_halfspace: 128, max_spl_peak_db_cf6_1m_halfspace: 134, max_spl_cont_db_1m_anechoic: 122, max_spl_peak_db_cf6_1m_anechoic: 128, price_gbp_exVat: 5730, retailPriceGBP: 5730.00, currency: "GBP", vatIncluded: true, vatRate: 0.20, hfOffAxis16k: { minus3deg: 40, minus5deg: 50 }, dispersion: { horizontal: { minus1p5dB: 38, minus3dB: 54, minus5dB: 72 } } },
@@ -36,7 +36,7 @@ export const MODELS = [
   { key: "evolve-4-2_s", label: "EVOLVE 4-2", category: "SURROUNDS", widthMm: 270, heightMm: 370, depthMm: 82, sensitivity_dB_1w1m: 96, sensitivity_dB_2p83: 99, nominalOhms: 4, max_power: 120, price_gbp_exVat: 1780, retailPriceGBP: 1780.00, currency: "GBP", vatIncluded: true, vatRate: 0.20 },
   { key: "evolve-6-3_s", label: "EVOLVE 6-3", category: "SURROUNDS", widthMm: 270, heightMm: 370, depthMm: 82, sensitivity_dB_1w1m: 100, sensitivity_dB_2p83: 103, nominalOhms: 4, max_power: 180, price_gbp_exVat: 2250, retailPriceGBP: 2250.00, currency: "GBP", vatIncluded: true, vatRate: 0.20 },
   { key: "evolve-8-4_s", label: "EVOLVE 8-4", category: "SURROUNDS", widthMm: 270, heightMm: 370, depthMm: 82, sensitivity_dB_1w1m: 102, sensitivity_dB_2p83: 106, nominalOhms: 3, max_power: 240, price_gbp_exVat: 2720, retailPriceGBP: 2720.00, currency: "GBP", vatIncluded: true, vatRate: 0.20 },
-  { key: "q4-3_s", label: "Q4-3", category: "SURROUNDS", widthMm: 280, heightMm: 210, depthMm: 110, sensitivity_dB_1w1m: 98, sensitivity_dB_2p83: 98, nominalOhms: 8, max_power: 120, price_gbp_exVat: 1820, retailPriceGBP: 1820.00, currency: "GBP", vatIncluded: true, vatRate: 0.20 },
+  { key: "q4-3_s", label: "Q4-3", category: "SURROUNDS", widthMm: 280, heightMm: 210, depthMm: 110, sensitivity_dB_1w1m: 98, sensitivity_dB_2p83: 101, nominalOhms: 4, max_power: 120, max_spl_cont_db_1m_halfspace: 114, max_spl_peak_db_cf6_1m_halfspace: 120, max_spl_cont_db_1m_anechoic: 108, max_spl_peak_db_cf6_1m_anechoic: 114, frequency_response_low: 100, usable_lf_hz_minus6db: 97, coverage_deg: { horizontal: 90, vertical: 45 }, price_gbp_exVat: 1820, retailPriceGBP: 1820.00, currency: "GBP", vatIncluded: true, vatRate: 0.20 },
   { key: "q6-3_s", label: "Q6-3", category: "SURROUNDS", widthMm: 280, heightMm: 280, depthMm: 110, sensitivity_dB_1w1m: 100, sensitivity_dB_2p83: 100, nominalOhms: 10, max_power: 120, price_gbp_exVat: 2090, retailPriceGBP: 2090.00, currency: "GBP", vatIncluded: true, vatRate: 0.20 },
   { key: "q4-5_s", label: "Q4-5", category: "SURROUNDS", widthMm: 500, heightMm: 400, depthMm: 160, sensitivity_dB_1w1m: 99, sensitivity_dB_2p83: 99, nominalOhms: 8, max_power: 400, price_gbp_exVat: 3910, retailPriceGBP: 3910.00, currency: "GBP", vatIncluded: true, vatRate: 0.20 },
   { key: "q8-5_s", label: "Q8-5", category: "SURROUNDS", widthMm: 500, heightMm: 600, depthMm: 160, sensitivity_dB_1w1m: 103, sensitivity_dB_2p83: 106, nominalOhms: 4, max_power: 800, price_gbp_exVat: 5730, retailPriceGBP: 5730.00, currency: "GBP", vatIncluded: true, vatRate: 0.20 },
@@ -375,6 +375,7 @@ export function getSpeakerModelMeta(modelName, orientation) {
       hfOffAxis16k: finalHfOffAxis16k,
       builtInTiltDeg: hit.builtInTiltDeg ?? null,
       dispersion: finalDispersion,
+      coverage_deg: hit.coverage_deg ?? null,
       // RP22 P17 measured engine (Stage 1 scaffolding) — null for every current model.
       polarModel: hit.polarModel ?? null,
       frequency_response_curve: hit.frequency_response_curve ?? null,
@@ -435,6 +436,7 @@ export function getSpeakerModelMeta(modelName, orientation) {
     hfOffAxis16k: finalHfOffAxis16k,
     builtInTiltDeg: hit.builtInTiltDeg ?? null,
     dispersion: finalDispersion,
+    coverage_deg: hit.coverage_deg ?? null,
     // RP22 P17 measured engine (Stage 1 scaffolding) — null for every current model.
     polarModel: hit.polarModel ?? null,
     bassCapability: hit.bassCapability ?? null,
