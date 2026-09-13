@@ -516,6 +516,8 @@ export default function ImproveBassResponseV2({
           onApplyStage={handleApplyStage}
           onApplyTradeOff={handleApplyTradeOff}
           stale={completedResultStale}
+          sharedBassResults={shared}
+          currentDesignFingerprint={currentDesignFingerprint}
         />
       )}
 

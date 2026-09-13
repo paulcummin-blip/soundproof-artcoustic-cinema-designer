@@ -28,6 +28,8 @@ export default function ImproveBassV2StageResults({
   onApplyStage,
   onApplyTradeOff,
   stale,
+  sharedBassResults,
+  currentDesignFingerprint,
 }) {
   if (!selection) return null;
 
@@ -91,6 +93,8 @@ export default function ImproveBassV2StageResults({
               }
               currentResult={currentResult}
               seatingPositions={seatingPositions}
+              sharedBassResults={sharedBassResults}
+              currentDesignFingerprint={currentDesignFingerprint}
             />
           ))}
         </div>

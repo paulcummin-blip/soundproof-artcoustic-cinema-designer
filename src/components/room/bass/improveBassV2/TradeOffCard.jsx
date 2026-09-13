@@ -15,10 +15,11 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Wrench, Settings, Scale, CheckCircle2, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Wrench, Settings, Scale, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { buildWhatChanged } from "./improveBassV2WhatChanged.js";
 import { buildCalibrationSummary } from "./improveBassV2Apply.js";
 import { buildTradeOffSummary, delayToPathLengthCm } from "./tradeOffClassifier.js";
+import { resolveTradeOffVerification, VERIFICATION_VERIFIED, VERIFICATION_FAILED } from "./tradeOffVerificationAuthority.js";
 
 function levelText(level) {
   const n = (() => {
@@ -136,6 +137,74 @@ function PracticalTuningSection({ result, currentInstances }) {
   );
 }
 
+/**
+ * Display the actual verified after-values from the completed bass authority.
+ * Shows the real P14/P18/P19/P20 values that the bass engine produced for the
+ * applied design — not the predicted values from the trade-off candidate.
+ */
+function VerifiedAfterValues({ verifiedValues }) {
+  const { perSeatP19Results, perSeatP20Results, p14AchievedLevel, p18AchievedExtensionHz } = verifiedValues;
+
+  // Summarise per-seat P19 levels
+  const p19Summary = useMemo(() => {
+    if (!Array.isArray(perSeatP19Results) || perSeatP19Results.length === 0) return null;
+    return perSeatP19Results.map((s) => {
+      const level = s.achievedLevel ?? s.p19Level ?? s.level;
+      const seatId = s.seatId || s.id || "?";
+      return { seatId, level };
+    });
+  }, [perSeatP19Results]);
+
+  // Summarise per-seat P20 deviation
+  const p20Summary = useMemo(() => {
+    if (!Array.isArray(perSeatP20Results) || perSeatP20Results.length === 0) return null;
+    return perSeatP20Results.map((s) => {
+      const deviation = s.deviationDb ?? s.p20DeviationDb ?? s.rawDeviationDb;
+      const seatId = s.seatId || s.id || "?";
+      return { seatId, deviation };
+    });
+  }, [perSeatP20Results]);
+
+  const levelText = (lvl) => {
+    const n = Number(lvl);
+    if (Number.isFinite(n) && n >= 1 && n <= 4) return `L${n}`;
+    if (typeof lvl === "string" && /^L[1-4]$/i.test(lvl)) return lvl.toUpperCase();
+    return "—";
+  };
+
+  return (
+    <div className="rounded-md border border-[#E0DDD7] bg-white p-2">
+      <div className="text-[9px] font-semibold uppercase tracking-wide text-[#625143]">
+        Verified after-values
+      </div>
+      <div className="mt-1 space-y-1">
+        {p14AchievedLevel != null && (
+          <div className="text-[10px] text-[#213428]">
+            <span className="font-semibold">P14 achieved:</span> {levelText(p14AchievedLevel)}
+          </div>
+        )}
+        {p18AchievedExtensionHz != null && (
+          <div className="text-[10px] text-[#213428]">
+            <span className="font-semibold">P18 extension:</span> {Number(p18AchievedExtensionHz).toFixed(1)} Hz
+          </div>
+        )}
+        {p19Summary && (
+          <div className="text-[10px] text-[#213428]">
+            <span className="font-semibold">P19 per-seat:</span>{" "}
+            {p19Summary.map((s) => `${s.seatId} ${levelText(s.level)}`).join(", ")}
+          </div>
+        )}
+        {p20Summary && (
+          <div className="text-[10px] text-[#213428]">
+            <span className="font-semibold">P20 per-seat:</span>{" "}
+            {p20Summary.map((s) => `${s.seatId} ${Number(s.deviation).toFixed(1)} dB`).join(", ")}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function WhatChangedSection({ result, snapshot, currentInstances }) {
   const [showChanges, setShowChanges] = useState(false);
 
@@ -213,29 +282,42 @@ export default function TradeOffCard({
   isApplied,
   currentResult,
   seatingPositions,
+  sharedBassResults,
+  currentDesignFingerprint,
 }) {
   const { result, tradeOff, candidateId } = tradeOffEntry;
   const { improvement, worsening, neutralText } = tradeOff;
   const summary = buildTradeOffSummary(improvement, worsening);
 
-  // Apply lifecycle: idle → applying → recalculating → verified
+  // Apply lifecycle: idle → applying → recalculating → verified | failed
   const [applyState, setApplyState] = useState("idle");
   const [declined, setDeclined] = useState(false);
 
   // When the parent confirms the tuning is committed, transition to recalculating.
-  // The bass engine then recalculates from the new tuning before we verify.
   useEffect(() => {
     if (applyState === "applying" && isApplied) {
       setApplyState("recalculating");
     }
   }, [applyState, isApplied]);
 
-  // After recalculation settles, transition to verified.
+  // Verification authority: resolve from the shared bass results.
+  // VERIFIED APPLIED only appears when a completed authoritative bass result
+  // exists for the applied design with P14/P18/P19/P20 values available.
+  // No fixed timer — the real result drives the transition.
+  const verification = useMemo(
+    () => resolveTradeOffVerification({ isApplied, shared: sharedBassResults, currentDesignFingerprint }),
+    [isApplied, sharedBassResults, currentDesignFingerprint]
+  );
+
   useEffect(() => {
     if (applyState !== "recalculating") return;
-    const timer = setTimeout(() => setApplyState("verified"), 800);
-    return () => clearTimeout(timer);
-  }, [applyState]);
+    if (verification.status === VERIFICATION_VERIFIED) {
+      setApplyState("verified");
+    } else if (verification.status === VERIFICATION_FAILED) {
+      setApplyState("failed");
+    }
+    // else: stay in "recalculating" until the real result arrives
+  }, [applyState, verification.status]);
 
   const handleApply = () => {
     setApplyState("applying");
@@ -246,12 +328,13 @@ export default function TradeOffCard({
     setDeclined(true);
   };
 
-  // After verified or declined, show the evidence card but hide action buttons
+  // After verified, failed, or declined, show the evidence card but hide action buttons
   const showActions = applyState === "idle" && !declined;
 
   return (
     <div data-candidate-id={candidateId} data-trade-off-card={candidateId}
       data-apply-state={applyState}
+      data-verification-status={verification.status}
       className="rounded-md border border-[#B8A88E] bg-[#F8F7F4] p-3">
 
       {/* Headline — neutral */}
@@ -306,12 +389,33 @@ export default function TradeOffCard({
           </span>
         </div>
       )}
-      {applyState === "verified" && (
-        <div className="mt-2 flex items-center gap-2 rounded-md border border-[#213428] bg-white p-2">
-          <CheckCircle2 className="h-3.5 w-3.5 text-[#213428]" />
-          <span className="text-[10px] font-semibold text-[#213428]">
-            VERIFIED APPLIED
-          </span>
+      {applyState === "verified" && verification.verifiedValues && (
+        <div className="mt-2 space-y-1.5">
+          <div className="flex items-center gap-2 rounded-md border border-[#213428] bg-white p-2">
+            <CheckCircle2 className="h-3.5 w-3.5 text-[#213428]" />
+            <span className="text-[10px] font-semibold text-[#213428]">
+              VERIFIED APPLIED
+            </span>
+          </div>
+          <VerifiedAfterValues verifiedValues={verification.verifiedValues} />
+        </div>
+      )}
+      {applyState === "failed" && (
+        <div className="mt-2 space-y-1.5">
+          <div className="flex items-center gap-2 rounded-md border border-red-300 bg-red-50 p-2">
+            <AlertCircle className="h-3.5 w-3.5 text-red-700" />
+            <span className="text-[10px] font-semibold text-red-800">
+              VERIFICATION FAILED
+            </span>
+          </div>
+          <p className="text-[10px] leading-relaxed text-red-700">
+            The bass recalculation did not produce a valid result for this calibration.
+            The trade-off was not verified. The before evidence remains visible above.
+            Recalculate bass response and try again, or keep the current balance.
+          </p>
+          <p className="text-[10px] leading-relaxed text-red-700" data-verification-failed-reason={verification.reason}>
+            Reason: {verification.reason}
+          </p>
         </div>
       )}
 
