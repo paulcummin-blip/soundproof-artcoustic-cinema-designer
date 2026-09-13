@@ -327,6 +327,40 @@ function calculateSplAtPoint({
  * @param {number} eqHeadroom_dB - EQ headroom in dB (default 0)
  * @returns {Map} seatId → metrics object
  */
+export function computeSpeakerCapabilityAtDistance({
+  speakerModelId,
+  distance_m,
+  powerW,
+  speakerMeta = null,
+  screenLoss_dB = 0,
+  eqHeadroom_dB = 0,
+  roomVolumeM3 = null,
+}) {
+  const d = Number(distance_m);
+  const p = Number(powerW);
+  if (!Number.isFinite(d) || d <= 0 || !Number.isFinite(p) || p <= 0) {
+    return { spl: null, debug: null };
+  }
+
+  const result = calculateSplAtPoint({
+    speakerPos: { x: 0, y: 0, z: 1.2 },
+    seatPos: { x: 0, y: d, z: 1.2 },
+    sensitivity_dB_1w1m: speakerMeta?.sensitivity_db_1w_1m ?? speakerMeta?.sensitivity ?? null,
+    powerW: p,
+    speakerModel: speakerModelId || speakerMeta?.id || speakerMeta?.model || null,
+    speakerMeta,
+    screenLoss_dB,
+    eqHeadroom_dB,
+    roomVolumeM3,
+  });
+
+  if (!result || !Number.isFinite(result.spl)) {
+    return { spl: null, debug: result?.debug || null };
+  }
+
+  return { spl: result.spl, debug: result.debug || null };
+}
+
 export function computeAllSeatSplMetrics({
   seats,
   placedSpeakers,
