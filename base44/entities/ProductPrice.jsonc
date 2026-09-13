@@ -1,15 +1,15 @@
 {
   "name": "ProductPrice",
   "type": "object",
-  "description": "Canonical editable retail price for a Sound Proof commercial product. One record per SKU. Read access is limited to platform admins plus Full Access and Price List Only account users; writes are platform-admin only.",
+  "description": "Canonical Sound Proof Product Master record. One record per commercial SKU. Product identity, availability, selector roles and retail pricing live here; detailed acoustic engineering remains linked through engineering_key. Reads are capability-gated and writes are platform-admin only.",
   "properties": {
     "sku": {
       "type": "string",
-      "description": "Unique product lookup key. Matches the model key used by getCommercialPrice (e.g. 'q4-3', 'evolve-2-1_s', 'sub2-12', 'cph-1000d', '500027'). For soundbar size variants, the composite key 'model:value' (e.g. 'c4-1:1222', 'multi-lcr:1441-l')."
+      "description": "Stable unique commercial product ID / SKU. Soundbar size variants use model:value."
     },
     "label": {
       "type": "string",
-      "description": "Display name shown in admin table and future price breakdowns."
+      "description": "Canonical product display name."
     },
     "category": {
       "type": "string",
@@ -20,17 +20,49 @@
         "Acoustic Treatment",
         "Accessory"
       ],
-      "description": "Product category for grouping and filtering."
+      "description": "Commercial product category."
     },
     "price_ex_vat": {
       "type": "number",
-      "description": "Canonical retail price ex VAT in GBP. null = price not set. Do NOT convert null to zero.",
+      "description": "Canonical retail price ex VAT in GBP. null means price not set; never convert null to zero.",
       "nullable": true
     },
     "active": {
       "type": "boolean",
       "default": true,
-      "description": "Inactive products are retained for historical reference but excluded from new price lookups."
+      "description": "Inactive products remain available to historical projects but are excluded from new selections and active price lookups."
+    },
+    "engineering_key": {
+      "type": "string",
+      "nullable": true,
+      "description": "Read-only link to the established acoustic engineering record. This editor never invents or duplicates engineering data."
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "lcr",
+          "centre_soundbar",
+          "surround",
+          "rear_surround",
+          "front_wide",
+          "overhead",
+          "subwoofer"
+        ]
+      },
+      "default": [],
+      "description": "Sound Proof selector roles supplied by this commercial product."
+    },
+    "selector_order": {
+      "type": "number",
+      "nullable": true,
+      "description": "Stable ordering within Sound Proof selectors."
+    },
+    "catalog_version": {
+      "type": "number",
+      "default": 1,
+      "description": "Product Master migration/version marker."
     }
   },
   "required": [
