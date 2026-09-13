@@ -69,6 +69,21 @@ export function buildWhatChanged(snapshot, winner) {
     }
   }
 
+  // Phase control (unity-gain all-pass, expressed as lag at 80 Hz)
+  const phaseChanges = [];
+  for (let i = 0; i < winnerTuning.length; i++) {
+    const wt = winnerTuning[i] || {};
+    const ct = currentTuning[i] || {};
+    const wp = Number(wt.phaseControlDeg ?? wt.phaseAdjust) || 0;
+    const cp = Number(ct.phaseControlDeg ?? ct.phaseAdjust) || 0;
+    if (Math.abs(wp - cp) > 0.1) {
+      phaseChanges.push(`Sub ${i + 1} ${wp.toFixed(0)}°`);
+    }
+  }
+  if (phaseChanges.length > 0) {
+    calibrationChanges.push(`Phase — ${phaseChanges.join(" / ")} lag at 80 Hz (all-pass)`);
+  }
+
   // Trim (relative level)
   const trimChanges = [];
   for (let i = 0; i < winnerTuning.length; i++) {
