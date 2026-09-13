@@ -76,11 +76,11 @@ export default function ClientDesignHighlights({ highlights, print, recommendati
   return (
     <div style={containerStyle}>
       {!print && (
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 20, textAlign: "center" }}>
           <img
             src={LOGO_URL}
             alt="Sound Proof"
-            style={{ width: 290, height: "auto", objectFit: "contain", marginBottom: 12, alignSelf: "center" }}
+            style={{ width: 290, height: "auto", objectFit: "contain", marginBottom: 12, display: "block", margin: "0 auto" }}
           />
           <h1 style={{
             margin: 0,
