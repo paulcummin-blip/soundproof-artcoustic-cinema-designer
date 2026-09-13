@@ -19,7 +19,8 @@
 
 import React, { useMemo } from "react";
 import { LEVEL_FILLS, LEVEL_LABEL_COLORS, zoneLabelPosition } from "./levelFills";
-import { PositionMarker } from "./SeatMarker";
+import SeatMarker from "./SeatMarker";
+import { getSeatGradeColors } from "./visualReportSeatStyle";
 import { computeHaloRadiusPx, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 
@@ -274,16 +275,17 @@ export default function ClientRecommendedSeatingPosition({
           SCREEN
         </text>
 
-        {/* ── Seats — compact spacing-aware position markers ── */}
+        {/* ── Seats — spacing-aware markers with achieved-level colour band ── */}
         {plotSeats.map((seat) => {
           const sp = toPx(seat.x, seat.y);
           return (
-            <PositionMarker
+            <SeatMarker
               key={seat.id}
               cx={sp.px}
               cy={sp.py}
               haloRadius={haloRadius}
               isPrimary={seat.isPrimary}
+              singleLevel={seat.level}
             />
           );
         })}
@@ -384,19 +386,34 @@ export default function ClientRecommendedSeatingPosition({
           <tbody>
             <tr>
               <td style={{ padding: "4px 10px", textAlign: "left", fontWeight: 600, color: "#625143" }}>P1 Distance</td>
-              {plotSeats.map((seat) => (
-                <td
-                  key={seat.id}
-                  style={{
-                    padding: "4px 12px",
-                    textAlign: "center",
-                    fontWeight: seat.isPrimary ? 700 : 500,
-                    color: seat.isPrimary ? "#213428" : "#3E4349",
-                  }}
-                >
-                  {seat.level ?? "—"}
-                </td>
-              ))}
+              {plotSeats.map((seat) => {
+                const grade = getSeatGradeColors(seat.level);
+                return (
+                  <td
+                    key={seat.id}
+                    style={{
+                      padding: "4px 12px",
+                      textAlign: "center",
+                      fontWeight: seat.isPrimary ? 700 : 500,
+                      color: grade.text,
+                    }}
+                  >
+                    {seat.level ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        <span style={{
+                          display: "inline-block",
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: grade.fill,
+                          border: `1px solid ${grade.border}`,
+                        }} />
+                        {seat.level}
+                      </span>
+                    ) : "—"}
+                  </td>
+                );
+              })}
             </tr>
             <tr>
               <td style={{ padding: "2px 10px 4px" }} />
