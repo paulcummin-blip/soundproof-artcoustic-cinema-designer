@@ -70,6 +70,7 @@ import { buildRp22SeatCoverageResult } from '@/components/utils/rp22SeatCoverage
 import { resolveSeatPriority, getPrimarySeats, getSecondarySeats } from '@/components/utils/seatPriorityAuthority';
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
+import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReportPage';
 import { resolveBassReadiness } from '@/components/hooks/useAppDesignRating';
 import { publishDesignReviewHandoff, clearDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 
@@ -1794,6 +1795,14 @@ function RP22ReportInner() {
                             </>
                         )}
 
+                        {/* ── About Sound Proof — final page (fixed brand closing page) ── */}
+                        <section
+                          id="pdf-about-sound-proof"
+                          className="print-page-break-before print-avoid-break"
+                          style={{ background: '#FFFFFF', padding: 0, margin: 0 }}
+                        >
+                            <AboutSoundProofReportPage />
+                        </section>
 
                     </div>
                 </div>

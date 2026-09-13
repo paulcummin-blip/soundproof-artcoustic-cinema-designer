@@ -14,6 +14,7 @@
 import React from "react";
 import PrintP5Content from "@/components/report/client/print/PrintP5Content";
 import PrintP9Content from "@/components/report/client/print/PrintP9Content";
+import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
 import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
 import ClientBestListeningArea from "@/components/report/client/ClientBestListeningArea";
@@ -346,6 +347,9 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
               />
             </div>
           </>
+        )}
+        {printData?.type === "about-sound-proof" && (
+          <AboutSoundProofReportPage />
         )}
       </div>
 

@@ -39,6 +39,7 @@ import ClientAcousticTreatment from "@/components/report/client/ClientAcousticTr
 import ClientBassPerformance from "@/components/report/client/ClientBassPerformance";
 import { selectClientBassPerformance } from "@/components/report/client/selectClientBassPerformance";
 import ClientRecommendationFooter from "@/components/report/client/ClientRecommendationFooter";
+import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
@@ -551,7 +552,7 @@ export default function RP22ClientReport() {
         },
       });
     }
-    // Acoustic Treatment (always last — only when enabled)
+    // Acoustic Treatment (only when enabled)
     if (appState?.acousticTreatmentEnabled && Number(appState?.selectedAbfuserQty) > 0) {
       pages.push({
         id: "acoustic-treatment",
@@ -576,6 +577,23 @@ export default function RP22ClientReport() {
         },
       });
     }
+    // About Sound Proof — always the final page (fixed brand closing page)
+    pages.push({
+      id: "about-sound-proof",
+      visual: (
+        <div style={{
+          background: "#FFFFFF",
+          borderRadius: 16,
+          padding: "48px 40px",
+          minHeight: 400,
+          boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
+          border: "1px solid #DCDBD6",
+        }}>
+          <AboutSoundProofReportPage />
+        </div>
+      ),
+      printData: { type: "about-sound-proof" },
+    });
     return pages;
   }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence]);
 
