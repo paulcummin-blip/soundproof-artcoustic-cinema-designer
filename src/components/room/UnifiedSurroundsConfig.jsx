@@ -3,7 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAppState } from '@/components/AppStateProvider';
-import { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, displayModelKey } from "@/components/models/speakers/registry";
+import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
+import { useProductRoleOptions } from "@/components/products/useProductMaster";
+import { PRODUCT_ROLES } from "@/components/products/productMaster";
 import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { timeNowMs } from "@/components/utils/timeNow";
 import SurroundsSelector from '../speakers/SurroundsSelector';
@@ -50,6 +52,9 @@ export default function UnifiedSurroundsConfig({
   }, [dimensions]);
 
   const app = useAppState();
+  const { options: sideModels } = useProductRoleOptions(PRODUCT_ROLES.SURROUND);
+  const { options: rearModels } = useProductRoleOptions(PRODUCT_ROLES.REAR_SURROUND);
+  const { options: wideModels } = useProductRoleOptions(PRODUCT_ROLES.FRONT_WIDE);
   const activeRoles = useMemo(() => {
     const roles = [];
     if (allowedRoles.has('SL')) roles.push('SL', 'SR');
@@ -70,8 +75,12 @@ export default function UnifiedSurroundsConfig({
     };
 
     const surroundChoiceKeys = new Set(
-      ((getModelsByCategoryOrdered()?.SURROUNDS) || []).map((item) => item.key)
+      [...sideModels, ...rearModels, ...wideModels].map((item) => item.key)
     );
+    for (const speaker of (Array.isArray(placedSpeakers) ? placedSpeakers : [])) {
+      const historicalKey = normaliseModelKey(speaker?.model || '');
+      if (historicalKey) surroundChoiceKeys.add(historicalKey);
+    }
 
     const normalizeSurroundChoiceModel = (value) => {
       const normalized = normaliseModelKey(String(value || '').trim());
@@ -126,7 +135,7 @@ export default function UnifiedSurroundsConfig({
 
       return next;
     });
-  }, [app?.globalSurroundModel, placedSpeakers, setSurroundConfig]);
+  }, [app?.globalSurroundModel, placedSpeakers, setSurroundConfig, sideModels, rearModels, wideModels]);
 
   const handleSurroundModelChange = useCallback((config) => {
     const safeConfig = {
@@ -280,24 +289,32 @@ export default function UnifiedSurroundsConfig({
   ]);
 
   const surroundChoices = useMemo(() => {
-    const byCat = getModelsByCategoryOrdered();
-    const surrounds = byCat['SURROUNDS'] || [];
+    const activeGroups = [];
+    if (canSides) activeGroups.push(sideModels);
+    if (canRears) activeGroups.push(rearModels);
+    if (canWides) activeGroups.push(wideModels);
+    const groups = activeGroups.length ? activeGroups : [sideModels];
+    const allowedByEveryActiveRole = groups[0].filter((model) =>
+      groups.every((group) => group.some((candidate) => candidate.key === model.key))
+    );
     return [
       { value: 'off', label: 'Off' },
-      ...surrounds.map(s => ({ value: s.key, label: displayModelKey(s.label) }))
+      ...allowedByEveryActiveRole.map((model) => ({ value: model.key, label: model.label })),
     ];
-  }, [getModelsByCategoryOrdered]);
+  }, [canSides, canRears, canWides, sideModels, rearModels, wideModels]);
 
-  const surroundOverrideChoices = useMemo(() => {
-    return surroundChoices.filter(c => c.value !== 'off');
-  }, [surroundChoices]);
+  const sideChoices = useMemo(() => sideModels.map((model) => ({ value: model.key, label: model.label })), [sideModels]);
+  const rearChoices = useMemo(() => rearModels.map((model) => ({ value: model.key, label: model.label })), [rearModels]);
+  const wideChoices = useMemo(() => wideModels.map((model) => ({ value: model.key, label: model.label })), [wideModels]);
 
   return (
     <div className="space-y-3 p-2">
       <SurroundsSelector
         layout={dolbyPreset}
         choices={surroundChoices}
-        overrideChoices={surroundOverrideChoices}
+        sideChoices={sideChoices}
+        rearChoices={rearChoices}
+        wideChoices={wideChoices}
         value={surroundConfig.value}
         override={surroundConfig.override}
         onChange={handleSurroundModelChange}
