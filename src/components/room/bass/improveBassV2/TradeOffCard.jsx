@@ -87,8 +87,9 @@ function PracticalTuningSection({ result, currentInstances }) {
   const relativeDelayMs = hasGroups ? rearAvgDelay - frontAvgDelay : 0;
   const relativePathCm = delayToPathLengthCm(relativeDelayMs);
 
-  const formatDelay = (v) => `${v.toFixed(1)} ms`;
-  const formatGain = (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)} dB`;
+  const roundToHalf = (v) => Math.round(Number(v) * 2) / 2;
+  const formatDelay = (v) => `${roundToHalf(v).toFixed(1)} ms`;
+  const formatGain = (v) => `${v > 0 ? "+" : ""}${roundToHalf(v).toFixed(1)} dB`;
 
   return (
     <div className="mt-2 rounded-md border border-[#E0DDD7] bg-white p-2">
@@ -217,16 +218,24 @@ export default function TradeOffCard({
   const { improvement, worsening, neutralText } = tradeOff;
   const summary = buildTradeOffSummary(improvement, worsening);
 
-  // Apply lifecycle: idle → applying → verified
+  // Apply lifecycle: idle → applying → recalculating → verified
   const [applyState, setApplyState] = useState("idle");
   const [declined, setDeclined] = useState(false);
 
-  // When the parent confirms the tuning is applied, transition to verified
+  // When the parent confirms the tuning is committed, transition to recalculating.
+  // The bass engine then recalculates from the new tuning before we verify.
   useEffect(() => {
     if (applyState === "applying" && isApplied) {
-      setApplyState("verified");
+      setApplyState("recalculating");
     }
   }, [applyState, isApplied]);
+
+  // After recalculation settles, transition to verified.
+  useEffect(() => {
+    if (applyState !== "recalculating") return;
+    const timer = setTimeout(() => setApplyState("verified"), 800);
+    return () => clearTimeout(timer);
+  }, [applyState]);
 
   const handleApply = () => {
     setApplyState("applying");
@@ -275,8 +284,8 @@ export default function TradeOffCard({
       {/* What Sound Proof checked — always visible (evidence retained) */}
       <WhatChangedSection result={result} snapshot={snapshot} currentInstances={currentInstances} />
 
-      {/* Practical calibrator settings — visible when applying or verified */}
-      {(applyState === "applying" || applyState === "verified" || isApplied) && (
+      {/* Practical calibrator settings — visible when applying, recalculating, or verified */}
+      {(applyState === "applying" || applyState === "recalculating" || applyState === "verified" || isApplied) && (
         <PracticalTuningSection result={result} currentInstances={currentInstances} />
       )}
 
@@ -286,6 +295,14 @@ export default function TradeOffCard({
           <Loader2 className="h-3.5 w-3.5 animate-spin text-[#213428]" />
           <span className="text-[10px] font-semibold text-[#213428]">
             APPLYING CALIBRATION
+          </span>
+        </div>
+      )}
+      {applyState === "recalculating" && (
+        <div className="mt-2 flex items-center gap-2 rounded-md border border-[#E0DDD7] bg-white p-2">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-[#213428]" />
+          <span className="text-[10px] font-semibold text-[#213428]">
+            RECALCULATING BASS RESPONSE
           </span>
         </div>
       )}

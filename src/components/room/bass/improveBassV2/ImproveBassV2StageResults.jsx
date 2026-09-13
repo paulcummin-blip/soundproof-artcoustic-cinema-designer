@@ -84,7 +84,11 @@ export default function ImproveBassV2StageResults({
               snapshot={snapshot}
               currentInstances={currentInstances}
               onApply={onApplyTradeOff}
-              isApplied={isOptimisedApplied(currentInstances, entry.result, roomDims)}
+              isApplied={
+                entry.result.candidateKind === "calibration"
+                  ? isCalibrationApplied(currentInstances, entry.result.appliedTuning || entry.result.tuning || [])
+                  : isOptimisedApplied(currentInstances, entry.result, roomDims)
+              }
               currentResult={currentResult}
               seatingPositions={seatingPositions}
             />
