@@ -6,6 +6,11 @@ import {
   resonantTransfer,
 } from './modalCalculations.js';
 import { buildFrequencyAxis, interpolateCurveDb } from './rewCorePrimitives.js';
+import {
+  allPassPhaseRadians,
+  normalisePhaseControlDeg,
+  tuningPhaseRadians,
+} from './subwooferPhaseControl.js';
 
 const SPEED_OF_SOUND_MPS = 343;
 const MIN_DISTANCE_M = 0.01;
@@ -13,7 +18,7 @@ const MIN_DISTANCE_M = 0.01;
 
 
 function normalizeSubTuning(tuning) {
-  const defaults = { gainDb: 0, delayMs: 0, polarity: 0 };
+  const defaults = { gainDb: 0, delayMs: 0, polarity: 0, phaseControlDeg: 0 };
 
   if (!tuning || typeof tuning !== 'object') {
     return defaults;
@@ -22,7 +27,8 @@ function normalizeSubTuning(tuning) {
   return {
     gainDb: Number.isFinite(Number(tuning.gainDb)) ? Number(tuning.gainDb) : 0,
     delayMs: Number.isFinite(Number(tuning.delayMs)) ? Number(tuning.delayMs) : 0,
-    polarity: Number(tuning.polarity) === 180 ? 180 : 0,
+    polarity: Number(tuning.polarity) === 180 || Number(tuning.polarity) < 0 ? 180 : 0,
+    phaseControlDeg: normalisePhaseControlDeg(tuning.phaseControlDeg ?? tuning.phaseAdjust),
   };
 }
 
@@ -158,12 +164,12 @@ function rewModalBandwidthQ(freqHz, absorptionQ, bandwidthScale) {
 // are untouched. Uses Allen & Berkley (1979) Appendix A Eq. A2 dimensional Green's function
 // form (k_r² − k² real part, k·k_r/Q imaginary part, 1/V room-volume normalisation) instead of
 // the legacy 1−β² normalised resonant transfer function. Matches Case 065 / Case 071 variant B.
-function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, modalSourceAmplitude1m, delayMs, polarity, captureContributions = false, applyModeMultiplicity = false, roomIsSealed = false) {
+function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, modalSourceAmplitude1m, delayMs, polarity, phaseControlDeg = 0, captureContributions = false, applyModeMultiplicity = false, roomIsSealed = false) {
   const { widthM, lengthM, heightM } = dims;
   const contributions = [];
   const roomVolumeM3 = widthM * lengthM * heightM;
   const k = (2 * Math.PI * frequencyHz) / SPEED_OF_SOUND_MPS;
-  const tuningPhase = (-2 * Math.PI * frequencyHz * (delayMs / 1000)) + (polarity === 180 ? Math.PI : 0);
+  const tuningPhase = tuningPhaseRadians(frequencyHz, { delayMs, polarity, phaseControlDeg });
   const tuningCos = Math.cos(tuningPhase);
   const tuningSin = Math.sin(tuningPhase);
 
@@ -361,7 +367,7 @@ function buildPartialCoherenceDiagnostic({ frequencyHz, preModalRe, preModalIm, 
   };
 }
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0, debugMode200Multiplier = 1.0, debugModalHSign = 'normal', highOrderAxialScale = 1.0, axialFamilyScale = 1.0, tangentialFamilyScale = 1.0, obliqueFamilyScale = 1.0, muteModeKey = null) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0, phaseControlDeg = 0, debugMode200Multiplier = 1.0, debugModalHSign = 'normal', highOrderAxialScale = 1.0, axialFamilyScale = 1.0, tangentialFamilyScale = 1.0, obliqueFamilyScale = 1.0, muteModeKey = null) {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
@@ -437,9 +443,11 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     // Apply sub tuning phase (delay + polarity) to each modal contribution.
     // This ensures polarity inversion and time alignment affect the modal pressure field,
     // not just the direct/reflection path.
-    const tuningPhase =
-      (-2 * Math.PI * frequencyHz * (delayMs / 1000)) +
-      (polarity === 180 ? Math.PI : 0);
+    const tuningPhase = tuningPhaseRadians(frequencyHz, {
+      delayMs,
+      polarity,
+      phaseControlDeg,
+    });
     const tuningCos = Math.cos(tuningPhase);
     const tuningSin = Math.sin(tuningPhase);
     const tunedModalContrib = {
@@ -1101,7 +1109,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     const timeOfFlightPhase = -2 * Math.PI * frequencyHz * (distanceM / SPEED_OF_SOUND_MPS);
     const delayPhase = -2 * Math.PI * frequencyHz * (source.tuning.delayMs / 1000);
     const polarityPhase = source.tuning.polarity === 180 ? Math.PI : 0;
-    const totalPhase = timeOfFlightPhase + delayPhase + polarityPhase;
+    const phaseControlPhase = allPassPhaseRadians(frequencyHz, source.tuning.phaseControlDeg);
+    const sourceTuningPhase = delayPhase + polarityPhase + phaseControlPhase;
+    const totalPhase = timeOfFlightPhase + sourceTuningPhase;
 
     directRe = amplitude * Math.cos(totalPhase);
     directIm = amplitude * Math.sin(totalPhase);
@@ -1139,7 +1149,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       // Phase jitter was removed after parity audit showed it shallowed the 40 Hz null and shifted its centre.
       // disableReflectionPhaseJitter flag is preserved for reference but no longer alters output.
       const phaseJitter = 0;
-      const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
+      const imageTotalPhase = imageTimeOfFlightPhase + sourceTuningPhase;
 
       // __TEMP_REW_PARITY_TEST_REFLECTION_COHERENCE__
       // Temporarily forcing full coherence (1.0) to test whether the existing
@@ -1196,7 +1206,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         if (reflectionGainScale !== 1.0) imageAmplitude *= reflectionGainScale;
         const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
         // Step-debug copy: jitter removed to match production path.
-        const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
+        const imageTotalPhase = imageTimeOfFlightPhase + sourceTuningPhase;
         // __TEMP_REW_PARITY_TEST_REFLECTION_COHERENCE__ (debug copy — kept in sync with main path)
         const debugCoherenceWeight = disableReflectionCoherenceWeight
           ? 1
@@ -1278,7 +1288,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       } = skipLegacyModal
         ? { modalSumRe: 0, modalSumIm: 0, diagnosticPerturbedModalSumRe: 0, diagnosticPerturbedModalSumIm: 0, distributedCoherenceModalSumRe: 0, distributedCoherenceModalSumIm: 0, splitCoherenceModalSumRe: 0, splitCoherenceModalSumIm: 0, splitCoherenceModalEnergySq: 0, _debugStrongestMode: null, _debugModalContributors: null, _debugActiveModalVectorBreakdown: null }
         : legacyModalTransferLocal(
-            frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale, source.tuning.delayMs, source.tuning.polarity,
+            frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale, source.tuning.delayMs, source.tuning.polarity, source.tuning.phaseControlDeg,
             Number.isFinite(Number(options?.debugMode200Multiplier)) ? Number(options.debugMode200Multiplier) : 1.0, // __TEMP_REW_PARITY_MODE_200_SCALE__
             debugModalHSign, // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
             highOrderAxialScale, // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
@@ -1315,7 +1325,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         });
         const abResult = abCorrectedModalTransferLocal(
           frequencyHz, abModes, source, seat, { widthM, lengthM, heightM },
-          abSourceUnit, source.tuning.delayMs, source.tuning.polarity, captureThisFrequency,
+          abSourceUnit, source.tuning.delayMs, source.tuning.polarity, source.tuning.phaseControlDeg, captureThisFrequency,
           options?.abApplyModeMultiplicity !== false,
           options?.roomIsSealed !== false
         );
@@ -1962,9 +1972,7 @@ export function simulateBassResponseRewParityField(roomDims, seatPos, sub, subPr
 
     // Apply sub tuning phase (delay + polarity) once per frequency bin.
     // This rotates the entire modal field contribution coherently.
-    const tuningPhase =
-      (-2 * Math.PI * frequencyHz * (source.tuning.delayMs / 1000)) +
-      (source.tuning.polarity === 180 ? Math.PI : 0);
+    const tuningPhase = tuningPhaseRadians(frequencyHz, source.tuning);
     const tuningCos = Math.cos(tuningPhase);
     const tuningSin = Math.sin(tuningPhase);
 
