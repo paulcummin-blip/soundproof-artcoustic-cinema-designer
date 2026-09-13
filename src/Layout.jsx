@@ -17,7 +17,8 @@ import {
   Database,
   Settings,
   Tags,
-  UserCog
+  UserCog,
+  FileText
 } from "lucide-react";
 
 import ApiBadge from "@/components/ui/ApiBadge";
@@ -41,6 +42,7 @@ const menuItems = [
   { title: "Room Designer", url: "/RoomDesigner", icon: Home, capability: "soundProof" },
   { title: "SPL Calculator", url: "/SPLCalculator", icon: Calculator, capability: "soundProof", adminOnly: true },
   { title: "Price List", url: "/PriceList", icon: Tags, capability: "priceList" },
+  { title: "About Sound Proof", url: "/AboutSoundProof", icon: FileText, alwaysVisible: true },
   { title: "Users & Permissions", url: "/account/users", icon: UserCog, capability: "manageUsers" },
 ];
 
@@ -54,7 +56,7 @@ export default function Layout({ children, currentPageName }) {
   const canUseCommercial = hasCapability(user, "commercial");
   const accountName = user?.access_context?.account?.name || null;
   const availableMenuItems = menuItems.filter((item) =>
-    hasCapability(user, item.capability) && (!item.adminOnly || isMasterAdmin(user))
+  (item.alwaysVisible || hasCapability(user, item.capability)) && (!item.adminOnly || isMasterAdmin(user))
   );
   const [dealerAccountUrl, setDealerAccountUrl] = React.useState(null);
 
