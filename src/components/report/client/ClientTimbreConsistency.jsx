@@ -374,15 +374,15 @@ export default function ClientTimbreConsistency({
             return (
               <div key={entry.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <svg width={18} height={18} viewBox="0 0 20 20">
-                  <circle cx={10} cy={10} r={6.5} fill="none" stroke="#E8E8E5" strokeWidth={2.5} />
-                  {seg && (
-                    <path
-                      d={buildRingSegmentPath(10, 10, 4.5, 8, seg.startAngle, seg.endAngle)}
-                      fill="#625143"
-                      stroke="none"
-                    />
-                  )}
-                </svg>
+                   <circle cx={10} cy={10} r={3} fill="#625143" stroke="#F8F8F7" strokeWidth={0.8} />
+                   {seg && (
+                     <path
+                       d={buildRingSegmentPath(10, 10, 6.5, 8, seg.startAngle, seg.endAngle)}
+                       fill="#625143"
+                       stroke="none"
+                     />
+                   )}
+                 </svg>
                 <span style={{ fontSize: 11, color: "#3E4349", letterSpacing: "0.02em" }}>
                   {entry.label}
                 </span>

@@ -34,6 +34,7 @@ import {
   PRIMARY_STROKE_WIDTH,
   READABLE_HALO_THRESHOLD_PX,
   buildRingSegmentPath,
+  computeBandGeometry,
 } from "./seatMarkerGeometry";
 
 const NEUTRAL_DISC_FILL = "#625143";
@@ -51,18 +52,18 @@ export default function SeatMarker({
   fallback,
 }) {
   const useFallback = fallback || haloRadius < READABLE_HALO_THRESHOLD_PX;
-  const haloInnerR = CENTRAL_DISC_R + HALO_INNER_OFFSET;
-  const haloOuterR = Math.max(haloInnerR + 2, haloRadius);
-  const primaryRingR = haloOuterR + PRIMARY_STROKE_WIDTH / 2 + 1;
 
   // ── Fallback: compact marker, no segments ──
+  // The fallback uses the existing compact treatment (neutral thin ring +
+  // centre disc + Primary keyline).  It NEVER turns bands into filled wedges.
   if (useFallback) {
+    const fallbackR = Math.max(CENTRAL_DISC_R + HALO_INNER_OFFSET + 2, haloRadius);
     return (
       <g>
         <circle
           cx={cx}
           cy={cy}
-          r={haloOuterR}
+          r={fallbackR}
           fill="none"
           stroke={FALLBACK_RING_COLOR}
           strokeWidth={1.5}
@@ -79,7 +80,7 @@ export default function SeatMarker({
           <circle
             cx={cx}
             cy={cy}
-            r={haloOuterR + PRIMARY_STROKE_WIDTH / 2}
+            r={fallbackR + PRIMARY_STROKE_WIDTH / 2}
             fill="none"
             stroke={PRIMARY_RING_COLOR}
             strokeWidth={PRIMARY_STROKE_WIDTH}
@@ -89,7 +90,16 @@ export default function SeatMarker({
     );
   }
 
-  // ── Multi-segment halo (BLA: 3 segments, Timbre: 2 segments) ──
+  // ── Thin annular band geometry ──
+  // The envelope radius (haloRadius) is the FULL outer extent including the
+  // Primary keyline.  The performance band sits inside as a narrow ring near
+  // the outer edge, leaving the centre neutral and visually dominant.
+  const { bandInnerR, bandOuterR, primaryKeylineR, bandThickness } =
+    computeBandGeometry(haloRadius);
+
+  // ── Multi-segment thin annular band (BLA: 3 arcs, Timbre: 2 arcs) ──
+  // Narrow ring segments near the outer edge — NOT filled wedges from centre.
+  // The neutral centre remains visually dominant.
   if (segments && segments.length > 0) {
     return (
       <g>
@@ -98,8 +108,8 @@ export default function SeatMarker({
           const path = buildRingSegmentPath(
             cx,
             cy,
-            haloInnerR,
-            haloOuterR,
+            bandInnerR,
+            bandOuterR,
             seg.startAngle,
             seg.endAngle
           );
@@ -109,7 +119,7 @@ export default function SeatMarker({
               d={path}
               fill={grade.fill}
               stroke={grade.border}
-              strokeWidth={0.8}
+              strokeWidth={0.6}
             />
           );
         })}
@@ -122,12 +132,12 @@ export default function SeatMarker({
           stroke={NEUTRAL_DISC_STROKE}
           strokeWidth={1}
         />
-        {/* Primary outer keyline — independent of grade */}
+        {/* Primary outer keyline — at the envelope edge, independent of grade */}
         {isPrimary && (
           <circle
             cx={cx}
             cy={cy}
-            r={primaryRingR}
+            r={primaryKeylineR}
             fill="none"
             stroke={PRIMARY_RING_COLOR}
             strokeWidth={PRIMARY_STROKE_WIDTH}
@@ -137,29 +147,28 @@ export default function SeatMarker({
     );
   }
 
-  // ── Single-level halo (P9: one semantic result colour) ──
+  // ── Single-level thin annular band (P9: one continuous narrow band) ──
   const grade = getSeatGradeColors(singleLevel);
-  const ringMidR = (haloInnerR + haloOuterR) / 2;
-  const ringWidth = haloOuterR - haloInnerR;
+  const bandMidR = (bandInnerR + bandOuterR) / 2;
   return (
     <g>
-      {/* Thick-stroke ring filled with the grade colour */}
+      {/* Thin annular band filled with the grade colour */}
       <circle
         cx={cx}
         cy={cy}
-        r={ringMidR}
+        r={bandMidR}
         fill="none"
         stroke={grade.fill}
-        strokeWidth={ringWidth}
+        strokeWidth={bandThickness}
       />
       {/* Thin outer outline in the grade border colour */}
       <circle
         cx={cx}
         cy={cy}
-        r={haloOuterR}
+        r={bandOuterR}
         fill="none"
         stroke={grade.border}
-        strokeWidth={1}
+        strokeWidth={0.8}
       />
       {/* Central listening-position disc */}
       <circle
@@ -170,12 +179,12 @@ export default function SeatMarker({
         stroke={NEUTRAL_DISC_STROKE}
         strokeWidth={1}
       />
-      {/* Primary outer keyline — independent of grade */}
+      {/* Primary outer keyline — at the envelope edge, independent of grade */}
       {isPrimary && (
         <circle
           cx={cx}
           cy={cy}
-          r={primaryRingR}
+          r={primaryKeylineR}
           fill="none"
           stroke={PRIMARY_RING_COLOR}
           strokeWidth={PRIMARY_STROKE_WIDTH}

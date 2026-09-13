@@ -44,6 +44,70 @@ export const HALO_INNER_OFFSET = 3;
 /** Primary outer ring stroke width. */
 export const PRIMARY_STROKE_WIDTH = 3.5;
 
+// ── Annular band geometry (thin outer performance band) ──
+
+/** Target band thickness at normal report size (px). */
+export const BAND_THICKNESS_NORMAL_PX = 6;
+
+/** Minimum band thickness before the compact fallback is preferred (px). */
+export const BAND_THICKNESS_MIN_PX = 2.5;
+
+/** Band thickness as a fraction of the envelope radius (for small markers). */
+export const BAND_THICKNESS_FRACTION = 0.22;
+
+/** Gap between the performance band outer edge and the Primary keyline inner edge (px). */
+export const PRIMARY_GAP_PX = 2.5;
+
+/** Minimum Primary gap (px). */
+export const PRIMARY_GAP_MIN_PX = 1.5;
+
+/**
+ * Compute the thin annular band geometry from the spacing-safe envelope radius.
+ *
+ * The envelope radius (from computeHaloRadiusPx) is the FULL outer extent
+ * including the Primary keyline.  Everything is drawn INSIDE this envelope so
+ * no overlap is possible — the largest Primary marker fits within the
+ * spacing-safe marker envelope.
+ *
+ * Layout (outer → inner):
+ *   envelopeR          ← spacing-safe outer edge
+ *   primaryKeylineR    ← Primary keyline centre (stroke spans the outer edge)
+ *   bandOuterR         ← performance band outer edge (gap below keyline)
+ *   bandInnerR         ← performance band inner edge
+ *   CENTRAL_DISC_R     ← neutral listening-position disc
+ *
+ * All seats use the same band size — the Primary keyline space is reserved
+ * for every seat so Secondary bands are identical to Primary bands.
+ *
+ * @param {number} envelopeR - full outer extent from computeHaloRadiusPx
+ * @returns {{ bandInnerR:number, bandOuterR:number, primaryKeylineR:number, bandThickness:number, primaryGap:number }}
+ */
+export function computeBandGeometry(envelopeR) {
+  const bandThickness = Math.max(
+    BAND_THICKNESS_MIN_PX,
+    Math.min(BAND_THICKNESS_NORMAL_PX, envelopeR * BAND_THICKNESS_FRACTION)
+  );
+  const primaryGap = Math.max(
+    PRIMARY_GAP_MIN_PX,
+    Math.min(PRIMARY_GAP_PX, envelopeR * 0.09)
+  );
+  // Primary keyline centre — its outer edge coincides with the envelope.
+  const primaryKeylineR = Math.max(
+    CENTRAL_DISC_R + 1,
+    envelopeR - PRIMARY_STROKE_WIDTH / 2
+  );
+  // Band outer edge sits inside the keyline inner edge + gap.
+  const bandOuterR = Math.max(
+    CENTRAL_DISC_R + HALO_INNER_OFFSET + bandThickness,
+    primaryKeylineR - PRIMARY_STROKE_WIDTH / 2 - primaryGap
+  );
+  const bandInnerR = Math.max(
+    CENTRAL_DISC_R + HALO_INNER_OFFSET,
+    bandOuterR - bandThickness
+  );
+  return { bandInnerR, bandOuterR, primaryKeylineR, bandThickness, primaryGap };
+}
+
 // ── Segment layouts (SVG angles, degrees, clockwise from 3 o'clock) ──
 // In SVG: 0° = right, 90° = down, 180° = left, 270° = up.
 // Standard math cos/sin with SVG's flipped y gives clockwise rotation.
