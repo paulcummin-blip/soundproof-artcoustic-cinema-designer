@@ -5,7 +5,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import StepperInput from '@/components/ui/StepperInput';
-import { getModelsByCategoryOrdered, getSpeakerModelMeta, normaliseModelKey } from '@/components/models/speakers/registry';
+import { getSpeakerModelMeta, normaliseModelKey } from '@/components/models/speakers/registry';
+import { useProductRoleOptions } from '@/components/products/useProductMaster';
+import { PRODUCT_ROLES } from '@/components/products/productMaster';
 import { getLevelColors } from '@/components/utils/rp22Colors';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { getMlpSeat } from '@/components/utils/spl/centralSplEngine';
@@ -61,7 +63,8 @@ function RP22LevelPill({ parameter, level, label }) {
 export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics, onP12Update }) {
   const appState = useAppState();
   const { speakerSystem, splConfig = {}, updateGlobalSpl, seatingPositions, screen, frontSubsCfg, subwoofers } = appState || {};
-  const { LCR: lcrModelOptions = [] } = getModelsByCategoryOrdered() || {};
+  const { options: standardLcrOptions } = useProductRoleOptions(PRODUCT_ROLES.LCR);
+  const { options: soundbarOptions } = useProductRoleOptions(PRODUCT_ROLES.CENTRE_SOUNDBAR);
 
   const LCR_CANONICAL_ROLES = useMemo(() => new Set(['FL', 'FC', 'FR']), []);
   const lcrRoles = useMemo(() => ['FL', 'FC', 'FR'], []);
@@ -70,16 +73,6 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     [speakerSystem?.placedSpeakers]);
 
   const getByRole = useCallback(r => byRole.get(getCanonicalRole(r)), [byRole]);
-
-  const soundbarOptions = useMemo(() => lcrModelOptions.filter((opt) => {
-    const meta = getSpeakerModelMeta(opt.label);
-    return meta?.frontStageType === 'center_only' || meta?.frontStageType === 'integrated_lcr';
-  }), [lcrModelOptions]);
-
-  const standardLcrOptions = useMemo(() => lcrModelOptions.filter((opt) => {
-    const meta = getSpeakerModelMeta(opt.label);
-    return !meta?.frontStageType;
-  }), [lcrModelOptions]);
 
   const initialModel = useMemo(() => {
     const fcModel = getByRole('FC')?.model;
