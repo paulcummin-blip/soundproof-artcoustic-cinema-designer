@@ -395,7 +395,6 @@ export default function SPLCalculatorPage() {
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 28, fontWeight: 400, margin: 0, letterSpacing: "0.01em" }}>RP22 Speaker Capability</h1>
-          <p style={{ margin: "5px 0 0", color: BRAND.subtext, fontSize: 14 }}>Compare predicted RP22 P12 and P13 performance using the same Artcoustic SPL authority as the main Sound Proof design.</p>
         </div>
 
         <div style={{ background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18, marginBottom: 16 }}>
