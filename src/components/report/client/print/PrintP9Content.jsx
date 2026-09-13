@@ -14,6 +14,7 @@
 
 import React, { useMemo } from "react";
 import P9RowLabelStack, { P9_ROW_COLORS as ROW_COLORS } from "@/components/report/client/p9RowLabelStack";
+import { resolveRspLabelPlacement } from "../ClientSpeakerBalance";
 
 // ── Status copy (frozen — matches ClientSoundAboveListener) ───────────────
 const STATUS_COPY = {
@@ -291,14 +292,19 @@ export default function PrintP9Content({ p9Snapshot, roomDims }) {
           })}
 
           {/* RSP marker */}
-          <g>
-            <circle cx={earPx.px} cy={earPx.py} r={10} fill="none" stroke="#213428" strokeWidth={2} />
-            <circle cx={earPx.px} cy={earPx.py} r={4} fill="#FFFFFF" />
-            <text x={earPx.px} y={earPx.py + 24} fill="#213428"
-              fontSize={11} textAnchor="middle"
-              fontFamily="Didact Gothic, Century Gothic, sans-serif"
-              fontWeight={600} letterSpacing="0.08em">RSP</text>
-          </g>
+          {(() => {
+            const placement = resolveRspLabelPlacement(earPx, [], [], null, { w: SVG_W, h: SVG_H }, { markerRadius: 10 });
+            return (
+              <g>
+                <circle cx={earPx.px} cy={earPx.py} r={10} fill="none" stroke="#213428" strokeWidth={2} />
+                <circle cx={earPx.px} cy={earPx.py} r={4} fill="#FFFFFF" />
+                <text x={placement.x} y={placement.y} fill="#213428"
+                  fontSize={11} textAnchor={placement.anchor} dominantBaseline="middle"
+                  fontFamily="Didact Gothic, Century Gothic, sans-serif"
+                  fontWeight={600} letterSpacing="0.08em">RSP</text>
+              </g>
+            );
+          })()}
         </svg>
       </div>
 

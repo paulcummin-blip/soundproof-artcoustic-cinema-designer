@@ -15,6 +15,7 @@
 import React, { useMemo } from "react";
 import { isEligibleP5Surround } from "@/components/utils/p5SurroundGaps";
 import { resolveGradeToken } from "@/components/utils/rp22Colors";
+import { resolveRspLabelPlacement } from "../ClientSpeakerBalance";
 
 // ── Status copy (frozen — matches ClientSoundAroundListener) ───────────────
 const STATUS_COPY = {
@@ -253,14 +254,19 @@ export default function PrintP5Content({ p5Snapshot, roomDims, screen, screenFro
           })}
 
           {/* RSP marker */}
-          <g>
-            <circle cx={rspPx.px} cy={rspPx.py} r={10} fill="none" stroke="#213428" strokeWidth={2} />
-            <circle cx={rspPx.px} cy={rspPx.py} r={4} fill="#FFFFFF" />
-            <text x={rspPx.px} y={rspPx.py + 24} fill="#213428"
-              fontSize={11} textAnchor="middle"
-              fontFamily="Didact Gothic, Century Gothic, sans-serif"
-              fontWeight={600} letterSpacing="0.08em">RSP</text>
-          </g>
+          {(() => {
+            const placement = resolveRspLabelPlacement(rspPx, [], [], null, { w: SVG_W, h: SVG_H }, { markerRadius: 10 });
+            return (
+              <g>
+                <circle cx={rspPx.px} cy={rspPx.py} r={10} fill="none" stroke="#213428" strokeWidth={2} />
+                <circle cx={rspPx.px} cy={rspPx.py} r={4} fill="#FFFFFF" />
+                <text x={placement.x} y={placement.y} fill="#213428"
+                  fontSize={11} textAnchor={placement.anchor} dominantBaseline="middle"
+                  fontFamily="Didact Gothic, Century Gothic, sans-serif"
+                  fontWeight={600} letterSpacing="0.08em">RSP</text>
+              </g>
+            );
+          })()}
         </svg>
       </div>
 

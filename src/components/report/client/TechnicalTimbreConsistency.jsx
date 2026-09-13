@@ -265,7 +265,7 @@ export default function TechnicalTimbreConsistency({
             x2: Math.max(screenRightPx.px, screenCx + 25),
             y2: screenLeftPx.py + 3,
           };
-          const placement = resolveRspLabelPlacement(rspPx, seatCircles, badgeRects, screenRect, { w: SVG_W, h: SVG_H }, { markerRadius: 7 });
+          const placement = resolveRspLabelPlacement(rspPx, seatCircles, badgeRects, screenRect, { w: SVG_W, h: SVG_H }, { markerRadius: RSP_RING_R });
           return (
             <g>
               <circle cx={rspPx.px} cy={rspPx.py} r={RSP_RING_R} fill="none" stroke="#213428" strokeWidth={2.5} />

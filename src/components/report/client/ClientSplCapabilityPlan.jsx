@@ -19,6 +19,7 @@
  */
 
 import React, { useMemo } from "react";
+import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 
 // ── Level → brand colour (mirrors P5 / P9 STATUS_COPY) ──
 const LEVEL_COLOR = {
@@ -244,24 +245,32 @@ export default function ClientSplCapabilityPlan({
       })}
 
       {/* RSP marker — on top of the circle */}
-      {rspPx && (
-        <g>
-          <circle cx={rspPx.px} cy={rspPx.py} r={10} fill="none" stroke="#213428" strokeWidth={2} />
-          <circle cx={rspPx.px} cy={rspPx.py} r={4} fill="#FFFFFF" />
-          <text
-            x={rspPx.px}
-            y={rspPx.py + 24}
-            fill="#213428"
-            fontSize={11}
-            textAnchor="middle"
-            fontFamily="Didact Gothic, Century Gothic, sans-serif"
-            fontWeight={600}
-            letterSpacing="0.08em"
-          >
-            RSP
-          </text>
-        </g>
-      )}
+      {rspPx && (() => {
+          const seatCircles = plotSeats.map((s) => {
+            const sp = toPx(s.x, s.y);
+            return { cx: sp.px, cy: sp.py, r: 6 };
+          });
+          const placement = resolveRspLabelPlacement(rspPx, seatCircles, [], null, { w: SVG_W, h: SVG_H }, { markerRadius: circleRpx });
+          return (
+            <g>
+              <circle cx={rspPx.px} cy={rspPx.py} r={10} fill="none" stroke="#213428" strokeWidth={2} />
+              <circle cx={rspPx.px} cy={rspPx.py} r={4} fill="#FFFFFF" />
+              <text
+                x={placement.x}
+                y={placement.y}
+                fill="#213428"
+                fontSize={11}
+                textAnchor={placement.anchor}
+                dominantBaseline="middle"
+                fontFamily="Didact Gothic, Century Gothic, sans-serif"
+                fontWeight={600}
+                letterSpacing="0.08em"
+              >
+                RSP
+              </text>
+            </g>
+          );
+        })()}
     </svg>
   );
 }

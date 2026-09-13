@@ -458,7 +458,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
               fill="#FFFFFF"
             />
             {(() => {
-              const placement = resolveRspLabelPlacement(rspPx, [], [], null, { w: SVG_W, h: SVG_H }, { markerRadius: 8 });
+              const placement = resolveRspLabelPlacement(rspPx, [], [], null, { w: SVG_W, h: SVG_H }, { markerRadius: 10 });
               return (
                 <text
                   x={placement.x}
