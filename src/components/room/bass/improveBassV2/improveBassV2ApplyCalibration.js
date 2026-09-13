@@ -51,7 +51,7 @@ function normalisePolarity(value) {
  * Positions, enabled state, model, and all other fields are preserved.
  *
  * @param {Array} currentInstances - existing subwooferInstances (ALL, including disabled)
- * @param {Array} calibrationTuning - [{ delayMs, gainDb, polarity }] per active sub
+ * @param {Array} calibrationTuning - [{ phaseControlDeg, delayMs, gainDb, polarity }] per active sub
  * @returns {Array} new subwooferInstances with tuning applied
  */
 export function applyCalibrationTuning(currentInstances, calibrationTuning, provenance) {
@@ -87,7 +87,7 @@ export function applyCalibrationTuning(currentInstances, calibrationTuning, prov
  * tuning applied (delay, polarity, trim all match).
  *
  * @param {Array} currentInstances - current subwooferInstances (ALL)
- * @param {Array} calibrationTuning - [{ delayMs, gainDb, polarity }] per active sub
+ * @param {Array} calibrationTuning - [{ phaseControlDeg, delayMs, gainDb, polarity }] per active sub
  * @returns {boolean} true only if all active tuning matches
  */
 export function isCalibrationApplied(currentInstances, calibrationTuning) {
