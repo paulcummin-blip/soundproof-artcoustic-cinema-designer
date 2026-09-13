@@ -17,7 +17,6 @@ import React from 'react';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import {
-  getRoomDesignRatingDesignation,
   getDesignPerformanceIndex,
   getCategoryFloorSummaries,
 } from '@/components/report/technical/designRatingPresentation';
@@ -236,24 +235,18 @@ export default function DesignRatingSummary({
     secondaryRating.status !== 'NOT_ASSESSED' &&
     secondaryRating.status !== 'NOT_CONFIGURED';
 
-  const primaryDesignation = primaryRating ? getRoomDesignRatingDesignation(primaryRating) : null;
   const primaryIndex = primaryRating ? getDesignPerformanceIndex(primaryRating) : null;
-  const secondaryDesignation = secondaryIsConfigured ? getRoomDesignRatingDesignation(secondaryRating) : null;
   const secondaryIndex = secondaryIsConfigured ? getDesignPerformanceIndex(secondaryRating) : null;
-  const allDesignation = allRating ? getRoomDesignRatingDesignation(allRating) : null;
   const allIndex = allRating ? getDesignPerformanceIndex(allRating) : null;
 
   const CATEGORY_LABELS = ['Spatial Resolution', 'Dynamic Range', 'Timbre Matching', 'Screen / Viewing Geometry'];
 
-  const renderScopeSummary = (label, designation, index, emphasize) => (
-    <div style={{ marginTop: emphasize ? 0 : 6, paddingTop: emphasize ? 0 : 6, borderTop: emphasize ? 'none' : '1px solid #ECEAE6' }}>
+  const renderScopeSummary = (label, index, emphasize) => (
+    <div style={{ marginTop: emphasize ? 0 : 4, paddingTop: emphasize ? 0 : 4, borderTop: emphasize ? 'none' : '1px solid #ECEAE6' }}>
       <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
         {label}
       </div>
-      <div style={{ fontSize: emphasize ? 14 : 12, fontWeight: 700, color: '#213428', lineHeight: 1.2, marginTop: 2 }}>
-        {designation || '—'}
-      </div>
-      <div style={{ marginTop: 2, fontSize: 10, fontWeight: 600, color: '#625143', letterSpacing: '0.03em' }}>
+      <div style={{ marginTop: 2, fontSize: emphasize ? 13 : 11, fontWeight: 700, color: '#213428', letterSpacing: '0.03em' }}>
         Design Performance Index {index ?? '—'}
       </div>
     </div>
@@ -301,9 +294,9 @@ export default function DesignRatingSummary({
           <div style={{ marginTop: 10, paddingTop: 8, borderTop: '2px solid #DCDBD6' }} />
 
           {/* ── Overall Design Performance Index summary ── */}
-          {renderScopeSummary('Primary Seating', primaryDesignation, primaryIndex, true)}
+          {renderScopeSummary('Primary Seating', primaryIndex, true)}
           {secondaryIsConfigured
-            ? renderScopeSummary('Secondary Seating', secondaryDesignation, secondaryIndex, false)
+            ? renderScopeSummary('Secondary Seating', secondaryIndex, false)
             : (
               <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #ECEAE6' }}>
                 <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
@@ -312,7 +305,7 @@ export default function DesignRatingSummary({
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#9B9890', marginTop: 2 }}>Not configured</div>
               </div>
             )}
-          {renderScopeSummary('All Seating', allDesignation, allIndex, false)}
+          {renderScopeSummary('All Seating', allIndex, false)}
         </div>
       )}
     </div>
