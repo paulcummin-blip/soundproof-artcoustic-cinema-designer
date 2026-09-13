@@ -16,11 +16,13 @@
 // instances acoustically, but Apply must preserve them in project state.
 
 import { applyCalibrationTuning, resolveTuningInstances } from "./improveBassV2ApplyCalibration.js";
+import { normalisePhaseControlDeg } from "../../../../bass/core/subwooferPhaseControl.js";
 
 const COORDINATE_TOLERANCE_M = 0.01; // 10 mm
 
 const TUNING_TOLERANCE_DELAY_MS = 0.1;
 const TUNING_TOLERANCE_GAIN_DB = 0.1;
+const TUNING_TOLERANCE_PHASE_DEG = 0.1;
 
 /**
  * Normalise a polarity value to -1 (inverted) or 0 (normal).
@@ -112,9 +114,12 @@ export function isOptimisedApplied(currentInstances, winner, roomDims) {
     const instDelay = Number(inst.delayMs) || 0;
     const instGain = Number(inst.gainDb) || 0;
     const instPolarity = Number(inst.polarity) || 0;
+    const instPhase = normalisePhaseControlDeg(inst.phaseControlDeg ?? inst.phaseAdjust);
+    const tuningPhase = normalisePhaseControlDeg(t.phaseControlDeg ?? t.phaseAdjust);
 
     if (Math.abs(instDelay - (Number(t.delayMs) || 0)) > TUNING_TOLERANCE_DELAY_MS) return false;
     if (Math.abs(instGain - (Number(t.gainDb) || 0)) > TUNING_TOLERANCE_GAIN_DB) return false;
+    if (Math.abs(instPhase - tuningPhase) > TUNING_TOLERANCE_PHASE_DEG) return false;
     if (normalisePolarity(instPolarity) !== normalisePolarity(t.polarity)) return false;
   }
 
@@ -131,6 +136,7 @@ export function buildCalibrationSummary(winner) {
   return {
     delays: tuning.map((t) => `${(Number(t.delayMs) || 0).toFixed(1)} ms`),
     trims: tuning.map((t) => `${(Number(t.gainDb) || 0).toFixed(1)} dB`),
+    phases: tuning.map((t) => `${normalisePhaseControlDeg(t.phaseControlDeg ?? t.phaseAdjust).toFixed(0)}° at 80 Hz`),
     polarities: tuning.map((t) => normalisePolarity(t.polarity) < 0 ? "Inverted" : "Normal"),
   };
 }
