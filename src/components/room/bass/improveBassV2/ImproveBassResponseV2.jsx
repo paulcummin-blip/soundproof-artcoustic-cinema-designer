@@ -1,7 +1,7 @@
 // ImproveBassResponseV2.jsx
 // Main V2 Improve Bass Response UI component.
 // Replaces the V1 "Find Better Positions" flow with the full V2 workflow:
-// placement + delay + polarity + trim search, canonical confirmation,
+// placement + all-pass phase + delay + polarity + trim search, canonical confirmation,
 // primary-seat protection, and atomic apply.
 //
 // BLOCKER 3: Stale detection reads CURRENT project state via a ref, not a
