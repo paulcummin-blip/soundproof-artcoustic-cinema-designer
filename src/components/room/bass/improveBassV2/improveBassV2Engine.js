@@ -95,6 +95,7 @@ export function snapshotCurrentDesign({
     delayMs: Number(inst.delayMs) || 0,
     gainDb: Number(inst.gainDb) || 0,
     polarity: Number(inst.polarity) || 0,
+    phaseControlDeg: Number(inst.phaseControlDeg ?? inst.phaseAdjust) || 0,
   }));
   const mutedInfo = detectMutedSubs(
     activeInstances.map((inst) => ({
@@ -119,6 +120,7 @@ export function snapshotCurrentDesign({
       delayMs: Number(inst.delayMs) || 0,
       gainDb: Number(inst.gainDb) || 0,
       polarity: Number(inst.polarity) || 0,
+      phaseControlDeg: Number(inst.phaseControlDeg ?? inst.phaseAdjust) || 0,
       positionSource: inst.positionSource || null,
       legacyGroup: inst.legacyGroup || null,
       symmetryLinkId: inst.symmetryLinkId || null,
@@ -472,6 +474,7 @@ export function resolveInstalledEffectiveTuning(rawTransfer, instances, rspPosit
     delayMs: source.delay + (auto[source.id] || 0),
     gainDb: Number(active[i].gainDb) || 0,
     polarity: Number(active[i].polarity) < 0 || Number(active[i].polarity) === 180 ? -1 : 0,
+    phaseControlDeg: Number(active[i].phaseControlDeg ?? active[i].phaseAdjust) || 0,
   }));
 }
 
@@ -599,6 +602,10 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     // ── Phase 1.5: Calibration-only search on Current positions (Stage 11A) ─
     // Search delay/polarity/trim on the CURRENT installed positions before any
     // physical movement. Produces the "Recommended Calibration" tier (B).
+    let phaseResult = null;
+    let phaseMaterial = null;
+    const phaseCandidates = [];
+    const phaseDiagnostics = {status:"incomplete",tested:0,retained:0,confirmed:0,valid:0,invalid:0,options:[]};
     let calibrationResult = null;
     let calibrationMaterial = null;
     let calibrationTuning = null;
@@ -618,15 +625,16 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       const configurationKey=effectiveConfigurationKey(instances,appliedTuning);
       let hash=2166136261;for(const ch of configurationKey)hash=Math.imul(hash^ch.charCodeAt(0),16777619);
       return {...result,appliedTuning,configurationKey,inputIdentity:startFingerprint,candidateKind:kind,
-        candidateId:kind==="current"?"current":kind==="calibration"?(candidate.groupedDelay?.id || "calibration:"+(hash>>>0).toString(16)):candidate.id,
+        candidateId:kind==="current"?"current":kind==="phase"?(candidate.groupedPhase?.id || "phase:"+(hash>>>0).toString(16)):kind==="calibration"?(candidate.groupedDelay?.id || "calibration:"+(hash>>>0).toString(16)):candidate.id,
         groupedDelay:candidate.groupedDelay || null,
-        isCurrent:kind==="current",candidateOrigin:kind==="calibration"?"calibration-only":candidate.candidateOrigin};
+        groupedPhase:candidate.groupedPhase || null,
+        isCurrent:kind==="current",candidateOrigin:kind==="phase"?"phase-only":kind==="calibration"?"calibration-only":candidate.candidateOrigin};
     }
 
     try {
       setStageVerdict(projectId, "phase_polarity", "skipped");
       setStageVerdict(projectId, "gain", "skipped");
-      onProgress("calibrating", "Preparing grouped delay search", 0, 1);
+      onProgress("calibrating", "Preparing grouped phase search", 0, 1);
       const currentFinalist = buildCurrentFinalist(subwooferInstances, roomDims);
       if (currentFinalist) {
         // Get or compute Current's raw transfers (zero tuning)
@@ -645,7 +653,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         }
 
         if (!currentRawTransfer) {
-          currentRawTransfer = await prepareFullTransfer(currentFinalist, "calibration-current", "grouped-delay and canonical confirmation");
+          currentRawTransfer = await prepareFullTransfer(currentFinalist, "calibration-current", "grouped phase, delay and canonical confirmation");
         } else {
           metrics.recordStage2TransferReused();
         }
@@ -658,6 +666,97 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           resolveInstalledEffectiveTuning(currentRawTransfer,subwooferInstances,rspPosition),snapshot.instanceIds);
         savedCurrentRawTransfer = currentRawTransfer;
         savedEffectiveBaseline = effectiveBaseline;
+
+        // PHASE: search a physical unity-gain first-order all-pass control in
+        // 5-degree steps at 80 Hz. Each retained proxy minimum is confirmed
+        // through the same canonical EQ/P18/P19/P20 chain as every other lever.
+        try {
+          onProgress("calibrating", "Testing grouped all-pass phase settings", 0, 71);
+          const phaseStarted = performance.now();
+          const phaseSearch = await runInWorker(worker, "grouped-phase", {
+            rawTransfer: currentRawTransfer,
+            instances: subwooferInstances,
+            roomDims,
+            effectiveBaseline,
+          }, controller.signal);
+          metrics.recordWorkerCall("grouped-phase", "phase-current", performance.now() - phaseStarted, false);
+          if (isStale()) return {status:"stale",snapshot};
+          const retainedPhase = phaseSearch?.candidates || [];
+          Object.assign(phaseDiagnostics, {
+            grouping: phaseSearch?.grouping,
+            optionCount: phaseSearch?.optionCount,
+            tested: phaseSearch?.optionCount || 0,
+            retained: retainedPhase.length,
+            ledger: phaseSearch?.ledger,
+            timings: phaseSearch?.timings,
+            phaseReferenceHz: phaseSearch?.phaseReferenceHz,
+            phaseModel: phaseSearch?.phaseModel,
+            searchStatus: phaseSearch?.status,
+          });
+          if (phaseSearch?.status === "ambiguous") {
+            evaluationIssues.push({stage:"phase",error:phaseSearch.grouping?.reason});
+          }
+          phaseDiagnostics.options = retainedPhase.map((candidate) => ({
+            candidateId: candidate.id,
+            tuning: candidate.tuning,
+            proxy: candidate.proxy,
+            phaseAtReferenceDeg: candidate.phaseAtReferenceDeg,
+            direction: candidate.direction,
+          }));
+          for (let index = 0; index < retainedPhase.length; index++) {
+            if (isCancelled()) return {status:"cancelled",snapshot};
+            if (isStale()) return {status:"stale",snapshot};
+            onProgress("calibrating", "Confirming grouped phase settings", index, retainedPhase.length);
+            const confirmStarted = performance.now();
+            const response = await runInWorker(worker, "confirmation", {
+              rawTransfer: currentRawTransfer,
+              tuning: retainedPhase[index].tuning,
+              tuningVariant: "phase-all-pass",
+              p14TargetBasis,p14TargetLevel,p14TargetDb,p18TargetBasis,
+            }, controller.signal);
+            metrics.recordWorkerCall("confirmation", "phase:" + index, performance.now() - confirmStarted, false);
+            if (isStale()) return {status:"stale",snapshot};
+            const result = response
+              ? bindConfirmation(
+                  response,
+                  retainedPhase[index].tuning,
+                  {...currentFinalist,groupedPhase:retainedPhase[index]},
+                  "phase",
+                )
+              : null;
+            const check = validateConfirmedCandidate(result, validationContext);
+            phaseDiagnostics.confirmed++;
+            phaseDiagnostics.options[index].validity = {valid:check.valid,issues:check.issues};
+            phaseDiagnostics.options[index].canonical = result;
+            if (check.valid) {
+              phaseCandidates.push(check.result);
+              phaseDiagnostics.valid++;
+            } else {
+              phaseDiagnostics.invalid++;
+              evaluationIssues.push({stage:"phase",index,issues:check.issues});
+            }
+          }
+          phaseDiagnostics.status = phaseSearch?.status === "skipped"
+            ? "skipped"
+            : phaseDiagnostics.valid
+              ? "completed-shortlist"
+              : "incomplete";
+          setStageVerdict(
+            projectId,
+            "phase_polarity",
+            phaseDiagnostics.status === "skipped"
+              ? "skipped"
+              : phaseDiagnostics.invalid || phaseDiagnostics.error || !phaseDiagnostics.valid
+                ? "incomplete"
+                : "done",
+          );
+        } catch (err) {
+          if (isFatalLifecycleError(err)) throw err;
+          phaseDiagnostics.error = err.message;
+          evaluationIssues.push({stage:"phase",error:err.message});
+          setStageVerdict(projectId, "phase_polarity", "incomplete");
+        }
+
         onProgress("calibrating", "Testing grouped delay adjustments", 0, 61);
         const groupedStarted=performance.now();
         const calibrationSearch=await runInWorker(worker,"grouped-delay",{
@@ -704,11 +803,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     }
 
     onProgress("calibrating", "Searching calibration improvements", 2, 2);
-    // Phase/polarity: NOT AVAILABLE YET — the intended 5-degree grouped phase
-    // search requires an all-pass or processor phase control model. Only
-    // binary polarity (0°/180°) is currently implemented. Do NOT fake it.
     const calVerdict = calibrationDiagnostics.invalid || calibrationDiagnostics.error || !calibrationDiagnostics.valid ? "incomplete" : "done";
-    setStageVerdict(projectId, "phase_polarity", "not_available");
     setStageVerdict(projectId, "delays", calibrationDiagnostics.status==="skipped"?"skipped":calVerdict);
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot };
@@ -892,6 +987,13 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     if(existingAuthority){
       snapshot.effectiveTuning=existingAuthority.appliedTuning;
       snapshot.effectiveConfiguration=effectiveConfigurationKey(snapshot.allInstances,existingAuthority.appliedTuning);
+      const phaseSelection=selectConfirmedRecommendations(phaseCandidates,snapshot,existingAuthority);
+      phaseResult=phaseSelection.winner;
+      phaseMaterial={material:!!phaseResult,reason:phaseSelection.materialityReason};
+      phaseDiagnostics.evaluations=phaseSelection.evaluations;
+      setStageVerdict(projectId,"phase_polarity",phaseDiagnostics.status==="skipped"?"skipped":
+        phaseResult?"improvement":phaseDiagnostics.invalid || phaseDiagnostics.error || !phaseDiagnostics.valid?"incomplete":"no_improvement");
+
       const calSelection=selectConfirmedRecommendations(calibrationCandidates,snapshot,existingAuthority);
       calibrationResult=calSelection.winner;
       calibrationTuning=calibrationResult?.appliedTuning || null;
@@ -1274,6 +1376,9 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     setStageVerdict(projectId, "comparing", "done");
     snapshot.evaluationIncomplete=evaluationIssues.length>0;
     const selection = selectWinnerWithProtection([...confirmedResults,...calibrationCandidates], snapshot, existingAuthority);
+    selection.phaseResult=phaseResult;
+    selection.phaseMaterial=phaseMaterial;
+    selection.phaseDiagnostics=phaseDiagnostics;
     selection.calibrationDiagnostics=calibrationDiagnostics;
     selection.evaluationIssues=evaluationIssues;
     selection.gainResult=gainResult;
@@ -1296,6 +1401,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           message: "No verified material automatic improvement found.",
           confirmedResults,
           currentResult: existingAuthority,
+          phaseResult, phaseMaterial, phaseDiagnostics,
           gainResult, gainMaterial, gainDiagnostics,
           seatingResult, seatingMaterial, seatingDiagnostics,
         },
