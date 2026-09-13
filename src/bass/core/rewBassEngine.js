@@ -1178,7 +1178,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // Temporary REW parity diagnostic only: no late-field contribution below Schroeder.
     const lateFieldDecay = Math.exp(-(frequencyHz - 20) / 120);
     const lateFieldAmplitude = (disableLateField || frequencyHz < schroederFrequency) ? 0 : amplitude * 0.12 * lateFieldDecay;
-    const lateFieldPhase = 2 * Math.PI * frequencyHz * 0.0071 + 1.3;
+    // The late field belongs to this source and must receive the same source
+    // tuning rotation. Otherwise a unity-gain all-pass changes a single
+    // subwoofer's magnitude merely by rotating only part of its field.
+    const lateFieldPhase = 2 * Math.PI * frequencyHz * 0.0071 + 1.3 + sourceTuningPhase;
     lateFieldRe = (disableLateField || frequencyHz < schroederFrequency) ? 0 : lateFieldAmplitude * Math.cos(lateFieldPhase);
     lateFieldIm = (disableLateField || frequencyHz < schroederFrequency) ? 0 : lateFieldAmplitude * Math.sin(lateFieldPhase);
     // Suppress late-field in mode-only parity mode.
