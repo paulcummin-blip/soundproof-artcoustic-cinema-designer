@@ -5,7 +5,7 @@
 // `calibrationResult`, and `confirmedResults`. This module maps that output
 // to the 5-stage designer workflow:
 //
-//   1. PHASE              — NOT AVAILABLE YET (no 5-degree phase control)
+//   1. PHASE              — best grouped all-pass result (from phaseResult)
 //   2. DELAY              — best grouped-delay result (from calibrationResult)
 //   3. GAIN               — best grouped-gain result (from gainResult)
 //   4. SUBWOOFER POSITIONS — best position candidate (from confirmedResults)
@@ -44,17 +44,35 @@ export function buildStageResults(selection) {
 
   const currentResult = selection.currentResult;
 
-  // ── 1. PHASE — NOT AVAILABLE YET ───────────────────────────────────
-  // The intended grouped phase search requires an all-pass or processor
-  // phase control model with 5-degree resolution. Only binary polarity
-  // (0°/180°) is currently implemented. Do NOT fake it.
+  // ── 1. PHASE — grouped physical all-pass search ────────────────────
+  const phaseResult = selection.phaseResult || null;
+  const phaseMaterial = selection.phaseMaterial?.material === true;
+  const phaseDiagnostics = selection.phaseDiagnostics || null;
+  const phaseSearchSkipped = phaseDiagnostics?.status === "skipped"
+    || phaseDiagnostics?.searchStatus === "skipped";
+  const groupedPhase = phaseResult?.groupedPhase || null;
+  const phaseGrouping = phaseDiagnostics?.grouping || null;
+  const phaseGroup = groupedPhase && phaseGrouping?.groups?.find(
+    (group) => group.id === groupedPhase.direction,
+  );
   const phase = {
-    verdict: "not_available",
-    result: null,
-    reason:
-      "Grouped 5-degree phase search requires an all-pass or processor phase control model. " +
-      "Only binary polarity (0°/180°) is currently implemented. " +
-      "The physical phase control definition is not yet available.",
+    verdict: phaseSearchSkipped
+      ? "not_tested"
+      : phaseMaterial && phaseResult
+        ? "improvement"
+        : "no_improvement",
+    result: phaseMaterial ? phaseResult : null,
+    reason: phaseSearchSkipped
+      ? phaseDiagnostics?.grouping?.reason || "No differential phase control is applicable."
+      : phaseMaterial
+        ? null
+        : "No material all-pass phase improvement found.",
+    phaseGroupLabel: phaseGroup?.label || null,
+    phaseAtReferenceDeg: Number(groupedPhase?.phaseAtReferenceDeg) || 0,
+    phaseReferenceHz: Number(groupedPhase?.phaseReferenceHz)
+      || Number(phaseDiagnostics?.phaseReferenceHz)
+      || 80,
+    phaseModel: groupedPhase?.phaseModel || phaseDiagnostics?.phaseModel || "first-order-all-pass",
   };
 
   // ── 2. DELAY — best grouped-delay result ───────────────────────────
