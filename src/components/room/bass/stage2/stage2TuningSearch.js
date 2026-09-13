@@ -60,7 +60,7 @@ const MATERIAL_GAIN_DIFF_DB = 1.0;
 const SECOND_FINALIST_SCORE_MARGIN = 1.5; // second must be within 1.5x best score
 
 /**
- * Apply a tuning (delay, gain, polarity) to a per-source complex transfer
+ * Apply a tuning (all-pass phase, delay, gain, polarity) to a per-source complex transfer
  * and return the tuned complex values.
  */
 function applyTuning(points, delayMs, gainDb, polarity, phaseControlDeg = 0) {
