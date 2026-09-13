@@ -40,7 +40,7 @@ import { hasCapability, isMasterAdmin } from "@/lib/accountAccess";
 const menuItems = [
   { title: "Projects", url: "/Projects", icon: Layers3, capability: "soundProof" },
   { title: "Room Designer", url: "/RoomDesigner", icon: Home, capability: "soundProof" },
-  { title: "RP22 Speaker Capability", url: "/SPLCalculator", icon: Calculator, capability: "soundProof", adminOnly: true },
+  { title: "RP22 Speaker Capability", url: "/SPLCalculator", icon: Calculator, capability: "soundProof" },
   { title: "Price List", url: "/PriceList", icon: Tags, capability: "priceList" },
   { title: "About Sound Proof", url: "/AboutSoundProof", icon: FileText, alwaysVisible: true },
   { title: "Users & Permissions", url: "/account/users", icon: UserCog, capability: "manageUsers" },
