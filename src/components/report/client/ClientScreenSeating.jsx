@@ -312,7 +312,7 @@ export default function ClientScreenSeating({
             const sp = toPx(s.x, s.y);
             return { cx: sp.px, cy: sp.py, r: haloRadius + PRIMARY_STROKE_WIDTH };
           });
-          const placement = resolveRspLabelPlacement(rspPx, seatCircles, [], null, { w: svgW, h: svgH }, { markerRadius: markerR });
+          const placement = resolveRspLabelPlacement(rspPx, seatCircles, [], null, { w: svgW, h: svgH }, { markerRadius: markerR, labelGapPx: 24 });
           return (
             <text
               x={placement.x}

@@ -82,10 +82,15 @@ function circleRectIntersect(cx, cy, r, rect) {
  * @param {Array}  badgeRects  - [{ x1, y1, x2, y2 }] badge rectangle obstacles
  * @param {Object} screenRect  - { x1, y1, x2, y2 } screen line + label bounds
  * @param {Object} svgBounds   - { w, h } SVG dimensions
- * @param {Object} [options]  - { markerRadius?: number } outer radius of the
- *                               marker at the RSP position (seat halo or RSP
- *                               ring). Defaults to RSP_RING_R. The label is
- *                               placed RSP_LABEL_GAP_PX outside this radius.
+ * @param {Object} [options]  - { markerRadius?: number, labelGapPx?: number }
+ *                               markerRadius = outer radius of the marker at
+ *                               the RSP position (seat halo or RSP ring).
+ *                               Defaults to RSP_RING_R.
+ *                               labelGapPx = clear visual gap between the
+ *                               marker outer edge and the label. Defaults to
+ *                               RSP_LABEL_GAP_PX. Callers with larger visible
+ *                               markers/halos can provide a context-specific
+ *                               value so the label clears the outermost ring.
  * @returns {Object} { x, y, anchor } label anchor position + text-anchor
  */
 export function resolveRspLabelPlacement(rspPx, seatCircles, badgeRects, screenRect, svgBounds, options = {}) {
@@ -94,7 +99,7 @@ export function resolveRspLabelPlacement(rspPx, seatCircles, badgeRects, screenR
   const hw = RSP_LABEL_W / 2;
   const hh = RSP_LABEL_H / 2;
   const markerR = options.markerRadius ?? RSP_RING_R;
-  const gap = RSP_LABEL_GAP_PX;
+  const gap = options.labelGapPx ?? RSP_LABEL_GAP_PX;
 
   const candidates = [
     { name: "above", x: cx, y: cy - markerR - gap - hh, anchor: "middle",
