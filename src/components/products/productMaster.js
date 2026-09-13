@@ -74,6 +74,72 @@ function positive(...values) {
   return values.some((value) => Number.isFinite(Number(value)) && Number(value) > 0);
 }
 
+function firstPositive(...values) {
+  const value = values.find((candidate) => Number.isFinite(Number(candidate)) && Number(candidate) > 0);
+  return value === undefined ? null : Number(value);
+}
+
+function technicalDetails(meta, staticSpeaker, capability, isSubwoofer) {
+  if (!meta) return [];
+
+  const details = [];
+  const depth = firstPositive(meta.depthMm);
+  if (positive(meta.diameterMm)) {
+    details.push(`Dimensions: Ø${Number(meta.diameterMm)} × ${depth || '—'} mm deep`);
+  } else if (meta.tvWidthMap && Object.keys(meta.tvWidthMap).length) {
+    const widths = Object.values(meta.tvWidthMap).map(Number).filter(Number.isFinite);
+    const widthRange = widths.length ? `${Math.min(...widths)}–${Math.max(...widths)}` : 'TV-linked';
+    details.push(`Dimensions: ${widthRange} × ${meta.heightMm || '—'} × ${depth || '—'} mm (TV-linked width)`);
+  } else if (positive(meta.widthMm, meta.fixedWidthMm)) {
+    details.push(`Dimensions: ${firstPositive(meta.widthMm, meta.fixedWidthMm)} × ${meta.heightMm || '—'} × ${depth || '—'} mm`);
+  }
+
+  const sensitivity = firstPositive(
+    meta.sensitivity_dB_1w1m,
+    meta.sensitivity_dB_2p83,
+    staticSpeaker?.sensitivity,
+    staticSpeaker?.sensitivity_db_1w_1m
+  );
+  if (sensitivity) details.push(`Sensitivity: ${sensitivity} dB`);
+
+  const impedance = firstPositive(meta.nominalOhms, staticSpeaker?.impedance, staticSpeaker?.impedance_ohm);
+  if (impedance) details.push(`Nominal impedance: ${impedance} Ω`);
+
+  const power = firstPositive(meta.max_power, staticSpeaker?.max_power, staticSpeaker?.power_handling_w);
+  if (power) details.push(`Power handling: ${power} W`);
+
+  const maxSpl = firstPositive(
+    capability?.maxSPL,
+    meta.max_spl_cont_db_1m_halfspace,
+    meta.max_spl,
+    staticSpeaker?.max_spl_cont_db_1m,
+    staticSpeaker?.max_spl
+  );
+  if (maxSpl) details.push(`Maximum continuous SPL: ${maxSpl} dB at 1 m`);
+
+  const lowLimit = firstPositive(
+    capability?.usableLF_neg6dB,
+    meta.usable_lf_hz_minus6db,
+    meta.frequency_response_low,
+    staticSpeaker?.usable_lf_response_hz_minus6,
+    staticSpeaker?.frequency_response_low
+  );
+  if (lowLimit) details.push(`Usable low-frequency limit: ${lowLimit} Hz`);
+
+  const horizontal = firstPositive(meta.dispersion?.horizontal?.minus3dB);
+  const vertical = firstPositive(meta.dispersion?.vertical?.minus3dB);
+  if (horizontal || vertical) {
+    details.push(`Dispersion at −3 dB: ${horizontal ? `H ${horizontal}°` : ''}${horizontal && vertical ? ' / ' : ''}${vertical ? `V ${vertical}°` : ''}`);
+  } else if (meta.polarModel?.dataset) {
+    details.push(`Dispersion source: measured ${meta.polarModel.dataset} polar data`);
+  }
+
+  details.push(isSubwoofer && capability?.outputReference
+    ? `Source type: ${capability.outputReference}`
+    : 'Source type: Sound Proof engineering registry');
+  return details;
+}
+
 export function getProductTechnicalStatus(product) {
   const roles = effectiveProductRoles(product);
   const needsEngineering = product?.category === 'Loudspeaker'
@@ -86,6 +152,7 @@ export function getProductTechnicalStatus(product) {
       calculable: true,
       missing: [],
       warnings: [],
+      details: ['Technical data: not required for this product category.'],
       message: 'No Room Designer engineering record is required for this product category.',
     };
   }
@@ -97,6 +164,8 @@ export function getProductTechnicalStatus(product) {
   const staticSpeaker = staticSpeakerFor([selectorKey, engineeringKey, selectorKey.replace(/_s$/, '')]);
   const missing = [];
   const warnings = [];
+  const isSubwoofer = roles.includes(PRODUCT_ROLES.SUBWOOFER) || product?.category === 'Subwoofer';
+  const capability = isSubwoofer ? SUBWOOFER_BASS_CAPABILITIES[engineeringKey] : null;
 
   if (!engineeringKey) missing.push('engineering link');
   if (!meta) missing.push('recognised engineering record');
@@ -109,9 +178,7 @@ export function getProductTechnicalStatus(product) {
         && positive(meta.depthMm);
     if (!dimensionsAvailable) missing.push('physical dimensions');
 
-    const isSubwoofer = roles.includes(PRODUCT_ROLES.SUBWOOFER) || product?.category === 'Subwoofer';
     if (isSubwoofer) {
-      const capability = SUBWOOFER_BASS_CAPABILITIES[engineeringKey];
       if (!capability || !Array.isArray(capability.frequencyResponseCurve) || capability.frequencyResponseCurve.length < 3) {
         missing.push('subwoofer capability curve');
       }
@@ -163,6 +230,7 @@ export function getProductTechnicalStatus(product) {
     calculable,
     missing,
     warnings,
+    details: technicalDetails(meta, staticSpeaker, capability, isSubwoofer),
     message: !calculable
       ? 'Unavailable in new design selectors until the required engineering data is linked.'
       : warnings.length
