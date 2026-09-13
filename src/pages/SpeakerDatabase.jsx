@@ -14,10 +14,8 @@ import {
   Download,
   Loader2
 } from "lucide-react";
-import { useAuth } from "@/lib/AuthContext";
 import { useProductPriceMap } from "@/components/pricing/useProductPriceMap";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
-import AdminPriceEdit from "@/components/speakers/AdminPriceEdit";
 
 export default function SpeakerDatabasePage() {
   // UI filters
@@ -25,10 +23,8 @@ export default function SpeakerDatabasePage() {
   const [selectedModel, setSelectedModel] = useState('all');
   const [search, setSearch] = useState('');
 
-  // Auth + canonical price authority (ProductPrice)
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
-  const { priceMap, refetch: refetchPrices } = useProductPriceMap();
+  // Canonical commercial authority comes only from Product Master.
+  const { priceMap } = useProductPriceMap();
 
   // Data state
   const [serverSpeakers, setServerSpeakers] = useState(null); // null => fallback to local
@@ -323,23 +319,12 @@ export default function SpeakerDatabasePage() {
                     const sku = normaliseModelKey(speaker.model);
                     const priceRec = priceMap?.get(sku);
                     const canonicalPrice = (priceRec && priceRec.price_ex_vat != null) ? Number(priceRec.price_ex_vat) : null;
-                    const displayPrice = canonicalPrice != null ? canonicalPrice : (speaker.price != null ? Number(speaker.price) : null);
-                    if (displayPrice == null) return null;
                     return (
-                      <div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[#3E4349]">Price:</span>
-                          <span className="text-[#1B1A1A] font-medium">£{Number(displayPrice).toLocaleString()}</span>
-                        </div>
-                        {isAdmin && (
-                          <AdminPriceEdit
-                            sku={sku}
-                            modelLabel={speaker.model}
-                            speakerType={speaker.type}
-                            currentPrice={canonicalPrice}
-                            onSaved={() => refetchPrices()}
-                          />
-                        )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-[#3E4349]">Price:</span>
+                        <span className="text-[#1B1A1A] font-medium">
+                          {canonicalPrice == null ? 'Price on request' : `£${canonicalPrice.toLocaleString()}`}
+                        </span>
                       </div>
                     );
                   })()}
