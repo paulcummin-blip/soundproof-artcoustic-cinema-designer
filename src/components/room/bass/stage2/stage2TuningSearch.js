@@ -1,3 +1,5 @@
+import { tuningPhaseRadians } from "../../../../bass/core/subwooferPhaseControl.js";
+
 // stage2TuningSearch.js
 // Independent per-source delay and level+delay tuning search for Stage 2
 // canonical confirmation.
@@ -61,21 +63,25 @@ const SECOND_FINALIST_SCORE_MARGIN = 1.5; // second must be within 1.5x best sco
  * Apply a tuning (delay, gain, polarity) to a per-source complex transfer
  * and return the tuned complex values.
  */
-function applyTuning(points, delayMs, gainDb, polarity) {
-  const delayS = Number(delayMs) / 1000;
+function applyTuning(points, delayMs, gainDb, polarity, phaseControlDeg = 0) {
   const gainLinear = Math.pow(10, Number(gainDb) / 20);
-  const sign = polarity < 0 || Number(polarity) === 180 ? -1 : 1;
   return points.map((p) => {
     const freq = Number(p.frequency);
     if (!Number.isFinite(freq) || !Number.isFinite(p.re) || !Number.isFinite(p.im)) {
       return { re: 0, im: 0 };
     }
-    const theta = -2 * Math.PI * freq * delayS;
+    // Delay, polarity and the unity-magnitude all-pass phase control are one
+    // coherent source rotation. The all-pass term is frequency-dependent;
+    // it is deliberately not a non-causal constant phase offset.
+    const theta = tuningPhaseRadians(freq, {
+      delayMs,
+      polarity,
+      phaseControlDeg,
+    });
     const cosT = Math.cos(theta);
     const sinT = Math.sin(theta);
-    // Positive delay is phase lag: H(f) * exp(-j * 2π * f * delay).
-    const reTuned = (p.re * cosT - p.im * sinT) * gainLinear * sign;
-    const imTuned = (p.re * sinT + p.im * cosT) * gainLinear * sign;
+    const reTuned = (p.re * cosT - p.im * sinT) * gainLinear;
+    const imTuned = (p.re * sinT + p.im * cosT) * gainLinear;
     return { re: reTuned, im: imTuned };
   });
 }
@@ -90,8 +96,14 @@ function sumTunedTransfers(perSourceTransfers, tuning) {
   let sumRe = null;
   let sumIm = null;
   perSourceTransfers.forEach((transfer, sourceIndex) => {
-    const t = tuning[sourceIndex] || { delayMs: 0, gainDb: 0, polarity: 0 };
-    const tuned = applyTuning(transfer.points, t.delayMs, t.gainDb, t.polarity);
+    const t = tuning[sourceIndex] || { delayMs: 0, gainDb: 0, polarity: 0, phaseControlDeg: 0 };
+    const tuned = applyTuning(
+      transfer.points,
+      t.delayMs,
+      t.gainDb,
+      t.polarity,
+      t.phaseControlDeg ?? t.phaseAdjust ?? 0,
+    );
     if (!freqsHz) {
       freqsHz = tuned.map((_, i) => transfer.points[i].frequency);
       sumRe = tuned.map((v) => v.re);
@@ -467,7 +479,7 @@ export function searchLevelAndDelay(perSourceRspTransfers, sources) {
  * the summed seat responses (freqsHz, splDb per seat).
  *
  * @param {Array} perSourcePerSeatTransfers — [{ seatId, points: [{frequency, re, im}] }] per source per seat
- * @param {Array} tuning — [{ delayMs, gainDb, polarity }] per source
+ * @param {Array} tuning — [{ delayMs, gainDb, polarity, phaseControlDeg }] per source
  * @param {Array} seatIds — ordered list of seat IDs
  * @returns {object} seatResponses — { [seatId]: { freqsHz, splDb, _sumRe, _sumIm } }
  */
