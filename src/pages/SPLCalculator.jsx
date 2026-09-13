@@ -180,7 +180,7 @@ function SpeakerRow({ eyebrow, name, price, result, accent = false, note = null,
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "minmax(260px, 1fr) auto auto auto",
+        gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 28px",
         gap: 12,
         alignItems: "center",
         padding: "14px 16px",
@@ -194,10 +194,10 @@ function SpeakerRow({ eyebrow, name, price, result, accent = false, note = null,
         <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
         {note && <div style={{ marginTop: 3, fontSize: 12, color: BRAND.subtext }}>{note}</div>}
       </div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.text, minWidth: 92, textAlign: "right" }}>{formatPrice(price)}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.text, textAlign: "right" }}>{formatPrice(price)}</div>
       <Rp22Pill parameter="P12" level={result?.grades?.p12} />
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Rp22Pill parameter="P13" level={result?.grades?.p13} />
+      <Rp22Pill parameter="P13" level={result?.grades?.p13} />
+      <div>
         {onRemove && (
           <button type="button" onClick={onRemove} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}>
             <Trash2 size={16} />
@@ -429,12 +429,12 @@ export default function SPLCalculatorPage() {
         </div>
 
         <div style={{ background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) auto auto auto", gap: 12, alignItems: "end", padding: "0 16px 8px", fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-            <div>Speaker</div><div>Retail inc VAT</div><div>P12</div><div>P13</div>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 28px", gap: 12, alignItems: "end", padding: "0 16px 8px", fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}>
+            <div>Speaker</div><div style={{ textAlign: "right" }}>Retail inc VAT</div><div style={{ textAlign: "center" }}>P12</div><div style={{ textAlign: "center" }}>P13</div><div />
           </div>
 
           <div style={{ marginBottom: 8 }}>
-            <div style={{ marginBottom: 7, display: "grid", gridTemplateColumns: "minmax(260px, 1fr) auto auto auto", gap: 12, alignItems: "center" }}>
+            <div style={{ marginBottom: 7, display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 28px", gap: 12, alignItems: "center" }}>
               <select value={art?.id || ""} onChange={(e) => setArtId(e.target.value)} style={{ border: `1px solid ${BRAND.border}`, borderRadius: 10, padding: "10px 12px", background: "#FFF", fontWeight: 700, color: BRAND.text }}>
                 {artcousticVisible.map((s) => <option key={s.id} value={s.id}>Artcoustic · {s.model}</option>)}
               </select>
