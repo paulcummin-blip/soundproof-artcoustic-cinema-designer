@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { buildProductRoleOptions, PRODUCT_ROLES } from '@/components/products/productMaster';
 
 export const PRODUCT_MASTER_QUERY_KEY = ['productMaster'];
+const EMPTY_PRODUCTS = Object.freeze([]);
 
 export function useProductMaster(enabled = true) {
   const query = useQuery({
@@ -16,7 +17,7 @@ export function useProductMaster(enabled = true) {
     enabled,
   });
 
-  const products = Array.isArray(query.data?.products) ? query.data.products : [];
+  const products = Array.isArray(query.data?.products) ? query.data.products : EMPTY_PRODUCTS;
 
   const derived = useMemo(() => {
     const priceMap = new Map();
