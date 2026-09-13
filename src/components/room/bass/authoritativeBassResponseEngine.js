@@ -19,7 +19,7 @@ function isBatchModalEligible({ qStrategyOverride, physics, sources }) {
   // and re-summed with tuning by the existing tuning/re-summation path.
   for (const src of sources) {
     const t = src?.tuning;
-    if (t && (Number(t.gainDb) !== 0 || Number(t.delayMs) !== 0 || Number(t.polarity) !== 0)) return false;
+    if (t && (Number(t.gainDb) !== 0 || Number(t.delayMs) !== 0 || Number(t.polarity) !== 0 || Number(t.phaseControlDeg ?? t.phaseAdjust ?? 0) !== 0)) return false;
   }
   return true;
 }
