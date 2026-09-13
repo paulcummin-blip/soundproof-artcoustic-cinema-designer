@@ -181,6 +181,8 @@ export function buildStageDisplay(state) {
     if (key === 'gain') {
       if (stageVerdicts[key] === 'improvement' || stageVerdicts[key] === 'no_improvement') {
         stageStatus = 'completed';
+      } else if (activeStageKey === 'gain') {
+        stageStatus = 'active';
       } else if (stageVerdicts[key] === 'skipped') {
         stageStatus = 'not_tested';
       } else if (calibratingDone) {
