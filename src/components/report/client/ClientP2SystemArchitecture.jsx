@@ -328,24 +328,49 @@ export default function ClientP2SystemArchitecture({
             );
           })()}
 
-          {/* Subwoofers — rendered from canonical subwooferInstances (descriptive only) */}
+          {/* Subwoofers — rendered from canonical subwooferInstances (descriptive only).
+              Presentation-only wall snap: the acoustic coordinate is preserved; only
+              the rendered icon offset shifts so the outer edge touches the wall. */}
           {(Array.isArray(subwoofers) ? subwoofers : []).map((sub, i) => {
             const sp = toPx(sub.x, sub.y);
+            const SUB_W = 14;
+            const SUB_H = 10;
+            const WALL_THRESH_M = 0.5;
+            const sx = Number(sub.x);
+            const sy = Number(sub.y);
+            const distFront = sy;
+            const distRear = L - sy;
+            const distLeft = sx;
+            const distRight = W - sx;
+            let iconX = sp.px - SUB_W / 2;
+            let iconY = sp.py - SUB_H / 2;
+            let labelBelow = true;
+            if (distFront <= WALL_THRESH_M && distFront <= distRear) {
+              iconY = roomTopLeft.py;              // top edge against front wall
+            } else if (distRear <= WALL_THRESH_M) {
+              iconY = roomBottomRight.py - SUB_H;   // bottom edge against rear wall
+              labelBelow = false;
+            }
+            if (distLeft <= WALL_THRESH_M && distLeft <= distRight) {
+              iconX = roomTopLeft.px;              // left edge against left wall
+            } else if (distRight <= WALL_THRESH_M) {
+              iconX = roomBottomRight.px - SUB_W;   // right edge against right wall
+            }
             return (
               <g key={`sub-${sub.id || i}`}>
                 <rect
-                  x={sp.px - 7}
-                  y={sp.py - 5}
-                  width={14}
-                  height={10}
+                  x={iconX}
+                  y={iconY}
+                  width={SUB_W}
+                  height={SUB_H}
                   rx={2}
                   fill={SUB_COLOR}
                   stroke="#F8F8F7"
                   strokeWidth={1.5}
                 />
                 <text
-                  x={sp.px}
-                  y={sp.py + 18}
+                  x={iconX + SUB_W / 2}
+                  y={labelBelow ? iconY + SUB_H + 13 : iconY - 5}
                   fill={SUB_COLOR}
                   fontSize={9}
                   textAnchor="middle"
