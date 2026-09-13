@@ -8,6 +8,7 @@ import { evaluateSeatingBatch } from "../stage2/stage2SeatingBatchEvaluation.js"
 
 import { runGroupedDelaySearch } from "./groupedDelaySearch.js";
 import { runGroupedGainSearch } from "./groupedGainSearch.js";
+import { runGroupedPhaseSearch } from "./groupedPhaseSearch.js";
 
 self.onmessage = (event) => {
   const { requestId, phase, ...params } = event.data || {};
@@ -22,6 +23,9 @@ self.onmessage = (event) => {
     } else if (phase === "seating-batch") {
       const result = evaluateSeatingBatch(params);
       self.postMessage({ type: "complete", requestId, phase: "seating-batch", result });
+    } else if (phase === "grouped-phase") {
+      const result = runGroupedPhaseSearch(params);
+      self.postMessage({ type: "complete", requestId, phase, result });
     } else if (phase === "grouped-delay") {
       const result = runGroupedDelaySearch(params);
       self.postMessage({ type: "complete", requestId, phase, result });
