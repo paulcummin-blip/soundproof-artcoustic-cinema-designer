@@ -478,16 +478,14 @@ export default function SPLCalculatorPage() {
                 const item = competitorResults.find((x) => x.record.id === id);
                 return (
                   <div key={`${id}-${index}`}>
-                    <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) auto auto auto", gap: 12, alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 28px", gap: 12, alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}>
                       <select value={id} onChange={(e) => updateSelectedCompetitor(index, e.target.value)} style={{ border: 0, background: "transparent", fontSize: 15, fontWeight: 700, color: BRAND.text, minWidth: 0 }}>
                         {competitorRows.map((r) => <option key={r.id} value={r.id}>{r.manufacturer} · {r.model}</option>)}
                       </select>
-                      <div style={{ fontWeight: 600, textAlign: "right", minWidth: 92 }}>{formatPrice(numeric(record?.retail_price_inc_vat))}</div>
+                      <div style={{ fontWeight: 600, textAlign: "right" }}>{record ? formatPrice(numeric(record?.retail_price_inc_vat)) : "—"}</div>
                       <Rp22Pill parameter="P12" level={item?.result?.grades?.p12} />
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <Rp22Pill parameter="P13" level={item?.result?.grades?.p13} />
-                        <button type="button" onClick={() => setSelectedCompetitorIds((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>
-                      </div>
+                      <Rp22Pill parameter="P13" level={item?.result?.grades?.p13} />
+                      <button type="button" onClick={() => setSelectedCompetitorIds((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>
                     </div>
                     {record?.normalization_warnings?.length > 0 && (
                       <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
