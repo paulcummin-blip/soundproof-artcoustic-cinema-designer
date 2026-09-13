@@ -18,6 +18,7 @@ import { buildTreatmentAdvisory, buildRemainingLimitation } from "./improveBassV
 import { isOptimisedApplied } from "./improveBassV2Apply";
 import V2SeatBeforeAfterGrid from "./V2SeatBeforeAfterGrid";
 import RecommendationCard from "./RecommendationCard";
+import TradeOffCard from "./TradeOffCard";
 import { rankRecommendations } from "./recommendationRanker.js";
 
 function levelText(level) {
@@ -322,6 +323,7 @@ export default function ImproveBassV2Results({
   seatingPositions,
   onApply,
   onApplyCalibration,
+  onApplyTradeOff,
 }) {
   if (!selection) return null;
 
@@ -409,6 +411,24 @@ export default function ImproveBassV2Results({
               onApply={onApply}
               onApplyCalibration={onApplyCalibration}
               isApplied={isOptimisedApplied(currentInstances,rec.result,roomDims)}
+              currentResult={currentResult}
+              seatingPositions={seatingPositions}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── Verified trade-off alternatives (designer choices) ── */}
+      {selection.tradeOffs && selection.tradeOffs.length > 0 && (
+        <div className="space-y-2">
+          {selection.tradeOffs.map((entry) => (
+            <TradeOffCard
+              key={entry.candidateId}
+              tradeOffEntry={entry}
+              snapshot={augmentedSnapshot}
+              currentInstances={currentInstances}
+              onApply={onApplyTradeOff}
+              isApplied={isOptimisedApplied(currentInstances, entry.result, roomDims)}
               currentResult={currentResult}
               seatingPositions={seatingPositions}
             />

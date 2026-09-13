@@ -367,6 +367,31 @@ export default function ImproveBassResponseV2({
   },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,subwooferInstances,roomDims,selectedSubModel]);
   const handleApplyCalibration=handleApply;
 
+  // ── Trade-off Apply handler ──────────────────────────────────────────
+  // Allows applying a verified trade-off alternative (not the canonical winner).
+  // The designer explicitly chose this priority — it passed all hard safety gates.
+  // Same fingerprint/stale checks as the winner Apply.
+  const handleApplyTradeOff = useCallback((candidateId) => {
+    const selection=state?.winner;
+    const entry=selection?.tradeOffs?.find(t=>t.candidateId===candidateId);
+    if(!entry || !commitInstances || !hasCanonicalInstances) return;
+    const d=latestDesignRef.current;
+    const fingerprint=computeV2DesignFingerprint({...d,...d.p14Params});
+    if(state?.status!=="complete" || !selection.applyFingerprint || fingerprint!==selection.applyFingerprint ||
+       entry.result.inputIdentity!==fingerprint){
+      setStale(projectId,"Design changed — recalculate the recommendation before Apply");return;
+    }
+    const _provenance=buildProvenance(
+      entry.result.candidateKind==="calibration"?"calibration":"subPositions",
+      entry.result.candidateId,
+      selection.applyFingerprint,
+      fingerprint);
+    const next=entry.result.candidateKind==="calibration"
+      ? applyCalibrationTuning(subwooferInstances,entry.result.appliedTuning,_provenance)
+      : buildOptimisedInstances(entry.result,subwooferInstances,roomDims,selectedSubModel,_provenance);
+    commitInstances(next,{front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
+  },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,subwooferInstances,roomDims,selectedSubModel]);
+
   // ── Per-stage Apply handler ──────────────────────────────────────────
   // Each stage has its own independent Apply action. The user may choose
   // independently which improvement to apply. Applying one stage does NOT
@@ -489,6 +514,7 @@ export default function ImproveBassResponseV2({
           roomDims={roomDims}
           seatingPositions={seatingPositions}
           onApplyStage={handleApplyStage}
+          onApplyTradeOff={handleApplyTradeOff}
           stale={completedResultStale}
         />
       )}

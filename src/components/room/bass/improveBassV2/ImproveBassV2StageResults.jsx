@@ -14,6 +14,7 @@
 
 import React from "react";
 import ImproveBassV2StageRow from "./ImproveBassV2StageRow";
+import TradeOffCard from "./TradeOffCard";
 import { buildStageResults, STAGE_ORDER, STAGE_DISPLAY_LABELS } from "./improveBassV2StageAuthority";
 import { isOptimisedApplied } from "./improveBassV2Apply";
 import { isCalibrationApplied } from "./improveBassV2ApplyCalibration";
@@ -25,12 +26,14 @@ export default function ImproveBassV2StageResults({
   roomDims,
   seatingPositions,
   onApplyStage,
+  onApplyTradeOff,
   stale,
 }) {
   if (!selection) return null;
 
   const stages = buildStageResults(selection);
   const currentResult = selection.currentResult;
+  const tradeOffs = selection.tradeOffs || [];
 
   // Determine which stages are already applied
   function isStageApplied(stageKey, stage) {
@@ -70,6 +73,24 @@ export default function ImproveBassV2StageResults({
           />
         );
       })}
+
+      {/* ── Verified trade-off alternatives (designer choices) ── */}
+      {tradeOffs.length > 0 && !stale && (
+        <div className="space-y-2 pt-2" data-trade-offs-section="true">
+          {tradeOffs.map((entry) => (
+            <TradeOffCard
+              key={entry.candidateId}
+              tradeOffEntry={entry}
+              snapshot={snapshot}
+              currentInstances={currentInstances}
+              onApply={onApplyTradeOff}
+              isApplied={isOptimisedApplied(currentInstances, entry.result, roomDims)}
+              currentResult={currentResult}
+              seatingPositions={seatingPositions}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
