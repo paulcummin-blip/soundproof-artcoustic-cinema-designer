@@ -55,13 +55,15 @@ export default function SurroundsSelector({
   const getModelLabel = (modelKey) => {
     if (!modelKey || modelKey === 'off' || modelKey === 'OFF') return 'Off';
     
-    // Use speaker registry as source of truth for labels
+    const choice = choices.find(c => c.value === modelKey)
+      || filteredSideChoices.find(c => c.value === modelKey)
+      || filteredRearChoices.find(c => c.value === modelKey)
+      || filteredWideChoices.find(c => c.value === modelKey);
+    if (choice?.label) return choice.label;
+
+    // Historical inactive products still resolve through the engineering registry.
     const meta = getSpeakerModelMeta(modelKey);
-    if (meta && meta.label && !meta.notFound) return meta.label;
-    
-    // Fallback to choices if registry lookup fails
-    const choice = choices.find(c => c.value === modelKey);
-    return choice?.label || modelKey;
+    return meta?.label && !meta.notFound ? meta.label : modelKey;
   };
 
   return (
