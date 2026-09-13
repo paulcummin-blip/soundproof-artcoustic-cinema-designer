@@ -82,8 +82,8 @@ check("handleApplyStage seating branch only calls commitSeating (not commitInsta
     const block = v2Comp.slice(idx, blockEnd > idx ? blockEnd : idx + 200);
     return !block.includes("commitInstances");
   })());
-check("handleApplyStage delay/gain calls applyCalibrationTuning (not buildOptimisedInstances)", 
-  v2Comp.includes('stageKey === "delay" || stageKey === "gain"') && v2Comp.includes("applyCalibrationTuning(subwooferInstances"));
+check("handleApplyStage phase/delay/gain calls applyCalibrationTuning (not buildOptimisedInstances)", 
+  v2Comp.includes('stageKey === "phase" || stageKey === "delay" || stageKey === "gain"') && v2Comp.includes("applyCalibrationTuning(subwooferInstances"));
 check("handleApplyStage subPositions calls buildOptimisedInstances", 
   v2Comp.includes('stageKey === "subPositions"') && v2Comp.includes("buildOptimisedInstances("));
 
