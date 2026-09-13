@@ -98,6 +98,7 @@ export function buildAuthoritativeBassSources({
     const instGainDb = Number(item?.gainDb);
     const instDelayMs = Number(item?.delay ?? item?.delayMs);
     const instPolarity = item?.polarity ?? 1;
+    const instPhaseControlDeg = Number(item?.phaseControlDeg ?? item?.phaseAdjust);
     return {
       id,
       modelKey,
@@ -110,6 +111,9 @@ export function buildAuthoritativeBassSources({
         gainDb: Number.isFinite(instGainDb) ? instGainDb : 0,
         delayMs: (Number.isFinite(instDelayMs) ? instDelayMs : 0) + (item?.tuningSource === "v2-optimised" ? 0 : resolveAutoDelay(id, resolvedGroup, resolvedIndex)),
         polarity: instPolarity === -1 || Number(instPolarity) === 180 ? 180 : 0,
+        phaseControlDeg: Number.isFinite(instPhaseControlDeg)
+          ? Math.max(0, Math.min(175, instPhaseControlDeg))
+          : 0,
       },
     };
   };
