@@ -1341,9 +1341,10 @@ function useDesignerState() {
   }, []);
 
   const setScreenFrontPlaneM = useCallback((m) => {
+    if (m == null) { _setScreenFrontPlaneM(null); return; }
     if (!Number.isFinite(m)) return;
     _setScreenFrontPlaneM(prev => {
-      const prevRounded = prev ? Math.round(prev * 1000) : null;
+      const prevRounded = Number.isFinite(prev) ? Math.round(prev * 1000) : null;
       const newRounded = Math.round(m * 1000);
       return prevRounded === newRounded ? prev : m;
     });
