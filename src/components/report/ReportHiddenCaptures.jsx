@@ -205,6 +205,7 @@ export default function ReportHiddenCaptures({
             <div data-seat-metrics-builder style={HIDDEN_STYLE}>
                 <RoomVisualisation
                     rp22DiagnosticOwner="report-seat-metrics"
+                    geometryReadOnly={true}
                     placedSpeakers={placedSpeakers}
                     seatingPositions={seats}
                     mlpPoint={primarySeatingPosition}
