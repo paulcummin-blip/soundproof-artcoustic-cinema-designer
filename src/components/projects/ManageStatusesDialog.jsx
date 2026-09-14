@@ -21,6 +21,8 @@ export default function ManageStatusesDialog({
   const [newColor, setNewColor] = useState("#625143");
   const [editingId, setEditingId] = useState(null);
   const [editLabel, setEditLabel] = useState("");
+  const [archivingId, setArchivingId] = useState(null);
+  const [replacementId, setReplacementId] = useState("");
   const [error, setError] = useState(null);
 
   if (!open) return null;
@@ -39,21 +41,26 @@ export default function ManageStatusesDialog({
 
   const handleArchive = async (status) => {
     const count = statusUsageCounts?.[status.status_id] || 0;
-    if (count > 0) {
-      if (
-        !window.confirm(
-          `"${status.label}" is used by ${count} project(s). Archiving hides it from new assignments, but existing projects keep it. Continue?`
-        )
-      ) {
-        return;
-      }
+    // If the status is in use, prompt for a replacement status before archiving
+    if (count > 0 && archivingId !== status.id) {
+      const others = activeStatuses.filter((s) => s.id !== status.id);
+      setArchivingId(status.id);
+      setReplacementId(others[0]?.status_id || "");
+      return;
     }
     try {
       setError(null);
-      await onArchive(status.id);
+      await onArchive(status.id, count > 0 ? replacementId : undefined);
+      setArchivingId(null);
+      setReplacementId("");
     } catch (e) {
       setError(e?.message || "Failed to archive status");
     }
+  };
+
+  const cancelArchive = () => {
+    setArchivingId(null);
+    setReplacementId("");
   };
 
   const moveUp = (idx) => {
@@ -241,6 +248,44 @@ export default function ManageStatusesDialog({
                   <button onClick={() => setEditingId(null)} style={{ ...btnBase }}>
                     Cancel
                   </button>
+                </>
+              ) : archivingId === s.id ? (
+                <>
+                  <div style={{ flex: 1, fontSize: 13 }}>
+                    <div style={{ marginBottom: 4 }}>
+                      Used by {statusUsageCounts?.[s.status_id] || 0} project(s). Select replacement:
+                    </div>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <select
+                        value={replacementId}
+                        onChange={(e) => setReplacementId(e.target.value)}
+                        style={{
+                          flex: 1,
+                          padding: "4px 8px",
+                          borderRadius: 6,
+                          border: "1px solid #DCDBD6",
+                          fontSize: 13,
+                        }}
+                      >
+                        {activeStatuses
+                          .filter((o) => o.id !== s.id)
+                          .map((o) => (
+                            <option key={o.status_id} value={o.status_id}>
+                              {o.label}
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        onClick={() => handleArchive(s)}
+                        style={{ ...btnBase, background: "#1B1A1A", color: "#fff", borderColor: "#1B1A1A" }}
+                      >
+                        Confirm
+                      </button>
+                      <button onClick={cancelArchive} style={{ ...btnBase }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 </>
               ) : (
                 <>

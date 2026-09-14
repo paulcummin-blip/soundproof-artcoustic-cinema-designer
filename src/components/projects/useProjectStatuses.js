@@ -76,6 +76,11 @@ export function useProjectStatuses() {
     async (label, color) => {
       const trimmed = (label || "").trim();
       if (!trimmed) return;
+      // Block duplicate active label (case-insensitive, trimmed)
+      const dup = statuses.find(
+        (s) => !s.is_archived && (s.label || "").trim().toLowerCase() === trimmed.toLowerCase()
+      );
+      if (dup) throw new Error("A project status with this name already exists.");
       const maxOrder = statuses.reduce((m, s) => Math.max(m, s.sort_order ?? 0), 0);
       const status_id = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const created = await base44.entities.ProjectStatus.create({
@@ -96,6 +101,11 @@ export function useProjectStatuses() {
   const renameStatus = useCallback(async (id, newLabel) => {
     const trimmed = (newLabel || "").trim();
     if (!trimmed) return;
+    // Block duplicate active label (case-insensitive, trimmed), excluding self
+    const dup = statuses.find(
+      (s) => s.id !== id && !s.is_archived && (s.label || "").trim().toLowerCase() === trimmed.toLowerCase()
+    );
+    if (dup) throw new Error("A project status with this name already exists.");
     const updated = await base44.entities.ProjectStatus.update(id, { label: trimmed });
     setStatuses((arr) =>
       sortStatuses(arr.map((s) => (s.id === id ? { ...s, label: updated.label } : s)))
@@ -129,13 +139,26 @@ export function useProjectStatuses() {
     });
   }, []);
 
-  const archiveStatus = useCallback(async (id) => {
+  const archiveStatus = useCallback(async (id, replacementStatusId) => {
+    // If a replacement is provided, reassign all projects from this status
+    // to the replacement before archiving, so no project points to an
+    // archived/unusable status value.
+    const status = statuses.find((s) => s.id === id);
+    if (replacementStatusId && status?.status_id) {
+      const projects = await base44.entities.Project.filter({ project_status: status.status_id });
+      if (projects && projects.length > 0) {
+        await base44.entities.Project.updateMany(
+          { project_status: status.status_id },
+          { $set: { project_status: replacementStatusId } }
+        );
+      }
+    }
     const updated = await base44.entities.ProjectStatus.update(id, { is_archived: true });
     setStatuses((arr) =>
       sortStatuses(arr.map((s) => (s.id === id ? { ...s, is_archived: true } : s)))
     );
     return updated;
-  }, []);
+  }, [statuses]);
 
   const unarchiveStatus = useCallback(async (id) => {
     const updated = await base44.entities.ProjectStatus.update(id, { is_archived: false });

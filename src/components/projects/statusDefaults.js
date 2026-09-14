@@ -6,10 +6,10 @@
 // into the default ids via normalizeStatusId.
 
 export const DEFAULT_STATUSES = [
-  { status_id: "prospective", label: "Prospective", sort_order: 1, color: "#625143", is_default: true, is_archived: false },
-  { status_id: "live",        label: "Live",        sort_order: 2, color: "#213428", is_default: true, is_archived: false },
-  { status_id: "completed",   label: "Completed",   sort_order: 3, color: "#C1B6AD", is_default: true, is_archived: false },
-  { status_id: "lost",        label: "Lost",        sort_order: 4, color: "#4A230F", is_default: true, is_archived: false },
+  { status_id: "prospective", label: "Prospective", sort_order: 1, color: "#625143", is_default: true,  is_archived: false },
+  { status_id: "live",        label: "Live",        sort_order: 2, color: "#213428", is_default: false, is_archived: false },
+  { status_id: "completed",   label: "Completed",   sort_order: 3, color: "#C1B6AD", is_default: false, is_archived: false },
+  { status_id: "lost",        label: "Lost",        sort_order: 4, color: "#4A230F", is_default: false, is_archived: false },
 ];
 
 // Legacy / raw project_status value -> canonical default status_id.
