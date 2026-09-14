@@ -22,9 +22,8 @@ import { useAllSeatSplMetrics } from '@/components/hooks/useAllSeatSplMetrics';
 import { useSubwooferSync } from '@/components/hooks/useSubwooferSync';
 import { base44 } from '@/api/base44Client';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
-import { resolveDesignatedRspSeat } from '@/components/room/rsp/rspInputResolver';
+import { resolveDesignatedRspSeat, resolveRowDerivedRspYByMode } from '@/components/room/rsp/rspInputResolver';
 import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from '@/components/room/rsp/screenGeometryResolver';
-import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 
 // Extracted child components
 import ReportPrintStyles from '../components/report/ReportPrintStyles';
@@ -519,46 +518,15 @@ function RP22ReportInner() {
     const rspMode = app?.rspMode || "auto_from_screen";
     const manualRspY_m = app?.manualRspY_m ?? null;
 
-    const screenVisibleWidthInches = React.useMemo(() => {
-        const TV_PRESET_WIDTH_MM = { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 };
-        const tvKey = screen?.tvPresetKey;
-        const tvMm = Number(screen?.tvWidthMm);
-        if (tvKey && TV_PRESET_WIDTH_MM[tvKey]) return TV_PRESET_WIDTH_MM[tvKey] / 25.4;
-        if (Number.isFinite(tvMm) && tvMm > 0) return tvMm / 25.4;
-        const vwi = Number(screen?.visibleWidthInches);
-        if (Number.isFinite(vwi) && vwi > 0) return vwi;
-        const mw = Number(screen?.manualWidthM);
-        if (Number.isFinite(mw) && mw > 0) return mw / 0.0254;
-        return 120;
-    }, [screen?.tvPresetKey, screen?.tvWidthMm, screen?.visibleWidthInches, screen?.manualWidthM]);
-
-    const reportScreenFrontPlaneM = React.useMemo(() => {
-        const raw = Number(app?.screenFrontPlaneM);
-        if (Number.isFinite(raw) && raw > 0) return raw;
-        const floatDepth = Number(screen?.floatDepthM);
-        if (Number.isFinite(floatDepth) && floatDepth > 0) return floatDepth;
-        return 0.20;
-    }, [app?.screenFrontPlaneM, screen?.floatDepthM]);
-
-    const reportScreenWidthM = React.useMemo(
-        () => Number(screenVisibleWidthInches) * 0.0254,
-        [screenVisibleWidthInches]
+    const reportScreenFrontPlaneM = React.useMemo(
+        () => resolveRspScreenFrontPlaneM(app?.screenFrontPlaneM, screen),
+        [app?.screenFrontPlaneM, screen?.floatDepthM, screen?.screenPlaneY_m]
     );
 
-    const rowDerivedRspYByMode = React.useMemo(() => {
-        if (!seats.length) return {};
-        try {
-            const result = computeMLPAndPrimary(
-                seats,
-                stableDimensions.width,
-                stableDimensions.length,
-                "front"
-            );
-            return result?.rowDerivedRspYByMode ?? {};
-        } catch {
-            return {};
-        }
-    }, [seats, stableDimensions.width, stableDimensions.length]);
+    const rowDerivedRspYByMode = React.useMemo(
+        () => resolveRowDerivedRspYByMode(seats, stableDimensions.width, stableDimensions.length),
+        [seats, stableDimensions.width, stableDimensions.length]
+    );
 
     // ── Designated RSP seat (seat_bound mode) ──────────────────────────────
     const designatedRspSeat = React.useMemo(
@@ -569,10 +537,7 @@ function RP22ReportInner() {
     // ── Canonical RSP via shared screen-geometry resolver ──────────────────
     // Uses resolveRspScreenFrontPlaneM / resolveRspScreenWidthM so the RSP
     // coordinate matches RoomVisualisation and useClientReportAuthority exactly.
-    const rspScreenFrontPlaneM = React.useMemo(
-        () => resolveRspScreenFrontPlaneM(app?.screenFrontPlaneM, screen),
-        [app?.screenFrontPlaneM, screen?.floatDepthM, screen?.screenPlaneY_m]
-    );
+    const rspScreenFrontPlaneM = reportScreenFrontPlaneM;
     const rspScreenWidthM = React.useMemo(
         () => resolveRspScreenWidthM(screen),
         [screen?.tvPresetKey, screen?.tvWidthMm, screen?.visibleWidthInches, screen?.manualWidthM, screen?.manualHeightM, screen?.aspectRatio, screen?.manualSize]
@@ -634,7 +599,7 @@ function RP22ReportInner() {
             const borderThicknessM = Number.isFinite(rawBorder) && rawBorder > 0 ? rawBorder : 0.08;
             const overallWm = viewWm + borderThicknessM * 2;
             const overallHm = viewHm + borderThicknessM * 2;
-            const screenFrontPlaneM = app?.screenFrontPlaneM ?? app?.screen?.frontPlaneYm ?? null;
+            const screenFrontPlaneM = resolveRspScreenFrontPlaneM(app?.screenFrontPlaneM, app?.screen);
             return {
                 ok: true, viewWm, viewHm, overallWm, overallHm,
                 wallDistM: Number.isFinite(screenFrontPlaneM) ? screenFrontPlaneM : null,
