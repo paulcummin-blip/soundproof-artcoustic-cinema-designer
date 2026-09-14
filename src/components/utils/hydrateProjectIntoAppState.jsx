@@ -3,6 +3,7 @@
 // Extracted from components/hooks/useProjectLoader.js hydrateFromProject(...).
 // Do not add logic here; keep it a pure pass-through to existing setters.
 
+import { readPersistedScreenPlaneM } from "@/components/utils/screenPlanePersistence";
 import { parseProjectJson } from "@/components/roomdesigner/RoomDesignerHelpers";
 import { normaliseSeatPriorities } from "@/components/utils/seatScopeAuthority";
 import {
@@ -141,7 +142,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       presetTvWidthMm: hydratedManualSize ? (Number(p?.tv_width_mm) || null) : undefined,
       viewableWidthM: undefined,
       viewableHeightM: undefined,
-      screenPlaneY_m: Number(p?.screen_front_plane_m) > 0 ? Number(p.screen_front_plane_m) : undefined,
+      screenPlaneY_m: readPersistedScreenPlaneM(p?.screen_front_plane_m) ?? undefined,
       // For TV presets, derive visibleWidthInches from the canonical preset key/mm
       // so live state stays coherent with persisted tv_preset_key/tv_width_mm.
       // For projector/manual projects (no tv_preset_key), restore screen_size directly.
@@ -552,8 +553,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
 
   // 10c) screenFrontPlaneM — restore persisted value so signature matches on first autosave tick
   if (typeof appState?.setScreenFrontPlaneM === "function") {
-    const sfp = Number(p?.screen_front_plane_m);
-    appState.setScreenFrontPlaneM(Number.isFinite(sfp) ? sfp : 0);
+    appState.setScreenFrontPlaneM(readPersistedScreenPlaneM(p?.screen_front_plane_m));
   }
 
   // 10d) RSP MODE + MANUAL RSP POSITION (x, y)
@@ -593,8 +593,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       return Number.isFinite(w) ? w : 4.5;
     })();
     const screenFrontPlaneHydrated = (() => {
-      const sfp = Number(p?.screen_front_plane_m);
-      return Number.isFinite(sfp) ? sfp : null;
+      return readPersistedScreenPlaneM(p?.screen_front_plane_m);
     })();
     const screenWidthHydratedM = (() => {
       const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
