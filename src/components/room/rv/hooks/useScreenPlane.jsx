@@ -210,12 +210,35 @@ export function useScreenPlane({
     ? resolveRspScreenFrontPlaneM(appState?.screenFrontPlaneM, screen)
     : (isLocked && Number.isFinite(lockedY)) ? lockedY : renderedScreenPlaneY;
 
+  // Readiness: LCR geometry must be available before publishing a live-computed
+  // screen plane to appState. An empty LCR set (speakers not yet hydrated) or
+  // unresolvable dimensions produce a transient 0 from computeMinimumScreenDepthM
+  // that must not overwrite a valid persisted screenFrontPlaneM. This guards the
+  // publish effect only — rendering and internal calculations are unchanged.
+  // Once LCR geometry is ready, normal live calculation publishes the real value.
+  const lcrGeometryReady = useMemo(() => {
+    const lcrSpeakers = (placedSpeakers || []).filter((s) => {
+      const r = getCanonicalRole(s?.role);
+      return r === 'FL' || r === 'FC' || r === 'FR';
+    });
+    if (lcrSpeakers.length === 0) return false;
+    return lcrSpeakers.every((s) => {
+      const dims = getModelDimsM(s?.model);
+      return dims != null;
+    });
+  }, [placedSpeakers, getCanonicalRole, getModelDimsM]);
+
   // Publish screen front plane to AppState with guards (rounded to mm + change detection)
   const lastScreenFrontPlaneRef = useRef(null);
 
   useEffect(() => {
     if (readOnly || !appState?.setScreenFrontPlaneM) return;
     if (!Number.isFinite(resolvedScreenPlaneY)) return;
+
+    // Readiness guard: do not publish a live-computed screen plane until LCR
+    // geometry is ready. A transient 0 from incomplete hydration must not
+    // overwrite a valid persisted screenFrontPlaneM.
+    if (!lcrGeometryReady) return;
 
     // Round to mm to avoid jitter/loops
     const v = Math.round(resolvedScreenPlaneY * 1000) / 1000;
@@ -225,7 +248,7 @@ export function useScreenPlane({
     lastScreenFrontPlaneRef.current = v;
 
     appState.setScreenFrontPlaneM(v);
-  }, [readOnly, resolvedScreenPlaneY, appState?.setScreenFrontPlaneM]);
+  }, [readOnly, resolvedScreenPlaneY, appState?.setScreenFrontPlaneM, lcrGeometryReady]);
 
   // Push live plane up to RoomDesigner when it changes (debounced + change guard)
   const screenSendTimerRef = useRef(null);
