@@ -22,6 +22,8 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useActiveProjectId } from "@/components/state/project-session";
+import { useAppState } from "@/components/AppStateProvider";
+import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 import { base44 } from "@/api/base44Client";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
@@ -45,6 +47,8 @@ const COLORS = {
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
 
 export default function DesignReviewPage() {
+  const app = useAppState();
+  const [geometryReadyProjectId, setGeometryReadyProjectId] = useState(null);
   const { projectId: routeProjectId } = useParams();
   const [searchParams] = useSearchParams();
   const activeProjectId = useActiveProjectId();
@@ -98,10 +102,19 @@ export default function DesignReviewPage() {
     // Clear the previous project's record before fetching the next one so its
     // seat geometry cannot render under the new project identity.
     setProjectDetails(null);
+    setGeometryReadyProjectId(null);
     setLoadingProject(true);
     base44.entities.Project.filter({ id: projectId }).then((results) => {
       if (cancelled) return;
       const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
+      if (p) {
+        // Preserve live same-project edits; cold/direct loads use the same
+        // hydration path as Room Designer and the PDF report before drawing.
+        if (!(activeProjectId === projectId && app?.isProjectHydrationReady === true)) {
+          hydrateProjectIntoAppState(p, app, { ...app, setDolbyPreset: app.setDolbyLayout });
+        }
+        setGeometryReadyProjectId(p.id);
+      }
       setProjectDetails(p || null);
     }).catch(() => {
       if (!cancelled) setProjectDetails(null);
@@ -224,7 +237,11 @@ export default function DesignReviewPage() {
           title="Drawings & Geometry"
           icon={<PenTool style={{ width: 16, height: 16, color: COLORS.primary }} />}
         >
-          <DrawingsBlock asdrData={asdrData} />
+          {geometryReadyProjectId === projectId ? (
+            <DrawingsBlock asdrData={asdrData} />
+          ) : (
+            <div role="status">Loading project geometry…</div>
+          )}
         </CollapsiblePanel>
 
         <CollapsiblePanel
