@@ -17,7 +17,8 @@ await build({
     "export {default as Captures} from './src/components/report/ReportHiddenCaptures.jsx';",
     "export {computeEffectiveRsp} from './src/components/room/rsp/computeEffectiveRsp.js';",
     "export {resolveRspInputs} from './src/components/room/rsp/rspInputResolver.js';",
-    "export {resolveEffectiveViewableDimsM} from './src/components/models/screen/resolveEffectiveScreen.js';",
+    "export {resolveEffectiveViewableDimsM, applyManualOverrideToScreen} from './src/components/models/screen/resolveEffectiveScreen.js';",
+    "export {hydrateProjectIntoAppState} from './src/components/utils/hydrateProjectIntoAppState.jsx';",
   ].join('\n'),resolveDir:root,loader:'jsx'},
   bundle:true,platform:'node',format:'cjs',outfile:out,alias:{'@':root+'/src'},logLevel:'error',
   plugins:[{name:'acoustic-builder-prop-probe',setup(b){
@@ -28,7 +29,7 @@ await build({
     }));
   }}]
 });
-const {React,render,Canvas,Captures,computeEffectiveRsp,resolveRspInputs,resolveEffectiveViewableDimsM}=createRequire(import.meta.url)(out);
+const {React,render,Canvas,Captures,computeEffectiveRsp,resolveRspInputs,resolveEffectiveViewableDimsM,applyManualOverrideToScreen,hydrateProjectIntoAppState}=createRequire(import.meta.url)(out);
 const seats=[1.15,1.95,2.75,3.55,4.35].map((x,i)=>({id:'seat-r1-c'+(i+1),x,y:3.81,z:1.2,rowNumber:1,isPrimary:i===2}));
 const screen={tvPresetKey:'tv100',tvWidthMm:2230,visibleWidthInches:87.8,aspectRatio:'16:9',screenPlaneY_m:.102,floatDepthM:.2,borderThicknessM:.005};
 const app={roomDims:{widthM:5.5,lengthM:5.29,heightM:2.4},rspMode:'manual_position',manualRspY_m:3.81,manualRspX_m:0,designatedRspSeatId:null,screenFrontPlaneM:null,seatingPositions:seats};
@@ -85,5 +86,28 @@ try {
   assert.ok(html.includes('data-builder-rsp-mode="manual_position"'));
   assert.ok(html.includes('data-builder-rsp-y="3.81"'));
   console.log('PASS all PDF captures and acoustic builder retain saved RSP and screen inputs'); passed++;
+  const saved={roomDims:JSON.stringify(app.roomDims),screen_size:87.8,aspect_ratio:'16:9',tv_preset_key:'tv100',tv_width_mm:2230,manual_dimensions:false,manual_width_m:0,manual_height_m:0,screen_front_plane_m:.102,rsp_mode:'manual_position',manual_rsp_x_m:0,manual_rsp_y_m:3.81,designated_rsp_seat_id:null,seating_positions:seats};
+  let hydratedScreen={...screen,manualSize:{enabled:true,mode:'wh',widthM:4,heightM:2},presetVisibleWidthInches:160,presetTvPresetKey:null,screenPlaneY_m:.8};
+  const hydrated={};
+  const setters={
+    setScreen(next){hydratedScreen=applyManualOverrideToScreen(hydratedScreen,typeof next==='function'?next(hydratedScreen):next);},
+    setRspMode(v){hydrated.rspMode=v;},setManualRspY_m(v){hydrated.manualRspY_m=v;},setManualRspX_m(v){hydrated.manualRspX_m=v;},
+    setDesignatedRspSeatId(v){hydrated.designatedRspSeatId=v;},setSeatingPositions(v){hydrated.seats=v;},
+    setScreenFrontPlaneM(v){hydrated.screenFrontPlaneM=v;}
+  };
+  hydrateProjectIntoAppState(saved,setters,setters);
+  assert.equal(hydratedScreen.manualSize,undefined,'saved OFF must reject previous project manual override');
+  assert.equal(hydratedScreen.screenPlaneY_m,.102,'saved screen plane replaces previous project plane');
+  assert.ok(Math.abs(resolveEffectiveViewableDimsM(hydratedScreen).widthM-2.23012)<1e-12);
+  assert.equal(hydrated.rspMode,'manual_position');
+  assert.equal(hydrated.manualRspY_m,3.81);
+  assert.equal(hydrated.manualRspX_m,0);
+  assert.equal(hydrated.designatedRspSeatId,null);
+  assert.equal(hydrated.screenFrontPlaneM,.102);
+  assert.deepEqual(hydrated.seats.map(s=>[s.x,s.y,s.z]),seats.map(s=>[s.x,s.y,s.z]));
+  console.log('PASS saved project hydration rejects stale manual geometry and retains all RSP/seat inputs'); passed++;
+  hydrateProjectIntoAppState({...saved,manual_dimensions:true,manual_width_m:3,manual_height_m:1.6},setters,setters);
+  assert.deepEqual(resolveEffectiveViewableDimsM(hydratedScreen),{widthM:3,heightM:1.6});
+  console.log('PASS persisted manual dimensions retain override authority'); passed++;
   console.log(JSON.stringify({passed,failed:0}));
 } finally { fs.rmSync(tmp,{recursive:true,force:true}); }
