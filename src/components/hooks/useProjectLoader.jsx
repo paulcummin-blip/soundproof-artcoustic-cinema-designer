@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Project } from "@/entities/Project";
 import { serializeProject } from "@/components/utils/serializeProject";
+import { readPersistedScreenPlaneM } from "@/components/utils/screenPlanePersistence";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
 // Stage 1: subwooferInstances is the new canonical authority for bass analysis.
 // deriveSubwoofersFromCfg remains as a legacy fallback only.
@@ -345,7 +346,7 @@ appState, // Pass appState directly for setters
           useFrontGlobal: typeof p?.use_front_global === "boolean" ? p.use_front_global : true,
           useMidGlobal: typeof p?.use_mid_global === "boolean" ? p.use_mid_global : true,
           useRearGlobal: typeof p?.use_rear_global === "boolean" ? p.use_rear_global : true,
-          screenFrontPlaneM: (() => { const v = Number(p?.screen_front_plane_m); return Number.isFinite(v) ? v : 0; })(),
+          screenFrontPlaneM: readPersistedScreenPlaneM(p?.screen_front_plane_m),
           splConfig: _parseMaybe(p?.spl_config, null),
           p12Mode: p?.spl_config?.p12_mode ?? null,
           p12Level: p?.spl_config?.p12_level ?? null,
@@ -428,9 +429,12 @@ appState, // Pass appState directly for setters
   const lastBootTargetRef = useRef("");
   const autosaveProjectIdRef = useRef(null); // tracks which project the autosave timers belong to
   const isMountedRef = useRef(true);
+  // Long-lived timers must dispatch the current committed save callback.
+  // Capturing the first render here can later persist a transient zero plane.
+  const autosaveAttemptRef = useRef(null);
   useEffect(() => {
     isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
+    return () => { isMountedRef.current = false; autosaveAttemptRef.current = null; };
   }, []);
 
   useEffect(() => {
@@ -443,6 +447,7 @@ appState, // Pass appState directly for setters
   // Auto-save ONLY for an existing project.
   // Quiet autosave: mark dirty on changes, then commit at most every 10s (and also on short pauses).
   useEffect(() => {
+    autosaveAttemptRef.current = null;
     const effectiveProjectId = activeProjectId || projectIdState || null;
     if (!effectiveProjectId) {
       // No project — the page shell should have redirected to Projects.
@@ -638,6 +643,12 @@ appState, // Pass appState directly for setters
       }
     };
 
+    autosaveAttemptRef.current = { projectId: effectiveProjectId, run: trySaveNow };
+    const runLatestSave = () => {
+      const current = autosaveAttemptRef.current;
+      if (current?.projectId === effectiveProjectId) void current.run();
+    };
+
     // Compute signature once — used to decide whether to queue a new debounce
     let currentSig = "";
     try {
@@ -656,17 +667,13 @@ appState, // Pass appState directly for setters
       r.lastQueuedSig = currentSig;
       setAutosaveStatus("dirty");
       if (r.debounceId) clearTimeout(r.debounceId);
-      r.debounceId = setTimeout(() => {
-        void trySaveNow();
-      }, AUTOSAVE_DEBOUNCE_MS);
+      r.debounceId = setTimeout(runLatestSave, AUTOSAVE_DEBOUNCE_MS);
     }
     // else: payload changed but matches what is already queued — leave the pending debounce alone
 
     // Interval: ensure we commit at least every 30 seconds while dirty
     if (!r.intervalId) {
-      r.intervalId = setInterval(() => {
-        void trySaveNow();
-      }, AUTOSAVE_INTERVAL_MS);
+      r.intervalId = setInterval(runLatestSave, AUTOSAVE_INTERVAL_MS);
     }
 
     // Cleanup: only tear down timers when the project ID changes or the component unmounts.
@@ -691,6 +698,8 @@ appState, // Pass appState directly for setters
       // else: same project, normal payload-change re-run — leave timers alive
     };
   }, [
+  buildSharedProjectPayload,
+  loadState.phase,
   projectIdState,
   projectIdFromUrl,
   projectNameState,
