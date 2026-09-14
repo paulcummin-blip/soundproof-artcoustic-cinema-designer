@@ -82,6 +82,12 @@ function P9SeatBadge({ level, degrees }) {
   );
 }
 
+const OVERHEAD_PREFIXES = ["T", "U"];
+
+function isOverheadRole(canonRole) {
+  return OVERHEAD_PREFIXES.some((p) => canonRole.startsWith(p));
+}
+
 export default function ClientP9Overhead({
   roomDims,
   seats,
@@ -90,6 +96,7 @@ export default function ClientP9Overhead({
   screenWidthM,
   counts,
   summary,
+  placedSpeakers,
 }) {
   const W = Number(roomDims?.widthM) || 4.5;
   const L = Number(roomDims?.lengthM) || 6.0;
@@ -126,6 +133,16 @@ export default function ClientP9Overhead({
   const rspY = Number(rsp?.y);
   const rspValid = Number.isFinite(rspX) && Number.isFinite(rspY);
   const rspPx = rspValid ? toPx(rspX, rspY) : null;
+
+  // Actual installed overhead speakers — same geometry authority as Room Designer.
+  // Rendered at their real plan coordinates so the P9 result has spatial meaning.
+  const overheadSpeakers = (Array.isArray(placedSpeakers) ? placedSpeakers : [])
+    .filter((s) => s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y))
+    .map((s) => {
+      const role = String(s.role || "").toUpperCase();
+      return { role, x: Number(s.position.x), y: Number(s.position.y) };
+    })
+    .filter((s) => isOverheadRole(s.role));
 
   if (!seats || seats.length === 0) {
     return (
@@ -222,6 +239,54 @@ export default function ClientP9Overhead({
         >
           SCREEN
         </text>
+
+        {/* Rays from RSP to each overhead speaker — spatial context for the
+             P9 angle result. Thin, low-opacity so they don't clutter the seats. */}
+        {rspPx && overheadSpeakers.map((spk, i) => {
+          const sp = toPx(spk.x, spk.y);
+          return (
+            <line
+              key={`p9-ray-${i}`}
+              x1={rspPx.px}
+              y1={rspPx.py}
+              x2={sp.px}
+              y2={sp.py}
+              stroke="#8A7B6A"
+              strokeWidth={1}
+              strokeOpacity={0.35}
+              strokeDasharray="3 3"
+            />
+          );
+        })}
+
+        {/* Actual installed overhead speakers at their real plan coordinates */}
+        {overheadSpeakers.map((spk, i) => {
+          const sp = toPx(spk.x, spk.y);
+          return (
+            <g key={`p9-ovh-${i}`}>
+              <circle
+                cx={sp.px}
+                cy={sp.py}
+                r={6}
+                fill="none"
+                stroke="#8A7B6A"
+                strokeWidth={1.5}
+                strokeDasharray="2 2"
+              />
+              <text
+                x={sp.px}
+                y={sp.py - 12}
+                fill="#8A7B6A"
+                fontSize={10}
+                textAnchor="middle"
+                fontFamily="Didact Gothic, Century Gothic, sans-serif"
+                fontWeight={600}
+              >
+                {spk.role}
+              </text>
+            </g>
+          );
+        })}
 
         {/* Seat markers — compact spacing-aware single-result halo.
              Primary seats get an additional bold dark outer keyline. */}

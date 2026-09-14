@@ -437,6 +437,7 @@ export default function RP22ClientReport() {
             screenWidthM={screenWidthM}
             counts={p9Overhead.counts}
             summary={p9Overhead.summary}
+            placedSpeakers={placedSpeakers}
           />
         ),
         printData: {

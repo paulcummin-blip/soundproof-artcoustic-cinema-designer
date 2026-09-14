@@ -480,6 +480,25 @@ export default function ClientP2SystemArchitecture({
             </div>
           )}
 
+          {/* ── Factual upgrade path (objective: channel-count → next RP22 threshold) ── */}
+          {level !== "L4" && upgradePath && (
+            <div style={{
+              width: "100%",
+              maxWidth: print ? "100%" : 600,
+              padding: "16px 20px",
+              background: "#F5F4F1",
+              borderRadius: 12,
+              border: "1px solid #D9D5CE",
+              fontFamily: BODY_FONT,
+            }}>
+              <div style={{ fontSize: 14, color: "#213428", lineHeight: 1.5 }}>
+                Add {upgradePath.channelsNeeded} more discrete speaker
+                channel{upgradePath.channelsNeeded !== 1 ? "s" : ""} to reach
+                Level {upgradePath.targetLevel}.
+              </div>
+            </div>
+          )}
+
           {/* ── Summary callout (screen only) ── */}
           {!print && (
             <div style={{
