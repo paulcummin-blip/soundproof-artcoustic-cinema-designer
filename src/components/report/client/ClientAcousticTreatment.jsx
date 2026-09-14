@@ -191,7 +191,7 @@ export default function ClientAcousticTreatment({
           WHY ABFUSER?
         </div>
         <p style={{ margin: 0, fontSize: "10pt", lineHeight: 1.5, color: COLORS.body, fontFamily: FONT_BODY }}>
-          Artcoustic Abfuser combines absorption and diffusion. Its absorption coefficient reaches 0.85 at 500 Hz and approximately 0.95 from 1–4 kHz, making it well suited to controlling reflections that affect dialogue clarity and localisation.
+          Artcoustic Abfuser combines absorption and diffusion. Its absorption coefficient reaches 0.85 at 500 Hz and approximately 0.95 from 1–4 kHz, for controlling reflections that affect dialogue clarity and localisation.
         </p>
       </div>
 

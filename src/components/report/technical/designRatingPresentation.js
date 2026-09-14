@@ -614,7 +614,7 @@ export function getDesignRatingSupportingSentence(roomDesignRating) {
     prefix =
       dom.key === "L1"
         ? "Level 1 performance"
-        : `Strong Level ${floorNum} performance`;
+        : `Level ${floorNum} performance`;
   }
 
   // Higher-level strengths above the floor (excluding the mentioned pair).
@@ -626,7 +626,7 @@ export function getDesignRatingSupportingSentence(roomDesignRating) {
 
   if (!qual || higher.length === 0) {
     if (dom.key === "L4" && !balanced) {
-      return "Strong Level 4 performance across multiple parameters";
+      return "Level 4 performance across multiple parameters";
     }
     return prefix;
   }
