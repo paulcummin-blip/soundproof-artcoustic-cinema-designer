@@ -10,7 +10,7 @@ import { RotateCcw, Move } from 'lucide-react';
 import { clampViewingOffset } from "@/components/utils/screenMetrics";
 import RP22GradingPill from '../ui/RP22GradingPill';
 import ViewingAnglePanel from './ViewingAnglePanel';
-import ViewingPriorityControl from './ViewingPriorityControl';
+
 import { useAppState } from '@/components/AppStateProvider';
 import { cancelMlpGrab } from '@/components/state/mlpGrabStore';
 import { normaliseSeatCount, stepSeatCount } from './seatCount';
@@ -110,10 +110,7 @@ export default function SeatingLayout({
   // Designated RSP seat (seat_bound mode)
   designatedRspSeatId = null,
   onSetDesignatedRspSeatId,
-  // Viewing priority (multi-row viewing intent)
-  viewingPriority = "balanced",
-  onViewingPriorityChange,
-}) {
+  }) {
   // Build rowsArray purely from props (parent is the source of truth)
   const rowsArray = React.useMemo(() => {
     if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
@@ -841,11 +838,6 @@ export default function SeatingLayout({
     <div>
       <div style={groupTitleStyle}>Viewing Angle Analysis</div>
       <div className="space-y-3">
-        <ViewingPriorityControl
-          rowCount={rowCount}
-          viewingPriority={viewingPriority}
-          onViewingPriorityChange={onViewingPriorityChange}
-          disabled={disabled} />
         <ViewingAnglePanel
           screen={screen}
           seatingPositions={seatingPositions}
@@ -853,8 +845,7 @@ export default function SeatingLayout({
           mlpOverride={mlpOverride}
           mlpDotOffsetM={seatingBlockOffset}
           showMlpRuler={showMlpRuler}
-          onShowMlpRulerChange={onShowMlpRulerChange}
-          viewingPriority={viewingPriority} />
+          onShowMlpRulerChange={onShowMlpRulerChange} />
       </div>
     </div>
 

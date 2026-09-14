@@ -124,9 +124,6 @@ export default function RoomDesignerControlsPanel({
   // Designated RSP seat (seat_bound mode)
   designatedRspSeatId,
   onSetDesignatedRspSeatId,
-  // Viewing priority
-  viewingPriority,
-  onViewingPriorityChange,
   // Link ear & platform heights
   linkEarPlatformHeights,
   onLinkEarPlatformHeightsChange,
@@ -258,8 +255,6 @@ export default function RoomDesignerControlsPanel({
               onManualRspY_mChange={onManualRspY_mChange}
               designatedRspSeatId={designatedRspSeatId}
               onSetDesignatedRspSeatId={onSetDesignatedRspSeatId}
-              viewingPriority={viewingPriority}
-              onViewingPriorityChange={onViewingPriorityChange}
               linkEarPlatformHeights={linkEarPlatformHeights}
               onLinkEarPlatformHeightsChange={onLinkEarPlatformHeightsChange} />
           </Suspense>
