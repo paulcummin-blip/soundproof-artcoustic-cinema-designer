@@ -569,16 +569,13 @@ export function getDesignRatingSupportingSentence(roomDesignRating) {
 
   // No achieved levels at all — everything failed.
   if (total <= 0) {
-    return "Design improvement recommended across multiple parameters";
+    return "No achieved levels across assessed parameters";
   }
 
-  // FAIL-aware sentence: some parameters failed but overall performance is
-  // strong. This makes "Design Improvement Recommended" understandable even
-  // when the Design Performance Index is otherwise high.
+  // FAIL-aware sentence: some parameters at FAIL.
   if (failCount > 0) {
     const paramWord = failCount === 1 ? "parameter" : "parameters";
-    const verb = failCount === 1 ? "requires" : "require";
-    return `Strong overall performance, but ${failCount} ${paramWord} ${verb} correction.`;
+    return `${failCount} ${paramWord} at FAIL`;
   }
 
   const achieved = [

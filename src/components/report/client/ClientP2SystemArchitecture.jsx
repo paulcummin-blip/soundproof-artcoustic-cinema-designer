@@ -463,33 +463,6 @@ export default function ClientP2SystemArchitecture({
             </div>
           )}
 
-          {/* ── Upgrade path ── */}
-          {upgradePath && (
-            <div style={{
-              width: "100%",
-              maxWidth: print ? "100%" : 600,
-              padding: "16px 20px",
-              background: "#F5F4F1",
-              borderRadius: 12,
-              border: "1px solid #D9D5CE",
-              fontFamily: BODY_FONT,
-            }}>
-              <div style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#625143",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 6,
-              }}>
-                To improve Spatial Resolution
-              </div>
-              <div style={{ fontSize: 14, color: "#213428", lineHeight: 1.5 }}>
-                Add {upgradePath.channelsNeeded} more discrete speaker channel{upgradePath.channelsNeeded !== 1 ? "s" : ""} to reach {upgradePath.targetLevel}
-              </div>
-            </div>
-          )}
-
           {/* ── Already L4 ── */}
           {level === "L4" && (
             <div style={{
@@ -502,7 +475,7 @@ export default function ClientP2SystemArchitecture({
               fontFamily: BODY_FONT,
             }}>
               <div style={{ fontSize: 14, color: "#213428", lineHeight: 1.5 }}>
-                The system already meets the highest Parameter 2 level.
+                The system meets the highest Parameter 2 level.
               </div>
             </div>
           )}
@@ -525,9 +498,9 @@ export default function ClientP2SystemArchitecture({
                   System Architecture
                 </div>
                 <div style={{ fontSize: 13, color: "#3E4349", lineHeight: 1.5 }}>
-                  {upgradePath
-                    ? `Adding ${upgradePath.channelsNeeded} more discrete speaker channel${upgradePath.channelsNeeded !== 1 ? "s" : ""} would allow the design to meet the next RP22 Spatial Resolution level.`
-                    : "The system already meets the highest RP22 Spatial Resolution level."
+                  {levelLabel
+                    ? `The current layout achieves ${levelLabel} for RP22 Parameter 2 with ${discreteCount ?? 0} discrete speaker channels.`
+                    : "Discrete speaker channel configuration."
                   }
                 </div>
               </div>

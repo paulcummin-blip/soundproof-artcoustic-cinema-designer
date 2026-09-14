@@ -402,7 +402,7 @@ export default function ClientP7FrontWides({
                   Front Wide Placement
                 </div>
                 <div style={{ fontSize: 13, color: "#3E4349", lineHeight: 1.5 }}>
-                  The front wide speakers are positioned relative to the ideal median angle to support smooth movement between the screen and surround channels.
+                  The front wide speakers are positioned relative to the median angle between the screen and surround channels.
                 </div>
               </div>
             </div>

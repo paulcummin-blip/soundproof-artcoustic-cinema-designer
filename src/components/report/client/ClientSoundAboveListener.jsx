@@ -20,53 +20,19 @@ import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 
 // ── Status copy ────────────────────────────────────────────────────────────
 const STATUS_COPY = {
-  L4: { label: "Excellent overhead continuity", explanation: "The overhead rows are correctly spaced for smooth, precise movement above the listening position." },
-  L3: { label: "Very good overhead continuity", explanation: "The overhead rows are well positioned and create smooth movement above the listener." },
-  L2: { label: "Good overhead continuity", explanation: "The overhead layout provides clear movement above the listener. Bringing the rows slightly closer together would improve continuity." },
-  L1: { label: "Further refinement recommended", explanation: "Bringing the overhead rows closer together would create smoother movement above the listener." },
-  Fail: { label: "Further refinement recommended", explanation: "Bringing the overhead rows closer together would create smoother movement above the listener." },
-  "N/A": { label: "Single overhead row", explanation: "This layout uses one overhead row, so spacing between rows is not assessed." },
-  "—": { label: "Further refinement recommended", explanation: "Bringing the overhead rows closer together would create smoother movement above the listener." },
+  L4: { label: "Overhead Speaker Spacing", explanation: "Maximum vertical angle between adjacent height speakers." },
+  L3: { label: "Overhead Speaker Spacing", explanation: "Maximum vertical angle between adjacent height speakers." },
+  L2: { label: "Overhead Speaker Spacing", explanation: "Maximum vertical angle between adjacent height speakers." },
+  L1: { label: "Overhead Speaker Spacing", explanation: "Maximum vertical angle between adjacent height speakers." },
+  Fail: { label: "Overhead Speaker Spacing", explanation: "Maximum vertical angle between adjacent height speakers." },
+  "N/A": { label: "Single Overhead Row", explanation: "This layout uses one overhead row, so spacing between rows is not assessed." },
+  "—": { label: "Overhead Speaker Spacing", explanation: "Maximum vertical angle between adjacent height speakers." },
 };
 
-// L3 near-boundary: when the largest gap is no more than 1° outside the 50° L4 target,
-// use a gentler explanation that avoids alarming the client over a fractional miss.
-const L4_BOUNDARY_DEG = 50;
-const NEAR_BOUNDARY_TOLERANCE_DEG = 2;
-const L3_NEAR_BOUNDARY_EXPLANATION =
-  "The overhead rows are well positioned and create smooth movement above the listener. Only a small adjustment would reach the highest target.";
-
-function getStatusInfo(level, value) {
+function getStatusInfo(level) {
   const base = STATUS_COPY[level] || STATUS_COPY["—"];
   const { token } = resolveGradeToken(level);
-  const overridden = { ...base, color: token.border, tokenBg: token.bg, tokenText: token.text, tokenSolid: token.solid };
-  if (level === "L3" && Number.isFinite(value) && value <= L4_BOUNDARY_DEG + NEAR_BOUNDARY_TOLERANCE_DEG) {
-    return { ...overridden, explanation: L3_NEAR_BOUNDARY_EXPLANATION };
-  }
-  return overridden;
-}
-
-// L1 pair-specific placement advice based on the worst adjacent-row pair
-function getL1Advice(representativeGaps, worstGapDeg) {
-  if (!Array.isArray(representativeGaps) || !Number.isFinite(worstGapDeg)) {
-    return "Bringing the overhead rows closer together would create smoother movement above the listener.";
-  }
-  const worst = representativeGaps.find((g) => Math.abs(g.deg - worstGapDeg) < 0.5);
-  if (!worst) {
-    return "Bringing the overhead rows closer together would create smoother movement above the listener.";
-  }
-  const pair = [worst.fromRow, worst.toRow].sort();
-  const [a, b] = pair;
-  if (a === "front" && b === "rear") {
-    return "Bringing the front and rear overhead rows closer together would create smoother movement above the listener. Where the room allows, adding a middle pair of overhead speakers can also reduce the spacing between adjacent rows and improve overhead continuity.";
-  }
-  if (a === "front" && b === "mid") {
-    return "Bringing the front and middle overhead rows closer together would create smoother movement above the listener.";
-  }
-  if (a === "mid" && b === "rear") {
-    return "Bringing the middle and rear overhead rows closer together would create smoother movement above the listener.";
-  }
-  return "Bringing the overhead rows closer together would create smoother movement above the listener.";
+  return { ...base, color: token.border, tokenBg: token.bg, tokenText: token.text, tokenSolid: token.solid };
 }
 
 // Presentation-only level normaliser: converts numeric levels (1–4) to string
@@ -124,9 +90,8 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
   const displayLevel = normaliseClientLevel(p9Snapshot?.level);
   const value = p9Snapshot?.value;
   const worstGapDeg = p9Snapshot?.worstGapDeg;
-  const statusInfo = getStatusInfo(displayLevel, value);
-  const l1Advice = getL1Advice(representativeGaps, worstGapDeg);
-  const displayExplanation = (displayLevel === "L1" || displayLevel === "Fail") ? l1Advice : statusInfo.explanation;
+  const statusInfo = getStatusInfo(displayLevel);
+  const displayExplanation = statusInfo.explanation;
 
   // Ear position in SVG coords (authoritative seat origin)
   const earPx = authoritativeSeat ? toPx(authoritativeSeat.y, authoritativeSeat.z) : null;
