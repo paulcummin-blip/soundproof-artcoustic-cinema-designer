@@ -28,6 +28,7 @@ import { computeHaloRadiusPx, BASS_TWO_SEGMENT_LAYOUT, PRIMARY_STROKE_WIDTH } fr
 import { resolveCoordinate } from "./selectClientSpeakerBalance";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { Loader2 } from "lucide-react";
+import P19SeatProbeTable from "./P19SeatProbeTable";
 
 const HEADING_FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
 const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -105,12 +106,23 @@ export default function ClientP19HeatMap({
   print,
   printPart,
 }) {
-  const { status, grid, gridN, error } = useP19HeatMap({
+  // Resolve seat coordinates for explicit heat-map probes
+  const seatPositions = (Array.isArray(seatingPositions) ? seatingPositions : [])
+    .filter((s) => s && s.id != null)
+    .map((s) => {
+      const x = resolveCoordinate(s.x, s.position?.x);
+      const y = resolveCoordinate(s.y, s.position?.y);
+      return { id: s.id, x, y };
+    })
+    .filter((s) => s.x !== null && s.y !== null);
+
+  const { status, grid, gridN, error, seatProbes, rspProbe } = useP19HeatMap({
     completedBassAuthority,
     roomDims,
     subwooferInstances,
     rsp,
     earHeightM,
+    seatPositions,
   });
 
   const W = Number(roomDims?.widthM) || 4.5;
@@ -293,7 +305,9 @@ export default function ClientP19HeatMap({
                 fontWeight={600}
               >
                 {showError
-                  ? "Map generation error"
+                  ? (error && error.includes("incomplete")
+                    ? "Heat map unavailable"
+                    : "Map generation error")
                   : showNotReady
                   ? "Map not yet generated"
                   : "Generating bass response map\u2026"}
@@ -307,7 +321,9 @@ export default function ClientP19HeatMap({
                 fontFamily={BODY_FONT}
               >
                 {showError
-                  ? error || "Please return to the project and reopen the report."
+                  ? (error && error.includes("incomplete")
+                    ? "Current bass authority incomplete"
+                    : error || "Please return to the project and reopen the report.")
                   : showNotReady
                   ? "The map will appear here once generation completes."
                   : "30\u00d730 grid \u00b7 P19 response quality"}
@@ -464,6 +480,15 @@ export default function ClientP19HeatMap({
             Higher levels indicate smoother predicted bass response across the assessed frequency band.
           </p>
 
+          {/* ── Seat P19 parity table (heat-map vs published) ── */}
+          <P19SeatProbeTable
+            seatProbes={seatProbes}
+            rspProbe={rspProbe}
+            bassPerformance={bassPerformance}
+            seatingPositions={seatingPositions}
+            print={print}
+          />
+
           {/* ── Summary ── */}
           {summary && (
             <div style={{
@@ -488,7 +513,7 @@ export default function ClientP19HeatMap({
         </>
       )}
 
-      {/* ── Screen-only loading indicator (below SVG) ── */}
+      {/* ── Screen-only loading / error indicator (below SVG) ── */}
       {!print && showLoading && (
         <div style={{
           display: "flex",
@@ -503,6 +528,22 @@ export default function ClientP19HeatMap({
           <Loader2 className="w-4 h-4 animate-spin" style={{ color: "#213428" }} />
           <span style={{ fontSize: 13, color: "#3E4349" }}>
             {"Generating bass response map\u2026"}
+          </span>
+        </div>
+      )}
+      {!print && showError && (
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 20px",
+          background: "#F1F0EE",
+          borderRadius: 8,
+          border: "1px solid #DCDBD6",
+          fontFamily: BODY_FONT,
+        }}>
+          <span style={{ fontSize: 13, color: error && error.includes("incomplete") ? "#625143" : "#B04040", fontWeight: 600 }}>
+            {error || "Heat map generation failed"}
           </span>
         </div>
       )}

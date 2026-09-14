@@ -31,7 +31,7 @@ import { bassInputAdapter, deriveCentreZ } from "@/components/utils/subwooferIns
 import { computeOfficialP19Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 import { resolveGradeToken } from "@/components/utils/rp22Colors";
 
-export const HEATMAP_AUTHORITY_VERSION = 1;
+export const HEATMAP_AUTHORITY_VERSION = 2;
 export const DEFAULT_GRID_N = 30;
 
 // ── Linear interpolation of a {frequency, spl} curve at a target frequency ──
@@ -81,6 +81,7 @@ export function generateP19HeatMap({
   assessmentEndHz = 120,
   earHeightM = 1.2,
   gridN = DEFAULT_GRID_N,
+  seatPositions = [],
 }) {
   const W = Number(roomDims?.widthM) || 4.5;
   const L = Number(roomDims?.lengthM) || 6.0;
@@ -133,6 +134,15 @@ export function generateP19HeatMap({
   const listeners = [];
   if (rspPosition && Number.isFinite(rspPosition.x) && Number.isFinite(rspPosition.y)) {
     listeners.push({ id: "rsp", x: rspPosition.x, y: rspPosition.y, z });
+  }
+  // Explicit seat probes — evaluated by the heat-map evaluator itself at the
+  // exact saved seat coordinates. These are NOT copied from published grades.
+  const seatListeners = [];
+  for (const seat of (Array.isArray(seatPositions) ? seatPositions : [])) {
+    if (!seat?.id || !Number.isFinite(Number(seat.x)) || !Number.isFinite(Number(seat.y))) continue;
+    const listenerId = `seat-${seat.id}`;
+    listeners.push({ id: listenerId, x: Number(seat.x), y: Number(seat.y), z });
+    seatListeners.push({ seatId: seat.id, listenerId });
   }
   for (let j = 0; j < gridN; j++) {
     for (let i = 0; i < gridN; i++) {
@@ -222,7 +232,54 @@ export function generateP19HeatMap({
     grid.push(row);
   }
 
-  return { grid, gridN, earHeightM: z, assessmentStartHz, assessmentEndHz, error: null };
+  // 11. Compute P19 at each explicit seat probe (heat-map evaluator path)
+  const seatProbes = seatListeners.map(({ seatId, listenerId }) => {
+    const rawCurve = splCurves[listenerId];
+    if (!rawCurve || !rawCurve.length) {
+      return { seatId, p19Raw: null, p19Displayed: null, p19Level: null, p19Grade: null };
+    }
+    const postEqCurve = eqCorrection
+      ? freqsHz.map((f, fi) => ({ frequency: f, spl: rawCurve[fi].spl + eqCorrection[fi] }))
+      : rawCurve;
+    const p19 = computeOfficialP19Assessment({
+      rspPostEqCurve: postEqCurve,
+      canonicalTargetCurve: null,
+      assessmentStartHz,
+      assessmentEndHz,
+    });
+    const { key } = resolveGradeToken(p19.level);
+    return {
+      seatId,
+      p19Raw: Number.isFinite(p19.variationDbRaw) ? p19.variationDbRaw : null,
+      p19Displayed: Number.isFinite(p19.displayVariationDb) ? p19.displayVariationDb : null,
+      p19Level: p19.level,
+      p19Grade: key,
+    };
+  });
+
+  // 12. Compute P19 at the exact RSP coordinate (heat-map evaluator path)
+  let rspProbe = { p19Raw: null, p19Displayed: null, p19Level: null, p19Grade: null };
+  if (splCurves["rsp"]) {
+    const rspRawCurve = splCurves["rsp"];
+    const rspPostEq = eqCorrection
+      ? freqsHz.map((f, fi) => ({ frequency: f, spl: rspRawCurve[fi].spl + eqCorrection[fi] }))
+      : rspRawCurve;
+    const p19 = computeOfficialP19Assessment({
+      rspPostEqCurve: rspPostEq,
+      canonicalTargetCurve: null,
+      assessmentStartHz,
+      assessmentEndHz,
+    });
+    const { key } = resolveGradeToken(p19.level);
+    rspProbe = {
+      p19Raw: Number.isFinite(p19.variationDbRaw) ? p19.variationDbRaw : null,
+      p19Displayed: Number.isFinite(p19.displayVariationDb) ? p19.displayVariationDb : null,
+      p19Level: p19.level,
+      p19Grade: key,
+    };
+  }
+
+  return { grid, gridN, earHeightM: z, assessmentStartHz, assessmentEndHz, seatProbes, rspProbe, error: null };
 }
 
 // ── Summary sentence builder (neutral, factual) ───────────────────────────
