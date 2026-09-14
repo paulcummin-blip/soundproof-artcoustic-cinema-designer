@@ -95,8 +95,8 @@ export default function RvStaticCanvas({
   aimAtMLP = false,
 
   // RSP
-  rspMode = "auto_from_screen",
-  manualRspY_m,
+  rspMode: propRspMode,
+  manualRspY_m: propManualRspY_m,
 
   // AppState passed explicitly (NOT via useAppState)
   appState,
@@ -106,6 +106,9 @@ export default function RvStaticCanvas({
   const lengthM = Number(appState?.roomDims?.lengthM) || 6.0;
   const heightM = Number(appState?.roomDims?.heightM) || 2.4;
   const tvPresetKey = screen?.tvPresetKey || null;
+  // Omitted capture props must retain the hydrated project authority.
+  const rspMode = propRspMode ?? appState?.rspMode ?? "auto_from_screen";
+  const manualRspY_m = propManualRspY_m !== undefined ? propManualRspY_m : appState?.manualRspY_m;
 
   // ── getCanonicalRole (matches RoomVisualisation inline definition) ─────────
   const getCanonicalRole = useCallback((role) => {
@@ -139,9 +142,10 @@ export default function RvStaticCanvas({
   );
 
   // ── Screen plane (direct computation — no useScreenPlane, no appState writes)
-  const screenFrontPlaneM = Number.isFinite(Number(propScreenFrontPlaneM))
-    ? Number(propScreenFrontPlaneM)
-    : Number(appState?.screenFrontPlaneM ?? 0);
+  const screenFrontPlaneM = resolveRspScreenFrontPlaneM(
+    propScreenFrontPlaneM ?? appState?.screenFrontPlaneM,
+    screen
+  );
 
   const actualScreenFrontY = screenFrontPlaneM;
 
@@ -166,10 +170,7 @@ export default function RvStaticCanvas({
     [seatingPositions, widthM, lengthM]
   );
 
-  const rspScreenFrontPlaneM = resolveRspScreenFrontPlaneM(
-    Number.isFinite(Number(propScreenFrontPlaneM)) ? Number(propScreenFrontPlaneM) : appState?.screenFrontPlaneM,
-    screen
-  );
+  const rspScreenFrontPlaneM = screenFrontPlaneM;
   const rspScreenWidthM = resolveRspScreenWidthM(screen);
 
   const { effectiveRspY_m, effectiveRspX_m } = useEffectiveRsp({
