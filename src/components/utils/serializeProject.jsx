@@ -6,6 +6,7 @@
 // INPUT: plain JS values from appState + local state
 // OUTPUT: flat object that matches entities/Project.json
 
+import { readPersistedScreenPlaneM } from "@/components/utils/screenPlanePersistence";
 import { migrateP12Mode } from "@/components/utils/p12ModeAuthority";
 import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuthority";
 import { resolveRoomDimensionsEdited } from "@/components/utils/roomDimensionsEditedAuthority";
@@ -92,7 +93,7 @@ export function serializeProject(input = {}) {
     useRearGlobal = true,
 
     // Screen plane
-    screenFrontPlaneM = 0,
+    screenFrontPlaneM = null,
 
     // Subwoofer config (stored as JSON blobs for now)
     frontSubsCfg = null,
@@ -172,6 +173,8 @@ export function serializeProject(input = {}) {
     }
   };
 
+  const persistedScreenPlaneM = readPersistedScreenPlaneM(screenFrontPlaneM);
+
   return {
     // Meta
     name: name || "Untitled Room",
@@ -201,7 +204,8 @@ export function serializeProject(input = {}) {
     show_screen_plane: showScreenPlane,
     show_cavity: showCavity,
     speaker_clearance_m: speakerClearanceM,
-    screen_front_plane_m: Number(screenFrontPlaneM) || 0,
+    // A missing derived value must not overwrite the existing entity value.
+    ...(persistedScreenPlaneM !== null ? { screen_front_plane_m: persistedScreenPlaneM } : {}),
     tv_preset_key: screen?.tvPresetKey ?? null,
     tv_width_mm: Number(screen?.tvWidthMm) || null,
     border_thickness_m: Number(screen?.borderThicknessM) || 0.08,
