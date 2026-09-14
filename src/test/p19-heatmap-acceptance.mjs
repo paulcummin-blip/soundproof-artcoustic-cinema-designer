@@ -21,7 +21,7 @@ import { prepareModeBank } from '@/bass/core/rewBassEngine';
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from '@/components/room/bass/bassPhysicsDefaults';
 import fs from 'node:fs';
 
-const DATA = JSON.parse(fs.readFileSync(new URL('./_fresh-stage2-data.json', import.meta.url), 'utf8'));
+const DATA = JSON.parse(fs.readFileSync(new URL('../../test/_fresh-stage2-data.json', import.meta.url), 'utf8'));
 
 const ROOM_DIMS = { widthM: 4, lengthM: 6.3, heightM: 2.4 };
 const SELECTED_SUB_MODEL = 'sub4-12';
