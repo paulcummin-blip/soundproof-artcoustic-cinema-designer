@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import RoomVisualisation from '../room/RoomVisualisation';
 import RvStaticCanvas from './RvStaticCanvas';
+import { resolveRspScreenFrontPlaneM } from '../room/rsp/screenGeometryResolver';
 
 const HIDDEN_STYLE = {
     position: 'fixed',
@@ -46,9 +47,10 @@ export default function ReportHiddenCaptures({
     }, []);
 
     // --- Extract only the fields we need from `app` so useMemo deps are stable ---
-    const screenFrontPlaneM = Number.isFinite(Number(app?.screenFrontPlaneM))
-        ? Number(app.screenFrontPlaneM)
-        : undefined;
+    const screenFrontPlaneM = resolveRspScreenFrontPlaneM(app?.screenFrontPlaneM, screen);
+    const rspMode = app?.rspMode ?? "auto_from_screen";
+    const manualRspY_m = app?.manualRspY_m;
+    const manualRspX_m = app?.manualRspX_m;
 
     const allLiveSubs = app?.subwoofers;
     const frontSubsCfg = app?.frontSubsCfg;
@@ -87,6 +89,8 @@ export default function ReportHiddenCaptures({
         mlpPoint: primarySeatingPosition,
         screen: screenWithDepth,
         screenFrontPlaneM,
+        rspMode,
+        manualRspY_m,
         dolbyLayout,
         frontSubs: frontSubsForExport,
         rearSubs: rearSubsForExport,
@@ -105,7 +109,7 @@ export default function ReportHiddenCaptures({
         ...NOOPS,
     }), [
         placedSpeakers, seats, primarySeatingPosition, screenWithDepth,
-        screenFrontPlaneM, dolbyLayout, frontSubsForExport, rearSubsForExport,
+        screenFrontPlaneM, rspMode, manualRspY_m, dolbyLayout, frontSubsForExport, rearSubsForExport,
         frontSubsCfg, rearSubsCfg, stableRoomElements, lcrAimMode, aimAtMLP,
     ]);
 
@@ -147,6 +151,9 @@ export default function ReportHiddenCaptures({
                     placedSpeakers={placedSpeakers}
                     seatingPositions={seats}
                     mlpPoint={primarySeatingPosition}
+                    rspMode={rspMode}
+                    manualRspY_m={manualRspY_m}
+                    manualRspX_m={manualRspX_m}
                     screen={screenWithDepth}
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsForExport}
@@ -201,6 +208,9 @@ export default function ReportHiddenCaptures({
                     placedSpeakers={placedSpeakers}
                     seatingPositions={seats}
                     mlpPoint={primarySeatingPosition}
+                    rspMode={rspMode}
+                    manualRspY_m={manualRspY_m}
+                    manualRspX_m={manualRspX_m}
                     screen={screen}
                     exportWidthPx={1200}
                     exportHeightPx={800}
