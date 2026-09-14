@@ -787,6 +787,7 @@ const byId = useEntitiesById({
     onScreenPlaneChange,
     onScreenPlaneYChange: props.onScreenPlaneYChange,
     isDraggingRef: isDraggingSpeakerRef,
+    readOnly: props.geometryReadOnly === true,
   });
 
   // Alias for backward compatibility with rest of component
