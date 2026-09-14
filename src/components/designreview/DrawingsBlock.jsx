@@ -15,6 +15,7 @@
 import React, { useState, useMemo } from "react";
 import { useAppState } from "@/components/AppStateProvider";
 import ResponsivePlanCanvas from "@/components/designreview/ResponsivePlanCanvas";
+import { resolveRspScreenFrontPlaneM } from "@/components/room/rsp/screenGeometryResolver";
 import SideElevation from "@/components/room/SideElevation";
 import FrontElevation from "@/components/room/FrontElevation";
 import AcousticTreatmentDrawing from "@/components/designreview/AcousticTreatmentDrawing";
@@ -50,7 +51,7 @@ export default function DrawingsBlock({ asdrData }) {
     const placedSpeakers = asdrData?.placedSpeakers || app?.speakerSystem?.placedSpeakers || [];
     const frontSubs = asdrData?.frontSubs || (Array.isArray(app?.subwoofers) ? app.subwoofers.filter(s => s?.group === 'front') : []);
     const rearSubs = asdrData?.rearSubs || (Array.isArray(app?.subwoofers) ? app.subwoofers.filter(s => s?.group === 'rear') : []);
-    const screen = asdrData?.screen || app?.screen || {};
+    const screen = app?.screen || asdrData?.screen || {};
     const dolbyLayout = asdrData?.dolbyLayout || app?.dolbyLayout || "5.1";
     const mlpPoint = asdrData?.mlpPoint || null;
     const dimensions = app?.roomDims || { widthM: 4.5, lengthM: 6.0, heightM: 2.4 };
@@ -58,7 +59,7 @@ export default function DrawingsBlock({ asdrData }) {
     const roomElements = app?.roomElements || [];
     const frontSubsCfg = app?.frontSubsCfg;
     const rearSubsCfg = app?.rearSubsCfg;
-    const screenFrontPlaneM = Number.isFinite(Number(app?.screenFrontPlaneM)) ? Number(app.screenFrontPlaneM) : undefined;
+    const screenFrontPlaneM = resolveRspScreenFrontPlaneM(app?.screenFrontPlaneM, screen);
     const lcrAimMode = app?.lcrAimMode || "flat";
     const aimAtMLP = !!app?.aimAtMLP;
     const rspMode = app?.rspMode || "auto_from_screen";
