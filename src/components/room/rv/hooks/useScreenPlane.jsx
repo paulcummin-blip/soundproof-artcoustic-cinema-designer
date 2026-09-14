@@ -2,6 +2,7 @@ import React, { useMemo, useEffect, useRef, useState } from "react";
 import { useExportMinScreenDepth } from "@/components/room/rv/hooks/useExportMinScreenDepth";
 import { useActualScreenFrontY } from "@/components/room/rv/hooks/useActualScreenFrontY";
 import { computeMinimumScreenDepthM } from "@/components/room/rv/utils/rvGeometry";
+import { resolveRspScreenFrontPlaneM } from "@/components/room/rsp/screenGeometryResolver";
 import { isSubRole } from "@/components/room/rv/RenderPrimitives";
 
 export function useScreenPlane({
@@ -17,6 +18,7 @@ export function useScreenPlane({
   onScreenPlaneChange,
   onScreenPlaneYChange,
   isDraggingRef,
+  readOnly = false,
 }) {
   // LOCK: if screen plane is locked, return the locked value immediately
   const isLocked = appState?.screenPlaneLocked === true;
@@ -203,13 +205,16 @@ export function useScreenPlane({
   // (appState.screenFrontPlaneM, onScreenPlaneChange, onScreenPlaneYChange) always
   // receive the locked value when the screen is locked, regardless of what the
   // live geometry recalculates (e.g. due to lcrAngleInfo / speaker aiming changes).
-  const resolvedScreenPlaneY = (isLocked && Number.isFinite(lockedY)) ? lockedY : renderedScreenPlaneY;
+  // Reports consume the published geometry; they do not become geometry writers.
+  const resolvedScreenPlaneY = readOnly
+    ? resolveRspScreenFrontPlaneM(appState?.screenFrontPlaneM, screen)
+    : (isLocked && Number.isFinite(lockedY)) ? lockedY : renderedScreenPlaneY;
 
   // Publish screen front plane to AppState with guards (rounded to mm + change detection)
   const lastScreenFrontPlaneRef = useRef(null);
 
   useEffect(() => {
-    if (!appState?.setScreenFrontPlaneM) return;
+    if (readOnly || !appState?.setScreenFrontPlaneM) return;
     if (!Number.isFinite(resolvedScreenPlaneY)) return;
 
     // Round to mm to avoid jitter/loops
@@ -220,14 +225,14 @@ export function useScreenPlane({
     lastScreenFrontPlaneRef.current = v;
 
     appState.setScreenFrontPlaneM(v);
-  }, [resolvedScreenPlaneY, appState?.setScreenFrontPlaneM]);
+  }, [readOnly, resolvedScreenPlaneY, appState?.setScreenFrontPlaneM]);
 
   // Push live plane up to RoomDesigner when it changes (debounced + change guard)
   const screenSendTimerRef = useRef(null);
   const lastSentRef = useRef(null);
 
   useEffect(() => {
-    if (typeof onScreenPlaneChange !== 'function') return;
+    if (readOnly || typeof onScreenPlaneChange !== 'function') return;
     if (!Number.isFinite(resolvedScreenPlaneY)) return;
 
     // Round to 0.1mm to prevent float jitter
@@ -246,7 +251,7 @@ export function useScreenPlane({
     }, 1000);
 
     return () => clearTimeout(screenSendTimerRef.current);
-  }, [resolvedScreenPlaneY, onScreenPlaneChange]);
+  }, [readOnly, resolvedScreenPlaneY, onScreenPlaneChange]);
 
   // NEW: Publish live screen plane Y to screen object for Live Metrics (immediate, no debounce)
   // Guard: suppress write-back while any speaker drag is active to prevent
@@ -254,7 +259,7 @@ export function useScreenPlane({
   const lastSentScreenPlaneYRef = useRef(null);
 
   useEffect(() => {
-    if (typeof onScreenPlaneYChange !== 'function') return;
+    if (readOnly || typeof onScreenPlaneYChange !== 'function') return;
     if (!Number.isFinite(resolvedScreenPlaneY)) return;
 
     // Do not write screenPlaneY_m back to _screen while a speaker drag is active.
@@ -269,7 +274,7 @@ export function useScreenPlane({
     lastSentScreenPlaneYRef.current = rounded;
 
     onScreenPlaneYChange(rounded);
-  }, [resolvedScreenPlaneY, onScreenPlaneYChange, isDraggingRef]);
+  }, [readOnly, resolvedScreenPlaneY, onScreenPlaneYChange, isDraggingRef]);
 
   // resolvedScreenPlaneY is computed early (before publish effects) — reuse it here.
   const resolvedZoneDepthM = (isLocked && Number.isFinite(lockedY))
