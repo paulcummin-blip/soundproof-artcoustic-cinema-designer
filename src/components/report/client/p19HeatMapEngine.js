@@ -141,7 +141,11 @@ export function generateP19HeatMap({
   for (const seat of (Array.isArray(seatPositions) ? seatPositions : [])) {
     if (!seat?.id || !Number.isFinite(Number(seat.x)) || !Number.isFinite(Number(seat.y))) continue;
     const listenerId = `seat-${seat.id}`;
-    listeners.push({ id: listenerId, x: Number(seat.x), y: Number(seat.y), z });
+    // Use the seat's individual Z (ear height) when available, matching the
+    // production engine's coordinate convention so the heat-map probe P19
+    // is computed at the exact same (x, y, z) as the published per-seat P19.
+    const seatZ = Number.isFinite(Number(seat.z)) && Number(seat.z) > 0 ? Number(seat.z) : z;
+    listeners.push({ id: listenerId, x: Number(seat.x), y: Number(seat.y), z: seatZ });
     seatListeners.push({ seatId: seat.id, listenerId });
   }
   for (let j = 0; j < gridN; j++) {

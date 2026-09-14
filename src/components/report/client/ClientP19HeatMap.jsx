@@ -106,13 +106,18 @@ export default function ClientP19HeatMap({
   print,
   printPart,
 }) {
-  // Resolve seat coordinates for explicit heat-map probes
+  // Resolve seat coordinates for explicit heat-map probes.
+  // Each seat carries its own Z (ear height) matching the production engine's
+  // convention (seat.z ?? seat.position?.z ?? seat.earHeightM ?? seat.ear_h)
+  // so the heat-map evaluator computes P19 at the exact same (x, y, z) as the
+  // published per-seat P19 authority.
   const seatPositions = (Array.isArray(seatingPositions) ? seatingPositions : [])
     .filter((s) => s && s.id != null)
     .map((s) => {
       const x = resolveCoordinate(s.x, s.position?.x);
       const y = resolveCoordinate(s.y, s.position?.y);
-      return { id: s.id, x, y };
+      const z = Number(s.z ?? s.position?.z ?? s.earHeightM ?? s.ear_h);
+      return { id: s.id, x, y, z: Number.isFinite(z) && z > 0 ? z : Number(earHeightM) || 1.2 };
     })
     .filter((s) => s.x !== null && s.y !== null);
 
