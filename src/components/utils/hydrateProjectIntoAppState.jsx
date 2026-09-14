@@ -126,9 +126,22 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   const screenSizeInches = Number(p?.screen_size) || 120;
   const aspectRatio = p?.aspect_ratio || "16:9";
   const hasTvPreset = !!p?.tv_preset_key;
+  const hydratedManualSize = p?.manual_dimensions && Number(p?.manual_width_m) > 0 && Number(p?.manual_height_m) > 0
+    ? { enabled: true, mode: "wh", widthM: Number(p.manual_width_m), heightM: Number(p.manual_height_m) }
+    : undefined;
   if (typeof setScreen === "function") {
     setScreen((prev) => ({
       ...prev,
+      // A previous project must not override the screen being hydrated.
+      // Clear transient manual/preset geometry and restore this project alone.
+      manualSize: hydratedManualSize,
+      presetVisibleWidthInches: hydratedManualSize ? screenSizeInches : undefined,
+      presetAspectRatio: hydratedManualSize ? aspectRatio : undefined,
+      presetTvPresetKey: hydratedManualSize ? (p?.tv_preset_key ?? null) : undefined,
+      presetTvWidthMm: hydratedManualSize ? (Number(p?.tv_width_mm) || null) : undefined,
+      viewableWidthM: undefined,
+      viewableHeightM: undefined,
+      screenPlaneY_m: Number(p?.screen_front_plane_m) > 0 ? Number(p.screen_front_plane_m) : undefined,
       // For TV presets, derive visibleWidthInches from the canonical preset key/mm
       // so live state stays coherent with persisted tv_preset_key/tv_width_mm.
       // For projector/manual projects (no tv_preset_key), restore screen_size directly.
