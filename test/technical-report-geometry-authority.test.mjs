@@ -78,9 +78,10 @@ try {
     assert.ok(Math.abs(g.y-3.81)<=g.tolerance,'PDF capture '+i+' retains saved manual RSP');
     assert.ok(Math.abs(g.screenY-.102)<1e-12,'PDF capture '+i+' screen plane');
   }
-  assert.ok(svgs[1].includes('3.81 m'),'dimension drawing labels the current front-wall distance');
-  assert.ok(svgs[1].includes('3.71 m'),'dimension drawing uses canonical screen-to-RSP distance');
-  assert.ok(!svgs[1].includes('2.13 m'),'automatic RSP must not replace manual RSP');
+  const dimensionText = svgs[1].replace(/<[^>]*>/g, '');
+  assert.ok(dimensionText.includes('3.81m'),'dimension drawing labels the current front-wall distance');
+  assert.ok(dimensionText.includes('3.71m'),'dimension drawing uses canonical screen-to-RSP distance');
+  assert.ok(!dimensionText.includes('2.13m'),'automatic RSP must not replace manual RSP');
   assert.ok(html.includes('data-builder-rsp-mode="manual_position"'));
   assert.ok(html.includes('data-builder-rsp-y="3.81"'));
   console.log('PASS all PDF captures and acoustic builder retain saved RSP and screen inputs'); passed++;
