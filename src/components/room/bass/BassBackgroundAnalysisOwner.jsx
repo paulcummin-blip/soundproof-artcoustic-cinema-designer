@@ -14,6 +14,8 @@ import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign,
 import { beginP14AnalysisJob, publishP14AnalysisProgress, getP14AnalysisProgress } from "./p14AnalysisProgressStore";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
 import { isBackgroundInputsReady } from "./backgroundInputReadiness";
+import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from "@/components/room/rsp/screenGeometryResolver";
+import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
@@ -237,12 +239,54 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // sufficient to confirm the request is still valid.
   const manualRequestMatchesCurrent = !!manualAnalysisRequest
     && manualAnalysisRequest.fingerprint === cacheKey;
+  // Semantic geometry readiness: proves the geometry feeding the calibration
+  // fingerprint is fully resolved and internally consistent. This is NOT a
+  // timing heuristic — it checks the mathematical invariant that mlpY_m
+  // equals the value the canonical RSP authority would derive from the
+  // current screenFrontPlaneM and screen width. When the invariant holds,
+  // the MLP effect's setter is a no-op and the entire downstream chain
+  // (rspPosition → autoAlignDelays → sources → calibration fingerprint) is
+  // stable. Uses the SAME canonical resolvers used by computeEffectiveRsp
+  // during hydration — no duplicated maths.
+  const bassGeometryReady = (() => {
+    const rspMode = appState?.rspMode || "auto_from_screen";
+
+    // SEAT-BOUND: designated seat resolved → rspPosition authoritative.
+    // No screen-plane or MLP dependency.
+    if (rspMode === "seat_bound") {
+      return !!appState?.designatedRspSeatId && !!rspPosition;
+    }
+
+    // MANUAL_POSITION: manualRspY_m is the sole authority. MLP effect does
+    // not run for this mode.
+    if (rspMode === "manual_position") {
+      return Number.isFinite(Number(appState?.manualRspY_m));
+    }
+
+    // AUTO_FROM_SCREEN and row-derived modes: screenFrontPlaneM must be a
+    // real published value, and mlpY_m must match the canonical derivation
+    // from the current screenFrontPlaneM + screen width.
+    const sfp = Number(appState?.screenFrontPlaneM);
+    if (!Number.isFinite(sfp) || sfp <= 0) return false;
+
+    const mlpY = Number(appState?.mlpY_m);
+    if (!Number.isFinite(mlpY) || mlpY <= 0) return false;
+
+    const expectedSfp = resolveRspScreenFrontPlaneM(appState?.screenFrontPlaneM, appState?.screen);
+    const screenWidthM = resolveRspScreenWidthM(appState?.screen);
+    const idealDistM = distanceFor57_5FromWidth(screenWidthM);
+    const expectedMlpY = expectedSfp + idealDistM;
+
+    return Math.abs(mlpY - expectedMlpY) < 0.0005;
+  })();
+
   // PASS 2: canCalculate no longer depends on the normalized room-transfer
   // hook. The authoritative geometry fingerprint (fingerprints.geometry) is the
   // sole geometry-validity gate. The normalized hook stays idle during manual
   // Calculate (analysisRequestId: null) and is not waited on.
   const canCalculate = isProjectHydrationReady
     && bassAuthorityHydrationSettled
+    && bassGeometryReady
     && !!fingerprints
     && !!fingerprints?.geometry
     && !!cacheKey
