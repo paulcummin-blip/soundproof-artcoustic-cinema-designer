@@ -284,9 +284,11 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // hook. The authoritative geometry fingerprint (fingerprints.geometry) is the
   // sole geometry-validity gate. The normalized hook stays idle during manual
   // Calculate (analysisRequestId: null) and is not waited on.
+  const layoutRefreshPending = !!appState?.layoutRefreshPending;
   const canCalculate = isProjectHydrationReady
     && bassAuthorityHydrationSettled
     && bassGeometryReady
+    && !layoutRefreshPending
     && !!fingerprints
     && !!fingerprints?.geometry
     && !!cacheKey
@@ -406,6 +408,19 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       dispatchedManualRequestRef.current = null;
       // FIX 3: Authoritative preparation failure — terminal "error" state.
       setLastTerminalOutcome({ outcome: "error", fingerprint: cacheKey, message: authoritative.reason || "Bass analysis preparation failed" });
+      setManualAnalysisRequest(null);
+      return;
+    }
+    // Fingerprint mismatch: the calibration fingerprint changed between the
+    // Calculate click and the simulation start (e.g. post-reflow seating or
+    // source mutation). The authoritative simulation will never run for this
+    // request — terminate immediately instead of sitting in "Preparing" until
+    // the 90-second watchdog fires.
+    if (authoritative.status === "idle") {
+      if (timingTraceRef.current) timingTraceRef.current.mark("preparationFingerprintMismatchMs");
+      markBassAuthorityFailed(scopeId, cacheKey, "Design changed during calculation. Recalculate to analyse the current layout.");
+      dispatchedManualRequestRef.current = null;
+      setLastTerminalOutcome({ outcome: "cancelled", fingerprint: cacheKey });
       setManualAnalysisRequest(null);
       return;
     }
