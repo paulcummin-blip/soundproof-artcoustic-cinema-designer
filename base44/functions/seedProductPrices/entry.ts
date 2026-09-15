@@ -72,6 +72,8 @@ const SEED_DATA = [
   { sku: "spitfire-cloud",    label: "SPITFIRE CLOUD",        category: "Loudspeaker", price_ex_vat: null },
   { sku: "architect-4-2-mk2", label: "ARCHITECT 4-2 mk II",   category: "Loudspeaker", price_ex_vat: null },
   { sku: "evolve-1-1_s",      label: "EVOLVE 1-1 (Surround)", category: "Loudspeaker", price_ex_vat: null },
+  { sku: "sl-evolve-1-1",      label: "SL EVOLVE 1-1",            category: "Loudspeaker", price_ex_vat: 400 },
+  { sku: "sl-evolve-1-1_s",    label: "SL EVOLVE 1-1 (Surround)", category: "Loudspeaker", price_ex_vat: 400 },
 ];
 
 const SURROUND_ROLES = ['surround', 'rear_surround', 'front_wide'];
