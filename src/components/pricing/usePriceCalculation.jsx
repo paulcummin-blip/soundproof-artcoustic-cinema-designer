@@ -131,6 +131,7 @@ function addProductLine(linesByKey, modelKey, qty, roles, soundbarSelections, pr
     isSoundbar: resolved.isSoundbar,
     sizeValue: resolved.sizeValue,
     sizeLabel: resolved.sizeLabel,
+    inactive: resolved.note === 'inactive',
   });
 }
 
@@ -186,10 +187,26 @@ export function usePriceCalculation({
       addAbfuserLine(linesByKey, Number(selectedAbfuserQty), priceMap);
     }
 
+    // Split active and inactive product lines. Inactive products never appear
+    // in the active breakdown, never contribute to totals, and are reported
+    // separately in inactiveBreakdown for the developer "Inactive Products"
+    // section.
+    const allLines = Array.from(linesByKey.values());
+    const activeLines = allLines.filter((line) => !line.inactive);
+    const inactiveLines = allLines.filter((line) => line.inactive);
+    const inactiveBreakdown = inactiveLines.map((line) => ({
+      ...line,
+      roles: line.rolesList.join(', '),
+      subtotal: line.subtotalExVat,
+      displayUnitPrice: null,
+      displaySubtotal: null,
+      inactiveReason: 'Product is inactive',
+    }));
+
     // Territory without a connected price list: return product structure with
     // quantities intact but ALL monetary fields null. No UK fallback, no £0.
     if (!priceListAvailable) {
-      const unavailableBreakdown = Array.from(linesByKey.values()).map((line) => ({
+      const unavailableBreakdown = activeLines.map((line) => ({
         ...line,
         price: null,
         unitPriceExVat: null,
@@ -217,10 +234,11 @@ export function usePriceCalculation({
         incompletePriceCount: 0,
         soundbarOptions: null,
         priceMapLoading,
+        inactiveBreakdown,
       };
     }
 
-    const productBreakdown = Array.from(linesByKey.values()).map((line) => {
+    const productBreakdown = activeLines.map((line) => {
       const hasPrice = line.unitPriceExVat !== null && line.unitPriceExVat !== undefined;
       return {
         ...line,
@@ -290,6 +308,7 @@ export function usePriceCalculation({
       incompletePriceCount,
       soundbarOptions,
       priceMapLoading,
+      inactiveBreakdown,
     };
   }, [placedSpeakers, frontSubsCfg, rearSubsCfg, difficultyMultiplier, priceMode, manualExtras, soundbarSelections, priceListAvailable, territory, acousticTreatmentEnabled, selectedAbfuserQty, priceMap, soundbarOptions, priceMapLoading]);
 }

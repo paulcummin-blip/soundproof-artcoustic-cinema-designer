@@ -54,6 +54,7 @@ export default function OptionsPanel({
   recommendedAbfuserQty = 0,
 }) {
   const [showDifficultyRating, setShowDifficultyRating] = React.useState(false);
+  const [showInactiveItems, setShowInactiveItems] = React.useState(false);
 
   // Source authority from app state — distinguishes recommendation-applied
   // ("recommended") from designer-manually-set ("user"). The recommendation
@@ -230,6 +231,49 @@ export default function OptionsPanel({
               )}
             </div>
           </SectionCard>
+
+          {/* 4b. INACTIVE PRODUCTS (developer only) */}
+          {(activePriceData.inactiveBreakdown || []).length > 0 && (
+            <SectionCard
+              title="Inactive Products"
+              action={
+                <button
+                  type="button"
+                  onClick={() => setShowInactiveItems((v) => !v)}
+                  className="text-[10px] px-2 py-1 rounded border border-[#DCDBD6] bg-white text-[#625143] hover:bg-[#F8F8F7]"
+                >
+                  {showInactiveItems ? 'Hide' : 'Show inactive'}
+                </button>
+              }
+            >
+              {showInactiveItems ? (
+                <div className="border border-[#EEEDEA] rounded-md overflow-hidden">
+                  <div className="grid grid-cols-[1fr_42px_1fr] gap-2 bg-[#F8F8F7] px-3 py-2 text-[10px] font-semibold tracking-[0.04em] uppercase text-[#625143]">
+                    <div>Description</div>
+                    <div className="text-right">Qty</div>
+                    <div>Reason</div>
+                  </div>
+                  {(activePriceData.inactiveBreakdown || []).map((line, index) => (
+                    <div key={`${line.model}-${line.sizeValue || 'fixed'}-${index}`} className="grid grid-cols-[1fr_42px_1fr] gap-2 px-3 py-2 border-t border-[#EEEDEA] text-xs items-start opacity-60">
+                      <div className="min-w-0">
+                        <div className="font-medium text-[#213428] truncate">{line.description}</div>
+                        <div className="text-[10px] text-[#8B7F76]">{line.roles}</div>
+                      </div>
+                      <div className="text-right text-[#3E4349]">{line.qty ?? line.count}</div>
+                      <div className="text-[11px] text-amber-700">{line.inactiveReason || 'Product is inactive'}</div>
+                    </div>
+                  ))}
+                  <div className="px-3 py-2 text-[10px] text-[#8B7F76] border-t border-[#EEEDEA]">
+                    Inactive products do not contribute to totals or exports.
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[11px] text-[#8B7F76]">
+                  {(activePriceData.inactiveBreakdown || []).length} inactive product{(activePriceData.inactiveBreakdown || []).length > 1 ? 's' : ''} excluded from quotation. Click "Show inactive" to view.
+                </div>
+              )}
+            </SectionCard>
+          )}
 
           {/* 5. MANUAL EXTRAS */}
           {priceListAvailable && (

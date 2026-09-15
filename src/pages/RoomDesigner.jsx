@@ -1043,6 +1043,7 @@ function RoomDesignerWithState() {
     currency: priceData.currency,
     priceListAvailable: priceData.priceListAvailable,
     breakdown: priceData.breakdown,
+    inactiveBreakdown: priceData.inactiveBreakdown || [],
     baseTotalExVat: priceData.baseTotalExVat,
     vatAmount: priceData.vatAmount,
     finalTotalExVat: priceData.finalTotalExVat,
