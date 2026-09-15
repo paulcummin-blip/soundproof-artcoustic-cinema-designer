@@ -14,7 +14,7 @@ import { resolveSpeakerSplMeta } from "@/components/utils/spl/speakerSplMeta";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { useAuth } from "@/lib/AuthContext";
 import { isMasterAdmin } from "@/lib/accountAccess";
-import ComparisonWarnings from "@/components/spl/ComparisonWarnings";
+import { shouldShowDataWarning, shouldShowOpenBackWarning } from "@/components/spl/ComparisonWarnings";
 
 const BRAND = {
   bg: "#F8F8F7",
@@ -26,6 +26,21 @@ const BRAND = {
   soft: "#F1F0EE",
   accent: "#C1B6AD",
 };
+
+const ROW_GRID = "minmax(220px, 320px) 140px 110px 110px 72px";
+
+function DataNote({ record }) {
+  if (!record) return null;
+  const showData = shouldShowDataWarning(record);
+  const showOpenBack = shouldShowOpenBackWarning(record);
+  if (!showData && !showOpenBack) return null;
+  return (
+    <div style={{ gridColumn: "3 / 5", fontSize: 11, color: "#7A5C00", lineHeight: 1.4, paddingTop: 2 }}>
+      {showData && <div>Estimated from incomplete published manufacturer data.</div>}
+      {showOpenBack && <div>Open-back design — subject to inconsistent installed results.</div>}
+    </div>
+  );
+}
 
 const LEVEL_RANK = { "—": 0, "N/A": 0, FAIL: 0, L1: 1, L2: 2, L3: 3, L4: 4 };
 
@@ -306,13 +321,15 @@ function normalizeImportedRow(row, index) {
   };
 }
 
-function SpeakerRow({ eyebrow, name, price, result, accent = false, note = null, onRemove = null, infoRows = null, sourceUrl = null, datasheetUrl = null }) {
+function SpeakerRow({ eyebrow, name, price, result, accent = false, note = null, dataNoteRecord = null, onRemove = null, infoRows = null, sourceUrl = null, datasheetUrl = null }) {
+  const showDataNote = dataNoteRecord && (shouldShowDataWarning(dataNoteRecord) || shouldShowOpenBackWarning(dataNoteRecord));
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 64px",
-        gap: 12,
+        gridTemplateColumns: ROW_GRID,
+        gridTemplateRows: showDataNote ? "auto auto" : "auto",
+        gap: "8px 12px",
         alignItems: "center",
         padding: "14px 16px",
         border: `1px solid ${accent ? BRAND.accent : BRAND.border}`,
@@ -336,6 +353,7 @@ function SpeakerRow({ eyebrow, name, price, result, accent = false, note = null,
           </button>
         )}
       </div>
+      {showDataNote && <DataNote record={dataNoteRecord} />}
     </div>
   );
 }
@@ -467,6 +485,9 @@ export default function SPLCalculatorPage() {
 
   const artResult = useMemo(() => calculateArtResult(art), [art, calculateArtResult]);
 
+  const artWarningRecord = buildArtcousticWarningRecord(art);
+  const artShowDataNote = artWarningRecord && (shouldShowDataWarning(artWarningRecord) || shouldShowOpenBackWarning(artWarningRecord));
+
   const competitorById = useMemo(() => new Map(competitorRows.map((r) => [r.id, r])), [competitorRows]);
 
   const competitorResultFor = useCallback((record) => {
@@ -588,7 +609,7 @@ export default function SPLCalculatorPage() {
         </div>
 
         <div style={{ background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18, marginBottom: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "220px 220px 280px", justifyContent: "start", gap: 14 }}>
             <label style={{ fontSize: 13, color: BRAND.subtext }}>
               Speaker to RSP distance
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
@@ -618,21 +639,23 @@ export default function SPLCalculatorPage() {
         </div>
 
         <div style={{ background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 64px", gap: 12, alignItems: "end", padding: "0 16px 8px", fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}>
+          <div style={{ display: "grid", gridTemplateColumns: ROW_GRID, gap: "8px 12px", alignItems: "end", padding: "0 16px 8px", fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}>
             <div>Speaker</div><div style={{ textAlign: "right" }}>Retail inc VAT</div><div style={{ textAlign: "center" }}><div style={{ fontWeight: 700, color: BRAND.subtext }}>LCR SPL</div><div style={{ fontSize: 9, color: BRAND.hint, marginTop: 1, letterSpacing: 0 }}>P12</div></div><div style={{ textAlign: "center" }}><div style={{ fontWeight: 700, color: BRAND.subtext }}>Surround SPL</div><div style={{ fontSize: 9, color: BRAND.hint, marginTop: 1, letterSpacing: 0 }}>P13</div></div><div />
           </div>
 
           <div style={{ marginBottom: 8 }}>
-            <div style={{ marginBottom: 7, display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 64px", gap: 12, alignItems: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: ROW_GRID, gridTemplateRows: artShowDataNote ? "auto auto" : "auto", gap: "8px 12px", alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}>
               <select value={art?.id || ""} onChange={(e) => setArtId(e.target.value)} style={{ border: `1px solid ${BRAND.border}`, borderRadius: 10, padding: "10px 12px", background: "#FFF", fontWeight: 700, color: BRAND.text }}>
                 {artcousticVisible.map((s) => <option key={s.id} value={s.id}>Artcoustic · {s.model}</option>)}
               </select>
-              <div style={{ fontWeight: 600, textAlign: "right", minWidth: 92 }}>{formatPrice(artPrice(art))}</div>
+              <div style={{ fontWeight: 600, textAlign: "right" }}>{formatPrice(artPrice(art))}</div>
               <Rp22Pill parameter="P12" level={artResult?.grades?.p12} />
               <Rp22Pill parameter="P13" level={artResult?.grades?.p13} />
-              <SpeakerInfo rows={artcousticInfoRows(art, artPrice(art))} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+                <SpeakerInfo rows={artcousticInfoRows(art, artPrice(art))} />
               </div>
-              <ComparisonWarnings record={buildArtcousticWarningRecord(art)} />
+              {artShowDataNote && <DataNote record={artWarningRecord} />}
+            </div>
           </div>
 
           {suggestedArt && (
@@ -644,9 +667,9 @@ export default function SPLCalculatorPage() {
                 result={suggestedArt.result}
                 accent
                 note="Lowest-priced Artcoustic option that matches or exceeds the strongest selected comparison result."
+                dataNoteRecord={buildArtcousticWarningRecord(suggestedArt?.speaker)}
                 infoRows={artcousticInfoRows(suggestedArt.speaker, suggestedArt.price)}
               />
-              <ComparisonWarnings record={buildArtcousticWarningRecord(suggestedArt?.speaker)} />
             </div>
           )}
 
@@ -669,9 +692,10 @@ export default function SPLCalculatorPage() {
               {selectedCompetitorIds.map((id, index) => {
                 const record = competitorById.get(id);
                 const item = competitorResults.find((x) => x.record.id === id);
+                const compShowDataNote = record && (shouldShowDataWarning(record) || shouldShowOpenBackWarning(record));
                 return (
                   <div key={`${id}-${index}`}>
-                    <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 64px", gap: 12, alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}>
+                    <div style={{ display: "grid", gridTemplateColumns: ROW_GRID, gridTemplateRows: compShowDataNote ? "auto auto" : "auto", gap: "8px 12px", alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}>
                       <select value={id} onChange={(e) => updateSelectedCompetitor(index, e.target.value)} style={{ border: 0, background: "transparent", fontSize: 15, fontWeight: 700, color: id ? BRAND.text : BRAND.subtext, minWidth: 0 }}>
                         <option value="">Choose alternative speaker</option>
                         {competitorRows.map((r) => <option key={r.id} value={r.id}>{r.manufacturer} · {r.model}</option>)}
@@ -683,13 +707,13 @@ export default function SPLCalculatorPage() {
                         {record && <SpeakerInfo rows={competitorInfoRows(record, item?.result)} sourceUrl={record.source_url} datasheetUrl={record.datasheet_url} />}
                         <button type="button" onClick={() => setSelectedCompetitorIds((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>
                       </div>
+                      {compShowDataNote && <DataNote record={record} />}
                     </div>
                     {record?.normalization_warnings?.length > 0 && (
                       <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
                         Speaker specification needs confirmation
                       </div>
                     )}
-                    <ComparisonWarnings record={record} />
                   </div>
                 );
               })}
