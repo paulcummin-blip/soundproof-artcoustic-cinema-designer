@@ -444,32 +444,56 @@ function useDesignerState() {
     });
   }, []);
 
+  // Ref that always tracks the latest roomDims — used by dimension setters to
+  // capture the previous dims before a change, so reflowLayout can compute
+  // the old centreline for projector/sub recentering heuristics.
+  const roomDimsRef = useRef(roomDims);
+  useEffect(() => { roomDimsRef.current = roomDims; }, [roomDims]);
+
+  const markLayoutRefreshPending = useCallback(() => {
+    // Only set the pending flag when there are existing layout objects that
+    // could become stale. On a fresh/scratch project with no seating, no
+    // reflow is needed.
+    setLayoutRefreshPending((prev) => {
+      if (prev) return prev; // already pending
+      const hasSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0;
+      const hasSubs = Array.isArray(subwooferInstances) && subwooferInstances.some(i => i?.enabled !== false);
+      const hasElements = Array.isArray(roomElements) && roomElements.length > 0;
+      const hasSpeakers = Array.isArray(speakerSystem?.placedSpeakers) && speakerSystem.placedSpeakers.length > 0;
+      if (!hasSeats && !hasSubs && !hasElements && !hasSpeakers) return false;
+      return true;
+    });
+  }, [seatingPositions, subwooferInstances, roomElements, speakerSystem?.placedSpeakers]);
+
   const setRoomWidthM = useCallback((v) => {
     const newVal = Number(v);
     if (!Number.isFinite(newVal) || newVal === 0) return;
-    setRoomDims(d => {
-      if (Math.abs((d?.widthM ?? 0) - newVal) < 0.001) return d;
-      return { ...d, widthM: newVal };
-    });
-  }, []);
+    const prev = roomDimsRef.current;
+    if (Math.abs((prev?.widthM ?? 0) - newVal) < 0.001) return;
+    prevRoomDimsRef.current = { ...prev };
+    setRoomDims(d => ({ ...d, widthM: newVal }));
+    markLayoutRefreshPending();
+  }, [markLayoutRefreshPending]);
   
   const setRoomLengthM = useCallback((v) => {
     const newVal = Number(v);
     if (!Number.isFinite(newVal) || newVal === 0) return;
-    setRoomDims(d => {
-      if (Math.abs((d?.lengthM ?? 0) - newVal) < 0.001) return d;
-      return { ...d, lengthM: newVal };
-    });
-  }, []);
+    const prev = roomDimsRef.current;
+    if (Math.abs((prev?.lengthM ?? 0) - newVal) < 0.001) return;
+    prevRoomDimsRef.current = { ...prev };
+    setRoomDims(d => ({ ...d, lengthM: newVal }));
+    markLayoutRefreshPending();
+  }, [markLayoutRefreshPending]);
   
   const setRoomHeightM = useCallback((v) => {
     const newVal = Number(v);
     if (!Number.isFinite(newVal) || newVal === 0) return;
-    setRoomDims(d => {
-      if (Math.abs((d?.heightM ?? 0) - newVal) < 0.001) return d;
-      return { ...d, heightM: newVal };
-    });
-  }, []);
+    const prev = roomDimsRef.current;
+    if (Math.abs((prev?.heightM ?? 0) - newVal) < 0.001) return;
+    prevRoomDimsRef.current = { ...prev };
+    setRoomDims(d => ({ ...d, heightM: newVal }));
+    markLayoutRefreshPending();
+  }, [markLayoutRefreshPending]);
 
   const [dimensions, setDimensions] = useState({}); 
 
@@ -743,6 +767,16 @@ function useDesignerState() {
   const [isProjectHydrationReady, setProjectHydrationReady] = useState(() => __isFreeUse);
   const [perSeatMetrics, setPerSeatMetrics] = useState({});
   const [roomResetEpoch, setRoomResetEpoch] = useState(0);
+  // Reflow epoch — incremented when the user clicks "Refresh Layout" after room
+  // dimension changes. useSeatingRebuild and useSpeakerReconciliation check
+  // this to bypass their loaded-project preservation guards for one pass.
+  const [roomReflowEpoch, setRoomReflowEpoch] = useState(0);
+  // Pending layout refresh flag — true when room dimensions have changed on a
+  // loaded project and dependent geometry needs reflow. Cleared by reflowLayout.
+  const [layoutRefreshPending, setLayoutRefreshPending] = useState(false);
+  // Snapshot of room dims at the last committed state, used to detect genuine
+  // dimension changes vs hydration. Updated by the dimension setters.
+  const prevRoomDimsRef = useRef(null);
   const [seatMetricsById, setSeatMetricsById] = useState(() => (
     (__autosavePayload && __autosavePayload.seatMetricsById) ? __autosavePayload.seatMetricsById : {}
   ));
@@ -2036,6 +2070,112 @@ function useDesignerState() {
     }
   }, []);
 
+  // ── REFRESH LAYOUT ──────────────────────────────────────────────────────
+  // Reflow dependent geometry after room dimension changes. Preserves all
+  // product/model/system selections but repositions seating, subs, projector,
+  // and speakers to suit the new room. Invalidates bass/RP22 cached results.
+  const reflowLayout = useCallback(() => {
+    const newDims = roomDimsRef.current;
+    const oldDims = prevRoomDimsRef.current;
+    const newW = Number(newDims?.widthM) || 4.5;
+    const newL = Number(newDims?.lengthM) || 6.0;
+    const newH = Number(newDims?.heightM) || 2.4;
+    const oldW = Number(oldDims?.widthM) || newW;
+    const oldL = Number(oldDims?.lengthM) || newL;
+    const newCenterX = newW / 2;
+    const oldCenterX = oldW / 2;
+    const widthShift = newCenterX - oldCenterX;
+
+    // 1. Reflow subwoofer instances — recenter auto-placed, clamp user-placed
+    if (Array.isArray(subwooferInstances) && subwooferInstances.length > 0) {
+      const MIN = 0.15;
+      const refLowedInstances = subwooferInstances.map((inst) => {
+        if (!inst || inst.enabled === false) return inst;
+        const pos = inst.position || {};
+        const px = Number(pos.x);
+        const py = Number(pos.y);
+        if (!Number.isFinite(px) || !Number.isFinite(py)) return inst;
+
+        const source = inst.positionSource || "auto";
+        let newX = px;
+        let newY = py;
+
+        if (source === "auto") {
+          // Auto-placed: recenter to new centreline
+          newX = newCenterX;
+        } else {
+          // User-placed: shift by the centreline delta to preserve relative position
+          newX = px + widthShift;
+        }
+        // Clamp to new room bounds
+        newX = Math.max(MIN, Math.min(newW - MIN, newX));
+        newY = Math.max(MIN, Math.min(newL - MIN, newY));
+
+        return { ...inst, position: { ...pos, x: newX, y: newY } };
+      });
+      setSubwooferInstances(refLowedInstances);
+      // Rebuild runtime subwoofers from ref lowed instances
+      const enabled = refLowedInstances.filter((i) => i?.enabled !== false);
+      const orientationMeta = {
+        frontOrientation: frontSubsCfg?.orientation ?? null,
+        rearOrientation: rearSubsCfg?.orientation ?? null,
+      };
+      try {
+        const newSubs = enabled.length > 0 ? bassInputAdapter(enabled, orientationMeta) : [];
+        setSubwoofers(newSubs);
+      } catch (e) {
+        // keep existing subwoofers on adapter failure
+      }
+    }
+
+    // 2. Reflow projector — recenter if previously centred, always clamp
+    if (Array.isArray(roomElements) && roomElements.length > 0) {
+      const refLowedElements = roomElements.map((el) => {
+        if (!el || el.type !== "projector") return el;
+        const lensX = Number(el.x_lens_m);
+        const lensY = Number(el.y_lens_m);
+        const lensZ = Number(el.z_lens_m);
+        const next = { ...el };
+        if (Number.isFinite(lensX)) {
+          // Heuristic: if within 10cm of the old centreline, recenter to new
+          if (Math.abs(lensX - oldCenterX) <= 0.10) {
+            next.x_lens_m = newCenterX;
+          } else {
+            next.x_lens_m = Math.max(0.10, Math.min(newW - 0.10, lensX + widthShift));
+          }
+        }
+        if (Number.isFinite(lensY)) {
+          next.y_lens_m = Math.max(0.10, Math.min(newL - 0.10, lensY));
+        }
+        if (Number.isFinite(lensZ)) {
+          next.z_lens_m = Math.max(0.10, Math.min(newH - 0.10, lensZ));
+        }
+        return next;
+      });
+      setRoomElements(refLowedElements);
+    }
+
+    // 3. Clear per-seat RP22 metrics — they are geometry-dependent and stale
+    setPerSeatMetrics({});
+
+    // 4. Increment reflow epoch to unblock useSeatingRebuild and
+    //    useSpeakerReconciliation guards for one pass. This triggers
+    //    recentering of seating rows and recalculation of derived speaker
+    //    positions (front wides, surrounds, overheads) for the new room.
+    setRoomReflowEpoch((prev) => prev + 1);
+
+    // 5. Clear the pending flag
+    setLayoutRefreshPending(false);
+
+    // 6. Update prevRoomDimsRef to the current dims so a subsequent change
+    //    measures from here.
+    prevRoomDimsRef.current = { ...newDims };
+
+    if (globalThis.__B44_LOGS) {
+      console.log('[AppState] Refresh Layout complete, reflow epoch:', roomReflowEpoch + 1);
+    }
+  }, [subwooferInstances, roomElements, frontSubsCfg, rearSubsCfg]);
+
   const value = useMemo(() => {
     return {
     dimensions, setDimensions, 
@@ -2113,6 +2253,9 @@ function useDesignerState() {
     seatMetricsById,
     roomResetEpoch,
     resetRoomDesignerToDefaults,
+    layoutRefreshPending,
+    reflowLayout,
+    roomReflowEpoch,
     assumedP15Level,
     setAssumedP15LevelSafe,
     assumedP21Level,
@@ -2227,6 +2370,9 @@ function useDesignerState() {
     seatMetricsById,
     roomResetEpoch,
     resetRoomDesignerToDefaults,
+    layoutRefreshPending,
+    reflowLayout,
+    roomReflowEpoch,
     assumedP15Level,
     setAssumedP15LevelSafe,
     assumedP21Level,

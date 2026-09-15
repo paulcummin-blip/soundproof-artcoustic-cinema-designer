@@ -39,12 +39,14 @@ export function useSpeakerReconciliation({
     const hasProjectId = resolvedProjectId || projectIdState;
     const presetChanged = lastPresetRef.current !== dolbyPreset;
     const resetEpochChanged = appState?.roomResetEpoch !== undefined && appState.roomResetEpoch > 0;
+    const reflowEpochChanged = appState?.roomReflowEpoch !== undefined && appState.roomReflowEpoch > 0;
 
     if (
       loadState?.phase === "loaded" &&
       hasProjectId &&
       !didUserRequestResetRef.current &&
-      !resetEpochChanged
+      !resetEpochChanged &&
+      !reflowEpochChanged
     ) {
       return;
     }
@@ -549,6 +551,6 @@ export function useSpeakerReconciliation({
     appState?.isHydrated,
     dolbyPreset, stableDimensions, setSpeakers, _isFrozen, placedSpeakers, _sevenBedLayoutType, lastPresetRef,
     _overheadGlobalModel, _overheadFrontOverride, _overheadMidOverride, _overheadRearOverride,
-    _useFrontGlobal, _useMidGlobal, _useRearGlobal, loadState?.phase, appState?.roomResetEpoch
+    _useFrontGlobal, _useMidGlobal, _useRearGlobal, loadState?.phase, appState?.roomResetEpoch, appState?.roomReflowEpoch
   ]);
 }

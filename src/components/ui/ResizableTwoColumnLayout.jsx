@@ -64,10 +64,11 @@ export default function ResizableTwoColumnLayout({
       style={{
         display: "grid",
         gridTemplateColumns: `${leftWidth}px ${dividerWidth}px minmax(${minRightWidth}px, 1fr)`,
+        gridTemplateRows: "1fr",
         columnGap: gap,
         overflow: "hidden",
         padding: 16,
-        flex: "1 1 auto",
+        flex: "1 1 0",
         minWidth: 0,
         minHeight: 0,
       }}

@@ -217,7 +217,8 @@ export function useSeatingRebuild({
       currentSeats.length > 0 &&
       !userHasChangedSeatingSinceLoad &&
       !didUserRequestResetRef.current &&
-      !(appState?.roomResetEpoch > 0)
+      !(appState?.roomResetEpoch > 0) &&
+      !(appState?.roomReflowEpoch > 0)
     ) {
       // Seed tracking refs so that when the user does make a genuine change,
       // deltas are measured correctly from the stable loaded state.
@@ -256,7 +257,8 @@ export function useSeatingRebuild({
       currentSeats.length > 0 &&
       !userHasChangedSeatingSinceLoad &&
       !didUserRequestResetRef.current &&
-      !(appState?.roomResetEpoch > 0)
+      !(appState?.roomResetEpoch > 0) &&
+      !(appState?.roomReflowEpoch > 0)
     ) {
       const deltaY = currentMlpY - prevMlpYRef.current;
       if (Math.abs(deltaY) > EQ_EPS) {
@@ -299,6 +301,7 @@ export function useSeatingRebuild({
       currentSeats.length > 0 &&
       !didUserRequestResetRef.current &&
       !(appState?.roomResetEpoch > 0) &&
+      !(appState?.roomReflowEpoch > 0) &&
       Number.isFinite(appState?.mlpY_m);
 
     if (widthChangedAfterHydration) {
@@ -366,6 +369,7 @@ export function useSeatingRebuild({
       !userHasChangedSeatingSinceLoad &&
       !didUserRequestResetRef.current &&
       !(appState?.roomResetEpoch > 0) &&
+      !(appState?.roomReflowEpoch > 0) &&
       !seatingReferenceChanged
     ) {
       return;
@@ -499,6 +503,7 @@ export function useSeatingRebuild({
     stableDimensions?.width,
     stableDimensions?.length,
     appState?.roomResetEpoch,
+    appState?.roomReflowEpoch,
     loadState?.phase,
     seatingConfigEpoch,
     _rowSpacingM,

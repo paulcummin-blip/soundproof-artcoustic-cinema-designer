@@ -4,6 +4,7 @@ import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
 import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
+import RoomDimensionReflowBanner from "@/components/room/RoomDimensionReflowBanner";
 
 const RoomDimensions = React.lazy(() =>
   import("@/components/room/RoomDimensions").then((m) => ({ default: m.default ?? m.RoomDimensions }))
@@ -139,6 +140,8 @@ export default function RoomDesignerControlsPanel({
       <div
         style={{ flex: 1, minHeight: 0, overflow: "auto", paddingRight: 8, paddingBottom: 12 }}
         className="space-y-3">
+
+        <RoomDimensionReflowBanner />
 
         <CollapsiblePanel
           title="Room Dimensions"
