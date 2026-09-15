@@ -30,6 +30,7 @@ import {
   setBestSoFar,
   setWinner,
   setRuntimeMetrics,
+  setOptimisationDiagnostics,
   setCancelled,
   setStale,
   setError,
@@ -47,6 +48,7 @@ import { buildProvenance } from "./appliedProvenance";
 import ImproveBassV2Progress from "./ImproveBassV2Progress";
 import ImproveBassV2StageResults from "./ImproveBassV2StageResults";
 import ImproveBassV2CompletedInvestigation from "./ImproveBassV2CompletedInvestigation";
+import OptimisationDiagnosticsReport from "./OptimisationDiagnosticsReport";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
 
 export default function ImproveBassResponseV2({
@@ -323,6 +325,10 @@ export default function ImproveBassResponseV2({
       if (result.runtimeMetrics) {
         setRuntimeMetrics(projectId, result.runtimeMetrics);
       }
+      // Store developer/debug optimisation diagnostics report (read-only)
+      if (result.optimisationDiagnostics) {
+        setOptimisationDiagnostics(projectId, result.optimisationDiagnostics);
+      }
     } catch (err) {
       setError(projectId, err.message);
     } finally {
@@ -519,6 +525,11 @@ export default function ImproveBassResponseV2({
           sharedBassResults={shared}
           currentDesignFingerprint={currentDesignFingerprint}
         />
+      )}
+
+      {/* ── Developer/debug optimisation diagnostics (read-only) ── */}
+      {isComplete && state?.optimisationDiagnostics && (
+        <OptimisationDiagnosticsReport report={state.optimisationDiagnostics} />
       )}
 
       {isCancelled && (

@@ -45,6 +45,9 @@ function emptyState(projectId) {
     // Runtime metrics from the last V2 run (placementFingerprintUsed,
     // stage2TransfersReused, etc.) — set when the run reaches a terminal state.
     runtimeMetrics: null,
+    // Developer/debug optimisation diagnostics report from the last V2 run.
+    // Read-only transform of the engine's selection + diagnostics. Not user-facing.
+    optimisationDiagnostics: null,
   };
 }
 
@@ -107,6 +110,7 @@ export function startImproveBassV2(projectId, snapshot) {
     materialSubImprovementFound: false,
     bestPracticalSubResult: null,
     runtimeMetrics: null,
+    optimisationDiagnostics: null,
   });
 }
 
@@ -156,6 +160,10 @@ export function setWinner(projectId, winner) {
 
 export function setRuntimeMetrics(projectId, runtimeMetrics) {
   return publish(projectId, { runtimeMetrics });
+}
+
+export function setOptimisationDiagnostics(projectId, report) {
+  return publish(projectId, { optimisationDiagnostics: report });
 }
 
 export function setPositionSearchPhase(projectId, phase) {

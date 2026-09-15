@@ -46,6 +46,7 @@ import { createSeatingProfiler } from "./seatingStageProfiler.js";
 import { selectSeatingShortlist, selectSeatingWinner, SEATING_SHORTLIST_SIZE } from "./seatingShortlistPolicy.js";
 
 import { attachCurrentCanonicalValidation } from "./currentAuthorityValidation.js";
+import { buildOptimisationDiagnosticsReport, logOptimisationDiagnosticsReport } from "./optimisationDiagnosticsReport.js";
 
 const MAX_CHALLENGERS = 3;
 
@@ -1443,6 +1444,26 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     // fingerprint usage and Stage 2 transfer reuse without console scraping.
     if (runResult) {
       runResult.runtimeMetrics = metrics.toReport();
+    }
+    // ── Developer/debug optimisation diagnostics report ──────────────
+    // Read-only transform of the engine's selection + diagnostics. Does NOT
+    // alter the optimiser. Logged to console and attached to the run result
+    // so the UI can surface it behind the SHOW_DEBUG_PANEL flag.
+    try {
+      const selectionForReport = runResult?.selection || null;
+      if (selectionForReport) {
+        const diagReport = buildOptimisationDiagnosticsReport(selectionForReport, {
+          instanceIds: runResult?.snapshot?.instanceIds || [],
+          runFingerprint: startFingerprint,
+          runtimeMetrics: runResult?.runtimeMetrics || metrics.toReport(),
+        });
+        if (diagReport) {
+          logOptimisationDiagnosticsReport(diagReport);
+          if (runResult) runResult.optimisationDiagnostics = diagReport;
+        }
+      }
+    } catch {
+      // Diagnostics must never break the engine.
     }
     try { worker.terminate(); } catch { /* idempotent on already-terminated worker */ }
   }
