@@ -186,8 +186,7 @@ function buildSeatLines(paramKey, seatData, shared) {
 
   const lines = [];
   lines.push(["Seat", formatSeatLabel(seatData.seatId)]);
-  lines.push([paramKey.toUpperCase() + " measured deviation", formatRawSeatDeviation(rawValue)]);
-  lines.push(["Displayed value", seatData.displayVariationDb || "—"]);
+  lines.push(["Measured value", formatRawSeatDeviation(rawValue)]);
   lines.push(["Result", seatData.level]);
 
   if (isFiniteNumber(seatData.worstFrequencyHz)) {
@@ -210,7 +209,6 @@ function buildSeatLines(paramKey, seatData, shared) {
     if (isFiniteNumber(marginInfo.threshold)) {
       lines.push(["Threshold", marginInfo.threshold + " dB"]);
     }
-    lines.push(["Margin", marginInfo.label]);
   }
 
   return lines;
