@@ -804,7 +804,7 @@ function useDesignerState() {
   }, []);
 
   const [assumedP21Level, setAssumedP21Level] = useState(() => (
-    (__autosavePayload && __autosavePayload.assumedP21Level) ? __autosavePayload.assumedP21Level : null
+    (__autosavePayload && __autosavePayload.assumedP21Level) ? __autosavePayload.assumedP21Level : "L2"
   ));
 
   const [designEqEnabled, setDesignEqEnabled] = useState(() => (
