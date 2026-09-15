@@ -1,4 +1,6 @@
-import { MODELS } from '@/components/models/speakers/registry';
+import { MODELS, getModelDisplayOrder } from '@/components/models/speakers/registry';
+
+export { getModelDisplayOrder };
 import { artcousticSpeakers } from '@/components/data/speakerData';
 import { SUBWOOFER_BASS_CAPABILITIES } from '@/components/data/subwooferBassCapabilities';
 import { normaliseModelKey } from '@/components/utils/modelKeyNormaliser';
@@ -303,8 +305,10 @@ export function buildProductRoleOptions(products, role) {
     .filter((product) => product?.active !== false)
     .filter((product) => effectiveProductRoles(product).includes(role))
     .sort((a, b) => {
-      const orderA = Number.isFinite(Number(a.selector_order)) ? Number(a.selector_order) : Number.MAX_SAFE_INTEGER;
-      const orderB = Number.isFinite(Number(b.selector_order)) ? Number(b.selector_order) : Number.MAX_SAFE_INTEGER;
+      const keyA = productSelectorKey(a, role);
+      const keyB = productSelectorKey(b, role);
+      const orderA = getModelDisplayOrder(keyA);
+      const orderB = getModelDisplayOrder(keyB);
       return orderA - orderB || String(a.label || '').localeCompare(String(b.label || ''));
     });
 

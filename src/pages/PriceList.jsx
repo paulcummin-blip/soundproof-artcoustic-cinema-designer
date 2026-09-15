@@ -8,6 +8,7 @@ import {
   effectiveProductRoles,
   getProductTechnicalStatus,
   productEngineeringKey,
+  getModelDisplayOrder,
   PRODUCT_ENGINEERING_OPTIONS,
   PRODUCT_ROLE_LABELS,
   PRODUCT_ROLE_OPTIONS,
@@ -287,9 +288,15 @@ export default function PriceList() {
         || String(item.sku || '').toLowerCase().includes(query))
       .sort((a, b) => {
         const categoryDifference = CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category);
+        if (categoryDifference !== 0) return categoryDifference;
+        const displayA = getModelDisplayOrder(productEngineeringKey(a));
+        const displayB = getModelDisplayOrder(productEngineeringKey(b));
+        const useDisplayA = displayA !== Number.MAX_SAFE_INTEGER;
+        const useDisplayB = displayB !== Number.MAX_SAFE_INTEGER;
+        if (useDisplayA || useDisplayB) return displayA - displayB;
         const orderA = Number.isFinite(Number(a.selector_order)) ? Number(a.selector_order) : Number.MAX_SAFE_INTEGER;
         const orderB = Number.isFinite(Number(b.selector_order)) ? Number(b.selector_order) : Number.MAX_SAFE_INTEGER;
-        return categoryDifference || orderA - orderB || String(a.label || '').localeCompare(String(b.label || ''));
+        return orderA - orderB || String(a.label || '').localeCompare(String(b.label || ''));
       });
   }, [master.products, search, category, showInactive, editMode]);
 

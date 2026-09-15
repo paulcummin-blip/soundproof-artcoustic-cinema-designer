@@ -80,6 +80,39 @@ const SURROUND_ROLES = ['surround', 'rear_surround', 'front_wide'];
 const SOUNDBAR_MODELS = new Set(['c-1', 'c4-1', 'multi-lcr', 'multi-mono', 'hspl-lcr', 'hspl-mono']);
 const OVERHEAD_MODELS = new Set(['architect-mikro', 'architect-2-1', 'spitfire-cloud', 'architect-4-2-mk2']);
 
+// Master display order — mirrors the registry DISPLAY_ORDER map so DB selector_order
+// stays consistent with the engineering catalogue's single source of truth.
+const DISPLAY_ORDER: Record<string, number> = {
+  'q4-3': 1, 'q4-3_s': 1,
+  'q6-3': 2, 'q6-3_s': 2,
+  'q4-5': 3, 'q4-5_s': 3,
+  'q8-5': 4, 'q8-5_s': 4,
+  'mikro': 5,
+  'evolve-1': 6,
+  'evolve-1-1': 7, 'evolve-1-1_s': 7,
+  'sl-evolve-1-1': 7, 'sl-evolve-1-1_s': 7,
+  'evolve-2-1': 8, 'evolve-2-1_s': 8,
+  'evolve-3-1': 9, 'evolve-3-1_s': 9,
+  'evolve-4-2': 10, 'evolve-4-2_s': 10,
+  'evolve-6-3': 11, 'evolve-6-3_s': 11,
+  'evolve-8-4': 12, 'evolve-8-4_s': 12,
+  'architect-mikro': 13,
+  'architect-2-1': 14,
+  'architect-4-2-mk2': 15,
+  'spitfire-cloud': 16,
+  'c-1': 20,
+  'c4-1': 21,
+  'multi-lcr': 22,
+  'multi-mono': 23,
+  'hspl-lcr': 24,
+  'hspl-mono': 25,
+  'sub2-12': 50,
+  'sub3-12': 51,
+  'sub4-12': 52,
+  'architect-4-2': 100,
+  'architect-pas2-2': 101,
+};
+
 function engineeringKey(sku) {
   const key = String(sku || '').split(':')[0];
   return key.endsWith('_s') ? key.slice(0, -2) : key;
@@ -133,7 +166,8 @@ export default async function(req) {
 
     for (let index = 0; index < SEED_DATA.length; index++) {
       const seed = SEED_DATA[index];
-      const defaults = masterDefaults(seed, index);
+      const desiredOrder = DISPLAY_ORDER[seed.sku] ?? index;
+      const defaults = masterDefaults(seed, desiredOrder);
       const existingRec = existingBySku.get(seed.sku);
       if (existingRec) {
         const patch = {};
@@ -145,6 +179,10 @@ export default async function(req) {
             ? Number(existingRec.selector_order)
             : defaults.selector_order;
           patch.role_migration_version = 1;
+        }
+        // Sync selector_order to master display_order if drifted
+        if (Number(existingRec.selector_order) !== desiredOrder) {
+          patch.selector_order = desiredOrder;
         }
         if (!Number.isFinite(Number(existingRec.catalog_version))) patch.catalog_version = defaults.catalog_version;
 

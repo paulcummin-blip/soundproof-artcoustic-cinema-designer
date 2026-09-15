@@ -326,6 +326,62 @@ export const MODELS = [
   },
 ];
 
+// MASTER DISPLAY ORDER — single source of truth for product ordering across all selectors.
+// All product selectors sort by display_order ASC, never alphabetically.
+// Products not listed here default to Number.MAX_SAFE_INTEGER (sorted last).
+// Variants (_s surround suffix) inherit the same display_order as their base model.
+export const DISPLAY_ORDER = {
+  // Q SERIES
+  'q4-3': 1,
+  'q6-3': 2,
+  'q4-5': 3,
+  'q8-5': 4,
+  // MIKRO
+  'mikro': 5,
+  // EVOLVE
+  'evolve-1': 6,
+  'evolve-1-1': 7,
+  'sl-evolve-1-1': 7,
+  'evolve-2-1': 8,
+  'evolve-3-1': 9,
+  'evolve-4-2': 10,
+  'evolve-6-3': 11,
+  'evolve-8-4': 12,
+  // ARCHITECT
+  'architect-mikro': 13,
+  'architect-2-1': 14,
+  'architect-4-2-mk2': 15,
+  'spitfire-cloud': 16,
+  // SOUNDBARS (after main product lines)
+  'c-1': 20,
+  'c4-1': 21,
+  'multi-lcr': 22,
+  'multi-mono': 23,
+  'hspl-lcr': 24,
+  'hspl-mono': 25,
+  // SUBWOOFERS
+  'sub2-12': 50,
+  'sub3-12': 51,
+  'sub4-12': 52,
+  // Hidden architect models (not in selectors)
+  'architect-4-2': 100,
+  'architect-pas2-2': 101,
+};
+
+// Returns the master display_order for a model key.
+// Strips _s suffix automatically so surround variants inherit their base model's order.
+export function getModelDisplayOrder(key) {
+  const normalized = normaliseModelKey(key);
+  const order = DISPLAY_ORDER[normalized];
+  if (Number.isFinite(order)) return order;
+  const baseKey = normalized.replace(/_s$/, '');
+  const baseOrder = DISPLAY_ORDER[baseKey];
+  return Number.isFinite(baseOrder) ? baseOrder : Number.MAX_SAFE_INTEGER;
+}
+
+// Pre-computed index for stable secondary sort (preserves MODELS array order for ties)
+const _MODEL_ARRAY_INDEX = new Map(MODELS.map((m, i) => [m.key, i]));
+
 // NORMALISATION — TOLERANT TO SPACES/CASE/EXTRA TEXT
 // Extracted to modelKeyNormaliser.js for Node compatibility; re-exported here.
 export { normaliseModelKey };
@@ -602,18 +658,26 @@ export function getProductCurveFrequencyRange(modelKey) {
   return { minHz: freqs[0], maxHz: freqs[freqs.length - 1] };
 }
 
-// CATEGORY LISTS IN EXACT UI ORDER
+// CATEGORY LISTS SORTED BY MASTER DISPLAY_ORDER
 export function getModelsByCategoryOrdered() {
   const byCat = { LCR: [], SURROUNDS: [], ARCHITECT: [], SUBWOOFERS: [] };
-  MODELS.forEach(m => { 
+  MODELS.forEach(m => {
     if (m.hiddenFromSelector) return; // Legacy models: excluded from selectors, still resolvable via getSpeakerModelMeta
     if (byCat[m.category]) { // Ensure category exists before pushing
-      byCat[m.category].push(m); 
+      byCat[m.category].push(m);
     }
   });
+  // Sort each category by display_order ASC, with stable registry-array-order tiebreaker
+  for (const cat of Object.keys(byCat)) {
+    byCat[cat].sort((a, b) => {
+      const orderDiff = getModelDisplayOrder(a.key) - getModelDisplayOrder(b.key);
+      if (orderDiff !== 0) return orderDiff;
+      return (_MODEL_ARRAY_INDEX.get(a.key) ?? 0) - (_MODEL_ARRAY_INDEX.get(b.key) ?? 0);
+    });
+  }
   const ordered = {};
   CATEGORY_ORDER.forEach(cat => { ordered[cat] = byCat[cat] || []; });
   return ordered;
 }
 
-export default { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, getProductCurveFrequencyRange, isValidCurve, getSpeakerPriceGbp, hasSpeakerModel, isGraphDerivedEstimate, getApprovedContinuousSplDb, getApprovedContinuousSplAt30HzDb, getApprovedPeakSplDb, getApprovedFrequencyRangeHz, CATEGORY_ORDER, MODELS };
+export default { getSpeakerModelMeta, getModelsByCategoryOrdered, getModelDisplayOrder, DISPLAY_ORDER, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, getProductCurveFrequencyRange, isValidCurve, getSpeakerPriceGbp, hasSpeakerModel, isGraphDerivedEstimate, getApprovedContinuousSplDb, getApprovedContinuousSplAt30HzDb, getApprovedPeakSplDb, getApprovedFrequencyRangeHz, CATEGORY_ORDER, MODELS };
