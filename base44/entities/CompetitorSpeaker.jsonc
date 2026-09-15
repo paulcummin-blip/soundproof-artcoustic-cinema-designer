@@ -10,6 +10,10 @@
     "product_type": {
       "type": "string"
     },
+    "open_back": {
+      "type": "string",
+      "description": "Whether the speaker is an open-back design (Y/N). Open-back in-wall speakers are subject to inconsistent installed results."
+    },
     "retail_price_inc_vat": {
       "type": "number"
     },
