@@ -729,6 +729,11 @@ function useDesignerState() {
   // Pending layout refresh flag — true when room dimensions have changed on a
   // loaded project and dependent geometry needs reflow. Cleared by reflowLayout.
   const [layoutRefreshPending, setLayoutRefreshPending] = useState(false);
+  // Geometry reflow in-progress flag — set true by reflowLayout when geometry
+  // mutations begin, cleared by clearGeometryReflow when the calibration
+  // fingerprint has stabilised. layoutRefreshPending stays true until both
+  // the reflow mutations AND all downstream rebuild effects have completed.
+  const [geometryReflowInProgress, setGeometryReflowInProgress] = useState(false);
   // Snapshot of room dims at the last committed state, used to detect genuine
   // dimension changes vs hydration. Updated by the dimension setters.
   const prevRoomDimsRef = useRef(null);
@@ -2067,6 +2072,10 @@ function useDesignerState() {
     // RSP state
     resetRspState();
 
+    // Clear any stale reflow state — reset produces fresh geometry.
+    setLayoutRefreshPending(false);
+    setGeometryReflowInProgress(false);
+
     // 3. Increment reset epoch to force rebuild
     setRoomResetEpoch(prev => prev + 1);
 
@@ -2169,17 +2178,29 @@ function useDesignerState() {
     //    positions (front wides, surrounds, overheads) for the new room.
     setRoomReflowEpoch((prev) => prev + 1);
 
-    // 5. Clear the pending flag
-    setLayoutRefreshPending(false);
+    // 5. Mark geometry reflow as in-progress. layoutRefreshPending is NOT
+    //    cleared here — it stays true until the calibration fingerprint has
+    //    stabilised (all downstream rebuild effects have completed).
+    //    BassBackgroundAnalysisOwner watches the fingerprint and calls
+    //    clearGeometryReflow() when it has remained unchanged for one render.
+    setGeometryReflowInProgress(true);
 
     // 6. Update prevRoomDimsRef to the current dims so a subsequent change
     //    measures from here.
     prevRoomDimsRef.current = { ...newDims };
 
     if (globalThis.__B44_LOGS) {
-      console.log('[AppState] Refresh Layout complete, reflow epoch:', roomReflowEpoch + 1);
+      console.log('[AppState] Refresh Layout dispatched, reflow epoch:', roomReflowEpoch + 1);
     }
   }, [subwooferInstances, roomElements, frontSubsCfg, rearSubsCfg]);
+
+  // clearGeometryReflow — called by BassBackgroundAnalysisOwner when the
+  // calibration fingerprint has stabilised after a reflow. Clears both the
+  // in-progress and pending flags, unblocking Calculate.
+  const clearGeometryReflow = useCallback(() => {
+    setGeometryReflowInProgress(false);
+    setLayoutRefreshPending(false);
+  }, []);
 
   const value = useMemo(() => {
     return {
@@ -2261,6 +2282,8 @@ function useDesignerState() {
     layoutRefreshPending,
     reflowLayout,
     roomReflowEpoch,
+    geometryReflowInProgress,
+    clearGeometryReflow,
     assumedP15Level,
     setAssumedP15LevelSafe,
     assumedP21Level,
@@ -2378,6 +2401,8 @@ function useDesignerState() {
     layoutRefreshPending,
     reflowLayout,
     roomReflowEpoch,
+    geometryReflowInProgress,
+    clearGeometryReflow,
     assumedP15Level,
     setAssumedP15LevelSafe,
     assumedP21Level,

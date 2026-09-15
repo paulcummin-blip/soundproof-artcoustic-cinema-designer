@@ -285,10 +285,90 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // sole geometry-validity gate. The normalized hook stays idle during manual
   // Calculate (analysisRequestId: null) and is not waited on.
   const layoutRefreshPending = !!appState?.layoutRefreshPending;
+  const geometryReflowInProgress = !!appState?.geometryReflowInProgress;
+  const clearGeometryReflow = appState?.clearGeometryReflow;
+
+  // ── Geometry-ready state machine ──────────────────────────────────────
+  // After a room-dimension Refresh, reflowLayout mutates geometry (subs,
+  // projector) and increments roomReflowEpoch. Downstream effects
+  // (useSeatingRebuild, MLP recalc, speaker reconciliation) then fire across
+  // subsequent renders, each mutating the calibration fingerprint.
+  //
+  // geometryReadyForCalculation becomes true ONLY when:
+  //   1. No reflow is in progress (normal operation), OR
+  //   2. A reflow is in progress AND the calibration fingerprint has been
+  //      observed unchanged across two consecutive renders — proving all
+  //      downstream rebuild effects have completed.
+  //
+  // This is event-driven and deterministic: no timers, no arbitrary delays.
+  // The settle-tick triggers one extra render so the fingerprint can be
+  // compared against itself; if it changed (another effect mutated geometry),
+  // we store the new value and tick again. Convergence is bounded by the
+  // number of geometry-effect chains (typically 3–5 renders).
+  const prevCalibrationFingerprintRef = useRef(null);
+  const prevReflowInProgressRef = useRef(false);
+  const settleAttemptsRef = useRef(0);
+  const [settleTick, setSettleTick] = useState(0);
+  const MAX_SETTLE_TICKS = 30; // safety bound — not a timer
+
+  useEffect(() => {
+    const reflowJustStarted = geometryReflowInProgress && !prevReflowInProgressRef.current;
+    prevReflowInProgressRef.current = geometryReflowInProgress;
+
+    if (!geometryReflowInProgress) {
+      // Not in reflow — keep ref synced for the next reflow.
+      prevCalibrationFingerprintRef.current = calibrationFingerprint;
+      settleAttemptsRef.current = 0;
+      return;
+    }
+
+    if (reflowJustStarted) {
+      // Reset the ref so we don't match against the pre-reflow fingerprint.
+      // Tick to trigger a second render for the first comparison.
+      prevCalibrationFingerprintRef.current = null;
+      settleAttemptsRef.current = 1;
+      setSettleTick((t) => t + 1);
+      return;
+    }
+
+    if (!calibrationFingerprint) {
+      // Fingerprint not yet computed — wait for it.
+      prevCalibrationFingerprintRef.current = null;
+      return;
+    }
+
+    if (calibrationFingerprint === prevCalibrationFingerprintRef.current) {
+      // Fingerprint unchanged across two consecutive renders — all
+      // downstream rebuild effects have completed. Clear the reflow flags.
+      prevCalibrationFingerprintRef.current = null;
+      settleAttemptsRef.current = 0;
+      if (typeof clearGeometryReflow === "function") clearGeometryReflow();
+    } else {
+      // Fingerprint changed (or first observation) — store it and trigger
+      // one more render so we can compare again.
+      prevCalibrationFingerprintRef.current = calibrationFingerprint;
+      settleAttemptsRef.current += 1;
+      if (settleAttemptsRef.current < MAX_SETTLE_TICKS) {
+        setSettleTick((t) => t + 1);
+      } else {
+        // Safety valve — geometry should have settled by now.
+        prevCalibrationFingerprintRef.current = null;
+        settleAttemptsRef.current = 0;
+        if (typeof clearGeometryReflow === "function") clearGeometryReflow();
+      }
+    }
+  }, [calibrationFingerprint, geometryReflowInProgress, settleTick, clearGeometryReflow]);
+
+  // geometryReadyForCalculation — the sole geometry gate for canCalculate.
+  // True when no reflow is pending or in-progress. During a reflow, it stays
+  // false until the fingerprint stabilises (effect above calls
+  // clearGeometryReflow, which sets both flags false).
+  const geometryReadyForCalculation = !layoutRefreshPending && !geometryReflowInProgress;
+
   const canCalculate = isProjectHydrationReady
     && bassAuthorityHydrationSettled
     && bassGeometryReady
-    && !layoutRefreshPending
+    && geometryReadyForCalculation
     && !!fingerprints
     && !!fingerprints?.geometry
     && !!cacheKey
