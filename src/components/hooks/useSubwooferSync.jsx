@@ -68,8 +68,8 @@ export function useSubwooferSync({ appState }) {
           const c = current[i];
           const subId = s?.id || c?.id || `(index ${i} — missing)`;
           console.log(`[useSubwooferSync] Run #${runNum} | Sub: ${subId}`);
-          console.log(`  Previous:  x=${c?.x ?? "—"}  y=${c?.y ?? "—"}  z=${c?.z ?? "—"}  orientation=${c?.orientation ?? "—"}  gain=${c?.gainDb ?? "—"}  delay=${c?.delay ?? "—"}  polarity=${c?.polarity ?? "—"}`);
-          console.log(`  Adapted:   x=${s?.x ?? "—"}  y=${s?.y ?? "—"}  z=${s?.z ?? "—"}  orientation=${s?.orientation ?? "—"}  gain=${s?.gainDb ?? "—"}  delay=${s?.delay ?? "—"}  polarity=${s?.polarity ?? "—"}`);
+          console.log(`  Previous:  x=${c?.x ?? "—"}  y=${c?.y ?? "—"}  z=${c?.z ?? "—"}  orientation=${c?.orientation ?? "—"}  gain=${c?.gainDb ?? "—"}  delay=${c?.delay ?? "—"}  polarity=${c?.polarity ?? "—"}  enabled=${c?.enabled ?? "—"}`);
+          console.log(`  Adapted:   x=${s?.x ?? "—"}  y=${s?.y ?? "—"}  z=${s?.z ?? "—"}  orientation=${s?.orientation ?? "—"}  gain=${s?.gainDb ?? "—"}  delay=${s?.delay ?? "—"}  polarity=${s?.polarity ?? "—"}  enabled=${s?.enabled ?? "—"}`);
         }
       }
       // ── END INSTRUMENTATION ──────────────────────────────────────────────
@@ -110,6 +110,8 @@ export function useSubwooferSync({ appState }) {
               console.log(`  FAIL: [${s.id}] id differs (adapted=${s.id}, current=${c.id})`);
             if (String(s.model) !== String(c.model))
               console.log(`  FAIL: [${s.id}] model differs (adapted=${s.model}, current=${c.model})`);
+            if (s?.enabled !== c?.enabled)
+              console.log(`  FAIL: [${s?.id}] enabled differs (adapted=${s?.enabled}, current=${c?.enabled}) — NOT checked by same()`);
             if (Math.abs((s.x ?? 0) - (c.x ?? 0)) >= 0.001)
               console.log(`  FAIL: [${s.id}] x differs (adapted=${s.x}, current=${c.x}, delta=${((s.x ?? 0) - (c.x ?? 0)).toFixed(6)})`);
             if (Math.abs((s.y ?? 0) - (c.y ?? 0)) >= 0.001)
@@ -148,7 +150,19 @@ export function useSubwooferSync({ appState }) {
                 (s.polarity ?? 1) !== (c.polarity ?? 1)
               );
             });
-          console.log(`[useSubwooferSync] Run #${runNum} | Values actually different: ${valuesActuallyDifferent ? "YES" : "NO — only object references changed"}`);
+          console.log(`[useSubwooferSync] Run #${runNum} | ${valuesActuallyDifferent ? "Values changed" : "Only object reference changed"}`);
+
+          // ── CORRELATION: report active worker state ──────────────────────
+          const diag = typeof window !== "undefined" ? window.__BASS_WORKER_DIAG__ : null;
+          if (diag) {
+            console.log(`%c[useSubwooferSync] Run #${runNum} | CORRELATION`, "color: #ffa500; font-weight: bold;");
+            console.log(`  Current Worker ID: ${diag.activeWorkerId ?? "—"}`);
+            console.log(`  Current calculation phase: ${diag.calculationPhase ?? "—"}`);
+            console.log(`  Current calibration fingerprint: ${diag.calibrationFingerprint ?? "—"}`);
+            console.log(`  Current simulation fingerprint: ${diag.simulationFingerprint ?? "—"}`);
+            console.log(`  Worker will be terminated on next render if deps changed (check for [AuthWorker] TERMINATED log)`);
+          }
+          // ── END CORRELATION ───────────────────────────────────────────────
         }
 
         console.log(`%c[useSubwooferSync] Run #${runNum} END`, __SUB_SYNC_END);

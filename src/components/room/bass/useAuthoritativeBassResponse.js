@@ -15,6 +15,29 @@ import {
 import { buildAuthoritativeRspPosition } from "./authoritativeRspPosition";
 import { buildCanonicalRoomResponse, canonicalRoomResponseCurve as extractRoomResponseCurve } from "./buildCanonicalRoomResponse";
 
+// ── INSTRUMENTATION (diagnostic only — no behaviour change) ──────────────
+let __authWorkerIdCounter = 0;
+const __authObjIdMap = new WeakMap();
+let __authObjIdCounter = 0;
+function __getObjId(obj) {
+  if (obj === null || obj === undefined) return "null";
+  if (typeof obj !== "object" && typeof obj !== "function") return String(obj);
+  let id = __authObjIdMap.get(obj);
+  if (id === undefined) { id = ++__authObjIdCounter; __authObjIdMap.set(obj, id); }
+  return `obj#${id}`;
+}
+if (typeof window !== "undefined") {
+  window.__BASS_WORKER_DIAG__ = window.__BASS_WORKER_DIAG__ || {
+    activeWorkerId: null,
+    calculationPhase: null,
+    calibrationFingerprint: null,
+    simulationFingerprint: null,
+  };
+}
+const __WORKER_TAG = "color: #4ecdc4; font-weight: bold; font-size: 13px;";
+const __WORKER_TERM_TAG = "color: #ff6b6b; font-weight: bold; font-size: 13px;";
+// ── END INSTRUMENTATION ──────────────────────────────────────────────────
+
 const POSITION_LABELS = ["left", "right"];
 const EMPTY_SIMULATION_RESULT = Object.freeze({
   seatResponses: Object.freeze({}),
@@ -248,6 +271,17 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     result: null,
     error: null,
   });
+
+  // ── INSTRUMENTATION: track current deps for cleanup reason detection ────
+  const __currentDepsRef = useRef(null);
+  __currentDepsRef.current = {
+    analysisBlocked, simulationRequest, runSimulation, qStrategy,
+    analysisRequestId, analysisRequestFingerprint,
+    frontSubsLive, rearSubsLive,
+    appStateSubwoofers: appState?.subwoofers,
+  };
+  // ── END INSTRUMENTATION ────────────────────────────────────────────────
+
   useEffect(() => {
     const generation = simulationGenerationRef.current + 1;
     simulationGenerationRef.current = generation;
@@ -292,6 +326,32 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       new URL("./authoritativeBassResponse.worker.js", import.meta.url),
       { type: "module" },
     );
+
+    // ── INSTRUMENTATION: Worker CREATED ───────────────────────────────────
+    const workerId = ++__authWorkerIdCounter;
+    const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
+    if (isDev) {
+      console.log(`%c[AuthWorker] Worker #${workerId} CREATED`, __WORKER_TAG);
+      console.log(`  timestamp: ${new Date().toISOString()}`);
+      console.log(`  analysisRequestId: ${analysisRequestId}`);
+      console.log(`  analysisRequestFingerprint: ${analysisRequestFingerprint}`);
+      console.log(`  calibrationFingerprint: ${fingerprints?.calibration ?? "—"}`);
+      console.log(`  simulationRequest: ${__getObjId(simulationRequest)}`);
+      console.log(`  sources: ${__getObjId(sources)}`);
+      console.log(`  frontSubsLive: ${__getObjId(frontSubsLive)}`);
+      console.log(`  rearSubsLive: ${__getObjId(rearSubsLive)}`);
+      console.log(`  appState.subwoofers: ${__getObjId(appState?.subwoofers)}`);
+      console.log(`  runSimulation: ${__getObjId(runSimulation)}`);
+      console.log(`  qStrategy: ${qStrategy}`);
+      if (typeof window !== "undefined" && window.__BASS_WORKER_DIAG__) {
+        window.__BASS_WORKER_DIAG__.activeWorkerId = workerId;
+        window.__BASS_WORKER_DIAG__.calculationPhase = "preparing";
+        window.__BASS_WORKER_DIAG__.calibrationFingerprint = fingerprints?.calibration ?? null;
+        window.__BASS_WORKER_DIAG__.simulationFingerprint = fingerprints?.calibration ?? null;
+      }
+    }
+    // ── END INSTRUMENTATION ──────────────────────────────────────────────
+
     worker.onmessage = (event) => {
       const message = event.data || {};
       if (message.generation !== generation) return;
@@ -311,6 +371,50 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     return () => {
       cancelled = true;
       worker.terminate();
+
+      // ── INSTRUMENTATION: Worker TERMINATED with reason ─────────────────
+      if (isDev) {
+        const oldDeps = {
+          analysisBlocked, simulationRequest, runSimulation, qStrategy,
+          analysisRequestId, analysisRequestFingerprint,
+          frontSubsLive, rearSubsLive,
+          appStateSubwoofers: appState?.subwoofers,
+        };
+        const newDeps = __currentDepsRef.current || {};
+        const changedDeps = [];
+        if (oldDeps.analysisBlocked !== newDeps.analysisBlocked) changedDeps.push("analysisBlocked");
+        if (oldDeps.simulationRequest !== newDeps.simulationRequest) changedDeps.push(`simulationRequest (${__getObjId(oldDeps.simulationRequest)} → ${__getObjId(newDeps.simulationRequest)})`);
+        if (oldDeps.runSimulation !== newDeps.runSimulation) changedDeps.push(`runSimulation (${__getObjId(oldDeps.runSimulation)} → ${__getObjId(newDeps.runSimulation)})`);
+        if (oldDeps.qStrategy !== newDeps.qStrategy) changedDeps.push(`qStrategy (${oldDeps.qStrategy} → ${newDeps.qStrategy})`);
+        if (oldDeps.analysisRequestId !== newDeps.analysisRequestId) changedDeps.push(`analysisRequestId (${oldDeps.analysisRequestId} → ${newDeps.analysisRequestId})`);
+        if (oldDeps.analysisRequestFingerprint !== newDeps.analysisRequestFingerprint) changedDeps.push(`analysisRequestFingerprint (${oldDeps.analysisRequestFingerprint} → ${newDeps.analysisRequestFingerprint})`);
+        if (oldDeps.frontSubsLive !== newDeps.frontSubsLive) changedDeps.push(`frontSubsLive (${__getObjId(oldDeps.frontSubsLive)} → ${__getObjId(newDeps.frontSubsLive)})`);
+        if (oldDeps.rearSubsLive !== newDeps.rearSubsLive) changedDeps.push(`rearSubsLive (${__getObjId(oldDeps.rearSubsLive)} → ${__getObjId(newDeps.rearSubsLive)})`);
+        if (oldDeps.appStateSubwoofers !== newDeps.appStateSubwoofers) changedDeps.push(`appState.subwoofers (${__getObjId(oldDeps.appStateSubwoofers)} → ${__getObjId(newDeps.appStateSubwoofers)})`);
+
+        let reason;
+        if (changedDeps.length === 0) {
+          reason = "component unmounted";
+        } else if (newDeps.analysisRequestId === null || newDeps.analysisRequestId === undefined) {
+          reason = "analysis cancelled";
+        } else if (newDeps.analysisRequestFingerprint !== oldDeps.analysisRequestFingerprint) {
+          reason = "fingerprint mismatch";
+        } else {
+          reason = "dependency changed";
+        }
+
+        console.log(`%c[AuthWorker] Worker #${workerId} TERMINATED`, __WORKER_TERM_TAG);
+        console.log(`  Reason: ${reason}`);
+        if (changedDeps.length > 0) {
+          console.log(`  Changed dependencies:`);
+          changedDeps.forEach((d) => console.log(`    • ${d}`));
+        }
+        if (typeof window !== "undefined" && window.__BASS_WORKER_DIAG__ && window.__BASS_WORKER_DIAG__.activeWorkerId === workerId) {
+          window.__BASS_WORKER_DIAG__.activeWorkerId = null;
+          window.__BASS_WORKER_DIAG__.calculationPhase = null;
+        }
+      }
+      // ── END INSTRUMENTATION ──────────────────────────────────────────────
     };
   }, [analysisBlocked, simulationRequest, runSimulation, qStrategy, analysisRequestId, analysisRequestFingerprint]);
   const simulationReady = simulationState.request === simulationRequest
