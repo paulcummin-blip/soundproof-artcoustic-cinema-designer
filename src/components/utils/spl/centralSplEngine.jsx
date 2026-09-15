@@ -108,9 +108,10 @@ function resolveEffectiveSensitivity(speakerMeta, effectiveSplInputs) {
 function getSPL1mCapability(speakerMeta, ampPowerW, effectiveSensitivity = null) {
     const P_amp = safeNum(ampPowerW) || 0;
     const P_spk = safeNum(speakerMeta?.power_handling_w || speakerMeta?.max_power) || Infinity;
+    const P_rec = safeNum(speakerMeta?.recommended_amp_max_w) || Infinity;
 
-    // Available power is minimum of amp and speaker max
-    const P_available = Math.min(P_amp, P_spk);
+    // Available power is minimum of amp, speaker continuous power, and recommended amp max
+    const P_available = Math.min(P_amp, P_spk, P_rec);
 
     // Get sensitivity in 1W/1m terms (use passed-in effective sensitivity if provided)
     const sens_1W = effectiveSensitivity !== null 
@@ -207,6 +208,7 @@ function calculateSplAtPoint({
     power_handling_w: safeNum(resolvedMeta?.power_handling_w) || 
                       safeNum(resolvedMeta?.max_power) || 
                       Infinity,
+    recommended_amp_max_w: safeNum(resolvedMeta?.recommended_amp_max_w) || null,
     // Continuous cap: half-space first → legacy cont → legacy max_spl
     max_spl_cont_db_1m: safeNum(resolvedMeta?.max_spl_cont_db_1m_halfspace) ||
                         safeNum(resolvedMeta?.max_spl_cont_db_1m) || 

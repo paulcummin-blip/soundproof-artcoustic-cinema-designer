@@ -70,6 +70,14 @@
     "recommended_amplifier_power_w": {
       "type": "number"
     },
+    "recommended_amp_min_w": {
+      "type": "number",
+      "description": "Lower bound of the manufacturer recommended amplifier power range, in watts. Null when not specified."
+    },
+    "recommended_amp_max_w": {
+      "type": "number",
+      "description": "Upper bound of the manufacturer recommended amplifier power range, in watts. Used as a ceiling on effective amplifier power for SPL capability calculations. Null when not specified."
+    },
     "source_url": {
       "type": "string"
     },

@@ -8,7 +8,7 @@ import { PRODUCT_ROLES } from "@/components/products/productMaster";
 import { getModelsByCategoryOrdered, normaliseModelKey } from "@/components/models/speakers/registry";
 import { computeSpeakerCapabilityAtDistance } from "@/components/utils/spl/centralSplEngine";
 import { resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
-import { normalizeCompetitor, competitorMetaForComparison } from "@/components/utils/spl/competitorNormalization";
+import { normalizeCompetitor, competitorMetaForComparison, parseRecommendedAmpRange } from "@/components/utils/spl/competitorNormalization";
 import { getLevelColors } from "@/components/utils/rp22Colors";
 import { resolveSpeakerSplMeta } from "@/components/utils/spl/speakerSplMeta";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
@@ -127,35 +127,35 @@ function artcousticInfoRows(speaker, price) {
   ];
 }
 
-function competitorInfoRows(record) {
+function competitorInfoRows(record, result = null) {
   if (!record) return [];
+  const debug = result?.debug || null;
+  const recAmpRange = (record.recommended_amp_min_w != null || record.recommended_amp_max_w != null)
+    ? `${record.recommended_amp_min_w != null ? `${record.recommended_amp_min_w}–` : ""}${record.recommended_amp_max_w ?? ""} W`
+    : infoValue(record.recommended_amplifier_power_w, " W");
+  const limitingFactor = debug
+    ? (debug.spl1mCappedDb != null && debug.maxContinuousSplCapDb != null && debug.spl1mCappedDb === debug.maxContinuousSplCapDb
+      ? "Published continuous SPL"
+      : debug.availablePowerW != null && debug.ampPowerW != null && debug.availablePowerW < debug.ampPowerW
+        ? "Power limited (continuous/rec amp)"
+        : "Amplifier power")
+    : "—";
   return [
     ["Manufacturer", record.manufacturer],
     ["Model", record.model],
     ["Product type", record.product_type],
     ["Retail inc VAT", formatPrice(numeric(record.retail_price_inc_vat))],
-    ["Published sensitivity", infoValue(record.sensitivity_value_db, " dB")],
-    ["Sensitivity reference", record.sensitivity_reference || "—"],
-    ["Sensitivity measurement basis", record.sensitivity_measurement_basis || "Unstated → assumed Half Space"],
-    ["Rated impedance", infoValue(record.rated_impedance_ohm, " Ω")],
-    ["Minimum impedance", infoValue(record.minimum_impedance_ohm, " Ω")],
-    ["Continuous / RMS / AES power", infoValue(record.continuous_power_w, " W")],
-    ["Power rating type / standard", record.power_rating_type || "—"],
-    ["Program power", infoValue(record.program_power_w, " W")],
-    ["Peak power", infoValue(record.peak_power_w, " W")],
-    ["Published max continuous SPL @ 1 m", infoValue(record.published_max_continuous_spl_db_1m, " dB")],
-    ["Published max peak SPL @ 1 m", infoValue(record.published_max_peak_spl_db_1m, " dB")],
-    ["Max SPL measurement basis", record.max_spl_measurement_basis || "Unstated → assumed Half Space"],
-    ["Normalised sensitivity 1 W / 1 m", infoValue(record.normalized_sensitivity_db_1w_1m, " dB")],
-    ["Half-space sensitivity 1 W / 1 m", infoValue(record.halfspace_sensitivity_db_1w_1m, " dB")],
-    ["Half-space max continuous SPL @ 1 m", infoValue(record.halfspace_published_max_continuous_spl_db_1m ?? record.halfspace_calculated_max_continuous_spl_db_1m, " dB")],
-    ["Sensitivity basis provenance", record.sensitivity_space_provenance || "—"],
-    ["Max SPL basis provenance", record.max_spl_space_provenance || "—"],
-    ["Frequency range", record.frequency_range || "—"],
-    ["Usable LF response (-6 dB)", infoValue(record.usable_lf_minus6db_hz, " Hz")],
-    ["Horizontal coverage", infoValue(record.horizontal_coverage_deg, "°")],
-    ["Vertical coverage", infoValue(record.vertical_coverage_deg, "°")],
-    ["Recommended amplifier power", infoValue(record.recommended_amplifier_power_w, " W")],
+    ["Sensitivity source", `${infoValue(record.sensitivity_value_db, " dB")} @ ${record.sensitivity_reference || "—"}`],
+    ["Sensitivity source basis", record.sensitivity_measurement_basis || "Unstated → assumed Half Space"],
+    ["Normalised sensitivity (1W/1m, half-space)", infoValue(record.halfspace_sensitivity_db_1w_1m, " dB")],
+    ["Continuous power", infoValue(record.continuous_power_w, " W")],
+    ["Recommended amp range", recAmpRange],
+    ["Published continuous SPL", infoValue(record.published_max_continuous_spl_db_1m, " dB")],
+    ["Published SPL source basis", record.max_spl_measurement_basis || "Unstated → assumed Half Space"],
+    ["Normalised continuous SPL (half-space)", infoValue(record.halfspace_published_max_continuous_spl_db_1m ?? record.halfspace_calculated_max_continuous_spl_db_1m, " dB")],
+    ["User amplifier", debug ? `${Math.round(debug.ampPowerW)} W` : "—"],
+    ["Effective amplifier used", debug ? `${Math.round(debug.availablePowerW)} W` : "—"],
+    ["Final limiting factor", limitingFactor],
     ["SPL authority", record.spl_authority || "—"],
     ["Data confidence", record.data_confidence || "—"],
     ["Date checked", record.date_checked || "—"],
@@ -242,9 +242,10 @@ function normalizeImportedRow(row, index) {
   const continuousPower = numeric(firstValue(row, ["Continuous / RMS / AES Power W", "Continuous Power W", "continuous_power_w", "Max Power (W)"]));
   const publishedContinuous = numeric(firstValue(row, ["Published Max Continuous SPL dB @1m", "published_max_continuous_spl_db_1m"]));
 
-  const sensitivityBasis = String(firstValue(row, ["Sensitivity Measurement Basis", "sensitivity_measurement_basis", "Sensitivity Space Basis"]) ?? "").trim();
-  const maxSplBasis = String(firstValue(row, ["Max SPL Measurement Basis", "max_spl_measurement_basis", "Max SPL Space Basis", "SPL Measurement Basis"]) ?? "").trim();
+  const sensitivityBasis = String(firstValue(row, ["Sensitivity Measurement Basis", "sensitivity_measurement_basis", "Sensitivity Space Basis", "Sensitivity Full/Half Space", "Sensitivity Full Space", "Sensitivity Space", "Sensitivity Basis"]) ?? "").trim();
+  const maxSplBasis = String(firstValue(row, ["Max SPL Measurement Basis", "max_spl_measurement_basis", "Max SPL Space Basis", "SPL Measurement Basis", "SPL Full/Half Space", "SPL Full Space", "Max SPL Space", "SPL Basis", "Max SPL Basis"]) ?? "").trim();
   const legacyMeasurementSpace = String(firstValue(row, ["Measurement Space Basis", "Measurement Basis", "Measurement Space", "Full Space / Half Space", "measurement_space_basis"]) ?? "").trim();
+  const recAmpRange = parseRecommendedAmpRange(firstValue(row, ["Recommended Amplifier Power W", "recommended_amplifier_power_w", "Recommended Amplifier Range", "Recommended Amp Power", "Recommended Amplifier"]));
   const normalized = normalizeCompetitor({
       manufacturer,
       model,
@@ -268,7 +269,9 @@ function normalizeImportedRow(row, index) {
       usable_lf_minus6db_hz: numeric(firstValue(row, ["Usable LF / -6 dB Point", "usable_lf_minus6db_hz"])),
       horizontal_coverage_deg: numeric(firstValue(row, ["Horizontal Coverage °", "horizontal_coverage_deg"])),
       vertical_coverage_deg: numeric(firstValue(row, ["Vertical Coverage °", "vertical_coverage_deg"])),
-      recommended_amplifier_power_w: numeric(firstValue(row, ["Recommended Amplifier Power W", "recommended_amplifier_power_w"])),
+      recommended_amplifier_power_w: recAmpRange.max,
+      recommended_amp_min_w: recAmpRange.min,
+      recommended_amp_max_w: recAmpRange.max,
       source_url: String(firstValue(row, ["Source URL", "source_url"]) || "").trim(),
       datasheet_url: String(firstValue(row, ["Datasheet URL", "datasheet_url"]) || "").trim(),
       date_checked: String(firstValue(row, ["Date Checked", "date_checked"]) || "").trim(),
@@ -661,7 +664,7 @@ export default function SPLCalculatorPage() {
                       <Rp22Pill parameter="P12" level={item?.result?.grades?.p12} />
                       <Rp22Pill parameter="P13" level={item?.result?.grades?.p13} />
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
-                        {record && <SpeakerInfo rows={competitorInfoRows(record)} sourceUrl={record.source_url} datasheetUrl={record.datasheet_url} />}
+                        {record && <SpeakerInfo rows={competitorInfoRows(record, item?.result)} sourceUrl={record.source_url} datasheetUrl={record.datasheet_url} />}
                         <button type="button" onClick={() => setSelectedCompetitorIds((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>
                       </div>
                     </div>

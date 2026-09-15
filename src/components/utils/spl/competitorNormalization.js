@@ -17,14 +17,41 @@ function num(value) {
 // Resolve a single measurement-basis declaration to { correctionDb, provenance }.
 function resolveSpaceBasis(rawBasis) {
   const normalized = String(rawBasis ?? '').trim().toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ');
-  if (normalized === 'full space') {
+  if (normalized === 'full space' || normalized === 'full') {
     return { correctionDb: FULL_TO_HALF_SPACE_DB, provenance: 'full_space_published_converted' };
   }
-  if (normalized === 'half space') {
+  if (normalized === 'half space' || normalized === 'half') {
     return { correctionDb: 0, provenance: 'half_space_published' };
   }
-  // blank / Unknown / unstated → assume Half Space, 0 dB
+  // blank / Unknown / unstated → explicit unknown/assumed state (Half Space, 0 dB)
   return { correctionDb: 0, provenance: 'half_space_assumed' };
+}
+
+// Parse manufacturer recommended amplifier range strings like "200-1400", "150–600", "50 to 225".
+// Returns { min, max } in watts. The upper value is the relevant maximum ceiling.
+export function parseRecommendedAmpRange(raw) {
+  if (raw === null || raw === undefined) return { min: null, max: null };
+  const s = String(raw).trim();
+  if (s === '') return { min: null, max: null };
+  // Single number
+  const single = Number(s);
+  if (Number.isFinite(single) && single > 0) return { min: null, max: single };
+  // Range: "200-1400", "200 – 1400", "200—1400", "200 to 1400"
+  const rangeMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:[-–—]|to)\s*(\d+(?:\.\d+)?)/i);
+  if (rangeMatch) {
+    const lo = Number(rangeMatch[1]);
+    const hi = Number(rangeMatch[2]);
+    if (Number.isFinite(lo) && Number.isFinite(hi) && hi > 0) {
+      return { min: Math.min(lo, hi), max: Math.max(lo, hi) };
+    }
+  }
+  // Fallback: extract first number as max
+  const numMatch = s.match(/(\d+(?:\.\d+)?)/);
+  if (numMatch) {
+    const n = Number(numMatch[1]);
+    if (Number.isFinite(n) && n > 0) return { min: null, max: n };
+  }
+  return { min: null, max: null };
 }
 
 export function normalizeCompetitor(record) {
@@ -53,6 +80,10 @@ export function normalizeCompetitor(record) {
   const rawContinuous = num(record.published_max_continuous_spl_db_1m);
   const rawPeak = num(record.published_max_peak_spl_db_1m);
 
+  // Recommended amplifier range — prefer dedicated min/max fields, fall back to legacy single value
+  const recAmpMin = num(record.recommended_amp_min_w);
+  const recAmpMax = num(record.recommended_amp_max_w) ?? num(record.recommended_amplifier_power_w);
+
   // Published SPL values get the max-SPL space correction applied once (independently)
   const continuous = rawContinuous !== null ? rawContinuous + maxSplBasis.correctionDb : null;
   const peak = rawPeak !== null ? rawPeak + maxSplBasis.correctionDb : null;
@@ -69,6 +100,23 @@ export function normalizeCompetitor(record) {
 
   const eligible = warnings.length === 0;
 
+  // Data confidence classification:
+  // A — published continuous SPL + confirmed space basis
+  // B — calculated continuous SPL from confirmed sensitivity/power/basis
+  // C — partial/inferred (basis assumed)
+  // INSUFFICIENT — cannot make reliable RP22 comparison
+  const hasConfirmedBasis = sensitivityBasis.provenance !== 'half_space_assumed' && maxSplBasis.provenance !== 'half_space_assumed';
+  let dataConfidence;
+  if (!eligible) {
+    dataConfidence = 'INSUFFICIENT';
+  } else if (continuous !== null && hasConfirmedBasis) {
+    dataConfidence = 'A';
+  } else if (calculated !== null && hasConfirmedBasis) {
+    dataConfidence = 'B';
+  } else {
+    dataConfidence = 'C';
+  }
+
   return {
     ...record,
     normalized_sensitivity_db_1w_1m: oneW,
@@ -82,12 +130,14 @@ export function normalizeCompetitor(record) {
     measurement_basis_status: 'Resolved',
     halfspace_sensitivity_db_1w_1m: halfSensitivity,
     normalized_continuous_power_w: power,
+    recommended_amp_min_w: recAmpMin,
+    recommended_amp_max_w: recAmpMax,
     calculated_max_continuous_spl_db_1m: rawCalculated,
     halfspace_published_max_continuous_spl_db_1m: continuous,
     halfspace_published_max_peak_spl_db_1m: peak,
     halfspace_calculated_max_continuous_spl_db_1m: calculated,
     spl_authority: !eligible ? 'Incomplete' : continuous !== null ? 'Published continuous SPL' : 'Calculated from sensitivity + power',
-    data_confidence: !eligible ? 'Low' : continuous !== null ? 'High' : 'Medium',
+    data_confidence: dataConfidence,
     p12_p13_eligible: eligible,
     normalization_warnings: warnings,
   };
@@ -102,6 +152,7 @@ export function competitorMetaForComparison(record) {
     sensitivity_db_1w_1m: n.halfspace_sensitivity_db_1w_1m,
     power_handling_w: n.normalized_continuous_power_w,
     max_spl_cont_db_1m_halfspace: n.halfspace_published_max_continuous_spl_db_1m ?? n.halfspace_calculated_max_continuous_spl_db_1m,
+    recommended_amp_max_w: n.recommended_amp_max_w,
     isLineSource: false,
   };
 }
