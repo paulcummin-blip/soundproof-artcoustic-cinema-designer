@@ -27,7 +27,7 @@ const BRAND = {
   accent: "#C1B6AD",
 };
 
-const ROW_GRID = "minmax(220px, 320px) 140px 110px 110px 72px";
+const ROW_GRID = "minmax(200px, 260px) 48px 140px 110px 110px 72px";
 
 function DataNote({ record }) {
   if (!record) return null;
@@ -35,7 +35,7 @@ function DataNote({ record }) {
   const showOpenBack = shouldShowOpenBackWarning(record);
   if (!showData && !showOpenBack) return null;
   return (
-    <div style={{ gridColumn: "3 / 5", fontSize: 11, color: "#7A5C00", lineHeight: 1.4, paddingTop: 2 }}>
+    <div style={{ gridColumn: "4 / 6", fontSize: 11, color: "#7A5C00", lineHeight: 1.4, paddingTop: 2 }}>
       {showData && <div>Estimated from incomplete published manufacturer data.</div>}
       {showOpenBack && <div>Open-back design — subject to inconsistent installed results.</div>}
     </div>
@@ -342,6 +342,7 @@ function SpeakerRow({ eyebrow, name, price, result, accent = false, note = null,
         <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
         {note && <div style={{ marginTop: 3, fontSize: 12, color: BRAND.subtext }}>{note}</div>}
       </div>
+      <div />
       <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.text, textAlign: "right" }}>{formatPrice(price)}</div>
       <Rp22Pill parameter="P12" level={result?.grades?.p12} />
       <Rp22Pill parameter="P13" level={result?.grades?.p13} />
@@ -640,7 +641,7 @@ export default function SPLCalculatorPage() {
 
         <div style={{ background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18 }}>
           <div style={{ display: "grid", gridTemplateColumns: ROW_GRID, gap: "8px 12px", alignItems: "end", padding: "0 16px 8px", fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-            <div>Speaker</div><div style={{ textAlign: "right" }}>Retail inc VAT</div><div style={{ textAlign: "center" }}><div style={{ fontWeight: 700, color: BRAND.subtext }}>LCR SPL</div><div style={{ fontSize: 9, color: BRAND.hint, marginTop: 1, letterSpacing: 0 }}>P12</div></div><div style={{ textAlign: "center" }}><div style={{ fontWeight: 700, color: BRAND.subtext }}>Surround SPL</div><div style={{ fontSize: 9, color: BRAND.hint, marginTop: 1, letterSpacing: 0 }}>P13</div></div><div />
+            <div>Speaker</div><div /><div style={{ textAlign: "right" }}>Retail inc VAT</div><div style={{ textAlign: "center" }}><div style={{ fontWeight: 700, color: BRAND.subtext }}>LCR SPL</div><div style={{ fontSize: 9, color: BRAND.hint, marginTop: 1, letterSpacing: 0 }}>P12</div></div><div style={{ textAlign: "center" }}><div style={{ fontWeight: 700, color: BRAND.subtext }}>Surround SPL</div><div style={{ fontSize: 9, color: BRAND.hint, marginTop: 1, letterSpacing: 0 }}>P13</div></div><div />
           </div>
 
           <div style={{ marginBottom: 8 }}>
@@ -648,6 +649,7 @@ export default function SPLCalculatorPage() {
               <select value={art?.id || ""} onChange={(e) => setArtId(e.target.value)} style={{ border: `1px solid ${BRAND.border}`, borderRadius: 10, padding: "10px 12px", background: "#FFF", fontWeight: 700, color: BRAND.text }}>
                 {artcousticVisible.map((s) => <option key={s.id} value={s.id}>Artcoustic · {s.model}</option>)}
               </select>
+              <div />
               <div style={{ fontWeight: 600, textAlign: "right" }}>{formatPrice(artPrice(art))}</div>
               <Rp22Pill parameter="P12" level={artResult?.grades?.p12} />
               <Rp22Pill parameter="P13" level={artResult?.grades?.p13} />
@@ -700,6 +702,7 @@ export default function SPLCalculatorPage() {
                         <option value="">Choose alternative speaker</option>
                         {competitorRows.map((r) => <option key={r.id} value={r.id}>{r.manufacturer} · {r.model}</option>)}
                       </select>
+                      <div />
                       <div style={{ fontWeight: 600, textAlign: "right" }}>{record ? formatPrice(numeric(record?.retail_price_inc_vat)) : "—"}</div>
                       <Rp22Pill parameter="P12" level={item?.result?.grades?.p12} />
                       <Rp22Pill parameter="P13" level={item?.result?.grades?.p13} />
