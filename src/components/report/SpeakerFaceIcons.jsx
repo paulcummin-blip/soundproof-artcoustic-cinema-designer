@@ -99,10 +99,34 @@ export function Q63FaceIcon({ x, y, size, width, height }) {
 
 // ─── Evolve Series face icons ─────────────────────────────────────────────────
 
+/**
+ * EVOLVE 1-1 — dedicated vector-drawn face icon.
+ *
+ * Physical cabinet: 150 × 150 mm square face, 72 mm depth.
+ * Transducers: 1 × 3" woofer (lower), 1 × 1.5" tweeter (upper).
+ *
+ * The viewBox matches the physical 150 × 150 mm dimensions so the icon
+ * scales proportionally and is immediately distinguishable from:
+ *   - EVOLVE 1   (120 × 120 mm — smaller square)
+ *   - EVOLVE 2-1 (200 × 200 mm — larger square)
+ *
+ * Drawn in the same Artcoustic line-art style as the Q-series and
+ * Multi Soundbar vector icons (concentric circle primitives).
+ */
 export function Evolve11FaceIcon({ x, y, width, height }) {
   return (
-    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <image x="0" y="0" width="100" height="100" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/590fdd26f_Screenshot2026-05-23at153725.png" preserveAspectRatio="xMidYMid meet" />
+    <svg x={x} y={y} width={width} height={height} viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+      {/* Cabinet outline — 150 × 150 mm square */}
+      <rect x="1" y="1" width="148" height="148" rx="3" fill="none" stroke={STROKE} strokeWidth="1" />
+
+      {/* Tweeter — 1.5" (upper centre) */}
+      <TweeterCircles cx={75} cy={42} r1={16} r2={10} />
+
+      {/* Woofer — 3" (lower centre) */}
+      <WooferCircles cx={75} cy={103} r1={30} r2={22} r3={8} />
+
+      {/* Corner fixing bolts */}
+      <CornerBolts x={1} y={1} w={148} h={148} inset={9} r={1.5} />
     </svg>
   );
 }
