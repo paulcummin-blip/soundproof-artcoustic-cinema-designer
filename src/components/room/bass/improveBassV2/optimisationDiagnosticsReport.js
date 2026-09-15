@@ -121,6 +121,124 @@ function perSeatRows(result) {
 }
 
 /**
+ * Compute worst/average/best seat variation from a confirmed result's per-seat
+ * P19/P20 rows. Lower variation dB is better.
+ */
+function seatStats(result) {
+  if (!result) return null;
+  const { p19, p20 } = perSeatRows(result);
+  const compute = (seats) => {
+    if (!seats.length) return null;
+    const variations = seats.map((s) => num(s.variationDbRaw)).filter((v) => v != null);
+    if (!variations.length) return null;
+    return {
+      worst: Math.max(...variations),
+      average: variations.reduce((a, b) => a + b, 0) / variations.length,
+      best: Math.min(...variations),
+      seatCount: variations.length,
+    };
+  };
+  return { p19: compute(p19), p20: compute(p20) };
+}
+
+/**
+ * Extract winning sub settings (delay, gain, polarity, phase) from a result.
+ */
+function winningSubSettings(result, instanceIds) {
+  const tuning = tuningPerSub(result, instanceIds);
+  if (!tuning.length) return null;
+  return {
+    delay: tuning.map((t) => t.delayMs),
+    gain: tuning.map((t) => t.gainDb),
+    polarity: tuning.map((t) => t.polarity),
+    phase: tuning.map((t) => t.phaseControlDeg),
+  };
+}
+
+/**
+ * Build acoustic performance block (P19/P20 before/after/improvement + seat stats).
+ */
+function buildAcousticPerformance(beforeScore, afterScore, result) {
+  return {
+    p19: {
+      before: beforeScore?.p19VariationDb ?? null,
+      after: afterScore?.p19VariationDb ?? null,
+      improvement: (beforeScore?.p19VariationDb != null && afterScore?.p19VariationDb != null)
+        ? beforeScore.p19VariationDb - afterScore.p19VariationDb : null,
+    },
+    p20: {
+      before: beforeScore?.p20VariationDb ?? null,
+      after: afterScore?.p20VariationDb ?? null,
+      improvement: (beforeScore?.p20VariationDb != null && afterScore?.p20VariationDb != null)
+        ? beforeScore.p20VariationDb - afterScore.p20VariationDb : null,
+    },
+    seatStats: seatStats(result),
+  };
+}
+
+/**
+ * Rank confirmed results and return the top N candidate solutions with their
+ * tuning settings and scores. Lower P19 variation is better; P20 is tie-break.
+ */
+function topCandidates(confirmedResults, instanceIds, limit = 10) {
+  if (!Array.isArray(confirmedResults) || !confirmedResults.length) return [];
+  const scored = confirmedResults
+    .filter((r) => r && num(r.achievedP19VariationDb) != null)
+    .map((r) => {
+      const tuning = tuningPerSub(r, instanceIds);
+      return {
+        candidateId: r.candidateId || null,
+        candidateKind: r.candidateKind || null,
+        score: {
+          p19VariationDb: num(r.achievedP19VariationDb),
+          p20VariationDb: num(r.achievedP20VariationDb),
+          p19Level: r.achievedP19Level ?? null,
+          p20Level: r.achievedP20Level ?? null,
+        },
+        delay: tuning.map((t) => t.delayMs),
+        gain: tuning.map((t) => t.gainDb),
+        polarity: tuning.map((t) => t.polarity),
+        phase: tuning.map((t) => t.phaseControlDeg),
+      };
+    })
+    .sort((a, b) => {
+      const aP19 = a.score.p19VariationDb;
+      const bP19 = b.score.p19VariationDb;
+      if (aP19 !== bP19) return aP19 - bP19;
+      const aP20 = a.score.p20VariationDb ?? Infinity;
+      const bP20 = b.score.p20VariationDb ?? Infinity;
+      return aP20 - bP20;
+    });
+  return scored.slice(0, limit);
+}
+
+/**
+ * Compute each stage's percentage contribution to the total P19 improvement.
+ * Uses the P19 variation delta each stage achieved over the baseline, normalised
+ * so all positive contributions sum to 100%.
+ */
+function stageContributions(stages, beforeScore, winnerScore) {
+  const totalP19Improvement = (beforeScore?.p19VariationDb != null && winnerScore?.p19VariationDb != null)
+    ? Math.max(0, beforeScore.p19VariationDb - winnerScore.p19VariationDb)
+    : 0;
+  if (totalP19Improvement <= 0) {
+    return stages.map((s) => ({ name: s.name, contributionPercent: 0 }));
+  }
+  const stageImprovements = stages.map((s) => {
+    const delta = s.improvement?.p19VarDelta;
+    return { name: s.name, improvement: delta != null ? Math.max(0, delta) : 0 };
+  });
+  const totalStageImprovement = stageImprovements.reduce((sum, s) => sum + s.improvement, 0);
+  if (totalStageImprovement <= 0) {
+    return stages.map((s) => ({ name: s.name, contributionPercent: 0 }));
+  }
+  return stageImprovements.map((s) => ({
+    name: s.name,
+    contributionPercent: Math.round((s.improvement / totalStageImprovement) * 100),
+  }));
+}
+
+/**
  * Build the full winning-candidate detail (tuning + resulting metrics).
  */
 function buildWinningCandidateDetail(result, instanceIds) {
@@ -228,6 +346,8 @@ export function buildOptimisationDiagnosticsReport(selection, context = {}) {
     improvement: improvementDelta(beforeScore, placementScore || winnerScore),
     significance: classifySignificance(placementMaterial, !!placementBest),
     winningCandidate: placementBest ? buildWinningCandidateDetail(placementBest, instanceIds) : null,
+    acousticPerformance: buildAcousticPerformance(beforeScore, placementScore || winnerScore, placementBest || winner),
+    winningSubSettings: winningSubSettings(placementBest || winner, instanceIds),
   };
 
   // ── Stage 2: Polarity (proxy search polarity component) ─────────────
@@ -250,6 +370,8 @@ export function buildOptimisationDiagnosticsReport(selection, context = {}) {
     winningCandidate: winner ? {
       polarityPerSub: winnerPolarity,
     } : null,
+    acousticPerformance: buildAcousticPerformance(beforeScore, winnerScore, winner),
+    winningSubSettings: winningSubSettings(winner, instanceIds),
   };
 
   // ── Stage 3: Delay (grouped delay search) ───────────────────────────
@@ -271,6 +393,8 @@ export function buildOptimisationDiagnosticsReport(selection, context = {}) {
     improvement: improvementDelta(beforeScore, delayScore),
     significance: classifySignificance(delayMaterial, !!delayResult),
     winningCandidate: delayResult ? buildWinningCandidateDetail(delayResult, instanceIds) : null,
+    acousticPerformance: buildAcousticPerformance(beforeScore, delayScore, delayResult),
+    winningSubSettings: winningSubSettings(delayResult, instanceIds),
   };
 
   // ── Stage 4: Gain (grouped gain search) ─────────────────────────────
@@ -292,6 +416,8 @@ export function buildOptimisationDiagnosticsReport(selection, context = {}) {
     improvement: improvementDelta(beforeScore, gainScore),
     significance: classifySignificance(gainMaterial, !!gainResult),
     winningCandidate: gainResult ? buildWinningCandidateDetail(gainResult, instanceIds) : null,
+    acousticPerformance: buildAcousticPerformance(beforeScore, gainScore, gainResult),
+    winningSubSettings: winningSubSettings(gainResult, instanceIds),
   };
 
   // ── Stage 5: Phase (grouped all-pass phase search) ──────────────────
@@ -312,6 +438,8 @@ export function buildOptimisationDiagnosticsReport(selection, context = {}) {
     improvement: improvementDelta(beforeScore, phaseScore),
     significance: classifySignificance(phaseMaterial, !!phaseResult),
     winningCandidate: phaseResult ? buildWinningCandidateDetail(phaseResult, instanceIds) : null,
+    acousticPerformance: buildAcousticPerformance(beforeScore, phaseScore, phaseResult),
+    winningSubSettings: winningSubSettings(phaseResult, instanceIds),
   };
 
   // ── Stage 6: Final EQ (canonical confirmation) ─────────────────────
@@ -330,7 +458,27 @@ export function buildOptimisationDiagnosticsReport(selection, context = {}) {
     improvement: improvementDelta(beforeScore, finalEqScore),
     significance: classifySignificance(finalEqMaterial, !!winner),
     winningCandidate: winner ? buildWinningCandidateDetail(winner, instanceIds) : null,
+    acousticPerformance: buildAcousticPerformance(beforeScore, finalEqScore, winner),
+    winningSubSettings: winningSubSettings(winner, instanceIds),
   };
+
+  const allStages = [placementStage, polarityStage, delayStage, gainStage, phaseStage, finalEqStage];
+
+  // Identify the winning stage = the stage that produced the final winner.
+  const winningStageName = winner?.candidateKind === "position"
+    ? "Placement"
+    : winner ? "Final EQ" : null;
+
+  // Top 10 candidate solutions from the winning stage's candidate pool.
+  // For Placement, use position candidates; for calibration stages, use
+  // confirmedResults (all fully-evaluated candidates).
+  const topCandidatesPool = winningStageName === "Placement"
+    ? confirmedResults.filter((r) => r?.isPositionCandidate)
+    : confirmedResults;
+  const topCandidatesForWinningStage = topCandidates(topCandidatesPool, instanceIds, 10);
+
+  // Stage contribution to the total P19 improvement.
+  const stageContributionBreakdown = stageContributions(allStages, beforeScore, winnerScore);
 
   return {
     runFingerprint: context.runFingerprint || null,
@@ -342,7 +490,10 @@ export function buildOptimisationDiagnosticsReport(selection, context = {}) {
       perSeatP19: perSeatRows(currentResult).p19,
       perSeatP20: perSeatRows(currentResult).p20,
     } : null,
-    stages: [placementStage, polarityStage, delayStage, gainStage, phaseStage, finalEqStage],
+    stages: allStages,
+    winningStage: winningStageName,
+    topCandidatesForWinningStage,
+    stageContributions: stageContributionBreakdown,
     winningCandidate: winner ? buildWinningCandidateDetail(winner, instanceIds) : null,
     runtimeMetrics: context.runtimeMetrics || null,
   };
@@ -358,17 +509,75 @@ export function logOptimisationDiagnosticsReport(report) {
       `%c[V2-OPT-DIAGNOSTICS] ${report.runFingerprint || "(no-fp)"} · ${report.totalDurationMs ?? "?"}ms`,
       "color:#213428;font-weight:600",
     );
-    console.table(report.stages.map((s) => ({
-      Stage: s.name,
-      Candidates: JSON.stringify(s.candidatesEvaluated),
-      "Before P19": s.bestScoreBefore?.p19VariationDb ?? "—",
-      "After P19": s.bestScoreAfter?.p19VariationDb ?? "—",
-      "P19 Δ": s.improvement?.p19VarDelta ?? "—",
-      "Before P20": s.bestScoreBefore?.p20VariationDb ?? "—",
-      "After P20": s.bestScoreAfter?.p20VariationDb ?? "—",
-      "P20 Δ": s.improvement?.p20VarDelta ?? "—",
-      Significance: s.significance,
-    })));
+    // Stage summary table — P19/P20 before/after/Δ + seat stats
+    console.table(report.stages.map((s) => {
+      const ap = s.acousticPerformance || {};
+      const p19Seats = ap.seatStats?.p19;
+      const p20Seats = ap.seatStats?.p20;
+      return {
+        Stage: s.name,
+        "P19 Before": ap.p19?.before ?? "—",
+        "P19 After": ap.p19?.after ?? "—",
+        "P19 Δ": ap.p19?.improvement ?? "—",
+        "P20 Before": ap.p20?.before ?? "—",
+        "P20 After": ap.p20?.after ?? "—",
+        "P20 Δ": ap.p20?.improvement ?? "—",
+        "P19 Worst": p19Seats?.worst ?? "—",
+        "P19 Avg": p19Seats?.average?.toFixed(2) ?? "—",
+        "P19 Best": p19Seats?.best ?? "—",
+        "P20 Worst": p20Seats?.worst ?? "—",
+        "P20 Avg": p20Seats?.average?.toFixed(2) ?? "—",
+        "P20 Best": p20Seats?.best ?? "—",
+        Significance: s.significance,
+      };
+    }));
+
+    // Winning sub settings per stage
+    console.groupCollapsed("%cWinning sub settings per stage", "color:#3E4349;font-weight:600");
+    for (const s of report.stages) {
+      const ws = s.winningSubSettings;
+      if (!ws) continue;
+      console.log(`${s.name}:`, {
+        delay: ws.delay,
+        gain: ws.gain,
+        polarity: ws.polarity,
+        phase: ws.phase,
+      });
+    }
+    console.groupEnd();
+
+    // Top 10 candidate solutions for the winning stage
+    if (report.topCandidatesForWinningStage?.length) {
+      console.groupCollapsed(
+        `%cTop 10 candidates (winning stage: ${report.winningStage || "?"})`,
+        "color:#3E4349;font-weight:600",
+      );
+      console.table(report.topCandidatesForWinningStage.map((c, i) => ({
+        Rank: i + 1,
+        Id: c.candidateId ?? "—",
+        Kind: c.candidateKind ?? "—",
+        "P19 Var": c.score.p19VariationDb?.toFixed(3) ?? "—",
+        "P20 Var": c.score.p20VariationDb?.toFixed(3) ?? "—",
+        "P19 Lvl": c.score.p19Level ?? "—",
+        "P20 Lvl": c.score.p20Level ?? "—",
+        Delay: JSON.stringify(c.delay),
+        Gain: JSON.stringify(c.gain),
+        Polarity: JSON.stringify(c.polarity),
+        Phase: JSON.stringify(c.phase),
+      })));
+      console.groupEnd();
+    }
+
+    // Stage contribution breakdown
+    if (report.stageContributions?.length) {
+      console.groupCollapsed("%cStage contributions to final result", "color:#213428;font-weight:600");
+      console.table(report.stageContributions.map((c) => ({
+        Stage: c.name,
+        "Contribution %": c.contributionPercent,
+      })));
+      console.groupEnd();
+    }
+
     if (report.winningCandidate) {
       console.groupCollapsed("%cWinning candidate", "color:#3E4349;font-weight:600");
       console.log("candidateId:", report.winningCandidate.candidateId);
