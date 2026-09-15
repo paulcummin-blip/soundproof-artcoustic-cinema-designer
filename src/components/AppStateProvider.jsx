@@ -450,51 +450,6 @@ function useDesignerState() {
   const roomDimsRef = useRef(roomDims);
   useEffect(() => { roomDimsRef.current = roomDims; }, [roomDims]);
 
-  const markLayoutRefreshPending = useCallback(() => {
-    // Only set the pending flag when there are existing layout objects that
-    // could become stale. On a fresh/scratch project with no seating, no
-    // reflow is needed.
-    setLayoutRefreshPending((prev) => {
-      if (prev) return prev; // already pending
-      const hasSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0;
-      const hasSubs = Array.isArray(subwooferInstances) && subwooferInstances.some(i => i?.enabled !== false);
-      const hasElements = Array.isArray(roomElements) && roomElements.length > 0;
-      const hasSpeakers = Array.isArray(speakerSystem?.placedSpeakers) && speakerSystem.placedSpeakers.length > 0;
-      if (!hasSeats && !hasSubs && !hasElements && !hasSpeakers) return false;
-      return true;
-    });
-  }, [seatingPositions, subwooferInstances, roomElements, speakerSystem?.placedSpeakers]);
-
-  const setRoomWidthM = useCallback((v) => {
-    const newVal = Number(v);
-    if (!Number.isFinite(newVal) || newVal === 0) return;
-    const prev = roomDimsRef.current;
-    if (Math.abs((prev?.widthM ?? 0) - newVal) < 0.001) return;
-    prevRoomDimsRef.current = { ...prev };
-    setRoomDims(d => ({ ...d, widthM: newVal }));
-    markLayoutRefreshPending();
-  }, [markLayoutRefreshPending]);
-  
-  const setRoomLengthM = useCallback((v) => {
-    const newVal = Number(v);
-    if (!Number.isFinite(newVal) || newVal === 0) return;
-    const prev = roomDimsRef.current;
-    if (Math.abs((prev?.lengthM ?? 0) - newVal) < 0.001) return;
-    prevRoomDimsRef.current = { ...prev };
-    setRoomDims(d => ({ ...d, lengthM: newVal }));
-    markLayoutRefreshPending();
-  }, [markLayoutRefreshPending]);
-  
-  const setRoomHeightM = useCallback((v) => {
-    const newVal = Number(v);
-    if (!Number.isFinite(newVal) || newVal === 0) return;
-    const prev = roomDimsRef.current;
-    if (Math.abs((prev?.heightM ?? 0) - newVal) < 0.001) return;
-    prevRoomDimsRef.current = { ...prev };
-    setRoomDims(d => ({ ...d, heightM: newVal }));
-    markLayoutRefreshPending();
-  }, [markLayoutRefreshPending]);
-
   const [dimensions, setDimensions] = useState({}); 
 
   // SINGLE SOURCE OF TRUTH for TV preset widths — must match registry.js tvWidthMap and ScreenConfiguration
@@ -777,6 +732,56 @@ function useDesignerState() {
   // Snapshot of room dims at the last committed state, used to detect genuine
   // dimension changes vs hydration. Updated by the dimension setters.
   const prevRoomDimsRef = useRef(null);
+
+  // markLayoutRefreshPending and the dimension setters are declared HERE
+  // (after all referenced state: seatingPositions, subwooferInstances,
+  // roomElements, speakerSystem, layoutRefreshPending, prevRoomDimsRef)
+  // to avoid a temporal-dead-zone ReferenceError at boot.
+  const markLayoutRefreshPending = useCallback(() => {
+    // Only set the pending flag when there are existing layout objects that
+    // could become stale. On a fresh/scratch project with no seating, no
+    // reflow is needed.
+    setLayoutRefreshPending((prev) => {
+      if (prev) return prev; // already pending
+      const hasSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0;
+      const hasSubs = Array.isArray(subwooferInstances) && subwooferInstances.some(i => i?.enabled !== false);
+      const hasElements = Array.isArray(roomElements) && roomElements.length > 0;
+      const hasSpeakers = Array.isArray(speakerSystem?.placedSpeakers) && speakerSystem.placedSpeakers.length > 0;
+      if (!hasSeats && !hasSubs && !hasElements && !hasSpeakers) return false;
+      return true;
+    });
+  }, [seatingPositions, subwooferInstances, roomElements, speakerSystem?.placedSpeakers]);
+
+  const setRoomWidthM = useCallback((v) => {
+    const newVal = Number(v);
+    if (!Number.isFinite(newVal) || newVal === 0) return;
+    const prev = roomDimsRef.current;
+    if (Math.abs((prev?.widthM ?? 0) - newVal) < 0.001) return;
+    prevRoomDimsRef.current = { ...prev };
+    setRoomDims(d => ({ ...d, widthM: newVal }));
+    markLayoutRefreshPending();
+  }, [markLayoutRefreshPending]);
+
+  const setRoomLengthM = useCallback((v) => {
+    const newVal = Number(v);
+    if (!Number.isFinite(newVal) || newVal === 0) return;
+    const prev = roomDimsRef.current;
+    if (Math.abs((prev?.lengthM ?? 0) - newVal) < 0.001) return;
+    prevRoomDimsRef.current = { ...prev };
+    setRoomDims(d => ({ ...d, lengthM: newVal }));
+    markLayoutRefreshPending();
+  }, [markLayoutRefreshPending]);
+
+  const setRoomHeightM = useCallback((v) => {
+    const newVal = Number(v);
+    if (!Number.isFinite(newVal) || newVal === 0) return;
+    const prev = roomDimsRef.current;
+    if (Math.abs((prev?.heightM ?? 0) - newVal) < 0.001) return;
+    prevRoomDimsRef.current = { ...prev };
+    setRoomDims(d => ({ ...d, heightM: newVal }));
+    markLayoutRefreshPending();
+  }, [markLayoutRefreshPending]);
+
   const [seatMetricsById, setSeatMetricsById] = useState(() => (
     (__autosavePayload && __autosavePayload.seatMetricsById) ? __autosavePayload.seatMetricsById : {}
   ));
