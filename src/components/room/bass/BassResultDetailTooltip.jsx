@@ -44,37 +44,6 @@ function parseLevel(level) {
   return match ? Number(match[1]) : null;
 }
 
-function buildSeatMarginInfo(paramKey, numericLevel, rawValue) {
-  if (!isFiniteNumber(rawValue)) return null;
-  const absRaw = Math.abs(Number(rawValue));
-  const catalogKey = String(PARAMETER_NUMBERS[paramKey]);
-  const levels = RP22_CATALOG[catalogKey]?.levels || {};
-
-  if (numericLevel === 0) {
-    const l1Threshold = levels.L1;
-    if (!isFiniteNumber(l1Threshold)) {
-      if (paramKey === "p20") return { threshold: null, margin: null, label: "Not computed" };
-      return null;
-    }
-    const margin = absRaw - l1Threshold;
-    return { threshold: l1Threshold, margin: margin, label: margin.toFixed(2) + " dB above L1 threshold" };
-  }
-
-  const threshold = levels["L" + numericLevel];
-  if (!isFiniteNumber(threshold)) {
-    if (numericLevel === 1 && paramKey === "p20") {
-      const l2Threshold = levels.L2;
-      if (isFiniteNumber(l2Threshold)) {
-        const margin = absRaw - l2Threshold;
-        return { threshold: l2Threshold, margin: margin, label: margin.toFixed(2) + " dB above L2 threshold" };
-      }
-    }
-    return null;
-  }
-  const margin = threshold - absRaw;
-  return { threshold: threshold, margin: margin, label: margin.toFixed(2) + " dB inside L" + numericLevel + " threshold" };
-}
-
 function formatRawP14(value) {
   if (!isFiniteNumber(value)) return "—";
   return Number(value).toFixed(1) + " dBC";
@@ -83,11 +52,6 @@ function formatRawP14(value) {
 function formatRawP18(value) {
   if (!isFiniteNumber(value)) return "—";
   return Number(value).toFixed(1) + " Hz";
-}
-
-function formatRawSeatDeviation(value) {
-  if (!isFiniteNumber(value)) return "—";
-  return "±" + Number(value).toFixed(2) + " dB";
 }
 
 function buildP14Lines(shared) {
@@ -178,19 +142,15 @@ function buildP18Lines(shared) {
 function buildSeatLines(paramKey, seatData, shared) {
   if (!seatData) return null;
 
-  const rawValue = seatData.variationDbRaw;
-  if (!isFiniteNumber(rawValue)) return null;
-
   const numericLevel = parseLevel(seatData.level);
   if (numericLevel === null) return null;
 
   const lines = [];
   lines.push(["Seat", formatSeatLabel(seatData.seatId)]);
-  lines.push(["Measured value", formatRawSeatDeviation(rawValue)]);
-  lines.push(["Result", seatData.level]);
+  lines.push(["Published Result", seatData.level]);
 
   if (isFiniteNumber(seatData.worstFrequencyHz)) {
-    lines.push(["Limiting frequency", Number(seatData.worstFrequencyHz).toFixed(1) + " Hz"]);
+    lines.push(["Limiting frequency", Math.round(Number(seatData.worstFrequencyHz)) + " Hz"]);
   }
 
   if (paramKey === "p19") {
@@ -201,13 +161,6 @@ function buildSeatLines(paramKey, seatData, shared) {
     const transition = isFiniteNumber(transitionHz) ? Math.round(Number(transitionHz)) : null;
     if (p18Hz !== null && transition !== null) {
       lines.push(["Assessment band", p18Hz + " Hz – " + transition + " Hz"]);
-    }
-  }
-
-  const marginInfo = buildSeatMarginInfo(paramKey, numericLevel, rawValue);
-  if (marginInfo) {
-    if (isFiniteNumber(marginInfo.threshold)) {
-      lines.push(["Threshold", marginInfo.threshold + " dB"]);
     }
   }
 
