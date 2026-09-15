@@ -105,6 +105,58 @@ function StageRow({ stage }) {
               {stage.improvement.p19LevelDelta != null ? ` · LΔ P19 ${fmt(stage.improvement.p19LevelDelta)}` : ""}
             </div>
           )}
+          {stage.acousticPerformance && (
+            <div className="text-[10px] text-gray-600 space-y-0.5 pt-0.5">
+              <div className="font-medium text-gray-700">Acoustic performance</div>
+              <div className="flex gap-4">
+                <span>
+                  <span className="text-gray-500">P19:</span> {fmt(stage.acousticPerformance.p19?.before)} → {fmt(stage.acousticPerformance.p19?.after)} dB
+                  {stage.acousticPerformance.p19?.improvement != null && (
+                    <span className={stage.acousticPerformance.p19.improvement > 0 ? "text-green-600 font-medium" : "text-gray-500"}>
+                      {" "}({fmt(stage.acousticPerformance.p19.improvement)} dB)
+                    </span>
+                  )}
+                </span>
+                <span>
+                  <span className="text-gray-500">P20:</span> {fmt(stage.acousticPerformance.p20?.before)} → {fmt(stage.acousticPerformance.p20?.after)} dB
+                  {stage.acousticPerformance.p20?.improvement != null && (
+                    <span className={stage.acousticPerformance.p20.improvement > 0 ? "text-green-600 font-medium" : "text-gray-500"}>
+                      {" "}({fmt(stage.acousticPerformance.p20.improvement)} dB)
+                    </span>
+                  )}
+                </span>
+              </div>
+              {stage.acousticPerformance.seatStats && (
+                <div className="flex gap-4">
+                  {stage.acousticPerformance.seatStats.p19 && (
+                    <span>
+                      <span className="text-gray-500">P19 seats:</span>{" "}
+                      worst {fmt(stage.acousticPerformance.seatStats.p19.worst)} ·
+                      avg {fmt(stage.acousticPerformance.seatStats.p19.average)} ·
+                      best {fmt(stage.acousticPerformance.seatStats.p19.best)}
+                    </span>
+                  )}
+                  {stage.acousticPerformance.seatStats.p20 && (
+                    <span>
+                      <span className="text-gray-500">P20 seats:</span>{" "}
+                      worst {fmt(stage.acousticPerformance.seatStats.p20.worst)} ·
+                      avg {fmt(stage.acousticPerformance.seatStats.p20.average)} ·
+                      best {fmt(stage.acousticPerformance.seatStats.p20.best)}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {stage.winningSubSettings && (
+            <div className="text-[10px] text-gray-600">
+              <span className="font-medium text-gray-700">Winning sub settings:</span>{" "}
+              delay [{(stage.winningSubSettings.delay || []).map(fmt).join(", ")}] ·
+              gain [{(stage.winningSubSettings.gain || []).map(fmt).join(", ")}] ·
+              polarity [{(stage.winningSubSettings.polarity || []).map(fmt).join(", ")}] ·
+              phase [{(stage.winningSubSettings.phase || []).map(fmt).join(", ")}]
+            </div>
+          )}
           {stage.winningCandidate && (
             <div className="pt-1">
               <div className="text-[10px] font-medium text-gray-700 mb-0.5">Winning candidate tuning</div>
@@ -153,6 +205,57 @@ export default function OptimisationDiagnosticsReport({ report }) {
               <div className="text-[10px] text-gray-600 mt-1">
                 P14: {fmt(report.winningCandidate.resultingP14?.db)}dB L{fmt(report.winningCandidate.resultingP14?.level)}
                 {" · "}P18: {fmt(report.winningCandidate.resultingP18?.hz)}Hz L{fmt(report.winningCandidate.resultingP18?.level)}
+              </div>
+            </div>
+          )}
+          {report.topCandidatesForWinningStage?.length > 0 && (
+            <div className="pt-1 border-t border-gray-200">
+              <div className="text-[10px] font-semibold text-gray-700 mb-0.5">
+                Top 10 candidates (winning stage: {report.winningStage || "?"})
+              </div>
+              <table className="text-[9px] border-collapse w-full">
+                <thead>
+                  <tr className="text-gray-500">
+                    <th className="px-1 py-0.5 text-left font-medium">#</th>
+                    <th className="px-1 py-0.5 text-left font-medium">Id</th>
+                    <th className="px-1 py-0.5 text-right font-medium">P19 dB</th>
+                    <th className="px-1 py-0.5 text-right font-medium">P20 dB</th>
+                    <th className="px-1 py-0.5 text-left font-medium">Delay</th>
+                    <th className="px-1 py-0.5 text-left font-medium">Gain</th>
+                    <th className="px-1 py-0.5 text-left font-medium">Pol</th>
+                    <th className="px-1 py-0.5 text-left font-medium">Phase</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.topCandidatesForWinningStage.map((c, i) => (
+                    <tr key={i} className="border-t border-gray-100">
+                      <td className="px-1 py-0.5">{i + 1}</td>
+                      <td className="px-1 py-0.5">{c.candidateId ?? "—"}</td>
+                      <td className="px-1 py-0.5 text-right">{fmt(c.score?.p19VariationDb)}</td>
+                      <td className="px-1 py-0.5 text-right">{fmt(c.score?.p20VariationDb)}</td>
+                      <td className="px-1 py-0.5">{(c.delay || []).map(fmt).join(",")}</td>
+                      <td className="px-1 py-0.5">{(c.gain || []).map(fmt).join(",")}</td>
+                      <td className="px-1 py-0.5">{(c.polarity || []).map(fmt).join(",")}</td>
+                      <td className="px-1 py-0.5">{(c.phase || []).map(fmt).join(",")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {report.stageContributions?.length > 0 && (
+            <div className="pt-1 border-t border-gray-200">
+              <div className="text-[10px] font-semibold text-gray-700 mb-0.5">Stage contributions to final result</div>
+              <div className="space-y-0.5">
+                {report.stageContributions.map((c) => (
+                  <div key={c.name} className="flex items-center gap-2 text-[10px]">
+                    <span className="text-gray-600 w-20">{c.name}</span>
+                    <div className="flex-1 bg-gray-100 rounded h-2 overflow-hidden">
+                      <div className="bg-[#213428] h-full" style={{ width: `${c.contributionPercent}%` }} />
+                    </div>
+                    <span className="text-gray-700 font-medium w-8 text-right">{c.contributionPercent}%</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
