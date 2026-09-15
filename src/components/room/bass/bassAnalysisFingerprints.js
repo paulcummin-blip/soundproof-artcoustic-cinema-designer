@@ -96,14 +96,19 @@ function sortById(arr) {
   });
 }
 
-// Geometry-only source fields: position, height, relative tuning. NO model.
+// Geometry-only source fields: position, height, orientation, relative tuning. NO model.
 function normalizeSourceGeometry(s) {
   const phaseControlDeg = num(s?.tuning?.phaseControlDeg ?? s?.tuning?.phaseAdjust, 3);
+  const rotationDeg = num(s?.rotationDeg ?? s?.rotation_deg ?? s?.rotation, 3);
   return {
     id: s?.id || null,
     x: num(s?.x),
     y: num(s?.y),
     z: num(s?.z),
+    // rotationDeg is a bass-relevant geometry field — a subwoofer orientation
+    // change must invalidate per-seat P19/P20 results. Included even when 0
+    // so the fingerprint captures the full physical identity.
+    rotationDeg,
     gainDb: num(s?.tuning?.gainDb),
     delayMs: num(s?.tuning?.delayMs, 3),
     polarity: s?.tuning?.polarity ?? 0,
@@ -234,11 +239,13 @@ function sortSourcesByPosition(arr) {
 
 function normalizeSourceGeometryNoId(s) {
   const phaseControlDeg = num(s?.tuning?.phaseControlDeg ?? s?.tuning?.phaseAdjust, 3);
+  const rotationDeg = num(s?.rotationDeg ?? s?.rotation_deg ?? s?.rotation, 3);
   return {
     x: num(s?.x),
     y: num(s?.y),
     z: num(s?.z),
     placement: s?.placement || null,
+    rotationDeg,
     gainDb: num(s?.tuning?.gainDb),
     delayMs: num(s?.tuning?.delayMs, 3),
     polarity: s?.tuning?.polarity ?? 0,

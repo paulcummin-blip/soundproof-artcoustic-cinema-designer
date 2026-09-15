@@ -1981,7 +1981,7 @@ function RoomDesignerWithState() {
           onRecommendationsChange={setDesignRecommendations}
         />
       )}
-      <div className="flex flex-col bg-[#F8F8F7]" style={{ height: "100vh", minHeight: 0 }}>
+      <div className="flex flex-col bg-[#F8F8F7]" style={{ height: "100%", minHeight: 0 }}>
         <style>{`
           .brand-btn{
             background:#213428 !important;
@@ -2041,7 +2041,7 @@ function RoomDesignerWithState() {
           style={{
             minWidth: 0,
             minHeight: 0,
-            height: "calc(100vh - 152px)"
+            height: "calc(100% - 152px)"
           }}>
 
           {/* View selector bar */}

@@ -213,8 +213,44 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const sharedBassResults = useOptionalSharedBassResults();
   const currentBassContract = sharedBassResults?.contract || null;
   const currentP19Result = currentBassContract?.productAnalysis?.parameters?.p19 || null;
-  const currentP19Results = currentBassContract?.selectedCandidate?.perSeatP19Results || [];
-  const currentP20Results = currentBassContract?.selectedCandidate?.perSeatP20Results || [];
+  // ── Per-seat result seatId validation ──────────────────────────────────
+  // Stale cached per-seat P19/P20 results whose seatIds don't match the
+  // current rendered seatingPositions are filtered out so they can never
+  // attach to the wrong physical seat. This is a safety net on top of the
+  // bass fingerprint — if the fingerprint ever misses a geometry field, the
+  // seatId-set mismatch catches it here.
+  const currentP19Results = useMemo(() => {
+    const results = currentBassContract?.selectedCandidate?.perSeatP19Results || [];
+    if (!Array.isArray(results) || results.length === 0) return [];
+    const seatIds = new Set(
+      (Array.isArray(seatingPositions) ? seatingPositions : [])
+        .map((s) => String(s?.id || ""))
+        .filter(Boolean)
+    );
+    if (seatIds.size === 0) return results;
+    const filtered = results.filter((r) => seatIds.has(String(r?.seatId || "")));
+    if (filtered.length !== results.length && import.meta?.env?.DEV === true) {
+      console.warn("[P19 seatId validation] Filtered stale results", {
+        resultCount: results.length,
+        seatCount: seatIds.size,
+        matched: filtered.length,
+        resultSeatIds: results.map((r) => r?.seatId),
+        currentSeatIds: [...seatIds],
+      });
+    }
+    return filtered;
+  }, [currentBassContract?.selectedCandidate?.perSeatP19Results, seatingPositions]);
+  const currentP20Results = useMemo(() => {
+    const results = currentBassContract?.selectedCandidate?.perSeatP20Results || [];
+    if (!Array.isArray(results) || results.length === 0) return [];
+    const seatIds = new Set(
+      (Array.isArray(seatingPositions) ? seatingPositions : [])
+        .map((s) => String(s?.id || ""))
+        .filter(Boolean)
+    );
+    if (seatIds.size === 0) return results;
+    return results.filter((r) => seatIds.has(String(r?.seatId || "")));
+  }, [currentBassContract?.selectedCandidate?.perSeatP20Results, seatingPositions]);
   const widthM  = Number(appState?.roomDims?.widthM)  || 4.5;
   const lengthM = Number(appState?.roomDims?.lengthM) || 6.0;
   const heightM = Number(appState?.roomDims?.heightM) || 2.4;

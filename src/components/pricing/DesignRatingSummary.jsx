@@ -115,7 +115,7 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
       }
       const isFail = lvl === 'FAIL';
       const lead = isPrimary
-        ? (isFail ? 'Primary Seats FAIL' : 'Primary Seats achieve')
+        ? (isFail ? 'Primary Seats FAIL' : 'Primary Seats — no lower than')
         : (isFail ? 'Secondary Seats FAIL' : 'Secondary Seats — no lower than');
       const pillLabel = isFail ? 'RP23 FAIL' : `RP23 L${levelNum(lvl)}`;
       const descriptor = isFail ? null : (SCREEN_DESCRIPTOR[lvl] ?? null);
