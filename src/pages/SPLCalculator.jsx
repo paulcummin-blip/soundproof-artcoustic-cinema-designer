@@ -14,6 +14,7 @@ import { resolveSpeakerSplMeta } from "@/components/utils/spl/speakerSplMeta";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { useAuth } from "@/lib/AuthContext";
 import { isMasterAdmin } from "@/lib/accountAccess";
+import ComparisonWarnings from "@/components/spl/ComparisonWarnings";
 
 const BRAND = {
   bg: "#F8F8F7",
@@ -88,6 +89,18 @@ function formatPrice(value) {
     currency: "GBP",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function buildArtcousticWarningRecord(speaker) {
+  if (!speaker) return null;
+  const meta = resolveSpeakerSplMeta(speaker.p12Key || speaker.p13Key || speaker.id);
+  return {
+    product_type: null,
+    open_back: null,
+    spl_authority: meta?.max_spl_cont_db_1m_halfspace != null ? "Published continuous SPL" : "Calculated from sensitivity + power",
+    data_confidence: meta?.max_spl_cont_db_1m_halfspace != null ? "High" : "Medium",
+    p12_p13_eligible: true,
+  };
 }
 
 function resultRank(result) {
@@ -250,6 +263,7 @@ function normalizeImportedRow(row, index) {
       manufacturer,
       model,
       product_type: String(firstValue(row, ["Product Type", "product_type"]) || "").trim(),
+      open_back: String(firstValue(row, ["Open Back", "open_back", "Open-Back", "OpenBack"]) || "").trim(),
       retail_price_inc_vat: numeric(firstValue(row, ["Retail Price inc VAT", "retail_price_inc_vat"])),
       currency: String(firstValue(row, ["Currency", "currency"]) || "GBP").trim() || "GBP",
       rated_impedance_ohm: ratedImpedance,
@@ -605,7 +619,7 @@ export default function SPLCalculatorPage() {
 
         <div style={{ background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18 }}>
           <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 120px 92px 92px 64px", gap: 12, alignItems: "end", padding: "0 16px 8px", fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-            <div>Speaker</div><div style={{ textAlign: "right" }}>Retail inc VAT</div><div style={{ textAlign: "center" }}>P12</div><div style={{ textAlign: "center" }}>P13</div><div />
+            <div>Speaker</div><div style={{ textAlign: "right" }}>Retail inc VAT</div><div style={{ textAlign: "center" }}><div style={{ fontWeight: 700, color: BRAND.subtext }}>LCR SPL</div><div style={{ fontSize: 9, color: BRAND.hint, marginTop: 1, letterSpacing: 0 }}>P12</div></div><div style={{ textAlign: "center" }}><div style={{ fontWeight: 700, color: BRAND.subtext }}>Surround SPL</div><div style={{ fontSize: 9, color: BRAND.hint, marginTop: 1, letterSpacing: 0 }}>P13</div></div><div />
           </div>
 
           <div style={{ marginBottom: 8 }}>
@@ -617,7 +631,8 @@ export default function SPLCalculatorPage() {
               <Rp22Pill parameter="P12" level={artResult?.grades?.p12} />
               <Rp22Pill parameter="P13" level={artResult?.grades?.p13} />
               <SpeakerInfo rows={artcousticInfoRows(art, artPrice(art))} />
-            </div>
+              </div>
+              <ComparisonWarnings record={buildArtcousticWarningRecord(art)} />
           </div>
 
           {suggestedArt && (
@@ -631,6 +646,7 @@ export default function SPLCalculatorPage() {
                 note="Lowest-priced Artcoustic option that matches or exceeds the strongest selected comparison result."
                 infoRows={artcousticInfoRows(suggestedArt.speaker, suggestedArt.price)}
               />
+              <ComparisonWarnings record={buildArtcousticWarningRecord(suggestedArt?.speaker)} />
             </div>
           )}
 
@@ -673,6 +689,7 @@ export default function SPLCalculatorPage() {
                         Speaker specification needs confirmation
                       </div>
                     )}
+                    <ComparisonWarnings record={record} />
                   </div>
                 );
               })}
