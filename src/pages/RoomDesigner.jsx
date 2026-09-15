@@ -2041,7 +2041,7 @@ function RoomDesignerWithState() {
           style={{
             minWidth: 0,
             minHeight: 0,
-            height: "calc(100% - 152px)"
+            height: "100%"
           }}>
 
           {/* View selector bar */}
