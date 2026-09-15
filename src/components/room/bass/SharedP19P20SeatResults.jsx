@@ -19,6 +19,7 @@
 
 import React from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
+import BassResultDetailTooltip from "@/components/room/bass/BassResultDetailTooltip";
 import { PRIMARY } from "@/components/utils/seatPriorityAuthority";
 import { formatCoverageSummaryFromRows } from "@/components/utils/seatCoverageSummary";
 
@@ -35,32 +36,34 @@ function stateTextFor(authorityStatus, publicationVerified, p14TargetUnselected)
   return "—";
 }
 
-function SeatPill({ seat, compact }) {
+function SeatPill({ seat, compact, paramKey }) {
   const isPrimary = seat.priority === PRIMARY;
   const borderColour = isPrimary ? PRIMARY_BORDER : SECONDARY_BORDER;
   const borderWidth = isPrimary ? "2px" : "1px";
   return (
-    <div
-      style={{
-        border: `${borderWidth} solid ${borderColour}`,
-        borderRadius: 6,
-        padding: 2,
-        background: "#FFFFFF",
-        display: "inline-flex",
-      }}
-    >
-      <RP22GradingPill level={seat.level} compact={compact}>{seat.level}</RP22GradingPill>
-    </div>
+    <BassResultDetailTooltip parameterKey={paramKey} seatData={seat}>
+      <div
+        style={{
+          border: `${borderWidth} solid ${borderColour}`,
+          borderRadius: 6,
+          padding: 2,
+          background: "#FFFFFF",
+          display: "inline-flex",
+        }}
+      >
+        <RP22GradingPill level={seat.level} compact={compact}>{seat.level}</RP22GradingPill>
+      </div>
+    </BassResultDetailTooltip>
   );
 }
 
-function SeatGrid({ rows, compact }) {
+function SeatGrid({ rows, compact, paramKey }) {
   return (
     <div className="grid gap-1.5">
       {rows.map((row) => (
         <div key={row.row} className="flex flex-wrap justify-center gap-1.5">
           {row.seats.map((seat) => (
-            <SeatPill key={seat.seatId} seat={seat} compact={compact} />
+            <SeatPill key={seat.seatId} seat={seat} compact={compact} paramKey={paramKey} />
           ))}
         </div>
       ))}
@@ -68,7 +71,7 @@ function SeatGrid({ rows, compact }) {
   );
 }
 
-function Panel({ title, rows, publicationVerified, stateText, compact }) {
+function Panel({ title, paramKey, rows, publicationVerified, stateText, compact }) {
   const showSeats = publicationVerified && rows.length > 0;
   return (
     <div className={`rounded-lg border border-[#DCDBD6] bg-white ${compact ? "p-2" : "p-3"}`}>
@@ -78,7 +81,7 @@ function Panel({ title, rows, publicationVerified, stateText, compact }) {
           {!compact && (
             <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{formatCoverageSummaryFromRows(rows)}</div>
           )}
-          <SeatGrid rows={rows} compact={compact} />
+          <SeatGrid rows={rows} compact={compact} paramKey={paramKey} />
         </>
       ) : (
         <div className="rounded-md border border-[#DCDBD6] bg-[#F8F8F7] px-3 py-2 text-[11px] text-[#625143]">
@@ -104,6 +107,7 @@ export default function SharedP19P20SeatResults({
     <div className={gridClass} aria-label="P19 and P20 per-seat results">
       <Panel
         title="P19 — All Seats"
+        paramKey="p19"
         rows={p19Rows}
         publicationVerified={publicationVerified}
         stateText={stateText}
@@ -111,6 +115,7 @@ export default function SharedP19P20SeatResults({
       />
       <Panel
         title="P20 — All Seats"
+        paramKey="p20"
         rows={p20Rows}
         publicationVerified={publicationVerified}
         stateText={stateText}

@@ -8,7 +8,7 @@
 // Primary/Secondary distinction.
 import React, { useEffect, useState } from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
-import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
+import BassResultDetailTooltip from "@/components/room/bass/BassResultDetailTooltip";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
@@ -50,16 +50,16 @@ export default function BassResultCards() {
         {Object.entries(formatted.pills).map(([key, pill]) => (
           <div
             key={key}
-            className="flex flex-col gap-1 rounded-lg border border-[#DCDBD6] bg-white p-3"
+            className="flex flex-col items-center gap-1 rounded-lg border border-[#DCDBD6] bg-white p-3"
             aria-label={pill.text}
           >
-            <BassRp22ParameterTooltip parameterKey={key}>
-              <span className="cursor-help text-[11px] font-semibold text-[#213428] underline decoration-dotted underline-offset-2">
-                {CARD_TITLES[key] || pill.label}
-              </span>
-            </BassRp22ParameterTooltip>
-            <RP22GradingPill level={pill.level} style={{ width: "100%" }}>{pill.resultText}</RP22GradingPill>
-            {pill.detail && <div className="text-[10px] text-[#625143]">{pill.detail}</div>}
+            <span className="text-[11px] font-semibold text-[#213428]">
+              {CARD_TITLES[key] || pill.label}
+            </span>
+            <BassResultDetailTooltip parameterKey={key}>
+              <RP22GradingPill level={pill.level}>{pill.resultText}</RP22GradingPill>
+            </BassResultDetailTooltip>
+            {pill.detail && <div className="text-center text-[10px] text-[#625143]">{pill.detail}</div>}
           </div>
         ))}
       </div>
