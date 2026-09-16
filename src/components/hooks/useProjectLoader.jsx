@@ -267,6 +267,7 @@ appState, // Pass appState directly for setters
         }
         if (p?.active_version_id) {
           activeVersionIdRef.current = p.active_version_id;
+          appState?.setActiveVersionId?.(p.active_version_id);
           const versions = await base44.entities.ProjectVersion.filter({ id: p.active_version_id });
           if (versions?.length > 0) {
             mergedP = mergeProjectAndVersion(p, versions[0]);

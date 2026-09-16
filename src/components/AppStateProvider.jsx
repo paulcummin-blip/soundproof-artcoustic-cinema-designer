@@ -9,7 +9,8 @@ import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import { useRspState } from "@/components/state/useRspState";
 import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
-import { validateInstances, bassInputAdapter, normaliseLegacySubwoofers } from "@/components/utils/subwooferInstanceMigration";
+import { bassInputAdapter } from "@/components/utils/subwooferInstanceMigration";
+import { restoreSubwooferInstancesFromAutosave, enforceOnePrimary, normaliseSeatingPositions, normaliseRoomElements } from "@/components/utils/appStateHelpers";
 import { migrateP12Mode, P12_MODE_MINIMUM, P12_MODE_RECOMMENDED } from "@/components/utils/p12ModeAuthority";
 import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuthority";
 import { normaliseP14Level } from "@/components/room/bass/p14TargetSelectionState";
@@ -17,178 +18,8 @@ import { applyManualOverrideToScreen } from "@/components/models/screen/resolveE
 // Seat priority is an independent user classification. It is intentionally
 // not coupled to the acoustic RSP / legacy isPrimary authority here.
 
-// Stage 2: Restore canonical subwoofer instances from a local autosave payload.
-// Four-way logic:
-//   1. No payload / fresh scratch → [] + VALID + NONE + subwoofers []
-//   2. Field present + valid (incl. []) → instances win + VALID + PERSISTED + adapt enabled
-//   3. Field present + malformed → clear + ERROR + NONE + subwoofers [] (never CFG fallback)
-//   4. Field absent + usable legacy CFG → normaliseLegacySubwoofers once + VALID + RUNTIME_MIGRATED + adapt
-//   5. Field absent + no usable CFG → [] + VALID + NONE + subwoofers []
-// Disagreeing CFG is display compatibility only. Never reconstruct a modern record from CFG
-// outside the single normaliseLegacySubwoofers call in case 4.
-const isCfgUsableForMigration = (cfg) => {
-  if (!cfg || typeof cfg !== "object") return false;
-  const hasModel = typeof cfg.model === "string" && cfg.model.trim().length > 0;
-  const hasCount = Number.isFinite(Number(cfg.count)) && Number(cfg.count) > 0;
-  return hasModel || hasCount;
-};
-
-const restoreSubwooferInstancesFromAutosave = (payload) => {
-  // Case 1: No payload / fresh scratch session
-  if (!payload) {
-    return { instances: [], status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.NONE, subwoofers: [] };
-  }
-
-  // Orientation metadata for bassInputAdapter — derived from CFG, not stored per instance.
-  const orientationMeta = {
-    frontOrientation: payload.frontSubsCfg?.orientation ?? null,
-    rearOrientation: payload.rearSubsCfg?.orientation ?? null,
-  };
-
-  const hasField = Object.prototype.hasOwnProperty.call(payload, "subwooferInstances");
-
-  if (hasField) {
-    const raw = payload.subwooferInstances;
-    // Case 3: Field present but malformed (not an array or validation fails)
-    if (!Array.isArray(raw)) {
-      return { instances: [], status: INSTANCE_STATUS.ERROR, migration: MIGRATION_STATE.NONE, subwoofers: [] };
-    }
-    const validation = validateInstances(raw);
-    if (!validation.valid) {
-      return { instances: [], status: INSTANCE_STATUS.ERROR, migration: MIGRATION_STATE.NONE, subwoofers: [] };
-    }
-    // Case 2: Field present + valid (including empty []). Adapt only enabled instances.
-    const enabled = raw.filter((i) => i?.enabled !== false);
-    const subwoofers = enabled.length > 0 ? bassInputAdapter(enabled, orientationMeta) : [];
-    return { instances: raw, status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.PERSISTED, subwoofers };
-  }
-
-  // Field absent — try legacy CFG migration (case 4)
-  const frontCfg = payload.frontSubsCfg;
-  const rearCfg = payload.rearSubsCfg;
-  if (isCfgUsableForMigration(frontCfg) || isCfgUsableForMigration(rearCfg)) {
-    const roomDims = payload.roomDims || { widthM: 4.5, lengthM: 6.0, heightM: 2.4 };
-    const migrated = normaliseLegacySubwoofers(frontCfg, rearCfg, roomDims, null);
-    const enabled = migrated.filter((i) => i?.enabled !== false);
-    const subwoofers = enabled.length > 0 ? bassInputAdapter(enabled, orientationMeta) : [];
-    return { instances: migrated, status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.RUNTIME_MIGRATED, subwoofers };
-  }
-
-  // Case 5: Field absent + no usable CFG → fresh-like state
-  return { instances: [], status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.NONE, subwoofers: [] };
-};
-
-const enforceOnePrimary = (seats, dims, mlpBasis = "front") => {
-  if (!Array.isArray(seats) || seats.length === 0) return seats;
-  const W = Number(dims?.widthM ?? dims?.width) || 4.5;
-  const L = Number(dims?.lengthM ?? dims?.length) || 6.0;
-  try {
-    const { seatsWithFlags } = computeMLPAndPrimary(seats, W, L, mlpBasis, null);
-    if (!Array.isArray(seatsWithFlags) || seatsWithFlags.length === 0) return seats;
-    // Collapse: keep only the first primary as the single RSP
-    const primaries = seatsWithFlags.filter(s => s.isPrimary);
-    const rspId = primaries.length > 0 ? primaries[0].id : seatsWithFlags[0].id;
-    const collapsed = seatsWithFlags.map(s => ({ ...s, isPrimary: s.id === rspId }));
-    // NOTE: RSP *priority* is NOT enforced here. enforceOnePrimary may be
-    // called on intermediate hydration states where isPrimary is transient;
-    // promoting a transient RSP would corrupt a stored non-RSP Secondary
-    // priority. Priority is enforced atomically at the final RSP-setting
-    // commit (RoomDesigner isPrimary normalisation effect).
-    return collapsed;
-  } catch {
-    return seats.map((s, i) => ({ ...s, isPrimary: i === 0 }));
-  }
-};
-
-// --- SEATING POSITIONS NORMALISER ---
-const normaliseSeatingPositions = (seats, roomDims) => {
-  if (!Array.isArray(seats)) return [];
-
-  const widthM = Number(roomDims?.widthM ?? roomDims?.width) || 4.5;
-  const lengthM = Number(roomDims?.lengthM ?? roomDims?.length) || 6.0;
-
-  const MIN = 0.40;
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
-  const minX = MIN;
-  const maxX = Math.max(minX, widthM - MIN);
-  const minY = MIN;
-  const maxY = Math.max(minY, lengthM - MIN);
-
-  return seats
-    .map((s, i) => {
-      const px = s?.x ?? s?.position?.x;
-      const py = s?.y ?? s?.position?.y;
-      const pz = s?.z ?? s?.position?.z;
-
-      const x = Number(px);
-      const y = Number(py);
-      const z = Number.isFinite(Number(pz)) ? Number(pz) : 1.2;
-
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-
-      return {
-        ...s,
-        // force canonical flat coords
-        x: clamp(x, minX, maxX),
-        y: clamp(y, minY, maxY),
-        z,
-        // keep id stable if it exists
-        id: s?.id ?? `seat-${i + 1}`,
-        // keep rowNumber if present; otherwise leave as-is (seat rebuild can set it later)
-        rowNumber: Number.isInteger(s?.rowNumber) ? s.rowNumber : s?.rowNumber,
-        // drop legacy nested position to avoid disagreement between readers
-        position: undefined
-      };
-    })
-    .filter(Boolean);
-};
-
-// --- ROOM ELEMENTS NORMALISER ---
-function normaliseRoomElements(list) {
-  const arr = Array.isArray(list) ? list : [];
-  return arr
-    .filter(Boolean)
-    .map((el, i) => {
-      const id = el.id ?? el._id ?? (i + 1);
-      const type = el.type ?? "door";
-      const wall = el.wall ?? "front";
-      const length_m = Number.isFinite(el.length_m) ? el.length_m : 0.9;
-      const thickness_m = Number.isFinite(el.thickness_m) ? el.thickness_m : 0.05;
-      const pos_m = Number.isFinite(el.pos_m) ? el.pos_m : 0;
-
-      // keep BOTH id styles so any renderer/export code will find one
-      const label = (el.label ?? el.__label ?? "").toString();
-
-      // projector-specific fields (preserved as-is if present, left undefined if absent)
-      const x_lens_m = Number.isFinite(Number(el?.x_lens_m)) ? Number(el.x_lens_m) : undefined;
-      const y_lens_m = Number.isFinite(Number(el?.y_lens_m)) ? Number(el.y_lens_m) : undefined;
-      const z_lens_m = Number.isFinite(Number(el?.z_lens_m)) ? Number(el.z_lens_m) : undefined;
-      const body_width_m = Number.isFinite(Number(el?.body_width_m)) ? Number(el.body_width_m) : undefined;
-      const body_height_m = Number.isFinite(Number(el?.body_height_m)) ? Number(el.body_height_m) : undefined;
-      const body_depth_m = Number.isFinite(Number(el?.body_depth_m)) ? Number(el.body_depth_m) : undefined;
-
-      return {
-        ...el,
-        id,
-        _id: id,
-        type,
-        wall,
-        length_m,
-        thickness_m,
-        pos_m,
-        label,
-        __label: label,
-        // projector fields: only written when defined, undefined fields are stripped by spread
-        ...(x_lens_m !== undefined && { x_lens_m }),
-        ...(y_lens_m !== undefined && { y_lens_m }),
-        ...(z_lens_m !== undefined && { z_lens_m }),
-        ...(body_width_m !== undefined && { body_width_m }),
-        ...(body_height_m !== undefined && { body_height_m }),
-        ...(body_depth_m !== undefined && { body_depth_m }),
-      };
-    });
-}
+// Subwoofer restore, seating normalisation, and room element normalisation
+// helpers are imported from @/components/utils/appStateHelpers.
 
 // --- ATMOS PROTECTION HELPERS ---
 const safeCanonRole = (role) => {
@@ -715,6 +546,23 @@ function useDesignerState() {
   }, []);
 
   const [autosaveMeta, setAutosaveMeta] = useState(null);
+
+  // ── ACTIVE VERSION ID (for version-scoped autosave) ──────────────────────
+  // Set by useProjectLoader when a versioned project is loaded. Passed to
+  // every sessionAutosave call so V1's browser working copy cannot overwrite
+  // V2's. Null = no version loaded yet (pre-migration or free-use); autosave
+  // is skipped entirely in that case to prevent project-id-keyed fallback.
+  const activeVersionIdRef = useRef(null);
+  const [, forceVersionTick] = useState(0);
+  const setActiveVersionId = useCallback((vid) => {
+    const next = vid || null;
+    if (activeVersionIdRef.current !== next) {
+      activeVersionIdRef.current = next;
+      forceVersionTick((n) => n + 1);
+    }
+  }, []);
+  const activeVersionId = activeVersionIdRef.current;
+
   const [globalSurroundModel, _setGlobalSurroundModel] = useState(() => (
     (!__isFreeUse && __autosavePayload && __autosavePayload.globalSurroundModel) ? stripSurroundSuffix(__autosavePayload.globalSurroundModel) : null
   ));
@@ -1485,8 +1333,8 @@ function useDesignerState() {
   ]);
 
   useEffect(() => {
-    // OLD RESTORE LOGIC (disabled - now happens in useState initializers)
-    const data = loadAutosave();
+    const vid = activeVersionIdRef.current;
+    const data = loadAutosave(vid);
     if (!data?.payload) {
       setIsHydrated(true);
       return;
@@ -1513,7 +1361,7 @@ function useDesignerState() {
     }
 
     const p = data.payload;
-    if (!isAutosavePayloadValid(p)) {
+    if (!isAutosavePayloadValid(p, vid)) {
       setIsHydrated(true);
       return;
     }
@@ -1578,7 +1426,7 @@ function useDesignerState() {
       if (typeof p.designEqEnabled === "boolean") setDesignEqEnabled(p.designEqEnabled);
       if (Object.prototype.hasOwnProperty.call(p, "p12Mode")) setP12Mode(p.p12Mode);
 
-      setAutosaveMeta(getAutosaveMeta());
+      setAutosaveMeta(getAutosaveMeta(vid));
       
       // Derived geometry must always be recalculated live
       setScreenFrontPlaneM(null);
@@ -1678,13 +1526,19 @@ function useDesignerState() {
       roomElements: normaliseRoomElements(roomElements),
       };
 
-      if (!isAutosavePayloadValid(payload)) return;
+      // Version-scoped autosave: skip entirely if no version is loaded yet.
+      // This prevents project-id-keyed fallback writes that could overwrite
+      // another version's working copy.
+      const vid = activeVersionIdRef.current;
+      if (!vid) return;
+
+      if (!isAutosavePayloadValid(payload, vid)) return;
 
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
 
     autosaveTimerRef.current = setTimeout(() => {
-      saveAutosave(payload);
-      setAutosaveMeta(getAutosaveMeta());
+      saveAutosave(payload, vid);
+      setAutosaveMeta(getAutosaveMeta(vid));
     }, 500);
 
     return () => {
@@ -1745,10 +1599,11 @@ function useDesignerState() {
     ]);
 
   const restoreAutosave = useCallback(() => {
-    const data = loadAutosave();
+    const vid = activeVersionIdRef.current;
+    const data = loadAutosave(vid);
     if (!data?.payload) return false;
     const p = data.payload;
-    if (!isAutosavePayloadValid(p)) return false;
+    if (!isAutosavePayloadValid(p, vid)) return false;
 
     try {
       if (p.roomDims) setRoomDims(p.roomDims);
@@ -1823,7 +1678,7 @@ function useDesignerState() {
       if (typeof p.designEqEnabled === "boolean") setDesignEqEnabled(p.designEqEnabled);
       if (Object.prototype.hasOwnProperty.call(p, "p12Mode")) setP12Mode(p.p12Mode);
 
-      setAutosaveMeta(getAutosaveMeta());
+      setAutosaveMeta(getAutosaveMeta(vid));
       return true;
     } catch {
       return false;
@@ -1831,7 +1686,8 @@ function useDesignerState() {
   }, []);
 
   const clearAutosaveNow = useCallback(() => {
-    clearAutosaveStorage();
+    const vid = activeVersionIdRef.current;
+    clearAutosaveStorage(vid);
     setAutosaveMeta(null);
   }, []);
 
@@ -1896,11 +1752,14 @@ function useDesignerState() {
       p12Mode
     };
     try {
-      saveAutosave(payload);
-      // Stage 2: Only after saveAutosave succeeds may state become PERSISTED.
-      // Do not mark persisted on failure.
-      if (subwooferInstancesStatus === INSTANCE_STATUS.VALID) {
-        setSubwooferInstanceMigrationState(MIGRATION_STATE.PERSISTED);
+      const vid = activeVersionIdRef.current;
+      if (vid) {
+        saveAutosave(payload, vid);
+        // Stage 2: Only after saveAutosave succeeds may state become PERSISTED.
+        // Do not mark persisted on failure.
+        if (subwooferInstancesStatus === INSTANCE_STATUS.VALID) {
+          setSubwooferInstanceMigrationState(MIGRATION_STATE.PERSISTED);
+        }
       }
     } catch (e) {
       console.warn("Autosave failed:", e);
@@ -1909,7 +1768,8 @@ function useDesignerState() {
 
   const clearWorkingCopy = useCallback(() => {
     try {
-      clearAutosaveStorage();
+      const vid = activeVersionIdRef.current;
+      clearAutosaveStorage(vid);
     } catch (e) {
       console.warn("Clear autosave failed:", e);
     }
@@ -1927,7 +1787,8 @@ function useDesignerState() {
   const resetRoomDesignerToDefaults = useCallback(() => {
     // 1. Clear autosave/persistence
     try {
-      clearAutosaveStorage();
+      const vid = activeVersionIdRef.current;
+      clearAutosaveStorage(vid);
       setAutosaveMeta(null);
     } catch (e) {
       console.warn("Failed to clear autosave:", e);
@@ -2317,6 +2178,8 @@ function useDesignerState() {
     setSelectedAbfuserQty,
     abfuserQtySource,
     setAbfuserQtySource,
+    activeVersionId,
+    setActiveVersionId,
     };
   }, [
     dimensions, setDimensions,
@@ -2436,6 +2299,8 @@ function useDesignerState() {
     setSelectedAbfuserQty,
     abfuserQtySource,
     setAbfuserQtySource,
+    activeVersionId,
+    setActiveVersionId,
     ]);
 
   value.setAssumedP21Level = setAssumedP21LevelSafe;
