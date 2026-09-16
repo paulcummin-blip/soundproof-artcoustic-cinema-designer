@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { getAgeDays, formatAge } from "@/components/utils/projectAge";
 import { normalizeStatusId } from "@/components/projects/statusDefaults";
+import OpenVersionDropdown from "@/components/versions/OpenVersionDropdown";
 
 // Refined prototype card — lighter, calmer, more architectural.
 // Only used for the "Bass Test" project to assess the design before rollout.
@@ -333,32 +334,9 @@ export default function ProjectCardPrototype({
             paddingTop: 4,
           }}
         >
-          <button
-            type="button"
-            onClick={() => {
-              const id = p.id;
-              if (projectActions && typeof projectActions.setActiveProjectId === "function") {
-                projectActions.setActiveProjectId(id);
-              }
-              window.location.href = `/RoomDesigner?project=${encodeURIComponent(id)}`;
-            }}
-            style={{
-              flex: 1,
-              padding: "8px 12px",
-              borderRadius: 6,
-              border: `1px solid ${openBtnColor}`,
-              background: openBtnColor,
-              color: "#FFFFFF",
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "background 0.15s ease",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = openBtnHover; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = openBtnColor; }}
-          >
-            Open Project
-          </button>
+          <div style={{ flex: 1 }}>
+            <OpenVersionDropdown projectId={p.id} projectName={p.name} />
+          </div>
 
           <button
             type="button"

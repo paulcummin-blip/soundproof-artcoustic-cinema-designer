@@ -351,6 +351,11 @@
       "type": "string",
       "description": "ID of the Account this project belongs to"
     },
+    "active_version_id": {
+      "type": "string",
+      "description": "ID of the active ProjectVersion. Single source of truth for which version is currently loaded in the Room Designer. Null = not yet migrated (legacy project). When set, the Room Designer loads this version's design_state. There is NO is_active flag on ProjectVersion \u2014 this pointer is the only authority.",
+      "nullable": true
+    },
     "lifecycle_status": {
       "type": "string",
       "enum": [
@@ -489,10 +494,18 @@
       "description": "Durable Apply provenance for the V2 Improve Bass Seating Position stage. Seating Apply mutates seatingPositions (not subwooferInstances), so provenance cannot be stamped on sub instances. This project-level field records the actual Apply action: { stageKey, candidateId, baselineFingerprint, appliedFingerprint }. Null when no Seating Apply has occurred. Cleared when the design changes (stale detection). Used by isStageResultApplied to distinguish a genuine Apply from coincidental value matching.",
       "nullable": true,
       "properties": {
-        "stageKey": { "type": "string" },
-        "candidateId": { "type": "string" },
-        "baselineFingerprint": { "type": "string" },
-        "appliedFingerprint": { "type": "string" }
+        "stageKey": {
+          "type": "string"
+        },
+        "candidateId": {
+          "type": "string"
+        },
+        "baselineFingerprint": {
+          "type": "string"
+        },
+        "appliedFingerprint": {
+          "type": "string"
+        }
       }
     }
   },

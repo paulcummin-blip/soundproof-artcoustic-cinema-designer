@@ -1,6 +1,8 @@
 // Extracted verbatim from src/pages/RoomDesigner.jsx (lines 204–1132)
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Project } from "@/entities/Project";
+import { base44 } from "@/api/base44Client";
+import { mergeProjectAndVersion, buildDesignState, buildSharedUpdate } from "@/lib/versionAuthority";
 import { serializeProject } from "@/components/utils/serializeProject";
 import { readPersistedScreenPlaneM } from "@/components/utils/screenPlanePersistence";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
@@ -96,6 +98,10 @@ appState, // Pass appState directly for setters
   // Structural counts snapshot from the hydrated DB record, used by the
   // destructive-save tripwire to detect accidental hydration wipes.
   const hydratedStructuralCountsRef = useRef(null);
+  // Active ProjectVersion ID — tracks which version's design_state is loaded.
+  // Set during loadProject, used by autosave/manual save to write design_state
+  // to the correct ProjectVersion record.
+  const activeVersionIdRef = useRef(null);
 
   // SHARED PAYLOAD BUILDER — single source of truth for both autosave and manual save.
   // Both paths must use this function so their signatures are always identical.
@@ -243,9 +249,34 @@ appState, // Pass appState directly for setters
       const projects = await Project.filter({ id }, '-updated_date', 1);
 
       if (Array.isArray(projects) && projects.length) {
-      const p = projects[0] || null;
+      let p = projects[0] || null;
       if (globalThis.__B44_LOGS) console.log('[RD] loadProject result', { projectIdState, id: p?.id, name: p?.name });
-      hydrateFromProject(p);
+
+      // ─── Version migration & loading ──────────────────────────────────
+      // Ensure the project has a V1 ProjectVersion (lazy migration).
+      // Then load the active version's design_state and merge with the
+      // Project's shared fields for hydration.
+      let mergedP = p;
+      try {
+        if (!p?.active_version_id) {
+          const migRes = await base44.functions.invoke('migrateProjectVersions', { project_id: id });
+          if (migRes?.data?.version_id) {
+            const reloaded = await Project.filter({ id }, '-updated_date', 1);
+            if (reloaded?.length) p = reloaded[0];
+          }
+        }
+        if (p?.active_version_id) {
+          activeVersionIdRef.current = p.active_version_id;
+          const versions = await base44.entities.ProjectVersion.filter({ id: p.active_version_id });
+          if (versions?.length > 0) {
+            mergedP = mergeProjectAndVersion(p, versions[0]);
+          }
+        }
+      } catch (versionErr) {
+        console.error('[RD] Version load failed, falling back to project-only hydration:', versionErr);
+      }
+
+      hydrateFromProject(mergedP);
       setProjectNameState(p?.name || "Project"); // Update internal projectName state
       // Capture the loaded room_dimensions_edited flag so the autosave path
       // never resets it to false. Defaults to false for pre-feature projects.
@@ -587,7 +618,16 @@ appState, // Pass appState directly for setters
         // if the project switches while we are waiting for the DB response.
         const myGeneration = loadGenerationRef.current;
 
-        await Project.update(effectiveProjectId, data);
+        // ─── Version-aware save ──────────────────────────────────────────
+        // Split the serialized data into shared fields (→ Project) and
+        // design_state (→ ProjectVersion). Both are saved so the active
+        // version's design state is independent from other versions.
+        const designState = buildDesignState(data);
+        const sharedData = buildSharedUpdate(data);
+        await Project.update(effectiveProjectId, sharedData);
+        if (activeVersionIdRef.current) {
+          await base44.entities.ProjectVersion.update(activeVersionIdRef.current, { design_state: designState });
+        }
 
         // If the project switched while we were awaiting, our write is stale —
         // do not stamp state for a different project.
@@ -885,7 +925,16 @@ appState, // Pass appState directly for setters
         // Capture generation before the await.
         const myGeneration = loadGenerationRef.current;
 
-        savedProject = await Project.update(effectiveProjectId, projectData);
+        // ─── Version-aware manual save ───────────────────────────────────
+        // Split the serialized data into shared fields (→ Project) and
+        // design_state (→ ProjectVersion). Both are saved so the active
+        // version's design state is independent from other versions.
+        const designStateMS = buildDesignState(projectData);
+        const sharedDataMS = buildSharedUpdate(projectData);
+        savedProject = await Project.update(effectiveProjectId, sharedDataMS);
+        if (activeVersionIdRef.current) {
+          await base44.entities.ProjectVersion.update(activeVersionIdRef.current, { design_state: designStateMS });
+        }
 
         // If the project switched while we were awaiting, do not stamp state.
         if (loadGenerationRef.current !== myGeneration) {

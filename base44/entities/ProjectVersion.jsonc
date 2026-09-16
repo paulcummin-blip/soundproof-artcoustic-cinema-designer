@@ -1,0 +1,189 @@
+{
+  "name": "ProjectVersion",
+  "type": "object",
+  "description": "A complete, independent design state for a single physical room. Every calculation, report, optimisation, AI summary and cached result is version-specific, while project metadata remains shared on the parent Project. The design_state field is the authoritative serialisation of the Room Designer state \u2014 it contains every field required to completely reconstruct a design version. No per-version design field should remain on the Project entity. Future per-version fields automatically belong inside design_state without requiring schema changes. The UI slot limit is 5; the data model allows any number internally for future flexibility.",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "ID of the parent Project this version belongs to."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Denormalized account_id from the parent Project, used for RLS. Must be set at creation time from the parent Project's account_id."
+    },
+    "version_number": {
+      "type": "integer",
+      "description": "Version slot number (1\u20135 in the UI; data model allows any positive integer). V1 is the permanent baseline and cannot be deleted."
+    },
+    "version_name": {
+      "type": "string",
+      "description": "Designer-editable custom name for this version (max 50 characters). Shown in the Open Version dropdown and on report headers instead of the raw version number. Defaults to 'Current Design' for migrated V1.",
+      "default": "Current Design"
+    },
+    "design_state": {
+      "type": "object",
+      "description": "The authoritative serialisation of the Room Designer state. Contains every field required to completely reconstruct a design version \u2014 speakers, subwoofers, seating, screen, overlays, SPL config, RSP, acoustic treatment, calibration assumptions, and all other per-version design data. No per-version design field should remain on the Project entity. Future per-version fields automatically belong inside design_state without requiring schema changes.",
+      "properties": {}
+    }
+  },
+  "required": [
+    "project_id",
+    "account_id",
+    "version_number",
+    "version_name"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

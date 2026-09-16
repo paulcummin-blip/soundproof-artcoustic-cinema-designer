@@ -2,16 +2,19 @@
 //
 // Browser working copy for the Room Designer.
 //
-// KEYED BY PROJECT ID — each project gets its own localStorage entry.
-// A working copy from Project A can never initialise Project B.
+// KEYED BY VERSION ID — each design version gets its own localStorage entry.
+// A working copy from Version A can never initialise Version B, even within
+// the same project. This prevents cross-version data corruption.
 //
-// Key format: b44_roomdesigner_autosave_v2:{projectId}
-// Free-use fallback: b44_roomdesigner_autosave_v2:free
+// Key format: b44_roomdesigner_autosave_v3:{versionId}
+// Legacy v2 keys (project-id-keyed) are migrated once on first load.
+// Free-use fallback: b44_roomdesigner_autosave_v3:free
 //
-// Each stored payload embeds __projectId. On restore, if the stored
-// projectId does not match the current project, the payload is rejected.
+// Each stored payload embeds __versionId and __projectId. On restore, if the
+// stored versionId does not match the current version, the payload is rejected.
 
 const LEGACY_KEY = "b44_roomdesigner_autosave_v1";
+const V2_PREFIX = "b44_roomdesigner_autosave_v2:";
 
 function getProjectIdFromUrl() {
   if (typeof window === "undefined") return null;
@@ -31,6 +34,12 @@ function getProjectIdFromUrl() {
   }
 }
 
+function getVersionKey(versionId) {
+  if (versionId) return `b44_roomdesigner_autosave_v3:${versionId}`;
+  return "b44_roomdesigner_autosave_v3:free";
+}
+
+// Legacy v2 key (project-id-keyed) — used for one-time migration to v3.
 function getProjectKey(projectId) {
   const pid = projectId || getProjectIdFromUrl();
   return pid
@@ -47,37 +56,55 @@ export function safeJsonParse(str) {
 }
 
 /**
- * Load the browser working copy for the current project.
- * Rejects payloads whose embedded __projectId does not match.
- * Falls back to the legacy global key for one-time migration.
- * @param {string} [projectId] - Override (defaults to URL-derived ID).
+ * Load the browser working copy for the current version.
+ * v3 keys are version-id-keyed; v2 keys (project-id-keyed) are tried as
+ * a one-time migration fallback when no v3 key exists yet.
+ * @param {string} [versionId] - Active ProjectVersion ID (v3 key).
+ * @param {string} [projectId] - Project ID (v2 legacy fallback).
  * @returns {{savedAt: number, payload: object}|null}
  */
-export function loadAutosave(projectId) {
+export function loadAutosave(versionId, projectId) {
+  const vid = versionId;
   const pid = projectId || getProjectIdFromUrl();
-  const key = getProjectKey(pid);
+  const v3Key = getVersionKey(vid);
+
   try {
-    const raw = localStorage.getItem(key);
-    if (raw) {
-      const parsed = safeJsonParse(raw);
-      if (!parsed) return null;
-      // Validate project ID match — reject cross-project working copies.
-      if (
-        parsed.payload &&
-        parsed.payload.__projectId &&
-        pid &&
-        parsed.payload.__projectId !== pid
-      ) {
-        return null;
+    // v3: version-id-keyed
+    if (vid) {
+      const raw = localStorage.getItem(v3Key);
+      if (raw) {
+        const parsed = safeJsonParse(raw);
+        if (!parsed) return null;
+        if (
+          parsed.payload &&
+          parsed.payload.__versionId &&
+          parsed.payload.__versionId !== vid
+        ) {
+          return null;
+        }
+        return parsed;
       }
-      return parsed;
     }
 
-    // Migration: try legacy global key (one-time).
-    // SECURITY: Only migrate if the legacy payload carries a positively
-    // matching project ID. Anonymous payloads (no __projectId) must NEVER
-    // initialise an existing saved project. If project identity is absent
-    // or cannot be proven, the legacy payload is ignored.
+    // v2 fallback: project-id-keyed (one-time migration to v3)
+    if (pid) {
+      const v2Key = getProjectKey(pid);
+      const v2Raw = localStorage.getItem(v2Key);
+      if (v2Raw) {
+        const parsed = safeJsonParse(v2Raw);
+        if (!parsed) return null;
+        if (
+          parsed.payload &&
+          parsed.payload.__projectId &&
+          parsed.payload.__projectId !== pid
+        ) {
+          return null;
+        }
+        return parsed;
+      }
+    }
+
+    // v1 legacy global key
     const legacyRaw = localStorage.getItem(LEGACY_KEY);
     if (!legacyRaw) return null;
     const legacy = safeJsonParse(legacyRaw);
@@ -89,12 +116,7 @@ export function loadAutosave(projectId) {
     ) {
       return legacy;
     }
-    // Anonymous or mismatched legacy payload — archive it, do not migrate.
-    try {
-      localStorage.removeItem(LEGACY_KEY);
-    } catch {
-      // ignore
-    }
+    try { localStorage.removeItem(LEGACY_KEY); } catch { /* ignore */ }
     return null;
   } catch {
     return null;
@@ -102,15 +124,18 @@ export function loadAutosave(projectId) {
 }
 
 /**
- * Clear the browser working copy for the current project.
- * Also removes the legacy global key for cleanliness.
- * @param {string} [projectId]
+ * Clear the browser working copy for the current version (v3) or project (v2).
+ * Also removes legacy keys for cleanliness.
+ * @param {string} [versionId] - Active ProjectVersion ID (v3 key).
+ * @param {string} [projectId] - Project ID (v2 legacy cleanup).
  */
-export function clearAutosave(projectId) {
-  const key = getProjectKey(projectId);
+export function clearAutosave(versionId, projectId) {
   try {
-    localStorage.removeItem(key);
-    // Also clean up legacy key if present.
+    if (versionId) localStorage.removeItem(getVersionKey(versionId));
+    // Backward compatibility: old callers pass projectId as the first
+    // argument. Clean up the v2 key using it as a potential project ID.
+    if (versionId) localStorage.removeItem(getProjectKey(versionId));
+    if (projectId) localStorage.removeItem(getProjectKey(projectId));
     localStorage.removeItem(LEGACY_KEY);
   } catch {
     // ignore
@@ -118,20 +143,22 @@ export function clearAutosave(projectId) {
 }
 
 /**
- * Save the browser working copy for the current project.
- * Embeds __projectId so cross-project restore can be rejected.
+ * Save the browser working copy for the current version.
+ * Embeds __versionId and __projectId so cross-version restore can be rejected.
  * @param {object} payload
- * @param {string} [projectId]
+ * @param {string} [versionId] - Active ProjectVersion ID (v3 key).
+ * @param {string} [projectId] - Project ID (embedded for traceability).
  */
-export function saveAutosave(payload, projectId) {
+export function saveAutosave(payload, versionId, projectId) {
+  const vid = versionId;
   const pid = projectId || getProjectIdFromUrl();
-  const key = getProjectKey(pid);
+  const key = getVersionKey(vid);
   try {
     localStorage.setItem(
       key,
       JSON.stringify({
         savedAt: Date.now(),
-        payload: { ...payload, __projectId: pid },
+        payload: { ...payload, __versionId: vid, __projectId: pid },
       })
     );
   } catch {
@@ -140,27 +167,32 @@ export function saveAutosave(payload, projectId) {
 }
 
 /**
- * Get metadata (savedAt) for the current project's working copy.
- * @param {string} [projectId]
+ * Get metadata (savedAt) for the current version's working copy.
+ * @param {string} [versionId] - Active ProjectVersion ID.
+ * @param {string} [projectId] - Project ID (v2 fallback).
  * @returns {{savedAt: number}|null}
  */
-export function getAutosaveMeta(projectId) {
-  const data = loadAutosave(projectId);
+export function getAutosaveMeta(versionId, projectId) {
+  const data = loadAutosave(versionId, projectId);
   if (!data || !data.savedAt) return null;
   return { savedAt: data.savedAt };
 }
 
 /**
  * Very light validity guard so we don't store junk.
- * Also rejects payloads whose __projectId does not match the current project.
+ * Rejects payloads whose __versionId (v3) or __projectId (v2) do not match.
  * @param {object} p
- * @param {string} [projectId]
+ * @param {string} [versionId] - Active ProjectVersion ID.
+ * @param {string} [projectId] - Project ID (v2 fallback).
  * @returns {boolean}
  */
-export function isAutosavePayloadValid(p, projectId) {
+export function isAutosavePayloadValid(p, versionId, projectId) {
   if (!p || typeof p !== "object") return false;
 
-  // Project ID validation: reject cross-project payloads.
+  // Version ID validation (v3): reject cross-version payloads.
+  if (versionId && p.__versionId && p.__versionId !== versionId) return false;
+
+  // Project ID validation (v2 fallback): reject cross-project payloads.
   const currentPid = projectId || getProjectIdFromUrl();
   if (p.__projectId && currentPid && p.__projectId !== currentPid) return false;
 
