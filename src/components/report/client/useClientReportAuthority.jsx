@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAppState } from "@/components/AppStateProvider";
 import { base44 } from "@/api/base44Client";
+import { mergeProjectAndVersion } from "@/lib/versionAuthority";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { useAnalysisSpeakers } from "@/components/hooks/useAnalysisSpeakers";
 import { useEffectiveRsp } from "@/components/room/rsp/useEffectiveRsp";
@@ -128,7 +129,7 @@ export function useClientReportAuthority(projectId) {
 
     setHydrating(true);
 
-    base44.entities.Project.filter({ id: projectId }).then((results) => {
+    base44.entities.Project.filter({ id: projectId }).then(async (results) => {
       if (cancelled) return;
       const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
       if (!p) {
@@ -143,7 +144,22 @@ export function useClientReportAuthority(projectId) {
         client_name: p.client_name,
         created_date: p.created_date,
       });
-      hydrateProjectIntoAppState(p, app, {
+      // Merge with the active ProjectVersion so per-version design fields
+      // come from design_state, not from the legacy Project position.
+      let merged = p;
+      const versionId = p.active_version_id;
+      if (versionId) {
+        try {
+          const versions = await base44.entities.ProjectVersion.filter({ id: versionId });
+          if (cancelled) return;
+          if (versions && versions.length > 0) {
+            merged = mergeProjectAndVersion(p, versions[0]);
+          }
+        } catch (verErr) {
+          console.warn("[useClientReportAuthority] Version fetch failed, using project-only:", verErr);
+        }
+      }
+      hydrateProjectIntoAppState(merged, app, {
         setScreen: app.setScreen,
         setDolbyConfig: app.setDolbyConfig,
         setDolbyPreset: app.setDolbyLayout,

@@ -1,47 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Project } from '@/entities/Project';
+import React from 'react';
+import { useVersionedProjectLoader } from '@/components/hooks/useVersionedProjectLoader';
 import { Button } from '@/components/ui/button';
 import { Printer, Download, Users, Volume2, AlertTriangle } from 'lucide-react';
 import PlanViewDrawing from '../components/report/PlanViewDrawing';
 import ElevationDrawing from '../components/report/ElevationDrawing';
 
 export default function PrintableReport() {
-  const [project, setProject] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    loadProject();
-  }, []);
-
-  const loadProject = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const urlParams = new URLSearchParams(window.location.search);
-      const projectId = urlParams.get('project');
-      
-      if (!projectId) {
-        setError("No project ID provided in URL");
-        setLoading(false);
-        return;
-      }
-
-      const projectData = await Project.filter({ id: projectId });
-      
-      if (projectData && projectData.length > 0) {
-        setProject(projectData[0]);
-      } else {
-        setError("Project not found");
-      }
-    } catch (err) {
-      console.error("Error loading project:", err);
-      setError("Failed to load project data");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const urlParams = new URLSearchParams(window.location.search);
+  const projectId = urlParams.get('project') || urlParams.get('projectId') || urlParams.get('id');
+  const { mergedProject: project, loading, error } = useVersionedProjectLoader(projectId);
 
   const handlePrint = () => {
     window.print();

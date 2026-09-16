@@ -1,11 +1,15 @@
 {
   "name": "Stage2PlacementCache",
   "type": "object",
-  "description": "Persistent Stage 2 subwoofer placement canonical evaluation cache. Product-aware, P14-aware canonical P19/P20 ranking of Stage 1 finalists. Clearly separate from Stage 1 placement search, applied-layout canonical authority, and eight-target P14 cache.",
+  "description": "Persistent Stage 2 subwoofer placement canonical evaluation cache for a project version. Product-aware, P14-aware canonical P19/P20 ranking of Stage 1 finalists. Clearly separate from Stage 1 placement search, applied-layout canonical authority, and eight-target P14 cache.",
   "properties": {
     "project_id": {
       "type": "string",
       "description": "Project identifier owning this Stage 2 placement cache."
+    },
+    "version_id": {
+      "type": "string",
+      "description": "ProjectVersion identifier owning this Stage 2 placement cache. Together with project_id and fingerprint, this is the sole cache lookup key. No NULL version_id fallback path exists."
     },
     "stage2_cache_version": {
       "type": "integer",
@@ -22,7 +26,7 @@
     },
     "current_fingerprint": {
       "type": "string",
-      "description": "Current Stage 2 fingerprint required by the project."
+      "description": "Current Stage 2 fingerprint required by the project version."
     },
     "status": {
       "type": "string",
@@ -98,6 +102,7 @@
     }
   },
   "required": [
-    "project_id"
+    "project_id",
+    "version_id"
   ]
 }

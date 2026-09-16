@@ -17,6 +17,7 @@ import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { deriveSubwoofersFromCfg } from '@/components/utils/deriveSubwoofersFromCfg';
 import { hydrateProjectIntoAppState } from '@/components/utils/hydrateProjectIntoAppState';
+import { mergeProjectAndVersion } from '@/lib/versionAuthority';
 import { useAnalysisSpeakers } from '@/components/hooks/useAnalysisSpeakers';
 import { useAllSeatSplMetrics } from '@/components/hooks/useAllSeatSplMetrics';
 import { useSubwooferSync } from '@/components/hooks/useSubwooferSync';
@@ -241,7 +242,7 @@ function RP22ReportInner() {
             setReportReadyProjectId(null);
         }
 
-        base44.entities.Project.filter({ id: explicitProjectId }).then((results) => {
+        base44.entities.Project.filter({ id: explicitProjectId }).then(async (results) => {
             if (cancelled) return;
             const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
             if (!p) {
@@ -260,7 +261,21 @@ function RP22ReportInner() {
                 created_date: p.created_date,
                 updated_date: p.updated_date,
             });
-            hydrateProjectIntoAppState(p, app, {
+            // Merge with the active ProjectVersion so per-version design fields
+            // come from design_state, not from the legacy Project position.
+            let merged = p;
+            const versionId = p.active_version_id;
+            if (versionId) {
+                try {
+                    const versions = await base44.entities.ProjectVersion.filter({ id: versionId });
+                    if (!cancelled && versions && versions.length > 0) {
+                        merged = mergeProjectAndVersion(p, versions[0]);
+                    }
+                } catch (verErr) {
+                    console.warn("[RP22Report] Version fetch failed, using project-only:", verErr);
+                }
+            }
+            hydrateProjectIntoAppState(merged, app, {
                 setScreen: app.setScreen,
                 setDolbyConfig: app.setDolbyConfig,
                 setDolbyPreset: app.setDolbyLayout,

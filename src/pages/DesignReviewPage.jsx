@@ -24,6 +24,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useAppState } from "@/components/AppStateProvider";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
+import { mergeProjectAndVersion } from "@/lib/versionAuthority";
 import { readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 import { base44 } from "@/api/base44Client";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
@@ -104,14 +105,28 @@ export default function DesignReviewPage() {
     setProjectDetails(null);
     setGeometryReadyProjectId(null);
     setLoadingProject(true);
-    base44.entities.Project.filter({ id: projectId }).then((results) => {
+    base44.entities.Project.filter({ id: projectId }).then(async (results) => {
       if (cancelled) return;
       const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
       if (p) {
+        // Merge with the active ProjectVersion so per-version design fields
+        // come from design_state, not from the legacy Project position.
+        let merged = p;
+        const versionId = p.active_version_id;
+        if (versionId) {
+          try {
+            const versions = await base44.entities.ProjectVersion.filter({ id: versionId });
+            if (!cancelled && versions && versions.length > 0) {
+              merged = mergeProjectAndVersion(p, versions[0]);
+            }
+          } catch (verErr) {
+            console.warn("[DesignReviewPage] Version fetch failed, using project-only:", verErr);
+          }
+        }
         // Preserve live same-project edits; cold/direct loads use the same
         // hydration path as Room Designer and the PDF report before drawing.
         if (!(activeProjectId === projectId && app?.isProjectHydrationReady === true)) {
-          hydrateProjectIntoAppState(p, app, { ...app, setDolbyPreset: app.setDolbyLayout });
+          hydrateProjectIntoAppState(merged, app, { ...app, setDolbyPreset: app.setDolbyLayout });
         }
         setGeometryReadyProjectId(p.id);
       }

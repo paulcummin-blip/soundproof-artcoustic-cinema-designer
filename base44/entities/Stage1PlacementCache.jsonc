@@ -1,11 +1,15 @@
 {
   "name": "Stage1PlacementCache",
   "type": "object",
-  "description": "Persistent Stage 1 subwoofer placement optimisation cache. Product-independent, P14-independent geometric placement search authority. Clearly separate from canonical completed bass authority, eight-target P14 cache, and applied-layout bass result.",
+  "description": "Persistent Stage 1 subwoofer placement optimisation cache for a project version. Product-independent, P14-independent geometric placement search authority. Clearly separate from canonical completed bass authority, eight-target P14 cache, and applied-layout bass result.",
   "properties": {
     "project_id": {
       "type": "string",
       "description": "Project identifier owning this Stage 1 placement cache."
+    },
+    "version_id": {
+      "type": "string",
+      "description": "ProjectVersion identifier owning this Stage 1 placement cache. Together with project_id and fingerprint, this is the sole cache lookup key. No NULL version_id fallback path exists."
     },
     "stage1_cache_version": {
       "type": "integer",
@@ -26,7 +30,7 @@
     },
     "current_fingerprint": {
       "type": "string",
-      "description": "Current Stage 1 fingerprint required by the project."
+      "description": "Current Stage 1 fingerprint required by the project version."
     },
     "status": {
       "type": "string",
@@ -65,6 +69,7 @@
     }
   },
   "required": [
-    "project_id"
+    "project_id",
+    "version_id"
   ]
 }

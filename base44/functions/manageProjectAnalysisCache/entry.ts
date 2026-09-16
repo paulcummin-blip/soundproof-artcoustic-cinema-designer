@@ -8,6 +8,7 @@ function cleanRecord(record) {
   return {
     id: record.id,
     project_id: record.project_id,
+    version_id: record.version_id || null,
     current_fingerprint: record.current_fingerprint || null,
     status: record.status || 'uncalculated',
     completed_by_fingerprint:
@@ -41,6 +42,7 @@ export default async function(req) {
 
     const action = String(body?.action || '').trim().toLowerCase();
     const projectId = String(body?.project_id || '').trim();
+    const versionId = String(body?.version_id || '').trim();
     if (!projectId || !['load', 'save'].includes(action)) {
       return Response.json({ error: 'INVALID_REQUEST' }, { status: 400 });
     }
@@ -58,8 +60,16 @@ export default async function(req) {
       return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
 
+    // version_id is required for cache isolation. If not provided, fall back to
+    // the project's active_version_id (lazy migration safety net).
+    const resolvedVersionId = versionId || project.active_version_id || null;
+    if (!resolvedVersionId) {
+      return Response.json({ error: 'VERSION_ID_REQUIRED' }, { status: 400 });
+    }
+
+    const cacheFilter = { project_id: projectId, version_id: resolvedVersionId };
     const rows = await service.entities.ProjectAnalysisCache.filter(
-      { project_id: projectId },
+      cacheFilter,
       '-updated_date',
       1,
     );
@@ -77,6 +87,7 @@ export default async function(req) {
 
     const payload = {
       project_id: projectId,
+      version_id: resolvedVersionId,
       current_fingerprint:
         input.current_fingerprint == null ? null : String(input.current_fingerprint),
       status,
