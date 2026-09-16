@@ -113,13 +113,13 @@ export class P14TargetBackgroundScheduler {
     this.currentTarget = null;
     this.running = false;
     // FIX 6: Publish "paused" status so the UI shows "Paused — N of 8 prepared".
-    publishP14AnalysisProgress(this.projectId, {
+    publishP14AnalysisProgress(this.projectId, this.versionId, {
       baseDesignFingerprint: this.currentBaseDesignFingerprint,
       status: "paused",
       activeTargetKey: null,
       activeStartedAtMs: null,
     });
-    pauseP14AnalysisJob(this.projectId, { baseDesignFingerprint: this.currentBaseDesignFingerprint });
+    pauseP14AnalysisJob(this.projectId, this.versionId, { baseDesignFingerprint: this.currentBaseDesignFingerprint });
     if (this.pendingCompletion) {
       this.armCompletionProcessTimer();
       return;
@@ -130,6 +130,7 @@ export class P14TargetBackgroundScheduler {
         targetBaseDesignFingerprint: interruptedFingerprint,
         currentBaseDesignFingerprint: this.currentBaseDesignFingerprint,
         projectId: this.projectId,
+        versionId: this.versionId,
         pendingCompletionTargetKey: this.pendingCompletion?.target?.key ?? null,
       });
     }
@@ -144,7 +145,7 @@ export class P14TargetBackgroundScheduler {
     *  Recommended basis as the selected target is preferred. This ensures the
     *  closest targets to the user's selection are calculated first, so a P14
     *  switch to a nearby target is most likely to hit a cached result. */
-  schedule({ projectId, baseDesignFingerprint, foregroundTargetKey, allTargets, designContext }) {
+  schedule({ projectId, versionId, baseDesignFingerprint, foregroundTargetKey, allTargets, designContext }) {
     if (this.currentBaseDesignFingerprint !== baseDesignFingerprint || this.projectId !== projectId) {
       this.cancel();
       this.currentBaseDesignFingerprint = baseDesignFingerprint;
@@ -160,6 +161,7 @@ export class P14TargetBackgroundScheduler {
     this.cancelled = false;
     this.foregroundCalculateInProgress = false;
     this.projectId = projectId;
+    this.versionId = versionId || "free";
     this.foregroundTargetKey = foregroundTargetKey;
     this.allTargets = allTargets;
     this.designContext = designContext;
@@ -214,7 +216,7 @@ export class P14TargetBackgroundScheduler {
     // Skip already-cached targets
     while (this.queue.length > 0) {
       const target = this.queue[0];
-      const cached = getTargetCacheEntry(this.projectId, this.currentBaseDesignFingerprint, target.key);
+      const cached = getTargetCacheEntry(this.projectId, this.versionId, this.currentBaseDesignFingerprint, target.key);
       if (cached) {
         this.queue.shift();
         continue;
@@ -229,7 +231,7 @@ export class P14TargetBackgroundScheduler {
       // pretend the family is 8/8 — successfully completed targets are
       // flushed, missing targets remain identifiable for a later sweep.
       const allKeys = (this.allTargets || []).map((t) => t.key);
-      const progress = getTargetCacheProgress(this.projectId, this.currentBaseDesignFingerprint, allKeys);
+      const progress = getTargetCacheProgress(this.projectId, this.versionId, this.currentBaseDesignFingerprint, allKeys);
       const failed = this.sweepDiagnostics.failedAfterRetry;
       // FIX 6/7: Distinguish "complete" (8/8), "retryable-partial" (some failed),
       // and "calculating" (should not reach here with remaining work).
@@ -238,7 +240,7 @@ export class P14TargetBackgroundScheduler {
         : failed.length > 0
           ? "retryable-partial"
           : "calculating";
-      publishP14AnalysisProgress(this.projectId, {
+      publishP14AnalysisProgress(this.projectId, this.versionId, {
         baseDesignFingerprint: this.currentBaseDesignFingerprint,
         status,
         completed: progress.resolved,
@@ -259,7 +261,7 @@ export class P14TargetBackgroundScheduler {
       // completion (immediate: true); this final write guarantees the full
       // 8/8 snapshot is consistent even if an individual immediate write was
       // coalesced or the last write is still in-flight.
-      flushTargetCachePersistence(this.projectId);
+      flushTargetCachePersistence(this.projectId, this.versionId);
       return;
     }
 
@@ -267,8 +269,8 @@ export class P14TargetBackgroundScheduler {
     const target = this.queue.shift();
     this.currentTarget = target;
     const allKeys = (this.allTargets || []).map((item) => item.key);
-    const progress = getTargetCacheProgress(this.projectId, this.currentBaseDesignFingerprint, allKeys);
-    beginP14AnalysisJob(this.projectId, {
+    const progress = getTargetCacheProgress(this.projectId, this.versionId, this.currentBaseDesignFingerprint, allKeys);
+    beginP14AnalysisJob(this.projectId, this.versionId, {
       baseDesignFingerprint: this.currentBaseDesignFingerprint,
       targetKey: target.key,
       completed: progress.resolved,
@@ -544,6 +546,7 @@ export class P14TargetBackgroundScheduler {
       ? (isLimited
         ? time("cacheInsert", () => setLimitedTargetCacheEntry(
             this.projectId,
+            this.versionId,
             this.currentBaseDesignFingerprint,
             target.key,
             compactContract,
@@ -551,6 +554,7 @@ export class P14TargetBackgroundScheduler {
           ))
         : time("cacheInsert", () => setTargetCacheEntry(
             this.projectId,
+            this.versionId,
             this.currentBaseDesignFingerprint,
             target.key,
             compactContract,
@@ -562,7 +566,7 @@ export class P14TargetBackgroundScheduler {
     // OR limited). A target is complete ONLY when insertion returns true
     // AND getTargetCacheEntry readback returns the contract.
     const readback = insertResult
-      ? time("readback", () => getTargetCacheEntry(this.projectId, this.currentBaseDesignFingerprint, target.key))
+      ? time("readback", () => getTargetCacheEntry(this.projectId, this.versionId, this.currentBaseDesignFingerprint, target.key))
       : null;
 
     pushP14BgTimingRecordFromTimings(target.key, timings);
@@ -637,8 +641,8 @@ export class P14TargetBackgroundScheduler {
       case 'advance': {
         this.retryCounts.delete(target.key);
         const allKeys = (this.allTargets || []).map((item) => item.key);
-        const progress = getTargetCacheProgress(this.projectId, this.currentBaseDesignFingerprint, allKeys);
-        publishP14AnalysisProgress(this.projectId, {
+        const progress = getTargetCacheProgress(this.projectId, this.versionId, this.currentBaseDesignFingerprint, allKeys);
+        publishP14AnalysisProgress(this.projectId, this.versionId, {
           baseDesignFingerprint: this.currentBaseDesignFingerprint,
           status: progress.resolved >= progress.total && progress.total > 0 ? "complete" : "calculating",
           completed: progress.resolved,
@@ -660,8 +664,8 @@ export class P14TargetBackgroundScheduler {
         // resolved so the sweep can reach 8/8 and report "complete".
         this.retryCounts.delete(target.key);
         const allKeys = (this.allTargets || []).map((item) => item.key);
-        const progress = getTargetCacheProgress(this.projectId, this.currentBaseDesignFingerprint, allKeys);
-        publishP14AnalysisProgress(this.projectId, {
+        const progress = getTargetCacheProgress(this.projectId, this.versionId, this.currentBaseDesignFingerprint, allKeys);
+        publishP14AnalysisProgress(this.projectId, this.versionId, {
           baseDesignFingerprint: this.currentBaseDesignFingerprint,
           status: progress.resolved >= progress.total && progress.total > 0 ? "complete" : "calculating",
           completed: progress.resolved,
@@ -788,10 +792,10 @@ export class P14TargetBackgroundScheduler {
     this.running = false;
     this.currentTarget = null;
     this.foregroundCalculateInProgress = false;
-    pauseP14AnalysisJob(projectId, { baseDesignFingerprint: this.currentBaseDesignFingerprint });
+    pauseP14AnalysisJob(projectId, this.versionId, { baseDesignFingerprint: this.currentBaseDesignFingerprint });
     // Completed background targets remain memory-first, then flush as one
     // snapshot when a sweep is interrupted by foreground/user work.
-    if (projectId) flushTargetCachePersistence(projectId);
+    if (projectId) flushTargetCachePersistence(projectId, this.versionId);
   }
 
   isRunning() { return this.running; }
@@ -835,7 +839,7 @@ export class P14TargetBackgroundScheduler {
     this.running = false;
     this.foregroundCalculateInProgress = true;
     // Publish "paused" status so the UI shows "Paused — N of 8 prepared".
-    publishP14AnalysisProgress(this.projectId, {
+    publishP14AnalysisProgress(this.projectId, this.versionId, {
       baseDesignFingerprint: this.currentBaseDesignFingerprint,
       status: "paused",
       activeTargetKey: null,
@@ -851,6 +855,7 @@ export class P14TargetBackgroundScheduler {
         targetBaseDesignFingerprint: interruptedFingerprint,
         currentBaseDesignFingerprint: this.currentBaseDesignFingerprint,
         projectId: this.projectId,
+        versionId: this.versionId,
         pendingCompletionTargetKey: this.pendingCompletion?.target?.key ?? null,
       });
     }

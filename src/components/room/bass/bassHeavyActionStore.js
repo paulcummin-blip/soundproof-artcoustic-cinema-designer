@@ -1,14 +1,13 @@
 import { useSyncExternalStore } from "react";
+import { bassCacheKey } from "./bassCacheKey";
 
 const listeners = new Set();
 const states = new Map();
 let sequence = 0;
 
-const keyFor = (projectId) => String(projectId || "free");
-
-function emptyState(projectId) {
+function emptyState(projectId, versionId) {
   return {
-    projectId: keyFor(projectId),
+    projectId: bassCacheKey(projectId, versionId),
     requestId: null,
     action: null,
     sourceFingerprint: null,
@@ -19,9 +18,9 @@ function emptyState(projectId) {
   };
 }
 
-export function getBassHeavyAction(projectId) {
-  const key = keyFor(projectId);
-  if (!states.has(key)) states.set(key, emptyState(key));
+export function getBassHeavyAction(projectId, versionId) {
+  const key = bassCacheKey(projectId, versionId);
+  if (!states.has(key)) states.set(key, emptyState(projectId, versionId));
   return states.get(key);
 }
 
@@ -30,17 +29,17 @@ export function subscribeBassHeavyAction(listener) {
   return () => listeners.delete(listener);
 }
 
-function publish(projectId, patch) {
-  const key = keyFor(projectId);
-  states.set(key, { ...getBassHeavyAction(key), ...patch, projectId: key });
+function publish(projectId, versionId, patch) {
+  const key = bassCacheKey(projectId, versionId);
+  states.set(key, { ...getBassHeavyAction(projectId, versionId), ...patch, projectId: key });
   listeners.forEach((listener) => listener());
   return states.get(key);
 }
 
-export function requestBassHeavyAction(projectId, action, sourceFingerprint) {
+export function requestBassHeavyAction(projectId, versionId, action, sourceFingerprint) {
   if (!["optimise", "compare"].includes(action) || !sourceFingerprint) return null;
   sequence += 1;
-  return publish(projectId, {
+  return publish(projectId, versionId, {
     requestId: `${action}:${Date.now()}:${sequence}`,
     action,
     sourceFingerprint,
@@ -51,37 +50,37 @@ export function requestBassHeavyAction(projectId, action, sourceFingerprint) {
   });
 }
 
-export function markBassHeavyActionRunning(projectId, requestId) {
-  const current = getBassHeavyAction(projectId);
+export function markBassHeavyActionRunning(projectId, versionId, requestId) {
+  const current = getBassHeavyAction(projectId, versionId);
   if (current.requestId !== requestId) return current;
-  return publish(projectId, { status: "running" });
+  return publish(projectId, versionId, { status: "running" });
 }
 
-export function markBassHeavyActionComplete(projectId, requestId) {
-  const current = getBassHeavyAction(projectId);
+export function markBassHeavyActionComplete(projectId, versionId, requestId) {
+  const current = getBassHeavyAction(projectId, versionId);
   if (current.requestId !== requestId) return current;
-  return publish(projectId, { status: "complete", completedAtMs: Date.now() });
+  return publish(projectId, versionId, { status: "complete", completedAtMs: Date.now() });
 }
 
-export function markBassHeavyActionError(projectId, requestId, error) {
-  const current = getBassHeavyAction(projectId);
+export function markBassHeavyActionError(projectId, versionId, requestId, error) {
+  const current = getBassHeavyAction(projectId, versionId);
   if (current.requestId !== requestId) return current;
-  return publish(projectId, {
+  return publish(projectId, versionId, {
     status: "error",
     error: error || "Bass option analysis could not be completed.",
   });
 }
 
-export function cancelBassHeavyAction(projectId, reason = "cancelled") {
-  const current = getBassHeavyAction(projectId);
+export function cancelBassHeavyAction(projectId, versionId, reason = "cancelled") {
+  const current = getBassHeavyAction(projectId, versionId);
   if (!current.requestId || ["idle", "cancelled"].includes(current.status)) return current;
-  return publish(projectId, { status: "cancelled", error: reason });
+  return publish(projectId, versionId, { status: "cancelled", error: reason });
 }
 
-export function useBassHeavyAction(projectId) {
+export function useBassHeavyAction(projectId, versionId) {
   return useSyncExternalStore(
     subscribeBassHeavyAction,
-    () => getBassHeavyAction(projectId),
-    () => getBassHeavyAction(projectId),
+    () => getBassHeavyAction(projectId, versionId),
+    () => getBassHeavyAction(projectId, versionId),
   );
 }

@@ -27,11 +27,11 @@ import { useIsDragActive } from "@/components/state/userInteractionStore";
  * @param {Array} params.seatingPositions — [{ id, x, y, z?, priority? }]
  * @param {object} params.physicsOptions — modal physics options (optional)
  */
-export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, seatingPositions, physicsOptions, enabled = true, requestId = null }) {
+export function useStage1PlacementOptimiser({ projectId, versionId = "free", roomDims, rspPosition, seatingPositions, physicsOptions, enabled = true, requestId = null }) {
   const state = useSyncExternalStore(
     subscribeStage1,
-    () => getStage1State(projectId),
-    () => getStage1State(projectId),
+    () => getStage1State(projectId, versionId),
+    () => getStage1State(projectId, versionId),
   );
   // FIX 5: Consume the shared interaction authority. When any drag type is
   // active (subwoofer, seat, RSP/MLP, speaker), cancel speculative Stage 1
@@ -62,20 +62,20 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
 
     let cancelled = false;
     (async () => {
-      const hydrated = await hydrateStage1PlacementCache(projectId);
+      const hydrated = await hydrateStage1PlacementCache(projectId, versionId);
       if (cancelled) return;
       setHydratedCache(hydrated || null);
       setHydrationDone(true);
     })();
 
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, versionId]);
 
   // Project geometry can hydrate after the cache query completes. Retain the
   // persisted snapshot and restore as soon as the final fingerprint is known.
   useEffect(() => {
     if (!hydrationDone || !isStage1CacheValid(hydratedCache, fingerprint)) return;
-    publishHydratedStage1(projectId, fingerprint, {
+    publishHydratedStage1(projectId, versionId, fingerprint, {
       one_sub_result: hydratedCache.one_sub_result,
       two_sub_result: hydratedCache.two_sub_result,
       four_sub_result: hydratedCache.four_sub_result,
@@ -95,7 +95,7 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     if (!enabled || !requestId) {
       explicitRequestRef.current = { requestId: null, fingerprint: null };
       stage1PlacementController.cancelActive("explicit-action-required");
-      markStage1Idle(projectId);
+      markStage1Idle(projectId, versionId);
       return;
     }
 
@@ -105,14 +105,14 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     }
     if (!fingerprint) {
       stage1PlacementController.cancelActive("inputs-incomplete");
-      markStage1Idle(projectId);
+      markStage1Idle(projectId, versionId);
       return;
     }
     if (!explicitRequestRef.current.fingerprint) {
       explicitRequestRef.current.fingerprint = fingerprint;
     } else if (explicitRequestRef.current.fingerprint !== fingerprint) {
       stage1PlacementController.cancelActive("request-fingerprint-stale");
-      markStage1Idle(projectId);
+      markStage1Idle(projectId, versionId);
       return;
     }
 
@@ -129,7 +129,7 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     }
 
     if (!fingerprint) {
-      markStage1Idle(projectId);
+      markStage1Idle(projectId, versionId);
       return;
     }
 
@@ -137,7 +137,7 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     // Restore synchronously here as well so scheduling cannot race the restore
     // effect during the same commit.
     if (isStage1CacheValid(hydratedCache, fingerprint)) {
-      publishHydratedStage1(projectId, fingerprint, {
+      publishHydratedStage1(projectId, versionId, fingerprint, {
         one_sub_result: hydratedCache.one_sub_result,
         two_sub_result: hydratedCache.two_sub_result,
         four_sub_result: hydratedCache.four_sub_result,
@@ -146,12 +146,13 @@ export function useStage1PlacementOptimiser({ projectId, roomDims, rspPosition, 
     }
 
     // If the current state already has this fingerprint and is complete, skip
-    const current = getStage1State(projectId);
+    const current = getStage1State(projectId, versionId);
     if (current.status === "complete" && current.fingerprint === fingerprint) return;
 
     // Schedule the search (cancels any existing pending/active search)
     stage1PlacementController.schedule({
       projectId,
+      versionId,
       fingerprint,
       payload: { roomDims, rspPosition, seatingPositions, physicsOptions: physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS },
       delay: STAGE1_START_DELAY_MS,

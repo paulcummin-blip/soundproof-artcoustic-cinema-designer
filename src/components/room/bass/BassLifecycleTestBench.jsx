@@ -29,7 +29,7 @@ export default function BassLifecycleTestBench() {
 
   return (
     <AppStateContext.Provider value={fixture.appState}>
-      <BassBackgroundAnalysisOwner scopeId={SCOPE_ID}>
+      <BassBackgroundAnalysisOwner scopeId={SCOPE_ID} versionId="free">
         <BenchObserver />
       </BassBackgroundAnalysisOwner>
     </AppStateContext.Provider>

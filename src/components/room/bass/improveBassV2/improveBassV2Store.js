@@ -2,20 +2,20 @@
 // State store for the V2 Improve Bass Response workflow.
 // Manages: status, phase, progress, best-so-far, confirmed challengers,
 // winner, error, snapshot, and cancellation.
+// Version-aware: all state is keyed by (projectId, versionId) via bassCacheKey.
 
 import { useSyncExternalStore } from "react";
 import { computeEta } from "./etaCalculator.js";
+import { bassCacheKey } from "../bassCacheKey";
 
 const listeners = new Set();
 const states = new Map();
 
 const MAX_ETA_SAMPLES = 10;
 
-const keyFor = (projectId) => String(projectId || "free");
-
-function emptyState(projectId) {
+function emptyState(projectId, versionId) {
   return {
-    projectId: keyFor(projectId),
+    projectId: bassCacheKey(projectId, versionId),
     status: "idle", // idle | awaiting_stage2 | running | complete | cancelled | error | stale
     phase: "idle", // reviewing | testing_positions | optimising_timing | testing_polarity | balancing_levels | confirming | finalising
     phaseLabel: "",
@@ -51,9 +51,9 @@ function emptyState(projectId) {
   };
 }
 
-export function getImproveBassV2State(projectId) {
-  const key = keyFor(projectId);
-  if (!states.has(key)) states.set(key, emptyState(key));
+export function getImproveBassV2State(projectId, versionId) {
+  const key = bassCacheKey(projectId, versionId);
+  if (!states.has(key)) states.set(key, emptyState(projectId, versionId));
   return states.get(key);
 }
 
@@ -62,16 +62,16 @@ export function subscribeImproveBassV2(listener) {
   return () => listeners.delete(listener);
 }
 
-function publish(projectId, patch) {
-  const key = keyFor(projectId);
-  const current = getImproveBassV2State(key);
+function publish(projectId, versionId, patch) {
+  const key = bassCacheKey(projectId, versionId);
+  const current = getImproveBassV2State(projectId, versionId);
   states.set(key, { ...current, ...patch, projectId: key });
   listeners.forEach((l) => l());
   return states.get(key);
 }
 
-export function setAwaitingStage2(projectId, snapshot) {
-  return publish(projectId, {
+export function setAwaitingStage2(projectId, versionId, snapshot) {
+  return publish(projectId, versionId, {
     status: "awaiting_stage2",
     phase: "awaiting_stage2",
     phaseLabel: "Improving bass response",
@@ -85,11 +85,19 @@ export function setAwaitingStage2(projectId, snapshot) {
     startedAtMs: Date.now(),
     completedAtMs: null,
     cancelRequested: false,
+    // Reset previous-run investigation state so the new run starts clean.
+    stageVerdicts: {},
+    positionSearchPhase: null,
+    subOptimisationExhausted: false,
+    materialSubImprovementFound: false,
+    bestPracticalSubResult: null,
+    runtimeMetrics: null,
+    optimisationDiagnostics: null,
   });
 }
 
-export function startImproveBassV2(projectId, snapshot) {
-  return publish(projectId, {
+export function startImproveBassV2(projectId, versionId, snapshot) {
+  return publish(projectId, versionId, {
     status: "running",
     phase: "reviewing",
     phaseLabel: "Reviewing current design",
@@ -114,8 +122,8 @@ export function startImproveBassV2(projectId, snapshot) {
   });
 }
 
-export function updateProgress(projectId, phase, label, current, total) {
-  const state = getImproveBassV2State(projectId);
+export function updateProgress(projectId, versionId, phase, label, current, total) {
+  const state = getImproveBassV2State(projectId, versionId);
   const now = Date.now();
   const unitTimes = [...(state.unitTimes || [])];
 
@@ -128,7 +136,7 @@ export function updateProgress(projectId, phase, label, current, total) {
 
   const eta = computeEta(unitTimes, current || 0, total || 0, phase);
 
-  return publish(projectId, {
+  return publish(projectId, versionId, {
     phase,
     phaseLabel: label,
     progressCurrent: current || 0,
@@ -140,90 +148,90 @@ export function updateProgress(projectId, phase, label, current, total) {
   });
 }
 
-export function setBestSoFar(projectId, bestSoFar) {
-  return publish(projectId, { bestSoFar });
+export function setBestSoFar(projectId, versionId, bestSoFar) {
+  return publish(projectId, versionId, { bestSoFar });
 }
 
-export function addConfirmedChallenger(projectId, challenger) {
-  const current = getImproveBassV2State(projectId);
+export function addConfirmedChallenger(projectId, versionId, challenger) {
+  const current = getImproveBassV2State(projectId, versionId);
   const confirmed = [...(current.confirmedChallengers || []), challenger];
-  return publish(projectId, { confirmedChallengers: confirmed });
+  return publish(projectId, versionId, { confirmedChallengers: confirmed });
 }
 
-export function setWinner(projectId, winner) {
-  return publish(projectId, {
+export function setWinner(projectId, versionId, winner) {
+  return publish(projectId, versionId, {
     winner,
     status: "complete",
     completedAtMs: Date.now(),
   });
 }
 
-export function setRuntimeMetrics(projectId, runtimeMetrics) {
-  return publish(projectId, { runtimeMetrics });
+export function setRuntimeMetrics(projectId, versionId, runtimeMetrics) {
+  return publish(projectId, versionId, { runtimeMetrics });
 }
 
-export function setOptimisationDiagnostics(projectId, report) {
-  return publish(projectId, { optimisationDiagnostics: report });
+export function setOptimisationDiagnostics(projectId, versionId, report) {
+  return publish(projectId, versionId, { optimisationDiagnostics: report });
 }
 
-export function setPositionSearchPhase(projectId, phase) {
-  return publish(projectId, { positionSearchPhase: phase });
+export function setPositionSearchPhase(projectId, versionId, phase) {
+  return publish(projectId, versionId, { positionSearchPhase: phase });
 }
 
-export function setPositionExhaustion(projectId, exhausted, materialFound, bestPractical) {
-  return publish(projectId, {
+export function setPositionExhaustion(projectId, versionId, exhausted, materialFound, bestPractical) {
+  return publish(projectId, versionId, {
     subOptimisationExhausted: exhausted,
     materialSubImprovementFound: materialFound,
     bestPracticalSubResult: bestPractical,
   });
 }
 
-export function setStageVerdict(projectId, stageKey, verdict) {
-  const state = getImproveBassV2State(projectId);
+export function setStageVerdict(projectId, versionId, stageKey, verdict) {
+  const state = getImproveBassV2State(projectId, versionId);
   const stageVerdicts = { ...(state.stageVerdicts || {}) };
   stageVerdicts[stageKey] = verdict;
-  return publish(projectId, { stageVerdicts });
+  return publish(projectId, versionId, { stageVerdicts });
 }
 
-export function setCancelled(projectId) {
-  return publish(projectId, {
+export function setCancelled(projectId, versionId) {
+  return publish(projectId, versionId, {
     status: "cancelled",
     completedAtMs: Date.now(),
   });
 }
 
-export function setStale(projectId, message) {
-  return publish(projectId, {
+export function setStale(projectId, versionId, message) {
+  return publish(projectId, versionId, {
     status: "stale",
     error: message || "Design changed — optimisation result discarded",
     completedAtMs: Date.now(),
   });
 }
 
-export function setError(projectId, error) {
-  return publish(projectId, {
+export function setError(projectId, versionId, error) {
+  return publish(projectId, versionId, {
     status: "error",
     error: error || "Optimisation could not be completed.",
     completedAtMs: Date.now(),
   });
 }
 
-export function requestCancel(projectId) {
-  return publish(projectId, { cancelRequested: true });
+export function requestCancel(projectId, versionId) {
+  return publish(projectId, versionId, { cancelRequested: true });
 }
 
-export function isCancelRequested(projectId) {
-  return getImproveBassV2State(projectId)?.cancelRequested === true;
+export function isCancelRequested(projectId, versionId) {
+  return getImproveBassV2State(projectId, versionId)?.cancelRequested === true;
 }
 
-export function resetImproveBassV2(projectId) {
-  return publish(projectId, emptyState(projectId));
+export function resetImproveBassV2(projectId, versionId) {
+  return publish(projectId, versionId, emptyState(projectId, versionId));
 }
 
-export function useImproveBassV2State(projectId) {
+export function useImproveBassV2State(projectId, versionId) {
   return useSyncExternalStore(
     subscribeImproveBassV2,
-    () => getImproveBassV2State(projectId),
-    () => getImproveBassV2State(projectId),
+    () => getImproveBassV2State(projectId, versionId),
+    () => getImproveBassV2State(projectId, versionId),
   );
 }

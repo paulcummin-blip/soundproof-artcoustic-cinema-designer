@@ -36,7 +36,7 @@ import { getStage2State, subscribeStage2 } from "./stage2/stage2PlacementStore";
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
 
-export default function BassBackgroundAnalysisOwner({ children, scopeId = "free" }) {
+export default function BassBackgroundAnalysisOwner({ children, scopeId = "free", versionId = "free" }) {
   const appState = useAppState();
   const recommendationsActive = useRecommendationGate();
   const calcAllTargetsRequest = useCalculateAllTargetsRequest();
@@ -44,8 +44,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // to manual Calculate, Improve Bass Response / Stage 2, and recommendation
   // work. These reactive subscriptions ensure the auto-start useEffect re-runs
   // when higher-priority work starts or ends.
-  const heavyAction = useBassHeavyAction(scopeId);
-  const stage2State = useSyncExternalStore(subscribeStage2, () => getStage2State(scopeId), () => getStage2State(scopeId));
+  const heavyAction = useBassHeavyAction(scopeId, versionId);
+  const stage2State = useSyncExternalStore(subscribeStage2, () => getStage2State(scopeId, versionId), () => getStage2State(scopeId, versionId));
   const heavyActionRunning = heavyAction?.status === "requested" || heavyAction?.status === "running";
   const stage2Updating = stage2State?.status === "updating";
   const controllerRef = useRef(null);
@@ -183,22 +183,22 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const allTargetKeys = useMemo(() => allTargets.map((target) => target.key), [allTargets]);
 
   // Reactive cache lookup: returns cached compact contract for the current target, or null
-  const cachedContract = useTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey);
-  const targetFamilyProgress = useTargetCacheProgress(scopeId, baseDesignFingerprint, allTargetKeys);
+  const cachedContract = useTargetCacheEntry(scopeId, versionId, baseDesignFingerprint, targetKey);
+  const targetFamilyProgress = useTargetCacheProgress(scopeId, versionId, baseDesignFingerprint, allTargetKeys);
   const targetDurationSignature = targetFamilyProgress.completedDurationsMs.join("|");
 
   // Hydrate target cache from DB on mount / project change
   const [targetCacheHydrated, setTargetCacheHydrated] = useState(false);
   useEffect(() => {
     setTargetCacheHydrated(false);
-    hydrateTargetCache(scopeId).finally(() => setTargetCacheHydrated(true));
-  }, [scopeId]);
+    hydrateTargetCache(scopeId, versionId).finally(() => setTargetCacheHydrated(true));
+  }, [scopeId, versionId]);
 
   // Clear stale cache after hydration if the design doesn't match
   useEffect(() => {
     if (!targetCacheHydrated || !baseDesignFingerprint) return;
-    clearTargetCacheForDesign(scopeId, baseDesignFingerprint);
-  }, [targetCacheHydrated, baseDesignFingerprint, scopeId]);
+    clearTargetCacheForDesign(scopeId, versionId, baseDesignFingerprint);
+  }, [targetCacheHydrated, baseDesignFingerprint, scopeId, versionId]);
 
   // ── Fallback: completed bass store contract ──────────────────────────
   // When the controller is idle (route return, authority-restored skip),
@@ -213,7 +213,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // when hydration completes so completedContract / completedFingerprint /
   // completedContractMatches / effectiveContract all pick up the hydrated
   // contract without requiring a foreground optimiser run.
-  const completedBassAuthority = useCompletedBassAuthority(scopeId);
+  const completedBassAuthority = useCompletedBassAuthority(scopeId, versionId);
   const completedContract = completedBassAuthority?.contract || null;
   const completedFingerprint = completedContract?.job?.resultFingerprint || null;
   // #1: Persisted completed-bass-authority hydration settled flag. While false,
@@ -387,11 +387,11 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       fingerprint: cacheKey,
     });
 
-    const heavyAction = getBassHeavyAction(scopeId);
+    const heavyAction = getBassHeavyAction(scopeId, versionId);
     if (heavyAction?.requestId
       && heavyAction.sourceFingerprint
       && heavyAction.sourceFingerprint !== cacheKey) {
-      cancelBassHeavyAction(scopeId, "Design changed — request cancelled.");
+      cancelBassHeavyAction(scopeId, versionId, "Design changed — request cancelled.");
     }
 
     if (
@@ -401,9 +401,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       && completedBassAuthority.currentFingerprint !== cacheKey
     ) {
       if (completedBassAuthority.contract || completedBassAuthority.staleContract) {
-        markBassAuthorityStale(scopeId, cacheKey);
+        markBassAuthorityStale(scopeId, versionId, cacheKey);
       } else {
-        markBassAuthorityUpdating(scopeId, null);
+        markBassAuthorityUpdating(scopeId, versionId, null);
       }
     }
 
@@ -458,7 +458,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
       if (isDev) console.log("[bass-prep-watchdog]", "TIMEOUT", { requestId, requestFingerprint });
       if (timingTraceRef.current) timingTraceRef.current.mark("preparationTimeoutMs");
-      markBassAuthorityFailed(scopeId, requestFingerprint, "Bass preparation timed out — please retry.");
+      markBassAuthorityFailed(scopeId, versionId, requestFingerprint, "Bass preparation timed out — please retry.");
       dispatchedManualRequestRef.current = null;
       // FIX 3: Watchdog timeout — terminal "timeout" state, distinct from error.
       setLastTerminalOutcome({ outcome: "timeout", fingerprint: requestFingerprint });
@@ -484,7 +484,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // calculating state, and surface a concise error. No stranded spinner.
     if (authoritative.status === "error") {
       if (timingTraceRef.current) timingTraceRef.current.mark("preparationFailMs");
-      markBassAuthorityFailed(scopeId, cacheKey, authoritative.reason || "Bass analysis preparation failed");
+      markBassAuthorityFailed(scopeId, versionId, cacheKey, authoritative.reason || "Bass analysis preparation failed");
       dispatchedManualRequestRef.current = null;
       // FIX 3: Authoritative preparation failure — terminal "error" state.
       setLastTerminalOutcome({ outcome: "error", fingerprint: cacheKey, message: authoritative.reason || "Bass analysis preparation failed" });
@@ -498,7 +498,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // the 90-second watchdog fires.
     if (authoritative.status === "idle") {
       if (timingTraceRef.current) timingTraceRef.current.mark("preparationFingerprintMismatchMs");
-      markBassAuthorityFailed(scopeId, cacheKey, "Design changed during calculation. Recalculate to analyse the current layout.");
+      markBassAuthorityFailed(scopeId, versionId, cacheKey, "Design changed during calculation. Recalculate to analyse the current layout.");
       dispatchedManualRequestRef.current = null;
       setLastTerminalOutcome({ outcome: "cancelled", fingerprint: cacheKey });
       setManualAnalysisRequest(null);
@@ -536,10 +536,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   ]);
   useEffect(() => () => {
     getP14TargetBackgroundScheduler().cancel();
-    flushTargetCachePersistence(scopeId);
+    flushTargetCachePersistence(scopeId, versionId);
     controller.dispose();
     scopeRef.current?.clear();
-  }, [controller, scopeId]);
+  }, [controller, scopeId, versionId]);
 
   const detailedStatus = LEGACY_STATUS[lifecycle.status] || "IDLE";
   const matchingResult = lifecycle.status === "ready" && lifecycle.resultFingerprint === cacheKey ? lifecycle.result : null;
@@ -753,7 +753,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       // Publish as a LIMITED authority (not AUTHORITATIVE) so the UI can show
       // the P14 capability shortfall without running the optimiser again.
       if (isValidLimitedP14Contract(cachedContract)) {
-        publishCachedLimitedBassContract(scopeId, cachedContract, cacheKey, requested);
+        publishCachedLimitedBassContract(scopeId, versionId, cachedContract, cacheKey, requested);
         return;
       }
       // Stage 4: publish cached compact contract with full safety guards.
@@ -761,7 +761,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       // expected full result fingerprint. requested = the selected P14 target
       // identity. publishCachedCompactBassContract rejects any contract that
       // doesn't match both, or lacks the graph payload, or isn't AUTHORITATIVE.
-      publishCachedCompactBassContract(scopeId, cachedContract, cacheKey, requested);
+      publishCachedCompactBassContract(scopeId, versionId, cachedContract, cacheKey, requested);
       return;
     }
     // ── Authority already restored: no publish, no sync, no recalculation ──
@@ -773,7 +773,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // so the active-result test is !contract?.selectedCandidate, not !contract.
     // Don't call syncPersistentBassAuthority with a shell contract — it would
     // needlessly rewrite the DB. The authority is already live.
-    if (!contract?.selectedCandidate && fingerprints && hasAuthoritativeResult(scopeId, cacheKey)) {
+    if (!contract?.selectedCandidate && fingerprints && hasAuthoritativeResult(scopeId, versionId, cacheKey)) {
       // ── Bridge restored authority into P14 target cache ────────────────
       // On a fresh reopen, the completed authority hydrates from DB but the
       // target cache may be empty (e.g. after a base-design fingerprint change
@@ -795,13 +795,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         && completedBassAuthority?.authoritative
         && completedBassAuthority?.currentFingerprint === cacheKey
       ) {
-        const restoredContract = getCompletedBassContract(scopeId);
+        const restoredContract = getCompletedBassContract(scopeId, versionId);
         if (
           restoredContract
           && isAuthoritativeBassContract(restoredContract)
           && bassContractMatchesRequestedP14(restoredContract, requested)
         ) {
-          setTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey, restoredContract, { immediate: true });
+          setTargetCacheEntry(scopeId, versionId, baseDesignFingerprint, targetKey, restoredContract, { immediate: true });
         }
       }
       return;
@@ -810,8 +810,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       // Subwoofer instances / project inputs may still be hydrating. Don't wipe
       // a valid hydrated authoritative result until the live fingerprint can be
       // evaluated and a mismatch confirmed.
-      if (!hasAuthoritativeResult(scopeId)) {
-        markBassAuthorityBlocked(scopeId);
+      if (!hasAuthoritativeResult(scopeId, versionId)) {
+        markBassAuthorityBlocked(scopeId, versionId);
       }
       return;
     }
@@ -823,7 +823,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         contract?.job?.errorMessage
         || lifecycle?.errorMessage
         || "Bass calculation could not be completed. Please try again.";
-      markBassAuthorityFailed(scopeId, cacheKey, message);
+      markBassAuthorityFailed(scopeId, versionId, cacheKey, message);
       setLastTerminalOutcome({ outcome: "error", fingerprint: cacheKey, message });
       dispatchedManualRequestRef.current = null;
       setManualAnalysisRequest(null);
@@ -832,15 +832,15 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     const jobComplete = contract?.job?.status === "complete" || contract?.job?.status === "ready";
     const p19Ready = hasReadyCanonicalP19Contract(contract);
     if (jobComplete && !p19Ready) {
-      if (!hasAuthoritativeResult(scopeId, cacheKey)) {
-        markBassAuthorityUpdating(scopeId, cacheKey);
+      if (!hasAuthoritativeResult(scopeId, versionId, cacheKey)) {
+        markBassAuthorityUpdating(scopeId, versionId, cacheKey);
       }
       return;
     }
     // FIX 4: publishCompletedBassContract returns true ONLY for authoritative
     // acceptance. A structurally complete but NOT_VERIFIED contract returns
     // false — treat that as a terminal rejected state, not success.
-    const published = publishCompletedBassContract(scopeId, contract);
+    const published = publishCompletedBassContract(scopeId, versionId, contract);
     if (published && timingTraceRef.current && timingTraceRef.current.trace.publicationMs === null) {
       timingTraceRef.current.mark("publicationMs");
     }
@@ -854,8 +854,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         setLastTerminalOutcome({ outcome: "rejected", fingerprint: cacheKey, message: "Bass calculation could not be verified." });
         dispatchedManualRequestRef.current = null;
         setManualAnalysisRequest(null);
-      } else if (!hasAuthoritativeResult(scopeId, cacheKey)) {
-        markBassAuthorityUpdating(scopeId, cacheKey);
+      } else if (!hasAuthoritativeResult(scopeId, versionId, cacheKey)) {
+        markBassAuthorityUpdating(scopeId, versionId, cacheKey);
       }
     }
     // ── #2: Current authority persistence invariant ──────────────────────
@@ -872,7 +872,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // lifecycle, a transient hydration target, a background target the user did
     // not select, or cacheKey without first proving the completed contract
     // equals it.
-    const completedContract = getCompletedBassContract(scopeId);
+    const completedContract = getCompletedBassContract(scopeId, versionId);
     const resultFingerprint = completedContract?.job?.resultFingerprint || null;
     const canPersistCurrent = jobComplete
       && p19Ready
@@ -883,7 +883,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       && resultFingerprint === cacheKey
       && hasGraphPayload(completedContract);
     if (canPersistCurrent) {
-      syncPersistentBassAuthority(scopeId, resultFingerprint, completedContract);
+      syncPersistentBassAuthority(scopeId, versionId, resultFingerprint, completedContract);
     }
     // ── Stage 4 / #5: Foreground target enters family first ─────────────
     // After foreground publication succeeds, write the authoritative compact
@@ -893,7 +893,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // contain only 7 targets. Gated on canPersistCurrent so only a fully
     // verified current foreground contract enters the family.
     if (published && baseDesignFingerprint && targetKey && canPersistCurrent) {
-      setTargetCacheEntry(scopeId, baseDesignFingerprint, targetKey, completedContract, { immediate: true });
+      setTargetCacheEntry(scopeId, versionId, baseDesignFingerprint, targetKey, completedContract, { immediate: true });
     }
     // Record contract-published ONLY when publishCompletedBassContract returned
     // true — not when authority is merely marked updating.
@@ -902,7 +902,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       publishedContractTokensRef.current.add(publishedToken);
       recordDiagStage(publishedToken, "contract-published", { contractAnalysisId: contract?.analysisId || null, contractFingerprint: resultFingerprint });
     }
-  }, [scopeId, cacheKey, contract, fingerprints, cachedContract, manualRequestMatchesCurrent, isProjectHydrationReady, baseDesignFingerprint, targetKey, bassAuthorityHydrationSettled]);
+  }, [scopeId, versionId, cacheKey, contract, fingerprints, cachedContract, manualRequestMatchesCurrent, isProjectHydrationReady, baseDesignFingerprint, targetKey, bassAuthorityHydrationSettled]);
 
   const publishedStagesRef = useRef(new Set());
   useEffect(() => {
@@ -930,7 +930,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       getP14TargetBackgroundScheduler().pauseForForegroundCalculate();
       controller.cancelActive("manual-replaced");
       dispatchedManualRequestRef.current = null;
-      markBassAuthorityUpdating(scopeId, cacheKey);
+      markBassAuthorityUpdating(scopeId, versionId, cacheKey);
       const id = `manual-bass-${++manualRequestSequenceRef.current}`;
       // PASS 2: normalizedFingerprint removed — the authoritative simulation
       // now provides perSourceRspComplexTransfers directly. The cacheKey
@@ -1040,15 +1040,15 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       completedDurationsMs: targetFamilyProgress.completedDurationsMs,
     };
     if (targetFamilyProgress.total > 0 && targetFamilyProgress.resolved >= targetFamilyProgress.total) {
-      publishP14AnalysisProgress(scopeId, { ...basePatch, status: "complete", activeTargetKey: null, activeStartedAtMs: null });
+      publishP14AnalysisProgress(scopeId, versionId, { ...basePatch, status: "complete", activeTargetKey: null, activeStartedAtMs: null });
       return;
     }
     if (hydrationGated) {
-      publishP14AnalysisProgress(scopeId, { ...basePatch, status: "idle", activeTargetKey: null, activeStartedAtMs: null });
+      publishP14AnalysisProgress(scopeId, versionId, { ...basePatch, status: "idle", activeTargetKey: null, activeStartedAtMs: null });
       return;
     }
     if ((lifecycle.status === "queued" || lifecycle.status === "calculating") && targetKey) {
-      beginP14AnalysisJob(scopeId, { ...basePatch, targetKey });
+      beginP14AnalysisJob(scopeId, versionId, { ...basePatch, targetKey });
       return;
     }
     // FIX 1: Fallthrough — partial cache with no foreground calculation.
@@ -1056,16 +1056,16 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // Preserve "retryable-partial" and "paused" statuses from the scheduler.
     // Otherwise publish "idle" — cache incompleteness is NOT active work.
     const scheduler = getP14TargetBackgroundScheduler();
-    const currentProgress = getP14AnalysisProgress(scopeId);
+    const currentProgress = getP14AnalysisProgress(scopeId, versionId);
     const currentStatus = currentProgress?.status;
     if (scheduler.hasActiveBatchWork()
       || currentStatus === "retryable-partial"
       || currentStatus === "paused") {
       // Scheduler owns the status or a terminal/paused status exists —
       // update counts only, preserve the scheduler's published status.
-      publishP14AnalysisProgress(scopeId, basePatch);
+      publishP14AnalysisProgress(scopeId, versionId, basePatch);
     } else {
-      publishP14AnalysisProgress(scopeId, { ...basePatch, status: "idle", activeTargetKey: null, activeStartedAtMs: null });
+      publishP14AnalysisProgress(scopeId, versionId, { ...basePatch, status: "idle", activeTargetKey: null, activeStartedAtMs: null });
     }
   }, [scopeId, baseDesignFingerprint, targetKey, targetCacheHydrated, bassAuthorityHydrationSettled, targetFamilyProgress.resolved, targetFamilyProgress.total, targetDurationSignature, lifecycle.status]);
 
@@ -1138,7 +1138,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     }
 
     // FIX 6: Don't auto-start if retryable-partial — user must press Retry.
-    const currentProgress = getP14AnalysisProgress(scopeId);
+    const currentProgress = getP14AnalysisProgress(scopeId, versionId);
     if (currentProgress?.status === "retryable-partial") {
       return;
     }

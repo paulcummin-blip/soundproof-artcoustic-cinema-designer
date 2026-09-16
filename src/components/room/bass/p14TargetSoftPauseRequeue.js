@@ -34,13 +34,14 @@ export function requeueInterruptedTargetOnSoftPause({
   targetBaseDesignFingerprint,
   currentBaseDesignFingerprint,
   projectId,
+  versionId,
   pendingCompletionTargetKey = null,
 }) {
   if (!target) return false;
   // Guard 1: fingerprint unchanged (soft pause only).
   if (targetBaseDesignFingerprint !== currentBaseDesignFingerprint) return false;
   // Guard 2: not already cached.
-  if (getTargetCacheEntry(projectId, currentBaseDesignFingerprint, target.key)) return false;
+  if (getTargetCacheEntry(projectId, versionId, currentBaseDesignFingerprint, target.key)) return false;
   // Guard 3: not already queued (no duplicate).
   if (queue.some((t) => t.key === target.key)) return false;
   // Guard 4: no pending completed result for this target.

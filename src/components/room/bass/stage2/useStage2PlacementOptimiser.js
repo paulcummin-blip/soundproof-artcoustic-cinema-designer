@@ -76,6 +76,7 @@ function resolveQuantityOrder(currentQuantity) {
  */
 export function useStage2PlacementOptimiser({
   projectId,
+  versionId = "free",
   roomDims,
   rspPosition,
   seatingPositions,
@@ -89,8 +90,8 @@ export function useStage2PlacementOptimiser({
 }) {
   const state = useSyncExternalStore(
     subscribeStage2,
-    () => getStage2State(projectId),
-    () => getStage2State(projectId),
+    () => getStage2State(projectId, versionId),
+    () => getStage2State(projectId, versionId),
   );
 
   // FIX 5: Consume the shared interaction authority. When any drag type is
@@ -100,8 +101,8 @@ export function useStage2PlacementOptimiser({
 
   const stage1State = useSyncExternalStore(
     subscribeStage1,
-    () => getStage1State(projectId),
-    () => getStage1State(projectId),
+    () => getStage1State(projectId, versionId),
+    () => getStage1State(projectId, versionId),
   );
 
   const [hydrationDone, setHydrationDone] = useState(false);
@@ -202,21 +203,21 @@ export function useStage2PlacementOptimiser({
 
     let cancelled = false;
     (async () => {
-      const hydrated = await hydrateStage2PlacementCache(projectId);
+      const hydrated = await hydrateStage2PlacementCache(projectId, versionId);
       if (cancelled) return;
       setHydratedCache(hydrated || null);
       setHydrationDone(true);
     })();
 
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, versionId]);
 
   // Restore from persisted cache when valid. No longer requires the 8/8 P14
   // family — Stage 2 only needs the authoritative selected P14 result and
   // valid placement/raw authority.
   useEffect(() => {
     if (!hydrationDone || !isStage2CacheValid(hydratedCache, fingerprint)) return;
-    publishHydratedStage2(projectId, fingerprint, {
+    publishHydratedStage2(projectId, versionId, fingerprint, {
       placement_fingerprint: hydratedCache.placement_fingerprint,
       one_sub_result: hydratedCache.one_sub_result,
       two_sub_result: hydratedCache.two_sub_result,
@@ -259,7 +260,7 @@ export function useStage2PlacementOptimiser({
     if (!enabled || !requestId) {
       explicitRequestRef.current = { requestId: null, fingerprint: null };
       stage2PlacementController.cancelAll("explicit-action-required");
-      markStage2Idle(projectId);
+      markStage2Idle(projectId, versionId);
       return;
     }
 
@@ -276,7 +277,7 @@ export function useStage2PlacementOptimiser({
       && explicitRequestRef.current.fingerprint
       && explicitRequestRef.current.fingerprint !== fingerprint) {
       stage2PlacementController.cancelAll("request-fingerprint-stale");
-      markStage2Idle(projectId);
+      markStage2Idle(projectId, versionId);
       return;
     }
 
@@ -294,12 +295,12 @@ export function useStage2PlacementOptimiser({
 
     if (!fingerprint) {
       stage2PlacementController.cancelAll("inputs-incomplete");
-      markStage2Idle(projectId);
+      markStage2Idle(projectId, versionId);
       return;
     }
 
     // If the current state already has this fingerprint and is complete, skip
-    const current = getStage2State(projectId);
+    const current = getStage2State(projectId, versionId);
     if (current.status === "complete" && current.fingerprint === fingerprint) return;
 
     // Build promotion plan from Stage 1 finalists
@@ -315,6 +316,7 @@ export function useStage2PlacementOptimiser({
 
     stage2PlacementController.schedule({
       projectId,
+      versionId,
       fingerprint,
       placementFingerprint,
       confirmationFingerprint,

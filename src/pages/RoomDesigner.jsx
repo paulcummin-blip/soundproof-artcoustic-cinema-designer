@@ -656,6 +656,7 @@ function RoomDesignerWithState() {
     && ["requested", "running", "complete"].includes(bassHeavyAction.status);
   const stage1Optimisation = useStage1PlacementOptimiser({
     projectId: activeProjectId,
+    versionId: appState?.activeVersionId || "free",
     roomDims: stableDimensions,
     rspPosition: mlpAnchorEffective,
     seatingPositions: _seatingPositions,
@@ -700,6 +701,7 @@ function RoomDesignerWithState() {
 
   const stage2Optimisation = useStage2PlacementOptimiser({
     projectId: activeProjectId,
+    versionId: appState?.activeVersionId || "free",
     roomDims: stableDimensions,
     rspPosition: mlpAnchorEffective,
     seatingPositions: _seatingPositions,
@@ -1964,7 +1966,7 @@ function RoomDesignerWithState() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <BassBackgroundAnalysisOwner key={resolvedProjectId || "free"} scopeId={resolvedProjectId || "free"}>
+      <BassBackgroundAnalysisOwner key={resolvedProjectId || "free"} scopeId={resolvedProjectId || "free"} versionId={appState?.activeVersionId || "free"}>
       {showAsdr && minimumSystemMet && (
         <DesignRecommendationEngine
           key={`asdr-recommendations:${resolvedProjectId || projectIdState || "free"}`}

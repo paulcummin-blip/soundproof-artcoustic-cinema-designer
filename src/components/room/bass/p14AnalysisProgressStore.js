@@ -1,15 +1,12 @@
 import { useSyncExternalStore } from "react";
+import { bassCacheKey } from "./bassCacheKey";
 
 const listeners = new Set();
 const memoryByProject = new Map();
 
-function projectKey(projectId) {
-  return String(projectId || "free");
-}
-
-function emptyProgress(projectId) {
+function emptyProgress(projectId, versionId) {
   return {
-    projectId: projectKey(projectId),
+    projectId: bassCacheKey(projectId, versionId),
     baseDesignFingerprint: null,
     status: "idle",
     completed: 0,
@@ -22,9 +19,9 @@ function emptyProgress(projectId) {
   };
 }
 
-function getMemory(projectId) {
-  const key = projectKey(projectId);
-  if (!memoryByProject.has(key)) memoryByProject.set(key, emptyProgress(key));
+function getMemory(projectId, versionId) {
+  const key = bassCacheKey(projectId, versionId);
+  if (!memoryByProject.has(key)) memoryByProject.set(key, emptyProgress(projectId, versionId));
   return memoryByProject.get(key);
 }
 
@@ -39,8 +36,8 @@ function finiteDurations(values) {
     .slice(-8);
 }
 
-export function getP14AnalysisProgress(projectId) {
-  return getMemory(projectId);
+export function getP14AnalysisProgress(projectId, versionId) {
+  return getMemory(projectId, versionId);
 }
 
 export function subscribeP14AnalysisProgress(listener) {
@@ -48,13 +45,13 @@ export function subscribeP14AnalysisProgress(listener) {
   return () => listeners.delete(listener);
 }
 
-export function publishP14AnalysisProgress(projectId, patch = {}) {
-  const key = projectKey(projectId);
-  const previous = getMemory(key);
+export function publishP14AnalysisProgress(projectId, versionId, patch = {}) {
+  const key = bassCacheKey(projectId, versionId);
+  const previous = getMemory(projectId, versionId);
   const fingerprintChanged = patch.baseDesignFingerprint
     && previous.baseDesignFingerprint
     && patch.baseDesignFingerprint !== previous.baseDesignFingerprint;
-  const base = fingerprintChanged ? emptyProgress(key) : previous;
+  const base = fingerprintChanged ? emptyProgress(projectId, versionId) : previous;
   const next = {
     ...base,
     ...patch,
@@ -83,18 +80,18 @@ export function publishP14AnalysisProgress(projectId, patch = {}) {
   return next;
 }
 
-export function beginP14AnalysisJob(projectId, {
+export function beginP14AnalysisJob(projectId, versionId, {
   baseDesignFingerprint,
   targetKey,
   completed,
   total,
   completedDurationsMs,
 } = {}) {
-  const previous = getMemory(projectId);
+  const previous = getMemory(projectId, versionId);
   const sameJob = previous.baseDesignFingerprint === baseDesignFingerprint
     && previous.activeTargetKey === targetKey
     && Number.isFinite(previous.activeStartedAtMs);
-  return publishP14AnalysisProgress(projectId, {
+  return publishP14AnalysisProgress(projectId, versionId, {
     baseDesignFingerprint,
     status: "calculating",
     completed,
@@ -105,19 +102,19 @@ export function beginP14AnalysisJob(projectId, {
   });
 }
 
-export function pauseP14AnalysisJob(projectId, { baseDesignFingerprint } = {}) {
-  return publishP14AnalysisProgress(projectId, {
+export function pauseP14AnalysisJob(projectId, versionId, { baseDesignFingerprint } = {}) {
+  return publishP14AnalysisProgress(projectId, versionId, {
     baseDesignFingerprint,
     activeTargetKey: null,
     activeStartedAtMs: null,
   });
 }
 
-export function useP14AnalysisProgress(projectId) {
+export function useP14AnalysisProgress(projectId, versionId) {
   return useSyncExternalStore(
     subscribeP14AnalysisProgress,
-    () => getP14AnalysisProgress(projectId),
-    () => getP14AnalysisProgress(projectId),
+    () => getP14AnalysisProgress(projectId, versionId),
+    () => getP14AnalysisProgress(projectId, versionId),
   );
 }
 
@@ -142,9 +139,6 @@ export function presentP14AnalysisProgress(progress, nowMs = Date.now()) {
     return { label: `${total} of ${total} prepared`, etaSeconds: null, complete: true };
   }
 
-  // Hydration gate: "idle" status means the persisted cache hasn't been read
-  // yet or no work is in progress. Don't show "Calculating N/8" — it's a
-  // transient flash before the hydrated family resolves.
   if (progress?.status === "idle") {
     if (completed > 0) {
       return { label: `${completed} of ${total} prepared`, etaSeconds: null, complete: false };
@@ -152,24 +146,14 @@ export function presentP14AnalysisProgress(progress, nowMs = Date.now()) {
     return { label: "Preparing…", etaSeconds: null, complete: false };
   }
 
-  // FIX 6: Paused status — the sweep was paused by user interaction or a
-  // foreground manual Calculate. The batch is still alive; missing targets
-  // will resume after the pause ends.
   if (progress?.status === "paused") {
     return { label: `Paused — ${completed} of ${total} prepared`, etaSeconds: null, complete: false };
   }
 
-  // FIX 7: Retryable-partial status — one or more targets exhausted retry
-  // attempts. Verified results are preserved; the designer can press Prepare
-  // All again to retry only the missing targets.
   if (progress?.status === "retryable-partial") {
     return { label: `${completed} of ${total} prepared — retry`, etaSeconds: null, complete: false, retryable: true };
   }
 
-  // Secondary status label — small, non-blocking. Shows completed count,
-  // not the ordinal, so a stuck queue honestly reports "2 of 8 prepared"
-  // without implying active progress. ETA is computed for internal/debug
-  // use but is NOT shown in the user-facing label.
   const active = !!progress?.activeTargetKey;
   const baseLabel = active
     ? `Preparing ${Math.min(completed + 1, total)} of ${total}`
