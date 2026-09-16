@@ -4,15 +4,16 @@
 // Fixes the worker backlog issue: rapid geometry changes terminate obsolete workers.
 
 import { STAGE1_START_DELAY_MS, STAGE1_DEBOUNCE_MS } from "./stage1Constants";
+import { bassCacheKey } from "../bassCacheKey";
 
 const listeners = new Set();
 const memoryByProject = new Map();
 
 function notify() { listeners.forEach((l) => l()); }
 
-function emptyState(projectId) {
+function emptyState(projectId, versionId) {
   return {
-    projectId: String(projectId || "free"),
+    projectId: bassCacheKey(projectId, versionId),
     status: "idle",
     fingerprint: null,
     one_sub_result: null,
@@ -26,23 +27,23 @@ function emptyState(projectId) {
   };
 }
 
-function getMemory(projectId) {
-  const key = String(projectId || "free");
-  if (!memoryByProject.has(key)) memoryByProject.set(key, emptyState(key));
+function getMemory(projectId, versionId) {
+  const key = bassCacheKey(projectId, versionId);
+  if (!memoryByProject.has(key)) memoryByProject.set(key, emptyState(projectId, versionId));
   return memoryByProject.get(key);
 }
 
-function setMemory(projectId, patch) {
-  const key = String(projectId || "free");
-  const prev = memoryByProject.get(key) || emptyState(key);
+function setMemory(projectId, versionId, patch) {
+  const key = bassCacheKey(projectId, versionId);
+  const prev = memoryByProject.get(key) || emptyState(projectId, versionId);
   const next = { ...prev, ...patch };
   memoryByProject.set(key, next);
   notify();
   return next;
 }
 
-export function getStage1State(projectId) {
-  return getMemory(projectId);
+export function getStage1State(projectId, versionId) {
+  return getMemory(projectId, versionId);
 }
 
 export function subscribeStage1(listener) {
@@ -53,8 +54,8 @@ export function subscribeStage1(listener) {
 /**
  * Publish a hydrated cache result as the live state (reopen path).
  */
-export function publishHydratedStage1(projectId, fingerprint, results) {
-  return setMemory(projectId, {
+export function publishHydratedStage1(projectId, versionId, fingerprint, results) {
+  return setMemory(projectId, versionId, {
     status: "complete",
     fingerprint,
     one_sub_result: results?.one_sub_result || null,
@@ -67,11 +68,8 @@ export function publishHydratedStage1(projectId, fingerprint, results) {
   });
 }
 
-/**
- * Mark Stage 1 as updating (worker in progress).
- */
-export function markStage1Updating(projectId, fingerprint) {
-  return setMemory(projectId, {
+export function markStage1Updating(projectId, versionId, fingerprint) {
+  return setMemory(projectId, versionId, {
     status: "updating",
     fingerprint,
     isUpdating: true,
@@ -80,11 +78,8 @@ export function markStage1Updating(projectId, fingerprint) {
   });
 }
 
-/**
- * Publish completed Stage 1 results.
- */
-export function publishStage1Complete(projectId, fingerprint, results) {
-  return setMemory(projectId, {
+export function publishStage1Complete(projectId, versionId, fingerprint, results) {
+  return setMemory(projectId, versionId, {
     status: "complete",
     fingerprint,
     one_sub_result: results?.one_sub_result || null,
@@ -97,11 +92,8 @@ export function publishStage1Complete(projectId, fingerprint, results) {
   });
 }
 
-/**
- * Mark Stage 1 as idle (invalid inputs).
- */
-export function markStage1Idle(projectId) {
-  return setMemory(projectId, {
+export function markStage1Idle(projectId, versionId) {
+  return setMemory(projectId, versionId, {
     status: "idle",
     fingerprint: null,
     isUpdating: false,
@@ -109,11 +101,8 @@ export function markStage1Idle(projectId) {
   });
 }
 
-/**
- * Mark Stage 1 as error.
- */
-export function markStage1Error(projectId, fingerprint, errorMessage) {
-  return setMemory(projectId, {
+export function markStage1Error(projectId, versionId, fingerprint, errorMessage) {
+  return setMemory(projectId, versionId, {
     status: "error",
     fingerprint,
     isUpdating: false,
@@ -121,10 +110,9 @@ export function markStage1Error(projectId, fingerprint, errorMessage) {
   });
 }
 
-// Settle cancelled/superseded work without changing completed acoustic results.
 function markStage1Stopped(request, outcome) {
   if (!request) return;
-  setMemory(request.projectId, {
+  setMemory(request.projectId, request.versionId, {
     status: outcome === "superseded" || outcome === "request-fingerprint-stale" ? "stale" : "cancelled",
     fingerprint: request.fingerprint,
     isUpdating: false,
@@ -152,36 +140,29 @@ class Stage1PlacementController {
    * Schedule a Stage 1 search. Cancels any existing pending/active search.
    * Debounces rapid geometry changes.
    */
-  schedule({ projectId, fingerprint, payload, delay }) {
-    // Cancel any existing timer
+  schedule({ projectId, versionId, fingerprint, payload, delay }) {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
-
-    // Cancel any active worker
     this.cancelActive("superseded");
 
     if (!fingerprint) {
-      markStage1Idle(projectId);
+      markStage1Idle(projectId, versionId);
       return;
     }
 
-    // Mark as updating
-    markStage1Updating(projectId, fingerprint);
+    markStage1Updating(projectId, versionId, fingerprint);
 
     const waitMs = Number.isFinite(delay) ? delay : this.startDelayMs;
-    this.pendingRequest = { projectId, fingerprint };
+    this.pendingRequest = { projectId, versionId, fingerprint };
     this.timer = setTimeout(() => {
       this.timer = null;
       this.pendingRequest = null;
-      this.start({ projectId, fingerprint, payload });
+      this.start({ projectId, versionId, fingerprint, payload });
     }, waitMs);
   }
 
-  /**
-   * Start a worker for the Stage 1 search.
-   */
-  start({ projectId, fingerprint, payload }) {
+  start({ projectId, versionId, fingerprint, payload }) {
     const requestId = `stage1-${++this.requestSequence}`;
-    this.activeRequest = { requestId, fingerprint, projectId, startedAtMs: performance.now() };
+    this.activeRequest = { requestId, fingerprint, projectId, versionId, startedAtMs: performance.now() };
 
     try {
       if (!this.worker) {
@@ -222,9 +203,8 @@ class Stage1PlacementController {
 
     if (message.type === "complete") {
       this.activeRequest = null;
-      publishStage1Complete(active.projectId, active.fingerprint, message.result?.results || null);
-      // Persist asynchronously
-      this.persist(active.projectId, active.fingerprint, message.result?.results);
+      publishStage1Complete(active.projectId, active.versionId, active.fingerprint, message.result?.results || null);
+      this.persist(active.projectId, active.versionId, active.fingerprint, message.result?.results);
     }
   }
 
@@ -236,7 +216,7 @@ class Stage1PlacementController {
     const active = this.activeRequest;
     if (!active) return;
     this.activeRequest = null;
-    markStage1Error(active.projectId, active.fingerprint, errorMessage);
+    markStage1Error(active.projectId, active.versionId, active.fingerprint, errorMessage);
   }
 
   /**
@@ -262,11 +242,11 @@ class Stage1PlacementController {
   /**
    * Persist results to DB (async, non-blocking).
    */
-  async persist(projectId, fingerprint, results) {
+  async persist(projectId, versionId, fingerprint, results) {
     if (!projectId || projectId === "free" || !results) return;
     try {
       const { syncStage1PlacementCache } = await import("./stage1PlacementPersistence");
-      await syncStage1PlacementCache(projectId, fingerprint, results, null);
+      await syncStage1PlacementCache(projectId, versionId, fingerprint, results, null);
     } catch { /* non-fatal */ }
   }
 
