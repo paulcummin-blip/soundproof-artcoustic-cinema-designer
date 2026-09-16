@@ -4,6 +4,7 @@
 // and eight-target P14 cache.
 
 import { base44 } from "@/api/base44Client";
+import { bassDbFilter } from "../bassCacheKey";
 import {
   STAGE2_CACHE_VERSION,
   STAGE2_RANKING_VERSION,
@@ -13,12 +14,13 @@ import {
 /**
  * Hydrate the Stage 2 placement cache from the database.
  * @param {string} projectId
+ * @param {string} versionId
  * @returns {Promise<object|null>} persisted cache, or null if not found
  */
-export async function hydrateStage2PlacementCache(projectId) {
-  if (!projectId) return null;
+export async function hydrateStage2PlacementCache(projectId, versionId) {
+  if (!projectId || !versionId) return null;
   try {
-    const records = await base44.entities.Stage2PlacementCache.filter({ project_id: projectId }, "-updated_date", 1);
+    const records = await base44.entities.Stage2PlacementCache.filter(bassDbFilter(projectId, versionId), "-updated_date", 1);
     const record = Array.isArray(records) ? records[0] : null;
     if (!record) return null;
     return {
@@ -84,11 +86,11 @@ export function isRawTransferCacheValid(hydrated, placementFingerprint) {
  * @param {object|null} rawTransfers — { finalistId → rawTransfer } for the placement fingerprint
  * @param {string|null} existingRecordId
  */
-export async function syncStage2PlacementCache(projectId, fingerprint, results, placementFingerprint, rawTransfers, existingRecordId) {
-  if (!projectId || !fingerprint || !results) return null;
+export async function syncStage2PlacementCache(projectId, versionId, fingerprint, results, placementFingerprint, rawTransfers, existingRecordId) {
+  if (!projectId || !versionId || !fingerprint || !results) return null;
   try {
     const payload = {
-      project_id: projectId,
+      ...bassDbFilter(projectId, versionId),
       stage2_cache_version: STAGE2_CACHE_VERSION,
       stage2_ranking_version: STAGE2_RANKING_VERSION,
       stage2_canonical_version: STAGE2_CANONICAL_VERSION,
@@ -111,7 +113,7 @@ export async function syncStage2PlacementCache(projectId, fingerprint, results, 
     if (existingRecordId) {
       await base44.entities.Stage2PlacementCache.update(existingRecordId, payload);
     } else {
-      const records = await base44.entities.Stage2PlacementCache.filter({ project_id: projectId }, "-updated_date", 1);
+      const records = await base44.entities.Stage2PlacementCache.filter(bassDbFilter(projectId, versionId), "-updated_date", 1);
       const record = Array.isArray(records) ? records[0] : null;
       if (record?.id) {
         await base44.entities.Stage2PlacementCache.update(record.id, payload);

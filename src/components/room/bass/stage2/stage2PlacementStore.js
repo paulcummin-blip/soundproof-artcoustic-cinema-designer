@@ -25,15 +25,16 @@ import {
   getCachedRawTransfersForFingerprint,
 } from "./stage2RawTransferCache.js";
 import { searchDelayOnly, searchLevelAndDelay } from "./stage2TuningSearch.js";
+import { bassCacheKey } from "../bassCacheKey";
 
 const listeners = new Set();
 const memoryByProject = new Map();
 
 function notify() { listeners.forEach((l) => l()); }
 
-function emptyState(projectId) {
+function emptyState(projectId, versionId) {
   return {
-    projectId: String(projectId || "free"),
+    projectId: bassCacheKey(projectId, versionId),
     status: "idle",
     fingerprint: null,
     placementFingerprint: null,
@@ -56,23 +57,23 @@ function emptyState(projectId) {
   };
 }
 
-function getMemory(projectId) {
-  const key = String(projectId || "free");
-  if (!memoryByProject.has(key)) memoryByProject.set(key, emptyState(key));
+function getMemory(projectId, versionId) {
+  const key = bassCacheKey(projectId, versionId);
+  if (!memoryByProject.has(key)) memoryByProject.set(key, emptyState(projectId, versionId));
   return memoryByProject.get(key);
 }
 
-function setMemory(projectId, patch) {
-  const key = String(projectId || "free");
-  const prev = memoryByProject.get(key) || emptyState(key);
+function setMemory(projectId, versionId, patch) {
+  const key = bassCacheKey(projectId, versionId);
+  const prev = memoryByProject.get(key) || emptyState(projectId, versionId);
   const next = { ...prev, ...patch };
   memoryByProject.set(key, next);
   notify();
   return next;
 }
 
-export function getStage2State(projectId) {
-  return getMemory(projectId);
+export function getStage2State(projectId, versionId) {
+  return getMemory(projectId, versionId);
 }
 
 export function subscribeStage2(listener) {
@@ -83,12 +84,12 @@ export function subscribeStage2(listener) {
 // Test-only helper: directly set Stage 2 state for unit tests.
 // Not used in production — production state transitions go through
 // markStage2Updating / publishStage2Complete / publishStage2Error.
-export function setStage2StateForTest(projectId, patch) {
-  return setMemory(projectId, patch);
+export function setStage2StateForTest(projectId, versionId, patch) {
+  return setMemory(projectId, versionId, patch);
 }
 
-export function publishHydratedStage2(projectId, fingerprint, results) {
-  return setMemory(projectId, {
+export function publishHydratedStage2(projectId, versionId, fingerprint, results) {
+  return setMemory(projectId, versionId, {
     status: "complete",
     fingerprint,
     placementFingerprint: results?.placement_fingerprint || null,
@@ -111,8 +112,8 @@ export function publishHydratedStage2(projectId, fingerprint, results) {
   });
 }
 
-export function markStage2Updating(projectId, fingerprint, progress = {}) {
-  return setMemory(projectId, {
+export function markStage2Updating(projectId, versionId, fingerprint, progress = {}) {
+  return setMemory(projectId, versionId, {
     status: "updating",
     fingerprint,
     one_sub_result: null,
@@ -134,27 +135,27 @@ export function markStage2Updating(projectId, fingerprint, progress = {}) {
   });
 }
 
-export function markStage2Waiting(projectId, fingerprint, phase = "waiting_for_bass") {
-  return markStage2Updating(projectId, fingerprint, { phase });
+export function markStage2Waiting(projectId, versionId, fingerprint, phase = "waiting_for_bass") {
+  return markStage2Updating(projectId, versionId, fingerprint, { phase });
 }
 
-export function markStage2Idle(projectId) {
-  return setMemory(projectId, {
-    ...emptyState(projectId),
+export function markStage2Idle(projectId, versionId) {
+  return setMemory(projectId, versionId, {
+    ...emptyState(projectId, versionId),
     status: "idle",
   });
 }
 
-export function markStage2Error(projectId, fingerprint, errorMessage) {
-  return setMemory(projectId, {
+export function markStage2Error(projectId, versionId, fingerprint, errorMessage) {
+  return setMemory(projectId, versionId, {
     status: "error",
     fingerprint,
     errorMessage,
   });
 }
 
-function publishStage2Progress(projectId, fingerprint, results, placementFingerprint) {
-  return setMemory(projectId, {
+function publishStage2Progress(projectId, versionId, fingerprint, results, placementFingerprint) {
+  return setMemory(projectId, versionId, {
     status: "updating",
     fingerprint,
     placementFingerprint: placementFingerprint || null,
@@ -174,8 +175,8 @@ function publishStage2Progress(projectId, fingerprint, results, placementFingerp
   });
 }
 
-function publishStage2Complete(projectId, fingerprint, results, placementFingerprint) {
-  return setMemory(projectId, {
+function publishStage2Complete(projectId, versionId, fingerprint, results, placementFingerprint) {
+  return setMemory(projectId, versionId, {
     status: "complete",
     fingerprint,
     placementFingerprint: placementFingerprint || null,
@@ -250,14 +251,15 @@ export class Stage2PlacementController {
     this.watchdogs = new Map();
   }
 
-  schedule({ projectId, fingerprint, placementFingerprint, confirmationFingerprint, promotionPlan, allStage1Finalists, stage1Complete, params, quantityOrder, delay }) {
+  schedule({ projectId, versionId, fingerprint, placementFingerprint, confirmationFingerprint, promotionPlan, allStage1Finalists, stage1Complete, params, quantityOrder, delay }) {
     this.cancelAll("superseded");
     if (!fingerprint) {
-      markStage2Idle(projectId);
+      markStage2Idle(projectId, versionId);
       return;
     }
 
     this.projectId = projectId;
+    this.versionId = versionId;
     this.currentFingerprint = fingerprint;
     this.placementFingerprint = placementFingerprint || null;
     this.confirmationFingerprint = confirmationFingerprint || null;
@@ -329,7 +331,7 @@ export class Stage2PlacementController {
       }
     }
 
-    markStage2Updating(projectId, fingerprint, {
+    markStage2Updating(projectId, versionId, fingerprint, {
       phase: this.queue.length > 0 ? "placement" : "confirmation",
       completedJobs: 0,
       totalJobsPlanned: this.totalJobsPlanned,
@@ -807,7 +809,7 @@ export class Stage2PlacementController {
     } else {
       results.phase = Number.isFinite(nextQuantity) ? `evaluating_${nextQuantity}_sub` : "preparing";
     }
-    publishStage2Progress(this.projectId, this.currentFingerprint, results, this.placementFingerprint);
+    publishStage2Progress(this.projectId, this.versionId, this.currentFingerprint, results, this.placementFingerprint);
   }
 
   /**
@@ -929,8 +931,8 @@ export class Stage2PlacementController {
     results.b_failed_candidates = this.bFailedCandidates;
     results.b_result = this.bResult;
 
-    publishStage2Complete(this.projectId, this.currentFingerprint, results, this.placementFingerprint);
-    this.persist(this.projectId, this.currentFingerprint, results);
+    publishStage2Complete(this.projectId, this.versionId, this.currentFingerprint, results, this.placementFingerprint);
+    this.persist(this.projectId, this.versionId, this.currentFingerprint, results);
     this.cancelAll("complete");
   }
 
@@ -995,7 +997,7 @@ export class Stage2PlacementController {
     this.activeJobs.clear();
   }
 
-  async persist(projectId, fingerprint, results) {
+  async persist(projectId, versionId, fingerprint, results) {
     if (!projectId || projectId === "free" || !results) return;
     try {
       const { syncStage2PlacementCache } = await import("./stage2PlacementPersistence.js");
@@ -1013,6 +1015,7 @@ export class Stage2PlacementController {
       }
       await syncStage2PlacementCache(
         projectId,
+        versionId,
         fingerprint,
         results,
         this.placementFingerprint,

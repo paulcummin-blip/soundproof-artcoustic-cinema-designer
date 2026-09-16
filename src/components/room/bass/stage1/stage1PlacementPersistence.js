@@ -3,6 +3,7 @@
 // Clearly separate from canonical completed bass authority.
 
 import { base44 } from "@/api/base44Client";
+import { bassDbFilter } from "../bassCacheKey";
 import {
   STAGE1_CACHE_VERSION,
   STAGE1_PLACEMENT_ALGORITHM_VERSION,
@@ -39,10 +40,10 @@ function buildPersistedCache(existing, fingerprint, results, status) {
  * @param {string} projectId
  * @returns {Promise<object|null>} persisted cache, or null if not found
  */
-export async function hydrateStage1PlacementCache(projectId) {
-  if (!projectId) return null;
+export async function hydrateStage1PlacementCache(projectId, versionId) {
+  if (!projectId || !versionId) return null;
   try {
-    const records = await base44.entities.Stage1PlacementCache.filter({ project_id: projectId }, "-updated_date", 1);
+    const records = await base44.entities.Stage1PlacementCache.filter(bassDbFilter(projectId, versionId), "-updated_date", 1);
     const record = Array.isArray(records) ? records[0] : null;
     if (!record) return null;
     return {
@@ -102,20 +103,20 @@ export function isStage1CacheValid(hydrated, fingerprint) {
  * @param {string|null} existingRecordId
  * @returns {Promise<object|null>}
  */
-export async function syncStage1PlacementCache(projectId, fingerprint, results, existingRecordId) {
-  if (!projectId || !fingerprint || !results) return null;
+export async function syncStage1PlacementCache(projectId, versionId, fingerprint, results, existingRecordId) {
+  if (!projectId || !versionId || !fingerprint || !results) return null;
   try {
     const existing = existingRecordId ? { id: existingRecordId } : null;
     const persisted = buildPersistedCache(existing, fingerprint, results, "complete");
     const payload = {
-      project_id: projectId,
+      ...bassDbFilter(projectId, versionId),
       ...persisted,
     };
     if (existingRecordId) {
       await base44.entities.Stage1PlacementCache.update(existingRecordId, payload);
     } else {
       // Check if a record already exists (avoid duplicates)
-      const records = await base44.entities.Stage1PlacementCache.filter({ project_id: projectId }, "-updated_date", 1);
+      const records = await base44.entities.Stage1PlacementCache.filter(bassDbFilter(projectId, versionId), "-updated_date", 1);
       const record = Array.isArray(records) ? records[0] : null;
       if (record?.id) {
         await base44.entities.Stage1PlacementCache.update(record.id, payload);
@@ -132,11 +133,11 @@ export async function syncStage1PlacementCache(projectId, fingerprint, results, 
 /**
  * Mark the Stage 1 cache as updating (worker in progress).
  */
-export async function markStage1Updating(projectId, fingerprint, existingRecordId) {
-  if (!projectId) return null;
+export async function markStage1Updating(projectId, versionId, fingerprint, existingRecordId) {
+  if (!projectId || !versionId) return null;
   try {
     const payload = {
-      project_id: projectId,
+      ...bassDbFilter(projectId, versionId),
       stage1_cache_version: STAGE1_CACHE_VERSION,
       placement_algorithm_version: STAGE1_PLACEMENT_ALGORITHM_VERSION,
       family_policy_version: STAGE1_FAMILY_POLICY_VERSION,
