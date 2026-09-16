@@ -17,6 +17,7 @@ import { hasGraphPayload } from "./finishedGraphAdapter";
 import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 import { safeConsole } from "@/components/utils/safeConsole";
+import { bassCacheKey, bassDbFilter } from "./bassCacheKey";
 
 const cacheByProject = new Map();
 const listeners = new Set();
@@ -35,10 +36,10 @@ function notify() {
   listeners.forEach((l) => l());
 }
 
-function projectKey(projectId) { return String(projectId || "free"); }
+function projectKey(projectId, versionId) { return bassCacheKey(projectId, versionId); }
 
-function ensureCache(projectId) {
-  const key = projectKey(projectId);
+function ensureCache(projectId, versionId) {
+  const key = projectKey(projectId, versionId);
   if (!cacheByProject.has(key)) {
     cacheByProject.set(key, { metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, baseDesignFingerprint: null, targets: {} });
   }
@@ -50,9 +51,9 @@ function ensureCache(projectId) {
  * Returns null if the cache doesn't match the current base design or the
  * target hasn't been cached yet.
  */
-export function getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey) {
+export function getTargetCacheEntry(projectId, versionId, baseDesignFingerprint, targetKey) {
   if (!baseDesignFingerprint || !targetKey) return null;
-  const cache = ensureCache(projectId);
+  const cache = ensureCache(projectId, versionId);
   if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION) return null;
   if (cache.baseDesignFingerprint !== baseDesignFingerprint) return null;
   const entry = cache.targets[targetKey];
@@ -74,10 +75,10 @@ export function getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey)
  * achieved. It is stored separately from authoritative contracts and does
  * NOT pass the authoritative cache gate.
  */
-export function setLimitedTargetCacheEntry(projectId, baseDesignFingerprint, targetKey, limitedContract, { deferPersistence = false, immediate = false } = {}) {
+export function setLimitedTargetCacheEntry(projectId, versionId, baseDesignFingerprint, targetKey, limitedContract, { deferPersistence = false, immediate = false } = {}) {
   if (!baseDesignFingerprint || !targetKey || !limitedContract) return false;
   if (!isValidLimitedP14Contract(limitedContract)) return false;
-  const cache = ensureCache(projectId);
+  const cache = ensureCache(projectId, versionId);
   if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION
     || cache.baseDesignFingerprint !== baseDesignFingerprint) {
     cache.metricSchemaVersion = RP22_BASS_METRIC_SCHEMA_VERSION;
@@ -87,18 +88,18 @@ export function setLimitedTargetCacheEntry(projectId, baseDesignFingerprint, tar
   // Mark the entry so isLimitedP14Entry can identify it without re-validating
   cache.targets[targetKey] = { ...limitedContract, __p14Limited: true };
   notify();
-  scheduleSync(projectId, { deferPersistence, immediate });
+  scheduleSync(projectId, versionId, { deferPersistence, immediate });
   return true;
 }
 
 /**
  * Get cache progress: how many of the 8 targets are ready.
  */
-export function getTargetCacheProgress(projectId, baseDesignFingerprint, allTargetKeys) {
+export function getTargetCacheProgress(projectId, versionId, baseDesignFingerprint, allTargetKeys) {
   const keys = Array.isArray(allTargetKeys) ? allTargetKeys : [];
   const empty = { ready: 0, resolved: 0, total: keys.length, completedDurationsMs: [], readyTargetKeys: [], limitedTargetKeys: [], resolvedTargetKeys: [] };
   if (!baseDesignFingerprint) return empty;
-  const cache = ensureCache(projectId);
+  const cache = ensureCache(projectId, versionId);
   if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION) return empty;
   if (cache.baseDesignFingerprint !== baseDesignFingerprint) return empty;
   const readyTargetKeys = [];
@@ -134,7 +135,7 @@ export function getTargetCacheProgress(projectId, baseDesignFingerprint, allTarg
 /**
  * Store a compact contract for a target. Resets the cache if the design changed.
  */
-export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey, compactContract, { deferPersistence = false, immediate = false } = {}) {
+export function setTargetCacheEntry(projectId, versionId, baseDesignFingerprint, targetKey, compactContract, { deferPersistence = false, immediate = false } = {}) {
   if (!baseDesignFingerprint || !targetKey || !compactContract) return false;
   if (!isAuthoritativeBassContract(compactContract)) return false;
   // Stage 3: reject contracts without the required finished graph payload.
@@ -142,7 +143,7 @@ export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey,
   // P19 readiness is part of completed-target reuse: a target without both
   // canonical curves and a finite official result remains eligible to retry.
   if (!hasReadyCanonicalP19Contract(compactContract)) return false;
-  const cache = ensureCache(projectId);
+  const cache = ensureCache(projectId, versionId);
   if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION
     || cache.baseDesignFingerprint !== baseDesignFingerprint) {
     cache.metricSchemaVersion = RP22_BASS_METRIC_SCHEMA_VERSION;
@@ -151,7 +152,7 @@ export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey,
   }
   cache.targets[targetKey] = compactContract;
   notify();
-  scheduleSync(projectId, { deferPersistence, immediate });
+  scheduleSync(projectId, versionId, { deferPersistence, immediate });
   return true;
 }
 
@@ -159,25 +160,25 @@ export function setTargetCacheEntry(projectId, baseDesignFingerprint, targetKey,
  * Reset the cache when the design changes. Old cached results for a different
  * design are no longer valid.
  */
-export function clearTargetCacheForDesign(projectId, baseDesignFingerprint) {
-  const cache = ensureCache(projectId);
+export function clearTargetCacheForDesign(projectId, versionId, baseDesignFingerprint) {
+  const cache = ensureCache(projectId, versionId);
   if (cache.metricSchemaVersion === RP22_BASS_METRIC_SCHEMA_VERSION
     && cache.baseDesignFingerprint === baseDesignFingerprint) return;
   cache.metricSchemaVersion = RP22_BASS_METRIC_SCHEMA_VERSION;
   cache.baseDesignFingerprint = baseDesignFingerprint;
   cache.targets = {};
   notify();
-  scheduleSync(projectId);
+  scheduleSync(projectId, versionId);
 }
 
 /**
  * Hydrate the target cache from the database. Called on project load.
  */
-export async function hydrateTargetCache(projectId) {
-  const key = projectKey(projectId);
-  if (key === "free") return;
+export async function hydrateTargetCache(projectId, versionId) {
+  const key = projectKey(projectId, versionId);
+  if (key === "free::free") return;
   try {
-    const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
+    const records = await base44.entities.ProjectAnalysisCache.filter(bassDbFilter(projectId, versionId), '-updated_date', 1);
     const record = Array.isArray(records) ? records[0] : null;
     if (!record?.target_cache) return;
     const stored = typeof record.target_cache === 'string' ? JSON.parse(record.target_cache) : record.target_cache;
@@ -212,9 +213,9 @@ export async function hydrateTargetCache(projectId) {
  * The debounce remains for non-terminal cache mutations (e.g. design-clear)
  * where coalescing is safe and no completed target is at risk of being lost.
  */
-function scheduleSync(projectId, { deferPersistence = false, immediate = false } = {}) {
-  const key = projectKey(projectId);
-  if (key === "free") return;
+function scheduleSync(projectId, versionId, { deferPersistence = false, immediate = false } = {}) {
+  const key = projectKey(projectId, versionId);
+  if (key === "free::free") return;
   dirtyProjects.add(key);
   const previousTimer = persistenceTimers.get(key);
   if (previousTimer != null) clearTimeout(previousTimer);
@@ -224,35 +225,37 @@ function scheduleSync(projectId, { deferPersistence = false, immediate = false }
     // Bypass the debounce — write immediately so the completed target is
     // durable before the user can close the page. Fire-and-forget; errors
     // are logged inside flushTargetCachePersistence.
-    flushTargetCachePersistence(key).catch(() => { /* already logged */ });
+    flushTargetCachePersistence(projectId, versionId).catch(() => { /* already logged */ });
     return;
   }
   persistenceTimers.set(key, setTimeout(() => {
     persistenceTimers.delete(key);
-    flushTargetCachePersistence(key);
+    flushTargetCachePersistence(projectId, versionId);
   }, TARGET_CACHE_WRITE_DEBOUNCE_MS));
 }
 
-export function flushTargetCachePersistence(projectId) {
-  const key = projectKey(projectId);
-  if (key === "free") return Promise.resolve();
+export function flushTargetCachePersistence(projectId, versionId) {
+  const key = projectKey(projectId, versionId);
+  if (key === "free::free") return Promise.resolve();
   const timer = persistenceTimers.get(key);
   if (timer != null) clearTimeout(timer);
   persistenceTimers.delete(key);
   if (!dirtyProjects.has(key)) return writeQueues.get(key) || Promise.resolve();
 
-  const snapshot = JSON.parse(JSON.stringify(ensureCache(key)));
+  const snapshot = JSON.parse(JSON.stringify(ensureCache(projectId, versionId)));
   const signature = JSON.stringify(snapshot);
   dirtyProjects.delete(key);
   if (persistedSignatures.get(key) === signature) {
     return writeQueues.get(key) || Promise.resolve();
   }
 
+  const dbFilter = bassDbFilter(projectId, versionId);
   const queued = (writeQueues.get(key) || Promise.resolve()).then(async () => {
     try {
-      const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
+      const records = await base44.entities.ProjectAnalysisCache.filter(dbFilter, '-updated_date', 1);
       const record = Array.isArray(records) ? records[0] : null;
       const payload = {
+        ...dbFilter,
         completed_cache_version: COMPLETED_BASS_CACHE_VERSION,
         instance_authority_version: INSTANCE_AUTHORITY_VERSION,
         metric_schema_version: RP22_BASS_METRIC_SCHEMA_VERSION,
@@ -261,7 +264,7 @@ export function flushTargetCachePersistence(projectId) {
       if (record?.id) {
         await base44.entities.ProjectAnalysisCache.update(record.id, payload);
       } else {
-        await base44.entities.ProjectAnalysisCache.create({ project_id: key, ...payload });
+        await base44.entities.ProjectAnalysisCache.create(payload);
       }
       persistedSignatures.set(key, signature);
       // Write succeeded — clear any previous failure record for this project.
@@ -293,8 +296,8 @@ export function flushTargetCachePersistence(projectId) {
  * NOT durably saved — do not falsely treat the cache as durable when this
  * returns non-null.
  */
-export function getPersistenceFailure(projectId) {
-  const key = projectKey(projectId);
+export function getPersistenceFailure(projectId, versionId) {
+  const key = projectKey(projectId, versionId);
   return persistenceFailures.get(key) || null;
 }
 
@@ -303,8 +306,8 @@ export function getPersistenceFailure(projectId) {
  * by diagnostics and tests to verify the dirty/retry state is retained after
  * a write failure.
  */
-export function isTargetCacheDirty(projectId) {
-  const key = projectKey(projectId);
+export function isTargetCacheDirty(projectId, versionId) {
+  const key = projectKey(projectId, versionId);
   return dirtyProjects.has(key);
 }
 
@@ -327,25 +330,25 @@ export function _resetTargetCacheForTest() {
 
 // ── React hook for reactive cache reads ──────────────────────────────────
 
-export function useTargetCacheEntry(projectId, baseDesignFingerprint, targetKey) {
+export function useTargetCacheEntry(projectId, versionId, baseDesignFingerprint, targetKey) {
   return useSyncExternalStore(
     (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
-    () => getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey),
-    () => getTargetCacheEntry(projectId, baseDesignFingerprint, targetKey),
+    () => getTargetCacheEntry(projectId, versionId, baseDesignFingerprint, targetKey),
+    () => getTargetCacheEntry(projectId, versionId, baseDesignFingerprint, targetKey),
   );
 }
 
-export function useTargetCacheProgress(projectId, baseDesignFingerprint, allTargetKeys) {
+export function useTargetCacheProgress(projectId, versionId, baseDesignFingerprint, allTargetKeys) {
   useSyncExternalStore(
     (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
     () => cacheRevision,
     () => cacheRevision,
   );
-  return getTargetCacheProgress(projectId, baseDesignFingerprint, allTargetKeys);
+  return getTargetCacheProgress(projectId, versionId, baseDesignFingerprint, allTargetKeys);
 }
 
-export function useTargetCacheHydration(projectId) {
+export function useTargetCacheHydration(projectId, versionId) {
   useEffect(() => {
-    hydrateTargetCache(projectId);
-  }, [projectId]);
+    hydrateTargetCache(projectId, versionId);
+  }, [projectId, versionId]);
 }
