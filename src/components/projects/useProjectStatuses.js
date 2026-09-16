@@ -139,10 +139,10 @@ export function useProjectStatuses() {
     });
   }, []);
 
-  const archiveStatus = useCallback(async (id, replacementStatusId) => {
+  const deleteStatus = useCallback(async (id, replacementStatusId) => {
     // If a replacement is provided, reassign all projects from this status
-    // to the replacement before archiving, so no project points to an
-    // archived/unusable status value.
+    // to the replacement before deleting, so no project points to a
+    // deleted/unusable status value.
     const status = statuses.find((s) => s.id === id);
     if (replacementStatusId && status?.status_id) {
       const projects = await base44.entities.Project.filter({ project_status: status.status_id });
@@ -153,20 +153,9 @@ export function useProjectStatuses() {
         );
       }
     }
-    const updated = await base44.entities.ProjectStatus.update(id, { is_archived: true });
-    setStatuses((arr) =>
-      sortStatuses(arr.map((s) => (s.id === id ? { ...s, is_archived: true } : s)))
-    );
-    return updated;
+    await base44.entities.ProjectStatus.delete(id);
+    setStatuses((arr) => sortStatuses(arr.filter((s) => s.id !== id)));
   }, [statuses]);
-
-  const unarchiveStatus = useCallback(async (id) => {
-    const updated = await base44.entities.ProjectStatus.update(id, { is_archived: false });
-    setStatuses((arr) =>
-      sortStatuses(arr.map((s) => (s.id === id ? { ...s, is_archived: false } : s)))
-    );
-    return updated;
-  }, []);
 
   return {
     scopeId,
@@ -179,7 +168,6 @@ export function useProjectStatuses() {
     renameStatus,
     recolorStatus,
     reorderStatuses,
-    archiveStatus,
-    unarchiveStatus,
+    deleteStatus,
   };
 }

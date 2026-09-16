@@ -1,27 +1,24 @@
 import React, { useState } from "react";
 
 // Compact modal for managing configurable project statuses:
-// add, rename, reorder, archive (safe — never hard-deletes in-use statuses).
-// Archived statuses stay visible on existing projects that already use them.
+// add, rename, reorder, delete (with safe reassignment of in-use projects).
 export default function ManageStatusesDialog({
   open,
   onClose,
   statuses,
   activeStatuses,
-  archivedStatuses,
   onAdd,
   onRename,
   onRecolor,
   onReorder,
-  onArchive,
-  onUnarchive,
+  onDelete,
   statusUsageCounts,
 }) {
   const [newLabel, setNewLabel] = useState("");
   const [newColor, setNewColor] = useState("#625143");
   const [editingId, setEditingId] = useState(null);
   const [editLabel, setEditLabel] = useState("");
-  const [archivingId, setArchivingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [replacementId, setReplacementId] = useState("");
   const [error, setError] = useState(null);
 
@@ -39,27 +36,27 @@ export default function ManageStatusesDialog({
     }
   };
 
-  const handleArchive = async (status) => {
+  const handleDelete = async (status) => {
     const count = statusUsageCounts?.[status.status_id] || 0;
-    // If the status is in use, prompt for a replacement status before archiving
-    if (count > 0 && archivingId !== status.id) {
+    // If the status is in use, prompt for a replacement before deleting
+    if (count > 0 && deletingId !== status.id) {
       const others = activeStatuses.filter((s) => s.id !== status.id);
-      setArchivingId(status.id);
+      setDeletingId(status.id);
       setReplacementId(others[0]?.status_id || "");
       return;
     }
     try {
       setError(null);
-      await onArchive(status.id, count > 0 ? replacementId : undefined);
-      setArchivingId(null);
+      await onDelete(status.id, count > 0 ? replacementId : undefined);
+      setDeletingId(null);
       setReplacementId("");
     } catch (e) {
-      setError(e?.message || "Failed to archive status");
+      setError(e?.message || "Failed to delete status");
     }
   };
 
-  const cancelArchive = () => {
-    setArchivingId(null);
+  const cancelDelete = () => {
+    setDeletingId(null);
     setReplacementId("");
   };
 
@@ -249,11 +246,12 @@ export default function ManageStatusesDialog({
                     Cancel
                   </button>
                 </>
-              ) : archivingId === s.id ? (
+              ) : deletingId === s.id ? (
                 <>
                   <div style={{ flex: 1, fontSize: 13 }}>
                     <div style={{ marginBottom: 4 }}>
-                      Used by {statusUsageCounts?.[s.status_id] || 0} project(s). Select replacement:
+                      This status is currently used by {statusUsageCounts?.[s.status_id] || 0} project(s).
+                      Move those projects to:
                     </div>
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       <select
@@ -276,12 +274,12 @@ export default function ManageStatusesDialog({
                           ))}
                       </select>
                       <button
-                        onClick={() => handleArchive(s)}
-                        style={{ ...btnBase, background: "#1B1A1A", color: "#fff", borderColor: "#1B1A1A" }}
+                        onClick={() => handleDelete(s)}
+                        style={{ ...btnBase, background: "#B23A3A", color: "#fff", borderColor: "#B23A3A" }}
                       >
                         Confirm
                       </button>
-                      <button onClick={cancelArchive} style={{ ...btnBase }}>
+                      <button onClick={cancelDelete} style={{ ...btnBase }}>
                         Cancel
                       </button>
                     </div>
@@ -325,11 +323,11 @@ export default function ManageStatusesDialog({
                     Rename
                   </button>
                   <button
-                    onClick={() => handleArchive(s)}
+                    onClick={() => handleDelete(s)}
                     style={{ ...btnBase, color: "#B23A3A" }}
-                    title="Archive — hides from new assignments, keeps on existing projects"
+                    title="Delete — permanently removes this status"
                   >
-                    Archive
+                    Delete
                   </button>
                 </>
               )}
@@ -394,76 +392,6 @@ export default function ManageStatusesDialog({
             </button>
           </div>
         </div>
-
-        {/* Archived */}
-        {archivedStatuses.length > 0 && (
-          <div style={{ borderTop: "1px solid #DCDBD6", paddingTop: 14 }}>
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#9B9890",
-                marginBottom: 8,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Archived
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {archivedStatuses.map((s) => (
-                <div
-                  key={s.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "8px 10px",
-                    border: "1px solid #DCDBD6",
-                    borderRadius: 8,
-                    background: "#F8F8F7",
-                    opacity: 0.75,
-                  }}
-                >
-                  <label
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 6,
-                      border: "1px solid #DCDBD6",
-                      background: s.color || "#625143",
-                      flexShrink: 0,
-                      cursor: "pointer",
-                      position: "relative",
-                      overflow: "hidden",
-                    }}
-                    title="Click to change colour"
-                  >
-                    <input
-                      type="color"
-                      value={s.color || "#625143"}
-                      onChange={(e) => handleColorChange(s.id, e.target.value)}
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        width: "100%",
-                        height: "100%",
-                        opacity: 0,
-                        cursor: "pointer",
-                        border: "none",
-                        padding: 0,
-                      }}
-                    />
-                  </label>
-                  <span style={{ flex: 1, fontSize: 14 }}>{s.label}</span>
-                  <button onClick={() => onUnarchive(s.id)} style={{ ...btnBase }}>
-                    Restore
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
