@@ -12,7 +12,8 @@
 //
 // The Projects page owns all data fetching and mutation logic.
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, Check, Plus, AlertCircle } from "lucide-react";
 import { setActiveProjectId } from "@/components/state/project-session";
@@ -51,20 +52,48 @@ export default function OpenVersionDropdown({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
   const dropdownRef = useRef(null);
+  const [menuPos, setMenuPos] = useState(null);
 
   const versionList = versions || [];
   const nextEmptySlot = findNextEmptySlot(versionList);
   const canCreateVersion = nextEmptySlot !== null;
 
-  // Close on outside click
+  // Measure button position when opening — menu renders as a floating
+  // portal so it is never clipped by the card's overflow:hidden.
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPos(null);
+      return;
+    }
+    const btn = dropdownRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    setMenuPos({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: Math.max(rect.width, 220),
+    });
+  }, [open]);
+
+  // Close on outside click or scroll/resize
   useEffect(() => {
+    if (!open) return;
     function handleClickOutside(e) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setOpen(false);
       }
     }
-    if (open) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    function handleClose() {
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("scroll", handleClose, true);
+    window.addEventListener("resize", handleClose);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", handleClose, true);
+      window.removeEventListener("resize", handleClose);
+    };
   }, [open]);
 
   const navigateToDesigner = () => {
@@ -161,13 +190,18 @@ export default function OpenVersionDropdown({
         </button>
       </div>
 
-      {open && (
+      {open && menuPos && createPortal(
         <div
-          className="absolute right-0 mt-1 w-full min-w-[220px] rounded-md shadow-lg z-50 max-h-[360px] overflow-y-auto"
+          className="fixed rounded-md shadow-xl max-h-[360px] overflow-y-auto"
           style={{
+            position: "fixed",
+            top: menuPos.top,
+            left: menuPos.left,
+            width: menuPos.width,
             background: BRAND.bg,
             border: `1px solid ${BRAND.border}`,
             fontFamily: "Didact Gothic, sans-serif",
+            zIndex: 9999,
           }}
         >
           {/* Existing versions — name only, no slot numbers */}
@@ -233,7 +267,8 @@ export default function OpenVersionDropdown({
               </span>
             )}
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

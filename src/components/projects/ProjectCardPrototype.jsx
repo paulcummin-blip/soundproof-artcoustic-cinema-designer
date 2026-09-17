@@ -199,7 +199,6 @@ export default function ProjectCardPrototype({
         background: BRAND.card,
         border: `1px solid ${BRAND.border}`,
         borderRadius: 8,
-        overflow: "hidden",
         transition: "box-shadow 0.2s ease, border-color 0.2s ease",
         display: "flex",
         flexDirection: "column",
@@ -224,10 +223,10 @@ export default function ProjectCardPrototype({
 
       <div
         style={{
-          padding: "20px 20px 16px",
+          padding: "22px 22px 18px",
           display: "flex",
           flexDirection: "column",
-          gap: 14,
+          gap: 16,
           flex: 1,
         }}
       >
@@ -331,150 +330,157 @@ export default function ProjectCardPrototype({
           )}
         </div>
 
-        {/* 6. Actions — aligned at bottom */}
+        {/* 6. Actions — two rows for breathing room */}
         <div
           style={{
             display: "flex",
+            flexDirection: "column",
             gap: 8,
             marginTop: "auto",
-            paddingTop: 4,
+            paddingTop: 8,
           }}
         >
-          <div style={{ flex: 1 }}>
-            <OpenVersionDropdown
-              projectId={p.id}
-              projectName={p.name}
-              versions={versions}
-              activeVersionId={activeVersionId}
-              onSwitchVersion={onSwitchVersion}
-              onCreateVersion={onCreateVersion}
-              loading={versionsLoading}
-            />
+          {/* Row 1: Open ▼ — full width */}
+          <OpenVersionDropdown
+            projectId={p.id}
+            projectName={p.name}
+            versions={versions}
+            activeVersionId={activeVersionId}
+            onSwitchVersion={onSwitchVersion}
+            onCreateVersion={onCreateVersion}
+            loading={versionsLoading}
+          />
+
+          {/* Row 2: Edit · Archive · Delete */}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => onEdit && onEdit(p)}
+              style={{
+                flex: 1,
+                padding: "8px 12px",
+                borderRadius: 6,
+                border: `1px solid ${BRAND.btnGhostBorder}`,
+                background: BRAND.btnGhost,
+                color: BRAND.subtext,
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "border-color 0.15s ease, color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#C5C0B8";
+                e.currentTarget.style.color = BRAND.text;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = BRAND.btnGhostBorder;
+                e.currentTarget.style.color = BRAND.subtext;
+              }}
+            >
+              Edit
+            </button>
+
+            {p.lifecycleStatus === "Archived" ? (
+              <button
+                type="button"
+                onClick={() => onUnarchive && onUnarchive()}
+                style={{
+                  flex: 1,
+                  padding: "8px 12px",
+                  borderRadius: 6,
+                  border: `1px solid ${BRAND.btnGhostBorder}`,
+                  background: BRAND.btnGhost,
+                  color: BRAND.subtext,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  transition: "border-color 0.15s ease, color 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#C5C0B8";
+                  e.currentTarget.style.color = BRAND.text;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = BRAND.btnGhostBorder;
+                  e.currentTarget.style.color = BRAND.subtext;
+                }}
+              >
+                Unarchive
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onArchive && onArchive()}
+                style={{
+                  flex: 1,
+                  padding: "8px 12px",
+                  borderRadius: 6,
+                  border: `1px solid ${BRAND.btnGhostBorder}`,
+                  background: BRAND.btnGhost,
+                  color: BRAND.subtext,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  transition: "border-color 0.15s ease, color 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#C5C0B8";
+                  e.currentTarget.style.color = BRAND.text;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = BRAND.btnGhostBorder;
+                  e.currentTarget.style.color = BRAND.subtext;
+                }}
+              >
+                Archive
+              </button>
+            )}
+
+            <button
+              type="button"
+              onMouseDown={() => startHoldDelete(p.id)}
+              onMouseUp={() => cancelHoldDelete(p.id)}
+              onMouseLeave={() => cancelHoldDelete(p.id)}
+              style={{
+                flex: 1,
+                position: "relative",
+                padding: "8px 12px",
+                borderRadius: 6,
+                border: `1px solid ${BRAND.btnGhostBorder}`,
+                background: BRAND.btnGhost,
+                color: BRAND.muted,
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "pointer",
+                overflow: "hidden",
+                transition: "border-color 0.15s ease, color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#C5C0B8";
+                e.currentTarget.style.color = BRAND.subtext;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = BRAND.btnGhostBorder;
+                e.currentTarget.style.color = BRAND.muted;
+              }}
+              aria-label="Hold to delete project"
+              title="Hold to delete (safety)"
+            >
+              <span>Delete</span>
+              <span
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  bottom: 0,
+                  height: 2,
+                  width: `${Math.round(prog * 100)}%`,
+                  background: BRAND.muted,
+                  transition: "width 60ms linear",
+                }}
+                aria-hidden
+              />
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => onEdit && onEdit(p)}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 6,
-              border: `1px solid ${BRAND.btnGhostBorder}`,
-              background: BRAND.btnGhost,
-              color: BRAND.subtext,
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "border-color 0.15s ease, color 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "#C5C0B8";
-              e.currentTarget.style.color = BRAND.text;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = BRAND.btnGhostBorder;
-              e.currentTarget.style.color = BRAND.subtext;
-            }}
-          >
-            Edit
-          </button>
-
-          {p.lifecycleStatus === "Archived" ? (
-            <button
-              type="button"
-              onClick={() => onUnarchive && onUnarchive()}
-              style={{
-                padding: "8px 12px",
-                borderRadius: 6,
-                border: `1px solid ${BRAND.btnGhostBorder}`,
-                background: BRAND.btnGhost,
-                color: BRAND.subtext,
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: "pointer",
-                transition: "border-color 0.15s ease, color 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "#C5C0B8";
-                e.currentTarget.style.color = BRAND.text;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = BRAND.btnGhostBorder;
-                e.currentTarget.style.color = BRAND.subtext;
-              }}
-            >
-              Unarchive
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onArchive && onArchive()}
-              style={{
-                padding: "8px 12px",
-                borderRadius: 6,
-                border: `1px solid ${BRAND.btnGhostBorder}`,
-                background: BRAND.btnGhost,
-                color: BRAND.subtext,
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: "pointer",
-                transition: "border-color 0.15s ease, color 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "#C5C0B8";
-                e.currentTarget.style.color = BRAND.text;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = BRAND.btnGhostBorder;
-                e.currentTarget.style.color = BRAND.subtext;
-              }}
-            >
-              Archive
-            </button>
-          )}
-
-          <button
-            type="button"
-            onMouseDown={() => startHoldDelete(p.id)}
-            onMouseUp={() => cancelHoldDelete(p.id)}
-            onMouseLeave={() => cancelHoldDelete(p.id)}
-            style={{
-              position: "relative",
-              padding: "8px 12px",
-              borderRadius: 6,
-              border: `1px solid ${BRAND.btnGhostBorder}`,
-              background: BRAND.btnGhost,
-              color: BRAND.muted,
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
-              overflow: "hidden",
-              transition: "border-color 0.15s ease, color 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "#C5C0B8";
-              e.currentTarget.style.color = BRAND.subtext;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = BRAND.btnGhostBorder;
-              e.currentTarget.style.color = BRAND.muted;
-            }}
-            aria-label="Hold to delete project"
-            title="Hold to delete (safety)"
-          >
-            <span>Delete</span>
-            <span
-              style={{
-                position: "absolute",
-                left: 0,
-                bottom: 0,
-                height: 2,
-                width: `${Math.round(prog * 100)}%`,
-                background: BRAND.muted,
-                transition: "width 60ms linear",
-              }}
-              aria-hidden
-            />
-          </button>
         </div>
       </div>
     </div>
