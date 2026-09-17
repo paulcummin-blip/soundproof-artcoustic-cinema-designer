@@ -204,3 +204,18 @@ export function sanitiseVersionName(name) {
   if (!trimmed) return DEFAULT_V1_NAME;
   return trimmed.substring(0, VERSION_NAME_MAX_LENGTH);
 }
+
+/**
+ * Build a copy name for a newly duplicated version.
+ * Appends " (Copy)" to the source name, truncating the base if needed
+ * to stay within VERSION_NAME_MAX_LENGTH.
+ * e.g. "Original Design" → "Original Design (Copy)"
+ *      "Premium Cinema"   → "Premium Cinema (Copy)"
+ */
+export function buildCopyVersionName(sourceName) {
+  const base = ((sourceName || "") || DEFAULT_V1_NAME).trim() || DEFAULT_V1_NAME;
+  const suffix = " (Copy)";
+  const maxBase = VERSION_NAME_MAX_LENGTH - suffix.length;
+  const truncatedBase = base.length > maxBase ? base.substring(0, maxBase) : base;
+  return truncatedBase + suffix;
+}

@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { RotateCcw, FileText, Eye, ExternalLink } from "lucide-react";
+import NewVersionRenameBanner from "@/components/versions/NewVersionRenameBanner";
 
 // External resource — Artcoustic product CAD files (Dropbox folder).
 // Opens in a new tab; not a primary project action.
@@ -92,6 +93,11 @@ export default function RoomDesignerHeader({
             <span className="text-xs text-gray-400 ml-auto">ID: {projectIdState.slice(0, 12)}…</span>
           )}
       </div>
+      {effectiveProjectId && (
+        <div className="mt-2">
+          <NewVersionRenameBanner projectId={effectiveProjectId} />
+        </div>
+      )}
     </header>
   );
 }
