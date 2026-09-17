@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import BassResultsPills from "@/components/room/bass/BassResultsPills";
+import BassHeadlinePills from "@/components/room/bass/BassHeadlinePills";
 import BassDesignRecommendation from "@/components/room/bass/BassDesignRecommendation";
 import BassCapabilitySummary from "@/components/room/bass/BassCapabilitySummary";
 import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
@@ -33,7 +33,7 @@ export default function BassResultsSummary({ compact = false, showPriority = tru
   return <div className={compact ? "space-y-1" : "rounded-lg border border-[#DCDBD6] bg-[#F8F8F7] p-2"}>
     {showPriority && <div className="mb-2 text-xs font-semibold text-[#213428]">Balanced RP22 Optimisation</div>}
     <div className="flex flex-wrap items-center gap-2">
-      <div className="min-w-[280px] flex-1"><BassResultsPills compact={compact} nowMs={nowMs} /></div>
+      <div className="min-w-[280px] flex-1"><BassHeadlinePills nowMs={nowMs} /></div>
     </div>
     <div className="flex items-center gap-2 text-[10px] font-medium text-[#625143]" aria-live="polite">
       {shared.lifecycle?.status === "error" && shared.onRetry

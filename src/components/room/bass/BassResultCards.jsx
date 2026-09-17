@@ -7,34 +7,11 @@
 // no RSP/aggregate headline. Expanded seat grids below show all seats with
 // Primary/Secondary distinction.
 import React, { useEffect, useState } from "react";
-import RP22GradingPill from "@/components/ui/RP22GradingPill";
-import BassResultDetailTooltip from "@/components/room/bass/BassResultDetailTooltip";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import SharedP19P20SeatResults from "@/components/room/bass/SharedP19P20SeatResults";
-
-const CARD_TITLES = {
-  p14: "P14 Bass SPL",
-  p18: "P18 Extension",
-  p19: "P19 Response Fit",
-  p20: "P20 Seat Consistency",
-};
-
-const SEAT_SCOPED_KEYS = new Set(["p19", "p20"]);
-
-// Split "L2 · 112 dBC" into pill label "L2" and supporting text "112 dBC".
-// Non-ready states ("Calculating…", "FAIL", "SEAT", "Select Bass Target")
-// have no " · " separator — shown in the pill as-is with no supporting text.
-function splitPillContent(resultText) {
-  const text = String(resultText || "");
-  const sepIndex = text.indexOf(" · ");
-  if (sepIndex === -1) return { pillLabel: text, supportingText: null };
-  return {
-    pillLabel: text.slice(0, sepIndex),
-    supportingText: text.slice(sepIndex + 3),
-  };
-}
+import BassHeadlinePills from "@/components/room/bass/BassHeadlinePills";
 
 export default function BassResultCards() {
   const shared = useSharedBassResults();
@@ -61,31 +38,8 @@ export default function BassResultCards() {
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {Object.entries(formatted.pills).map(([key, pill]) => {
-          const isSeatScoped = SEAT_SCOPED_KEYS.has(key);
-          const { pillLabel, supportingText } = isSeatScoped
-            ? { pillLabel: pill.resultText, supportingText: null }
-            : splitPillContent(pill.resultText);
-          return (
-            <div
-              key={key}
-              className="flex flex-col items-center gap-1 rounded-lg border border-[#DCDBD6] bg-white p-3"
-              aria-label={pill.text}
-            >
-              <span className="text-[11px] font-semibold text-[#213428]">
-                {CARD_TITLES[key] || pill.label}
-              </span>
-              <BassResultDetailTooltip parameterKey={key}>
-                <RP22GradingPill level={pill.level}>{pillLabel}</RP22GradingPill>
-              </BassResultDetailTooltip>
-              {supportingText
-                ? <div className="text-center text-[10px] text-[#625143]">{supportingText}</div>
-                : null}
-            </div>
-          );
-        })}
-      </div>
+      {/* Shared P14/P18/P19/P20 headline pills — same component as Subwoofer section */}
+      <BassHeadlinePills nowMs={nowMs} />
 
       {/* Expanded P19/P20 per-seat views — shared component */}
       <SharedP19P20SeatResults

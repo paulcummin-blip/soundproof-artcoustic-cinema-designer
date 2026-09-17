@@ -1,9 +1,30 @@
+// BassHeadlinePills — THE single shared P14/P18/P19/P20 headline presentation
+// for both the Bass Simulation section and the Subwoofer / Parameter Results
+// section. One visual implementation, one presentation authority.
+//
+// Layout: 4-column grid of titled cards, each with a standard RP22GradingPill
+// and supporting value underneath. P19/P20 are SEAT-scoped (pill shows "SEAT",
+// no supporting text). P14/P18 split "L2 · 112 dBC" into pill label "L2" and
+// supporting text "112 dBC".
+//
+// Publication-gated: only a canonically published completed result may be
+// presented as an official RP22 result. While calculating/updating, pills
+// show "Calculating…" — never preliminary live values.
+//
+// Tooltip: BassResultDetailTooltip (same canonical authority for both surfaces).
 import React, { useEffect, useState } from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
-import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
+import BassResultDetailTooltip from "@/components/room/bass/BassResultDetailTooltip";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
+
+const CARD_TITLES = {
+  p14: "P14 Bass SPL",
+  p18: "P18 Extension",
+  p19: "P19 Response Fit",
+  p20: "P20 Seat Consistency",
+};
 
 const SEAT_SCOPED_KEYS = new Set(["p19", "p20"]);
 
@@ -20,7 +41,12 @@ function splitPillContent(resultText) {
   };
 }
 
-export default function BassResultsPills({ compact = false, nowMs }) {
+/**
+ * Shared P14/P18/P19/P20 headline pills grid.
+ * @param {object} opts
+ * @param {number} [opts.nowMs] — optional clock for elapsed-time text
+ */
+export default function BassHeadlinePills({ nowMs }) {
   const shared = useSharedBassResults();
   const [clock, setClock] = useState(Date.now());
   const active = nowMs == null && (shared.isUpdating || ["stale", "calculating", "running", "queued"].includes(shared.lifecycle?.status));
@@ -29,6 +55,7 @@ export default function BassResultsPills({ compact = false, nowMs }) {
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [active, shared.lifecycle?.startedAtMs, shared.lifecycle?.queuedAtMs]);
+
   const p14Selection = resolveP14TargetSelectionState(shared.authoritative?.requested);
   const formatted = formatOfficialBassResults(
     shared.completedBassAuthority,
@@ -41,25 +68,30 @@ export default function BassResultsPills({ compact = false, nowMs }) {
       p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
     },
   );
+
   return (
-    <div className="grid grid-cols-2 gap-1 sm:grid-cols-4" aria-label="Bass RP22 results">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {Object.entries(formatted.pills).map(([key, pill]) => {
         const isSeatScoped = SEAT_SCOPED_KEYS.has(key);
         const { pillLabel, supportingText } = isSeatScoped
           ? { pillLabel: pill.resultText, supportingText: null }
           : splitPillContent(pill.resultText);
         return (
-          <span key={key} className="flex flex-col items-center gap-1" aria-label={pill.text}>
-            <BassRp22ParameterTooltip parameterKey={key}>
-              <span className="cursor-help text-center text-[11px] font-semibold text-[#213428] underline decoration-dotted underline-offset-2">
-                {key.toUpperCase()}
-              </span>
-            </BassRp22ParameterTooltip>
-            <RP22GradingPill level={pill.level} compact={compact}>{pillLabel}</RP22GradingPill>
+          <div
+            key={key}
+            className="flex flex-col items-center gap-1 rounded-lg border border-[#DCDBD6] bg-white p-3"
+            aria-label={pill.text}
+          >
+            <span className="text-[11px] font-semibold text-[#213428]">
+              {CARD_TITLES[key] || pill.label}
+            </span>
+            <BassResultDetailTooltip parameterKey={key}>
+              <RP22GradingPill level={pill.level}>{pillLabel}</RP22GradingPill>
+            </BassResultDetailTooltip>
             {supportingText
-              ? <small className="text-center text-[10px] text-muted-foreground">{supportingText}</small>
+              ? <div className="text-center text-[10px] text-[#625143]">{supportingText}</div>
               : null}
-          </span>
+          </div>
         );
       })}
     </div>

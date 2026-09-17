@@ -1,6 +1,6 @@
 import React from "react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
-import BassResultsPills from "@/components/room/bass/BassResultsPills";
+import BassHeadlinePills from "@/components/room/bass/BassHeadlinePills";
 import BassDesignRecommendation from "@/components/room/bass/BassDesignRecommendation";
 import BassCapabilitySummary from "@/components/room/bass/BassCapabilitySummary";
 
@@ -9,7 +9,7 @@ import BassCapabilitySummary from "@/components/room/bass/BassCapabilitySummary"
 // simulation path: all data comes from useSharedBassResults().
 //
 // Contains ONLY:
-//   1. P14 / P18 / P19 / P20 pills
+//   1. P14 / P18 / P19 / P20 pills (shared BassHeadlinePills — same as Bass Simulation)
 //   2. Concise capability / limitation / improvement guidance
 //
 // The authoritative response graph, RSP/seat selectors, and graph-layer
@@ -22,8 +22,8 @@ export default function BassResultBlock() {
 
   return (
     <div className="mt-4 space-y-3">
-      {/* 1. P14 / P18 / P19 / P20 pills */}
-      <BassResultsPills compact={false} nowMs={Date.now()} />
+      {/* 1. P14 / P18 / P19 / P20 pills — shared with Bass Simulation */}
+      <BassHeadlinePills nowMs={Date.now()} />
 
       {/* 2. Concise capability / limitation / improvement guidance */}
       <BassCapabilitySummary

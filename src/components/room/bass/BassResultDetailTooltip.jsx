@@ -44,16 +44,6 @@ function parseLevel(level) {
   return match ? Number(match[1]) : null;
 }
 
-function formatRawP14(value) {
-  if (!isFiniteNumber(value)) return "—";
-  return Number(value).toFixed(1) + " dBC";
-}
-
-function formatRawP18(value) {
-  if (!isFiniteNumber(value)) return "—";
-  return Number(value).toFixed(1) + " Hz";
-}
-
 function buildP14Lines(shared) {
   const contract = shared?.completedBassAuthority?.contract;
   const source = contract?.productAnalysis?.parameters?.p14;
@@ -74,7 +64,6 @@ function buildP14Lines(shared) {
   const lines = [];
 
   if (isFiniteNumber(achievedCapability)) {
-    lines.push(["Measured capability", formatRawP14(achievedCapability)]);
     lines.push(["Displayed capability", formatSplDisplay(achievedCapability)]);
   }
 
@@ -123,16 +112,15 @@ function buildP18Lines(shared) {
   else if (designHz <= thresholds.L1) achievedLevel = 1;
 
   const lines = [];
-  lines.push(["Measured -3 dB point", formatRawP18(achievedValue)]);
-  lines.push(["Displayed", (bounded ? "≤" : "") + formatBassParameterValue("p18", achievedValue)]);
+  lines.push(["Displayed extension", (bounded ? "≤" : "") + formatBassParameterValue("p18", achievedValue)]);
   lines.push(["Grading basis", targetBasis === "recommended" ? "Recommended" : "Minimum"]);
 
   if (achievedLevel > 0) {
     const threshold = thresholds["L" + achievedLevel];
-    lines.push(["L" + achievedLevel + " threshold", "≤" + threshold + " Hz"]);
+    lines.push(["Relevant threshold", "≤" + threshold + " Hz"]);
     lines.push(["Result", "L" + achievedLevel]);
   } else {
-    lines.push(["L1 threshold", "≤" + thresholds.L1 + " Hz"]);
+    lines.push(["Relevant threshold", "≤" + thresholds.L1 + " Hz"]);
     lines.push(["Result", "FAIL"]);
   }
 
