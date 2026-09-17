@@ -129,12 +129,12 @@ export default function DesignReviewPage() {
           hydrateProjectIntoAppState(merged, app, { ...app, setDolbyPreset: app.setDolbyLayout });
         }
         setGeometryReadyProjectId(merged.id || p.id);
+        // Store the MERGED project (Project + active version design_state), not
+        // the raw Project entity. Per-version design fields (speakers, subs,
+        // seating, room dims, screen, etc.) come from design_state; storing raw
+        // p would show stale legacy fields when a version has diverged.
+        setProjectDetails(merged || null);
       }
-      // Store the MERGED project (Project + active version design_state), not
-      // the raw Project entity. Per-version design fields (speakers, subs,
-      // seating, room dims, screen, etc.) come from design_state; storing raw
-      // p would show stale legacy fields when a version has diverged.
-      setProjectDetails(merged || null);
     }).catch(() => {
       if (!cancelled) setProjectDetails(null);
     }).finally(() => {
