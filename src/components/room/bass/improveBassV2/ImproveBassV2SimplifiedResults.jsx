@@ -1,26 +1,25 @@
 // ImproveBassV2SimplifiedResults.jsx
-// Simplified Improve Bass Response results UI — replaces the large stage cards.
+// Simplified Improve Bass Response results UI with live canonical combination preview.
 //
-// Shows a simple checkbox list of available improvements with Current → With Change
-// metrics (failing seats, primary floor, P19, P20). One "Apply Selected Changes"
-// button applies all checked improvements as one atomic configuration, then
-// triggers automatic canonical recalculation.
+// Layout:
+//   CURRENT SYSTEM — failing seats, primary floor, P19/P20 seat pills
+//   IMPROVEMENTS FOUND — checkboxes with per-option metrics
+//   WITH SELECTED CHANGES — live canonical preview of the exact selected combination
+//   [ Apply Selected Changes ] — applies the exact previewed candidate
 //
-// Recommended combined winner is pre-checked. Individual options are unchecked
-// (optional). The user can override manually.
+// The preview is canonical: selected changes → chained retune → canonical confirmation.
+// No naive field-overlay merge. No individual result addition.
 
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CheckCircle2, ArrowRight } from "lucide-react";
+import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 import { countFailingSeats } from "./zeroFailOptimiser";
 import { buildStageResults, STAGE_ORDER, STAGE_DISPLAY_LABELS } from "./improveBassV2StageAuthority";
-import { buildOptimisedInstances } from "./improveBassV2Apply";
-import { applyCalibrationTuning, resolveTuningInstances } from "./improveBassV2ApplyCalibration";
-import { buildProvenance } from "./appliedProvenance";
-import { computeV2DesignFingerprint } from "./improveBassV2Fingerprint";
 import { formatAcousticPath } from "./acousticDistance";
-import { extractGainAdjustmentDb, extractGainGroupLabel } from "./gainRationaleBuilder";
+import { extractGainAdjustmentDb } from "./gainRationaleBuilder";
+import { usePreviewState, resetPreview } from "./selectedCombinationPreviewStore";
+import { runSelectedCombinationPreview } from "./selectedCombinationPreview";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -52,6 +51,60 @@ function levelColor(level) {
   return "text-red-600 font-semibold";
 }
 
+// ── SeatPills — compact per-seat level pills ─────────────────────────────
+
+function SeatPills({ perSeat }) {
+  if (!Array.isArray(perSeat) || !perSeat.length) return null;
+  return (
+    <div className="flex flex-wrap gap-0.5">
+      {perSeat.map((seat, i) => {
+        const level = seat.level || "FAIL";
+        const n = numericLevel(level);
+        const colorClass = n >= 3
+          ? "bg-[#213428] text-white"
+          : n >= 1
+            ? "bg-[#D9E5DF] text-[#213428]"
+            : "bg-red-100 text-red-700";
+        return (
+          <span key={seat.seatId || i} className={`text-[8px] px-1 py-0.5 rounded font-medium ${colorClass}`}>
+            {levelText(level)}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Delta displays ───────────────────────────────────────────────────────
+
+function FailingSeatsDelta({ before, after }) {
+  const changed = before !== after;
+  return (
+    <div className="flex items-center gap-1.5 text-[10px]">
+      <span className="text-[#8A7B6A] w-10">Fails</span>
+      <span className={before > 0 ? "text-red-600 font-semibold" : "text-[#213428]"}>{before}</span>
+      {changed && <ArrowRight className="h-2.5 w-2.5 text-[#8A7B6A]" />}
+      {changed && <span className={after > 0 ? "text-red-600 font-semibold" : "text-[#213428] font-semibold"}>{after}</span>}
+    </div>
+  );
+}
+
+function MetricDelta({ label, beforeValue, afterValue, formatFn, levelBased = false }) {
+  const before = formatFn(beforeValue);
+  const after = formatFn(afterValue);
+  const changed = levelBased
+    ? numericLevel(beforeValue) !== numericLevel(afterValue)
+    : Math.abs(Number(beforeValue) - Number(afterValue)) > 0.05;
+  return (
+    <div className="flex items-center gap-1.5 text-[10px]">
+      <span className="text-[#8A7B6A] w-10">{label}</span>
+      <span className={levelBased ? levelColor(beforeValue) : "text-[#625143]"}>{before}</span>
+      {changed && <ArrowRight className="h-2.5 w-2.5 text-[#8A7B6A]" />}
+      {changed && <span className={levelBased ? levelColor(afterValue) : "text-[#213428] font-medium"}>{after}</span>}
+    </div>
+  );
+}
+
 // ── Build the list of available improvements ──────────────────────────────
 
 function buildImprovementList(selection) {
@@ -71,7 +124,6 @@ function buildImprovementList(selection) {
     const beforeP20 = primarySeatMetric(currentResult?.perSeatP20);
     const afterP20 = primarySeatMetric(result.perSeatP20);
 
-    // Build a human-readable change description
     let changeDesc = "";
     if (stageKey === "phase") {
       const grouped = result.groupedPhase || {};
@@ -122,150 +174,42 @@ function buildImprovementList(selection) {
   return improvements;
 }
 
-// ── Compose selected changes into one complete configuration ──────────────
+// ── Default selection: preselect the recommended combination ─────────────
 
-export function composeSelectedChanges(
-  selectedKeys,
-  improvements,
-  currentInstances,
-  roomDims,
-  selectedSubModel,
-  applyFingerprint,
-  currentFingerprint,
-) {
-  const _provenance = buildProvenance("subPositions", "combined-apply", applyFingerprint, currentFingerprint);
+function getDefaultSelectedKeys(selection, availableKeys) {
+  const winner = selection?.winner;
+  if (!winner) return new Set();
 
-  // Case 1: Combined winner is selected → use it directly (it has everything)
-  if (selectedKeys.has("combined")) {
-    const combined = improvements.find((i) => i.stageKey === "combined");
-    if (!combined) return null;
-    const result = combined.result;
-    const hasCoords = (result.positionCoordinates?.length || result.coordinates?.length || 0) > 0;
-    let next;
-    if (hasCoords) {
-      next = buildOptimisedInstances(result, currentInstances, roomDims, selectedSubModel, _provenance);
-    } else {
-      next = applyCalibrationTuning(currentInstances, result.appliedTuning || result.tuning || [], _provenance);
+  const keys = new Set();
+  const combinedFrom = winner.combinedFrom || {};
+  const isCombined = winner.candidateOrigin === "combined"
+    || combinedFrom.calibrationOnly
+    || combinedFrom.calibrationRetuned;
+
+  if (isCombined) {
+    // Combined candidates retune all calibration levers
+    if (availableKeys.has("phase")) keys.add("phase");
+    if (availableKeys.has("delay")) keys.add("delay");
+    if (availableKeys.has("gain")) keys.add("gain");
+    if (availableKeys.has("seating") && (winner.seatingOffsetMm != null || combinedFrom.seatingOffsetMm != null)) {
+      keys.add("seating");
     }
-    return { instances: next, seatingPositions: result.seatingPositions || null };
-  }
-
-  // Case 2: Individual stages selected → compose a merged configuration
-  const selectedCalibration = ["phase", "delay", "gain"].filter((k) => selectedKeys.has(k));
-  const selectedPositions = selectedKeys.has("subPositions");
-  const selectedSeating = selectedKeys.has("seating");
-
-  if (selectedCalibration.length === 0 && !selectedPositions && !selectedSeating) {
-    return null; // Nothing selected
-  }
-
-  // Build merged tuning from selected calibration stages
-  let nextInstances = currentInstances;
-
-  if (selectedCalibration.length > 0) {
-    // Start with current tuning values, then overlay selected fields
-    const activeInstances = (currentInstances || []).filter((s) => s.enabled !== false);
-    const referenceTuning = improvements.find((i) => i.stageKey === selectedCalibration[0])?.result?.appliedTuning
-      || improvements.find((i) => i.stageKey === selectedCalibration[0])?.result?.tuning
-      || [];
-    const ordered = resolveTuningInstances(currentInstances, referenceTuning);
-    if (!ordered) return null;
-
-    const mergedTuning = ordered.map((inst, i) => {
-      const base = {
-        sourceId: referenceTuning[i]?.sourceId || inst.id,
-        delayMs: Number(inst.delayMs) || 0,
-        gainDb: Number(inst.gainDb) || 0,
-        phaseControlDeg: inst.phaseControlDeg ?? inst.phaseAdjust ?? 0,
-        polarity: Number(inst.polarity) || 0,
-      };
-
-      // Overlay phase from phase result
-      if (selectedKeys.has("phase")) {
-        const phaseResult = improvements.find((im) => im.stageKey === "phase")?.result;
-        const phaseTuning = phaseResult?.appliedTuning || phaseResult?.tuning || [];
-        const phaseEntry = phaseTuning[i];
-        if (phaseEntry) {
-          base.phaseControlDeg = phaseEntry.phaseControlDeg ?? phaseEntry.phaseAdjust ?? base.phaseControlDeg;
-          base.polarity = phaseEntry.polarity ?? base.polarity;
-        }
-      }
-
-      // Overlay delay from delay result
-      if (selectedKeys.has("delay")) {
-        const delayResult = improvements.find((im) => im.stageKey === "delay")?.result;
-        const delayTuning = delayResult?.appliedTuning || delayResult?.tuning || [];
-        const delayEntry = delayTuning[i];
-        if (delayEntry) {
-          base.delayMs = delayEntry.delayMs ?? base.delayMs;
-        }
-      }
-
-      // Overlay gain from gain result
-      if (selectedKeys.has("gain")) {
-        const gainResult = improvements.find((im) => im.stageKey === "gain")?.result;
-        const gainTuning = gainResult?.appliedTuning || gainResult?.tuning || [];
-        const gainEntry = gainTuning[i];
-        if (gainEntry) {
-          base.gainDb = gainEntry.gainDb ?? base.gainDb;
-        }
-      }
-
-      return base;
-    });
-
-    nextInstances = applyCalibrationTuning(currentInstances, mergedTuning, _provenance);
-  }
-
-  // Overlay positions from subPositions result
-  if (selectedPositions) {
-    const posResult = improvements.find((im) => im.stageKey === "subPositions")?.result;
-    if (posResult) {
-      nextInstances = buildOptimisedInstances(posResult, nextInstances, roomDims, selectedSubModel, _provenance);
+    if (availableKeys.has("subPositions") && (winner.isPositionCandidate || combinedFrom.positionCandidateId)) {
+      keys.add("subPositions");
     }
+  } else if (winner.candidateKind === "phase" && availableKeys.has("phase")) {
+    keys.add("phase");
+  } else if (winner.candidateKind === "calibration" && availableKeys.has("delay")) {
+    keys.add("delay");
+  } else if (winner.candidateKind === "gain" && availableKeys.has("gain")) {
+    keys.add("gain");
+  } else if (winner.candidateKind === "seating" && availableKeys.has("seating")) {
+    keys.add("seating");
+  } else if (winner.isPositionCandidate && availableKeys.has("subPositions")) {
+    keys.add("subPositions");
   }
 
-  // Extract seating positions if selected
-  let seatingPositions = null;
-  if (selectedSeating) {
-    const seatingResult = improvements.find((im) => im.stageKey === "seating")?.result;
-    if (seatingResult?.seatingPositions) {
-      seatingPositions = seatingResult.seatingPositions;
-    }
-  }
-
-  return { instances: nextInstances, seatingPositions };
-}
-
-// ── Metric delta display ──────────────────────────────────────────────────
-
-function MetricDelta({ label, beforeValue, afterValue, formatFn, levelBased = false }) {
-  const before = formatFn(beforeValue);
-  const after = formatFn(afterValue);
-  const changed = levelBased
-    ? numericLevel(beforeValue) !== numericLevel(afterValue)
-    : Math.abs(Number(beforeValue) - Number(afterValue)) > 0.05;
-
-  return (
-    <div className="flex items-center gap-1.5 text-[10px]">
-      <span className="text-[#8A7B6A] w-10">{label}</span>
-      <span className={levelBased ? levelColor(beforeValue) : "text-[#625143]"}>{before}</span>
-      {changed && <ArrowRight className="h-2.5 w-2.5 text-[#8A7B6A]" />}
-      {changed && <span className={levelBased ? levelColor(afterValue) : "text-[#213428] font-medium"}>{after}</span>}
-    </div>
-  );
-}
-
-function FailingSeatsDelta({ before, after }) {
-  const changed = before !== after;
-  return (
-    <div className="flex items-center gap-1.5 text-[10px]">
-      <span className="text-[#8A7B6A] w-10">Fails</span>
-      <span className={before > 0 ? "text-red-600 font-semibold" : "text-[#213428]"}>{before}</span>
-      {changed && <ArrowRight className="h-2.5 w-2.5 text-[#8A7B6A]" />}
-      {changed && <span className={after > 0 ? "text-red-600 font-semibold" : "text-[#213428] font-semibold"}>{after}</span>}
-    </div>
-  );
+  return keys;
 }
 
 // ── Main component ────────────────────────────────────────────────────────
@@ -276,57 +220,94 @@ export default function ImproveBassV2SimplifiedResults({
   roomDims,
   seatingPositions,
   selectedSubModel,
-  onApplySelected,
+  onApplyCandidate,
   stale,
-  sharedBassResults,
+  projectId,
+  versionId,
+  rspPosition,
+  amplifierPowerPerSubW,
+  subwooferBottomHeightM,
+  p14TargetBasis,
+  p14TargetLevel,
+  p14TargetDb,
+  p18TargetBasis,
   currentDesignFingerprint,
 }) {
   const improvements = useMemo(() => buildImprovementList(selection), [selection]);
+  const availableKeys = useMemo(() => new Set(improvements.map((i) => i.stageKey)), [improvements]);
 
-  // Pre-select the combined winner (recommended). Individual options unchecked.
-  const [selectedKeys, setSelectedKeys] = useState(() => {
-    const initial = new Set();
-    if (improvements.some((im) => im.stageKey === "combined")) {
-      initial.add("combined");
-    }
-    return initial;
-  });
+  const [selectedKeys, setSelectedKeys] = useState(() => getDefaultSelectedKeys(selection, availableKeys));
 
   // Reset selection when a new result arrives (new optimisation run)
   useEffect(() => {
-    const initial = new Set();
-    if (improvements.some((im) => im.stageKey === "combined")) {
-      initial.add("combined");
-    }
-    setSelectedKeys(initial);
+    setSelectedKeys(getDefaultSelectedKeys(selection, availableKeys));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection]);
+
+  // Reset preview when selection becomes stale
+  useEffect(() => {
+    if (stale) resetPreview(projectId, versionId);
+  }, [stale, projectId, versionId]);
+
+  const previewState = usePreviewState(projectId, versionId);
+
+  // Trigger canonical preview on selection change
+  const selectedKeysKey = Array.from(selectedKeys).sort().join(",");
+  const paramsRef = useRef({});
+  paramsRef.current = {
+    projectId, versionId, selection,
+    roomDims, subwooferInstances: currentInstances,
+    rspPosition, selectedSubModel,
+    amplifierPowerPerSubW, subwooferBottomHeightM,
+    seatingPositions,
+    p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+    currentDesignFingerprint,
+  };
+
+  useEffect(() => {
+    if (selectedKeys.size === 0) {
+      resetPreview(projectId, versionId);
+      return;
+    }
+    const controller = new AbortController();
+    runSelectedCombinationPreview({
+      ...paramsRef.current,
+      selectedKeys,
+      signal: controller.signal,
+    });
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKeysKey, selection, currentDesignFingerprint, projectId, versionId]);
 
   const toggleImprovement = useCallback((stageKey) => {
     setSelectedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(stageKey)) {
-        next.delete(stageKey);
-      } else {
-        next.add(stageKey);
-      }
-      // If selecting an individual option, uncheck combined (user override)
-      if (stageKey !== "combined" && next.has(stageKey)) {
-        next.delete("combined");
-      }
-      // If selecting combined, uncheck all individual options
-      if (stageKey === "combined" && next.has(stageKey)) {
-        STAGE_ORDER.forEach((k) => { if (k !== "combined") next.delete(k); });
-      }
+      if (next.has(stageKey)) next.delete(stageKey);
+      else next.add(stageKey);
       return next;
     });
   }, []);
 
   const handleApply = useCallback(() => {
-    if (onApplySelected) {
-      onApplySelected(selectedKeys, improvements);
+    if (onApplyCandidate && previewState.result) {
+      onApplyCandidate(previewState.result);
     }
-  }, [selectedKeys, improvements, onApplySelected]);
+  }, [onApplyCandidate, previewState.result]);
+
+  // ── Current system metrics ──────────────────────────────────────────
+  const currentResult = selection?.currentResult;
+  const currentFails = countFailingSeats(currentResult);
+  const currentPrimaryP20 = primarySeatMetric(currentResult?.perSeatP20);
+  const currentFloor = currentPrimaryP20?.level || "FAIL";
+
+  // ── Preview metrics ─────────────────────────────────────────────────
+  const previewResult = previewState.result;
+  const previewFails = previewResult ? countFailingSeats(previewResult) : null;
+  const previewPrimaryP20 = previewResult ? primarySeatMetric(previewResult.perSeatP20) : null;
+  const previewFloor = previewPrimaryP20?.level || "FAIL";
+
+  const isPreviewRunning = ["preparing", "retuning", "confirming"].includes(previewState.status);
+  const isPreviewComplete = previewState.status === "complete" && !!previewResult;
 
   if (improvements.length === 0) {
     return (
@@ -341,10 +322,34 @@ export default function ImproveBassV2SimplifiedResults({
     );
   }
 
-  const hasSelection = selectedKeys.size > 0;
-
   return (
     <div className="mt-3 space-y-2" data-simplified-results="true">
+      {/* ── CURRENT SYSTEM ────────────────────────────────────────────── */}
+      <div className="rounded-md border border-[#D9D5CE] bg-white p-2.5" data-current-system="true">
+        <div className="text-[11px] font-semibold text-[#1B1A1A] uppercase tracking-wide mb-1.5">
+          Current System
+        </div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5 text-[10px]">
+            <span className="text-[#8A7B6A] w-10">Fails</span>
+            <span className={currentFails > 0 ? "text-red-600 font-semibold" : "text-[#213428]"}>{currentFails}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px]">
+            <span className="text-[#8A7B6A] w-10">Floor</span>
+            <span className={levelColor(currentFloor)}>{levelText(currentFloor)}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] text-[#8A7B6A] w-8">P19</span>
+            <SeatPills perSeat={currentResult?.perSeatP19} />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] text-[#8A7B6A] w-8">P20</span>
+            <SeatPills perSeat={currentResult?.perSeatP20} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── IMPROVEMENTS FOUND ────────────────────────────────────────── */}
       <div className="text-[11px] font-semibold text-[#213428] uppercase tracking-wide">
         Improvements found
       </div>
@@ -371,7 +376,6 @@ export default function ImproveBassV2SimplifiedResults({
                   : "border-[#E7E4DF] bg-white"
             }`}
           >
-            {/* Checkbox + label row */}
             <div className="flex items-start gap-2">
               <Checkbox
                 checked={isChecked}
@@ -396,7 +400,7 @@ export default function ImproveBassV2SimplifiedResults({
               </div>
             </div>
 
-            {/* Current → With Change metrics */}
+            {/* Per-option metrics: Fails/Floor first, then P19/P20 */}
             <div className="mt-2 ml-6 space-y-1">
               {failsChanged && (
                 <FailingSeatsDelta before={imp.before.failingSeats} after={imp.after.failingSeats} />
@@ -433,12 +437,74 @@ export default function ImproveBassV2SimplifiedResults({
         );
       })}
 
-      {/* One Apply button */}
+      {/* ── WITH SELECTED CHANGES ────────────────────────────────────── */}
+      {selectedKeys.size > 0 && (
+        <div className="rounded-md border border-[#213428]/30 bg-[#F8F7F4] p-2.5" data-with-selected-changes="true">
+          <div className="text-[11px] font-semibold text-[#213428] uppercase tracking-wide mb-1.5">
+            With Selected Changes
+          </div>
+
+          {isPreviewRunning && (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin text-[#213428] flex-shrink-0" />
+              <span className="text-[11px] text-[#625143]">
+                {previewState.progress?.label || "Checking selected combination..."}
+              </span>
+              {previewState.progress && (
+                <span className="text-[9px] text-[#8A7B6A]">
+                  ({previewState.progress.current}/{previewState.progress.total})
+                </span>
+              )}
+            </div>
+          )}
+
+          {isPreviewComplete && (
+            <div className="space-y-1">
+              <FailingSeatsDelta before={currentFails} after={previewFails} />
+              <MetricDelta
+                label="Floor"
+                beforeValue={currentFloor}
+                afterValue={previewFloor}
+                formatFn={levelText}
+                levelBased
+              />
+              <div className="mt-1.5 space-y-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[9px] text-[#8A7B6A] w-8">P19</span>
+                  <SeatPills perSeat={currentResult?.perSeatP19} />
+                  <ArrowRight className="h-2.5 w-2.5 text-[#8A7B6A] flex-shrink-0" />
+                  <SeatPills perSeat={previewResult?.perSeatP19} />
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[9px] text-[#8A7B6A] w-8">P20</span>
+                  <SeatPills perSeat={currentResult?.perSeatP20} />
+                  <ArrowRight className="h-2.5 w-2.5 text-[#8A7B6A] flex-shrink-0" />
+                  <SeatPills perSeat={previewResult?.perSeatP20} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {previewState.status === "error" && (
+            <div className="text-[10px] text-red-600">
+              {previewState.error || "Preview failed"}
+            </div>
+          )}
+
+          {previewState.status === "idle" && (
+            <div className="text-[10px] text-[#8A7B6A]">
+              Select options to preview the combined result.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Apply Selected Changes ────────────────────────────────────── */}
       {!stale && (
         <Button
           type="button"
-          className="w-full bg-[#213428] text-white hover:bg-[#3E4349] font-semibold mt-2"
-          disabled={!hasSelection}
+          className="w-full bg-[#213428] text-white hover:bg-[#3E4349] font-semibold mt-1"
+          disabled={!isPreviewComplete}
           onClick={handleApply}
           data-apply-selected="true"
         >

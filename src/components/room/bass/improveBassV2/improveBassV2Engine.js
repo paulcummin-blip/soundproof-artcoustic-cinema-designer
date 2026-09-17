@@ -1188,6 +1188,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     let seatingMaterial = null;
     let seatingDiagnostics = { status: "incomplete", tested: 0, valid: 0, best: null };
     let seatingRawTransfer = null;
+    let positionRawTransfer = null;
     let seatingProfiler = createSeatingProfiler();
     setStageVerdict(projectId, versionId, "seating_positions", "skipped");
     try {
@@ -1403,7 +1404,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       if (existingAuthority && savedCurrentRawTransfer?.perSourcePerSeatComplexTransfers?.length) {
         // Find the best position candidate and its rawTransfer (may be null)
         const bestPositionCandidate = identifyBestPositionCandidate(confirmedResults, existingAuthority);
-        let positionRawTransfer = null;
+        positionRawTransfer = null;
         if (bestPositionCandidate) {
           const positionCandidateWithTransfer = allCandidates.find(
             (c) => c.id === bestPositionCandidate.candidateId || c.finalist?.id === bestPositionCandidate.candidateId,
@@ -1525,6 +1526,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     subOptimisationExhausted = positionOpt.subOptimisationExhausted;
     setPositionExhaustion(projectId, versionId, subOptimisationExhausted, materialSubImprovementFound, selection.winner);
     selection.positionOptimisation = positionOpt;
+    selection.previewRawTransfers = {
+      current: savedCurrentRawTransfer,
+      seating: seatingRawTransfer,
+      position: positionRawTransfer,
+    };
 
     runResult = { status: "complete", selection, snapshot, confirmedResults };
     return runResult;

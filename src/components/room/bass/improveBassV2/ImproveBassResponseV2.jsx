@@ -46,7 +46,7 @@ import { applyCalibrationTuning } from "./improveBassV2ApplyCalibration";
 import { computeV2DesignFingerprint } from "./improveBassV2Fingerprint";
 import { buildProvenance } from "./appliedProvenance";
 import ImproveBassV2Progress from "./ImproveBassV2Progress";
-import ImproveBassV2SimplifiedResults, { composeSelectedChanges } from "./ImproveBassV2SimplifiedResults";
+import ImproveBassV2SimplifiedResults from "./ImproveBassV2SimplifiedResults";
 import ImproveBassV2InfoPopover from "./ImproveBassV2InfoPopover";
 import ImproveBassV2CompletedInvestigation from "./ImproveBassV2CompletedInvestigation";
 import OptimisationDiagnosticsReport from "./OptimisationDiagnosticsReport";
@@ -516,12 +516,12 @@ export default function ImproveBassResponseV2({
     }
   }, [postApplyRecalculating, shared?.hasCurrentResult, shared?.calculationInProgress]);
 
-  // ── Apply Selected Changes handler ───────────────────────────────────
-  // Composes ALL selected improvements into ONE complete configuration,
-  // commits it atomically, then triggers automatic canonical recalculation.
-  // No second button press required.
-  const handleApplySelected = useCallback((selectedKeys, improvements) => {
-    if (!selectedKeys || selectedKeys.size === 0 || !commitInstances || !hasCanonicalInstances) return;
+  // ── Apply Candidate handler (exact previewed candidate) ─────────────
+  // Applies the EXACT confirmed candidate from the live preview — no
+  // recomposition from checkbox rows. The candidate displayed in
+  // "WITH SELECTED CHANGES" is the candidate that gets applied.
+  const handleApplyCandidate = useCallback((candidate) => {
+    if (!candidate || !commitInstances || !hasCanonicalInstances) return;
     const selection = state?.winner;
     if (!selection) return;
 
@@ -532,83 +532,38 @@ export default function ImproveBassResponseV2({
       return;
     }
 
-    // Compose selected changes into one complete configuration
-    const composed = composeSelectedChanges(
-      selectedKeys,
-      improvements,
-      subwooferInstances,
-      roomDims,
-      selectedSubModel,
-      selection.applyFingerprint,
-      fingerprint,
-    );
-    if (!composed) return;
+    const _provenance = buildProvenance("subPositions", "preview-apply", selection.applyFingerprint, fingerprint);
+    const hasCoords = (candidate.positionCoordinates?.length || candidate.coordinates?.length || 0) > 0;
 
-    // Capture BEFORE fingerprint for authority verification
-    const beforeFingerprint = fingerprint;
+    let next;
+    if (hasCoords) {
+      next = buildOptimisedInstances(candidate, subwooferInstances, roomDims, selectedSubModel, _provenance);
+    } else {
+      next = applyCalibrationTuning(subwooferInstances, candidate.appliedTuning || [], _provenance);
+    }
+    commitInstances(next, { front: { placementMode: "manual", isManual: true }, rear: { placementMode: "manual", isManual: true } });
 
-    // Commit the composed instances atomically
-    commitInstances(composed.instances, {
-      front: { placementMode: "manual", isManual: true },
-      rear: { placementMode: "manual", isManual: true },
-    });
-
-    // Commit seating if part of the selection
-    if (composed.seatingPositions && commitSeating) {
-      commitSeating(composed.seatingPositions);
+    if (candidate.seatingPositions && commitSeating) {
+      commitSeating(candidate.seatingPositions);
       const postMutationFingerprint = (() => {
-        try {
-          return computeV2DesignFingerprint({
-            ...d,
-            seatingPositions: composed.seatingPositions,
-            ...d.p14Params,
-          });
-        } catch { return null; }
+        try { return computeV2DesignFingerprint({ ...d, seatingPositions: candidate.seatingPositions, ...d.p14Params }); } catch { return null; }
       })();
-      const seatingProvenance = buildProvenance(
-        "seating_positions", "combined-apply",
-        selection.applyFingerprint, postMutationFingerprint,
-      );
+      const seatingProvenance = buildProvenance("seating_positions", "preview-apply", selection.applyFingerprint, postMutationFingerprint);
       if (commitSeatingProvenance) commitSeatingProvenance(seatingProvenance);
     }
 
-    // ── PART C: Authority chain verification ──────────────────────────
-    // Capture the AFTER fingerprint and verify it changed
-    const afterFingerprint = (() => {
-      try {
-        const updatedDesign = {
-          ...d,
-          subwooferInstances: composed.instances,
-          seatingPositions: composed.seatingPositions || d.seatingPositions,
-          ...d.p14Params,
-        };
-        return computeV2DesignFingerprint(updatedDesign);
-      } catch { return null; }
-    })();
-
-    // Log verification to console for diagnostic tracing
     if (typeof window !== "undefined") {
       window.__IMPROVE_BASS_APPLY_AUDIT__ = {
-        beforeFingerprint,
-        afterFingerprint,
-        fingerprintChanged: beforeFingerprint !== afterFingerprint,
-        selectedKeys: Array.from(selectedKeys),
-        composedHasInstances: !!composed.instances,
-        composedHasSeating: !!composed.seatingPositions,
+        beforeFingerprint: fingerprint,
+        appliedCandidateId: candidate.candidateId || "preview",
+        hasCoords, hasSeating: !!candidate.seatingPositions,
         timestamp: Date.now(),
       };
     }
 
-    // ── PART B: Automatic canonical recalculation ─────────────────────
-    // Trigger the normal canonical Parameter calculation automatically.
-    // No second button press. No warning message. Sound Proof itself
-    // changed the design, so it recalculates.
     setPostApplyRecalculating(true);
     if (shared?.onCalculate) {
-      // Defer to next tick so commitInstances state propagation settles
-      setTimeout(() => {
-        shared.onCalculate();
-      }, 50);
+      setTimeout(() => { shared.onCalculate(); }, 50);
     }
   }, [state?.status, state?.winner, commitInstances, commitSeating, commitSeatingProvenance,
       hasCanonicalInstances, projectId, versionId, subwooferInstances, roomDims, selectedSubModel, shared]);
@@ -668,9 +623,17 @@ export default function ImproveBassResponseV2({
           roomDims={roomDims}
           seatingPositions={seatingPositions}
           selectedSubModel={selectedSubModel}
-          onApplySelected={handleApplySelected}
+          onApplyCandidate={handleApplyCandidate}
           stale={completedResultStale}
-          sharedBassResults={shared}
+          projectId={projectId}
+          versionId={versionId}
+          rspPosition={rspPosition}
+          amplifierPowerPerSubW={amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0}
+          subwooferBottomHeightM={subwooferBottomHeightM}
+          p14TargetBasis={p14Params.p14TargetBasis}
+          p14TargetLevel={p14Params.p14TargetLevel}
+          p14TargetDb={p14Params.p14TargetDb}
+          p18TargetBasis={p14Params.p18TargetBasis}
           currentDesignFingerprint={currentDesignFingerprint}
         />
       )}
