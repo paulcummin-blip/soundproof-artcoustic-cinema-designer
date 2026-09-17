@@ -385,6 +385,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     controller.observeInputs({
       valid: !!fingerprints && !!cacheKey && !!targetKey,
       fingerprint: cacheKey,
+      projectId: scopeId,
+      versionId,
     });
 
     const heavyAction = getBassHeavyAction(scopeId, versionId);
@@ -521,6 +523,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       collectDiagnostics: manualAnalysisRequest.collectDiagnostics === true,
       force: true,
       diagnosticToken: manualAnalysisRequest.diagnosticToken || null,
+      projectId: scopeId,
+      versionId,
     });
   }, [
     controller,

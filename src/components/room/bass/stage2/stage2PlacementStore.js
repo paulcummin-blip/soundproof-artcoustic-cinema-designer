@@ -308,8 +308,8 @@ export class Stage2PlacementController {
       this.confirmationJobsDoneByQty[qty] = 0;
 
       for (const f of finalists) {
-        if (placementFingerprint && hasCachedRawTransfer(placementFingerprint, f.id)) {
-          const rawTransfer = getCachedRawTransfer(placementFingerprint, f.id);
+        if (placementFingerprint && hasCachedRawTransfer(this.projectId, this.versionId, placementFingerprint, f.id)) {
+          const rawTransfer = getCachedRawTransfer(this.projectId, this.versionId, placementFingerprint, f.id);
           const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
           const placementRanking = buildPlacementRankingTuple(rawTransfer, seatPriorityMap);
           this.placementResults[qty].push({ finalistId: f.id, rawTransfer, placementRanking });
@@ -616,7 +616,7 @@ export class Stage2PlacementController {
       if (isSuccess) {
         const rawTransfer = outcome.result;
         if (this.placementFingerprint) {
-          setCachedRawTransfer(this.placementFingerprint, rawTransfer.finalistId, rawTransfer);
+          setCachedRawTransfer(this.projectId, this.versionId, this.placementFingerprint, rawTransfer.finalistId, rawTransfer);
         }
 
         // B-representative: queue exactly one confirmation job now that the

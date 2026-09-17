@@ -10,6 +10,7 @@ import {
 } from "./bassOptimiserWorkerProtocol";
 import { validateCachedBassResult } from "./bassResultAuthority";
 import { recordDiagStage } from "./bassDiagTokenTrace";
+import { bassCacheKey } from "./bassCacheKey";
 
 export const BASS_BACKGROUND_SCHEMA_VERSION = bassOptimiserVersionSignature();
 export const BASS_BACKGROUND_DEBOUNCE_MS = 1000;
@@ -115,6 +116,9 @@ export class BassBackgroundAnalysisController {
 
   getSnapshot = () => this.state;
   subscribe = (listener) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
+  _versionedCacheKey(fingerprint) {
+    return `${bassCacheKey(this._projectId, this._versionId)}::${fingerprint}`;
+  }
   emit(patch) {
     this.state = { ...this.state, ...patch };
     this.listeners.forEach((listener) => listener());
@@ -172,7 +176,9 @@ export class BassBackgroundAnalysisController {
   // Observe live design identity without scheduling work. This is the manual
   // authority boundary: geometry/model/target changes may invalidate or cancel
   // an existing result, but they can never queue a replacement calculation.
-  observeInputs({ valid, fingerprint }) {
+  observeInputs({ valid, fingerprint, projectId = null, versionId = null }) {
+    this._projectId = projectId;
+    this._versionId = versionId;
     const nextFingerprint = valid && fingerprint ? fingerprint : null;
     const sameFingerprint = this.state.currentCalibrationFingerprint === nextFingerprint;
     if (sameFingerprint && !this.activeRequest && !this.pending && this.timer == null) {
@@ -213,7 +219,9 @@ export class BassBackgroundAnalysisController {
     return { action: staleResult ? "stale" : "idle" };
   }
 
-  updateInputs({ valid, fingerprint, legacyFingerprint = null, payload, identity = null, collectDiagnostics = false, diagnosticToken = null }) {
+  updateInputs({ valid, fingerprint, legacyFingerprint = null, payload, identity = null, collectDiagnostics = false, diagnosticToken = null, projectId = null, versionId = null }) {
+    this._projectId = projectId;
+    this._versionId = versionId;
     if (!valid || !fingerprint) {
       const nextFingerprint = fingerprint || null;
       const alreadyIdle =
@@ -258,11 +266,13 @@ export class BassBackgroundAnalysisController {
     this.cancelActive("superseded");
     const staleResult = this.state.result || this.state.staleResult;
     this.stage("Cache lookup", { fingerprint });
-    let cacheRead = this.cache.read(fingerprint);
+    const vKey = this._versionedCacheKey(fingerprint);
+    let cacheRead = this.cache.read(vKey);
     if (!cacheRead.result && legacyFingerprint && legacyFingerprint !== fingerprint) {
-      const legacyRead = this.cache.read(legacyFingerprint);
+      const legacyVKey = this._versionedCacheKey(legacyFingerprint);
+      const legacyRead = this.cache.read(legacyVKey);
       if (legacyRead.result || legacyRead.status === "rejected-stale") {
-        this.cache.entries.delete(legacyFingerprint);
+        this.cache.entries.delete(legacyVKey);
         cacheRead = { result: null, status: "rejected-stale", reason: legacyRead.reason || "legacy-unversioned-cache-key" };
       }
     }
@@ -312,7 +322,9 @@ export class BassBackgroundAnalysisController {
     return { action: "queued" };
   }
 
-  requestManual({ fingerprint, payload, identity = null, collectDiagnostics = false, force = false, diagnosticToken = null }) {
+  requestManual({ fingerprint, payload, identity = null, collectDiagnostics = false, force = false, diagnosticToken = null, projectId = null, versionId = null }) {
+    this._projectId = projectId;
+    this._versionId = versionId;
     recordDiagStage(diagnosticToken, "requestManual", { collectDiagnostics, force });
     if (!fingerprint) return { action: "idle" };
     if (!force && (this.state.status === "queued" || this.state.status === "calculating") && this.state.currentJobFingerprint === fingerprint) {
@@ -335,7 +347,7 @@ export class BassBackgroundAnalysisController {
     // MUST produce a genuinely fresh result with the current live EQ code.
     // Normal cache reuse for automatic renders is unaffected — the cache
     // is repopulated when the worker completes.
-    this.cache.entries.delete(fingerprint);
+    this.cache.entries.delete(this._versionedCacheKey(fingerprint));
     const staleResult = this.state.result || this.state.staleResult;
     this.emit({
       status: staleResult ? "stale" : "queued", currentCalibrationFingerprint: fingerprint,
@@ -489,7 +501,7 @@ export class BassBackgroundAnalysisController {
     recordDiagStage(active.diagnosticToken, "worker-result-validated", { workerRequestId: active.requestId, validationValid: true });
     this.stage("Main thread received result", { jobId: active.requestId });
     this.stage("Fingerprint validated", { jobId: active.requestId });
-    this.cache.set(active.fingerprint, result);
+    this.cache.set(this._versionedCacheKey(active.fingerprint), result);
     this.stage("Cache written", { jobId: active.requestId });
     this.terminateWorker();
     this.pending = null;
@@ -514,7 +526,7 @@ export class BassBackgroundAnalysisController {
   handleCompatibilityMismatch(active, message, reason, field = "worker-handshake") {
     const replacementRunCount = this.state.replacementRunCount || 0;
     this.stage("Job superseded", { jobId: active.requestId, field, terminalOutcome: "superseded" });
-    this.cache.entries.delete(active.fingerprint);
+    this.cache.entries.delete(this._versionedCacheKey(active.fingerprint));
     this.terminateWorker();
     if (replacementRunCount < 1 && this.pending) {
       this.emit({ status: "calculating", terminalOutcome: "superseded", errorMessage: reason, replacementRunCount: 1, workerStatus: "replacing", result: null, resultFingerprint: null });

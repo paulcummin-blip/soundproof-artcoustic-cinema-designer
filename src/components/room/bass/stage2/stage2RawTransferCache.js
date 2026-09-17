@@ -8,42 +8,52 @@
 //   - usableLfHz
 //   - transitionHz
 //
-// Keyed by placementFingerprint + finalistId, this cache survives P14 changes.
-// When P14 changes, the confirmation layer reuses the cached raw transfer
-// and only re-runs the EQ/P14/P18/P19/P20 pipeline.
+// Keyed by projectId::versionId::placementFingerprint + finalistId.
+// The composite (projectId, versionId) prefix guarantees version isolation
+// even if two versions share the same placementFingerprint. The placement
+// fingerprint survives P14 changes — when P14 changes, the confirmation
+// layer reuses the cached raw transfer and only re-runs the EQ/P14/P18/P19/P20
+// pipeline.
 
-const cache = new Map(); // placementFingerprint -> Map(finalistId -> rawTransfer)
+import { bassCacheKey } from "../bassCacheKey";
 
-export function getCachedRawTransfer(placementFingerprint, finalistId) {
+const cache = new Map(); // bassCacheKey(projectId,versionId)::placementFingerprint -> Map(finalistId -> rawTransfer)
+
+function versionedKey(projectId, versionId, placementFingerprint) {
+  return `${bassCacheKey(projectId, versionId)}::${placementFingerprint}`;
+}
+
+export function getCachedRawTransfer(projectId, versionId, placementFingerprint, finalistId) {
   if (!placementFingerprint || !finalistId) return null;
-  const byFinalist = cache.get(placementFingerprint);
+  const byFinalist = cache.get(versionedKey(projectId, versionId, placementFingerprint));
   if (!byFinalist) return null;
   return byFinalist.get(finalistId) || null;
 }
 
-export function setCachedRawTransfer(placementFingerprint, finalistId, rawTransfer) {
+export function setCachedRawTransfer(projectId, versionId, placementFingerprint, finalistId, rawTransfer) {
   if (!placementFingerprint || !finalistId || !rawTransfer) return;
-  let byFinalist = cache.get(placementFingerprint);
+  const vk = versionedKey(projectId, versionId, placementFingerprint);
+  let byFinalist = cache.get(vk);
   if (!byFinalist) {
     byFinalist = new Map();
-    cache.set(placementFingerprint, byFinalist);
+    cache.set(vk, byFinalist);
   }
   byFinalist.set(finalistId, rawTransfer);
 }
 
-export function hasCachedRawTransfer(placementFingerprint, finalistId) {
-  return getCachedRawTransfer(placementFingerprint, finalistId) != null;
+export function hasCachedRawTransfer(projectId, versionId, placementFingerprint, finalistId) {
+  return getCachedRawTransfer(projectId, versionId, placementFingerprint, finalistId) != null;
 }
 
-export function getCachedRawTransfersForFingerprint(placementFingerprint) {
-  const byFinalist = cache.get(placementFingerprint);
+export function getCachedRawTransfersForFingerprint(projectId, versionId, placementFingerprint) {
+  const byFinalist = cache.get(versionedKey(projectId, versionId, placementFingerprint));
   if (!byFinalist) return new Map();
   return new Map(byFinalist);
 }
 
-export function clearRawTransferCache(placementFingerprint) {
+export function clearRawTransferCache(projectId, versionId, placementFingerprint) {
   if (!placementFingerprint) return;
-  cache.delete(placementFingerprint);
+  cache.delete(versionedKey(projectId, versionId, placementFingerprint));
 }
 
 export function clearAllRawTransferCache() {
