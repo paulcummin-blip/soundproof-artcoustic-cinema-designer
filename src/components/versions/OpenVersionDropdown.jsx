@@ -1,14 +1,13 @@
 // src/components/versions/OpenVersionDropdown.jsx
 //
-// "Open Version ▼" dropdown for project cards.
-// Lists existing versions by name only (no V-numbers).
-// Active version is marked with ✓ and a subtle highlight.
-// "+ New Design Option…" at the bottom duplicates the active version's
-// design_state into the next available slot (V2→V5), switches to it,
-// and opens the Room Designer with the temporary name "New Design Option".
-// Navigation state { renameVersion: true } tells the Room Designer header
-// to auto-enter edit mode on the version name field so the user can
-// immediately type a meaningful name. No banner, no sessionStorage.
+// Split-button "Open Version | ▼" for project cards.
+// Left (main) button opens the active version immediately — the 90% case.
+// Right (▼) arrow opens a menu listing existing versions by name (no V-numbers),
+// with the active version marked ✓, plus a "+ New Design Option…" action that
+// duplicates the active version into the next slot and opens the Room Designer
+// with the temporary name "New Design Option". Navigation state
+// { renameVersion: true } tells the header to auto-enter edit mode on the
+// version name field. No banner, no sessionStorage.
 
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -106,24 +105,54 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
     }
   };
 
+  const handleMainClick = () => {
+    if (loading) return;
+    navigateToDesigner();
+  };
+
+  const handleArrowClick = () => {
+    if (loading) return;
+    setOpen(!open);
+  };
+
   return (
     <div ref={dropdownRef} className="relative inline-block text-left w-full">
-      <button
-        onClick={() => setOpen(!open)}
-        disabled={loading}
-        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 disabled:opacity-50"
-        style={{
-          background: BRAND.btnBg,
-          color: BRAND.btnText,
-          fontFamily: "Didact Gothic, sans-serif",
-          letterSpacing: "0.02em",
-        }}
-      >
-        <span>{loading ? "Loading…" : "Open Version"}</span>
-        <ChevronDown
-          className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-        />
-      </button>
+      <div className="w-full flex items-stretch rounded-md overflow-hidden" style={{ background: BRAND.btnBg }}>
+        {/* Main button — opens the active version immediately */}
+        <button
+          onClick={handleMainClick}
+          disabled={loading}
+          className="flex-1 flex items-center px-3 py-2 text-sm font-medium transition-all duration-200 disabled:opacity-50 hover:brightness-110"
+          style={{
+            color: BRAND.btnText,
+            fontFamily: "Didact Gothic, sans-serif",
+            letterSpacing: "0.02em",
+          }}
+          title={loading ? "Loading versions…" : "Open the current version"}
+        >
+          <span>{loading ? "Loading…" : "Open Version"}</span>
+        </button>
+
+        {/* Divider between main button and arrow */}
+        <div style={{ width: 1, background: "rgba(255,255,255,0.25)" }} />
+
+        {/* Arrow button — opens the version menu */}
+        <button
+          onClick={handleArrowClick}
+          disabled={loading}
+          aria-label="Choose a version"
+          className="flex items-center justify-center px-2.5 py-2 text-sm font-medium transition-all duration-200 disabled:opacity-50 hover:brightness-110"
+          style={{
+            color: BRAND.btnText,
+            fontFamily: "Didact Gothic, sans-serif",
+          }}
+          title="Choose another version or create a new one"
+        >
+          <ChevronDown
+            className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+      </div>
 
       {open && (
         <div
