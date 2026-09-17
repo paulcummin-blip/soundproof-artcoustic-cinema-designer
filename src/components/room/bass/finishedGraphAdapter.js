@@ -40,9 +40,13 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
     ? gp.productionHouseCurveTarget
     : [];
 
-  // Recompute signatures using the SAME canonical helpers — no second hash method.
-  const postEqCurveSignature = postEqRspCurve.length ? buildCurveSignature(postEqRspCurve) : null;
-  const filterBankSignature = eqFilterBank.length ? buildFilterBankSignature({ generatedFilterBank: eqFilterBank }) : null;
+  // Recompute signatures using the SAME canonical helpers — no second hash
+  // method. The helpers own the empty-bank / empty-curve sentinel values
+  // ("(none)" / "curve:empty"), so we call them unconditionally. Do NOT invent
+  // a local null sentinel — that diverges from the live path and causes the
+  // cached authority to be rejected for identity / no-EQ candidates.
+  const postEqCurveSignature = buildCurveSignature(postEqRspCurve);
+  const filterBankSignature = buildFilterBankSignature({ generatedFilterBank: eqFilterBank });
 
   // Reconstruct finalSeatVariationData from the persisted assessment envelope
   // (v9) so buildRp22GraphMarkers produces identical markers after cold reopen.
