@@ -729,6 +729,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             phaseDiagnostics.confirmed++;
             phaseDiagnostics.options[index].validity = {valid:check.valid,issues:check.issues};
             phaseDiagnostics.options[index].canonical = result;
+            phaseDiagnostics.options[index].validated = check.result;
             if (check.valid) {
               phaseCandidates.push(check.result);
               phaseDiagnostics.valid++;
@@ -789,6 +790,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           calibrationDiagnostics.confirmed++;
           calibrationDiagnostics.options[index].validity={valid:check.valid,issues:check.issues};
           calibrationDiagnostics.options[index].canonical=result;
+          calibrationDiagnostics.options[index].validated=check.result;
           calibrationDiagnostics.options[index].canonicalMs=performance.now()-_confirmT0;
           if(check.valid){calibrationCandidates.push(check.result);calibrationDiagnostics.valid++;}
           else {calibrationDiagnostics.invalid++;evaluationIssues.push({stage:"calibration",index,issues:check.issues});}
@@ -856,6 +858,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             gainDiagnostics.confirmed++;
             gainDiagnostics.options[gi].validity = {valid: gCheck.valid, issues: gCheck.issues};
             gainDiagnostics.options[gi].canonical = gBound;
+            gainDiagnostics.options[gi].validated = gCheck.result;
             if (gCheck.valid) {
               gainCandidates.push(gCheck.result);
               gainDiagnostics.valid++;

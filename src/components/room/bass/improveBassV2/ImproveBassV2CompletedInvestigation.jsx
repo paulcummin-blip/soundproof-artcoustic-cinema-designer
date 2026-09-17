@@ -22,6 +22,7 @@ import { isOptimisedApplied } from "./improveBassV2Apply.js";
 import { isProvenanceApplied, getActiveProvenance } from "./appliedProvenance.js";
 import { isSeatingProvenanceApplied } from "./seatingProvenanceAuthority.js";
 import { buildStageResults } from "./improveBassV2StageAuthority.js";
+import { buildCalibrationRejectionDetail } from "./stageRejectionPresentation.js";
 
 // Map the display stage keys (from buildStageDisplay) to the stage authority
 // keys (from buildStageResults) so we can look up the result for applied-check.
@@ -63,13 +64,15 @@ export function primarySeatMetric(perSeatArray) {
 export function findBestCalibrationOption(calibrationDiagnostics) {
   if (!calibrationDiagnostics?.options) return null;
   const valid = calibrationDiagnostics.options.filter(
-    (o) => o?.validity?.valid && o?.canonical,
+    (o) => o?.validity?.valid && (o?.validated || o?.canonical),
   );
   if (!valid.length) return null;
   let best = null;
   let bestP19 = Infinity;
   for (const opt of valid) {
-    const p19 = primarySeatMetric(opt.canonical.perSeatP19);
+    // Prefer validated (isPrimary-enriched) over raw canonical
+    const source = opt.validated || opt.canonical;
+    const p19 = primarySeatMetric(source.perSeatP19);
     const raw = p19 ? Math.abs(Number(p19.variationDbRaw) || 0) : Infinity;
     if (raw < bestP19) {
       bestP19 = raw;
@@ -82,11 +85,6 @@ export function findBestCalibrationOption(calibrationDiagnostics) {
 function fmtDb(raw) {
   if (!Number.isFinite(Number(raw))) return "—";
   return Math.abs(Number(raw)).toFixed(2);
-}
-
-function fmtDb1(raw) {
-  if (!Number.isFinite(Number(raw))) return "—";
-  return Math.abs(Number(raw)).toFixed(1);
 }
 
 /**
@@ -146,20 +144,14 @@ export function buildStageDetails(selection) {
         parts.push(`P20 ${fmtDb(beforeP20.variationDbRaw)} → ${fmtDb(afterP20.variationDbRaw)} dB`);
       }
     } else if (currentResult) {
-      // No material winner — find the best valid option
-      const bestOpt = findBestCalibrationOption(calDiag);
-      if (bestOpt?.canonical) {
-        const beforeP19 = primarySeatMetric(currentResult.perSeatP19);
-        const candP19 = primarySeatMetric(bestOpt.canonical.perSeatP19);
-        if (beforeP19 && candP19) {
-          parts.push("Best change below material threshold");
-          parts.push(`P19 ${fmtDb1(beforeP19.variationDbRaw)} → ${fmtDb1(candP19.variationDbRaw)} dB`);
-          const beforeLevel = beforeP19.level;
-          const afterLevel = candP19.level;
-          if (Number(beforeLevel) === Number(afterLevel) && beforeLevel != null) {
-            parts.push("Same RP22 level");
-          }
-        }
+      // No material winner — show the actual rejection reason from the engine's
+      // evaluation, using validated canonical results with correct seat identity.
+      // Reads selectConfirmedRecommendations.evaluations for the real category
+      // (safety-rejected / trade-off / below-materiality / unchanged / invalid)
+      // instead of labelling every non-winner as "below material threshold".
+      const rejectionDetail = buildCalibrationRejectionDetail(selection);
+      if (rejectionDetail) {
+        parts.push(rejectionDetail);
       }
     }
 
