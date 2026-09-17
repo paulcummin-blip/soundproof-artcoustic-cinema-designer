@@ -147,7 +147,10 @@ function buildSeatLines(paramKey, seatData, shared) {
 
   const lines = [];
   lines.push(["Seat", formatSeatLabel(seatData.seatId)]);
-  lines.push(["Published Result", seatData.level]);
+  const displayValue = seatData.displayVariationDb && seatData.displayVariationDb !== "—"
+    ? seatData.displayVariationDb
+    : null;
+  lines.push(["Published Result", displayValue ? `${seatData.level} · ${displayValue}` : seatData.level]);
 
   if (isFiniteNumber(seatData.worstFrequencyHz)) {
     lines.push(["Limiting frequency", Math.round(Number(seatData.worstFrequencyHz)) + " Hz"]);
