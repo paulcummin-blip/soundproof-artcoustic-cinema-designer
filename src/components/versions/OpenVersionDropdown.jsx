@@ -56,6 +56,10 @@ export default function OpenVersionDropdown({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
   const dropdownRef = useRef(null);
+  // The menu is portaled to document.body, so it is NOT a DOM child of
+  // dropdownRef. The outside-click handler must also check this ref, or
+  // every mousedown inside the menu closes it before the click fires.
+  const menuRef = useRef(null);
   const [menuPos, setMenuPos] = useState(null);
 
   const versionList = versions || [];
@@ -83,7 +87,9 @@ export default function OpenVersionDropdown({
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      const inButton = dropdownRef.current && dropdownRef.current.contains(e.target);
+      const inMenu = menuRef.current && menuRef.current.contains(e.target);
+      if (!inButton && !inMenu) {
         setOpen(false);
       }
     }
@@ -197,6 +203,7 @@ export default function OpenVersionDropdown({
 
       {open && menuPos && createPortal(
         <div
+          ref={menuRef}
           className="fixed rounded-md shadow-xl max-h-[360px] overflow-y-auto"
           style={{
             position: "fixed",
