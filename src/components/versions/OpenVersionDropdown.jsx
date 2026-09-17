@@ -1,20 +1,26 @@
 // src/components/versions/OpenVersionDropdown.jsx
 //
 // Split-button "Open Version | ▼" for project cards.
-// Left (main) button opens the active version immediately — the 90% case.
-// Right (▼) arrow opens a menu listing existing versions by name (no V-numbers),
-// with the active version marked ✓, plus a "+ New Design Option…" action that
-// duplicates the active version into the next slot and opens the Room Designer
-// with the temporary name "New Design Option". Navigation state
-// { renameVersion: true } tells the header to auto-enter edit mode on the
-// version name field. No banner, no sessionStorage.
+// PURE PRESENTATION COMPONENT — no network requests.
+//
+// Receives all version data and callbacks through props:
+//   versions          — array of ProjectVersion records for this project
+//   activeVersionId   — the active version's ID
+//   onSwitchVersion   — async callback(versionId) → switches active version
+//   onCreateVersion    — async callback(slotNumber, name) → creates new version
+//   loading           — whether versions are still being loaded
+//
+// The Projects page owns all data fetching and mutation logic.
 
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, Check, Plus, AlertCircle } from "lucide-react";
-import { useProjectVersions } from "@/components/versions/useProjectVersions";
 import { setActiveProjectId } from "@/components/state/project-session";
-import { truncateVersionName, NEW_VERSION_DEFAULT_NAME } from "@/lib/versionAuthority";
+import {
+  truncateVersionName,
+  NEW_VERSION_DEFAULT_NAME,
+  findNextEmptySlot,
+} from "@/lib/versionAuthority";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -29,25 +35,26 @@ const BRAND = {
   dangerBg: "#FDF5F5",
 };
 
-// Phase 2 — version creation is now enabled.
 const VERSION_CREATION_ENABLED = true;
 
-export default function OpenVersionDropdown({ projectId, projectName }) {
+export default function OpenVersionDropdown({
+  projectId,
+  projectName,
+  versions,
+  activeVersionId,
+  onSwitchVersion,
+  onCreateVersion,
+  loading = false,
+}) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
   const dropdownRef = useRef(null);
-  const {
-    versions,
-    activeVersionId,
-    loading,
-    switchVersion,
-    createVersion,
-    nextEmptySlot,
-    canCreateVersion,
-    activeVersion,
-  } = useProjectVersions(projectId);
+
+  const versionList = versions || [];
+  const nextEmptySlot = findNextEmptySlot(versionList);
+  const canCreateVersion = nextEmptySlot !== null;
 
   // Close on outside click
   useEffect(() => {
@@ -66,9 +73,9 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
   };
 
   const handleSelect = async (version) => {
-    if (version.id !== activeVersionId) {
+    if (version.id !== activeVersionId && onSwitchVersion) {
       try {
-        await switchVersion(version.id);
+        await onSwitchVersion(projectId, version.id);
       } catch (err) {
         console.error("[OpenVersionDropdown] Switch failed:", err);
       }
@@ -88,7 +95,7 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
 
     setCreating(true);
     try {
-      await createVersion(nextEmptySlot, NEW_VERSION_DEFAULT_NAME);
+      await onCreateVersion(projectId, nextEmptySlot, NEW_VERSION_DEFAULT_NAME);
 
       setOpen(false);
       setActiveProjectId(projectId);
@@ -164,7 +171,7 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
           }}
         >
           {/* Existing versions — name only, no slot numbers */}
-          {versions.map((version) => {
+          {versionList.map((version) => {
             const isActive = version.id === activeVersionId;
             return (
               <button

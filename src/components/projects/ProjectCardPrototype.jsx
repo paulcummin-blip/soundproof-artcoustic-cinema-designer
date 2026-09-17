@@ -142,6 +142,12 @@ export default function ProjectCardPrototype({
   cancelHoldDelete,
   holdProgress,
   setProjects,
+  // Version data (page-level, batch-loaded — no per-card fetching)
+  versions,
+  activeVersionId,
+  onSwitchVersion,
+  onCreateVersion,
+  versionsLoading,
 }) {
   const prog = holdProgress[p.id] || 0;
 
@@ -335,7 +341,15 @@ export default function ProjectCardPrototype({
           }}
         >
           <div style={{ flex: 1 }}>
-            <OpenVersionDropdown projectId={p.id} projectName={p.name} />
+            <OpenVersionDropdown
+              projectId={p.id}
+              projectName={p.name}
+              versions={versions}
+              activeVersionId={activeVersionId}
+              onSwitchVersion={onSwitchVersion}
+              onCreateVersion={onCreateVersion}
+              loading={versionsLoading}
+            />
           </div>
 
           <button

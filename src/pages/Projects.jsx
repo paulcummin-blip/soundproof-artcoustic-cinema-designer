@@ -9,6 +9,7 @@ import ManageStatusesDialog from "@/components/projects/ManageStatusesDialog";
 import { useProjectStatuses } from "@/components/projects/useProjectStatuses";
 import { normalizeStatusId, getStatusColor } from "@/components/projects/statusDefaults";
 import { useProjectsSortPreference } from "@/components/projects/useProjectsSortPreference";
+import { useProjectVersionsBatched } from "@/components/versions/useProjectVersionsBatched";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { useProfessionalCapacity } from "@/lib/commercial/useProfessionalCapacity";
@@ -129,6 +130,17 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+
+  // Page-level version management — single batched query for ALL projects.
+  // Replaces the per-card useProjectVersions() N+1 pattern.
+  const {
+    versionsByProject,
+    loading: versionsLoading,
+    loadAllVersions,
+    switchVersion,
+    createVersion,
+  } = useProjectVersionsBatched();
+
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [sortKey, setSortKey] = useState("recent");
@@ -194,47 +206,38 @@ export default function ProjectsPage() {
           : await base44.entities.Project.filter({ account_id: userAccountId }, '-created_date', 200);
 
         if (mounted) {
-          // ── Version-aware merge ──────────────────────────────────────────
-          // Project summaries must reflect the ACTIVE version's design state.
-          // Per-version design fields (room dims, dolby_config, speakers,
-          // seating, screen, spl_config) live in ProjectVersion.design_state,
-          // not on the legacy Project entity. We batch-fetch all active
-          // versions for the loaded projects and merge each project with its
-          // active version before mapping to the summary card shape.
-          const projectsWithVersionId = (projectList || []).filter(
-            (p) => p && p.active_version_id
-          );
-          const versionIdSet = [
-            ...new Set(projectsWithVersionId.map((p) => p.active_version_id)),
-          ];
-
+          // ── Version-aware merge (batched) ───────────────────────────────
+          // The page owns ALL version loading. We batch-migrate unmigrated
+          // projects, then batch-load ALL versions for ALL projects in a
+          // single grouped query (ceil(N/50) requests, not N×3).
+          // No per-card version fetching occurs.
           let versionMap = {};
-          if (versionIdSet.length > 0) {
-            try {
-              // Fetch versions in batches of 50 (SDK filter supports arrays).
-              for (let i = 0; i < versionIdSet.length; i += 50) {
-                const batch = versionIdSet.slice(i, i + 50);
-                const versions = await base44.entities.ProjectVersion.filter({
-                  id: batch,
-                });
-                if (Array.isArray(versions)) {
-                  for (const v of versions) {
-                    versionMap[v.id] = v;
-                  }
-                }
+          let updatedProjectList = projectList || [];
+          try {
+            const result = await loadAllVersions(projectList || []);
+            if (!mounted) return;
+            versionMap = result.versionMap || {};
+            // Use updated projects (with new active_version_ids from migration)
+            updatedProjectList = result.updatedProjects || projectList || [];
+          } catch (verErr) {
+            console.warn('[Projects] Batch version load failed, using project-only:', verErr);
+          }
+
+          // Build a lookup of active version by project ID for the merge
+          const activeVersionByProject = {};
+          for (const [pid, vlist] of Object.entries(versionMap)) {
+            for (const v of vlist) {
+              if (v.id === (updatedProjectList.find((p) => p.id === pid)?.active_version_id)) {
+                activeVersionByProject[pid] = v;
               }
-            } catch (verErr) {
-              console.warn('[Projects] Version batch fetch failed, using project-only:', verErr);
             }
           }
 
-          const mapped = (projectList || []).map((rawP) => {
+          const mapped = updatedProjectList.map((rawP) => {
             try {
               // Merge with active version's design_state so the summary
               // reflects the current version, not stale legacy fields.
-              const version = rawP.active_version_id
-                ? versionMap[rawP.active_version_id]
-                : null;
+              const version = activeVersionByProject[rawP.id] || null;
               const p = version
                 ? mergeProjectAndVersion(rawP, version)
                 : rawP;
@@ -244,6 +247,7 @@ export default function ProjectsPage() {
                 name: p.name || "Untitled Project",
                 client: p.client_name || "",
                 status: normalizeStatusId(p.project_status || "Prospective"),
+                active_version_id: rawP.active_version_id || null,
                 roomLength: p.room_length || null,
                 roomWidth: p.room_width || null,
                 roomHeight: p.room_height || null,
@@ -303,11 +307,11 @@ export default function ProjectsPage() {
     }
     
     loadProjects();
-    
+
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadAllVersions]);
 
   // Derived list
   const list = useMemo(() => {
@@ -454,6 +458,7 @@ export default function ProjectsPage() {
       name: newProject.name || "Untitled Project",
       client: newProject.client_name || "",
       status: normalizeStatusId(newProject.project_status || "Prospective"),
+      active_version_id: newProject.active_version_id || null,
       roomLength: newProject.room_length || null,
       roomWidth: newProject.room_width || null,
       roomHeight: newProject.room_height || null,
@@ -1062,6 +1067,11 @@ export default function ProjectsPage() {
                 cancelHoldDelete={cancelHoldDelete}
                 holdProgress={holdProgress}
                 setProjects={setProjects}
+                versions={versionsByProject[p.id]}
+                activeVersionId={p.active_version_id}
+                onSwitchVersion={switchVersion}
+                onCreateVersion={createVersion}
+                versionsLoading={versionsLoading}
               />
             ))}
           </div>
