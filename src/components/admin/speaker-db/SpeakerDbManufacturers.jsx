@@ -110,6 +110,11 @@ export default function SpeakerDbManufacturers() {
       primary_power_rating: "",
       primary_spl: "",
       preferred_frequency_response: "",
+      product_index_url: "",
+      pdf_first: false,
+      crawler_enabled: false,
+      auto_approve: false,
+      requires_review: true,
     });
     try {
       const existing = await base44.entities.SpeakerManufacturerRule.filter({ manufacturer_id: row.id });
@@ -123,6 +128,11 @@ export default function SpeakerDbManufacturers() {
           primary_power_rating: rule.primary_power_rating || "",
           primary_spl: rule.primary_spl || "",
           preferred_frequency_response: rule.preferred_frequency_response || "",
+          product_index_url: rule.product_index_url || "",
+          pdf_first: rule.pdf_first || false,
+          crawler_enabled: rule.crawler_enabled || false,
+          auto_approve: rule.auto_approve || false,
+          requires_review: rule.requires_review !== false,
         });
       }
     } catch (err) {
@@ -301,6 +311,39 @@ export default function SpeakerDbManufacturers() {
                   <option value="-6dB">-6dB</option>
                   <option value="Manufacturer Default">Manufacturer Default</option>
                 </select>
+              </div>
+
+              {/* Crawler Configuration — designed to become the crawler config, even though crawling doesn't exist yet */}
+              <div className="pt-3 mt-3" style={{ borderTop: `1px solid ${BRAND.border}` }}>
+                <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: BRAND.green }}>Crawler Configuration</div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Product Index URL</label>
+                  <input type="text" value={rulesForm.product_index_url || ""} onChange={(e) => setRulesForm({ ...rulesForm, product_index_url: e.target.value })}
+                    className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }} placeholder="https://manufacturer.com/products" />
+                </div>
+                <div className="flex items-center gap-6 mt-3">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: BRAND.text }}>
+                    <input type="checkbox" checked={rulesForm.pdf_first || false} onChange={(e) => setRulesForm({ ...rulesForm, pdf_first: e.target.checked })} className="w-4 h-4" />
+                    PDF First
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: BRAND.text }}>
+                    <input type="checkbox" checked={rulesForm.crawler_enabled || false} onChange={(e) => setRulesForm({ ...rulesForm, crawler_enabled: e.target.checked })} className="w-4 h-4" />
+                    Crawler Enabled
+                  </label>
+                </div>
+                <div className="flex items-center gap-6 mt-2">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: BRAND.text }}>
+                    <input type="checkbox" checked={rulesForm.auto_approve || false} onChange={(e) => setRulesForm({ ...rulesForm, auto_approve: e.target.checked })} className="w-4 h-4" />
+                    Auto Approve
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: BRAND.text }}>
+                    <input type="checkbox" checked={rulesForm.requires_review !== false} onChange={(e) => setRulesForm({ ...rulesForm, requires_review: e.target.checked })} className="w-4 h-4" />
+                    Requires Review
+                  </label>
+                </div>
+                <div className="text-xs mt-2" style={{ color: BRAND.subtext }}>
+                  Initially disabled for all manufacturers. Enabled per-manufacturer when ready.
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">

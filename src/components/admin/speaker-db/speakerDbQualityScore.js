@@ -61,3 +61,45 @@ export function calculateQualityScore(issues) {
 export function calculateProductQualityScore(issues) {
   return calculateQualityScore(issues);
 }
+
+// ── Specification Completeness ───────────────────────────────────────
+//
+// Completeness is DIFFERENT from quality. Completeness measures whether
+// specification fields are populated — it says nothing about correctness.
+// A spec can be 100% complete (all fields filled) but low quality (values
+// are wrong). Like the quality score, completeness is NEVER stored — it is
+// calculated dynamically whenever the dashboard loads.
+
+export const SPEC_COMPLETENESS_FIELDS = [
+  "sensitivity_db",
+  "frequency_response_low_hz",
+  "frequency_response_high_hz",
+  "max_continuous_spl_db",
+  "max_peak_spl_db",
+  "nominal_impedance_ohm",
+  "cabinet_type",
+  "mounting_type",
+  "woofer_count",
+  "woofer_size",
+  "tweeter_description",
+  "height_mm",
+  "width_mm",
+  "depth_mm",
+  "weight_kg",
+  "horizontal_dispersion_deg",
+  "vertical_dispersion_deg",
+];
+
+export function calculateSpecCompleteness(spec) {
+  if (!spec) return 0;
+  const populated = SPEC_COMPLETENESS_FIELDS.filter(
+    (f) => spec[f] != null && spec[f] !== ""
+  ).length;
+  return Math.round((populated / SPEC_COMPLETENESS_FIELDS.length) * 100);
+}
+
+export function calculateAverageCompleteness(specs) {
+  if (!specs || specs.length === 0) return "—";
+  const avg = specs.reduce((sum, s) => sum + calculateSpecCompleteness(s), 0) / specs.length;
+  return `${Math.round(avg)}%`;
+}

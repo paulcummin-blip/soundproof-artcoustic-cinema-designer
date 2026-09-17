@@ -7,7 +7,8 @@
 
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Building2, Package, CheckCircle, XCircle, AlertTriangle, HelpCircle, Clock, FileText, TrendingUp } from "lucide-react";
+import { Building2, Package, CheckCircle, XCircle, AlertTriangle, HelpCircle, Clock, FileText, TrendingUp, ClipboardCheck } from "lucide-react";
+import { calculateAverageCompleteness } from "@/components/admin/speaker-db/speakerDbQualityScore";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -53,6 +54,7 @@ export default function SpeakerDbDashboard() {
     missingData: 0,
     avgConfidence: "—",
     avgApproval: "—",
+    avgCompleteness: "—",
     lastUpdate: null,
     recentChanges: 0,
   });
@@ -95,6 +97,10 @@ export default function SpeakerDbDashboard() {
         const approvedCount = specList.filter((s) => s.approval_status === "Approved").length;
         const avgApproval = specList.length > 0 ? `${Math.round((approvedCount / specList.length) * 100)}%` : "—";
 
+        // Specification completeness — percentage of core spec fields populated.
+        // Calculated dynamically, never stored. Different from quality (correctness).
+        const avgCompleteness = calculateAverageCompleteness(specList);
+
         const lastUpdate = history && history.length > 0 ? history[0].created_date : null;
 
         setStats({
@@ -106,6 +112,7 @@ export default function SpeakerDbDashboard() {
           missingData,
           avgConfidence,
           avgApproval,
+          avgCompleteness,
           lastUpdate,
           recentChanges: (history || []).length,
         });
@@ -135,6 +142,7 @@ export default function SpeakerDbDashboard() {
         <StatCard icon={HelpCircle} label="Specs Missing Data" value={stats.missingData} color={BRAND.amber} />
         <StatCard icon={TrendingUp} label="Average Confidence" value={stats.avgConfidence} color={BRAND.green} />
         <StatCard icon={CheckCircle} label="Approved Specs" value={stats.avgApproval} color={BRAND.green} />
+        <StatCard icon={ClipboardCheck} label="Spec Completeness" value={stats.avgCompleteness} color={BRAND.green} />
       </div>
 
       {/* Last update + Recent changes */}

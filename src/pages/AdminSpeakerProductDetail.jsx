@@ -28,6 +28,7 @@ const TABS = [
   { key: "general", label: "General" },
   { key: "specifications", label: "Specifications" },
   { key: "sources", label: "Sources" },
+  { key: "documents", label: "Documents" },
   { key: "dataQuality", label: "Data Quality" },
   { key: "history", label: "History" },
 ];
@@ -133,6 +134,7 @@ export default function AdminSpeakerProductDetail() {
   const [sources, setSources] = useState([]);
   const [dataQuality, setDataQuality] = useState([]);
   const [history, setHistory] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -140,7 +142,7 @@ export default function AdminSpeakerProductDetail() {
   const [specData, setSpecData] = useState({});
   const [specId, setSpecId] = useState(null);
   const [allSpecs, setAllSpecs] = useState([]);
-  const [changeReason, setChangeReason] = useState("Manual correction");
+  const [changeReason, setChangeReason] = useState("Manual Correction");
 
   const isNew = productId === "new";
 
@@ -175,6 +177,7 @@ export default function AdminSpeakerProductDetail() {
           setSources([]);
           setDataQuality([]);
           setHistory([]);
+          setDocuments([]);
         } else {
           const products = await base44.entities.SpeakerProduct.filter({ id: productId });
           const p = products?.[0];
@@ -182,16 +185,18 @@ export default function AdminSpeakerProductDetail() {
           setProduct(p);
           setFormData(p || {});
 
-          const [srcs, dq, hist, specs] = await Promise.all([
+          const [srcs, dq, hist, specs, docs] = await Promise.all([
             base44.entities.SpeakerSource.filter({ product_id: productId }, "-created_date", 100),
             base44.entities.SpeakerDataQuality.filter({ product_id: productId }, "-created_date", 100),
             base44.entities.SpeakerChangeHistory.filter({ product_id: productId }, "-created_date", 100),
             base44.entities.SpeakerSpecification.filter({ product_id: productId }, "-created_date", 100),
+            base44.entities.SpeakerDocument.filter({ product_id: productId }, "-created_date", 100),
           ]);
           if (!mounted) return;
           setSources(srcs || []);
           setDataQuality(dq || []);
           setHistory(hist || []);
+          setDocuments(docs || []);
 
           // Use the current specification (is_current=true, or the first one)
           const specList = specs || [];
@@ -259,7 +264,7 @@ export default function AdminSpeakerProductDetail() {
           new_value: created.full_product_name || created.model,
           source: "Manual Edit",
           change_type: "Created",
-          change_reason: changeReason || "Manual correction",
+          change_reason: changeReason || "Manual Correction",
         });
         navigate(`/admin/speaker-database/product/${created.id}`);
       } else {
@@ -272,7 +277,7 @@ export default function AdminSpeakerProductDetail() {
           const oldVal = product[key];
           const newVal = payload[key];
           if (String(oldVal ?? "") !== String(newVal ?? "")) {
-            changes.push({ product_id: productId, field_changed: key, old_value: String(oldVal ?? ""), new_value: String(newVal ?? ""), source: "Manual Edit", change_type: "Manual Edit", change_reason: changeReason || "Manual correction" });
+            changes.push({ product_id: productId, field_changed: key, old_value: String(oldVal ?? ""), new_value: String(newVal ?? ""), source: "Manual Edit", change_type: "Manual Edit", change_reason: changeReason || "Manual Correction" });
           }
         }
         await base44.entities.SpeakerProduct.update(productId, payload);
@@ -333,6 +338,32 @@ export default function AdminSpeakerProductDetail() {
     }
   };
 
+  const handleAddDocument = async () => {
+    try {
+      await base44.entities.SpeakerDocument.create({
+        product_id: productId,
+        document_type: "PDF",
+        url: "",
+        title: "",
+        date_checked: new Date().toISOString().split("T")[0],
+        notes: "",
+      });
+      const docs = await base44.entities.SpeakerDocument.filter({ product_id: productId }, "-created_date", 100);
+      setDocuments(docs || []);
+    } catch (err) {
+      console.error("[AdminSpeakerProductDetail] Add document failed:", err);
+    }
+  };
+
+  const handleDeleteDocument = async (docId) => {
+    try {
+      await base44.entities.SpeakerDocument.delete(docId);
+      setDocuments(documents.filter((d) => d.id !== docId));
+    } catch (err) {
+      console.error("[AdminSpeakerProductDetail] Delete document failed:", err);
+    }
+  };
+
   if (isLoadingAuth) return <div style={{ padding: 48, textAlign: "center", color: BRAND.subtext }}>Checking access…</div>;
   if (!isAdmin) {
     return (
@@ -367,12 +398,14 @@ export default function AdminSpeakerProductDetail() {
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium" style={{ color: BRAND.subtext }}>Reason:</span>
                   <select value={changeReason} onChange={(e) => setChangeReason(e.target.value)} className="px-2 py-1.5 rounded text-sm outline-none" style={inputStyle}>
-                    <option value="Manual correction">Manual correction</option>
-                    <option value="Manufacturer update">Manufacturer update</option>
-                    <option value="PDF revised">PDF revised</option>
-                    <option value="Crawler update">Crawler update</option>
-                    <option value="Specification error">Specification error</option>
-                    <option value="Other">Other</option>
+                    <option value="Manual Correction">Manual Correction</option>
+                    <option value="Manufacturer Specification Update">Manufacturer Specification Update</option>
+                    <option value="Crawler Import">Crawler Import</option>
+                    <option value="Document Revision">Document Revision</option>
+                    <option value="URL Change">URL Change</option>
+                    <option value="Metadata Update">Metadata Update</option>
+                    <option value="Status Change">Status Change</option>
+                    <option value="Administrative">Administrative</option>
                   </select>
                 </div>
               )}
@@ -486,12 +519,14 @@ export default function AdminSpeakerProductDetail() {
               {specData.approval_status && (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{
                   background: specData.approval_status === "Approved" ? BRAND.green + "15"
-                    : specData.approval_status === "Reviewed" ? "#9A6E00" + "15"
-                    : specData.approval_status === "Rejected" ? BRAND.danger + "15"
+                    : specData.approval_status === "Awaiting Review" ? "#9A6E00" + "15"
+                    : specData.approval_status === "Superseded" ? "#625143" + "15"
+                    : specData.approval_status === "Archived" ? "#625143" + "15"
                     : BRAND.subtext + "15",
                   color: specData.approval_status === "Approved" ? BRAND.green
-                    : specData.approval_status === "Reviewed" ? "#9A6E00"
-                    : specData.approval_status === "Rejected" ? BRAND.danger
+                    : specData.approval_status === "Awaiting Review" ? "#9A6E00"
+                    : specData.approval_status === "Superseded" ? "#625143"
+                    : specData.approval_status === "Archived" ? "#625143"
                     : BRAND.subtext,
                 }}>{specData.approval_status}</span>
               )}
@@ -524,9 +559,10 @@ export default function AdminSpeakerProductDetail() {
                   {editMode || isNew ? (
                     <select value={specData.approval_status || "Draft"} onChange={(e) => handleSpecChange("approval_status", e.target.value)} className="w-full px-2 py-1.5 rounded text-sm outline-none" style={inputStyle}>
                       <option value="Draft">Draft</option>
-                      <option value="Reviewed">Reviewed</option>
+                      <option value="Awaiting Review">Awaiting Review</option>
                       <option value="Approved">Approved</option>
-                      <option value="Rejected">Rejected</option>
+                      <option value="Superseded">Superseded</option>
+                      <option value="Archived">Archived</option>
                     </select>
                   ) : (
                     <div className="px-2 py-1.5 text-sm rounded-md" style={{ background: "#F8F8F7", color: BRAND.text, minHeight: 34, display: "flex", alignItems: "center" }}>
@@ -650,8 +686,8 @@ export default function AdminSpeakerProductDetail() {
                       </span>
                       {s.approval_status && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{
-                          background: s.approval_status === "Approved" ? BRAND.green + "15" : s.approval_status === "Reviewed" ? "#9A6E00" + "15" : s.approval_status === "Rejected" ? BRAND.danger + "15" : BRAND.subtext + "15",
-                          color: s.approval_status === "Approved" ? BRAND.green : s.approval_status === "Reviewed" ? "#9A6E00" : s.approval_status === "Rejected" ? BRAND.danger : BRAND.subtext,
+                          background: s.approval_status === "Approved" ? BRAND.green + "15" : s.approval_status === "Awaiting Review" ? "#9A6E00" + "15" : (s.approval_status === "Superseded" || s.approval_status === "Archived") ? "#625143" + "15" : BRAND.subtext + "15",
+                          color: s.approval_status === "Approved" ? BRAND.green : s.approval_status === "Awaiting Review" ? "#9A6E00" : (s.approval_status === "Superseded" || s.approval_status === "Archived") ? "#625143" : BRAND.subtext,
                         }}>{s.approval_status}</span>
                       )}
                       {s.reviewed_by && <span className="text-xs" style={{ color: BRAND.subtext }}>Reviewed by {s.reviewed_by}</span>}
@@ -695,6 +731,42 @@ export default function AdminSpeakerProductDetail() {
                     </div>
                   </div>
                   <button onClick={() => handleDeleteSource(src.id)} className="p-1 rounded hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" style={{ color: BRAND.danger, opacity: 0.6 }} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Documents Tab */}
+      {tab === "documents" && (
+        <div>
+          {!isNew && (
+            <button onClick={handleAddDocument} className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium mb-4" style={{ background: BRAND.btn, color: BRAND.btnText }}>
+              <Plus className="w-4 h-4" /> Add Document
+            </button>
+          )}
+          {documents.length === 0 ? (
+            <div className="py-12 text-center text-sm" style={{ color: BRAND.subtext }}>No documents recorded.</div>
+          ) : (
+            <div className="space-y-2">
+              {documents.map((doc) => (
+                <div key={doc.id} className="flex items-center gap-4 p-4 rounded-lg" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card }}>
+                  <div className="flex-1 grid gap-3" style={{ gridTemplateColumns: "140px 1fr 120px" }}>
+                    <div>
+                      <div className="text-xs font-medium mb-1" style={{ color: BRAND.subtext }}>Type</div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: BRAND.green + "15", color: BRAND.green }}>{doc.document_type}</span>
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium mb-1" style={{ color: BRAND.subtext }}>URL</div>
+                      {doc.url ? <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-sm underline flex items-center gap-1" style={{ color: BRAND.green }}>{doc.title || doc.url} <ExternalLink className="w-3 h-3" /></a> : <span className="text-sm" style={{ color: BRAND.subtext }}>—</span>}
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium mb-1" style={{ color: BRAND.subtext }}>Date Checked</div>
+                      <div className="text-sm" style={{ color: BRAND.text }}>{doc.date_checked ? new Date(doc.date_checked).toLocaleDateString("en-GB") : "—"}</div>
+                    </div>
+                  </div>
+                  <button onClick={() => handleDeleteDocument(doc.id)} className="p-1 rounded hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" style={{ color: BRAND.danger, opacity: 0.6 }} /></button>
                 </div>
               ))}
             </div>

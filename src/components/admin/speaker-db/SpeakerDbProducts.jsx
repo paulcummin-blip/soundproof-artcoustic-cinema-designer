@@ -60,7 +60,7 @@ function ConfidenceBadge({ confidence }) {
 
 function ApprovalBadge({ status }) {
   if (!status) return <span style={{ color: BRAND.subtext }}>—</span>;
-  const colors = { Draft: BRAND.subtext, Reviewed: "#9A6E00", Approved: BRAND.green, Rejected: "#B23A3A" };
+  const colors = { Draft: BRAND.subtext, "Awaiting Review": "#9A6E00", Approved: BRAND.green, Superseded: "#625143", Archived: "#625143" };
   const color = colors[status] || BRAND.subtext;
   return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: color + "15", color }}>{status}</span>;
 }
