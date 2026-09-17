@@ -6,8 +6,9 @@
 // last update, recent changes.
 
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { Building2, Package, CheckCircle, XCircle, AlertTriangle, HelpCircle, Clock, FileText, TrendingUp, ClipboardCheck } from "lucide-react";
+import { Building2, Package, CheckCircle, XCircle, AlertTriangle, HelpCircle, Clock, FileText, TrendingUp, ClipboardCheck, UserPlus } from "lucide-react";
 import { calculateAverageCompleteness } from "@/components/admin/speaker-db/speakerDbQualityScore";
 
 const BRAND = {
@@ -45,6 +46,7 @@ function StatCard({ icon: Icon, label, value, color }) {
 }
 
 export default function SpeakerDbDashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     manufacturers: 0,
     products: 0,
@@ -132,6 +134,17 @@ export default function SpeakerDbDashboard() {
 
   return (
     <div>
+      {/* Add Speaker action */}
+      <div className="mb-6">
+        <button
+          onClick={() => navigate("/admin/speaker-database/add-speaker")}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-all hover:shadow-md"
+          style={{ background: BRAND.green, color: "#fff" }}
+        >
+          <UserPlus className="w-4 h-4" /> Add Speaker
+        </button>
+      </div>
+
       {/* Stat cards */}
       <div className="grid gap-4 mb-8" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
         <StatCard icon={Building2} label="Manufacturers" value={stats.manufacturers} color={BRAND.green} />
