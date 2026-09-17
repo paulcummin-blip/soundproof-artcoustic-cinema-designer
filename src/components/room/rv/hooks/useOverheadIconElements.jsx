@@ -107,8 +107,8 @@ export function useOverheadIconElements({
               canvasX={xPx}
               canvasY_raw={yPx}
               yawDeg={0}
-              widthM={0.27}
-              depthM={0.27}
+              widthM={0}
+              depthM={0}
               scale={scale}
               speakerMouseDownHandler={(e) => bedLayerSpeakerMouseDownHandler(e, spk.id || spk.role)}
               onIconEnter={handleIconEnter}

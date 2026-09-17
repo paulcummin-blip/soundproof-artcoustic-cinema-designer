@@ -1169,8 +1169,20 @@ export default function SideElevation({
               // Side-profile ceiling insert: body extends upward into ceiling void.
               // Bottom edge 10mm below ceiling line; body extends upward from there.
               const meta = getSpeakerModelMeta(spk.model) || {};
-              const spkWidthM  = Number(meta.widthM)  > 0 ? Number(meta.widthM)  : 0.165;
-              const spkHeightM = 0.10; // C3.24: vertical cabinet depth (no verified cabinet-depth value)
+              const isRoundCeiling = meta?.round === true;
+              // Rectangular ceiling speakers (Mikro Ci): the long grille dimension
+              // (stored as depthM in the registry) is the horizontal extent seen
+              // from the side; heightM is the cabinet recess depth. Round ceiling
+              // speakers keep the existing behaviour (diameter for width, 100mm
+              // fallback for depth).
+              const spkWidthM = isRoundCeiling
+                ? (Number(meta.widthM) > 0 ? Number(meta.widthM) : 0.165)
+                : (Math.max(Number(meta.widthM) || 0, Number(meta.depthM) || 0) || 0.165);
+              const spkHeightM = isRoundCeiling
+                ? 0.10
+                : (Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.10);
+              // Mikro Ci: clean white rectangle with simple black outline.
+              const cabinetStroke = isRoundCeiling ? "#4A4540" : "#000000";
               const GAP_BELOW_CEILING_M = 0.01; // 10mm below ceiling line
               const cx = rx(spk.y);
               const svgHalfW = Math.max(4, (spkWidthM / roomL) * drawW / 2);
@@ -1187,12 +1199,12 @@ export default function SideElevation({
                   <rect
                     x={cx - svgHalfW} y={svgBodyTop}
                     width={svgHalfW * 2} height={svgBodyH}
-                    fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
+                    fill="#fff" stroke={cabinetStroke} strokeWidth={0.9} rx={1} />
                   {/* Baffle edge — bottom face (facing into room) */}
                   <line
                     x1={cx - svgHalfW} y1={svgBodyBottom}
                     x2={cx + svgHalfW} y2={svgBodyBottom}
-                    stroke="#4A4540" strokeWidth={1.4} />
+                    stroke={cabinetStroke} strokeWidth={1.4} />
                   {/* Ceiling line — drawn through the gap for clarity */}
                   <line
                     x1={cx - svgHalfW - 6} y1={svgGrille}
