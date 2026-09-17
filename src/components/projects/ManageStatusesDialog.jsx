@@ -1,5 +1,108 @@
 import React, { useState } from "react";
 
+// ---- Colour helpers (mirror ProjectCardPrototype logic) ----
+// Darken a hex colour by a factor (0-1). Used for the arrow section.
+function darkenHex(hex, factor = 0.92) {
+  const h = hex.replace("#", "");
+  let r = parseInt(h.substring(0, 2), 16);
+  let g = parseInt(h.substring(2, 4), 16);
+  let b = parseInt(h.substring(4, 6), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return hex;
+  r = Math.round(r * factor);
+  g = Math.round(g * factor);
+  b = Math.round(b * factor);
+  const toHex = (n) => n.toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+// Ensure a colour is dark enough for readable white text. If too light,
+// darken by mixing toward black so the preview matches the real Open button.
+function getReadableButtonColor(hex) {
+  const h = hex.replace("#", "");
+  let r = parseInt(h.substring(0, 2), 16);
+  let g = parseInt(h.substring(2, 4), 16);
+  let b = parseInt(h.substring(4, 6), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return "#1B1A1A";
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  if (lum < 0.4) return hex;
+  const f = 0.5;
+  r = Math.round(r * f);
+  g = Math.round(g * f);
+  b = Math.round(b * f);
+  const toHex = (n) => n.toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+// Mini preview of the Open split button — shows how the status colour will
+// look on the actual Open button: main section + subtly darker arrow section,
+// white text. Clicking opens the native colour picker.
+function OpenButtonPreview({ color, onColorChange, title = "Click to change colour" }) {
+  const main = getReadableButtonColor(color || "#625143");
+  const arrow = darkenHex(main, 0.92);
+  return (
+    <label
+      title={title}
+      style={{
+        display: "flex",
+        alignItems: "stretch",
+        borderRadius: 6,
+        overflow: "hidden",
+        border: "1px solid rgba(0,0,0,0.12)",
+        flexShrink: 0,
+        cursor: "pointer",
+        position: "relative",
+        height: 28,
+        fontFamily: "Didact Gothic, sans-serif",
+      }}
+    >
+      <span
+        style={{
+          display: "flex",
+          alignItems: "center",
+          padding: "0 10px",
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#FFFFFF",
+          background: main,
+          letterSpacing: "0.02em",
+          whiteSpace: "nowrap",
+        }}
+      >
+        Open
+      </span>
+      <span
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 6px",
+          color: "#FFFFFF",
+          background: arrow,
+        }}
+      >
+        <svg width="8" height="8" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+          <path fill="#FFFFFF" d="M5 7L1 3h8z" />
+        </svg>
+      </span>
+      <input
+        type="color"
+        value={color || "#625143"}
+        onChange={(e) => onColorChange(e.target.value)}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          opacity: 0,
+          cursor: "pointer",
+          border: "none",
+          padding: 0,
+        }}
+      />
+    </label>
+  );
+}
+
 // Compact modal for managing configurable project statuses:
 // add, rename, reorder, delete (with safe reassignment of in-use projects).
 export default function ManageStatusesDialog({
@@ -191,36 +294,10 @@ export default function ManageStatusesDialog({
                 background: "#FAFAF8",
               }}
             >
-              <label
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 6,
-                  border: "1px solid #DCDBD6",
-                  background: s.color || "#625143",
-                  flexShrink: 0,
-                  cursor: "pointer",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-                title="Click to change colour"
-              >
-                <input
-                  type="color"
-                  value={s.color || "#625143"}
-                  onChange={(e) => handleColorChange(s.id, e.target.value)}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    opacity: 0,
-                    cursor: "pointer",
-                    border: "none",
-                    padding: 0,
-                  }}
-                />
-              </label>
+              <OpenButtonPreview
+                color={s.color}
+                onColorChange={(c) => handleColorChange(s.id, c)}
+              />
               {editingId === s.id ? (
                 <>
                   <input
@@ -350,18 +427,10 @@ export default function ManageStatusesDialog({
             Add New Status
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input
-              type="color"
-              value={newColor}
-              onChange={(e) => setNewColor(e.target.value)}
-              style={{
-                width: 36,
-                height: 36,
-                border: "1px solid #DCDBD6",
-                borderRadius: 6,
-                cursor: "pointer",
-                padding: 2,
-              }}
+            <OpenButtonPreview
+              color={newColor}
+              onColorChange={setNewColor}
+              title="Preview of the Open button — click to change colour"
             />
             <input
               value={newLabel}

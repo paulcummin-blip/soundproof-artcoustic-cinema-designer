@@ -21,10 +21,10 @@ const BRAND = {
 };
 
 const STATUS_COLORS = {
-  live: "#213428",
+  live: "#3F5A4A",
   prospective: "#625143",
-  lost: "#4A230F",
-  completed: "#C1B6AD",
+  lost: "#6B3218",
+  completed: "#BEB6AC",
 };
 
 function hexToRgba(hex, alpha) {
@@ -189,6 +189,8 @@ export default function ProjectCardPrototype({
   // readable white text, so it always reads as a clear primary action.
   const openBtnColor = getReadableButtonColor(statusColor);
   const openBtnHover = darkenHex(openBtnColor, 0.85);
+  // Arrow section is a subtly darker shade of the main button colour.
+  const openArrowColor = darkenHex(openBtnColor, 0.92);
 
   const systemSummary = buildSystemSummary(p, dolbyLabelMap);
   const supportingDetail = buildSupportingDetail(p);
@@ -349,6 +351,8 @@ export default function ProjectCardPrototype({
             onSwitchVersion={onSwitchVersion}
             onCreateVersion={onCreateVersion}
             loading={versionsLoading}
+            buttonColor={openBtnColor}
+            arrowColor={openArrowColor}
           />
 
           {/* Row 2: Edit · Archive · Delete */}

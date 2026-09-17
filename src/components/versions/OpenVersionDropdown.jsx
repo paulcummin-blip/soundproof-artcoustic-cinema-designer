@@ -46,6 +46,10 @@ export default function OpenVersionDropdown({
   onSwitchVersion,
   onCreateVersion,
   loading = false,
+  // Status-coloured button. Defaults to the classic dark action when not
+  // provided (backward compatibility for any caller that doesn't pass them).
+  buttonColor = "#1B1A1A",
+  arrowColor = "#1B1A1A",
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -153,7 +157,7 @@ export default function OpenVersionDropdown({
 
   return (
     <div ref={dropdownRef} className="relative inline-block text-left w-full">
-      <div className="w-full flex items-stretch rounded-md overflow-hidden" style={{ background: BRAND.btnBg }}>
+      <div className="w-full flex items-stretch rounded-md overflow-hidden" style={{ background: buttonColor }}>
         {/* Main button — opens the active version immediately */}
         <button
           onClick={handleMainClick}
@@ -172,13 +176,14 @@ export default function OpenVersionDropdown({
         {/* Divider between main button and arrow */}
         <div style={{ width: 1, background: "rgba(255,255,255,0.25)" }} />
 
-        {/* Arrow button — opens the version menu */}
+        {/* Arrow button — opens the version menu (subtly darker shade) */}
         <button
           onClick={handleArrowClick}
           disabled={loading}
           aria-label="Choose a version"
           className="flex items-center justify-center px-2.5 py-2 text-sm font-medium transition-all duration-200 disabled:opacity-50 hover:brightness-110"
           style={{
+            background: arrowColor,
             color: BRAND.btnText,
             fontFamily: "Didact Gothic, sans-serif",
           }}

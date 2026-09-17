@@ -46,10 +46,10 @@ const BRAND = {
 // Legacy fallback colours/alpha for the default statuses (used before the
 // dynamic ProjectStatus definitions have loaded).
 const STATUS_COLORS = {
-  live: "#213428",
+  live: "#3F5A4A",
   prospective: "#625143",
-  lost: "#4A230F",
-  completed: "#C1B6AD",
+  lost: "#6B3218",
+  completed: "#BEB6AC",
 };
 
 const STATUS_ALPHA = {
