@@ -60,6 +60,18 @@
       "default": "Unknown",
       "description": "Product lifecycle status. 'Hidden' = suppressed from selectors but retained in database. 'Archived' = long-term retained, excluded from active views."
     },
+    "import_status": {
+      "type": "string",
+      "enum": [
+        "Manual",
+        "Imported",
+        "Verified",
+        "Needs Review",
+        "Locked"
+      ],
+      "default": "Manual",
+      "description": "Import pipeline status. Manual = entered by hand. Imported = crawler-extracted (pending review). Needs Review = awaiting human approval. Verified = human-approved engineering data. Locked = verified and protected from automatic overwrite."
+    },
     "official_product_url": {
       "type": "string",
       "description": "Official manufacturer product page URL."

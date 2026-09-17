@@ -166,6 +166,11 @@
       "type": "string",
       "format": "date",
       "description": "Metadata: Date the specifications were last verified against the source."
+    },
+    "field_authority": {
+      "type": "object",
+      "description": "Per-field source authority. Maps specification field names to their source type (e.g. { \"sensitivity_db\": \"Official PDF\", \"max_continuous_spl_db\": \"Official Product Page\" }). Records where each individual value came from, enabling precise change tracking when the crawler later re-extracts. Keys are spec field names; values are one of: Official Product Page, Official PDF, Engineering Document, Support Article.",
+      "properties": {}
     }
   },
   "required": [
