@@ -744,6 +744,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
               : "incomplete";
           setStageVerdict(
             projectId,
+            versionId,
             "phase_polarity",
             phaseDiagnostics.status === "skipped"
               ? "skipped"

@@ -371,7 +371,7 @@ export default function ImproveBassResponseV2({
       ? applyCalibrationTuning(subwooferInstances,rec.result.appliedTuning,_provenance)
       : buildOptimisedInstances(rec.result,subwooferInstances,roomDims,selectedSubModel,_provenance);
     commitInstances(next,{front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
-  },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,subwooferInstances,roomDims,selectedSubModel]);
+  },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,versionId,subwooferInstances,roomDims,selectedSubModel]);
   const handleApplyCalibration=handleApply;
 
   // ── Trade-off Apply handler ──────────────────────────────────────────
@@ -397,7 +397,7 @@ export default function ImproveBassResponseV2({
       ? applyCalibrationTuning(subwooferInstances,entry.result.appliedTuning,_provenance)
       : buildOptimisedInstances(entry.result,subwooferInstances,roomDims,selectedSubModel,_provenance);
     commitInstances(next,{front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
-  },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,subwooferInstances,roomDims,selectedSubModel]);
+  },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,versionId,subwooferInstances,roomDims,selectedSubModel]);
 
   // ── Per-stage Apply handler ──────────────────────────────────────────
   // Each stage has its own independent Apply action. The user may choose
@@ -464,7 +464,7 @@ export default function ImproveBassResponseV2({
         if (commitSeatingProvenance) commitSeatingProvenance(_provenance);
       }
     }
-  }, [state?.status, state?.winner, commitInstances, commitSeating, commitSeatingProvenance, hasCanonicalInstances, projectId, subwooferInstances, roomDims, selectedSubModel]);
+  }, [state?.status, state?.winner, commitInstances, commitSeating, commitSeatingProvenance, hasCanonicalInstances, projectId, versionId, subwooferInstances, roomDims, selectedSubModel]);
 
   if (!shared?.hasCurrentResult) return null;
 
