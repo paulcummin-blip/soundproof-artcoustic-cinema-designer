@@ -71,8 +71,8 @@ export default function AdminDashboard() {
       href: "/SpeakerDatabase",
     },
     {
-      title: "Speaker Capability Database",
-      description: "The single source of truth for all loudspeaker capability data. Manufacturers, products, specifications, validation and change history.",
+      title: "Speaker Database",
+      description: "A structured catalogue of loudspeaker specifications and sources. Manufacturers, products, specifications, data quality and change history.",
       status: "Ready",
       count: "Foundation built",
       href: "/admin/speaker-database",
