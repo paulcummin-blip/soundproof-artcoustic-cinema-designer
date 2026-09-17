@@ -3,6 +3,7 @@ import React, { useMemo, useRef, useState, useEffect } from "react";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import { useProjectActions } from "@/components/state/project-session";
 import { base44 } from "@/api/base44Client";
+import { mergeProjectAndVersion } from "@/lib/versionAuthority";
 import NewProjectDialog, { dolbyConfigs, splOptions } from "@/components/projects/NewProjectDialog";
 import ManageStatusesDialog from "@/components/projects/ManageStatusesDialog";
 import { useProjectStatuses } from "@/components/projects/useProjectStatuses";
@@ -191,10 +192,53 @@ export default function ProjectsPage() {
         const projectList = isAdmin
           ? await base44.entities.Project.list('-created_date', 200)
           : await base44.entities.Project.filter({ account_id: userAccountId }, '-created_date', 200);
-        
+
         if (mounted) {
-          const mapped = (projectList || []).map(p => {
+          // ── Version-aware merge ──────────────────────────────────────────
+          // Project summaries must reflect the ACTIVE version's design state.
+          // Per-version design fields (room dims, dolby_config, speakers,
+          // seating, screen, spl_config) live in ProjectVersion.design_state,
+          // not on the legacy Project entity. We batch-fetch all active
+          // versions for the loaded projects and merge each project with its
+          // active version before mapping to the summary card shape.
+          const projectsWithVersionId = (projectList || []).filter(
+            (p) => p && p.active_version_id
+          );
+          const versionIdSet = [
+            ...new Set(projectsWithVersionId.map((p) => p.active_version_id)),
+          ];
+
+          let versionMap = {};
+          if (versionIdSet.length > 0) {
             try {
+              // Fetch versions in batches of 50 (SDK filter supports arrays).
+              for (let i = 0; i < versionIdSet.length; i += 50) {
+                const batch = versionIdSet.slice(i, i + 50);
+                const versions = await base44.entities.ProjectVersion.filter({
+                  id: batch,
+                });
+                if (Array.isArray(versions)) {
+                  for (const v of versions) {
+                    versionMap[v.id] = v;
+                  }
+                }
+              }
+            } catch (verErr) {
+              console.warn('[Projects] Version batch fetch failed, using project-only:', verErr);
+            }
+          }
+
+          const mapped = (projectList || []).map((rawP) => {
+            try {
+              // Merge with active version's design_state so the summary
+              // reflects the current version, not stale legacy fields.
+              const version = rawP.active_version_id
+                ? versionMap[rawP.active_version_id]
+                : null;
+              const p = version
+                ? mergeProjectAndVersion(rawP, version)
+                : rawP;
+
               return {
                 id: p.id,
                 name: p.name || "Untitled Project",
@@ -235,17 +279,17 @@ export default function ProjectsPage() {
                 })(),
               };
             } catch (mapErr) {
-              console.warn('[Projects] Failed to map project:', p?.id, mapErr);
+              console.warn('[Projects] Failed to map project:', rawP?.id, mapErr);
               return {
-                id: p.id,
-                name: p.name || "Untitled Project",
-                client: p.client_name || "",
-                status: normalizeStatusId(p.project_status || "Prospective"),
+                id: rawP.id,
+                name: rawP.name || "Untitled Project",
+                client: rawP.client_name || "",
+                status: normalizeStatusId(rawP.project_status || "Prospective"),
                 createdAt: Date.now(),
               };
             }
           });
-          
+
           setProjects(mapped);
           setLoading(false);
         }

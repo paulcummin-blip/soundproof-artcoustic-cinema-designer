@@ -1,11 +1,49 @@
-
 // Base44EntityAdapter.js - handles persistence layer for room dimensions and speaker handoff
+//
+// VERSION-AWARENESS (Stage B1):
+// All READ functions merge the raw Project with its active ProjectVersion's
+// design_state before returning per-version fields (room dimensions, selected
+// speakers, speaker nodes). This ensures the SPL Calculator sees the current
+// version's design, not stale legacy Project fields.
+//
+// The WRITE functions (setRoomDimensions, setSelectedSpeakers, setSpeakerNodes)
+// are LEGACY paths that predate the versioning system. They write directly to
+// the raw Project entity. The canonical save path is useProjectLoader's
+// autosave/manual save, which correctly splits design_state into the
+// ProjectVersion record. These write functions are retained for backward
+// compatibility but should not be used for version-aware saves. The only
+// active consumer (SPLCalculator via useRoomDimensions) calls loadDims only —
+// it never calls the setters.
 
 import { base44 } from '@/api/base44Client';
+import { mergeProjectAndVersion } from '@/lib/versionAuthority';
 
 const STORAGE_KEY = 'Base44:lastRoomDimensions';
 const SPEAKERS_KEY = 'Base44:selectedSpeakersByRole';
 const NODES_KEY = 'Base44:speakerNodes';
+
+/**
+ * Fetch a project and merge it with its active ProjectVersion's design_state.
+ * Returns the merged project (raw Project fields overlaid with version
+ * design_state), or the raw project if no active version exists.
+ * @param {string} projectId
+ * @returns {Promise<object|null>}
+ */
+async function fetchMergedProject(projectId) {
+  const projects = await base44.entities.Project.filter({ id: projectId }, '-updated_date', 1);
+  if (!projects || projects.length === 0) return null;
+  const rawP = projects[0];
+  if (!rawP.active_version_id) return rawP;
+  try {
+    const versions = await base44.entities.ProjectVersion.filter({ id: rawP.active_version_id });
+    if (versions && versions.length > 0) {
+      return mergeProjectAndVersion(rawP, versions[0]);
+    }
+  } catch (verErr) {
+    console.warn('[Base44EntityAdapter] Version fetch failed, using project-only:', verErr.message);
+  }
+  return rawP;
+}
 
 /**
  * Get room dimensions from Base44 SDK or localStorage fallback
@@ -18,16 +56,14 @@ export async function getRoomDimensions(projectId) {
   try {
     // Try SDK first if we have project context
     if (projectId) {
-      const projects = await base44.entities.Project.filter({ id: projectId }, '-updated_date', 1);
-      
-      if (projects && projects.length > 0) {
-        const project = projects[0];
-        
-        // Read from project properties (original behavior)
+      const project = await fetchMergedProject(projectId);
+
+      if (project) {
+        // Read from merged project (version design_state takes precedence)
         const width_m = Number(project.room_width) || 0;
         const length_m = Number(project.room_length) || 0;
         const height_m = Number(project.room_height) || 0;
-        
+
         if (width_m > 0 && length_m > 0 && height_m > 0) {
           // Mirror to localStorage for local fallback
           try {
@@ -115,18 +151,16 @@ export async function getSelectedSpeakers(projectId) {
   try {
     // Try SDK first if we have project context
     if (projectId) {
-      const projects = await base44.entities.Project.filter({ id: projectId }, '-updated_date', 1);
-      
-      if (projects && projects.length > 0) {
-        const project = projects[0];
-        
+      const project = await fetchMergedProject(projectId);
+
+      if (project) {
         // Try to parse from JSON string field
         if (project.selected_speakers_by_role) {
           try {
-            const parsed = typeof project.selected_speakers_by_role === 'string' 
+            const parsed = typeof project.selected_speakers_by_role === 'string'
               ? JSON.parse(project.selected_speakers_by_role)
               : project.selected_speakers_by_role;
-            
+
             // Mirror to localStorage
             try {
               if (typeof window !== 'undefined' && window.localStorage) {
@@ -201,11 +235,9 @@ export async function getSpeakerNodes(projectId) {
   try {
     // Try SDK first if we have project context
     if (projectId) {
-      const projects = await base44.entities.Project.filter({ id: projectId }, '-updated_date', 1);
-      
-      if (projects && projects.length > 0) {
-        const project = projects[0];
-        
+      const project = await fetchMergedProject(projectId);
+
+      if (project) {
         // Try to parse from JSON string field
         if (project.spl_speaker_nodes) {
           try {
