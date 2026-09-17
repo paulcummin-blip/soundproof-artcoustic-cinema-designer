@@ -650,7 +650,7 @@ function RoomDesignerWithState() {
   // Heavy placement work receives a unique request identity from a deliberate
   // post-result user action. The hooks bind that request to their first valid
   // fingerprint and refuse to follow later geometry/model/target changes.
-  const bassHeavyAction = useBassHeavyAction(activeProjectId);
+  const bassHeavyAction = useBassHeavyAction(activeProjectId, appState?.activeVersionId);
   const recommendationsActive = !!bassHeavyAction?.requestId
     && ["optimise", "compare"].includes(bassHeavyAction.action)
     && ["requested", "running", "complete"].includes(bassHeavyAction.status);
@@ -719,17 +719,18 @@ function RoomDesignerWithState() {
     if (stage1Optimisation?.status === "error" || stage2Optimisation?.status === "error") {
       markBassHeavyActionError(
         activeProjectId,
+        appState?.activeVersionId,
         bassHeavyAction.requestId,
         stage2Optimisation?.errorMessage || stage1Optimisation?.errorMessage,
       );
       return;
     }
     if (stage2Optimisation?.status === "complete") {
-      markBassHeavyActionComplete(activeProjectId, bassHeavyAction.requestId);
+      markBassHeavyActionComplete(activeProjectId, appState?.activeVersionId, bassHeavyAction.requestId);
       return;
     }
     if (bassHeavyAction.status === "requested") {
-      markBassHeavyActionRunning(activeProjectId, bassHeavyAction.requestId);
+      markBassHeavyActionRunning(activeProjectId, appState?.activeVersionId, bassHeavyAction.requestId);
     }
   }, [
     recommendationsActive,
