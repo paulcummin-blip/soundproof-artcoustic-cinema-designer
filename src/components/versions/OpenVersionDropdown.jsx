@@ -5,15 +5,17 @@
 // Active version is marked with ✓ and a subtle highlight.
 // "+ New Design Option…" at the bottom duplicates the active version's
 // design_state into the next available slot (V2→V5), switches to it,
-// and opens the Room Designer. The new version inherits the source
-// name with a " (Copy)" suffix. A sessionStorage flag triggers the
-// NewVersionRenameBanner in the Room Designer header for instant renaming.
+// and opens the Room Designer with the temporary name "New Design Option".
+// Navigation state { renameVersion: true } tells the Room Designer header
+// to auto-enter edit mode on the version name field so the user can
+// immediately type a meaningful name. No banner, no sessionStorage.
 
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChevronDown, Check, Plus, AlertCircle } from "lucide-react";
 import { useProjectVersions } from "@/components/versions/useProjectVersions";
 import { setActiveProjectId } from "@/components/state/project-session";
-import { truncateVersionName, buildCopyVersionName } from "@/lib/versionAuthority";
+import { truncateVersionName, NEW_VERSION_DEFAULT_NAME } from "@/lib/versionAuthority";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -31,10 +33,8 @@ const BRAND = {
 // Phase 2 — version creation is now enabled.
 const VERSION_CREATION_ENABLED = true;
 
-// sessionStorage flag prefix consumed by NewVersionRenameBanner.
-const RENAME_FLAG_PREFIX = "sp:newVersionRename:";
-
 export default function OpenVersionDropdown({ projectId, projectName }) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
@@ -89,21 +89,15 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
 
     setCreating(true);
     try {
-      const sourceName = activeVersion?.version_name || "Original Design";
-      const copyName = buildCopyVersionName(sourceName);
-      const newVersion = await createVersion(nextEmptySlot, copyName);
-
-      // Set the rename flag so NewVersionRenameBanner auto-enters edit mode
-      if (newVersion?.id) {
-        try {
-          sessionStorage.setItem(RENAME_FLAG_PREFIX + newVersion.id, copyName);
-        } catch {
-          // sessionStorage may be unavailable; fail silently.
-        }
-      }
+      await createVersion(nextEmptySlot, NEW_VERSION_DEFAULT_NAME);
 
       setOpen(false);
-      navigateToDesigner();
+      setActiveProjectId(projectId);
+      // Pass rename intent via navigation state — transient, belongs to this
+      // navigation event only. No sessionStorage, no banner.
+      navigate(`/RoomDesigner?project=${encodeURIComponent(projectId)}`, {
+        state: { renameVersion: true },
+      });
     } catch (err) {
       console.error("[OpenVersionDropdown] Create version failed:", err);
       setCreateError(err?.message || "Failed to create design option.");

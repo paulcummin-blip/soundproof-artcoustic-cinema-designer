@@ -190,6 +190,10 @@ export function resolveActiveAfterDeletion(versions, deletedVersionNumber) {
  * Truncate a version name with ellipsis for dropdowns and narrow layouts.
  * Report headings use the full name.
  */
+// Temporary default name for a newly created design option.
+// The user normally renames it immediately via the inline edit field.
+export const NEW_VERSION_DEFAULT_NAME = "New Design Option";
+
 export function truncateVersionName(name, maxLen = 30) {
   if (!name) return "";
   if (name.length <= maxLen) return name;

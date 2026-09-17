@@ -1,13 +1,123 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, FileText, Eye, ExternalLink } from "lucide-react";
-import NewVersionRenameBanner from "@/components/versions/NewVersionRenameBanner";
+import { RotateCcw, FileText, Eye, ExternalLink, Edit2 } from "lucide-react";
+import { useProjectVersions } from "@/components/versions/useProjectVersions";
+import { VERSION_NAME_MAX_LENGTH, sanitiseVersionName } from "@/lib/versionAuthority";
 
 // External resource — Artcoustic product CAD files (Dropbox folder).
 // Opens in a new tab; not a primary project action.
 const PRODUCT_CAD_FILES_URL =
   "https://www.dropbox.com/scl/fo/uh8061fp2gcua4qya4vsl/AIB6tiWKiYJ1kmc1bkav8Ag?rlkey=13gap6ajvpnlgjs74u8jopctq&st=c8f27qoy&dl=0";
+
+const BRAND = {
+  text: "#1B1A1A",
+  subtext: "#625143",
+  border: "#DCDBD6",
+  green: "#213428",
+};
+
+// Inline editable version name field. Doubles as the rename target when a
+// new design option is created — navigation state { renameVersion: true }
+// auto-enters edit mode with the text selected so the user can immediately
+// type a meaningful name. No banner, no extra notification UI.
+function VersionNameField({ projectId }) {
+  const { versions, activeVersionId, renameVersion } = useProjectVersions(projectId);
+  const location = useLocation();
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const [renameConsumed, setRenameConsumed] = useState(false);
+  const inputRef = useRef(null);
+
+  const activeVersion = versions.find((v) => v.id === activeVersionId);
+  const versionName = activeVersion?.version_name || "";
+
+  // Auto-enter edit mode when navigation state requests a rename.
+  const renameRequested = location.state?.renameVersion === true && !renameConsumed;
+
+  useEffect(() => {
+    if (renameRequested && activeVersionId) {
+      setRenameConsumed(true);
+      setEditing(true);
+      setEditValue(versionName);
+    }
+  }, [renameRequested, activeVersionId, versionName]);
+
+  // Focus + select-all when entering edit mode
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const handleSave = async () => {
+    const newName = sanitiseVersionName(editValue);
+    setEditing(false);
+    if (newName !== versionName && activeVersionId) {
+      try {
+        await renameVersion(activeVersionId, newName);
+      } catch (err) {
+        console.error("[VersionNameField] Rename failed:", err);
+      }
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSave();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setEditing(false);
+    }
+  };
+
+  if (!activeVersion) return null;
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <span className="text-xs font-medium" style={{ color: BRAND.subtext }}>Version:</span>
+        <input
+          ref={inputRef}
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value.substring(0, VERSION_NAME_MAX_LENGTH))}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          maxLength={VERSION_NAME_MAX_LENGTH}
+          className="px-2 py-0.5 rounded text-xs outline-none"
+          style={{
+            border: `1px solid ${BRAND.green}`,
+            color: BRAND.text,
+            fontFamily: "Didact Gothic, sans-serif",
+            background: "#FFFFFF",
+            minWidth: 140,
+          }}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="text-xs font-medium" style={{ color: BRAND.subtext }}>Version:</span>
+      <button
+        onClick={() => {
+          setEditing(true);
+          setEditValue(versionName);
+        }}
+        className="inline-flex items-center gap-1 text-xs font-semibold transition-colors hover:underline"
+        style={{ color: BRAND.green, fontFamily: "Didact Gothic, sans-serif" }}
+        title="Click to rename"
+      >
+        {versionName}
+        <Edit2 className="w-3 h-3 opacity-40" />
+      </button>
+    </span>
+  );
+}
 
 export default function RoomDesignerHeader({
   loadState,
@@ -80,7 +190,7 @@ export default function RoomDesignerHeader({
           </Button>
         </div>
       </div>
-      <div className="mt-2 text-xs flex items-center gap-4">
+      <div className="mt-2 text-xs flex items-center gap-4 flex-wrap">
           {/* A valid project is always present — project-mode statuses only */}
           {loadState.phase === "loading" && <div className="text-xs text-gray-500 inline-flex items-center gap-2"> Loading project... </div>}
           {loadState.phase === "loaded" && <div className="text-xs text-gray-600 inline-flex items-center gap-2"> Loaded "{loadState.name}" </div>}
@@ -89,15 +199,13 @@ export default function RoomDesignerHeader({
           {autosaveStatus === "saved" && <span className="text-green-700 font-medium">Saved</span>}
           {autosaveStatus === "dirty" && <span className="text-amber-600 font-medium">Pending changes...</span>}
           {autosaveStatus === "hydrating" && <span>Loading project data...</span>}
+          {effectiveProjectId && (
+            <VersionNameField projectId={effectiveProjectId} />
+          )}
           {projectIdState && (
             <span className="text-xs text-gray-400 ml-auto">ID: {projectIdState.slice(0, 12)}…</span>
           )}
       </div>
-      {effectiveProjectId && (
-        <div className="mt-2">
-          <NewVersionRenameBanner projectId={effectiveProjectId} />
-        </div>
-      )}
     </header>
   );
 }
