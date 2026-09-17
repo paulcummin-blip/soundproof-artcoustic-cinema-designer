@@ -278,28 +278,32 @@ appState, // Pass appState directly for setters
       }
 
       hydrateFromProject(mergedP);
-      setProjectNameState(p?.name || "Project"); // Update internal projectName state
+      setProjectNameState(mergedP?.name || "Project"); // Update internal projectName state
       // Capture the loaded room_dimensions_edited flag so the autosave path
       // never resets it to false. Defaults to false for pre-feature projects.
-      loadedRoomDimensionsEditedRef.current = p?.room_dimensions_edited === true;
-      setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
+      loadedRoomDimensionsEditedRef.current = mergedP?.room_dimensions_edited === true;
+      setLoadState({ phase: "loaded", error: null, name: mergedP?.name || "Project" });
       // Only enable saving after successful same-project hydration.
       hydrationAuthorityRef.current = markLoaded(hydrationAuthorityRef.current);
       appState?.setProjectHydrationReady?.(true);
       // Snapshot structural counts for the destructive-save tripwire.
       const _parseArr = (v) => { if (Array.isArray(v)) return v; if (typeof v === "string") { try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; } } return []; };
       hydratedStructuralCountsRef.current = {
-        speakers: _parseArr(p?.selected_speakers).length,
-        subs: Array.isArray(p?.subwooferInstances) ? p.subwooferInstances.length : 0,
-        roomElements: _parseArr(p?.room_elements).length,
-        seatingPositions: _parseArr(p?.seating_positions).length,
-        dolbyConfig: p?.dolby_config || "5.1",
+        speakers: _parseArr(mergedP?.selected_speakers).length,
+        subs: Array.isArray(mergedP?.subwooferInstances) ? mergedP.subwooferInstances.length : 0,
+        roomElements: _parseArr(mergedP?.room_elements).length,
+        seatingPositions: _parseArr(mergedP?.seating_positions).length,
+        dolbyConfig: mergedP?.dolby_config || "5.1",
       };
 
       // Stamp the loaded signature using the same serializeProject() shape that
       // autosave/manual save compare against, so the autosave effect does not
       // falsely mark the freshly loaded project as dirty.
-      const loadedId = p?.id || id;
+      // CRITICAL: the signature baseline is built from the MERGED version data
+      // (mergedP), never from the raw Project entity. Per-version design fields
+      // live in design_state; reading raw p would baseline against stale legacy
+      // fields and cause false dirty detection after a version switch.
+      const loadedId = mergedP?.id || p?.id || id;
       if (loadedId) {
         const loadedRefKey = `__rdAutosaveRefs_${loadedId}`;
         if (!globalThis[loadedRefKey]) {
@@ -320,78 +324,78 @@ appState, // Pass appState directly for setters
           return fallback;
         };
         let loadedRoomDims = { widthM: 4.5, lengthM: 6.0, heightM: 2.4 };
-        if (p?.roomDims) {
+        if (mergedP?.roomDims) {
           try {
-            const rd = JSON.parse(p.roomDims);
+            const rd = JSON.parse(mergedP.roomDims);
             loadedRoomDims = { widthM: Number(rd?.widthM ?? rd?.width) || 4.5, lengthM: Number(rd?.lengthM ?? rd?.length) || 6.0, heightM: Number(rd?.heightM ?? rd?.height) || 2.4 };
-          } catch { loadedRoomDims = { widthM: Number(p?.room_width) || 4.5, lengthM: Number(p?.room_length) || 6.0, heightM: Number(p?.room_height) || 2.4 }; }
+          } catch { loadedRoomDims = { widthM: Number(mergedP?.room_width) || 4.5, lengthM: Number(mergedP?.room_length) || 6.0, heightM: Number(mergedP?.room_height) || 2.4 }; }
         } else {
-          loadedRoomDims = { widthM: Number(p?.room_width) || 4.5, lengthM: Number(p?.room_length) || 6.0, heightM: Number(p?.room_height) || 2.4 };
+          loadedRoomDims = { widthM: Number(mergedP?.room_width) || 4.5, lengthM: Number(mergedP?.room_length) || 6.0, heightM: Number(mergedP?.room_height) || 2.4 };
         }
         const loadedScreen = {
-          visibleWidthInches: Number(p?.screen_size) || 120,
-          aspectRatio: p?.aspect_ratio || "16:9",
-          manualMode: !!p?.manual_dimensions,
-          manualWidthM: Number(p?.manual_width_m) || 0,
-          manualHeightM: Number(p?.manual_height_m) || 0,
-          mountMode: p?.screen_mount_mode || "floating",
-          floatDepthM: Number(p?.float_depth_m) || 0.2,
-          showScreenPlane: !!p?.show_screen_plane,
-          showCavity: !!p?.show_cavity,
-          speakerClearanceM: Number(p?.speaker_clearance_m) || 0.02,
-          heightFromFloorM: typeof p?.screen_height_from_floor === "number" ? p.screen_height_from_floor : 0.5,
+          visibleWidthInches: Number(mergedP?.screen_size) || 120,
+          aspectRatio: mergedP?.aspect_ratio || "16:9",
+          manualMode: !!mergedP?.manual_dimensions,
+          manualWidthM: Number(mergedP?.manual_width_m) || 0,
+          manualHeightM: Number(mergedP?.manual_height_m) || 0,
+          mountMode: mergedP?.screen_mount_mode || "floating",
+          floatDepthM: Number(mergedP?.float_depth_m) || 0.2,
+          showScreenPlane: !!mergedP?.show_screen_plane,
+          showCavity: !!mergedP?.show_cavity,
+          speakerClearanceM: Number(mergedP?.speaker_clearance_m) || 0.02,
+          heightFromFloorM: typeof mergedP?.screen_height_from_floor === "number" ? mergedP.screen_height_from_floor : 0.5,
 
           // CRITICAL: restore TV preset state
-          tvPresetKey: p?.tv_preset_key ?? null,
-          tvWidthMm: Number(p?.tv_width_mm) || null,
+          tvPresetKey: mergedP?.tv_preset_key ?? null,
+          tvWidthMm: Number(mergedP?.tv_width_mm) || null,
         };
-        const loadedFrontSubsCfg = _parseMaybe(p?.front_subs_cfg ?? p?.frontSubsCfg, null);
-        const loadedRearSubsCfg  = _parseMaybe(p?.rear_subs_cfg  ?? p?.rearSubsCfg,  null);
+        const loadedFrontSubsCfg = _parseMaybe(mergedP?.front_subs_cfg ?? mergedP?.frontSubsCfg, null);
+        const loadedRearSubsCfg  = _parseMaybe(mergedP?.rear_subs_cfg  ?? mergedP?.rearSubsCfg,  null);
         const loadedProjectData = serializeProject({
-          name: p?.name || "Untitled Room",
+          name: mergedP?.name || "Untitled Room",
           roomDims: loadedRoomDims,
           dimensions: loadedRoomDims,
           screen: loadedScreen,
-          seatingPositions: _parseMaybe(p?.seating_positions, []),
-          seatsPerRowByRow: _parseMaybe(p?.seats_per_row_by_row, []),
-          rowSpacingM: Number(p?.row_spacing_m) || 1.8,
-          placedSpeakers: _parseMaybe(p?.selected_speakers, []),
-          roomElements: _parseMaybe(p?.room_elements, []),
-          selectedSpeakersByRole: _parseMaybe(p?.selected_speakers_by_role, {}),
-          speakerNodes: _parseMaybe(p?.spl_speaker_nodes, []),
-          dolbyLayout: p?.dolby_config || "5.1",
-          overlays: _parseMaybe(p?.overlays, {}),
-          frozenTabs: _parseMaybe(p?.frozen_tabs, {}),
-          sevenBedLayoutType: p?.seven_bed_layout_type || "rears",
+          seatingPositions: _parseMaybe(mergedP?.seating_positions, []),
+          seatsPerRowByRow: _parseMaybe(mergedP?.seats_per_row_by_row, []),
+          rowSpacingM: Number(mergedP?.row_spacing_m) || 1.8,
+          placedSpeakers: _parseMaybe(mergedP?.selected_speakers, []),
+          roomElements: _parseMaybe(mergedP?.room_elements, []),
+          selectedSpeakersByRole: _parseMaybe(mergedP?.selected_speakers_by_role, {}),
+          speakerNodes: _parseMaybe(mergedP?.spl_speaker_nodes, []),
+          dolbyLayout: mergedP?.dolby_config || "5.1",
+          overlays: _parseMaybe(mergedP?.overlays, {}),
+          frozenTabs: _parseMaybe(mergedP?.frozen_tabs, {}),
+          sevenBedLayoutType: mergedP?.seven_bed_layout_type || "rears",
           frontSubsCfg: loadedFrontSubsCfg,
           rearSubsCfg: loadedRearSubsCfg,
-          subwooferInstances: _parseMaybe(p?.subwooferInstances, null),
-          lcrAimMode: p?.lcr_aim_mode || "angled",
-          enableFrontWides: !!p?.enable_front_wides,
-          free_move_lcr: !!p?.free_move_lcr,
-          globalSurroundModel: p?.global_surround_model || null,
-          extraSurroundCount: Number(p?.extra_surround_count) || 0,
-          overheadGlobalModel: p?.overhead_global_model || null,
-          overheadFrontOverride: p?.overhead_front_override || null,
-          overheadMidOverride: p?.overhead_mid_override || null,
-          overheadRearOverride: p?.overhead_rear_override || null,
-          useFrontGlobal: typeof p?.use_front_global === "boolean" ? p.use_front_global : true,
-          useMidGlobal: typeof p?.use_mid_global === "boolean" ? p.use_mid_global : true,
-          useRearGlobal: typeof p?.use_rear_global === "boolean" ? p.use_rear_global : true,
-          screenFrontPlaneM: readPersistedScreenPlaneM(p?.screen_front_plane_m),
-          splConfig: _parseMaybe(p?.spl_config, null),
-          p12Mode: p?.spl_config?.p12_mode ?? null,
-          p12Level: p?.spl_config?.p12_level ?? null,
-          rspMode: p?.rsp_mode || "auto_from_screen",
-          manualRspY_m: (() => { const v = Number(p?.manual_rsp_y_m); return Number.isFinite(v) ? v : null; })(),
-          manualRspX_m: (() => { const v = Number(p?.manual_rsp_x_m); return Number.isFinite(v) ? v : null; })(),
-          designatedRspSeatId: typeof p?.designated_rsp_seat_id === "string" ? p.designated_rsp_seat_id : null,
-          acousticTreatmentEnabled: !!p?.acoustic_treatment_enabled,
-          selectedAbfuserQty: (() => { const v = Number(p?.selected_abfuser_qty); return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0; })(),
-          p15ConstructionLevel: p?.p15_construction_level || "purpose-built",
-          p21EarlyReflectionPreset: p?.p21_early_reflection_preset || "l3",
-          existingRoomDimensionsEdited: p?.room_dimensions_edited === true,
-          linkEarPlatformHeights: typeof p?.link_ear_platform_heights === "boolean" ? p.link_ear_platform_heights : true,
+          subwooferInstances: _parseMaybe(mergedP?.subwooferInstances, null),
+          lcrAimMode: mergedP?.lcr_aim_mode || "angled",
+          enableFrontWides: !!mergedP?.enable_front_wides,
+          free_move_lcr: !!mergedP?.free_move_lcr,
+          globalSurroundModel: mergedP?.global_surround_model || null,
+          extraSurroundCount: Number(mergedP?.extra_surround_count) || 0,
+          overheadGlobalModel: mergedP?.overhead_global_model || null,
+          overheadFrontOverride: mergedP?.overhead_front_override || null,
+          overheadMidOverride: mergedP?.overhead_mid_override || null,
+          overheadRearOverride: mergedP?.overhead_rear_override || null,
+          useFrontGlobal: typeof mergedP?.use_front_global === "boolean" ? mergedP.use_front_global : true,
+          useMidGlobal: typeof mergedP?.use_mid_global === "boolean" ? mergedP.use_mid_global : true,
+          useRearGlobal: typeof mergedP?.use_rear_global === "boolean" ? mergedP.use_rear_global : true,
+          screenFrontPlaneM: readPersistedScreenPlaneM(mergedP?.screen_front_plane_m),
+          splConfig: _parseMaybe(mergedP?.spl_config, null),
+          p12Mode: mergedP?.spl_config?.p12_mode ?? null,
+          p12Level: mergedP?.spl_config?.p12_level ?? null,
+          rspMode: mergedP?.rsp_mode || "auto_from_screen",
+          manualRspY_m: (() => { const v = Number(mergedP?.manual_rsp_y_m); return Number.isFinite(v) ? v : null; })(),
+          manualRspX_m: (() => { const v = Number(mergedP?.manual_rsp_x_m); return Number.isFinite(v) ? v : null; })(),
+          designatedRspSeatId: typeof mergedP?.designated_rsp_seat_id === "string" ? mergedP.designated_rsp_seat_id : null,
+          acousticTreatmentEnabled: !!mergedP?.acoustic_treatment_enabled,
+          selectedAbfuserQty: (() => { const v = Number(mergedP?.selected_abfuser_qty); return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0; })(),
+          p15ConstructionLevel: mergedP?.p15_construction_level || "purpose-built",
+          p21EarlyReflectionPreset: mergedP?.p21_early_reflection_preset || "l3",
+          existingRoomDimensionsEdited: mergedP?.room_dimensions_edited === true,
+          linkEarPlatformHeights: typeof mergedP?.link_ear_platform_heights === "boolean" ? mergedP.link_ear_platform_heights : true,
         });
         delete loadedProjectData.name;
         delete loadedProjectData.client_name;
