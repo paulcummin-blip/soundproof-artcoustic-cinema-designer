@@ -137,7 +137,7 @@ export default function OpenVersionDropdown({
           }}
           title={loading ? "Loading versions…" : "Open the current version"}
         >
-          <span>{loading ? "Loading…" : "Open Version"}</span>
+          <span>{loading ? "Loading…" : "Open"}</span>
         </button>
 
         {/* Divider between main button and arrow */}
