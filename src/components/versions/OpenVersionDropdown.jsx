@@ -3,8 +3,9 @@
 // "Open Version ▼" dropdown for project cards.
 // Lists existing versions by name only (no V-numbers).
 // Active version is marked with ✓ and a subtle highlight.
-// A single disabled "+ Create New Version..." item sits at the bottom
-// until version creation is implemented in a future phase.
+// A single disabled "+ Copy Active Version..." item sits at the bottom
+// until version creation is implemented in a future phase. When enabled,
+// it duplicates the active version's design_state into a new slot.
 
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown, Check, Plus } from "lucide-react";
@@ -62,7 +63,8 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
 
   const handleCreateNew = () => {
     if (!VERSION_CREATION_ENABLED) return;
-    // Phase 2: create version from active, switch, navigate
+    // Phase 2: duplicate the active version's design_state into a new slot,
+    // switch to it, and navigate to the Room Designer.
     setOpen(false);
     navigateToDesigner();
   };
@@ -135,7 +137,7 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
           >
             <Plus className="w-3.5 h-3.5 flex-shrink-0" />
             <span className="flex-1">
-              {VERSION_CREATION_ENABLED ? "Create New Version..." : "Create New Version..."}
+              {VERSION_CREATION_ENABLED ? "Copy Active Version..." : "Copy Active Version..."}
             </span>
             {!VERSION_CREATION_ENABLED && (
               <span className="text-xs italic" style={{ color: BRAND.subtext }}>

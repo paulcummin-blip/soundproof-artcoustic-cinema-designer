@@ -117,7 +117,7 @@ async function migrateSingleProject(base44, projectId, user) {
     project_id: projectId,
     account_id: accountId,
     version_number: 1,
-    version_name: 'Current Design',
+    version_name: 'Original Design',
     design_state: designState,
   });
 
@@ -157,7 +157,7 @@ async function migrateBatch(base44) {
         project_id: project.id,
         account_id: project.account_id || '',
         version_number: 1,
-        version_name: 'Current Design',
+        version_name: 'Original Design',
         design_state: designState,
       });
       await base44.asServiceRole.entities.Project.update(project.id, {

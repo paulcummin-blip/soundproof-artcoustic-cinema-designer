@@ -175,7 +175,7 @@ export function buildSharedUpdate(serialized) {
 
 export const MAX_VERSION_SLOTS = 5;
 export const VERSION_NAME_MAX_LENGTH = 50;
-export const DEFAULT_V1_NAME = "Current Design";
+export const DEFAULT_V1_NAME = "Original Design";
 
 /**
  * Find the next available version slot number for a project.

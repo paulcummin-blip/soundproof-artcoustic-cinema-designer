@@ -56,7 +56,7 @@ const SHARED_PROJECT_FIELDS = new Set([
 
 export const MAX_VERSION_SLOTS = 5;
 export const VERSION_NAME_MAX_LENGTH = 50;
-export const DEFAULT_V1_NAME = "Current Design";
+export const DEFAULT_V1_NAME = "Original Design";
 
 /**
  * Split a serialized project object into shared fields and design_state.
