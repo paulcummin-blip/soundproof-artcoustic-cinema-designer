@@ -1,0 +1,53 @@
+{
+  "name": "SpeakerManufacturer",
+  "type": "object",
+  "description": "One record per loudspeaker manufacturer in the Sound Proof Speaker Capability Database. The single source of truth for manufacturer identity and status. Products link to this via manufacturer_id.",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Manufacturer name (e.g. Artcoustic, Bowers & Wilkins)"
+    },
+    "website": {
+      "type": "string",
+      "description": "Official manufacturer website URL"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Active",
+        "Inactive"
+      ],
+      "default": "Active",
+      "description": "Whether this manufacturer is currently active in the database."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Internal notes about this manufacturer."
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

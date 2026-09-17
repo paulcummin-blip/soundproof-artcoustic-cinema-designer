@@ -1,0 +1,60 @@
+{
+  "name": "SpeakerSource",
+  "type": "object",
+  "description": "A source reference for a SpeakerProduct. A product may have multiple sources (official product page, PDF, engineering document, etc.).",
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "description": "ID of the SpeakerProduct this source belongs to."
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "Official Product Page",
+        "Official PDF",
+        "Engineering Document",
+        "Support Article"
+      ],
+      "description": "Type of source reference."
+    },
+    "url": {
+      "type": "string",
+      "description": "URL of the source document or page."
+    },
+    "date_checked": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the source was last checked."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes about this source (e.g. what data was extracted from it)."
+    }
+  },
+  "required": [
+    "product_id",
+    "source_type"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

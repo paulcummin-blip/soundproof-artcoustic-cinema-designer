@@ -1,0 +1,64 @@
+{
+  "name": "SpeakerChangeHistory",
+  "type": "object",
+  "description": "Append-only audit log for every change to a SpeakerProduct. One record per field change. Provides full traceability for the Speaker Capability Database.",
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "description": "ID of the SpeakerProduct that changed."
+    },
+    "field_changed": {
+      "type": "string",
+      "description": "The specification field that was changed."
+    },
+    "old_value": {
+      "type": "string",
+      "description": "The previous value before the change."
+    },
+    "new_value": {
+      "type": "string",
+      "description": "The new value after the change."
+    },
+    "source": {
+      "type": "string",
+      "description": "What triggered the change (e.g. 'Manual Edit', 'AI Extraction', 'Crawler', 'Import')."
+    },
+    "change_type": {
+      "type": "string",
+      "enum": [
+        "Created",
+        "Updated",
+        "Removed",
+        "Manual Edit"
+      ],
+      "description": "Type of change that occurred."
+    }
+  },
+  "required": [
+    "product_id",
+    "field_changed",
+    "change_type"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
