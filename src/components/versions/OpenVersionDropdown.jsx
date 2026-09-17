@@ -1,10 +1,10 @@
 // src/components/versions/OpenVersionDropdown.jsx
 //
-// Replaces the 'Open Project' button on project cards with an
-// 'Open Version ▼' dropdown listing V1–V5 with custom names.
-// Empty slots show 'Create new...'.
-//
-// Selecting a version navigates to the Room Designer with that version loaded.
+// "Open Version ▼" dropdown for project cards.
+// Lists existing versions by name only (no V-numbers).
+// Active version is marked with ✓ and a subtle highlight.
+// A single disabled "+ Create New Version..." item sits at the bottom
+// until version creation is implemented in a future phase.
 
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown, Check, Plus } from "lucide-react";
@@ -17,18 +17,19 @@ const BRAND = {
   subtext: "#625143",
   border: "#DCDBD6",
   bg: "#FFFFFF",
-  card: "#FBFAF8",
   green: "#213428",
   btnBg: "#1B1A1A",
   btnText: "#FFFFFF",
   activeBg: "#E8E6E0",
 };
 
+// Phase 2 gate — version creation is not yet implemented.
+const VERSION_CREATION_ENABLED = false;
+
 export default function OpenVersionDropdown({ projectId, projectName }) {
   const [open, setOpen] = useState(false);
-  const [showPlaceholder, setShowPlaceholder] = useState(false);
   const dropdownRef = useRef(null);
-  const { versions, activeVersionId, loading, slotGrid, switchVersion } =
+  const { versions, activeVersionId, loading, switchVersion } =
     useProjectVersions(projectId);
 
   // Close on outside click
@@ -60,8 +61,10 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
   };
 
   const handleCreateNew = () => {
-    setShowPlaceholder(true);
-    window.setTimeout(() => setShowPlaceholder(false), 3000);
+    if (!VERSION_CREATION_ENABLED) return;
+    // Phase 2: create version from active, switch, navigate
+    setOpen(false);
+    navigateToDesigner();
   };
 
   return (
@@ -77,9 +80,7 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
           letterSpacing: "0.02em",
         }}
       >
-        <span className="flex items-center gap-2">
-          <span>{loading ? "Loading…" : "Open Version"}</span>
-        </span>
+        <span>{loading ? "Loading…" : "Open Version"}</span>
         <ChevronDown
           className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
@@ -94,28 +95,8 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
             fontFamily: "Didact Gothic, sans-serif",
           }}
         >
-          {slotGrid.map(({ slot, occupied, version }) => {
-            if (!occupied) {
-              return (
-                <button
-                  key={`empty-${slot}`}
-                  onClick={handleCreateNew}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors duration-150 hover:bg-gray-50 text-left"
-                  style={{ color: BRAND.subtext, opacity: 0.6 }}
-                  title={`V${slot} — Version creation coming soon`}
-                >
-                  <span
-                    className="flex-shrink-0 w-6 text-center text-xs font-bold"
-                    style={{ color: BRAND.subtext, opacity: 0.5 }}
-                  >
-                    V{slot}
-                  </span>
-                  <Plus className="w-3 h-3" />
-                  <span className="text-xs italic">Create New...</span>
-                </button>
-              );
-            }
-
+          {/* Existing versions — name only, no slot numbers */}
+          {versions.map((version) => {
             const isActive = version.id === activeVersionId;
             return (
               <button
@@ -129,27 +110,39 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
                 }}
                 title={version.version_name}
               >
-                <span
-                  className="flex-shrink-0 w-6 text-center text-xs font-bold"
-                  style={{ color: isActive ? BRAND.green : BRAND.subtext }}
-                >
-                  V{slot}
+                <span className="flex-shrink-0 w-4 flex justify-center">
+                  {isActive && <Check className="w-3.5 h-3.5" style={{ color: BRAND.green }} />}
                 </span>
                 <span className="flex-1 truncate">
-                  {truncateVersionName(version.version_name, 26)}
+                  {truncateVersionName(version.version_name, 30)}
                 </span>
-                {isActive && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
               </button>
             );
           })}
-          {showPlaceholder && (
-            <div
-              className="px-3 py-2 text-xs italic"
-              style={{ color: BRAND.subtext, borderTop: `1px solid ${BRAND.border}` }}
-            >
-              Version creation will be implemented in the next phase.
-            </div>
-          )}
+
+          {/* Divider before create action */}
+          <div style={{ borderTop: `1px solid ${BRAND.border}` }} />
+
+          {/* Create New Version — disabled until Phase 2 */}
+          <button
+            onClick={handleCreateNew}
+            disabled={!VERSION_CREATION_ENABLED}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors duration-150 text-left disabled:cursor-not-allowed"
+            style={{
+              color: VERSION_CREATION_ENABLED ? BRAND.green : BRAND.subtext,
+              opacity: VERSION_CREATION_ENABLED ? 1 : 0.5,
+            }}
+          >
+            <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="flex-1">
+              {VERSION_CREATION_ENABLED ? "Create New Version..." : "Create New Version..."}
+            </span>
+            {!VERSION_CREATION_ENABLED && (
+              <span className="text-xs italic" style={{ color: BRAND.subtext }}>
+                Coming next
+              </span>
+            )}
+          </button>
         </div>
       )}
     </div>
