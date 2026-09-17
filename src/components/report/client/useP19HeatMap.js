@@ -38,6 +38,8 @@ import {
 import { buildCacheKey, getCachedMap, setCachedMap } from "./p19HeatMapCache";
 
 export function useP19HeatMap({
+  projectId,
+  versionId,
   completedBassAuthority,
   roomDims,
   subwooferInstances,
@@ -98,6 +100,8 @@ export function useP19HeatMap({
 
     // Cache check
     const cacheKey = buildCacheKey({
+      projectId,
+      versionId,
       calibrationFingerprint,
       authorityVersion: HEATMAP_AUTHORITY_VERSION,
       gridN,

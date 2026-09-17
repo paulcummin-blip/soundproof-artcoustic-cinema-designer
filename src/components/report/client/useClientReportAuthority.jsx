@@ -81,6 +81,7 @@ export function useClientReportAuthority(projectId) {
   const [projectDetails, setProjectDetails] = useState(null);
   const [hydrating, setHydrating] = useState(true);
   const [hydratedProjectId, setHydratedProjectId] = useState(null);
+  const [versionId, setVersionId] = useState(null);
 
   // ── 1) Fetch + hydrate ──────────────────────────────────────────────────
   useEffect(() => {
@@ -92,6 +93,7 @@ export function useClientReportAuthority(projectId) {
       setProjectDetails(null);
       setHydrating(false);
       setHydratedProjectId(null);
+      setVersionId(null);
       return;
     }
 
@@ -121,6 +123,7 @@ export function useClientReportAuthority(projectId) {
           client_name: p.client_name,
           created_date: p.created_date,
         });
+        setVersionId(p.active_version_id || null);
       }).catch(() => { /* non-blocking metadata fetch */ });
       return () => { cancelled = true; };
     }
@@ -136,6 +139,7 @@ export function useClientReportAuthority(projectId) {
         setProjectDetails(null);
         setHydrating(false);
         setHydratedProjectId(null);
+        setVersionId(null);
         return;
       }
       setProjectDetails({
@@ -144,13 +148,14 @@ export function useClientReportAuthority(projectId) {
         client_name: p.client_name,
         created_date: p.created_date,
       });
+      setVersionId(p.active_version_id || null);
       // Merge with the active ProjectVersion so per-version design fields
       // come from design_state, not from the legacy Project position.
       let merged = p;
-      const versionId = p.active_version_id;
-      if (versionId) {
+      const activeVersionId = p.active_version_id;
+      if (activeVersionId) {
         try {
-          const versions = await base44.entities.ProjectVersion.filter({ id: versionId });
+          const versions = await base44.entities.ProjectVersion.filter({ id: activeVersionId });
           if (cancelled) return;
           if (versions && versions.length > 0) {
             merged = mergeProjectAndVersion(p, versions[0]);
@@ -687,6 +692,7 @@ export function useClientReportAuthority(projectId) {
 
   return {
     projectId,
+    versionId,
     projectDetails,
     hydrating,
     hydrated: hydratedProjectId === projectId && !hydrating,

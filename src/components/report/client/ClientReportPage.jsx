@@ -394,6 +394,8 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             </div>
             <div className="client-report-print-drawing">
               <ClientP19HeatMap
+                projectId={printData.projectId}
+                versionId={printData.versionId}
                 completedBassAuthority={printData.completedBassAuthority}
                 bassPerformance={printData.bassPerformance}
                 roomDims={printData.roomDims}

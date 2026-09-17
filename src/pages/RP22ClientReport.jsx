@@ -98,6 +98,7 @@ export default function RP22ClientReport() {
     bassPresentation,
     allSeatSplMetrics,
     earHeightM,
+    versionId,
   } = authority;
 
   // Use the same completed-bass readiness gate as the Technical Report.
@@ -628,6 +629,8 @@ export default function RP22ClientReport() {
         id: "p19-heatmap",
         visual: (
           <ClientP19HeatMap
+            projectId={projectId}
+            versionId={versionId}
             completedBassAuthority={completedBassAuthority}
             bassPerformance={bassPerformance}
             roomDims={roomDims}
@@ -641,6 +644,8 @@ export default function RP22ClientReport() {
         ),
         printData: {
           type: "p19-heatmap",
+          projectId,
+          versionId,
           completedBassAuthority,
           bassPerformance,
           roomDims,

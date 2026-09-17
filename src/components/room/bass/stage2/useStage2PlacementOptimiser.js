@@ -244,7 +244,7 @@ export function useStage2PlacementOptimiser({
     if (!persisted || typeof persisted !== "object") return;
     for (const [finalistId, rawTransfer] of Object.entries(persisted)) {
       if (rawTransfer && typeof rawTransfer === "object") {
-        setCachedRawTransfer(placementFingerprint, finalistId, rawTransfer);
+        setCachedRawTransfer(projectId, versionId, placementFingerprint, finalistId, rawTransfer);
       }
     }
   }, [hydrationDone, hydratedCache, placementFingerprint]);

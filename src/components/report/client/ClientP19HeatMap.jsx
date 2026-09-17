@@ -94,6 +94,8 @@ function buildBassSeats(seatingPositions, p19PerSeat) {
 }
 
 export default function ClientP19HeatMap({
+  projectId,
+  versionId,
   completedBassAuthority,
   bassPerformance,
   roomDims,
@@ -122,6 +124,8 @@ export default function ClientP19HeatMap({
     .filter((s) => s.x !== null && s.y !== null);
 
   const { status, grid, gridN, error, seatProbes, rspProbe } = useP19HeatMap({
+    projectId,
+    versionId,
     completedBassAuthority,
     roomDims,
     subwooferInstances,

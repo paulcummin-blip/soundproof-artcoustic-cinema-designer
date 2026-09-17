@@ -1005,7 +1005,7 @@ export class Stage2PlacementController {
       // fingerprint so they persist across cold reopen + P14 switches.
       let rawTransfersObj = null;
       if (this.placementFingerprint) {
-        const rawTransfersMap = getCachedRawTransfersForFingerprint(this.placementFingerprint);
+        const rawTransfersMap = getCachedRawTransfersForFingerprint(projectId, versionId, this.placementFingerprint);
         if (rawTransfersMap.size > 0) {
           rawTransfersObj = {};
           for (const [finalistId, rawTransfer] of rawTransfersMap.entries()) {
