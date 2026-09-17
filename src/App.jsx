@@ -20,6 +20,7 @@ import AdminProjectLicensing from './pages/AdminProjectLicensing';
 import AdminUserLicensingDetail from './pages/AdminUserLicensingDetail';
 import AdminSpeakerDatabase from './pages/AdminSpeakerDatabase';
 import AdminSpeakerProductDetail from './pages/AdminSpeakerProductDetail';
+import AdminAddSpeaker from './pages/AdminAddSpeaker';
 import RP22ClientReport from './pages/RP22ClientReport';
 import DesignReviewPage from './pages/DesignReviewPage';
 import PurchaseProjects from './pages/PurchaseProjects';
@@ -119,6 +120,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/rp22-config" element={<AccessGate masterAdmin><AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." /></AccessGate>} />
         <Route path="/admin/speaker-database" element={<AccessGate masterAdmin><AdminSpeakerDatabase /></AccessGate>} />
         <Route path="/admin/speaker-database/product/:productId" element={<AccessGate masterAdmin><AdminSpeakerProductDetail /></AccessGate>} />
+        <Route path="/admin/speaker-database/add-speaker" element={<AccessGate masterAdmin><AdminAddSpeaker /></AccessGate>} />
         <Route path="/admin/audit-log" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Audit Log" description="Track changes made across the platform." /></AccessGate>} />
         <Route path="/admin/billing" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Billing" description="Subscription plans and payment configuration." /></AccessGate>} />
         <Route path="*" element={<PageNotFound />} />

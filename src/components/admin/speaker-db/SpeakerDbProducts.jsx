@@ -8,7 +8,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import SpeakerDbTable from "@/components/admin/speaker-db/SpeakerDbTable";
-import { Plus } from "lucide-react";
+import { Plus, UserPlus } from "lucide-react";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -144,13 +144,22 @@ export default function SpeakerDbProducts({ drillFilter, onClearDrillFilter }) {
         <div className="text-sm" style={{ color: BRAND.subtext }}>
           {filteredRows.length} product{filteredRows.length !== 1 ? "s" : ""}
         </div>
-        <button
-          onClick={() => navigate("/admin/speaker-database/product/new")}
-          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-          style={{ background: BRAND.btn, color: BRAND.btnText }}
-        >
-          <Plus className="w-4 h-4" /> Add Product
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/admin/speaker-database/add-speaker")}
+            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            style={{ background: BRAND.green, color: "#fff" }}
+          >
+            <UserPlus className="w-4 h-4" /> Add Speaker
+          </button>
+          <button
+            onClick={() => navigate("/admin/speaker-database/product/new")}
+            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.card }}
+          >
+            <Plus className="w-4 h-4" /> Quick Add
+          </button>
+        </div>
       </div>
 
       {loading ? (
