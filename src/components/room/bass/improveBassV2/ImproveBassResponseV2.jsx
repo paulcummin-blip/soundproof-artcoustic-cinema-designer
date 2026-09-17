@@ -14,7 +14,7 @@
 // BLOCKER 7: Cancelled jobs can never publish or apply — the store gates
 // status transitions and the Apply button checks for a valid winner.
 
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, AlertCircle, RotateCcw } from "lucide-react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
@@ -46,7 +46,8 @@ import { applyCalibrationTuning } from "./improveBassV2ApplyCalibration";
 import { computeV2DesignFingerprint } from "./improveBassV2Fingerprint";
 import { buildProvenance } from "./appliedProvenance";
 import ImproveBassV2Progress from "./ImproveBassV2Progress";
-import ImproveBassV2StageResults from "./ImproveBassV2StageResults";
+import ImproveBassV2SimplifiedResults, { composeSelectedChanges } from "./ImproveBassV2SimplifiedResults";
+import ImproveBassV2InfoPopover from "./ImproveBassV2InfoPopover";
 import ImproveBassV2CompletedInvestigation from "./ImproveBassV2CompletedInvestigation";
 import OptimisationDiagnosticsReport from "./OptimisationDiagnosticsReport";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
@@ -501,6 +502,117 @@ export default function ImproveBassResponseV2({
     }
   }, [state?.status, state?.winner, commitInstances, commitSeating, commitSeatingProvenance, hasCanonicalInstances, projectId, versionId, subwooferInstances, roomDims, selectedSubModel]);
 
+  // ── Post-Apply automatic recalculation state ──────────────────────────
+  // Tracks whether a post-Apply canonical recalculation is in progress.
+  // Set true when Apply Selected Changes commits state and triggers onCalculate.
+  // Cleared when the shared bass results show a new current result (recalc done).
+  const [postApplyRecalculating, setPostApplyRecalculating] = useState(false);
+
+  // Clear post-apply state when the new result arrives
+  React.useEffect(() => {
+    if (postApplyRecalculating && shared?.hasCurrentResult && !shared?.calculationInProgress) {
+      // The recalculation has completed — the new fingerprint is now current
+      setPostApplyRecalculating(false);
+    }
+  }, [postApplyRecalculating, shared?.hasCurrentResult, shared?.calculationInProgress]);
+
+  // ── Apply Selected Changes handler ───────────────────────────────────
+  // Composes ALL selected improvements into ONE complete configuration,
+  // commits it atomically, then triggers automatic canonical recalculation.
+  // No second button press required.
+  const handleApplySelected = useCallback((selectedKeys, improvements) => {
+    if (!selectedKeys || selectedKeys.size === 0 || !commitInstances || !hasCanonicalInstances) return;
+    const selection = state?.winner;
+    if (!selection) return;
+
+    const d = latestDesignRef.current;
+    const fingerprint = computeV2DesignFingerprint({ ...d, ...d.p14Params });
+    if (state?.status !== "complete" || !selection.applyFingerprint || fingerprint !== selection.applyFingerprint) {
+      setStale(projectId, versionId, "Design changed — recalculate the recommendation before Apply");
+      return;
+    }
+
+    // Compose selected changes into one complete configuration
+    const composed = composeSelectedChanges(
+      selectedKeys,
+      improvements,
+      subwooferInstances,
+      roomDims,
+      selectedSubModel,
+      selection.applyFingerprint,
+      fingerprint,
+    );
+    if (!composed) return;
+
+    // Capture BEFORE fingerprint for authority verification
+    const beforeFingerprint = fingerprint;
+
+    // Commit the composed instances atomically
+    commitInstances(composed.instances, {
+      front: { placementMode: "manual", isManual: true },
+      rear: { placementMode: "manual", isManual: true },
+    });
+
+    // Commit seating if part of the selection
+    if (composed.seatingPositions && commitSeating) {
+      commitSeating(composed.seatingPositions);
+      const postMutationFingerprint = (() => {
+        try {
+          return computeV2DesignFingerprint({
+            ...d,
+            seatingPositions: composed.seatingPositions,
+            ...d.p14Params,
+          });
+        } catch { return null; }
+      })();
+      const seatingProvenance = buildProvenance(
+        "seating_positions", "combined-apply",
+        selection.applyFingerprint, postMutationFingerprint,
+      );
+      if (commitSeatingProvenance) commitSeatingProvenance(seatingProvenance);
+    }
+
+    // ── PART C: Authority chain verification ──────────────────────────
+    // Capture the AFTER fingerprint and verify it changed
+    const afterFingerprint = (() => {
+      try {
+        const updatedDesign = {
+          ...d,
+          subwooferInstances: composed.instances,
+          seatingPositions: composed.seatingPositions || d.seatingPositions,
+          ...d.p14Params,
+        };
+        return computeV2DesignFingerprint(updatedDesign);
+      } catch { return null; }
+    })();
+
+    // Log verification to console for diagnostic tracing
+    if (typeof window !== "undefined") {
+      window.__IMPROVE_BASS_APPLY_AUDIT__ = {
+        beforeFingerprint,
+        afterFingerprint,
+        fingerprintChanged: beforeFingerprint !== afterFingerprint,
+        selectedKeys: Array.from(selectedKeys),
+        composedHasInstances: !!composed.instances,
+        composedHasSeating: !!composed.seatingPositions,
+        timestamp: Date.now(),
+      };
+    }
+
+    // ── PART B: Automatic canonical recalculation ─────────────────────
+    // Trigger the normal canonical Parameter calculation automatically.
+    // No second button press. No warning message. Sound Proof itself
+    // changed the design, so it recalculates.
+    setPostApplyRecalculating(true);
+    if (shared?.onCalculate) {
+      // Defer to next tick so commitInstances state propagation settles
+      setTimeout(() => {
+        shared.onCalculate();
+      }, 50);
+    }
+  }, [state?.status, state?.winner, commitInstances, commitSeating, commitSeatingProvenance,
+      hasCanonicalInstances, projectId, versionId, subwooferInstances, roomDims, selectedSubModel, shared]);
+
   if (!shared?.hasCurrentResult) return null;
 
   const isRunning = state?.status === "running";
@@ -513,7 +625,19 @@ export default function ImproveBassResponseV2({
 
   return (
     <div className="mt-3 rounded-lg border border-[#D9D5CE] bg-white px-4 py-4">
-      <div className="text-[13px] font-semibold text-[#1B1A1A]">Improve Bass Response</div>
+      <div className="flex items-center gap-1.5">
+        <div className="text-[13px] font-semibold text-[#1B1A1A]">Improve Bass Response</div>
+        {isComplete && state?.winner && (
+          <ImproveBassV2InfoPopover
+            state={state}
+            selection={state?.winner}
+            stale={completedResultStale}
+            currentInstances={subwooferInstances}
+            roomDims={roomDims}
+            appliedSeatingProvenance={appliedSeatingProvenance}
+          />
+        )}
+      </div>
       <p className="mt-1 text-[11px] leading-relaxed text-[#625143]">
         Test practical placement, timing, polarity and level improvements before recommending more hardware.
       </p>
@@ -537,30 +661,33 @@ export default function ImproveBassResponseV2({
       {/* ── Completed investigation — persists in all terminal states ── */}
       {/* Shows the full stage checklist with verdicts + numerical results. */}
       {/* Mounted alongside the results (complete) or error messages. */}
-      {isComplete && (
-        <ImproveBassV2CompletedInvestigation
-          state={state}
-          selection={state?.winner}
-          stale={completedResultStale}
-          currentInstances={subwooferInstances}
-          roomDims={roomDims}
-          appliedSeatingProvenance={appliedSeatingProvenance}
-        />
-      )}
-
       {isComplete && state?.winner && !completedResultStale && (
-        <ImproveBassV2StageResults
+        <ImproveBassV2SimplifiedResults
           selection={state.winner}
-          snapshot={state.snapshot}
           currentInstances={subwooferInstances}
           roomDims={roomDims}
           seatingPositions={seatingPositions}
-          onApplyStage={handleApplyStage}
-          onApplyTradeOff={handleApplyTradeOff}
+          selectedSubModel={selectedSubModel}
+          onApplySelected={handleApplySelected}
           stale={completedResultStale}
           sharedBassResults={shared}
           currentDesignFingerprint={currentDesignFingerprint}
         />
+      )}
+
+      {/* ── Post-Apply automatic recalculation progress ── */}
+      {postApplyRecalculating && shared?.calculationInProgress && (
+        <div className="mt-3 rounded-md border border-[#213428]/20 bg-[#E7F0EC] p-3" data-post-apply-recalc="true">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-[#213428] border-t-transparent rounded-full animate-spin flex-shrink-0" />
+            <span className="text-[12px] font-semibold text-[#213428]">
+              {shared?.calculationPhaseLabel || "Recalculating bass performance…"}
+            </span>
+          </div>
+          <p className="mt-1 text-[10px] text-[#625143] ml-6">
+            Applying your changes and recalculating seat results automatically.
+          </p>
+        </div>
       )}
 
       {/* ── Developer/debug optimisation diagnostics (read-only) ── */}
