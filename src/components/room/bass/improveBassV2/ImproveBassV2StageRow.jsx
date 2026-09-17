@@ -279,14 +279,21 @@ export default function ImproveBassV2StageRow({
       data-stage-key={stageKey}
       data-stage-verdict={verdict}
       className={`rounded-md border p-2.5 ${
-        verdict === "improvement"
-          ? "border-[#213428]/30 bg-[#F8F7F4]"
-          : "border-[#E7E4DF] bg-[#F8F7F4]"
+        stageKey === "combined"
+          ? "border-2 border-[#213428] bg-[#E7F0EC]"
+          : verdict === "improvement"
+            ? "border-[#213428]/30 bg-[#F8F7F4]"
+            : "border-[#E7E4DF] bg-[#F8F7F4]"
       }`}
     >
       {/* Stage header */}
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold text-[#1B1A1A] tracking-wide">{label}</span>
+        <div className="flex flex-col">
+          <span className="text-[11px] font-bold text-[#1B1A1A] tracking-wide">{label}</span>
+          {stageKey !== "combined" && (
+            <span className="text-[9px] font-medium text-[#8A7B6A]">Individual option</span>
+          )}
+        </div>
         <div className="flex items-center gap-1.5">
           {isApplied && (
             <span className="inline-flex items-center gap-1 rounded-md bg-[#213428] px-1.5 py-0.5">
@@ -297,6 +304,13 @@ export default function ImproveBassV2StageRow({
           <StageVerdictBadge verdict={verdict} />
         </div>
       </div>
+
+      {/* Supporting line for combined stage */}
+      {stageKey === "combined" && verdict === "improvement" && (
+        <p className="mt-1 text-[10px] leading-relaxed text-[#213428] font-medium">
+          Applies all changes listed below together as one confirmed solution.
+        </p>
+      )}
 
       {/* Reason for not-available / no-improvement */}
       {verdict === "not_available" && reason && (
@@ -329,15 +343,24 @@ export default function ImproveBassV2StageRow({
           {/* Apply button */}
           {!isApplied && !stale && onApply && (
             <div className="mt-2">
+              {stageKey === "combined" && (
+                <p className="text-[10px] leading-relaxed text-[#213428] mb-1.5 font-medium">
+                  This applies the complete recommended configuration in one action.
+                </p>
+              )}
               <Button
                 type="button"
                 size="sm"
-                className="w-full bg-[#213428] text-white hover:bg-[#3E4349] text-[11px] font-semibold"
+                className={`w-full text-white hover:bg-[#3E4349] font-semibold ${
+                  stageKey === "combined"
+                    ? "bg-[#213428] text-[12px] py-2.5"
+                    : "bg-[#213428] text-[11px]"
+                }`}
                 data-apply-stage={stageKey}
                 data-apply-candidate-id={result.candidateId}
                 onClick={() => onApply(stageKey, result)}
               >
-                Apply {label}
+                {stageKey === "combined" ? "Apply Recommended Combined Changes" : `Apply ${label}`}
               </Button>
             </div>
           )}

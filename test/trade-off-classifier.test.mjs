@@ -9,7 +9,7 @@
 //   5. P20 improves materially / P19 worsens materially → Verified trade-off
 //   6. tiny regression below materiality → normal recommendation, not trade-off
 //   7. trade-off candidate comes only from canonical confirmation
-//   8. Keep Current Balance → no project mutation
+//   8. Keep Recommended Balance → no project mutation
 //   9. Apply alternative → exact graded tuning applied
 //  10. before evidence remains visible while applying
 //  11. verified after-result attaches to the same trade-off snapshot
@@ -245,9 +245,9 @@ function testOnlyFromCanonicalConfirmation() {
   assert(eval0?.status === "invalid", "Non-canonical candidate should be 'invalid'");
 }
 
-// ── Test 8: Keep Current Balance → no project mutation ──────────────────
+// ── Test 8: Keep Recommended Balance → no project mutation ──────────────────
 function testKeepCurrentBalanceNoMutation() {
-  // Simulate: TradeOffCard "Keep Current Balance" does not call onApply.
+  // Simulate: TradeOffCard "Keep Recommended Balance" does not call onApply.
   // We test that the apply function is NOT called when declining.
   let applyCalled = false;
   const onApply = () => { applyCalled = true; };
@@ -257,7 +257,7 @@ function testKeepCurrentBalanceNoMutation() {
   const declined = true;
   if (!declined) onApply("cand-1"); // This branch is NOT taken
 
-  assert(applyCalled === false, "Keep Current Balance should not call onApply (no mutation)");
+  assert(applyCalled === false, "Keep Recommended Balance should not call onApply (no mutation)");
 }
 
 // ── Test 9: Apply alternative → exact graded tuning applied ──────────────

@@ -2,9 +2,9 @@
 // Presents a verified trade-off as a designer choice — NOT a recommendation.
 //
 // Shows:
-//   - "Alternative calibration available" headline (neutral)
+//   - "Alternative: Prioritise Primary Seats" headline (secondary/trade-off)
 //   - What improves and what reduces (neutral language, no judgement)
-//   - Two designer actions: "Prioritise Primary Seats" vs "Keep Current Balance"
+//   - Two designer actions: "Prioritise Primary Seats" vs "Keep Recommended Balance"
 //   - Neutral supporting text explaining the choice
 //   - Practical calibrator settings (front/rear pair delay, gain, polarity)
 //   - Apply lifecycle: READY → APPLYING → VERIFIED APPLIED
@@ -335,15 +335,18 @@ export default function TradeOffCard({
     <div data-candidate-id={candidateId} data-trade-off-card={candidateId}
       data-apply-state={applyState}
       data-verification-status={verification.status}
-      className="rounded-md border border-[#B8A88E] bg-[#F8F7F4] p-3">
+      className="rounded-md border border-[#D9D5CE] bg-[#F5F4F1] p-3">
 
-      {/* Headline — neutral */}
+      {/* Headline — alternative trade-off */}
       <div className="flex items-center gap-2">
-        <Scale className="h-4 w-4 text-[#625143]" />
-        <span className="text-[9px] font-semibold uppercase tracking-wide text-[#625143]">
-          Alternative calibration available
+        <Scale className="h-4 w-4 text-[#8A7B6A]" />
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+          Alternative: Prioritise Primary Seats
         </span>
       </div>
+      <p className="mt-1 text-[10px] leading-relaxed text-[#8A7B6A]">
+        Improves the primary listening position, but reduces consistency across the seating area.
+      </p>
 
       {/* Trade-off summary — neutral, no judgement */}
       <div className="mt-2 grid grid-cols-2 gap-2">
@@ -411,7 +414,7 @@ export default function TradeOffCard({
           <p className="text-[10px] leading-relaxed text-red-700">
             The bass recalculation did not produce a valid result for this calibration.
             The trade-off was not verified. The before evidence remains visible above.
-            Recalculate bass response and try again, or keep the current balance.
+            Recalculate bass response and try again, or keep the recommended balance.
           </p>
           <p className="text-[10px] leading-relaxed text-red-700" data-verification-failed-reason={verification.reason}>
             Reason: {verification.reason}
@@ -424,7 +427,8 @@ export default function TradeOffCard({
         <div className="mt-3 space-y-2" data-trade-off-actions={candidateId}>
           <Button
             type="button"
-            className="w-full bg-[#213428] text-white hover:bg-[#3E4349] font-semibold"
+            variant="outline"
+            className="w-full border-[#8A7B6A] text-[#625143] hover:bg-[#E7E4DF] font-semibold"
             data-apply-trade-off-id={candidateId}
             onClick={handleApply}
           >
@@ -437,7 +441,7 @@ export default function TradeOffCard({
             data-keep-current-id={candidateId}
             onClick={handleKeepCurrent}
           >
-            Keep Current Balance
+            Keep Recommended Balance
           </Button>
         </div>
       )}
@@ -445,7 +449,7 @@ export default function TradeOffCard({
       {/* Declined notice — no mutation, evidence still visible */}
       {declined && (
         <div className="mt-2 text-[10px] text-[#8A7B6A] italic" data-declined={candidateId}>
-          Current balance retained. No changes applied.
+          Recommended balance retained. No changes applied.
         </div>
       )}
     </div>

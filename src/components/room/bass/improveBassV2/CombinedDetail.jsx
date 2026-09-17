@@ -153,7 +153,7 @@ export default function CombinedDetail({ result, currentResult, currentInstances
       {/* Changes list */}
       {allChanges.length > 0 && (
         <div className="mt-1 rounded-md border border-[#E0DDD7] bg-white p-2">
-          <div className="text-[10px] font-semibold text-[#213428] mb-1">Changes</div>
+          <div className="text-[10px] font-semibold text-[#213428] mb-1">Changes applied together</div>
           <ul className="space-y-0.5">
             {allChanges.map((change, i) => (
               <li key={i} className="text-[10px] leading-relaxed text-[#625143]">• {change}</li>

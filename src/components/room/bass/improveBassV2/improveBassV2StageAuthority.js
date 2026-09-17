@@ -186,5 +186,5 @@ export const STAGE_DISPLAY_LABELS = {
   gain: "GAIN",
   subPositions: "SUBWOOFER POSITIONS",
   seating: "SEATING POSITIONS",
-  combined: "BEST OVERALL IMPROVEMENT",
+  combined: "RECOMMENDED BEST OVERALL IMPROVEMENT",
 };

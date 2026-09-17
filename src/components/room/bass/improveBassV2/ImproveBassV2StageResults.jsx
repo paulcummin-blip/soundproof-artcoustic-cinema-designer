@@ -69,6 +69,10 @@ export default function ImproveBassV2StageResults({
 
   return (
     <div className="mt-3 space-y-2" data-stage-results="true">
+      {/* Intro copy — clarifies individual vs combined hierarchy */}
+      <p className="text-[10px] leading-relaxed text-[#625143]">
+        Review individual improvements below, or apply the recommended combined solution further down.
+      </p>
       {STAGE_ORDER.map((stageKey) => {
         const stage = stages[stageKey];
         const label = STAGE_DISPLAY_LABELS[stageKey];
