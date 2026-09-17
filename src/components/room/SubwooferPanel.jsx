@@ -7,7 +7,7 @@ import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import HeightInput from '@/components/ui/HeightInput';
 import BassTerminalStatus from '@/components/room/bass/BassTerminalStatus';
 import ImproveBassResponseV2 from '@/components/room/bass/improveBassV2/ImproveBassResponseV2';
-import BassPermanentPills from '@/components/room/bass/BassPermanentPills';
+import BassHeadlinePills from '@/components/room/bass/BassHeadlinePills';
 import BassPermanentSeatResults from '@/components/room/bass/BassPermanentSeatResults';
 import CalculateAllTargetResults from '@/components/room/bass/CalculateAllTargetResults';
 import { useSharedBassResults } from '@/components/room/bass/bassResultsStore';
@@ -358,8 +358,8 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               <BassTargetLevelControl disabled={disabled} />
             </div>
 
-            {/* Permanent P14/P18/P19/P20 parameter pills */}
-            <BassPermanentPills />
+            {/* P14/P18/P19/P20 headline pills — shared with Bass Simulation */}
+            <BassHeadlinePills />
 
             {/* Permanent P19/P20 per-seat results — always visible beneath the pills */}
             <BassPermanentSeatResults />
