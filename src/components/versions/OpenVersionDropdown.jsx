@@ -3,7 +3,7 @@
 // "Open Version ▼" dropdown for project cards.
 // Lists existing versions by name only (no V-numbers).
 // Active version is marked with ✓ and a subtle highlight.
-// A single disabled "+ Copy Active Version..." item sits at the bottom
+// A single disabled "+ New Design Option..." item sits at the bottom
 // until version creation is implemented in a future phase. When enabled,
 // it duplicates the active version's design_state into a new slot.
 
@@ -125,7 +125,7 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
           {/* Divider before create action */}
           <div style={{ borderTop: `1px solid ${BRAND.border}` }} />
 
-          {/* Create New Version — disabled until Phase 2 */}
+          {/* New Design Option — disabled until Phase 2 */}
           <button
             onClick={handleCreateNew}
             disabled={!VERSION_CREATION_ENABLED}
@@ -137,7 +137,7 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
           >
             <Plus className="w-3.5 h-3.5 flex-shrink-0" />
             <span className="flex-1">
-              {VERSION_CREATION_ENABLED ? "Copy Active Version..." : "Copy Active Version..."}
+              {VERSION_CREATION_ENABLED ? "New Design Option..." : "New Design Option..."}
             </span>
             {!VERSION_CREATION_ENABLED && (
               <span className="text-xs italic" style={{ color: BRAND.subtext }}>
