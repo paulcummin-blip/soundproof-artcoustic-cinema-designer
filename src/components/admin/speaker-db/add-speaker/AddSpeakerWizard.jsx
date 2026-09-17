@@ -62,6 +62,8 @@ export default function AddSpeakerWizard() {
   const [productUrl, setProductUrl] = useState("");
   const [urlValid, setUrlValid] = useState(false);
   const [pdfUrl, setPdfUrl] = useState("");
+  const [targetModel, setTargetModel] = useState("");
+  const [useManualUrl, setUseManualUrl] = useState(false);
   const [additionalDocs, setAdditionalDocs] = useState([]);
   const [productId, setProductId] = useState(null);
   const [specId, setSpecId] = useState(null);
@@ -174,7 +176,7 @@ export default function AddSpeakerWizard() {
                 >
                   {isComplete ? "✓" : i + 1}
                 </span>
-                <span className="text-sm font-medium">{i === 1 && isMkManufacturer(selectedManufacturer) ? "Discover Products" : s.label}</span>
+                <span className="text-sm font-medium">{i === 1 && isMkManufacturer(selectedManufacturer) && !useManualUrl ? "Discover Products" : s.label}</span>
               </button>
               {i < STEPS.length - 1 && (
                 <div style={{ width: 24, height: 2, background: isComplete ? BRAND.green : BRAND.border, flexShrink: 0 }} />
@@ -194,12 +196,14 @@ export default function AddSpeakerWizard() {
               onSelect={setSelectedManufacturer}
             />
           )}
-          {step === 1 && isMkManufacturer(selectedManufacturer) ? (
+          {step === 1 && isMkManufacturer(selectedManufacturer) && !useManualUrl ? (
             <StepDiscoverMk
               manufacturer={selectedManufacturer}
               productUrl={productUrl}
               onProductUrlChange={setProductUrl}
               onPdfUrlChange={setPdfUrl}
+              onTargetModelChange={setTargetModel}
+              onUseManualUrl={() => { setUseManualUrl(true); setTargetModel(""); setUrlValid(false); }}
               onValidationResult={({ valid }) => setUrlValid(valid)}
             />
           ) : step === 1 ? (
@@ -207,7 +211,10 @@ export default function AddSpeakerWizard() {
               manufacturer={selectedManufacturer}
               productUrl={productUrl}
               onProductUrlChange={setProductUrl}
+              onTargetModelChange={setTargetModel}
               onValidationResult={({ valid }) => setUrlValid(valid)}
+              showBackToDiscovery={isMkManufacturer(selectedManufacturer)}
+              onBackToDiscovery={() => { setUseManualUrl(false); setTargetModel(""); setUrlValid(false); }}
             />
           ) : null}
           {step === 2 && (
@@ -228,6 +235,7 @@ export default function AddSpeakerWizard() {
               onExtracted={handleExtracted}
               productId={productId}
               specId={specId}
+              targetModel={targetModel}
             />
           )}
           {step === 4 && specData && (

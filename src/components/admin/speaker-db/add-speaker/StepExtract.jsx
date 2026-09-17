@@ -27,7 +27,7 @@ const BRAND = {
   amber: "#9A6E00",
 };
 
-export default function StepExtract({ manufacturer, productUrl, pdfUrl, additionalDocs, onExtracted, productId, specId }) {
+export default function StepExtract({ manufacturer, productUrl, pdfUrl, additionalDocs, onExtracted, productId, specId, targetModel }) {
   const [phase, setPhase] = useState("idle"); // idle | scaffolding | extracting | done | error
   const [error, setError] = useState("");
   const [rawExtraction, setRawExtraction] = useState(null);
@@ -54,6 +54,7 @@ export default function StepExtract({ manufacturer, productUrl, pdfUrl, addition
           manufacturerName: manufacturer?.name,
           productUrl,
           pdfUrl,
+          targetModel,
         });
         setRawExtraction(extraction);
         setProgressMsg("");

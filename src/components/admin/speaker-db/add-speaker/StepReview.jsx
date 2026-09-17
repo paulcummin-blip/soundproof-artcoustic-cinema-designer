@@ -10,6 +10,7 @@ import { SPEC_GROUPS, CONFIDENCE_LABELS, ALL_SPEC_FIELDS } from "./specFieldDefi
 import { fieldDisplayStatus, validateDraftSpec } from "./addSpeakerValidation.js";
 import { saveSpecEdits, runValidationAndPersist } from "./addSpeakerPersistence.js";
 import { coerceRawValue, mapRawSourceToAuthority } from "./rawExtraction.js";
+import { shouldOverwriteByPriority } from "./sourcePriority.js";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -22,11 +23,14 @@ const BRAND = {
   amber: "#9A6E00",
 };
 
-// Source options with color dots
+// Source options with color dots.
+// Ordered by priority (1 = highest). See sourcePriority.js for the ranking.
 const SOURCE_OPTIONS = [
   { value: "", label: "—", dot: null },
   { value: "Official Product Page", label: "Product Page", dot: "#213428" },
-  { value: "Official PDF", label: "PDF", dot: "#213428" },
+  { value: "Official PDF", label: "Spec PDF", dot: "#213428" },
+  { value: "Official Series Brochure", label: "Series Brochure", dot: "#213428" },
+  { value: "Official Manual", label: "Manual", dot: "#213428" },
   { value: "Engineering Document", label: "Engineering Doc", dot: "#213428" },
   { value: "Support Article", label: "Support Article", dot: "#213428" },
 ];
@@ -111,12 +115,21 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
     setDirty(false);
   }, [specId, specData]);
 
-  // Promote a raw extraction value into the spec
+  // Promote a raw extraction value into the spec.
+  // Source priority: never overwrite a value from a higher-priority source
+  // with a value from a lower-priority source.
   const handlePromote = (fieldKey, rawEntry) => {
     if (!rawEntry?.value) return;
     const fieldDef = ALL_SPEC_FIELDS.find((f) => f.key === fieldKey);
     const coercedValue = coerceRawValue(rawEntry.value, fieldDef?.type || "text");
     const authoritySource = mapRawSourceToAuthority(rawEntry.source);
+
+    // Source priority check — read from current state before mutation
+    const existingSource = resolveAuthority(localSpec.field_authority, fieldKey).source;
+    if (existingSource && authoritySource && !shouldOverwriteByPriority(existingSource, authoritySource)) {
+      setSaveMsg(`Skipped "${fieldDef?.label || fieldKey}": existing source (${existingSource}) is higher priority than raw source (${authoritySource}).`);
+      return;
+    }
 
     setLocalSpec((prev) => {
       const currentAuthority = prev.field_authority || {};
@@ -130,13 +143,30 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
     setSaveMsg("");
   };
 
-  // Promote all raw values at once
+  // Promote all raw values at once.
+  // Source priority: fields that already have a higher-priority source are
+  // skipped — the existing value is preserved.
   const handlePromoteAll = () => {
     if (!rawLookup || Object.keys(rawLookup).length === 0) return;
+
+    // Count skips using current state (before mutation)
+    let skippedCount = 0;
+    const promoteKeys = [];
+    for (const [fieldKey, rawEntry] of Object.entries(rawLookup)) {
+      const authoritySource = mapRawSourceToAuthority(rawEntry.source);
+      const existingSource = resolveAuthority(localSpec.field_authority, fieldKey).source;
+      if (existingSource && authoritySource && !shouldOverwriteByPriority(existingSource, authoritySource)) {
+        skippedCount++;
+      } else {
+        promoteKeys.push(fieldKey);
+      }
+    }
+
     setLocalSpec((prev) => {
       const next = { ...prev };
       const nextAuthority = { ...(next.field_authority || {}) };
-      for (const [fieldKey, rawEntry] of Object.entries(rawLookup)) {
+      for (const fieldKey of promoteKeys) {
+        const rawEntry = rawLookup[fieldKey];
         const fieldDef = ALL_SPEC_FIELDS.find((f) => f.key === fieldKey);
         next[fieldKey] = coerceRawValue(rawEntry.value, fieldDef?.type || "text");
         const authoritySource = mapRawSourceToAuthority(rawEntry.source);
@@ -148,7 +178,11 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
       return next;
     });
     setDirty(true);
-    setSaveMsg("");
+    if (skippedCount > 0) {
+      setSaveMsg(`Promoted ${promoteKeys.length} value(s). ${skippedCount} skipped — higher-priority source already set.`);
+    } else {
+      setSaveMsg("");
+    }
   };
 
   const handleFieldChange = (key, value) => {

@@ -10,7 +10,7 @@
 
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Loader2, CheckCircle2, AlertCircle, ExternalLink, FileText, XCircle, Eye } from "lucide-react";
+import { Search, Loader2, CheckCircle2, AlertCircle, ExternalLink, FileText, XCircle, Eye, Link2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { checkExistingProduct } from "./addSpeakerExtraction.js";
 
@@ -30,6 +30,8 @@ export default function StepDiscoverMk({
   productUrl,
   onProductUrlChange,
   onPdfUrlChange,
+  onTargetModelChange,
+  onUseManualUrl,
   onValidationResult,
 }) {
   const navigate = useNavigate();
@@ -81,6 +83,7 @@ export default function StepDiscoverMk({
 
     onProductUrlChange(product.product_url);
     onPdfUrlChange(product.pdf_url || "");
+    if (onTargetModelChange) onTargetModelChange(product.model || "");
     setSelectedUrl(product.product_url);
     onValidationResult({ valid: true, existing: false });
   };
@@ -95,8 +98,23 @@ export default function StepDiscoverMk({
         </h2>
         <p style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
           Sound Proof searches the official M&K website for current loudspeakers and their
-          specification documents. No manual URL entry needed.
+          specification documents.
         </p>
+      </div>
+
+      {/* Manual fallback — always available. Discovery never blocks manual entry. */}
+      <div className="mb-4 flex items-center justify-between p-3 rounded-md" style={{ background: BRAND.bg, border: `1px solid ${BRAND.border}` }}>
+        <div className="text-xs" style={{ color: BRAND.subtext }}>
+          Can't find the product or discovery failed? You can always enter a URL manually.
+        </div>
+        <button
+          onClick={() => { if (onUseManualUrl) onUseManualUrl(); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap"
+          style={{ border: `1px solid ${BRAND.green}`, color: BRAND.green, background: BRAND.card }}
+        >
+          <Link2 className="w-3.5 h-3.5" />
+          Use Manual URL Instead
+        </button>
       </div>
 
       {/* Discover button */}
@@ -271,7 +289,7 @@ export default function StepDiscoverMk({
       {/* No results */}
       {hasDiscovered && !discovering && products.length === 0 && !error && (
         <div className="rounded-lg p-6" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card, maxWidth: 600 }}>
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 mb-4">
             <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: BRAND.amber }} />
             <div>
               <div className="text-sm font-medium mb-1" style={{ color: BRAND.text }}>No qualifying products found</div>
@@ -280,6 +298,14 @@ export default function StepDiscoverMk({
               </div>
             </div>
           </div>
+          <button
+            onClick={() => { if (onUseManualUrl) onUseManualUrl(); }}
+            className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium"
+            style={{ background: BRAND.green, color: "#fff" }}
+          >
+            <Link2 className="w-4 h-4" />
+            Enter URL Manually
+          </button>
         </div>
       )}
 
@@ -293,13 +319,23 @@ export default function StepDiscoverMk({
               <div className="text-xs" style={{ color: BRAND.subtext }}>{error}</div>
             </div>
           </div>
-          <button
-            onClick={handleDiscover}
-            className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium"
-            style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.card }}
-          >
-            <Search className="w-4 h-4" /> Try Again
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDiscover}
+              className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium"
+              style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.card }}
+            >
+              <Search className="w-4 h-4" /> Try Again
+            </button>
+            <button
+              onClick={() => { if (onUseManualUrl) onUseManualUrl(); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium"
+              style={{ background: BRAND.green, color: "#fff" }}
+            >
+              <Link2 className="w-4 h-4" />
+              Enter URL Manually
+            </button>
+          </div>
         </div>
       )}
     </div>

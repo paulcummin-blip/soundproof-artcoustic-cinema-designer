@@ -94,11 +94,14 @@ export const COMPLETENESS_FIELDS = [
   "vertical_dispersion_deg",
 ];
 
-// Authority options for field_authority dropdown
+// Authority options for field_authority dropdown.
+// Ordered by priority (1 = highest). See sourcePriority.js for the ranking.
 export const AUTHORITY_OPTIONS = [
   { value: "", label: "—" },
   { value: "Official Product Page", label: "Product Page" },
-  { value: "Official PDF", label: "PDF" },
+  { value: "Official PDF", label: "Spec PDF" },
+  { value: "Official Series Brochure", label: "Series Brochure" },
+  { value: "Official Manual", label: "Manual" },
   { value: "Engineering Document", label: "Engineering Doc" },
   { value: "Support Article", label: "Support Article" },
 ];

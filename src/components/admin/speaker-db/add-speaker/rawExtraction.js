@@ -34,16 +34,41 @@ import { ALL_SPEC_FIELDS } from "./specFieldDefinitions.js";
 /**
  * Build the LLM prompt for raw extraction.
  * Lists all spec fields the LLM should look for.
+ *
+ * MULTI-MODEL BROCHURE SCOPING:
+ * Official PDFs may contain multiple loudspeaker models (series brochures,
+ * catalogues). The prompt instructs the LLM to identify the requested target
+ * model, locate only its section, and ignore all neighbouring models. If the
+ * correct section cannot be identified with confidence, values are left
+ * blank — never guessed, never copied from the nearest model.
  */
-function buildExtractionPrompt(manufacturerName, productUrl, pdfUrl) {
+function buildExtractionPrompt(manufacturerName, productUrl, pdfUrl, targetModel) {
   const fieldList = ALL_SPEC_FIELDS
     .filter((f) => f.key !== "primary_source" && f.key !== "confidence" && f.key !== "evidence_quality" && f.key !== "last_verified")
     .map((f) => `  - ${f.key}: ${f.label}`)
     .join("\n");
 
+  const modelScopingBlock = targetModel
+    ? `
+TARGET MODEL: ${targetModel}
+
+CRITICAL — MULTI-MODEL BROCHURE SCOPING:
+The provided PDF may be a series brochure or catalogue containing MULTIPLE loudspeaker models on different pages or in different sections. You MUST follow these rules strictly:
+
+1. IDENTIFY the target model "${targetModel}" within the document. Look for model names, headers, section titles, or spec tables that explicitly name this model.
+2. LOCATE only the section, page, or spec table that belongs to "${targetModel}".
+3. IGNORE all neighbouring models. Do NOT read, reference, or extract values from any other model's section — even if they appear on the same page or in the same table.
+4. EXTRACT values only from the "${targetModel}" section. Every value you return must come from the part of the document that unambiguously describes "${targetModel}".
+5. IF the correct section cannot be identified with confidence — for example, the document shows multiple models without clear labels, or the target model name is not found, or the section boundaries are ambiguous — leave the value BLANK (value="", confidence="D"). NEVER guess. NEVER copy values from the nearest or most similar model. NEVER assume values from a different model apply to the target.
+6. When you record the source, include the page number and model context, e.g. "PDF Page 3 — ${targetModel} section" so the reviewer can verify the scoping.
+
+These rules exist because multi-model brochures are a leading cause of cross-contaminated specification data. A value extracted from the wrong model is worse than a missing value.`
+    : "";
+
   return `You are a professional acoustic engineering data extraction assistant.
 
 TASK: Read the provided documents for a ${manufacturerName || "loudspeaker"} product and extract specification values.
+${modelScopingBlock}
 
 PRODUCT URL: ${productUrl || "(not provided)"}
 PDF URL: ${pdfUrl || "(not provided)"}
@@ -85,12 +110,12 @@ Return the extracted data as a JSON object.`;
  *   pdfUrl           — string (official PDF URL, optional)
  * @returns {object} raw extraction: { model_name, series, fields: [...] }
  */
-export async function runRawExtraction({ manufacturerName, productUrl, pdfUrl }) {
+export async function runRawExtraction({ manufacturerName, productUrl, pdfUrl, targetModel }) {
   if (!productUrl && !pdfUrl) {
     throw new Error("At least one document URL is required for extraction.");
   }
 
-  const prompt = buildExtractionPrompt(manufacturerName, productUrl, pdfUrl);
+  const prompt = buildExtractionPrompt(manufacturerName, productUrl, pdfUrl, targetModel);
 
   const fileUrls = [];
   if (pdfUrl) fileUrls.push(pdfUrl);
@@ -170,9 +195,11 @@ export function coerceRawValue(rawValue, fieldType) {
  */
 export function mapRawSourceToAuthority(rawSource) {
   if (!rawSource || rawSource === "Not Found") return "";
-  if (/pdf/i.test(rawSource)) return "Official PDF";
   if (/product page/i.test(rawSource)) return "Official Product Page";
+  if (/series brochure|brochure/i.test(rawSource)) return "Official Series Brochure";
+  if (/manual/i.test(rawSource)) return "Official Manual";
   if (/engineering/i.test(rawSource)) return "Engineering Document";
   if (/support/i.test(rawSource)) return "Support Article";
+  if (/pdf/i.test(rawSource)) return "Official PDF";
   return "Official PDF";
 }

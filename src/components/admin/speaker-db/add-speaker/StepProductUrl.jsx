@@ -1,7 +1,7 @@
 // StepProductUrl.jsx — Step 2: Paste and validate the official product URL
 
 import React, { useState } from "react";
-import { Link2, Loader2, CheckCircle2, AlertCircle, ExternalLink, Eye } from "lucide-react";
+import { Link2, Loader2, CheckCircle2, AlertCircle, ExternalLink, Eye, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { checkExistingProduct } from "./addSpeakerExtraction.js";
 
@@ -16,7 +16,7 @@ const BRAND = {
   amber: "#9A6E00",
 };
 
-export default function StepProductUrl({ manufacturer, productUrl, onProductUrlChange, onValidationResult }) {
+export default function StepProductUrl({ manufacturer, productUrl, onProductUrlChange, onTargetModelChange, onValidationResult, showBackToDiscovery, onBackToDiscovery, targetModel }) {
   const navigate = useNavigate();
   const [validating, setValidating] = useState(false);
   const [validationState, setValidationState] = useState("idle"); // idle | valid | exists | invalid
@@ -90,6 +90,18 @@ export default function StepProductUrl({ manufacturer, productUrl, onProductUrlC
       </div>
 
       <div className="rounded-lg p-6" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card, maxWidth: 700 }}>
+        {showBackToDiscovery && (
+          <div className="mb-4">
+            <button
+              onClick={() => { if (onBackToDiscovery) onBackToDiscovery(); }}
+              className="flex items-center gap-1.5 text-xs font-medium"
+              style={{ color: BRAND.green }}
+            >
+              <Search className="w-3.5 h-3.5" />
+              Back to M&K Discovery
+            </button>
+          </div>
+        )}
         <label className="text-xs font-medium mb-2 block" style={{ color: BRAND.subtext }}>
           Product Page URL
         </label>
@@ -119,6 +131,21 @@ export default function StepProductUrl({ manufacturer, productUrl, onProductUrlC
             {validating ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             {validating ? "Validating…" : "Validate"}
           </button>
+        </div>
+
+        {/* Optional target model — helps with multi-model brochure scoping */}
+        <div className="mt-3">
+          <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>
+            Target Model (optional — for multi-model brochures)
+          </label>
+          <input
+            type="text"
+            value={targetModel || ""}
+            onChange={(e) => { if (onTargetModelChange) onTargetModelChange(e.target.value); }}
+            placeholder="e.g. MP-150 — helps the extractor find the right section in a brochure"
+            className="w-full px-3 py-2 rounded-md text-sm outline-none"
+            style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.bg }}
+          />
         </div>
 
         {/* Validation result */}
