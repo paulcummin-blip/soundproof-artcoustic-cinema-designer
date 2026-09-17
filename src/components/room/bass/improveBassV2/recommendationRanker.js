@@ -2,6 +2,7 @@
 // P19, then P20, then P18, then P14. Seat priorities remain explicit.
 
 import { isMaterialImprovement } from './materialityGate.js';
+import { compareZeroFailFirst } from './zeroFailOptimiser.js';
 
 // Practical priority — lower = less disruptive = preferred for equivalent results
 const PRACTICAL_PRIORITY = {
@@ -168,7 +169,7 @@ export function rankRecommendations(selection) {
     });
   }
 
-  recommendations.sort((a,b) => compareCanonicalRecommendations(a.result,b.result)
+  recommendations.sort((a,b) => compareZeroFailFirst(a.result,b.result)
     || (PRACTICAL_PRIORITY[a.interventionType] || 99)-(PRACTICAL_PRIORITY[b.interventionType] || 99)
     || String(a.result.candidateId).localeCompare(String(b.result.candidateId)));
 

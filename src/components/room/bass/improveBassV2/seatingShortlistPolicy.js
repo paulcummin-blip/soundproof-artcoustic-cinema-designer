@@ -9,18 +9,18 @@
 // Policy:
 //   1. Take the top 8 proxy candidates by proxy P19 (lower = better).
 //   2. Canonically confirm all 8 (or fewer if fewer valid candidates exist).
-//   3. Apply Primary-seat safety protection (hard veto on regression).
-//   4. Apply materiality gate (reject below-materiality candidates).
-//   5. Grade-first canonical ordering: compare RP22 level outcomes first,
-//      then raw values only when grades are equal.
+//   3. Apply materiality gate (zero-fail-first: fail-count reduction is
+//      always material; moved fails are not; blanket primary-seat regression
+//      veto has been removed).
+//   4. Zero-fail-first canonical ordering: failing-seat count first, then
+//      primary-seat floor (worst-first), then raw margins.
 //   6. Smaller-movement tie-break: when canonical outcomes are equivalent,
 //      prefer the candidate with the smaller abs(seating offset).
 //      Direction is irrelevant: -100 mm and +100 mm are equivalent magnitude.
 //   7. Final fallback: stable candidate ID ordering.
 
-import { hasPrimarySeatRegression } from "../best-layout/authoritativeFinalistSelection.js";
 import { isMaterialImprovement } from "./materialityGate.js";
-import { compareCanonicalRecommendations } from "./recommendationRanker.js";
+import { compareZeroFailFirst } from "./zeroFailOptimiser.js";
 
 export const SEATING_SHORTLIST_SIZE = 8;
 
@@ -44,8 +44,8 @@ export function selectSeatingShortlist(proxyResults, n = SEATING_SHORTLIST_SIZE)
 /**
  * Compare two confirmed seating candidates for final winner selection.
  *
- * Grade-first: canonical RP22 level outcomes compared first (via
- * compareCanonicalRecommendations which uses -numericLevel then raw).
+ * Zero-fail-first: failing-seat count compared first, then primary-seat
+ * floor (worst-first), then raw margins (via compareZeroFailFirst).
  * Smaller-movement tie-break: prefer abs(offsetMm) when canonical
  * outcomes are equivalent. Direction-agnostic.
  * Final fallback: stable candidate ID.
@@ -55,7 +55,7 @@ export function selectSeatingShortlist(proxyResults, n = SEATING_SHORTLIST_SIZE)
  * @returns {number} negative if a is better, positive if b is better
  */
 export function compareSeatingCandidates(a, b) {
-  const canonical = compareCanonicalRecommendations(a.result, b.result);
+  const canonical = compareZeroFailFirst(a.result, b.result);
   if (Math.abs(canonical) > 1e-8) return canonical;
 
   // Smaller-movement tie-break (direction-agnostic)
@@ -73,11 +73,10 @@ export function compareSeatingCandidates(a, b) {
  * Select the seating winner from canonically confirmed candidates.
  *
  * Applies in order:
- *   1. Primary safety protection (hard veto — hasPrimarySeatRegression)
- *   2. Materiality gate (isMaterialImprovement)
- *   3. Grade-first canonical ordering (compareCanonicalRecommendations)
- *   4. Smaller-movement tie-break (abs(offsetMm), direction-agnostic)
- *   5. Stable candidate ID (final fallback)
+ *   1. Materiality gate (zero-fail-first: isMaterialImprovement)
+ *   2. Zero-fail-first canonical ordering (compareZeroFailFirst)
+ *   3. Smaller-movement tie-break (abs(offsetMm), direction-agnostic)
+ *   4. Stable candidate ID (final fallback)
  *
  * @param {Array} confirmedCandidates - [{ result, seatingOffsetMm, seatingPositions }]
  * @param {object} baseline - existing authority (Current control)
@@ -92,21 +91,8 @@ export function selectSeatingWinner(confirmedCandidates, baseline) {
   for (const candidate of confirmedCandidates || []) {
     if (!candidate?.result) continue;
 
-    // Primary safety protection (hard veto)
-    const primaryRegression = hasPrimarySeatRegression(
-      candidate.result,
-      baseline,
-    );
-    if (primaryRegression.regressed) {
-      evaluations.push({
-        candidateId: candidate.result.candidateId,
-        offsetMm: candidate.seatingOffsetMm,
-        status: "safety-rejected",
-        primary: primaryRegression,
-      });
-      continue;
-    }
-
+    // Zero-fail-first: no blanket primary-seat regression veto.
+    // Materiality gate handles fail-count reduction and moved-fail detection.
     // Materiality gate
     const materiality = isMaterialImprovement(baseline, candidate.result);
     evaluations.push({

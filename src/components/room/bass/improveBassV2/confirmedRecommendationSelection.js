@@ -1,8 +1,9 @@
 import { validateConfirmedCandidate, effectiveConfigurationKey } from "./confirmedCandidateValidity.js";
 import { isMaterialImprovement } from "./materialityGate.js";
 import { rankRecommendations } from "./recommendationRanker.js";
-import { hasLevelRegression, extractAuthoritativeMetrics, detectMutedSubs } from "../best-layout/authoritativeFinalistSelection.js";
-import { hasPrimarySeatLevelRegression, classifyVerifiedTradeOff } from "./tradeOffClassifier.js";
+import { extractAuthoritativeMetrics, detectMutedSubs } from "../best-layout/authoritativeFinalistSelection.js";
+import { classifyVerifiedTradeOff } from "./tradeOffClassifier.js";
+import { countFailingSeats, hasHardSafetyRegression } from "./zeroFailOptimiser.js";
 
 export function selectConfirmedRecommendations(results, snapshot, current) {
   const context = snapshot.validationContext || {
@@ -24,16 +25,27 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
     if (snapshot.effectiveConfiguration && result.configurationKey === snapshot.effectiveConfiguration) {
       evaluations.push({candidateId:result.candidateId,status:"unchanged"}); continue;
     }
-    const level = hasLevelRegression(extractAuthoritativeMetrics(result),extractAuthoritativeMetrics(baseline));
-    // HARD SAFETY: primary seat LEVEL regression (not same-level raw worsening,
-    // which is reclassified as a trade-off signal).
-    const primaryLevel = hasPrimarySeatLevelRegression(result,baseline);
+    const hardSafety = hasHardSafetyRegression(extractAuthoritativeMetrics(result),extractAuthoritativeMetrics(baseline));
     const muted = detectMutedSubs((result.appliedTuning || []).map(t=>({id:t.sourceId,tuning:t})));
     const outputPass = result.requestedP14Pass === true &&
       result.operatingOutputDb >= result.p14TargetDb - 1e-7 &&
       result.p14AchievedDb >= result.p14TargetDb - 1e-7;
-    if (!outputPass || level.regressed || primaryLevel.regressed || muted.mutedCount) {
-      evaluations.push({candidateId:result.candidateId,status:"safety-rejected",outputPass,level,primary:primaryLevel,muted});
+    if (!outputPass || hardSafety.regressed || muted.mutedCount) {
+      evaluations.push({candidateId:result.candidateId,status:"safety-rejected",outputPass,level:hardSafety,muted});
+      continue;
+    }
+    // Zero-fail-first: fail-count reduction is a material improvement, not a
+    // trade-off. Short-circuit before the trade-off classifier so candidates
+    // that eliminate FAILs are always classified as material improvements.
+    const currentFails = countFailingSeats(baseline);
+    const candidateFails = countFailingSeats(result);
+    if (candidateFails < currentFails) {
+      const eliminated = currentFails - candidateFails;
+      const reason = candidateFails === 0
+        ? `All seats now pass P19 and P20 (eliminated ${eliminated} failing seat${eliminated > 1 ? 's' : ''})`
+        : `Eliminated ${eliminated} failing seat${eliminated > 1 ? 's' : ''}`;
+      evaluations.push({candidateId:result.candidateId,status:"material",materiality:{material:true,reason}});
+      eligible.push(result);
       continue;
     }
     const materiality = isMaterialImprovement(baseline,result);

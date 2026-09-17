@@ -1,4 +1,5 @@
 import { validateSeatResults, canonicalLevel } from "./confirmedCandidateValidity.js";
+import { countFailingSeats, hasNewFailingSeats } from "./zeroFailOptimiser.js";
 // materialityGate.js
 // Canonical user-facing materiality assessment for calibration-only improvements.
 //
@@ -136,19 +137,32 @@ export function isMaterialImprovement(currentResult, candidateResult) {
   const baseline = validateSeatResults(currentResult,seats), candidate = validateSeatResults(candidateResult,seats);
   if (!baseline.valid || !candidate.valid) return {material:false,valid:false,reason:"Invalid or incomplete canonical seat data",details:{baseline,candidate}};
 
-  // Check for primary-seat regression (hard veto)
-  const regression = hasPrimarySeatRegression(currentResult, candidateResult);
-  if (regression.regressed) {
-    return {
-      material: false,
-      reason: regression.reason
-        ? `Primary seat ${regression.seatId} ${regression.parameter} ${regression.reason} (+${(regression.rawDeltaDb || 0).toFixed(2)} dB)`
-        : `Primary seat ${regression.seatId} ${regression.parameter} regression (L${regression.currentLevel} -> L${regression.candidateLevel})`,
-      details: regression,
-    };
+  // Zero-fail-first: failing-seat count decrease is always material.
+  // The blanket primary-seat regression veto has been removed — a candidate
+  // may trade a strong primary seat (e.g. L4 -> L2) to eliminate a FAIL
+  // elsewhere. Fail-count reduction is always material; zero-fail is always
+  // material.
+  const currentFails = countFailingSeats(currentResult);
+  const candidateFails = countFailingSeats(candidateResult);
+  if (candidateFails < currentFails) {
+    const eliminated = currentFails - candidateFails;
+    const reason = candidateFails === 0
+      ? `All seats now pass P19 and P20 (eliminated ${eliminated} failing seat${eliminated > 1 ? 's' : ''})`
+      : `Eliminated ${eliminated} failing seat${eliminated > 1 ? 's' : ''}`;
+    return { material: true, reason, details: { currentFails, candidateFails, eliminated } };
+  }
+  // Fail count increased -> never material
+  if (candidateFails > currentFails) {
+    return { material: false, reason: `Failing seats increased from ${currentFails} to ${candidateFails}` };
+  }
+  // Same fail count -- if fails moved (new fail at a previously-passing seat),
+  // do not treat as material improvement on the fail objective.
+  if (hasNewFailingSeats(currentResult, candidateResult)) {
+    return { material: false, reason: "Failing seat moved \u2014 no net improvement" };
   }
 
-  // Use the actual matched seats. The P19/P20 headline remains SEAT.
+  // Same fail count, no moved fails -- check for level / deviation / null
+  // improvements. Use the actual matched seats. The P19/P20 headline remains SEAT.
   const pairs = ["perSeatP19","perSeatP20"].flatMap(field=>candidateResult[field].map(seat=>({
     parameter:field==="perSeatP19"?"P19":"P20",seatId:seat.seatId,
     before:currentResult[field].find(s=>String(s.seatId)===String(seat.seatId)),after:seat,

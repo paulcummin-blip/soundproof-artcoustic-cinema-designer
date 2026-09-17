@@ -18,7 +18,7 @@
 // those gates. This module only maps engine output to the 5-stage structure.
 
 import { isMaterialImprovement } from "./materialityGate.js";
-import { compareCanonicalRecommendations } from "./recommendationRanker.js";
+import { compareZeroFailFirst } from "./zeroFailOptimiser.js";
 
 /**
  * Build per-stage results from the engine's selection object.
@@ -129,7 +129,7 @@ export function buildStageResults(selection) {
   if (positionResults.length > 0 && currentResult) {
     bestPosition = positionResults
       .slice()
-      .sort((a, b) => compareCanonicalRecommendations(a, b))[0];
+      .sort((a, b) => compareZeroFailFirst(a, b))[0];
     // Verify materiality (engine already checked, but double-check)
     const mat = isMaterialImprovement(currentResult, bestPosition);
     if (!mat.material) bestPosition = null;

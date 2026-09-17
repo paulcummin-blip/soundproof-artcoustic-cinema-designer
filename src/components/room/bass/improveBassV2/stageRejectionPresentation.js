@@ -173,7 +173,10 @@ export function buildCalibrationRejectionDetail(selection) {
       break;
     }
     case "below-materiality": {
-      if (p19Detail) {
+      const reason = evaluation.materiality?.reason;
+      if (reason) {
+        parts.push(reason);
+      } else if (p19Detail) {
         parts.push(`Best change below material threshold: ${p19Detail.text}`);
       } else {
         parts.push("Best change below material threshold");

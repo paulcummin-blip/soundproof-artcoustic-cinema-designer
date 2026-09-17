@@ -29,6 +29,8 @@
 // in either direction does NOT create a trade-off.
 // ---------------------------------------------------------------------------
 
+import { countFailingSeats } from "./zeroFailOptimiser.js";
+
 const MATERIAL_RAW_THRESHOLD_DB = 1.0;  // material raw improvement or worsening
 const PRIMARY_RAW_WORSENING_THRESHOLD_DB = 1.0;  // same as materialityGate
 const SOUND_SPEED_M_PER_MS = 0.343;  // 343 m/s → m per ms
@@ -244,11 +246,16 @@ export function classifyVerifiedTradeOff(currentResult, candidateResult) {
     return { isTradeOff: false, rejectReason: "Missing result data" };
   }
 
-  // 1. Hard safety: no primary seat LEVEL regression
-  const levelRegression = hasPrimarySeatLevelRegression(candidateResult, currentResult);
-  if (levelRegression.regressed) {
-    return { isTradeOff: false, rejectReason: `Primary seat ${levelRegression.seatId} ${levelRegression.parameter} level regression (L${levelRegression.currentLevel} → L${levelRegression.candidateLevel})` };
+  // Zero-fail-first: fail-count reduction is a material improvement, not a
+  // trade-off. The blanket primary-seat regression veto has been removed.
+  if (countFailingSeats(candidateResult) < countFailingSeats(currentResult)) {
+    return { isTradeOff: false, rejectReason: "Failing-seat count reduced \u2014 material improvement" };
   }
+
+  // 1. (Removed) Blanket primary-seat LEVEL regression veto.
+  //    The zero-fail-first policy allows trading a strong primary seat to
+  //    eliminate FAILs elsewhere. Primary-seat regressions are no longer a
+  //    blanket hard-safety rejection.
 
   // 2. Find material improvement
   const improvement = findBestImprovement(candidateResult, currentResult);
