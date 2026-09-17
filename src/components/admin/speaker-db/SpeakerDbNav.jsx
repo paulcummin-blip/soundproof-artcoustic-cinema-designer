@@ -4,7 +4,7 @@
 // Tabs: Dashboard, Manufacturers, Products, Data Quality, Change History, Settings.
 
 import React from "react";
-import { LayoutDashboard, Building2, Package, ShieldCheck, History, Settings } from "lucide-react";
+import { LayoutDashboard, Building2, Package, ShieldCheck, History, Settings, Activity } from "lucide-react";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -17,6 +17,7 @@ const BRAND = {
 const TABS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "manufacturers", label: "Manufacturers", icon: Building2 },
+  { key: "manufacturerHealth", label: "Manufacturer Health", icon: Activity },
   { key: "products", label: "Products", icon: Package },
   { key: "dataQuality", label: "Data Quality", icon: ShieldCheck },
   { key: "history", label: "Change History", icon: History },

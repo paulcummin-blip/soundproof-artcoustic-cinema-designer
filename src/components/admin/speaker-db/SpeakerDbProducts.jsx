@@ -58,7 +58,7 @@ function ConfidenceBadge({ confidence }) {
   return <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold" style={{ background: color + "15", color }}>{confidence}</span>;
 }
 
-export default function SpeakerDbProducts() {
+export default function SpeakerDbProducts({ drillFilter, onClearDrillFilter }) {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +85,9 @@ export default function SpeakerDbProducts() {
           sensitivity_db: specMap[p.id]?.sensitivity_db ?? null,
           max_continuous_spl_db: specMap[p.id]?.max_continuous_spl_db ?? null,
           confidence: specMap[p.id]?.confidence ?? null,
+          frequency_response_low_hz: specMap[p.id]?.frequency_response_low_hz ?? null,
+          frequency_response_high_hz: specMap[p.id]?.frequency_response_high_hz ?? null,
+          nominal_impedance_ohm: specMap[p.id]?.nominal_impedance_ohm ?? null,
         }));
 
         setRows(merged);
@@ -95,6 +98,13 @@ export default function SpeakerDbProducts() {
       }
     })();
   }, []);
+
+  // Drill-in filter from Manufacturer Health page
+  const KEY_SPEC_FIELDS = ["sensitivity_db", "frequency_response_low_hz", "frequency_response_high_hz", "max_continuous_spl_db", "nominal_impedance_ohm"];
+  const isProductComplete = (r) => KEY_SPEC_FIELDS.every((f) => r[f] != null && r[f] !== "");
+  const filteredRows = drillFilter
+    ? rows.filter((r) => r.manufacturer_id === drillFilter.manufacturerId && (!drillFilter.incompleteOnly || !isProductComplete(r)))
+    : rows;
 
   const handleRowClick = (row) => {
     navigate(`/admin/speaker-database/product/${row.id}`);
@@ -113,9 +123,17 @@ export default function SpeakerDbProducts() {
 
   return (
     <div>
+      {drillFilter && (
+        <div className="flex items-center justify-between mb-4 p-3 rounded-lg" style={{ border: `1px solid ${BRAND.border}`, background: "#F8F8F7" }}>
+          <div className="text-sm" style={{ color: BRAND.text }}>
+            Showing incomplete products for <span className="font-medium">{drillFilter.manufacturerName}</span>
+          </div>
+          <button onClick={onClearDrillFilter} className="text-sm underline" style={{ color: BRAND.green }}>Show all products</button>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-4">
         <div className="text-sm" style={{ color: BRAND.subtext }}>
-          {rows.length} product{rows.length !== 1 ? "s" : ""}
+          {filteredRows.length} product{filteredRows.length !== 1 ? "s" : ""}
         </div>
         <button
           onClick={() => navigate("/admin/speaker-database/product/new")}
@@ -131,7 +149,7 @@ export default function SpeakerDbProducts() {
       ) : (
         <SpeakerDbTable
           columns={columns}
-          rows={rows}
+          rows={filteredRows}
           searchableKeys={["manufacturer_name", "full_product_name", "model", "series"]}
           filters={[
             { key: "category", label: "Categories", options: [

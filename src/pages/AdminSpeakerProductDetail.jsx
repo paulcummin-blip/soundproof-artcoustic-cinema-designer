@@ -4,7 +4,7 @@
 // Tabs: General, Specifications, Sources, Data Quality, History.
 // Specifications are stored in SpeakerSpecification (one-to-one via current_specification_id).
 // General tab holds product identity, category (physical form), role, status, and images.
-// A "Derived Values" section is reserved (empty) for future engineering outputs.
+// An "Engineering Analysis" section is reserved (empty) for future engineering outputs.
 
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -161,6 +161,7 @@ export default function AdminSpeakerProductDetail() {
             category: "Other",
             role: "Flexible",
             status: "Unknown",
+            import_status: "Manual",
             official_product_url: "",
             official_pdf_url: "",
             hero_image_url: "",
@@ -216,6 +217,19 @@ export default function AdminSpeakerProductDetail() {
 
   const handleSpecChange = (key, value) => {
     setSpecData((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleFieldAuthorityChange = (fieldKey, authorityValue) => {
+    setSpecData((prev) => {
+      const currentAuthority = prev.field_authority || {};
+      const nextAuthority = { ...currentAuthority };
+      if (authorityValue) {
+        nextAuthority[fieldKey] = authorityValue;
+      } else {
+        delete nextAuthority[fieldKey];
+      }
+      return { ...prev, field_authority: nextAuthority };
+    });
   };
 
   const handleSave = async () => {
@@ -408,6 +422,12 @@ export default function AdminSpeakerProductDetail() {
                 {["Current", "Discontinued", "Coming Soon", "Hidden", "Archived", "Unknown"].map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Import Status</label>
+              <select value={formData.import_status || "Manual"} onChange={(e) => handleFieldChange("import_status", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle}>
+                {["Manual", "Imported", "Verified", "Needs Review", "Locked"].map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Official Product URL</label>
@@ -466,18 +486,40 @@ export default function AdminSpeakerProductDetail() {
             <div key={group.label} className="rounded-lg p-6" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card }}>
               <h3 className="text-sm font-bold uppercase tracking-wide mb-4" style={{ color: BRAND.green }}>{group.label}</h3>
               <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
-                {group.fields.map((field) => (
+                {group.fields.map((field) => {
+                  const authority = specData.field_authority?.[field.key];
+                  return (
                   <div key={field.key}>
                     <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>{field.label}</label>
                     {editMode || isNew ? (
-                      <SpecField field={field} value={specData[field.key]} onChange={handleSpecChange} />
+                      <>
+                        <SpecField field={field} value={specData[field.key]} onChange={handleSpecChange} />
+                        <select
+                          value={authority || ""}
+                          onChange={(e) => handleFieldAuthorityChange(field.key, e.target.value)}
+                          className="w-full mt-1 px-1.5 py-1 rounded text-xs outline-none"
+                          style={inputStyle}
+                        >
+                          <option value="">Authority: —</option>
+                          <option value="Official PDF">PDF</option>
+                          <option value="Official Product Page">Product Page</option>
+                          <option value="Engineering Document">Engineering Doc</option>
+                          <option value="Support Article">Support Article</option>
+                        </select>
+                      </>
                     ) : (
-                      <div className="px-2 py-1.5 text-sm rounded-md" style={{ background: "#F8F8F7", color: BRAND.text, minHeight: 34, display: "flex", alignItems: "center" }}>
-                        {field.type === "boolean" ? (specData[field.key] ? "Yes" : "No") : (specData[field.key] != null && specData[field.key] !== "" ? String(specData[field.key]) : "—")}
-                      </div>
+                      <>
+                        <div className="px-2 py-1.5 text-sm rounded-md" style={{ background: "#F8F8F7", color: BRAND.text, minHeight: 34, display: "flex", alignItems: "center" }}>
+                          {field.type === "boolean" ? (specData[field.key] ? "Yes" : "No") : (specData[field.key] != null && specData[field.key] !== "" ? String(specData[field.key]) : "—")}
+                        </div>
+                        {authority && (
+                          <div className="text-xs mt-0.5" style={{ color: BRAND.subtext }}>↳ {authority}</div>
+                        )}
+                      </>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -486,11 +528,11 @@ export default function AdminSpeakerProductDetail() {
           <div className="rounded-lg p-6" style={{ border: `1px solid ${BRAND.border}`, background: "#F8F8F7" }}>
             <div className="flex items-center gap-2 mb-3">
               <Calculator className="w-4 h-4" style={{ color: BRAND.subtext }} />
-              <h3 className="text-sm font-bold uppercase tracking-wide" style={{ color: BRAND.subtext }}>Derived Values</h3>
+              <h3 className="text-sm font-bold uppercase tracking-wide" style={{ color: BRAND.subtext }}>Engineering Analysis</h3>
             </div>
             <div className="text-xs" style={{ color: BRAND.subtext }}>
-              Reserved for future engineering outputs — estimated max SPL, estimated sensitivity, estimated P12 capability, etc.
-              These are never manufacturer data; they are computed downstream by the RP22 engine. Nothing is stored or calculated here yet.
+              Reserved for future engineering outputs — estimated clean SPL, P12 capability, P13 capability, dynamic range prediction, listening distance recommendations, and upgrade analysis.
+              These are engineering models, not manufacturer data; they are computed downstream by the RP22 engine. Nothing is stored or calculated here yet.
             </div>
           </div>
         </div>

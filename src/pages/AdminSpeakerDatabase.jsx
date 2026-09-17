@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/AuthContext";
 import SpeakerDbNav from "@/components/admin/speaker-db/SpeakerDbNav";
 import SpeakerDbDashboard from "@/components/admin/speaker-db/SpeakerDbDashboard";
 import SpeakerDbManufacturers from "@/components/admin/speaker-db/SpeakerDbManufacturers";
+import SpeakerDbManufacturerHealth from "@/components/admin/speaker-db/SpeakerDbManufacturerHealth";
 import SpeakerDbProducts from "@/components/admin/speaker-db/SpeakerDbProducts";
 import SpeakerDbDataQuality from "@/components/admin/speaker-db/SpeakerDbDataQuality";
 import SpeakerDbChangeHistory from "@/components/admin/speaker-db/SpeakerDbChangeHistory";
@@ -27,6 +28,18 @@ export default function AdminSpeakerDatabase() {
   const { user, isLoadingAuth } = useAuth();
   const isAdmin = user?.role === "admin";
   const [section, setSection] = useState("dashboard");
+  // Drill-in filter: when set, the Products tab shows only the specified
+  // manufacturer's incomplete products. Set by the Manufacturer Health page.
+  const [productsDrillFilter, setProductsDrillFilter] = useState(null);
+
+  const handleDrillIntoManufacturer = (manufacturerId, manufacturerName) => {
+    setProductsDrillFilter({ manufacturerId, manufacturerName, incompleteOnly: true });
+    setSection("products");
+  };
+
+  const handleClearDrillFilter = () => {
+    setProductsDrillFilter(null);
+  };
 
   if (isLoadingAuth) {
     return <div style={{ padding: 48, textAlign: "center", color: BRAND.subtext }}>Checking access…</div>;
@@ -60,7 +73,8 @@ export default function AdminSpeakerDatabase() {
 
       {section === "dashboard" && <SpeakerDbDashboard />}
       {section === "manufacturers" && <SpeakerDbManufacturers />}
-      {section === "products" && <SpeakerDbProducts />}
+      {section === "manufacturerHealth" && <SpeakerDbManufacturerHealth onDrillInto={handleDrillIntoManufacturer} />}
+      {section === "products" && <SpeakerDbProducts drillFilter={productsDrillFilter} onClearDrillFilter={handleClearDrillFilter} />}
       {section === "dataQuality" && <SpeakerDbDataQuality />}
       {section === "history" && <SpeakerDbChangeHistory />}
       {section === "settings" && <SpeakerDbSettings />}
