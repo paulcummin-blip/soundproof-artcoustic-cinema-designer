@@ -2,27 +2,26 @@
 // Combined optimisation phase for Improve Bass Response V2.
 //
 // PRINCIPLE: Reuse existing work. Do NOT rerun Stage 1 or modal simulation.
-// The best position candidate's rawTransfer is already computed — retuning
-// runs grouped-delay/phase/gain worker calls on that EXISTING rawTransfer.
+// Uses saved rawTransfers from Current, best seating, and best position to
+// retune FULL calibration (phase → delay → gain chained) and canonically
+// confirm combined candidates.
 //
-// WORKFLOW:
-//   1. Identify best position candidate from confirmedResults
-//   2. Retune delay + gain on that position's rawTransfer (worker calls)
-//   3. Merge retuned calibration with the position
-//   4. Canonically confirm the combined candidate (1 confirmation)
-//   5. Optionally: combine best calibration + best seating (1 more confirmation)
+// CANDIDATE BUDGET (max 3 canonical confirmations):
+//   1. Calibration-only combined (phase + delay + gain retuned together on Current)
+//      — ALWAYS attempted when Current's rawTransfer exists. Does NOT require
+//        a useful position candidate.
+//   2. Calibration + seating (retuned on seating geometry)
+//      — Only if seating is material.
+//   3. Position + retuned calibration (retuned on position geometry, including phase)
+//      — Only if position is useful.
 //
-// BUDGET: Max 3 canonical confirmations. Target +5-15 seconds using cached
-// transfers. If budget is exceeded, stop promoting more candidates.
-//
-// NO ACOUSTIC MATH CHANGED: Uses existing grouped-delay, grouped-gain, and
-// confirmation worker calls. No new equations or scaling.
+// NO ACOUSTIC MATH CHANGED: Uses existing grouped-phase, grouped-delay,
+// grouped-gain, and confirmation worker calls. No new equations or scaling.
 
 import { runInWorker } from "./improveBassV2WorkerLifecycle.js";
-import { bindTuningToSourceIds } from "./improveBassV2ApplyCalibration.js";
 import { effectiveConfigurationKey, validateConfirmedCandidate } from "./confirmedCandidateValidity.js";
-import { selectConfirmedRecommendations } from "./confirmedRecommendationSelection.js";
 import { compareZeroFailFirst } from "./zeroFailOptimiser.js";
+import { isMaterialImprovement } from "./materialityGate.js";
 
 const COMBINED_BUDGET_MS = 15000;
 const MAX_COMBINED_CONFIRMATIONS = 3;
@@ -53,19 +52,80 @@ export function identifyBestCalibrationCandidate(confirmedResults, existingAutho
 }
 
 /**
- * Merge per-source tunings: take delay from delayTuning, gain from gainTuning,
- * phase from phaseTuning, keeping baseline for anything not overridden.
+ * Retune full calibration (phase → delay → gain) on a rawTransfer.
+ * Chains the searches so each builds on the previous result — individually
+ * optimal values are NOT assumed to remain optimal when combined.
+ *
+ * Returns the final combined tuning (or the baseline if no improvement found).
  */
-function mergeTunings(baselineTuning, delayTuning, gainTuning) {
-  if (!baselineTuning?.length) return baselineTuning || [];
-  const merged = baselineTuning.map((t, i) => ({
-    sourceId: t.sourceId,
-    delayMs: delayTuning?.[i]?.delayMs ?? t.delayMs,
-    gainDb: gainTuning?.[i]?.gainDb ?? t.gainDb,
-    polarity: delayTuning?.[i]?.polarity ?? t.polarity,
-    phaseControlDeg: delayTuning?.[i]?.phaseControlDeg ?? t.phaseControlDeg,
-  }));
-  return merged;
+async function retuneFullCalibration(ctx, rawTransfer, baseline) {
+  const { worker, controller, isStale, metrics, subwooferInstances, roomDims } = ctx;
+  if (!rawTransfer?.perSourcePerSeatComplexTransfers?.length || !baseline?.length) return null;
+
+  let tuning = baseline;
+
+  // 1. Phase search (grouped all-pass at 80 Hz)
+  try {
+    const t0 = performance.now();
+    const phaseSearch = await runInWorker(worker, "grouped-phase", {
+      rawTransfer, instances: subwooferInstances, roomDims, effectiveBaseline: tuning,
+    }, controller.signal);
+    metrics.recordWorkerCall("grouped-phase", "combined-retune-phase", performance.now() - t0, false);
+    if (isStale()) return null;
+    const phaseTuning = phaseSearch?.candidates?.[0]?.tuning;
+    if (phaseTuning) tuning = phaseTuning;
+  } catch (err) {
+    if (err?.name === "AbortError") throw err;
+    // Phase search may be skipped (no differential phase applicable) — continue
+  }
+
+  // 2. Delay search (with phase tuning as baseline)
+  try {
+    const t0 = performance.now();
+    const delaySearch = await runInWorker(worker, "grouped-delay", {
+      rawTransfer, instances: subwooferInstances, roomDims, effectiveBaseline: tuning,
+    }, controller.signal);
+    metrics.recordWorkerCall("grouped-delay", "combined-retune-delay", performance.now() - t0, false);
+    if (isStale()) return null;
+    const delayTuning = delaySearch?.candidates?.[0]?.tuning;
+    if (delayTuning) tuning = delayTuning;
+  } catch (err) {
+    if (err?.name === "AbortError") throw err;
+  }
+
+  // 3. Gain search (with delay tuning as baseline)
+  try {
+    const t0 = performance.now();
+    const gainSearch = await runInWorker(worker, "grouped-gain", {
+      rawTransfer, instances: subwooferInstances, roomDims, effectiveBaseline: tuning,
+    }, controller.signal);
+    metrics.recordWorkerCall("grouped-gain", "combined-retune-gain", performance.now() - t0, false);
+    if (isStale()) return null;
+    const gainTuning = gainSearch?.candidates?.[0]?.tuning;
+    if (gainTuning) tuning = gainTuning;
+  } catch (err) {
+    if (err?.name === "AbortError") throw err;
+  }
+
+  return tuning;
+}
+
+/**
+ * Canonically confirm a combined candidate. Returns the validation check.
+ */
+async function confirmCombinedCandidate(ctx, rawTransfer, tuning, candidateInfo, kind) {
+  const { worker, controller, isStale, bindConfirmation, validationContext,
+    p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis } = ctx;
+
+  const response = await runInWorker(worker, "confirmation", {
+    rawTransfer, tuning, tuningVariant: "delay-polarity-trim",
+    p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+  }, controller.signal);
+  if (isStale()) return null;
+  if (!response) return null;
+
+  const bound = bindConfirmation(response, tuning, candidateInfo, kind);
+  return validateConfirmedCandidate(bound, validationContext);
 }
 
 /**
@@ -91,6 +151,10 @@ export async function runCombinedOptimisation(ctx) {
     p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
     roomDims, subwooferInstances, rspPosition,
     seatingResult, seatingMaterial,
+    seatingRawTransfer,
+    currentRawTransfer,
+    effectiveBaseline,
+    positionRawTransfer,
     combinedStartTime,
   } = ctx;
 
@@ -102,190 +166,169 @@ export async function runCombinedOptimisation(ctx) {
     invalid: 0,
     budgetExceeded: false,
     options: [],
+    candidatesBuilt: [],
   };
-
   const combinedCandidates = [];
   const elapsed = () => Date.now() - combinedStartTime;
 
-  // ── 1. Identify best position candidate ──────────────────────────
-  const bestPosition = identifyBestPositionCandidate(confirmedResults, existingAuthority);
+  const retuneCtx = { worker, controller, isStale, metrics, subwooferInstances, roomDims };
+  const confirmCtx = { worker, controller, isStale, bindConfirmation, validationContext,
+    p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis };
 
-  if (!bestPosition) {
-    diagnostics.status = "skipped";
-    diagnostics.reason = "No position candidate to combine";
-    return { combinedCandidates, diagnostics };
-  }
-
-  // Get the rawTransfer for the best position
-  const positionRawTransfer = bestPosition.rawTransfer || ctx.positionRawTransfer;
-  if (!positionRawTransfer?.perSourcePerSeatComplexTransfers?.length) {
-    diagnostics.status = "skipped";
-    diagnostics.reason = "No raw transfer available for best position";
-    return { combinedCandidates, diagnostics };
-  }
-
-  // ── 2. Retune delay on the best position's rawTransfer ────────────
-  onProgress("combining", "Retuning delay on best placement", 0, 2);
-  if (isCancelled()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "cancelled" } };
-  if (isStale()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "stale" } };
-
-  let retunedDelay = null;
-  let retunedGain = null;
-  const effectiveBaseline = bestPosition.appliedTuning || existingAuthority?.appliedTuning || [];
-
-  try {
-    const delayT0 = performance.now();
-    const delaySearch = await runInWorker(worker, "grouped-delay", {
-      rawTransfer: positionRawTransfer,
-      instances: subwooferInstances,
-      roomDims,
-      effectiveBaseline,
-    }, controller.signal);
-    metrics.recordWorkerCall("grouped-delay", "combined-retune-delay", performance.now() - delayT0, false);
-    if (isStale()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "stale" } };
-    retunedDelay = delaySearch?.candidates?.[0]?.tuning || null;
-    diagnostics.tested++;
-  } catch (err) {
-    if (err?.name === "AbortError") throw err;
-    diagnostics.options.push({ stage: "retune-delay", error: err.message });
-  }
-
-  onProgress("combining", "Retuning gain on best placement", 1, 2);
-  if (isCancelled()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "cancelled" } };
-
-  // ── 3. Retune gain on the best position's rawTransfer ─────────────
-  try {
-    const gainT0 = performance.now();
-    const gainSearch = await runInWorker(worker, "grouped-gain", {
-      rawTransfer: positionRawTransfer,
-      instances: subwooferInstances,
-      roomDims,
-      effectiveBaseline: retunedDelay || effectiveBaseline,
-    }, controller.signal);
-    metrics.recordWorkerCall("grouped-gain", "combined-retune-gain", performance.now() - gainT0, false);
-    if (isStale()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "stale" } };
-    retunedGain = gainSearch?.candidates?.[0]?.tuning || null;
-    diagnostics.tested++;
-  } catch (err) {
-    if (err?.name === "AbortError") throw err;
-    diagnostics.options.push({ stage: "retune-gain", error: err.message });
-  }
-
-  // ── 4. Merge tunings and canonically confirm ──────────────────────
-  const mergedTuning = mergeTunings(effectiveBaseline, retunedDelay, retunedGain);
-  if (!mergedTuning?.length) {
-    diagnostics.status = "incomplete";
-    diagnostics.reason = "Retuning produced no valid tuning";
-    return { combinedCandidates, diagnostics };
-  }
-
-  // Budget check before canonical confirmation
-  if (elapsed() > COMBINED_BUDGET_MS) {
-    diagnostics.budgetExceeded = true;
-    diagnostics.status = "budget_exceeded";
-    diagnostics.reason = "Combined budget exceeded before confirmation";
-    return { combinedCandidates, diagnostics };
-  }
-
-  const totalConfirmations = (seatingMaterial?.material && seatingResult && ctx.seatingRawTransfer?.perSourcePerSeatComplexTransfers?.length) ? 2 : 1;
-  onProgress("combined_confirming", `Canonical confirmation 1 of ${totalConfirmations}`, 0, totalConfirmations);
-  if (isCancelled()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "cancelled" } };
-
-  try {
-    const confirmT0 = performance.now();
-    const response = await runInWorker(worker, "confirmation", {
-      rawTransfer: positionRawTransfer,
-      tuning: mergedTuning,
-      tuningVariant: "delay-polarity-trim",
-      p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
-    }, controller.signal);
-    metrics.recordWorkerCall("confirmation", "combined-1", performance.now() - confirmT0, false);
-    if (isStale()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "stale" } };
-
-    if (response) {
-      const bound = bindConfirmation(response, mergedTuning, {
-        ...bestPosition,
-        candidateOrigin: "combined",
-      }, "position");
-      bound.isPositionCandidate = true;
-      bound.candidateOrigin = "combined";
-      bound.candidateId = "combined:" + (bestPosition.candidateId || "position");
-      bound.combinedFrom = {
-        positionCandidateId: bestPosition.candidateId,
-        retunedDelay: !!retunedDelay,
-        retunedGain: !!retunedGain,
-      };
-      const check = validateConfirmedCandidate(bound, validationContext);
-      diagnostics.confirmed++;
-      if (check.valid) {
-        combinedCandidates.push(check.result);
-        diagnostics.valid++;
-        onBestSoFar({ result: check.result, candidate: { ...bestPosition, candidateOrigin: "combined" } });
-      } else {
-        diagnostics.invalid++;
-        diagnostics.options.push({ stage: "confirm-combined", issues: check.issues });
-      }
-    }
-  } catch (err) {
-    if (err?.name === "AbortError") throw err;
-    diagnostics.options.push({ stage: "confirm-combined", error: err.message });
-  }
-
-  // ── 5. Optional second combined finalist: calibration + seating ──
+  // ═══════════════════════════════════════════════════════════════════════
+  // 1. CALIBRATION-ONLY COMBINED (always, if Current's rawTransfer exists)
+  //    Retunes phase + delay + gain TOGETHER on Current's saved rawTransfer.
+  //    Does NOT require a useful position candidate.
+  // ═══════════════════════════════════════════════════════════════════════
   if (
-    combinedCandidates.length > 0 &&
+    currentRawTransfer?.perSourcePerSeatComplexTransfers?.length &&
+    effectiveBaseline?.length &&
+    existingAuthority
+  ) {
+    onProgress("combining", "Retuning full calibration on current positions", 0, 3);
+    if (isCancelled()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "cancelled" } };
+    if (isStale()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "stale" } };
+
+    try {
+      const combinedTuning = await retuneFullCalibration(retuneCtx, currentRawTransfer, effectiveBaseline);
+      if (isStale()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "stale" } };
+      diagnostics.tested++;
+
+      if (combinedTuning && !isCancelled() && !isStale() && elapsed() < COMBINED_BUDGET_MS) {
+        const check = await confirmCombinedCandidate(confirmCtx, currentRawTransfer, combinedTuning,
+          { candidateOrigin: "combined-calibration" }, "calibration");
+        diagnostics.confirmed++;
+        if (check?.valid) {
+          const result = check.result;
+          result.candidateKind = "calibration";
+          result.candidateId = "combined-calibration";
+          result.candidateOrigin = "combined";
+          result.combinedFrom = { calibrationOnly: true, phaseRetuned: true, delayRetuned: true, gainRetuned: true };
+          combinedCandidates.push(result);
+          diagnostics.valid++;
+          diagnostics.candidatesBuilt.push("calibration-only");
+          onBestSoFar({ result, candidate: { candidateOrigin: "combined" } });
+        } else if (check) {
+          diagnostics.invalid++;
+          diagnostics.options.push({ stage: "confirm-cal-only", issues: check.issues });
+        }
+      }
+    } catch (err) {
+      if (err?.name === "AbortError") throw err;
+      diagnostics.options.push({ stage: "calibration-only", error: err.message });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 2. CALIBRATION + SEATING (if seating is material)
+  //    Retunes full calibration on the SEATING rawTransfer (not Current's).
+  //    Does NOT require a useful position candidate.
+  // ═══════════════════════════════════════════════════════════════════════
+  if (
     seatingMaterial?.material &&
     seatingResult &&
+    seatingRawTransfer?.perSourcePerSeatComplexTransfers?.length &&
     elapsed() < COMBINED_BUDGET_MS - 5000 &&
-    combinedCandidates.length < MAX_COMBINED_CONFIRMATIONS
+    combinedCandidates.length < MAX_COMBINED_CONFIRMATIONS &&
+    existingAuthority
   ) {
-    onProgress("combined_confirming", `Canonical confirmation 2 of ${totalConfirmations}`, 1, totalConfirmations);
-    if (isCancelled()) return { combinedCandidates, diagnostics };
+    onProgress("combining", "Retuning calibration on seating geometry", 1, 3);
+    if (isCancelled()) return { combinedCandidates, diagnostics: { ...diagnostics, status: "cancelled" } };
+    if (isStale()) return { combinedCandidates, diagnostics: { ...diagnostics, status: "stale" } };
 
-    // Combine best calibration tuning with best seating offset
-    const bestCal = identifyBestCalibrationCandidate(confirmedResults, existingAuthority);
-    if (bestCal?.appliedTuning) {
-      try {
-        // Use the seating result's rawTransfer if available, with the best calibration tuning
-        const seatingRawTransfer = ctx.seatingRawTransfer;
-        if (seatingRawTransfer?.perSourcePerSeatComplexTransfers?.length) {
-          const confirmT0 = performance.now();
-          const response = await runInWorker(worker, "confirmation", {
-            rawTransfer: seatingRawTransfer,
-            tuning: bestCal.appliedTuning,
-            tuningVariant: "delay-polarity-trim",
-            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
-          }, controller.signal);
-          metrics.recordWorkerCall("confirmation", "combined-2", performance.now() - confirmT0, false);
-          if (isStale()) return { combinedCandidates, diagnostics: { ...diagnostics, status: "stale" } };
+    try {
+      // Retune on the SEATING rawTransfer — do NOT reuse Current's calibration blindly
+      const combinedTuning = await retuneFullCalibration(retuneCtx, seatingRawTransfer, effectiveBaseline);
+      if (isStale()) return { combinedCandidates, diagnostics: { ...diagnostics, status: "stale" } };
+      diagnostics.tested++;
 
-          if (response) {
-            const bound = bindConfirmation(response, bestCal.appliedTuning, {
-              candidateOrigin: "combined-calibration-seating",
-            }, "calibration");
-            bound.candidateKind = "calibration";
-            bound.candidateId = "combined-cal-seating";
-            bound.seatingOffsetMm = seatingResult.seatingOffsetMm;
-            bound.seatingPositions = seatingResult.seatingPositions;
-            bound.combinedFrom = {
-              calibrationCandidateId: bestCal.candidateId,
-              seatingOffsetMm: seatingResult.seatingOffsetMm,
-            };
-            const check = validateConfirmedCandidate(bound, validationContext);
-            diagnostics.confirmed++;
-            if (check.valid) {
-              combinedCandidates.push(check.result);
-              diagnostics.valid++;
-              onBestSoFar({ result: check.result, candidate: { candidateOrigin: "combined" } });
-            } else {
-              diagnostics.invalid++;
-            }
-          }
+      if (combinedTuning && !isCancelled() && !isStale() && elapsed() < COMBINED_BUDGET_MS) {
+        const check = await confirmCombinedCandidate(confirmCtx, seatingRawTransfer, combinedTuning,
+          { candidateOrigin: "combined-calibration-seating" }, "calibration");
+        diagnostics.confirmed++;
+        if (check?.valid) {
+          const result = check.result;
+          result.candidateKind = "calibration";
+          result.candidateId = "combined-cal-seating";
+          result.candidateOrigin = "combined-calibration-seating";
+          result.seatingOffsetMm = seatingResult.seatingOffsetMm;
+          result.seatingPositions = seatingResult.seatingPositions;
+          result.combinedFrom = {
+            calibrationRetuned: true,
+            phaseRetuned: true,
+            seatingOffsetMm: seatingResult.seatingOffsetMm,
+          };
+          combinedCandidates.push(result);
+          diagnostics.valid++;
+          diagnostics.candidatesBuilt.push("calibration-seating");
+          onBestSoFar({ result, candidate: { candidateOrigin: "combined" } });
+        } else if (check) {
+          diagnostics.invalid++;
+          diagnostics.options.push({ stage: "confirm-cal-seating", issues: check.issues });
         }
-      } catch (err) {
-        if (err?.name === "AbortError") throw err;
-        diagnostics.options.push({ stage: "confirm-cal-seating", error: err.message });
       }
+    } catch (err) {
+      if (err?.name === "AbortError") throw err;
+      diagnostics.options.push({ stage: "cal-seating", error: err.message });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 3. POSITION + RETUNED CALIBRATION (if position is useful)
+  //    Retunes FULL calibration (including phase) on the position rawTransfer.
+  // ═══════════════════════════════════════════════════════════════════════
+  const bestPosition = identifyBestPositionCandidate(confirmedResults, existingAuthority);
+  const positionIsUseful = bestPosition
+    ? isMaterialImprovement(existingAuthority, bestPosition).material
+    : false;
+  const posRawTransfer = bestPosition?.rawTransfer || positionRawTransfer;
+
+  if (
+    positionIsUseful &&
+    posRawTransfer?.perSourcePerSeatComplexTransfers?.length &&
+    elapsed() < COMBINED_BUDGET_MS - 5000 &&
+    combinedCandidates.length < MAX_COMBINED_CONFIRMATIONS &&
+    existingAuthority
+  ) {
+    onProgress("combining", "Retuning full calibration on best position", 2, 3);
+    if (isCancelled()) return { combinedCandidates, diagnostics: { ...diagnostics, status: "cancelled" } };
+    if (isStale()) return { combinedCandidates, diagnostics: { ...diagnostics, status: "stale" } };
+
+    try {
+      const positionBaseline = bestPosition.appliedTuning || effectiveBaseline;
+      // Retune FULL calibration (phase + delay + gain) on the position geometry
+      const combinedTuning = await retuneFullCalibration(retuneCtx, posRawTransfer, positionBaseline);
+      if (isStale()) return { combinedCandidates, diagnostics: { ...diagnostics, status: "stale" } };
+      diagnostics.tested++;
+
+      if (combinedTuning && !isCancelled() && !isStale() && elapsed() < COMBINED_BUDGET_MS) {
+        const check = await confirmCombinedCandidate(confirmCtx, posRawTransfer, combinedTuning,
+          { ...bestPosition, candidateOrigin: "combined" }, "position");
+        diagnostics.confirmed++;
+        if (check?.valid) {
+          const result = check.result;
+          result.isPositionCandidate = true;
+          result.candidateOrigin = "combined";
+          result.candidateId = "combined:" + (bestPosition.candidateId || "position");
+          result.combinedFrom = {
+            positionCandidateId: bestPosition.candidateId,
+            calibrationRetuned: true,
+            phaseRetuned: true,
+            delayRetuned: true,
+            gainRetuned: true,
+          };
+          combinedCandidates.push(result);
+          diagnostics.valid++;
+          diagnostics.candidatesBuilt.push("position-calibration");
+          onBestSoFar({ result, candidate: { ...bestPosition, candidateOrigin: "combined" } });
+        } else if (check) {
+          diagnostics.invalid++;
+          diagnostics.options.push({ stage: "confirm-pos-cal", issues: check.issues });
+        }
+      }
+    } catch (err) {
+      if (err?.name === "AbortError") throw err;
+      diagnostics.options.push({ stage: "position-calibration", error: err.message });
     }
   }
 

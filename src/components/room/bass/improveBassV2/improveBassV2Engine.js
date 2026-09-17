@@ -1385,71 +1385,79 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     }
 
     // ── Phase 10: Combined optimisation ────────────────────────────────
-    // Take the best position candidate, retune delay/gain on its rawTransfer,
-    // and canonically confirm the combined result. Reuses existing
-    // rawTransfer — NO new modal simulation. Budget: +5-15 seconds.
+    // Build combined candidates by retuning FULL calibration (phase → delay →
+    // gain chained) on Current, seating, and position rawTransfers. Reuses
+    // existing rawTransfers — NO new modal simulation. Budget: +5-15 seconds.
+    //
+    // CANDIDATES (max 3 canonical confirmations):
+    //   1. Calibration-only combined (on Current's rawTransfer) — ALWAYS
+    //   2. Calibration + seating (retuned on seating rawTransfer) — if seating material
+    //   3. Position + retuned calibration (retuned on position rawTransfer) — if position useful
+    //
+    // The position-candidate hard gate is REMOVED: calibration + seating is
+    // evaluated independently of whether subwoofer position improved.
     let combinedResult = null;
     let combinedMaterial = null;
     let combinedDiagnostics = { status: "skipped", tested: 0, confirmed: 0, valid: 0 };
     try {
-      const bestPositionCandidate = identifyBestPositionCandidate(confirmedResults, existingAuthority);
-      if (bestPositionCandidate && existingAuthority) {
-        // Find the rawTransfer for the best position from allCandidates
-        const positionCandidateWithTransfer = allCandidates.find(
-          (c) => c.id === bestPositionCandidate.candidateId || c.finalist?.id === bestPositionCandidate.candidateId,
-        );
-        const positionRawTransfer = positionCandidateWithTransfer?.rawTransfer || null;
-
-        if (positionRawTransfer?.perSourcePerSeatComplexTransfers?.length) {
-          if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
-          if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
-
-          setStageVerdict(projectId, versionId, "combining_best", "done");
-          const combinedStartTime = Date.now();
-          const { combinedCandidates, diagnostics: combinedDiag } = await runCombinedOptimisation({
-            confirmedResults,
-            existingAuthority,
-            snapshot,
-            worker,
-            controller,
-            isCancelled: () => isCancelled(),
-            isStale: () => isStale(),
-            onProgress: (phase, label, current, total) => {
-              onProgress(phase, label, current, total);
-            },
-            onBestSoFar: (bsf) => onBestSoFar(bsf),
-            metrics,
-            bindConfirmation,
-            validationContext,
-            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
-            roomDims, subwooferInstances, rspPosition,
-            seatingResult, seatingMaterial,
-            seatingRawTransfer,
-            positionRawTransfer,
-            combinedStartTime,
-          });
-
-          combinedDiagnostics = combinedDiag;
-
-          // Add confirmed combined candidates to the pool
-          for (const cc of combinedCandidates) {
-            confirmedResults.push(cc);
-            metrics.recordChallengerConfirmed();
-          }
-
-          if (combinedCandidates.length > 0 && existingAuthority) {
-            const combinedSelection = selectConfirmedRecommendations(combinedCandidates, snapshot, existingAuthority);
-            combinedResult = combinedSelection.winner;
-            combinedMaterial = { material: !!combinedResult, reason: combinedSelection.materialityReason };
-            setStageVerdict(projectId, versionId, "confirming_finalists", combinedMaterial?.material ? "improvement" : "no_improvement");
-          } else {
-            setStageVerdict(projectId, versionId, "confirming_finalists", "no_improvement");
-          }
-          setCombinedResult(projectId, versionId, combinedResult, combinedMaterial, combinedDiagnostics);
-        } else {
-          setStageVerdict(projectId, versionId, "combining_best", "skipped");
-          setStageVerdict(projectId, versionId, "confirming_finalists", "skipped");
+      if (existingAuthority && savedCurrentRawTransfer?.perSourcePerSeatComplexTransfers?.length) {
+        // Find the best position candidate and its rawTransfer (may be null)
+        const bestPositionCandidate = identifyBestPositionCandidate(confirmedResults, existingAuthority);
+        let positionRawTransfer = null;
+        if (bestPositionCandidate) {
+          const positionCandidateWithTransfer = allCandidates.find(
+            (c) => c.id === bestPositionCandidate.candidateId || c.finalist?.id === bestPositionCandidate.candidateId,
+          );
+          positionRawTransfer = positionCandidateWithTransfer?.rawTransfer || null;
         }
+
+        if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+        if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
+        setStageVerdict(projectId, versionId, "combining_best", "done");
+        const combinedStartTime = Date.now();
+        const { combinedCandidates, diagnostics: combinedDiag } = await runCombinedOptimisation({
+          confirmedResults,
+          existingAuthority,
+          snapshot,
+          worker,
+          controller,
+          isCancelled: () => isCancelled(),
+          isStale: () => isStale(),
+          onProgress: (phase, label, current, total) => {
+            onProgress(phase, label, current, total);
+          },
+          onBestSoFar: (bsf) => onBestSoFar(bsf),
+          metrics,
+          bindConfirmation,
+          validationContext,
+          p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+          roomDims, subwooferInstances, rspPosition,
+          seatingResult, seatingMaterial,
+          seatingRawTransfer,
+          currentRawTransfer: savedCurrentRawTransfer,
+          effectiveBaseline: savedEffectiveBaseline,
+          positionRawTransfer,
+          combinedStartTime,
+        });
+
+        combinedDiagnostics = combinedDiag;
+
+        // Add confirmed combined candidates to the pool
+        for (const cc of combinedCandidates) {
+          confirmedResults.push(cc);
+          metrics.recordChallengerConfirmed();
+        }
+
+        if (combinedCandidates.length > 0 && existingAuthority) {
+          const combinedSelection = selectConfirmedRecommendations(combinedCandidates, snapshot, existingAuthority);
+          combinedResult = combinedSelection.winner;
+          combinedMaterial = { material: !!combinedResult, reason: combinedSelection.materialityReason };
+          setStageVerdict(projectId, versionId, "confirming_finalists", combinedMaterial?.material ? "improvement" : "no_improvement");
+        } else {
+          setStageVerdict(projectId, versionId, "confirming_finalists", "no_improvement");
+        }
+        setCombinedResult(projectId, versionId, combinedResult, combinedMaterial, combinedDiagnostics);
       } else {
         setStageVerdict(projectId, versionId, "combining_best", "skipped");
         setStageVerdict(projectId, versionId, "confirming_finalists", "skipped");

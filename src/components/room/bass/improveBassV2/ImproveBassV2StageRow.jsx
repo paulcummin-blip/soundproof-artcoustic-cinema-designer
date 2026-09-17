@@ -13,6 +13,7 @@ import { CheckCircle2, Minus, AlertCircle, Lock } from "lucide-react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { formatAcousticPath } from "./acousticDistance";
 import { buildGainRationale, extractGainAdjustmentDb, extractGainGroupLabel } from "./gainRationaleBuilder";
+import { countFailingSeats } from "./zeroFailOptimiser";
 import CombinedDetail from "./CombinedDetail";
 
 function numericLevel(value) {
@@ -230,11 +231,28 @@ function SeatingDetail({ result, currentResult }) {
 
   const direction = offsetMm < 0 ? "toward screen" : offsetMm > 0 ? "away from screen" : "current";
 
+  // Detect: failing seats reduced even when headline P19/P20 deviation worsened.
+  // This explains WHY the verdict is "Improvement found" when the numbers look worse.
+  const beforeFails = countFailingSeats(currentResult);
+  const afterFails = countFailingSeats(result);
+  const failsReduced = afterFails < beforeFails;
+
+  const beforeP19Raw = Math.abs(Number(beforeP19?.variationDbRaw) || 0);
+  const afterP19Raw = Math.abs(Number(afterP19?.variationDbRaw) || 0);
+  const beforeP20Raw = Math.abs(Number(beforeP20?.variationDbRaw) || 0);
+  const afterP20Raw = Math.abs(Number(afterP20?.variationDbRaw) || 0);
+  const headlineWorsened = afterP19Raw > beforeP19Raw + 0.1 || afterP20Raw > beforeP20Raw + 0.1;
+
   return (
     <div className="mt-1.5 space-y-1">
       <div className="text-[10px] text-[#625143]">
         Move seating {Math.abs(offsetMm)} mm {direction}
       </div>
+      {failsReduced && headlineWorsened && (
+        <div className="text-[10px] leading-relaxed text-[#213428] font-medium">
+          Failing seats reduced {beforeFails} → {afterFails}, despite higher headline deviation.
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-1.5">
         <MetricBeforeAfter label="P19" before={beforeP19} after={afterP19} />
         <MetricBeforeAfter label="P20" before={beforeP20} after={afterP20} />
@@ -252,6 +270,7 @@ export default function ImproveBassV2StageRow({
   isApplied,
   onApply,
   stale,
+  snapshot,
 }) {
   const { verdict, result, reason } = stage;
 
@@ -304,7 +323,7 @@ export default function ImproveBassV2StageRow({
           )}
           {stageKey === "seating" && <SeatingDetail result={result} currentResult={currentResult} />}
           {stageKey === "combined" && (
-            <CombinedDetail result={result} currentResult={currentResult} currentInstances={currentInstances} />
+            <CombinedDetail result={result} currentResult={currentResult} currentInstances={currentInstances} snapshot={snapshot} />
           )}
 
           {/* Apply button */}

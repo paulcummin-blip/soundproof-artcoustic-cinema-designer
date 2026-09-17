@@ -47,12 +47,17 @@ export default function ImproveBassV2StageResults({
       return isOptimisedApplied(currentInstances, stage.result, roomDims);
     }
     if (stageKey === "combined") {
-      // Combined may be position+tuning (check positions) or calibration+seating (check calibration)
-      const hasCoords = (stage.result?.positionCoordinates?.length || stage.result?.coordinates?.length || 0) > 0;
+      // Best Overall may include positions, calibration, and/or seating.
+      // Check each component: all must be applied for the APPLIED badge.
+      const result = stage.result;
+      const hasCoords = (result?.positionCoordinates?.length || result?.coordinates?.length || 0) > 0;
+      const hasSeating = !!result?.seatingPositions && (result?.seatingOffsetMm || 0) !== 0;
+      // If seating is part of the winner, it's not fully applied until seating moves too
+      if (hasSeating) return false;
       if (hasCoords) {
-        return isOptimisedApplied(currentInstances, stage.result, roomDims);
+        return isOptimisedApplied(currentInstances, result, roomDims);
       }
-      return isCalibrationApplied(currentInstances, stage.result?.appliedTuning || stage.result?.tuning || []);
+      return isCalibrationApplied(currentInstances, result?.appliedTuning || result?.tuning || []);
     }
     if (stageKey === "seating") {
       // Seating apply check: compare current seating positions against the result's moved positions
@@ -80,6 +85,7 @@ export default function ImproveBassV2StageResults({
             isApplied={applied}
             onApply={onApplyStage}
             stale={stale}
+            snapshot={selection?.snapshot || snapshot}
           />
         );
       })}

@@ -154,15 +154,19 @@ export function buildStageResults(selection) {
     reason: seatingMaterial ? null : "No material seating improvement found.",
   };
 
-  // ── 6. COMBINED IMPROVEMENT — best combined result ──────────────
-  // The engine's combinedResult is the combined optimisation winner
-  // (best position + retuned calibration, canonically confirmed).
-  const combinedResult = selection.combinedResult || null;
-  const combinedMaterial = selection.combinedMaterial?.material === true;
+  // ── 6. BEST OVERALL IMPROVEMENT — single best across ALL interventions ──
+  // The overall winner is selection.winner — the best confirmed result across
+  // Current, phase, delay, gain, position, seating, and combined candidates,
+  // selected by the existing zero-fail-first comparator (fewest failing seats
+  // first, then primary-seat floor, then raw margins, then simpler-intervention
+  // tie-break). The winner may legitimately be a simple delay-only change,
+  // a phase+delay combination, a seating+calibration combination, a position+
+  // calibration combination, or a full combined solution.
+  const bestOverallResult = selection.winner || null;
   const combined = {
-    verdict: combinedMaterial && combinedResult ? "improvement" : "no_improvement",
-    result: combinedMaterial ? combinedResult : null,
-    reason: combinedMaterial ? null : "No material combined improvement found.",
+    verdict: bestOverallResult ? "improvement" : "no_improvement",
+    result: bestOverallResult,
+    reason: bestOverallResult ? null : "No material improvement found across any intervention.",
   };
 
   return { phase, delay, gain, subPositions, seating, combined };
@@ -182,5 +186,5 @@ export const STAGE_DISPLAY_LABELS = {
   gain: "GAIN",
   subPositions: "SUBWOOFER POSITIONS",
   seating: "SEATING POSITIONS",
-  combined: "BEST COMBINED IMPROVEMENT",
+  combined: "BEST OVERALL IMPROVEMENT",
 };
