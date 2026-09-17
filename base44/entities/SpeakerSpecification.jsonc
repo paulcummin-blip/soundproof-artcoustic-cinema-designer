@@ -1,0 +1,196 @@
+{
+  "name": "SpeakerSpecification",
+  "type": "object",
+  "description": "A versioned specification record for a SpeakerProduct. One-to-one today (SpeakerProduct.current_specification_id points here); designed for one-to-many in the future (2026, 2027, 2028 specifications). Contains all physical, electrical, acoustic, and metadata specification fields. Separated from Product so product identity remains stable while specifications can evolve over time. The database knows nothing about RP22; derived values like estimated max SPL or P12 capability are computed downstream by the RP22 engine, never stored here.",
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "description": "ID of the SpeakerProduct this specification belongs to."
+    },
+    "version_label": {
+      "type": "string",
+      "description": "Version label for this specification (e.g. '2026', 'v1.2', '2026-03'). Allows future versioning without changing the Product record.",
+      "default": "Current"
+    },
+    "is_current": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this is the current specification for the product. When versioned specifications are introduced, only one record per product_id should have this set to true."
+    },
+    "cabinet_type": {
+      "type": "string",
+      "description": "Physical: Cabinet type (e.g. Sealed, Ported, Passive Radiator)."
+    },
+    "mounting_type": {
+      "type": "string",
+      "description": "Physical: Mounting type (e.g. Freestanding, On Wall, In Wall, In Ceiling)."
+    },
+    "woofer_count": {
+      "type": "number",
+      "description": "Physical: Number of woofer drivers."
+    },
+    "woofer_size": {
+      "type": "string",
+      "description": "Physical: Woofer driver size (e.g. '8\"', '6.5\"')."
+    },
+    "midrange_count": {
+      "type": "number",
+      "description": "Physical: Number of midrange drivers."
+    },
+    "midrange_size": {
+      "type": "string",
+      "description": "Physical: Midrange driver size (e.g. '5\"', '4\"')."
+    },
+    "tweeter_description": {
+      "type": "string",
+      "description": "Physical: Tweeter description (e.g. '1\" soft dome', 'AMT')."
+    },
+    "compression_driver": {
+      "type": "boolean",
+      "description": "Physical: Whether the tweeter is a compression driver design."
+    },
+    "coaxial": {
+      "type": "boolean",
+      "description": "Physical: Whether the driver arrangement is coaxial."
+    },
+    "height_mm": {
+      "type": "number",
+      "description": "Physical: Cabinet height in millimeters."
+    },
+    "width_mm": {
+      "type": "number",
+      "description": "Physical: Cabinet width in millimeters."
+    },
+    "depth_mm": {
+      "type": "number",
+      "description": "Physical: Cabinet depth in millimeters."
+    },
+    "weight_kg": {
+      "type": "number",
+      "description": "Physical: Cabinet weight in kilograms."
+    },
+    "sensitivity_db": {
+      "type": "number",
+      "description": "Electrical: Sensitivity in dB (typically 1W/1m or 2.83V/1m). Valid range 75-105 dB."
+    },
+    "nominal_impedance_ohm": {
+      "type": "number",
+      "description": "Electrical: Nominal impedance in ohms. Valid range 2-16 \u03a9."
+    },
+    "minimum_impedance_ohm": {
+      "type": "number",
+      "description": "Electrical: Minimum impedance in ohms."
+    },
+    "recommended_amp_min_w": {
+      "type": "number",
+      "description": "Electrical: Minimum recommended amplifier power in watts."
+    },
+    "recommended_amp_max_w": {
+      "type": "number",
+      "description": "Electrical: Maximum recommended amplifier power in watts."
+    },
+    "long_term_iec_power_w": {
+      "type": "number",
+      "description": "Electrical: Long-term IEC power handling in watts."
+    },
+    "rated_iec_power_w": {
+      "type": "number",
+      "description": "Electrical: Rated IEC power handling in watts."
+    },
+    "aes_power_w": {
+      "type": "number",
+      "description": "Electrical: AES power handling in watts."
+    },
+    "peak_power_w": {
+      "type": "number",
+      "description": "Electrical: Peak power handling in watts."
+    },
+    "frequency_response_low_hz": {
+      "type": "number",
+      "description": "Acoustic: Lowest frequency response in Hz. Valid range 10-200 Hz."
+    },
+    "frequency_response_high_hz": {
+      "type": "number",
+      "description": "Acoustic: Highest frequency response in Hz."
+    },
+    "frequency_response_tolerance": {
+      "type": "string",
+      "description": "Acoustic: Frequency response tolerance (e.g. '\u00b13dB', '-6dB')."
+    },
+    "max_continuous_spl_db": {
+      "type": "number",
+      "description": "Acoustic: Maximum continuous SPL in dB. Valid range 85-140 dB."
+    },
+    "max_peak_spl_db": {
+      "type": "number",
+      "description": "Acoustic: Maximum peak SPL in dB."
+    },
+    "horizontal_dispersion_deg": {
+      "type": "number",
+      "description": "Acoustic: Horizontal dispersion angle in degrees."
+    },
+    "vertical_dispersion_deg": {
+      "type": "number",
+      "description": "Acoustic: Vertical dispersion angle in degrees."
+    },
+    "thx_certification": {
+      "type": "string",
+      "description": "Acoustic: THX certification level if applicable (e.g. 'THX Ultra2', 'None')."
+    },
+    "primary_source": {
+      "type": "string",
+      "description": "Metadata: Primary source reference for the specification data."
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "description": "Metadata: Confidence level. A=Published, B=Calculated, C=Estimated, D=Engineering Estimate."
+    },
+    "evidence_quality": {
+      "type": "string",
+      "enum": [
+        "Manufacturer Published",
+        "Manufacturer Calculated",
+        "Engineering Estimate",
+        "Unknown"
+      ],
+      "default": "Unknown",
+      "description": "Metadata: Quality of the evidence behind the specifications."
+    },
+    "last_verified": {
+      "type": "string",
+      "format": "date",
+      "description": "Metadata: Date the specifications were last verified against the source."
+    }
+  },
+  "required": [
+    "product_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

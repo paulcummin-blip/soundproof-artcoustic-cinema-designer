@@ -1,7 +1,7 @@
 // src/pages/AdminSpeakerDatabase.jsx
 //
-// Main admin page for the Speaker Capability Database.
-// Contains sub-navigation (Dashboard, Manufacturers, Products, Validation,
+// Main admin page for the Speaker Database.
+// Contains sub-navigation (Dashboard, Manufacturers, Products, Data Quality,
 // Change History, Settings) and renders the active section.
 
 import React, { useState } from "react";
@@ -10,7 +10,7 @@ import SpeakerDbNav from "@/components/admin/speaker-db/SpeakerDbNav";
 import SpeakerDbDashboard from "@/components/admin/speaker-db/SpeakerDbDashboard";
 import SpeakerDbManufacturers from "@/components/admin/speaker-db/SpeakerDbManufacturers";
 import SpeakerDbProducts from "@/components/admin/speaker-db/SpeakerDbProducts";
-import SpeakerDbValidation from "@/components/admin/speaker-db/SpeakerDbValidation";
+import SpeakerDbDataQuality from "@/components/admin/speaker-db/SpeakerDbDataQuality";
 import SpeakerDbChangeHistory from "@/components/admin/speaker-db/SpeakerDbChangeHistory";
 import SpeakerDbSettings from "@/components/admin/speaker-db/SpeakerDbSettings";
 
@@ -50,9 +50,9 @@ export default function AdminSpeakerDatabase() {
       </div>
 
       <div style={{ marginBottom: 8 }}>
-        <h1 style={{ margin: 0, fontSize: 26, color: BRAND.text }}>Speaker Capability Database</h1>
+        <h1 style={{ margin: 0, fontSize: 26, color: BRAND.text }}>Speaker Database</h1>
         <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-          The single source of truth for all loudspeaker capability data in Sound Proof.
+          A structured catalogue of loudspeaker specifications and sources. Capability is derived downstream by the RP22 engine.
         </div>
       </div>
 
@@ -61,7 +61,7 @@ export default function AdminSpeakerDatabase() {
       {section === "dashboard" && <SpeakerDbDashboard />}
       {section === "manufacturers" && <SpeakerDbManufacturers />}
       {section === "products" && <SpeakerDbProducts />}
-      {section === "validation" && <SpeakerDbValidation />}
+      {section === "dataQuality" && <SpeakerDbDataQuality />}
       {section === "history" && <SpeakerDbChangeHistory />}
       {section === "settings" && <SpeakerDbSettings />}
     </div>

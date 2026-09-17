@@ -1,12 +1,13 @@
 // src/components/admin/speaker-db/SpeakerDbDashboard.jsx
 //
-// Dashboard section for the Speaker Capability Database.
+// Dashboard section for the Speaker Database.
 // Shows summary statistics: total manufacturers, total products, current,
-// discontinued, warnings, missing data, last update, recent changes.
+// discontinued, data quality issues, missing data, average confidence,
+// last update, recent changes.
 
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Building2, Package, CheckCircle, XCircle, AlertTriangle, HelpCircle, Clock, FileText } from "lucide-react";
+import { Building2, Package, CheckCircle, XCircle, AlertTriangle, HelpCircle, Clock, FileText, TrendingUp } from "lucide-react";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -50,6 +51,7 @@ export default function SpeakerDbDashboard() {
     discontinued: 0,
     warnings: 0,
     missingData: 0,
+    avgConfidence: "—",
     lastUpdate: null,
     recentChanges: 0,
   });
@@ -60,10 +62,11 @@ export default function SpeakerDbDashboard() {
     let mounted = true;
     (async () => {
       try {
-        const [manufacturers, products, validations, history] = await Promise.all([
+        const [manufacturers, products, specs, dataQuality, history] = await Promise.all([
           base44.entities.SpeakerManufacturer.list("-created_date", 500),
           base44.entities.SpeakerProduct.list("-created_date", 500),
-          base44.entities.SpeakerValidation.filter({ status: "Open" }, "-created_date", 500),
+          base44.entities.SpeakerSpecification.list("-created_date", 500),
+          base44.entities.SpeakerDataQuality.filter({ status: "Needs Review" }, "-created_date", 500),
           base44.entities.SpeakerChangeHistory.list("-created_date", 10),
         ]);
 
@@ -72,10 +75,21 @@ export default function SpeakerDbDashboard() {
         const productList = products || [];
         const current = productList.filter((p) => p.status === "Current").length;
         const discontinued = productList.filter((p) => p.status === "Discontinued").length;
-        const warnings = (validations || []).length;
-        const missingData = productList.filter(
-          (p) => p.sensitivity_db == null || p.frequency_response_low_hz == null || p.max_continuous_spl_db == null
+        const warnings = (dataQuality || []).length;
+        const specList = specs || [];
+        const missingData = specList.filter(
+          (s) => s.sensitivity_db == null || s.frequency_response_low_hz == null || s.max_continuous_spl_db == null
         ).length;
+
+        // Average confidence across all specifications that have a confidence rating
+        const confidenceMap = { A: 4, B: 3, C: 2, D: 1 };
+        const rated = specList.filter((s) => s.confidence);
+        let avgConfidence = "—";
+        if (rated.length > 0) {
+          const sum = rated.reduce((acc, s) => acc + (confidenceMap[s.confidence] || 0), 0);
+          avgConfidence = `${Math.round((sum / rated.length) * 25)}%`;
+        }
+
         const lastUpdate = history && history.length > 0 ? history[0].created_date : null;
 
         setStats({
@@ -85,6 +99,7 @@ export default function SpeakerDbDashboard() {
           discontinued,
           warnings,
           missingData,
+          avgConfidence,
           lastUpdate,
           recentChanges: (history || []).length,
         });
@@ -110,8 +125,9 @@ export default function SpeakerDbDashboard() {
         <StatCard icon={Package} label="Total Products" value={stats.products} color={BRAND.green} />
         <StatCard icon={CheckCircle} label="Current" value={stats.current} color={BRAND.green} />
         <StatCard icon={XCircle} label="Discontinued" value={stats.discontinued} color={BRAND.subtext} />
-        <StatCard icon={AlertTriangle} label="Products with Warnings" value={stats.warnings} color={BRAND.amber} />
-        <StatCard icon={HelpCircle} label="Products Missing Data" value={stats.missingData} color={BRAND.amber} />
+        <StatCard icon={AlertTriangle} label="Data Quality Issues" value={stats.warnings} color={BRAND.amber} />
+        <StatCard icon={HelpCircle} label="Specs Missing Data" value={stats.missingData} color={BRAND.amber} />
+        <StatCard icon={TrendingUp} label="Average Confidence" value={stats.avgConfidence} color={BRAND.green} />
       </div>
 
       {/* Last update + Recent changes */}

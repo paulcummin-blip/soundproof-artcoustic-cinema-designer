@@ -1,14 +1,16 @@
 // src/pages/AdminSpeakerProductDetail.jsx
 //
 // Product detail page for a single SpeakerProduct.
-// Tabs: General, Specifications, Sources, Validation, History.
-// Specifications tab groups fields into Physical, Electrical, Acoustic, Metadata.
+// Tabs: General, Specifications, Sources, Data Quality, History.
+// Specifications are stored in SpeakerSpecification (one-to-one via current_specification_id).
+// General tab holds product identity, category (physical form), role, status, and images.
+// A "Derived Values" section is reserved (empty) for future engineering outputs.
 
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Save, Plus, Trash2, ExternalLink } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, ExternalLink, Calculator } from "lucide-react";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -26,11 +28,11 @@ const TABS = [
   { key: "general", label: "General" },
   { key: "specifications", label: "Specifications" },
   { key: "sources", label: "Sources" },
-  { key: "validation", label: "Validation" },
+  { key: "dataQuality", label: "Data Quality" },
   { key: "history", label: "History" },
 ];
 
-// Field groups for the Specifications tab
+// Field groups for the Specifications tab (now stored in SpeakerSpecification)
 const SPEC_GROUPS = [
   {
     label: "Physical",
@@ -88,13 +90,9 @@ const SPEC_GROUPS = [
   },
 ];
 
-function SpecField({ field, value, onChange }) {
-  const inputStyle = {
-    border: `1px solid ${BRAND.border}`,
-    color: BRAND.text,
-    background: BRAND.card,
-  };
+const inputStyle = { border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.card };
 
+function SpecField({ field, value, onChange }) {
   if (field.type === "boolean") {
     return (
       <input type="checkbox" checked={!!value} onChange={(e) => onChange(field.key, e.target.checked)} className="w-4 h-4" />
@@ -133,12 +131,14 @@ export default function AdminSpeakerProductDetail() {
   const [product, setProduct] = useState(null);
   const [manufacturers, setManufacturers] = useState([]);
   const [sources, setSources] = useState([]);
-  const [validations, setValidations] = useState([]);
+  const [dataQuality, setDataQuality] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({});
+  const [specData, setSpecData] = useState({});
+  const [specId, setSpecId] = useState(null);
 
   const isNew = productId === "new";
 
@@ -159,14 +159,18 @@ export default function AdminSpeakerProductDetail() {
             series: "",
             full_product_name: "",
             category: "Other",
+            role: "Flexible",
             status: "Unknown",
             official_product_url: "",
             official_pdf_url: "",
-            specification_version: "",
+            hero_image_url: "",
+            thumbnail_image_url: "",
+            diagram_image_url: "",
             notes: "",
           });
+          setSpecData({ version_label: "Current", is_current: true });
           setSources([]);
-          setValidations([]);
+          setDataQuality([]);
           setHistory([]);
         } else {
           const products = await base44.entities.SpeakerProduct.filter({ id: productId });
@@ -175,15 +179,27 @@ export default function AdminSpeakerProductDetail() {
           setProduct(p);
           setFormData(p || {});
 
-          const [srcs, vals, hist] = await Promise.all([
+          const [srcs, dq, hist, specs] = await Promise.all([
             base44.entities.SpeakerSource.filter({ product_id: productId }, "-created_date", 100),
-            base44.entities.SpeakerValidation.filter({ product_id: productId }, "-created_date", 100),
+            base44.entities.SpeakerDataQuality.filter({ product_id: productId }, "-created_date", 100),
             base44.entities.SpeakerChangeHistory.filter({ product_id: productId }, "-created_date", 100),
+            base44.entities.SpeakerSpecification.filter({ product_id: productId }, "-created_date", 100),
           ]);
           if (!mounted) return;
           setSources(srcs || []);
-          setValidations(vals || []);
+          setDataQuality(dq || []);
           setHistory(hist || []);
+
+          // Use the current specification (is_current=true, or the first one)
+          const specList = specs || [];
+          const currentSpec = specList.find((s) => s.is_current) || specList[0] || null;
+          if (currentSpec) {
+            setSpecId(currentSpec.id);
+            setSpecData(currentSpec);
+          } else {
+            setSpecId(null);
+            setSpecData({ version_label: "Current", is_current: true, product_id: productId });
+          }
         }
       } catch (err) {
         console.error("[AdminSpeakerProductDetail] Load failed:", err);
@@ -198,6 +214,10 @@ export default function AdminSpeakerProductDetail() {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleSpecChange = (key, value) => {
+    setSpecData((prev) => ({ ...prev, [key]: value }));
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -205,6 +225,15 @@ export default function AdminSpeakerProductDetail() {
         const man = manufacturers.find((m) => m.id === formData.manufacturer_id);
         const payload = { ...formData, manufacturer_name: man?.name || "" };
         const created = await base44.entities.SpeakerProduct.create(payload);
+        // Create the initial specification record
+        const specRecord = await base44.entities.SpeakerSpecification.create({
+          ...specData,
+          product_id: created.id,
+          version_label: specData.version_label || "Current",
+          is_current: true,
+        });
+        // Link the spec to the product
+        await base44.entities.SpeakerProduct.update(created.id, { current_specification_id: specRecord.id });
         // Log creation in change history
         await base44.entities.SpeakerChangeHistory.create({
           product_id: created.id,
@@ -218,7 +247,7 @@ export default function AdminSpeakerProductDetail() {
       } else {
         const man = manufacturers.find((m) => m.id === formData.manufacturer_id);
         const payload = { ...formData, manufacturer_name: man?.name || formData.manufacturer_name };
-        // Track changed fields
+        // Track changed product fields
         const changes = [];
         for (const key of Object.keys(payload)) {
           if (key === "id" || key === "created_date" || key === "updated_date" || key === "created_by_id") continue;
@@ -229,6 +258,21 @@ export default function AdminSpeakerProductDetail() {
           }
         }
         await base44.entities.SpeakerProduct.update(productId, payload);
+
+        // Save specification
+        if (specId) {
+          await base44.entities.SpeakerSpecification.update(specId, specData);
+        } else {
+          const specRecord = await base44.entities.SpeakerSpecification.create({
+            ...specData,
+            product_id: productId,
+            version_label: specData.version_label || "Current",
+            is_current: true,
+          });
+          setSpecId(specRecord.id);
+          await base44.entities.SpeakerProduct.update(productId, { current_specification_id: specRecord.id });
+        }
+
         // Log changes
         if (changes.length > 0) {
           await base44.entities.SpeakerChangeHistory.bulkCreate(changes);
@@ -328,52 +372,69 @@ export default function AdminSpeakerProductDetail() {
         <div className="rounded-lg p-6 space-y-4" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card, maxWidth: 600 }}>
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Manufacturer *</label>
-            <select value={formData.manufacturer_id || ""} onChange={(e) => handleFieldChange("manufacturer_id", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.card }}>
+            <select value={formData.manufacturer_id || ""} onChange={(e) => handleFieldChange("manufacturer_id", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle}>
               <option value="">Select…</option>
               {manufacturers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Model *</label>
-            <input type="text" value={formData.model || ""} onChange={(e) => handleFieldChange("model", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }} />
+            <input type="text" value={formData.model || ""} onChange={(e) => handleFieldChange("model", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle} />
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Series</label>
-            <input type="text" value={formData.series || ""} onChange={(e) => handleFieldChange("series", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }} />
+            <input type="text" value={formData.series || ""} onChange={(e) => handleFieldChange("series", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle} />
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Full Product Name</label>
-            <input type="text" value={formData.full_product_name || ""} onChange={(e) => handleFieldChange("full_product_name", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }} />
+            <input type="text" value={formData.full_product_name || ""} onChange={(e) => handleFieldChange("full_product_name", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Category</label>
-              <select value={formData.category || "Other"} onChange={(e) => handleFieldChange("category", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }}>
-                {["LCR", "On Wall", "In Wall", "Surround", "Other"].map((c) => <option key={c} value={c}>{c}</option>)}
+              <select value={formData.category || "Other"} onChange={(e) => handleFieldChange("category", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle}>
+                {["On Wall", "In Wall", "Freestanding", "Other"].map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Role</label>
+              <select value={formData.role || "Flexible"} onChange={(e) => handleFieldChange("role", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle}>
+                {["LCR", "Surround", "Both", "Wide", "Height", "Flexible"].map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Status</label>
-              <select value={formData.status || "Unknown"} onChange={(e) => handleFieldChange("status", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }}>
-                {["Current", "Discontinued", "Coming Soon", "Unknown"].map((s) => <option key={s} value={s}>{s}</option>)}
+              <select value={formData.status || "Unknown"} onChange={(e) => handleFieldChange("status", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle}>
+                {["Current", "Discontinued", "Coming Soon", "Hidden", "Archived", "Unknown"].map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Official Product URL</label>
-            <input type="text" value={formData.official_product_url || ""} onChange={(e) => handleFieldChange("official_product_url", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }} placeholder="https://…" />
+            <input type="text" value={formData.official_product_url || ""} onChange={(e) => handleFieldChange("official_product_url", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle} placeholder="https://…" />
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Official PDF URL</label>
-            <input type="text" value={formData.official_pdf_url || ""} onChange={(e) => handleFieldChange("official_pdf_url", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }} placeholder="https://…" />
+            <input type="text" value={formData.official_pdf_url || ""} onChange={(e) => handleFieldChange("official_pdf_url", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle} placeholder="https://…" />
+          </div>
+          {/* Product Images */}
+          <div className="pt-2" style={{ borderTop: `1px solid ${BRAND.border}` }} />
+          <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: BRAND.green }}>Product Images</div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Hero Image URL</label>
+            <input type="text" value={formData.hero_image_url || ""} onChange={(e) => handleFieldChange("hero_image_url", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle} placeholder="https://…" />
           </div>
           <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Specification Version</label>
-            <input type="text" value={formData.specification_version || ""} onChange={(e) => handleFieldChange("specification_version", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }} />
+            <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Thumbnail Image URL</label>
+            <input type="text" value={formData.thumbnail_image_url || ""} onChange={(e) => handleFieldChange("thumbnail_image_url", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle} placeholder="https://…" />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Diagram Image URL</label>
+            <input type="text" value={formData.diagram_image_url || ""} onChange={(e) => handleFieldChange("diagram_image_url", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle} placeholder="https://…" />
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Notes</label>
-            <textarea value={formData.notes || ""} onChange={(e) => handleFieldChange("notes", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }} rows={3} />
+            <textarea value={formData.notes || ""} onChange={(e) => handleFieldChange("notes", e.target.value)} disabled={!editMode && !isNew} className="w-full px-3 py-2 rounded-md text-sm outline-none" style={inputStyle} rows={3} />
           </div>
         </div>
       )}
@@ -381,6 +442,26 @@ export default function AdminSpeakerProductDetail() {
       {/* Specifications Tab */}
       {tab === "specifications" && (
         <div className="space-y-6">
+          {/* Specification version label */}
+          <div className="rounded-lg p-6" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card }}>
+            <h3 className="text-sm font-bold uppercase tracking-wide mb-4" style={{ color: BRAND.green }}>Specification Version</h3>
+            <div className="grid gap-4" style={{ gridTemplateColumns: "260px 1fr" }}>
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Version Label</label>
+                {editMode || isNew ? (
+                  <input type="text" value={specData.version_label || ""} onChange={(e) => handleSpecChange("version_label", e.target.value)} className="w-full px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} placeholder="e.g. 2026, v1.2" />
+                ) : (
+                  <div className="px-2 py-1.5 text-sm rounded-md" style={{ background: "#F8F8F7", color: BRAND.text, minHeight: 34, display: "flex", alignItems: "center" }}>
+                    {specData.version_label || "Current"}
+                  </div>
+                )}
+              </div>
+              <div className="text-xs flex items-center" style={{ color: BRAND.subtext }}>
+                Specifications are stored separately from product identity, allowing future versioning (2026, 2027, 2028) without changing the Product record.
+              </div>
+            </div>
+          </div>
+
           {SPEC_GROUPS.map((group) => (
             <div key={group.label} className="rounded-lg p-6" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card }}>
               <h3 className="text-sm font-bold uppercase tracking-wide mb-4" style={{ color: BRAND.green }}>{group.label}</h3>
@@ -389,10 +470,10 @@ export default function AdminSpeakerProductDetail() {
                   <div key={field.key}>
                     <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>{field.label}</label>
                     {editMode || isNew ? (
-                      <SpecField field={field} value={formData[field.key]} onChange={handleFieldChange} />
+                      <SpecField field={field} value={specData[field.key]} onChange={handleSpecChange} />
                     ) : (
                       <div className="px-2 py-1.5 text-sm rounded-md" style={{ background: "#F8F8F7", color: BRAND.text, minHeight: 34, display: "flex", alignItems: "center" }}>
-                        {field.type === "boolean" ? (formData[field.key] ? "Yes" : "No") : (formData[field.key] != null && formData[field.key] !== "" ? String(formData[field.key]) : "—")}
+                        {field.type === "boolean" ? (specData[field.key] ? "Yes" : "No") : (specData[field.key] != null && specData[field.key] !== "" ? String(specData[field.key]) : "—")}
                       </div>
                     )}
                   </div>
@@ -400,6 +481,18 @@ export default function AdminSpeakerProductDetail() {
               </div>
             </div>
           ))}
+
+          {/* Derived Values — reserved, empty */}
+          <div className="rounded-lg p-6" style={{ border: `1px solid ${BRAND.border}`, background: "#F8F8F7" }}>
+            <div className="flex items-center gap-2 mb-3">
+              <Calculator className="w-4 h-4" style={{ color: BRAND.subtext }} />
+              <h3 className="text-sm font-bold uppercase tracking-wide" style={{ color: BRAND.subtext }}>Derived Values</h3>
+            </div>
+            <div className="text-xs" style={{ color: BRAND.subtext }}>
+              Reserved for future engineering outputs — estimated max SPL, estimated sensitivity, estimated P12 capability, etc.
+              These are never manufacturer data; they are computed downstream by the RP22 engine. Nothing is stored or calculated here yet.
+            </div>
+          </div>
         </div>
       )}
 
@@ -439,14 +532,14 @@ export default function AdminSpeakerProductDetail() {
         </div>
       )}
 
-      {/* Validation Tab */}
-      {tab === "validation" && (
+      {/* Data Quality Tab */}
+      {tab === "dataQuality" && (
         <div>
-          {validations.length === 0 ? (
-            <div className="py-12 text-center text-sm" style={{ color: BRAND.subtext }}>No validation warnings for this product.</div>
+          {dataQuality.length === 0 ? (
+            <div className="py-12 text-center text-sm" style={{ color: BRAND.subtext }}>No data quality issues for this product.</div>
           ) : (
             <div className="space-y-2">
-              {validations.map((v) => (
+              {dataQuality.map((v) => (
                 <div key={v.id} className="flex items-center gap-4 p-4 rounded-lg" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card }}>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: v.severity === "Critical" ? BRAND.danger + "15" : v.severity === "Warning" ? "#9A6E0015" : BRAND.subtext + "15", color: v.severity === "Critical" ? BRAND.danger : v.severity === "Warning" ? "#9A6E00" : BRAND.subtext }}>{v.severity}</span>
                   <span className="font-medium text-sm" style={{ color: BRAND.text }}>{v.field}</span>

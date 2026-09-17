@@ -1,0 +1,76 @@
+{
+  "name": "SpeakerManufacturerRule",
+  "type": "object",
+  "description": "Per-manufacturer rules for data extraction and interpretation. Defines preferred source types, which product categories to ignore, and which power/SPL rating to use as primary. Avoids hard-coding manufacturer-specific logic in the extraction engine. One record per manufacturer.",
+  "properties": {
+    "manufacturer_id": {
+      "type": "string",
+      "description": "ID of the SpeakerManufacturer these rules apply to."
+    },
+    "preferred_source_type": {
+      "type": "string",
+      "enum": [
+        "Official Product Page",
+        "Official PDF",
+        "Engineering Document",
+        "Support Article"
+      ],
+      "description": "Preferred source type for extracting specification data from this manufacturer."
+    },
+    "ignore_subwoofers": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to ignore subwoofer products from this manufacturer (e.g. if they use a different measurement standard)."
+    },
+    "ignore_ceiling": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to ignore ceiling / in-ceiling products from this manufacturer."
+    },
+    "primary_power_rating": {
+      "type": "string",
+      "enum": [
+        "AES",
+        "Long Term IEC",
+        "Rated IEC",
+        "Peak",
+        "Program"
+      ],
+      "description": "Which power rating to use as the primary power handling figure for this manufacturer's products."
+    },
+    "primary_spl": {
+      "type": "string",
+      "enum": [
+        "Continuous",
+        "Peak",
+        "Calculated"
+      ],
+      "description": "Which SPL rating to use as the primary maximum SPL figure for this manufacturer's products."
+    }
+  },
+  "required": [
+    "manufacturer_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

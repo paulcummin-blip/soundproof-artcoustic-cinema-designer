@@ -1,10 +1,10 @@
 // src/components/admin/speaker-db/SpeakerDbNav.jsx
 //
-// Horizontal sub-navigation for the Speaker Capability Database admin section.
-// Tabs: Dashboard, Manufacturers, Products, Validation, Change History, Settings.
+// Horizontal sub-navigation for the Speaker Database admin section.
+// Tabs: Dashboard, Manufacturers, Products, Data Quality, Change History, Settings.
 
 import React from "react";
-import { LayoutDashboard, Building2, Package, AlertCircle, History, Settings } from "lucide-react";
+import { LayoutDashboard, Building2, Package, ShieldCheck, History, Settings } from "lucide-react";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -18,7 +18,7 @@ const TABS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "manufacturers", label: "Manufacturers", icon: Building2 },
   { key: "products", label: "Products", icon: Package },
-  { key: "validation", label: "Validation", icon: AlertCircle },
+  { key: "dataQuality", label: "Data Quality", icon: ShieldCheck },
   { key: "history", label: "Change History", icon: History },
   { key: "settings", label: "Settings", icon: Settings },
 ];

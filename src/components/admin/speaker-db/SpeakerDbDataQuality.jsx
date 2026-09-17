@@ -1,7 +1,8 @@
-// src/components/admin/speaker-db/SpeakerDbValidation.jsx
+// src/components/admin/speaker-db/SpeakerDbDataQuality.jsx
 //
-// Validation section: list of all validation warnings across products.
-// Filter by severity and status. Update warning status (Open/Resolved/Ignored).
+// Data Quality section: list of all data quality issues across products.
+// Filter by severity and status. Update issue status.
+// Renamed from SpeakerDbValidation to avoid confusion with RP22 validation.
 
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
@@ -25,22 +26,30 @@ function SeverityIcon({ severity }) {
 }
 
 function StatusBadge({ status }) {
-  const colors = { Open: BRAND.amber, Resolved: BRAND.green, Ignored: BRAND.subtext };
+  const colors = {
+    Missing: BRAND.red,
+    Conflict: BRAND.amber,
+    Estimated: BRAND.subtext,
+    "Needs Review": BRAND.amber,
+    "Out of Date": BRAND.subtext,
+    Resolved: BRAND.green,
+    Ignored: BRAND.subtext,
+  };
   const color = colors[status] || BRAND.subtext;
   return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: color + "15", color }}>{status}</span>;
 }
 
-export default function SpeakerDbValidation() {
+export default function SpeakerDbDataQuality() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const data = await base44.entities.SpeakerValidation.list("-created_date", 500);
+      const data = await base44.entities.SpeakerDataQuality.list("-created_date", 500);
       setRows(data || []);
     } catch (err) {
-      console.error("[SpeakerDbValidation] Load failed:", err);
+      console.error("[SpeakerDbDataQuality] Load failed:", err);
     } finally {
       setLoading(false);
     }
@@ -50,10 +59,10 @@ export default function SpeakerDbValidation() {
 
   const handleStatusChange = async (row, newStatus) => {
     try {
-      await base44.entities.SpeakerValidation.update(row.id, { status: newStatus });
+      await base44.entities.SpeakerDataQuality.update(row.id, { status: newStatus });
       await loadData();
     } catch (err) {
-      console.error("[SpeakerDbValidation] Status update failed:", err);
+      console.error("[SpeakerDbDataQuality] Status update failed:", err);
     }
   };
 
@@ -63,14 +72,18 @@ export default function SpeakerDbValidation() {
     { key: "message", label: "Message", render: (r) => r.message },
     { key: "status", label: "Status", sortable: true, width: "120px", render: (r) => <StatusBadge status={r.status} /> },
     {
-      key: "actions", label: "", width: "120px", render: (r) => (
+      key: "actions", label: "", width: "140px", render: (r) => (
         <select
           value={r.status}
           onChange={(e) => handleStatusChange(r, e.target.value)}
           className="px-2 py-1 rounded text-xs outline-none cursor-pointer"
           style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.card }}
         >
-          <option value="Open">Open</option>
+          <option value="Missing">Missing</option>
+          <option value="Conflict">Conflict</option>
+          <option value="Estimated">Estimated</option>
+          <option value="Needs Review">Needs Review</option>
+          <option value="Out of Date">Out of Date</option>
           <option value="Resolved">Resolved</option>
           <option value="Ignored">Ignored</option>
         </select>
@@ -81,7 +94,7 @@ export default function SpeakerDbValidation() {
   return (
     <div>
       <div className="text-sm mb-4" style={{ color: BRAND.subtext }}>
-        {rows.length} validation warning{rows.length !== 1 ? "s" : ""}
+        {rows.length} data quality issue{rows.length !== 1 ? "s" : ""}
       </div>
       {loading ? (
         <div className="py-12 text-center text-sm" style={{ color: BRAND.subtext }}>Loading…</div>
@@ -95,7 +108,13 @@ export default function SpeakerDbValidation() {
               { value: "Critical", label: "Critical" }, { value: "Warning", label: "Warning" }, { value: "Information", label: "Information" },
             ]},
             { key: "status", label: "Status", options: [
-              { value: "Open", label: "Open" }, { value: "Resolved", label: "Resolved" }, { value: "Ignored", label: "Ignored" },
+              { value: "Missing", label: "Missing" },
+              { value: "Conflict", label: "Conflict" },
+              { value: "Estimated", label: "Estimated" },
+              { value: "Needs Review", label: "Needs Review" },
+              { value: "Out of Date", label: "Out of Date" },
+              { value: "Resolved", label: "Resolved" },
+              { value: "Ignored", label: "Ignored" },
             ]},
           ]}
           rowKey={(r) => r.id}

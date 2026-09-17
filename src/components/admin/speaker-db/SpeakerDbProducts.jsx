@@ -2,6 +2,7 @@
 //
 // Products section: list with search/filter/sort/pagination.
 // Clicking a row navigates to the product detail page.
+// Specifications are loaded from SpeakerSpecification and merged for display.
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -24,6 +25,8 @@ function StatusBadge({ status }) {
     Current: BRAND.green,
     Discontinued: BRAND.subtext,
     "Coming Soon": "#9A6E00",
+    Hidden: "#625143",
+    Archived: "#625143",
     Unknown: BRAND.subtext,
   };
   const color = colors[status] || BRAND.subtext;
@@ -32,6 +35,20 @@ function StatusBadge({ status }) {
       {status || "Unknown"}
     </span>
   );
+}
+
+function RoleBadge({ role }) {
+  if (!role) return <span style={{ color: BRAND.subtext }}>—</span>;
+  const colors = {
+    LCR: BRAND.green,
+    Surround: "#9A6E00",
+    Both: BRAND.green,
+    Wide: BRAND.subtext,
+    Height: BRAND.subtext,
+    Flexible: BRAND.subtext,
+  };
+  const color = colors[role] || BRAND.subtext;
+  return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: color + "15", color }}>{role}</span>;
 }
 
 function ConfidenceBadge({ confidence }) {
@@ -49,8 +66,28 @@ export default function SpeakerDbProducts() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await base44.entities.SpeakerProduct.list("-updated_date", 500);
-        setRows(data || []);
+        const [products, specs] = await Promise.all([
+          base44.entities.SpeakerProduct.list("-updated_date", 500),
+          base44.entities.SpeakerSpecification.list("-created_date", 500),
+        ]);
+
+        // Build a map of product_id → current specification
+        const specMap = {};
+        (specs || []).forEach((s) => {
+          if (!specMap[s.product_id] || s.is_current) {
+            specMap[s.product_id] = s;
+          }
+        });
+
+        // Merge product + spec for display
+        const merged = (products || []).map((p) => ({
+          ...p,
+          sensitivity_db: specMap[p.id]?.sensitivity_db ?? null,
+          max_continuous_spl_db: specMap[p.id]?.max_continuous_spl_db ?? null,
+          confidence: specMap[p.id]?.confidence ?? null,
+        }));
+
+        setRows(merged);
       } catch (err) {
         console.error("[SpeakerDbProducts] Load failed:", err);
       } finally {
@@ -66,7 +103,8 @@ export default function SpeakerDbProducts() {
   const columns = [
     { key: "manufacturer_name", label: "Manufacturer", sortable: true, width: "160px", render: (r) => <span className="font-medium">{r.manufacturer_name || "—"}</span> },
     { key: "full_product_name", label: "Product", sortable: true, render: (r) => <span className="font-medium">{r.full_product_name || r.model}</span> },
-    { key: "category", label: "Category", sortable: true, width: "100px", render: (r) => r.category || "—" },
+    { key: "category", label: "Category", sortable: true, width: "110px", render: (r) => r.category || "—" },
+    { key: "role", label: "Role", sortable: true, width: "90px", render: (r) => <RoleBadge role={r.role} /> },
     { key: "status", label: "Status", sortable: true, width: "120px", render: (r) => <StatusBadge status={r.status} /> },
     { key: "sensitivity_db", label: "Sensitivity", sortable: true, width: "100px", render: (r) => r.sensitivity_db != null ? `${r.sensitivity_db} dB` : "—" },
     { key: "max_continuous_spl_db", label: "Max SPL", sortable: true, width: "90px", render: (r) => r.max_continuous_spl_db != null ? `${r.max_continuous_spl_db} dB` : "—" },
@@ -97,12 +135,26 @@ export default function SpeakerDbProducts() {
           searchableKeys={["manufacturer_name", "full_product_name", "model", "series"]}
           filters={[
             { key: "category", label: "Categories", options: [
-              { value: "LCR", label: "LCR" }, { value: "On Wall", label: "On Wall" },
-              { value: "In Wall", label: "In Wall" }, { value: "Surround", label: "Surround" }, { value: "Other", label: "Other" },
+              { value: "On Wall", label: "On Wall" },
+              { value: "In Wall", label: "In Wall" },
+              { value: "Freestanding", label: "Freestanding" },
+              { value: "Other", label: "Other" },
+            ]},
+            { key: "role", label: "Role", options: [
+              { value: "LCR", label: "LCR" },
+              { value: "Surround", label: "Surround" },
+              { value: "Both", label: "Both" },
+              { value: "Wide", label: "Wide" },
+              { value: "Height", label: "Height" },
+              { value: "Flexible", label: "Flexible" },
             ]},
             { key: "status", label: "Status", options: [
-              { value: "Current", label: "Current" }, { value: "Discontinued", label: "Discontinued" },
-              { value: "Coming Soon", label: "Coming Soon" }, { value: "Unknown", label: "Unknown" },
+              { value: "Current", label: "Current" },
+              { value: "Discontinued", label: "Discontinued" },
+              { value: "Coming Soon", label: "Coming Soon" },
+              { value: "Hidden", label: "Hidden" },
+              { value: "Archived", label: "Archived" },
+              { value: "Unknown", label: "Unknown" },
             ]},
           ]}
           rowKey={(r) => r.id}

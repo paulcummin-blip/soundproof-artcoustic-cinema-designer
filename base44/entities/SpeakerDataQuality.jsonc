@@ -1,0 +1,70 @@
+{
+  "name": "SpeakerDataQuality",
+  "type": "object",
+  "description": "A data quality issue for a SpeakerProduct specification field. Generated when specification values fall outside expected ranges, are missing, conflict with other sources, are estimated, need review, or are out of date. One record per issue. Renamed from SpeakerValidation to avoid confusion with RP22 validation \u2014 this is about data quality of the catalogue, not RP22 compliance.",
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "description": "ID of the SpeakerProduct this data quality issue belongs to."
+    },
+    "field": {
+      "type": "string",
+      "description": "The specification field that triggered the issue (e.g. 'sensitivity_db', 'max_continuous_spl_db')."
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "Information",
+        "Warning",
+        "Critical"
+      ],
+      "default": "Warning",
+      "description": "Severity of the data quality issue."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Missing",
+        "Conflict",
+        "Estimated",
+        "Needs Review",
+        "Out of Date",
+        "Resolved",
+        "Ignored"
+      ],
+      "default": "Needs Review",
+      "description": "Current status of the data quality issue."
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable message explaining the issue."
+    }
+  },
+  "required": [
+    "product_id",
+    "field",
+    "message"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
