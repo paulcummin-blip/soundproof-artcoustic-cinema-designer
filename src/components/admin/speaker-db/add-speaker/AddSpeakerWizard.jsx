@@ -19,6 +19,7 @@ import StepDocuments from "./StepDocuments.jsx";
 import StepExtract from "./StepExtract.jsx";
 import StepReview from "./StepReview.jsx";
 import StepApprove from "./StepApprove.jsx";
+import ProductPreviewPanel from "./ProductPreviewPanel.jsx";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -35,7 +36,7 @@ const STEPS = [
   { key: "manufacturer", label: "Manufacturer" },
   { key: "url", label: "Product URL" },
   { key: "documents", label: "Documents" },
-  { key: "extract", label: "Extract" },
+  { key: "extract", label: "Read Specifications" },
   { key: "review", label: "Review" },
   { key: "approve", label: "Approve" },
 ];
@@ -55,6 +56,7 @@ export default function AddSpeakerWizard() {
   const [productId, setProductId] = useState(null);
   const [specId, setSpecId] = useState(null);
   const [specData, setSpecData] = useState(null);
+  const [productData, setProductData] = useState(null);
   const [reviewerName, setReviewerName] = useState(user?.full_name || "");
   const [validationResult, setValidationResult] = useState(null);
 
@@ -70,7 +72,7 @@ export default function AddSpeakerWizard() {
     })();
   }, []);
 
-  // After extraction, load the spec data
+  // After extraction, load the spec and product data
   useEffect(() => {
     if (!productId) return;
     (async () => {
@@ -81,6 +83,8 @@ export default function AddSpeakerWizard() {
           setSpecId(current.id);
           setSpecData(current);
         }
+        const product = await base44.entities.SpeakerProduct.get(productId);
+        setProductData(product);
       } catch (err) {
         console.error("[AddSpeakerWizard] Failed to load spec:", err);
       }
@@ -168,60 +172,72 @@ export default function AddSpeakerWizard() {
         })}
       </div>
 
-      {/* Step content */}
-      <div className="rounded-lg p-6" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card }}>
-        {step === 0 && (
-          <StepManufacturer
-            manufacturers={manufacturers}
-            selected={selectedManufacturer}
-            onSelect={setSelectedManufacturer}
-          />
-        )}
-        {step === 1 && (
-          <StepProductUrl
-            manufacturer={selectedManufacturer}
-            productUrl={productUrl}
-            onProductUrlChange={setProductUrl}
-            onValidationResult={({ valid }) => setUrlValid(valid)}
-          />
-        )}
-        {step === 2 && (
-          <StepDocuments
-            productUrl={productUrl}
-            pdfUrl={pdfUrl}
-            onPdfUrlChange={setPdfUrl}
-            additionalDocs={additionalDocs}
-            onAdditionalDocsChange={setAdditionalDocs}
-          />
-        )}
-        {step === 3 && (
-          <StepExtract
-            manufacturer={selectedManufacturer}
-            productUrl={productUrl}
-            pdfUrl={pdfUrl}
-            additionalDocs={additionalDocs}
-            onExtracted={handleExtracted}
-            productId={productId}
-            specId={specId}
-          />
-        )}
-        {step === 4 && specData && (
-          <StepReview
-            productId={productId}
-            specId={specId}
-            specData={specData}
-            onSpecDataChange={setSpecData}
-            onValidationUpdate={setValidationResult}
-          />
-        )}
-        {step === 5 && specData && (
-          <StepApprove
-            productId={productId}
-            specId={specId}
-            specData={specData}
-            reviewerName={reviewerName}
-            onReviewerNameChange={setReviewerName}
-          />
+      {/* Step content — two-column layout for steps 4-6 with product preview */}
+      <div className={step >= 3 && productId ? "flex gap-6" : ""}>
+        <div className="flex-1 rounded-lg p-6" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card, minWidth: 0 }}>
+          {step === 0 && (
+            <StepManufacturer
+              manufacturers={manufacturers}
+              selected={selectedManufacturer}
+              onSelect={setSelectedManufacturer}
+            />
+          )}
+          {step === 1 && (
+            <StepProductUrl
+              manufacturer={selectedManufacturer}
+              productUrl={productUrl}
+              onProductUrlChange={setProductUrl}
+              onValidationResult={({ valid }) => setUrlValid(valid)}
+            />
+          )}
+          {step === 2 && (
+            <StepDocuments
+              productUrl={productUrl}
+              pdfUrl={pdfUrl}
+              onPdfUrlChange={setPdfUrl}
+              additionalDocs={additionalDocs}
+              onAdditionalDocsChange={setAdditionalDocs}
+            />
+          )}
+          {step === 3 && (
+            <StepExtract
+              manufacturer={selectedManufacturer}
+              productUrl={productUrl}
+              pdfUrl={pdfUrl}
+              additionalDocs={additionalDocs}
+              onExtracted={handleExtracted}
+              productId={productId}
+              specId={specId}
+            />
+          )}
+          {step === 4 && specData && (
+            <StepReview
+              productId={productId}
+              specId={specId}
+              specData={specData}
+              onSpecDataChange={setSpecData}
+              onValidationUpdate={setValidationResult}
+            />
+          )}
+          {step === 5 && specData && (
+            <StepApprove
+              productId={productId}
+              specId={specId}
+              specData={specData}
+              reviewerName={reviewerName}
+              onReviewerNameChange={setReviewerName}
+              onSpecDataChange={setSpecData}
+            />
+          )}
+        </div>
+        {step >= 3 && productId && (
+          <div style={{ width: 280, flexShrink: 0 }}>
+            <ProductPreviewPanel
+              product={productData}
+              manufacturer={selectedManufacturer}
+              specData={specData}
+            />
+          </div>
         )}
       </div>
 

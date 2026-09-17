@@ -178,6 +178,29 @@ export async function approveSpecification({ productId, specId, reviewerName }) 
 }
 
 /**
+ * Save the specification as a Draft (keeps approval_status = "Draft").
+ * Stamps the reviewer name and logs the action to Change History.
+ */
+export async function saveDraft({ productId, specId, reviewerName }) {
+  const today = new Date().toISOString().split("T")[0];
+  await base44.entities.SpeakerSpecification.update(specId, {
+    approval_status: "Draft",
+    reviewed_by: reviewerName || "",
+    reviewed_date: today,
+  });
+  await base44.entities.SpeakerChangeHistory.create({
+    product_id: productId,
+    field_changed: "approval_status",
+    old_value: "Draft",
+    new_value: "Draft",
+    source: "Manual Edit",
+    change_type: "Manual Edit",
+    change_reason: "Status Change",
+  });
+  return { saved: true };
+}
+
+/**
  * Submit the specification for review (Draft → Awaiting Review).
  */
 export async function submitForReview({ productId, specId, reviewerName }) {

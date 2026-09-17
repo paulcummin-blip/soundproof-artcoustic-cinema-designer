@@ -1,4 +1,4 @@
-// StepExtract.jsx — Step 4: Create the Draft scaffolding (extraction engine)
+// StepExtract.jsx — Step 4: Read Specifications (create the Draft scaffolding)
 
 import React, { useState } from "react";
 import { Loader2, CheckCircle2, AlertCircle, FileSearch } from "lucide-react";
@@ -42,9 +42,9 @@ export default function StepExtract({ manufacturer, productUrl, pdfUrl, addition
     return (
       <div>
         <div className="mb-4">
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: BRAND.text, margin: 0 }}>Extraction Complete</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: BRAND.text, margin: 0 }}>Draft Created</h2>
           <p style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-            A Draft product and specification have been created. No specification values were extracted — all fields are blank and ready for manual review.
+            A Draft product and specification have been created. No specification values were guessed — all fields are blank and ready for manual entry.
           </p>
         </div>
 
@@ -74,9 +74,9 @@ export default function StepExtract({ manufacturer, productUrl, pdfUrl, addition
   return (
     <div>
       <div className="mb-4">
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: BRAND.text, margin: 0 }}>Extract</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: BRAND.text, margin: 0 }}>Read Specifications</h2>
         <p style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-          This step creates an empty Draft from the available data. It is <strong>not</strong> AI extraction — no specification values are guessed or invented.
+          This step creates an empty Draft from the available data. No specification values are guessed or invented — fields are populated manually in the Review step.
         </p>
       </div>
 

@@ -1,13 +1,18 @@
 // StepApprove.jsx — Step 6: Approval screen
-// Shows completeness, data quality, warnings, and confidence.
-// Only Approved specifications become Current Specification.
+// Shows completeness, data quality, comparison with existing spec, and
+// a phased approval workflow: Save Draft → Submit for Review → Approve.
+//
+// Approve is only visible when the spec is in "Awaiting Review" status.
+// This mirrors a real engineering review workflow.
 
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, Loader2, AlertTriangle, ShieldCheck, ArrowRight } from "lucide-react";
+import { CheckCircle2, Loader2, AlertTriangle, ShieldCheck, ArrowRight, Save, Send } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 import { validateDraftSpec } from "./addSpeakerValidation.js";
-import { approveSpecification, submitForReview, runValidationAndPersist } from "./addSpeakerPersistence.js";
+import { approveSpecification, submitForReview, runValidationAndPersist, saveDraft } from "./addSpeakerPersistence.js";
 import { calculateSpecCompleteness, SPEC_COMPLETENESS_FIELDS } from "../speakerDbQualityScore.js";
+import SpecComparison from "./SpecComparison.jsx";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -20,12 +25,29 @@ const BRAND = {
   amber: "#9A6E00",
 };
 
-export default function StepApprove({ productId, specId, specData, reviewerName, onReviewerNameChange }) {
+export default function StepApprove({ productId, specId, specData, reviewerName, onReviewerNameChange, onSpecDataChange }) {
   const navigate = useNavigate();
   const [approving, setApproving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [done, setDone] = useState(false);
+  const [doneAction, setDoneAction] = useState("");
   const [error, setError] = useState("");
+  const [existingSpec, setExistingSpec] = useState(null);
+
+  // Load any existing approved spec for comparison
+  useEffect(() => {
+    if (!productId) return;
+    (async () => {
+      try {
+        const specs = await base44.entities.SpeakerSpecification.filter({ product_id: productId });
+        const approved = (specs || []).find((s) => s.approval_status === "Approved" && s.id !== specId);
+        if (approved) setExistingSpec(approved);
+      } catch {
+        // Non-fatal
+      }
+    })();
+  }, [productId, specId]);
 
   const validation = validateDraftSpec(specData);
   const completeness = calculateSpecCompleteness(specData);
@@ -34,21 +56,21 @@ export default function StepApprove({ productId, specId, specData, reviewerName,
     return sum + (weights[i.status] || 0.5);
   }, 0));
 
-  const canApprove = specData && specId && reviewerName;
+  const isAwaitingReview = specData?.approval_status === "Awaiting Review";
+  const canAct = specData && specId && reviewerName;
 
-  const handleApprove = async () => {
-    setApproving(true);
+  const handleSaveDraft = async () => {
+    setSavingDraft(true);
     setError("");
     try {
-      // Run final validation and persist
-      await runValidationAndPersist(productId, specData);
-      // Approve
-      await approveSpecification({ productId, specId, reviewerName });
+      await saveDraft({ productId, specId, reviewerName });
+      onSpecDataChange?.({ ...specData, approval_status: "Draft" });
+      setDoneAction("Saved as Draft");
       setDone(true);
     } catch (err) {
-      setError(err.message || "Approval failed.");
+      setError(err.message || "Save failed.");
     } finally {
-      setApproving(false);
+      setSavingDraft(false);
     }
   };
 
@@ -58,6 +80,8 @@ export default function StepApprove({ productId, specId, specData, reviewerName,
     try {
       await runValidationAndPersist(productId, specData);
       await submitForReview({ productId, specId, reviewerName });
+      onSpecDataChange?.({ ...specData, approval_status: "Awaiting Review" });
+      setDoneAction("Submitted for Review");
       setDone(true);
     } catch (err) {
       setError(err.message || "Submission failed.");
@@ -66,13 +90,32 @@ export default function StepApprove({ productId, specId, specData, reviewerName,
     }
   };
 
+  const handleApprove = async () => {
+    setApproving(true);
+    setError("");
+    try {
+      await runValidationAndPersist(productId, specData);
+      await approveSpecification({ productId, specId, reviewerName });
+      setDoneAction("Approved");
+      setDone(true);
+    } catch (err) {
+      setError(err.message || "Approval failed.");
+    } finally {
+      setApproving(false);
+    }
+  };
+
   if (done) {
     return (
       <div>
         <div className="mb-4">
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: BRAND.text, margin: 0 }}>Specification Approved</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: BRAND.text, margin: 0 }}>{doneAction}</h2>
           <p style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-            This specification is now the Current Specification. It will appear in the Speaker Database Products list.
+            {doneAction === "Approved"
+              ? "This specification is now the Current Specification. It will appear in the Speaker Database Products list."
+              : doneAction === "Submitted for Review"
+                ? "The specification has been submitted for review. A reviewer can now approve it."
+                : "The specification has been saved as a Draft. You can return to continue editing later."}
           </p>
         </div>
 
@@ -82,7 +125,11 @@ export default function StepApprove({ productId, specId, specData, reviewerName,
             <div>
               <div className="text-base font-medium mb-1" style={{ color: BRAND.green }}>Workflow complete</div>
               <div className="text-sm" style={{ color: BRAND.subtext }}>
-                The specification has been approved and is now the Current Specification. Any previous Approved spec on this product has been Superseded (not deleted).
+                {doneAction === "Approved"
+                  ? "The specification has been approved and is now the Current Specification. Any previous Approved spec on this product has been Superseded (not deleted)."
+                  : doneAction === "Submitted for Review"
+                    ? "The specification is now Awaiting Review. A reviewer can approve it from this screen."
+                    : "The Draft has been saved. Return to the Review step to continue editing."}
               </div>
             </div>
           </div>
@@ -98,17 +145,27 @@ export default function StepApprove({ productId, specId, specData, reviewerName,
     );
   }
 
+  const helpText = isAwaitingReview
+    ? "Approve sets the status to Approved and makes it the Current Specification. Any previous Approved spec is Superseded."
+    : "Submit for Review sets the status to Awaiting Review. Only then can a reviewer approve it.";
+
   return (
     <div>
       <div className="mb-4">
         <h2 style={{ fontSize: 18, fontWeight: 700, color: BRAND.text, margin: 0 }}>Approve Specification</h2>
         <p style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-          Review the summary below. Only Approved specifications become the Current Specification. Warnings do not block approval — they simply require review.
+          Review the summary below. Save as Draft to continue later, or Submit for Review to send to a reviewer.
         </p>
       </div>
 
-      <div className="grid gap-4" style={{ maxWidth: 700, gridTemplateColumns: "1fr 1fr" }}>
-        {/* Completeness */}
+      {/* Spec Comparison — show if existing approved spec exists */}
+      {existingSpec && (
+        <div className="mb-4">
+          <SpecComparison existingSpec={existingSpec} newSpec={specData} />
+        </div>
+      )}
+
+      <div className="grid gap-4 mb-4" style={{ maxWidth: 700, gridTemplateColumns: "1fr 1fr" }}>
         <div className="rounded-lg p-5" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card }}>
           <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: BRAND.green }}>Specification Completeness</div>
           <div className="flex items-baseline gap-2">
@@ -118,8 +175,6 @@ export default function StepApprove({ productId, specId, specData, reviewerName,
             </span>
           </div>
         </div>
-
-        {/* Data Quality Score */}
         <div className="rounded-lg p-5" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card }}>
           <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: BRAND.green }}>Data Quality Score</div>
           <div className="flex items-baseline gap-2">
@@ -129,7 +184,7 @@ export default function StepApprove({ productId, specId, specData, reviewerName,
         </div>
       </div>
 
-      {/* Warnings & Issues */}
+      {/* Validation Summary */}
       <div className="mt-4 rounded-lg p-5" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card, maxWidth: 700 }}>
         <div className="flex items-center gap-2 mb-3">
           <ShieldCheck className="w-4 h-4" style={{ color: BRAND.green }} />
@@ -153,7 +208,6 @@ export default function StepApprove({ productId, specId, specData, reviewerName,
             <div className="text-xs" style={{ color: BRAND.subtext }}>Conflicts</div>
           </div>
         </div>
-
         {validation.summary.missing > 0 && (
           <div className="mt-3 flex items-start gap-2 p-3 rounded-md" style={{ background: BRAND.danger + "08" }}>
             <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: BRAND.danger }} />
@@ -185,30 +239,48 @@ export default function StepApprove({ productId, specId, specData, reviewerName,
         </div>
       )}
 
-      {/* Actions */}
+      {/* Actions — phased workflow */}
       <div className="mt-4 flex items-center gap-3" style={{ maxWidth: 700 }}>
+        {/* Save Draft — always available */}
         <button
-          onClick={handleApprove}
-          disabled={!canApprove || approving}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium"
-          style={{ background: BRAND.green, color: "#fff", opacity: !canApprove || approving ? 0.5 : 1 }}
-        >
-          {approving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-          {approving ? "Approving…" : "Approve Specification"}
-        </button>
-        <button
-          onClick={handleSubmitForReview}
-          disabled={!canApprove || submitting}
+          onClick={handleSaveDraft}
+          disabled={!canAct || savingDraft}
           className="flex items-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium"
-          style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.card, opacity: !canApprove || submitting ? 0.5 : 1 }}
+          style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.card, opacity: !canAct || savingDraft ? 0.5 : 1 }}
         >
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-          {submitting ? "Submitting…" : "Submit for Review"}
+          {savingDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {savingDraft ? "Saving…" : "Save Draft"}
         </button>
+
+        {/* Submit for Review — available when in Draft */}
+        {!isAwaitingReview && (
+          <button
+            onClick={handleSubmitForReview}
+            disabled={!canAct || submitting}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium"
+            style={{ background: BRAND.green, color: "#fff", opacity: !canAct || submitting ? 0.5 : 1 }}
+          >
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            {submitting ? "Submitting…" : "Submit for Review"}
+          </button>
+        )}
+
+        {/* Approve — only visible when Awaiting Review */}
+        {isAwaitingReview && (
+          <button
+            onClick={handleApprove}
+            disabled={!canAct || approving}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium"
+            style={{ background: BRAND.green, color: "#fff", opacity: !canAct || approving ? 0.5 : 1 }}
+          >
+            {approving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            {approving ? "Approving…" : "Approve Specification"}
+          </button>
+        )}
       </div>
 
       <div className="mt-3 text-xs" style={{ color: BRAND.subtext, maxWidth: 700 }}>
-        <strong>Submit for Review</strong> sets the status to "Awaiting Review" without approving. <strong>Approve</strong> sets it to "Approved" and makes it the Current Specification.
+        {helpText}
       </div>
     </div>
   );

@@ -1,11 +1,12 @@
 // StepReview.jsx — Step 5: Primary engineering review screen
-// Displays all spec fields in a table with Value, Authority, Confidence, Status.
+// Displays all spec fields in a table with Field, Value, Source, Notes.
+// Source is color-coded: 🟢 PDF, 🟢 Product Page, 🟡 Estimated, 🔴 Missing.
 // Every edit is tracked and saved with a change reason.
 
 import React, { useState, useEffect } from "react";
 import { Save, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { SPEC_GROUPS, AUTHORITY_OPTIONS, CONFIDENCE_LABELS } from "./specFieldDefinitions.js";
+import { SPEC_GROUPS } from "./specFieldDefinitions.js";
 import { fieldDisplayStatus, validateDraftSpec } from "./addSpeakerValidation.js";
 import { saveSpecEdits, runValidationAndPersist } from "./addSpeakerPersistence.js";
 
@@ -20,11 +21,14 @@ const BRAND = {
   amber: "#9A6E00",
 };
 
-const STATUS_COLORS = {
-  published: { bg: "#21342815", color: "#213428", label: "Published" },
-  estimated: { bg: "#9A6E0015", color: "#9A6E00", label: "Estimated" },
-  missing: { bg: "#B23A3A15", color: "#B23A3A", label: "Missing" },
-};
+// Source options with color dots
+const SOURCE_OPTIONS = [
+  { value: "", label: "—", dot: null },
+  { value: "Official Product Page", label: "Product Page", dot: "#213428" },
+  { value: "Official PDF", label: "PDF", dot: "#213428" },
+  { value: "Engineering Document", label: "Engineering Doc", dot: "#213428" },
+  { value: "Support Article", label: "Support Article", dot: "#213428" },
+];
 
 const CHANGE_REASONS = [
   "Manual Correction",
@@ -34,17 +38,28 @@ const CHANGE_REASONS = [
   "Administrative",
 ];
 
+// Resolve field_authority entry — supports both string and { source, note } formats
+function resolveAuthority(fieldAuthority, fieldKey) {
+  const entry = fieldAuthority?.[fieldKey];
+  if (entry == null) return { source: "", note: "" };
+  if (typeof entry === "string") return { source: entry, note: "" };
+  return { source: entry.source || "", note: entry.note || "" };
+}
+
+function SourceDot({ status, source }) {
+  // Green dot if source is set, amber if estimated (value exists, no source), red if missing
+  if (source) return <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: BRAND.green, flexShrink: 0 }} />;
+  if (status === "missing") return <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: BRAND.danger, flexShrink: 0 }} />;
+  if (status === "estimated") return <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: BRAND.amber, flexShrink: 0 }} />;
+  return <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: BRAND.border, flexShrink: 0 }} />;
+}
+
 function SpecInput({ field, value, onChange }) {
   const inputStyle = { border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.bg };
 
   if (field.type === "boolean") {
     return (
-      <input
-        type="checkbox"
-        checked={!!value}
-        onChange={(e) => onChange(e.target.checked)}
-        className="w-4 h-4"
-      />
+      <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} className="w-4 h-4" />
     );
   }
   if (field.type === "select") {
@@ -78,7 +93,6 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
   const [saveMsg, setSaveMsg] = useState("");
   const [dirty, setDirty] = useState(false);
 
-  // Sync when specData changes externally (e.g. after extraction)
   useEffect(() => {
     setLocalSpec(specData || {});
     setOriginalSpec(specData || {});
@@ -91,12 +105,29 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
     setSaveMsg("");
   };
 
-  const handleAuthorityChange = (fieldKey, authorityValue) => {
+  const handleSourceChange = (fieldKey, sourceValue) => {
     setLocalSpec((prev) => {
       const currentAuthority = prev.field_authority || {};
+      const currentEntry = resolveAuthority(currentAuthority, fieldKey);
       const nextAuthority = { ...currentAuthority };
-      if (authorityValue) {
-        nextAuthority[fieldKey] = authorityValue;
+      if (sourceValue || currentEntry.note) {
+        nextAuthority[fieldKey] = { source: sourceValue, note: currentEntry.note };
+      } else {
+        delete nextAuthority[fieldKey];
+      }
+      return { ...prev, field_authority: nextAuthority };
+    });
+    setDirty(true);
+    setSaveMsg("");
+  };
+
+  const handleNoteChange = (fieldKey, noteValue) => {
+    setLocalSpec((prev) => {
+      const currentAuthority = prev.field_authority || {};
+      const currentEntry = resolveAuthority(currentAuthority, fieldKey);
+      const nextAuthority = { ...currentAuthority };
+      if (currentEntry.source || noteValue) {
+        nextAuthority[fieldKey] = { source: currentEntry.source, note: noteValue };
       } else {
         delete nextAuthority[fieldKey];
       }
@@ -110,17 +141,8 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
     setSaving(true);
     setSaveMsg("");
     try {
-      await saveSpecEdits({
-        productId,
-        specId,
-        oldSpec: originalSpec,
-        newSpec: localSpec,
-        changeReason,
-      });
-
-      // Run validation and persist issues
+      await saveSpecEdits({ productId, specId, oldSpec: originalSpec, newSpec: localSpec, changeReason });
       const validationResult = await runValidationAndPersist(productId, localSpec);
-
       setOriginalSpec(localSpec);
       setDirty(false);
       setSaveMsg(`Saved — ${validationResult.issues.length} validation issue(s) detected`);
@@ -133,7 +155,6 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
     }
   };
 
-  // Live validation (not persisted — just for display)
   const liveValidation = validateDraftSpec(localSpec);
 
   return (
@@ -142,7 +163,7 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: BRAND.text, margin: 0 }}>Review Specification</h2>
           <p style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-            This is the primary engineering screen. Populate every field from the official source. Every edit is logged to Change History.
+            Populate every field from the official source. Every edit is logged to Change History.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -166,14 +187,13 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
         </div>
       </div>
 
-      {/* Save message */}
       {saveMsg && (
         <div className="mb-3 text-sm" style={{ color: saveMsg.includes("failed") ? BRAND.danger : BRAND.green }}>
           {saveMsg}
         </div>
       )}
 
-      {/* Live validation summary */}
+      {/* Completeness summary */}
       <div className="flex items-center gap-4 mb-4 p-3 rounded-lg" style={{ background: BRAND.bg, border: `1px solid ${BRAND.border}` }}>
         <div className="text-sm font-medium" style={{ color: BRAND.text }}>Completeness: {liveValidation.completeness}%</div>
         <div className="text-xs" style={{ color: liveValidation.summary.missing ? BRAND.danger : BRAND.subtext }}>
@@ -187,7 +207,7 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
         </div>
       </div>
 
-      {/* Field groups */}
+      {/* Field groups — Field | Value | Source | Notes */}
       <div className="space-y-4">
         {SPEC_GROUPS.map((group) => (
           <div key={group.label} className="rounded-lg overflow-hidden" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card }}>
@@ -198,18 +218,17 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
               <table className="w-full" style={{ borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${BRAND.border}` }}>
-                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "200px" }}>Field</th>
-                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em" }}>Value</th>
-                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "140px" }}>Authority</th>
-                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "90px" }}>Status</th>
+                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "180px" }}>Field</th>
+                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "160px" }}>Value</th>
+                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "150px" }}>Source</th>
+                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em" }}>Notes</th>
                   </tr>
                 </thead>
                 <tbody>
                   {group.fields.map((field) => {
                     const value = localSpec[field.key];
-                    const authority = localSpec.field_authority?.[field.key];
+                    const { source, note } = resolveAuthority(localSpec.field_authority, field.key);
                     const status = fieldDisplayStatus(localSpec, field.key);
-                    const statusStyle = STATUS_COLORS[status];
                     return (
                       <tr key={field.key} style={{ borderBottom: `1px solid ${BRAND.border}` }}>
                         <td style={{ padding: "8px 12px", fontSize: 13, fontWeight: 500, color: BRAND.text, verticalAlign: "middle" }}>
@@ -219,19 +238,27 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
                           <SpecInput field={field} value={value} onChange={(v) => handleFieldChange(field.key, v)} />
                         </td>
                         <td style={{ padding: "8px 12px", verticalAlign: "middle" }}>
-                          <select
-                            value={authority || ""}
-                            onChange={(e) => handleAuthorityChange(field.key, e.target.value)}
-                            className="w-full px-1.5 py-1.5 rounded text-xs outline-none"
-                            style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.bg }}
-                          >
-                            {AUTHORITY_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                          </select>
+                          <div className="flex items-center gap-1.5">
+                            <SourceDot status={status} source={source} />
+                            <select
+                              value={source}
+                              onChange={(e) => handleSourceChange(field.key, e.target.value)}
+                              className="w-full px-1.5 py-1.5 rounded text-xs outline-none"
+                              style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.bg }}
+                            >
+                              {SOURCE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                            </select>
+                          </div>
                         </td>
                         <td style={{ padding: "8px 12px", verticalAlign: "middle" }}>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: statusStyle.bg, color: statusStyle.color }}>
-                            {statusStyle.label}
-                          </span>
+                          <input
+                            type="text"
+                            value={note}
+                            onChange={(e) => handleNoteChange(field.key, e.target.value)}
+                            placeholder="Reviewer notes…"
+                            className="w-full px-2 py-1.5 rounded text-xs outline-none"
+                            style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.bg }}
+                          />
                         </td>
                       </tr>
                     );
