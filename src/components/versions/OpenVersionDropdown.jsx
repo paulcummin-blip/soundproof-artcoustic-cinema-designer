@@ -10,7 +10,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown, Check, Plus } from "lucide-react";
 import { useProjectVersions } from "@/components/versions/useProjectVersions";
 import { setActiveProjectId } from "@/components/state/project-session";
-import { truncateVersionName, MAX_VERSION_SLOTS } from "@/lib/versionAuthority";
+import { truncateVersionName } from "@/lib/versionAuthority";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -26,6 +26,7 @@ const BRAND = {
 
 export default function OpenVersionDropdown({ projectId, projectName }) {
   const [open, setOpen] = useState(false);
+  const [showPlaceholder, setShowPlaceholder] = useState(false);
   const dropdownRef = useRef(null);
   const { versions, activeVersionId, loading, slotGrid, switchVersion } =
     useProjectVersions(projectId);
@@ -59,14 +60,9 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
   };
 
   const handleCreateNew = () => {
-    setOpen(false);
-    navigateToDesigner();
+    setShowPlaceholder(true);
+    window.setTimeout(() => setShowPlaceholder(false), 3000);
   };
-
-  const activeVersion = versions.find((v) => v.id === activeVersionId);
-  const activeLabel = activeVersion
-    ? `V${activeVersion.version_number}  ${truncateVersionName(activeVersion.version_name)}`
-    : "Open";
 
   return (
     <div ref={dropdownRef} className="relative inline-block text-left w-full">
@@ -82,10 +78,7 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
         }}
       >
         <span className="flex items-center gap-2">
-          <span className="font-bold" style={{ fontSize: 11, opacity: 0.7 }}>
-            {loading ? "…" : "Open"}
-          </span>
-          <span className="truncate">{loading ? "Loading…" : activeLabel}</span>
+          <span>{loading ? "Loading…" : "Open Version"}</span>
         </span>
         <ChevronDown
           className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
@@ -109,7 +102,7 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
                   onClick={handleCreateNew}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors duration-150 hover:bg-gray-50 text-left"
                   style={{ color: BRAND.subtext, opacity: 0.6 }}
-                  title={`V${slot} — Create new version from the Room Designer`}
+                  title={`V${slot} — Version creation coming soon`}
                 >
                   <span
                     className="flex-shrink-0 w-6 text-center text-xs font-bold"
@@ -118,7 +111,7 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
                     V{slot}
                   </span>
                   <Plus className="w-3 h-3" />
-                  <span className="text-xs italic">Create new…</span>
+                  <span className="text-xs italic">Create New...</span>
                 </button>
               );
             }
@@ -149,6 +142,14 @@ export default function OpenVersionDropdown({ projectId, projectName }) {
               </button>
             );
           })}
+          {showPlaceholder && (
+            <div
+              className="px-3 py-2 text-xs italic"
+              style={{ color: BRAND.subtext, borderTop: `1px solid ${BRAND.border}` }}
+            >
+              Version creation will be implemented in the next phase.
+            </div>
+          )}
         </div>
       )}
     </div>
