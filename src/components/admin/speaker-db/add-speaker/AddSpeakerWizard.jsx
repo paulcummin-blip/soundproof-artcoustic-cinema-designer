@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/AuthContext";
 
 import StepManufacturer from "./StepManufacturer.jsx";
 import StepProductUrl from "./StepProductUrl.jsx";
+import StepDiscoverMk from "./StepDiscoverMk.jsx";
 import StepDocuments from "./StepDocuments.jsx";
 import StepExtract from "./StepExtract.jsx";
 import StepReview from "./StepReview.jsx";
@@ -40,6 +41,15 @@ const STEPS = [
   { key: "review", label: "Review" },
   { key: "approve", label: "Approve" },
 ];
+
+// M&K Sound detection — when selected, Step 2 becomes dynamic product discovery
+// instead of manual URL entry. Matches by manufacturer name or website domain.
+function isMkManufacturer(manufacturer) {
+  if (!manufacturer) return false;
+  const name = (manufacturer.name || "").toLowerCase();
+  const website = (manufacturer.website || "").toLowerCase();
+  return name.includes("m&k") || name.includes("mk sound") || website.includes("mksound");
+}
 
 export default function AddSpeakerWizard() {
   const navigate = useNavigate();
@@ -164,7 +174,7 @@ export default function AddSpeakerWizard() {
                 >
                   {isComplete ? "✓" : i + 1}
                 </span>
-                <span className="text-sm font-medium">{s.label}</span>
+                <span className="text-sm font-medium">{i === 1 && isMkManufacturer(selectedManufacturer) ? "Discover Products" : s.label}</span>
               </button>
               {i < STEPS.length - 1 && (
                 <div style={{ width: 24, height: 2, background: isComplete ? BRAND.green : BRAND.border, flexShrink: 0 }} />
@@ -184,14 +194,22 @@ export default function AddSpeakerWizard() {
               onSelect={setSelectedManufacturer}
             />
           )}
-          {step === 1 && (
+          {step === 1 && isMkManufacturer(selectedManufacturer) ? (
+            <StepDiscoverMk
+              manufacturer={selectedManufacturer}
+              productUrl={productUrl}
+              onProductUrlChange={setProductUrl}
+              onPdfUrlChange={setPdfUrl}
+              onValidationResult={({ valid }) => setUrlValid(valid)}
+            />
+          ) : step === 1 ? (
             <StepProductUrl
               manufacturer={selectedManufacturer}
               productUrl={productUrl}
               onProductUrlChange={setProductUrl}
               onValidationResult={({ valid }) => setUrlValid(valid)}
             />
-          )}
+          ) : null}
           {step === 2 && (
             <StepDocuments
               productUrl={productUrl}
