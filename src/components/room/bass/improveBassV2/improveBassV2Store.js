@@ -48,6 +48,13 @@ function emptyState(projectId, versionId) {
     // Developer/debug optimisation diagnostics report from the last V2 run.
     // Read-only transform of the engine's selection + diagnostics. Not user-facing.
     optimisationDiagnostics: null,
+    // Combined optimisation result (Stage 10). Null = not run.
+    combinedResult: null,
+    combinedMaterial: null,
+    combinedDiagnostics: null,
+    // Best-so-far summary — tracks failing seat count and primary floor
+    // from onBestSoFar events. Updated live during the run.
+    bestSoFarSummary: null,
   };
 }
 
@@ -149,7 +156,36 @@ export function updateProgress(projectId, versionId, phase, label, current, tota
 }
 
 export function setBestSoFar(projectId, versionId, bestSoFar) {
-  return publish(projectId, versionId, { bestSoFar });
+  // Also compute a best-so-far summary for the progress UI
+  let bestSoFarSummary = null;
+  if (bestSoFar?.result) {
+    const result = bestSoFar.result;
+    const perSeatP19 = result.perSeatP19 || [];
+    const perSeatP20 = result.perSeatP20 || [];
+
+    // Count failing seats (level is null, "FAIL", or below L1)
+    const failingSeats = perSeatP19.filter((s) => {
+      const lvl = s.level;
+      return lvl === null || lvl === undefined || lvl === "FAIL" || lvl === "fail";
+    }).length;
+
+    // Primary seat floor
+    const primaryP19 = perSeatP19.find((s) => s.isPrimary) || perSeatP19[0] || null;
+    const primaryFloor = primaryP19?.level || null;
+
+    bestSoFarSummary = {
+      failingSeats,
+      primaryFloor,
+      p19VariationDb: result.achievedP19VariationDb ?? null,
+      p20VariationDb: result.achievedP20VariationDb ?? null,
+      p19Level: result.achievedP19Level ?? null,
+      p20Level: result.achievedP20Level ?? null,
+      candidateId: result.candidateId ?? null,
+      candidateOrigin: result.candidateOrigin ?? null,
+      isPreliminary: result.candidateOrigin !== "combined" && !result.isPositionCandidate,
+    };
+  }
+  return publish(projectId, versionId, { bestSoFar, bestSoFarSummary });
 }
 
 export function addConfirmedChallenger(projectId, versionId, challenger) {
@@ -172,6 +208,10 @@ export function setRuntimeMetrics(projectId, versionId, runtimeMetrics) {
 
 export function setOptimisationDiagnostics(projectId, versionId, report) {
   return publish(projectId, versionId, { optimisationDiagnostics: report });
+}
+
+export function setCombinedResult(projectId, versionId, combinedResult, combinedMaterial, combinedDiagnostics) {
+  return publish(projectId, versionId, { combinedResult, combinedMaterial, combinedDiagnostics });
 }
 
 export function setPositionSearchPhase(projectId, versionId, phase) {

@@ -417,9 +417,9 @@ export default function ImproveBassResponseV2({
       const _provenance = buildProvenance(stageKey, result.candidateId, state.winner.applyFingerprint, fingerprint);
       const next = applyCalibrationTuning(subwooferInstances, result.appliedTuning || result.tuning || [], _provenance);
       commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
-    } else if (stageKey === "subPositions") {
-      // Apply subwoofer position change
-      const _provenance = buildProvenance(stageKey, result.candidateId, state.winner.applyFingerprint, fingerprint);
+    } else if (stageKey === "subPositions" || stageKey === "combined") {
+      // Apply subwoofer position change (combined includes retuned calibration)
+      const _provenance = buildProvenance("subPositions", result.candidateId, state.winner.applyFingerprint, fingerprint);
       const next = buildOptimisedInstances(result, subwooferInstances, roomDims, selectedSubModel, _provenance);
       commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
     } else if (stageKey === "seating") {

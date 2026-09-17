@@ -47,6 +47,8 @@ import { selectSeatingShortlist, selectSeatingWinner, SEATING_SHORTLIST_SIZE } f
 
 import { attachCurrentCanonicalValidation } from "./currentAuthorityValidation.js";
 import { buildOptimisationDiagnosticsReport, logOptimisationDiagnosticsReport } from "./optimisationDiagnosticsReport.js";
+import { runCombinedOptimisation, identifyBestPositionCandidate } from "./combinedOptimisationSearch.js";
+import { setCombinedResult } from "./improveBassV2Store.js";
 
 const MAX_CHALLENGERS = 3;
 
@@ -1185,6 +1187,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     let seatingResult = null;
     let seatingMaterial = null;
     let seatingDiagnostics = { status: "incomplete", tested: 0, valid: 0, best: null };
+    let seatingRawTransfer = null;
     let seatingProfiler = createSeatingProfiler();
     setStageVerdict(projectId, versionId, "seating_positions", "skipped");
     try {
@@ -1341,6 +1344,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             seatingResult = seatingSelection.winner.result;
             seatingResult.seatingOffsetMm = seatingSelection.winner.seatingOffsetMm;
             seatingResult.seatingPositions = seatingSelection.winner.seatingPositions;
+            // Save the best seating candidate's rawTransfer for the combined phase
+            const winningShortlistEntry = shortlist.find(
+              (s) => s.offsetMm === seatingSelection.winner.seatingOffsetMm,
+            );
+            seatingRawTransfer = winningShortlistEntry?.seatingTransfer || null;
             const winnerEval = seatingSelection.evaluations.find(
               (e) => e.candidateId === seatingSelection.winner.result.candidateId,
             );
@@ -1376,6 +1384,86 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       setStageVerdict(projectId, versionId, "seating_positions", "incomplete");
     }
 
+    // ── Phase 10: Combined optimisation ────────────────────────────────
+    // Take the best position candidate, retune delay/gain on its rawTransfer,
+    // and canonically confirm the combined result. Reuses existing
+    // rawTransfer — NO new modal simulation. Budget: +5-15 seconds.
+    let combinedResult = null;
+    let combinedMaterial = null;
+    let combinedDiagnostics = { status: "skipped", tested: 0, confirmed: 0, valid: 0 };
+    try {
+      const bestPositionCandidate = identifyBestPositionCandidate(confirmedResults, existingAuthority);
+      if (bestPositionCandidate && existingAuthority) {
+        // Find the rawTransfer for the best position from allCandidates
+        const positionCandidateWithTransfer = allCandidates.find(
+          (c) => c.id === bestPositionCandidate.candidateId || c.finalist?.id === bestPositionCandidate.candidateId,
+        );
+        const positionRawTransfer = positionCandidateWithTransfer?.rawTransfer || null;
+
+        if (positionRawTransfer?.perSourcePerSeatComplexTransfers?.length) {
+          if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+          if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
+          setStageVerdict(projectId, versionId, "combining_best", "done");
+          const combinedStartTime = Date.now();
+          const { combinedCandidates, diagnostics: combinedDiag } = await runCombinedOptimisation({
+            confirmedResults,
+            existingAuthority,
+            snapshot,
+            worker,
+            controller,
+            isCancelled: () => isCancelled(),
+            isStale: () => isStale(),
+            onProgress: (phase, label, current, total) => {
+              onProgress(phase, label, current, total);
+            },
+            onBestSoFar: (bsf) => onBestSoFar(bsf),
+            metrics,
+            bindConfirmation,
+            validationContext,
+            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+            roomDims, subwooferInstances, rspPosition,
+            seatingResult, seatingMaterial,
+            seatingRawTransfer,
+            positionRawTransfer,
+            combinedStartTime,
+          });
+
+          combinedDiagnostics = combinedDiag;
+
+          // Add confirmed combined candidates to the pool
+          for (const cc of combinedCandidates) {
+            confirmedResults.push(cc);
+            metrics.recordChallengerConfirmed();
+          }
+
+          if (combinedCandidates.length > 0 && existingAuthority) {
+            const combinedSelection = selectConfirmedRecommendations(combinedCandidates, snapshot, existingAuthority);
+            combinedResult = combinedSelection.winner;
+            combinedMaterial = { material: !!combinedResult, reason: combinedSelection.materialityReason };
+            setStageVerdict(projectId, versionId, "confirming_finalists", combinedMaterial?.material ? "improvement" : "no_improvement");
+          } else {
+            setStageVerdict(projectId, versionId, "confirming_finalists", "no_improvement");
+          }
+          setCombinedResult(projectId, versionId, combinedResult, combinedMaterial, combinedDiagnostics);
+        } else {
+          setStageVerdict(projectId, versionId, "combining_best", "skipped");
+          setStageVerdict(projectId, versionId, "confirming_finalists", "skipped");
+        }
+      } else {
+        setStageVerdict(projectId, versionId, "combining_best", "skipped");
+        setStageVerdict(projectId, versionId, "confirming_finalists", "skipped");
+      }
+    } catch (err) {
+      if (isFatalLifecycleError(err)) throw err;
+      evaluationIssues.push({ stage: "combined", error: err.message });
+      setStageVerdict(projectId, versionId, "combining_best", "incomplete");
+      setStageVerdict(projectId, versionId, "confirming_finalists", "incomplete");
+    }
+    await yieldToUI();
+    if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+    if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
     // ── Phase 8: Final single winner selection ───────────────────────────
     onProgress("finalising", "Finalising recommendation", 0, 1);
     setStageVerdict(projectId, versionId, "comparing", "done");
@@ -1393,6 +1481,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     selection.seatingMaterial=seatingMaterial;
     selection.seatingDiagnostics=seatingDiagnostics;
     selection.seatingProfile=seatingProfiler.getReport();
+    selection.combinedResult=combinedResult;
+    selection.combinedMaterial=combinedMaterial;
+    selection.combinedDiagnostics=combinedDiagnostics;
     setStageVerdict(projectId, versionId, "preparing", "done");
     await yieldToUI();
 

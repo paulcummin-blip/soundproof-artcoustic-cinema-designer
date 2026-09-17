@@ -25,7 +25,8 @@ export const STAGE_KEYS = [
   'gain',
   'sub_positions',
   'seating_positions',
-  'comparing',
+  'combining_best',
+  'confirming_finalists',
   'preparing',
 ];
 
@@ -35,7 +36,8 @@ export const STAGE_LABELS = {
   gain: 'Gain',
   sub_positions: 'Subwoofer positions',
   seating_positions: 'Seating positions',
-  comparing: 'Comparing improvements',
+  combining_best: 'Combining best options',
+  confirming_finalists: 'Confirming finalists',
   preparing: 'Preparing recommendations',
 };
 
@@ -45,7 +47,8 @@ export const STAGE_SUPPORTING_TEXT = {
   gain: 'Testing grouped level balance between subwoofers.',
   sub_positions: 'Testing practical placement changes.',
   seating_positions: 'Testing whether small seating changes could improve bass consistency.',
-  comparing: 'Comparing all tested improvements.',
+  combining_best: 'Retuning delay, polarity and gain on the best placement.',
+  confirming_finalists: 'Canonical confirmation of combined finalists.',
   preparing: 'Preparing final recommendations.',
 };
 
@@ -64,6 +67,8 @@ const PHASE_TO_ACTIVE_STAGE = {
   screening_individual: 'sub_positions',
   confirming_individual: 'sub_positions',
   finalising: 'comparing',
+  combining: 'combining_best',
+  combined_confirming: 'confirming_finalists',
 };
 
 // Sub-stage label for the sub_positions stage, derived from the engine phase
@@ -113,13 +118,15 @@ export function buildStageDisplay(state) {
   }
 
   // Determine completion from phase progression
-  const calibratingDone = !['reviewing', 'awaiting_stage2', 'calibrating', 'idle'].includes(phase);
-  const subPositionsDone = phase === 'finalising';
+  const calibratingDone = !['reviewing', 'awaiting_stage2', 'calibrating', 'idle', 'combining', 'combined_confirming'].includes(phase);
+  const subPositionsDone = phase === 'finalising' || phase === 'combining' || phase === 'combined_confirming';
   // Only a fully completed run marks comparing/preparing as completed.
   // Cancelled/error/stale runs freeze at the last active stage — comparing
   // and preparing never ran, so they remain pending.
   const runComplete = status === 'complete';
   const finalisingActive = phase === 'finalising';
+  const combiningActive = phase === 'combining';
+  const combinedConfirmingActive = phase === 'combined_confirming';
 
   const phaseLabel = String(state?.phaseLabel || '');
   const phaseSearchActive = phase === 'calibrating' && /phase/i.test(phaseLabel);
@@ -198,6 +205,32 @@ export function buildStageDisplay(state) {
       }
     }
 
+    // Combining best options
+    if (key === 'combining_best') {
+      if (stageVerdicts[key] === 'improvement' || stageVerdicts[key] === 'no_improvement' || stageVerdicts[key] === 'done') {
+        stageStatus = 'completed';
+      } else if (combiningActive) {
+        stageStatus = 'active';
+      } else if (stageVerdicts[key] === 'skipped') {
+        stageStatus = 'not_tested';
+      } else if (runComplete) {
+        stageStatus = 'completed';
+      }
+    }
+
+    // Confirming finalists
+    if (key === 'confirming_finalists') {
+      if (stageVerdicts[key] === 'improvement' || stageVerdicts[key] === 'no_improvement' || stageVerdicts[key] === 'done') {
+        stageStatus = 'completed';
+      } else if (combinedConfirmingActive) {
+        stageStatus = 'active';
+      } else if (stageVerdicts[key] === 'skipped') {
+        stageStatus = 'not_tested';
+      } else if (runComplete) {
+        stageStatus = 'completed';
+      }
+    }
+
     // Comparing
     if (key === 'comparing') {
       if (runComplete) {
@@ -228,6 +261,11 @@ export function buildStageDisplay(state) {
       subStageLabel = SUB_POSITION_SUB_LABELS[phase]
         || SUB_POSITION_SUB_LABELS[positionSearchPhase]
         || null;
+    }
+    if ((key === 'combining_best' || key === 'confirming_finalists') && stageStatus === 'active') {
+      subStageLabel = state?.phaseLabel
+        ? `${state.phaseLabel} (${state.progressCurrent || 0} of ${state.progressTotal || 0})`
+        : null;
     }
 
     return {

@@ -150,13 +150,24 @@ export function buildStageResults(selection) {
     reason: seatingMaterial ? null : "No material seating improvement found.",
   };
 
-  return { phase, delay, gain, subPositions, seating };
+  // ── 6. COMBINED IMPROVEMENT — best combined result ──────────────
+  // The engine's combinedResult is the combined optimisation winner
+  // (best position + retuned calibration, canonically confirmed).
+  const combinedResult = selection.combinedResult || null;
+  const combinedMaterial = selection.combinedMaterial?.material === true;
+  const combined = {
+    verdict: combinedMaterial && combinedResult ? "improvement" : "no_improvement",
+    result: combinedMaterial ? combinedResult : null,
+    reason: combinedMaterial ? null : "No material combined improvement found.",
+  };
+
+  return { phase, delay, gain, subPositions, seating, combined };
 }
 
 /**
  * Get the list of stage keys in display order.
  */
-export const STAGE_ORDER = ["phase", "delay", "gain", "subPositions", "seating"];
+export const STAGE_ORDER = ["phase", "delay", "gain", "subPositions", "seating", "combined"];
 
 /**
  * Get the display label for a stage key.
@@ -167,4 +178,5 @@ export const STAGE_DISPLAY_LABELS = {
   gain: "GAIN",
   subPositions: "SUBWOOFER POSITIONS",
   seating: "SEATING POSITIONS",
+  combined: "BEST COMBINED IMPROVEMENT",
 };

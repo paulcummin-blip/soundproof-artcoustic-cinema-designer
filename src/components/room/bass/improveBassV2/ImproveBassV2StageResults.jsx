@@ -43,7 +43,7 @@ export default function ImproveBassV2StageResults({
     if (stageKey === "phase" || stageKey === "delay" || stageKey === "gain") {
       return isCalibrationApplied(currentInstances, stage.result.appliedTuning || stage.result.tuning || []);
     }
-    if (stageKey === "subPositions") {
+    if (stageKey === "subPositions" || stageKey === "combined") {
       return isOptimisedApplied(currentInstances, stage.result, roomDims);
     }
     if (stageKey === "seating") {
