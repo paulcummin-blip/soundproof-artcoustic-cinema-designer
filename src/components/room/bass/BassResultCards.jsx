@@ -21,6 +21,21 @@ const CARD_TITLES = {
   p20: "P20 Seat Consistency",
 };
 
+const SEAT_SCOPED_KEYS = new Set(["p19", "p20"]);
+
+// Split "L2 · 112 dBC" into pill label "L2" and supporting text "112 dBC".
+// Non-ready states ("Calculating…", "FAIL", "SEAT", "Select Bass Target")
+// have no " · " separator — shown in the pill as-is with no supporting text.
+function splitPillContent(resultText) {
+  const text = String(resultText || "");
+  const sepIndex = text.indexOf(" · ");
+  if (sepIndex === -1) return { pillLabel: text, supportingText: null };
+  return {
+    pillLabel: text.slice(0, sepIndex),
+    supportingText: text.slice(sepIndex + 3),
+  };
+}
+
 export default function BassResultCards() {
   const shared = useSharedBassResults();
   const [nowMs, setNowMs] = useState(Date.now());
@@ -47,21 +62,29 @@ export default function BassResultCards() {
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {Object.entries(formatted.pills).map(([key, pill]) => (
-          <div
-            key={key}
-            className="flex flex-col items-center gap-1 rounded-lg border border-[#DCDBD6] bg-white p-3"
-            aria-label={pill.text}
-          >
-            <span className="text-[11px] font-semibold text-[#213428]">
-              {CARD_TITLES[key] || pill.label}
-            </span>
-            <BassResultDetailTooltip parameterKey={key}>
-              <RP22GradingPill level={pill.level}>{pill.resultText}</RP22GradingPill>
-            </BassResultDetailTooltip>
-            {pill.detail && <div className="text-center text-[10px] text-[#625143]">{pill.detail}</div>}
-          </div>
-        ))}
+        {Object.entries(formatted.pills).map(([key, pill]) => {
+          const isSeatScoped = SEAT_SCOPED_KEYS.has(key);
+          const { pillLabel, supportingText } = isSeatScoped
+            ? { pillLabel: pill.resultText, supportingText: null }
+            : splitPillContent(pill.resultText);
+          return (
+            <div
+              key={key}
+              className="flex flex-col items-center gap-1 rounded-lg border border-[#DCDBD6] bg-white p-3"
+              aria-label={pill.text}
+            >
+              <span className="text-[11px] font-semibold text-[#213428]">
+                {CARD_TITLES[key] || pill.label}
+              </span>
+              <BassResultDetailTooltip parameterKey={key}>
+                <RP22GradingPill level={pill.level}>{pillLabel}</RP22GradingPill>
+              </BassResultDetailTooltip>
+              {supportingText
+                ? <div className="text-center text-[10px] text-[#625143]">{supportingText}</div>
+                : null}
+            </div>
+          );
+        })}
       </div>
 
       {/* Expanded P19/P20 per-seat views — shared component */}

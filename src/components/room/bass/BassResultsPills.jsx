@@ -5,6 +5,21 @@ import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPre
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 
+const SEAT_SCOPED_KEYS = new Set(["p19", "p20"]);
+
+// Split "L2 · 112 dBC" into pill label "L2" and supporting text "112 dBC".
+// Non-ready states ("Calculating…", "FAIL", "SEAT", "Select Bass Target")
+// have no " · " separator — shown in the pill as-is with no supporting text.
+function splitPillContent(resultText) {
+  const text = String(resultText || "");
+  const sepIndex = text.indexOf(" · ");
+  if (sepIndex === -1) return { pillLabel: text, supportingText: null };
+  return {
+    pillLabel: text.slice(0, sepIndex),
+    supportingText: text.slice(sepIndex + 3),
+  };
+}
+
 export default function BassResultsPills({ compact = false, nowMs }) {
   const shared = useSharedBassResults();
   const [clock, setClock] = useState(Date.now());
@@ -26,17 +41,27 @@ export default function BassResultsPills({ compact = false, nowMs }) {
       p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
     },
   );
-  return <div className="grid grid-cols-2 gap-1 sm:grid-cols-4" aria-label="Bass RP22 results">
-    {Object.entries(formatted.pills).map(([key, pill]) => (
-      <span key={key} className="flex flex-col gap-1" aria-label={pill.text}>
-        <BassRp22ParameterTooltip parameterKey={key}>
-          <span className="cursor-help text-center text-[11px] font-semibold text-[#213428] underline decoration-dotted underline-offset-2">
-            {key.toUpperCase()}
+  return (
+    <div className="grid grid-cols-2 gap-1 sm:grid-cols-4" aria-label="Bass RP22 results">
+      {Object.entries(formatted.pills).map(([key, pill]) => {
+        const isSeatScoped = SEAT_SCOPED_KEYS.has(key);
+        const { pillLabel, supportingText } = isSeatScoped
+          ? { pillLabel: pill.resultText, supportingText: null }
+          : splitPillContent(pill.resultText);
+        return (
+          <span key={key} className="flex flex-col items-center gap-1" aria-label={pill.text}>
+            <BassRp22ParameterTooltip parameterKey={key}>
+              <span className="cursor-help text-center text-[11px] font-semibold text-[#213428] underline decoration-dotted underline-offset-2">
+                {key.toUpperCase()}
+              </span>
+            </BassRp22ParameterTooltip>
+            <RP22GradingPill level={pill.level} compact={compact}>{pillLabel}</RP22GradingPill>
+            {supportingText
+              ? <small className="text-center text-[10px] text-muted-foreground">{supportingText}</small>
+              : null}
           </span>
-        </BassRp22ParameterTooltip>
-        <RP22GradingPill level={pill.level} compact={compact} style={{ width: "100%" }}>{pill.resultText}</RP22GradingPill>
-        {pill.detail && <small className="text-center text-[10px] text-muted-foreground">{pill.detail}</small>}
-      </span>
-    ))}
-  </div>;
+        );
+      })}
+    </div>
+  );
 }
