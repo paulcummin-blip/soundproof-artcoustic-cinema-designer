@@ -196,27 +196,36 @@ export default function AddSpeakerWizard() {
               onSelect={setSelectedManufacturer}
             />
           )}
-          {step === 1 && isMkManufacturer(selectedManufacturer) && !useManualUrl ? (
-            <StepDiscoverMk
-              manufacturer={selectedManufacturer}
-              productUrl={productUrl}
-              onProductUrlChange={setProductUrl}
-              onPdfUrlChange={setPdfUrl}
-              onTargetModelChange={setTargetModel}
-              onUseManualUrl={() => { setUseManualUrl(true); setTargetModel(""); setUrlValid(false); }}
-              onValidationResult={({ valid }) => setUrlValid(valid)}
-            />
-          ) : step === 1 ? (
+          {/* M&K Discovery — kept mounted (hidden when manual URL is active) so
+              the discovered products list and selection are preserved when the
+              user switches to Manual URL and back. targetModel is also preserved
+              across the switch — the model selected in Discovery carries over to
+              the manual URL input, and any manual edits carry back to Discovery. */}
+          {step === 1 && isMkManufacturer(selectedManufacturer) && (
+            <div style={{ display: useManualUrl ? "none" : "block" }}>
+              <StepDiscoverMk
+                manufacturer={selectedManufacturer}
+                productUrl={productUrl}
+                onProductUrlChange={setProductUrl}
+                onPdfUrlChange={setPdfUrl}
+                onTargetModelChange={setTargetModel}
+                onUseManualUrl={() => { setUseManualUrl(true); setUrlValid(false); }}
+                onValidationResult={({ valid }) => setUrlValid(valid)}
+              />
+            </div>
+          )}
+          {step === 1 && (useManualUrl || !isMkManufacturer(selectedManufacturer)) && (
             <StepProductUrl
               manufacturer={selectedManufacturer}
               productUrl={productUrl}
               onProductUrlChange={setProductUrl}
               onTargetModelChange={setTargetModel}
+              targetModel={targetModel}
               onValidationResult={({ valid }) => setUrlValid(valid)}
               showBackToDiscovery={isMkManufacturer(selectedManufacturer)}
-              onBackToDiscovery={() => { setUseManualUrl(false); setTargetModel(""); setUrlValid(false); }}
+              onBackToDiscovery={() => { setUseManualUrl(false); setUrlValid(false); }}
             />
-          ) : null}
+          )}
           {step === 2 && (
             <StepDocuments
               productUrl={productUrl}
