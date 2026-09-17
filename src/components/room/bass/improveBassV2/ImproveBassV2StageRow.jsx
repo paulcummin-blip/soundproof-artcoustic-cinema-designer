@@ -13,6 +13,7 @@ import { CheckCircle2, Minus, AlertCircle, Lock } from "lucide-react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { formatAcousticPath } from "./acousticDistance";
 import { buildGainRationale, extractGainAdjustmentDb, extractGainGroupLabel } from "./gainRationaleBuilder";
+import CombinedDetail from "./CombinedDetail";
 
 function numericLevel(value) {
   if (Number.isFinite(Number(value))) return Math.max(0, Math.min(4, Number(value)));
@@ -302,6 +303,9 @@ export default function ImproveBassV2StageRow({
             <PositionDetail result={result} currentResult={currentResult} currentInstances={currentInstances} />
           )}
           {stageKey === "seating" && <SeatingDetail result={result} currentResult={currentResult} />}
+          {stageKey === "combined" && (
+            <CombinedDetail result={result} currentResult={currentResult} currentInstances={currentInstances} />
+          )}
 
           {/* Apply button */}
           {!isApplied && !stale && onApply && (

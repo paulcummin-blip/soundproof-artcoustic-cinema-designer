@@ -182,7 +182,9 @@ export function setBestSoFar(projectId, versionId, bestSoFar) {
       p20Level: result.achievedP20Level ?? null,
       candidateId: result.candidateId ?? null,
       candidateOrigin: result.candidateOrigin ?? null,
-      isPreliminary: result.candidateOrigin !== "combined" && !result.isPositionCandidate,
+      // onBestSoFar is only called AFTER canonical confirmation — never proxy.
+      // Preliminary is only for proxy-only values shown before confirmation.
+      isPreliminary: false,
     };
   }
   return publish(projectId, versionId, { bestSoFar, bestSoFarSummary });

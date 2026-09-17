@@ -417,11 +417,46 @@ export default function ImproveBassResponseV2({
       const _provenance = buildProvenance(stageKey, result.candidateId, state.winner.applyFingerprint, fingerprint);
       const next = applyCalibrationTuning(subwooferInstances, result.appliedTuning || result.tuning || [], _provenance);
       commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
-    } else if (stageKey === "subPositions" || stageKey === "combined") {
-      // Apply subwoofer position change (combined includes retuned calibration)
+    } else if (stageKey === "subPositions") {
+      // Apply subwoofer position change
       const _provenance = buildProvenance("subPositions", result.candidateId, state.winner.applyFingerprint, fingerprint);
       const next = buildOptimisedInstances(result, subwooferInstances, roomDims, selectedSubModel, _provenance);
       commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
+    } else if (stageKey === "combined") {
+      // Combined apply: may include sub positions + retuned calibration,
+      // OR calibration + seating, OR all three. Apply ALL components in
+      // one atomic user action → single canonical state mutation.
+      const _provenance = buildProvenance("subPositions", result.candidateId, state.winner.applyFingerprint, fingerprint);
+      const hasCoords = (result.positionCoordinates?.length || result.coordinates?.length || 0) > 0;
+
+      // Step 1: Apply sub positions + tuning (if coordinates exist) or
+      // calibration tuning only (for calibration+seating combined candidates)
+      let next;
+      if (hasCoords) {
+        next = buildOptimisedInstances(result, subwooferInstances, roomDims, selectedSubModel, _provenance);
+      } else {
+        next = applyCalibrationTuning(subwooferInstances, result.appliedTuning || result.tuning || [], _provenance);
+      }
+      commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
+
+      // Step 2: Apply seating changes if present (calibration+seating combined)
+      if (result.seatingPositions && commitSeating) {
+        commitSeating(result.seatingPositions);
+        const postMutationFingerprint = (() => {
+          try {
+            return computeV2DesignFingerprint({
+              ...d,
+              seatingPositions: result.seatingPositions,
+              ...d.p14Params,
+            });
+          } catch { return null; }
+        })();
+        const seatingProvenance = buildProvenance(
+          "seating_positions", result.candidateId,
+          state.winner.applyFingerprint, postMutationFingerprint,
+        );
+        if (commitSeatingProvenance) commitSeatingProvenance(seatingProvenance);
+      }
     } else if (stageKey === "seating") {
       // Apply seating position change — stamp provenance on successful apply.
       // Seating mutates seatingPositions (not subwooferInstances), so provenance

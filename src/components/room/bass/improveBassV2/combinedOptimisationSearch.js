@@ -125,7 +125,7 @@ export async function runCombinedOptimisation(ctx) {
   }
 
   // ── 2. Retune delay on the best position's rawTransfer ────────────
-  onProgress("combining", "Retuning delay on best placement", 0, 3);
+  onProgress("combining", "Retuning delay on best placement", 0, 2);
   if (isCancelled()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "cancelled" } };
   if (isStale()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "stale" } };
 
@@ -150,7 +150,7 @@ export async function runCombinedOptimisation(ctx) {
     diagnostics.options.push({ stage: "retune-delay", error: err.message });
   }
 
-  onProgress("combining", "Retuning gain on best placement", 1, 3);
+  onProgress("combining", "Retuning gain on best placement", 1, 2);
   if (isCancelled()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "cancelled" } };
 
   // ── 3. Retune gain on the best position's rawTransfer ─────────────
@@ -187,7 +187,8 @@ export async function runCombinedOptimisation(ctx) {
     return { combinedCandidates, diagnostics };
   }
 
-  onProgress("combined_confirming", "Confirming combined finalist 1 of 1", 0, 1);
+  const totalConfirmations = (seatingMaterial?.material && seatingResult && ctx.seatingRawTransfer?.perSourcePerSeatComplexTransfers?.length) ? 2 : 1;
+  onProgress("combined_confirming", `Canonical confirmation 1 of ${totalConfirmations}`, 0, totalConfirmations);
   if (isCancelled()) return { combinedCandidates: [], diagnostics: { ...diagnostics, status: "cancelled" } };
 
   try {
@@ -238,7 +239,7 @@ export async function runCombinedOptimisation(ctx) {
     elapsed() < COMBINED_BUDGET_MS - 5000 &&
     combinedCandidates.length < MAX_COMBINED_CONFIRMATIONS
   ) {
-    onProgress("combining", "Confirming combined finalist 2 of 2", 3, 3);
+    onProgress("combined_confirming", `Canonical confirmation 2 of ${totalConfirmations}`, 1, totalConfirmations);
     if (isCancelled()) return { combinedCandidates, diagnostics };
 
     // Combine best calibration tuning with best seating offset

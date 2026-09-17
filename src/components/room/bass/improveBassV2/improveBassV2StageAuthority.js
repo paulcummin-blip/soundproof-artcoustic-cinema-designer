@@ -122,8 +122,12 @@ export function buildStageResults(selection) {
   // ── 4. SUBWOOFER POSITIONS — best position candidate ──────────────
   // From confirmedResults, pick the best position candidate by canonical
   // ranking. Only ONE result is surfaced.
+  // Exclude combined candidates from the subPositions stage — they have
+  // isPositionCandidate=true but belong in the dedicated combined stage.
   const positionResults = (selection.confirmedResults || []).filter(
-    (r) => r && r.isPositionCandidate && r.candidateKind !== "current",
+    (r) => r && r.isPositionCandidate && r.candidateKind !== "current"
+      && r.candidateOrigin !== "combined"
+      && r.candidateOrigin !== "combined-calibration-seating",
   );
   let bestPosition = null;
   if (positionResults.length > 0 && currentResult) {

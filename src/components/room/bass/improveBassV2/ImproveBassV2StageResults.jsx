@@ -43,8 +43,16 @@ export default function ImproveBassV2StageResults({
     if (stageKey === "phase" || stageKey === "delay" || stageKey === "gain") {
       return isCalibrationApplied(currentInstances, stage.result.appliedTuning || stage.result.tuning || []);
     }
-    if (stageKey === "subPositions" || stageKey === "combined") {
+    if (stageKey === "subPositions") {
       return isOptimisedApplied(currentInstances, stage.result, roomDims);
+    }
+    if (stageKey === "combined") {
+      // Combined may be position+tuning (check positions) or calibration+seating (check calibration)
+      const hasCoords = (stage.result?.positionCoordinates?.length || stage.result?.coordinates?.length || 0) > 0;
+      if (hasCoords) {
+        return isOptimisedApplied(currentInstances, stage.result, roomDims);
+      }
+      return isCalibrationApplied(currentInstances, stage.result?.appliedTuning || stage.result?.tuning || []);
     }
     if (stageKey === "seating") {
       // Seating apply check: compare current seating positions against the result's moved positions

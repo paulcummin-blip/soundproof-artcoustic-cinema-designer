@@ -4,11 +4,14 @@
 import { isMaterialImprovement } from './materialityGate.js';
 import { compareZeroFailFirst } from './zeroFailOptimiser.js';
 
-// Practical priority — lower = less disruptive = preferred for equivalent results
+// Practical priority — lower = less disruptive = preferred for equivalent results.
+// Combined changes are the MOST disruptive, so they rank last when acoustic
+// results are effectively equivalent (zero-fail-first tie-break).
 const PRACTICAL_PRIORITY = {
   calibration: 1,
   position: 2,
   seating: 3,
+  combined: 4,
 };
 
 // Threshold for "broadly equivalent" raw improvements.
@@ -60,6 +63,10 @@ function worstPrimarySeatDeviation(result) {
 
 function classifyIntervention(result) {
   if (!result) return 'position';
+  // Combined candidates (position + retuned calibration, or calibration + seating)
+  // are classified separately so the ranker prefers simpler interventions when
+  // the acoustic result is effectively equivalent.
+  if (result.candidateOrigin === 'combined' || result.candidateOrigin === 'combined-calibration-seating') return 'combined';
   if (result.candidateKind === 'calibration' || result.candidateId === 'calibration-only') return 'calibration';
   if (result.isPositionCandidate) return 'position';
   return 'position'; // global placement also moves positions
@@ -159,7 +166,11 @@ export function rankRecommendations(selection) {
     recommendations.push({
       result,
       interventionType,
-      interventionLabel: interventionType === 'position' ? 'Adjust subwoofer positions' : 'Adjust calibration',
+      interventionLabel: interventionType === 'position'
+        ? 'Adjust subwoofer positions'
+        : interventionType === 'combined'
+          ? 'Apply combined improvement'
+          : 'Adjust calibration',
       interventionSubLabel: result.movementDescription || null,
       levelChanges,
       rawImprovement,
