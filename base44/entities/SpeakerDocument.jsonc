@@ -1,0 +1,65 @@
+{
+  "name": "SpeakerDocument",
+  "type": "object",
+  "description": "A downloadable or viewable document associated with a SpeakerProduct. Distinct from SpeakerSource (which records where specification data was extracted from). Documents are the actual files Sound Proof may link to directly: product pages, PDFs, manuals, CAD drawings, and spinorama plots. A product may have multiple documents. Later, Sound Proof may link directly to these from reports or comparison views.",
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "description": "ID of the SpeakerProduct this document belongs to."
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "Product Page",
+        "PDF",
+        "Manual",
+        "CAD",
+        "Spinorama"
+      ],
+      "description": "Type of document. Product Page = official manufacturer product page URL. PDF = specification sheet or brochure PDF. Manual = user or installation manual. CAD = CAD drawing file. Spinorama = spinorama / directivity measurement data."
+    },
+    "url": {
+      "type": "string",
+      "description": "URL of the document."
+    },
+    "title": {
+      "type": "string",
+      "description": "Document title or label for display (e.g. 'M&K Sound MP-150 Datasheet', 'CAD Drawing \u2014 Front View')."
+    },
+    "date_checked": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the document was last checked / verified to be accessible."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes about this document (e.g. what data it contains, revision date)."
+    }
+  },
+  "required": [
+    "product_id",
+    "document_type"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

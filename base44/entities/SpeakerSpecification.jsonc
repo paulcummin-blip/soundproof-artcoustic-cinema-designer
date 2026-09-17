@@ -176,12 +176,13 @@
       "type": "string",
       "enum": [
         "Draft",
-        "Reviewed",
+        "Awaiting Review",
         "Approved",
-        "Rejected"
+        "Superseded",
+        "Archived"
       ],
       "default": "Draft",
-      "description": "Approval workflow status. Draft = entered but not yet reviewed. Reviewed = checked by a reviewer. Approved = signed off by an approver. Rejected = failed review and needs correction. SEPARATE from Confidence (data quality) and Import Status (pipeline origin). Example: Confidence A + Approval Draft = excellent data, nobody has checked it yet."
+      "description": "Approval workflow status. Draft = entered but not yet submitted for review. Awaiting Review = submitted, waiting for a reviewer. Approved = signed off by an approver. Superseded = replaced by a newer specification version (the data was not wrong, just outdated). Archived = retired from active use. SEPARATE from Confidence (data quality) and Import Status (pipeline origin). 'Rejected' is intentionally absent \u2014 in practice data is rarely wrong; it is superseded when newer data arrives."
     },
     "reviewed_by": {
       "type": "string",

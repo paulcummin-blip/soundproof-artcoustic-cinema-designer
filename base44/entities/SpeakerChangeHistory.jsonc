@@ -36,14 +36,16 @@
     "change_reason": {
       "type": "string",
       "enum": [
-        "Manufacturer update",
-        "Manual correction",
-        "PDF revised",
-        "Crawler update",
-        "Specification error",
-        "Other"
+        "Manufacturer Specification Update",
+        "Manual Correction",
+        "Crawler Import",
+        "Document Revision",
+        "URL Change",
+        "Metadata Update",
+        "Status Change",
+        "Administrative"
       ],
-      "description": "Reason the change was made. Enables filtering and reporting on change patterns over time. Examples: 'Manufacturer update' = the manufacturer published new data; 'Manual correction' = a human fixed a typo; 'PDF revised' = the source PDF was updated; 'Crawler update' = the automated crawler re-extracted; 'Specification error' = the previous value was wrong."
+      "description": "Reason the change was made. Controlled enum \u2014 no free text \u2014 so change patterns can be analysed over time. 'Manufacturer Specification Update' = the manufacturer published new data; 'Manual Correction' = a human fixed a typo or error; 'Crawler Import' = the automated crawler re-extracted; 'Document Revision' = the source PDF or document was updated; 'URL Change' = the source URL changed; 'Metadata Update' = non-spec metadata changed; 'Status Change' = product status changed; 'Administrative' = bulk admin action."
     }
   },
   "required": [

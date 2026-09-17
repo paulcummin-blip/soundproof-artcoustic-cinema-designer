@@ -1,7 +1,7 @@
 {
   "name": "SpeakerManufacturerRule",
   "type": "object",
-  "description": "Per-manufacturer rules for data extraction and interpretation. Defines preferred source types, which product categories to ignore, which power/SPL rating to use as primary, and which frequency response bandwidth convention the manufacturer publishes. Avoids hard-coding manufacturer-specific logic in the extraction engine. One record per manufacturer.",
+  "description": "Per-manufacturer rules for data extraction, interpretation, and crawler configuration. Defines preferred source types, which product categories to ignore, which power/SPL rating to use as primary, which frequency response bandwidth convention the manufacturer publishes, and crawler enablement settings. This table is designed to become the crawler configuration \u2014 even though crawling does not exist yet, the fields are in place so a future redesign is not needed. One record per manufacturer.",
   "properties": {
     "manufacturer_id": {
       "type": "string",
@@ -55,6 +55,30 @@
         "Manufacturer Default"
       ],
       "description": "Which frequency response bandwidth convention this manufacturer publishes. Different manufacturers quote -3dB, -6dB, or their own convention. The extraction engine uses this to interpret and normalise frequency response values consistently."
+    },
+    "product_index_url": {
+      "type": "string",
+      "description": "URL of the manufacturer's product index page that the crawler will use to discover all products. Initially blank; populated when crawling is enabled for this manufacturer."
+    },
+    "pdf_first": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to prefer PDF sources over product pages for extraction. Some manufacturers publish more complete data in PDFs than on product pages."
+    },
+    "crawler_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the automated crawler is enabled for this manufacturer. Initially disabled for ALL manufacturers. Enabled per-manufacturer when ready (e.g. M&K first)."
+    },
+    "auto_approve": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether crawled specifications are automatically approved without human review. Default false \u2014 all crawled data goes through review. May be set true for trusted manufacturers later."
+    },
+    "requires_review": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether crawled specifications require human review before becoming the current specification. Default true. When false + auto_approve true, crawled data flows straight through to current."
     }
   },
   "required": [
