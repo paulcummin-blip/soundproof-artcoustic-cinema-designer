@@ -479,7 +479,7 @@ export function resolveInstalledEffectiveTuning(rawTransfer, instances, rspPosit
   }));
 }
 
-export async function runImproveBassV2(projectId, params, callbacks) {
+export async function runImproveBassV2(projectId, versionId, params, callbacks) {
   const { onProgress, isCancelled, onBestSoFar, getCurrentFingerprint } = callbacks;
   const {
     subwooferInstances, roomDims, seatingPositions, rspPosition,
@@ -502,7 +502,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
   // true, abort the controller immediately (synchronous — same call stack as
   // the user's click). Unsubscribe in finally.
   const storeListener = () => {
-    const st = getImproveBassV2State(projectId);
+    const st = getImproveBassV2State(projectId, versionId);
     if (st?.cancelRequested === true && !controller.signal.aborted) {
       controller.abort();
     }
@@ -633,8 +633,8 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     }
 
     try {
-      setStageVerdict(projectId, "phase_polarity", "skipped");
-      setStageVerdict(projectId, "gain", "skipped");
+      setStageVerdict(projectId, versionId, "phase_polarity", "skipped");
+      setStageVerdict(projectId, versionId, "gain", "skipped");
       onProgress("calibrating", "Preparing grouped phase search", 0, 1);
       const currentFinalist = buildCurrentFinalist(subwooferInstances, roomDims);
       if (currentFinalist) {
@@ -755,7 +755,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
           if (isFatalLifecycleError(err)) throw err;
           phaseDiagnostics.error = err.message;
           evaluationIssues.push({stage:"phase",error:err.message});
-          setStageVerdict(projectId, "phase_polarity", "incomplete");
+          setStageVerdict(projectId, versionId, "phase_polarity", "incomplete");
         }
 
         onProgress("calibrating", "Testing grouped delay adjustments", 0, 61);
@@ -805,7 +805,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
 
     onProgress("calibrating", "Searching calibration improvements", 2, 2);
     const calVerdict = calibrationDiagnostics.invalid || calibrationDiagnostics.error || !calibrationDiagnostics.valid ? "incomplete" : "done";
-    setStageVerdict(projectId, "delays", calibrationDiagnostics.status==="skipped"?"skipped":calVerdict);
+    setStageVerdict(projectId, versionId, "delays", calibrationDiagnostics.status==="skipped"?"skipped":calVerdict);
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
@@ -814,7 +814,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     // Search grouped gain with the same raw transfer and effective baseline
     // as the delay search. Delays and polarities are held fixed at the
     // effective baseline; only gain is adjusted.
-    setStageVerdict(projectId, "gain", "skipped");
+    setStageVerdict(projectId, versionId, "gain", "skipped");
     if (savedCurrentRawTransfer && savedEffectiveBaseline && existingAuthority) {
       try {
         onProgress("calibrating", "Testing grouped gain adjustments", 0, 1);
@@ -872,11 +872,11 @@ export async function runImproveBassV2(projectId, params, callbacks) {
         }
         const gainVerdict = gainMaterial?.material ? "improvement" :
           gainDiagnostics.invalid || gainDiagnostics.error || !gainDiagnostics.valid ? "incomplete" : "no_improvement";
-        setStageVerdict(projectId, "gain", gainDiagnostics.status === "skipped" ? "skipped" : gainVerdict);
+        setStageVerdict(projectId, versionId, "gain", gainDiagnostics.status === "skipped" ? "skipped" : gainVerdict);
       } catch (err) {
         if (isFatalLifecycleError(err)) throw err;
         gainDiagnostics.error = err.message;
-        setStageVerdict(projectId, "gain", "incomplete");
+        setStageVerdict(projectId, versionId, "gain", "incomplete");
       }
     }
     await yieldToUI();
@@ -992,7 +992,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       phaseResult=phaseSelection.winner;
       phaseMaterial={material:!!phaseResult,reason:phaseSelection.materialityReason};
       phaseDiagnostics.evaluations=phaseSelection.evaluations;
-      setStageVerdict(projectId,"phase_polarity",phaseDiagnostics.status==="skipped"?"skipped":
+      setStageVerdict(projectId, versionId,"phase_polarity",phaseDiagnostics.status==="skipped"?"skipped":
         phaseResult?"improvement":phaseDiagnostics.invalid || phaseDiagnostics.error || !phaseDiagnostics.valid?"incomplete":"no_improvement");
 
       const calSelection=selectConfirmedRecommendations(calibrationCandidates,snapshot,existingAuthority);
@@ -1000,7 +1000,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       calibrationTuning=calibrationResult?.appliedTuning || null;
       calibrationMaterial={material:!!calibrationResult,reason:calSelection.materialityReason};
       calibrationDiagnostics.evaluations=calSelection.evaluations;
-      setStageVerdict(projectId,"delays",calibrationDiagnostics.status==="skipped"?"skipped":
+      setStageVerdict(projectId, versionId,"delays",calibrationDiagnostics.status==="skipped"?"skipped":
         calibrationResult?"improvement":calibrationDiagnostics.invalid || calibrationDiagnostics.error || !calibrationDiagnostics.valid?"incomplete":"no_improvement");
     }
     const attemptedConfirmationIds=new Set();
@@ -1044,7 +1044,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       const funnelKey = escPhase.name === "asymmetric-pair" ? "asymmetricPair" : escPhase.name;
 
       // ── Generate + screen + promote (fast batch modal — NO full simulation)
-      setPositionSearchPhase(projectId, escPhase.name);
+      setPositionSearchPhase(projectId, versionId, escPhase.name);
       onProgress(`screening_${escPhase.name}`, escPhase.label, 0, 1);
 
       let phaseResult;
@@ -1166,7 +1166,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
 
     // Publish sub_positions stage verdict (purely observational)
-    setStageVerdict(projectId, "sub_positions", materialSubImprovementFound ? "improvement" : evaluationIssues.some(e=>e.stage!=="calibration") ? "incomplete" : "no_improvement");
+    setStageVerdict(projectId, versionId, "sub_positions", materialSubImprovementFound ? "improvement" : evaluationIssues.some(e=>e.stage!=="calibration") ? "incomplete" : "no_improvement");
 
     // ── Phase 9: Seating position search (Stage 11C) ────────────────────
     // Move the complete seating layout together along the room length axis.
@@ -1182,7 +1182,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     let seatingMaterial = null;
     let seatingDiagnostics = { status: "incomplete", tested: 0, valid: 0, best: null };
     let seatingProfiler = createSeatingProfiler();
-    setStageVerdict(projectId, "seating_positions", "skipped");
+    setStageVerdict(projectId, versionId, "seating_positions", "skipped");
     try {
       const screenWall = "front"; // default; could be derived from project
       const seatingCandidates = generateSeatingCandidates(seatingPositions, roomDims, screenWall);
@@ -1365,16 +1365,16 @@ export async function runImproveBassV2(projectId, params, callbacks) {
       }
       const seatingVerdict = seatingMaterial?.material ? "improvement" :
         seatingDiagnostics.tested === 0 ? "skipped" : "no_improvement";
-      setStageVerdict(projectId, "seating_positions", seatingVerdict);
+      setStageVerdict(projectId, versionId, "seating_positions", seatingVerdict);
     } catch (err) {
       if (isFatalLifecycleError(err)) throw err;
       evaluationIssues.push({ stage: "seating", error: err.message });
-      setStageVerdict(projectId, "seating_positions", "incomplete");
+      setStageVerdict(projectId, versionId, "seating_positions", "incomplete");
     }
 
     // ── Phase 8: Final single winner selection ───────────────────────────
     onProgress("finalising", "Finalising recommendation", 0, 1);
-    setStageVerdict(projectId, "comparing", "done");
+    setStageVerdict(projectId, versionId, "comparing", "done");
     snapshot.evaluationIncomplete=evaluationIssues.length>0;
     const selection = selectWinnerWithProtection([...confirmedResults,...calibrationCandidates], snapshot, existingAuthority);
     selection.phaseResult=phaseResult;
@@ -1389,7 +1389,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     selection.seatingMaterial=seatingMaterial;
     selection.seatingDiagnostics=seatingDiagnostics;
     selection.seatingProfile=seatingProfiler.getReport();
-    setStageVerdict(projectId, "preparing", "done");
+    setStageVerdict(projectId, versionId, "preparing", "done");
     await yieldToUI();
 
     // BLOCKER 4: If selection is null/undefined, return NO_WINNER explicitly
@@ -1420,7 +1420,7 @@ export async function runImproveBassV2(projectId, params, callbacks) {
     selection.evaluationCounts={calibration:calibrationDiagnostics,...funnel};
     materialSubImprovementFound = positionOpt.materialSubImprovementFound;
     subOptimisationExhausted = positionOpt.subOptimisationExhausted;
-    setPositionExhaustion(projectId, subOptimisationExhausted, materialSubImprovementFound, selection.winner);
+    setPositionExhaustion(projectId, versionId, subOptimisationExhausted, materialSubImprovementFound, selection.winner);
     selection.positionOptimisation = positionOpt;
 
     runResult = { status: "complete", selection, snapshot, confirmedResults };

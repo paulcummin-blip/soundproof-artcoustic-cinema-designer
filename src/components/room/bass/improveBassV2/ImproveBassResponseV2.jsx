@@ -66,12 +66,13 @@ export default function ImproveBassResponseV2({
   amplifierPowerPerSubW,
 }) {
   const projectId = useActiveProjectId();
+  const versionId = appState?.activeVersionId || null;
   const shared = useSharedBassResults();
-  const state = useImproveBassV2State(projectId);
+  const state = useImproveBassV2State(projectId, versionId);
   const stage2 = useSyncExternalStore(
     subscribeStage2,
-    () => getStage2State(projectId),
-    () => getStage2State(projectId),
+    () => getStage2State(projectId, versionId),
+    () => getStage2State(projectId, versionId),
   );
   const runningRef = useRef(false);
 
@@ -215,37 +216,37 @@ export default function ImproveBassResponseV2({
     if (!isStage2ReadyForConsumption(stage2)) {
       // Case B: request Stage 2 through the existing heavy action lifecycle
       if (!shared.cacheKey) {
-        setError(projectId, "Bass result is not ready — calculate parameter results first.");
+        setError(projectId, versionId, "Bass result is not ready — calculate parameter results first.");
         runningRef.current = false;
         return;
       }
 
-      setAwaitingStage2(projectId, snapshot);
-      requestBassHeavyAction(projectId, "optimise", shared.cacheKey);
+      setAwaitingStage2(projectId, versionId, snapshot);
+      requestBassHeavyAction(projectId, versionId, "optimise", shared.cacheKey);
 
-      const waitResult = await waitForStage2Terminal(projectId, {
-        isCancelled: () => isCancelRequested(projectId),
+      const waitResult = await waitForStage2Terminal(projectId, versionId, {
+        isCancelled: () => isCancelRequested(projectId, versionId),
         getCurrentFingerprint,
         startFingerprint,
       });
 
       if (waitResult.status === "cancelled") {
-        setCancelled(projectId);
+        setCancelled(projectId, versionId);
         runningRef.current = false;
         return;
       }
       if (waitResult.status === "stale") {
-        setStale(projectId, waitResult.message);
+        setStale(projectId, versionId, waitResult.message);
         runningRef.current = false;
         return;
       }
       if (waitResult.status === "error") {
-        setError(projectId, waitResult.error);
+        setError(projectId, versionId, waitResult.error);
         runningRef.current = false;
         return;
       }
       if (waitResult.status === "timeout") {
-        setError(projectId, waitResult.error);
+        setError(projectId, versionId, waitResult.error);
         runningRef.current = false;
         return;
       }
@@ -256,7 +257,7 @@ export default function ImproveBassResponseV2({
     }
 
     // ── Continue into V2 finalist/local optimisation ──────────────────
-    startImproveBassV2(projectId, snapshot);
+    startImproveBassV2(projectId, versionId, snapshot);
 
     const params = {
       subwooferInstances,
@@ -280,11 +281,11 @@ export default function ImproveBassResponseV2({
 
     const callbacks = {
       onProgress: (phase, label, current, total) => {
-        updateProgress(projectId, phase, label, current, total);
+        updateProgress(projectId, versionId, phase, label, current, total);
       },
-      isCancelled: () => isCancelRequested(projectId),
+      isCancelled: () => isCancelRequested(projectId, versionId),
       onBestSoFar: (bestSoFar) => {
-        setBestSoFar(projectId, bestSoFar);
+        setBestSoFar(projectId, versionId, bestSoFar);
       },
       // BLOCKER 3: Stale-job rejection — recompute the fingerprint from the
       // CURRENT design state on each check, reading from the ref (not the
@@ -294,21 +295,21 @@ export default function ImproveBassResponseV2({
     };
 
     try {
-      const result = await runImproveBassV2(projectId, params, callbacks);
+      const result = await runImproveBassV2(projectId, versionId, params, callbacks);
 
       // BLOCKER 7: Cancelled jobs never publish a winner
       if (result.status === "cancelled") {
-        setCancelled(projectId);
+        setCancelled(projectId, versionId);
       } else if (result.status === "stale") {
-        setStale(projectId, result.message);
+        setStale(projectId, versionId, result.message);
       } else if (result.status === "error") {
-        setError(projectId, result.error);
+        setError(projectId, versionId, result.error);
       } else if (result.status === "complete") {
         // BLOCKER 4: If selection is null/undefined, treat as NO_WINNER
         // (Current retained), never blank complete
         const selection = result.selection;
         if (!selection) {
-          setWinner(projectId, {
+          setWinner(projectId, versionId, {
             isCurrent: true,
             winner: null,
             message: "No verified material automatic improvement found.",
@@ -316,38 +317,38 @@ export default function ImproveBassResponseV2({
             currentResult: null,
           });
         } else {
-          setWinner(projectId, { ...selection, applyFingerprint: startFingerprint,
+          setWinner(projectId, versionId, { ...selection, applyFingerprint: startFingerprint,
             applyCandidateId: selection.winner?.candidateId ?? null,
             applyCalibrationId: selection.calibrationResult?.candidateId ?? null });
         }
       }
       // Store runtime metrics for acceptance verification
       if (result.runtimeMetrics) {
-        setRuntimeMetrics(projectId, result.runtimeMetrics);
+        setRuntimeMetrics(projectId, versionId, result.runtimeMetrics);
       }
       // Store developer/debug optimisation diagnostics report (read-only)
       if (result.optimisationDiagnostics) {
-        setOptimisationDiagnostics(projectId, result.optimisationDiagnostics);
+        setOptimisationDiagnostics(projectId, versionId, result.optimisationDiagnostics);
       }
     } catch (err) {
-      setError(projectId, err.message);
+      setError(projectId, versionId, err.message);
     } finally {
       runningRef.current = false;
     }
-  }, [projectId, shared, rspPosition, selectedSubModel, subwooferInstances, roomDims,
+  }, [projectId, versionId, shared, rspPosition, selectedSubModel, subwooferInstances, roomDims,
     seatingPositions, frontSubsCfg, rearSubsCfg, amplifierPowerPerSubW,
     subwooferBottomHeightM, p14Params, stage2]);
 
   const handleCancel = useCallback(() => {
-    requestCancel(projectId);
+    requestCancel(projectId, versionId);
     // If Stage 2 is being generated, cancel the heavy action so the
     // orchestrator's store listener fires and resolves the wait promise.
-    cancelBassHeavyAction(projectId, "Improve Bass cancelled");
-  }, [projectId]);
+    cancelBassHeavyAction(projectId, versionId, "Improve Bass cancelled");
+  }, [projectId, versionId]);
 
   const handleRetry = useCallback(() => {
-    resetImproveBassV2(projectId);
-  }, [projectId]);
+    resetImproveBassV2(projectId, versionId);
+  }, [projectId, versionId]);
 
   // A card supplies its own ID; look it up in the one confirmed collection.
   // Recheck the live design at mutation time, including edits after completion.
@@ -359,7 +360,7 @@ export default function ImproveBassResponseV2({
     const fingerprint=computeV2DesignFingerprint({...d,...d.p14Params});
     if(state?.status!=="complete" || !selection.applyFingerprint || fingerprint!==selection.applyFingerprint ||
        rec.result.inputIdentity!==fingerprint){
-      setStale(projectId,"Design changed — recalculate the recommendation before Apply");return;
+      setStale(projectId, versionId,"Design changed — recalculate the recommendation before Apply");return;
     }
     const _provenance=buildProvenance(
       rec.interventionType==="calibration"?"calibration":"subPositions",
@@ -385,7 +386,7 @@ export default function ImproveBassResponseV2({
     const fingerprint=computeV2DesignFingerprint({...d,...d.p14Params});
     if(state?.status!=="complete" || !selection.applyFingerprint || fingerprint!==selection.applyFingerprint ||
        entry.result.inputIdentity!==fingerprint){
-      setStale(projectId,"Design changed — recalculate the recommendation before Apply");return;
+      setStale(projectId, versionId,"Design changed — recalculate the recommendation before Apply");return;
     }
     const _provenance=buildProvenance(
       entry.result.candidateKind==="calibration"?"calibration":"subPositions",
@@ -407,7 +408,7 @@ export default function ImproveBassResponseV2({
     const d = latestDesignRef.current;
     const fingerprint = computeV2DesignFingerprint({...d, ...d.p14Params});
     if (state?.status !== "complete" || !state?.winner?.applyFingerprint || fingerprint !== state.winner.applyFingerprint) {
-      setStale(projectId, "Design changed — recalculate the recommendation before Apply");
+      setStale(projectId, versionId, "Design changed — recalculate the recommendation before Apply");
       return;
     }
 

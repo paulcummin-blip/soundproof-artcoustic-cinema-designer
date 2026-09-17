@@ -62,7 +62,7 @@ export function isStage2ReadyForConsumption(stage2State) {
  * @param {string} [options.startFingerprint] — the V2 design fingerprint at request time
  * @returns {Promise<object>}
  */
-export function waitForStage2Terminal(projectId, { isCancelled, getCurrentFingerprint, startFingerprint } = {}) {
+export function waitForStage2Terminal(projectId, versionId, { isCancelled, getCurrentFingerprint, startFingerprint } = {}) {
   return new Promise((resolve) => {
     let resolved = false;
     let unsubscribeStage2 = null;
@@ -87,7 +87,7 @@ export function waitForStage2Terminal(projectId, { isCancelled, getCurrentFinger
 
       // Cancellation — user pressed Cancel
       if (isCancelled && isCancelled()) {
-        cancelBassHeavyAction(projectId, "Improve Bass cancelled");
+        cancelBassHeavyAction(projectId, versionId, "Improve Bass cancelled");
         settle({ status: "cancelled" });
         return;
       }
@@ -97,7 +97,7 @@ export function waitForStage2Terminal(projectId, { isCancelled, getCurrentFinger
         try {
           const currentFp = getCurrentFingerprint();
           if (currentFp && currentFp !== startFingerprint) {
-            cancelBassHeavyAction(projectId, "Design changed during Stage 2");
+            cancelBassHeavyAction(projectId, versionId, "Design changed during Stage 2");
             settle({ status: "stale", message: "Design changed during Stage 2 evaluation" });
             return;
           }
@@ -107,7 +107,7 @@ export function waitForStage2Terminal(projectId, { isCancelled, getCurrentFinger
       }
 
       // Stage 2 complete — consume evaluatedFinalists
-      const stage2 = getStage2State(projectId);
+      const stage2 = getStage2State(projectId, versionId);
       if (stage2.status === "complete") {
         settle({ status: "complete", stage2 });
         return;
@@ -121,7 +121,7 @@ export function waitForStage2Terminal(projectId, { isCancelled, getCurrentFinger
 
       // Heavy action cancelled or error (safety net — BassBackgroundAnalysisOwner
       // cancels the heavy action when the design changes)
-      const heavy = getBassHeavyAction(projectId);
+      const heavy = getBassHeavyAction(projectId, versionId);
       if (heavy?.status === "cancelled") {
         settle({ status: "cancelled" });
         return;
