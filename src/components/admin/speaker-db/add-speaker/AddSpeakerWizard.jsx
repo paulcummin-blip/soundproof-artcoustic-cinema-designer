@@ -36,7 +36,7 @@ const STEPS = [
   { key: "manufacturer", label: "Manufacturer" },
   { key: "url", label: "Product URL" },
   { key: "documents", label: "Documents" },
-  { key: "extract", label: "Read Specifications" },
+  { key: "extract", label: "Raw Extraction" },
   { key: "review", label: "Review" },
   { key: "approve", label: "Approve" },
 ];
@@ -59,6 +59,7 @@ export default function AddSpeakerWizard() {
   const [productData, setProductData] = useState(null);
   const [reviewerName, setReviewerName] = useState(user?.full_name || "");
   const [validationResult, setValidationResult] = useState(null);
+  const [rawExtraction, setRawExtraction] = useState(null);
 
   // Load manufacturers
   useEffect(() => {
@@ -95,6 +96,7 @@ export default function AddSpeakerWizard() {
     setProductId(result.productId);
     setSpecId(result.specId);
     setSpecData(result.spec);
+    if (result.rawExtraction) setRawExtraction(result.rawExtraction);
   };
 
   const canProceed = () => {
@@ -217,6 +219,7 @@ export default function AddSpeakerWizard() {
               specData={specData}
               onSpecDataChange={setSpecData}
               onValidationUpdate={setValidationResult}
+              rawExtraction={rawExtraction}
             />
           )}
           {step === 5 && specData && (

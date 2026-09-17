@@ -3,12 +3,13 @@
 // Source is color-coded: 🟢 PDF, 🟢 Product Page, 🟡 Estimated, 🔴 Missing.
 // Every edit is tracked and saved with a change reason.
 
-import React, { useState, useEffect } from "react";
-import { Save, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Save, Loader2, AlertCircle, CheckCircle2, ArrowRight } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { SPEC_GROUPS } from "./specFieldDefinitions.js";
+import { SPEC_GROUPS, CONFIDENCE_LABELS, ALL_SPEC_FIELDS } from "./specFieldDefinitions.js";
 import { fieldDisplayStatus, validateDraftSpec } from "./addSpeakerValidation.js";
 import { saveSpecEdits, runValidationAndPersist } from "./addSpeakerPersistence.js";
+import { coerceRawValue, mapRawSourceToAuthority } from "./rawExtraction.js";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -85,7 +86,7 @@ function SpecInput({ field, value, onChange }) {
   );
 }
 
-export default function StepReview({ productId, specId, specData, onSpecDataChange, onValidationUpdate }) {
+export default function StepReview({ productId, specId, specData, onSpecDataChange, onValidationUpdate, rawExtraction }) {
   const [localSpec, setLocalSpec] = useState(specData || {});
   const [originalSpec, setOriginalSpec] = useState(specData || {});
   const [changeReason, setChangeReason] = useState("Manual Correction");
@@ -93,11 +94,62 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
   const [saveMsg, setSaveMsg] = useState("");
   const [dirty, setDirty] = useState(false);
 
+  // Build raw extraction lookup: field key → raw entry
+  const rawLookup = useMemo(() => {
+    const map = {};
+    if (rawExtraction?.fields) {
+      for (const f of rawExtraction.fields) {
+        if (f.field && f.value) map[f.field] = f;
+      }
+    }
+    return map;
+  }, [rawExtraction]);
+
   useEffect(() => {
     setLocalSpec(specData || {});
     setOriginalSpec(specData || {});
     setDirty(false);
   }, [specId, specData]);
+
+  // Promote a raw extraction value into the spec
+  const handlePromote = (fieldKey, rawEntry) => {
+    if (!rawEntry?.value) return;
+    const fieldDef = ALL_SPEC_FIELDS.find((f) => f.key === fieldKey);
+    const coercedValue = coerceRawValue(rawEntry.value, fieldDef?.type || "text");
+    const authoritySource = mapRawSourceToAuthority(rawEntry.source);
+
+    setLocalSpec((prev) => {
+      const currentAuthority = prev.field_authority || {};
+      const nextAuthority = { ...currentAuthority };
+      if (authoritySource) {
+        nextAuthority[fieldKey] = { source: authoritySource, note: rawEntry.raw_text || "" };
+      }
+      return { ...prev, [fieldKey]: coercedValue, field_authority: nextAuthority };
+    });
+    setDirty(true);
+    setSaveMsg("");
+  };
+
+  // Promote all raw values at once
+  const handlePromoteAll = () => {
+    if (!rawLookup || Object.keys(rawLookup).length === 0) return;
+    setLocalSpec((prev) => {
+      const next = { ...prev };
+      const nextAuthority = { ...(next.field_authority || {}) };
+      for (const [fieldKey, rawEntry] of Object.entries(rawLookup)) {
+        const fieldDef = ALL_SPEC_FIELDS.find((f) => f.key === fieldKey);
+        next[fieldKey] = coerceRawValue(rawEntry.value, fieldDef?.type || "text");
+        const authoritySource = mapRawSourceToAuthority(rawEntry.source);
+        if (authoritySource) {
+          nextAuthority[fieldKey] = { source: authoritySource, note: rawEntry.raw_text || "" };
+        }
+      }
+      next.field_authority = nextAuthority;
+      return next;
+    });
+    setDirty(true);
+    setSaveMsg("");
+  };
 
   const handleFieldChange = (key, value) => {
     setLocalSpec((prev) => ({ ...prev, [key]: value }));
@@ -163,9 +215,19 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: BRAND.text, margin: 0 }}>Review Specification</h2>
           <p style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-            Populate every field from the official source. Every edit is logged to Change History.
+            Promote raw extraction values or enter manually. Every edit is logged to Change History.
           </p>
         </div>
+        {rawLookup && Object.keys(rawLookup).length > 0 && (
+          <button
+            onClick={handlePromoteAll}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium"
+            style={{ border: `1px solid ${BRAND.green}`, color: BRAND.green, background: BRAND.card }}
+          >
+            <ArrowRight className="w-3 h-3" />
+            Promote All Raw Values
+          </button>
+        )}
         <div className="flex items-center gap-2">
           <select
             value={changeReason}
@@ -218,9 +280,10 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
               <table className="w-full" style={{ borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${BRAND.border}` }}>
-                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "180px" }}>Field</th>
-                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "160px" }}>Value</th>
-                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "150px" }}>Source</th>
+                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "160px" }}>Field</th>
+                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "180px" }}>Raw Extraction</th>
+                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "140px" }}>Value</th>
+                    <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em", width: "140px" }}>Source</th>
                     <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 600, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.04em" }}>Notes</th>
                   </tr>
                 </thead>
@@ -229,11 +292,42 @@ export default function StepReview({ productId, specId, specData, onSpecDataChan
                     const value = localSpec[field.key];
                     const { source, note } = resolveAuthority(localSpec.field_authority, field.key);
                     const status = fieldDisplayStatus(localSpec, field.key);
+                    const rawEntry = rawLookup[field.key];
+                    const hasRaw = !!rawEntry?.value;
+                    const rawConf = rawEntry?.confidence || "D";
+                    const confLabel = CONFIDENCE_LABELS[rawConf] || CONFIDENCE_LABELS.D;
                     return (
                       <tr key={field.key} style={{ borderBottom: `1px solid ${BRAND.border}` }}>
                         <td style={{ padding: "8px 12px", fontSize: 13, fontWeight: 500, color: BRAND.text, verticalAlign: "middle" }}>
                           {field.label}
                         </td>
+                        {/* Raw Extraction column */}
+                        <td style={{ padding: "8px 12px", verticalAlign: "middle" }}>
+                          {hasRaw ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-medium" style={{ color: BRAND.text }}>
+                                  {rawEntry.value}{rawEntry.unit && <span style={{ color: BRAND.subtext }}> {rawEntry.unit}</span>}
+                                </div>
+                                <div className="text-[10px]" style={{ color: BRAND.subtext }}>
+                                  {rawEntry.source} · <span style={{ color: confLabel.color, fontWeight: 600 }}>{rawConf}</span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handlePromote(field.key, rawEntry)}
+                                title="Promote raw value into specification"
+                                className="flex items-center gap-0.5 px-2 py-1 rounded text-[10px] font-medium flex-shrink-0"
+                                style={{ border: `1px solid ${BRAND.green}40`, color: BRAND.green, background: BRAND.card }}
+                              >
+                                <ArrowRight className="w-2.5 h-2.5" />
+                                Promote
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[10px]" style={{ color: BRAND.border }}>—</span>
+                          )}
+                        </td>
+                        {/* Value column */}
                         <td style={{ padding: "8px 12px", verticalAlign: "middle" }}>
                           <SpecInput field={field} value={value} onChange={(v) => handleFieldChange(field.key, v)} />
                         </td>
