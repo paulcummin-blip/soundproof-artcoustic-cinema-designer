@@ -139,6 +139,8 @@ export default function AdminSpeakerProductDetail() {
   const [formData, setFormData] = useState({});
   const [specData, setSpecData] = useState({});
   const [specId, setSpecId] = useState(null);
+  const [allSpecs, setAllSpecs] = useState([]);
+  const [changeReason, setChangeReason] = useState("Manual correction");
 
   const isNew = productId === "new";
 
@@ -169,7 +171,7 @@ export default function AdminSpeakerProductDetail() {
             diagram_image_url: "",
             notes: "",
           });
-          setSpecData({ version_label: "Current", is_current: true });
+          setSpecData({ version_label: "Current", is_current: true, approval_status: "Draft" });
           setSources([]);
           setDataQuality([]);
           setHistory([]);
@@ -193,13 +195,14 @@ export default function AdminSpeakerProductDetail() {
 
           // Use the current specification (is_current=true, or the first one)
           const specList = specs || [];
+          setAllSpecs(specList);
           const currentSpec = specList.find((s) => s.is_current) || specList[0] || null;
           if (currentSpec) {
             setSpecId(currentSpec.id);
             setSpecData(currentSpec);
           } else {
             setSpecId(null);
-            setSpecData({ version_label: "Current", is_current: true, product_id: productId });
+            setSpecData({ version_label: "Current", is_current: true, product_id: productId, approval_status: "Draft" });
           }
         }
       } catch (err) {
@@ -256,6 +259,7 @@ export default function AdminSpeakerProductDetail() {
           new_value: created.full_product_name || created.model,
           source: "Manual Edit",
           change_type: "Created",
+          change_reason: changeReason || "Manual correction",
         });
         navigate(`/admin/speaker-database/product/${created.id}`);
       } else {
@@ -268,7 +272,7 @@ export default function AdminSpeakerProductDetail() {
           const oldVal = product[key];
           const newVal = payload[key];
           if (String(oldVal ?? "") !== String(newVal ?? "")) {
-            changes.push({ product_id: productId, field_changed: key, old_value: String(oldVal ?? ""), new_value: String(newVal ?? ""), source: "Manual Edit", change_type: "Manual Edit" });
+            changes.push({ product_id: productId, field_changed: key, old_value: String(oldVal ?? ""), new_value: String(newVal ?? ""), source: "Manual Edit", change_type: "Manual Edit", change_reason: changeReason || "Manual correction" });
           }
         }
         await base44.entities.SpeakerProduct.update(productId, payload);
@@ -359,6 +363,19 @@ export default function AdminSpeakerProductDetail() {
         <div className="flex items-center gap-2">
           {editMode || isNew ? (
             <>
+              {!isNew && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium" style={{ color: BRAND.subtext }}>Reason:</span>
+                  <select value={changeReason} onChange={(e) => setChangeReason(e.target.value)} className="px-2 py-1.5 rounded text-sm outline-none" style={inputStyle}>
+                    <option value="Manual correction">Manual correction</option>
+                    <option value="Manufacturer update">Manufacturer update</option>
+                    <option value="PDF revised">PDF revised</option>
+                    <option value="Crawler update">Crawler update</option>
+                    <option value="Specification error">Specification error</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              )}
               {!isNew && <button onClick={() => { setEditMode(false); setFormData(product); }} className="px-4 py-2 rounded-md text-sm" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }}>Cancel</button>}
               <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium" style={{ background: BRAND.green, color: "#fff", opacity: saving ? 0.5 : 1 }}>
                 <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
@@ -462,9 +479,26 @@ export default function AdminSpeakerProductDetail() {
       {/* Specifications Tab */}
       {tab === "specifications" && (
         <div className="space-y-6">
-          {/* Specification version label */}
+          {/* Current Specification — explicit pointer: Product → Current Specification → Specification History */}
           <div className="rounded-lg p-6" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card }}>
-            <h3 className="text-sm font-bold uppercase tracking-wide mb-4" style={{ color: BRAND.green }}>Specification Version</h3>
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="text-sm font-bold uppercase tracking-wide" style={{ color: BRAND.green }}>Current Specification</h3>
+              {specData.approval_status && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{
+                  background: specData.approval_status === "Approved" ? BRAND.green + "15"
+                    : specData.approval_status === "Reviewed" ? "#9A6E00" + "15"
+                    : specData.approval_status === "Rejected" ? BRAND.danger + "15"
+                    : BRAND.subtext + "15",
+                  color: specData.approval_status === "Approved" ? BRAND.green
+                    : specData.approval_status === "Reviewed" ? "#9A6E00"
+                    : specData.approval_status === "Rejected" ? BRAND.danger
+                    : BRAND.subtext,
+                }}>{specData.approval_status}</span>
+              )}
+            </div>
+            <div className="text-xs mb-4" style={{ color: BRAND.subtext }}>
+              Product → <span style={{ color: BRAND.green, fontWeight: 600 }}>Current Specification</span> → Specification History. Older specifications remain archived.
+            </div>
             <div className="grid gap-4" style={{ gridTemplateColumns: "260px 1fr" }}>
               <div>
                 <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Version Label</label>
@@ -478,6 +512,71 @@ export default function AdminSpeakerProductDetail() {
               </div>
               <div className="text-xs flex items-center" style={{ color: BRAND.subtext }}>
                 Specifications are stored separately from product identity, allowing future versioning (2026, 2027, 2028) without changing the Product record.
+              </div>
+            </div>
+
+            {/* Approval — separate from Confidence (data quality) and Import Status (pipeline origin) */}
+            <div className="pt-4 mt-4" style={{ borderTop: `1px solid ${BRAND.border}` }}>
+              <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: BRAND.green }}>Approval</div>
+              <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Approval Status</label>
+                  {editMode || isNew ? (
+                    <select value={specData.approval_status || "Draft"} onChange={(e) => handleSpecChange("approval_status", e.target.value)} className="w-full px-2 py-1.5 rounded text-sm outline-none" style={inputStyle}>
+                      <option value="Draft">Draft</option>
+                      <option value="Reviewed">Reviewed</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+                  ) : (
+                    <div className="px-2 py-1.5 text-sm rounded-md" style={{ background: "#F8F8F7", color: BRAND.text, minHeight: 34, display: "flex", alignItems: "center" }}>
+                      {specData.approval_status || "Draft"}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Reviewed By</label>
+                  {editMode || isNew ? (
+                    <input type="text" value={specData.reviewed_by || ""} onChange={(e) => handleSpecChange("reviewed_by", e.target.value)} className="w-full px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} placeholder="e.g. Paul" />
+                  ) : (
+                    <div className="px-2 py-1.5 text-sm rounded-md" style={{ background: "#F8F8F7", color: BRAND.text, minHeight: 34, display: "flex", alignItems: "center" }}>
+                      {specData.reviewed_by || "—"}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Reviewed Date</label>
+                  {editMode || isNew ? (
+                    <input type="date" value={specData.reviewed_date || ""} onChange={(e) => handleSpecChange("reviewed_date", e.target.value)} className="w-full px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} />
+                  ) : (
+                    <div className="px-2 py-1.5 text-sm rounded-md" style={{ background: "#F8F8F7", color: BRAND.text, minHeight: 34, display: "flex", alignItems: "center" }}>
+                      {specData.reviewed_date ? new Date(specData.reviewed_date).toLocaleDateString("en-GB") : "—"}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Approved By</label>
+                  {editMode || isNew ? (
+                    <input type="text" value={specData.approved_by || ""} onChange={(e) => handleSpecChange("approved_by", e.target.value)} className="w-full px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} placeholder="e.g. Paul" />
+                  ) : (
+                    <div className="px-2 py-1.5 text-sm rounded-md" style={{ background: "#F8F8F7", color: BRAND.text, minHeight: 34, display: "flex", alignItems: "center" }}>
+                      {specData.approved_by || "—"}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Approved Date</label>
+                  {editMode || isNew ? (
+                    <input type="date" value={specData.approved_date || ""} onChange={(e) => handleSpecChange("approved_date", e.target.value)} className="w-full px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} />
+                  ) : (
+                    <div className="px-2 py-1.5 text-sm rounded-md" style={{ background: "#F8F8F7", color: BRAND.text, minHeight: 34, display: "flex", alignItems: "center" }}>
+                      {specData.approved_date ? new Date(specData.approved_date).toLocaleDateString("en-GB") : "—"}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="text-xs mt-2" style={{ color: BRAND.subtext }}>
+                Separate from Confidence (data quality) and Import Status (pipeline origin). Records who checked and who signed off.
               </div>
             </div>
           </div>
@@ -524,7 +623,7 @@ export default function AdminSpeakerProductDetail() {
             </div>
           ))}
 
-          {/* Derived Values — reserved, empty */}
+          {/* Engineering Analysis — reserved, completely empty. No placeholder fields. */}
           <div className="rounded-lg p-6" style={{ border: `1px solid ${BRAND.border}`, background: "#F8F8F7" }}>
             <div className="flex items-center gap-2 mb-3">
               <Calculator className="w-4 h-4" style={{ color: BRAND.subtext }} />
@@ -535,6 +634,35 @@ export default function AdminSpeakerProductDetail() {
               These are engineering models, not manufacturer data; they are computed downstream by the RP22 engine. Nothing is stored or calculated here yet.
             </div>
           </div>
+
+          {/* Specification History — archived older specifications */}
+          {!isNew && allSpecs.length > 1 && (
+            <div className="rounded-lg p-6" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card }}>
+              <h3 className="text-sm font-bold uppercase tracking-wide mb-4" style={{ color: BRAND.green }}>Specification History</h3>
+              <div className="space-y-2">
+                {allSpecs
+                  .filter((s) => s.id !== specId)
+                  .map((s) => (
+                    <div key={s.id} className="flex items-center gap-4 p-3 rounded-md" style={{ background: "#F8F8F7" }}>
+                      <span className="text-sm font-medium" style={{ color: BRAND.text, width: 120 }}>{s.version_label || "—"}</span>
+                      <span className="text-xs" style={{ color: BRAND.subtext }}>
+                        {s.is_current ? "Current" : "Archived"}
+                      </span>
+                      {s.approval_status && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{
+                          background: s.approval_status === "Approved" ? BRAND.green + "15" : s.approval_status === "Reviewed" ? "#9A6E00" + "15" : s.approval_status === "Rejected" ? BRAND.danger + "15" : BRAND.subtext + "15",
+                          color: s.approval_status === "Approved" ? BRAND.green : s.approval_status === "Reviewed" ? "#9A6E00" : s.approval_status === "Rejected" ? BRAND.danger : BRAND.subtext,
+                        }}>{s.approval_status}</span>
+                      )}
+                      {s.reviewed_by && <span className="text-xs" style={{ color: BRAND.subtext }}>Reviewed by {s.reviewed_by}</span>}
+                      <span className="text-xs ml-auto" style={{ color: BRAND.subtext }}>
+                        {s.created_date ? new Date(s.created_date).toLocaleDateString("en-GB") : "—"}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -604,11 +732,14 @@ export default function AdminSpeakerProductDetail() {
               {history.map((h) => (
                 <div key={h.id} className="flex items-center gap-4 p-4 rounded-lg" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.card }}>
                   <span className="text-xs" style={{ color: BRAND.subtext, width: 100 }}>{h.created_date ? new Date(h.created_date).toLocaleDateString("en-GB") : "—"}</span>
-                  <span className="font-medium text-sm" style={{ color: BRAND.text, width: 180 }}>{h.field_changed}</span>
-                  <span className="text-sm" style={{ color: BRAND.subtext, width: 120 }}>{h.old_value || "—"}</span>
+                  <span className="font-medium text-sm" style={{ color: BRAND.text, width: 160 }}>{h.field_changed}</span>
+                  <span className="text-sm" style={{ color: BRAND.subtext, width: 100 }}>{h.old_value || "—"}</span>
                   <span style={{ color: BRAND.subtext }}>→</span>
-                  <span className="text-sm" style={{ color: BRAND.text, width: 120 }}>{h.new_value || "—"}</span>
+                  <span className="text-sm" style={{ color: BRAND.text, width: 100 }}>{h.new_value || "—"}</span>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: BRAND.subtext + "15", color: BRAND.subtext }}>{h.change_type}</span>
+                  {h.change_reason && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: BRAND.green + "15", color: BRAND.green }}>{h.change_reason}</span>
+                  )}
                 </div>
               ))}
             </div>

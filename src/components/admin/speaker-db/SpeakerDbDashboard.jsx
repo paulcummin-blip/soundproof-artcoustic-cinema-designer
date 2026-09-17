@@ -52,6 +52,7 @@ export default function SpeakerDbDashboard() {
     warnings: 0,
     missingData: 0,
     avgConfidence: "—",
+    avgApproval: "—",
     lastUpdate: null,
     recentChanges: 0,
   });
@@ -90,6 +91,10 @@ export default function SpeakerDbDashboard() {
           avgConfidence = `${Math.round((sum / rated.length) * 25)}%`;
         }
 
+        // Average approval rate: percentage of specs with Approved status
+        const approvedCount = specList.filter((s) => s.approval_status === "Approved").length;
+        const avgApproval = specList.length > 0 ? `${Math.round((approvedCount / specList.length) * 100)}%` : "—";
+
         const lastUpdate = history && history.length > 0 ? history[0].created_date : null;
 
         setStats({
@@ -100,6 +105,7 @@ export default function SpeakerDbDashboard() {
           warnings,
           missingData,
           avgConfidence,
+          avgApproval,
           lastUpdate,
           recentChanges: (history || []).length,
         });
@@ -128,6 +134,7 @@ export default function SpeakerDbDashboard() {
         <StatCard icon={AlertTriangle} label="Data Quality Issues" value={stats.warnings} color={BRAND.amber} />
         <StatCard icon={HelpCircle} label="Specs Missing Data" value={stats.missingData} color={BRAND.amber} />
         <StatCard icon={TrendingUp} label="Average Confidence" value={stats.avgConfidence} color={BRAND.green} />
+        <StatCard icon={CheckCircle} label="Approved Specs" value={stats.avgApproval} color={BRAND.green} />
       </div>
 
       {/* Last update + Recent changes */}
@@ -162,6 +169,12 @@ export default function SpeakerDbDashboard() {
                   <span className="font-medium">{h.field_changed}</span>
                   <span style={{ color: BRAND.subtext }}>·</span>
                   <span style={{ color: BRAND.subtext }}>{h.change_type}</span>
+                  {h.change_reason && (
+                    <>
+                      <span style={{ color: BRAND.subtext }}>·</span>
+                      <span style={{ color: BRAND.green }}>{h.change_reason}</span>
+                    </>
+                  )}
                 </div>
               ))}
             </div>

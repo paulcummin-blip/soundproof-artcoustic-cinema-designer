@@ -58,6 +58,13 @@ function ConfidenceBadge({ confidence }) {
   return <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold" style={{ background: color + "15", color }}>{confidence}</span>;
 }
 
+function ApprovalBadge({ status }) {
+  if (!status) return <span style={{ color: BRAND.subtext }}>—</span>;
+  const colors = { Draft: BRAND.subtext, Reviewed: "#9A6E00", Approved: BRAND.green, Rejected: "#B23A3A" };
+  const color = colors[status] || BRAND.subtext;
+  return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: color + "15", color }}>{status}</span>;
+}
+
 export default function SpeakerDbProducts({ drillFilter, onClearDrillFilter }) {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
@@ -88,6 +95,7 @@ export default function SpeakerDbProducts({ drillFilter, onClearDrillFilter }) {
           frequency_response_low_hz: specMap[p.id]?.frequency_response_low_hz ?? null,
           frequency_response_high_hz: specMap[p.id]?.frequency_response_high_hz ?? null,
           nominal_impedance_ohm: specMap[p.id]?.nominal_impedance_ohm ?? null,
+          approval_status: specMap[p.id]?.approval_status ?? null,
         }));
 
         setRows(merged);
@@ -119,6 +127,7 @@ export default function SpeakerDbProducts({ drillFilter, onClearDrillFilter }) {
     { key: "sensitivity_db", label: "Sensitivity", sortable: true, width: "100px", render: (r) => r.sensitivity_db != null ? `${r.sensitivity_db} dB` : "—" },
     { key: "max_continuous_spl_db", label: "Max SPL", sortable: true, width: "90px", render: (r) => r.max_continuous_spl_db != null ? `${r.max_continuous_spl_db} dB` : "—" },
     { key: "confidence", label: "Conf.", sortable: true, width: "60px", render: (r) => <ConfidenceBadge confidence={r.confidence} /> },
+    { key: "approval_status", label: "Approval", sortable: true, width: "100px", render: (r) => <ApprovalBadge status={r.approval_status} /> },
   ];
 
   return (

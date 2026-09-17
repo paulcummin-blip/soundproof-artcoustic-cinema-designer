@@ -1,7 +1,7 @@
 {
   "name": "SpeakerManufacturerRule",
   "type": "object",
-  "description": "Per-manufacturer rules for data extraction and interpretation. Defines preferred source types, which product categories to ignore, and which power/SPL rating to use as primary. Avoids hard-coding manufacturer-specific logic in the extraction engine. One record per manufacturer.",
+  "description": "Per-manufacturer rules for data extraction and interpretation. Defines preferred source types, which product categories to ignore, which power/SPL rating to use as primary, and which frequency response bandwidth convention the manufacturer publishes. Avoids hard-coding manufacturer-specific logic in the extraction engine. One record per manufacturer.",
   "properties": {
     "manufacturer_id": {
       "type": "string",
@@ -46,6 +46,15 @@
         "Calculated"
       ],
       "description": "Which SPL rating to use as the primary maximum SPL figure for this manufacturer's products."
+    },
+    "preferred_frequency_response": {
+      "type": "string",
+      "enum": [
+        "-3dB",
+        "-6dB",
+        "Manufacturer Default"
+      ],
+      "description": "Which frequency response bandwidth convention this manufacturer publishes. Different manufacturers quote -3dB, -6dB, or their own convention. The extraction engine uses this to interpret and normalise frequency response values consistently."
     }
   },
   "required": [

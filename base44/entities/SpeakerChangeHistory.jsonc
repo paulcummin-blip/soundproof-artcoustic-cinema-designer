@@ -1,7 +1,7 @@
 {
   "name": "SpeakerChangeHistory",
   "type": "object",
-  "description": "Append-only audit log for every change to a SpeakerProduct. One record per field change. Provides full traceability for the Speaker Capability Database.",
+  "description": "Append-only audit log for every change to a SpeakerProduct. One record per field change. Provides full traceability for the Speaker Capability Database. Stores old value, new value, date, source, change type, and change reason.",
   "properties": {
     "product_id": {
       "type": "string",
@@ -32,6 +32,18 @@
         "Manual Edit"
       ],
       "description": "Type of change that occurred."
+    },
+    "change_reason": {
+      "type": "string",
+      "enum": [
+        "Manufacturer update",
+        "Manual correction",
+        "PDF revised",
+        "Crawler update",
+        "Specification error",
+        "Other"
+      ],
+      "description": "Reason the change was made. Enables filtering and reporting on change patterns over time. Examples: 'Manufacturer update' = the manufacturer published new data; 'Manual correction' = a human fixed a typo; 'PDF revised' = the source PDF was updated; 'Crawler update' = the automated crawler re-extracted; 'Specification error' = the previous value was wrong."
     }
   },
   "required": [

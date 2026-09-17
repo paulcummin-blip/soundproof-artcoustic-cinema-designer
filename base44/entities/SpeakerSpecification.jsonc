@@ -1,7 +1,7 @@
 {
   "name": "SpeakerSpecification",
   "type": "object",
-  "description": "A versioned specification record for a SpeakerProduct. One-to-one today (SpeakerProduct.current_specification_id points here); designed for one-to-many in the future (2026, 2027, 2028 specifications). Contains all physical, electrical, acoustic, and metadata specification fields. Separated from Product so product identity remains stable while specifications can evolve over time. The database knows nothing about RP22; derived values like estimated max SPL or P12 capability are computed downstream by the RP22 engine, never stored here.",
+  "description": "A versioned specification record for a SpeakerProduct. Product \u2192 Current Specification \u2192 Specification History. The SpeakerProduct.current_specification_id pointer selects the active specification; older specifications remain archived with is_current=false. Contains all physical, electrical, acoustic, and metadata specification fields. Separated from Product so product identity remains stable while specifications can evolve over time. The database knows nothing about RP22; derived values like estimated max SPL or P12 capability are computed downstream by the RP22 engine, never stored here.",
   "properties": {
     "product_id": {
       "type": "string",
@@ -15,7 +15,7 @@
     "is_current": {
       "type": "boolean",
       "default": true,
-      "description": "Whether this is the current specification for the product. When versioned specifications are introduced, only one record per product_id should have this set to true."
+      "description": "Whether this is the current specification for the product. When versioned specifications are introduced, only one record per product_id should have this set to true. The SpeakerProduct.current_specification_id pointer is the authoritative link; this flag is a denormalized convenience."
     },
     "cabinet_type": {
       "type": "string",
@@ -149,7 +149,7 @@
         "C",
         "D"
       ],
-      "description": "Metadata: Confidence level. A=Published, B=Calculated, C=Estimated, D=Engineering Estimate."
+      "description": "Metadata: Confidence level. A=Published, B=Calculated, C=Estimated, D=Engineering Estimate. This is about DATA QUALITY, not approval."
     },
     "evidence_quality": {
       "type": "string",
@@ -171,6 +171,35 @@
       "type": "object",
       "description": "Per-field source authority. Maps specification field names to their source type (e.g. { \"sensitivity_db\": \"Official PDF\", \"max_continuous_spl_db\": \"Official Product Page\" }). Records where each individual value came from, enabling precise change tracking when the crawler later re-extracts. Keys are spec field names; values are one of: Official Product Page, Official PDF, Engineering Document, Support Article.",
       "properties": {}
+    },
+    "approval_status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Reviewed",
+        "Approved",
+        "Rejected"
+      ],
+      "default": "Draft",
+      "description": "Approval workflow status. Draft = entered but not yet reviewed. Reviewed = checked by a reviewer. Approved = signed off by an approver. Rejected = failed review and needs correction. SEPARATE from Confidence (data quality) and Import Status (pipeline origin). Example: Confidence A + Approval Draft = excellent data, nobody has checked it yet."
+    },
+    "reviewed_by": {
+      "type": "string",
+      "description": "Name of the person who reviewed this specification. Eventually this will simply say 'Paul'."
+    },
+    "reviewed_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the specification was reviewed."
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Name of the person who approved this specification. When somebody changes a sensitivity six months later, this records who approved the original."
+    },
+    "approved_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the specification was approved."
     }
   },
   "required": [

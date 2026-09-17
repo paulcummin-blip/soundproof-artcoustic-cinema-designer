@@ -109,6 +109,7 @@ export default function SpeakerDbManufacturers() {
       ignore_ceiling: false,
       primary_power_rating: "",
       primary_spl: "",
+      preferred_frequency_response: "",
     });
     try {
       const existing = await base44.entities.SpeakerManufacturerRule.filter({ manufacturer_id: row.id });
@@ -121,6 +122,7 @@ export default function SpeakerDbManufacturers() {
           ignore_ceiling: rule.ignore_ceiling || false,
           primary_power_rating: rule.primary_power_rating || "",
           primary_spl: rule.primary_spl || "",
+          preferred_frequency_response: rule.preferred_frequency_response || "",
         });
       }
     } catch (err) {
@@ -289,6 +291,16 @@ export default function SpeakerDbManufacturers() {
                     <option value="Calculated">Calculated</option>
                   </select>
                 </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Preferred Frequency Response</label>
+                <select value={rulesForm.preferred_frequency_response} onChange={(e) => setRulesForm({ ...rulesForm, preferred_frequency_response: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }}>
+                  <option value="">—</option>
+                  <option value="-3dB">-3dB</option>
+                  <option value="-6dB">-6dB</option>
+                  <option value="Manufacturer Default">Manufacturer Default</option>
+                </select>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">

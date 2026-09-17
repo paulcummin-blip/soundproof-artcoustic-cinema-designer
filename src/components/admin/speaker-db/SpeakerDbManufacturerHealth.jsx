@@ -11,6 +11,7 @@
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Building2, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { calculateQualityScore } from "@/components/admin/speaker-db/speakerDbQualityScore";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -78,7 +79,7 @@ export default function SpeakerDbManufacturerHealth({ onDrillInto }) {
           base44.entities.SpeakerManufacturer.list("name", 500),
           base44.entities.SpeakerProduct.list("-created_date", 500),
           base44.entities.SpeakerSpecification.list("-created_date", 500),
-          base44.entities.SpeakerDataQuality.filter({ status: "Needs Review" }, "-created_date", 500),
+          base44.entities.SpeakerDataQuality.list("-created_date", 500),
           base44.entities.SpeakerChangeHistory.list("-created_date", 500),
         ]);
 
@@ -92,11 +93,12 @@ export default function SpeakerDbManufacturerHealth({ onDrillInto }) {
           }
         });
 
-        // Build data-quality count map: product_id → warning count
+        // Build data-quality map: product_id → array of open issues
         const dqMap = {};
         (dataQuality || []).forEach((dq) => {
           if (dq.status === "Resolved" || dq.status === "Ignored") return;
-          dqMap[dq.product_id] = (dqMap[dq.product_id] || 0) + 1;
+          if (!dqMap[dq.product_id]) dqMap[dq.product_id] = [];
+          dqMap[dq.product_id].push(dq);
         });
 
         // Build last-update map: product_id → most recent change date
@@ -123,7 +125,9 @@ export default function SpeakerDbManufacturerHealth({ onDrillInto }) {
           const total = mfrProducts.length;
           const completeCount = mfrProducts.filter((p) => isSpecComplete(specMap[p.id])).length;
           const missing = total - completeCount;
-          const warnings = mfrProducts.reduce((acc, p) => acc + (dqMap[p.id] || 0), 0);
+          const warnings = mfrProducts.reduce((acc, p) => acc + (dqMap[p.id]?.length || 0), 0);
+          const allMfrIssues = mfrProducts.flatMap((p) => dqMap[p.id] || []);
+          const qualityScore = calculateQualityScore(allMfrIssues);
           const lastUpdate = mfrProducts.reduce((latest, p) => {
             const d = lastUpdateMap[p.id];
             if (!d) return latest;
@@ -139,6 +143,7 @@ export default function SpeakerDbManufacturerHealth({ onDrillInto }) {
             percent,
             missing,
             warnings,
+            qualityScore,
             lastUpdate,
           };
         });
@@ -181,6 +186,7 @@ export default function SpeakerDbManufacturerHealth({ onDrillInto }) {
                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: BRAND.subtext }}>Manufacturer</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: BRAND.subtext }}>Products</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: BRAND.subtext }}>Complete</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: BRAND.subtext }}>Quality Score</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: BRAND.subtext }}>Missing</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: BRAND.subtext }}>Warnings</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: BRAND.subtext }}>Last Update</th>
@@ -208,6 +214,9 @@ export default function SpeakerDbManufacturerHealth({ onDrillInto }) {
                   <td className="px-4 py-3 text-right" style={{ color: BRAND.text }}>{row.productCount}</td>
                   <td className="px-4 py-3 text-right">
                     {row.productCount > 0 ? <CompleteBadge percent={row.percent} /> : <span style={{ color: BRAND.subtext }}>—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {row.productCount > 0 ? <CompleteBadge percent={row.qualityScore} /> : <span style={{ color: BRAND.subtext }}>—</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {row.missing > 0 ? (
