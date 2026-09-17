@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
+import { mergeProjectAndVersion } from "@/lib/versionAuthority";
 import { normalizeStatusId, getStatusLabel } from "@/components/projects/statusDefaults";
 import { aggregateCapacityBreakdown } from "@/lib/commercial/capacityService";
 import { aggregateTurnoverForYear } from "@/lib/commercial/commercialOverview";
@@ -127,7 +128,37 @@ export default function AccountDashboard() {
 
         if (mounted) {
           setAccount((accountList || [])[0] || null);
-          setProjects(projectList || []);
+
+          // ── Version-aware merge ──────────────────────────────────────
+          // The projects table shows dolby_config (a per-version design-state
+          // field). Merge each project with its active ProjectVersion's
+          // design_state so the table reflects the current version, not stale
+          // legacy Project fields.
+          let mergedProjects = projectList || [];
+          const versionIds = mergedProjects
+            .filter((p) => p && p.active_version_id)
+            .map((p) => p.active_version_id);
+          const uniqueVersionIds = [...new Set(versionIds)];
+          if (uniqueVersionIds.length > 0) {
+            try {
+              const versionMap = {};
+              for (let i = 0; i < uniqueVersionIds.length; i += 50) {
+                const batch = uniqueVersionIds.slice(i, i + 50);
+                const versions = await base44.entities.ProjectVersion.filter({ id: batch });
+                if (Array.isArray(versions)) {
+                  for (const v of versions) versionMap[v.id] = v;
+                }
+              }
+              mergedProjects = mergedProjects.map((p) => {
+                const v = p.active_version_id ? versionMap[p.active_version_id] : null;
+                return v ? mergeProjectAndVersion(p, v) : p;
+              });
+            } catch (verErr) {
+              console.warn('[AccountDashboard] Version batch fetch failed, using project-only:', verErr);
+            }
+          }
+          setProjects(mergedProjects);
+
           setBreakdown(aggregateCapacityBreakdown(ledgerEntries || []));
           setTurnover(aggregateTurnoverForYear(turnoverRecords, accountId, CALENDAR_YEAR));
           setPromotions(promoList || []);
