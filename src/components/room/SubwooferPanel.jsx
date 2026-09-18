@@ -5,12 +5,10 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import HeightInput from '@/components/ui/HeightInput';
-import BassTerminalStatus from '@/components/room/bass/BassTerminalStatus';
-import ImproveBassResponseV2 from '@/components/room/bass/improveBassV2/ImproveBassResponseV2';
 import BassHeadlinePills from '@/components/room/bass/BassHeadlinePills';
 import BassPermanentSeatResults from '@/components/room/bass/BassPermanentSeatResults';
-import CalculateAllTargetResults from '@/components/room/bass/CalculateAllTargetResults';
 import { useSharedBassResults } from '@/components/room/bass/bassResultsStore';
+import OptimiseAndCalculate from '@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate';
 import BassTargetLevelControl from '@/components/room/bass/BassTargetLevelControl';
 import BestSubLayoutGuide from '@/components/room/bass/best-layout/BestSubLayoutGuide';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
@@ -364,34 +362,13 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
             {/* Permanent P19/P20 per-seat results — always visible beneath the pills */}
             <BassPermanentSeatResults />
 
-            {/* Calculate Parameter Results — calculates only the currently selected target */}
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={() => sharedBassResults?.onCalculate?.()}
-                disabled={bassActionDisabled}
-                className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {bassCalculationInProgress ? (bassCalculationPhaseLabel || 'Calculating…') : 'Calculate Parameter Results'}
-                </button>
-              {!hasActiveSubModel && (
-                <p className="mt-2 text-[11px] text-[#625143]">Select a subwoofer model and quantity before calculating.</p>
-              )}
-              {bassAuthorityStatus === 'STALE' && (
-                <p className="mt-2 text-[11px] font-medium text-amber-700">Previous result needs recalculation — press Calculate to update.</p>
-              )}
-            </div>
-
-            {/* P18 target preparation progress — passive status + retry for failed targets */}
-            <div className="mt-2">
-              <CalculateAllTargetResults disabled={disabled || !hasActiveSubModel} />
-            </div>
-
-            {/* Terminal status — error/notice messages only (no duplicated results) */}
-            <BassTerminalStatus />
-
-            {/* Improve Bass Response — V2 Stage 11B canonical optimisation */}
-            <ImproveBassResponseV2
+            {/* Unified Optimise & Calculate workflow — replaces the separate
+                Calculate + Improve Bass Response engineering workflow with a
+                single button that internally calculates, optimises, auto-applies
+                calibration improvements, and recalculates. The existing
+                engineering UI is retained behind an Advanced Diagnostics toggle
+                inside this component. */}
+            <OptimiseAndCalculate
               roomDims={roomDimensions}
               seatingPositions={seats}
               subwooferInstances={appState?.subwooferInstances}
@@ -403,6 +380,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               appliedSeatingProvenance={appState?.appliedSeatingProvenance}
               hasCanonicalInstances={compat.hasCanonicalInstances}
               appState={appState}
+              disabled={disabled}
             />
           </div>
 
