@@ -68,6 +68,7 @@ import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReport
 import { resolveBassReadiness } from '@/components/hooks/useAppDesignRating';
 import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { setAuthoritativeReadOnlyMode } from '@/components/state/authoritativeReadOnlyMode';
+import { useAutoPrintReadinessInstrumentation } from '@/components/report/useAutoPrintReadinessInstrumentation';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -876,6 +877,32 @@ function RP22ReportInner() {
     // Export gate: recommendations are read from the handoff, not evaluated
     // locally. The gate checks the published settlement state only.
     const recommendationsPending = false;
+
+    // ── Forensic autoPrint readiness instrumentation ──────────────────────
+    // Logs every prerequisite flag change with timestamp/old/new, patches
+    // window.print to log when called, and emits a periodic "waiting forever
+    // because: X = false" diagnostic while isAutoPrintPreparing is true.
+    // Instrumentation only — no gating logic, no side effects on the pipeline.
+    useAutoPrintReadinessInstrumentation({
+        autoPrintRequested,
+        explicitProjectId,
+        reportHydrating,
+        reportReadyProjectId,
+        bassReportPending,
+        completedBassAuthority,
+        isPrinting,
+        printReady,
+        hasPrintedOnce,
+        autoPrintDone,
+        autoPrintTriggeredRef,
+        planImageDataUrl,
+        planDimsImageDataUrl,
+        planSpeakerDimsImageDataUrl,
+        roomDesignRating,
+        designRecommendations,
+        analysisResult,
+        showLoadingReport,
+    });
 
     // ── ASDR contributions by key — for parameter card footers ────────────
     // Maps the canonical contributions array to a { p1: {...}, p12: {...}, screen: {...} } lookup
