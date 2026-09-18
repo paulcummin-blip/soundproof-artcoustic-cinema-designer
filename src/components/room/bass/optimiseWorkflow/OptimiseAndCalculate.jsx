@@ -193,16 +193,19 @@ export default function OptimiseAndCalculate({
       phaseRef.current = "recalculating";
       setRecalculating(projectId, versionId);
 
-      if (typeof shared?.onCalculate === "function") {
+      if (typeof sharedRef.current?.onCalculate === "function") {
         // Small delay to let the instance commit propagate
         await sleep(150);
-        shared.onCalculate();
+        sharedRef.current?.onCalculate();
       }
 
-      // Wait for recalculation to complete
+      // Wait for recalculation to complete — read live state via sharedRef
+      // (NOT the stale closure-captured `shared`) so layout/position changes
+      // between runs don't freeze the break condition on an old snapshot.
       while (true) {
         await sleep(SLEEP_MS);
-        if (!shared?.calculationInProgress && shared?.hasCurrentResult) break;
+        const s = sharedRef.current;
+        if (!s?.calculationInProgress && s?.hasCurrentResult) break;
         if (phaseRef.current === "cancelled") break;
       }
       if (phaseRef.current === "cancelled") return;
@@ -221,9 +224,11 @@ export default function OptimiseAndCalculate({
         details: autoApplySummary.changeSummary,
       };
 
-      // Check for global bass trim from the authority
-      const globalTrim = shared?.completedBassAuthority?.contract?.selectedCandidate?.globalLevelAlignment
-        || shared?.completedBassAuthority?.contract?.productAnalysis?.parameters?.globalLevelAlignment
+      // Check for global bass trim from the authority — read live state so the
+      // freshly recalculated authority (not the stale closure snapshot) is used.
+      const liveAuthority = sharedRef.current?.completedBassAuthority;
+      const globalTrim = liveAuthority?.contract?.selectedCandidate?.globalLevelAlignment
+        || liveAuthority?.contract?.productAnalysis?.parameters?.globalLevelAlignment
         || null;
       if (globalTrim && Number.isFinite(globalTrim.recommendedTrimDb) && Math.abs(globalTrim.recommendedTrimDb) > 0.05) {
         autoApplied.globalBassTrim = true;
