@@ -48,6 +48,7 @@ import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Finger
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import BassOptimisationSummary from "./BassOptimisationSummary";
 import FurtherImprovements from "./FurtherImprovements";
+import ImproveBassResponseV2 from "../improveBassV2/ImproveBassResponseV2";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -101,6 +102,7 @@ export default function OptimiseAndCalculate({
     || shared?.canCalculate !== true;
 
   const isBusy = ["calculating", "optimising", "applying", "recalculating", "publishing"].includes(workflowState.status);
+  const [engineeringMode, setEngineeringMode] = useState(false);
 
   // ── Main orchestration: triggered by the OPTIMISE & CALCULATE button ──
   const handleStart = useCallback(async () => {
@@ -407,19 +409,17 @@ export default function OptimiseAndCalculate({
         </div>
       )}
 
-      {/* ── Completion: Summary + Further Improvements ── */}
+      {/* ── Completion: Calibration Summary ── */}
       {isComplete && (
         <>
           <BassOptimisationSummary
             autoApplied={workflowState.autoApplied}
             noImprovementsFound={workflowState.noImprovementsFound}
-            shared={shared}
-            seatingPositions={seatingPositions}
-            hasPhysicalImprovements={
-              !!(workflowState.recommendations?.subPositions || workflowState.recommendations?.seating)
-            }
-          >
-            {workflowState.recommendations && (
+          />
+
+          {/* ── Further Design Improvements (physical recommendations) ── */}
+          {workflowState.recommendations && (
+            <div className="mt-3">
               <FurtherImprovements
                 recommendations={workflowState.recommendations}
                 selection={v2State?.winner}
@@ -434,15 +434,16 @@ export default function OptimiseAndCalculate({
                 shared={shared}
                 onRecalculate={() => shared?.onCalculate?.()}
               />
-            )}
-          </BassOptimisationSummary>
+            </div>
+          )}
+
           <div className="mt-3">
             <button
               type="button"
               onClick={handleReset}
               className="text-[11px] text-[#625143] hover:text-[#1B1A1A] underline underline-offset-2"
             >
-              Run again
+              Re-optimise Bass
             </button>
           </div>
         </>
@@ -475,6 +476,37 @@ export default function OptimiseAndCalculate({
           </button>
         </div>
       )}
+
+      {/* ── Engineering Mode (advanced diagnostics) ── */}
+      <div className="mt-4 pt-3 border-t border-[#E7E4DF]">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={engineeringMode}
+            onChange={(e) => setEngineeringMode(e.target.checked)}
+            className="h-3.5 w-3.5 accent-[#213428]"
+          />
+          <span className="text-[11px] font-medium text-[#625143]">Engineering Mode</span>
+        </label>
+        {engineeringMode && (
+          <div className="mt-3">
+            <ImproveBassResponseV2
+              roomDims={roomDims}
+              seatingPositions={seatingPositions}
+              subwooferInstances={subwooferInstances}
+              frontSubsCfg={frontSubsCfg}
+              rearSubsCfg={rearSubsCfg}
+              commitInstances={commitInstances}
+              commitSeating={commitSeating}
+              commitSeatingProvenance={commitSeatingProvenance}
+              appliedSeatingProvenance={appState?.appliedSeatingProvenance}
+              hasCanonicalInstances={hasCanonicalInstances}
+              appState={appState}
+              amplifierPowerPerSubW={amplifierPowerPerSubW}
+            />
+          </div>
+        )}
+      </div>
 
     </div>
   );

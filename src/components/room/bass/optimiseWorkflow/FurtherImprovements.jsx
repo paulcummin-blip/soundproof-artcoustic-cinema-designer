@@ -1,55 +1,44 @@
 // FurtherImprovements.jsx
-// Physical improvement cards (subwoofer placement, seating position) that
-// require user decision. Rendered inside the BassOptimisationSummary
-// "IMPROVEMENTS FOUND" section — no separate heading.
+// Physical design recommendation cards (subwoofer placement, seating position).
+// These are NOT calibration — they are design changes that require user decision.
 //
-// Cards remain visible after Apply. State transitions from Available → Applied ✓.
-// The Apply button is disabled after applying. Values remain visible.
-// Once applied, the card stays so the user can see what changed.
+// Rendered as a separate section below the Calibration Applied summary.
+// After applying, the card disappears (the design now reflects the change).
+// No "Applied ✓" state — once applied, it simply becomes the design.
 
 import React, { useCallback, useState } from "react";
-import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { buildOptimisedInstances } from "../improveBassV2/improveBassV2Apply";
 import { buildProvenance } from "../improveBassV2/appliedProvenance";
 import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Fingerprint";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 
-function ImprovementCard({ title, description, onApply, applyLabel, applied }) {
+function ImprovementCard({ title, description, onApply, applyLabel }) {
   const [applying, setApplying] = useState(false);
 
   const handleApply = useCallback(() => {
-    if (!onApply || applied) return;
+    if (!onApply) return;
     setApplying(true);
     try {
       onApply();
     } finally {
       setApplying(false);
     }
-  }, [onApply, applied]);
+  }, [onApply]);
 
   return (
     <div className="rounded-md border border-[#E7E4DF] bg-white px-3 py-2.5">
-      <div className="flex items-center justify-between">
-        <div className="text-[12px] font-semibold text-[#1B1A1A]">{title}</div>
-        {applied && (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#213428]">
-            <CheckCircle2 className="h-3 w-3" />
-            Applied
-          </span>
-        )}
-      </div>
+      <div className="text-[12px] font-semibold text-[#1B1A1A]">{title}</div>
       <p className="mt-1 text-[11px] text-[#625143] leading-relaxed">{description}</p>
-      {onApply && !applied && (
-        <button
-          type="button"
-          onClick={handleApply}
-          disabled={applying}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-[#3E4349] disabled:opacity-50"
-        >
-          {applying ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArrowRight className="h-3 w-3" />}
-          {applyLabel || "Apply"}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={handleApply}
+        disabled={applying}
+        className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-[#3E4349] disabled:opacity-50"
+      >
+        {applying ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArrowRight className="h-3 w-3" />}
+        {applyLabel || "Apply"}
+      </button>
     </div>
   );
 }
@@ -137,26 +126,34 @@ export default function FurtherImprovements({
 
   if (!recommendations || (!hasSubPositions && !hasSeating)) return null;
 
+  const showPlacement = hasSubPositions && !appliedStages.has("placement");
+  const showSeating = hasSeating && !appliedStages.has("seating");
+
+  if (!showPlacement && !showSeating) return null;
+
   return (
-    <>
-      {hasSubPositions && (
-        <ImprovementCard
-          title="Placement"
-          description="Repositioning the subwoofers could further improve bass consistency across the seating area."
-          onApply={handleApplySubPositions}
-          applyLabel="Apply positions"
-          applied={appliedStages.has("placement")}
-        />
-      )}
-      {hasSeating && (
-        <ImprovementCard
-          title="Seating Position"
-          description="Small seating position changes could further improve bass uniformity."
-          onApply={handleApplySeating}
-          applyLabel="Apply seating"
-          applied={appliedStages.has("seating")}
-        />
-      )}
-    </>
+    <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A] mb-2">
+        Further Design Improvements
+      </div>
+      <div className="space-y-2">
+        {showPlacement && (
+          <ImprovementCard
+            title="Move subwoofers"
+            description="Repositioning the subwoofers could further improve bass consistency across the seating area."
+            onApply={handleApplySubPositions}
+            applyLabel="Apply"
+          />
+        )}
+        {showSeating && (
+          <ImprovementCard
+            title="Move seating"
+            description="Small seating position changes could further improve bass uniformity."
+            onApply={handleApplySeating}
+            applyLabel="Apply"
+          />
+        )}
+      </div>
+    </div>
   );
 }
