@@ -7,6 +7,8 @@
  * no grading, seat matching, RSP selection, or analysis is performed here.
  */
 
+import { assertNotAuthoritativeReadOnly } from "@/components/state/authoritativeReadOnlyMode";
+
 const STORAGE_PREFIX = "soundproof:design-review-handoff:v1:";
 const PROJECT_UPDATE_GRACE_MS = 30_000;
 
@@ -172,6 +174,9 @@ export function publishDesignReviewHandoff(snapshot) {
   if (typeof window === "undefined") return null;
 
   const projectId = normaliseProjectId(snapshot?.projectId);
+  // Authoritative Read-Only Mode guard — warn if the Technical Report
+  // (or any read-only consumer) attempts to publish authoritative state.
+  assertNotAuthoritativeReadOnly('publishDesignReviewHandoff', 'publish-design-review-handoff');
   if (!projectId) return null;
 
   // Previously, a pending-bass rating was blocked from publication entirely.

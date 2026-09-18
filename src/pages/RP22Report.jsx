@@ -67,10 +67,22 @@ import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
 import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReportPage';
 import { resolveBassReadiness } from '@/components/hooks/useAppDesignRating';
 import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
+import { setAuthoritativeReadOnlyMode } from '@/components/state/authoritativeReadOnlyMode';
 
 // --- Main component ---
 function RP22ReportInner() {
     const app = useAppState();
+
+    // ── Authoritative Read-Only Mode ──────────────────────────────────────
+    // While the Technical Report is mounted, authoritative write boundaries
+    // (publishDesignReviewHandoff, publishCompletedBassContract, markBass
+    // Authority, syncBassAuthority) emit a console warning if called. The
+    // report must be a pure consumer — zero authoritative publishes, zero
+    // bass recalculations, zero cache invalidations. Cleared on unmount.
+    useEffect(() => {
+        setAuthoritativeReadOnlyMode(true);
+        return () => setAuthoritativeReadOnlyMode(false);
+    }, []);
 
     const [isPrinting, setIsPrinting] = useState(false);
     const [planImageDataUrl, setPlanImageDataUrl] = useState(null);

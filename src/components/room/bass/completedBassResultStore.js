@@ -16,6 +16,7 @@ import {
 } from "./completedBassResultPersistence";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 import { bassCacheKey, bassDbFilter } from "./bassCacheKey";
+import { assertNotAuthoritativeReadOnly } from "@/components/state/authoritativeReadOnlyMode";
 
 export {
   BASS_AUTHORITY_STATUS,
@@ -172,6 +173,7 @@ function setMemory(projectId, versionId, authority) {
 }
 
 export function publishCompletedBassContract(projectId, versionId, contract) {
+  assertNotAuthoritativeReadOnly('publishCompletedBassContract', 'publish-completed-bass');
   if (!isStructurallyCompleteBassContract(contract)) return false;
   const compact = compactCompletedBassContract(contract);
   const authoritative = isAuthoritativeBassContract(compact);
@@ -207,6 +209,7 @@ export function publishCompletedBassContract(projectId, versionId, contract) {
  * This does NOT call compactCompletedBassContract — the input is already compact.
  */
 export function publishCachedCompactBassContract(projectId, versionId, compactContract, expectedFingerprint = null, requestedP14Identity = null) {
+  assertNotAuthoritativeReadOnly('publishCachedCompactBassContract', 'publish-cached-compact-bass');
   if (!compactContract || !isAuthoritativeBassContract(compactContract)) return false;
   // Stage 3: cached target must contain the finished graph payload.
   if (!compactContract?.graphPayload?.postEqRspCurve?.length) return false;
@@ -245,6 +248,7 @@ export function publishCachedCompactBassContract(projectId, versionId, compactCo
  * the project restores a valid authoritative state, not a dead-end LIMITED.
  */
 export function publishCachedLimitedBassContract(projectId, versionId, compactContract, expectedFingerprint = null, requestedP14Identity = null) {
+  assertNotAuthoritativeReadOnly('publishCachedLimitedBassContract', 'publish-cached-limited-bass');
   if (!compactContract || !isValidLimitedP14Contract(compactContract)) return false;
   const resultFingerprint = compactContract.job?.resultFingerprint || null;
   if (expectedFingerprint && resultFingerprint !== expectedFingerprint) return false;
@@ -267,6 +271,7 @@ export function publishCachedLimitedBassContract(projectId, versionId, compactCo
 }
 
 export function markBassAuthorityUpdating(projectId, versionId, currentFingerprint) {
+  assertNotAuthoritativeReadOnly('markBassAuthorityUpdating', 'mark-bass-updating');
   const key = projectKey(projectId, versionId);
   const previous = memoryByProject.get(key) || emptyAuthority(projectId, versionId);
   if (previous.authoritative && previous.contract && currentFingerprint && previous.currentFingerprint === currentFingerprint) {
@@ -288,6 +293,7 @@ export function markBassAuthorityUpdating(projectId, versionId, currentFingerpri
 }
 
 export function markBassAuthorityStale(projectId, versionId, currentFingerprint) {
+  assertNotAuthoritativeReadOnly('markBassAuthorityStale', 'mark-bass-stale');
   const key = projectKey(projectId, versionId);
   const previous = memoryByProject.get(key) || emptyAuthority(projectId, versionId);
   const staleContract = previous.contract || previous.staleContract || null;
@@ -315,6 +321,7 @@ export function markBassAuthorityStale(projectId, versionId, currentFingerprint)
 }
 
 export function markBassAuthorityFailed(projectId, versionId, currentFingerprint, errorMessage) {
+  assertNotAuthoritativeReadOnly('markBassAuthorityFailed', 'mark-bass-failed');
   const previous = memoryByProject.get(projectKey(projectId, versionId)) || emptyAuthority(projectId, versionId);
   setMemory(projectId, versionId, {
     ...previous,
@@ -332,6 +339,7 @@ export function markBassAuthorityFailed(projectId, versionId, currentFingerprint
 }
 
 export function markBassAuthorityBlocked(projectId, versionId) {
+  assertNotAuthoritativeReadOnly('markBassAuthorityBlocked', 'mark-bass-blocked');
   const key = projectKey(projectId, versionId);
   const previous = memoryByProject.get(key) || emptyAuthority(projectId, versionId);
   if (previous.authoritative && previous.contract) {
@@ -365,6 +373,7 @@ export function markBassAuthorityBlocked(projectId, versionId) {
  * contract and does NOT re-compact it (which would lose the graphPayload).
  */
 export function syncCachedCompactBassAuthority(projectId, versionId, compactContract) {
+  assertNotAuthoritativeReadOnly('syncCachedCompactBassAuthority', 'sync-db-cached-compact');
   const key = projectKey(projectId, versionId);
   if (key === "free::free") return Promise.resolve(null);
   if (!compactContract || !isAuthoritativeBassContract(compactContract)) return Promise.resolve(null);
@@ -412,6 +421,7 @@ export function syncCachedCompactBassAuthority(projectId, versionId, compactCont
 }
 
 export function syncStaleBassAuthority(projectId, versionId, currentFingerprint) {
+  assertNotAuthoritativeReadOnly('syncStaleBassAuthority', 'sync-db-stale');
   const key = projectKey(projectId, versionId);
   if (key === "free::free" || !currentFingerprint) return Promise.resolve(null);
   const signature = `stale:${currentFingerprint}`;
@@ -464,6 +474,7 @@ export function syncStaleBassAuthority(projectId, versionId, currentFingerprint)
 }
 
 export function syncPersistentBassAuthority(projectId, versionId, currentFingerprint, contract) {
+  assertNotAuthoritativeReadOnly('syncPersistentBassAuthority', 'sync-db-persistent');
   const key = projectKey(projectId, versionId);
   if (key === "free::free") return Promise.resolve(null);
   const isAlreadyCompact = contract && !contract.finalOptimisedBassResponse && contract.graphPayload;
