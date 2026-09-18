@@ -15,6 +15,7 @@
  */
 
 import { useMemo, useEffect, useRef } from 'react';
+import { resolveEffectiveVersionId } from '@/lib/versionAuthority';
 import { useCompletedBassAuthority, BASS_AUTHORITY_STATUS } from '@/components/room/bass/completedBassResultStore';
 import { buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { buildDesignRatingInput } from '@/components/report/technical/buildDesignRatingInput';
@@ -207,7 +208,7 @@ export function useAppDesignRating({
   versionId,
   minimumSystemMet = true,
 }) {
-  const completedBassAuthority = useCompletedBassAuthority(projectId || 'free', versionId || appState?.activeVersionId || 'free');
+  const completedBassAuthority = useCompletedBassAuthority(projectId || 'free', resolveEffectiveVersionId(versionId, appState));
   const bassErrorMessage = completedBassAuthority?.errorMessage || null;
 
   const completedBassPresentation = useMemo(

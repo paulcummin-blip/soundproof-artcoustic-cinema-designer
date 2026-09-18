@@ -20,7 +20,7 @@ import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { deriveSubwoofersFromCfg } from '@/components/utils/deriveSubwoofersFromCfg';
 import { hydrateProjectIntoAppState } from '@/components/utils/hydrateProjectIntoAppState';
-import { mergeProjectAndVersion } from '@/lib/versionAuthority';
+import { mergeProjectAndVersion, resolveEffectiveVersionId } from '@/lib/versionAuthority';
 import { base44 } from '@/api/base44Client';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
 import { resolveDesignatedRspSeat, resolveRowDerivedRspYByMode } from '@/components/room/rsp/rspInputResolver';
@@ -140,13 +140,13 @@ function RP22ReportInner() {
     );
     const designRecommendations = designReviewHandoff?.recommendations ?? null;
 
-    // Fall back to the app's already-hydrated activeVersionId when reportVersionId
-    // hasn't been set yet (fast path: SPA navigation from Room Designer). Without
-    // this fallback the hook fetches with "free", never finds the persisted
-    // authority, bassReportPending stays true, and autoPrint deadlocks on
-    // "Preparing Technical Report…". Mirrors useAppDesignRating line 210.
-    const resolvedReportVersionId = reportVersionId || app?.activeVersionId || null;
-    const completedBassAuthority = useCompletedBassAuthority(explicitProjectId || "free", resolvedReportVersionId || "free");
+    // Single canonical version-resolution path (shared with every report and
+    // authority consumer via resolveEffectiveVersionId). During SPA navigation
+    // reportVersionId is null until the async project fetch completes; the
+    // helper falls back to app.activeVersionId so the hook requests the correct
+    // authority on the first render instead of deadlocking on "free".
+    const resolvedReportVersionId = resolveEffectiveVersionId(reportVersionId, app);
+    const completedBassAuthority = useCompletedBassAuthority(explicitProjectId || "free", resolvedReportVersionId);
     const completedBassContract = completedBassAuthority.contract;
     const bassErrorMessage = completedBassAuthority.errorMessage || null;
     // P14 target selection state — shared with the main-app Compliance panel.
@@ -172,7 +172,7 @@ function RP22ReportInner() {
     // key with the same composite format so the identity comparison
     // matches like-for-like. Comparing a composite key against a bare
     // project ID always fails and deadlocks the auto-print gate.
-    const expectedProjectKey = bassCacheKey(explicitProjectId || 'free', resolvedReportVersionId || 'free');
+    const expectedProjectKey = bassCacheKey(explicitProjectId || 'free', resolvedReportVersionId);
     const projectIdMatch = String(completedBassAuthority?.projectId || 'free') === expectedProjectKey;
     const bassReadiness = useMemo(() => {
         if (!projectIdMatch) return { ready: false, pending: true, reason: 'project-id-mismatch', fingerprint: null };

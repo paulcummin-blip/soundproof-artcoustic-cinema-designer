@@ -12,12 +12,13 @@ import { buildComplianceBassPresentation } from '@/components/room/bass/bassComp
 import { RP22_PRESENTATION_PARAMETERS, RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
 import { formatAuthoritativeP20Result, p20LevelText } from '@/components/room/bass/p20SeatPresentation';
 import { attachAuthoritativeP19ToSeatSnapshot } from '@/components/room/seatHudPresentation';
+import { resolveEffectiveVersionId } from '@/lib/versionAuthority';
 
 export default function ComplianceReportPrint() {
   const app = useAppState();
   const [isReady, setIsReady] = useState(false);
   const reportScopeId = new URLSearchParams(window.location.search).get('projectId') || new URLSearchParams(window.location.search).get('id') || 'free';
-  const completedBassAuthority = useCompletedBassAuthority(reportScopeId, app?.activeVersionId || "free");
+  const completedBassAuthority = useCompletedBassAuthority(reportScopeId, resolveEffectiveVersionId(null, app));
   const completedBassContract = completedBassAuthority.contract;
   const bassErrorMessage = completedBassAuthority.errorMessage || null;
   const bassPresentation = useMemo(() => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);

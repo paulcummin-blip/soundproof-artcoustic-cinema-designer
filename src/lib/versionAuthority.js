@@ -223,3 +223,27 @@ export function buildCopyVersionName(sourceName) {
   const truncatedBase = base.length > maxBase ? base.substring(0, maxBase) : base;
   return truncatedBase + suffix;
 }
+
+/**
+ * Resolve the effective version ID for bass authority and report consumers.
+ *
+ * Canonical fallback chain (used by EVERY report and authority consumer):
+ *   1. Explicit versionId argument (from async project fetch or version selector)
+ *   2. appState.activeVersionId (already-hydrated active version — SPA fast path)
+ *   3. "free" (no version bound)
+ *
+ * Every consumer — Room Designer, Technical Report, Compliance Report,
+ * Visual Report, Design Rating — MUST call this helper so they all resolve
+ * the version identically. Duplicated fallback logic causes version-key
+ * mismatches that deadlock the auto-print gate (the report requests the
+ * authority with "free" while the Room Designer requests it with the real
+ * version ID, so the authority is never found and bassReportPending stays
+ * true forever).
+ *
+ * @param {string|null|undefined} versionId  Explicit version ID (null during SPA navigation before async fetch completes).
+ * @param {object|null|undefined} appState   AppState (must expose activeVersionId).
+ * @returns {string} The effective version ID, or "free" if none is available.
+ */
+export function resolveEffectiveVersionId(versionId, appState) {
+  return versionId || appState?.activeVersionId || "free";
+}

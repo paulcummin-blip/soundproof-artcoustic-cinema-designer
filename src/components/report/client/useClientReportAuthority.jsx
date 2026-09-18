@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAppState } from "@/components/AppStateProvider";
 import { base44 } from "@/api/base44Client";
-import { mergeProjectAndVersion } from "@/lib/versionAuthority";
+import { mergeProjectAndVersion, resolveEffectiveVersionId } from "@/lib/versionAuthority";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { useAnalysisSpeakers } from "@/components/hooks/useAnalysisSpeakers";
 import { useEffectiveRsp } from "@/components/room/rsp/useEffectiveRsp";
@@ -367,7 +367,7 @@ export function useClientReportAuthority(projectId) {
   });
 
   // ── 5d) Completed bass authority (lightweight useSyncExternalStore, no engine) ──
-  const completedBassAuthority = useCompletedBassAuthority(projectId || "free", versionId || "free");
+  const completedBassAuthority = useCompletedBassAuthority(projectId || "free", resolveEffectiveVersionId(versionId, app));
   const completedBassContract = completedBassAuthority.contract;
   const bassErrorMessage = completedBassAuthority.errorMessage || null;
   const bassPresentation = useMemo(
