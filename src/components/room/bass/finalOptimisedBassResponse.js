@@ -159,6 +159,10 @@ export function applyAuthorityToCanonicalResult(canonicalResult, authorityBearin
     achievedP19Level: candidate.achievedP19Level ?? null,
     achievedP20VariationDb: candidate.achievedP20VariationDb ?? null,
     achievedP20Level: candidate.achievedP20Level ?? null,
+    globalLevelAlignment: candidate.globalLevelAlignment ?? null,
+    alignedPostEqRsp: Array.isArray(candidate.alignedPostEqRsp) && candidate.alignedPostEqRsp.length
+      ? candidate.alignedPostEqRsp.map((point) => ({ ...point }))
+      : canonicalResult.canonicalPostEqRsp,
     p14CapabilityDetails: candidate.p14CapabilityDetails || null,
     postEqCapabilityAssessment: candidate.postEqCapabilityAssessment || null,
     finalSeatVariationData: {

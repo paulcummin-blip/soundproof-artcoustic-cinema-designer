@@ -478,6 +478,11 @@ export function buildCanonicalCompletedBassMetricAuthority({
       assessmentBandValid: assessmentBand.valid,
       assessmentBandReason: assessmentBand.reason,
     },
+    globalLevelAlignment: finalOptimisedBassResponse?.globalLevelAlignment ?? null,
+    alignedPostEqRsp: Array.isArray(finalOptimisedBassResponse?.alignedPostEqRsp)
+      && finalOptimisedBassResponse.alignedPostEqRsp.length
+      ? finalOptimisedBassResponse.alignedPostEqRsp
+      : postEqRsp,
   };
 
   diagnostics.canonicalMetricAuthorityValid = true;

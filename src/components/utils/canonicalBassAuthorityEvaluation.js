@@ -18,6 +18,7 @@ import { isCanonicalP19Ready } from "@/components/room/bass/p19Readiness";
 import { buildSmoothCapabilityEnvelope, buildPracticalCalibrationTarget } from "@/components/utils/practicalCalibrationTarget";
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 import { getProductCurveFrequencyRange } from "@/components/models/speakers/registry";
+import { performGlobalLevelAlignment, applyGlobalBassTrimToCurve } from "@/components/room/bass/globalLevelAlignment";
 
 export function buildPositionAwareP14Capability({
   canonicalResult,
@@ -273,6 +274,8 @@ export function evaluateCanonicalBassAuthority({
       perSeatP19Results: [],
       p19Evaluated: false,
       p19NotEvaluatedReason: "p14-operating-point-not-achieved",
+      globalLevelAlignment: null,
+      alignedPostEqRsp: canonicalResult.canonicalPostEqRsp,
       achievedP20VariationDb: null,
       achievedP20Level: null,
       worstP20SeatId: null,
@@ -404,6 +407,8 @@ export function evaluateCanonicalBassAuthority({
       perSeatP19Results: [],
       p19Evaluated: false,
       p19NotEvaluatedReason: assessmentBand.reason || "p18-extension-not-achieved",
+      globalLevelAlignment: null,
+      alignedPostEqRsp: canonicalResult.canonicalPostEqRsp,
       achievedP20VariationDb: null,
       achievedP20Level: null,
       worstP20SeatId: null,
@@ -432,8 +437,37 @@ export function evaluateCanonicalBassAuthority({
     officialVariationDb: officialP19VariationDb,
     officialLevel: officialP19Level,
   });
-  const achievedP19VariationDb = p19AssessmentReady ? officialP19VariationDb : null;
-  const achievedP19Level = p19AssessmentReady ? officialP19Level : null;
+
+  // ── Global Level Alignment — final calibration trim ──
+  // After the final predicted post-EQ response is produced, a professional
+  // calibrator would set the overall subwoofer trim to the best operating
+  // level before assessing the finished result. This sweeps a single global
+  // vertical offset (0.25 dB steps) bounded by available P14 headroom upward
+  // and unrestricted downward, and selects the offset producing the minimum
+  // P19 error. The response shape is never altered — only a vertical
+  // translation. P14 is never improved; only genuine available headroom is
+  // used. If no better operating level exists, trim = 0.0 dB and P19 is
+  // unchanged.
+  const p14HeadroomDb = Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb)
+    ? achievedP14Db - selectedTargetDb
+    : 0;
+  const globalLevelAlignment = p19AssessmentReady
+    ? performGlobalLevelAlignment({
+        rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
+        canonicalTargetCurve: p19TargetCurve,
+        assessmentStartHz: p19AssessmentStartHz,
+        assessmentEndHz: p19AssessmentEndHz,
+        p14HeadroomDb,
+      })
+    : null;
+
+  const alignedP19VariationDb = globalLevelAlignment?.alignedP19Db ?? officialP19VariationDb;
+  const achievedP19VariationDb = p19AssessmentReady ? alignedP19VariationDb : null;
+  const achievedP19Level = p19AssessmentReady ? houseCurveP19Level(alignedP19VariationDb) : null;
+  const recommendedGlobalBassTrimDb = globalLevelAlignment?.recommendedTrimDb ?? 0;
+  const alignedPostEqRsp = p19AssessmentReady && Number.isFinite(recommendedGlobalBassTrimDb)
+    ? applyGlobalBassTrimToCurve(canonicalResult.canonicalPostEqRsp, recommendedGlobalBassTrimDb)
+    : canonicalResult.canonicalPostEqRsp;
   const perSeatP19Results = computeOfficialPerSeatP19Assessment({
     perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
     canonicalTargetCurve: p19TargetCurve,
@@ -497,6 +531,20 @@ export function evaluateCanonicalBassAuthority({
     perSeatP19Results,
     p19Evaluated: true,
     p19NotEvaluatedReason: null,
+    globalLevelAlignment: globalLevelAlignment
+      ? {
+          recommendedTrimDb: globalLevelAlignment.recommendedTrimDb,
+          originalP19VariationDb: globalLevelAlignment.originalP19Db,
+          alignedP19VariationDb: globalLevelAlignment.alignedP19Db,
+          improvementDb: globalLevelAlignment.improvementDb,
+          aligned: globalLevelAlignment.aligned,
+          p14HeadroomDb: globalLevelAlignment.p14HeadroomDb,
+          upwardBoundDb: globalLevelAlignment.upwardBoundDb,
+          downwardBoundDb: globalLevelAlignment.downwardBoundDb,
+          stepDb: globalLevelAlignment.stepDb,
+        }
+      : null,
+    alignedPostEqRsp,
     achievedP20VariationDb,
     achievedP20Level,
     worstP20SeatId: p20?.worstSeat?.seatId ?? null,
