@@ -714,8 +714,27 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     // spl_speaker_nodes is the position authority — it contains the live x/y/z
     // set by the Room Designer (e.g. FC z=0.59m). selected_speakers may have
     // stale or missing position.z, causing FrontElevation to fall back to 1.2m.
+    //
+    // USER-POSITION GUARD: A speaker with positionSource === "user" and valid
+    // finite saved x/y is an intentional manual placement. Its selected_speakers
+    // position is authoritative and must NOT be overwritten by spl_speaker_nodes
+    // (which may still hold stale pre-drag coordinates). Only non-user speakers
+    // (auto / seeded / legacy / absent positionSource) fall back to the node
+    // merge. This preserves id, role, model, position, positionSource,
+    // isOnRearWall, and any aiming/rotation metadata on the user speaker.
+    const isUserPositioned = (spk) => {
+      if (!spk || spk.positionSource !== "user") return false;
+      const pos = spk.position || {};
+      const x = Number(pos.x);
+      const y = Number(pos.y);
+      return Number.isFinite(x) && Number.isFinite(y);
+    };
+
     const mergedSpeakers = Array.isArray(loadedSpeakers)
       ? loadedSpeakers.map(spk => {
+          // User-positioned speakers are authoritative — return untouched.
+          if (isUserPositioned(spk)) return spk;
+          // Non-user speakers: fall back to spl_speaker_nodes position merge.
           const nodePos = nodePositionByCanonRole.get(normalizeSpeakerRole(spk?.role));
           if (!nodePos) return spk;
           return {
