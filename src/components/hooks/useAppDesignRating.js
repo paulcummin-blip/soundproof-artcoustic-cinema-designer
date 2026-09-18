@@ -203,9 +203,10 @@ export function useAppDesignRating({
   stableDimensions,
   primarySeatingPosition,
   projectId,
+  versionId,
   minimumSystemMet = true,
 }) {
-  const completedBassAuthority = useCompletedBassAuthority(projectId || 'free');
+  const completedBassAuthority = useCompletedBassAuthority(projectId || 'free', versionId || appState?.activeVersionId || 'free');
   const bassErrorMessage = completedBassAuthority?.errorMessage || null;
 
   const completedBassPresentation = useMemo(

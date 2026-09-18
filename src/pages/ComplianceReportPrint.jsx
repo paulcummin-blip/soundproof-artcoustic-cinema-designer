@@ -17,7 +17,7 @@ export default function ComplianceReportPrint() {
   const app = useAppState();
   const [isReady, setIsReady] = useState(false);
   const reportScopeId = new URLSearchParams(window.location.search).get('projectId') || new URLSearchParams(window.location.search).get('id') || 'free';
-  const completedBassAuthority = useCompletedBassAuthority(reportScopeId);
+  const completedBassAuthority = useCompletedBassAuthority(reportScopeId, app?.activeVersionId || "free");
   const completedBassContract = completedBassAuthority.contract;
   const bassErrorMessage = completedBassAuthority.errorMessage || null;
   const bassPresentation = useMemo(() => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);

@@ -1768,6 +1768,7 @@ function RoomDesignerWithState() {
     stableDimensions,
     primarySeatingPosition: mlpAnchorEffective,
     projectId: resolvedProjectId || projectIdState || "free",
+    versionId: appState?.activeVersionId || "free",
     minimumSystemMet,
   });
 

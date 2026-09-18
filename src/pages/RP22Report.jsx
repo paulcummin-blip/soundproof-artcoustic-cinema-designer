@@ -92,6 +92,7 @@ function RP22ReportInner() {
     const [projectDetails, setProjectDetails] = useState(null);
     const [reportHydrating, setReportHydrating] = useState(true);
     const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
+    const [reportVersionId, setReportVersionId] = useState(null);
     const showDesignRating = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
 
     // ── ASDR recommendation wiring ───────────────────────────────────────
@@ -139,7 +140,7 @@ function RP22ReportInner() {
         }
     }, [explicitProjectId]);
 
-    const completedBassAuthority = useCompletedBassAuthority(explicitProjectId || "free");
+    const completedBassAuthority = useCompletedBassAuthority(explicitProjectId || "free", reportVersionId || "free");
     const completedBassContract = completedBassAuthority.contract;
     const bassErrorMessage = completedBassAuthority.errorMessage || null;
     // P14 target selection state — shared with the main-app Compliance panel.
@@ -229,6 +230,7 @@ function RP22ReportInner() {
                     created_date: p.created_date,
                     updated_date: p.updated_date,
                 });
+                setReportVersionId(p.active_version_id || null);
             }).catch(() => { /* non-blocking metadata fetch */ });
             return () => { cancelled = true; };
         }
@@ -261,6 +263,7 @@ function RP22ReportInner() {
                 created_date: p.created_date,
                 updated_date: p.updated_date,
             });
+            setReportVersionId(p.active_version_id || null);
             // Merge with the active ProjectVersion so per-version design fields
             // come from design_state, not from the legacy Project position.
             let merged = p;

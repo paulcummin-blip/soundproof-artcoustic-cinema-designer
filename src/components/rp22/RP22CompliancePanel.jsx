@@ -241,7 +241,7 @@ export default function RP22CompliancePanel({
 }) {
   const appState = useAppState();
   const activeProjectId = useActiveProjectId();
-  const bassAuthority = useCompletedBassAuthority(activeProjectId || "free");
+  const bassAuthority = useCompletedBassAuthority(activeProjectId || "free", appState?.activeVersionId || "free");
   const p14Selection = React.useMemo(
     () => resolveP14TargetSelectionState(appState?.splConfig),
     [appState?.splConfig?.selectedP14TargetBasis, appState?.splConfig?.selectedP14Level]

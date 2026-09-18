@@ -201,7 +201,7 @@ export default function ParameterExplorer({
     return primary?.id || seats[0]?.id || "";
   }, [seats]);
 
-  const completedBassAuthority = useCompletedBassAuthority(projectId || "free");
+  const completedBassAuthority = useCompletedBassAuthority(projectId || "free", app?.activeVersionId || "free");
   const bassErrorMessage = completedBassAuthority?.errorMessage || null;
 
   // Build seatHudSnapshots from analysisResult.perSeatRp22

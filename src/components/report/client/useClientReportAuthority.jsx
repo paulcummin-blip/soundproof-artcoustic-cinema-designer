@@ -367,7 +367,7 @@ export function useClientReportAuthority(projectId) {
   });
 
   // ── 5d) Completed bass authority (lightweight useSyncExternalStore, no engine) ──
-  const completedBassAuthority = useCompletedBassAuthority(projectId || "free");
+  const completedBassAuthority = useCompletedBassAuthority(projectId || "free", versionId || "free");
   const completedBassContract = completedBassAuthority.contract;
   const bassErrorMessage = completedBassAuthority.errorMessage || null;
   const bassPresentation = useMemo(

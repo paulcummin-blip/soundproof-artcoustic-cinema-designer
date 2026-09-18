@@ -254,6 +254,7 @@ function CandidateRatingEvaluator({
     stableDimensions: dimensions,
     primarySeatingPosition: candidate.mlpPoint,
     projectId,
+    versionId: appState?.activeVersionId,
   });
 
   const p12RawDb = analysisResult?.gradedParameters?.primary?.[12]?.value;
