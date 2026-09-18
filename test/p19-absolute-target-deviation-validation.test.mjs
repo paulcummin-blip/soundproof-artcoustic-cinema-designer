@@ -162,18 +162,20 @@ test("PROOF (c): Response already centred on target remains unchanged", () => {
 test("PROOF (d): Protected null exclusion — narrow null does not cause false FAIL", () => {
   const targetCurve = makeTargetCurve(20, 120, 200, 100);
 
-  // Response with a narrow -15 dB null at 50 Hz, otherwise flat on target
+  // Response with a flat-bottom -15 dB null from 46–54 Hz, otherwise on target.
+  // Wide enough to survive 1/3-octave smoothing (so unprotected P19 is high),
+  // but still narrow enough to be excluded by the protected null region.
   const narrowNullCurve = [];
   for (let i = 0; i < 200; i++) {
     const f = 20 + i * 0.5;
     const shape = artcousticHouseCurveOffsetAt(f);
-    const nullDepth = -15 * Math.exp(-0.5 * ((f - 50) / 1.5) ** 2);
+    const nullDepth = (f >= 46 && f <= 54) ? -15 : 0;
     narrowNullCurve.push({ frequency: f, spl: 100 + shape + nullDepth });
   }
 
-  // Protected null region around 50 Hz
+  // Protected null region covering the flat-bottom null
   const protectedNullRegions = [{
-    startHz: 48, endHz: 52,
+    startHz: 46, endHz: 54,
     centreFrequencyHz: 50,
     protected: true,
     narrowCancellation: true,

@@ -257,19 +257,19 @@ test("TEST 11: Protected null exclusion — narrow null excluded, broad shortfal
   const broadDisplay = resolveRp22DesignValue(19, broadResult.variationDbRaw);
   assert.ok(broadDisplay >= 5, `Broad -6.9 dB shortfall → ≥ ±5 (correctly flagged), got ±${broadDisplay}`);
 
-  // A narrow null at 50 Hz, -15 dB deep, with flat response elsewhere.
-  // With protected null exclusion, the null is excluded and P19 reflects
-  // the remaining (flat) response → P19 ≈ 0.
+  // A flat-bottom null at 50 Hz, -15 dB deep, 8 Hz wide (46–54 Hz).
+  // Wide enough to survive 1/3-octave smoothing (so unprotected P19 is high),
+  // but still narrow enough to be excluded by the protected null region.
   const narrowNullCurve = [];
   for (let i = 0; i < 200; i++) {
     const f = 20 + i * 0.5; // 0.5 Hz steps from 20 to 120 Hz
     const shape = artcousticHouseCurveOffsetAt(f);
-    const nullDepth = -15 * Math.exp(-0.5 * ((f - 50) / 1.5) ** 2); // narrow gaussian null
+    const nullDepth = (f >= 46 && f <= 54) ? -15 : 0; // flat-bottom null
     narrowNullCurve.push({ frequency: f, spl: 100 + shape + nullDepth });
   }
-  // Protected null region around 50 Hz (narrow, deep)
+  // Protected null region around 50 Hz (covers the flat-bottom null)
   const protectedNullRegions = [{
-    startHz: 48, endHz: 52,
+    startHz: 46, endHz: 54,
     centreFrequencyHz: 50,
     protected: true,
     narrowCancellation: true,
@@ -415,10 +415,21 @@ test("EXAMPLE: -5 / +5 residual → max|residual| = 5 → displayed ±5", () => 
   assert.ok(displayDb <= 5 && displayDb >= 4, `displayed should be ±4-5 (after smoothing), got ±${displayDb}`);
 });
 
-test("EXAMPLE: -6 / 0 → max|residual| = 6 → displayed ±6 / FAIL", () => {
-  const curve = makeResidualCurve(20, 120, 50, -6, 0);
+test("EXAMPLE: flat -6 dB below target → max|residual| = 6 → displayed ±6 / FAIL", () => {
+  // Use flat curves so 1/3-octave smoothing does not reduce the peak.
+  // Response = 94 dB flat, Target = 100 dB flat → residual = -6 everywhere.
+  const curve = [];
+  for (let i = 0; i < 50; i++) {
+    const f = 20 * Math.pow(120 / 20, i / 49);
+    curve.push({ frequency: f, spl: 94 });
+  }
+  const target = [];
+  for (let i = 0; i < 50; i++) {
+    const f = 20 * Math.pow(120 / 20, i / 49);
+    target.push({ frequency: f, spl: 100 });
+  }
   const result = computeOfficialP19Assessment({
-    rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
+    rspPostEqCurve: curve, canonicalTargetCurve: target, assessmentStartHz: 20, assessmentEndHz: 120,
   });
   const displayDb = resolveRp22DesignValue(19, result.variationDbRaw);
   assert.equal(displayDb, 6, `displayed should be ±6, got ±${displayDb}`);
