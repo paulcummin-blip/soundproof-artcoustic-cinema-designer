@@ -296,7 +296,7 @@ export function buildDesignRatingInput({
   }
 
   return {
-    seats: seatIds.map((id) => ({ id })),
+    seats: (Array.isArray(seats) ? seats : []).map((s) => ({ id: s?.id, priority: s?.priority })).filter((s) => s?.id),
     // Room-scope
     p2,
     p3,

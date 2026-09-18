@@ -27,6 +27,7 @@
 import {
   buildArtcousticDesignRatingAuthority,
   calculateRoomDesignRating,
+  calculateScopedRoomDesignRating,
   calculateSeatDesignRating,
   PARAM_WEIGHTS,
   LEVEL_MULTIPLIERS,
@@ -1427,6 +1428,106 @@ function fixtureAS() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// AT. Primary/Secondary 65/35 weighting for seat-scope parameters
+//     Primary seats weighted 65%, Secondary 35% when both groups present.
+//     Single-group scopes use flat average (no weighting distortion).
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureAT() {
+  const checks = [];
+
+  // 4 Primary (L4,L4,L3,L2) + 2 Secondary (L1,FAIL)
+  // Primary avg = (12+12+8+4)/4 = 9
+  // Secondary avg = (2+(-5))/2 = -1.5
+  // Weighted = 9*0.65 + (-1.5)*0.35 = 5.85 - 0.525 = 5.325
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: [
+      { id: "p1", priority: "primary" },
+      { id: "p2", priority: "primary" },
+      { id: "p3", priority: "primary" },
+      { id: "p4", priority: "primary" },
+      { id: "s1", priority: "secondary" },
+      { id: "s2", priority: "secondary" },
+    ],
+    p4: {
+      p1: 1, p2: 1, p3: 3, p4: 5,   // L4(12), L4(12), L3(8), L2(4)
+      s1: 5.5, s2: 7,               // L1(2), FAIL(-5)
+    },
+  });
+  const rating = calculateRoomDesignRating(auth);
+  const p4Contrib = rating.contributions.find((c) => c.key === "p4");
+  checks.push(["p4 in contributions", !!p4Contrib]);
+  if (p4Contrib) {
+    checks.push(["p4 65/35 multiplier = 5.325", approx(p4Contrib.multiplier, 5.325, 0.01)]);
+  }
+
+  // One-row cinema: all Primary → flat average (no Secondary → no weighting)
+  const authOneRow = buildArtcousticDesignRatingAuthority({
+    seats: [
+      { id: "p1", priority: "primary" },
+      { id: "p2", priority: "primary" },
+    ],
+    p4: { p1: 1, p2: 3 }, // L4(12), L3(8) → flat avg = 10
+  });
+  const ratingOneRow = calculateRoomDesignRating(authOneRow);
+  const p4OneRow = ratingOneRow.contributions.find((c) => c.key === "p4");
+  if (p4OneRow) {
+    checks.push(["one-row flat avg = 10", approx(p4OneRow.multiplier, 10, 0.01)]);
+  }
+
+  // 1 Primary (L4) + 5 Secondary (L1) — Primary not drowned out
+  // Weighted = 12*0.65 + 2*0.35 = 8.5
+  // Old flat = (12 + 2*5)/6 = 3.67
+  const authUnequal = buildArtcousticDesignRatingAuthority({
+    seats: [
+      { id: "p1", priority: "primary" },
+      { id: "s1", priority: "secondary" },
+      { id: "s2", priority: "secondary" },
+      { id: "s3", priority: "secondary" },
+      { id: "s4", priority: "secondary" },
+      { id: "s5", priority: "secondary" },
+    ],
+    p4: {
+      p1: 1,                       // L4(12)
+      s1: 5.5, s2: 5.5, s3: 5.5, s4: 5.5, s5: 5.5, // L1(2)
+    },
+  });
+  const ratingUnequal = calculateRoomDesignRating(authUnequal);
+  const p4Unequal = ratingUnequal.contributions.find((c) => c.key === "p4");
+  if (p4Unequal) {
+    checks.push(["1P+5S weighted = 8.5 (Primary protected)", approx(p4Unequal.multiplier, 8.5, 0.01)]);
+  }
+
+  // Legacy seats (no priority field) → all Primary → flat average
+  const authLegacy = buildArtcousticDesignRatingAuthority({
+    seats: [{ id: "s1" }, { id: "s2" }],
+    p4: { s1: 1, s2: 3 }, // L4(12), L3(8) → avg = 10
+  });
+  const ratingLegacy = calculateRoomDesignRating(authLegacy);
+  const p4Legacy = ratingLegacy.contributions.find((c) => c.key === "p4");
+  if (p4Legacy) {
+    checks.push(["legacy no-priority flat avg = 10", approx(p4Legacy.multiplier, 10, 0.01)]);
+  }
+
+  // Scoped Primary-only rating: only Primary seats → flat Primary average
+  const scopedPrimary = calculateScopedRoomDesignRating(auth, ["p1", "p2", "p3", "p4"]);
+  const p4ScopedPrimary = scopedPrimary.contributions.find((c) => c.key === "p4");
+  if (p4ScopedPrimary) {
+    checks.push(["scoped Primary-only flat avg = 9", approx(p4ScopedPrimary.multiplier, 9, 0.01)]);
+  }
+
+  // Scoped Secondary-only rating: only Secondary seats → flat Secondary average
+  const scopedSecondary = calculateScopedRoomDesignRating(auth, ["s1", "s2"]);
+  const p4ScopedSecondary = scopedSecondary.contributions.find((c) => c.key === "p4");
+  if (p4ScopedSecondary) {
+    checks.push(["scoped Secondary-only flat avg = -1.5", approx(p4ScopedSecondary.multiplier, -1.5, 0.01)]);
+  }
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AT: Primary/Secondary 65/35 weighting", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Runner
 // ═══════════════════════════════════════════════════════════════
 
@@ -1477,6 +1578,7 @@ export function runAllFixtures() {
     fixtureAQ(),
     fixtureAR(),
     fixtureAS(),
+    fixtureAT(),
   ];
   const allPassed = fixtures.every((f) => f.passed);
   return { allPassed, results: fixtures };

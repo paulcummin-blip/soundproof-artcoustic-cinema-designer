@@ -37,6 +37,7 @@ import gradeP1Distance from "@/components/utils/rp22/p1LevelAuthority";
 import { isAuthoritativeBassContract } from "@/components/room/bass/completedBassResultPersistence";
 import { assessP18Extension } from "@/components/utils/p18ExtensionAuthority";
 import { getEffectiveAssumedLevel, normalizeAssumedLevel } from "@/components/utils/assumedParameterAuthority";
+import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
 
 // ═══════════════════════════════════════════════════════════════
 // Fixed V1 constants
@@ -511,6 +512,16 @@ export function buildArtcousticDesignRatingAuthority(input) {
   const seats = Array.isArray(input?.seats) ? input.seats : [];
   const seatIds = seats.map((s) => s.id).filter(Boolean);
 
+  // Build seat-priority map so seat-scope parameters can weight Primary vs
+  // Secondary groups. Missing/invalid priority resolves to Primary (legacy
+  // projects load cleanly).
+  const seatPriorities = {};
+  for (const seat of seats) {
+    if (seat?.id) {
+      seatPriorities[seat.id] = resolveSeatPriority(seat);
+    }
+  }
+
   const parameters = {};
 
   for (const key of Object.keys(PARAM_WEIGHTS)) {
@@ -573,6 +584,7 @@ export function buildArtcousticDesignRatingAuthority(input) {
   return {
     parameters,
     seatIds,
+    seatPriorities,
     excludedParams: Array.from(V1_EXCLUDED_PARAMS),
   };
 }
@@ -638,13 +650,25 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
       // Extract mode from the original input stored on the authority parameter
       mode = param.mode || null;
     } else {
-      // seat-scope: average multipliers across applicable seats IN SCOPE.
+      // seat-scope: average multipliers across applicable seats IN SCOPE,
+      // weighted 65% Primary / 35% Secondary when both groups are present.
       // The scope filter happens HERE — before averaging and distribution —
       // so Primary/Secondary/All scopes see only their seat subsets.
-      // Filtering only authority.seatIds is NOT sufficient; param.seats must
-      // be filtered by scopeSeatIds before averaging and buildSeatDistribution.
+      //
+      // When both Primary and Secondary seats are present in the scope, the
+      // final multiplier = (Primary avg × 0.65) + (Secondary avg × 0.35).
+      // This rewards performance in the seats that matter most — a large
+      // number of Secondary seats can never outweigh excellent Primary
+      // performance, and poor Primary seats cannot be hidden by good
+      // Secondary seats.
+      //
+      // When only one group exists (e.g. scoped Primary-only or Secondary-only
+      // ratings, or a one-row cinema where all seats are Primary), the flat
+      // group average is used — the weighting never distorts a single-group
+      // scope.
       const scopedSeatIds = (authority?.seatIds || []).filter((id) => seatIdSet.has(id));
-      const applicableSeats = [];
+      const primarySeats = [];
+      const secondarySeats = [];
       for (const id of scopedSeatIds) {
         const sa = param.seats?.[id];
         if (!sa || sa.state === "na") continue; // N/A seat — skip individually
@@ -652,11 +676,27 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
           hasProvisional = true; // diagnostic only — does not affect status
           continue; // not-calculated/missing seat — skip individually
         }
-        applicableSeats.push(sa);
+        const priority = authority?.seatPriorities?.[id] || "primary";
+        if (priority === "secondary") {
+          secondarySeats.push(sa);
+        } else {
+          primarySeats.push(sa);
+        }
       }
-      if (applicableSeats.length === 0) continue; // all seats ineligible → param contributes nothing
-      const sum = applicableSeats.reduce((acc, s) => acc + (s.multiplier ?? 0), 0);
-      multiplier = sum / applicableSeats.length;
+      if (primarySeats.length === 0 && secondarySeats.length === 0) continue;
+      const primaryAvg = primarySeats.length > 0
+        ? primarySeats.reduce((acc, s) => acc + (s.multiplier ?? 0), 0) / primarySeats.length
+        : 0;
+      const secondaryAvg = secondarySeats.length > 0
+        ? secondarySeats.reduce((acc, s) => acc + (s.multiplier ?? 0), 0) / secondarySeats.length
+        : 0;
+      if (primarySeats.length > 0 && secondarySeats.length > 0) {
+        multiplier = (primaryAvg * 0.65) + (secondaryAvg * 0.35);
+      } else if (primarySeats.length > 0) {
+        multiplier = primaryAvg;
+      } else {
+        multiplier = secondaryAvg;
+      }
       resultLevel = buildSeatDistribution(param.seats, scopedSeatIds);
     }
 
