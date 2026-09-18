@@ -38,23 +38,28 @@ function layout(id, quantity, side, metrics) {
   };
 }
 
-test("candidate library contains the required canonical 1/2/4 layouts", () => {
+test("candidate library contains the required practical 1/2/4 layouts", () => {
   [
     "front-centre-1",
-    "front-quarter-left-1",
-    "front-quarter-right-1",
-    "rear-midpoint-1",
-    "left-quarter-front-1",
-    "front-rear-midpoint-2",
+    "rear-centre-1",
     "front-quarter-2",
+    "front-corners-2",
     "front-thirds-2",
-    "rear-quarter-2",
-    "side-midpoints-2",
+    "front-rear-centre-2",
+    "four-corners-4",
     "front-rear-pairs-4",
     "front-rear-pairs-third-4",
-    "four-corners-4",
-    "four-midpoints-4",
+    "front-rear-centres-4",
   ].forEach((id) => assert.match(candidateSource, new RegExp(`"${id}"`)));
+});
+
+test("candidate library contains no side-wall or floating-room layouts", () => {
+  [
+    "left-quarter-front-1",
+    "right-quarter-rear-1",
+    "side-midpoints-2",
+    "four-midpoints-4",
+  ].forEach((id) => assert.doesNotMatch(candidateSource, new RegExp(`"${id}"`)));
 });
 
 test("tiny side-wall gain cannot displace a practical four-sub layout", () => {
