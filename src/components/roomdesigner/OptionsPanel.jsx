@@ -53,6 +53,7 @@ export default function OptionsPanel({
   selectedAbfuserQty = 0,
   setSelectedAbfuserQty = () => {},
   recommendedAbfuserQty = 0,
+  treatmentRecommendation = null,
 }) {
   const [showDifficultyRating, setShowDifficultyRating] = React.useState(false);
   const [showInactiveItems, setShowInactiveItems] = React.useState(false);
@@ -70,14 +71,17 @@ export default function OptionsPanel({
     setAcousticTreatmentEnabled(nextEnabled);
   };
 
-  // RECOMMENDATION IS DISPLAY-ONLY — it must NOT mutate project quantity.
-  // An explicit user action (Apply button or manual quantity entry) is the
-  // only path that may persist an Abfuser quantity change.
-  const applyRecommendedQty = () => {
+  // "Reset to Recommended" re-enables auto-follow (source → "recommended")
+  // so the quantity automatically tracks future room-size changes. The
+  // auto-follow effect in RoomDesigner confirms the qty on next render.
+  // With auto-follow, there is nothing to "apply" — the recommendation is
+  // already applied. This button only restores the calculated value after
+  // a manual override.
+  const resetToRecommended = () => {
     if (recommendedAbfuserQty > 0) {
       setSelectedAbfuserQty(recommendedAbfuserQty);
-      setAbfuserQtySource("user");
     }
+    setAbfuserQtySource("recommended");
   };
 
   // Pricing is calculated once in RoomDesigner and passed to every surface.
@@ -115,35 +119,54 @@ export default function OptionsPanel({
           />
         </div>
         {acousticTreatmentEnabled ? (
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs text-[#625143]">
-                Recommended: {recommendedAbfuserQty} × Artcoustic Abfuser
+          <div className="mt-3 space-y-3">
+            {treatmentRecommendation && (
+              <div className="rounded-md bg-[#F8F8F7] border border-[#EEEDEA] p-3 space-y-1">
+                <div className="text-xs font-semibold text-[#213428]">
+                  Recommended: {recommendedAbfuserQty} × Artcoustic Abfuser
+                </div>
+                <div className="text-xs text-[#625143]">
+                  Effective treatment: {treatmentRecommendation.effectiveTreatmentArea.toFixed(1)} m²
+                </div>
+                <div className="text-xs text-[#625143]">
+                  Remaining reflective area: {treatmentRecommendation.remainingReflectiveArea.toFixed(1)} m²
+                </div>
+                <div className="text-xs text-[#625143]">
+                  Treats {treatmentRecommendation.percentageTreated.toFixed(0)}% of equivalent reflective area
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={applyRecommendedQty}
-                disabled={recommendedAbfuserQty <= 0 || selectedAbfuserQty === recommendedAbfuserQty}
-                className="text-xs px-2 py-1 rounded border border-[#DCDBD6] bg-white text-[#213428] hover:bg-[#F8F8F7] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Apply
-              </button>
-            </div>
+            )}
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="abfuser-qty" className="text-xs font-medium text-[#3E4349] whitespace-nowrap">Quantity</Label>
-              <input
-                id="abfuser-qty"
-                type="number"
-                min="0"
-                step="1"
-                value={selectedAbfuserQty}
-                onChange={(e) => {
-                  setSelectedAbfuserQty(parseInt(e.target.value, 10) || 0);
-                  setAbfuserQtySource("user");
-                }}
-                className="w-20 px-2 py-1 border border-[#DCDBD6] rounded text-xs bg-white text-[#1B1A1A] focus:outline-none focus:ring-1 focus:ring-[#213428]"
-              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={resetToRecommended}
+                  disabled={abfuserQtySource === "recommended" || recommendedAbfuserQty <= 0}
+                  className="text-xs px-2 py-1 rounded border border-[#DCDBD6] bg-white text-[#213428] hover:bg-[#F8F8F7] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  title="Reset to calculated recommendation"
+                >
+                  Reset to Recommended
+                </button>
+                <input
+                  id="abfuser-qty"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={selectedAbfuserQty}
+                  onChange={(e) => {
+                    setSelectedAbfuserQty(parseInt(e.target.value, 10) || 0);
+                    setAbfuserQtySource("user");
+                  }}
+                  className="w-20 px-2 py-1 border border-[#DCDBD6] rounded text-xs bg-white text-[#1B1A1A] focus:outline-none focus:ring-1 focus:ring-[#213428]"
+                />
+              </div>
             </div>
+            {abfuserQtySource === "user" && (
+              <div className="text-[10px] text-[#8B7F76]">
+                Manually overridden — click "Reset to Recommended" to recalculate from room size
+              </div>
+            )}
           </div>
         ) : (
           <div className="mt-3 text-xs text-[#8B7F76]">Not included</div>
