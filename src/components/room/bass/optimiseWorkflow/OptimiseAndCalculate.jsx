@@ -16,11 +16,12 @@
 // The existing engineering workflow (Calculate + Improve Bass Response V2) is
 // retained behind an Advanced Diagnostics toggle.
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { useSyncExternalStore } from "react";
 import { Sparkles, CheckCircle2, Loader2, AlertCircle, RotateCcw } from "lucide-react";
 import { useSharedBassResults } from "../bassResultsStore";
 import { useActiveProjectId } from "@/components/state/project-session";
+import { useEngineeringMode } from "@/components/state/useEngineeringMode";
 import { getStage2State, subscribeStage2 } from "../stage2/stage2PlacementStore";
 import { useImproveBassV2State, requestCancel, resetImproveBassV2 } from "../improveBassV2/improveBassV2Store";
 import { cancelBassHeavyAction } from "../bassHeavyActionStore";
@@ -102,7 +103,7 @@ export default function OptimiseAndCalculate({
     || shared?.canCalculate !== true;
 
   const isBusy = ["calculating", "optimising", "applying", "recalculating", "publishing"].includes(workflowState.status);
-  const [engineeringMode, setEngineeringMode] = useState(false);
+  const { engineeringMode } = useEngineeringMode();
 
   // ── Main orchestration: triggered by the OPTIMISE & CALCULATE button ──
   const handleStart = useCallback(async () => {
@@ -477,36 +478,31 @@ export default function OptimiseAndCalculate({
         </div>
       )}
 
-      {/* ── Engineering Mode (advanced diagnostics) ── */}
-      <div className="mt-4 pt-3 border-t border-[#E7E4DF]">
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={engineeringMode}
-            onChange={(e) => setEngineeringMode(e.target.checked)}
-            className="h-3.5 w-3.5 accent-[#213428]"
-          />
-          <span className="text-[11px] font-medium text-[#625143]">Engineering Mode</span>
-        </label>
-        {engineeringMode && (
-          <div className="mt-3">
-            <ImproveBassResponseV2
-              roomDims={roomDims}
-              seatingPositions={seatingPositions}
-              subwooferInstances={subwooferInstances}
-              frontSubsCfg={frontSubsCfg}
-              rearSubsCfg={rearSubsCfg}
-              commitInstances={commitInstances}
-              commitSeating={commitSeating}
-              commitSeatingProvenance={commitSeatingProvenance}
-              appliedSeatingProvenance={appState?.appliedSeatingProvenance}
-              hasCanonicalInstances={hasCanonicalInstances}
-              appState={appState}
-              amplifierPowerPerSubW={amplifierPowerPerSubW}
-            />
+      {/* ── Engineering Mode (advanced diagnostics) ──
+          The toggle lives in the Options panel so it can reveal engineering
+          workflows across the app, not just Bass. When enabled there, the full
+          Improve Bass Response V2 workflow is shown below the standard summary. */}
+      {engineeringMode && (
+        <div className="mt-4 pt-3 border-t border-[#E7E4DF]">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A] mb-2">
+            Engineering Diagnostics
           </div>
-        )}
-      </div>
+          <ImproveBassResponseV2
+            roomDims={roomDims}
+            seatingPositions={seatingPositions}
+            subwooferInstances={subwooferInstances}
+            frontSubsCfg={frontSubsCfg}
+            rearSubsCfg={rearSubsCfg}
+            commitInstances={commitInstances}
+            commitSeating={commitSeating}
+            commitSeatingProvenance={commitSeatingProvenance}
+            appliedSeatingProvenance={appState?.appliedSeatingProvenance}
+            hasCanonicalInstances={hasCanonicalInstances}
+            appState={appState}
+            amplifierPowerPerSubW={amplifierPowerPerSubW}
+          />
+        </div>
+      )}
 
     </div>
   );

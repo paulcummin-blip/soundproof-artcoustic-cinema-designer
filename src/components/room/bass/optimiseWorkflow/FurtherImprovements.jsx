@@ -2,18 +2,18 @@
 // Physical design recommendation cards (subwoofer placement, seating position).
 // These are NOT calibration — they are design changes that require user decision.
 //
-// Rendered as a separate section below the Calibration Applied summary.
-// After applying, the card disappears (the design now reflects the change).
-// No "Applied ✓" state — once applied, it simply becomes the design.
+// Rendered as a separate section below the calibration summary.
+// After applying, the card stays visible as a read-only "Applied" summary so the
+// user can see what Sound Proof recommended and that it has been applied.
 
 import React, { useCallback, useState } from "react";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { buildOptimisedInstances } from "../improveBassV2/improveBassV2Apply";
 import { buildProvenance } from "../improveBassV2/appliedProvenance";
 import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Fingerprint";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 
-function ImprovementCard({ title, description, onApply, applyLabel }) {
+function ImprovementCard({ title, description, onApply, applyLabel, appliedSummary }) {
   const [applying, setApplying] = useState(false);
 
   const handleApply = useCallback(() => {
@@ -25,6 +25,28 @@ function ImprovementCard({ title, description, onApply, applyLabel }) {
       setApplying(false);
     }
   }, [onApply]);
+
+  if (appliedSummary) {
+    // Read-only "Applied" state — card stays visible with the recommendation
+    // and a disabled Apply button, so the user can see what was recommended.
+    return (
+      <div className="rounded-md border border-[#DCE3DD] bg-[#F2F6F3] px-3 py-2.5">
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 className="h-3.5 w-3.5 text-[#213428]" />
+          <span className="text-[12px] font-semibold text-[#1B1A1A]">{title}</span>
+        </div>
+        <p className="mt-1 text-[11px] text-[#625143] leading-relaxed">{appliedSummary}</p>
+        <button
+          type="button"
+          disabled
+          className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[#9CAFA3] px-3 py-1.5 text-[11px] font-semibold text-white cursor-not-allowed"
+        >
+          <CheckCircle2 className="h-3 w-3" />
+          Applied
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-md border border-[#E7E4DF] bg-white px-3 py-2.5">
@@ -126,10 +148,8 @@ export default function FurtherImprovements({
 
   if (!recommendations || (!hasSubPositions && !hasSeating)) return null;
 
-  const showPlacement = hasSubPositions && !appliedStages.has("placement");
-  const showSeating = hasSeating && !appliedStages.has("seating");
-
-  if (!showPlacement && !showSeating) return null;
+  const placementApplied = appliedStages.has("placement");
+  const seatingApplied = appliedStages.has("seating");
 
   return (
     <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3">
@@ -137,20 +157,22 @@ export default function FurtherImprovements({
         Further Design Improvements
       </div>
       <div className="space-y-2">
-        {showPlacement && (
+        {hasSubPositions && (
           <ImprovementCard
             title="Move subwoofers"
             description="Repositioning the subwoofers could further improve bass consistency across the seating area."
             onApply={handleApplySubPositions}
             applyLabel="Apply"
+            appliedSummary={placementApplied ? "Subwoofer positions updated. Estimated improvement achieved." : null}
           />
         )}
-        {showSeating && (
+        {hasSeating && (
           <ImprovementCard
             title="Move seating"
             description="Small seating position changes could further improve bass uniformity."
             onApply={handleApplySeating}
             applyLabel="Apply"
+            appliedSummary={seatingApplied ? "Seating position updated. Estimated improvement achieved." : null}
           />
         )}
       </div>

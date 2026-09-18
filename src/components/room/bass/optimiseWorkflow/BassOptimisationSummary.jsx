@@ -3,15 +3,15 @@
 //
 // Layout:
 //   Bass Optimisation
-//   ✓ Automatic calibration completed  (or "✓ No calibration adjustments required.")
+//   ✓ Automatic optimisation complete  (or "✓ No calibration adjustments required.")
 //
-//   Calibration Applied
-//   ✓ Phase — 15° lag @ 80 Hz        (only if adjusted)
-//   ✓ Delay — +0.5 ms                (only if adjusted)
-//   ✓ Relative gain — +1.0 dB       (only if adjusted)
-//   ✓ Global bass trim — +1.5 dB    (only if adjusted)
+//   Phase — 15° lag @ 80 Hz        (adjusted values shown; unchanged marked)
+//   Delay — +0.5 ms
+//   Relative gain — +1.0 dB
+//   Global bass trim — +1.5 dB
 //
-// When nothing changed at all, only the status line is shown.
+// The list always shows all four calibration stages so the user can see what
+// was adjusted and what was left unchanged. Stage values are preserved.
 
 import React from "react";
 import { CheckCircle2, Minus } from "lucide-react";
@@ -51,55 +51,47 @@ export default function BassOptimisationSummary({
   const delayAdjusted = !!autoApplied?.delay;
   const gainAdjusted = !!autoApplied?.gain;
   const trimAdjusted = !!autoApplied?.globalBassTrim;
-  const anyAdjusted = phaseAdjusted || delayAdjusted || gainAdjusted || trimAdjusted;
 
   return (
-    <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3 space-y-3">
+    <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3 space-y-2">
       {/* Heading + status line */}
       <div>
         <div className="text-[13px] font-semibold text-[#1B1A1A] mb-1.5">Bass Optimisation</div>
         <div className="flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 text-[#213428]" />
           <span className="text-[12px] font-medium text-[#1B1A1A]">
-            {noImprovementsFound ? "No calibration adjustments required." : "Automatic calibration completed"}
+            {noImprovementsFound ? "No calibration adjustments required." : "Automatic optimisation complete"}
           </span>
         </div>
       </div>
 
-      {/* Calibration Applied — only show if something changed */}
-      {anyAdjusted && (
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A] mb-1.5">
-            Calibration Applied
-          </div>
-          <div className="space-y-0.5">
-            <CalibrationRow
-              label="Phase"
-              detail={formatDetail(autoApplied?.details, "phases")}
-              adjusted={phaseAdjusted}
-            />
-            <CalibrationRow
-              label="Delay"
-              detail={formatDetail(autoApplied?.details, "delays")}
-              adjusted={delayAdjusted}
-            />
-            <CalibrationRow
-              label="Relative gain"
-              detail={formatDetail(autoApplied?.details, "trims")}
-              adjusted={gainAdjusted}
-            />
-            <CalibrationRow
-              label="Global bass trim"
-              detail={
-                Number.isFinite(autoApplied?.details?.globalTrimDb)
-                  ? `${autoApplied.details.globalTrimDb > 0 ? "+" : ""}${autoApplied.details.globalTrimDb.toFixed(1)} dB`
-                  : null
-              }
-              adjusted={trimAdjusted}
-            />
-          </div>
-        </div>
-      )}
+      {/* Calibration stages — always show all four */}
+      <div className="space-y-0.5">
+        <CalibrationRow
+          label="Phase"
+          detail={formatDetail(autoApplied?.details, "phases")}
+          adjusted={phaseAdjusted}
+        />
+        <CalibrationRow
+          label="Delay"
+          detail={formatDetail(autoApplied?.details, "delays")}
+          adjusted={delayAdjusted}
+        />
+        <CalibrationRow
+          label="Relative gain"
+          detail={formatDetail(autoApplied?.details, "trims")}
+          adjusted={gainAdjusted}
+        />
+        <CalibrationRow
+          label="Global bass trim"
+          detail={
+            Number.isFinite(autoApplied?.details?.globalTrimDb)
+              ? `${autoApplied.details.globalTrimDb > 0 ? "+" : ""}${autoApplied.details.globalTrimDb.toFixed(1)} dB`
+              : null
+          }
+          adjusted={trimAdjusted}
+        />
+      </div>
     </div>
   );
 }

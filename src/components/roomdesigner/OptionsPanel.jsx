@@ -2,6 +2,7 @@ import React from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useAppState } from "@/components/AppStateProvider";
+import { useEngineeringMode } from "@/components/state/useEngineeringMode";
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(value || 0));
@@ -55,6 +56,10 @@ export default function OptionsPanel({
 }) {
   const [showDifficultyRating, setShowDifficultyRating] = React.useState(false);
   const [showInactiveItems, setShowInactiveItems] = React.useState(false);
+
+  // Engineering Mode is a global toggle — reveals advanced engineering
+  // workflows across the app (e.g. the full Improve Bass Response V2 panel).
+  const { engineeringMode, setEngineeringMode } = useEngineeringMode();
 
   // Source authority from app state — distinguishes recommendation-applied
   // ("recommended") from designer-manually-set ("user"). The recommendation
@@ -382,6 +387,21 @@ export default function OptionsPanel({
           </button>
         </div>
       </div>
+
+      {/* DEVELOPER SETTINGS — Engineering Mode reveals advanced workflows */}
+      <SectionCard title="Developer Settings">
+        <div className="divide-y divide-[#EEEDEA]">
+          <ToggleRow
+            id="engineering-mode"
+            label="Engineering Mode"
+            checked={engineeringMode}
+            onChange={setEngineeringMode}
+          />
+        </div>
+        <div className="mt-2 text-xs text-[#8B7F76]">
+          Reveals advanced engineering workflows (e.g. full Improve Bass Response diagnostics) across the app.
+        </div>
+      </SectionCard>
     </div>
   );
 }
