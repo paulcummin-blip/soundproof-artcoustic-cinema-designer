@@ -663,6 +663,7 @@ function buildCanonicalCandidate({
         canonicalTargetCurve: predictorTargetCurve,
         assessmentStartHz: assessmentBand.lowerHz,
         assessmentEndHz: assessmentBand.upperHz,
+        protectedNullRegions,
       });
       p19Db = p19?.variationDbRaw ?? null;
       p19Level = p19?.level ?? null;
@@ -673,6 +674,7 @@ function buildCanonicalCandidate({
         canonicalTargetCurve: predictorTargetCurve,
         assessmentStartHz: assessmentBand.lowerHz,
         assessmentEndHz: assessmentBand.upperHz,
+        protectedNullRegions,
       });
       perSeatP19 = rawPerSeatP19.map((seat) => ({
         ...seat,

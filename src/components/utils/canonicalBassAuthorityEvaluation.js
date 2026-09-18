@@ -423,11 +423,17 @@ export function evaluateCanonicalBassAuthority({
 
   // P19: canonical post-EQ RSP versus the Practical Calibration Target T(f)
   // (RSP only — the official RP22 P19 result is at the RSP relative to target).
+  // Protected null regions identified on the RSP are excluded from the max-abs
+  // scan so that narrow uncorrectable nulls do not cause a false FAIL.
+  const protectedNullRegions = Array.isArray(canonicalResult.protectedNullRegions)
+    ? canonicalResult.protectedNullRegions
+    : [];
   const p19 = computeOfficialP19Assessment({
     rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
     canonicalTargetCurve: p19TargetCurve,
     assessmentStartHz: p19AssessmentStartHz,
     assessmentEndHz: p19AssessmentEndHz,
+    protectedNullRegions,
   });
   const officialP19VariationDb = p19?.variationDbRaw ?? null;
   const officialP19Level = houseCurveP19Level(officialP19VariationDb);
@@ -458,6 +464,7 @@ export function evaluateCanonicalBassAuthority({
         assessmentStartHz: p19AssessmentStartHz,
         assessmentEndHz: p19AssessmentEndHz,
         p14HeadroomDb,
+        protectedNullRegions,
       })
     : null;
 
@@ -473,6 +480,7 @@ export function evaluateCanonicalBassAuthority({
     canonicalTargetCurve: p19TargetCurve,
     assessmentStartHz: p19AssessmentStartHz,
     assessmentEndHz: p19AssessmentEndHz,
+    protectedNullRegions,
   });
 
   // P20: canonical post-EQ real seats versus the canonical post-EQ RSP.
@@ -542,6 +550,7 @@ export function evaluateCanonicalBassAuthority({
           upwardBoundDb: globalLevelAlignment.upwardBoundDb,
           downwardBoundDb: globalLevelAlignment.downwardBoundDb,
           stepDb: globalLevelAlignment.stepDb,
+          statusMessage: globalLevelAlignment.statusMessage,
         }
       : null,
     alignedPostEqRsp,

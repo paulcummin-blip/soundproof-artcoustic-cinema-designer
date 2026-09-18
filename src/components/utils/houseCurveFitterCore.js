@@ -20,6 +20,7 @@ import { evaluateSeatRegressionTolerance } from "@/components/utils/houseCurveSe
 import { classifyEqCorrectionRegion, curveSplAt, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
 import { compareHouseCurveMetrics } from "@/components/utils/houseCurveMetricComparison";
 import { levelP19_lfResponse, numericRp22Level } from "@/components/utils/rp22/levels";
+import { scanMaxAbsoluteDeviationFromResidualPoints } from "@/components/utils/p19AbsoluteTargetDeviation";
 
 export { compareHouseCurveMetrics };
 
@@ -127,14 +128,23 @@ function summarizeSeatMetrics(seatMetrics, protectedNullRegions = []) {
   if (!seatMetrics.length) return null;
   const rsp = seatMetrics.find((metric) => metric.seatId === "rsp") || null;
   const scoredRspPoints = (rsp?.residualPoints || []).filter((point) => !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions));
-  const rspMaxDeviationDb = scoredRspPoints.length ? Math.max(...scoredRspPoints.map((point) => Math.abs(point.deviationDb))) : rsp?.maxAbsDeviationDb ?? null;
+  // RSP max-abs uses the canonical P19 helper — the same authority as the
+  // published P19. The optimiser objective and published metric never diverge.
+  const rspScan = rsp?.residualPoints?.length
+    ? scanMaxAbsoluteDeviationFromResidualPoints(rsp.residualPoints, protectedNullRegions)
+    : null;
+  const rspMaxDeviationDb = rspScan?.maxAbsDeviationDb ?? rsp?.maxAbsDeviationDb ?? null;
   const rspRmsDeviationDb = scoredRspPoints.length ? Math.sqrt(scoredRspPoints.reduce((sum, point) => sum + point.deviationDb ** 2, 0) / scoredRspPoints.length) : rsp?.rmsDeviationDb ?? null;
   const rspMeanSignedResidualDb = scoredRspPoints.length ? scoredRspPoints.reduce((sum, point) => sum + point.deviationDb, 0) / scoredRspPoints.length : rsp?.meanSignedResidualDb ?? null;
   const rspShapeRmsDeviationDb = scoredRspPoints.length ? Math.sqrt(scoredRspPoints.reduce((sum, point) => sum + (point.deviationDb - rspMeanSignedResidualDb) ** 2, 0) / scoredRspPoints.length) : rsp?.shapeRmsDeviationDb ?? null;
   const objectiveMetric = (metric) => {
     const points = (metric.residualPoints || []).filter((point) => !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions));
+    // Per-seat max-abs uses the same canonical helper as the published P19.
+    const scan = metric.residualPoints?.length
+      ? scanMaxAbsoluteDeviationFromResidualPoints(metric.residualPoints, protectedNullRegions)
+      : null;
     return { ...metric,
-      objectiveMaxAbsDeviationDb: points.length ? Math.max(...points.map((point) => Math.abs(point.deviationDb))) : metric.maxAbsDeviationDb,
+      objectiveMaxAbsDeviationDb: scan?.maxAbsDeviationDb ?? (points.length ? Math.max(...points.map((point) => Math.abs(point.deviationDb))) : metric.maxAbsDeviationDb),
       objectiveRmsDeviationDb: points.length ? Math.sqrt(points.reduce((sum, point) => sum + point.deviationDb ** 2, 0) / points.length) : metric.rmsDeviationDb,
     };
   };

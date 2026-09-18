@@ -1,7 +1,7 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { isReferenceSeatIdentity } from "@/components/room/bass/normalizedRoomInputAdapters";
-import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
-import { levelP19_lfResponse, levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
+import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
+import { evaluateP19AbsoluteTargetDeviation } from "@/components/utils/p19AbsoluteTargetDeviation";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
@@ -34,71 +34,49 @@ function curveValueAt(curve, frequency) {
   return null;
 }
 
-/**
- * Canonical P19 span authority.
- *
- * residual(f) = smoothedResponse(f) − houseCurveShape(f)
- * spanDb = max(residual) − min(residual)
- * p19RawDb = spanDb / 2
- *
- * The house-curve SHAPE (artcousticHouseCurveOffsetAt) is used, not the
- * vertically-anchored target. A constant vertical offset shifts min and max
- * equally and leaves the span unchanged — so P19 is independent of target
- * centring.
- *
- * Protected null regions are excluded from the min/max so that narrow/deep
- * cancellations a calibrator would not equalise do not distort the span.
- */
-function residualSpan(curve, excludedRegions = []) {
-  let maxResidual = -Infinity;
-  let minResidual = Infinity;
-  let worstFrequencyHz = null;
-  curve.forEach((point) => {
-    if (excludedRegions.some((region) => point.frequency >= region.startHz && point.frequency <= region.endHz)) return;
-    const shapeOffset = artcousticHouseCurveOffsetAt(point.frequency);
-    if (!Number.isFinite(shapeOffset)) return;
-    const residual = point.spl - shapeOffset;
-    if (residual > maxResidual) {
-      maxResidual = residual;
-      worstFrequencyHz = point.frequency;
-    }
-    if (residual < minResidual) {
-      minResidual = residual;
-    }
+// ── Canonical P19 authority ──
+//
+// P19 is the maximum absolute deviation from the P14-anchored practical
+// calibration target after calibration, excluding protected null regions.
+//
+// The canonical evaluation lives in p19AbsoluteTargetDeviation.js and is
+// shared by both this published assessment and the house-curve fitter.
+// There is never a separate optimisation metric and reporting metric.
+//
+// Protected null regions are excluded from the max-abs scan so that narrow
+// uncorrectable nulls a calibrator would not equalise do not cause a false
+// FAIL. The exclusion uses isProtectedSmoothedFrequency (the smoothed-edge
+// variant) exactly as the fitter does.
+
+export function computeOfficialP19Assessment({ rspPostEqCurve, canonicalTargetCurve, assessmentStartHz, assessmentEndHz, protectedNullRegions = [] }) {
+  const result = evaluateP19AbsoluteTargetDeviation({
+    rspPostEqCurve,
+    canonicalTargetCurve,
+    assessmentStartHz,
+    assessmentEndHz,
+    protectedNullRegions,
   });
-  if (!Number.isFinite(maxResidual) || !Number.isFinite(minResidual)) return null;
-  const spanDb = maxResidual - minResidual;
-  const p19RawDb = spanDb / 2;
-  return {
-    variationDbRaw: p19RawDb,
-    totalRspToTargetDifferenceDbRaw: p19RawDb,
-    displayVariationDb: p19RawDb,
-    level: numericRp22Level(levelP19_lfResponse(p19RawDb)),
-    worstFrequencyHz,
-    spanDb,
-    maxResidual,
-    minResidual,
-  };
-}
-
-export function computeOfficialP19Assessment({ rspPostEqCurve, canonicalTargetCurve, assessmentStartHz, assessmentEndHz }) {
-  const sourceCurve = smoothedAssessmentCurve(rspPostEqCurve, assessmentStartHz, assessmentEndHz);
-  const result = residualSpan(sourceCurve);
-  return { ...result, sourceCurve, label: "P19 RSP" };
+  if (!result) return null;
+  return { ...result, sourceCurve: result.sourceCurve, label: "P19 RSP" };
 }
 
 /**
- * Per-seat P19 assessment — same residualSpan maths as the RSP P19,
- * applied to each real seat's post-EQ curve.
+ * Per-seat P19 assessment — same canonical max-abs deviation as the RSP P19,
+ * applied to each real seat's post-EQ curve against the same absolute target.
+ * Protected null regions (identified on the RSP) are excluded from every seat.
  * Returns an array of per-seat P19 results with seatId, level, variationDbRaw.
  */
-export function computeOfficialPerSeatP19Assessment({ perSeatPostEqCurves, canonicalTargetCurve, assessmentStartHz, assessmentEndHz }) {
+export function computeOfficialPerSeatP19Assessment({ perSeatPostEqCurves, canonicalTargetCurve, assessmentStartHz, assessmentEndHz, protectedNullRegions = [] }) {
   return (Array.isArray(perSeatPostEqCurves) ? perSeatPostEqCurves : [])
     .filter((seat) => seat?.seatId && !isReferenceSeatIdentity(seat))
     .map((seat) => {
-      const seatCurve = smoothedAssessmentCurve(seat.responseData, assessmentStartHz, assessmentEndHz);
-      if (!seatCurve.length) return null;
-      const result = residualSpan(seatCurve);
+      const result = evaluateP19AbsoluteTargetDeviation({
+        rspPostEqCurve: seat.responseData,
+        canonicalTargetCurve,
+        assessmentStartHz,
+        assessmentEndHz,
+        protectedNullRegions,
+      });
       if (!result || result.variationDbRaw == null) return null;
       return {
         seatId: seat.seatId,
@@ -113,9 +91,15 @@ export function computeOfficialPerSeatP19Assessment({ perSeatPostEqCurves, canon
 }
 
 export function computeCorrectableP19Diagnostic({ rspPostEqCurve, canonicalTargetCurve, assessmentStartHz, assessmentEndHz, protectedNullRegions = [] }) {
-  const sourceCurve = smoothedAssessmentCurve(rspPostEqCurve, assessmentStartHz, assessmentEndHz);
-  const result = residualSpan(sourceCurve, protectedNullRegions);
-  return { ...result, sourceCurve, label: "Correctable P19 — optimiser diagnostic" };
+  const result = evaluateP19AbsoluteTargetDeviation({
+    rspPostEqCurve,
+    canonicalTargetCurve,
+    assessmentStartHz,
+    assessmentEndHz,
+    protectedNullRegions,
+  });
+  if (!result) return null;
+  return { ...result, sourceCurve: result.sourceCurve, label: "Correctable P19 — optimiser diagnostic" };
 }
 
 export function p20LevelFromDisplayVariation(displayVariationDb) {

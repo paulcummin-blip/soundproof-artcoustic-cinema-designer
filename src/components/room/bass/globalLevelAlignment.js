@@ -39,6 +39,7 @@ import { computeOfficialP19Assessment } from "@/components/utils/bassAuthoritati
 
 const STEP_DB = 0.25;
 const DOWNWARD_RANGE_DB = 12; // generous downward sweep (unrestricted by capability)
+const HEADROOM_LIMITED_EPSILON_DB = 0.01;
 
 function shiftCurve(curve, offsetDb) {
   if (!Array.isArray(curve)) return [];
@@ -66,6 +67,7 @@ export function performGlobalLevelAlignment({
   assessmentStartHz,
   assessmentEndHz,
   p14HeadroomDb,
+  protectedNullRegions = [],
 }) {
   // Original P19 at the as-calibrated operating level (offset = 0)
   const originalP19 = computeOfficialP19Assessment({
@@ -73,6 +75,7 @@ export function performGlobalLevelAlignment({
     canonicalTargetCurve,
     assessmentStartHz,
     assessmentEndHz,
+    protectedNullRegions,
   });
   const originalP19Db = Number.isFinite(originalP19?.variationDbRaw)
     ? Number(originalP19.variationDbRaw)
@@ -91,10 +94,13 @@ export function performGlobalLevelAlignment({
       upwardBoundDb: 0,
       downwardBoundDb: 0,
       stepDb: STEP_DB,
+      statusMessage: "P19 not available — no assessment band data",
     };
   }
 
-  // Upward bound: available P14 headroom (can never exceed capability)
+  // Upward bound: available P14 headroom (can never exceed capability).
+  // Global Level Alignment may never increase the response beyond the
+  // physically available headroom established by the final P14 result.
   const upwardBoundDb = Math.max(0, headroom);
   // Downward bound: generous calibration range (not constrained by capability)
   const downwardBoundDb = DOWNWARD_RANGE_DB;
@@ -117,6 +123,7 @@ export function performGlobalLevelAlignment({
       canonicalTargetCurve,
       assessmentStartHz,
       assessmentEndHz,
+      protectedNullRegions,
     });
     const p19Db = Number.isFinite(p19?.variationDbRaw) ? Number(p19.variationDbRaw) : Infinity;
 
@@ -133,6 +140,22 @@ export function performGlobalLevelAlignment({
   const improvementDb = Math.max(0, originalP19Db - bestP19Db);
   const aligned = improvementDb > 1e-9;
 
+  // Determine the status message:
+  // - If the optimum trim is 0.0 dB, the current operating level is already
+  //   optimum — no adjustment is needed.
+  // - If the best offset is at the upward bound, the mathematical optimum
+  //   would require more gain than the loudspeaker can physically produce.
+  //   The published P19 represents the best physically achievable result.
+  // - Otherwise, the alignment improved P19 by applying a global trim.
+  let statusMessage;
+  if (!aligned) {
+    statusMessage = "Current operating level already optimum";
+  } else if (upwardBoundDb > 0 && Math.abs(bestOffset - upwardBoundDb) < HEADROOM_LIMITED_EPSILON_DB) {
+    statusMessage = "Limited by available output capability";
+  } else {
+    statusMessage = `Global trim ${bestOffset > 0 ? "+" : ""}${bestOffset.toFixed(2)} dB applied`;
+  }
+
   return {
     recommendedTrimDb: bestOffset,
     originalP19Db,
@@ -143,6 +166,7 @@ export function performGlobalLevelAlignment({
     upwardBoundDb,
     downwardBoundDb,
     stepDb: STEP_DB,
+    statusMessage,
   };
 }
 

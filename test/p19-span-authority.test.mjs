@@ -1,18 +1,21 @@
 // test/p19-span-authority.test.mjs
-// Canonical tests for the P19 span authority and 3 dB capability reserve.
+// Canonical tests for the P19 absolute-target-deviation authority.
+//
+// P19 is the maximum absolute deviation from the P14-anchored practical
+// calibration target after calibration, excluding protected null regions.
 //
 // Tests:
-//  1.  P19 equals half residual span
-//  2.  Constant vertical target shifts do not change P19
-//  3.  11.99 dB span remains displayed ±5
-//  4.  12.00 dB span becomes ±6 / FAIL
-//  5.  House-curve slope is removed before measuring span
+//  1.  P19 equals max |residual| (not span/2)
+//  2.  Constant vertical shifts DO change P19 (absolute-level sensitivity)
+//  3.  5.99 dB max-abs remains displayed ±5 / L1
+//  4.  6.5 dB max-abs becomes ±6 / FAIL
+//  5.  House-curve slope is removed before measuring deviation
 //  6.  P18→transition bounds are respected
 //  7.  P20 is unchanged
 //  8.  3 dB capability reserve is total, not additive to the existing 2 dB
 //  9.  P18's definitional −3 dB remains unchanged
-//  10. Optimiser current/challenger scoring uses the same new P19 authority
-//  11. Luxavo front-row result becomes materially more believable
+//  10. Optimiser current/challenger scoring uses the same P19 authority
+//  11. Protected null exclusion — narrow nulls excluded, broad shortfall flagged
 //  12. Existing optimiser fixes remain green
 //
 // Run: node --import ./test/_alias-register.mjs test/p19-span-authority.test.mjs
@@ -29,6 +32,7 @@ import { levelP19_lfResponse } from "@/components/utils/rp22/levels";
 import { selectAuthoritativeFinalist, hasPrimarySeatRegression } from "@/components/room/bass/best-layout/authoritativeFinalistSelection";
 import { isMaterialImprovement } from "@/components/room/bass/improveBassV2/materialityGate";
 import { gatherCandidates, selectWinnerWithProtection } from "@/components/room/bass/improveBassV2/improveBassV2Engine";
+import { evaluateP19AbsoluteTargetDeviation } from "@/components/utils/p19AbsoluteTargetDeviation";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -56,11 +60,11 @@ function makeResidualCurve(startHz, endHz, count, minResidual, maxResidual) {
   return points;
 }
 
-// ── TEST 1: P19 equals half residual span ───────────────────────────────
+// ── TEST 1: P19 equals max |residual| ───────────────────────────────────
 
-test("TEST 1: P19 equals half residual span", () => {
-  // residual spans from -5 to +5 → span 10 → raw ±5
-  // 1/3-octave smoothing reduces the span slightly (~5%) — this is expected.
+test("TEST 1: P19 equals max |residual| (not span/2)", () => {
+  // residual spans from -5 to +5 → max|residual| = 5
+  // 1/3-octave smoothing reduces the peak slightly — this is expected.
   const curve = makeResidualCurve(20, 120, 50, -5, 5);
   const result = computeOfficialP19Assessment({
     rspPostEqCurve: curve,
@@ -68,17 +72,18 @@ test("TEST 1: P19 equals half residual span", () => {
     assessmentStartHz: 20,
     assessmentEndHz: 120,
   });
-  assert.ok(result.spanDb > 9.0 && result.spanDb < 10.1, `spanDb should be ~9.5 (after smoothing), got ${result.spanDb}`);
-  assert.ok(result.variationDbRaw > 4.5 && result.variationDbRaw < 5.1, `p19RawDb should be ~4.8 (after smoothing), got ${result.variationDbRaw}`);
+  assert.ok(result.variationDbRaw > 4.5 && result.variationDbRaw < 5.1,
+    `p19RawDb should be ~4.8 (max|residual| after smoothing), got ${result.variationDbRaw}`);
+  assert.ok(result.maxAbsDeviationDb != null, "maxAbsDeviationDb should be populated");
 });
 
-// ── TEST 2: Constant vertical target shifts do not change P19 ──────────
+// ── TEST 2: Constant vertical shifts DO change P19 ─────────────────────
 
-test("TEST 2: Constant vertical target shifts do not change P19", () => {
+test("TEST 2: Constant vertical shifts DO change P19 (absolute-level sensitivity)", () => {
   const baseCurve = makeResidualCurve(20, 120, 50, -5, 5);
-  // Shift the entire response up by 10 dB
+  // Shift the entire response up by 10 dB — now 10 dB above the shape-only target
   const shiftedCurve = baseCurve.map((p) => ({ frequency: p.frequency, spl: p.spl + 10 }));
-  // Shift down by 7 dB
+  // Shift down by 7 dB — now 7 dB below the shape-only target
   const downCurve = baseCurve.map((p) => ({ frequency: p.frequency, spl: p.spl - 7 }));
 
   const baseResult = computeOfficialP19Assessment({
@@ -91,59 +96,74 @@ test("TEST 2: Constant vertical target shifts do not change P19", () => {
     rspPostEqCurve: downCurve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
   });
 
-  assert.ok(Math.abs(baseResult.variationDbRaw - upResult.variationDbRaw) < 0.01,
-    `+10 dB shift should not change P19: base=${baseResult.variationDbRaw}, shifted=${upResult.variationDbRaw}`);
-  assert.ok(Math.abs(baseResult.variationDbRaw - downResult.variationDbRaw) < 0.01,
-    `-7 dB shift should not change P19: base=${baseResult.variationDbRaw}, down=${downResult.variationDbRaw}`);
+  // A +10 dB shift makes P19 worse (response is now ~10 dB above target)
+  assert.ok(upResult.variationDbRaw > baseResult.variationDbRaw + 5,
+    `+10 dB shift should worsen P19: base=${baseResult.variationDbRaw}, shifted=${upResult.variationDbRaw}`);
+  // A -7 dB shift also makes P19 worse (response is now ~7 dB below target)
+  assert.ok(downResult.variationDbRaw > baseResult.variationDbRaw + 3,
+    `-7 dB shift should worsen P19: base=${baseResult.variationDbRaw}, down=${downResult.variationDbRaw}`);
 });
 
-// ── TEST 3: 11.99 dB span remains displayed ±5 ──────────────────────────
+// ── TEST 3: 5.99 dB max-abs remains displayed ±5 / L1 ──────────────────
 
-test("TEST 3: 11.99 dB span remains displayed ±5", () => {
-  const curve = makeResidualCurve(20, 120, 50, -5.995, 5.995);
+test("TEST 3: 5.99 dB max-abs → displayed ±5 / L1", () => {
+  const curve = makeResidualCurve(20, 120, 50, -5.995, 0);
   const result = computeOfficialP19Assessment({
     rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
   });
   const displayDb = resolveRp22DesignValue(19, result.variationDbRaw);
-  assert.equal(displayDb, 5, `11.99 dB span → raw ±5.995 → floor → ±5, got ±${displayDb}`);
+  assert.equal(displayDb, 5, `5.99 dB max-abs → floor → ±5, got ±${displayDb}`);
   const levelResult = levelP19_lfResponse(result.variationDbRaw);
   assert.equal(levelResult.level, "L1", `±5 should be L1, got ${levelResult.level}`);
 });
 
-// ── TEST 4: 12.00 dB span becomes ±6 / FAIL ─────────────────────────────
+// ── TEST 4: 6.5 dB max-abs becomes ±6 / FAIL ────────────────────────────
 
-test("TEST 4: 12.00 dB span becomes ±6 / FAIL", () => {
-  // Use a larger raw span so that after 1/3-octave smoothing the span is ≥12.
-  // Smoothing reduces the span by ~5%, so raw 13 dB → smoothed ~12.4 → raw ±6.2 → FAIL.
-  const curve = makeResidualCurve(20, 120, 50, -6.5, 6.5);
+test("TEST 4: 6.5 dB max-abs → ±6 / FAIL", () => {
+  // After 1/3-octave smoothing, max|residual| is slightly less than 6.5.
+  // Use -6.5 to 0 so max|residual| = 6.5 before smoothing.
+  const curve = makeResidualCurve(20, 120, 50, -6.5, 0);
   const result = computeOfficialP19Assessment({
     rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
   });
   const displayDb = resolveRp22DesignValue(19, result.variationDbRaw);
-  assert.equal(displayDb, 6, `12+ dB smoothed span → raw ±6 → floor → ±6, got ±${displayDb}`);
+  assert.equal(displayDb, 6, `6+ dB max-abs → ±6 / FAIL, got ±${displayDb}`);
   const levelResult = levelP19_lfResponse(result.variationDbRaw);
   assert.equal(levelResult.level, "FAIL", `±6 should be FAIL, got ${levelResult.level}`);
 });
 
-// ── TEST 5: House-curve slope is removed before measuring span ──────────
+// ── TEST 5: House-curve slope is removed before measuring deviation ─────
 
-test("TEST 5: House-curve slope is removed before measuring span", () => {
+test("TEST 5: House-curve slope is removed before measuring deviation", () => {
   // Build a curve that perfectly follows the house curve shape (residual = 0 everywhere)
-  // but has a 10 dB SPL difference between 20 Hz and 120 Hz due to the house curve slope.
   const curve = [];
   for (let i = 0; i < 50; i++) {
     const f = 20 * Math.pow(120 / 20, i / 49);
     const shape = artcousticHouseCurveOffsetAt(f);
-    curve.push({ frequency: f, spl: 100 + shape }); // constant residual of 100
+    curve.push({ frequency: f, spl: 100 + shape }); // residual = 100 (constant)
   }
   const result = computeOfficialP19Assessment({
     rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
   });
-  // Residual is constant → span ≈ 0 → P19 ≈ 0
+  // With shape-only fallback target, residual = spl - shape = 100 (constant)
+  // max|residual| = 100 → P19 = 100 → FAIL
+  // This is correct: a response 100 dB above the shape reference is far from target.
+  // But the SHAPE is removed — the variation comes only from the constant offset.
   // 1/3-octave smoothing introduces a small residual variation (~0.25 dB)
   // because the smoothing kernel interacts with the house-curve slope.
-  assert.ok(result.spanDb < 0.5, `Perfect house-curve follow → span < 0.5, got ${result.spanDb}`);
-  assert.ok(result.variationDbRaw < 0.25, `Perfect house-curve follow → P19 < 0.25, got ${result.variationDbRaw}`);
+  // The key point: the house-curve slope itself does not inflate P19.
+  // A response that perfectly follows the shape (residual = 0) would give P19 ≈ 0.
+  const perfectCurve = [];
+  for (let i = 0; i < 50; i++) {
+    const f = 20 * Math.pow(120 / 20, i / 49);
+    const shape = artcousticHouseCurveOffsetAt(f);
+    perfectCurve.push({ frequency: f, spl: shape }); // residual = 0
+  }
+  const perfectResult = computeOfficialP19Assessment({
+    rspPostEqCurve: perfectCurve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
+  });
+  assert.ok(perfectResult.variationDbRaw < 0.25,
+    `Perfect house-curve follow (residual=0) → P19 < 0.25, got ${perfectResult.variationDbRaw}`);
 });
 
 // ── TEST 6: P18→transition bounds are respected ─────────────────────────
@@ -161,8 +181,7 @@ test("TEST 6: P18→transition bounds are respected", () => {
   const result80 = computeOfficialP19Assessment({
     rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 80,
   });
-  // With assessmentEndHz = 200, the flat 80-200 band is included → span should be same
-  // because the flat band has residual = 0 which is within the existing min/max
+  // With assessmentEndHz = 200, the flat 80-200 band is included
   const result200 = computeOfficialP19Assessment({
     rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 200,
   });
@@ -205,30 +224,16 @@ test("TEST 8: 3 dB capability reserve is total (P14_SAFETY_MARGIN_DB = 3)", () =
 // ── TEST 9: P18's definitional −3 dB remains unchanged ──────────────────
 
 test("TEST 9: P18's definitional −3 dB cutoff remains unchanged", () => {
-  // The F3 cutoff is p14TargetDb - 3 (the RP22 F3 definition).
-  // This is NOT the safety reserve. The safety reserve derates the product
-  // capability curve, not the cutoff.
-  // Verify: computeCapabilityTargetF3 derates the product curve by P14_SAFETY_MARGIN_DB
-  // but the cutoff remains p14TargetDb - 3.
-  // We test this by checking that a product curve that exactly meets the target
-  // at the cutoff (target - 3) now FAILS after derating (because the derated
-  // curve is 3 dB below the cutoff).
-  // This is a structural test — the function exists and uses P14_SAFETY_MARGIN_DB.
   assert.equal(P14_SAFETY_MARGIN_DB, 3, "Safety reserve is 3 dB total");
-  // The F3 definition (target - 3) is separate from the safety reserve.
-  // This test confirms the constant is 3, not 2+3=5.
   assert.ok(P14_SAFETY_MARGIN_DB === 3, "Reserve is 3 dB total, not additive");
 });
 
-// ── TEST 10: Optimiser scoring uses the same new P19 authority ──────────
+// ── TEST 10: Optimiser scoring uses the same P19 authority ──────────────
 
-test("TEST 10: Optimiser scoring uses the same new P19 authority", () => {
-  // The optimiser reads achievedP19VariationDb from canonical results.
-  // Since computeOfficialP19Assessment now returns span/2, the optimiser
-  // automatically uses the new P19. This test verifies that a candidate
-  // with a lower span produces a lower achievedP19VariationDb.
-  const curve1 = makeResidualCurve(20, 120, 50, -3, 3);  // span 6, P19 = 3
-  const curve2 = makeResidualCurve(20, 120, 50, -5, 5);  // span 10, P19 = 5
+test("TEST 10: Optimiser scoring uses the same P19 authority", () => {
+  // A candidate with a lower max|residual| produces a lower achievedP19VariationDb.
+  const curve1 = makeResidualCurve(20, 120, 50, -3, 3);  // max|residual| = 3
+  const curve2 = makeResidualCurve(20, 120, 50, -5, 5);  // max|residual| = 5
   const r1 = computeOfficialP19Assessment({
     rspPostEqCurve: curve1, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
   });
@@ -236,26 +241,84 @@ test("TEST 10: Optimiser scoring uses the same new P19 authority", () => {
     rspPostEqCurve: curve2, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
   });
   assert.ok(r1.variationDbRaw < r2.variationDbRaw,
-    `Lower span → lower P19: ${r1.variationDbRaw} < ${r2.variationDbRaw}`);
+    `Lower max|residual| → lower P19: ${r1.variationDbRaw} < ${r2.variationDbRaw}`);
 });
 
-// ── TEST 11: Luxavo front-row result becomes materially more believable ─
+// ── TEST 11: Protected null exclusion — narrow nulls excluded ───────────
 
-test("TEST 11: Luxavo front-row span → P19 is more believable than max-abs", () => {
-  // Simulate Luxavo front-seat residuals: approximately -6.9 / +0.84
-  // Old max-abs P19 = max(|-6.9|, |0.84|) = 6.9 → displayed ±6 / FAIL
-  // New span P19 = (6.9 + 0.84) / 2 = 3.87 → displayed ±3 / L3
-  const curve = makeResidualCurve(20, 120, 50, -6.9, 0.84);
-  const result = computeOfficialP19Assessment({
-    rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
+test("TEST 11: Protected null exclusion — narrow null excluded, broad shortfall flagged", () => {
+  // A broad ramp from -6.9 to +0.84 — this is NOT a narrow null.
+  // Without protected null exclusion, max|residual| = 6.9 → FAIL.
+  // This is correct: a broad -6.9 dB shortfall from target is a real problem.
+  const broadCurve = makeResidualCurve(20, 120, 50, -6.9, 0.84);
+  const broadResult = computeOfficialP19Assessment({
+    rspPostEqCurve: broadCurve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
   });
-  const displayDb = resolveRp22DesignValue(19, result.variationDbRaw);
-  assert.ok(displayDb <= 4, `Front-row P19 should be ≤ ±4 (believable), got ±${displayDb}`);
-  assert.ok(result.variationDbRaw < 4, `Raw P19 should be < 4, got ${result.variationDbRaw}`);
-  // Old max-abs would have been ~6.9 → FAIL. New span is ~3.87 → L3.
-  // This is materially more believable.
-  const levelResult = levelP19_lfResponse(result.variationDbRaw);
-  assert.ok(levelResult.level !== "FAIL", `Front-row should not be FAIL, got ${levelResult.level}`);
+  const broadDisplay = resolveRp22DesignValue(19, broadResult.variationDbRaw);
+  assert.ok(broadDisplay >= 5, `Broad -6.9 dB shortfall → ≥ ±5 (correctly flagged), got ±${broadDisplay}`);
+
+  // A narrow null at 50 Hz, -15 dB deep, with flat response elsewhere.
+  // With protected null exclusion, the null is excluded and P19 reflects
+  // the remaining (flat) response → P19 ≈ 0.
+  const narrowNullCurve = [];
+  for (let i = 0; i < 200; i++) {
+    const f = 20 + i * 0.5; // 0.5 Hz steps from 20 to 120 Hz
+    const shape = artcousticHouseCurveOffsetAt(f);
+    const nullDepth = -15 * Math.exp(-0.5 * ((f - 50) / 1.5) ** 2); // narrow gaussian null
+    narrowNullCurve.push({ frequency: f, spl: 100 + shape + nullDepth });
+  }
+  // Protected null region around 50 Hz (narrow, deep)
+  const protectedNullRegions = [{
+    startHz: 48, endHz: 52,
+    centreFrequencyHz: 50,
+    protected: true,
+    narrowCancellation: true,
+  }];
+  const protectedResult = computeOfficialP19Assessment({
+    rspPostEqCurve: narrowNullCurve,
+    canonicalTargetCurve: [],
+    assessmentStartHz: 20,
+    assessmentEndHz: 120,
+    protectedNullRegions,
+  });
+  // With the narrow null excluded, the remaining response is flat → P19 should
+  // be small (the response is at 100 dB, the shape-only target is shape, so
+  // the residual is 100 — but that's a constant offset, not a variation).
+  // The max|residual| of the non-protected points is ~100 (constant).
+  // Wait — with shape-only fallback, residual = spl - shape = 100 + nullDepth - shape + shape = 100 + nullDepth.
+  // Actually: spl = 100 + shape + nullDepth, residual = spl - shape = 100 + nullDepth.
+  // For non-protected points, nullDepth ≈ 0, so residual ≈ 100 (constant).
+  // max|residual| = 100 → that's a huge P19. This is because the shape-only
+  // fallback doesn't have an absolute level reference.
+  //
+  // For this test to be meaningful, we need an absolute target curve.
+  // Build a target curve at 100 + shape (matching the flat response level).
+  const targetCurve = [];
+  for (let i = 0; i < 200; i++) {
+    const f = 20 + i * 0.5;
+    targetCurve.push({ frequency: f, spl: 100 + artcousticHouseCurveOffsetAt(f) });
+  }
+  const protectedWithTarget = computeOfficialP19Assessment({
+    rspPostEqCurve: narrowNullCurve,
+    canonicalTargetCurve: targetCurve,
+    assessmentStartHz: 20,
+    assessmentEndHz: 120,
+    protectedNullRegions,
+  });
+  const protectedDisplay = resolveRp22DesignValue(19, protectedWithTarget.variationDbRaw);
+  assert.ok(protectedDisplay <= 2,
+    `Narrow null excluded → P19 ≤ ±2 (protected), got ±${protectedDisplay}`);
+
+  // Without protection, the same curve gives a high P19 (the null is included)
+  const unprotected = computeOfficialP19Assessment({
+    rspPostEqCurve: narrowNullCurve,
+    canonicalTargetCurve: targetCurve,
+    assessmentStartHz: 20,
+    assessmentEndHz: 120,
+  });
+  const unprotectedDisplay = resolveRp22DesignValue(19, unprotected.variationDbRaw);
+  assert.ok(unprotectedDisplay >= 5,
+    `Narrow null without protection → P19 ≥ ±5 (null included), got ±${unprotectedDisplay}`);
 });
 
 // ── TEST 12: Existing optimiser fixes remain green ─────────────────────
@@ -291,8 +354,6 @@ test("TEST 12b: Primary-seat regression protection still works", () => {
 });
 
 test("TEST 12c: Level-preservation gate rejects P14/P18 regressors", () => {
-  // This tests the new level-preservation gate in authoritativeFinalistSelection.
-  // A candidate that drops P14 level is rejected before the Pareto filter.
   const currentLayout = {
     metrics: {
       perSeatP19: [],
@@ -309,7 +370,6 @@ test("TEST 12c: Level-preservation gate rejects P14/P18 regressors", () => {
     sources: [{ id: "sub-1", tuning: { gainDb: 0 } }],
   };
 
-  // Candidate: P20 improves but P14 drops from L3 to L1
   const candidateResult = {
     achievedP19VariationDb: 3.0,
     achievedP19Level: 3,
@@ -324,14 +384,29 @@ test("TEST 12c: Level-preservation gate rejects P14/P18 regressors", () => {
 
   const quantityResult = { evaluatedFinalists: [candidateResult] };
   const selection = selectAuthoritativeFinalist(quantityResult, null, currentLayout);
-  // The candidate should be rejected because P14 dropped from L3 to L1
   assert.ok(selection.isCurrent, "P14 L3→L1 candidate should be rejected (keep current)");
 });
 
-// ── EXAMPLES FROM THE SPEC ──────────────────────────────────────────────
+// ── CANONICAL HELPER DIRECT TESTS ───────────────────────────────────────
 
-test("EXAMPLE: -5 / +5 residual → span 10 → raw ±5 → displayed ±5", () => {
-  // 1/3-octave smoothing reduces the span slightly — displayed ±4 or ±5.
+test("HELPER: evaluateP19AbsoluteTargetDeviation returns max|residual|", () => {
+  const curve = makeResidualCurve(20, 120, 50, -3, 7);
+  const result = evaluateP19AbsoluteTargetDeviation({
+    rspPostEqCurve: curve,
+    canonicalTargetCurve: [],
+    assessmentStartHz: 20,
+    assessmentEndHz: 120,
+  });
+  // max|residual| = max(|-3|, |7|) = 7 (before smoothing)
+  assert.ok(result.variationDbRaw > 6 && result.variationDbRaw < 7.5,
+    `max|residual| should be ~7 (after smoothing), got ${result.variationDbRaw}`);
+  assert.ok(result.worstFrequencyHz != null, "worstFrequencyHz should be populated");
+  assert.ok(result.residualCurve.length > 0, "residualCurve should be populated");
+});
+
+// ── EXAMPLES ───────────────────────────────────────────────────────────
+
+test("EXAMPLE: -5 / +5 residual → max|residual| = 5 → displayed ±5", () => {
   const curve = makeResidualCurve(20, 120, 50, -5, 5);
   const result = computeOfficialP19Assessment({
     rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
@@ -340,39 +415,8 @@ test("EXAMPLE: -5 / +5 residual → span 10 → raw ±5 → displayed ±5", () =
   assert.ok(displayDb <= 5 && displayDb >= 4, `displayed should be ±4-5 (after smoothing), got ±${displayDb}`);
 });
 
-test("EXAMPLE: -6 / 0 → span 6 → raw ±3 → displayed ±3", () => {
+test("EXAMPLE: -6 / 0 → max|residual| = 6 → displayed ±6 / FAIL", () => {
   const curve = makeResidualCurve(20, 120, 50, -6, 0);
-  const result = computeOfficialP19Assessment({
-    rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
-  });
-  const displayDb = resolveRp22DesignValue(19, result.variationDbRaw);
-  assert.ok(displayDb <= 3 && displayDb >= 2, `displayed should be ±2-3 (after smoothing), got ±${displayDb}`);
-});
-
-test("EXAMPLE: -8 / +2 → span 10 → raw ±5 → displayed ±5", () => {
-  const curve = makeResidualCurve(20, 120, 50, -8, 2);
-  const result = computeOfficialP19Assessment({
-    rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
-  });
-  const displayDb = resolveRp22DesignValue(19, result.variationDbRaw);
-  assert.ok(displayDb <= 5 && displayDb >= 4, `displayed should be ±4-5 (after smoothing), got ±${displayDb}`);
-});
-
-test("EXAMPLE: -6.9 / +0.84 → span 7.74 → raw ±3.87 → displayed ±3", () => {
-  // After smoothing, the span is ~7.4 → raw ~3.7 → floor 3.
-  const curve = makeResidualCurve(20, 120, 50, -6.9, 0.84);
-  const result = computeOfficialP19Assessment({
-    rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
-  });
-  const displayDb = resolveRp22DesignValue(19, result.variationDbRaw);
-  assert.equal(displayDb, 3, `displayed should be ±3, got ±${displayDb}`);
-  const levelResult = levelP19_lfResponse(result.variationDbRaw);
-  assert.equal(levelResult.level, "L3", `should be L3, got ${levelResult.level}`);
-});
-
-test("EXAMPLE: -10.49 / +3.07 → span 13.56 → raw ±6.78 → displayed ±6 / FAIL", () => {
-  // After smoothing, the span is ~12.9 → raw ~6.4 → floor 6 → FAIL.
-  const curve = makeResidualCurve(20, 120, 50, -10.49, 3.07);
   const result = computeOfficialP19Assessment({
     rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
   });
@@ -380,4 +424,28 @@ test("EXAMPLE: -10.49 / +3.07 → span 13.56 → raw ±6.78 → displayed ±6 / 
   assert.equal(displayDb, 6, `displayed should be ±6, got ±${displayDb}`);
   const levelResult = levelP19_lfResponse(result.variationDbRaw);
   assert.equal(levelResult.level, "FAIL", `should be FAIL, got ${levelResult.level}`);
+});
+
+test("EXAMPLE: -8 / +2 → max|residual| = 8 → displayed ±8 / FAIL", () => {
+  const curve = makeResidualCurve(20, 120, 50, -8, 2);
+  const result = computeOfficialP19Assessment({
+    rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
+  });
+  const displayDb = resolveRp22DesignValue(19, result.variationDbRaw);
+  assert.ok(displayDb >= 7, `displayed should be ≥ ±7 (after smoothing), got ±${displayDb}`);
+  const levelResult = levelP19_lfResponse(result.variationDbRaw);
+  assert.equal(levelResult.level, "FAIL", `should be FAIL, got ${levelResult.level}`);
+});
+
+test("EXAMPLE: -6.9 / +0.84 → max|residual| = 6.9 → displayed ±6 / FAIL (broad shortfall)", () => {
+  const curve = makeResidualCurve(20, 120, 50, -6.9, 0.84);
+  const result = computeOfficialP19Assessment({
+    rspPostEqCurve: curve, canonicalTargetCurve: [], assessmentStartHz: 20, assessmentEndHz: 120,
+  });
+  const displayDb = resolveRp22DesignValue(19, result.variationDbRaw);
+  assert.ok(displayDb >= 5, `broad -6.9 dB shortfall → ≥ ±5, got ±${displayDb}`);
+  const levelResult = levelP19_lfResponse(result.variationDbRaw);
+  // A broad -6.9 dB shortfall from target is a real problem → FAIL or L1
+  assert.ok(["FAIL", "L1"].includes(levelResult.level),
+    `broad shortfall should be FAIL or L1, got ${levelResult.level}`);
 });
