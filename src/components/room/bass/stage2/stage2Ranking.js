@@ -175,9 +175,8 @@ export function buildStage2RankingTuple(result, seatPriorityMap) {
     .sort().join("|");
 
   const rankingTuple = [
-    // PRIMARY: Eliminate FAIL seats (all seats, P19 OR P20)
+    // PRIMARY: Minimise FAIL seats (all seats, P19 OR P20)
     -totalFailingSeats,
-    -totalParameterFails,
     // SECONDARY: Primary Row — Highest Level → Lowest Deviation → Lowest Row Variation
     worstPrimaryCombined,
     primaryL4Count,

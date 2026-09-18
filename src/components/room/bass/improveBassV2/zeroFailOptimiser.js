@@ -98,25 +98,28 @@ function rowVariation(result, isPrimary) {
  * Lower tuple = better candidate.
  *
  * Hierarchy:
- *   1. PRIMARY: Eliminate FAIL seats (fewer failing seats = better)
- *   2. Within primary: fewer parameter fails
- *   3. SECONDARY.1: Highest Primary Seat Level (worst-first, negated levels)
- *   4. SECONDARY.2: Lowest Primary Seat Deviation (worst-first raw margins)
- *   5. SECONDARY.3: Lowest Primary Row Variation (seat-to-seat spread)
- *   6. TERTIARY.1: Secondary Row RP22 level (worst-first, negated levels)
- *   7. TERTIARY.2: Secondary Seat Deviation (worst-first raw margins)
- *   8. TERTIARY.3: Secondary Row Variation (seat-to-seat spread)
- *   9. QUATERNARY.1: Overall P19 metric (lower = better)
- *   10. QUATERNARY.2: Overall P20 metric (lower = better)
- *   11. Final tie-breakers: P18 level, P18 Hz, P14 level, P14 dB
+ *   1. PRIMARY: Minimise FAIL seats (fewer failing seats = better).
+ *      The optimiser never assumes zero FAIL is achievable — it seeks the
+ *      fewest FAIL seats that is physically attainable, then maximises RP22
+ *      performance for the remaining seats.
+ *   2. SECONDARY: Strongest Primary Seating performance
+ *      a. Highest Primary Seat Level (worst-first, negated levels)
+ *      b. Lowest Primary Seat Deviation (worst-first raw margins)
+ *      c. Lowest Primary Row Variation (seat-to-seat spread)
+ *   3. TERTIARY: Strongest Secondary Seating performance (same sub-hierarchy)
+ *      a. Highest Secondary Seat Level
+ *      b. Lowest Secondary Seat Deviation
+ *      c. Lowest Secondary Row Variation
+ *   4. QUATERNARY: Lowest overall P19 error
+ *   5. FINAL TIE-BREAKERS (mathematical smoothness — only when every RP22
+ *      outcome is identical): P20 metric, P18 level, P18 Hz, P14 level, P14 dB
  *
  * No seat may be sacrificed into FAIL to improve mathematical smoothness.
- * RP22 outcomes always outrank raw response error.
+ * A reduction in FAIL seats always outranks smoother response.
  */
 export function zeroFailTuple(result) {
   return [
     countFailingSeats(result),
-    countParameterFails(result),
     ...floorVector(result, true),
     ...rawMarginVector(result, true),
     rowVariation(result, true),
