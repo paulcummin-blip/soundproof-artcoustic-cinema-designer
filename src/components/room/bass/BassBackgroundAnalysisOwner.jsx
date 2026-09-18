@@ -743,6 +743,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // Also gate on targetKey: no P14 target selected → no optimisation, no
     // publish, no authority marking, no cache seeding.
     if (!isProjectHydrationReady || !targetKey) return;
+    // [VR-CAPTURE] PRODUCER — temporary diagnostic, remove after verdict
+    console.info("[VR-CAPTURE] PRODUCER", {
+      projectId: scopeId,
+      versionId: versionId,
+      activeVersionId: appState?.activeVersionId ?? null,
+      cacheKey: cacheKey,
+      fingerprint: calibrationFingerprint,
+    });
     // ── Cache hit: publish cached compact contract directly, skip optimiser ──
     // Two cases:
     // 1. Manual calculate for current target (manualRequestMatchesCurrent) —

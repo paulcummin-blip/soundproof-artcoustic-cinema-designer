@@ -146,7 +146,24 @@ function RP22ReportInner() {
     // helper falls back to app.activeVersionId so the hook requests the correct
     // authority on the first render instead of deadlocking on "free".
     const resolvedReportVersionId = resolveEffectiveVersionId(reportVersionId, app);
-    const completedBassAuthority = useCompletedBassAuthority(explicitProjectId || "free", resolvedReportVersionId);
+    // [VR-CAPTURE] CONSUMER — temporary diagnostic, remove after verdict
+    const __vrConsumerProjectId = explicitProjectId || "free";
+    console.info("[VR-CAPTURE] CONSUMER", {
+      projectId: __vrConsumerProjectId,
+      resolvedVersionId: resolvedReportVersionId,
+      expectedProjectKey: `${__vrConsumerProjectId}|${resolvedReportVersionId}`,
+      authorityProjectId: null, // not stored separately on the authority object
+      authorityVersionId: null, // not stored separately on the authority object
+      authorityFingerprint: null, // resolved below after the hook call
+    });
+    const completedBassAuthority = useCompletedBassAuthority(__vrConsumerProjectId, resolvedReportVersionId);
+    console.info("[VR-CAPTURE] CONSUMER-AUTHORITY", {
+      authorityProjectId: null,
+      authorityVersionId: null,
+      authorityFingerprint: completedBassAuthority?.currentFingerprint ?? null,
+      authorityStatus: completedBassAuthority?.authorityStatus ?? null,
+      hydrationSettled: completedBassAuthority?.hydrationSettled ?? null,
+    });
     const completedBassContract = completedBassAuthority.contract;
     const bassErrorMessage = completedBassAuthority.errorMessage || null;
     // P14 target selection state — shared with the main-app Compliance panel.
