@@ -2,6 +2,11 @@
 import { useEffect } from 'react';
 
 function captureOnePlan({ selector, isPrinting, imageDataUrl, setImageDataUrl, setExportStatus, exportTimeoutRef, exportGuardRef, setIsPrinting, debugPlanCapture, label }) {
+    // Capture state must only ever be null (pending) or string (captured/skipped).
+    // Undefined indicates a wiring bug — fail fast rather than silently exiting.
+    if (imageDataUrl === undefined) {
+        throw new Error(`usePlanCapture: imageDataUrl is undefined for ${label}. Capture state must be null or string, never undefined.`);
+    }
     if (!isPrinting || imageDataUrl !== null) return () => {};
 
     setExportStatus(`Capturing ${label}: waiting for SVG…`);
@@ -91,6 +96,15 @@ function captureOnePlan({ selector, isPrinting, imageDataUrl, setImageDataUrl, s
 }
 
 export function usePlanCapture({ isPrinting, planImageDataUrl, setPlanImageDataUrl, planDimsImageDataUrl, setPlanDimsImageDataUrl, planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl, setExportStatus, exportTimeoutRef, exportGuardRef, setIsPrinting, debugPlanCapture }) {
+    // Fail fast: validate all required parameters before any effect runs.
+    // A missing parameter means a wiring bug that would silently break capture
+    // and produce an infinite "Preparing Technical Report…" screen.
+    const required = { isPrinting, planImageDataUrl, setPlanImageDataUrl, planDimsImageDataUrl, setPlanDimsImageDataUrl, planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl };
+    const missing = Object.entries(required).filter(([, v]) => v === undefined).map(([k]) => k);
+    if (missing.length > 0) {
+        throw new Error(`usePlanCapture called with incomplete parameter set. Missing: ${missing.join(', ')}`);
+    }
+
     useEffect(() => captureOnePlan({ selector: '[data-plan-capture]', isPrinting, imageDataUrl: planImageDataUrl, setImageDataUrl: setPlanImageDataUrl, setExportStatus, exportTimeoutRef, exportGuardRef, setIsPrinting, debugPlanCapture, label: 'CLEAN' }), [isPrinting, planImageDataUrl]);
     useEffect(() => captureOnePlan({ selector: '[data-plan-capture-dims]', isPrinting, imageDataUrl: planDimsImageDataUrl, setImageDataUrl: setPlanDimsImageDataUrl, setExportStatus, exportTimeoutRef, exportGuardRef, setIsPrinting, debugPlanCapture, label: 'DIMS' }), [isPrinting, planDimsImageDataUrl]);
     useEffect(() => captureOnePlan({ selector: '[data-plan-capture-speaker-dims]', isPrinting, imageDataUrl: planSpeakerDimsImageDataUrl, setImageDataUrl: setPlanSpeakerDimsImageDataUrl, setExportStatus, exportTimeoutRef, exportGuardRef, setIsPrinting, debugPlanCapture, label: 'SPEAKER' }), [isPrinting, planSpeakerDimsImageDataUrl]);
