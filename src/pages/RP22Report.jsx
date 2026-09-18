@@ -68,7 +68,7 @@ import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReport
 import { resolveBassReadiness } from '@/components/hooks/useAppDesignRating';
 import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { setAuthoritativeReadOnlyMode } from '@/components/state/authoritativeReadOnlyMode';
-import { useAutoPrintReadinessInstrumentation } from '@/components/report/useAutoPrintReadinessInstrumentation';
+import { useAutoPrintReadinessInstrumentation, logAutoPrintBlock } from '@/components/report/useAutoPrintReadinessInstrumentation';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -380,20 +380,34 @@ function RP22ReportInner() {
     // existing readiness conditions are satisfied and window.print() opens.
     const isAutoPrintPreparing = autoPrintRequested && !autoPrintDone;
     useEffect(() => {
-        if (!autoPrintRequested || autoPrintTriggeredRef.current) return;
+        if (!autoPrintRequested || autoPrintTriggeredRef.current) {
+            if (!autoPrintRequested) logAutoPrintBlock('autoPrintRequested = false', 383);
+            if (autoPrintTriggeredRef.current) logAutoPrintBlock('autoPrintTriggered already true', 383);
+            return;
+        }
         // FIX 3: autoPrint requires an explicit project ID. Never fall back
         // to a globally active project. A failed PDF is preferable to a PDF
         // for the wrong client.
         if (!explicitProjectId) {
+            logAutoPrintBlock('explicitProjectId missing', 388);
             setReportProjectError("Project could not be resolved for Technical Report.");
             return;
         }
-        if (reportHydrating || reportReadyProjectId !== explicitProjectId) return;
+        if (reportHydrating || reportReadyProjectId !== explicitProjectId) {
+            logAutoPrintBlock(reportHydrating ? 'reportHydrating = true' : 'reportReadyProjectId mismatch', 391);
+            return;
+        }
         // FIX 5: P14 unselected is a valid settled state — do not wait for a
         // bass calculation that was never requested. Only block when bass is
         // genuinely pending (calculation in progress or hydrating).
-        if (bassReportPending) return;
-        if (isPrinting) return;
+        if (bassReportPending) {
+            logAutoPrintBlock('bassReportPending = true', 395);
+            return;
+        }
+        if (isPrinting) {
+            logAutoPrintBlock('isPrinting already true', 396);
+            return;
+        }
         autoPrintTriggeredRef.current = true;
         setExportStatus("Auto-printing from Design Review…");
         setHasPrintedOnce(false);
@@ -405,25 +419,36 @@ function RP22ReportInner() {
 
     // Mark printReady when all captures are done
     useEffect(() => {
-        if (!isPrinting || reportHydrating || !explicitProjectId || reportReadyProjectId !== explicitProjectId) return;
+        if (!isPrinting || reportHydrating || !explicitProjectId || reportReadyProjectId !== explicitProjectId) {
+            if (isPrinting) logAutoPrintBlock('printReady effect: report not ready (hydrating or project mismatch)', 422);
+            return;
+        }
         if (planImageDataUrl !== null && planDimsImageDataUrl !== null && planSpeakerDimsImageDataUrl !== null) {
             setExportDebug(d => ({ ...d, printReady: true }));
             setPrintReady(true);
             setExportStatus("Capture complete — preparing print…");
             if (exportTimeoutRef.current) { clearTimeout(exportTimeoutRef.current); exportTimeoutRef.current = null; }
+        } else {
+            logAutoPrintBlock('printReady effect: planCaptureReady = false (waiting for plan captures)', 423);
         }
     }, [isPrinting, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl, reportHydrating, explicitProjectId, reportReadyProjectId]);
 
     // Trigger print when ready
     useEffect(() => {
         if (!isPrinting) { setHasPrintedOnce(false); printLockRef.current = false; setPrintReady(false); return; }
-        if (!printReady || hasPrintedOnce || printLockRef.current) return;
+        if (!printReady || hasPrintedOnce || printLockRef.current) {
+            if (!printReady) logAutoPrintBlock('print trigger: printReady = false', 434);
+            if (hasPrintedOnce) logAutoPrintBlock('print trigger: hasPrintedOnce already true', 434);
+            if (printLockRef.current) logAutoPrintBlock('print trigger: printLockRef already true', 434);
+            return;
+        }
         const t = setTimeout(() => {
             // FIX 5: Project consistency guard before window.print().
             // Assert the report is still bound to the same explicit project
             // and the bass authority scope matches. Cancel print if any
             // identity mismatch is detected — never substitute another project.
             if (!explicitProjectId || reportReadyProjectId !== explicitProjectId || reportHydrating) {
+                logAutoPrintBlock('print trigger: project identity mismatch guard', 440);
                 setExportStatus("Print cancelled — project identity mismatch.");
                 setIsPrinting(false);
                 setPrintReady(false);
@@ -432,6 +457,7 @@ function RP22ReportInner() {
             }
             const bassScopeId = String(completedBassAuthority?.projectId || 'free');
             if (bassScopeId !== String(explicitProjectId || 'free')) {
+                logAutoPrintBlock('print trigger: bass authority project mismatch', 448);
                 setExportStatus("Print cancelled — bass authority project mismatch.");
                 setIsPrinting(false);
                 setPrintReady(false);
@@ -879,30 +905,26 @@ function RP22ReportInner() {
     const recommendationsPending = false;
 
     // ── Forensic autoPrint readiness instrumentation ──────────────────────
-    // Logs every prerequisite flag change with timestamp/old/new, patches
-    // window.print to log when called, and emits a periodic "waiting forever
-    // because: X = false" diagnostic while isAutoPrintPreparing is true.
-    // Instrumentation only — no gating logic, no side effects on the pipeline.
-    useAutoPrintReadinessInstrumentation({
-        autoPrintRequested,
-        explicitProjectId,
-        reportHydrating,
-        reportReadyProjectId,
-        bassReportPending,
-        completedBassAuthority,
-        isPrinting,
-        printReady,
-        hasPrintedOnce,
-        autoPrintDone,
-        autoPrintTriggeredRef,
-        planImageDataUrl,
-        planDimsImageDataUrl,
-        planSpeakerDimsImageDataUrl,
-        roomDesignRating,
-        designRecommendations,
-        analysisResult,
-        showLoadingReport,
-    });
+    // Single immutable snapshot — the diagnostics hook logs every field
+    // transition, emits a periodic wait report while preparing, patches
+    // window.print to log when called, and identifies the first blocking
+    // condition. Instrumentation only — no gating, no side effects.
+    const autoPrintState = {
+        autoPrintRequested: !!autoPrintRequested,
+        reportReady: !reportHydrating && !!explicitProjectId && reportReadyProjectId === explicitProjectId,
+        designReviewHandoffReady: !!designReviewHandoff,
+        analysisResultReady: !!analysisResult && !!analysisResult.gradedParameters,
+        completedBassAuthorityReady: !bassReportPending,
+        recommendationsReady: designRecommendations != null,
+        renderGatePassed: !!analysisResult && !!analysisResult.gradedParameters && !showLoadingReport,
+        planCaptureReady: planImageDataUrl !== null && planDimsImageDataUrl !== null && planSpeakerDimsImageDataUrl !== null,
+        autoPrintTriggered: !!autoPrintTriggeredRef.current,
+        isPrinting: !!isPrinting,
+        autoPrintDone: !!autoPrintDone,
+        isAutoPrintPreparing: !!autoPrintRequested && !autoPrintDone,
+        bassReportPending: !!bassReportPending,
+    };
+    useAutoPrintReadinessInstrumentation(autoPrintState);
 
     // ── ASDR contributions by key — for parameter card footers ────────────
     // Maps the canonical contributions array to a { p1: {...}, p12: {...}, screen: {...} } lookup

@@ -1,38 +1,22 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * Forensic instrumentation for the Technical Report autoPrint readiness chain.
+ * Technical Report autoPrint state-machine diagnostics.
  *
- * Logs every change to each prerequisite flag with timestamp, old value, and
- * new value. Patches window.print to log when it is called. While
- * isAutoPrintPreparing is true, emits a periodic summary that identifies the
- * first blocking false flag — the one the pipeline is "waiting forever because"
- * of.
+ * Accepts a single immutable `autoPrintState` snapshot object. Logs every
+ * field transition, emits a periodic wait report while preparing, patches
+ * window.print to log when called, and identifies the first blocking
+ * condition in the readiness chain.
  *
- * This is instrumentation only. No gating logic, no side effects on the print
- * pipeline. Pure console logging for diagnosis.
+ * Instrumentation only — no gating logic, no side effects on the pipeline.
  */
 
-const FLAG_KEYS = [
-  'autoPrintRequested',
-  'reportReady',
-  'completedBassAuthorityReady',
-  'designRatingReady',
-  'recommendationsReady',
-  'analysisResultReady',
-  'renderGatePassed',
-  'autoPrintTriggered',
-  'isPrinting',
-  'planCaptureReady',
-  'printReady',
-  'isAutoPrintPreparing',
-  'windowPrintCalled',
-  'autoPrintDone',
-  'hasPrintedOnce',
-];
+// ── Helpers ─────────────────────────────────────────────────────────────
 
 function ts() {
-  return new Date().toISOString();
+  const d = new Date();
+  const pad = (n, l = 2) => String(n).padStart(l, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
 }
 
 function fmt(v) {
@@ -41,108 +25,65 @@ function fmt(v) {
   return JSON.stringify(v);
 }
 
-export function useAutoPrintReadinessInstrumentation({
-  autoPrintRequested,
-  explicitProjectId,
-  reportHydrating,
-  reportReadyProjectId,
-  bassReportPending,
-  completedBassAuthority,
-  isPrinting,
-  printReady,
-  hasPrintedOnce,
-  autoPrintDone,
-  autoPrintTriggeredRef,
-  planImageDataUrl,
-  planDimsImageDataUrl,
-  planSpeakerDimsImageDataUrl,
-  roomDesignRating,
-  designRecommendations,
-  analysisResult,
-  showLoadingReport,
-}) {
+// Ordered readiness chain — first false flag is the blocking condition.
+const CHAIN = [
+  'autoPrintRequested',
+  'reportReady',
+  'designReviewHandoffReady',
+  'analysisResultReady',
+  'completedBassAuthorityReady',
+  'renderGatePassed',
+  'autoPrintTriggered',
+  'isPrinting',
+  'planCaptureReady',
+  'autoPrintDone',
+];
+
+/**
+ * Logs a single AUTOPRINT BLOCKED line for an early return in the state machine.
+ * Call this at every `return` in the autoPrint effect that exits without
+ * progressing the pipeline.
+ */
+export function logAutoPrintBlock(reason, line) {
+  console.log(`[AUTOPRINT] ${ts()} BLOCKED  Reason: ${reason}  Return: RP22Report.jsx line ${line}`);
+}
+
+// ── Hook ────────────────────────────────────────────────────────────────
+
+export function useAutoPrintReadinessInstrumentation(autoPrintState) {
   const prevRef = useRef({});
   const printPatchedRef = useRef(false);
   const windowPrintCalledRef = useRef(false);
   const summaryTimerRef = useRef(null);
+  const stateRef = useRef(autoPrintState);
 
-  // Compute current readiness flags
-  const flags = {
-    autoPrintRequested: !!autoPrintRequested,
-    reportReady:
-      !reportHydrating &&
-      !!explicitProjectId &&
-      reportReadyProjectId === explicitProjectId,
-    completedBassAuthorityReady: !bassReportPending,
-    designRatingReady: roomDesignRating != null,
-    recommendationsReady: designRecommendations != null,
-    analysisResultReady: !!analysisResult && !!analysisResult.gradedParameters,
-    renderGatePassed:
-      !!analysisResult &&
-      !!analysisResult.gradedParameters &&
-      !showLoadingReport,
-    autoPrintTriggered: !!autoPrintTriggeredRef?.current,
-    isPrinting: !!isPrinting,
-    planCaptureReady:
-      planImageDataUrl !== null &&
-      planDimsImageDataUrl !== null &&
-      planSpeakerDimsImageDataUrl !== null,
-    printReady: !!printReady,
-    isAutoPrintPreparing: !!autoPrintRequested && !autoPrintDone,
-    windowPrintCalled: windowPrintCalledRef.current,
-    autoPrintDone: !!autoPrintDone,
-    hasPrintedOnce: !!hasPrintedOnce,
-  };
+  // Keep latest snapshot in a ref for the periodic timer
+  stateRef.current = autoPrintState;
 
-  // Diff and log every flag change
+  // ── 1. Log every transition ───────────────────────────────────────────
   useEffect(() => {
     const prev = prevRef.current;
+    const now = autoPrintState;
     let changed = false;
-    for (const key of FLAG_KEYS) {
-      const oldVal = prev[key];
-      const newVal = flags[key];
-      if (oldVal !== newVal) {
+    for (const key of Object.keys(now)) {
+      if (prev[key] !== now[key]) {
         changed = true;
-        console.log(
-          `[AUTOPRINT-READINESS] ${ts()} ${key}: ${fmt(oldVal)} → ${fmt(newVal)}`
-        );
+        console.log(`[AUTOPRINT] ${ts()} ${key}  ${fmt(prev[key])} → ${fmt(now[key])}`);
       }
     }
     if (changed) {
-      prevRef.current = { ...flags };
+      prevRef.current = { ...now };
     }
-  }, [
-    autoPrintRequested,
-    reportHydrating,
-    explicitProjectId,
-    reportReadyProjectId,
-    bassReportPending,
-    completedBassAuthority,
-    isPrinting,
-    printReady,
-    hasPrintedOnce,
-    autoPrintDone,
-    planImageDataUrl,
-    planDimsImageDataUrl,
-    planSpeakerDimsImageDataUrl,
-    roomDesignRating,
-    designRecommendations,
-    analysisResult,
-    showLoadingReport,
-  ]);
+  }, [autoPrintState]);
 
-  // Patch window.print to log when it is called
+  // ── 2. Monkey-patch window.print ──────────────────────────────────────
   useEffect(() => {
     if (printPatchedRef.current) return;
     printPatchedRef.current = true;
     const orig = window.print.bind(window);
     window.print = function patchedPrint(...args) {
       windowPrintCalledRef.current = true;
-      console.log(
-        `[AUTOPRINT-READINESS] ${ts()} window.print() CALLED`
-      );
-      // Also update prevRef so the next diff picks it up
-      prevRef.current = { ...prevRef.current, windowPrintCalled: true };
+      console.log(`[AUTOPRINT] ${ts()} window.print() called`);
       return orig.apply(this, args);
     };
     return () => {
@@ -152,9 +93,9 @@ export function useAutoPrintReadinessInstrumentation({
     };
   }, []);
 
-  // Periodic "waiting forever because" diagnostic while preparing
+  // ── 3. Periodic wait report while preparing ───────────────────────────
   useEffect(() => {
-    if (!flags.isAutoPrintPreparing) {
+    if (!autoPrintState.isAutoPrintPreparing) {
       if (summaryTimerRef.current) {
         clearInterval(summaryTimerRef.current);
         summaryTimerRef.current = null;
@@ -162,14 +103,47 @@ export function useAutoPrintReadinessInstrumentation({
       return;
     }
 
-    // Emit immediately
-    emitWaitingDiagnostic(flags);
+    const emit = () => {
+      const snap = stateRef.current;
+      const printCalled = windowPrintCalledRef.current;
 
-    summaryTimerRef.current = setInterval(() => {
-      // Re-read windowPrintCalledRef for the freshest value
-      const liveFlags = { ...flags, windowPrintCalled: windowPrintCalledRef.current };
-      emitWaitingDiagnostic(liveFlags);
-    }, 3000);
+      // Full snapshot
+      console.log(`[AUTOPRINT] ${ts()} === SNAPSHOT ===`);
+      for (const key of Object.keys(snap)) {
+        console.log(`[AUTOPRINT]   ${key} = ${fmt(snap[key])}`);
+      }
+
+      // If window.print was already called, check why we're still preparing
+      if (printCalled) {
+        console.log(`[AUTOPRINT] ${ts()} window.print() was called — if still preparing, autoPrintDone was not set or isAutoPrintPreparing did not clear.`);
+        return;
+      }
+
+      // Find first unmet prerequisite in the chain
+      for (const key of CHAIN) {
+        const val = snap[key];
+        if (val === false) {
+          console.log(`[AUTOPRINT] ${ts()} Waiting because: ${key} = false`);
+          return;
+        }
+        if (key === 'bassReportPending' && val === true) {
+          console.log(`[AUTOPRINT] ${ts()} Waiting because: bassReportPending = true`);
+          return;
+        }
+      }
+
+      // Special case: bassReportPending is a positive-blocking flag
+      if (snap.bassReportPending === true) {
+        console.log(`[AUTOPRINT] ${ts()} Waiting because: bassReportPending = true`);
+        return;
+      }
+
+      // All chain flags true but window.print not called
+      console.log(`[AUTOPRINT] ${ts()} All readiness gates passed. window.print() NOT invoked.`);
+    };
+
+    emit();
+    summaryTimerRef.current = setInterval(emit, 3000);
 
     return () => {
       if (summaryTimerRef.current) {
@@ -177,82 +151,5 @@ export function useAutoPrintReadinessInstrumentation({
         summaryTimerRef.current = null;
       }
     };
-  }, [
-    flags.isAutoPrintPreparing,
-    flags.reportReady,
-    flags.completedBassAuthorityReady,
-    flags.designRatingReady,
-    flags.recommendationsReady,
-    flags.analysisResultReady,
-    flags.renderGatePassed,
-    flags.autoPrintTriggered,
-    flags.isPrinting,
-    flags.planCaptureReady,
-    flags.printReady,
-    flags.autoPrintDone,
-    flags.hasPrintedOnce,
-  ]);
-}
-
-/**
- * Identifies the first blocking false flag in the autoPrint readiness chain
- * and logs a single "Waiting forever because: X = false" line.
- *
- * The chain order mirrors the pipeline:
- *   autoPrintRequested → reportReady → completedBassAuthorityReady →
- *   analysisResultReady → renderGatePassed → autoPrintTriggered →
- *   isPrinting → planCaptureReady → printReady → windowPrintCalled
- *
- * If all flags are true but windowPrintCalled is false, logs why print was
- * not called (printLockRef / hasPrintedOnce guards).
- */
-function emitWaitingDiagnostic(flags) {
-  const chain = [
-    ['autoPrintRequested', flags.autoPrintRequested],
-    ['reportReady', flags.reportReady],
-    ['completedBassAuthorityReady', flags.completedBassAuthorityReady],
-    ['analysisResultReady', flags.analysisResultReady],
-    ['renderGatePassed', flags.renderGatePassed],
-    ['autoPrintTriggered', flags.autoPrintTriggered],
-    ['isPrinting', flags.isPrinting],
-    ['planCaptureReady', flags.planCaptureReady],
-    ['printReady', flags.printReady],
-    ['windowPrintCalled', flags.windowPrintCalled],
-  ];
-
-  console.log(`[AUTOPRINT-READINESS] ${ts()} === READINESS SNAPSHOT ===`);
-  for (const [key, val] of chain) {
-    console.log(`[AUTOPRINT-READINESS]   ${key} = ${fmt(val)}`);
-  }
-
-  // If window.print was called but isAutoPrintPreparing is still true,
-  // the issue is that autoPrintDone was never set or isAutoPrintPreparing
-  // was never cleared.
-  if (flags.windowPrintCalled) {
-    if (!flags.autoPrintDone) {
-      console.log(
-        `[AUTOPRINT-READINESS] ${ts()} Waiting forever because: autoPrintDone = false (window.print was called but autoPrintDone was never set — check setAutoPrintDone in the print trigger effect)`
-      );
-    } else {
-      console.log(
-        `[AUTOPRINT-READINESS] ${ts()} window.print() was called and autoPrintDone=true — isAutoPrintPreparing should clear on next render. If still showing preparation screen, check the isAutoPrintPreparing derivation.`
-      );
-    }
-    return;
-  }
-
-  // Find the first false flag in the chain
-  for (const [key, val] of chain) {
-    if (!val) {
-      console.log(
-        `[AUTOPRINT-READINESS] ${ts()} Waiting forever because: ${key} = false`
-      );
-      return;
-    }
-  }
-
-  // All chain flags true but window.print still not called
-  console.log(
-    `[AUTOPRINT-READINESS] ${ts()} All readiness flags are true but window.print() was not called — check printLockRef.current, hasPrintedOnce guard, or the setTimeout(250) in the print trigger effect`
-  );
+  }, [autoPrintState.isAutoPrintPreparing]);
 }
