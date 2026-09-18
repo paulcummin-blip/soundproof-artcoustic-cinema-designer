@@ -95,12 +95,10 @@ function levelPillColors(norm) {
 
 /** Render a single room-scope level as neutral coloured text. */
 function RoomLevelText({ param, level, value }) {
-  // P8 is N/A when no upfiring / elevation speakers
-  if (param.id === 8) {
-    if (value === "No" || value === "—" || value === "N/A" || !value) {
-      return <span style={{ fontSize: 11, color: COLORS.label, fontFamily: FONT_BODY }}>N/A</span>;
-    }
-  }
+  // P8 (Upfiring/elevation speakers allowed?) is a scored Room parameter.
+  // "No" = L4 (direct-radiating overheads preferred); "Yes" = L1/L2.
+  // Show the authority's achieved level — only genuine N/A (no height layer
+  // where RP22 defines it as not applicable) should display as N/A.
   const norm = normalizeLevel(level);
   if (!norm || norm === "N/A") {
     return <span style={{ fontSize: 11, color: COLORS.label, fontFamily: FONT_BODY }}>N/A</span>;
