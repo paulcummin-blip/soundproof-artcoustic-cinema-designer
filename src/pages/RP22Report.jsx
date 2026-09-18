@@ -46,6 +46,7 @@ import { usePlanCapture } from '@/components/report/usePlanCapture';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '../components/utils/viewingAngleUtils';
 import { getP21PresetResult, levelP21_earlyReflections } from '@/components/utils/rp22/levels';
 import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
+import { bassCacheKey } from '@/components/room/bass/bassCacheKey';
 import { buildComplianceBassExportData, buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { resolveP14TargetSelectionState } from '@/components/room/bass/p14TargetSelectionState';
 import { RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
@@ -160,7 +161,12 @@ function RP22ReportInner() {
     // resolveBassReadiness is the shared gate from useAppDesignRating — when
     // bass is applicable (subwoofers present), UNCALCULATED means "not yet
     // computed" (pending), not "no bass" (ready).
-    const expectedProjectKey = String(explicitProjectId || 'free');
+    // The authority's `projectId` field is the COMPOSITE cache key
+    // (projectId::versionId), not the bare project ID. Build the expected
+    // key with the same composite format so the identity comparison
+    // matches like-for-like. Comparing a composite key against a bare
+    // project ID always fails and deadlocks the auto-print gate.
+    const expectedProjectKey = bassCacheKey(explicitProjectId || 'free', reportVersionId || 'free');
     const projectIdMatch = String(completedBassAuthority?.projectId || 'free') === expectedProjectKey;
     const bassReadiness = useMemo(() => {
         if (!projectIdMatch) return { ready: false, pending: true, reason: 'project-id-mismatch', fingerprint: null };
