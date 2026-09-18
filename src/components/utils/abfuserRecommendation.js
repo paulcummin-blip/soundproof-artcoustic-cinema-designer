@@ -1,32 +1,35 @@
 // abfuserRecommendation.js
 // --------------------------------
-// Recommended-quantity calculator for the Artcoustic Abfuser.
+// Backward-compatible wrapper around the surface-area-based recommendation
+// engine (acousticTreatmentRecommendation.js).
 //
-// The recommendation is now derived from the physical extent of the
-// priority wall treatment zones (side reflection zones + rear zone),
-// NOT from a floor-area heuristic. See abfuserTreatmentZones.js for
-// the full geometry derivation.
-//
-// This is a SOUND PROOF PRACTICAL GUIDANCE RULE — not an RP22 prescription.
+// The canonical engine uses room surface areas, subtracts screen/doors/
+// windows/large elements, targets 15–25% coverage adjusted by room volume,
+// and divides by the product's effectiveCoverageArea. This wrapper keeps
+// the original export signature so existing callers (RoomDesigner) don't
+// need to change their import.
 
-import {
-  computeAbfuserTreatmentZones,
+export {
   ABFUSER_SKU,
   ABFUSER_LABEL,
-} from "./abfuserTreatmentZones";
+  calculateTreatmentRecommendation,
+  DEFAULT_TREATMENT_SKU,
+  TREATMENT_PRODUCTS,
+} from './acousticTreatmentRecommendation';
 
-export { ABFUSER_SKU, ABFUSER_LABEL };
+import { calculateTreatmentRecommendation } from './acousticTreatmentRecommendation';
 
 /**
- * Calculate the recommended Abfuser quantity from room geometry,
-// speaker positions, and seating positions.
+ * Calculate the recommended Abfuser quantity from room geometry.
  *
- * @param {Object} roomDims - { widthM, lengthM }
- * @param {Array}  placedSpeakers - speaker objects with role + position
- * @param {Array}  seatingPositions - seat objects with x, y
+ * @param {Object} roomDims     - { widthM, lengthM, heightM }
+ * @param {Array}  placedSpeakers - (legacy, unused by surface-area method)
+ * @param {Array}  seatingPositions - (legacy, unused by surface-area method)
+ * @param {Object} screen       - Screen state
+ * @param {Array}  roomElements - Room elements array
  * @returns {number} Recommended quantity (integer >= 0)
  */
-export function calculateRecommendedAbfuserQty(roomDims, placedSpeakers, seatingPositions) {
-  const zones = computeAbfuserTreatmentZones({ roomDims, placedSpeakers, seatingPositions });
-  return zones ? zones.recommendedQty : 0;
+export function calculateRecommendedAbfuserQty(roomDims, placedSpeakers, seatingPositions, screen, roomElements) {
+  const result = calculateTreatmentRecommendation({ roomDims, screen, roomElements });
+  return result ? result.recommendedQty : 0;
 }

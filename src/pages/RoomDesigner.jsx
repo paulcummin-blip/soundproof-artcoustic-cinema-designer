@@ -44,7 +44,7 @@ import { useStage2PlacementOptimiser } from '@/components/room/bass/stage2/useSt
 import { useBassHeavyAction, markBassHeavyActionRunning, markBassHeavyActionComplete, markBassHeavyActionError } from '@/components/room/bass/bassHeavyActionStore';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
-import { calculateRecommendedAbfuserQty } from "@/components/utils/abfuserRecommendation";
+import { calculateTreatmentRecommendation } from "@/components/utils/acousticTreatmentRecommendation";
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
@@ -271,10 +271,29 @@ function RoomDesignerWithState() {
   const [soundbarSelections, setSoundbarSelections] = useState({});
   const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
-  const recommendedAbfuserQty = useMemo(
-    () => calculateRecommendedAbfuserQty(appState?.roomDims, appState?.speakerSystem?.placedSpeakers, appState?.seatingPositions),
-    [appState?.roomDims?.widthM, appState?.roomDims?.lengthM, appState?.speakerSystem?.placedSpeakers, appState?.seatingPositions]
+  const treatmentRecommendation = useMemo(
+    () => calculateTreatmentRecommendation({
+      roomDims: appState?.roomDims,
+      screen: appState?.screen,
+      roomElements: appState?.roomElements,
+    }),
+    [appState?.roomDims?.widthM, appState?.roomDims?.lengthM, appState?.roomDims?.heightM, appState?.screen, appState?.roomElements]
   );
+  const recommendedAbfuserQty = treatmentRecommendation?.recommendedQty ?? 0;
+
+  // Auto-follow: when source is "recommended" and treatment is enabled,
+  // selectedAbfuserQty automatically tracks the recommended qty so the
+  // recommendation is "calculated automatically" and the system price
+  // updates as room dimensions change. When the user manually overrides
+  // the quantity (source becomes "user"), auto-follow stops. Toggling
+  // treatment OFF preserves the qty; toggling back ON with source still
+  // "recommended" restores the calculated recommendation.
+  useEffect(() => {
+    if (appState?.abfuserQtySource === "recommended" && appState?.acousticTreatmentEnabled && recommendedAbfuserQty > 0) {
+      appState?.setSelectedAbfuserQty?.(recommendedAbfuserQty);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appState?.abfuserQtySource, appState?.acousticTreatmentEnabled, recommendedAbfuserQty]);
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [localLiveImpactMode, setLocalLiveImpactMode] = React.useState("off");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -2335,6 +2354,7 @@ function RoomDesignerWithState() {
             selectedAbfuserQty={appState?.selectedAbfuserQty ?? 0}
             setSelectedAbfuserQty={appState?.setSelectedAbfuserQty}
             recommendedAbfuserQty={recommendedAbfuserQty}
+            treatmentRecommendation={treatmentRecommendation}
           />
         )}
       />

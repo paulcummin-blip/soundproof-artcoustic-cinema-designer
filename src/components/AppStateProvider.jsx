@@ -1922,8 +1922,10 @@ function useDesignerState() {
     // Design EQ defaults to On for a new/reset project
     setDesignEqEnabled(true);
 
-    // Acoustic treatment defaults to off
-    setAcousticTreatmentEnabled(false);
+    // Acoustic treatment defaults to ON for every new project.
+    // The auto-follow effect in RoomDesigner will seed selectedAbfuserQty
+    // from the calculated recommendation once room dimensions are available.
+    setAcousticTreatmentEnabled(true);
     setSelectedAbfuserQty(0);
     setAbfuserQtySource("recommended");
 
