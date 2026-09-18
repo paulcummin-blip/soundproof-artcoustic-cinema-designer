@@ -18,7 +18,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useSyncExternalStore } from "react";
-import { Sparkles, CheckCircle2, Loader2, AlertCircle, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
+import { Sparkles, CheckCircle2, Loader2, AlertCircle, RotateCcw } from "lucide-react";
 import { useSharedBassResults } from "../bassResultsStore";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { getStage2State, subscribeStage2 } from "../stage2/stage2PlacementStore";
@@ -48,7 +48,6 @@ import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Finger
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import BassOptimisationSummary from "./BassOptimisationSummary";
 import FurtherImprovements from "./FurtherImprovements";
-import AdvancedDiagnosticsPanel from "./AdvancedDiagnosticsPanel";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -79,7 +78,6 @@ export default function OptimiseAndCalculate({
     () => getStage2State(projectId, versionId),
   );
 
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const runningRef = useRef(false);
   const phaseRef = useRef("idle"); // tracks which phase we're in to avoid double-trigger
 
@@ -415,23 +413,29 @@ export default function OptimiseAndCalculate({
           <BassOptimisationSummary
             autoApplied={workflowState.autoApplied}
             noImprovementsFound={workflowState.noImprovementsFound}
-          />
-          {workflowState.recommendations && (
-            <FurtherImprovements
-              recommendations={workflowState.recommendations}
-              selection={v2State?.winner}
-              currentInstances={subwooferInstances}
-              roomDims={roomDims}
-              selectedSubModel={frontSubsCfg?.model || rearSubsCfg?.model || null}
-              commitInstances={commitInstances}
-              commitSeating={commitSeating}
-              commitSeatingProvenance={commitSeatingProvenance}
-              hasCanonicalInstances={hasCanonicalInstances}
-              appState={appState}
-              shared={shared}
-              onRecalculate={() => shared?.onCalculate?.()}
-            />
-          )}
+            shared={shared}
+            seatingPositions={seatingPositions}
+            hasPhysicalImprovements={
+              !!(workflowState.recommendations?.subPositions || workflowState.recommendations?.seating)
+            }
+          >
+            {workflowState.recommendations && (
+              <FurtherImprovements
+                recommendations={workflowState.recommendations}
+                selection={v2State?.winner}
+                currentInstances={subwooferInstances}
+                roomDims={roomDims}
+                selectedSubModel={frontSubsCfg?.model || rearSubsCfg?.model || null}
+                commitInstances={commitInstances}
+                commitSeating={commitSeating}
+                commitSeatingProvenance={commitSeatingProvenance}
+                hasCanonicalInstances={hasCanonicalInstances}
+                appState={appState}
+                shared={shared}
+                onRecalculate={() => shared?.onCalculate?.()}
+              />
+            )}
+          </BassOptimisationSummary>
           <div className="mt-3">
             <button
               type="button"
@@ -472,38 +476,6 @@ export default function OptimiseAndCalculate({
         </div>
       )}
 
-      {/* ── Advanced Diagnostics toggle ── */}
-      <div className="mt-4 border-t border-[#DCDBD6] pt-3">
-        <button
-          type="button"
-          onClick={() => setShowAdvanced((v) => !v)}
-          className="flex items-center gap-1.5 text-[11px] font-medium text-[#625143] hover:text-[#1B1A1A]"
-        >
-          {showAdvanced ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-          Advanced Diagnostics
-        </button>
-        {showAdvanced && (
-          <div className="mt-3">
-            <AdvancedDiagnosticsPanel
-              shared={shared}
-              disabled={disabled}
-              bassActionDisabled={bassActionDisabled}
-              roomDims={roomDims}
-              seatingPositions={seatingPositions}
-              subwooferInstances={subwooferInstances}
-              frontSubsCfg={frontSubsCfg}
-              rearSubsCfg={rearSubsCfg}
-              commitInstances={commitInstances}
-              commitSeating={commitSeating}
-              commitSeatingProvenance={commitSeatingProvenance}
-              appliedSeatingProvenance={appliedSeatingProvenance}
-              hasCanonicalInstances={hasCanonicalInstances}
-              appState={appState}
-              amplifierPowerPerSubW={amplifierPowerPerSubW}
-            />
-          </div>
-        )}
-      </div>
     </div>
   );
 }
