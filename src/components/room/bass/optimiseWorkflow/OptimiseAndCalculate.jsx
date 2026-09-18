@@ -83,6 +83,15 @@ export default function OptimiseAndCalculate({
   const runningRef = useRef(false);
   const phaseRef = useRef("idle"); // tracks which phase we're in to avoid double-trigger
 
+  // Refs for live values that must be read during the async orchestration.
+  // The `shared` context value is replaced on every state change, so the
+  // closure captured at handleStart time would be stale. These refs are
+  // updated on every render so the async loop always reads the latest.
+  const sharedRef = useRef(shared);
+  sharedRef.current = shared;
+  const subInstancesRef = useRef(subwooferInstances);
+  subInstancesRef.current = subwooferInstances;
+
   // ── Check if a subwoofer model is active ──
   const hasActiveSubModel = React.useMemo(() => {
     const instances = Array.isArray(subwooferInstances) ? subwooferInstances : [];
@@ -106,14 +115,16 @@ export default function OptimiseAndCalculate({
 
     try {
       // Phase 1: Initial authoritative bass calculation (hidden)
-      if (typeof shared?.onCalculate === "function") {
-        shared.onCalculate();
+      const sharedStart = sharedRef.current;
+      if (typeof sharedStart?.onCalculate === "function") {
+        sharedStart.onCalculate();
       }
 
       // Wait for the initial calculation to complete
       while (true) {
         await sleep(SLEEP_MS);
-        if (!shared?.calculationInProgress && shared?.hasCurrentResult) break;
+        const s = sharedRef.current;
+        if (!s?.calculationInProgress && s?.hasCurrentResult) break;
         if (phaseRef.current === "cancelled") break;
       }
       if (phaseRef.current === "cancelled") return;
@@ -125,8 +136,8 @@ export default function OptimiseAndCalculate({
       const result = await runOptimisation({
         projectId,
         versionId,
-        shared,
-        subwooferInstances,
+        shared: sharedRef.current,
+        subwooferInstances: subInstancesRef.current,
         roomDims,
         seatingPositions,
         frontSubsCfg,
@@ -150,7 +161,7 @@ export default function OptimiseAndCalculate({
       setApplying(projectId, versionId);
 
       const selection = result.selection;
-      const autoApplySummary = buildAutoApplySummary(selection, subwooferInstances);
+      const autoApplySummary = buildAutoApplySummary(selection, subInstancesRef.current);
       const stageResults = autoApplySummary.stageResults;
       const hasCal = hasCalibrationImprovement(stageResults);
       const hasPhysical = hasPhysicalRecommendations(autoApplySummary);
