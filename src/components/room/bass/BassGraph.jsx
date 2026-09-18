@@ -3,87 +3,9 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { mergeBassGraphSeries } from '@/components/room/bass/bassGraphSeriesAlignment';
 import BassModeMarkers from '@/components/room/bass/BassModeMarkers';
 import ProtectedNullOverlay from '@/components/room/bass/ProtectedNullOverlay';
+import BassGraphTooltip from '@/components/room/bass/BassGraphTooltip';
 import { P14_EQ_ASSESSMENT_RANGE_HZ } from '@/components/utils/p14CapabilityAuthority';
 import { formatSplDisplay } from '@/components/utils/splDisplayFormatter';
-
-const hasFiniteValue = (value) =>
-  value !== null &&
-  value !== undefined &&
-  value !== "" &&
-  Number.isFinite(Number(value));
-
-const CustomTooltip = ({ active, payload, label, series = [], operatingLevelOffsetDb = 0 }) => {
-    if (!active || !payload?.length) return null;
-    const row = payload[0]?.payload;
-    const actualFreq = row?.frequency;
-    const freqDisplay = Number.isFinite(Number(actualFreq))
-        ? `${Number(actualFreq).toFixed(2)} Hz`
-        : (Number.isFinite(Number(label)) ? `${Number(label).toFixed(2)} Hz` : String(label));
-    const visibleSeries = series.filter((item) => hasFiniteValue(row?.[`spl_${item.id}`]));
-    const raw = visibleSeries.find((item) => item.kind === "raw");
-    const postEq = visibleSeries.find((item) => item.kind === "post-eq");
-    const houseCurve = visibleSeries.find((item) => item.kind === "house-curve");
-    const productMaximum = visibleSeries.find((item) => item.kind === "product-maximum");
-    const productMaximumValue = productMaximum ? row[`spl_${productMaximum.id}`] : null;
-    const rawValue = raw ? row[`spl_${raw.id}`] : null;
-    const postEqValue = postEq ? row[`spl_${postEq.id}`] : null;
-    const houseCurveValue = houseCurve ? row[`spl_${houseCurve.id}`] : null;
-    // rawValue is the level-normalised "RSP before PEQ" (raw + operatingLevelOffset).
-    // PEQ applied is the filter-bank response only, NOT the global level trim.
-    const rawSimulatedDb = hasFiniteValue(rawValue) ? Number(rawValue) - Number(operatingLevelOffsetDb) : null;
-    const peqAppliedDb = hasFiniteValue(rawValue) && hasFiniteValue(postEqValue) ? Number(postEqValue) - Number(rawValue) : null;
-    const residual = hasFiniteValue(postEqValue) && hasFiniteValue(houseCurveValue) ? Number(postEqValue) - Number(houseCurveValue) : null;
-    const fallbackValue = visibleSeries.length
-      ? row[`spl_${visibleSeries[0].id}`]
-      : payload.find((item) => hasFiniteValue(item?.value))?.value;
-    const hasLevelOffset = Number.isFinite(Number(operatingLevelOffsetDb)) && Number(operatingLevelOffsetDb) !== 0;
-
-    return (
-        <div className="bg-white/80 backdrop-blur-sm p-3 border border-[#DCDBD6] rounded-lg shadow-lg font-body">
-            <p className="font-bold text-[#1B1A1A]">{freqDisplay}</p>
-            {visibleSeries.length > 1
-                ? visibleSeries.map((item) => {
-                    const value = row[`spl_${item.id}`];
-                    if (!hasFiniteValue(value)) return null;
-                    if (item.kind === "room-response" && hasFiniteValue(item.systemPowerReferenceDb)) {
-                      const roomLayoutContributionDb = Number(value) - Number(item.systemPowerReferenceDb);
-                      return (
-                        <React.Fragment key={item.id}>
-                          <p style={{ color: item.color }}>{item.tooltipLabel || item.label || item.id}: {Number(value).toFixed(1)} dB</p>
-                          <p style={{ color: item.color }}>
-                            Room / layout contribution vs {Number(item.systemPowerReferenceDb).toFixed(1)} dB power-summed flat-system reference: {roomLayoutContributionDb >= 0 ? "+" : ""}{roomLayoutContributionDb.toFixed(1)} dB
-                          </p>
-                        </React.Fragment>
-                      );
-                    }
-                    if (item.kind === "maximum-spl") {
-                      const safetyMarginDb = hasFiniteValue(item.safetyMarginDb) ? Number(item.safetyMarginDb) : 0;
-                      const rawInRoomMaximumDb = Number(value) + safetyMarginDb;
-                      const roomLayoutEffectDb = hasFiniteValue(productMaximumValue)
-                        ? rawInRoomMaximumDb - Number(productMaximumValue)
-                        : null;
-                      return (
-                        <React.Fragment key={item.id}>
-                          <p style={{ color: item.color }}>{item.tooltipLabel || item.label || item.id}: {Number(value).toFixed(1)} dB</p>
-                          <p style={{ color: item.color }}>Raw product + room maximum before reserve: {rawInRoomMaximumDb.toFixed(1)} dB</p>
-                          {hasFiniteValue(roomLayoutEffectDb) && (
-                            <p style={{ color: item.color }}>
-                              Room / layout effect on product maximum: {roomLayoutEffectDb >= 0 ? "+" : ""}{Number(roomLayoutEffectDb).toFixed(1)} dB
-                            </p>
-                          )}
-                        </React.Fragment>
-                      );
-                    }
-                    return <p key={item.id} style={{ color: item.color }}>{item.tooltipLabel || item.label || item.id}: {Number(value).toFixed(1)} dB</p>;
-                  })
-                : hasFiniteValue(fallbackValue) && <p className="text-[#213428]">SPL: {Number(fallbackValue).toFixed(1)} dB</p>}
-            {hasFiniteValue(rawSimulatedDb) && <p className="text-[#3E4349]">Raw simulated RSP: {Number(rawSimulatedDb).toFixed(1)} dB</p>}
-            {hasLevelOffset && <p className="text-[#3E4349]">Operating-level offset: {Number(operatingLevelOffsetDb) >= 0 ? "+" : ""}{Number(operatingLevelOffsetDb).toFixed(1)} dB</p>}
-            {hasFiniteValue(peqAppliedDb) && <p className="text-[#3E4349]">PEQ applied: {peqAppliedDb >= 0 ? "+" : ""}{Number(peqAppliedDb).toFixed(1)} dB</p>}
-            {hasFiniteValue(residual) && <p className="text-[#625143]">Final residual: {residual >= 0 ? "+" : ""}{Number(residual).toFixed(1)} dB</p>}
-        </div>
-    );
-};
 
 // REW mode plot range debug (proof we're plotting the right numbers)
 const RewPlotRangeDebug = ({ chartData, yDomain }) => {
@@ -377,7 +299,7 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                         allowDecimals={false}
                     />
-                    <Tooltip content={(props) => <CustomTooltip {...props} series={isMulti ? multiSeries : []} operatingLevelOffsetDb={operatingLevelOffsetDb} />} shared cursor={false} />
+                    <Tooltip content={(props) => <BassGraphTooltip {...props} series={isMulti ? multiSeries : []} operatingLevelOffsetDb={operatingLevelOffsetDb} />} shared cursor={false} />
 
                     {/* Schroeder frequency line (on-scale only) */}
                     {Number.isFinite(schroederFrequency) && schroederFrequency > 0 && schroederFrequency <= 200 && (
