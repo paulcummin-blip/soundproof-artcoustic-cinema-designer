@@ -22,6 +22,7 @@ import {
   buildArtcousticDesignRatingAuthority,
   calculateRoomDesignRating,
   calculateScopedRoomDesignRating,
+  calculateSeatDesignRating,
 } from '@/components/report/technical/artcousticSystemDesignRating';
 import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
 import { getScopedSeatIds, buildSeatPriorityFingerprint } from '@/components/utils/seatScopeAuthority';
@@ -329,7 +330,15 @@ export function useAppDesignRating({
         ? Number(analysisResult.gradedParameters.primary[13].value)
         : null;
 
-      return { ...rating, seatLevels, p12RawDb, p13RawDb, scopedRatings, seatPriorityFingerprint };
+      // Per-seat design ratings from the SAME authority — pure derivation, no
+      // second authority build. Published to the Design Review handoff so the
+      // Technical Report reads them as a passive consumer (no recalculation).
+      const seatDesignRatings = {};
+      for (const seatId of authority?.seatIds || []) {
+        seatDesignRatings[seatId] = calculateSeatDesignRating(authority, seatId);
+      }
+
+      return { ...rating, seatLevels, p12RawDb, p13RawDb, scopedRatings, seatPriorityFingerprint, seatDesignRatings };
     } catch (e) {
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;

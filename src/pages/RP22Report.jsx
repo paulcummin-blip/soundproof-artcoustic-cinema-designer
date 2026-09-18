@@ -4,13 +4,16 @@ import { useAppState } from '../components/AppStateProvider';
 // TEMP DEBUG: remove after sub persistence proven
 import { useActiveProjectId } from '@/components/state/project-session';
 // END TEMP DEBUG
-import { useRP22AnalysisEngine } from '../components/hooks/useRP22AnalysisEngine';
+// READ-ONLY REPORT: The Technical Report does NOT run useRP22AnalysisEngine,
+// useSubwooferSync, useAnalysisSpeakers, or useAllSeatSplMetrics. It reads the
+// authoritative RP22 analysisResult, Design Rating, and recommendations from
+// the Design Review handoff published by the Room Designer.
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart4 } from 'lucide-react';
 import { rp22Parameters } from '../components/data/rp22Parameters';
 import RP22GradingPill from '../components/ui/RP22GradingPill';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
-import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
+import { buildLightweightSeatHudById } from '../components/hooks/useAppDesignRating';
 import { computeScreenMetrics } from '../components/utils/screenMetrics';
 import { resolveEffectiveViewableDimsM } from '../components/models/screen/resolveEffectiveScreen';
 import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
@@ -18,9 +21,6 @@ import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { deriveSubwoofersFromCfg } from '@/components/utils/deriveSubwoofersFromCfg';
 import { hydrateProjectIntoAppState } from '@/components/utils/hydrateProjectIntoAppState';
 import { mergeProjectAndVersion } from '@/lib/versionAuthority';
-import { useAnalysisSpeakers } from '@/components/hooks/useAnalysisSpeakers';
-import { useAllSeatSplMetrics } from '@/components/hooks/useAllSeatSplMetrics';
-import { useSubwooferSync } from '@/components/hooks/useSubwooferSync';
 import { base44 } from '@/api/base44Client';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
 import { resolveDesignatedRspSeat, resolveRowDerivedRspYByMode } from '@/components/room/rsp/rspInputResolver';
@@ -56,14 +56,8 @@ import ScopedAsdrSummary from '@/components/report/technical/ScopedAsdrSummary';
 import TechnicalReportRecommendations from '@/components/report/technical/TechnicalReportRecommendations';
 import { resolveRoomParameterLevel, normalizeRoomLevel } from '@/components/report/technical/roomParameterLevelAuthority';
 import { buildDesignRatingInput } from '@/components/report/technical/buildDesignRatingInput';
-import {
-  buildArtcousticDesignRatingAuthority,
-  calculateRoomDesignRating,
-  calculateScopedRoomDesignRating,
-  calculateSeatDesignRating,
-} from '@/components/report/technical/artcousticSystemDesignRating';
+import { buildArtcousticDesignRatingAuthority } from '@/components/report/technical/artcousticSystemDesignRating';
 import { subscribeAsdrVisibility, getAsdrVisibility } from '@/components/state/asdrVisibilityStore';
-import DesignRecommendationEngine from '@/components/recommendations/DesignRecommendationEngine';
 import { useAuth } from '@/lib/AuthContext';
 import { DEFAULT_TERRITORY, getTerritoryConfig } from '@/components/pricing/territoryConfig';
 import { buildRp22SeatCoverageResult } from '@/components/utils/rp22SeatCoverageSentence';
@@ -72,7 +66,7 @@ import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSenten
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
 import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReportPage';
 import { resolveBassReadiness } from '@/components/hooks/useAppDesignRating';
-import { publishDesignReviewHandoff, clearDesignReviewHandoff } from '@/components/state/designReviewHandoff';
+import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -96,15 +90,14 @@ function RP22ReportInner() {
     const showDesignRating = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
 
     // ── ASDR recommendation wiring ───────────────────────────────────────
-    // The report consumes the SAME canonical DesignRecommendationEngine used
-    // by the live Room Designer. No recommendation logic is duplicated here —
-    // the engine component runs the same candidate re-runs and publishes its
-    // evaluated shortlists via onRecommendationsChange.
+    // READ-ONLY REPORT: The report does NOT mount DesignRecommendationEngine.
+    // It reads the already-settled recommendations, analysisResult, Design
+    // Rating, and per-seat ratings from the Design Review handoff published
+    // by the Room Designer. No recommendation logic is duplicated here.
     const { user: reportUser } = useAuth();
     const reportTerritory = reportUser?.territory || DEFAULT_TERRITORY;
     const reportTerritoryConfig = getTerritoryConfig(reportTerritory);
     const reportAllowUkPricing = !!reportTerritoryConfig?.priceListAvailable && reportTerritory === "UK";
-    const [designRecommendations, setDesignRecommendations] = React.useState(null);
 
     const { projectId: routeProjectId } = useParams();
     const [searchParams] = useSearchParams();
@@ -122,23 +115,16 @@ function RP22ReportInner() {
         null;
     const [reportProjectError, setReportProjectError] = useState(null);
 
-    // SPA handoff: Room Designer has already run the canonical recommendation
-    // candidates for this exact project. Reuse that settled authority instead
-    // of mounting a second route-local evaluator with separately hydrated
-    // inputs. A direct report load has no handoff and still evaluates normally.
-    useEffect(() => {
-        const shared = typeof window !== "undefined" ? window.__ROOM_DESIGNER_ASDR__ : null;
-        const sharedProjectId = String(shared?.projectId || "");
-        const requestedProjectId = String(explicitProjectId || "free");
-        if (
-            sharedProjectId === requestedProjectId &&
-            shared?.recommendations?.isSettled === true
-        ) {
-            setDesignRecommendations(shared.recommendations);
-        } else {
-            setDesignRecommendations(null);
-        }
-    }, [explicitProjectId]);
+    // ── READ-ONLY handoff ──────────────────────────────────────────────────
+    // The Room Designer publishes its authoritative analysisResult, Design
+    // Rating (roomDesignRating + scopedRatings + seatDesignRatings), and
+    // settled recommendations to the Design Review handoff. The Technical
+    // Report reads this published state — it never recalculates.
+    const designReviewHandoff = useMemo(
+        () => explicitProjectId ? readDesignReviewHandoff(explicitProjectId) : null,
+        [explicitProjectId]
+    );
+    const designRecommendations = designReviewHandoff?.recommendations ?? null;
 
     const completedBassAuthority = useCompletedBassAuthority(explicitProjectId || "free", reportVersionId || "free");
     const completedBassContract = completedBassAuthority.contract;
@@ -487,7 +473,8 @@ function RP22ReportInner() {
         height: Number(roomDims?.heightM) || 2.4
     }), [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
 
-    useSubwooferSync({ appState: app, stableDimensions, frontSubsCfg, rearSubsCfg });
+    // READ-ONLY: useSubwooferSync is NOT called here. The Room Designer owns
+    // subwoofer sync; the report reads the already-synced appState.subwoofers.
 
     const seats = safeArray(app?.seatingPositions);
     const placedSpeakers = safeArray(app?.speakerSystem?.placedSpeakers);
@@ -634,85 +621,21 @@ function RP22ReportInner() {
     // Only block when genuinely pending (calculation in progress or hydrating).
     const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || (!bassReadiness.ready && bassReadiness.pending);
 
-    const analysisSpeakers = useAnalysisSpeakers({
-        placedSpeakers,
-        speakerSystem: app?.speakerSystem,
-        sevenBedLayoutType: app?.sevenBedLayoutType,
-        getSpeakerVisibility: app?.getSpeakerVisibility,
-        dolbyPreset: reportDolbyLayout,
-    });
+    // READ-ONLY: useAnalysisSpeakers, useAllSeatSplMetrics, and
+    // useRP22AnalysisEngine are NOT called here. The authoritative RP22
+    // analysisResult is read from the Design Review handoff published by the
+    // Room Designer. The report never recalculates RP22 parameters.
+    const analysisResult = designReviewHandoff?.analysisResult ?? null;
 
-    // ── Canonical seat SPL authority (unified with Room Designer) ────────
-    // Uses the same useAllSeatSplMetrics hook as the live Room Designer so the
-    // report inherits identical model-capability resolution (including the
-    // _s → base-model SPL cap inheritance for evolve-2-1_s etc.), role
-    // normalisation, room-dimension extraction, and SPL config. The report no
-    // longer owns a parallel computeAllSeatSplMetrics adapter, role map, or
-    // model-capability fallback.
-    const allSeatSplMetrics = useAllSeatSplMetrics({
-        _seatingPositions: seats,
-        analysisSpeakers,
-        appState: app,
-        mlpAnchorEffective: reportMlpAnchorEffective,
-        getSpeakerModelMeta,
-    });
-
-    const analysisResult = useRP22AnalysisEngine({
-        diagnosticOwner: "rp22-report-page-authority",
-        placedSpeakers, visiblePlanSpeakers: analysisSpeakers, seatingPositions: seats,
-        dimensions: stableDimensions, mlpBasis,
-        sevenBedLayoutType: app?.sevenBedLayoutType,
-        extraSurroundCount: app?.extraSurroundCount,
-        seatSplMetrics: allSeatSplMetrics,
-        mlpPointOverride: reportMlpAnchorEffective,
-        overheadState: { globalModel: app?.overheadGlobalModel, frontOverride: app?.overheadFrontOverride, midOverride: app?.overheadMidOverride, rearOverride: app?.overheadRearOverride, useFrontGlobal: app?.useFrontGlobal ?? true, useMidGlobal: app?.useMidGlobal ?? true, useRearGlobal: app?.useRearGlobal ?? true, aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
-        aimState: { aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP, lcrAimMode: app?.lcrAimMode },
-        assumedP15Level: app?.assumedP15Level,
-        screen,
-        screenFrontPlaneM: reportScreenFrontPlaneM,
-        dolbyLayout: canonicalP2Layout,
-        includeBassAnalysis: false,
-    });
-
+    // READ-ONLY: buildLightweightSeatHudById derives seat HUD snapshots from
+    // the PUBLISHED analysisResult + completed bass authority. No SPL
+    // recalculation, no buildSeatHudSnapshot, no allSeatSplMetrics dependency.
     const reportSeatHudById = React.useMemo(() => {
-        const out = {};
-        const list = safeArray(seats);
-        const aimAtMLP = app?.aimAtMLP ?? false;
-        const lcrAngleInfo = { L: 0, R: 0, averageAngle: 0, maxAbs: 0 };
-        if (aimAtMLP && primarySeatingPosition) {
-            const mlpTarget = { x: primarySeatingPosition.x, y: primarySeatingPosition.y };
-            const flSpeaker = placedSpeakers?.find(s => { const c = String(s?.role || '').toUpperCase(); return (c === 'FL' || c === 'L') && s?.position; });
-            const frSpeaker = placedSpeakers?.find(s => { const c = String(s?.role || '').toUpperCase(); return (c === 'FR' || c === 'R') && s?.position; });
-            if (flSpeaker?.position && Number.isFinite(mlpTarget.x)) lcrAngleInfo.L = safeYawToMLP(flSpeaker.position, mlpTarget);
-            if (frSpeaker?.position && Number.isFinite(mlpTarget.x)) lcrAngleInfo.R = safeYawToMLP(frSpeaker.position, mlpTarget);
-            const avg = (Math.abs(lcrAngleInfo.L) + Math.abs(lcrAngleInfo.R)) / 2;
-            lcrAngleInfo.averageAngle = Number.isFinite(avg) ? avg : 0;
-            lcrAngleInfo.maxAbs = Math.max(Math.abs(lcrAngleInfo.L), Math.abs(lcrAngleInfo.R));
-        }
-        for (let i = 0; i < list.length; i++) {
-            const seat = list[i];
-            if (!seat?.id) continue;
-            try {
-                const snapshot = buildSeatHudSnapshot({
-                    seat, placedSpeakers, widthM: stableDimensions.width, lengthM: stableDimensions.length, heightM: stableDimensions.height,
-                    screenFrontPlaneM: app?.screenFrontPlaneM ?? (app?.screen?.frontPlaneYm || 0),
-                    screen, mlp: primarySeatingPosition || { x: stableDimensions.width / 2, y: stableDimensions.length * 0.58, z: 1.2 },
-                    allSeatSplMetrics, aimAtMLP,
-                    aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP ?? false,
-                    aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP ?? false,
-                    aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP ?? false,
-                    lcrAngleInfo, analysisResult: analysisResult || {},
-                    seatingPositions: seats, splConfig: app?.splConfig || {},
-                    sevenBedMode: reportSevenBedMode, dolbyLayout: reportDolbyLayout,
-                    officialP19Result: completedP19Result,
-                    perSeatP19Results: completedP19Results,
-                    perSeatP20Results: completedP20Results,
-                });
-                if (snapshot) out[seat.id] = snapshot;
-            } catch (e) { console.warn(`[RP22Report] HUD failed for seat ${seat.id}:`, e); }
-        }
-        return out;
-    }, [seats, placedSpeakers, stableDimensions.width, stableDimensions.length, stableDimensions.height, screen, primarySeatingPosition, allSeatSplMetrics, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.splConfig, analysisResult, reportSevenBedMode, reportDolbyLayout, completedP19Result, completedP19Results, completedP20Results]);
+        return buildLightweightSeatHudById(
+            seats, analysisResult, primarySeatingPosition,
+            completedP19Result, completedP19Results, completedP20Results
+        );
+    }, [seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results]);
 
     const seatScopedParamNumbers = React.useMemo(() => new Set(RP22_SEAT_PARAMETERS.map((parameter) => parameter.number)), []);
 
@@ -926,95 +849,21 @@ function RP22ReportInner() {
     );
     const coverageSentence = coverageResult?.statement || null;
 
-    // ── Artcoustic System Design Rating ────────────────────────────────────
-    // Wires Page 3 into the approved Stage B adapter. The UI layer supplies
-    // ONLY existing canonical authority inputs — no thresholds, FAIL rules,
-    // or bass scoring are reimplemented. The adapter is the sole scoring authority.
-    const designRatingAuthority = React.useMemo(() => {
-    if (!showDesignRating) return null;
-    // FIX 4: Do not publish numeric ASDR when P14 target is unselected.
-    // The report may still render — bass params show "Select Bass Target"
-    // and ASDR shows "Select Bass Target to complete design rating".
-    if (p14Selection.noP14TargetSelected) return null;
-    const input = buildDesignRatingInput({
-            seats,
-            analysisResult,
-            reportSeatHudById,
-            completedBassAuthority,
-            completedBassPresentation,
-            reportP12Mode,
-            reportP13Mode,
-            reportP14Mode,
-            reportP18Mode,
-            hasFrontWides,
-            placedSpeakers,
-        });
-        return buildArtcousticDesignRatingAuthority(input);
-    }, [showDesignRating, seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers]);
+    // ── Artcoustic System Design Rating — READ from published handoff ──────
+    // The Technical Report does NOT regenerate the Design Rating. It reads
+    // the roomDesignRating, scopedRatings, and seatDesignRatings that the
+    // Room Designer already computed and published to the Design Review
+    // handoff. No buildArtcousticDesignRatingAuthority, calculateRoomDesignRating,
+    // calculateScopedRoomDesignRating, or calculateSeatDesignRating calls.
+    const roomDesignRating = (showDesignRating && !p14Selection.noP14TargetSelected)
+        ? (designReviewHandoff?.rating ?? null)
+        : null;
+    const scopedRatings = roomDesignRating?.scopedRatings ?? null;
+    const seatDesignRatings = designReviewHandoff?.seatDesignRatings ?? null;
 
-    const roomDesignRating = React.useMemo(() => {
-      if (!designRatingAuthority) return null;
-      return calculateRoomDesignRating(designRatingAuthority);
-    }, [designRatingAuthority]);
-
-    // ── Three scoped ASDR ratings from the SAME shared authority ──────────
-    // Primary and Secondary average only their seat subsets. Secondary with
-    // zero seats returns NOT_CONFIGURED. All Seating is the same authoritative
-    // result as roomDesignRating. No second authority build; no duplicated
-    // scoring logic — calculateScopedRoomDesignRating delegates to the same
-    // internal core as calculateRoomDesignRating.
-    const scopedRatings = React.useMemo(() => {
-      if (!designRatingAuthority) return null;
-      const primarySeatIds = getPrimarySeats(seats).map((s) => s.id).filter(Boolean);
-      const secondarySeatIds = getSecondarySeats(seats).map((s) => s.id).filter(Boolean);
-      return {
-        primary: calculateScopedRoomDesignRating(designRatingAuthority, primarySeatIds),
-        secondary: calculateScopedRoomDesignRating(designRatingAuthority, secondarySeatIds),
-        all: roomDesignRating,
-      };
-    }, [designRatingAuthority, seats, roomDesignRating]);
-
-    // ── Publish report ASDR to the shared sidebar handoff ─────────────────
-    // RP22Report computes its own authoritative ASDR. While the report page
-    // is mounted, publish the resolved rating into the same
-    // __ROOM_DESIGNER_ASDR__ handoff the Layout sidebar reads, so the sidebar
-    // shows the report's current project-scoped ASDR instead of a stale/null
-    // value from the unmounted Room Designer. On unmount, clear only if the
-    // handoff still belongs to this report's project — never clobber another
-    // page's newer publication.
-    React.useEffect(() => {
-      if (!explicitProjectId) return;
-      if (!showDesignRating || !roomDesignRating || !scopedRatings) return;
-
-      publishDesignReviewHandoff({
-        projectId: explicitProjectId,
-        showAsdr: showDesignRating,
-        rating: { ...roomDesignRating, scopedRatings },
-        recommendations: designRecommendations || null,
-      });
-
-      return () => {
-        if (typeof window === "undefined" || !window.__ROOM_DESIGNER_ASDR__) return;
-        const current = window.__ROOM_DESIGNER_ASDR__;
-        if (String(current.projectId || "") === String(explicitProjectId)) {
-          clearDesignReviewHandoff(explicitProjectId);
-        }
-      };
-    }, [explicitProjectId, showDesignRating, roomDesignRating, scopedRatings, designRecommendations]);
-
-    // Export gate: block PDF export until the recommendation engine has settled
-    // (all candidates terminated — valid rating OR timeout/null). Only applies
-    // when ASDR is enabled and a baseline rating exists (i.e. the engine mounts).
-    const recommendationsPending = showDesignRating && !!roomDesignRating && !designRecommendations?.isSettled;
-
-    const seatDesignRatings = React.useMemo(() => {
-        if (!designRatingAuthority) return null;
-        const ratings = {};
-        for (const seatId of designRatingAuthority.seatIds) {
-            ratings[seatId] = calculateSeatDesignRating(designRatingAuthority, seatId);
-        }
-        return ratings;
-    }, [designRatingAuthority]);
+    // Export gate: recommendations are read from the handoff, not evaluated
+    // locally. The gate checks the published settlement state only.
+    const recommendationsPending = false;
 
     // ── ASDR contributions by key — for parameter card footers ────────────
     // Maps the canonical contributions array to a { p1: {...}, p12: {...}, screen: {...} } lookup
@@ -1354,23 +1203,9 @@ function RP22ReportInner() {
         <div className="min-h-screen bg-[#F9F8F6] p-6">
             <ReportPrintStyles />
 
-            {/* ── Canonical ASDR recommendation engine (renders nothing; publishes evaluated shortlists) ── */}
-            {showDesignRating && roomDesignRating && !designRecommendations?.isSettled && (
-                <DesignRecommendationEngine
-                    appState={app}
-                    seats={seats}
-                    placedSpeakers={placedSpeakers}
-                    screen={screen}
-                    dolbyLayout={reportDolbyLayout}
-                    dimensions={stableDimensions}
-                    mlpPoint={primarySeatingPosition}
-                    projectId={explicitProjectId || "free"}
-                    baselineRating={roomDesignRating}
-                    allowUkPricing={reportAllowUkPricing}
-                    soundbarSelections={app?.soundbarSelections || null}
-                    onRecommendationsChange={setDesignRecommendations}
-                />
-            )}
+            {/* READ-ONLY: DesignRecommendationEngine is NOT mounted here.
+                The report reads already-settled recommendations from the
+                Design Review handoff published by the Room Designer. */}
 
             <div className="screen-only">
                 <ReportHiddenCaptures

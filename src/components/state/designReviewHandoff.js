@@ -199,6 +199,7 @@ export function publishDesignReviewHandoff(snapshot) {
     showAsdr: published.showAsdr,
     rating: published.rating,
     seatPriorityFingerprint: published.rating?.seatPriorityFingerprint ?? null,
+    seatDesignRatings: published.seatDesignRatings ?? null,
     analysisResult: published.analysisResult,
     seatingPositions: published.seatingPositions,
     placedSpeakers: published.placedSpeakers,

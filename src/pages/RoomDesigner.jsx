@@ -1850,6 +1850,7 @@ function RoomDesignerWithState() {
       showAsdr,
       rating: appDesignRating,
       recommendations: designRecommendations,
+      seatDesignRatings: appDesignRating?.seatDesignRatings ?? null,
       analysisResult,
       seatingPositions: currentSeats,
       // Stage D: drawing state for Design Review (read-only, no second engine)
