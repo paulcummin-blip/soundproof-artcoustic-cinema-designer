@@ -416,6 +416,15 @@ export default function OptimiseAndCalculate({
           <BassOptimisationSummary
             autoApplied={workflowState.autoApplied}
             noImprovementsFound={workflowState.noImprovementsFound}
+            v2State={v2State}
+            completedBassAuthority={shared?.completedBassAuthority}
+            subwooferCount={
+              Array.isArray(subwooferInstances)
+                ? subwooferInstances.filter(
+                    (i) => i?.enabled !== false && i?.model,
+                  ).length
+                : 0
+            }
           />
 
           {/* ── Further Design Improvements (physical recommendations) ── */}
