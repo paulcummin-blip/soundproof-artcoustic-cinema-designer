@@ -11,7 +11,7 @@ import ModalResonanceLineToggles from "@/components/room/bass/ModalResonanceLine
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
-import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
+import { bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 import BassEngineeringDetails from "@/components/room/bass/BassEngineeringDetails";
 import BassResultCards from "@/components/room/bass/BassResultCards";
 import BassDesignRecommendation from "@/components/room/bass/BassDesignRecommendation";
@@ -30,6 +30,7 @@ import ProtectedNullWarningSummary from "@/components/room/bass/ProtectedNullWar
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
 import BassCurveVisibilityControls, { DEFAULT_BASS_CURVE_VISIBILITY } from "@/components/room/bass/BassCurveVisibilityControls";
+import BassSmoothingControl from "@/components/room/bass/BassSmoothingControl";
 import { buildRp22GraphMarkers } from "@/components/room/bass/rp22GraphMarkers";
 import Rp22GraphMarkerKey from "@/components/room/bass/Rp22GraphMarkerKey";
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
@@ -731,6 +732,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 </select>
               </div>
             )}
+            {/* Smoothing — always visible. Defaults to 1/3-octave to match the
+                canonical P19/P20 assessment authority. "None" is raw diagnostic
+                detail and is flagged as such. */}
+            <BassSmoothingControl value={bassSmoothingMode} onChange={setBassSmoothingMode} />
             {includeDiagnostics && (
               <>
                 {designEqEnabled && Array.isArray(seatingPositions) && seatingPositions.length > 0 && (
@@ -739,18 +744,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                     <Switch checked={showRealSeatOverlays} onCheckedChange={setShowRealSeatOverlays} />
                   </div>
                 )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Smoothing:</span>
-                  <select
-                    value={bassSmoothingMode}
-                    onChange={e => setBassSmoothingMode(e.target.value)}
-                    style={{ height: 26, borderRadius: 6, border: '1px solid #DCDBD6', background: '#F8F8F7', fontSize: 11, padding: '0 6px', color: '#1B1A1A', fontFamily: 'monospace', cursor: 'pointer' }}
-                  >
-                    <option value="none">None</option>
-                    <option value="sixth">1/6 octave</option>
-                    <option value="third">1/3 octave</option>
-                  </select>
-                </div>
                 <CopyLiveBassValidationButton />
                 <CopyEqForensicTraceButton />
               </>

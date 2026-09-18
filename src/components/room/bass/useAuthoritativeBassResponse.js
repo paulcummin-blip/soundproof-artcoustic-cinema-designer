@@ -214,7 +214,10 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   const [highOrderAxialScale, setHighOrderAxialScale] = useState(DEFAULTS.highOrderAxialScale);
   const [qStrategy, setQStrategy] = useState(DEFAULTS.qStrategy);
   const [rewModalBandwidthScale, setRewModalBandwidthScale] = useState(DEFAULTS.rewModalBandwidthScale);
-  const [bassSmoothingMode, setBassSmoothingMode] = useState("none");
+  // Default to 1/3-octave so the graph visually matches the canonical P19/P20
+  // assessment (which uses applyBassSmoothing(..., "third")). "None" remains
+  // available as raw diagnostic detail via the graph smoothing control.
+  const [bassSmoothingMode, setBassSmoothingMode] = useState("third");
   const [includeDiagnostics, setIncludeDiagnostics] = useState(false);
   const designEqEnabledRef = useRef(appState?.designEqEnabled);
   designEqEnabledRef.current = appState?.designEqEnabled;
