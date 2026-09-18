@@ -62,12 +62,8 @@ export default function FurtherImprovements({
   shared,
   onRecalculate,
 }) {
-  if (!recommendations) return null;
-
-  const hasSubPositions = !!recommendations.subPositions;
-  const hasSeating = !!recommendations.seating;
-
-  if (!hasSubPositions && !hasSeating) return null;
+  const hasSubPositions = !!recommendations?.subPositions;
+  const hasSeating = !!recommendations?.seating;
 
   const handleApplySubPositions = useCallback(() => {
     if (!hasSubPositions || !commitInstances || !hasCanonicalInstances || !selection) return;
@@ -119,6 +115,8 @@ export default function FurtherImprovements({
       setTimeout(() => onRecalculate(), 100);
     }
   }, [hasSeating, commitSeating, selection, recommendations, roomDims, appState, currentInstances, selectedSubModel, shared, commitSeatingProvenance, onRecalculate]);
+
+  if (!recommendations || (!hasSubPositions && !hasSeating)) return null;
 
   return (
     <div className="mt-3 rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-3">
