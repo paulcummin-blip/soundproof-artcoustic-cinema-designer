@@ -7,7 +7,7 @@
 // input). Old cache records are rejected — all Stage 2 raw-transfer caches
 // invalidate once.
 export const STAGE2_CACHE_VERSION = 4;
-export const STAGE2_RANKING_VERSION = "stage2-ranking-v1";
+export const STAGE2_RANKING_VERSION = "stage2-ranking-v2";
 // Confirmation layer version: P14-dependent EQ/canonical/P14/P18/P19/P20
 // authority pipeline. v5 exposes the already-authoritative P14/P18 outcomes
 // on each comparison result. The equations are unchanged; this invalidates

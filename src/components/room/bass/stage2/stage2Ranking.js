@@ -24,6 +24,7 @@
 
 import { getFamilyPreferenceRank } from "../stage1/stage1FamilyRegistry.js";
 import { STAGE2_TIE_TOLERANCE_DB } from "./stage2Constants.js";
+import { countFailingSeats, countParameterFails } from "../improveBassV2/zeroFailOptimiser.js";
 
 /**
  * Build a per-seat summary from P19/P20 results.
@@ -69,6 +70,28 @@ function worstPrimaryCombinedLevel(primarySeats) {
 }
 
 /**
+ * Compute the worst Secondary combined P19/P20 level.
+ * For each Secondary seat: combinedLevel = min(p19Level, p20Level).
+ * Worst = min across all Secondary seats.
+ * @private
+ */
+function worstSecondaryCombinedLevel(secondarySeats) {
+  if (!secondarySeats.length) return 0;
+  return Math.min(...secondarySeats.map((s) => Math.min(s.p19Level || 0, s.p20Level || 0)));
+}
+
+/**
+ * Compute the P19 variation spread across seats (max - min raw deviation).
+ * Lower = better (more consistent row).
+ * @private
+ */
+function rowP19Variation(seats) {
+  if (!seats || seats.length < 2) return 0;
+  const raws = seats.map((s) => Math.abs(Number(s.p19VariationDb) || 0));
+  return Math.max(...raws) - Math.min(...raws);
+}
+
+/**
  * Build the lexicographic ranking tuple for a Stage 2 finalist result.
  *
  * @param {object} result — Stage 2 finalist evaluation result
@@ -95,11 +118,32 @@ export function buildStage2RankingTuple(result, seatPriorityMap) {
   const worstPrimaryP20Deviation = primarySeats.length
     ? Math.floor(Math.max(...primarySeats.map((s) => Math.abs(s.p20VariationDb ?? 0))))
     : 0;
+  const primaryRowVariation = rowP19Variation(primarySeats);
 
-  // Secondary metrics
+  // Secondary metrics — full hierarchy matching primary
+  const worstSecondaryCombined = worstSecondaryCombinedLevel(secondarySeats);
+  const secondaryL4Count = secondarySeats.filter((s) => (s.p19Level || 0) >= 4 && (s.p20Level || 0) >= 4).length;
+  const secondaryL3PlusCount = secondarySeats.filter((s) => (s.p19Level || 0) >= 3 && (s.p20Level || 0) >= 3).length;
+  const worstSecondaryP19Deviation = secondarySeats.length
+    ? Math.floor(Math.max(...secondarySeats.map((s) => Math.abs(s.p19VariationDb ?? 0))))
+    : 0;
+  const worstSecondaryP20Deviation = secondarySeats.length
+    ? Math.floor(Math.max(...secondarySeats.map((s) => Math.abs(s.p20VariationDb ?? 0))))
+    : 0;
+  const secondaryRowVariation = rowP19Variation(secondarySeats);
   const secondaryP19Fail = secondarySeats.filter((s) => (s.p19Level || 0) === 0).length;
   const secondaryL2Plus = secondarySeats.filter((s) => (s.p19Level || 0) >= 2 && (s.p20Level || 0) >= 2).length;
   const secondaryL1Plus = secondarySeats.filter((s) => (s.p19Level || 0) >= 1 && (s.p20Level || 0) >= 1).length;
+
+  // Overall P19/P20 metrics (quaternary objective)
+  const overallP19Variation = Number.isFinite(Number(result.achievedP19VariationDb))
+    ? Number(result.achievedP19VariationDb) : 0;
+  const overallP20Variation = Number.isFinite(Number(result.achievedP20VariationDb))
+    ? Number(result.achievedP20VariationDb) : 0;
+
+  // Total failing seats (primary + secondary, P19 OR P20) — PRIMARY objective
+  const totalFailingSeats = countFailingSeats(result);
+  const totalParameterFails = countParameterFails(result);
 
   // P14 headroom
   const p14HeadroomDb = Number.isFinite(result.p14HeadroomDb) ? result.p14HeadroomDb : -Infinity;
@@ -131,21 +175,32 @@ export function buildStage2RankingTuple(result, seatPriorityMap) {
     .sort().join("|");
 
   const rankingTuple = [
-    -primaryP19BelowL2,
-    -primaryP20BelowL2,
+    // PRIMARY: Eliminate FAIL seats (all seats, P19 OR P20)
+    -totalFailingSeats,
+    -totalParameterFails,
+    // SECONDARY: Primary Row — Highest Level → Lowest Deviation → Lowest Row Variation
     worstPrimaryCombined,
     primaryL4Count,
     primaryL3PlusCount,
     -worstPrimaryP19Deviation,
     -worstPrimaryP20Deviation,
-    -secondaryP19Fail,
-    secondaryL2Plus,
-    secondaryL1Plus,
+    -primaryRowVariation,
+    // TERTIARY: Secondary Row — same hierarchy
+    worstSecondaryCombined,
+    secondaryL4Count,
+    secondaryL3PlusCount,
+    -worstSecondaryP19Deviation,
+    -worstSecondaryP20Deviation,
+    -secondaryRowVariation,
+    // QUATERNARY: Overall response error (P19 then P20)
+    -overallP19Variation,
+    -overallP20Variation,
+    // Final tie-breakers
     p14HeadroomDb,
     0, // efficiency loss — not yet available
     -familyRank,
-    0, // local displacement — not yet available (needs current positions)
-    -asymmetryCount, // asymmetry — lower is better, negated for max-compare
+    0, // local displacement — not yet available
+    -asymmetryCount,
     coordKey,
   ];
 
@@ -160,6 +215,7 @@ export function buildStage2RankingTuple(result, seatPriorityMap) {
       l3PlusCount: primaryL3PlusCount,
       worstP19Deviation: worstPrimaryP19Deviation,
       worstP20Deviation: worstPrimaryP20Deviation,
+      rowVariation: primaryRowVariation,
       seats: primarySeats,
     },
     secondarySummary: {
@@ -167,6 +223,12 @@ export function buildStage2RankingTuple(result, seatPriorityMap) {
       p19Fail: secondaryP19Fail,
       l2Plus: secondaryL2Plus,
       l1Plus: secondaryL1Plus,
+      worstCombinedLevel: worstSecondaryCombined,
+      l4Count: secondaryL4Count,
+      l3PlusCount: secondaryL3PlusCount,
+      worstP19Deviation: worstSecondaryP19Deviation,
+      worstP20Deviation: worstSecondaryP20Deviation,
+      rowVariation: secondaryRowVariation,
       seats: secondarySeats,
     },
   };

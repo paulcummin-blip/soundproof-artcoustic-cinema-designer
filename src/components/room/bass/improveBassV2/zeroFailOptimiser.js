@@ -83,17 +83,35 @@ function rawMarginVector(result, isPrimary) {
 }
 
 /**
- * Build the zero-fail-first comparison tuple.
+ * Compute the P19 variation spread across seats of the given priority
+ * (max - min raw deviation). Lower = better (more consistent row).
+ */
+function rowVariation(result, isPrimary) {
+  const p19 = (Array.isArray(result?.perSeatP19) ? result.perSeatP19 : []).filter(s => !!s.isPrimary === isPrimary);
+  if (p19.length < 2) return 0;
+  const raws = p19.map(s => Math.abs(Number(s?.variationDbRaw) || 0));
+  return Math.max(...raws) - Math.min(...raws);
+}
+
+/**
+ * Build the RP22-priority comparison tuple.
  * Lower tuple = better candidate.
  *
- * Order:
- *   1. -failingSeatCount  (fewer fails = more negative = sorts first)
- *   2. -parameterFailCount
- *   3. primary floor vector (worst-first, negated levels)
- *   4. primary raw-margin vector (worst-first, lower = better)
- *   5. secondary floor vector
- *   6. secondary raw-margin vector
- *   7. P18 level, P18 Hz, P14 level, P14 dB (existing tie-breakers)
+ * Hierarchy:
+ *   1. PRIMARY: Eliminate FAIL seats (fewer failing seats = better)
+ *   2. Within primary: fewer parameter fails
+ *   3. SECONDARY.1: Highest Primary Seat Level (worst-first, negated levels)
+ *   4. SECONDARY.2: Lowest Primary Seat Deviation (worst-first raw margins)
+ *   5. SECONDARY.3: Lowest Primary Row Variation (seat-to-seat spread)
+ *   6. TERTIARY.1: Secondary Row RP22 level (worst-first, negated levels)
+ *   7. TERTIARY.2: Secondary Seat Deviation (worst-first raw margins)
+ *   8. TERTIARY.3: Secondary Row Variation (seat-to-seat spread)
+ *   9. QUATERNARY.1: Overall P19 metric (lower = better)
+ *   10. QUATERNARY.2: Overall P20 metric (lower = better)
+ *   11. Final tie-breakers: P18 level, P18 Hz, P14 level, P14 dB
+ *
+ * No seat may be sacrificed into FAIL to improve mathematical smoothness.
+ * RP22 outcomes always outrank raw response error.
  */
 export function zeroFailTuple(result) {
   return [
@@ -101,8 +119,12 @@ export function zeroFailTuple(result) {
     countParameterFails(result),
     ...floorVector(result, true),
     ...rawMarginVector(result, true),
+    rowVariation(result, true),
     ...floorVector(result, false),
     ...rawMarginVector(result, false),
+    rowVariation(result, false),
+    Number(result?.achievedP19VariationDb) || 0,
+    Number(result?.achievedP20VariationDb) || 0,
     -numericLevel(result?.p18AchievedLevel),
     Number(result?.achievedP18Hz) || 0,
     -numericLevel(result?.p14AchievedLevel),
