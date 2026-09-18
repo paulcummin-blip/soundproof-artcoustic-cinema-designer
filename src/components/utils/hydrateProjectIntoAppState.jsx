@@ -691,6 +691,18 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   if (typeof appState?.setAcousticTreatmentEnabled === "function") {
     appState.setAcousticTreatmentEnabled(!!p?.acoustic_treatment_enabled);
   }
+
+  // 10g) SURROUND / WIDE AIM-AT-MLP TOGGLES — persisted per-version so speaker
+  // rotation survives project reload, version creation, and report generation.
+  if (typeof appState?.setAimFrontWidesAtMLP === "function") {
+    appState.setAimFrontWidesAtMLP(!!p?.aim_front_wides_at_mlp);
+  }
+  if (typeof appState?.setAimSideSurroundsAtMLP === "function") {
+    appState.setAimSideSurroundsAtMLP(!!p?.aim_side_surrounds_at_mlp);
+  }
+  if (typeof appState?.setAimRearSurroundsAtMLP === "function") {
+    appState.setAimRearSurroundsAtMLP(!!p?.aim_rear_surrounds_at_mlp);
+  }
   if (typeof appState?.setSelectedAbfuserQty === "function") {
     const qty = Number(p?.selected_abfuser_qty);
     appState.setSelectedAbfuserQty(Number.isFinite(qty) && qty > 0 ? Math.floor(qty) : 0);

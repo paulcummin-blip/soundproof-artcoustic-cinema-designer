@@ -131,6 +131,12 @@ export function serializeProject(input = {}) {
 
     // Link ear & platform heights toggle — persisted per-project.
     linkEarPlatformHeights = true,
+
+    // Surround / wide aim-at-MLP toggles — persisted per-version so speaker
+    // rotation survives project reload, version creation, and report generation.
+    aimFrontWidesAtMLP = false,
+    aimSideSurroundsAtMLP = false,
+    aimRearSurroundsAtMLP = false,
   } = input;
 
   // Normalised room dims (support legacy dimensions as a fallback)
@@ -345,5 +351,10 @@ export function serializeProject(input = {}) {
 
     // Link ear & platform heights toggle — persisted per-project.
     link_ear_platform_heights: typeof linkEarPlatformHeights === "boolean" ? linkEarPlatformHeights : true,
+
+    // Surround / wide aim-at-MLP toggles — per-version design state.
+    aim_front_wides_at_mlp: !!aimFrontWidesAtMLP,
+    aim_side_surrounds_at_mlp: !!aimSideSurroundsAtMLP,
+    aim_rear_surrounds_at_mlp: !!aimRearSurroundsAtMLP,
   };
 }

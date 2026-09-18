@@ -150,6 +150,9 @@ appState, // Pass appState directly for setters
       splConfig: appState.splConfig,
       p12Mode: appState.p12Mode,
       p12Level: appState.p12Level,
+      aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
+      aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
+      aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
       rspMode: appState?.rspMode,
       manualRspY_m: appState?.manualRspY_m,
       manualRspX_m: appState?.manualRspX_m,
@@ -171,6 +174,7 @@ appState, // Pass appState directly for setters
     overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride,
     useFrontGlobal, useMidGlobal, useRearGlobal,
     appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty,
+    appState?.aimFrontWidesAtMLP, appState?.aimSideSurroundsAtMLP, appState?.aimRearSurroundsAtMLP,
   ]);
 
   const parseMaybe = useCallback((val, fallback) => {
@@ -386,6 +390,9 @@ appState, // Pass appState directly for setters
           splConfig: _parseMaybe(mergedP?.spl_config, null),
           p12Mode: mergedP?.spl_config?.p12_mode ?? null,
           p12Level: mergedP?.spl_config?.p12_level ?? null,
+          aimFrontWidesAtMLP: !!mergedP?.aim_front_wides_at_mlp,
+          aimSideSurroundsAtMLP: !!mergedP?.aim_side_surrounds_at_mlp,
+          aimRearSurroundsAtMLP: !!mergedP?.aim_rear_surrounds_at_mlp,
           rspMode: mergedP?.rsp_mode || "auto_from_screen",
           manualRspY_m: (() => { const v = Number(mergedP?.manual_rsp_y_m); return Number.isFinite(v) ? v : null; })(),
           manualRspX_m: (() => { const v = Number(mergedP?.manual_rsp_x_m); return Number.isFinite(v) ? v : null; })(),
