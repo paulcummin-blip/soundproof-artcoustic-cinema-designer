@@ -140,7 +140,13 @@ function RP22ReportInner() {
     );
     const designRecommendations = designReviewHandoff?.recommendations ?? null;
 
-    const completedBassAuthority = useCompletedBassAuthority(explicitProjectId || "free", reportVersionId || "free");
+    // Fall back to the app's already-hydrated activeVersionId when reportVersionId
+    // hasn't been set yet (fast path: SPA navigation from Room Designer). Without
+    // this fallback the hook fetches with "free", never finds the persisted
+    // authority, bassReportPending stays true, and autoPrint deadlocks on
+    // "Preparing Technical Report…". Mirrors useAppDesignRating line 210.
+    const resolvedReportVersionId = reportVersionId || app?.activeVersionId || null;
+    const completedBassAuthority = useCompletedBassAuthority(explicitProjectId || "free", resolvedReportVersionId || "free");
     const completedBassContract = completedBassAuthority.contract;
     const bassErrorMessage = completedBassAuthority.errorMessage || null;
     // P14 target selection state — shared with the main-app Compliance panel.
@@ -166,7 +172,7 @@ function RP22ReportInner() {
     // key with the same composite format so the identity comparison
     // matches like-for-like. Comparing a composite key against a bare
     // project ID always fails and deadlocks the auto-print gate.
-    const expectedProjectKey = bassCacheKey(explicitProjectId || 'free', reportVersionId || 'free');
+    const expectedProjectKey = bassCacheKey(explicitProjectId || 'free', resolvedReportVersionId || 'free');
     const projectIdMatch = String(completedBassAuthority?.projectId || 'free') === expectedProjectKey;
     const bassReadiness = useMemo(() => {
         if (!projectIdMatch) return { ready: false, pending: true, reason: 'project-id-mismatch', fingerprint: null };
@@ -460,7 +466,7 @@ function RP22ReportInner() {
                 return;
             }
             const bassScopeId = String(completedBassAuthority?.projectId || 'free');
-            if (bassScopeId !== String(explicitProjectId || 'free')) {
+            if (bassScopeId !== expectedProjectKey) {
                 logAutoPrintBlock('print trigger: bass authority project mismatch', 448);
                 setExportStatus("Print cancelled — bass authority project mismatch.");
                 setIsPrinting(false);
