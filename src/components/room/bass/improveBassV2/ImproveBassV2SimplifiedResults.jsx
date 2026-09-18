@@ -20,6 +20,7 @@ import { formatAcousticPath } from "./acousticDistance";
 import { extractGainAdjustmentDb } from "./gainRationaleBuilder";
 import { usePreviewState, resetPreview } from "./selectedCombinationPreviewStore";
 import { runSelectedCombinationPreview } from "./selectedCombinationPreview";
+import RP22GradingPill from "@/components/ui/RP22GradingPill";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -44,33 +45,15 @@ function fmtDb(raw) {
   return Math.abs(Number(raw)).toFixed(2);
 }
 
-function levelColor(level) {
-  const n = numericLevel(level);
-  if (n >= 3) return "text-[#213428]";
-  if (n >= 1) return "text-[#625143]";
-  return "text-red-600 font-semibold";
-}
-
-// ── SeatPills — compact per-seat level pills ─────────────────────────────
+// ── SeatPills — compact per-seat level pills (canonical RP22GradingPill) ──
 
 function SeatPills({ perSeat }) {
   if (!Array.isArray(perSeat) || !perSeat.length) return null;
   return (
     <div className="flex flex-wrap gap-0.5">
-      {perSeat.map((seat, i) => {
-        const level = seat.level || "FAIL";
-        const n = numericLevel(level);
-        const colorClass = n >= 3
-          ? "bg-[#213428] text-white"
-          : n >= 1
-            ? "bg-[#D9E5DF] text-[#213428]"
-            : "bg-red-100 text-red-700";
-        return (
-          <span key={seat.seatId || i} className={`text-[8px] px-1 py-0.5 rounded font-medium ${colorClass}`}>
-            {levelText(level)}
-          </span>
-        );
-      })}
+      {perSeat.map((seat, i) => (
+        <RP22GradingPill key={seat.seatId || i} level={seat.level || "FAIL"} compact />
+      ))}
     </div>
   );
 }
@@ -98,9 +81,13 @@ function MetricDelta({ label, beforeValue, afterValue, formatFn, levelBased = fa
   return (
     <div className="flex items-center gap-1.5 text-[10px]">
       <span className="text-[#8A7B6A] w-10">{label}</span>
-      <span className={levelBased ? levelColor(beforeValue) : "text-[#625143]"}>{before}</span>
+      {levelBased
+        ? <RP22GradingPill level={beforeValue} compact />
+        : <span className="text-[#625143]">{before}</span>}
       {changed && <ArrowRight className="h-2.5 w-2.5 text-[#8A7B6A]" />}
-      {changed && <span className={levelBased ? levelColor(afterValue) : "text-[#213428] font-medium"}>{after}</span>}
+      {changed && (levelBased
+        ? <RP22GradingPill level={afterValue} compact />
+        : <span className="text-[#213428] font-medium">{after}</span>)}
     </div>
   );
 }
@@ -334,9 +321,9 @@ export default function ImproveBassV2SimplifiedResults({
             <span className="text-[#8A7B6A] w-10">Fails</span>
             <span className={currentFails > 0 ? "text-red-600 font-semibold" : "text-[#213428]"}>{currentFails}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-[10px]">
-            <span className="text-[#8A7B6A] w-10">Floor</span>
-            <span className={levelColor(currentFloor)}>{levelText(currentFloor)}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-[#8A7B6A] w-10">Floor</span>
+            <RP22GradingPill level={currentFloor} compact />
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-[9px] text-[#8A7B6A] w-8">P19</span>
