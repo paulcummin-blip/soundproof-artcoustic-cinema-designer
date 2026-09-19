@@ -19,15 +19,11 @@ import { resolveEffectiveVersionId } from '@/lib/versionAuthority';
 import { useCompletedBassAuthority, BASS_AUTHORITY_STATUS } from '@/components/room/bass/completedBassResultStore';
 import { buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { buildDesignRatingInput } from '@/components/report/technical/buildDesignRatingInput';
-import {
-  buildArtcousticDesignRatingAuthority,
-  calculateRoomDesignRating,
-  calculateScopedRoomDesignRating,
-  calculateSeatDesignRating,
-} from '@/components/report/technical/artcousticSystemDesignRating';
+import { buildArtcousticDesignRatingAuthority } from '@/components/report/technical/artcousticSystemDesignRating';
+import { summariseEngineeringResults } from '@/components/engineering/engineeringSummaryAuthority';
 import { attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
 import { summariseAuthoritativeP19Seats } from '@/components/room/bass/p19SeatAuthority';
-import { getScopedSeatIds, buildSeatPriorityFingerprint } from '@/components/utils/seatScopeAuthority';
+import { getScopedSeatIds } from '@/components/utils/seatScopeAuthority';
 import { hasMinimumSystemForAsdr } from '@/components/utils/minimumSystemForAsdr';
 import { resolveP14TargetSelectionState } from '@/components/room/bass/p14TargetSelectionState';
 
@@ -316,40 +312,14 @@ export function useAppDesignRating({
         p19SeatAuthority,
       });
       const authority = buildArtcousticDesignRatingAuthority(input);
-      const rating = calculateRoomDesignRating(authority);
+      const engineeringSummary = summariseEngineeringResults({
+        designRatingAuthority: authority,
+        seats,
+        seatHudById: reportSeatHudById,
+        p19SeatAuthority,
+      });
+      if (!engineeringSummary) return null;
 
-      // Three scoped ratings from the SAME shared authority. All Seating is
-      // the same authoritative result as the top-level rating. Primary and
-      // Secondary average only their seat subsets. Secondary with zero seats
-      // returns NOT_CONFIGURED. No second authority build; no duplicated
-      // scoring logic — calculateScopedRoomDesignRating delegates to the same
-      // internal core as calculateRoomDesignRating.
-      const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(seats);
-      const scopedRatings = {
-        primary: calculateScopedRoomDesignRating(authority, primarySeatIds),
-        secondary: calculateScopedRoomDesignRating(authority, secondarySeatIds),
-        all: rating,
-      };
-
-      // Scope-identity stamp: deterministic fingerprint of the seat-priority set
-      // this rating was calculated from. Consumers compare this against the live
-      // fingerprint to detect stale scoped ratings.
-      const seatPriorityFingerprint = buildSeatPriorityFingerprint(seats);
-
-      // Stage B: expose per-seat levels + P12/P13 raw for RSP reach classification.
-      // No formula change — reuses the authority's already-computed per-seat levels
-      // and the analysisResult raw values. ASDR percentage/weights/thresholds are
-      // unchanged.
-      const seatLevels = {};
-      for (const [key, param] of Object.entries(authority?.parameters || {})) {
-        if (param?.scope === "seat" && param.seats) {
-          const perSeat = {};
-          for (const [seatId, sa] of Object.entries(param.seats)) {
-            perSeat[seatId] = sa?.state === "scored" ? sa.level : null;
-          }
-          seatLevels[key] = perSeat;
-        }
-      }
       const p12RawDb = Number.isFinite(Number(analysisResult?.gradedParameters?.primary?.[12]?.value))
         ? Number(analysisResult.gradedParameters.primary[12].value)
         : null;
@@ -357,15 +327,20 @@ export function useAppDesignRating({
         ? Number(analysisResult.gradedParameters.primary[13].value)
         : null;
 
-      // Per-seat design ratings from the SAME authority — pure derivation, no
-      // second authority build. Published to the Design Review handoff so the
-      // Technical Report reads them as a passive consumer (no recalculation).
-      const seatDesignRatings = {};
-      for (const seatId of authority?.seatIds || []) {
-        seatDesignRatings[seatId] = calculateSeatDesignRating(authority, seatId);
-      }
-
-      return { ...rating, seatLevels, p12RawDb, p13RawDb, scopedRatings, seatPriorityFingerprint, seatDesignRatings, p19SeatAuthority };
+      // Backward-compatible rating envelope. Every derived field is copied
+      // from the one immutable engineering summary; consumers also receive the
+      // summary itself and must not recalculate from the envelope.
+      return {
+        ...engineeringSummary.designRating.rating,
+        scopedRatings: engineeringSummary.designRating.scopedRatings,
+        seatDesignRatings: engineeringSummary.designRating.seatDesignRatings,
+        seatLevels: engineeringSummary.designRating.seatLevels,
+        seatPriorityFingerprint: engineeringSummary.seatPriorityFingerprint,
+        p12RawDb,
+        p13RawDb,
+        p19SeatAuthority,
+        engineeringSummary,
+      };
     } catch (e) {
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;
