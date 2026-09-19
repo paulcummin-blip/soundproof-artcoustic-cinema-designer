@@ -178,3 +178,14 @@ export function applyGlobalBassTrimToCurve(curve, trimDb) {
   if (!Number.isFinite(trimDb) || trimDb === 0) return curve;
   return shiftCurve(curve, trimDb);
 }
+
+// The final calibration trim is a system-wide setting. Every listening
+// position receives the same offset; only the room transfer differs by seat.
+export function applyGlobalBassTrimToSeatCurves(seatCurves, trimDb) {
+  if (!Array.isArray(seatCurves)) return [];
+  if (!Number.isFinite(trimDb) || trimDb === 0) return seatCurves;
+  return seatCurves.map((seat) => ({
+    ...seat,
+    responseData: shiftCurve(seat?.responseData, trimDb),
+  }));
+}
