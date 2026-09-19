@@ -191,6 +191,7 @@ export default function ParameterExplorer({
   activeFilter,
   onFilterChange,
   seatingPositions,
+  p19SeatAuthority = null,
 }) {
   const app = useAppState();
   const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
@@ -226,6 +227,7 @@ export default function ParameterExplorer({
     assumedP15Level: app?.assumedP15Level,
     assumedP21Level: app?.assumedP21Level,
     bassAuthority: completedBassAuthority,
+    p19SeatAuthority,
     bassErrorMessage,
     contributionsByKey,
   });
