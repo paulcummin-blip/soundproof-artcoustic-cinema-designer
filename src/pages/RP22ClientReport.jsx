@@ -57,6 +57,7 @@ import { resolveP14TargetSelectionState } from "@/components/room/bass/p14Target
 import { buildDesignRatingInput } from "@/components/report/technical/buildDesignRatingInput";
 import { buildArtcousticDesignRatingAuthority } from "@/components/report/technical/artcousticSystemDesignRating";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
+import { readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 
 export default function RP22ClientReport() {
   const navigate = useNavigate();
@@ -73,6 +74,13 @@ export default function RP22ClientReport() {
   );
 
   const authority = useClientReportAuthority(projectId);
+  const publishedEngineering = useMemo(
+    () => projectId ? readDesignReviewHandoff(projectId) : null,
+    [projectId]
+  );
+  const p19SeatAuthority = publishedEngineering?.p19SeatAuthority
+    ?? publishedEngineering?.rating?.p19SeatAuthority
+    ?? null;
   const appState = useAppState();
   // Active P12 target basis — the same authority that drives the App compliance
   // panel and the Technical Report (RP22CompliancePanel / RP22ReportParameterGrid).
@@ -126,8 +134,6 @@ export default function RP22ClientReport() {
   // allParametersAuthoritative is derived from the authority's param states.
   const reportP14Mode = bassPresentation?.parameters?.p14?.targetBasis || appState?.splConfig?.p14Mode || "minimum";
   const reportP18Mode = bassPresentation?.parameters?.p18?.targetBasis || appState?.splConfig?.p18Mode || "minimum";
-  const completedP19Result = completedBassAuthority?.contract?.productAnalysis?.parameters?.p19 || null;
-  const completedP19Results = completedBassAuthority?.contract?.selectedCandidate?.perSeatP19Results || [];
   const completedP20Results = bassPresentation?.perSeatP20Results || [];
   const hasFrontWides = useMemo(
     () => (Array.isArray(placedSpeakers) ? placedSpeakers : []).some((s) => {
@@ -139,8 +145,7 @@ export default function RP22ClientReport() {
   const coverageParamAuthority = useMemo(() => {
     try {
       const reportSeatHudById = buildLightweightSeatHudById(
-        seatingPositions, analysisResult, rsp,
-        completedP19Result, completedP19Results, completedP20Results
+        seatingPositions, analysisResult, completedP20Results, p19SeatAuthority
       );
       const input = buildDesignRatingInput({
         seats: seatingPositions,
@@ -154,13 +159,14 @@ export default function RP22ClientReport() {
         reportP18Mode,
         hasFrontWides,
         placedSpeakers,
+        p19SeatAuthority,
       });
       const authority = buildArtcousticDesignRatingAuthority(input);
       return authority?.parameters || null;
     } catch (e) {
       return null;
     }
-  }, [seatingPositions, analysisResult, rsp, completedBassAuthority, bassPresentation, p12Mode, p13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers]);
+  }, [seatingPositions, analysisResult, completedBassAuthority, bassPresentation, p12Mode, p13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, p19SeatAuthority, completedP20Results]);
   const coverageResult = useMemo(
     () => buildRp22SeatCoverageResult({ paramAuthority: coverageParamAuthority, seats: seatingPositions }),
     [coverageParamAuthority, seatingPositions]
@@ -300,8 +306,8 @@ export default function RP22ClientReport() {
   // Omitted entirely when no genuine assessed bass result exists.
   const bassPerformance = useMemo(() => {
     if (hydrating || !completedBassAuthority) return null;
-    return selectClientBassPerformance(completedBassAuthority, bassPresentation, seatingPositions);
-  }, [hydrating, completedBassAuthority, bassPresentation, seatingPositions]);
+    return selectClientBassPerformance(completedBassAuthority, bassPresentation, seatingPositions, p19SeatAuthority);
+  }, [hydrating, completedBassAuthority, bassPresentation, seatingPositions, p19SeatAuthority]);
 
   // ── Active pages collection — drives both screen and PDF rendering order ──
   const activePages = useMemo(() => {
