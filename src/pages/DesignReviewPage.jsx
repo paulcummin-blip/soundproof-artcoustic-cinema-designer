@@ -278,6 +278,7 @@ export default function DesignReviewPage() {
             activeFilter={activeFilter}
             onFilterChange={handleFilterChange}
             seatingPositions={resolvedSeatingPositions}
+            p19SeatAuthority={asdrData?.p19SeatAuthority ?? asdrData?.rating?.p19SeatAuthority ?? null}
           />
         </CollapsiblePanel>
 
