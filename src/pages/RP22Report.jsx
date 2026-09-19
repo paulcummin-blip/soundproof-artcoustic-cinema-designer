@@ -202,7 +202,10 @@ function RP22ReportInner() {
         const bassApplicable = fCount > 0 || rCount > 0 || subInstances.length > 0 || subs.length > 0;
         return resolveBassReadiness(completedBassAuthority, bassApplicable, !p14Selection.noP14TargetSelected);
     }, [completedBassAuthority, projectIdMatch, app?.frontSubsCfg, app?.rearSubsCfg, app?.subwooferInstances, app?.subwoofers, p14Selection.noP14TargetSelected]);
-    const bassReportPending = bassReadiness.pending;
+    // This read-only route has no bass calculation producer. Wait for the
+    // correct saved authority to hydrate, not for an unrequested calculation.
+    // Metric publication still uses bassReadiness and the gated presentation.
+    const bassReportPending = !projectIdMatch || completedBassAuthority?.hydrationSettled !== true;
     useEffect(() => {
         console.info('[REPORT-RUNTIME] report-gate ' + JSON.stringify({ expectedProjectKey, projectIdMatch, reportVersionId, resolvedReportVersionId, appVersion: app?.activeVersionId, readiness: bassReadiness, authority: { projectId: completedBassAuthority?.projectId, status: completedBassAuthority?.authorityStatus, hydrationSettled: completedBassAuthority?.hydrationSettled, currentFingerprint: completedBassAuthority?.currentFingerprint, resultFingerprint: completedBassAuthority?.contract?.job?.resultFingerprint }, noP14TargetSelected: p14Selection.noP14TargetSelected, reportHydrating, reportReadyProjectId }));
     }, [expectedProjectKey, projectIdMatch, reportVersionId, resolvedReportVersionId, bassReadiness, completedBassAuthority, reportHydrating, reportReadyProjectId]);
@@ -688,7 +691,7 @@ function RP22ReportInner() {
     // also false (reason: 'p14-target-not-selected'). The report must RENDER and
     // show "Select Bass Target" for bass parameters — NOT hang on "Loading…".
     // Only block when genuinely pending (calculation in progress or hydrating).
-    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || (!bassReadiness.ready && bassReadiness.pending);
+    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || bassReportPending;
 
     // READ-ONLY: useAnalysisSpeakers, useAllSeatSplMetrics, and
     // useRP22AnalysisEngine are NOT called here. The authoritative RP22
