@@ -45,7 +45,7 @@ export default function BassResultsSummary({ compact = false, showPriority = tru
         {formatted.p19Rows.length > 0 && (
           <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
             <div className="mb-1 text-[11px] font-semibold text-[#213428]">P19 — All Seats</div>
-            <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{formatCoverageSummaryFromRows(formatted.p19Rows)}</div>
+            <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{formatted.p19SeatAuthority?.project?.coverageSummary || "NOT CALCULATED"}</div>
             <P19SeatBlock
               rows={formatted.p19Rows}
               publicationVerified={formatted.publicationVerified}
