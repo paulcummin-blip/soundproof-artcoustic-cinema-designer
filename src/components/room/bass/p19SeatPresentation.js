@@ -1,5 +1,7 @@
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
+import { getScopedSeatIds } from "@/components/utils/seatScopeAuthority";
+import { summariseAuthoritativeP19Seats } from "@/components/room/bass/p19SeatAuthority";
 
 const referenceIds = new Set(["rsp", "mlp", "synthetic-rsp", "synthetic_rsp"]);
 
@@ -38,30 +40,14 @@ export function formatAuthoritativeP19Result(result) {
  * Each row contains seats with: seatId, row, column, priority, level, variationDbRaw, displayVariationDb.
  */
 export function buildP19SeatRows(seatingPositions = [], perSeatP19Results = []) {
-  const resultMap = new Map((Array.isArray(perSeatP19Results) ? perSeatP19Results : [])
-    .filter(isRealP19Seat).map((result) => [seatId(result.seatId), result]));
-  const rows = new Map();
-  (Array.isArray(seatingPositions) ? seatingPositions : []).filter(isRealP19Seat).forEach((seat, index) => {
-    const row = rowNumber(seat);
-    if (!rows.has(row)) rows.set(row, []);
-    const id = seatId(seat.id ?? seat.seatId);
-    const result = resultMap.get(id) || null;
-    rows.get(row).push({
-      seatId: id,
-      row,
-      column: columnNumber(seat, index + 1),
-      priority: resolveSeatPriority(seat),
-      level: result && finite(result.variationDbRaw) ? p19LevelText(result.level) : "—",
-      variationDbRaw: result && finite(result.variationDbRaw) ? Number(result.variationDbRaw) : null,
-      displayVariationDb: result && finite(result.variationDbRaw) ? formatAuthoritativeP19Result(result) : "—",
-      worstFrequencyHz: result && finite(result.worstFrequencyHz) ? Number(result.worstFrequencyHz) : null,
-      source: result,
-    });
-  });
-  return [...rows.entries()].sort(([a], [b]) => a - b).map(([row, seats]) => ({
-    row,
-    seats: seats.sort((a, b) => a.column - b.column),
-  }));
+  const seats = (Array.isArray(seatingPositions) ? seatingPositions : []).filter(isRealP19Seat);
+  const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(seats);
+  return summariseAuthoritativeP19Seats({
+    authoritativeSeatResults: perSeatP19Results,
+    primarySeatIds,
+    secondarySeatIds,
+    seatingPositions: seats,
+  }).rows;
 }
 
 /**
