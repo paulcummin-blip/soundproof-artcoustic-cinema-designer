@@ -71,7 +71,7 @@ function SeatGrid({ rows, compact, paramKey }) {
   );
 }
 
-function Panel({ title, paramKey, rows, publicationVerified, stateText, compact }) {
+function Panel({ title, paramKey, rows, publicationVerified, stateText, compact, authoritativeSummary = null }) {
   const showSeats = publicationVerified && rows.length > 0;
   return (
     <div className={`rounded-lg border border-[#DCDBD6] bg-white ${compact ? "p-2" : "p-3"}`}>
@@ -79,7 +79,7 @@ function Panel({ title, paramKey, rows, publicationVerified, stateText, compact 
       {showSeats ? (
         <>
           {!compact && (
-            <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{formatCoverageSummaryFromRows(rows)}</div>
+            <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{authoritativeSummary || formatCoverageSummaryFromRows(rows)}</div>
           )}
           <SeatGrid rows={rows} compact={compact} paramKey={paramKey} />
         </>
@@ -95,6 +95,7 @@ function Panel({ title, paramKey, rows, publicationVerified, stateText, compact 
 export default function SharedP19P20SeatResults({
   p19Rows = [],
   p20Rows = [],
+  p19Summary = null,
   publicationVerified = false,
   authorityStatus = null,
   p14TargetUnselected = false,
@@ -109,6 +110,7 @@ export default function SharedP19P20SeatResults({
         title="P19 — All Seats"
         paramKey="p19"
         rows={p19Rows}
+        authoritativeSummary={p19Summary}
         publicationVerified={publicationVerified}
         stateText={stateText}
         compact={compact}
