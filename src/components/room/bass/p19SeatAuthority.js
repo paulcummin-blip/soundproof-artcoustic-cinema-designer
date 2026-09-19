@@ -13,6 +13,11 @@ import { resolveSeatPriority, PRIMARY, SECONDARY } from "@/components/utils/seat
 const REFERENCE_IDS = new Set(["rsp", "mlp", "synthetic-rsp", "synthetic_rsp"]);
 const LEVEL_RANK = Object.freeze({ FAIL: 0, L1: 1, L2: 2, L3: 3, L4: 4 });
 
+// Identity cache: one immutable publication per engine result array + seat snapshot.
+// Multiple upstream readers may encounter the same completed contract in the same
+// render cycle; they receive this exact object rather than regenerating summaries.
+const PUBLICATION_BY_RESULTS = new WeakMap();
+
 const cleanId = (value) => String(value ?? "").trim();
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
@@ -81,6 +86,7 @@ export function summariseAuthoritativeP19Seats({
   secondarySeatIds = [],
   seatingPositions = [],
 } = {}) {
+  const results = Array.isArray(authoritativeSeatResults) ? authoritativeSeatResults : [];
   const positions = Array.isArray(seatingPositions) ? seatingPositions : [];
   const positionById = new Map(positions.map((seat) => [cleanId(seat?.id ?? seat?.seatId), seat]));
   const primaryIds = Array.from(new Set((primarySeatIds || []).map(cleanId).filter(Boolean)));
@@ -95,9 +101,31 @@ export function summariseAuthoritativeP19Seats({
     }
   }
 
+  const snapshotKey = JSON.stringify({
+    primaryIds,
+    secondaryIds,
+    seats: positions.map((seat) => ({
+      id: cleanId(seat?.id ?? seat?.seatId),
+      label: seat?.label || null,
+      priority: resolveSeatPriority(seat),
+      row: seat?.row ?? seat?.rowNumber ?? null,
+      column: seat?.column ?? seat?.col ?? seat?.indexInRow ?? seat?.seatNumber ?? null,
+      x: seat?.x ?? seat?.position?.x ?? null,
+      y: seat?.y ?? seat?.position?.y ?? null,
+      z: seat?.z ?? seat?.position?.z ?? null,
+    })),
+  });
+  let publications = PUBLICATION_BY_RESULTS.get(results);
+  if (!publications) {
+    publications = new Map();
+    PUBLICATION_BY_RESULTS.set(results, publications);
+  }
+  const existing = publications.get(snapshotKey);
+  if (existing) return existing;
+
   const allowedIds = [...primaryIds, ...secondaryIds];
   const sourceById = new Map(
-    (Array.isArray(authoritativeSeatResults) ? authoritativeSeatResults : [])
+    results
       .map((result) => [cleanId(result?.seatId ?? result?.id), result])
       .filter(([id]) => id && !REFERENCE_IDS.has(id.toLowerCase()) && allowedIds.includes(id)),
   );
@@ -153,7 +181,7 @@ export function summariseAuthoritativeP19Seats({
       })),
   );
 
-  return Object.freeze({
+  const publication = Object.freeze({
     parameter: "P19",
     sourcePath: "selectedCandidate.perSeatP19Results",
     seats: project.seats,
@@ -163,4 +191,6 @@ export function summariseAuthoritativeP19Seats({
     secondary,
     project: Object.freeze({ ...project, coverageSummary: coverageText(primary, secondary, project) }),
   });
+  publications.set(snapshotKey, publication);
+  return publication;
 }
