@@ -23,7 +23,6 @@ export default function ComplianceReportPrint() {
     ?? publishedEngineering?.rating?.p19SeatAuthority
     ?? null;
   const completedBassAuthority = useCompletedBassAuthority(reportScopeId, resolveEffectiveVersionId(null, app));
-  const completedBassContract = completedBassAuthority.contract;
   const bassErrorMessage = completedBassAuthority.errorMessage || null;
   const bassPresentation = useMemo(() => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);
   const bassReportPending = completedBassAuthority.status === 'loading';
