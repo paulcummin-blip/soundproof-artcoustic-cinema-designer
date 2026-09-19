@@ -1837,6 +1837,8 @@ function RoomDesignerWithState() {
     if (appDesignRating?.isP14TargetUnselected === true) {
       publishDesignReviewHandoff({
         projectId: handoffProjectId,
+        versionId: appState?.activeVersionId || null,
+        calculationFingerprint: appDesignRating?.bassReadiness?.fingerprint || null,
         showAsdr,
         rating: null,
         recommendations: null,
@@ -1866,8 +1868,11 @@ function RoomDesignerWithState() {
 
     publishDesignReviewHandoff({
       projectId: handoffProjectId,
+      versionId: appState?.activeVersionId || null,
+      calculationFingerprint: appDesignRating?.bassReadiness?.fingerprint || null,
       showAsdr,
       rating: appDesignRating,
+      p19SeatAuthority: appDesignRating?.p19SeatAuthority ?? null,
       recommendations: designRecommendations,
       seatDesignRatings: appDesignRating?.seatDesignRatings ?? null,
       analysisResult,
