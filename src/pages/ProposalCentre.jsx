@@ -1,32 +1,38 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { useActiveProjectId } from '@/components/state/project-session';
 import BrandAssetsPanel from '@/components/proposal/BrandAssetsPanel';
-import ProposalAssetsPanel from '@/components/proposal/ProposalAssetsPanel';
-import { Building2, Image } from 'lucide-react';
+import PlaceholderTab from '@/components/proposal/PlaceholderTab';
+import { Building2, FileText, Package, History } from 'lucide-react';
+
+const TABS = [
+  { key: 'brand', label: 'Brand Assets', icon: Building2 },
+  { key: 'templates', label: 'Templates', icon: FileText },
+  { key: 'products', label: 'Product Library', icon: Package },
+  { key: 'history', label: 'Proposal History', icon: History },
+];
+
+const PLACEHOLDER_CONTENT = {
+  templates: {
+    title: 'Templates',
+    description:
+      'Pre-designed proposal templates will live here. You will be able to create, edit, and manage reusable proposal layouts for different project types.',
+  },
+  products: {
+    title: 'Product Library',
+    description:
+      'The product knowledge base will live here. Each product will contain hero images, transparent PNGs, lifestyle shots, descriptions, benefits, and technical notes that the proposal engine draws from.',
+  },
+  history: {
+    title: 'Proposal History',
+    description:
+      'All generated proposals will be listed here with their status, date, and linked project.',
+  },
+};
 
 export default function ProposalCentre() {
   const { user } = useAuth();
-  const activeProjectId = useActiveProjectId();
   const [activeTab, setActiveTab] = useState('brand');
-
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
-
-  const tabButton = (key, Icon, label) => (
-    <button
-      key={key}
-      onClick={() => setActiveTab(key)}
-      className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors border ${
-        activeTab === key
-          ? 'bg-[#213428] text-white border-[#213428]'
-          : 'bg-white text-[#3E4349] border-[#DCDBD6] hover:bg-[#F5F4F0]'
-      }`}
-      style={activeTab === key ? { fontFamily: 'Didact Gothic, sans-serif' } : {}}
-    >
-      <Icon className="w-4 h-4" />
-      {label}
-    </button>
-  );
 
   return (
     <div className="min-h-screen bg-[#F5F4F0] p-6 lg:p-8">
@@ -39,17 +45,35 @@ export default function ProposalCentre() {
             Proposal Centre
           </h1>
           <p className="text-sm text-[#625143] mt-1">
-            Manage brand assets and project proposal visuals. These are used by every proposal generated for your account.
+            Proposal infrastructure for your dealer account — brand assets, templates, and product library.
           </p>
         </div>
 
-        <div className="flex gap-2 mb-6">
-          {tabButton('brand', Building2, 'Brand Assets')}
-          {tabButton('assets', Image, 'Proposal Assets')}
+        <div className="flex gap-2 mb-6 flex-wrap">
+          {TABS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors border ${
+                activeTab === key
+                  ? 'bg-[#213428] text-white border-[#213428]'
+                  : 'bg-white text-[#3E4349] border-[#DCDBD6] hover:bg-[#F5F4F0]'
+              }`}
+              style={activeTab === key ? { fontFamily: 'Didact Gothic, sans-serif' } : {}}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          ))}
         </div>
 
         {activeTab === 'brand' && <BrandAssetsPanel accountId={accountId} />}
-        {activeTab === 'assets' && <ProposalAssetsPanel projectId={activeProjectId} accountId={accountId} />}
+        {activeTab !== 'brand' && (
+          <PlaceholderTab
+            title={PLACEHOLDER_CONTENT[activeTab].title}
+            description={PLACEHOLDER_CONTENT[activeTab].description}
+          />
+        )}
       </div>
     </div>
   );

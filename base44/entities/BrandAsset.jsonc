@@ -1,7 +1,7 @@
 {
   "name": "BrandAsset",
   "type": "object",
-  "description": "Global brand assets for a dealer account. One record per account. Stores company identity, logos, contact details, marketing copy, and brand colours. Automatically available to every future proposal generated within this account.",
+  "description": "Global brand assets for a dealer account. One record per account. Stores company identity, logos, contact details, social media, marketing copy (rich text), brand colours, and proposal default toggles. Automatically available to every future proposal generated within this account.",
   "properties": {
     "account_id": {
       "type": "string",
@@ -37,21 +37,52 @@
       "type": "string",
       "description": "Business website URL."
     },
+    "linkedin": {
+      "type": "string",
+      "description": "LinkedIn profile URL."
+    },
+    "instagram": {
+      "type": "string",
+      "description": "Instagram profile URL."
+    },
+    "facebook": {
+      "type": "string",
+      "description": "Facebook page URL."
+    },
+    "youtube": {
+      "type": "string",
+      "description": "YouTube channel URL."
+    },
+    "google_maps_url": {
+      "type": "string",
+      "description": "Google Maps location URL (optional).",
+      "nullable": true
+    },
+    "vat_number": {
+      "type": "string",
+      "description": "VAT registration number (optional).",
+      "nullable": true
+    },
+    "company_registration_number": {
+      "type": "string",
+      "description": "Company registration number (optional).",
+      "nullable": true
+    },
     "about_us": {
       "type": "string",
-      "description": "About Us marketing copy for proposals."
+      "description": "About Us marketing copy (rich text / HTML) for proposals."
     },
     "why_choose_us": {
       "type": "string",
-      "description": "Why Choose Us marketing copy for proposals."
+      "description": "Why Choose Us marketing copy (rich text / HTML) for proposals."
     },
     "warranty": {
       "type": "string",
-      "description": "Warranty terms text shown on proposals."
+      "description": "Warranty terms text (rich text / HTML) shown on proposals."
     },
     "terms_conditions": {
       "type": "string",
-      "description": "Terms & Conditions text shown on proposals."
+      "description": "Terms & Conditions text (rich text / HTML) shown on proposals."
     },
     "primary_colour": {
       "type": "string",
@@ -67,6 +98,31 @@
       "type": "string",
       "description": "Accent brand colour (hex).",
       "default": "#625143"
+    },
+    "include_about_us": {
+      "type": "boolean",
+      "default": true,
+      "description": "Include About Us section in new proposals by default."
+    },
+    "include_warranty": {
+      "type": "boolean",
+      "default": true,
+      "description": "Include Warranty section in new proposals by default."
+    },
+    "include_product_gallery": {
+      "type": "boolean",
+      "default": true,
+      "description": "Include Product Gallery in new proposals by default."
+    },
+    "include_rp22_overview": {
+      "type": "boolean",
+      "default": true,
+      "description": "Include RP22 Overview in new proposals by default."
+    },
+    "include_technical_appendix": {
+      "type": "boolean",
+      "default": true,
+      "description": "Include Technical Appendix in new proposals by default."
     }
   },
   "required": [
