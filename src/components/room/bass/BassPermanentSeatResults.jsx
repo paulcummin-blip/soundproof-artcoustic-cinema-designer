@@ -35,11 +35,13 @@ export default function BassPermanentSeatResults() {
         p14TargetBasis: shared.authoritative?.requested?.p14TargetBasis,
         p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
       },
+      shared.p19SeatAuthority,
     );
   }, [
     shared.completedBassAuthority,
     shared.lifecycle,
     shared.seatingPositions,
+    shared.p19SeatAuthority,
     hasResult,
     isStale,
     isCalculating,
