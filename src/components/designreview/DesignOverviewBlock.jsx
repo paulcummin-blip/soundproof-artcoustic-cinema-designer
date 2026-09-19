@@ -23,10 +23,7 @@ import {
   normalizeLevel,
 } from "@/components/designreview/needsAttentionAuthority";
 import { getLevelColors } from "@/components/utils/rp22Colors";
-import {
-  getRoomDesignRatingDesignation,
-  getDesignPerformanceIndex,
-} from "@/components/report/technical/designRatingPresentation";
+import { getDesignPerformanceIndex } from "@/components/report/technical/designRatingPresentation";
 import DesignRatingCategoryFloor from "./DesignRatingCategoryFloor";
 
 const COLORS = {
@@ -67,7 +64,6 @@ function getParamLabel(contrib) {
 
 function DpiScopeSummary({ label, rating, emphasize }) {
   const isNotAssessed = !rating || rating.status === "NOT_ASSESSED" || rating.status === "NOT_CONFIGURED";
-  const designation = isNotAssessed ? null : getRoomDesignRatingDesignation(rating);
   const index = isNotAssessed ? null : getDesignPerformanceIndex(rating);
 
   return (
@@ -94,6 +90,18 @@ function DpiScopeSummary({ label, rating, emphasize }) {
       </div>
       <div
         style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: COLORS.secondary,
+          fontFamily: FONT_BODY,
+          marginBottom: 4,
+          letterSpacing: "0.03em",
+        }}
+      >
+        Design Performance Index
+      </div>
+      <div
+        style={{
           fontSize: emphasize ? 22 : 18,
           fontWeight: 400,
           color: isNotAssessed ? COLORS.muted : COLORS.primary,
@@ -101,22 +109,8 @@ function DpiScopeSummary({ label, rating, emphasize }) {
           lineHeight: 1.1,
         }}
       >
-        {designation || "Not configured"}
+        {isNotAssessed ? "Not configured" : (index ?? "—")}
       </div>
-      {index != null && (
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: COLORS.secondary,
-            fontFamily: FONT_BODY,
-            marginTop: 4,
-            letterSpacing: "0.03em",
-          }}
-        >
-          Design Performance Index {index}
-        </div>
-      )}
     </div>
   );
 }

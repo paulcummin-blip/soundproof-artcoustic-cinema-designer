@@ -134,10 +134,32 @@ function RP22ReportInner() {
     // Rating (roomDesignRating + scopedRatings + seatDesignRatings), and
     // settled recommendations to the Design Review handoff. The Technical
     // Report reads this published state — it never recalculates.
-    const designReviewHandoff = useMemo(
-        () => explicitProjectId ? readDesignReviewHandoff(explicitProjectId) : null,
-        [explicitProjectId]
+    // ── READ-ONLY handoff (polled, same as DesignReviewPage) ─────────────
+    // The Room Designer publishes its authoritative analysisResult, Design
+    // Rating (roomDesignRating + scopedRatings + seatDesignRatings), and
+    // settled recommendations to the Design Review handoff. The Technical
+    // Report reads this published state — it never recalculates. Polling
+    // (not a single useMemo read) guarantees the report sees the latest
+    // published rating, not a stale snapshot from before bass settled.
+    const [designReviewHandoff, setDesignReviewHandoff] = useState(
+        () => explicitProjectId ? readDesignReviewHandoff(explicitProjectId) : null
     );
+    useEffect(() => {
+        if (!explicitProjectId) {
+            setDesignReviewHandoff(null);
+            return;
+        }
+        const read = () => {
+            const shared = readDesignReviewHandoff(explicitProjectId, {
+                projectUpdatedAt: projectDetails?.updated_date,
+                allowStored: true,
+            });
+            setDesignReviewHandoff(shared);
+        };
+        read();
+        const interval = setInterval(read, 500);
+        return () => clearInterval(interval);
+    }, [explicitProjectId, projectDetails?.updated_date]);
     const designRecommendations = designReviewHandoff?.recommendations ?? null;
 
     // Single canonical version-resolution path (shared with every report and
@@ -207,11 +229,13 @@ function RP22ReportInner() {
     // Metric publication still uses the gated presentation; no result is promoted.
     const bassReportPending = !projectIdMatch || completedBassAuthority?.hydrationSettled !== true;
     const completedP19Result = completedBassContract?.productAnalysis?.parameters?.p19 || null;
-    // Use the gated presentation (publicationVerified) for per-seat P19 — same
-    // authority as P20 and the parameter grid. This ensures the HUD snapshot,
-    // the ASDR scoring input, and the expanded seat grid all consume the
-    // same completed authoritative P19 seat array.
-    const completedP19Results = completedBassPresentation.perSeatP19Results;
+    // Use the SAME raw per-seat P19 source as the Room Designer
+    // (useAppDesignRating line 221): contract.selectedCandidate.perSeatP19Results.
+    // The presentation-gated perSeatP19Results returns [] when publication is
+    // not verified, which suppresses genuine L1 seat results and makes the
+    // Technical Report disagree with the Room Designer's authoritative P19.
+    // Reading the raw contract source guarantees identical seat outcomes.
+    const completedP19Results = completedBassAuthority?.contract?.selectedCandidate?.perSeatP19Results || [];
     const completedP20Results = completedBassPresentation.perSeatP20Results;
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path

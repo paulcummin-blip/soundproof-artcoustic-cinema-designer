@@ -14,7 +14,6 @@
  */
 import React from "react";
 import {
-  getRoomDesignRatingDesignation,
   getDesignPerformanceIndex,
   getDesignRatingSupportingSentence,
 } from "./designRatingPresentation";
@@ -39,9 +38,6 @@ function isConfigured(rating) {
 
 function SeatingBlock({ label, rating, emphasize, concise }) {
   const configured = isConfigured(rating);
-  const designation = configured
-    ? getRoomDesignRatingDesignation(rating) || "—"
-    : "Not configured";
   const index = configured ? getDesignPerformanceIndex(rating) : null;
 
   let supportLine = null;
@@ -66,6 +62,18 @@ function SeatingBlock({ label, rating, emphasize, concise }) {
       </div>
       <div
         style={{
+          fontSize: emphasize ? "9pt" : "8pt",
+          fontWeight: 600,
+          color: COLORS.secondary,
+          fontFamily: FONT_BODY,
+          marginTop: "1mm",
+          letterSpacing: "0.03em",
+        }}
+      >
+        Design Performance Index
+      </div>
+      <div
+        style={{
           fontSize: emphasize ? "14pt" : "12pt",
           fontWeight: 400,
           color: configured ? COLORS.primary : COLORS.muted,
@@ -73,21 +81,7 @@ function SeatingBlock({ label, rating, emphasize, concise }) {
           lineHeight: 1.15,
         }}
       >
-        {designation}
-        {configured && index != null && (
-          <span
-            style={{
-              fontSize: emphasize ? "9pt" : "8pt",
-              fontWeight: 600,
-              color: COLORS.secondary,
-              fontFamily: FONT_BODY,
-              marginLeft: "3mm",
-              letterSpacing: "0.03em",
-            }}
-          >
-            · Design Performance Index {index}
-          </span>
-        )}
+        {configured ? (index ?? "—") : "Not configured"}
       </div>
       {supportLine && (
         <div

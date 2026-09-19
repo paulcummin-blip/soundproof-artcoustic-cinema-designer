@@ -15,10 +15,7 @@
  */
 
 import React from "react";
-import {
-  getRoomDesignRatingDesignation,
-  getDesignPerformanceIndex,
-} from "./designRatingPresentation";
+import { getDesignPerformanceIndex } from "./designRatingPresentation";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -38,9 +35,6 @@ function ScopeLine({ label, rating, emphasize }) {
     rating &&
     rating.status !== "NOT_ASSESSED" &&
     rating.status !== "NOT_CONFIGURED";
-  const designation = isConfigured
-    ? getRoomDesignRatingDesignation(rating) || "—"
-    : "Not configured";
   const index = isConfigured ? getDesignPerformanceIndex(rating) : null;
 
   return (
@@ -59,6 +53,18 @@ function ScopeLine({ label, rating, emphasize }) {
       </div>
       <div
         style={{
+          fontSize: emphasize ? "9pt" : "8pt",
+          fontWeight: 600,
+          color: COLORS.secondary,
+          fontFamily: FONT_BODY,
+          marginTop: "1mm",
+          letterSpacing: "0.03em",
+        }}
+      >
+        Design Performance Index
+      </div>
+      <div
+        style={{
           fontSize: emphasize ? "14pt" : "11pt",
           fontWeight: 400,
           color: isConfigured ? COLORS.primary : COLORS.muted,
@@ -66,21 +72,7 @@ function ScopeLine({ label, rating, emphasize }) {
           lineHeight: 1.15,
         }}
       >
-        {designation}
-        {isConfigured && index != null && (
-          <span
-            style={{
-              fontSize: emphasize ? "9pt" : "8pt",
-              fontWeight: 600,
-              color: COLORS.secondary,
-              fontFamily: FONT_BODY,
-              marginLeft: "3mm",
-              letterSpacing: "0.03em",
-            }}
-          >
-            · Design Performance Index {index}
-          </span>
-        )}
+        {isConfigured ? (index ?? "—") : "Not configured"}
       </div>
     </div>
   );
