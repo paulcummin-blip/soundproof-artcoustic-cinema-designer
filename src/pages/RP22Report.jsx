@@ -42,7 +42,7 @@ import ElevationDrawing from '../components/report/ElevationDrawing';
 import FrontElevation from '../components/room/FrontElevation';
 import SideElevation from '../components/room/SideElevation';
 import PrintRp23Pill from '@/components/report/PrintRp23Pill';
-import { usePlanCapture } from '@/components/report/usePlanCapture';
+import { usePlanCapture } from '@/components/report/usePlanCapture.jsx';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '../components/utils/viewingAngleUtils';
 import { getP21PresetResult, levelP21_earlyReflections } from '@/components/utils/rp22/levels';
 import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
