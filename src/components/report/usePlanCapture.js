@@ -60,6 +60,7 @@ function drawDebug(ctx, width, height, info, enabled) {
 
 export function usePlanCapture({ isPrinting, imageDataUrl, setImageDataUrl, selector, planLabel, debugPlanCapture, exportGuardRef, setExportStatus, setIsPrinting }) {
   useEffect(() => {
+    console.info('[REPORT-RUNTIME] plan-hook-js ' + JSON.stringify({ isPrinting, imageDataUrlType: typeof imageDataUrl, imageDataUrlIsNull: imageDataUrl === null, selector, planLabel, setImageDataUrlType: typeof setImageDataUrl }));
     if (!isPrinting || imageDataUrl !== null) return undefined;
     setExportStatus(`Capturing ${planLabel}: waiting for SVG…`);
     let attempts = 0;
