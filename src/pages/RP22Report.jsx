@@ -237,14 +237,11 @@ function RP22ReportInner() {
     // correct saved authority to hydrate, not for an unrequested calculation.
     // Metric publication still uses the gated presentation; no result is promoted.
     const bassReportPending = !projectIdMatch || completedBassAuthority?.hydrationSettled !== true;
-    const completedP19Result = completedBassContract?.productAnalysis?.parameters?.p19 || null;
-    // Use the SAME raw per-seat P19 source as the Room Designer
-    // (useAppDesignRating line 221): contract.selectedCandidate.perSeatP19Results.
-    // The presentation-gated perSeatP19Results returns [] when publication is
-    // not verified, which suppresses genuine L1 seat results and makes the
-    // Technical Report disagree with the Room Designer's authoritative P19.
-    // Reading the raw contract source guarantees identical seat outcomes.
-    const completedP19Results = completedBassAuthority?.contract?.selectedCandidate?.perSeatP19Results || [];
+    // P19 is read only from the Room Designer publication. The report never
+    // joins, filters, groups or re-grades selectedCandidate.perSeatP19Results.
+    const p19SeatAuthority = designReviewHandoff?.p19SeatAuthority
+        ?? designReviewHandoff?.rating?.p19SeatAuthority
+        ?? null;
     const completedP20Results = completedBassPresentation.perSeatP20Results;
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
@@ -734,10 +731,9 @@ function RP22ReportInner() {
     // recalculation, no buildSeatHudSnapshot, no allSeatSplMetrics dependency.
     const reportSeatHudById = React.useMemo(() => {
         return buildLightweightSeatHudById(
-            seats, analysisResult, primarySeatingPosition,
-            completedP19Result, completedP19Results, completedP20Results
+            seats, analysisResult, completedP20Results, p19SeatAuthority
         );
-    }, [seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results]);
+    }, [seats, analysisResult, completedP20Results, p19SeatAuthority]);
 
     const seatScopedParamNumbers = React.useMemo(() => new Set(RP22_SEAT_PARAMETERS.map((parameter) => parameter.number)), []);
 
@@ -937,13 +933,14 @@ function RP22ReportInner() {
                 reportP18Mode,
                 hasFrontWides,
                 placedSpeakers,
+                p19SeatAuthority,
             });
             const authority = buildArtcousticDesignRatingAuthority(input);
             return authority?.parameters || null;
         } catch (e) {
             return null;
         }
-    }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers]);
+    }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, p19SeatAuthority]);
 
     const coverageResult = React.useMemo(
         () => buildRp22SeatCoverageResult({ paramAuthority: coverageParamAuthority, seats }),
@@ -1240,6 +1237,7 @@ function RP22ReportInner() {
         setAssumedP15LevelSafe: app?.setAssumedP15LevelSafe,
         setAssumedP21LevelSafe: app?.setAssumedP21LevelSafe,
         bassAuthority: completedBassAuthority,
+        p19SeatAuthority,
         bassErrorMessage,
         contributionsByKey: showDesignRating ? asdrContributionsByKey : null,
     };
