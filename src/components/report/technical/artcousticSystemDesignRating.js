@@ -454,6 +454,22 @@ function scoreRoomParam(key, input) {
  * @returns {{ state: string, level: string|null, multiplier: number|null, reason: string|null }}
  */
 function scoreSeatParam(key, input) {
+  // P19 arrives pre-graded from selectedCandidate.perSeatP19Results through
+  // summariseAuthoritativeP19Seats(). Raw deviation remains diagnostic only.
+  // Missing shared authority is provisional; it is never independently graded.
+  if (key === "p19") {
+    const authoritativeLevel = String(input?.authoritativeLevel || "").toUpperCase();
+    if (input?.verified !== true || !/^(L[1-4]|FAIL)$/.test(authoritativeLevel)) {
+      return { state: "provisional", level: null, multiplier: null, reason: "missing-authoritative-p19-seat-grade" };
+    }
+    return {
+      state: "scored",
+      level: authoritativeLevel,
+      multiplier: multiplierForLevel(authoritativeLevel),
+      reason: null,
+    };
+  }
+
   const norm = normalizeInput(input, BASS_PARAMS.has(key));
   if (norm.state === "na") return { state: "na", level: null, multiplier: null, reason: null };
   if (norm.state === "provisional") {
