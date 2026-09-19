@@ -26,6 +26,7 @@ import DesignReviewPage from './pages/DesignReviewPage';
 import ProposalCentre from './pages/ProposalCentre';
 import ProjectProposalAssets from './pages/ProjectProposalAssets';
 import ProposalEditor from './pages/ProposalEditor';
+import ProposalDirectLink from '@/components/proposal/ProposalDirectLink';
 import PurchaseProjects from './pages/PurchaseProjects';
 import PriceList from './pages/PriceList';
 import AccountUsers from './pages/AccountUsers';
@@ -110,6 +111,7 @@ const AuthenticatedApp = () => {
         <Route path="/ProposalCentre" element={<AccessGate capability="soundProof"><ProposalCentre /></AccessGate>} />
         <Route path="/ProjectProposalAssets" element={<AccessGate capability="soundProof"><ProjectProposalAssets /></AccessGate>} />
         <Route path="/ProposalEditor" element={<AccessGate capability="soundProof"><ProposalEditor /></AccessGate>} />
+        <Route path="/proposal/:proposalId" element={<AccessGate capability="soundProof"><ProposalDirectLink /></AccessGate>} />
         <Route path="/PurchaseProjects" element={<AccessGate capability="commercial"><PurchaseProjects /></AccessGate>} />
         <Route path="/PriceList" element={<AccessGate capability="priceList"><PriceList /></AccessGate>} />
         <Route path="/account/users" element={<AccessGate capability="manageUsers"><AccountUsers /></AccessGate>} />
