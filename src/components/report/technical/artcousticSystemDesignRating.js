@@ -29,7 +29,6 @@ import {
   levelP10_upperDelta,
   levelP16_screenFR,
   levelP17_wsFR,
-  levelP19_lfResponse,
   levelP20_lfConsistency,
 } from "@/components/utils/rp22/levels";
 import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
@@ -341,13 +340,6 @@ function scoreP18(rawValue, mode) {
   };
 }
 
-function scoreP19(rawValue) {
-  // Engine parity: grade the direct maximum absolute deviation via the shared
-  // mapper. Never floor, halve, or independently re-grade the authoritative value.
-  // L1=5 is bounded, so values above 5 dB preserve FAIL.
-  return applyMapper(rawValue, levelP19_lfResponse, true);
-}
-
 function scoreP20(rawValue) {
   // RP22 P20 has no L1: >4 dB is below the L2 threshold (FAIL). canFail=true
   // so the FAIL level propagates instead of being silently coerced to L1.
@@ -486,7 +478,6 @@ function scoreSeatParam(key, input) {
     case "p10": scored = scoreP10(norm.rawValue); break;
     case "p16": scored = scoreP16(norm.rawValue); break;
     case "p17": scored = scoreP17(norm.rawValue); break;
-    case "p19": scored = scoreP19(norm.rawValue); break;
     case "p20": scored = scoreP20(norm.rawValue); break;
     case "screen": scored = scoreScreen(norm.rawValue); break;
     default: return { state: "provisional", level: null, multiplier: null, reason: "unknown-seat-param" };
