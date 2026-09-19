@@ -85,11 +85,9 @@ function startProjectHydration(key) {
   if (state.hydrationInFlight) return state.hydrationInFlight;
   state.hydrationSettled = false;
   const { projectId, versionId } = parseBassCacheKey(key);
-  console.info('[REPORT-RUNTIME] hydrate-start ' + JSON.stringify({ key, filter: bassDbFilter(projectId, versionId), storageKey: projectKey(projectId, versionId) }));
   state.hydrationInFlight = hydrateCompletedBassAuthority(projectId, versionId).finally(() => {
     state.hydrationInFlight = null;
     markHydrationSettled(key);
-    console.info('[REPORT-RUNTIME] hydrate-settled ' + JSON.stringify({ key, manager: state, snapshot: { projectId: memoryByProject.get(key)?.projectId, status: memoryByProject.get(key)?.authorityStatus, hydrationSettled: memoryByProject.get(key)?.hydrationSettled }, writtenKeys: [...memoryByProject.keys()] }));
   });
   return state.hydrationInFlight;
 }
@@ -530,7 +528,6 @@ export async function hydrateCompletedBassAuthority(projectId, versionId) {
     const record = Array.isArray(records) ? records[0] : null;
     const persisted = buildHydratedPersistedWrapper(record);
     const next = resolvePersistedBassAuthority(key, persisted);
-    console.info('[REPORT-RUNTIME] hydrate-result ' + JSON.stringify({ projectId, versionId, key, filter: bassDbFilter(projectId, versionId), records: records?.length, recordGenerations: { cache: record?.completed_cache_version, instance: record?.instance_authority_version, metric: record?.metric_schema_version, status: record?.status, fingerprint: record?.current_fingerprint, snapshotCount: Object.keys(record?.completed_by_fingerprint || {}).length }, expectedGenerations: { cache: COMPLETED_BASS_CACHE_VERSION, instance: INSTANCE_AUTHORITY_VERSION, metric: RP22_BASS_METRIC_SCHEMA_VERSION }, nextStatus: next?.authorityStatus }));
     if (current?.authoritative && current?.contract && !next?.authoritative) {
       return current;
     }

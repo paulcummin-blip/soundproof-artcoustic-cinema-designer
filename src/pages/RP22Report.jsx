@@ -204,11 +204,8 @@ function RP22ReportInner() {
     }, [completedBassAuthority, projectIdMatch, app?.frontSubsCfg, app?.rearSubsCfg, app?.subwooferInstances, app?.subwoofers, p14Selection.noP14TargetSelected]);
     // This read-only route has no bass calculation producer. Wait for the
     // correct saved authority to hydrate, not for an unrequested calculation.
-    // Metric publication still uses bassReadiness and the gated presentation.
+    // Metric publication still uses the gated presentation; no result is promoted.
     const bassReportPending = !projectIdMatch || completedBassAuthority?.hydrationSettled !== true;
-    useEffect(() => {
-        console.info('[REPORT-RUNTIME] report-gate ' + JSON.stringify({ expectedProjectKey, projectIdMatch, reportVersionId, resolvedReportVersionId, appVersion: app?.activeVersionId, readiness: bassReadiness, authority: { projectId: completedBassAuthority?.projectId, status: completedBassAuthority?.authorityStatus, hydrationSettled: completedBassAuthority?.hydrationSettled, currentFingerprint: completedBassAuthority?.currentFingerprint, resultFingerprint: completedBassAuthority?.contract?.job?.resultFingerprint }, noP14TargetSelected: p14Selection.noP14TargetSelected, reportHydrating, reportReadyProjectId }));
-    }, [expectedProjectKey, projectIdMatch, reportVersionId, resolvedReportVersionId, bassReadiness, completedBassAuthority, reportHydrating, reportReadyProjectId]);
     const completedP19Result = completedBassContract?.productAnalysis?.parameters?.p19 || null;
     // Use the gated presentation (publicationVerified) for per-seat P19 — same
     // authority as P20 and the parameter grid. This ensures the HUD snapshot,
@@ -690,7 +687,7 @@ function RP22ReportInner() {
     // When P14 target is unselected, bassReadiness.ready is false but pending is
     // also false (reason: 'p14-target-not-selected'). The report must RENDER and
     // show "Select Bass Target" for bass parameters — NOT hang on "Loading…".
-    // Only block when genuinely pending (calculation in progress or hydrating).
+    // Only block while report inputs or saved bass authority are hydrating.
     const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || bassReportPending;
 
     // READ-ONLY: useAnalysisSpeakers, useAllSeatSplMetrics, and

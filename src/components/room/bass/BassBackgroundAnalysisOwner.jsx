@@ -736,13 +736,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     }
   }, [lifecycle.status, lifecycle.resultFingerprint, cacheKey, manualAnalysisRequest, manualRequestMatchesCurrent]);
 
-  useEffect(() => {
-    console.info('[REPORT-RUNTIME] producer-mounted ' + JSON.stringify({ scopeId, versionId }));
-    return () => console.info('[REPORT-RUNTIME] producer-unmounted ' + JSON.stringify({ scopeId, versionId }));
-  }, [scopeId, versionId]);
-  useEffect(() => {
-    console.info('[REPORT-RUNTIME] producer-state ' + JSON.stringify({ scopeId, versionId, manualAnalysisRequest, lifecycleStatus: lifecycle?.status, contractStatus: contract?.job?.status, completedStatus: completedBassAuthority?.authorityStatus, bassAuthorityHydrationSettled, completedContractMatches, hasCachedContract: !!cachedContract, cacheKey }));
-  }, [scopeId, versionId, manualAnalysisRequest, lifecycle?.status, contract?.job?.status, completedBassAuthority, bassAuthorityHydrationSettled, completedContractMatches, cachedContract, cacheKey]);
   const publishedContractTokensRef = useRef(new Set());
   useEffect(() => {
     // #1: Do not publish/promote/sync while the project record is still
