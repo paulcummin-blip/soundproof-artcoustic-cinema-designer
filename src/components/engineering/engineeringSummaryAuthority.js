@@ -164,11 +164,42 @@ function buildReportCounts(parameters, seats) {
       seats: rowSeats.sort((a, b) => a.seatNum - b.seatNum),
     }));
 
+  // Relative seat-compromise diagnostic. This is calculated once here so
+  // reports never compare or rank authoritative seat results independently.
+  const bestByParameter = {};
+  for (const [key, parameter] of seatParameterEntries) {
+    const levels = Object.values(parameter?.seats || {})
+      .filter((seatAuthority) => seatAuthority?.state === "scored")
+      .map((seatAuthority) => normalizeLevel(seatAuthority.level))
+      .filter((level) => level && level !== "FAIL")
+      .map((level) => LEVEL_RANK[level]);
+    if (levels.length) bestByParameter[key] = Math.max(...levels);
+  }
+  const seatCompromiseById = {};
+  for (const seat of Array.isArray(seats) ? seats : []) {
+    let comparableCount = 0;
+    let majorGapCount = 0;
+    for (const [key, parameter] of seatParameterEntries) {
+      const level = normalizeLevel(parameter?.seats?.[seat?.id]?.level);
+      if (!level || level === "FAIL" || bestByParameter[key] == null) continue;
+      comparableCount += 1;
+      if (bestByParameter[key] - LEVEL_RANK[level] >= 2) majorGapCount += 1;
+    }
+    const majorGapPct = comparableCount > 0 ? majorGapCount / comparableCount : 0;
+    seatCompromiseById[seat?.id] = {
+      majorGapCount,
+      comparableCount,
+      majorGapPct,
+      isCompromised: majorGapCount >= 4 && majorGapPct >= 0.5,
+    };
+  }
+
   return {
     roomLevelCounts,
     roomCalculatedCount: roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1 + roomLevelCounts.fail,
     seatLevelCounts,
     seatCountsByRow,
+    seatCompromiseById,
   };
 }
 
