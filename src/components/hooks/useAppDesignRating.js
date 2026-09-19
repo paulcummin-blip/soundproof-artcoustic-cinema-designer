@@ -58,7 +58,7 @@ const extractMetricRawValue = (metric) => {
  * param authority for the RP22 seating-coverage floor without duplicating
  * the seat-HUD mapping logic.
  */
-export function buildLightweightSeatHudById(seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results, p19SeatAuthority = null) {
+export function buildLightweightSeatHudById(seats, analysisResult, completedP20Results, p19SeatAuthority = null) {
   const out = {};
   const perSeatRp22 = analysisResult?.perSeatRp22;
   const perSeatRp23 = analysisResult?.perSeatRp23;
@@ -86,14 +86,7 @@ export function buildLightweightSeatHudById(seats, analysisResult, primarySeatin
 
     let snapshot = { rp22, rp23: { angleDeg } };
 
-    // Overlay authoritative P19/P20 from the SAME completed bass authority as
-    // RP22Report (reusing the exact helpers from seatHudPresentation.js).
-    // RSP coincidence uses the same 0.05 m tolerance — no isPrimary fallback.
-    const seatX = Number(seat.x);
-    const seatY = Number(seat.y);
-    const isRspPosition = Number.isFinite(primarySeatingPosition?.x) && Number.isFinite(primarySeatingPosition?.y)
-      && Number.isFinite(seatX) && Number.isFinite(seatY)
-      && Math.hypot(seatX - primarySeatingPosition.x, seatY - primarySeatingPosition.y) <= 0.05;
+    // Overlay P19/P20 from the published seat authorities.
 
     // P19 is copied from the one canonical seat authority. Never substitute
     // the room/RSP P19 parameter for a real seat and never re-grade the raw dB.
@@ -269,8 +262,8 @@ export function useAppDesignRating({
   }, [placedSpeakers]);
 
   const reportSeatHudById = useMemo(
-    () => buildLightweightSeatHudById(seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results, p19SeatAuthority),
-    [seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results, p19SeatAuthority]
+    () => buildLightweightSeatHudById(seats, analysisResult, completedP20Results, p19SeatAuthority),
+    [seats, analysisResult, completedP20Results, p19SeatAuthority]
   );
 
   // ── Bass readiness gate ── (moved before roomRating so retainedFromRefresh
