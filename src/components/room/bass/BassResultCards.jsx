@@ -45,6 +45,7 @@ export default function BassResultCards() {
       <SharedP19P20SeatResults
         p19Rows={formatted.p19Rows}
         p20Rows={formatted.p20Rows}
+        p19Summary={formatted.p19SeatAuthority?.project?.coverageSummary || null}
         publicationVerified={formatted.publicationVerified}
         authorityStatus={shared.completedBassAuthority?.authorityStatus}
         p14TargetUnselected={p14Selection.noP14TargetSelected}
