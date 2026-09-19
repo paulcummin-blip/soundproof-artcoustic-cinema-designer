@@ -104,6 +104,12 @@ export function summariseAuthoritativeP19Seats({
   const snapshotKey = JSON.stringify({
     primaryIds,
     secondaryIds,
+    results: results.map((result) => ({
+      seatId: cleanId(result?.seatId ?? result?.id),
+      level: result?.level ?? null,
+      variationDbRaw: result?.variationDbRaw ?? null,
+      worstFrequencyHz: result?.worstFrequencyHz ?? null,
+    })),
     seats: positions.map((seat) => ({
       id: cleanId(seat?.id ?? seat?.seatId),
       label: seat?.label || null,
