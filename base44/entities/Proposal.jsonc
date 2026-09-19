@@ -1,7 +1,7 @@
 {
   "name": "Proposal",
   "type": "object",
-  "description": "A client-facing design proposal for a project. Created via a wizard that selects a project, proposal type (single or comparison), one or more project versions, and a Narrative Goal, then generates a complete first draft via GPT. The Proposal Editor is the primary workspace for reviewing, editing, and approving proposals before export.",
+  "description": "A client-facing design proposal for a project. Created via a wizard that selects a project, proposal type, one or more project versions, and a Client Brief & Narrative Focus, then generates a complete first draft. The Proposal Editor is the primary workspace for reviewing, editing, and approving proposals before export.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -49,7 +49,7 @@
         "archived"
       ],
       "default": "draft",
-      "description": "Proposal lifecycle status. draft = created but not yet generated. generating = GPT generation in progress. generated = GPT content populated. reviewed = human-reviewed. sent = delivered to client. archived = retired."
+      "description": "Proposal lifecycle status. draft = created but not yet generated. generating = generation in progress. generated = content populated. reviewed = human-reviewed. sent = delivered to client. archived = retired."
     },
     "narrative_goal": {
       "type": "string",
@@ -61,7 +61,12 @@
         "future_proof"
       ],
       "default": "luxury_cinema",
-      "description": "The proposal's personality. First thing GPT reads. luxury_cinema = premium home cinema experience, family_media_room = accessible family entertainment, reference_performance = audiophile-grade accuracy, best_value = cost-conscious quality, future_proof = investment in upgradeability."
+      "description": "Legacy narrative personality selector. Superseded by client_brief for new proposals. Retained for backward compatibility with existing proposals. No longer shown in the wizard UI."
+    },
+    "client_brief": {
+      "type": "string",
+      "description": "Client Brief & Narrative Focus \u2014 free-text guidance that shapes the narrative emphasis, wording, and structure of the generated proposal. Influences narrative only; never alters engineering results, RP22 values, Design Ratings, or recommendations. Preloaded on regeneration so the user can refine rather than rewrite.",
+      "nullable": true
     },
     "narrative_brief": {
       "type": "string",

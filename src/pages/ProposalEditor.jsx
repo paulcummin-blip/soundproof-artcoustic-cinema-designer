@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Link, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { NARRATIVE_GOALS, getSectionDef } from '@/components/proposal/proposalSections';
+import { getSectionDef } from '@/components/proposal/proposalSections';
 import { getProposalType } from '@/components/proposal/proposalTypes';
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
@@ -30,6 +30,9 @@ export default function ProposalEditor() {
   const [saveStatuses, setSaveStatuses] = useState({});
   const [regenerating, setRegenerating] = useState(null);
   const [showProperties, setShowProperties] = useState(false);
+  const [clientBrief, setClientBrief] = useState('');
+  const [showClientBrief, setShowClientBrief] = useState(false);
+  const [savingBrief, setSavingBrief] = useState(false);
 
   // ── Load proposal + sections by ID ──
   const load = useCallback(async () => {
@@ -42,6 +45,7 @@ export default function ProposalEditor() {
       const proposalRecord = await base44.entities.Proposal.get(proposalId);
       setProposal(proposalRecord);
       if (proposalRecord) {
+        setClientBrief(proposalRecord.client_brief || '');
         const sectionResults = await base44.entities.ProposalSection.filter({
           proposal_id: proposalRecord.id,
         });
@@ -123,9 +127,22 @@ export default function ProposalEditor() {
     await base44.entities.ProposalSection.update(activeSection.id, { dealer_notes: notes });
   };
 
-  // ── Regeneration (placeholder — GPT integration in Stage 5) ──
+  // ── Save Client Brief to Proposal record ──
+  const handleSaveClientBrief = async () => {
+    if (!proposal) return;
+    setSavingBrief(true);
+    try {
+      await base44.entities.Proposal.update(proposal.id, { client_brief: clientBrief });
+      setSavingBrief(false);
+    } catch (err) {
+      console.error('Failed to save client brief:', err);
+      setSavingBrief(false);
+    }
+  };
+
+  // ── Regeneration — uses Current Report + Client Brief + Dealer Notes + Authoritative data ──
   const handleRegenerate = async (action) => {
-    if (!activeSection) return;
+    if (!activeSection || !proposal) return;
     if (activeSection.locked) {
       const confirmed = window.confirm(
         'This section is locked. Regeneration will replace your manual edits. Continue?'
@@ -133,10 +150,22 @@ export default function ProposalEditor() {
       if (!confirmed) return;
     }
     setRegenerating(activeSection.id);
-    setTimeout(() => {
+    try {
+      const response = await base44.functions.invoke('regenerateProposalSection', {
+        proposal_id: proposal.id,
+        section_id: activeSection.id,
+        action,
+        client_brief: clientBrief,
+      });
+      if (response?.data?.error) throw new Error(response.data.error);
+      // Reload sections to pick up the regenerated content
+      await load();
+    } catch (err) {
+      console.error('Regeneration failed:', err);
+      alert('Regeneration failed. Please try again.');
+    } finally {
       setRegenerating(null);
-      alert('Section refresh will be available soon. The editor is ready for it.');
-    }, 1000);
+    }
   };
 
   // ── Render ──
@@ -192,9 +221,12 @@ export default function ProposalEditor() {
             </span>
           </div>
           <div className="text-xs text-[#625143] mt-1">{typeLabel}</div>
-          <div className="text-xs text-[#625143]">
-            {NARRATIVE_GOALS.find((g) => g.value === proposal?.narrative_goal)?.label || 'Luxury Cinema'}
-          </div>
+          <button
+            onClick={() => setShowClientBrief(true)}
+            className="text-xs text-[#625143] hover:text-[#213428] text-left mt-1"
+          >
+            {clientBrief ? `${clientBrief.slice(0, 28)}${clientBrief.length > 28 ? '…' : ''}` : 'No client brief'}
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           <ProposalSectionNav
@@ -276,6 +308,54 @@ export default function ProposalEditor() {
         </div>
       </div>
 
+      {/* ── Right: Client Brief & Narrative Focus ── */}
+      {showClientBrief && (
+        <div className="w-72 border-l border-[#DCDBD6] bg-white p-4 overflow-y-auto flex-shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <h3
+              className="text-sm font-semibold text-[#1B1A1A]"
+              style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+            >
+              Client Brief &amp; Narrative Focus
+            </h3>
+            <button
+              onClick={() => setShowClientBrief(false)}
+              className="text-xs text-[#A79E8C] hover:text-[#625143]"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="text-[11px] text-[#625143] leading-relaxed mb-3">
+            Describe anything you would like the report to emphasise. These notes guide the
+            narrative only and never alter the engineering results.
+          </p>
+          <textarea
+            value={clientBrief}
+            onChange={(e) => setClientBrief(e.target.value)}
+            placeholder="e.g. The client is passionate about music and wants invisible loudspeakers…"
+            rows={10}
+            className="w-full p-3 text-xs text-[#1B1A1A] bg-[#F5F4F0] border border-[#DCDBD6] rounded-lg resize-y focus:outline-none focus:border-[#213428] focus:ring-1 focus:ring-[#213428] transition-colors"
+            style={{ fontFamily: 'Inter, sans-serif', lineHeight: 1.6 }}
+          />
+          <button
+            onClick={handleSaveClientBrief}
+            disabled={savingBrief}
+            className="w-full mt-3 px-4 py-2 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
+            style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
+          >
+            {savingBrief ? 'Saving…' : 'Save Brief'}
+          </button>
+          <div className="mt-4 p-2.5 bg-[#F5F4F0] border-l-2 border-[#213428] rounded-r">
+            <p className="text-[10px] text-[#625143] leading-relaxed">
+              <strong className="text-[#213428]">Note:</strong> Changing the Client Brief changes
+              the wording and emphasis of the report. It must never change any engineering result,
+              RP22 value, Design Rating, or recommendation. Use Refine to apply the brief to a
+              section.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Right: Contextual properties ── */}
       {showProperties && activeSection && (
         <div className="w-64 border-l border-[#DCDBD6] bg-white p-4 overflow-y-auto">
@@ -313,6 +393,16 @@ export default function ProposalEditor() {
 
       {/* ── Top bar ── */}
       <div className="fixed top-0 right-0 z-40 flex items-center gap-2 px-4 py-2">
+        <button
+          onClick={() => setShowClientBrief(!showClientBrief)}
+          className={`px-3 py-1.5 text-xs rounded-md border transition-colors ${
+            showClientBrief
+              ? 'bg-[#213428] text-white border-[#213428]'
+              : 'border-[#DCDBD6] bg-white text-[#3E4349] hover:bg-[#F5F4F0]'
+          }`}
+        >
+          Client Brief
+        </button>
         <button
           onClick={() => setShowProperties(!showProperties)}
           className="px-3 py-1.5 text-xs rounded-md border border-[#DCDBD6] bg-white text-[#3E4349] hover:bg-[#F5F4F0]"

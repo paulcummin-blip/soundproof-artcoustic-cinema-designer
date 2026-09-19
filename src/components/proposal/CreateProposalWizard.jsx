@@ -6,14 +6,14 @@ import WizardStepper from '@/components/proposal/wizard/WizardStepper';
 import ProjectSelectStep from '@/components/proposal/wizard/ProjectSelectStep';
 import ProposalTypeStep from '@/components/proposal/wizard/ProposalTypeStep';
 import VersionSelectStep from '@/components/proposal/wizard/VersionSelectStep';
-import NarrativeGoalStep from '@/components/proposal/wizard/NarrativeGoalStep';
+import ClientBriefStep from '@/components/proposal/wizard/ClientBriefStep';
 import GenerateStep from '@/components/proposal/wizard/GenerateStep';
 
 const STEPS = [
   { key: 'project', label: 'Project' },
   { key: 'type', label: 'Type' },
   { key: 'versions', label: 'Versions' },
-  { key: 'goal', label: 'Goal' },
+  { key: 'brief', label: 'Brief' },
   { key: 'generate', label: 'Generate' },
 ];
 
@@ -25,7 +25,7 @@ const STEPS = [
  * 1. Select Project (any non-archived project for this dealer)
  * 2. Choose Proposal Type (single or comparison)
  * 3. Select Version(s) — one for single, two+ for comparison
- * 4. Choose Narrative Goal
+ * 4. Client Brief & Narrative Focus
  * 5. Generate (creates Proposal + blocks, invokes GPT, opens editor)
  *
  * The wizard is project-agnostic. The Proposal Editor becomes a
@@ -39,7 +39,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [proposalType, setProposalType] = useState('single');
   const [selectedVersionIds, setSelectedVersionIds] = useState([]);
-  const [narrativeGoal, setNarrativeGoal] = useState('luxury_cinema');
+  const [clientBrief, setClientBrief] = useState('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
 
@@ -63,7 +63,8 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
         proposal_type: proposalType,
         selected_version_ids: selectedVersionIds,
         account_id: accountId,
-        narrative_goal: narrativeGoal,
+        narrative_goal: 'luxury_cinema',
+        client_brief: clientBrief,
       });
       const proposalId = response?.data?.proposal_id;
       if (proposalId) {
@@ -92,7 +93,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
     !!selectedProjectId, // step 0
     !!proposalType, // step 1
     versionsValid, // step 2
-    !!narrativeGoal, // step 3
+    true, // step 3 — client brief is optional
   ];
 
   return (
@@ -132,9 +133,9 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
         />
       )}
 
-      {/* Step 3 — Narrative Goal */}
+      {/* Step 3 — Client Brief & Narrative Focus */}
       {step === 3 && (
-        <NarrativeGoalStep selectedGoal={narrativeGoal} onSelect={setNarrativeGoal} />
+        <ClientBriefStep value={clientBrief} onChange={setClientBrief} />
       )}
 
       {/* Step 4 — Review & Generate */}
@@ -151,8 +152,8 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
               value={`${selectedVersionIds.length} selected`}
             />
             <ReviewRow
-              label="Narrative Goal"
-              value={narrativeGoal ? narrativeGoal.replace(/_/g, ' ') : '—'}
+              label="Client Brief"
+              value={clientBrief ? `${clientBrief.slice(0, 60)}${clientBrief.length > 60 ? '…' : ''}` : '—'}
               last
             />
           </div>

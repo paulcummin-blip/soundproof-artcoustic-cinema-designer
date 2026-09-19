@@ -40,7 +40,7 @@ export default async function(req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids } = body;
+    const { project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief } = body;
 
     if (!project_id) return Response.json({ error: 'project_id required' }, { status: 400 });
 
@@ -79,6 +79,7 @@ export default async function(req) {
       title: project.name || 'Untitled Proposal',
       status: 'generating',
       narrative_goal: narrative_goal || 'luxury_cinema',
+      client_brief: client_brief || '',
     });
 
     // ── Create 10 ProposalSection records ──
@@ -98,7 +99,7 @@ export default async function(req) {
     );
 
     // ── Build project context for GPT ──
-    const projectContext = buildProjectContext(project, narrative_goal, brandAsset);
+    const projectContext = buildProjectContext(project, narrative_goal, brandAsset, client_brief);
 
     // ── Generate content for each editable section in parallel ──
     const editableIndices = sectionRecords
@@ -137,7 +138,7 @@ export default async function(req) {
   }
 }
 
-function buildProjectContext(project, narrativeGoal, brandAsset) {
+function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief) {
   const goalLabel = GOAL_LABELS[narrativeGoal] || 'Luxury Cinema';
   const roomWidth = project.room_width || '';
   const roomLength = project.room_length || '';
@@ -155,6 +156,7 @@ function buildProjectContext(project, narrativeGoal, brandAsset) {
     : '';
   const companyName = brandAsset?.company_name || '';
   const tone = brandAsset?.proposal_tone || 'luxury_residential';
+  const briefText = (clientBrief || '').trim();
 
   return [
     `Narrative Goal: ${goalLabel}`,
@@ -167,6 +169,14 @@ function buildProjectContext(project, narrativeGoal, brandAsset) {
     `Speaker Configuration: ${dolbyConfig}`,
     speakerInfo ? `Speakers: ${speakerInfo}` : '',
     subInfo ? `Subwoofers: ${subInfo}` : '',
+    '',
+    '=== CLIENT BRIEF & NARRATIVE FOCUS (guide the narrative emphasis only) ===',
+    briefText || 'No specific client brief provided. Use a balanced professional narrative.',
+    '',
+    '=== CONSTRAINT ===',
+    'The Client Brief influences narrative emphasis, wording, and structure ONLY.',
+    'It must NEVER alter, contradict, or override any engineering result, RP22 value,',
+    'Design Rating, or recommendation. All measured values remain exactly as reported.',
   ].filter(Boolean).join('\n');
 }
 
