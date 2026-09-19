@@ -67,17 +67,14 @@ test("P20 direct boundaries have no L1", async () => {
   assert.notEqual(levelP20_lfConsistency(100).level, "L1");
 });
 
-test("scoreP19 delegates to levelP19_lfResponse (engine parity wiring)", async () => {
+test("scorecard reads the engine-published P19 grade without a raw-value scorer", async () => {
   const src = await readFile(
     new URL("../src/components/report/technical/artcousticSystemDesignRating.js", import.meta.url),
     "utf8",
   );
-  // scoreP19 uses the direct engine mapper
-  assert.match(src, /function scoreP19[\s\S]*?levelP19_lfResponse/);
-  // No longer re-grades raw value against the flat catalog levels
-  assert.doesNotMatch(src, /function scoreP19[\s\S]*?applyCatalogThresholds\(rawValue,\s*cat\.levels/);
-  // Import is present
-  assert.match(src, /levelP19_lfResponse/);
+  assert.match(src, /key === "p19"[\s\S]*?authoritativeLevel/);
+  assert.doesNotMatch(src, /function scoreP19/);
+  assert.doesNotMatch(src, /levelP19_lfResponse/);
 });
 
 test("scoreP20 delegates to the shared mapper and preserves FAIL", async () => {
@@ -92,34 +89,19 @@ test("scoreP20 delegates to the shared mapper and preserves FAIL", async () => {
   }
 });
 
-test("scoreP19 output === levelP19_lfResponse for representative boundary values", async () => {
+test("P19 engine mapper remains covered at source boundaries", async () => {
   const { levelP19_lfResponse } = await loadLevels();
-  const cases = [1.5, 2.0, 2.001, 2.858, 3.0, 3.001, 4.0, 4.001, 4.815, 5.0, 5.001, 5.2];
-  for (const v of cases) {
-    const engine = levelP19_lfResponse(v).level;
-    const scorecard = applyMapper(v, levelP19_lfResponse, true).level;
-    assert.equal(scorecard, engine, `scoreP19(${v}) must equal levelP19_lfResponse(${v})`);
+  for (const [value, expected] of [[2, "L4"], [2.858, "L3"], [4, "L2"], [4.815, "L1"], [6, "FAIL"]]) {
+    assert.equal(levelP19_lfResponse(value).level, expected);
   }
 });
 
-test("scoreP19 preserves FAIL above the L1 band (canFail=true)", async () => {
-  const { levelP19_lfResponse } = await loadLevels();
-  // >5 dB is direct FAIL; scoreP19 (canFail=true) must preserve it
-  assert.equal(levelP19_lfResponse(6.0).level, "FAIL");
-  assert.equal(applyMapper(6.0, levelP19_lfResponse, true).level, "FAIL");
-});
-
-test("Room Designer P20 compact status and value use completed bass authority", async () => {
+test("Room Designer compliance reads P19 floor and summary from the publication", async () => {
   const src = await readFile(
     new URL("../src/components/rp22/RP22CompliancePanel.jsx", import.meta.url),
     "utf8",
   );
-  assert.match(
-    src,
-    /\[14, 18, 19, 20\]\.includes\(pid\)[^\n]*bassPresentation\.parameters\[`p\$\{pid\}`\]\.level/,
-  );
-  assert.match(
-    src,
-    /\[14, 18, 19, 20\]\.includes\(pid\)[^\n]*bassPresentation\.parameters\[`p\$\{pid\}`\]\.valueText/,
-  );
+  assert.match(src, /pid === 19[^\n]*p19SeatAuthority\?\.project\?\.floor/);
+  assert.match(src, /pid === 19[^\n]*p19SeatAuthority\?\.project\?\.coverageSummary/);
+  assert.doesNotMatch(src, /buildP19SeatRows/);
 });
