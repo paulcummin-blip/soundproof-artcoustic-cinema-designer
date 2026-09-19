@@ -40,6 +40,7 @@ export default function RP22ReportParameterGrid({
   setAssumedP15LevelSafe,
   setAssumedP21LevelSafe,
   bassAuthority = null,
+  p19SeatAuthority = null,
   bassErrorMessage = null,
   variant = "screen",
   contributionsByKey = null,
@@ -54,6 +55,7 @@ export default function RP22ReportParameterGrid({
     assumedP15Level,
     assumedP21Level,
     bassAuthority,
+    p19SeatAuthority,
     bassErrorMessage,
     contributionsByKey,
   });
