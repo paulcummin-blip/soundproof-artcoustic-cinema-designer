@@ -15,7 +15,7 @@ import {
   resolvePersistedBassAuthority,
 } from "./completedBassResultPersistence";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
-import { bassCacheKey, bassDbFilter } from "./bassCacheKey";
+import { bassCacheKey, bassDbFilter, parseBassCacheKey } from "./bassCacheKey";
 import { assertNotAuthoritativeReadOnly } from "@/components/state/authoritativeReadOnlyMode";
 
 export {
@@ -73,7 +73,8 @@ function markHydrationSettled(key) {
   state.hydrationSettled = true;
   const current = memoryByProject.get(key);
   if (current) {
-    setMemory(key, { ...current });
+    const { projectId, versionId } = parseBassCacheKey(key);
+    setMemory(projectId, versionId, { ...current });
   } else {
     notify();
   }
@@ -83,8 +84,9 @@ function startProjectHydration(key) {
   const state = ensureProjectAuthorityState(key);
   if (state.hydrationInFlight) return state.hydrationInFlight;
   state.hydrationSettled = false;
-  console.info('[REPORT-RUNTIME] hydrate-start ' + JSON.stringify({ key, filter: bassDbFilter(key), storageKey: projectKey(key) }));
-  state.hydrationInFlight = hydrateCompletedBassAuthority(key).finally(() => {
+  const { projectId, versionId } = parseBassCacheKey(key);
+  console.info('[REPORT-RUNTIME] hydrate-start ' + JSON.stringify({ key, filter: bassDbFilter(projectId, versionId), storageKey: projectKey(projectId, versionId) }));
+  state.hydrationInFlight = hydrateCompletedBassAuthority(projectId, versionId).finally(() => {
     state.hydrationInFlight = null;
     markHydrationSettled(key);
     console.info('[REPORT-RUNTIME] hydrate-settled ' + JSON.stringify({ key, manager: state, snapshot: { projectId: memoryByProject.get(key)?.projectId, status: memoryByProject.get(key)?.authorityStatus, hydrationSettled: memoryByProject.get(key)?.hydrationSettled }, writtenKeys: [...memoryByProject.keys()] }));
