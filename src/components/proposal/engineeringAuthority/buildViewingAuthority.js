@@ -1,88 +1,65 @@
 /**
- * buildViewingAuthority.js
+ * buildViewingAuthority.js  (Stage 2A — fragile multi-key probe removed)
  * --------------------------------
  * Layer 1 — RP23 viewing geometry sub-authority.
- * Exposes screen viewing angles and RP23 compliance per seat.
- * Pure function. No GPT. No side effects.
  *
- * Inputs:
- *   project         — Project entity (for screen dims, seating)
- *   analysisResult  — From useRP22AnalysisEngine (may contain viewing angles)
- *   seats           — Array of seating positions
+ * CHANGED in Stage 2A: The fragile multi-key probe
+ *   (analysisResult.viewing || analysisResult.rp23 || analysisResult.viewingAngles)
+ * has been REMOVED. The canonical RP23 source is analysisResult.perSeatRp23,
+ * the SAME source consumed by buildLightweightSeatHudById in useAppDesignRating.
+ *
+ * Pure function. No GPT. No side effects. No independent RP23 recalculation.
  */
 
 import { CONFIDENCE, withConfidence, notCalculated, SOURCE } from './confidence';
+import { rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
 
-function extractViewingAngles(analysisResult, seats) {
-  // The analysis result may contain per-seat viewing angles under various keys
-  // depending on the engine version. Check the most common locations.
-  const viewingData = analysisResult?.viewing || analysisResult?.rp23 || analysisResult?.viewingAngles || null;
-  if (!viewingData) return null;
+/**
+ * @param {Object} analysisResult — from useRP22AnalysisEngine (must contain perSeatRp23)
+ * @param {Array} seats — canonical seating positions
+ */
+export function buildViewingAuthority(analysisResult, seats) {
+  const perSeatRp23 = analysisResult?.perSeatRp23;
+  const seatList = Array.isArray(seats) ? seats : [];
 
-  // If viewing data is an array of per-seat results
-  if (Array.isArray(viewingData)) {
-    return viewingData.map((seat) => ({
-      seat_id: seat.seatId || seat.id || null,
-      horizontal_angle_deg: Number.isFinite(seat.horizontalAngle) ? Number(seat.horizontalAngle) : (Number.isFinite(seat.horizontal_angle_deg) ? Number(seat.horizontal_angle_deg) : null),
-      vertical_angle_deg: Number.isFinite(seat.verticalAngle) ? Number(seat.verticalAngle) : (Number.isFinite(seat.vertical_angle_deg) ? Number(seat.vertical_angle_deg) : null),
-      rp23_level: seat.rp23Level || seat.rp23_level || null,
-    }));
-  }
-
-  // If viewing data is an object keyed by seat ID
-  const seatIds = seats?.map((s) => s.id).filter(Boolean) || [];
-  if (seatIds.length > 0 && typeof viewingData === 'object') {
-    return seatIds.map((seatId) => {
-      const seatData = viewingData[seatId];
-      if (!seatData) return { seat_id: seatId, horizontal_angle_deg: null, vertical_angle_deg: null, rp23_level: null };
+  const perSeat = seatList
+    .filter((s) => s && s.id)
+    .map((seat) => {
+      const engineRp23 = perSeatRp23?.[seat.id];
+      const angleDeg = engineRp23 && Number.isFinite(engineRp23.angleDeg) ? Number(engineRp23.angleDeg) : null;
+      const level = angleDeg != null ? rp23LevelForAngleDeg(angleDeg) : null;
       return {
-        seat_id: seatId,
-        horizontal_angle_deg: Number.isFinite(seatData.horizontalAngle) ? Number(seatData.horizontalAngle) : (Number.isFinite(seatData.horizontal_angle_deg) ? Number(seatData.horizontal_angle_deg) : null),
-        vertical_angle_deg: Number.isFinite(seatData.verticalAngle) ? Number(seatData.verticalAngle) : (Number.isFinite(seatData.vertical_angle_deg) ? Number(seatData.vertical_angle_deg) : null),
-        rp23_level: seatData.rp23Level || seatData.rp23_level || null,
+        seat_id: seat.id,
+        horizontal_angle_deg: angleDeg,
+        rp23_level: level,
       };
     });
-  }
 
-  return null;
-}
+  const validAngles = perSeat.filter((s) => s.horizontal_angle_deg != null);
 
-function buildViewingSummary(perSeatAngles) {
-  if (!perSeatAngles || perSeatAngles.length === 0) {
-    return notCalculated('Viewing angles not calculated.');
-  }
-
-  const validAngles = perSeatAngles.filter((s) => s.horizontal_angle_deg != null || s.vertical_angle_deg != null);
   if (validAngles.length === 0) {
-    return notCalculated('Viewing angles not calculated.');
+    const nc = notCalculated('Viewing angles not calculated.');
+    return {
+      available: false,
+      per_seat: perSeat,
+      summary: nc.statement,
+      confidence: nc.confidence,
+      source: nc.source,
+    };
   }
 
-  const horizontalAngles = validAngles.map((s) => s.horizontal_angle_deg).filter(Number.isFinite);
-  const verticalAngles = validAngles.map((s) => s.vertical_angle_deg).filter(Number.isFinite);
-
-  const minH = horizontalAngles.length > 0 ? Math.min(...horizontalAngles) : null;
-  const maxH = horizontalAngles.length > 0 ? Math.max(...horizontalAngles) : null;
-  const minV = verticalAngles.length > 0 ? Math.min(...verticalAngles) : null;
-  const maxV = verticalAngles.length > 0 ? Math.max(...verticalAngles) : null;
+  const angles = validAngles.map((s) => s.horizontal_angle_deg);
+  const minH = Math.min(...angles);
+  const maxH = Math.max(...angles);
 
   let statement = `Viewing angles calculated for ${validAngles.length} seat${validAngles.length !== 1 ? 's' : ''}.`;
-  if (minH != null && maxH != null) {
-    statement += ` Horizontal viewing angle ranges from ${minH.toFixed(0)}° to ${maxH.toFixed(0)}°.`;
-  }
-  if (minV != null && maxV != null) {
-    statement += ` Vertical viewing angle ranges from ${minV.toFixed(0)}° to ${maxV.toFixed(0)}°.`;
-  }
+  statement += ` Horizontal viewing angle ranges from ${minH.toFixed(0)}° to ${maxH.toFixed(0)}°.`;
 
-  return withConfidence(statement, CONFIDENCE.COMPUTED_GEOMETRIC, SOURCE.GEOMETRIC_CALCULATION);
-}
-
-export function buildViewingAuthority(project, analysisResult, seats) {
-  const perSeatAngles = extractViewingAngles(analysisResult, seats);
-  const summary = buildViewingSummary(perSeatAngles);
+  const summary = withConfidence(statement, CONFIDENCE.COMPUTED_GEOMETRIC, SOURCE.GEOMETRIC_CALCULATION);
 
   return {
-    available: perSeatAngles != null,
-    per_seat: perSeatAngles || [],
+    available: true,
+    per_seat: perSeat,
     summary: summary.statement,
     confidence: summary.confidence,
     source: summary.source,

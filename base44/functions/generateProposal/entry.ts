@@ -40,7 +40,7 @@ export default async function(req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief } = body;
+    const { project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, engineering_snapshot } = body;
 
     if (!project_id) return Response.json({ error: 'project_id required' }, { status: 400 });
 
@@ -80,6 +80,11 @@ export default async function(req) {
       status: 'generating',
       narrative_goal: narrative_goal || 'luxury_cinema',
       client_brief: client_brief || '',
+      // Stage 2A: store the frozen Engineering Snapshot assembled by the frontend.
+      // The snapshot is frozen at generation time — later Room Designer edits do
+      // NOT silently change an existing proposal. The AI does NOT consume this
+      // snapshot yet (Stage 2A proves the snapshot itself first).
+      engineering_snapshot: engineering_snapshot || null,
     });
 
     // ── Create 10 ProposalSection records ──

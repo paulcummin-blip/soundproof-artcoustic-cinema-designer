@@ -89,6 +89,11 @@
       "description": "Template identifier for this proposal. References a future template definition from the Proposal Centre Templates tab. Null = use default template.",
       "nullable": true
     },
+    "engineering_snapshot": {
+      "type": "object",
+      "description": "Frozen Engineering Snapshot assembled at proposal generation time from the SAME canonical authorities used by Room Designer / Compliance / Design Rating. Contains version-locked engineering truth: identity (projectId, versionId, engineeringFingerprint, calculationRevision), room, seats, system, RP22 (overall, category floors, DPI, parameter headlines, assumed), bass (P14/P18/P19/P20 with per-seat and scoped floors), viewing/RP23, products, pricing, constraints. Later Room Designer edits do NOT silently change an existing proposal \u2014 the snapshot is frozen at generation time. A future regeneration creates/updates a new snapshot explicitly. Null for proposals generated before Stage 2A.",
+      "nullable": true
+    },
     "metadata": {
       "type": "object",
       "description": "Hidden proposal metadata supplied to GPT during generation. Includes audience, word count, language, tone. Dealer never sees this in the exported proposal.",

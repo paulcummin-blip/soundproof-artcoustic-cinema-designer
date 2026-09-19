@@ -120,3 +120,16 @@ export {
 };
 
 export { CONFIDENCE, SOURCE } from './confidence';
+
+// Stage 2A: Frozen Engineering Snapshot
+export { buildEngineeringSnapshot, ENGINEERING_SNAPSHOT_VERSION } from './buildEngineeringSnapshot';
+export { useEngineeringSnapshot } from './useEngineeringSnapshot';
+export { useVersionedEngineeringSnapshot } from './useVersionedEngineeringSnapshot';
+export { buildSnapshotCategoryFloors } from './snapshotCategoryFloors';
+export { buildSnapshotDpi } from './snapshotDpi';
+export { buildSnapshotP19 } from './snapshotP19';
+export { buildSnapshotP20 } from './snapshotP20';
+export { buildSnapshotViewing } from './snapshotViewing';
+export { buildSnapshotPricing } from './snapshotPricing';
+export { buildSnapshotSeats } from './snapshotSeats';
+export { buildSnapshotIdentity } from './snapshotIdentity';

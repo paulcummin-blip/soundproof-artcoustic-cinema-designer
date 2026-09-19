@@ -8,6 +8,7 @@ import ProposalTypeStep from '@/components/proposal/wizard/ProposalTypeStep';
 import VersionSelectStep from '@/components/proposal/wizard/VersionSelectStep';
 import ClientBriefStep from '@/components/proposal/wizard/ClientBriefStep';
 import GenerateStep from '@/components/proposal/wizard/GenerateStep';
+import { useVersionedEngineeringSnapshot } from '@/components/proposal/engineeringAuthority/useVersionedEngineeringSnapshot';
 
 const STEPS = [
   { key: 'project', label: 'Project' },
@@ -43,6 +44,17 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
 
+  // ── Stage 2A: Frozen Engineering Snapshot ──
+  // Assemble the snapshot from the canonical authorities for the first selected
+  // version. This is the version-safe engineering truth that will be stored on
+  // the Proposal at generation time. Later Room Designer edits do NOT silently
+  // change an existing proposal.
+  const snapshotVersionId = selectedVersionIds[0] || null;
+  const { snapshot: engineeringSnapshot, loading: snapshotLoading } = useVersionedEngineeringSnapshot(
+    selectedProjectId,
+    snapshotVersionId,
+  );
+
   const handleSelectProject = useCallback((projectId) => {
     setSelectedProjectId(projectId);
     setSelectedVersionIds([]);
@@ -65,6 +77,9 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
         account_id: accountId,
         narrative_goal: 'luxury_cinema',
         client_brief: clientBrief,
+        // Stage 2A: pass the frozen Engineering Snapshot. The backend stores
+        // it on the Proposal but does NOT use it for AI generation yet.
+        engineering_snapshot: engineeringSnapshot || null,
       });
       const proposalId = response?.data?.proposal_id;
       if (proposalId) {
