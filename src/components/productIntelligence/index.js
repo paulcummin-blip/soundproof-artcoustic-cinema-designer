@@ -1,0 +1,1 @@
+export { buildProductIntelligence, CONFIDENCE_LEVELS, IMAGE_SLOTS } from './buildProductIntelligence';

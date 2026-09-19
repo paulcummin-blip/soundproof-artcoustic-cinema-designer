@@ -9,7 +9,7 @@ import { Plus, ChevronLeft } from 'lucide-react';
 const TABS = [
   { key: 'brand', label: 'Brand Assets' },
   { key: 'templates', label: 'Templates' },
-  { key: 'products', label: 'Product Library' },
+  { key: 'products', label: 'Product Intelligence' },
   { key: 'history', label: 'Proposal History' },
 ];
 
@@ -20,9 +20,9 @@ const PLACEHOLDER_CONTENT = {
       'Pre-designed proposal templates will live here. You will be able to create, edit, and manage reusable proposal layouts for different project types.',
   },
   products: {
-    title: 'Product Library',
+    title: 'Product Intelligence',
     description:
-      'The product knowledge base will live here. Each product will contain hero images, transparent PNGs, lifestyle shots, descriptions, benefits, and technical notes that the proposal engine draws from.',
+      'Structured manufacturer knowledge for every Artcoustic product — why each model exists, where it should be used, its strengths, honest compromises, and upgrade path. Feeds Proposal Intelligence, product comparisons, and the dealer assistant.',
   },
   history: {
     title: 'Proposal History',

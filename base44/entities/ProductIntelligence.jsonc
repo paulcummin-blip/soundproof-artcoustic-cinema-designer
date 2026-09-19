@@ -1,0 +1,120 @@
+{
+  "name": "ProductIntelligence",
+  "type": "object",
+  "description": "Structured manufacturer knowledge for a single SpeakerProduct \u2014 why it exists, where it should be used, its strengths, honest design compromises, upgrade path, and engineering story. Sits between the product database and Proposal Intelligence. Engineering Authority owns project-specific facts; Product Intelligence owns manufacturer knowledge. Global (not dealer-scoped), admin-only. Stores curated knowledge text only \u2014 never HTML, never proposal copy, never GPT prompts. Images are not stored here; the assembly module resolves them from SpeakerProduct and SpeakerDocument at runtime.",
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "description": "ID of the SpeakerProduct this intelligence record describes. One record per product."
+    },
+    "engineering_purpose": {
+      "type": "string",
+      "description": "Why this product was designed. What engineering problem it solves. Engineering honesty, not marketing copy.",
+      "nullable": true
+    },
+    "ideal_applications": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Where this product shines. Suggested vocabulary: small_rooms, medium_rooms, large_rooms, behind_screen, lcr, surround, rear_surround, overhead, outdoor, commercial, near_field, distributed_audio. Free-text allowed for future flexibility."
+    },
+    "strengths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Engineering strengths. Suggested vocabulary: controlled_directivity, high_sensitivity, compact_enclosure, wide_coverage, high_dynamic_capability, low_distortion, full_range_bass, architectural_integration, weather_resistant. Free-text allowed."
+    },
+    "design_compromises": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Honest engineering compromises. Examples: requires_subwoofer_below_80hz, best_at_shorter_distances, surround_not_lcr, limited_low_frequency_extension, requires_external_amplification. No marketing \u2014 engineering honesty only."
+    },
+    "upgrade_path": {
+      "type": "object",
+      "description": "Natural upgrade chain. Stores model keys (not product IDs) so the chain survives product database changes. The assembly module resolves these to full product references at runtime when product data is available.",
+      "properties": {
+        "previous": {
+          "type": "string",
+          "description": "Model key of the product that naturally precedes this one (smaller / lesser in the range).",
+          "nullable": true
+        },
+        "current": {
+          "type": "string",
+          "description": "Model key of this product within the chain. Usually matches the SpeakerProduct model.",
+          "nullable": true
+        },
+        "next": {
+          "type": "string",
+          "description": "Model key of the product that naturally succeeds this one (larger / greater in the range).",
+          "nullable": true
+        }
+      },
+      "nullable": true
+    },
+    "product_story": {
+      "type": "string",
+      "description": "Short engineering narrative explaining why an experienced designer would select this product. Not brochure copy, not sales copy. Engineering reasoning.",
+      "nullable": true
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "default": "D",
+      "description": "Overall confidence of the knowledge record. A=Published/verified manufacturer information, B=Calculated from published data, C=Estimated from partial data, D=Engineering estimate. Mirrors the Engineering Authority confidence model."
+    },
+    "statement_confidence": {
+      "type": "object",
+      "description": "Per-field confidence for each knowledge statement. Maps field names (engineering_purpose, ideal_applications, strengths, design_compromises, upgrade_path, product_story) to confidence levels (A/B/C/D). Records the quality of evidence behind each individual statement.",
+      "properties": {},
+      "nullable": true
+    },
+    "knowledge_source": {
+      "type": "string",
+      "description": "Primary source for this knowledge (e.g. 'Manufacturer Technical Brief', 'Engineering Review', 'Product Launch Documentation', 'Designer Interview').",
+      "nullable": true
+    },
+    "last_verified": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the knowledge was last verified against manufacturer sources.",
+      "nullable": true
+    }
+  },
+  "required": [
+    "product_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
