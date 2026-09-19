@@ -34,7 +34,6 @@ import { resolveP14TargetSelectionState } from "@/components/room/bass/p14Target
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import { formatAuthoritativeP20Result, p20LevelText } from "@/components/room/bass/p20SeatPresentation";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
-import { p19LevelText, formatAuthoritativeP19Result, buildP19SeatRows } from "@/components/room/bass/p19SeatPresentation";
 import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
@@ -131,6 +130,7 @@ export function useParameterGridAuthority({
   assumedP15Level,
   assumedP21Level,
   bassAuthority = null,
+  p19SeatAuthority = null,
   bassErrorMessage = null,
   contributionsByKey = null,
 }) {
@@ -181,7 +181,8 @@ export function useParameterGridAuthority({
   /* ----- getHudLevelForParam ----- */
   const getHudLevelForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
-    if ([14, 18, 19].includes(pid)) return bassPresentation.parameters[`p${pid}`].level;
+    if (pid === 19) return p19SeatAuthority?.project?.floor || "NOT CALCULATED";
+    if ([14, 18].includes(pid)) return bassPresentation.parameters[`p${pid}`].level;
     if (pid === 20) return bassPresentation.parameters.p20.level;
     const isRoomScope = String(param?.scope || "").toLowerCase() === "room";
 
@@ -202,13 +203,14 @@ export function useParameterGridAuthority({
     // the Technical Report with Compliance / ASDR on the same data source.
     const metric = resolveSeatMetricHelper(lockedSeatId, `p${pid}`, analysisResult, seatSnapshotsById, mlpSeatId);
     return normalizeLevelForDisplay(getMetricDisplayState(metric, pid).level);
-  }, [analysisResult, assumedP15Level, assumedP21Level, seatSnapshotsById, lockedSeatId, mlpSeatId, p12Mode, p13Mode, p14Mode, bassPresentation]);
+  }, [analysisResult, assumedP15Level, assumedP21Level, seatSnapshotsById, lockedSeatId, mlpSeatId, p12Mode, p13Mode, p14Mode, bassPresentation, p19SeatAuthority]);
 
   /* ----- getHudValueForParam ----- */
   const getHudValueForParam = React.useCallback((param, opts = {}) => {
     const isPrintVariant = opts.isPrintVariant || false;
     const pid = Number(param?.id);
-    if ([14, 18, 19].includes(pid)) return bassPresentation.parameters[`p${pid}`].valueText;
+    if (pid === 19) return p19SeatAuthority?.project?.coverageSummary || "NOT CALCULATED";
+    if ([14, 18].includes(pid)) return bassPresentation.parameters[`p${pid}`].valueText;
     if (pid === 20) return bassPresentation.parameters.p20.valueText;
     const isRoomScope = String(param?.scope || "").toLowerCase() === "room";
 
@@ -277,7 +279,7 @@ export function useParameterGridAuthority({
     const n = getMetricNumericValue(metric);
     if (Number.isFinite(n)) return formatMetricFallback(n, paramDef?.unit || "");
     return "Not Calculated";
-  }, [analysisResult, assumedP15Level, assumedP21Level, seatSnapshotsById, lockedSeatId, mlpSeatId, bassPresentation]);
+  }, [analysisResult, assumedP15Level, assumedP21Level, seatSnapshotsById, lockedSeatId, mlpSeatId, bassPresentation, p19SeatAuthority]);
 
   /* ----- Per-seat pill grid for seat-scoped params ----- */
   const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
@@ -325,8 +327,7 @@ export function useParameterGridAuthority({
 
   const renderSeatPillGrid = React.useCallback((pId) => {
     if (Number(pId) === 19) {
-      const p19Rows = buildP19SeatRows(seats, bassPresentation.perSeatP19Results);
-      return <P19SeatBlock rows={p19Rows} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassPresentation.parameters.p19.status} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
+      return <P19SeatBlock rows={p19SeatAuthority?.rows || []} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassPresentation.parameters.p19.status} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
     }
     if (Number(pId) === 20) return <P20SeatBlock seatingPositions={seats} perSeatP20Results={bassPresentation.perSeatP20Results} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassPresentation.parameters.p20.status} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
     if (!rows.length) return null;
@@ -393,7 +394,7 @@ export function useParameterGridAuthority({
         ))}
       </div>
     );
-  }, [rows, denseSeatGrid, getSnapshotForSeat, analysisResult, seatSnapshotsById, mlpSeatId, bassPresentation.perSeatP19Results, bassPresentation.perSeatP20Results, bassPresentation.publicationVerified, bassPresentation.p14TargetUnselected, bassPresentation.parameters.p19.status, bassPresentation.parameters.p20.status, seats]);
+  }, [rows, denseSeatGrid, getSnapshotForSeat, analysisResult, seatSnapshotsById, mlpSeatId, p19SeatAuthority, bassPresentation.perSeatP20Results, bassPresentation.publicationVerified, bassPresentation.p14TargetUnselected, bassPresentation.parameters.p19.status, bassPresentation.parameters.p20.status, seats]);
 
   /* ----- Build per-seat grid data for TechnicalParameterCard ----- */
   const buildSeatGridData = React.useCallback((paramId) => {
@@ -401,22 +402,15 @@ export function useParameterGridAuthority({
     const pKey = `p${Number(paramId)}`;
 
     if (Number(paramId) === 19) {
-      return rows.map(rowObj => ({
+      return (p19SeatAuthority?.rows || []).map((rowObj) => ({
         row: rowObj.row,
-        seats: rowObj.seats.map((seat, idx) => {
-          const result = bassPresentation.perSeatP19Results.find(
-            item => String(item?.seatId) === String(seat?.id)
-          );
-          return {
-            id: seat?.id,
-            indexInRow: extractSeatIndexInRow(seat, idx),
-            level: result ? p19LevelText(result.level) : "—",
-            value: result && Number.isFinite(Number(result.variationDbRaw))
-              ? formatAuthoritativeP19Result(result)
-              : "—",
-            isPrimary: !!seat?.isPrimary,
-          };
-        }),
+        seats: rowObj.seats.map((seat, idx) => ({
+          id: seat.seatId,
+          indexInRow: seat.column ?? idx + 1,
+          level: seat.grade,
+          value: seat.displayedValue,
+          isPrimary: seat.priority === "primary",
+        })),
       }));
     }
 
@@ -455,7 +449,7 @@ export function useParameterGridAuthority({
         };
       }),
     }));
-  }, [rows, getSnapshotForSeat, analysisResult, seatSnapshotsById, mlpSeatId, bassPresentation.perSeatP19Results, bassPresentation.perSeatP20Results]);
+  }, [rows, getSnapshotForSeat, analysisResult, seatSnapshotsById, mlpSeatId, p19SeatAuthority, bassPresentation.perSeatP20Results]);
 
   /* ----- Build ASDR footer string for a parameter card ----- */
   const buildAsdrFooter = React.useCallback((paramId) => {
