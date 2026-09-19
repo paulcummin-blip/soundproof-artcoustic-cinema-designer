@@ -21,6 +21,29 @@ import {
   getCategoryFloorSummaries,
 } from '@/components/report/technical/designRatingPresentation';
 
+// Override the P19 contribution's resultLevel with the canonical P19 seat
+// authority floor. The scopedRatings are pre-computed by useAppDesignRating;
+// when the P19 contribution inside them is stale (e.g. still FAIL from before
+// the bass calculation settled), the authoritative p19SeatAuthority on the
+// same rating object holds the fresh grade. This corrects ONLY the P19
+// contribution — it does not rebuild the Timbre Matching category or
+// re-grade any other parameter.
+function overrideP19WithAuthority(rating, p19Authority, scopeName) {
+  if (!rating || !p19Authority) return rating;
+  const scopeFloor =
+    scopeName === 'primary'
+      ? p19Authority?.primary?.floor
+      : p19Authority?.secondary?.floor;
+  if (!scopeFloor || scopeFloor === 'NOT CALCULATED' || scopeFloor === 'NOT CONFIGURED') {
+    return rating;
+  }
+  const contributions = (rating.contributions || []).map((c) => {
+    if (c.key !== 'p19') return c;
+    return { ...c, resultLevel: scopeFloor };
+  });
+  return { ...rating, contributions };
+}
+
 const SCREEN_DESCRIPTOR = {
   L4: 'Exceptional Performance',
   L3: 'Reference Performance',
@@ -221,14 +244,26 @@ export default function DesignRatingSummary({
   if (staleScope && rating) return unavailableCard('Updating seat priorities…');
 
   const scopedRatings = rating?.scopedRatings || null;
+  const p19Authority = rating?.p19SeatAuthority ?? null;
   const primaryRating = scopedRatings?.primary || null;
   const secondaryRating = scopedRatings?.secondary || null;
   const allRating = scopedRatings?.all || rating || null;
 
   const isNotAssessed = !allRating || allRating.status === 'NOT_ASSESSED';
 
-  const primaryCats = primaryRating ? getCategoryFloorSummaries(primaryRating) : [];
-  const secondaryCats = secondaryRating ? getCategoryFloorSummaries(secondaryRating) : [];
+  // Correct the P19 contribution with the canonical P19 seat authority floor
+  // before computing category floors. This ensures the sidebar reflects the
+  // live authoritative P19 grade even when the pre-computed scopedRatings
+  // contribution is stale.
+  const primaryRatingCorrected = primaryRating
+    ? overrideP19WithAuthority(primaryRating, p19Authority, 'primary')
+    : null;
+  const secondaryRatingCorrected = secondaryRating
+    ? overrideP19WithAuthority(secondaryRating, p19Authority, 'secondary')
+    : null;
+
+  const primaryCats = primaryRatingCorrected ? getCategoryFloorSummaries(primaryRatingCorrected) : [];
+  const secondaryCats = secondaryRatingCorrected ? getCategoryFloorSummaries(secondaryRatingCorrected) : [];
 
   const secondaryIsConfigured =
     secondaryRating &&
