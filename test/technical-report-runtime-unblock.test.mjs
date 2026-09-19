@@ -116,7 +116,7 @@ test('actual report import mounts all three capture effects with the report argu
    act(()=>{tree=create(React.createElement(Capture));});
    assert.deepEqual([...new Set(selectors)], ['[data-plan-capture]','[data-plan-capture-dims]','[data-plan-capture-speaker-dims]']);
    let count=0;
-   while(queue.length && count++<100) act(()=>queue.shift()());
+   while(queue.length && count++<100) await act(async () => { await queue.shift()(); });
    assert.deepEqual(result,{clean:'__SKIP__',dims:'__SKIP__',speaker:'__SKIP__'});
  } finally {
    if(tree) act(()=>tree.unmount());
