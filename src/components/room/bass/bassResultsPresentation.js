@@ -1,7 +1,5 @@
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { p19LowestSeat, p19RspResult } from "@/components/room/bass/p19SeatPresentation";
-import { summariseAuthoritativeP19Seats } from "@/components/room/bass/p19SeatAuthority";
-import { getScopedSeatIds } from "@/components/utils/seatScopeAuthority";
 import { buildP20SeatRows, p20WorstSeat, p20BestPrimarySeat } from "@/components/room/bass/p20SeatPresentation";
 import { formatP14Capability, formatP14BasisLabel, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
@@ -120,8 +118,9 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  * @param {Array} seatingPositions - appState.seatingPositions for seat priority
  * @param {number} nowMs - current timestamp for elapsed timer
  * @param {object} displayBasis - current P14/P18 grading bases
+ * @param {object|null} p19SeatAuthority - published canonical P19 seat authority
  */
-export function formatOfficialBassResults(completedBassAuthority, lifecycle = null, seatingPositions = [], nowMs = Date.now(), noP14TargetSelected = false, displayBasis = {}) {
+export function formatOfficialBassResults(completedBassAuthority, lifecycle = null, seatingPositions = [], nowMs = Date.now(), noP14TargetSelected = false, displayBasis = {}, p19SeatAuthority = null) {
   const presentation = buildComplianceBassPresentation({ completedBassAuthority });
   const { publicationVerified, parameters } = presentation;
   const contract = completedBassAuthority?.contract || null;
@@ -199,23 +198,12 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // has P14 pass === false, so include it in the p14Failed gating.
   const p14Failed = (isAuthoritative || isLimited) && contract?.productAnalysis?.parameters?.p14?.pass === false;
 
-  // Per-seat arrays (publication-gated — empty when not verified or P14 failed)
-  const perSeatP19Results = (isAuthoritative && !p14Failed)
-    ? (Array.isArray(contract?.selectedCandidate?.perSeatP19Results) ? contract.selectedCandidate.perSeatP19Results : [])
-    : [];
+  // Per-seat arrays are publication-gated. P19 is never rebuilt here:
+  // consumers receive the exact immutable object published by the room owner.
+  const publishedP19SeatAuthority = (isAuthoritative && !p14Failed) ? p19SeatAuthority : null;
+  const perSeatP19Results = publishedP19SeatAuthority?.seats || [];
   const perSeatP20Results = (isAuthoritative && !p14Failed) ? (presentation.perSeatP20Results || []) : [];
-
-  // Build P19 identity, grouping, floors and rows exactly once.
-  const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(seatingPositions);
-  const p19SeatAuthority = (isAuthoritative && !p14Failed)
-    ? summariseAuthoritativeP19Seats({
-        authoritativeSeatResults: perSeatP19Results,
-        primarySeatIds,
-        secondarySeatIds,
-        seatingPositions,
-      })
-    : null;
-  const p19Rows = p19SeatAuthority?.rows || [];
+  const p19Rows = publishedP19SeatAuthority?.rows || [];
   const p20Rows = (isAuthoritative && !p14Failed) ? buildP20SeatRows(seatingPositions, perSeatP20Results) : [];
 
   // P19 compact: RSP + lowest seat (internal authority — presented as coverage summary)
@@ -347,7 +335,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     selectedCandidateId: contract?.selectedCandidateId || null,
     perSeatP19Results,
     perSeatP20Results,
-    p19SeatAuthority,
+    p19SeatAuthority: publishedP19SeatAuthority,
     p19Rows,
     p20Rows,
     p19Rsp,
