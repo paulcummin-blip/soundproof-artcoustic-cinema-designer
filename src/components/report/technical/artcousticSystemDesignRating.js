@@ -565,17 +565,24 @@ export function buildArtcousticDesignRatingAuthority(input) {
       // seat-scope
       const seatAuthorities = {};
       let allNa = true;
-      let anyProvisional = false;
+      let hasScored = false;
 
       for (const seatId of seatIds) {
         const seatInput = paramInput?.[seatId];
         const seatAuth = scoreSeatParam(key, seatInput);
         seatAuthorities[seatId] = seatAuth;
         if (seatAuth.state !== "na") allNa = false;
-        if (seatAuth.state === "provisional") anyProvisional = true;
+        if (seatAuth.state === "scored") hasScored = true;
       }
 
-      const paramState = allNa ? "na" : anyProvisional ? "provisional" : "scored";
+      // Seat-scope parameter state: a parameter is "scored" when at least one
+      // seat has a genuine calculated grade. Provisional/N/A seats are skipped
+      // individually inside calculateRoomDesignRatingCore — they never cause
+      // the whole parameter to be excluded. Only when ALL seats are N/A is the
+      // parameter "na"; only when NO seat is scored (but not all N/A) is it
+      // "provisional". This matches the documented behaviour that provisional
+      // and N/A seats are skipped individually, not at the parameter level.
+      const paramState = allNa ? "na" : hasScored ? "scored" : "provisional";
 
       parameters[key] = {
         key, weight, scope,
