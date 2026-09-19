@@ -1,7 +1,7 @@
 {
   "name": "ProposalAsset",
   "type": "object",
-  "description": "A visual asset (image) attached to a project for use in proposals. Supports cover images, front/rear views, plan views, elevation views, construction drawings, client logos, dealer photography, technical drawings, documents, and gallery images. Each asset has a caption and drag-orderable position (used for gallery images). Linked to the project so assets exist independently of any generated Proposal record.",
+  "description": "A visual asset (image) attached to a project for use in proposals. Supports cover images, front/rear views, plan views, elevation views, construction drawings, client logos, reference photography, technical drawings, documents, and gallery images. Each asset has a caption and drag-orderable position (used for gallery images). Linked to the project so assets exist independently of any generated Proposal record. Gallery images additionally store category and proposal_importance metadata to help the future Proposal Engine select the most appropriate images for each section.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -21,12 +21,12 @@
         "elevation",
         "construction",
         "client_logo",
-        "dealer_photography",
+        "reference_photography",
         "technical_drawings",
         "documents",
         "gallery"
       ],
-      "description": "Type of visual asset. Single-asset types (cover_image, front_view, rear_view, plan, elevation, construction, client_logo, dealer_photography, technical_drawings, documents) have one image per project. Gallery allows multiple images with drag ordering."
+      "description": "Type of visual asset. Single-asset types (cover_image, front_view, rear_view, plan, elevation, construction, client_logo, reference_photography, technical_drawings, documents) have one image per project. Gallery allows multiple images with drag ordering, category, and proposal importance metadata."
     },
     "file_url": {
       "type": "string",
@@ -34,13 +34,44 @@
     },
     "caption": {
       "type": "string",
-      "description": "Caption displayed with the asset in the proposal.",
+      "description": "Caption displayed with the asset in the proposal. For gallery images, this free-text caption will be supplied to GPT during proposal generation.",
       "default": ""
     },
     "order_index": {
       "type": "number",
       "default": 0,
-      "description": "Display order. Used for gallery images; single-asset types use 0."
+      "description": "Display order. Used for gallery images as drag-and-drop sort order; the Proposal Engine uses this as an additional priority when importance is equal. Single-asset types use 0."
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Seating",
+        "Lighting",
+        "Cabinetry",
+        "Equipment",
+        "Construction",
+        "Interior",
+        "Exterior",
+        "Joinery",
+        "Acoustic Treatment",
+        "Plan",
+        "Elevation",
+        "Lifestyle",
+        "Other"
+      ],
+      "default": "Other",
+      "description": "Gallery image category. Helps the future Proposal Engine decide which images are most appropriate for each proposal section. Primarily for gallery images; single-asset types default to their type."
+    },
+    "proposal_importance": {
+      "type": "string",
+      "enum": [
+        "Essential",
+        "Preferred",
+        "Optional",
+        "Do Not Use"
+      ],
+      "default": "Preferred",
+      "description": "Proposal priority for this image. The future Proposal Engine will always prioritise images in this order: Essential > Preferred > Optional. Images marked 'Do Not Use' must never be inserted automatically into proposals."
     },
     "usage": {
       "type": "string",
@@ -50,7 +81,7 @@
         "do_not_use"
       ],
       "default": "gallery",
-      "description": "How the Proposal Engine should use this image. 'cover' = available as cover image, 'gallery' = include in gallery, 'do_not_use' = ignore (GPT will skip). Primarily for gallery images; single-asset types default to their type."
+      "description": "How the Proposal Engine should use this image. 'cover' = available as cover image, 'gallery' = include in gallery, 'do_not_use' = ignore (GPT will skip). Superseded by proposal_importance for gallery images but retained for backward compatibility."
     }
   },
   "required": [

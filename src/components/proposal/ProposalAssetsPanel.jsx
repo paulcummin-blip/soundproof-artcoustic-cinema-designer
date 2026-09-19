@@ -12,7 +12,7 @@ const SINGLE_ASSET_TYPES = [
   { value: 'elevation', label: 'Elevation' },
   { value: 'construction', label: 'Construction' },
   { value: 'client_logo', label: 'Client Logo (Optional)' },
-  { value: 'dealer_photography', label: 'Dealer Photography' },
+  { value: 'reference_photography', label: 'Reference Photography' },
   { value: 'technical_drawings', label: 'Technical Drawings' },
   { value: 'documents', label: 'Documents' },
 ];
@@ -120,6 +120,8 @@ export default function ProposalAssetsPanel({ projectId, accountId }) {
         file_url,
         caption: '',
         order_index: nextIndex,
+        category: 'Other',
+        proposal_importance: 'Preferred',
       });
       await load();
     } catch (err) {
@@ -153,6 +155,24 @@ export default function ProposalAssetsPanel({ projectId, accountId }) {
       setAssets((prev) => prev.map((a) => (a.id === id ? { ...a, caption } : a)));
     } catch (err) {
       console.error('Failed to update caption:', err);
+    }
+  };
+
+  const handleGalleryCategory = async (id, category) => {
+    try {
+      await base44.entities.ProposalAsset.update(id, { category });
+      setAssets((prev) => prev.map((a) => (a.id === id ? { ...a, category } : a)));
+    } catch (err) {
+      console.error('Failed to update category:', err);
+    }
+  };
+
+  const handleGalleryImportance = async (id, proposal_importance) => {
+    try {
+      await base44.entities.ProposalAsset.update(id, { proposal_importance });
+      setAssets((prev) => prev.map((a) => (a.id === id ? { ...a, proposal_importance } : a)));
+    } catch (err) {
+      console.error('Failed to update importance:', err);
     }
   };
 
@@ -216,13 +236,20 @@ export default function ProposalAssetsPanel({ projectId, accountId }) {
 
       {/* Gallery section */}
       <div className="bg-white border border-[#DCDBD6] rounded-lg p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-[#3E4349]">Gallery Images</h3>
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <h3 className="text-base font-semibold text-[#213428]" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+              Project Gallery
+            </h3>
+            <p className="text-xs text-[#625143] mt-0.5">
+              Additional project images with category and importance metadata for the Proposal Engine.
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => !galleryUploading && galleryInputRef.current?.click()}
             disabled={galleryUploading}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md border border-[#DCDBD6] text-[#3E4349] hover:bg-[#F5F4F0] transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md border border-[#DCDBD6] text-[#3E4349] hover:bg-[#F5F4F0] transition-colors disabled:opacity-50 flex-shrink-0"
           >
             {galleryUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             Add Image
@@ -242,6 +269,8 @@ export default function ProposalAssetsPanel({ projectId, accountId }) {
             items={galleryItems}
             onReorder={handleGalleryReorder}
             onCaptionChange={handleGalleryCaption}
+            onCategoryChange={handleGalleryCategory}
+            onImportanceChange={handleGalleryImportance}
             onDelete={handleGalleryDelete}
           />
         )}
