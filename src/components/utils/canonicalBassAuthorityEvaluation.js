@@ -18,7 +18,7 @@ import { isCanonicalP19Ready } from "@/components/room/bass/p19Readiness";
 import { buildSmoothCapabilityEnvelope, buildPracticalCalibrationTarget } from "@/components/utils/practicalCalibrationTarget";
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 import { getProductCurveFrequencyRange } from "@/components/models/speakers/registry";
-import { performGlobalLevelAlignment, applyGlobalBassTrimToCurve } from "@/components/room/bass/globalLevelAlignment";
+import { performGlobalLevelAlignment, applyGlobalBassTrimToCurve, applyGlobalBassTrimToSeatCurves } from "@/components/room/bass/globalLevelAlignment";
 
 export function buildPositionAwareP14Capability({
   canonicalResult,
@@ -475,18 +475,23 @@ export function evaluateCanonicalBassAuthority({
   const alignedPostEqRsp = p19AssessmentReady && Number.isFinite(recommendedGlobalBassTrimDb)
     ? applyGlobalBassTrimToCurve(canonicalResult.canonicalPostEqRsp, recommendedGlobalBassTrimDb)
     : canonicalResult.canonicalPostEqRsp;
+  const alignedPostEqSeatResponses = p19AssessmentReady && Number.isFinite(recommendedGlobalBassTrimDb)
+    ? applyGlobalBassTrimToSeatCurves(canonicalResult.canonicalPostEqSeatResponses, recommendedGlobalBassTrimDb)
+    : canonicalResult.canonicalPostEqSeatResponses;
   const perSeatP19Results = computeOfficialPerSeatP19Assessment({
-    perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
+    perSeatPostEqCurves: alignedPostEqSeatResponses,
     canonicalTargetCurve: p19TargetCurve,
     assessmentStartHz: p19AssessmentStartHz,
     assessmentEndHz: p19AssessmentEndHz,
     protectedNullRegions,
   });
 
-  // P20: canonical post-EQ real seats versus the canonical post-EQ RSP.
+  // P20: final post-EQ real seats versus the final post-EQ RSP. The same
+  // system-wide alignment trim is present on both sides and therefore cancels,
+  // leaving only the genuine seat-to-RSP room-transfer difference.
   const p20 = computeOfficialP20Assessment({
-    rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
-    perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
+    rspPostEqCurve: alignedPostEqRsp,
+    perSeatPostEqCurves: alignedPostEqSeatResponses,
     assessmentStartHz: p19AssessmentStartHz,
     assessmentEndHz: p19AssessmentEndHz,
   });
@@ -554,6 +559,7 @@ export function evaluateCanonicalBassAuthority({
         }
       : null,
     alignedPostEqRsp,
+    alignedPostEqSeatResponses,
     achievedP20VariationDb,
     achievedP20Level,
     worstP20SeatId: p20?.worstSeat?.seatId ?? null,
