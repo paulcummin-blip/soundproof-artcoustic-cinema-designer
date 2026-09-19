@@ -79,7 +79,7 @@ function Panel({ title, paramKey, rows, publicationVerified, stateText, compact,
       {showSeats ? (
         <>
           {!compact && (
-            <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{authoritativeSummary || formatCoverageSummaryFromRows(rows)}</div>
+            <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{authoritativeSummary || (paramKey === "p19" ? "NOT CALCULATED" : formatCoverageSummaryFromRows(rows))}</div>
           )}
           <SeatGrid rows={rows} compact={compact} paramKey={paramKey} />
         </>
