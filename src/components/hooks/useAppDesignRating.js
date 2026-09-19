@@ -209,7 +209,6 @@ export function resolveBassReadiness(completedBassAuthority, bassApplicable = fa
  * @param {Object} params.analysisResult
  * @param {Array}  params.placedSpeakers
  * @param {Object} params.stableDimensions
- * @param {Object} params.primarySeatingPosition
  * @param {string} params.projectId
  * @returns {{ status, displayPercentage, coveragePercent, bassReadiness, isPendingBass, retainedFromRefresh } | null}
  */
@@ -219,7 +218,6 @@ export function useAppDesignRating({
   analysisResult,
   placedSpeakers,
   stableDimensions,
-  primarySeatingPosition,
   projectId,
   versionId,
   minimumSystemMet = true,
@@ -233,7 +231,6 @@ export function useAppDesignRating({
   );
 
   // Same canonical P19/P20 sources as RP22Report.jsx
-  const completedP19Result = completedBassAuthority?.contract?.productAnalysis?.parameters?.p19 || null;
   const completedP19Results = completedBassAuthority?.contract?.selectedCandidate?.perSeatP19Results || [];
   const completedP20Results = completedBassPresentation?.perSeatP20Results || [];
 
