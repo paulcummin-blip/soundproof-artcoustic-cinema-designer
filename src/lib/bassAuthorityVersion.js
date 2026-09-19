@@ -22,4 +22,4 @@
 export const INSTANCE_AUTHORITY_VERSION = 4;
 export const BASS_ANALYSIS_CONTRACT_VERSION = 19;
 export const COMPLETED_BASS_CACHE_VERSION = 10;
-export const RP22_BASS_METRIC_SCHEMA_VERSION = 17; // v17: P19 absolute target deviation (max|response − T(f)| with protected null exclusion)
+export const RP22_BASS_METRIC_SCHEMA_VERSION = 18; // v18: one final RSP-derived calibration trim is applied to RSP and every seat
