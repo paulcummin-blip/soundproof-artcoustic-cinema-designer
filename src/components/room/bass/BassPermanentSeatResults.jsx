@@ -69,6 +69,7 @@ export default function BassPermanentSeatResults() {
       <SharedP19P20SeatResults
         p19Rows={formatted?.p19Rows || []}
         p20Rows={formatted?.p20Rows || []}
+        p19Summary={formatted?.p19SeatAuthority?.project?.coverageSummary || null}
         publicationVerified={formatted?.publicationVerified === true}
         authorityStatus={authorityStatus}
         p14TargetUnselected={noP14TargetSelected}
