@@ -13,7 +13,6 @@ import { BarChart4 } from 'lucide-react';
 import { rp22Parameters } from '../components/data/rp22Parameters';
 import RP22GradingPill from '../components/ui/RP22GradingPill';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
-import { buildLightweightSeatHudById } from '../components/hooks/useAppDesignRating';
 import { computeScreenMetrics } from '../components/utils/screenMetrics';
 import { resolveEffectiveViewableDimsM } from '../components/models/screen/resolveEffectiveScreen';
 import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
@@ -49,19 +48,14 @@ import { useCompletedBassAuthority } from '@/components/room/bass/completedBassR
 import { bassCacheKey } from '@/components/room/bass/bassCacheKey';
 import { buildComplianceBassExportData, buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { resolveP14TargetSelectionState } from '@/components/room/bass/p14TargetSelectionState';
-import { RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
 import TechnicalProjectOverview from '@/components/report/technical/TechnicalProjectOverview';
 import TechnicalPerformanceSummary from '@/components/report/technical/TechnicalPerformanceSummary';
 import TechnicalAsdrScorecard from '@/components/report/technical/TechnicalAsdrScorecard';
 import ScopedAsdrSummary from '@/components/report/technical/ScopedAsdrSummary';
 import TechnicalReportRecommendations from '@/components/report/technical/TechnicalReportRecommendations';
-import { resolveRoomParameterLevel, normalizeRoomLevel } from '@/components/report/technical/roomParameterLevelAuthority';
-import { buildDesignRatingInput } from '@/components/report/technical/buildDesignRatingInput';
-import { buildArtcousticDesignRatingAuthority } from '@/components/report/technical/artcousticSystemDesignRating';
 import { subscribeAsdrVisibility, getAsdrVisibility } from '@/components/state/asdrVisibilityStore';
 import { useAuth } from '@/lib/AuthContext';
 import { DEFAULT_TERRITORY, getTerritoryConfig } from '@/components/pricing/territoryConfig';
-import { buildRp22SeatCoverageResult } from '@/components/utils/rp22SeatCoverageSentence';
 import { resolveSeatPriority, getPrimarySeats, getSecondarySeats } from '@/components/utils/seatPriorityAuthority';
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
@@ -239,10 +233,13 @@ function RP22ReportInner() {
     const bassReportPending = !projectIdMatch || completedBassAuthority?.hydrationSettled !== true;
     // P19 is read only from the Room Designer publication. The report never
     // joins, filters, groups or re-grades selectedCandidate.perSeatP19Results.
-    const p19SeatAuthority = designReviewHandoff?.p19SeatAuthority
+    const engineeringSummary = designReviewHandoff?.engineeringSummary
+        ?? designReviewHandoff?.rating?.engineeringSummary
+        ?? null;
+    const p19SeatAuthority = engineeringSummary?.p19SeatAuthority
+        ?? designReviewHandoff?.p19SeatAuthority
         ?? designReviewHandoff?.rating?.p19SeatAuthority
         ?? null;
-    const completedP20Results = completedBassPresentation.perSeatP20Results;
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
     useEffect(() => {
@@ -726,226 +723,20 @@ function RP22ReportInner() {
     // Room Designer. The report never recalculates RP22 parameters.
     const analysisResult = designReviewHandoff?.analysisResult ?? null;
 
-    // READ-ONLY: buildLightweightSeatHudById derives seat HUD snapshots from
-    // the PUBLISHED analysisResult + completed bass authority. No SPL
-    // recalculation, no buildSeatHudSnapshot, no allSeatSplMetrics dependency.
-    const reportSeatHudById = React.useMemo(() => {
-        return buildLightweightSeatHudById(
-            seats, analysisResult, completedP20Results, p19SeatAuthority
-        );
-    }, [seats, analysisResult, completedP20Results, p19SeatAuthority]);
-
-    const seatScopedParamNumbers = React.useMemo(() => new Set(RP22_SEAT_PARAMETERS.map((parameter) => parameter.number)), []);
-
-    const roomScopedParamCount = React.useMemo(() => {
-        return rp22Parameters.filter(p => !seatScopedParamNumbers.has(p.number)).length;
-    }, [seatScopedParamNumbers]);
-
-    const seatScopedParamCount = React.useMemo(() => {
-        return rp22Parameters.filter(p => seatScopedParamNumbers.has(p.number)).length;
-    }, [seatScopedParamNumbers]);
-
-    const orderedParams = React.useMemo(() => {
-        return [...rp22Parameters].filter(p => !seatScopedParamNumbers.has(p.number)).sort((a, b) => a.id - b.id);
-    }, [seatScopedParamNumbers]);
-
-    const getRoomResult = React.useCallback((paramId) => analysisResult?.gradedParameters?.primary?.[paramId] ?? null, [analysisResult]);
-
-    const getDisplayedRoomLevel = React.useCallback((paramId) => {
-        return resolveRoomParameterLevel(paramId, {
-            analysisResult,
-            p12Mode: reportP12Mode,
-            p13Mode: reportP13Mode,
-            p14Mode: reportP14Mode,
-            assumedP15Level: app?.assumedP15Level,
-            assumedP21Level: app?.assumedP21Level,
-            bassPresentation: completedBassPresentation,
-        });
-    }, [analysisResult, reportP12Mode, reportP13Mode, reportP14Mode, app?.assumedP15Level, app?.assumedP21Level, completedBassPresentation]);
-
-    const getSeatResults = React.useCallback((paramId) => {
-        if (!analysisResult?.perSeatRp22) return [];
-        const results = [];
-        for (const [seatId, seatData] of Object.entries(analysisResult.perSeatRp22)) {
-            const metric = seatData.rp22?.[paramId];
-            if (metric) results.push({ seatId, isPrimary: seatData.isPrimary, metric });
-        }
-        return results;
-    }, [analysisResult]);
-
-    const roomLevelCounts = React.useMemo(() => {
-        const counts = { L4: 0, L3: 0, L2: 0, L1: 0, unassessed: 0 };
-        for (const param of orderedParams) {
-            const raw = getDisplayedRoomLevel(param.id);
-            const lvl = normalizeRoomLevel(raw);
-            if (lvl) counts[lvl] += 1;
-            else counts.unassessed += 1;
-        }
-        return counts;
-    }, [getDisplayedRoomLevel, orderedParams]);
-
-    const roomCalculatedCount = React.useMemo(() => {
-        return roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1;
-    }, [roomLevelCounts]);
-
-    const lastSeatIdsRef = React.useRef([]);
-    const lastSeatLevelCountsRef = React.useRef([]);
-
-    const seatLevelCounts = React.useMemo(() => {
-        const seatIdsNow = (safeArray(seats).map(s => s?.id).filter(Boolean)).sort();
-        const seatIds = seatIdsNow.length ? seatIdsNow : lastSeatIdsRef.current;
-        if (seatIdsNow.length) lastSeatIdsRef.current = seatIdsNow;
-        const normalizeLvl = (rawLevel) => {
-            if (rawLevel == null) return null;
-            if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) { if (rawLevel >= 1 && rawLevel <= 4) return `L${rawLevel}`; return null; }
-            if (typeof rawLevel === "string") { const m = rawLevel.trim().match(/^L([1-4])$/i); if (m) return `L${m[1]}`; }
-            return null;
-        };
-        const next = seatIds.map(seatId => {
-            const counts = { L1: 0, L2: 0, L3: 0, L4: 0 };
-            let activeCount = 0;
-            let failCount = 0;
-            const seatHudRp22 = reportSeatHudById?.[seatId]?.rp22 || {};
-            const getRp22Metric = (key) => {
-                return seatHudRp22[key] ?? null;
-            };
-            RP22_SEAT_PARAMETERS.map((parameter) => `p${parameter.number}`).forEach(key => {
-                const metric = getRp22Metric(key);
-                if (!metric) return;
-                const rawLevel = metric.level;
-                const lvl = normalizeLvl(rawLevel);
-                const isFail = String(rawLevel ?? '').trim().toUpperCase() === 'FAIL';
-                if (!lvl && !isFail) return;
-                activeCount += 1;
-                if (isFail) {
-                    failCount += 1;
-                } else {
-                    counts[lvl] += 1;
-                }
-            });
-            return { seatId, counts, activeCount, failCount, total: RP22_SEAT_PARAMETERS.length };
-        });
-        if (!next.length && lastSeatLevelCountsRef.current.length) return lastSeatLevelCountsRef.current;
-        lastSeatLevelCountsRef.current = next;
-        return next;
-    }, [analysisResult, reportSeatHudById, app?.seatSnapshotBySeatId, app?.seatMetricsById, seats, completedBassContract]);
-
-    const seatCountsByRow = React.useMemo(() => {
-        const rows = {};
-        seatLevelCounts.forEach(({ seatId, counts, activeCount, failCount, total }) => {
-            const match = seatId.match(/^seat-r(\d+)-c(\d+)$/);
-            const rowNum = match ? parseInt(match[1], 10) : 0;
-            const seatNum = match ? parseInt(match[2], 10) : Number.MAX_SAFE_INTEGER;
-            if (!rows[rowNum]) rows[rowNum] = [];
-            rows[rowNum].push({ seatId, counts, activeCount, failCount, total, seatNum });
-        });
-        Object.keys(rows).forEach(rowNum => { rows[rowNum].sort((a, b) => a.seatNum - b.seatNum); });
-        return Object.keys(rows).map(Number).sort((a, b) => a - b).map(rowNum => ({ rowNum, seats: rows[rowNum] }));
-    }, [seatLevelCounts]);
-
-    // ── Seat compromise comparison (Page 3 only, relative observation) ────────
-    // For each seat-scope RP22 parameter, find the best achieved assessed level
-    // across all physical seats. A seat incurs a "major gap" for a parameter when
-    // it is two or more RP22 levels below that best. A seat is labelled
-    // "MORE COMPROMISED" only when it has at least 4 major gaps AND those gaps
-    // represent at least 50% of its comparable assessed seat-scope parameters.
-    // This is a relative design observation, NOT an RP22 Performance Level.
-    const seatCompromiseById = React.useMemo(() => {
-        const paramKeys = RP22_SEAT_PARAMETERS.map((parameter) => `p${parameter.number}`);
-        const normalizeLvl = (rawLevel) => {
-            if (rawLevel == null) return null;
-            if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) {
-                if (rawLevel >= 1 && rawLevel <= 4) return rawLevel;
-                return null;
-            }
-            if (typeof rawLevel === "string") {
-                const m = rawLevel.trim().match(/^L([1-4])$/i);
-                if (m) return parseInt(m[1], 10);
-            }
-            return null;
-        };
-        const seatIds = safeArray(seats).map(s => s?.id).filter(Boolean);
-        const seatLevelsByParam = {};      // paramKey -> { seatId -> numericLevel }
-        const comparableParamsBySeat = {}; // seatId -> Set<paramKey>
-        seatIds.forEach(seatId => {
-            const seatHudRp22 = reportSeatHudById?.[seatId]?.rp22 || {};
-            comparableParamsBySeat[seatId] = new Set();
-            paramKeys.forEach(key => {
-                const metric = seatHudRp22[key];
-                if (!metric) return;
-                const lvl = normalizeLvl(metric.level);
-                if (lvl == null) return; // ignore —, N/A, Not Calculated, FAIL
-                if (!seatLevelsByParam[key]) seatLevelsByParam[key] = {};
-                seatLevelsByParam[key][seatId] = lvl;
-                comparableParamsBySeat[seatId].add(key);
-            });
-        });
-        const bestByParam = {};
-        Object.keys(seatLevelsByParam).forEach(key => {
-            const levels = Object.values(seatLevelsByParam[key]);
-            if (levels.length) bestByParam[key] = Math.max(...levels);
-        });
-        const out = {};
-        seatIds.forEach(seatId => {
-            let majorGapCount = 0;
-            const comparableCount = (comparableParamsBySeat[seatId] || new Set()).size;
-            paramKeys.forEach(key => {
-                if (!bestByParam[key]) return;
-                const seatLvl = seatLevelsByParam[key]?.[seatId];
-                if (seatLvl == null) return;
-                const gap = bestByParam[key] - seatLvl;
-                if (gap >= 2) majorGapCount += 1;
-            });
-            const majorGapPct = comparableCount > 0 ? majorGapCount / comparableCount : 0;
-            const isCompromised = majorGapCount >= 4 && majorGapPct >= 0.5;
-            out[seatId] = { majorGapCount, comparableCount, majorGapPct, isCompromised };
-        });
-        return out;
-    }, [seats, reportSeatHudById]);
-
-    const hasFrontWides = React.useMemo(() => {
-        return placedSpeakers.some(s => {
-            const r = String(s?.role || '').toUpperCase();
-            return r === 'LW' || r === 'RW';
-        });
-    }, [placedSpeakers]);
-
-    // ── RP22 seating-coverage floor (strict, NOT ASDR) ─────────────────────
-    // Uses the SAME canonical param authority as the ASDR scoring path
-    // (buildArtcousticDesignRatingAuthority), but is NOT gated by ASDR
-    // visibility and is NOT an averaged score. The floor is the highest RP22
-    // Level for which every assessed applicable parameter passes that Level
-    // across every Primary seat (and every seat for ALL_SEAT_FLOOR).
-    // Room-scoped params are included — the room result must also pass.
-    // allParametersAuthoritative is derived from the authority's param states,
-    // not a separate bass-only check.
-    const coverageParamAuthority = React.useMemo(() => {
-        try {
-            const input = buildDesignRatingInput({
-                seats,
-                analysisResult,
-                reportSeatHudById,
-                completedBassAuthority,
-                completedBassPresentation,
-                reportP12Mode,
-                reportP13Mode,
-                reportP14Mode,
-                reportP18Mode,
-                hasFrontWides,
-                placedSpeakers,
-                p19SeatAuthority,
-            });
-            const authority = buildArtcousticDesignRatingAuthority(input);
-            return authority?.parameters || null;
-        } catch (e) {
-            return null;
-        }
-    }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, p19SeatAuthority]);
-
-    const coverageResult = React.useMemo(
-        () => buildRp22SeatCoverageResult({ paramAuthority: coverageParamAuthority, seats }),
-        [coverageParamAuthority, seats]
-    );
+    // PASSIVE CONSUMER: all seat grouping, counts, floors and diagnostics
+    // are read from the immutable summary published by Room Designer.
+    const reportSeatHudById = engineeringSummary?.seatHudById || {};
+    const parameterAuthority = engineeringSummary?.parameterAuthority || {};
+    const reportCounts = engineeringSummary?.project?.reportCounts || {};
+    const roomLevelCounts = reportCounts.roomLevelCounts || { L4: 0, L3: 0, L2: 0, L1: 0, fail: 0, unassessed: 0 };
+    const roomCalculatedCount = reportCounts.roomCalculatedCount || 0;
+    const seatCountsByRow = reportCounts.seatCountsByRow || [];
+    const seatCompromiseById = reportCounts.seatCompromiseById || {};
+    const roomScopedParamCount = Object.entries(parameterAuthority)
+        .filter(([key, parameter]) => key !== "screen" && parameter?.scope === "room").length;
+    const seatScopedParamCount = Object.entries(parameterAuthority)
+        .filter(([key, parameter]) => key !== "screen" && parameter?.scope === "seat").length;
+    const coverageResult = engineeringSummary?.project?.coverage || null;
     const coverageSentence = coverageResult?.statement || null;
 
     // ── Artcoustic System Design Rating — READ from published handoff ──────
