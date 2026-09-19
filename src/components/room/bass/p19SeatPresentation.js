@@ -1,5 +1,4 @@
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
-import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
 import { getScopedSeatIds } from "@/components/utils/seatScopeAuthority";
 import { summariseAuthoritativeP19Seats } from "@/components/room/bass/p19SeatAuthority";
 
@@ -11,16 +10,6 @@ const finite = (value) => value !== null && value !== "" && Number.isFinite(Numb
 function isRealP19Seat(seat) {
   const id = seatId(seat?.id ?? seat?.seatId).toLowerCase();
   return !!id && !referenceIds.has(id) && !seat?.__isSyntheticRsp && !seat?.isSyntheticRsp;
-}
-
-function rowNumber(seat) {
-  const value = Number(seat?.row ?? seat?.rowNumber);
-  return Number.isFinite(value) ? value : 1;
-}
-
-function columnNumber(seat, fallback) {
-  const value = Number(seat?.column ?? seat?.col ?? seat?.indexInRow ?? seat?.seatNumber);
-  return Number.isFinite(value) ? value : fallback;
 }
 
 export function p19LevelText(level) {
