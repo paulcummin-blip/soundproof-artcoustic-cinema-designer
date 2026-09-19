@@ -27,6 +27,7 @@ export const NARRATIVE_GOALS = [
 
 export const REGENERATION_ACTIONS = [
   { value: 'rewrite', label: 'Rewrite', icon: 'PenLine' },
+  { value: 'refine', label: 'Refine', icon: 'RefreshCw' },
   { value: 'expand', label: 'Expand', icon: 'Plus' },
   { value: 'shorten', label: 'Shorten', icon: 'Minus' },
   { value: 'technical', label: 'Technical', icon: 'Wrench' },

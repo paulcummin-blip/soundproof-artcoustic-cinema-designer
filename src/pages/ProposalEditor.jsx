@@ -135,7 +135,7 @@ export default function ProposalEditor() {
     setRegenerating(activeSection.id);
     setTimeout(() => {
       setRegenerating(null);
-      alert('GPT regeneration will be available in Stage 5. The editor is ready for it.');
+      alert('Section refresh will be available soon. The editor is ready for it.');
     }, 1000);
   };
 
@@ -162,7 +162,7 @@ export default function ProposalEditor() {
         >
           Generating Proposal
         </h3>
-        <p className="text-sm text-[#625143] mt-2">GPT is writing your complete proposal.</p>
+        <p className="text-sm text-[#625143] mt-2">Sound Proof is generating your complete proposal.</p>
       </div>
     );
   }
@@ -292,7 +292,7 @@ export default function ProposalEditor() {
               </div>
             </div>
             <div>
-              <div className="text-xs text-[#625143]">Last GPT</div>
+              <div className="text-xs text-[#625143]">Last Generated</div>
               <div className="text-[#1B1A1A] text-xs">
                 {activeSection.last_gpt_generated_at
                   ? new Date(activeSection.last_gpt_generated_at).toLocaleString()

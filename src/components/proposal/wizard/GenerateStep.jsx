@@ -30,7 +30,7 @@ export default function GenerateStep({ error, onBack }) {
         Generating Proposal
       </h3>
       <p className="text-sm text-[#8A8477] mt-3">
-        GPT is writing your complete proposal. This takes 30-60 seconds.
+        Sound Proof is generating your complete proposal. This takes 30-60 seconds.
       </p>
     </div>
   );

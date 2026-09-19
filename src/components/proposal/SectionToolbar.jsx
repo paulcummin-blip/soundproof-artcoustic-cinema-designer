@@ -1,8 +1,8 @@
 import React from 'react';
-import { PenLine, Plus, Minus, Wrench, Home, Lock, Unlock, StickyNote } from 'lucide-react';
+import { PenLine, Plus, Minus, Wrench, Home, RefreshCw, Lock, Unlock, StickyNote } from 'lucide-react';
 import { REGENERATION_ACTIONS } from '@/components/proposal/proposalSections';
 
-const ICONS = { PenLine, Plus, Minus, Wrench, Home };
+const ICONS = { PenLine, Plus, Minus, Wrench, Home, RefreshCw };
 
 /**
  * Floating section toolbar — appears when a section is active.

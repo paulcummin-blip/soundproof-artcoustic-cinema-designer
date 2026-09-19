@@ -35,7 +35,7 @@ export default function ProposalDefaultsPanel({ values, onChange }) {
         <div>
           <h3 className="text-sm font-semibold text-[#3E4349]">Proposal Tone</h3>
           <p className="text-xs text-[#625143] mt-1">
-            GPT uses this tone when generating proposal narrative.
+            Sound Proof uses this tone when generating proposal narrative.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2">

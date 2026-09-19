@@ -157,8 +157,8 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
             />
           </div>
           <p className="text-sm text-[#8A8477] mb-10 leading-relaxed">
-            Generate to create the proposal and open the editor. GPT will write a complete
-            first draft.
+            Generate to create the proposal and open the editor. A complete first draft will be
+            written using the selected project, design versions and proposal objectives.
           </p>
         </div>
       )}

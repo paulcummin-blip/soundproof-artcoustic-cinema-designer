@@ -11,8 +11,8 @@ export default function NarrativeGoalStep({ selectedGoal, onSelect }) {
   return (
     <div>
       <p className="text-xs text-[#625143] mb-4">
-        This gives the proposal its personality. GPT reads this before anything else. You can change
-        it later.
+        Choose the primary focus of this proposal. This helps shape the narrative, emphasis and
+        recommendations throughout the document. You can change this later.
       </p>
       <div className="space-y-2">
         {NARRATIVE_GOALS.map((goal) => {

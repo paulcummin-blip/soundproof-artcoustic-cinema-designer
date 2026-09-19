@@ -36,7 +36,7 @@ export default function DealerNotesPanel({ section, onSave, onClose }) {
         </button>
       </div>
       <p className="text-xs text-[#625143]">
-        These notes are invisible to the client. GPT reads them when regenerating this section.
+        These notes are invisible to the client. Sound Proof reads them when refreshing this section.
       </p>
       <Textarea
         value={notes}
