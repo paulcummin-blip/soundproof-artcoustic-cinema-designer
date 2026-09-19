@@ -122,6 +122,7 @@ export function buildDesignRatingInput({
   assumedP15Level = null,
   assumedP21Level = null,
   retainedBass = null,
+  p19SeatAuthority = null,
 }) {
   const bassVerified = isBassPublicationVerified(completedBassAuthority);
   // Retained bass: previously verified same-fingerprint bass inputs, used when
@@ -241,6 +242,20 @@ export function buildDesignRatingInput({
     }
 
     for (const seatId of seatIds) {
+      // P19 is already graded by the bass engine. Preserve that exact grade
+      // from the shared seat authority; Design Rating must never re-grade it.
+      if (key === "p19") {
+        const p19Seat = p19SeatAuthority?.bySeatId?.[seatId] || null;
+        seatScope[key][seatId] = p19Seat?.calculated
+          ? {
+              rawValue: p19Seat.rawValue,
+              authoritativeLevel: p19Seat.grade,
+              verified: true,
+            }
+          : null;
+        continue;
+      }
+
       const hud = reportSeatHudById?.[seatId];
       if (!hud) {
         seatScope[key][seatId] = null;
