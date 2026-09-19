@@ -14,7 +14,7 @@ const PROJECT_UPDATE_GRACE_MS = 30_000;
 
 const normaliseProjectId = (value) => String(value || "").trim();
 
-const storageKey = (projectId) =>
+export const storageKey = (projectId) =>
   `${STORAGE_PREFIX}${normaliseProjectId(projectId)}`;
 
 const belongsToProject = (snapshot, projectId) =>
@@ -228,15 +228,17 @@ export function publishDesignReviewHandoff(snapshot) {
 
 export function readDesignReviewHandoff(
   projectId,
-  { projectUpdatedAt = null, allowStored = true } = {}
+  { projectUpdatedAt = null, allowStored = true, preferStored = false } = {}
 ) {
   if (typeof window === "undefined") return null;
 
   const requestedProjectId = normaliseProjectId(projectId);
   if (!requestedProjectId) return null;
 
-  const live = window.__ROOM_DESIGNER_ASDR__;
-  if (belongsToProject(live, requestedProjectId)) return live;
+  if (!preferStored) {
+    const live = window.__ROOM_DESIGNER_ASDR__;
+    if (belongsToProject(live, requestedProjectId)) return live;
+  }
 
   if (!allowStored) return null;
 

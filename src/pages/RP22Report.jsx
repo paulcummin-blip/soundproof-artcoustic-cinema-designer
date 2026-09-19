@@ -67,7 +67,7 @@ import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSenten
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
 import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReportPage';
 import { resolveBassReadiness } from '@/components/hooks/useAppDesignRating';
-import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
+import { readDesignReviewHandoff, storageKey as getDesignReviewHandoffStorageKey } from '@/components/state/designReviewHandoff';
 import { setAuthoritativeReadOnlyMode } from '@/components/state/authoritativeReadOnlyMode';
 import { useAutoPrintReadinessInstrumentation, logAutoPrintBlock } from '@/components/report/useAutoPrintReadinessInstrumentation';
 
@@ -129,18 +129,17 @@ function RP22ReportInner() {
         null;
     const [reportProjectError, setReportProjectError] = useState(null);
 
-    // ── READ-ONLY handoff ──────────────────────────────────────────────────
+    // ── READ-ONLY handoff (event-driven snapshot, no polling) ──────────────
     // The Room Designer publishes its authoritative analysisResult, Design
     // Rating (roomDesignRating + scopedRatings + seatDesignRatings), and
     // settled recommendations to the Design Review handoff. The Technical
     // Report reads this published state — it never recalculates.
-    // ── READ-ONLY handoff (polled, same as DesignReviewPage) ─────────────
-    // The Room Designer publishes its authoritative analysisResult, Design
-    // Rating (roomDesignRating + scopedRatings + seatDesignRatings), and
-    // settled recommendations to the Design Review handoff. The Technical
-    // Report reads this published state — it never recalculates. Polling
-    // (not a single useMemo read) guarantees the report sees the latest
-    // published rating, not a stale snapshot from before bass settled.
+    //
+    // The handoff is a write-once/read-many snapshot. By the time the report
+    // mounts (SPA navigation) the value is already in window.__ROOM_DESIGNER_ASDR__;
+    // for direct loads it is already in localStorage. A single useEffect read
+    // suffices. A storage event listener covers the rare case where another
+    // browser tab updates the project while the report is already open.
     const [designReviewHandoff, setDesignReviewHandoff] = useState(
         () => explicitProjectId ? readDesignReviewHandoff(explicitProjectId) : null
     );
@@ -149,16 +148,26 @@ function RP22ReportInner() {
             setDesignReviewHandoff(null);
             return;
         }
-        const read = () => {
+        const read = (preferStored = false) => {
             const shared = readDesignReviewHandoff(explicitProjectId, {
                 projectUpdatedAt: projectDetails?.updated_date,
                 allowStored: true,
+                preferStored,
             });
             setDesignReviewHandoff(shared);
         };
+        // One-shot read — handles SPA navigation (window value) and direct
+        // load (localStorage fallback). Re-runs when projectDetails load.
         read();
-        const interval = setInterval(read, 500);
-        return () => clearInterval(interval);
+        // Cross-tab refresh — re-read when another browser tab writes the
+        // handoff to localStorage. preferStored bypasses any stale same-window
+        // value so the fresh localStorage payload from the other tab wins.
+        const expectedKey = getDesignReviewHandoffStorageKey(explicitProjectId);
+        const onStorage = (event) => {
+            if (event.key === expectedKey) read(true);
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
     }, [explicitProjectId, projectDetails?.updated_date]);
     const designRecommendations = designReviewHandoff?.recommendations ?? null;
 
