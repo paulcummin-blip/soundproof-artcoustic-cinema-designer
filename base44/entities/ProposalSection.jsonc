@@ -1,0 +1,218 @@
+{
+  "name": "ProposalSection",
+  "type": "object",
+  "description": "An editable content block within a proposal. Designed so GPT-generated content can later be stored in structured, individually editable sections. Each section has a type, stable key, heading, and rich-text body. Stage 1: database only \u2014 no generation, no editing UI.",
+  "properties": {
+    "proposal_id": {
+      "type": "string",
+      "description": "ID of the Proposal this section belongs to."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Denormalized account_id for RLS."
+    },
+    "section_type": {
+      "type": "string",
+      "enum": [
+        "hero",
+        "intro",
+        "system_summary",
+        "room_analysis",
+        "speaker_schedule",
+        "bass_performance",
+        "rp22_compliance",
+        "pricing",
+        "gallery",
+        "warranty",
+        "terms",
+        "custom"
+      ],
+      "description": "Type of proposal section. Determines how the body content is rendered and which data source feeds it."
+    },
+    "section_key": {
+      "type": "string",
+      "description": "Stable slug identifier for this section (e.g. 'hero', 'system_summary'). Used as a stable reference even if the display title changes."
+    },
+    "title": {
+      "type": "string",
+      "description": "Display heading for this section shown on the proposal."
+    },
+    "body": {
+      "type": "string",
+      "description": "Rich text / markdown body content. Populated by GPT generation in future stages; editable by the designer. Designed as the primary GPT-content storage block."
+    },
+    "order_index": {
+      "type": "number",
+      "default": 0,
+      "description": "Display order within the proposal."
+    },
+    "is_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this section is included in the proposal."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Section-specific configuration for future GPT generation (e.g. prompt overrides, data bindings, tone).",
+      "properties": {}
+    }
+  },
+  "required": [
+    "proposal_id",
+    "account_id"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

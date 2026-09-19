@@ -1,0 +1,229 @@
+{
+  "name": "BrandAsset",
+  "type": "object",
+  "description": "Global brand assets for a dealer account. One record per account. Stores company identity, logos, contact details, marketing copy, and brand colours. Automatically available to every future proposal generated within this account.",
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "description": "ID of the Account these brand assets belong to."
+    },
+    "company_name": {
+      "type": "string",
+      "description": "Dealer company name shown on proposals."
+    },
+    "dealer_logo_url": {
+      "type": "string",
+      "description": "Primary dealer logo URL (full-colour).",
+      "nullable": true
+    },
+    "white_logo_url": {
+      "type": "string",
+      "description": "White/reversed logo URL for dark backgrounds.",
+      "nullable": true
+    },
+    "address": {
+      "type": "string",
+      "description": "Business address shown on proposals."
+    },
+    "telephone": {
+      "type": "string",
+      "description": "Contact telephone number."
+    },
+    "email": {
+      "type": "string",
+      "description": "Contact email address."
+    },
+    "website": {
+      "type": "string",
+      "description": "Business website URL."
+    },
+    "about_us": {
+      "type": "string",
+      "description": "About Us marketing copy for proposals."
+    },
+    "why_choose_us": {
+      "type": "string",
+      "description": "Why Choose Us marketing copy for proposals."
+    },
+    "warranty": {
+      "type": "string",
+      "description": "Warranty terms text shown on proposals."
+    },
+    "terms_conditions": {
+      "type": "string",
+      "description": "Terms & Conditions text shown on proposals."
+    },
+    "primary_colour": {
+      "type": "string",
+      "description": "Primary brand colour (hex).",
+      "default": "#213428"
+    },
+    "secondary_colour": {
+      "type": "string",
+      "description": "Secondary brand colour (hex).",
+      "default": "#3E4349"
+    },
+    "accent_colour": {
+      "type": "string",
+      "description": "Accent brand colour (hex).",
+      "default": "#625143"
+    }
+  },
+  "required": [
+    "account_id"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

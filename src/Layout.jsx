@@ -18,7 +18,8 @@ import {
   Settings,
   Tags,
   UserCog,
-  FileText
+  FileText,
+  Presentation
 } from "lucide-react";
 
 import ApiBadge from "@/components/ui/ApiBadge";
@@ -40,6 +41,7 @@ import { hasCapability, isMasterAdmin } from "@/lib/accountAccess";
 const menuItems = [
   { title: "Projects", url: "/Projects", icon: Layers3, capability: "soundProof" },
   { title: "Room Designer", url: "/RoomDesigner", icon: Home, capability: "soundProof" },
+  { title: "Proposal Centre", url: "/ProposalCentre", icon: Presentation, capability: "soundProof" },
   { title: "RP22 Speaker Capability", url: "/SPLCalculator", icon: Calculator, capability: "soundProof" },
   { title: "Price List", url: "/PriceList", icon: Tags, capability: "priceList" },
   { title: "About Sound Proof", url: "/AboutSoundProof", icon: FileText, alwaysVisible: true },

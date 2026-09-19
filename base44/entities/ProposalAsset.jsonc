@@ -1,0 +1,202 @@
+{
+  "name": "ProposalAsset",
+  "type": "object",
+  "description": "A visual asset (image) attached to a project for use in proposals. Supports hero renders, front/rear views, plan views, elevation views, construction drawings, and gallery images. Each asset has a caption and drag-orderable position (used for gallery images). Linked to the project so assets exist independently of any generated Proposal record.",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "ID of the Project this asset belongs to."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Denormalized account_id for RLS."
+    },
+    "asset_type": {
+      "type": "string",
+      "enum": [
+        "hero_render",
+        "front_view",
+        "rear_view",
+        "plan",
+        "elevation",
+        "construction",
+        "gallery"
+      ],
+      "description": "Type of visual asset. Single-asset types (hero_render, front_view, rear_view, plan, elevation, construction) have one image per project. Gallery allows multiple images with drag ordering."
+    },
+    "file_url": {
+      "type": "string",
+      "description": "URL of the uploaded image file (public storage)."
+    },
+    "caption": {
+      "type": "string",
+      "description": "Caption displayed with the asset in the proposal.",
+      "default": ""
+    },
+    "order_index": {
+      "type": "number",
+      "default": 0,
+      "description": "Display order. Used for gallery images; single-asset types use 0."
+    }
+  },
+  "required": [
+    "project_id",
+    "account_id",
+    "asset_type",
+    "file_url"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
