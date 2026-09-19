@@ -16,6 +16,8 @@ import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler"
 import { isBackgroundInputsReady } from "./backgroundInputReadiness";
 import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from "@/components/room/rsp/screenGeometryResolver";
 import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
+import { summariseAuthoritativeP19Seats } from "./p19SeatAuthority";
+import { getScopedSeatIds } from "@/components/utils/seatScopeAuthority";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
@@ -1348,6 +1350,17 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
             ? "Bass calculation could not be verified. Please try again."
             : null;
 
-  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p14FamilyProgress: targetFamilyProgress });
+  // Single P19 seat authority instance for every Room Designer consumer.
+  const p19SeatAuthority = useMemo(() => {
+    const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(seatingPositions);
+    return summariseAuthoritativeP19Seats({
+      authoritativeSeatResults: completedBassAuthority?.contract?.selectedCandidate?.perSeatP19Results || [],
+      primarySeatIds,
+      secondarySeatIds,
+      seatingPositions,
+    });
+  }, [completedBassAuthority?.contract?.selectedCandidate?.perSeatP19Results, seatingPositions]);
+
+  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
