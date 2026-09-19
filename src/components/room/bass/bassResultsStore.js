@@ -23,6 +23,7 @@ export const emptyBassResults = () => ({
   hasCurrentResult: false,
   authoritative: null,
   completedBassAuthority: null,
+  p19SeatAuthority: null,
   p14FamilyProgress: null,
   seatingPositions: [],
 });
