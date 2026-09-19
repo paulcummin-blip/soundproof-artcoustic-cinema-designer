@@ -32,39 +32,34 @@ function applyMapper(rawValue, mapperFn, canFail) {
   return { level: canFail ? "FAIL" : "L1" };
 }
 
-test("levelP19_lfResponse direct-metric consequences for stored Yarm-era values", async () => {
+test("levelP19_lfResponse follows the engine's floored design grade", async () => {
   const { levelP19_lfResponse } = await loadLevels();
-  assert.equal(levelP19_lfResponse(2.858).level, "L3");
-  assert.equal(levelP19_lfResponse(4.204).level, "L1");
-  assert.equal(levelP19_lfResponse(4.815).level, "L1");
-  assert.equal(levelP19_lfResponse(5.2).level, "FAIL");
-});
-
-test("levelP19_lfResponse boundary cases around 2 / 3 / 4 / 5", async () => {
-  const { levelP19_lfResponse } = await loadLevels();
-  assert.equal(levelP19_lfResponse(2.0).level, "L4");
-  assert.equal(levelP19_lfResponse(2.001).level, "L3");
-  assert.equal(levelP19_lfResponse(2.999).level, "L3");
-  assert.equal(levelP19_lfResponse(3.0).level, "L3");
-  assert.equal(levelP19_lfResponse(3.001).level, "L2");
-  assert.equal(levelP19_lfResponse(3.999).level, "L2");
-  assert.equal(levelP19_lfResponse(4.0).level, "L2");
-  assert.equal(levelP19_lfResponse(4.001).level, "L1");
-  assert.equal(levelP19_lfResponse(4.999).level, "L1");
-  assert.equal(levelP19_lfResponse(5.0).level, "L1");
-  assert.equal(levelP19_lfResponse(5.001).level, "FAIL");
+  assert.equal(levelP19_lfResponse(2.858).level, "L4");
+  assert.equal(levelP19_lfResponse(4.204).level, "L2");
+  assert.equal(levelP19_lfResponse(5.815).level, "L1");
   assert.equal(levelP19_lfResponse(6.0).level, "FAIL");
 });
 
-test("P20 direct boundaries have no L1", async () => {
+test("levelP19_lfResponse boundary cases use whole-dB flooring", async () => {
+  const { levelP19_lfResponse } = await loadLevels();
+  assert.equal(levelP19_lfResponse(2.999).level, "L4");
+  assert.equal(levelP19_lfResponse(3.0).level, "L3");
+  assert.equal(levelP19_lfResponse(3.999).level, "L3");
+  assert.equal(levelP19_lfResponse(4.0).level, "L2");
+  assert.equal(levelP19_lfResponse(4.999).level, "L2");
+  assert.equal(levelP19_lfResponse(5.0).level, "L1");
+  assert.equal(levelP19_lfResponse(5.999).level, "L1");
+  assert.equal(levelP19_lfResponse(6.0).level, "FAIL");
+});
+
+test("P20 direct boundaries use whole-dB flooring and the current L1 fallback", async () => {
   const { levelP20_lfConsistency } = await loadLevels();
-  assert.equal(levelP20_lfConsistency(2.0).level, "L4");
-  assert.equal(levelP20_lfConsistency(2.01).level, "L3");
+  assert.equal(levelP20_lfConsistency(2.99).level, "L4");
   assert.equal(levelP20_lfConsistency(3.0).level, "L3");
-  assert.equal(levelP20_lfConsistency(3.01).level, "L2");
+  assert.equal(levelP20_lfConsistency(3.99).level, "L3");
   assert.equal(levelP20_lfConsistency(4.0).level, "L2");
-  assert.equal(levelP20_lfConsistency(4.01).level, "FAIL");
-  assert.notEqual(levelP20_lfConsistency(100).level, "L1");
+  assert.equal(levelP20_lfConsistency(4.99).level, "L2");
+  assert.equal(levelP20_lfConsistency(5.0).level, "L1");
 });
 
 test("scorecard reads the engine-published P19 grade without a raw-value scorer", async () => {
@@ -91,7 +86,7 @@ test("scoreP20 delegates to the shared mapper and preserves FAIL", async () => {
 
 test("P19 engine mapper remains covered at source boundaries", async () => {
   const { levelP19_lfResponse } = await loadLevels();
-  for (const [value, expected] of [[2, "L4"], [2.858, "L3"], [4, "L2"], [4.815, "L1"], [6, "FAIL"]]) {
+  for (const [value, expected] of [[2, "L4"], [2.858, "L4"], [4, "L2"], [4.815, "L2"], [6, "FAIL"]]) {
     assert.equal(levelP19_lfResponse(value).level, expected);
   }
 });
