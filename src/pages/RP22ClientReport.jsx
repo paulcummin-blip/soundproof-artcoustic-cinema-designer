@@ -50,12 +50,9 @@ import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
 import { useAppState } from "@/components/AppStateProvider";
-import { buildRp22SeatCoverageResult } from "@/components/utils/rp22SeatCoverageSentence";
 import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
-import { buildLightweightSeatHudById, resolveBassReadiness } from "@/components/hooks/useAppDesignRating";
+import { resolveBassReadiness } from "@/components/hooks/useAppDesignRating";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
-import { buildDesignRatingInput } from "@/components/report/technical/buildDesignRatingInput";
-import { buildArtcousticDesignRatingAuthority } from "@/components/report/technical/artcousticSystemDesignRating";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
 import { readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 
@@ -78,7 +75,11 @@ export default function RP22ClientReport() {
     () => projectId ? readDesignReviewHandoff(projectId) : null,
     [projectId]
   );
-  const p19SeatAuthority = publishedEngineering?.p19SeatAuthority
+  const engineeringSummary = publishedEngineering?.engineeringSummary
+    ?? publishedEngineering?.rating?.engineeringSummary
+    ?? null;
+  const p19SeatAuthority = engineeringSummary?.p19SeatAuthority
+    ?? publishedEngineering?.p19SeatAuthority
     ?? publishedEngineering?.rating?.p19SeatAuthority
     ?? null;
   const appState = useAppState();
@@ -125,52 +126,9 @@ export default function RP22ClientReport() {
   // ── Design Summary (static intro — pure selector, no analysis) ──
   const highlights = useMemo(() => selectClientDesignHighlights(), []);
 
-  // ── RP22 seating-coverage floor (strict, NOT ASDR) ──
-  // Uses the SAME canonical param authority as the Technical Report
-  // (buildArtcousticDesignRatingAuthority), built from the same canonical
-  // inputs. The floor is the highest RP22 Level for which every assessed
-  // applicable parameter passes that Level across every Primary seat (and
-  // every seat for ALL_SEAT_FLOOR). Room-scoped params are included.
-  // allParametersAuthoritative is derived from the authority's param states.
-  const reportP14Mode = bassPresentation?.parameters?.p14?.targetBasis || appState?.splConfig?.p14Mode || "minimum";
-  const reportP18Mode = bassPresentation?.parameters?.p18?.targetBasis || appState?.splConfig?.p18Mode || "minimum";
-  const completedP20Results = bassPresentation?.perSeatP20Results || [];
-  const hasFrontWides = useMemo(
-    () => (Array.isArray(placedSpeakers) ? placedSpeakers : []).some((s) => {
-      const r = String(s?.role || "").toUpperCase();
-      return r === "LW" || r === "RW";
-    }),
-    [placedSpeakers]
-  );
-  const coverageParamAuthority = useMemo(() => {
-    try {
-      const reportSeatHudById = buildLightweightSeatHudById(
-        seatingPositions, analysisResult, completedP20Results, p19SeatAuthority
-      );
-      const input = buildDesignRatingInput({
-        seats: seatingPositions,
-        analysisResult,
-        reportSeatHudById,
-        completedBassAuthority,
-        completedBassPresentation: bassPresentation,
-        reportP12Mode: p12Mode,
-        reportP13Mode: p13Mode,
-        reportP14Mode,
-        reportP18Mode,
-        hasFrontWides,
-        placedSpeakers,
-        p19SeatAuthority,
-      });
-      const authority = buildArtcousticDesignRatingAuthority(input);
-      return authority?.parameters || null;
-    } catch (e) {
-      return null;
-    }
-  }, [seatingPositions, analysisResult, completedBassAuthority, bassPresentation, p12Mode, p13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, p19SeatAuthority, completedP20Results]);
-  const coverageResult = useMemo(
-    () => buildRp22SeatCoverageResult({ paramAuthority: coverageParamAuthority, seats: seatingPositions }),
-    [coverageParamAuthority, seatingPositions]
-  );
+  // PASSIVE CONSUMER: the Visual Report reads the exact coverage result
+  // published by the Room Designer's canonical engineering summary.
+  const coverageResult = engineeringSummary?.project?.coverage || null;
   const coverageSentence = coverageResult?.statement || null;
 
   // ── Published recommendations (from Room Designer ASDR engine) ──
