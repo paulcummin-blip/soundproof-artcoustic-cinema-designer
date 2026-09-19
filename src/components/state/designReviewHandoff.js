@@ -200,9 +200,13 @@ export function publishDesignReviewHandoff(snapshot) {
   // direct-load cache carries only the settled report/result fields.
   const stored = {
     projectId,
+    versionId: published.versionId ?? null,
+    calculationRevision: published.calculationRevision ?? null,
+    calculationFingerprint: published.calculationFingerprint ?? null,
     publishedAt: published.publishedAt,
     showAsdr: published.showAsdr,
     rating: published.rating,
+    p19SeatAuthority: published.p19SeatAuthority ?? published.rating?.p19SeatAuthority ?? null,
     seatPriorityFingerprint: published.rating?.seatPriorityFingerprint ?? null,
     seatDesignRatings: published.seatDesignRatings ?? null,
     analysisResult: published.analysisResult,
