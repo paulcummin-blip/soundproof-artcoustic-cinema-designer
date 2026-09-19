@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import BrandAssetsPanel from '@/components/proposal/BrandAssetsPanel';
 import PlaceholderTab from '@/components/proposal/PlaceholderTab';
-import { Building2, FileText, Package, History } from 'lucide-react';
+import CreateProposalWizard from '@/components/proposal/CreateProposalWizard';
+import { Building2, FileText, Package, History, Plus, ChevronLeft } from 'lucide-react';
 
 const TABS = [
   { key: 'brand', label: 'Brand Assets', icon: Building2 },
@@ -31,22 +33,57 @@ const PLACEHOLDER_CONTENT = {
 
 export default function ProposalCentre() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('brand');
+  const [showWizard, setShowWizard] = useState(false);
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 
+  const handleCreated = (proposalId) => {
+    navigate(`/ProposalEditor?proposalId=${proposalId}`);
+  };
+
+  // ── Wizard view ──
+  if (showWizard) {
+    return (
+      <div className="min-h-screen bg-[#F5F4F0] p-6 lg:p-8">
+        <div className="max-w-5xl mx-auto">
+          <button
+            onClick={() => setShowWizard(false)}
+            className="flex items-center gap-1 text-sm text-[#625143] hover:text-[#213428] mb-4"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back to Proposal Centre
+          </button>
+          <CreateProposalWizard onCreated={handleCreated} onCancel={() => setShowWizard(false)} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Default view ──
   return (
     <div className="min-h-screen bg-[#F5F4F0] p-6 lg:p-8">
       <div className="max-w-5xl mx-auto">
-        <div className="mb-6">
-          <h1
-            className="text-2xl font-bold text-[#1B1A1A]"
-            style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h1
+              className="text-2xl font-bold text-[#1B1A1A]"
+              style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+            >
+              Proposal Centre
+            </h1>
+            <p className="text-sm text-[#625143] mt-1">
+              The publishing area for all your proposals — create, manage, and export.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowWizard(true)}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm rounded-md text-white shrink-0"
+            style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
           >
-            Proposal Centre
-          </h1>
-          <p className="text-sm text-[#625143] mt-1">
-            Proposal infrastructure for your dealer account — brand assets, templates, and product library.
-          </p>
+            <Plus className="w-4 h-4" />
+            Create New Proposal
+          </button>
         </div>
 
         <div className="flex gap-2 mb-6 flex-wrap">

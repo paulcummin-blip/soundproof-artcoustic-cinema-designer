@@ -40,7 +40,7 @@ export default async function(req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { project_id, version_id, account_id, narrative_goal } = body;
+    const { project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids } = body;
 
     if (!project_id) return Response.json({ error: 'project_id required' }, { status: 400 });
 
@@ -57,11 +57,25 @@ export default async function(req) {
       brandAsset = brandResults?.[0] || null;
     }
 
+    // ── Resolve version IDs ──
+    // New proposals pass selected_version_ids[] and proposal_type.
+    // Legacy calls pass a single version_id — treat as a single proposal.
+    const resolvedType = proposal_type || 'single';
+    const resolvedVersionIds = Array.isArray(selected_version_ids) && selected_version_ids.length > 0
+      ? selected_version_ids
+      : version_id
+        ? [version_id]
+        : [];
+    // For backward compatibility, version_id = first selected version.
+    const legacyVersionId = resolvedVersionIds[0] || null;
+
     // ── Create Proposal record ──
     const proposal = await base44.entities.Proposal.create({
       project_id,
       account_id: effectiveAccountId,
-      version_id: version_id || null,
+      proposal_type: resolvedType,
+      selected_version_ids: resolvedVersionIds,
+      version_id: legacyVersionId,
       title: project.name || 'Untitled Proposal',
       status: 'generating',
       narrative_goal: narrative_goal || 'luxury_cinema',

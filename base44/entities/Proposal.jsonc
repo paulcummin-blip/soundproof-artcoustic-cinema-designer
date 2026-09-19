@@ -1,7 +1,7 @@
 {
   "name": "Proposal",
   "type": "object",
-  "description": "A client-facing design proposal for a project. One proposal per project version. Created via a wizard that selects a project version and Narrative Goal, then generates a complete first draft via GPT. The Proposal Editor is the primary workspace for reviewing, editing, and approving proposals before export.",
+  "description": "A client-facing design proposal for a project. Created via a wizard that selects a project, proposal type (single or comparison), one or more project versions, and a Narrative Goal, then generates a complete first draft via GPT. The Proposal Editor is the primary workspace for reviewing, editing, and approving proposals before export.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -11,9 +11,26 @@
       "type": "string",
       "description": "Denormalized account_id from the parent Project, used for RLS."
     },
+    "proposal_type": {
+      "type": "string",
+      "enum": [
+        "single",
+        "comparison"
+      ],
+      "default": "single",
+      "description": "The type of proposal document. 'single' = a proposal for one design version. 'comparison' = a side-by-side comparison of two or more design versions. This determines which Proposal Intelligence pipeline is executed. Designed to support additional types in the future (e.g. product, upgrade, commercial, technical) without schema changes."
+    },
+    "selected_version_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Array of ProjectVersion IDs this proposal is based on. For 'single' proposals, exactly one version. For 'comparison' proposals, two or more versions. Future Proposal Intelligence receives all selected versions rather than assuming only one exists."
+    },
     "version_id": {
       "type": "string",
-      "description": "ID of the ProjectVersion this proposal is based on. One proposal per version.",
+      "description": "Legacy field \u2014 the single ProjectVersion ID this proposal was based on. Superseded by selected_version_ids for new proposals. Retained for backward compatibility; for new 'single' proposals this is set to selected_version_ids[0].",
       "nullable": true
     },
     "title": {

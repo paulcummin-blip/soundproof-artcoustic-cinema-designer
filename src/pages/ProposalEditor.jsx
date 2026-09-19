@@ -1,46 +1,53 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { useAuth } from '@/lib/AuthContext';
-import { useActiveProjectId } from '@/components/state/project-session';
-import { PROPOSAL_SECTIONS, NARRATIVE_GOALS, getSectionDef } from '@/components/proposal/proposalSections';
+import { NARRATIVE_GOALS, getSectionDef } from '@/components/proposal/proposalSections';
+import { getProposalType } from '@/components/proposal/proposalTypes';
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
 import ProposalSectionNav from '@/components/proposal/ProposalSectionNav';
-import CreateProposalWizard from '@/components/proposal/CreateProposalWizard';
-import { Loader2, FileText, Download, ChevronLeft } from 'lucide-react';
+import { Loader2, FileText, Download, ChevronLeft, Presentation } from 'lucide-react';
 
 const SAVE_STATUS = { IDLE: 'idle', SAVING: 'saving', SAVED: 'saved' };
 
+/**
+ * Proposal Editor — the publishing tool.
+ *
+ * Loads a proposal by ID from the URL query param `proposalId`.
+ * The Proposal Editor is no longer tied to the active project; proposals
+ * are created from the Proposal Centre wizard and opened here by ID.
+ */
 export default function ProposalEditor() {
-  const { user } = useAuth();
-  const activeProjectId = useActiveProjectId();
-  const accountId = user?.access_context?.account?.id || user?.account_id || null;
+  const [searchParams] = useSearchParams();
+  const proposalId = searchParams.get('proposalId');
 
   const [proposal, setProposal] = useState(null);
   const [sections, setSections] = useState([]);
   const [activeSectionKey, setActiveSectionKey] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showWizard, setShowWizard] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [saveStatuses, setSaveStatuses] = useState({});
   const [regenerating, setRegenerating] = useState(null);
   const [showProperties, setShowProperties] = useState(false);
 
-  // ── Load proposal + sections ──
+  // ── Load proposal + sections by ID ──
   const load = useCallback(async () => {
-    if (!activeProjectId) {
+    if (!proposalId) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const proposals = await base44.entities.Proposal.filter({ project_id: activeProjectId });
-      const existing = proposals?.[0] || null;
-      setProposal(existing);
-      if (existing) {
-        const sectionResults = await base44.entities.ProposalSection.filter({ proposal_id: existing.id });
-        const sorted = (sectionResults || []).sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+      const proposalRecord = await base44.entities.Proposal.get(proposalId);
+      setProposal(proposalRecord);
+      if (proposalRecord) {
+        const sectionResults = await base44.entities.ProposalSection.filter({
+          proposal_id: proposalRecord.id,
+        });
+        const sorted = (sectionResults || []).sort(
+          (a, b) => (a.order_index || 0) - (b.order_index || 0)
+        );
         setSections(sorted);
         if (sorted.length > 0 && !activeSectionKey) {
           setActiveSectionKey(sorted[0].section_key);
@@ -51,7 +58,7 @@ export default function ProposalEditor() {
     } finally {
       setLoading(false);
     }
-  }, [activeProjectId]);
+  }, [proposalId]);
 
   useEffect(() => {
     load();
@@ -126,8 +133,6 @@ export default function ProposalEditor() {
       if (!confirmed) return;
     }
     setRegenerating(activeSection.id);
-    // TODO: Stage 5 — call generateProposalSection backend function
-    // For now, this is a placeholder
     setTimeout(() => {
       setRegenerating(null);
       alert('GPT regeneration will be available in Stage 5. The editor is ready for it.');
@@ -143,33 +148,38 @@ export default function ProposalEditor() {
     );
   }
 
-  if (!activeProjectId) {
+  if (!proposalId) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#F5F4F0] text-[#625143]">
-        No active project. Open a project first.
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#F5F4F0] text-center px-6">
+        <Presentation className="w-10 h-10 text-[#625143] mb-4" />
+        <h2
+          className="text-lg font-bold text-[#1B1A1A] mb-2"
+          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+        >
+          No Proposal Selected
+        </h2>
+        <p className="text-sm text-[#625143] mb-6">
+          Proposals are created from the Proposal Centre. Open it to start a new proposal.
+        </p>
+        <Link
+          to="/ProposalCentre"
+          className="px-5 py-2.5 text-sm rounded-md text-white"
+          style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
+        >
+          Go to Proposal Centre
+        </Link>
       </div>
     );
   }
 
-  if (!proposal || showWizard) {
-    return (
-      <div className="min-h-screen bg-[#F5F4F0]">
-        <CreateProposalWizard
-          onCreated={(proposalId) => {
-            setShowWizard(false);
-            load();
-          }}
-          onCancel={() => setShowWizard(false)}
-        />
-      </div>
-    );
-  }
-
-  if (proposal.status === 'generating') {
+  if (proposal?.status === 'generating') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#F5F4F0]">
         <Loader2 className="w-8 h-8 text-[#213428] animate-spin mb-4" />
-        <h3 className="text-lg font-bold text-[#1B1A1A]" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+        <h3
+          className="text-lg font-bold text-[#1B1A1A]"
+          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+        >
           Generating Proposal
         </h3>
         <p className="text-sm text-[#625143] mt-2">GPT is writing your complete proposal.</p>
@@ -178,20 +188,32 @@ export default function ProposalEditor() {
   }
 
   const visibleSections = sections.filter((s) => s.is_enabled !== false);
+  const typeLabel = getProposalType(proposal?.proposal_type)?.label || 'Single Design Proposal';
 
   return (
     <div className="flex h-screen bg-[#F5F4F0] overflow-hidden">
       {/* ── Left: Section navigation ── */}
       <div className="w-56 border-r border-[#DCDBD6] bg-white flex flex-col overflow-hidden">
         <div className="p-4 border-b border-[#DCDBD6]">
+          <Link
+            to="/ProposalCentre"
+            className="flex items-center gap-1 text-xs text-[#625143] hover:text-[#213428] mb-2"
+          >
+            <ChevronLeft className="w-3 h-3" />
+            Proposal Centre
+          </Link>
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-[#213428]" />
-            <span className="text-sm font-bold text-[#1B1A1A]" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-              {proposal.title || 'Proposal'}
+            <span
+              className="text-sm font-bold text-[#1B1A1A]"
+              style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+            >
+              {proposal?.title || 'Proposal'}
             </span>
           </div>
-          <div className="text-xs text-[#625143] mt-1">
-            {NARRATIVE_GOALS.find((g) => g.value === proposal.narrative_goal)?.label || 'Luxury Cinema'}
+          <div className="text-xs text-[#625143] mt-1">{typeLabel}</div>
+          <div className="text-xs text-[#625143]">
+            {NARRATIVE_GOALS.find((g) => g.value === proposal?.narrative_goal)?.label || 'Luxury Cinema'}
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
@@ -219,7 +241,6 @@ export default function ProposalEditor() {
                 className={`mb-12 ${isActive ? '' : 'opacity-60'}`}
                 onClick={() => setActiveSectionKey(section.section_key)}
               >
-                {/* Section title */}
                 {def.type !== 'cover' && (
                   <h2
                     className="text-2xl font-bold text-[#1B1A1A] mb-4"
@@ -229,7 +250,6 @@ export default function ProposalEditor() {
                   </h2>
                 )}
 
-                {/* Section toolbar (only for active section) */}
                 {isActive && def.canEditBody && (
                   <div className="mb-3">
                     <SectionToolbar
@@ -242,7 +262,6 @@ export default function ProposalEditor() {
                   </div>
                 )}
 
-                {/* Dealer notes (only for active section) */}
                 {isActive && showNotes && def.canEditBody && (
                   <div className="mb-4">
                     <DealerNotesPanel
@@ -253,7 +272,6 @@ export default function ProposalEditor() {
                   </div>
                 )}
 
-                {/* Editable body */}
                 {def.canEditBody ? (
                   <InlineRichTextEditor
                     html={section.body}
@@ -262,7 +280,6 @@ export default function ProposalEditor() {
                     saveStatus={saveStatuses[section.id] || SAVE_STATUS.IDLE}
                   />
                 ) : (
-                  /* Cover section — rendered from brand assets + project data */
                   <div className="rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: '4/5' }}>
                     <CoverSection proposal={proposal} />
                   </div>
@@ -336,11 +353,13 @@ export default function ProposalEditor() {
 
 // ── Cover section component ──
 function CoverSection({ proposal }) {
-  // Placeholder — will be populated from brand assets + project data
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: '#213428' }}>
       <div className="p-8 flex items-center" style={{ minHeight: 56 }}>
-        <span className="text-sm font-bold text-white" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+        <span
+          className="text-sm font-bold text-white"
+          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+        >
           Dealer Logo
         </span>
       </div>
@@ -348,13 +367,18 @@ function CoverSection({ proposal }) {
         <div className="text-xs uppercase tracking-[0.25em] text-[#625143] mb-3">
           Cinema Design Proposal
         </div>
-        <div className="text-3xl font-bold text-white" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+        <div
+          className="text-3xl font-bold text-white"
+          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+        >
           {proposal?.title || 'Project Name'}
         </div>
       </div>
       <div className="px-8 py-3 flex items-center justify-between" style={{ backgroundColor: '#3E4349' }}>
         <span className="text-xs text-white/80">Dealer Name</span>
-        <span className="text-[10px] text-white/50 uppercase tracking-wider">Powered by Sound Proof</span>
+        <span className="text-[10px] text-white/50 uppercase tracking-wider">
+          Powered by Sound Proof
+        </span>
       </div>
     </div>
   );

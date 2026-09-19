@@ -1,69 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useActiveProjectId } from '@/components/state/project-session';
 import { useAuth } from '@/lib/AuthContext';
-import { NARRATIVE_GOALS } from '@/components/proposal/proposalSections';
-import { Loader2, Sparkles, ChevronRight } from 'lucide-react';
+import { Sparkles, ChevronLeft } from 'lucide-react';
+import { getProposalType } from '@/components/proposal/proposalTypes';
+import WizardStepper from '@/components/proposal/wizard/WizardStepper';
+import ProjectSelectStep from '@/components/proposal/wizard/ProjectSelectStep';
+import ProposalTypeStep from '@/components/proposal/wizard/ProposalTypeStep';
+import VersionSelectStep from '@/components/proposal/wizard/VersionSelectStep';
+import NarrativeGoalStep from '@/components/proposal/wizard/NarrativeGoalStep';
+import GenerateStep from '@/components/proposal/wizard/GenerateStep';
+
+const STEPS = [
+  { key: 'project', label: 'Project' },
+  { key: 'type', label: 'Type' },
+  { key: 'versions', label: 'Versions' },
+  { key: 'goal', label: 'Goal' },
+  { key: 'generate', label: 'Generate' },
+];
 
 /**
- * Create Proposal wizard — selects a project version and Narrative Goal,
- * then triggers GPT generation of a complete proposal.
+ * Create Proposal wizard — a multi-step flow that creates proposals
+ * from any non-archived project, not just the active one.
  *
  * Steps:
- * 1. Choose Version (if project has multiple versions)
- * 2. Narrative Goal
- * 3. Generate (creates Proposal + blocks, invokes GPT, redirects to editor)
+ * 1. Select Project (any non-archived project for this dealer)
+ * 2. Choose Proposal Type (single or comparison)
+ * 3. Select Version(s) — one for single, two+ for comparison
+ * 4. Choose Narrative Goal
+ * 5. Generate (creates Proposal + blocks, invokes GPT, opens editor)
+ *
+ * The wizard is project-agnostic. The Proposal Editor becomes a
+ * publishing tool that loads by proposal ID, not by active project.
  */
 export default function CreateProposalWizard({ onCreated, onCancel }) {
   const { user } = useAuth();
-  const activeProjectId = useActiveProjectId();
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 
   const [step, setStep] = useState(0);
-  const [versions, setVersions] = useState([]);
-  const [project, setProject] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedVersionId, setSelectedVersionId] = useState(null);
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [proposalType, setProposalType] = useState('single');
+  const [selectedVersionIds, setSelectedVersionIds] = useState([]);
   const [narrativeGoal, setNarrativeGoal] = useState('luxury_cinema');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
 
-  React.useEffect(() => {
-    if (!activeProjectId) {
-      setLoading(false);
-      return;
-    }
-    (async () => {
-      try {
-        const [projectResults, versionResults] = await Promise.all([
-          base44.entities.Project.filter({ id: activeProjectId }),
-          base44.entities.ProjectVersion.filter({ project_id: activeProjectId }),
-        ]);
-        setProject(projectResults?.[0] || null);
-        const sorted = (versionResults || []).sort((a, b) => (a.version_number || 0) - (b.version_number || 0));
-        setVersions(sorted);
-        const activeVersionId = projectResults?.[0]?.active_version_id;
-        if (activeVersionId && sorted.some((v) => v.id === activeVersionId)) {
-          setSelectedVersionId(activeVersionId);
-        } else if (sorted.length > 0) {
-          setSelectedVersionId(sorted[0].id);
-        }
-      } catch (err) {
-        console.error('Failed to load project/versions:', err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [activeProjectId]);
+  const handleSelectProject = useCallback((projectId) => {
+    setSelectedProjectId(projectId);
+    setSelectedVersionIds([]);
+  }, []);
+
+  const handleSelectType = useCallback((type) => {
+    setProposalType(type);
+    setSelectedVersionIds([]);
+  }, []);
 
   const handleGenerate = async () => {
-    if (!activeProjectId || !selectedVersionId) return;
+    if (!selectedProjectId || selectedVersionIds.length === 0) return;
     setGenerating(true);
     setError(null);
     try {
       const response = await base44.functions.invoke('generateProposal', {
-        project_id: activeProjectId,
-        version_id: selectedVersionId,
+        project_id: selectedProjectId,
+        proposal_type: proposalType,
+        selected_version_ids: selectedVersionIds,
         account_id: accountId,
         narrative_goal: narrativeGoal,
       });
@@ -80,120 +79,27 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
     }
   };
 
-  if (!activeProjectId) {
-    return (
-      <div className="p-8 text-center text-[#625143]">
-        No active project. Open a project first.
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 text-[#625143] animate-spin" />
-      </div>
-    );
-  }
-
   // ── Generating screen ──
   if (generating) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 text-[#213428] animate-spin mb-4" />
-        <h3
-          className="text-lg font-bold text-[#1B1A1A]"
-          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
-        >
-          Generating Proposal
-        </h3>
-        <p className="text-sm text-[#625143] mt-2">
-          GPT is writing your complete proposal. This takes 30-60 seconds.
-        </p>
-      </div>
-    );
-  }
-
-  // ── Error screen ──
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <p className="text-sm text-red-600 mb-4">{error}</p>
-        <button
-          onClick={() => setGenerating(false)}
-          className="px-4 py-2 text-sm rounded-md border border-[#DCDBD6] text-[#3E4349] hover:bg-[#F5F4F0]"
-        >
-          Back
-        </button>
-      </div>
-    );
-  }
-
-  // ── Step 0: Choose Version ──
-  if (step === 0) {
-    return (
       <div className="max-w-2xl mx-auto py-8">
-        <h2
-          className="text-xl font-bold text-[#1B1A1A] mb-2"
-          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
-        >
-          Create Proposal
-        </h2>
-        <p className="text-sm text-[#625143] mb-6">Step 1 of 2 — Choose a project version</p>
-
-        {versions.length === 0 ? (
-          <p className="text-sm text-[#625143]">This project has no versions yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {versions.map((v) => (
-              <button
-                key={v.id}
-                onClick={() => setSelectedVersionId(v.id)}
-                className={`w-full text-left p-4 rounded-lg border transition-colors ${
-                  selectedVersionId === v.id
-                    ? 'bg-[#213428] text-white border-[#213428]'
-                    : 'bg-white text-[#1B1A1A] border-[#DCDBD6] hover:bg-[#F5F4F0]'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-                      Version {v.version_number}
-                    </div>
-                    <div className={`text-sm ${selectedVersionId === v.id ? 'text-white/70' : 'text-[#625143]'}`}>
-                      {v.version_name || 'Current Design'}
-                    </div>
-                  </div>
-                  {selectedVersionId === v.id && <ChevronRight className="w-5 h-5" />}
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="flex gap-3 mt-8">
-          <button
-            onClick={() => setStep(1)}
-            disabled={!selectedVersionId}
-            className="px-5 py-2.5 text-sm rounded-md text-white disabled:opacity-50"
-            style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
-          >
-            Next: Narrative Goal
-          </button>
-          {onCancel && (
-            <button
-              onClick={onCancel}
-              className="px-4 py-2.5 text-sm rounded-md border border-[#DCDBD6] text-[#3E4349] hover:bg-[#F5F4F0]"
-            >
-              Cancel
-            </button>
-          )}
-        </div>
+        <GenerateStep error={error} onBack={() => setGenerating(false)} />
       </div>
     );
   }
 
-  // ── Step 1: Narrative Goal ──
+  const typeDef = getProposalType(proposalType);
+  const versionsValid = proposalType === 'comparison'
+    ? selectedVersionIds.length >= (typeDef?.minVersions || 2)
+    : selectedVersionIds.length === 1;
+
+  const canProceed = [
+    !!selectedProjectId, // step 0
+    !!proposalType, // step 1
+    versionsValid, // step 2
+    !!narrativeGoal, // step 3
+  ];
+
   return (
     <div className="max-w-2xl mx-auto py-8">
       <h2
@@ -202,53 +108,120 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
       >
         Create Proposal
       </h2>
-      <p className="text-sm text-[#625143] mb-6">Step 2 of 2 — Choose a Narrative Goal</p>
-      <p className="text-xs text-[#625143] mb-4">
-        This gives the proposal its personality. GPT reads this before anything else. You can change it later.
+      <p className="text-sm text-[#625143] mb-6">
+        Step {step + 1} of {STEPS.length} — {STEPS[step].label}
       </p>
 
-      <div className="space-y-2">
-        {NARRATIVE_GOALS.map((goal) => (
-          <button
-            key={goal.value}
-            onClick={() => setNarrativeGoal(goal.value)}
-            className={`w-full text-left p-4 rounded-lg border transition-colors ${
-              narrativeGoal === goal.value
-                ? 'bg-[#213428] text-white border-[#213428]'
-                : 'bg-white text-[#1B1A1A] border-[#DCDBD6] hover:bg-[#F5F4F0]'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-semibold" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-                  {goal.label}
-                </div>
-                <div className={`text-sm ${narrativeGoal === goal.value ? 'text-white/70' : 'text-[#625143]'}`}>
-                  {goal.description}
-                </div>
-              </div>
-              {narrativeGoal === goal.value && <Sparkles className="w-5 h-5" />}
-            </div>
-          </button>
-        ))}
-      </div>
+      <WizardStepper steps={STEPS} currentStep={step} />
 
+      {/* Step 0 — Select Project */}
+      {step === 0 && (
+        <ProjectSelectStep
+          selectedProjectId={selectedProjectId}
+          onSelect={handleSelectProject}
+        />
+      )}
+
+      {/* Step 1 — Choose Proposal Type */}
+      {step === 1 && (
+        <ProposalTypeStep selectedType={proposalType} onSelect={handleSelectType} />
+      )}
+
+      {/* Step 2 — Select Version(s) */}
+      {step === 2 && (
+        <VersionSelectStep
+          projectId={selectedProjectId}
+          proposalType={proposalType}
+          selectedVersionIds={selectedVersionIds}
+          onSelect={setSelectedVersionIds}
+        />
+      )}
+
+      {/* Step 3 — Narrative Goal */}
+      {step === 3 && (
+        <NarrativeGoalStep selectedGoal={narrativeGoal} onSelect={setNarrativeGoal} />
+      )}
+
+      {/* Step 4 — Review & Generate */}
+      {step === 4 && (
+        <div>
+          <div className="space-y-3 mb-6">
+            <ReviewRow label="Project" value={selectedProjectId ? 'Selected' : '—'} />
+            <ReviewRow
+              label="Proposal Type"
+              value={typeDef?.label || '—'}
+            />
+            <ReviewRow
+              label="Versions"
+              value={`${selectedVersionIds.length} selected`}
+            />
+            <ReviewRow
+              label="Narrative Goal"
+              value={narrativeGoal ? narrativeGoal.replace(/_/g, ' ') : '—'}
+            />
+          </div>
+          <p className="text-xs text-[#625143] mb-6">
+            Click generate to create the proposal and open the editor. GPT will write a complete
+            first draft.
+          </p>
+        </div>
+      )}
+
+      {/* Navigation */}
       <div className="flex gap-3 mt-8">
-        <button
-          onClick={() => setStep(0)}
-          className="px-4 py-2.5 text-sm rounded-md border border-[#DCDBD6] text-[#3E4349] hover:bg-[#F5F4F0]"
-        >
-          Back
-        </button>
-        <button
-          onClick={handleGenerate}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm rounded-md text-white"
-          style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
-        >
-          <Sparkles className="w-4 h-4" />
-          Generate Proposal
-        </button>
+        {step > 0 && (
+          <button
+            onClick={() => setStep(step - 1)}
+            className="flex items-center gap-1.5 px-4 py-2.5 text-sm rounded-md border border-[#DCDBD6] text-[#3E4349] hover:bg-[#F5F4F0]"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back
+          </button>
+        )}
+        {step < STEPS.length - 1 && (
+          <button
+            onClick={() => setStep(step + 1)}
+            disabled={!canProceed[step]}
+            className="px-5 py-2.5 text-sm rounded-md text-white disabled:opacity-50"
+            style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
+          >
+            Next
+          </button>
+        )}
+        {step === STEPS.length - 1 && (
+          <button
+            onClick={handleGenerate}
+            disabled={!canProceed[0] || !canProceed[2] || !canProceed[3]}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm rounded-md text-white disabled:opacity-50"
+            style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
+          >
+            <Sparkles className="w-4 h-4" />
+            Generate Proposal
+          </button>
+        )}
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="px-4 py-2.5 text-sm rounded-md border border-[#DCDBD6] text-[#3E4349] hover:bg-[#F5F4F0]"
+          >
+            Cancel
+          </button>
+        )}
       </div>
+    </div>
+  );
+}
+
+function ReviewRow({ label, value }) {
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-[#DCDBD6]">
+      <span className="text-sm text-[#625143]">{label}</span>
+      <span
+        className="text-sm font-semibold text-[#1B1A1A] capitalize"
+        style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+      >
+        {value}
+      </span>
     </div>
   );
 }
