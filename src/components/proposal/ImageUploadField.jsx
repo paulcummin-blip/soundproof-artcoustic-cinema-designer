@@ -38,7 +38,7 @@ export default function ImageUploadField({
     if (!file) return;
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
       onUpload(file_url);
     } catch (err) {
       console.error('Upload failed:', err);

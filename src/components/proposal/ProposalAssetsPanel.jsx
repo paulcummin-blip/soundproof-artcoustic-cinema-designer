@@ -110,7 +110,7 @@ export default function ProposalAssetsPanel({ projectId, accountId }) {
     if (!file) return;
     setGalleryUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
       const gallery = getGallery();
       const nextIndex = gallery.length > 0 ? Math.max(...gallery.map((g) => g.order_index || 0)) + 1 : 0;
       await base44.entities.ProposalAsset.create({
