@@ -530,7 +530,7 @@ export async function hydrateCompletedBassAuthority(projectId, versionId) {
     const record = Array.isArray(records) ? records[0] : null;
     const persisted = buildHydratedPersistedWrapper(record);
     const next = resolvePersistedBassAuthority(key, persisted);
-    console.info('[REPORT-RUNTIME] hydrate-result ' + JSON.stringify({ projectId, versionId, key, filter: bassDbFilter(projectId, versionId), records: records?.length, nextStatus: next?.authorityStatus }));
+    console.info('[REPORT-RUNTIME] hydrate-result ' + JSON.stringify({ projectId, versionId, key, filter: bassDbFilter(projectId, versionId), records: records?.length, recordGenerations: { cache: record?.completed_cache_version, instance: record?.instance_authority_version, metric: record?.metric_schema_version, status: record?.status, fingerprint: record?.current_fingerprint, snapshotCount: Object.keys(record?.completed_by_fingerprint || {}).length }, expectedGenerations: { cache: COMPLETED_BASS_CACHE_VERSION, instance: INSTANCE_AUTHORITY_VERSION, metric: RP22_BASS_METRIC_SCHEMA_VERSION }, nextStatus: next?.authorityStatus }));
     if (current?.authoritative && current?.contract && !next?.authoritative) {
       return current;
     }
