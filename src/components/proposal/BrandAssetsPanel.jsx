@@ -9,7 +9,7 @@ import ImageUploadField from '@/components/proposal/ImageUploadField';
 import ColourField from '@/components/proposal/ColourField';
 import RichTextField from '@/components/proposal/RichTextField';
 import ProposalDefaultsPanel from '@/components/proposal/ProposalDefaultsPanel';
-import BrandAssetsPreview from '@/components/proposal/BrandAssetsPreview';
+import PublicationPreview from '@/components/proposal/PublicationPreview';
 
 const DEFAULTS = {
   company_name: '',
@@ -158,6 +158,12 @@ export default function BrandAssetsPanel({ accountId }) {
               showCaption={false}
             />
           </div>
+        </Section>
+
+        <Section title="Brand Colours">
+          <p className="text-[12px] text-[#A79E8C] leading-relaxed -mt-2">
+            Applied naturally across every page of the publication — headings, rules, and accents.
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <ColourField
               label="Primary Colour"
@@ -342,7 +348,7 @@ export default function BrandAssetsPanel({ accountId }) {
 
       {/* ── Preview column ── */}
       <div className="lg:col-span-1">
-        <BrandAssetsPreview form={form} />
+        <PublicationPreview form={form} />
       </div>
     </div>
   );
