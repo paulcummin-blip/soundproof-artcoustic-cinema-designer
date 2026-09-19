@@ -149,6 +149,15 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
 export function applyAuthorityToCanonicalResult(canonicalResult, authorityBearingCandidate) {
   if (!canonicalResult?.selectedCandidateId || !authorityBearingCandidate?.candidateId) return canonicalResult;
   const candidate = authorityBearingCandidate;
+  const alignedRsp = Array.isArray(candidate.alignedPostEqRsp) && candidate.alignedPostEqRsp.length
+    ? candidate.alignedPostEqRsp.map((point) => ({ ...point }))
+    : canonicalResult.canonicalPostEqRsp;
+  const alignedSeats = Array.isArray(candidate.alignedPostEqSeatResponses)
+    ? candidate.alignedPostEqSeatResponses.map((seat) => ({
+        ...seat,
+        responseData: cloneCurve(seat.responseData),
+      }))
+    : canonicalResult.canonicalPostEqSeatResponses;
   return {
     ...canonicalResult,
     achievedP14Db: candidate.achievedP14Db ?? null,
@@ -160,9 +169,16 @@ export function applyAuthorityToCanonicalResult(canonicalResult, authorityBearin
     achievedP20VariationDb: candidate.achievedP20VariationDb ?? null,
     achievedP20Level: candidate.achievedP20Level ?? null,
     globalLevelAlignment: candidate.globalLevelAlignment ?? null,
-    alignedPostEqRsp: Array.isArray(candidate.alignedPostEqRsp) && candidate.alignedPostEqRsp.length
-      ? candidate.alignedPostEqRsp.map((point) => ({ ...point }))
-      : canonicalResult.canonicalPostEqRsp,
+    alignedPostEqRsp: alignedRsp,
+    alignedPostEqSeatResponses: alignedSeats,
+    // Publish and persist the response after the complete shared calibration.
+    // The global alignment is one system trim, so RSP and all seats move
+    // together. Consumers must not graph the pre-alignment seat curves.
+    canonicalPostEqRsp: alignedRsp,
+    postEqRspCurve: alignedRsp,
+    canonicalPostEqSeatResponses: alignedSeats,
+    postEqPerSeatCurves: alignedSeats,
+    postEqCurveSignature: buildCurveSignature(alignedRsp),
     p14CapabilityDetails: candidate.p14CapabilityDetails || null,
     postEqCapabilityAssessment: candidate.postEqCapabilityAssessment || null,
     finalSeatVariationData: {
