@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Sparkles, ChevronLeft } from 'lucide-react';
 import { getProposalType } from '@/components/proposal/proposalTypes';
 import WizardStepper from '@/components/proposal/wizard/WizardStepper';
 import ProjectSelectStep from '@/components/proposal/wizard/ProjectSelectStep';
@@ -81,11 +80,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
 
   // ── Generating screen ──
   if (generating) {
-    return (
-      <div className="max-w-2xl mx-auto py-8">
-        <GenerateStep error={error} onBack={() => setGenerating(false)} />
-      </div>
-    );
+    return <GenerateStep error={error} onBack={() => setGenerating(false)} />;
   }
 
   const typeDef = getProposalType(proposalType);
@@ -101,16 +96,16 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
   ];
 
   return (
-    <div className="max-w-2xl mx-auto py-8">
+    <div>
+      <div className="text-[11px] uppercase tracking-[0.24em] text-[#A79E8C] mb-4">
+        Step {step + 1} of {STEPS.length}
+      </div>
       <h2
-        className="text-xl font-bold text-[#1B1A1A] mb-2"
+        className="text-[32px] leading-none font-normal text-[#1B1A1A] tracking-tight mb-10"
         style={{ fontFamily: 'Didact Gothic, sans-serif' }}
       >
         Create Proposal
       </h2>
-      <p className="text-sm text-[#625143] mb-6">
-        Step {step + 1} of {STEPS.length} — {STEPS[step].label}
-      </p>
 
       <WizardStepper steps={STEPS} currentStep={step} />
 
@@ -145,7 +140,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
       {/* Step 4 — Review & Generate */}
       {step === 4 && (
         <div>
-          <div className="space-y-3 mb-6">
+          <div className="mb-10">
             <ReviewRow label="Project" value={selectedProjectId ? 'Selected' : '—'} />
             <ReviewRow
               label="Proposal Type"
@@ -158,23 +153,23 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
             <ReviewRow
               label="Narrative Goal"
               value={narrativeGoal ? narrativeGoal.replace(/_/g, ' ') : '—'}
+              last
             />
           </div>
-          <p className="text-xs text-[#625143] mb-6">
-            Click generate to create the proposal and open the editor. GPT will write a complete
+          <p className="text-sm text-[#8A8477] mb-10 leading-relaxed">
+            Generate to create the proposal and open the editor. GPT will write a complete
             first draft.
           </p>
         </div>
       )}
 
       {/* Navigation */}
-      <div className="flex gap-3 mt-8">
+      <div className="flex gap-4 mt-12 pt-8 border-t border-[#E5E1D8]">
         {step > 0 && (
           <button
             onClick={() => setStep(step - 1)}
-            className="flex items-center gap-1.5 px-4 py-2.5 text-sm rounded-md border border-[#DCDBD6] text-[#3E4349] hover:bg-[#F5F4F0]"
+            className="px-5 py-2.5 text-xs uppercase tracking-[0.14em] text-[#625143] hover:text-[#1B1A1A] transition-colors"
           >
-            <ChevronLeft className="w-4 h-4" />
             Back
           </button>
         )}
@@ -182,7 +177,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
           <button
             onClick={() => setStep(step + 1)}
             disabled={!canProceed[step]}
-            className="px-5 py-2.5 text-sm rounded-md text-white disabled:opacity-50"
+            className="px-6 py-2.5 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
             style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
           >
             Next
@@ -192,17 +187,16 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
           <button
             onClick={handleGenerate}
             disabled={!canProceed[0] || !canProceed[2] || !canProceed[3]}
-            className="flex items-center gap-2 px-5 py-2.5 text-sm rounded-md text-white disabled:opacity-50"
+            className="px-6 py-2.5 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
             style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
           >
-            <Sparkles className="w-4 h-4" />
             Generate Proposal
           </button>
         )}
         {onCancel && (
           <button
             onClick={onCancel}
-            className="px-4 py-2.5 text-sm rounded-md border border-[#DCDBD6] text-[#3E4349] hover:bg-[#F5F4F0]"
+            className="px-5 py-2.5 text-xs uppercase tracking-[0.14em] text-[#A79E8C] hover:text-[#625143] transition-colors"
           >
             Cancel
           </button>
@@ -212,12 +206,12 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
   );
 }
 
-function ReviewRow({ label, value }) {
+function ReviewRow({ label, value, last }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-[#DCDBD6]">
-      <span className="text-sm text-[#625143]">{label}</span>
+    <div className={`flex items-center justify-between py-3 ${last ? '' : 'border-b border-[#E5E1D8]'}`}>
+      <span className="text-[11px] uppercase tracking-[0.12em] text-[#A79E8C]">{label}</span>
       <span
-        className="text-sm font-semibold text-[#1B1A1A] capitalize"
+        className="text-sm text-[#1B1A1A] capitalize"
         style={{ fontFamily: 'Didact Gothic, sans-serif' }}
       >
         {value}

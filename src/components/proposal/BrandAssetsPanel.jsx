@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckCircle2 } from 'lucide-react';
 import ImageUploadField from '@/components/proposal/ImageUploadField';
 import ColourField from '@/components/proposal/ColourField';
 import RichTextField from '@/components/proposal/RichTextField';
@@ -41,10 +41,13 @@ const DEFAULTS = {
   proposal_tone: 'luxury_residential',
 };
 
-function SectionCard({ title, children }) {
+const inputClasses = 'bg-transparent border-0 border-b border-[#E5E1D8] rounded-none px-0 text-[#1B1A1A] focus-visible:ring-0 focus-visible:border-[#213428] mt-1.5';
+const labelClasses = 'text-[11px] uppercase tracking-[0.12em] text-[#A79E8C]';
+
+function Section({ title, children }) {
   return (
-    <div className="bg-white border border-[#DCDBD6] rounded-lg p-5 space-y-4">
-      <h3 className="text-sm font-semibold text-[#3E4349] uppercase tracking-wide">{title}</h3>
+    <div className="py-10 border-t border-[#E5E1D8] first:border-t-0 first:pt-0 space-y-6">
+      <h3 className="text-[11px] uppercase tracking-[0.2em] text-[#8A8477]">{title}</h3>
       {children}
     </div>
   );
@@ -111,7 +114,7 @@ export default function BrandAssetsPanel({ accountId }) {
 
   if (!accountId) {
     return (
-      <div className="p-8 text-center text-[#625143] bg-white border border-[#DCDBD6] rounded-lg">
+      <div className="py-16 text-center text-[#8A8477] border-t border-[#E5E1D8]">
         Brand assets are dealer-account-specific. Your admin account does not have brand assets.
       </div>
     );
@@ -119,27 +122,27 @@ export default function BrandAssetsPanel({ accountId }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 text-[#625143] animate-spin" />
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="w-5 h-5 text-[#A79E8C] animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
       {/* ── Form column ── */}
-      <div className="lg:col-span-2 space-y-4">
-        <SectionCard title="Brand Identity">
+      <div className="lg:col-span-2">
+        <Section title="Brand Identity">
           <div>
-            <Label className="text-sm font-medium text-[#3E4349]">Company Name</Label>
+            <Label className={labelClasses}>Company Name</Label>
             <Input
               value={form.company_name}
               onChange={(e) => update('company_name', e.target.value)}
-              className="bg-white border-[#DCDBD6] text-[#1B1A1A] mt-1"
+              className={inputClasses}
               placeholder="e.g. Artcoustic UK"
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <ImageUploadField
               label="Dealer Logo"
               value={form.dealer_logo_url}
@@ -155,7 +158,7 @@ export default function BrandAssetsPanel({ accountId }) {
               showCaption={false}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <ColourField
               label="Primary Colour"
               value={form.primary_colour}
@@ -172,122 +175,120 @@ export default function BrandAssetsPanel({ accountId }) {
               onChange={(hex) => update('accent_colour', hex)}
             />
           </div>
-        </SectionCard>
+        </Section>
 
-        <SectionCard title="Contact Details">
+        <Section title="Contact Details">
           <div>
-            <Label className="text-sm font-medium text-[#3E4349]">Address</Label>
+            <Label className={labelClasses}>Address</Label>
             <Textarea
               value={form.address}
               onChange={(e) => update('address', e.target.value)}
-              className="bg-white border-[#DCDBD6] text-[#1B1A1A] mt-1"
+              className={inputClasses}
               rows={2}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <Label className="text-sm font-medium text-[#3E4349]">Telephone</Label>
+              <Label className={labelClasses}>Telephone</Label>
               <Input
                 value={form.telephone}
                 onChange={(e) => update('telephone', e.target.value)}
-                className="bg-white border-[#DCDBD6] text-[#1B1A1A] mt-1"
+                className={inputClasses}
               />
             </div>
             <div>
-              <Label className="text-sm font-medium text-[#3E4349]">Email</Label>
+              <Label className={labelClasses}>Email</Label>
               <Input
                 type="email"
                 value={form.email}
                 onChange={(e) => update('email', e.target.value)}
-                className="bg-white border-[#DCDBD6] text-[#1B1A1A] mt-1"
+                className={inputClasses}
               />
             </div>
           </div>
           <div>
-            <Label className="text-sm font-medium text-[#3E4349]">Website</Label>
+            <Label className={labelClasses}>Website</Label>
             <Input
               value={form.website}
               onChange={(e) => update('website', e.target.value)}
-              className="bg-white border-[#DCDBD6] text-[#1B1A1A] mt-1"
+              className={inputClasses}
               placeholder="https://..."
             />
           </div>
-        </SectionCard>
+        </Section>
 
-        <SectionCard title="Social Media">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Section title="Social Media">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <Label className="text-sm font-medium text-[#3E4349]">LinkedIn</Label>
+              <Label className={labelClasses}>LinkedIn</Label>
               <Input
                 value={form.linkedin}
                 onChange={(e) => update('linkedin', e.target.value)}
-                className="bg-white border-[#DCDBD6] text-[#1B1A1A] mt-1"
+                className={inputClasses}
                 placeholder="https://linkedin.com/..."
               />
             </div>
             <div>
-              <Label className="text-sm font-medium text-[#3E4349]">Instagram</Label>
+              <Label className={labelClasses}>Instagram</Label>
               <Input
                 value={form.instagram}
                 onChange={(e) => update('instagram', e.target.value)}
-                className="bg-white border-[#DCDBD6] text-[#1B1A1A] mt-1"
+                className={inputClasses}
                 placeholder="https://instagram.com/..."
               />
             </div>
             <div>
-              <Label className="text-sm font-medium text-[#3E4349]">Facebook</Label>
+              <Label className={labelClasses}>Facebook</Label>
               <Input
                 value={form.facebook}
                 onChange={(e) => update('facebook', e.target.value)}
-                className="bg-white border-[#DCDBD6] text-[#1B1A1A] mt-1"
+                className={inputClasses}
                 placeholder="https://facebook.com/..."
               />
             </div>
             <div>
-              <Label className="text-sm font-medium text-[#3E4349]">YouTube</Label>
+              <Label className={labelClasses}>YouTube</Label>
               <Input
                 value={form.youtube}
                 onChange={(e) => update('youtube', e.target.value)}
-                className="bg-white border-[#DCDBD6] text-[#1B1A1A] mt-1"
+                className={inputClasses}
                 placeholder="https://youtube.com/..."
               />
             </div>
           </div>
-        </SectionCard>
+        </Section>
 
-        <SectionCard title="Optional Information">
-          <div className="grid grid-cols-1 gap-4">
+        <Section title="Optional Information">
+          <div>
+            <Label className={labelClasses}>Google Maps URL</Label>
+            <Input
+              value={form.google_maps_url}
+              onChange={(e) => update('google_maps_url', e.target.value)}
+              className={inputClasses}
+              placeholder="https://maps.app.goo.gl/..."
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <Label className="text-sm font-medium text-[#3E4349]">Google Maps URL</Label>
+              <Label className={labelClasses}>VAT Number</Label>
               <Input
-                value={form.google_maps_url}
-                onChange={(e) => update('google_maps_url', e.target.value)}
-                className="bg-white border-[#DCDBD6] text-[#1B1A1A] mt-1"
-                placeholder="https://maps.app.goo.gl/..."
+                value={form.vat_number}
+                onChange={(e) => update('vat_number', e.target.value)}
+                className={inputClasses}
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium text-[#3E4349]">VAT Number</Label>
-                <Input
-                  value={form.vat_number}
-                  onChange={(e) => update('vat_number', e.target.value)}
-                  className="bg-white border-[#DCDBD6] text-[#1B1A1A] mt-1"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-[#3E4349]">Company Registration No.</Label>
-                <Input
-                  value={form.company_registration_number}
-                  onChange={(e) => update('company_registration_number', e.target.value)}
-                  className="bg-white border-[#DCDBD6] text-[#1B1A1A] mt-1"
-                />
-              </div>
+            <div>
+              <Label className={labelClasses}>Company Registration No.</Label>
+              <Input
+                value={form.company_registration_number}
+                onChange={(e) => update('company_registration_number', e.target.value)}
+                className={inputClasses}
+              />
             </div>
           </div>
-        </SectionCard>
+        </Section>
 
-        <SectionCard title="Marketing Copy">
+        <Section title="Marketing Copy">
           <RichTextField
             label="About Us"
             value={form.about_us}
@@ -298,9 +299,9 @@ export default function BrandAssetsPanel({ accountId }) {
             value={form.why_choose_us}
             onChange={(html) => update('why_choose_us', html)}
           />
-        </SectionCard>
+        </Section>
 
-        <SectionCard title="Legal">
+        <Section title="Legal">
           <RichTextField
             label="Warranty"
             value={form.warranty}
@@ -311,28 +312,28 @@ export default function BrandAssetsPanel({ accountId }) {
             value={form.terms_conditions}
             onChange={(html) => update('terms_conditions', html)}
           />
-        </SectionCard>
+        </Section>
 
-        <SectionCard title="Proposal Defaults">
+        <Section title="Proposal Defaults">
           <ProposalDefaultsPanel
             values={form}
             onChange={(key, checked) => update(key, checked)}
           />
-        </SectionCard>
+        </Section>
 
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex items-center gap-4 pt-10 border-t border-[#E5E1D8]">
           <Button
             type="button"
             onClick={handleSave}
             disabled={saving}
             style={{ backgroundColor: '#213428', color: '#FFFFFF' }}
-            className="hover:bg-[#3E4349]"
+            className="rounded-none px-6 py-2.5 text-xs uppercase tracking-[0.14em] hover:bg-[#3E4349]"
           >
-            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
             {saving ? 'Saving...' : 'Save Brand Assets'}
           </Button>
           {saved && (
-            <span className="flex items-center gap-1 text-sm text-green-700">
+            <span className="flex items-center gap-1.5 text-sm text-[#213428]">
               <CheckCircle2 className="w-4 h-4" /> Saved
             </span>
           )}

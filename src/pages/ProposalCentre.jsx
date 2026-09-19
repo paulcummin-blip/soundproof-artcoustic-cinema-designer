@@ -4,13 +4,13 @@ import { useAuth } from '@/lib/AuthContext';
 import BrandAssetsPanel from '@/components/proposal/BrandAssetsPanel';
 import PlaceholderTab from '@/components/proposal/PlaceholderTab';
 import CreateProposalWizard from '@/components/proposal/CreateProposalWizard';
-import { Building2, FileText, Package, History, Plus, ChevronLeft } from 'lucide-react';
+import { Plus, ChevronLeft } from 'lucide-react';
 
 const TABS = [
-  { key: 'brand', label: 'Brand Assets', icon: Building2 },
-  { key: 'templates', label: 'Templates', icon: FileText },
-  { key: 'products', label: 'Product Library', icon: Package },
-  { key: 'history', label: 'Proposal History', icon: History },
+  { key: 'brand', label: 'Brand Assets' },
+  { key: 'templates', label: 'Templates' },
+  { key: 'products', label: 'Product Library' },
+  { key: 'history', label: 'Proposal History' },
 ];
 
 const PLACEHOLDER_CONTENT = {
@@ -45,14 +45,14 @@ export default function ProposalCentre() {
   // ── Wizard view ──
   if (showWizard) {
     return (
-      <div className="min-h-screen bg-[#F5F4F0] p-6 lg:p-8">
-        <div className="max-w-5xl mx-auto">
+      <div className="min-h-screen bg-[#FBFAF7]">
+        <div className="max-w-3xl mx-auto px-8 lg:px-0 py-16">
           <button
             onClick={() => setShowWizard(false)}
-            className="flex items-center gap-1 text-sm text-[#625143] hover:text-[#213428] mb-4"
+            className="flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-[#8A8477] hover:text-[#213428] mb-10 transition-colors"
           >
-            <ChevronLeft className="w-4 h-4" />
-            Back to Proposal Centre
+            <ChevronLeft className="w-3.5 h-3.5" />
+            Proposal Centre
           </button>
           <CreateProposalWizard onCreated={handleCreated} onCancel={() => setShowWizard(false)} />
         </div>
@@ -62,44 +62,52 @@ export default function ProposalCentre() {
 
   // ── Default view ──
   return (
-    <div className="min-h-screen bg-[#F5F4F0] p-6 lg:p-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-start justify-between mb-6">
+    <div className="min-h-screen bg-[#FBFAF7]">
+      <div className="max-w-5xl mx-auto px-8 lg:px-0 py-16">
+        {/* ── Editorial header ── */}
+        <div className="flex items-start justify-between gap-8 mb-14">
           <div>
+            <div className="text-[11px] uppercase tracking-[0.28em] text-[#A79E8C] mb-4">
+              Sound Proof
+            </div>
             <h1
-              className="text-2xl font-bold text-[#1B1A1A]"
+              className="text-[40px] leading-none font-normal text-[#1B1A1A] tracking-tight"
               style={{ fontFamily: 'Didact Gothic, sans-serif' }}
             >
               Proposal Centre
             </h1>
-            <p className="text-sm text-[#625143] mt-1">
-              The publishing area for all your proposals — create, manage, and export.
+            <p className="text-sm text-[#8A8477] mt-4 max-w-md leading-relaxed">
+              The publishing environment for every proposal — create, refine, and export.
             </p>
           </div>
           <button
             onClick={() => setShowWizard(true)}
-            className="flex items-center gap-2 px-5 py-2.5 text-sm rounded-md text-white shrink-0"
+            className="flex items-center gap-2 px-6 py-3 text-xs uppercase tracking-[0.14em] text-white shrink-0 mt-2 transition-colors hover:bg-[#3E4349]"
             style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
           >
-            <Plus className="w-4 h-4" />
-            Create New Proposal
+            <Plus className="w-3.5 h-3.5" />
+            Create Proposal
           </button>
         </div>
 
-        <div className="flex gap-2 mb-6 flex-wrap">
-          {TABS.map(({ key, label, icon: Icon }) => (
+        {/* ── Editorial tab navigation ── */}
+        <div className="flex gap-10 border-b border-[#E5E1D8] mb-12">
+          {TABS.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors border ${
-                activeTab === key
-                  ? 'bg-[#213428] text-white border-[#213428]'
-                  : 'bg-white text-[#3E4349] border-[#DCDBD6] hover:bg-[#F5F4F0]'
+              className={`relative pb-4 text-[13px] uppercase tracking-[0.12em] transition-colors ${
+                activeTab === key ? 'text-[#1B1A1A]' : 'text-[#A79E8C] hover:text-[#625143]'
               }`}
-              style={activeTab === key ? { fontFamily: 'Didact Gothic, sans-serif' } : {}}
+              style={{ fontFamily: 'Didact Gothic, sans-serif' }}
             >
-              <Icon className="w-4 h-4" />
               {label}
+              {activeTab === key && (
+                <span
+                  className="absolute left-0 right-0 -bottom-px h-[2px]"
+                  style={{ backgroundColor: '#213428' }}
+                />
+              )}
             </button>
           ))}
         </div>

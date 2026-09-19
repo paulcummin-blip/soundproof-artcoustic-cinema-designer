@@ -8,11 +8,11 @@ import { Loader2 } from 'lucide-react';
 export default function GenerateStep({ error, onBack }) {
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <p className="text-sm text-red-600 mb-4">{error}</p>
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <p className="text-sm text-[#8A3A3A] mb-6 max-w-sm">{error}</p>
         <button
           onClick={onBack}
-          className="px-4 py-2 text-sm rounded-md border border-[#DCDBD6] text-[#3E4349] hover:bg-[#F5F4F0]"
+          className="px-5 py-2.5 text-xs uppercase tracking-[0.14em] text-[#625143] hover:text-[#1B1A1A] transition-colors"
         >
           Back
         </button>
@@ -21,15 +21,15 @@ export default function GenerateStep({ error, onBack }) {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center py-20">
-      <Loader2 className="w-8 h-8 text-[#213428] animate-spin mb-4" />
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <Loader2 className="w-5 h-5 text-[#213428] animate-spin mb-6" />
       <h3
-        className="text-lg font-bold text-[#1B1A1A]"
+        className="text-xl font-normal text-[#1B1A1A] tracking-tight"
         style={{ fontFamily: 'Didact Gothic, sans-serif' }}
       >
         Generating Proposal
       </h3>
-      <p className="text-sm text-[#625143] mt-2">
+      <p className="text-sm text-[#8A8477] mt-3">
         GPT is writing your complete proposal. This takes 30-60 seconds.
       </p>
     </div>
