@@ -10,7 +10,7 @@
  *   completedBassPresentation  — from buildComplianceBassPresentation
  */
 
-import { CONFIDENCE, withConfidence, notCalculated } from './confidence';
+import { CONFIDENCE, withConfidence, notCalculated, SOURCE } from './confidence';
 
 function isBassAvailable(completedBassAuthority, completedBassPresentation) {
   const contract = completedBassAuthority?.contract;
@@ -50,8 +50,11 @@ function buildP14Authority(presentation, authority) {
     requested_target_db: targetDb ?? null,
     headroom_or_shortfall_db: headroom ?? null,
     pass: pass,
+    target_basis: p14.targetBasis || null,
+    target_basis_label: p14.targetBasisLabel || null,
     engineering_meaning: statement,
     confidence: CONFIDENCE.MODEL_DEPENDENT,
+    source: SOURCE.BASS_SIMULATION,
   };
 }
 
@@ -79,8 +82,11 @@ function buildP18Authority(presentation) {
     achieved_level: level || 'N/A',
     design_hz: designHz ?? null,
     qualified_at_selected_p14: qualified,
+    target_basis: p18.targetBasis || null,
+    target_basis_label: p18.targetBasisLabel || null,
     engineering_meaning: statement,
     confidence: CONFIDENCE.MODEL_DEPENDENT,
+    source: SOURCE.BASS_SIMULATION,
   };
 }
 
@@ -118,6 +124,7 @@ function buildP19Authority(presentation, authority) {
     engineering_meaning: statement,
     per_seat: perSeat,
     confidence: CONFIDENCE.MODEL_DEPENDENT,
+    source: SOURCE.BASS_SIMULATION,
   };
 }
 
@@ -155,6 +162,7 @@ function buildP20Authority(presentation, authority) {
     engineering_meaning: statement,
     per_seat: perSeat,
     confidence: CONFIDENCE.MODEL_DEPENDENT,
+    source: SOURCE.BASS_SIMULATION,
   };
 }
 
@@ -188,7 +196,8 @@ export function buildBassAuthority(completedBassAuthority, completedBassPresenta
     p18,
     p19,
     p20,
-    subwoofer_strategy_summary: withConfidence(summary, CONFIDENCE.MODEL_DEPENDENT).statement,
+    subwoofer_strategy_summary: withConfidence(summary, CONFIDENCE.MODEL_DEPENDENT, SOURCE.BASS_SIMULATION).statement,
     confidence: CONFIDENCE.MODEL_DEPENDENT,
+    source: SOURCE.BASS_SIMULATION,
   };
 }

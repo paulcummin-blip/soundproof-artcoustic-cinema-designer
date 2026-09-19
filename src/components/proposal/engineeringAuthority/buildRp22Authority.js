@@ -7,7 +7,7 @@
  * Pure function. No GPT. No side effects.
  */
 
-import { CONFIDENCE, withConfidence, notCalculated } from './confidence';
+import { CONFIDENCE, withConfidence, notCalculated, SOURCE } from './confidence';
 import { PARAM_INTERPRETERS, interpretP15, interpretP21, LEVEL_MEANINGS } from './rp22ParameterInterpretations';
 
 const LEVEL_NUMERIC = { L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0, 'N/A': null };
@@ -89,7 +89,7 @@ function buildDesignRatingEntry(designRating) {
     statement += ` This design ${LEVEL_MEANINGS[level] || 'meets performance standards'}.`;
   }
 
-  return withConfidence(statement, CONFIDENCE.COMPUTED_GEOMETRIC);
+  return withConfidence(statement, CONFIDENCE.COMPUTED_GEOMETRIC, SOURCE.RP22_CALCULATION);
 }
 
 function buildStrengthsWeaknesses(entries) {
@@ -124,7 +124,10 @@ function buildStrengthsWeaknesses(entries) {
   return { strengths, weaknesses };
 }
 
-export function buildRp22Authority(analysisResult, designRating, _seats, assumedLevels = {}) {
+export function buildRp22Authority(analysisResult, designRating, _seats, assumedLevels = {}, assessmentModes = {}) {
+  const p12Mode = assessmentModes.p12Mode || 'minimum';
+  const p13Mode = assessmentModes.p13Mode || 'minimum';
+
   // If no analysis result, return empty authority
   if (!analysisResult?.gradedParameters?.primary) {
     return {
@@ -133,6 +136,11 @@ export function buildRp22Authority(analysisResult, designRating, _seats, assumed
       spatial_resolution: buildCategorySummary('spatial_resolution', []),
       timbre: buildCategorySummary('timbre', []),
       bass_interpretation: notCalculated('Bass interpretation not available — see Bass Authority.'),
+      assessment_basis: {
+        p12_mode: p12Mode,
+        p13_mode: p13Mode,
+        description: `P12/P13 assessed against ${p12Mode === 'recommended' ? 'Recommended' : 'Minimum'} thresholds.`,
+      },
       assumed_parameters: {
         p15_noise_floor: interpretP15(assumedLevels.p15),
         p21_early_reflections: interpretP21(assumedLevels.p21),
@@ -169,8 +177,8 @@ export function buildRp22Authority(analysisResult, designRating, _seats, assumed
 
   // Bass interpretation summary (detailed facts are in Bass Authority)
   const bassInterpretation = weaknesses.some((w) => ['p18', 'p19', 'p20'].includes(w.parameter_key))
-    ? withConfidence('Bass performance has areas requiring attention — see Bass Authority for detailed P14/P18/P19/P20 facts.', CONFIDENCE.MODEL_DEPENDENT)
-    : withConfidence('Bass performance analysis is available in the Bass Authority.', CONFIDENCE.MODEL_DEPENDENT);
+    ? withConfidence('Bass performance has areas requiring attention — see Bass Authority for detailed P14/P18/P19/P20 facts.', CONFIDENCE.MODEL_DEPENDENT, SOURCE.BASS_SIMULATION)
+    : withConfidence('Bass performance analysis is available in the Bass Authority.', CONFIDENCE.MODEL_DEPENDENT, SOURCE.BASS_SIMULATION);
 
   return {
     overall_design_rating: overallRating,
@@ -178,6 +186,11 @@ export function buildRp22Authority(analysisResult, designRating, _seats, assumed
     spatial_resolution: spatialResolution,
     timbre: timbre,
     bass_interpretation: bassInterpretation,
+    assessment_basis: {
+      p12_mode: p12Mode,
+      p13_mode: p13Mode,
+      description: `P12/P13 assessed against ${p12Mode === 'recommended' ? 'Recommended' : 'Minimum'} thresholds.`,
+    },
     assumed_parameters: {
       p15_noise_floor: interpretP15(assumedLevels.p15),
       p21_early_reflections: interpretP21(assumedLevels.p21),

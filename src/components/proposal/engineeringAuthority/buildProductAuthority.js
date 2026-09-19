@@ -7,7 +7,7 @@
  * Pure function. No GPT. No side effects.
  */
 
-import { CONFIDENCE } from './confidence';
+import { CONFIDENCE, SOURCE } from './confidence';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 
 function extractProductFacts(meta, modelKey) {
@@ -59,6 +59,7 @@ function extractProductFacts(meta, modelKey) {
     found_in_registry: true,
     specifications: specs,
     confidence,
+    source: SOURCE.PUBLISHED_SPEC,
   };
 }
 

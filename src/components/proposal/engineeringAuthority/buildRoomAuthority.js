@@ -6,7 +6,92 @@
  * Pure function. No GPT. No side effects.
  */
 
-import { CONFIDENCE, withConfidence } from './confidence';
+import { CONFIDENCE, withConfidence, SOURCE } from './confidence';
+
+function interpretScreen(project) {
+  const screenSize = Number(project?.screen_size) || null;
+  const aspectRatio = project?.aspect_ratio || '16:9';
+  const heightFromFloor = Number(project?.screen_height_from_floor) || null;
+  const manualDims = project?.manual_dimensions || false;
+  const manualWidthM = Number(project?.manual_width_m) || null;
+  const manualHeightM = Number(project?.manual_height_m) || null;
+  const screenWall = project?.screen_wall || 'front';
+  const mountMode = project?.screen_mount_mode || 'baffle';
+  const floatDepthM = Number(project?.float_depth_m) || 0;
+
+  if (!screenSize && !manualDims) {
+    return {
+      size_inches: null,
+      aspect_ratio: aspectRatio,
+      height_from_floor_m: heightFromFloor,
+      manual_dimensions: false,
+      screen_wall: screenWall,
+      mount_mode: mountMode,
+      float_depth_m: floatDepthM,
+      interpretation: 'Screen not configured.',
+    };
+  }
+
+  let widthM, heightM;
+  if (manualDims && manualWidthM && manualHeightM) {
+    widthM = manualWidthM;
+    heightM = manualHeightM;
+  } else if (screenSize) {
+    const diagM = screenSize * 0.0254;
+    if (aspectRatio === '2.35:1') {
+      widthM = diagM / Math.sqrt(1 + (1 / 2.35) ** 2);
+      heightM = widthM / 2.35;
+    } else {
+      widthM = diagM / Math.sqrt(1 + (9 / 16) ** 2);
+      heightM = widthM * 9 / 16;
+    }
+  }
+
+  const sizeText = manualDims
+    ? `${manualWidthM.toFixed(2)}m × ${manualHeightM.toFixed(2)}m (manual)`
+    : `${screenSize}" (${aspectRatio})`;
+
+  return {
+    size_inches: screenSize,
+    aspect_ratio: aspectRatio,
+    height_from_floor_m: heightFromFloor,
+    manual_dimensions: manualDims,
+    manual_width_m: manualDims ? manualWidthM : null,
+    manual_height_m: manualDims ? manualHeightM : null,
+    computed_width_m: widthM ?? null,
+    computed_height_m: heightM ?? null,
+    screen_wall: screenWall,
+    mount_mode: mountMode,
+    float_depth_m: floatDepthM,
+    interpretation: `${sizeText} screen on ${screenWall} wall, ${mountMode === 'floating' ? 'floating mount' : 'baffle wall'} construction${heightFromFloor != null ? `, screen bottom at ${heightFromFloor.toFixed(2)}m from floor` : ''}.`,
+  };
+}
+
+function interpretRsp(project) {
+  const rspMode = project?.rsp_mode || 'auto_from_screen';
+  const manualY = Number(project?.manual_rsp_y_m);
+  const manualX = Number(project?.manual_rsp_x_m);
+  const designatedSeatId = project?.designated_rsp_seat_id || null;
+
+  const modeDescriptions = {
+    auto_from_screen: 'RSP derived automatically from screen geometry (57.5° viewing angle convention)',
+    front_row_center: 'RSP at front row centre',
+    middle_row_center: 'RSP at middle row centre',
+    back_row_center: 'RSP at rear row centre',
+    all_rows_average: 'RSP at all-rows average position',
+    manual_position: 'RSP at designer-specified position',
+    seat_bound: 'RSP bound to a designated seating position',
+  };
+
+  return {
+    mode: rspMode,
+    mode_description: modeDescriptions[rspMode] || rspMode,
+    manual_y_m: rspMode === 'manual_position' && Number.isFinite(manualY) ? manualY : null,
+    manual_x_m: rspMode === 'manual_position' && Number.isFinite(manualX) ? manualX : null,
+    designated_seat_id: rspMode === 'seat_bound' ? designatedSeatId : null,
+    interpretation: modeDescriptions[rspMode] || rspMode,
+  };
+}
 
 function parseRoomDims(project) {
   // Try roomDims JSON string first, then legacy numeric fields
@@ -176,26 +261,42 @@ export function buildRoomAuthority(project, _version) {
   const seating = interpretSeating(project);
   const acousticTreatment = interpretAcousticTreatment(project);
 
+  const screen = interpretScreen(project);
+  const rsp = interpretRsp(project);
+
   return {
     dimensions: { width_m: widthM, length_m: lengthM, height_m: heightM },
     dimensions_text: `${lengthM.toFixed(1)}m × ${widthM.toFixed(1)}m × ${heightM.toFixed(1)}m (L × W × H)`,
     volume_m3: Math.round(widthM * lengthM * heightM * 10) / 10,
-    classification: withConfidence(classification.classification, CONFIDENCE.MEASURED),
-    ratio: withConfidence(classification.ratio_description, CONFIDENCE.MEASURED),
-    acoustic_implication: withConfidence(classification.acoustic_implication, CONFIDENCE.COMPUTED_GEOMETRIC),
+    classification: withConfidence(classification.classification, CONFIDENCE.MEASURED, SOURCE.USER_INPUT),
+    ratio: withConfidence(classification.ratio_description, CONFIDENCE.MEASURED, SOURCE.USER_INPUT),
+    acoustic_implication: withConfidence(classification.acoustic_implication, CONFIDENCE.COMPUTED_GEOMETRIC, SOURCE.GEOMETRIC_CALCULATION),
     screen_wall: {
       construction_type: screenWall.construction_type,
       detail: screenWall.detail,
       engineering_purpose: screenWall.engineering_purpose,
       confidence: CONFIDENCE.MEASURED,
+      source: SOURCE.USER_INPUT,
+    },
+    screen: {
+      ...screen,
+      confidence: CONFIDENCE.MEASURED,
+      source: SOURCE.USER_INPUT,
+    },
+    rsp: {
+      ...rsp,
+      confidence: rsp.mode === 'auto_from_screen' ? CONFIDENCE.COMPUTED_GEOMETRIC : CONFIDENCE.MEASURED,
+      source: rsp.mode === 'auto_from_screen' ? SOURCE.GEOMETRIC_CALCULATION : SOURCE.USER_INPUT,
     },
     seating: {
       ...seating,
       confidence: CONFIDENCE.MEASURED,
+      source: SOURCE.USER_INPUT,
     },
     acoustic_treatment: {
       ...acousticTreatment,
       confidence: CONFIDENCE.MEASURED,
+      source: SOURCE.USER_INPUT,
     },
   };
 }

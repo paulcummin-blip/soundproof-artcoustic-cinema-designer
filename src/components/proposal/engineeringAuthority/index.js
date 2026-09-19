@@ -29,6 +29,7 @@ import { buildProductAuthority } from './buildProductAuthority';
 import { buildImageAuthority } from './buildImageAuthority';
 import { buildDealerAuthority } from './buildDealerAuthority';
 import { buildProposalMetadata } from './buildProposalMetadata';
+import { buildViewingAuthority } from './buildViewingAuthority';
 
 export const ENGINEERING_AUTHORITY_VERSION = '1.0';
 
@@ -49,6 +50,7 @@ export const ENGINEERING_AUTHORITY_VERSION = '1.0';
  * @param {Object} [params.brandAsset]          — BrandAsset entity
  * @param {Object} [params.proposalMetadata]   — { narrative_goal, audience, word_count, language, tone }
  * @param {Object} [params.assumedLevels]       — { p15, p21 } assumed RP22 levels
+ * @param {Object} [params.assessmentModes]     — { p12Mode, p13Mode } RP22 assessment basis
  * @returns {Object} Complete Engineering Authority object
  */
 export function buildEngineeringAuthority(params = {}) {
@@ -66,6 +68,7 @@ export function buildEngineeringAuthority(params = {}) {
     brandAsset,
     proposalMetadata,
     assumedLevels,
+    assessmentModes,
   } = params;
 
   const projectAuthority = buildProjectAuthority(project, version);
@@ -81,11 +84,18 @@ export function buildEngineeringAuthority(params = {}) {
     project: projectAuthority,
     room: buildRoomAuthority(project, version),
     system: buildSystemAuthority(project, version, placedSpeakers),
-    rp22: buildRp22Authority(analysisResult, designRating, seats, assumedLevels || {
-      p15: project?.assumed_p15_level || null,
-      p21: project?.assumed_p21_level || null,
-    }),
+    rp22: buildRp22Authority(
+      analysisResult,
+      designRating,
+      seats,
+      assumedLevels || {
+        p15: project?.assumed_p15_level || null,
+        p21: project?.assumed_p21_level || null,
+      },
+      assessmentModes || {},
+    ),
     bass: buildBassAuthority(completedBassAuthority, completedBassPresentation),
+    viewing: buildViewingAuthority(project, analysisResult, seats),
     products: buildProductAuthority(project, version, placedSpeakers),
     images: buildImageAuthority(proposalAssets),
     dealer: dealerAuthority,
@@ -106,6 +116,7 @@ export {
   buildImageAuthority,
   buildDealerAuthority,
   buildProposalMetadata,
+  buildViewingAuthority,
 };
 
-export { CONFIDENCE } from './confidence';
+export { CONFIDENCE, SOURCE } from './confidence';
