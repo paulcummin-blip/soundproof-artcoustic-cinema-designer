@@ -8,7 +8,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
 import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
-import { buildP19SeatRows } from "@/components/room/bass/p19SeatPresentation";
 import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -227,6 +226,7 @@ const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
 
 export default function RP22CompliancePanel({
   analysisResult,
+  p19SeatAuthority = null,
   screen,
   seatingPositions,
   seatHudSnapshots,
@@ -251,7 +251,6 @@ export default function RP22CompliancePanel({
     [bassAuthority, p14Selection.noP14TargetSelected]
   );
   const selectedP20Results = bassPresentation.perSeatP20Results;
-  const selectedP19Results = bassPresentation.perSeatP19Results;
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";
   const p14Mode = bassPresentation.parameters.p14.targetBasis || appState?.splConfig?.p14Mode || "minimum";
@@ -370,8 +369,7 @@ export default function RP22CompliancePanel({
   const renderSeatPillGridForParam = (pId) => {
     if (Number(pId) === 20) return <P20SeatBlock seatingPositions={seats} perSeatP20Results={selectedP20Results} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassAuthority?.authorityStatus} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
     if (Number(pId) === 19) {
-      const p19Rows = buildP19SeatRows(seats, selectedP19Results);
-      return <P19SeatBlock rows={p19Rows} perSeatP19Results={selectedP19Results} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassAuthority?.authorityStatus} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
+      return <P19SeatBlock rows={p19SeatAuthority?.rows || []} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassAuthority?.authorityStatus} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
     }
     if (!rows.length) return null;
 
@@ -571,7 +569,8 @@ export default function RP22CompliancePanel({
 
   const getHudLevelForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
-    if ([14, 18, 19, 20].includes(pid)) return bassPresentation.parameters[`p${pid}`].level;
+    if (pid === 19) return p19SeatAuthority?.project?.floor || "NOT CALCULATED";
+    if ([14, 18, 20].includes(pid)) return bassPresentation.parameters[`p${pid}`].level;
     const scope = String(param?.scope || "").toLowerCase();
     const isRoomScope = scope === "room";
 
@@ -655,7 +654,8 @@ export default function RP22CompliancePanel({
 
   const getHudValueForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
-    if ([14, 18, 19, 20].includes(pid)) return bassPresentation.parameters[`p${pid}`].valueText;
+    if (pid === 19) return p19SeatAuthority?.project?.coverageSummary || "NOT CALCULATED";
+    if ([14, 18, 20].includes(pid)) return bassPresentation.parameters[`p${pid}`].valueText;
     const scope = String(param?.scope || "").toLowerCase();
     const isRoomScope = scope === "room";
 
