@@ -34,6 +34,7 @@ export default function BassResultCards() {
       p14TargetBasis: shared.authoritative?.requested?.p14TargetBasis,
       p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
     },
+    shared.p19SeatAuthority,
   );
 
   return (
