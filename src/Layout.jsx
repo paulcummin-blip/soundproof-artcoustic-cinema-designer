@@ -43,6 +43,7 @@ const menuItems = [
   { title: "Projects", url: "/Projects", icon: Layers3, capability: "soundProof" },
   { title: "Room Designer", url: "/RoomDesigner", icon: Home, capability: "soundProof" },
   { title: "Project Images", url: "/ProjectProposalAssets", icon: Images, capability: "soundProof" },
+  { title: "Proposal Editor", url: "/ProposalEditor", icon: FileText, capability: "soundProof" },
   { title: "Proposal Centre", url: "/ProposalCentre", icon: Presentation, capability: "soundProof" },
   { title: "RP22 Speaker Capability", url: "/SPLCalculator", icon: Calculator, capability: "soundProof" },
   { title: "Price List", url: "/PriceList", icon: Tags, capability: "priceList" },

@@ -1,7 +1,7 @@
 {
   "name": "ProposalSection",
   "type": "object",
-  "description": "An editable content block within a proposal (the Proposal Block entity). Designed so GPT-generated content can later be stored in structured, individually editable blocks. Each block has a type, stable key, heading, rich-text body (HTML), lock state, and GPT/edit timestamps. Stage 1: database only \u2014 no generation, no editing UI. Stage 2 adds locked, last_gpt_generated_at, last_user_edited_at \u2014 still no GPT, no editor.",
+  "description": "An editable content block within a proposal (the Proposal Block entity). Fixed 10 section types \u2014 dealers can hide and reorder but cannot add custom sections. Each block has rich-text HTML body, dealer notes (invisible to client, fed to GPT on regeneration), lock state, and GPT/edit timestamps.",
   "properties": {
     "proposal_id": {
       "type": "string",
@@ -14,24 +14,22 @@
     "section_type": {
       "type": "string",
       "enum": [
-        "hero",
-        "intro",
-        "system_summary",
-        "room_analysis",
-        "speaker_schedule",
-        "bass_performance",
-        "rp22_compliance",
-        "pricing",
-        "gallery",
-        "warranty",
-        "terms",
-        "custom"
+        "cover",
+        "executive_summary",
+        "design_philosophy",
+        "system_overview",
+        "room_images",
+        "performance",
+        "products",
+        "comparison",
+        "conclusion",
+        "appendix"
       ],
-      "description": "Type of proposal block. Determines how the body content is rendered and which data source feeds it."
+      "description": "Fixed proposal section type. These 10 types are the same for every proposal \u2014 dealers can hide and reorder but cannot add custom sections. This gives Sound Proof proposals a recognisable, consistent structure."
     },
     "section_key": {
       "type": "string",
-      "description": "Stable slug identifier for this block (e.g. 'hero', 'system_summary'). Used as a stable reference even if the display title changes."
+      "description": "Stable slug identifier for this block (e.g. 'executive_summary', 'system_overview'). Used as a stable reference even if the display title changes."
     },
     "title": {
       "type": "string",
@@ -39,22 +37,28 @@
     },
     "body": {
       "type": "string",
-      "description": "Rich text / HTML body content. Populated by GPT generation in future stages; editable by the designer. This is the primary GPT-content storage block."
+      "description": "Rich text / HTML body content. Populated by GPT generation; editable by the designer in the Proposal Editor. This is the primary content storage block."
+    },
+    "dealer_notes": {
+      "type": "string",
+      "description": "Dealer-only notes for this section. Never rendered in the exported proposal. Supplied to GPT as context during section regeneration. Effectively invisible prompt engineering \u2014 the dealer guides GPT without the client ever seeing it.",
+      "default": "",
+      "nullable": true
     },
     "order_index": {
       "type": "number",
       "default": 0,
-      "description": "Display order within the proposal."
+      "description": "Display order within the proposal. Set by the section type ordering; adjustable via drag-and-drop in the left navigation."
     },
     "is_enabled": {
       "type": "boolean",
       "default": true,
-      "description": "Whether this block is included in the proposal."
+      "description": "Whether this block is included in the proposal. Dealers hide sections by setting this to false \u2014 the section remains in the database but is not rendered or exported."
     },
     "locked": {
       "type": "boolean",
       "default": false,
-      "description": "When true, this block's content is locked and GPT regeneration will not modify it. The designer has final say on locked blocks."
+      "description": "When true, this block's content is locked and GPT regeneration will not modify it without explicit confirmation. The designer has final say on locked blocks. Locked sections show a confirmation dialog before regeneration."
     },
     "last_gpt_generated_at": {
       "type": "string",
@@ -70,7 +74,7 @@
     },
     "metadata": {
       "type": "object",
-      "description": "Block-specific configuration for future GPT generation (e.g. prompt overrides, data bindings, tone).",
+      "description": "Block-specific configuration for GPT generation (e.g. prompt overrides, data bindings).",
       "properties": {}
     }
   },
