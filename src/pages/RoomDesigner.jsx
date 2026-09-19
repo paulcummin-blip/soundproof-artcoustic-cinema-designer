@@ -1785,7 +1785,6 @@ function RoomDesignerWithState() {
     analysisResult,
     placedSpeakers,
     stableDimensions,
-    primarySeatingPosition: mlpAnchorEffective,
     projectId: resolvedProjectId || projectIdState || "free",
     versionId: appState?.activeVersionId || "free",
     minimumSystemMet,
