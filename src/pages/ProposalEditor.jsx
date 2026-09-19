@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { NARRATIVE_GOALS, getSectionDef } from '@/components/proposal/proposalSections';
 import { getProposalType } from '@/components/proposal/proposalTypes';
@@ -7,7 +7,7 @@ import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
 import ProposalSectionNav from '@/components/proposal/ProposalSectionNav';
-import { Loader2, FileText, Download, ChevronLeft, Presentation } from 'lucide-react';
+import { Loader2, FileText, Download, ChevronLeft } from 'lucide-react';
 
 const SAVE_STATUS = { IDLE: 'idle', SAVING: 'saving', SAVED: 'saved' };
 
@@ -149,27 +149,7 @@ export default function ProposalEditor() {
   }
 
   if (!proposalId) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#F5F4F0] text-center px-6">
-        <Presentation className="w-10 h-10 text-[#625143] mb-4" />
-        <h2
-          className="text-lg font-bold text-[#1B1A1A] mb-2"
-          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
-        >
-          No Proposal Selected
-        </h2>
-        <p className="text-sm text-[#625143] mb-6">
-          Proposals are created from the Proposal Centre. Open it to start a new proposal.
-        </p>
-        <Link
-          to="/ProposalCentre"
-          className="px-5 py-2.5 text-sm rounded-md text-white"
-          style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
-        >
-          Go to Proposal Centre
-        </Link>
-      </div>
-    );
+    return <Navigate to="/ProposalCentre" replace />;
   }
 
   if (proposal?.status === 'generating') {
