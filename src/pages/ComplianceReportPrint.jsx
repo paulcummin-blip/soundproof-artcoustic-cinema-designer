@@ -11,13 +11,17 @@ import { useCompletedBassAuthority } from '@/components/room/bass/completedBassR
 import { buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { RP22_PRESENTATION_PARAMETERS, RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
 import { formatAuthoritativeP20Result, p20LevelText } from '@/components/room/bass/p20SeatPresentation';
-import { attachAuthoritativeP19ToSeatSnapshot } from '@/components/room/seatHudPresentation';
+import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { resolveEffectiveVersionId } from '@/lib/versionAuthority';
 
 export default function ComplianceReportPrint() {
   const app = useAppState();
   const [isReady, setIsReady] = useState(false);
   const reportScopeId = new URLSearchParams(window.location.search).get('projectId') || new URLSearchParams(window.location.search).get('id') || 'free';
+  const publishedEngineering = useMemo(() => readDesignReviewHandoff(reportScopeId), [reportScopeId]);
+  const p19SeatAuthority = publishedEngineering?.p19SeatAuthority
+    ?? publishedEngineering?.rating?.p19SeatAuthority
+    ?? null;
   const completedBassAuthority = useCompletedBassAuthority(reportScopeId, resolveEffectiveVersionId(null, app));
   const completedBassContract = completedBassAuthority.contract;
   const bassErrorMessage = completedBassAuthority.errorMessage || null;
@@ -114,14 +118,9 @@ export default function ComplianceReportPrint() {
         let level = '—';
 
         if (param.number === 19) {
-          const withP19 = attachAuthoritativeP19ToSeatSnapshot(
-            { rp22: rp22Raw }, seatId, isRsp,
-            completedBassContract?.productAnalysis?.parameters?.p19,
-            completedBassContract?.selectedCandidate?.perSeatP19Results,
-          );
-          const metric = withP19.rp22.p19;
-          valueFormatted = metric.formatted || '—';
-          level = metric.level || '—';
+          const p19Seat = p19SeatAuthority?.bySeatId?.[seatId] || null;
+          valueFormatted = p19Seat?.displayedValue || 'NOT CALCULATED';
+          level = p19Seat?.grade || 'NOT CALCULATED';
         } else if (param.number === 20) {
           const result = bassPresentation.perSeatP20Results.find(
             (item) => String(item?.seatId) === String(seatId)
@@ -149,7 +148,7 @@ export default function ComplianceReportPrint() {
       });
       return { param, perSeatResults };
     });
-  }, [seats, app?.seatMetricsById, rspSeatId, completedBassContract, bassPresentation]);
+  }, [seats, app?.seatMetricsById, rspSeatId, p19SeatAuthority, bassPresentation]);
 
   // Auto-print once ready
   useEffect(() => {
