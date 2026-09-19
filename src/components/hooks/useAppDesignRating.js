@@ -25,7 +25,8 @@ import {
   calculateScopedRoomDesignRating,
   calculateSeatDesignRating,
 } from '@/components/report/technical/artcousticSystemDesignRating';
-import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
+import { attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
+import { summariseAuthoritativeP19Seats } from '@/components/room/bass/p19SeatAuthority';
 import { getScopedSeatIds, buildSeatPriorityFingerprint } from '@/components/utils/seatScopeAuthority';
 import { hasMinimumSystemForAsdr } from '@/components/utils/minimumSystemForAsdr';
 import { resolveP14TargetSelectionState } from '@/components/room/bass/p14TargetSelectionState';
@@ -57,7 +58,7 @@ const extractMetricRawValue = (metric) => {
  * param authority for the RP22 seating-coverage floor without duplicating
  * the seat-HUD mapping logic.
  */
-export function buildLightweightSeatHudById(seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results) {
+export function buildLightweightSeatHudById(seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results, p19SeatAuthority = null) {
   const out = {};
   const perSeatRp22 = analysisResult?.perSeatRp22;
   const perSeatRp23 = analysisResult?.perSeatRp23;
@@ -94,7 +95,29 @@ export function buildLightweightSeatHudById(seats, analysisResult, primarySeatin
       && Number.isFinite(seatX) && Number.isFinite(seatY)
       && Math.hypot(seatX - primarySeatingPosition.x, seatY - primarySeatingPosition.y) <= 0.05;
 
-    snapshot = attachAuthoritativeP19ToSeatSnapshot(snapshot, seat.id, isRspPosition, completedP19Result, completedP19Results);
+    // P19 is copied from the one canonical seat authority. Never substitute
+    // the room/RSP P19 parameter for a real seat and never re-grade the raw dB.
+    const p19Seat = p19SeatAuthority?.bySeatId?.[seat.id] || null;
+    snapshot = {
+      ...snapshot,
+      rp22: {
+        ...(snapshot.rp22 || {}),
+        p19: p19Seat?.calculated ? {
+          value: p19Seat.rawValue,
+          valueDb: p19Seat.rawValue,
+          formatted: p19Seat.displayedValue,
+          level: p19Seat.grade,
+          status: "ok",
+          source: "canonical-p19-seat-authority",
+        } : {
+          value: null,
+          formatted: "NOT CALCULATED",
+          level: null,
+          status: "not_calculated",
+          source: "canonical-p19-seat-authority",
+        },
+      },
+    };
     snapshot = attachAuthoritativeP20ToSeatSnapshot(snapshot, seat.id, completedP20Results);
 
     out[seat.id] = snapshot;
@@ -221,6 +244,18 @@ export function useAppDesignRating({
   const completedP19Results = completedBassAuthority?.contract?.selectedCandidate?.perSeatP19Results || [];
   const completedP20Results = completedBassPresentation?.perSeatP20Results || [];
 
+  // The single canonical P19 seat object. It preserves the engine-published
+  // grades from selectedCandidate.perSeatP19Results and owns all grouping.
+  const p19SeatAuthority = useMemo(() => {
+    const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(seats);
+    return summariseAuthoritativeP19Seats({
+      authoritativeSeatResults: completedP19Results,
+      primarySeatIds,
+      secondarySeatIds,
+      seatingPositions: seats,
+    });
+  }, [completedP19Results, seats]);
+
   const reportP12Mode = appState?.p12Mode || 'minimum';
   const reportP13Mode = appState?.splConfig?.p13Mode || 'minimum';
   const reportP14Mode = completedBassPresentation?.parameters?.p14?.targetBasis || appState?.splConfig?.p14Mode || 'minimum';
@@ -234,8 +269,8 @@ export function useAppDesignRating({
   }, [placedSpeakers]);
 
   const reportSeatHudById = useMemo(
-    () => buildLightweightSeatHudById(seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results),
-    [seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results]
+    () => buildLightweightSeatHudById(seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results, p19SeatAuthority),
+    [seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results, p19SeatAuthority]
   );
 
   // ── Bass readiness gate ── (moved before roomRating so retainedFromRefresh
@@ -288,6 +323,7 @@ export function useAppDesignRating({
         assumedP15Level: appState?.assumedP15Level || null,
         assumedP21Level: appState?.assumedP21Level || null,
         retainedBass: retainedFromRefresh ? lastVerifiedBassRef.current : null,
+        p19SeatAuthority,
       });
       const authority = buildArtcousticDesignRatingAuthority(input);
       const rating = calculateRoomDesignRating(authority);
@@ -339,12 +375,12 @@ export function useAppDesignRating({
         seatDesignRatings[seatId] = calculateSeatDesignRating(authority, seatId);
       }
 
-      return { ...rating, seatLevels, p12RawDb, p13RawDb, scopedRatings, seatPriorityFingerprint, seatDesignRatings };
+      return { ...rating, seatLevels, p12RawDb, p13RawDb, scopedRatings, seatPriorityFingerprint, seatDesignRatings, p19SeatAuthority };
     } catch (e) {
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;
     }
-  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, minimumSystemMet, appState?.assumedP15Level, appState?.assumedP21Level, retainedFromRefresh]);
+  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, minimumSystemMet, appState?.assumedP15Level, appState?.assumedP21Level, retainedFromRefresh, p19SeatAuthority]);
 
   // Capture bass-specific inputs when bass is authoritative, for same-fingerprint
   // retention during a temporary bass refresh. Only bass parameters
