@@ -83,9 +83,11 @@ function startProjectHydration(key) {
   const state = ensureProjectAuthorityState(key);
   if (state.hydrationInFlight) return state.hydrationInFlight;
   state.hydrationSettled = false;
+  console.info('[REPORT-RUNTIME] hydrate-start ' + JSON.stringify({ key, filter: bassDbFilter(key), storageKey: projectKey(key) }));
   state.hydrationInFlight = hydrateCompletedBassAuthority(key).finally(() => {
     state.hydrationInFlight = null;
     markHydrationSettled(key);
+    console.info('[REPORT-RUNTIME] hydrate-settled ' + JSON.stringify({ key, manager: state, snapshot: { projectId: memoryByProject.get(key)?.projectId, status: memoryByProject.get(key)?.authorityStatus, hydrationSettled: memoryByProject.get(key)?.hydrationSettled }, writtenKeys: [...memoryByProject.keys()] }));
   });
   return state.hydrationInFlight;
 }
@@ -526,6 +528,7 @@ export async function hydrateCompletedBassAuthority(projectId, versionId) {
     const record = Array.isArray(records) ? records[0] : null;
     const persisted = buildHydratedPersistedWrapper(record);
     const next = resolvePersistedBassAuthority(key, persisted);
+    console.info('[REPORT-RUNTIME] hydrate-result ' + JSON.stringify({ projectId, versionId, key, filter: bassDbFilter(projectId, versionId), records: records?.length, nextStatus: next?.authorityStatus }));
     if (current?.authoritative && current?.contract && !next?.authoritative) {
       return current;
     }
