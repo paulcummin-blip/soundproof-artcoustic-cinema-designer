@@ -1,11 +1,10 @@
 // components/rp22/RP22ComplianceParameterTile.jsx
 // Exact tile extracted from RP22CompliancePanel — do not alter appearance.
-import React, { useState } from "react";
+import React from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 import SeatScopeBadge from "@/components/report/SeatScopeBadge";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { normalizeLevelForDisplay } from "@/components/utils/rp22LevelDisplay";
 
 /* ---------- Shared style tokens (mirrored from RP22CompliancePanel) ---------- */
@@ -37,7 +36,6 @@ const PILL_ZONE_MIN_HEIGHT = 110;
 
 export default function RP22ComplianceParameterTile({ param, achievedValue, lvl, seatPillGrid, seatGridData, targetBasisNote }) {
   const isSeatScope = String(param?.scope || "").toLowerCase() === "seat";
-  const [expanded, setExpanded] = useState(false);
 
   return (
     <div style={{ ...card, display: "flex", flexDirection: "column", minHeight: 380 }}>
@@ -85,20 +83,10 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
             <RP22GradingPill level={lvl} />
           )}
         </div>
-        {isSeatScope && seatGridData && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 text-xs text-[#625143] hover:text-[#1B1A1A] print:hidden"
-            style={{ marginTop: 8, alignSelf: "flex-start", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-          >
-            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            {expanded ? "Hide" : "Show"} seat results
-          </button>
-        )}
       </div>
 
-      {/* ── Section 2b: Expandable per-seat detail (seat-scoped only) ── */}
-      {isSeatScope && expanded && seatGridData && (
+      {/* ── Section 2b: Per-seat detail (seat-scoped only, always visible) ── */}
+      {isSeatScope && seatGridData && (
         <div style={{ padding: "8px 12px 0 12px" }}>
           <table className="w-full text-xs">
             <thead>
