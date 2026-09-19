@@ -1,7 +1,7 @@
 {
   "name": "BrandAsset",
   "type": "object",
-  "description": "Global brand assets for a dealer account. One record per account. Stores company identity, logos, contact details, social media, marketing copy (rich text), brand colours, and proposal default toggles. Automatically available to every future proposal generated within this account.",
+  "description": "Global brand assets for a dealer account. One record per account. Stores company identity, logos, contact details, social media, marketing copy (rich text), brand colours, proposal default toggles, and proposal tone. Automatically available to every future proposal generated within this account.",
   "properties": {
     "account_id": {
       "type": "string",
@@ -123,6 +123,17 @@
       "type": "boolean",
       "default": true,
       "description": "Include Technical Appendix in new proposals by default."
+    },
+    "proposal_tone": {
+      "type": "string",
+      "enum": [
+        "luxury_residential",
+        "technical",
+        "architect",
+        "commercial"
+      ],
+      "default": "luxury_residential",
+      "description": "Default narrative tone for GPT-generated proposals. luxury_residential = premium home cinema language, technical = engineering-focused, architect = design-led, commercial = business/commercial cinema."
     }
   },
   "required": [

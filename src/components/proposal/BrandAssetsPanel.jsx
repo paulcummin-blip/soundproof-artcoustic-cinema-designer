@@ -38,6 +38,7 @@ const DEFAULTS = {
   include_product_gallery: true,
   include_rp22_overview: true,
   include_technical_appendix: true,
+  proposal_tone: 'luxury_residential',
 };
 
 function SectionCard({ title, children }) {

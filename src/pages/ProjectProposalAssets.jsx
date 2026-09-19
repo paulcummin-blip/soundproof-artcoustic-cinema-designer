@@ -21,10 +21,10 @@ export default function ProjectProposalAssets() {
             className="text-2xl font-bold text-[#1B1A1A]"
             style={{ fontFamily: 'Didact Gothic, sans-serif' }}
           >
-            Proposal Assets
+            Project Images
           </h1>
           <p className="text-sm text-[#625143] mt-1">
-            Upload renders and drawings for this project's proposal. These travel with the project.
+            Upload renders, plans and supporting images that will be available when creating client proposals.
           </p>
         </div>
         <ProposalAssetsPanel projectId={activeProjectId} accountId={accountId} />

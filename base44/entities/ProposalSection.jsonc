@@ -1,11 +1,11 @@
 {
   "name": "ProposalSection",
   "type": "object",
-  "description": "An editable content block within a proposal. Designed so GPT-generated content can later be stored in structured, individually editable sections. Each section has a type, stable key, heading, and rich-text body. Stage 1: database only \u2014 no generation, no editing UI.",
+  "description": "An editable content block within a proposal (the Proposal Block entity). Designed so GPT-generated content can later be stored in structured, individually editable blocks. Each block has a type, stable key, heading, rich-text body (HTML), lock state, and GPT/edit timestamps. Stage 1: database only \u2014 no generation, no editing UI. Stage 2 adds locked, last_gpt_generated_at, last_user_edited_at \u2014 still no GPT, no editor.",
   "properties": {
     "proposal_id": {
       "type": "string",
-      "description": "ID of the Proposal this section belongs to."
+      "description": "ID of the Proposal this block belongs to."
     },
     "account_id": {
       "type": "string",
@@ -27,19 +27,19 @@
         "terms",
         "custom"
       ],
-      "description": "Type of proposal section. Determines how the body content is rendered and which data source feeds it."
+      "description": "Type of proposal block. Determines how the body content is rendered and which data source feeds it."
     },
     "section_key": {
       "type": "string",
-      "description": "Stable slug identifier for this section (e.g. 'hero', 'system_summary'). Used as a stable reference even if the display title changes."
+      "description": "Stable slug identifier for this block (e.g. 'hero', 'system_summary'). Used as a stable reference even if the display title changes."
     },
     "title": {
       "type": "string",
-      "description": "Display heading for this section shown on the proposal."
+      "description": "Display heading for this block shown on the proposal."
     },
     "body": {
       "type": "string",
-      "description": "Rich text / markdown body content. Populated by GPT generation in future stages; editable by the designer. Designed as the primary GPT-content storage block."
+      "description": "Rich text / HTML body content. Populated by GPT generation in future stages; editable by the designer. This is the primary GPT-content storage block."
     },
     "order_index": {
       "type": "number",
@@ -49,11 +49,28 @@
     "is_enabled": {
       "type": "boolean",
       "default": true,
-      "description": "Whether this section is included in the proposal."
+      "description": "Whether this block is included in the proposal."
+    },
+    "locked": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, this block's content is locked and GPT regeneration will not modify it. The designer has final say on locked blocks."
+    },
+    "last_gpt_generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the last GPT generation that populated this block. Null = never GPT-generated.",
+      "nullable": true
+    },
+    "last_user_edited_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the last manual user edit to this block. Null = never manually edited.",
+      "nullable": true
     },
     "metadata": {
       "type": "object",
-      "description": "Section-specific configuration for future GPT generation (e.g. prompt overrides, data bindings, tone).",
+      "description": "Block-specific configuration for future GPT generation (e.g. prompt overrides, data bindings, tone).",
       "properties": {}
     }
   },

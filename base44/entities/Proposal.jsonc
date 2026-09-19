@@ -1,7 +1,7 @@
 {
   "name": "Proposal",
   "type": "object",
-  "description": "A client-facing design proposal for a project. One proposal per project. Stage 1: database only \u2014 no generation, no editing, no PDF. Future stages will populate sections and assets via GPT generation. The schema is designed so GPT-generated content can later be stored in editable ProposalSection blocks.",
+  "description": "A client-facing design proposal for a project. One proposal per project. Stage 1: database only \u2014 no generation, no editing, no PDF. Future stages will populate blocks via GPT generation. The schema is designed so GPT-generated content can later be stored in editable ProposalSection blocks. Stage 2 adds template, narrative_brief, and lifecycle support \u2014 still no GPT, no editor.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -38,6 +38,16 @@
       "type": "number",
       "default": 1,
       "description": "Proposal version number for future versioning."
+    },
+    "template": {
+      "type": "string",
+      "description": "Template identifier for this proposal. References a future template definition from the Proposal Centre Templates tab. Null = use default template.",
+      "nullable": true
+    },
+    "narrative_brief": {
+      "type": "string",
+      "description": "Designer's brief for GPT generation \u2014 tone, emphasis, special instructions. Free text that guides the Proposal Engine. Null = no brief provided, GPT uses defaults from Brand Assets.",
+      "nullable": true
     },
     "metadata": {
       "type": "object",

@@ -5,12 +5,16 @@ import ImageUploadField from '@/components/proposal/ImageUploadField';
 import GalleryDragList from '@/components/proposal/GalleryDragList';
 
 const SINGLE_ASSET_TYPES = [
-  { value: 'hero_render', label: 'Hero Render' },
+  { value: 'cover_image', label: 'Cover Image' },
   { value: 'front_view', label: 'Front View' },
   { value: 'rear_view', label: 'Rear View' },
   { value: 'plan', label: 'Plan' },
   { value: 'elevation', label: 'Elevation' },
   { value: 'construction', label: 'Construction' },
+  { value: 'client_logo', label: 'Client Logo (Optional)' },
+  { value: 'dealer_photography', label: 'Dealer Photography' },
+  { value: 'technical_drawings', label: 'Technical Drawings' },
+  { value: 'documents', label: 'Documents' },
 ];
 
 /**

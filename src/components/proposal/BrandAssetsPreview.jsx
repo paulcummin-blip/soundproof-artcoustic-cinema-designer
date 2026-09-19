@@ -1,9 +1,10 @@
 import React from 'react';
+import { Image as ImageIcon } from 'lucide-react';
 
 /**
- * Live preview placeholder showing brand colours on a mock proposal cover.
- * Updates immediately as the form changes — no proposal generation, just
- * a visual indicator of how brand colours will look on a proposal.
+ * Live preview showing the actual future proposal cover page.
+ * Updates immediately as brand colours, logo, and company name change.
+ * Layout: dealer logo → cover image area with project name → footer.
  *
  * Props:
  * - form: the brand assets form state object
@@ -18,56 +19,72 @@ export default function BrandAssetsPreview({ form }) {
     <div className="lg:sticky lg:top-6">
       <h3 className="text-sm font-semibold text-[#3E4349] mb-3">Live Preview</h3>
 
-      {/* Mock proposal cover */}
-      <div className="rounded-xl overflow-hidden shadow-xl" style={{ backgroundColor: primary }}>
-        <div className="p-8" style={{ minHeight: 420 }}>
+      {/* Proposal cover page */}
+      <div className="rounded-xl overflow-hidden shadow-xl flex flex-col" style={{ aspectRatio: '4 / 5' }}>
+        {/* ── Header: dealer logo ── */}
+        <div
+          className="px-6 py-4 flex items-center"
+          style={{ backgroundColor: primary, minHeight: 56 }}
+        >
           {form.dealer_logo_url ? (
             <img
               src={form.dealer_logo_url}
               alt="Dealer logo"
-              className="h-12 object-contain mb-8"
+              className="h-7 object-contain"
             />
           ) : (
-            <div className="h-12 mb-8 flex items-center">
-              <span
-                className="text-lg font-bold text-white"
-                style={{ fontFamily: 'Didact Gothic, sans-serif' }}
-              >
-                {companyName}
-              </span>
-            </div>
+            <span
+              className="text-sm font-bold text-white"
+              style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+            >
+              {companyName}
+            </span>
           )}
+        </div>
 
-          <div className="space-y-3">
+        {/* ── Cover image area ── */}
+        <div
+          className="flex-1 relative flex flex-col items-center justify-center"
+          style={{
+            background: `linear-gradient(135deg, ${primary} 0%, ${secondary} 100%)`,
+          }}
+        >
+          {/* Placeholder cover image icon */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-20">
+            <ImageIcon className="w-16 h-16 text-white" />
+          </div>
+
+          {/* Cover text overlay */}
+          <div className="relative z-10 text-center px-6">
             <div
-              className="text-xs uppercase tracking-[0.2em] font-semibold"
+              className="text-xs uppercase tracking-[0.25em] font-semibold mb-3"
               style={{ color: accent }}
             >
-              Proposal
+              Cinema Design Proposal
             </div>
             <div
               className="text-3xl font-bold text-white leading-tight"
               style={{ fontFamily: 'Didact Gothic, sans-serif' }}
             >
-              Cinema Design
+              Project Name
             </div>
-            <div className="h-1 w-16 rounded-full" style={{ backgroundColor: accent }} />
-            <div className="text-sm text-white/70 mt-6">
-              Prepared for Client Name
-            </div>
+            <div
+              className="h-1 w-16 rounded-full mx-auto mt-4"
+              style={{ backgroundColor: accent }}
+            />
           </div>
         </div>
 
-        {/* Footer bar */}
+        {/* ── Footer ── */}
         <div
-          className="px-8 py-4 flex items-center justify-between"
+          className="px-6 py-3 flex items-center justify-between"
           style={{ backgroundColor: secondary }}
         >
-          <span className="text-xs text-white/80">
-            {form.email || 'contact@example.com'}
+          <span className="text-xs text-white/80" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+            {companyName}
           </span>
-          <span className="text-xs text-white/80">
-            {form.telephone || '—'}
+          <span className="text-[10px] text-white/50 uppercase tracking-wider">
+            Powered by Sound Proof
           </span>
         </div>
       </div>
@@ -97,8 +114,8 @@ export default function BrandAssetsPreview({ form }) {
         </div>
       </div>
 
-      <p className="text-xs text-[#625143] mt-4 text-center">
-        Preview shows brand colours on a sample proposal cover.
+      <p className="text-xs text-[#625143] mt-3 text-center">
+        Live preview of your proposal cover page.
       </p>
     </div>
   );

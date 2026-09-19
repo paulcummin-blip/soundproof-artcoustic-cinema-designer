@@ -1,7 +1,7 @@
 {
   "name": "ProposalAsset",
   "type": "object",
-  "description": "A visual asset (image) attached to a project for use in proposals. Supports hero renders, front/rear views, plan views, elevation views, construction drawings, and gallery images. Each asset has a caption and drag-orderable position (used for gallery images). Linked to the project so assets exist independently of any generated Proposal record.",
+  "description": "A visual asset (image) attached to a project for use in proposals. Supports cover images, front/rear views, plan views, elevation views, construction drawings, client logos, dealer photography, technical drawings, documents, and gallery images. Each asset has a caption and drag-orderable position (used for gallery images). Linked to the project so assets exist independently of any generated Proposal record.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -14,15 +14,19 @@
     "asset_type": {
       "type": "string",
       "enum": [
-        "hero_render",
+        "cover_image",
         "front_view",
         "rear_view",
         "plan",
         "elevation",
         "construction",
+        "client_logo",
+        "dealer_photography",
+        "technical_drawings",
+        "documents",
         "gallery"
       ],
-      "description": "Type of visual asset. Single-asset types (hero_render, front_view, rear_view, plan, elevation, construction) have one image per project. Gallery allows multiple images with drag ordering."
+      "description": "Type of visual asset. Single-asset types (cover_image, front_view, rear_view, plan, elevation, construction, client_logo, dealer_photography, technical_drawings, documents) have one image per project. Gallery allows multiple images with drag ordering."
     },
     "file_url": {
       "type": "string",
@@ -37,6 +41,16 @@
       "type": "number",
       "default": 0,
       "description": "Display order. Used for gallery images; single-asset types use 0."
+    },
+    "usage": {
+      "type": "string",
+      "enum": [
+        "cover",
+        "gallery",
+        "do_not_use"
+      ],
+      "default": "gallery",
+      "description": "How the Proposal Engine should use this image. 'cover' = available as cover image, 'gallery' = include in gallery, 'do_not_use' = ignore (GPT will skip). Primarily for gallery images; single-asset types default to their type."
     }
   },
   "required": [
