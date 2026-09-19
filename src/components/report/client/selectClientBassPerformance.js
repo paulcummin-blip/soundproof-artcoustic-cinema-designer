@@ -18,7 +18,7 @@
  * @param {Array} seatingPositions - for seat labels/priority
  * @returns {Object|null} bass performance summary or null
  */
-export function selectClientBassPerformance(completedBassAuthority, bassPresentation, seatingPositions) {
+export function selectClientBassPerformance(completedBassAuthority, bassPresentation, seatingPositions, p19SeatAuthority = null) {
   if (!completedBassAuthority?.contract) return null;
 
   const contract = completedBassAuthority.contract;
@@ -63,22 +63,26 @@ export function selectClientBassPerformance(completedBassAuthority, bassPresenta
     publicationVerified: p18Presentation?.publicationVerified ?? false,
   } : null;
 
-  // P19 — response below transition (SEAT-scope)
-  const perSeatP19Results = Array.isArray(selectedCandidate.perSeatP19Results)
-    ? selectedCandidate.perSeatP19Results : [];
-  const p19Param = params.p19 || null;
+  // P19 — read the already-published seat authority. No contract remap,
+  // priority interpretation, grouping, floor calculation or re-grading here.
   const p19Presentation = presentationParams.p19 || null;
-  const p19 = p19Param ? {
-    achievedLevel: p19Param.level ?? null,
-    achievedVariationDb: Number.isFinite(Number(p19Param.value)) ? Number(p19Param.value) : null,
+  const p19 = p19SeatAuthority ? {
+    achievedLevel: p19SeatAuthority.project?.floor ?? null,
+    achievedVariationDb: null,
     targetBasis: p19Presentation?.targetBasis || null,
     publicationVerified: p19Presentation?.publicationVerified ?? false,
-    perSeatResults: perSeatP19Results.map((s) => ({
-      seatId: s.seatId,
-      isPrimary: !!s.isPrimary,
-      level: s.level,
-      variationDbRaw: Number.isFinite(Number(s.variationDbRaw)) ? Number(s.variationDbRaw) : null,
-      worstFrequencyHz: Number.isFinite(Number(s.worstFrequencyHz)) ? Number(s.worstFrequencyHz) : null,
+    primary: p19SeatAuthority.primary,
+    secondary: p19SeatAuthority.secondary,
+    project: p19SeatAuthority.project,
+    perSeatResults: p19SeatAuthority.seats.map((seat) => ({
+      seatId: seat.seatId,
+      isPrimary: seat.priority === "primary",
+      priority: seat.priority,
+      level: seat.grade,
+      grade: seat.grade,
+      variationDbRaw: seat.rawValue,
+      displayedValue: seat.displayedValue,
+      worstFrequencyHz: seat.worstFrequencyHz,
     })),
   } : null;
 
