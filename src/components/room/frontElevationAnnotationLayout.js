@@ -32,7 +32,7 @@ function makeBox(left, top, right, bottom) {
 }
 
 export function speakerBBox(cx, cy, sw, sh) {
-  return makeBox(cx - sw / 2, cy - sh / 2, cx + sw / 2, cy + sh / 2);
+  return { ...makeBox(cx - sw / 2, cy - sh / 2, cx + sw / 2, cy + sh / 2), cx, cy };
 }
 
 function textBox(x, y, text, fontSize, anchor) {
