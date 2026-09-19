@@ -203,6 +203,9 @@ function RP22ReportInner() {
         return resolveBassReadiness(completedBassAuthority, bassApplicable, !p14Selection.noP14TargetSelected);
     }, [completedBassAuthority, projectIdMatch, app?.frontSubsCfg, app?.rearSubsCfg, app?.subwooferInstances, app?.subwoofers, p14Selection.noP14TargetSelected]);
     const bassReportPending = bassReadiness.pending;
+    useEffect(() => {
+        console.info('[REPORT-RUNTIME] report-gate ' + JSON.stringify({ expectedProjectKey, projectIdMatch, reportVersionId, resolvedReportVersionId, appVersion: app?.activeVersionId, readiness: bassReadiness, authority: { projectId: completedBassAuthority?.projectId, status: completedBassAuthority?.authorityStatus, hydrationSettled: completedBassAuthority?.hydrationSettled, currentFingerprint: completedBassAuthority?.currentFingerprint, resultFingerprint: completedBassAuthority?.contract?.job?.resultFingerprint }, noP14TargetSelected: p14Selection.noP14TargetSelected, reportHydrating, reportReadyProjectId }));
+    }, [expectedProjectKey, projectIdMatch, reportVersionId, resolvedReportVersionId, bassReadiness, completedBassAuthority, reportHydrating, reportReadyProjectId]);
     const completedP19Result = completedBassContract?.productAnalysis?.parameters?.p19 || null;
     // Use the gated presentation (publicationVerified) for per-seat P19 — same
     // authority as P20 and the parameter grid. This ensures the HUD snapshot,
