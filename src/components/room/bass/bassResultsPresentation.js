@@ -1,5 +1,7 @@
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
-import { buildP19SeatRows, p19LowestSeat, p19RspResult } from "@/components/room/bass/p19SeatPresentation";
+import { p19LowestSeat, p19RspResult } from "@/components/room/bass/p19SeatPresentation";
+import { summariseAuthoritativeP19Seats } from "@/components/room/bass/p19SeatAuthority";
+import { getScopedSeatIds } from "@/components/utils/seatScopeAuthority";
 import { buildP20SeatRows, p20WorstSeat, p20BestPrimarySeat } from "@/components/room/bass/p20SeatPresentation";
 import { formatP14Capability, formatP14BasisLabel, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
@@ -168,6 +170,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       selectedCandidateId: null,
       perSeatP19Results: [],
       perSeatP20Results: [],
+      p19SeatAuthority: null,
       p19Rows: [],
       p20Rows: [],
       p19Rsp: null,
@@ -202,8 +205,17 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     : [];
   const perSeatP20Results = (isAuthoritative && !p14Failed) ? (presentation.perSeatP20Results || []) : [];
 
-  // Build per-seat rows for expanded views
-  const p19Rows = (isAuthoritative && !p14Failed) ? buildP19SeatRows(seatingPositions, perSeatP19Results) : [];
+  // Build P19 identity, grouping, floors and rows exactly once.
+  const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(seatingPositions);
+  const p19SeatAuthority = (isAuthoritative && !p14Failed)
+    ? summariseAuthoritativeP19Seats({
+        authoritativeSeatResults: perSeatP19Results,
+        primarySeatIds,
+        secondarySeatIds,
+        seatingPositions,
+      })
+    : null;
+  const p19Rows = p19SeatAuthority?.rows || [];
   const p20Rows = (isAuthoritative && !p14Failed) ? buildP20SeatRows(seatingPositions, perSeatP20Results) : [];
 
   // P19 compact: RSP + lowest seat (internal authority — presented as coverage summary)
@@ -335,6 +347,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     selectedCandidateId: contract?.selectedCandidateId || null,
     perSeatP19Results,
     perSeatP20Results,
+    p19SeatAuthority,
     p19Rows,
     p20Rows,
     p19Rsp,
