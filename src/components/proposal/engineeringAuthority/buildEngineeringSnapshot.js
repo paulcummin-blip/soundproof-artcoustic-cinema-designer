@@ -64,7 +64,6 @@ export function buildEngineeringSnapshot(params = {}) {
     project,
     version,
     mergedProject,
-    analysisResult,
     completedBassAuthority,
     designRating,
     engineeringSummary: explicitEngineeringSummary,
@@ -139,8 +138,8 @@ export function buildEngineeringSnapshot(params = {}) {
   const p19Snapshot = buildSnapshotP19(engineeringSummary);
   const p20Snapshot = buildSnapshotP20(engineeringSummary);
 
-  // ── 9. Viewing / RP23 — presentation-only legacy adapter ──
-  const viewing = buildSnapshotViewing(analysisResult, seats);
+  // ── 9. Viewing / RP23 — passive read from the same publication ──
+  const viewing = buildSnapshotViewing(engineeringSummary);
 
   // ── 10. Pricing (separate from engineering) ──
   const pricing = buildSnapshotPricing(priceCalculation);
