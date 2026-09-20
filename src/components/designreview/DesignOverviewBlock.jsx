@@ -17,13 +17,9 @@
  */
 
 import React from "react";
-import { getCategoryForParam, getHumanTitleForParam } from "@/components/report/technical/technicalParameterMeta";
-import {
-  getLowestPerformanceResults,
-  normalizeLevel,
-} from "@/components/designreview/needsAttentionAuthority";
+import { getHumanTitleForParam } from "@/components/report/technical/technicalParameterMeta";
+import { normalizeLevel } from "@/components/designreview/needsAttentionAuthority";
 import { getLevelColors } from "@/components/utils/rp22Colors";
-import { getDesignPerformanceIndex } from "@/components/report/technical/designRatingPresentation";
 import DesignRatingCategoryFloor from "./DesignRatingCategoryFloor";
 
 const COLORS = {
@@ -42,19 +38,7 @@ const COLORS = {
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
 
-const PILLAR_ORDER = [
-  "Spatial Resolution",
-  "Dynamic Range",
-  "Timbre Matching",
-  "Screen / Viewing Geometry",
-];
-
 // ── Helpers (display-only, no scoring) ──────────────────────────────
-
-function getPillar(contrib) {
-  if (contrib.key === "screen") return "Screen / Viewing Geometry";
-  return getCategoryForParam(Number(contrib.parameter)) || "General";
-}
 
 function getParamLabel(contrib) {
   if (contrib.key === "screen") return "Screen / Viewing Geometry";
@@ -62,9 +46,10 @@ function getParamLabel(contrib) {
   return `P${num}  ${getHumanTitleForParam(num)}`;
 }
 
-function DpiScopeSummary({ label, rating, emphasize }) {
+function DpiScopeSummary({ label, summary, emphasize }) {
+  const rating = summary?.rating;
   const isNotAssessed = !rating || rating.status === "NOT_ASSESSED" || rating.status === "NOT_CONFIGURED";
-  const index = isNotAssessed ? null : getDesignPerformanceIndex(rating);
+  const index = isNotAssessed ? null : (summary?.designPerformanceIndex ?? null);
 
   return (
     <div
@@ -416,32 +401,22 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
     );
   }
 
-  const contributions = rating.contributions || [];
-
-  // Scoped ratings for category floor + DPI summaries (same authority as sidebar)
-  const scopedRatings = rating.scopedRatings || null;
-  const primaryRating = scopedRatings?.primary || null;
-  const secondaryRating = scopedRatings?.secondary || null;
-  const allRating = scopedRatings?.all || rating || null;
+  // Direct read only: every grouping, floor, DPI and lowest-result list is
+  // part of the one published engineering summary.
+  const engineeringSummary = rating.engineeringSummary || null;
+  const primarySummary = engineeringSummary?.primary || null;
+  const secondarySummary = engineeringSummary?.secondary || null;
+  const projectSummary = engineeringSummary?.project || null;
+  const scorecard = projectSummary?.scorecard || {};
+  const contributions = scorecard.contributions || [];
+  const pillarMap = scorecard.byCategory || {};
+  const scorecardPillars = scorecard.categories || [];
+  const lowestResults = scorecard.lowestPerformanceResults || [];
+  const secondaryRating = secondarySummary?.rating || null;
   const secondaryIsConfigured =
     secondaryRating &&
     secondaryRating.status !== "NOT_ASSESSED" &&
     secondaryRating.status !== "NOT_CONFIGURED";
-
-  // Group by pillar (for Full Scorecard)
-  const pillarMap = {};
-  for (const contrib of contributions) {
-    const pillar = getPillar(contrib);
-    if (!pillarMap[pillar]) pillarMap[pillar] = [];
-    pillarMap[pillar].push(contrib);
-  }
-  const scorecardPillars = [
-    ...PILLAR_ORDER,
-    ...Object.keys(pillarMap).filter((pillar) => !PILLAR_ORDER.includes(pillar)),
-  ];
-
-  // Lowest performance results (FAIL first, then L1, then L2)
-  const lowestResults = getLowestPerformanceResults(contributions);
 
   // Recommendation counts
   const improvementCount = Array.isArray(recommendations?.improvements)
@@ -465,11 +440,11 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
 
       {/* Overall DPI summaries — Primary / Secondary / All */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <DpiScopeSummary label="Primary Seating" rating={primaryRating} emphasize />
+        <DpiScopeSummary label="Primary Seating" summary={primarySummary} emphasize />
         {secondaryIsConfigured
-          ? <DpiScopeSummary label="Secondary Seating" rating={secondaryRating} />
-          : <DpiScopeSummary label="Secondary Seating" rating={null} />}
-        <DpiScopeSummary label="All Seating" rating={allRating} />
+          ? <DpiScopeSummary label="Secondary Seating" summary={secondarySummary} />
+          : <DpiScopeSummary label="Secondary Seating" summary={null} />}
+        <DpiScopeSummary label="All Seating" summary={projectSummary} />
       </div>
 
       {/* Full canonical scorecard — collapsed by default */}
