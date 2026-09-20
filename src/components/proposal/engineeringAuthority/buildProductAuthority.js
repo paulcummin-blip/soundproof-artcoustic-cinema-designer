@@ -9,6 +9,7 @@
 
 import { CONFIDENCE, SOURCE } from './confidence';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
+import { resolveSpeakerModelsByRole } from './resolveSpeakerModelsByRole';
 
 function extractProductFacts(meta, modelKey) {
   if (!meta || meta.notFound) {
@@ -90,7 +91,7 @@ function describeEngineeringPurpose(role, meta) {
 }
 
 export function buildProductAuthority(project, _version, placedSpeakers) {
-  const speakersByRole = project?.selected_speakers_by_role || {};
+  const speakersByRole = resolveSpeakerModelsByRole(project, placedSpeakers);
   const subwooferInstances = Array.isArray(project?.subwooferInstances) ? project.subwooferInstances : [];
   const overheadGlobal = project?.overhead_global_model || 'architect-2-1';
 
