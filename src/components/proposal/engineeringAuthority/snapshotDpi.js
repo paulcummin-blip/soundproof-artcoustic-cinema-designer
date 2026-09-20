@@ -1,36 +1,23 @@
 /**
- * snapshotDpi.js
- * --------------------------------
- * Reads canonical Design Performance Index values from the scoped Design
- * Rating authority. Does NOT recalculate scores.
- *
- * Pure function. No React. No side effects.
+ * Passive proposal adapter for canonical Design Performance Index values.
+ * No index or designation calculation is permitted here.
  */
 
-import { getDesignPerformanceIndex, getRoomDesignRatingDesignation } from '@/components/report/technical/designRatingPresentation';
-
-function buildScopedDpi(scopedRating) {
-  if (!scopedRating || scopedRating.status === 'NOT_ASSESSED' || scopedRating.status === 'NOT_CONFIGURED') {
-    return { available: false, index: null, designation: null, percentage: null };
-  }
-  const index = getDesignPerformanceIndex(scopedRating);
-  const designation = getRoomDesignRatingDesignation(scopedRating);
-  const percentage = Number.isFinite(Number(scopedRating.displayPercentage))
-    ? Number(scopedRating.displayPercentage)
-    : null;
-  return { available: true, index, designation, percentage };
+function readScope(scope) {
+  if (!scope) return { available: false, index: null, designation: null, percentage: null };
+  const rating = scope.rating || null;
+  return {
+    available: !!rating && rating.status !== "NOT_ASSESSED" && rating.status !== "NOT_CONFIGURED",
+    index: scope.designPerformanceIndex ?? null,
+    designation: rating?.designation ?? rating?.label ?? null,
+    percentage: rating?.displayPercentage ?? null,
+  };
 }
 
-/**
- * Build DPI for all three scopes from the published scoped ratings.
- *
- * @param {Object} scopedRatings — { primary, secondary, all } from useAppDesignRating
- * @returns {{ primary, secondary, all_seat }}
- */
-export function buildSnapshotDpi(scopedRatings) {
+export function buildSnapshotDpi(engineeringSummary) {
   return {
-    primary: buildScopedDpi(scopedRatings?.primary),
-    secondary: buildScopedDpi(scopedRatings?.secondary),
-    all_seat: buildScopedDpi(scopedRatings?.all),
+    primary: readScope(engineeringSummary?.primary),
+    secondary: readScope(engineeringSummary?.secondary),
+    all_seat: readScope(engineeringSummary?.project),
   };
 }
