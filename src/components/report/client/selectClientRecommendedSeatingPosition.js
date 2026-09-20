@@ -1,77 +1,51 @@
 /**
- * selectClientRecommendedSeatingPosition
- * --------------------------------------
- * Pure selector for the P1 (Recommended Seating Position) client Visual Report.
+ * Passive P1 Visual Report selector.
  *
- * Reads the CANONICAL P1 result only:
- *   analysisResult.perSeatRp22[seatId].rp22[1]
- *
- * Does NOT recalculate P1 from the shaded wall-distance zones — those zones are
- * purely visual. The seat distance/level shown on the page comes exclusively
- * from the analysis engine's canonical per-seat P1 metric.
- *
- * Returns:
- *   {
- *     seats: [{ id, x, y, distanceM, formatted, level, levelRaw, rank, isPrimary }],
- *     rsp,
- *     hasAny: boolean
- *   }
+ * Reads exact per-seat P1 rows from the published engineering summary and joins
+ * them to geometry. Wall-distance zones remain presentation-only.
  */
-
-// Engine stores P1 level as a canonical string ("L4"/"L3"/"L2"/"L1"/"FAIL") or,
-// on legacy paths, a numeric (4/3/2/1). Map both forms to the client-facing
-// display label used by the shaded-zone legend. Do NOT alter the canonical
-// level object — this only normalises for display/ranking.
 const LEVEL_LABELS = {
-  L4: "L4", L3: "L3", L2: "L2", L1: "L1", FAIL: "Below L1",
-  4: "L4", 3: "L3", 2: "L2", 1: "L1", 0: "Below L1", // numeric 0 = FAIL (canonical)
+  L4: "L4",
+  L3: "L3",
+  L2: "L2",
+  L1: "L1",
+  FAIL: "Below L1",
 };
-const LEVEL_RANK = {
-  L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0,
-  4: 4, 3: 3, 2: 2, 1: 1, 0: 0, // numeric 0 = FAIL (canonical)
-};
+const LEVEL_RANK = { L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0 };
 
 function normalizeSeat(seat) {
   if (!seat) return null;
   const x = Number(seat.x ?? seat.position?.x);
   const y = Number(seat.y ?? seat.position?.y);
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  return {
-    id: seat.id || `seat-${x.toFixed(2)}-${y.toFixed(2)}`,
-    x,
-    y,
-    // Canonical seat-priority authority — isPrimary from the seating position.
-    // The bold ring on P1/RP23 markers means PRIMARY SEAT, not best/strongest.
-    isPrimary: seat.isPrimary === true || seat.priority === "primary",
-  };
+  return { id: seat.id || `seat-${x.toFixed(2)}-${y.toFixed(2)}`, x, y };
 }
 
-export function selectClientRecommendedSeatingPosition({ analysisResult, seatingPositions, rsp }) {
-  const perSeat = analysisResult?.perSeatRp22;
+export function selectClientRecommendedSeatingPosition({ engineeringSummary, seatingPositions, rsp }) {
+  const published = engineeringSummary?.project?.reportCounts?.seatResultsByParameter?.p1 || [];
+  const resultBySeat = new Map(published.map((result) => [String(result.seatId), result]));
 
   const seats = (Array.isArray(seatingPositions) ? seatingPositions : [])
     .map((raw) => {
       const base = normalizeSeat(raw);
       if (!base) return null;
-
-      const p1 = perSeat?.[base.id]?.rp22?.[1];
-      const levelRaw = p1?.level;
-      const distanceM = Number.isFinite(p1?.valueM)
-        ? Number(p1.valueM)
-        : Number.isFinite(p1?.value)
-          ? Number(p1.value)
-          : null;
-      const formatted = p1?.formatted ?? (Number.isFinite(distanceM) ? `${distanceM.toFixed(2)}m` : null);
-      const level = LEVEL_LABELS[levelRaw] ?? (levelRaw == null ? null : String(levelRaw));
-      const rank = levelRaw in LEVEL_RANK ? LEVEL_RANK[levelRaw] : -1;
-
-      return { ...base, distanceM, formatted, level, levelRaw, rank };
+      const result = resultBySeat.get(String(base.id));
+      if (!result || result.status !== "scored") return null;
+      const levelRaw = result.level || null;
+      const distanceM = Number.isFinite(Number(result.value)) ? Number(result.value) : null;
+      return {
+        ...base,
+        isPrimary: result.isPrimary === true,
+        distanceM,
+        formatted: result.valueFormatted || (distanceM == null ? null : `${distanceM.toFixed(2)}m`),
+        level: LEVEL_LABELS[levelRaw] || null,
+        levelRaw,
+        rank: LEVEL_RANK[levelRaw] ?? -1,
+      };
     })
     .filter(Boolean);
 
-  const valid = seats.filter((s) => s.rank >= 0);
-
-  return { seats: valid, rsp, hasAny: valid.length > 0 };
+  return { seats, rsp, hasAny: seats.length > 0 };
 }
 
 export default selectClientRecommendedSeatingPosition;
