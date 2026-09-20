@@ -29,7 +29,7 @@ import { buildProductAuthority } from './buildProductAuthority';
 import { buildImageAuthority } from './buildImageAuthority';
 import { buildDealerAuthority } from './buildDealerAuthority';
 import { buildProposalMetadata } from './buildProposalMetadata';
-import { buildViewingAuthority } from './buildViewingAuthority';
+import { buildSnapshotViewing } from './snapshotViewing';
 
 export const ENGINEERING_AUTHORITY_VERSION = '1.0';
 
@@ -39,10 +39,8 @@ export const ENGINEERING_AUTHORITY_VERSION = '1.0';
  * @param {Object} params
  * @param {Object} params.project               — Project entity (merged with version design_state)
  * @param {Object} [params.version]             — ProjectVersion entity
- * @param {Object} [params.analysisResult]      — From useRP22AnalysisEngine
- * @param {Object} [params.completedBassAuthority]    — From useCompletedBassAuthority
- * @param {Object} [params.completedBassPresentation] — From buildComplianceBassPresentation
- * @param {Object} [params.designRating]        — From useAppDesignRating
+ * @param {Object} params.engineeringSummary    — Published canonical summary
+ * @param {Object} [params.designRating]         — Compatibility envelope carrying engineeringSummary
  * @param {Array}  [params.placedSpeakers]      — Array of placed speaker objects
  * @param {Array}  [params.seats]               — Array of seating positions
  * @param {Object} [params.primarySeatingPosition] — MLP coordinates
@@ -57,9 +55,7 @@ export function buildEngineeringAuthority(params = {}) {
   const {
     project,
     version,
-    analysisResult,
-    completedBassAuthority,
-    completedBassPresentation,
+    engineeringSummary: explicitEngineeringSummary,
     designRating,
     placedSpeakers,
     seats,
@@ -70,6 +66,11 @@ export function buildEngineeringAuthority(params = {}) {
     assumedLevels,
     assessmentModes,
   } = params;
+
+  const engineeringSummary = explicitEngineeringSummary || designRating?.engineeringSummary || null;
+  if (!engineeringSummary) {
+    throw new Error('Published canonical engineering summary is required.');
+  }
 
   const projectAuthority = buildProjectAuthority(project, version);
   const dealerAuthority = buildDealerAuthority(brandAsset);
@@ -84,18 +85,9 @@ export function buildEngineeringAuthority(params = {}) {
     project: projectAuthority,
     room: buildRoomAuthority(project, version),
     system: buildSystemAuthority(project, version, placedSpeakers),
-    rp22: buildRp22Authority(
-      analysisResult,
-      designRating,
-      seats,
-      assumedLevels || {
-        p15: project?.assumed_p15_level || null,
-        p21: project?.assumed_p21_level || null,
-      },
-      assessmentModes || {},
-    ),
-    bass: buildBassAuthority(completedBassAuthority, completedBassPresentation),
-    viewing: buildViewingAuthority(project, analysisResult, seats),
+    rp22: buildRp22Authority(engineeringSummary, null, null, null, assessmentModes || {}),
+    bass: buildBassAuthority(engineeringSummary),
+    viewing: buildSnapshotViewing(engineeringSummary),
     products: buildProductAuthority(project, version, placedSpeakers),
     images: buildImageAuthority(proposalAssets),
     dealer: dealerAuthority,
@@ -116,7 +108,6 @@ export {
   buildImageAuthority,
   buildDealerAuthority,
   buildProposalMetadata,
-  buildViewingAuthority,
 };
 
 export { CONFIDENCE, SOURCE } from './confidence';
