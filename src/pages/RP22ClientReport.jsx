@@ -172,12 +172,11 @@ export default function RP22ClientReport() {
     return selectClientP2SystemArchitecture(engineeringSummary, placedSpeakers, subwooferInstances);
   }, [hydrating, engineeringSummary, placedSpeakers, subwooferInstances]);
 
-  // ── P7 Front Wides (pure selector — reads canonical gradedParameters.primary[7]) ──
-  // Only returns data when front wides are actually present.
+  // ── P7 Front Wides — passive read from the canonical summary ──
   const p7FrontWides = useMemo(() => {
-    if (hydrating || !analysisResult || !Array.isArray(placedSpeakers) || !rsp) return null;
-    return selectClientP7FrontWides(analysisResult, placedSpeakers, rsp);
-  }, [hydrating, analysisResult, placedSpeakers, rsp]);
+    if (hydrating || !engineeringSummary || !Array.isArray(placedSpeakers) || !rsp) return null;
+    return selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp);
+  }, [hydrating, engineeringSummary, placedSpeakers, rsp]);
 
   // ── Recommended seating position — passive P1 authority read ──
   const recommendedSeatingPosition = useMemo(() => {
