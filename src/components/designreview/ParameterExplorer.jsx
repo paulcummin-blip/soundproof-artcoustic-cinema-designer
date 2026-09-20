@@ -462,15 +462,13 @@ export default function ParameterExplorer({
                 {isExpanded && (
                   <ExpandedParameterDetail
                     param={param}
-                    analysisResult={analysisResult}
+                    engineeringSummary={engineeringSummary}
                     bassPresentation={bassPresentation}
                     resolveThresholds={resolveThresholds}
-                    resolveP12P13DualLevels={resolveP12P13DualLevels}
                     getHudValueForParam={getHudValueForParam}
                     getHudLevelForParam={getHudLevelForParam}
                     buildSeatGridData={buildSeatGridData}
                     buildAsdrFooter={buildAsdrFooter}
-                    buildP6Presentation={buildP6Presentation}
                     lockedSeatId={lockedSeatId}
                     category={category}
                     humanTitle={humanTitle}
