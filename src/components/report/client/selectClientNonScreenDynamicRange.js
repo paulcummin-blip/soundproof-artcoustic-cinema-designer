@@ -87,6 +87,7 @@ function roleOrderIndex(role) {
 
 export function selectClientNonScreenDynamicRange({
   analysisResult,
+  engineeringSummary,
   allSeatSplMetrics,
   seatingPositions,
   rsp,
@@ -122,8 +123,9 @@ export function selectClientNonScreenDynamicRange({
     minimum = { value: p13.value, formatted: p13.formatted || `${p13.value} dB` };
   }
 
-  // Achieved level — re-graded from the canonical value using the active basis
-  const level = minimum ? gradeP13ForBasis(minimum.value, targetBasis) : null;
+  // Achieved level is read directly from the canonical published parameter
+  // authority. The Visual Report never re-grades the achieved value.
+  const level = engineeringSummary?.parameterAuthority?.p13?.level ?? null;
   const resultHeading = level ? RESULT_HEADINGS[level] || "" : "";
 
   const hasAny = speakerSplValues.length > 0 || !!(minimum && level);
