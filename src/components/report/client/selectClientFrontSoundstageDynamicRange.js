@@ -11,11 +11,8 @@
  * panel (RP22CompliancePanel) and the Technical Report (RP22ReportParameterGrid):
  *   appState.p12Mode  →  "minimum" | "recommended"  (default "minimum")
  *
- * The threshold tables below mirror those two authorities EXACTLY. Keep in sync.
- * The achieved SPL (gradedParameters.primary[12].value) does NOT change with the
- * target basis. The RP22 level and band thresholds DO change, because the level
- * is re-graded from the achieved value using the active thresholds — the same
- * re-grading the App and Technical Report perform. The component never grades.
+ * Threshold tables below are presentation bands only. The achieved value and
+ * RP22 level are read directly from the published engineering summary.
  *
  * ── Canonical P12 result ──
  *   analysisResult.gradedParameters.primary[12].value   → achieved minimum SPL
@@ -46,17 +43,6 @@ const P12_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 102, L2: 105, L3: 108,
 
 function resolveP12Thresholds(p12Mode) {
   return p12Mode === "recommended" ? P12_THRESHOLDS_RECOMMENDED : P12_THRESHOLDS_MINIMUM;
-}
-
-// Re-grade from the achieved value using the active basis — same logic as App/Tech.
-function gradeP12ForBasis(value, p12Mode) {
-  if (!Number.isFinite(value)) return null;
-  const t = resolveP12Thresholds(p12Mode);
-  if (value >= t.L4) return "L4";
-  if (value >= t.L3) return "L3";
-  if (value >= t.L2) return "L2";
-  if (value >= t.L1) return "L1";
-  return "FAIL";
 }
 
 function p12TargetBasisLabel(p12Mode) {
@@ -147,16 +133,12 @@ export function selectClientFrontSoundstageDynamicRange({
     }
   }
 
-  // Canonical P12 achieved value (room-scope) — does NOT change with basis
-  const p12 = analysisResult?.gradedParameters?.primary?.[12] ?? null;
-  let minimum = null;
-  if (p12 && Number.isFinite(p12.value)) {
-    minimum = { value: p12.value, formatted: p12.formatted || `${p12.value} dB` };
-  }
-
-  // Achieved level is read directly from the canonical published parameter
-  // authority. The Visual Report never re-grades the achieved value.
-  const level = engineeringSummary?.parameterAuthority?.p12?.level ?? null;
+  // Direct reads from the canonical publication. No report-side grading.
+  const p12 = engineeringSummary?.roomResultsByParameter?.[12] ?? null;
+  const minimum = p12 && Number.isFinite(Number(p12.value))
+    ? { value: Number(p12.value), formatted: p12.formatted || `${p12.value} dB` }
+    : null;
+  const level = p12?.level ?? engineeringSummary?.parameterAuthority?.p12?.level ?? null;
   const resultHeading = level ? RESULT_HEADINGS[level] || "" : "";
 
   const hasAny = !!(fl || fc || fr) || !!(minimum && level);
