@@ -17,7 +17,8 @@ import {
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
 import { useActiveProjectId } from "@/components/state/project-session";
-import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint } from "@/components/state/designReviewHandoff";
+import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint, readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
+import { isRetainedSummaryStillValid } from "@/components/state/designRatingPublicationAuthority";
 import { buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
 
 // Hooks and utils (kept eager; they are light and provide guards below)
@@ -1855,17 +1856,62 @@ function RoomDesignerWithState() {
       return;
     }
 
-    // Previously, a pending-bass rating was blocked from publication entirely.
-    // That left a STALE scoped rating visible when seat priorities changed while
-    // bass was pending. Now we always publish the current rating so the non-bass
-    // seat-scoped categories reflect the current priority scope. The separate
-    // bass-pending indicator lets the sidebar show "Calculating bass analysis…"
-    // independently. The isPendingBass flag remains on the rating for consumers
-    // that need it, but it no longer gates publication.
     if (!appDesignRating) {
       return;
     }
 
+    // ── Publication readiness gate ──
+    // Do NOT publish a numeric canonical Design Rating while bass authority is
+    // provisional for the current project/version/fingerprint. A partial
+    // numeric rating (e.g. 68/63/66 with P14/P18/P19/P20 excluded) must never
+    // be published as the canonical Engineering Summary. The single
+    // isDesignRatingPublishable predicate decides; no consumer duplicates the
+    // readiness rule.
+    if (appDesignRating.isPublishable !== true) {
+      const versionId = appState?.activeVersionId || null;
+      const existing = versionId
+        ? readDesignReviewHandoff(handoffProjectId, versionId)
+        : null;
+      const currentSeatPriorityFp = buildSeatPriorityFingerprint(currentSeats);
+      const stillValid = isRetainedSummaryStillValid(existing, {
+        projectId: handoffProjectId,
+        versionId,
+        seatPriorityFingerprint: currentSeatPriorityFp,
+        bassFingerprint: appDesignRating?.bassReadiness?.fingerprint || null,
+      });
+
+      if (stillValid) {
+        // Retain the existing settled same-fingerprint summary — do not
+        // overwrite it with a newly computed partial one.
+        return;
+      }
+
+      // Fail closed: publish neutral loading state. The bass-pending
+      // indicator (published separately) lets the sidebar show
+      // "Calculating bass analysis…" without a partial numeric score.
+      publishDesignReviewHandoff({
+        projectId: handoffProjectId,
+        versionId,
+        calculationFingerprint: appDesignRating?.bassReadiness?.fingerprint || null,
+        showAsdr,
+        rating: null,
+        engineeringSummary: null,
+        recommendations: null,
+        analysisResult,
+        seatingPositions: currentSeats,
+        placedSpeakers,
+        frontSubs: frontSubsForRendering,
+        rearSubs: rearSubsForRendering,
+        screen: _screen,
+        dolbyLayout: dolbyPreset,
+        mlpPoint: mlpAnchorEffective,
+        priceData: publishedPriceData,
+      });
+      return;
+    }
+
+    // Publishable — bass is ready (or retained same-fingerprint) and the
+    // rating is complete. Publish the full numeric Engineering Summary.
     publishDesignReviewHandoff({
       projectId: handoffProjectId,
       versionId: appState?.activeVersionId || null,

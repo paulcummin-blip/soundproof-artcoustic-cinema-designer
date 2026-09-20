@@ -26,6 +26,7 @@ import { summariseAuthoritativeP19Seats } from '@/components/room/bass/p19SeatAu
 import { getScopedSeatIds } from '@/components/utils/seatScopeAuthority';
 import { hasMinimumSystemForAsdr } from '@/components/utils/minimumSystemForAsdr';
 import { resolveP14TargetSelectionState } from '@/components/room/bass/p14TargetSelectionState';
+import { isDesignRatingPublishable } from '@/components/state/designRatingPublicationAuthority';
 
 // Map numeric RP22 parameter IDs to the string keys expected by buildDesignRatingInput
 const SEAT_PARAM_KEY_MAP = {
@@ -400,11 +401,24 @@ export function useAppDesignRating({
 
   const isP14TargetUnselected = bassReadiness.reason === 'p14-target-not-selected';
 
+  // Single publication readiness authority. One predicate decides whether a
+  // numeric Design Rating may be published. Consumers (RoomDesigner publish
+  // effect, sidebar, reports) read this flag instead of duplicating readiness
+  // logic. A partial numeric rating is never published while bass authority
+  // is provisional.
+  const isPublishable = isDesignRatingPublishable({
+    minimumSystemMet,
+    bassReadiness,
+    retainedFromRefresh,
+    isP14TargetUnselected,
+  });
+
   return {
     ...effectiveRating,
     bassReadiness,
     isPendingBass: !bassReadiness.ready && !retainedFromRefresh && !isP14TargetUnselected,
     isP14TargetUnselected,
     retainedFromRefresh,
+    isPublishable,
   };
 }
