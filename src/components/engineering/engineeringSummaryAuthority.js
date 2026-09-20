@@ -36,6 +36,15 @@ function normalizeLevel(level) {
   return null;
 }
 
+function clonePlain(value, seen = new WeakMap()) {
+  if (!value || typeof value !== "object") return value;
+  if (seen.has(value)) return seen.get(value);
+  const copy = Array.isArray(value) ? [] : {};
+  seen.set(value, copy);
+  for (const [key, child] of Object.entries(value)) copy[key] = clonePlain(child, seen);
+  return copy;
+}
+
 function freezeDeep(value, seen = new WeakSet()) {
   if (!value || typeof value !== "object" || seen.has(value)) return value;
   seen.add(value);
@@ -319,5 +328,7 @@ export function summariseEngineeringResults({
     },
   };
 
-  return freezeDeep(summary);
+  // Freeze an isolated publication. Never freeze live engine objects that the
+  // calculation pipeline may still own or update.
+  return freezeDeep(clonePlain(summary));
 }
