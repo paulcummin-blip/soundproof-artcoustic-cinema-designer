@@ -25,8 +25,6 @@ const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
  *   rearSubsCount       — number
  *   assumedP15Level
  *   assumedP21Level
- *   bassAuthority
- *   bassErrorMessage
  *   variant             — "screen" (default) or "print"
  *   contributionsByKey  — ASDR contributions by key
  */
@@ -40,9 +38,6 @@ export default function RP22ReportParameterGrid({
   assumedP21Level,
   setAssumedP15LevelSafe,
   setAssumedP21LevelSafe,
-  bassAuthority = null,
-  p19SeatAuthority = null,
-  bassErrorMessage = null,
   variant = "screen",
   contributionsByKey = null,
 }) {
