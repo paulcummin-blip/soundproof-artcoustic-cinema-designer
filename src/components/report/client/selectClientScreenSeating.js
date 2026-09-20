@@ -1,42 +1,18 @@
 /**
- * selectClientScreenSeating
- * -------------------------
- * Pure selector for the RP23 Screen Size / Seating client visual.
- *
- * Consumes the SAME canonical RP23 authority as the live app:
- *   rp23LevelForAngleDeg from viewingAngleUtils.jsx
- *
- * No second calculation authority — per-seat angle and level are
- * computed using the exact same formula and grading function.
- *
- * Zone distance boundaries are derived by SCANNING rp23LevelForAngleDeg
- * for exact level-transition angles, then converting those angles to
- * distances via: distance = (width/2) / tan(angle/2). This guarantees
- * the drawn zone boundaries match the grading function's inclusivity
- * rules exactly — including the sales-friendly ceil/floor/round
- * normalisation built into the authority.
+ * Passive selector for the RP23 Screen Size / Seating client visual.
+ * Seat angle, level, scoped floors and explanatory counts come exclusively
+ * from engineeringSummary.viewing. This file performs presentation layout
+ * only and never re-grades RP23.
  */
 
-import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
-
-function angleToDistance(widthM, angleDeg) {
-  if (!widthM || !angleDeg || angleDeg <= 0 || angleDeg >= 180) return Infinity;
-  return (widthM / 2) / Math.tan((angleDeg * Math.PI / 180) / 2);
-}
-
 function levelToKey(level) {
-  return level ? level.toLowerCase() : "below-l1";
+  return level ? String(level).toLowerCase() : "below-l1";
 }
 
 function levelToLabel(level) {
-  return level ? level : "Below L1";
+  return level || "Below L1";
 }
 
-/**
- * Parse an aspect-ratio string like "16:9" or "2.35:1" into a numeric
- * width/height ratio. Uses the SAME logic as normaliseScreenConfig
- * (the canonical screen authority in models/screen/normalise.jsx).
- */
 function parseAspectRatio(arStr) {
   const str = (arStr || "16:9").toString();
   const parts = str.includes(":") ? str.split(":").map(Number) : [16, 9];
@@ -46,128 +22,23 @@ function parseAspectRatio(arStr) {
     : 16 / 9;
 }
 
-/**
- * Compute the minimum calibrated projector light output (lumens) required
- * at the screen for a target luminance of 108 nits with 0.6 screen gain.
- *
- *   requiredLumens = (targetNits × π × visibleScreenAreaM2) / screenGain
- *
- * visibleScreenAreaM2 = visibleWidthM × visibleHeightM, where
- * visibleHeightM = visibleWidthM / aspectRatio  (same derivation as
- * normaliseScreenConfig.viewableHeightM).
- *
- * Result is rounded to the nearest 10 lumens.
- *
- * No efficiency, ageing, zoom, or headroom assumptions are included —
- * this is the minimum calibrated output at the screen surface.
- */
 function computeProjectorLumens(screenWidthM, aspectRatio) {
-  const W = Number(screenWidthM);
-  if (!W || W <= 0) return null;
-  const ratio = parseAspectRatio(aspectRatio);
-  const visibleHeightM = W / ratio;
-  const visibleScreenAreaM2 = W * visibleHeightM;
-  const requiredLumens = (108 * Math.PI * visibleScreenAreaM2) / 0.6;
-  return Math.round(requiredLumens / 10) * 10;
-}
-
-/**
- * Scan rp23LevelForAngleDeg from high angle (close to screen) to low
- * angle (far from screen), finding every level transition. Convert
- * each transition angle to a distance from the screen front plane.
- *
- * Returns an ordered list of { distFromScreen, levelBefore, levelAfter }
- * from closest to farthest.
- */
-function scanLevelTransitions(W) {
-  const transitions = [];
-  let prevLevel = rp23LevelForAngleDeg(180);
-
-  // Use integer hundredths to avoid floating-point accumulation:
-  // a = (17999 - i) / 100 gives exact values 179.99, 179.98, ..., 0.01
-  for (let i = 0; i <= 17998; i++) {
-    const a = (17999 - i) / 100;
-    const level = rp23LevelForAngleDeg(a);
-    if (level !== prevLevel) {
-      transitions.push({
-        angleDeg: a,
-        distFromScreen: angleToDistance(W, a),
-        levelBefore: prevLevel,
-        levelAfter: level,
-      });
-      prevLevel = level;
-    }
-  }
-  return transitions;
-}
-
-/**
- * Build zone rectangles from authority-scanned transitions.
- * Zones are ordered from close to screen → far from screen.
- * Each zone is clipped to the room boundaries [0, L].
- */
-function buildZonesFromTransitions(W, frontY, L) {
-  const transitions = scanLevelTransitions(W);
-
-  const zones = [];
-  let yStart = frontY;
-
-  for (let i = 0; i < transitions.length; i++) {
-    const t = transitions[i];
-    const yEnd = frontY + t.distFromScreen;
-
-    if (yEnd > yStart && yStart < L) {
-      zones.push({
-        key: `zone-${i}`,
-        yStart: Math.max(0, yStart),
-        yEnd: Math.min(L, yEnd),
-        level: levelToKey(t.levelBefore),
-        label: levelToLabel(t.levelBefore),
-      });
-    }
-    yStart = Math.max(yStart, yEnd);
-  }
-
-  // Final zone (beyond last transition — typically "Below L1" too far)
-  if (yStart < L) {
-    const finalLevel =
-      transitions.length > 0
-        ? transitions[transitions.length - 1].levelAfter
-        : null;
-    zones.push({
-      key: "zone-final",
-      yStart: Math.max(0, yStart),
-      yEnd: L,
-      level: levelToKey(finalLevel),
-      label: levelToLabel(finalLevel),
-    });
-  }
-
-  return zones;
+  const width = Number(screenWidthM);
+  if (!width || width <= 0) return null;
+  const visibleHeightM = width / parseAspectRatio(aspectRatio);
+  return Math.round(((108 * Math.PI * width * visibleHeightM) / 0.6) / 10) * 10;
 }
 
 function buildExplanation(seats) {
-  if (seats.length === 0) return "";
-
-  const l4Count = seats.filter((s) => s.level === "l4").length;
-  const l3Count = seats.filter((s) => s.level === "l3").length;
-  const belowCount = seats.filter((s) => s.level === "below-l1").length;
-
-  if (l4Count === seats.length) {
-    return `All ${seats.length} seat${seats.length === 1 ? "" : "s"} are within the Level 4 viewing range.`;
-  }
-  if (l4Count > 0 && belowCount === 0) {
-    return `${l4Count} of ${seats.length} seats are within the Level 4 viewing range; the remainder are within Level 3.`;
-  }
-  if (l4Count > 0) {
-    return `${l4Count} of ${seats.length} seats are within the Level 4 viewing range; ${belowCount} are below Level 1.`;
-  }
-  if (l3Count > 0 && belowCount === 0) {
-    return `All seats are within the Level 3 viewing range.`;
-  }
-  if (belowCount > 0) {
-    return `${belowCount} of ${seats.length} seat${belowCount === 1 ? "" : "s"} are below the Level 1 viewing range.`;
-  }
+  if (!seats.length) return "";
+  const l4Count = seats.filter((seat) => seat.level === "l4").length;
+  const l3Count = seats.filter((seat) => seat.level === "l3").length;
+  const belowCount = seats.filter((seat) => seat.level === "below-l1").length;
+  if (l4Count === seats.length) return `All ${seats.length} seat${seats.length === 1 ? "" : "s"} are within the Level 4 viewing range.`;
+  if (l4Count > 0 && belowCount === 0) return `${l4Count} of ${seats.length} seats are within the Level 4 viewing range; the remainder are within Level 3.`;
+  if (l4Count > 0) return `${l4Count} of ${seats.length} seats are within the Level 4 viewing range; ${belowCount} are below Level 1.`;
+  if (l3Count > 0 && belowCount === 0) return "All seats are within the Level 3 viewing range.";
+  if (belowCount > 0) return `${belowCount} of ${seats.length} seat${belowCount === 1 ? "" : "s"} are below the Level 1 viewing range.`;
   return "";
 }
 
@@ -175,57 +46,46 @@ export function selectClientScreenSeating({
   seatingPositions,
   screenFrontPlaneM,
   screenWidthM,
-  roomLengthM,
   aspectRatio,
+  engineeringSummary,
 }) {
-  if (!Array.isArray(seatingPositions) || !screenWidthM || seatingPositions.length === 0) {
+  const viewing = engineeringSummary?.viewing;
+  if (!Array.isArray(seatingPositions) || !viewing?.available) {
     return { seats: [], zones: [], hasAny: false, explanation: "", projectorLumens: null };
   }
 
-  const W = Number(screenWidthM);
+  const authorityBySeatId = new Map(
+    (viewing.per_seat || []).map((result) => [String(result?.seat_id), result]),
+  );
   const frontY = Number(screenFrontPlaneM) || 0.2;
-  const L = Number(roomLengthM) || 6.0;
+  const seats = seatingPositions.map((seat) => {
+    const authority = authorityBySeatId.get(String(seat?.id));
+    if (!authority || !Number.isFinite(Number(authority.horizontal_angle_deg))) return null;
+    const x = Number(seat?.x);
+    const y = Number(seat?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    const level = authority.rp23_level || null;
+    return {
+      id: seat.id,
+      x,
+      y,
+      distanceM: Math.max(0, y - frontY),
+      angleDeg: Number(authority.horizontal_angle_deg),
+      level: levelToKey(level),
+      levelLabel: levelToLabel(level),
+      formatted: `${Number(authority.horizontal_angle_deg).toFixed(1)}°`,
+      isPrimary: authority.priority === "primary",
+    };
+  }).filter(Boolean);
 
-  if (!W || W <= 0) {
-    return { seats: [], zones: [], hasAny: false, explanation: "", projectorLumens: null };
-  }
-
-  // Projector light output — uses the SAME screenWidthM (visible width) and
-  // aspectRatio from the canonical screen authority as the RP23 viewing calc.
-  const projectorLumens = computeProjectorLumens(W, aspectRatio);
-
-  // Zone boundaries derived from the SAME authority function
-  const zones = buildZonesFromTransitions(W, frontY, L);
-
-  // Per-seat analysis — SAME formula + grading as live app
-  const seats = seatingPositions
-    .map((s) => {
-      const x = Number(s.x);
-      const y = Number(s.y);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-      const distance = Math.max(0, y - frontY);
-      const angleDeg = W > 0 && distance > 0
-        ? (2 * Math.atan((W / 2) / distance) * 180) / Math.PI
-        : 0;
-      const levelStr = rp23LevelForAngleDeg(angleDeg);
-      const level = levelToKey(levelStr);
-      return {
-        id: s.id || `seat-${x.toFixed(2)}-${y.toFixed(2)}`,
-        x,
-        y,
-        distanceM: distance,
-        angleDeg,
-        level,
-        levelLabel: levelToLabel(levelStr),
-        formatted: `${angleDeg.toFixed(1)}°`,
-        // Canonical seat-priority authority — isPrimary from the seating position.
-        // The bold ring on RP23 markers means PRIMARY SEAT, not best/strongest.
-        isPrimary: s.isPrimary === true || s.priority === "primary",
-      };
-    })
-    .filter(Boolean);
-
-  const explanation = buildExplanation(seats);
-
-  return { seats, zones, hasAny: seats.length > 0, explanation, projectorLumens };
+  return {
+    seats,
+    // RP23 zone bands were previously re-derived by re-running the grading
+    // function inside the report. They are intentionally omitted: only the
+    // canonical published seat results are visualised.
+    zones: [],
+    hasAny: seats.length > 0,
+    explanation: buildExplanation(seats),
+    projectorLumens: computeProjectorLumens(screenWidthM, aspectRatio),
+  };
 }
