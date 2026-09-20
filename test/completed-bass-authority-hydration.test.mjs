@@ -106,6 +106,21 @@ test("cold hydration accepts only the current cache, instance, metric and contra
   assert.equal(resolved.contract.productAnalysis.parameters.p20.level, 0);
 });
 
+test("matching authoritative child overrides stale parent metadata", () => {
+  const record = buildRecord(buildAuthoritativeSnapshot());
+  record.status = "stale";
+
+  const resolved = resolvePersistedBassAuthority(
+    "disposable-yarm",
+    buildHydratedPersistedWrapper(record),
+  );
+
+  assert.equal(resolved.status, "complete");
+  assert.equal(resolved.authorityStatus, "AUTHORITATIVE");
+  assert.equal(resolved.authoritative, true);
+  assert.equal(resolved.contract?.job?.resultFingerprint, FINGERPRINT);
+});
+
 test("old record envelope without metric schema is rejected, not relabelled current", () => {
   const record = buildRecord(buildAuthoritativeSnapshot());
   delete record.metric_schema_version;
