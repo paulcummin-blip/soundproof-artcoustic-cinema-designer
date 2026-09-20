@@ -166,11 +166,11 @@ export default function RP22ClientReport() {
     return selectClientP9Overhead({ engineeringSummary, seatingPositions });
   }, [hydrating, engineeringSummary, seatingPositions]);
 
-  // ── P2 System Architecture (pure selector — reads canonical gradedParameters.primary[2]) ──
+  // ── P2 System Architecture — passive read from the canonical summary ──
   const p2SystemArchitecture = useMemo(() => {
-    if (hydrating || !analysisResult || !Array.isArray(placedSpeakers)) return null;
-    return selectClientP2SystemArchitecture(analysisResult, placedSpeakers, subwooferInstances);
-  }, [hydrating, analysisResult, placedSpeakers, subwooferInstances]);
+    if (hydrating || !engineeringSummary || !Array.isArray(placedSpeakers)) return null;
+    return selectClientP2SystemArchitecture(engineeringSummary, placedSpeakers, subwooferInstances);
+  }, [hydrating, engineeringSummary, placedSpeakers, subwooferInstances]);
 
   // ── P7 Front Wides (pure selector — reads canonical gradedParameters.primary[7]) ──
   // Only returns data when front wides are actually present.
