@@ -8,155 +8,52 @@ import { RP22_PRESENTATION_PARAMETERS, RP22_SEAT_PARAMETERS } from '@/components
 import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 
 export default function ComplianceReportPrint() {
-  const app = useAppState();
   const [isReady, setIsReady] = useState(false);
   const reportScopeId = new URLSearchParams(window.location.search).get('projectId') || new URLSearchParams(window.location.search).get('id') || 'free';
   const publishedEngineering = useMemo(() => readDesignReviewHandoff(reportScopeId), [reportScopeId]);
-  const p19SeatAuthority = publishedEngineering?.p19SeatAuthority
-    ?? publishedEngineering?.rating?.p19SeatAuthority
+  const engineeringSummary = publishedEngineering?.engineeringSummary
+    ?? publishedEngineering?.rating?.engineeringSummary
     ?? null;
-  const completedBassAuthority = useCompletedBassAuthority(reportScopeId, resolveEffectiveVersionId(null, app));
-  const bassErrorMessage = completedBassAuthority.errorMessage || null;
-  const bassPresentation = useMemo(() => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);
-  const bassReportPending = completedBassAuthority.status === 'loading';
 
-  // Extract data
-  const roomDims = app?.roomDims || {};
-  const widthM = Number(roomDims.widthM || roomDims.width) || 0;
-  const lengthM = Number(roomDims.lengthM || roomDims.length) || 0;
-  const heightM = Number(roomDims.heightM || roomDims.height) || 0;
-
-  const speakers = app?.speakerSystem?.placedSpeakers || [];
-  const seats = app?.seatingPositions || [];
-  const dolbyLayout = app?.dolbyLayout || app?.dolbyConfig || '5.1';
-  const mlp = app?.mlp;
-
-  // Run non-bass RP22 analysis; P14/P18/P19/P20 display comes only from the completed bass contract.
-  const analysis = useRP22AnalysisEngine({
-    diagnosticOwner: "compliance-report-print",
-    roomDims: { widthM, lengthM, heightM },
-    speakers,
-    seats,
-    dolbyLayout,
-    mlp,
-    seatMetricsById: app?.seatMetricsById || {},
-    includeBassAnalysis: false,
-  });
+  // Passive report inputs: every engineering value, grade and aggregate is a
+  // direct read from the Room Designer publication.
+  const seats = publishedEngineering?.seatingPositions || [];
+  const dolbyLayout = publishedEngineering?.dolbyLayout || '5.1';
+  const roomResultsByParameter = engineeringSummary?.roomResultsByParameter || {};
+  const reportCounts = engineeringSummary?.project?.reportCounts || {};
+  const roomCounts = reportCounts.roomLevelCounts || {};
+  const seatCalculatedParamCount = engineeringSummary?.project?.compliance?.calculatedSeatParams || 0;
 
   const roomParams = React.useMemo(
     () => RP22_PRESENTATION_PARAMETERS.filter((parameter) => parameter.scope === 'Room'),
     []
   );
 
-  const seatParams = analysis?.perSeatAnalysis || {};
-
-  // Count ROOM parameter levels only (seat-scoped levels are NOT included in room compliance)
-  const roomCounts = { L1: 0, L2: 0, L3: 0, L4: 0, FAIL: 0 };
-  roomParams.forEach(p => {
-    const authority = [14, 18].includes(p.id) ? bassPresentation.parameters[`p${p.id}`] : null;
-    const roomResult = authority
-      ? { level: authority.level }
-      : analysis?.gradedParameters?.primary?.[p.id] || null;
-    const lvl = roomResult?.level;
-    if (lvl) {
-      const key = String(lvl).toUpperCase();
-      if (roomCounts[key] !== undefined) roomCounts[key]++;
-    }
-  });
-
-  // Seat results: count calculated parameters and seats evaluated (no L-level aggregation)
-  const seatCalculatedParamCount = React.useMemo(() => {
-    return RP22_SEAT_PARAMETERS.filter((param) => {
-      const perSeat = app?.seatMetricsById || {};
-      return Object.values(perSeat).some((seatData) => {
-        const rp22 = seatData?.rp22 || {};
-        const metric = rp22[`p${param.number}`] || rp22[`P${param.number}`] || {};
-        return metric?.level && metric.level !== '—' && metric.level !== 'N/A';
-      });
-    }).length;
-  }, [app?.seatMetricsById]);
-
-  // Compute RSP seat
-  const rspSeatId = React.useMemo(() => {
-    const greenDot = mlp;
-    if (!greenDot || !Number.isFinite(greenDot.x) || !Number.isFinite(greenDot.y)) return null;
-    
-    let closestSeat = null;
-    let minDist = Infinity;
-    
-    seats.forEach(s => {
-      if (!Number.isFinite(s?.x) || !Number.isFinite(s?.y)) return;
-      const d = Math.hypot(s.x - greenDot.x, s.y - greenDot.y);
-      if (d < minDist) {
-        minDist = d;
-        closestSeat = s.id;
-      }
-    });
-    
-    return (minDist <= 0.05) ? closestSeat : null;
-  }, [seats, mlp]);
-
-  // Build per-parameter seat results for seat-scoped parameters (P1, P4, P5, P6, P9, P10, P16, P17, P19, P20)
-  const seatScopedParamData = React.useMemo(() => {
-    return RP22_SEAT_PARAMETERS.map(param => {
-      const perSeatResults = seats.map(seat => {
-        const seatId = seat?.id || '—';
-        const tooltipData = app?.seatMetricsById?.[seatId];
-        const rp22Raw = tooltipData?.rp22 || {};
-        const isRsp = seatId === rspSeatId;
-        const isPrimary = tooltipData?.isPrimary || false;
-
-        let valueFormatted = '—';
-        let level = '—';
-
-        if (param.number === 19) {
-          const p19Seat = p19SeatAuthority?.bySeatId?.[seatId] || null;
-          valueFormatted = p19Seat?.displayedValue || 'NOT CALCULATED';
-          level = p19Seat?.grade || 'NOT CALCULATED';
-        } else if (param.number === 20) {
-          const result = bassPresentation.perSeatP20Results.find(
-            (item) => String(item?.seatId) === String(seatId)
-          );
-          if (result && Number.isFinite(Number(result.variationDbRaw))) {
-            valueFormatted = formatAuthoritativeP20Result(result);
-            level = p20LevelText(result.level);
-          }
-        } else {
-          const metric = rp22Raw[`p${param.number}`] || rp22Raw[`P${param.number}`] || {};
-          valueFormatted = metric.formatted || metric.hudLabel || '—';
-          level = metric.level || '—';
-        }
-
-        const suffix = isRsp ? '(RSP)' : (isPrimary ? '(Primary)' : '');
-        return {
-          seatId,
-          seatLabel: formatSeatLabel(seatId),
-          suffix,
-          valueFormatted,
-          level,
-          isRsp,
-          isPrimary,
-        };
-      });
+  const seatScopedParamData = React.useMemo(() => (
+    RP22_SEAT_PARAMETERS.map((param) => {
+      const publishedRows = reportCounts.seatResultsByParameter?.[`p${param.number}`] || [];
+      const perSeatResults = publishedRows.map((row) => ({
+        ...row,
+        seatLabel: formatSeatLabel(row.seatId),
+        suffix: row.isPrimary ? '(Primary)' : '',
+        isRsp: false,
+      }));
       return { param, perSeatResults };
-    });
-  }, [seats, app?.seatMetricsById, rspSeatId, p19SeatAuthority, bassPresentation]);
+    })
+  ), [reportCounts]);
 
-  // Auto-print once ready
+  // Print only after one complete published engineering summary is available.
   useEffect(() => {
-    if (!bassReportPending && (roomParams.length > 0 || Object.keys(seatParams).length > 0)) {
-      setIsReady(true);
-      // Delay print to ensure render completes
-      setTimeout(() => {
-        window.print();
-      }, 500);
-    }
-  }, [roomParams, seatParams, bassReportPending]);
+    if (!engineeringSummary) return undefined;
+    setIsReady(true);
+    const timer = setTimeout(() => window.print(), 500);
+    return () => clearTimeout(timer);
+  }, [engineeringSummary]);
 
-  if (bassReportPending || !isReady) {
+  if (!engineeringSummary || !isReady) {
     return (
       <div className="flex items-center justify-center min-h-screen" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-        <p className="text-lg">{bassReportPending ? 'Bass analysis updating' : 'Preparing report...'}</p>
+        <p className="text-lg">Preparing authoritative report…</p>
       </div>
     );
   }
