@@ -1354,17 +1354,9 @@ function RP22ReportInner() {
                             {/* ── Page 3: RP22 Performance Summary ── */}
                             <div className="print-page-break-after">
                                 <TechnicalPerformanceSummary
-                                    roomLevelCounts={roomLevelCounts}
-                                    roomCalculatedCount={roomCalculatedCount}
-                                    seatCountsByRow={seatCountsByRow}
-                                    totalRoomParameters={roomScopedParamCount}
-                                    totalSeatParameters={seatScopedParamCount}
+                                    engineeringSummary={engineeringSummary}
                                     rspSeatId={rspSeatId}
-                                    seatCompromiseById={seatCompromiseById}
                                     showDesignRating={showDesignRating}
-                                    roomDesignRating={roomDesignRating}
-                                    seatDesignRatings={seatDesignRatings}
-                                    scopedRatings={scopedRatings}
                                 />
                             </div>
 
