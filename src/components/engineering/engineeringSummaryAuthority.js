@@ -225,11 +225,18 @@ function buildReportCounts(parameters, seats, seatHudById) {
   }
 
   const seatResultsByParameter = {};
+  const seatResultRowsByParameter = {};
   for (const [key] of seatParameterEntries) {
-    seatResultsByParameter[key] = (Array.isArray(seats) ? seats : []).map((seat) => {
+    const results = (Array.isArray(seats) ? seats : []).map((seat, fallbackIndex) => {
       const metric = seatHudById?.[seat?.id]?.rp22?.[key] || null;
+      const fallbackMatch = String(seat?.id || "").match(/^seat-r(\d+)-c(\d+)$/);
+      const row = Number(seat?.row ?? seat?.rowNumber ?? fallbackMatch?.[1]) || 1;
+      const column = Number(seat?.indexInRow ?? seat?.column ?? fallbackMatch?.[2]) || fallbackIndex + 1;
       return {
         seatId: seat?.id,
+        row,
+        column,
+        priority: String(seat?.priority || "").toLowerCase() === "secondary" ? "secondary" : "primary",
         isPrimary: seat?.isPrimary === true || String(seat?.priority || "").toLowerCase() !== "secondary",
         valueFormatted: metric?.formatted || metric?.hudLabel || "—",
         level: metric?.level || "—",
@@ -237,6 +244,19 @@ function buildReportCounts(parameters, seats, seatHudById) {
         value: metric?.value ?? metric?.valueDb ?? null,
       };
     });
+    seatResultsByParameter[key] = results;
+
+    const groupedRows = new Map();
+    for (const result of results) {
+      if (!groupedRows.has(result.row)) groupedRows.set(result.row, []);
+      groupedRows.get(result.row).push(result);
+    }
+    seatResultRowsByParameter[key] = Array.from(groupedRows.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([row, rowSeats]) => ({
+        row,
+        seats: rowSeats.sort((a, b) => b.column - a.column),
+      }));
   }
 
   return {
@@ -251,6 +271,7 @@ function buildReportCounts(parameters, seats, seatHudById) {
     seatCompromiseById,
     compromisedSeatCount: Object.values(seatCompromiseById).filter((seat) => seat.isCompromised).length,
     seatResultsByParameter,
+    seatResultRowsByParameter,
   };
 }
 
@@ -278,10 +299,19 @@ function buildScorecard(projectRating) {
     ...SCORECARD_CATEGORY_ORDER.filter((category) => byCategory[category]),
     ...Object.keys(byCategory).filter((category) => !SCORECARD_CATEGORY_ORDER.includes(category)),
   ];
+  const highestPerformanceResults = contributions
+    .filter((contribution) => {
+      const level = normalizeLevel(contribution?.level);
+      return level === "L3" || level === "L4";
+    })
+    .sort((a, b) => LEVEL_RANK[normalizeLevel(b?.level)] - LEVEL_RANK[normalizeLevel(a?.level)])
+    .slice(0, 5);
+
   return {
     contributions,
     byCategory,
     categories,
+    highestPerformanceResults,
     lowestPerformanceResults: getLowestPerformanceResults(contributions),
   };
 }
