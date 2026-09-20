@@ -375,11 +375,8 @@ function RP22ReportInner() {
             logAutoPrintBlock(reportHydrating ? 'reportHydrating = true' : 'reportReadyProjectId mismatch', 391);
             return;
         }
-        // FIX 5: P14 unselected is a valid settled state — do not wait for a
-        // bass calculation that was never requested. Only block when bass is
-        // genuinely pending (calculation in progress or hydrating).
-        if (bassReportPending) {
-            logAutoPrintBlock('bassReportPending = true', 395);
+        if (authorityReportPending) {
+            logAutoPrintBlock('engineeringSummary unavailable', 395);
             return;
         }
         if (isPrinting) {
@@ -393,7 +390,7 @@ function RP22ReportInner() {
         setPlanDimsImageDataUrl(null);
         setPlanSpeakerDimsImageDataUrl(null);
         setIsPrinting(true);
-    }, [autoPrintRequested, reportHydrating, explicitProjectId, reportReadyProjectId, isPrinting, bassReportPending]);
+    }, [autoPrintRequested, reportHydrating, explicitProjectId, reportReadyProjectId, isPrinting, authorityReportPending]);
 
     // Mark printReady when all captures are done
     useEffect(() => {
@@ -428,15 +425,6 @@ function RP22ReportInner() {
             if (!explicitProjectId || reportReadyProjectId !== explicitProjectId || reportHydrating) {
                 logAutoPrintBlock('print trigger: project identity mismatch guard', 440);
                 setExportStatus("Print cancelled — project identity mismatch.");
-                setIsPrinting(false);
-                setPrintReady(false);
-                printLockRef.current = false;
-                return;
-            }
-            const bassScopeId = String(completedBassAuthority?.projectId || 'free');
-            if (bassScopeId !== expectedProjectKey) {
-                logAutoPrintBlock('print trigger: bass authority project mismatch', 448);
-                setExportStatus("Print cancelled — bass authority project mismatch.");
                 setIsPrinting(false);
                 setPrintReady(false);
                 printLockRef.current = false;
