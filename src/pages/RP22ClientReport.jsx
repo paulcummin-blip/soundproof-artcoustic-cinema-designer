@@ -222,39 +222,35 @@ export default function RP22ClientReport() {
     });
   }, [hydrating, analysisResult, seatingPositions, rsp]);
 
-  // ── Front Soundstage Dynamic Range (pure selector, no new analysis) ──
-  // P12 is a room-scope parameter measured at the RSP. The selector reads the
-  // canonical gradedParameters.primary[12] (achieved value) and re-grades the
-  // level using the active p12Mode — the same authority as App / Tech Report.
+  // P12 presentation reads the published value and published level directly.
   const frontSoundstage = useMemo(() => {
-    if (hydrating || !allSeatSplMetrics || !Array.isArray(seatingPositions)) {
+    if (hydrating || !engineeringSummary || !Array.isArray(seatingPositions)) {
       return { seats: [], rsp: null, fl: null, fc: null, fr: null, minimum: null, level: null, hasAny: false };
     }
     return selectClientFrontSoundstageDynamicRange({
       analysisResult,
+      engineeringSummary,
       allSeatSplMetrics,
       seatingPositions,
       rsp,
       p12Mode,
     });
-  }, [hydrating, analysisResult, allSeatSplMetrics, seatingPositions, rsp, p12Mode]);
+  }, [hydrating, analysisResult, engineeringSummary, allSeatSplMetrics, seatingPositions, rsp, p12Mode]);
 
-  // ── Non-Screen Dynamic Range (pure selector, no new analysis) ──
-  // P13 is a room-scope parameter measured at the RSP. The selector reads the
-  // canonical gradedParameters.primary[13] (achieved value) and re-grades the
-  // level using the active p13Mode — the same authority as App / Tech Report.
+  // P13 presentation reads the published value and published level directly.
   const nonScreenSoundstage = useMemo(() => {
-    if (hydrating || !allSeatSplMetrics || !Array.isArray(seatingPositions)) {
+    if (hydrating || !engineeringSummary || !Array.isArray(seatingPositions)) {
       return { seats: [], rsp: null, speakerSplValues: [], minimum: null, level: null, hasAny: false };
     }
     return selectClientNonScreenDynamicRange({
       analysisResult,
+      engineeringSummary,
       allSeatSplMetrics,
       seatingPositions,
       rsp,
       p13Mode,
     });
-  }, [hydrating, analysisResult, allSeatSplMetrics, seatingPositions, rsp, p13Mode]);
+  }, [hydrating, analysisResult, engineeringSummary, allSeatSplMetrics, seatingPositions, rsp, p13Mode]);
 
   const hasSeatingPosition = recommendedSeatingPosition.hasAny && !!rsp;
 
