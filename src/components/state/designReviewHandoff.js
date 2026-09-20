@@ -10,6 +10,7 @@
 import { assertNotAuthoritativeReadOnly } from "@/components/state/authoritativeReadOnlyMode";
 
 const STORAGE_PREFIX = "soundproof:design-review-handoff:v1:";
+const HANDOFF_EVENT = "soundproof:design-review-handoff";
 const PROJECT_UPDATE_GRACE_MS = 30_000;
 
 const normaliseProjectId = (value) => String(value || "").trim();
@@ -228,7 +229,29 @@ export function publishDesignReviewHandoff(snapshot) {
     // or the browser quota cannot hold the snapshot.
   }
 
+  window.dispatchEvent(new CustomEvent(HANDOFF_EVENT, {
+    detail: { projectId, snapshot: published },
+  }));
+
   return published;
+}
+
+export function subscribeDesignReviewHandoff(projectId, callback) {
+  if (typeof window === "undefined" || typeof callback !== "function") return () => {};
+  const pid = normaliseProjectId(projectId);
+  const expectedKey = storageKey(pid);
+  const onPublish = (event) => {
+    if (normaliseProjectId(event?.detail?.projectId) === pid) callback(event.detail.snapshot, false);
+  };
+  const onStorage = (event) => {
+    if (event.key === expectedKey) callback(null, true);
+  };
+  window.addEventListener(HANDOFF_EVENT, onPublish);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(HANDOFF_EVENT, onPublish);
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 export function readDesignReviewHandoff(
