@@ -589,70 +589,47 @@ export function useClientReportAuthority(projectId) {
     };
   }, [authoritativeSeat, placedSpeakers, roomDims.widthM, earHeightM, zoneBands, rsp]);
 
-  // ── 10a) Canonical display override — P5/P9 display fields from perSeatRp22 ──
-  // Helper geometry (gaps, rows, arcs, speaker positions) is preserved for drawing.
-  // Display fields (level, worstGapDeg/value) are overridden from canonical perSeatRp22
-  // when available. Helper originals are retained as geometryWorstGapDeg / geometryLevel
-  // so the parity safeguard can still compare helper vs canonical.
-  // Client P5 is intentionally RSP-based (not canonical per-seat).
-  // canonicalP5 override removed — p5Snapshot already computes from the effective RSP.
-  // Stage B1: P9 headline reads the synthetic green-dot RSP (id="mlp") from the engine,
-  // matching the live engine's canonical RSP — not the nearest real authoritativeSeat.
-  const canonicalP9 = useMemo(() => {
-    if (!analysisResult || !rsp) return null;
-    const c = analysisResult.perSeatRp22?.["mlp"]?.rp22?.[9];
-    return (c && Number.isFinite(c.value)) ? c : null;
-  }, [analysisResult, rsp]);
+  // ── 10a) Published P5/P9 display authority ───────────────────────────
+  // Geometry remains local because it only draws the diagrams. Every displayed
+  // value and level is read directly from the canonical seat summary.
+  const canonicalReportSeatId = engineeringSummary?.primary?.seatIds?.[0]
+    ?? engineeringSummary?.project?.seatIds?.[0]
+    ?? null;
+  const canonicalSeatHud = canonicalReportSeatId
+    ? engineeringSummary?.seatHudById?.[canonicalReportSeatId]
+    : null;
+  const canonicalP5 = canonicalSeatHud?.rp22?.p5 || null;
+  const canonicalP9 = canonicalSeatHud?.rp22?.p9 || null;
 
-  // Client P5 is RSP-based. p5Snapshot already computes from the effective RSP
-  // via computeSurroundRingGaps + rp22LevelForP5. The real-seat engine result
-  // remains in analysisResult for the Technical Report and future seat maps.
   const p5SnapshotFinal = useMemo(() => {
     if (!p5Snapshot) return null;
     return {
       ...p5Snapshot,
+      worstGapDeg: canonicalP5?.value ?? null,
+      level: canonicalP5?.level ?? null,
+      formatted: canonicalP5?.formatted ?? null,
+      status: canonicalP5?.status ?? null,
+      canonical: !!canonicalP5,
+      canonicalSeatId: canonicalReportSeatId,
       geometryWorstGapDeg: p5Snapshot.worstGapDeg,
-      geometryLevel: p5Snapshot.level,
+      geometryLevel: null,
     };
-  }, [p5Snapshot]);
+  }, [p5Snapshot, canonicalP5, canonicalReportSeatId]);
 
   const p9SnapshotFinal = useMemo(() => {
     if (!p9Snapshot) return null;
-    const geometryWorstGapDeg = p9Snapshot.worstGapDeg;
-    const geometryLevel = p9Snapshot.level;
-    if (!canonicalP9) {
-      return { ...p9Snapshot, canonical: false, geometryWorstGapDeg, geometryLevel };
-    }
     return {
       ...p9Snapshot,
-      level: canonicalP9.level ?? geometryLevel,
-      value: canonicalP9.value ?? p9Snapshot.value,
-      formatted: canonicalP9.formatted ?? null,
-      status: canonicalP9.status ?? null,
-      canonical: true,
-      geometryWorstGapDeg,
-      geometryLevel,
+      level: canonicalP9?.level ?? null,
+      value: canonicalP9?.value ?? null,
+      formatted: canonicalP9?.formatted ?? null,
+      status: canonicalP9?.status ?? null,
+      canonical: !!canonicalP9,
+      canonicalSeatId: canonicalReportSeatId,
+      geometryWorstGapDeg: p9Snapshot.worstGapDeg,
+      geometryLevel: null,
     };
-  }, [p9Snapshot, canonicalP9]);
-
-  // ── 10b) P5/P9 parity safeguard — development-only divergence warnings ────
-  // Compares helper geometry (geometryWorstGapDeg) against canonical perSeatRp22 values.
-  // Display fields are already canonical in the final snapshots; this warns if the
-  // helper geometry diverges from the canonical engine result by more than 0.5°.
-  useEffect(() => {
-    if (!analysisResult || !rsp) return;
-    const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV;
-    if (!isDev) return;
-
-    // P5 is intentionally RSP-based for the Client Report; no canonical parity check.
-    // P9 headline is canonical green-dot RSP; warn on helper vs engine divergence.
-    if (p9SnapshotFinal && p9SnapshotFinal.applicable && canonicalP9 && Number.isFinite(canonicalP9.value) && Number.isFinite(p9SnapshotFinal.geometryWorstGapDeg)) {
-      const delta = Math.abs(p9SnapshotFinal.geometryWorstGapDeg - canonicalP9.value);
-      if (delta > 0.5) {
-        console.warn(`[ClientReportAuthority] P9 divergence: helper=${p9SnapshotFinal.geometryWorstGapDeg.toFixed(1)}° canonical=${canonicalP9.value.toFixed(1)}° (rsp=mlp)`);
-      }
-    }
-  }, [analysisResult, rsp, p9SnapshotFinal, canonicalP9]);
+  }, [p9Snapshot, canonicalP9, canonicalReportSeatId]);
 
   return {
     projectId,
