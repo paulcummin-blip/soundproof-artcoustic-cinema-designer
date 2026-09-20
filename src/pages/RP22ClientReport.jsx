@@ -242,13 +242,12 @@ export default function RP22ClientReport() {
   const hasSeatingPosition = recommendedSeatingPosition.hasAny && !!rsp;
 
   // ── Bass Performance (P14/P18/P19/P20) — current applied design ──
-  // Uses the canonical completed bass authority, not optimiser proposal data.
-  // P14/P18 are room-scope; P19/P20 are seat-scope with per-seat results.
-  // Omitted entirely when no genuine assessed bass result exists.
+  // Passive read from the canonical summary. The Visual Report never reads raw
+  // contract grades, so P19/P20 cannot diverge from the app or other reports.
   const bassPerformance = useMemo(() => {
-    if (hydrating || !completedBassAuthority) return null;
-    return selectClientBassPerformance(completedBassAuthority, bassPresentation, seatingPositions, p19SeatAuthority);
-  }, [hydrating, completedBassAuthority, bassPresentation, seatingPositions, p19SeatAuthority]);
+    if (hydrating || !engineeringSummary) return null;
+    return selectClientBassPerformance(engineeringSummary, seatingPositions);
+  }, [hydrating, engineeringSummary, seatingPositions]);
 
   // ── Active pages collection — drives both screen and PDF rendering order ──
   const activePages = useMemo(() => {
