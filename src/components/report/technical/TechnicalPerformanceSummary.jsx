@@ -17,7 +17,6 @@
 
 import React from "react";
 import TechnicalLevelBadge from "./TechnicalLevelBadge";
-import { getDesignPerformanceIndex } from "./designRatingPresentation";
 import ScopedAsdrSummary from "./ScopedAsdrSummary";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
@@ -54,7 +53,7 @@ function LevelCountBlock({ level, count }) {
 }
 
 /** Compact per-seat summary card: seat label, Active count, level distribution. */
-function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designRating }) {
+function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designRating, designRatingIndex }) {
   const seatNum = extractSeatCol(seat.seatId);
   const { counts, activeCount } = seat;
 
@@ -157,7 +156,7 @@ function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designR
             DESIGN RATING{" "}
             {designRating.status === "NOT_ASSESSED"
               ? "NOT ASSESSED"
-              : `Index ${getDesignPerformanceIndex(designRating) ?? "—"}`}
+              : `Index ${designRatingIndex ?? "—"}`}
           </div>
 
         </div>
@@ -167,18 +166,22 @@ function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designR
 }
 
 export default function TechnicalPerformanceSummary({
-  roomLevelCounts,
-  roomCalculatedCount,
-  seatCountsByRow,
-  totalRoomParameters,
-  totalSeatParameters,
+  engineeringSummary,
   rspSeatId,
-  seatCompromiseById,
   showDesignRating = false,
-  roomDesignRating = null,
-  seatDesignRatings = null,
-  scopedRatings = null,
 }) {
+  if (!engineeringSummary) return null;
+  const reportCounts = engineeringSummary.project?.reportCounts || {};
+  const roomLevelCounts = reportCounts.roomLevelCounts || {};
+  const roomCalculatedCount = reportCounts.roomCalculatedCount || 0;
+  const seatCountsByRow = reportCounts.seatCountsByRow || [];
+  const seatCompromiseById = reportCounts.seatCompromiseById || {};
+  const totalRoomParameters = reportCounts.roomParameterCount || 0;
+  const totalSeatParameters = reportCounts.seatParameterCount || 0;
+  const seatDesignRatings = engineeringSummary.designRating?.seatDesignRatings || {};
+  const seatDesignPerformanceIndexById = engineeringSummary.designRating?.seatDesignPerformanceIndexById || {};
+  const roomDesignRating = engineeringSummary.project?.rating || null;
+
   return (
     <div
       className="tech-summary-page"
@@ -286,7 +289,7 @@ export default function TechnicalPerformanceSummary({
             >
               ARTCOUSTIC SYSTEM DESIGN RATING
             </div>
-            <ScopedAsdrSummary scopedRatings={scopedRatings || { all: roomDesignRating }} />
+            <ScopedAsdrSummary engineeringSummary={engineeringSummary} />
             <div
               style={{
                 fontSize: "7pt",
@@ -323,16 +326,9 @@ export default function TechnicalPerformanceSummary({
           >
             SEAT PARAMETERS
           </span>
-          {(() => {
-            const allSeats = (seatCountsByRow || []).flatMap(r => r.seats || []);
-            const seatsEvaluated = allSeats.length;
-            const calculatedParams = allSeats.reduce((max, s) => Math.max(max, s.activeCount ?? 0), 0);
-            return (
-              <span style={{ fontSize: "9pt", color: COLORS.secondary, fontFamily: FONT_BODY }}>
-                {totalSeatParameters} parameters · {calculatedParams} calculated · {seatsEvaluated} seats
-              </span>
-            );
-          })()}
+          <span style={{ fontSize: "9pt", color: COLORS.secondary, fontFamily: FONT_BODY }}>
+            {totalSeatParameters} parameters · {reportCounts.seatCalculatedParamCount || 0} calculated · {reportCounts.seatsEvaluated || 0} seats
+          </span>
         </div>
 
         {(seatCountsByRow || []).map(({ rowNum, seats }) => (
@@ -364,6 +360,7 @@ export default function TechnicalPerformanceSummary({
                   isCompromised={!!seatCompromiseById?.[seat.seatId]?.isCompromised}
                   showDesignRating={showDesignRating}
                   designRating={seatDesignRatings?.[seat.seatId] ?? null}
+                  designRatingIndex={seatDesignPerformanceIndexById?.[seat.seatId] ?? null}
                 />
               ))}
             </div>
@@ -372,24 +369,15 @@ export default function TechnicalPerformanceSummary({
       </div>
 
       {/* ── Seat comparison summary line ── */}
-      {(() => {
-        const compromisedCount = (seatCountsByRow || []).reduce(
-          (sum, row) => sum + (row.seats || []).filter(s => seatCompromiseById?.[s.seatId]?.isCompromised).length,
-          0
-        );
-        if (compromisedCount === 0) {
-          return (
-            <div style={{ marginTop: "3mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
-              Calculated seat performance is broadly consistent across the listening area.
-            </div>
-          );
-        }
-        return (
-          <div style={{ marginTop: "3mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
-            Some positions show material compromise across multiple calculated seat-scope RP22 parameters.
-          </div>
-        );
-      })()}
+      {reportCounts.compromisedSeatCount === 0 ? (
+        <div style={{ marginTop: "3mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
+          Calculated seat performance is broadly consistent across the listening area.
+        </div>
+      ) : (
+        <div style={{ marginTop: "3mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
+          Some positions show material compromise across multiple calculated seat-scope RP22 parameters.
+        </div>
+      )}
 
       {/* ── Explanatory note ── */}
       <div
