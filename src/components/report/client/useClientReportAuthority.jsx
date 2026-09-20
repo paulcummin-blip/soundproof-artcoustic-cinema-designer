@@ -32,7 +32,7 @@ import { useCompletedBassAuthority } from "@/components/room/bass/completedBassR
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { resolveEffectiveVisibleWidthInches, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
-import { readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
+import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 
 // TV preset → viewable width in inches (matches RoomDesigner TV_KEY_TO_INCHES)
 const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
@@ -322,10 +322,19 @@ export function useClientReportAuthority(projectId) {
   // Visual reports are passive consumers. They never mount the RP22 engine or
   // rebuild SPL metrics; every engineering result comes from the Room Designer
   // publication for this project.
-  const publishedEngineering = useMemo(
-    () => projectId ? readDesignReviewHandoff(projectId) : null,
-    [projectId, hydratedProjectId, hydrating]
+  const [publishedEngineering, setPublishedEngineering] = useState(
+    () => projectId ? readDesignReviewHandoff(projectId) : null
   );
+  useEffect(() => {
+    if (!projectId) {
+      setPublishedEngineering(null);
+      return undefined;
+    }
+    setPublishedEngineering(readDesignReviewHandoff(projectId));
+    return subscribeDesignReviewHandoff(projectId, (snapshot) => {
+      setPublishedEngineering(snapshot || readDesignReviewHandoff(projectId, { preferStored: true }));
+    });
+  }, [projectId, hydratedProjectId, hydrating]);
   const engineeringSummary = publishedEngineering?.engineeringSummary
     ?? publishedEngineering?.rating?.engineeringSummary
     ?? null;
