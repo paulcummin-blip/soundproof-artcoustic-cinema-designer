@@ -178,8 +178,7 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
  */
 export default function DesignRatingSummary({
   showAsdr = false,
-  rating = null,
-  recommendations = null,
+  engineeringSummary = null,
   bassPending = false,
   asdrUnavailable = false,
   p14TargetUnselected = false,
@@ -207,18 +206,16 @@ export default function DesignRatingSummary({
   );
 
   if (asdrUnavailable) return unavailableCard('Add LCR, surrounds and subwoofer to calculate rating');
-  if (p14TargetUnselected && !rating) return unavailableCard('Select Bass Target to complete design rating');
-  if (bassPending && !rating) return unavailableCard('Calculating bass analysis…');
+  if (p14TargetUnselected && !engineeringSummary) return unavailableCard('Select Bass Target to complete design rating');
+  if (bassPending && !engineeringSummary) return unavailableCard('Calculating bass analysis…');
 
-  // Stale-scope guard: the published rating was calculated from a different
+  // Stale-scope guard: the published summary was calculated from a different
   // seat-priority set than the current live one. Do not display its
-  // Primary/Secondary floors as current — show "Updating…" until a rating
-  // calculated with the current priority set is available.
-  if (staleScope && rating) return unavailableCard('Updating seat priorities…');
+  // Primary/Secondary floors as current until a matching publication arrives.
+  if (staleScope && engineeringSummary) return unavailableCard('Updating seat priorities…');
 
-  // Direct read only: floors, scoped ratings and DPIs are published together by
-  // summariseEngineeringResults(). The sidebar must never rebuild them.
-  const engineeringSummary = rating?.engineeringSummary || null;
+  // Direct read only: floors, scoped ratings and DPIs are already present in
+  // summariseEngineeringResults(). The sidebar never rebuilds them.
   const primarySummary = engineeringSummary?.primary || null;
   const secondarySummary = engineeringSummary?.secondary || null;
   const projectSummary = engineeringSummary?.project || null;
