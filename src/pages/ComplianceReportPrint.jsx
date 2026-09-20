@@ -5,12 +5,18 @@ import SeatScopedParameterCard from '@/components/report/SeatScopedParameterCard
 import SeatComplianceSummary from '@/components/report/SeatComplianceSummary';
 import { formatSeatLabel } from '@/components/utils/seatLabel';
 import { RP22_PRESENTATION_PARAMETERS, RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
-import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
+import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 
 export default function ComplianceReportPrint() {
   const [isReady, setIsReady] = useState(false);
   const reportScopeId = new URLSearchParams(window.location.search).get('projectId') || new URLSearchParams(window.location.search).get('id') || 'free';
-  const publishedEngineering = useMemo(() => readDesignReviewHandoff(reportScopeId), [reportScopeId]);
+  const [publishedEngineering, setPublishedEngineering] = useState(() => readDesignReviewHandoff(reportScopeId));
+  useEffect(() => {
+    setPublishedEngineering(readDesignReviewHandoff(reportScopeId));
+    return subscribeDesignReviewHandoff(reportScopeId, (snapshot) => {
+      setPublishedEngineering(snapshot || readDesignReviewHandoff(reportScopeId, { preferStored: true }));
+    });
+  }, [reportScopeId]);
   const engineeringSummary = publishedEngineering?.engineeringSummary
     ?? publishedEngineering?.rating?.engineeringSummary
     ?? null;
