@@ -156,81 +156,13 @@ function RP22ReportInner() {
     }, [explicitProjectId, projectDetails?.updated_date]);
     const designRecommendations = designReviewHandoff?.recommendations ?? null;
 
-    // Single canonical version-resolution path (shared with every report and
-    // authority consumer via resolveEffectiveVersionId). During SPA navigation
-    // reportVersionId is null until the async project fetch completes; the
-    // helper falls back to app.activeVersionId so the hook requests the correct
-    // authority on the first render instead of deadlocking on "free".
-    const resolvedReportVersionId = resolveEffectiveVersionId(reportVersionId, app);
-    // [VR-CAPTURE] CONSUMER — temporary diagnostic, remove after verdict
-    const __vrConsumerProjectId = explicitProjectId || "free";
-    console.info("[VR-CAPTURE] CONSUMER", {
-      projectId: __vrConsumerProjectId,
-      resolvedVersionId: resolvedReportVersionId,
-      expectedProjectKey: `${__vrConsumerProjectId}|${resolvedReportVersionId}`,
-      authorityProjectId: null, // not stored separately on the authority object
-      authorityVersionId: null, // not stored separately on the authority object
-      authorityFingerprint: null, // resolved below after the hook call
-    });
-    const completedBassAuthority = useCompletedBassAuthority(__vrConsumerProjectId, resolvedReportVersionId);
-    console.info("[VR-CAPTURE] CONSUMER-AUTHORITY", {
-      authorityProjectId: null,
-      authorityVersionId: null,
-      authorityFingerprint: completedBassAuthority?.currentFingerprint ?? null,
-      authorityStatus: completedBassAuthority?.authorityStatus ?? null,
-      hydrationSettled: completedBassAuthority?.hydrationSettled ?? null,
-    });
-    const completedBassContract = completedBassAuthority.contract;
-    const bassErrorMessage = completedBassAuthority.errorMessage || null;
-    // P14 target selection state — shared with the main-app Compliance panel.
-    // When no P14 target is selected, the report must NOT surface old
-    // completed bass authority as current. Same semantics as Room Designer.
-    const p14Selection = useMemo(
-        () => resolveP14TargetSelectionState(app?.splConfig),
-        [app?.splConfig?.selectedP14TargetBasis, app?.splConfig?.selectedP14Level]
-    );
-    const completedBassPresentation = useMemo(() => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage, p14Selection.noP14TargetSelected), [completedBassAuthority, bassErrorMessage, p14Selection.noP14TargetSelected]);
-    const complianceBassExportData = useMemo(() => buildComplianceBassExportData({ completedBassAuthority }, bassErrorMessage, p14Selection.noP14TargetSelected), [completedBassAuthority, bassErrorMessage, p14Selection.noP14TargetSelected]);
-
-    // ── Bass readiness gate (reuses the SAME authority as Room Designer) ──
-    // The report must not publish any numeric ASDR, P14–P20, or seat-level
-    // bass result until the completed bass authority for the ACTIVE project
-    // is settled. This prevents the transient 81/65/69 partial rating and
-    // blank P14–P20 that appears on a cold/direct load before hydration.
-    // resolveBassReadiness is the shared gate from useAppDesignRating — when
-    // bass is applicable (subwoofers present), UNCALCULATED means "not yet
-    // computed" (pending), not "no bass" (ready).
-    // The authority's `projectId` field is the COMPOSITE cache key
-    // (projectId::versionId), not the bare project ID. Build the expected
-    // key with the same composite format so the identity comparison
-    // matches like-for-like. Comparing a composite key against a bare
-    // project ID always fails and deadlocks the auto-print gate.
-    const expectedProjectKey = bassCacheKey(explicitProjectId || 'free', resolvedReportVersionId);
-    const projectIdMatch = String(completedBassAuthority?.projectId || 'free') === expectedProjectKey;
-    const bassReadiness = useMemo(() => {
-        if (!projectIdMatch) return { ready: false, pending: true, reason: 'project-id-mismatch', fingerprint: null };
-        const fsc = app?.frontSubsCfg;
-        const rsc = app?.rearSubsCfg;
-        const fCount = (fsc && typeof fsc === 'object' && !Array.isArray(fsc)) ? Number(fsc?.count) || 0 : 0;
-        const rCount = (rsc && typeof rsc === 'object' && !Array.isArray(rsc)) ? Number(rsc?.count) || 0 : 0;
-        const subInstances = Array.isArray(app?.subwooferInstances) ? app.subwooferInstances : [];
-        const subs = Array.isArray(app?.subwoofers) ? app.subwoofers : [];
-        const bassApplicable = fCount > 0 || rCount > 0 || subInstances.length > 0 || subs.length > 0;
-        return resolveBassReadiness(completedBassAuthority, bassApplicable, !p14Selection.noP14TargetSelected);
-    }, [completedBassAuthority, projectIdMatch, app?.frontSubsCfg, app?.rearSubsCfg, app?.subwooferInstances, app?.subwoofers, p14Selection.noP14TargetSelected]);
-    // This read-only route has no bass calculation producer. Wait for the
-    // correct saved authority to hydrate, not for an unrequested calculation.
-    // Metric publication still uses the gated presentation; no result is promoted.
-    const bassReportPending = !projectIdMatch || completedBassAuthority?.hydrationSettled !== true;
-    // P19 is read only from the Room Designer publication. The report never
-    // joins, filters, groups or re-grades selectedCandidate.perSeatP19Results.
+    // One published engineering summary is the sole report authority.
+    // The printable report never mounts the bass result store, checks a second
+    // fingerprint, or reconstructs any parameter presentation.
     const engineeringSummary = designReviewHandoff?.engineeringSummary
         ?? designReviewHandoff?.rating?.engineeringSummary
         ?? null;
-    const p19SeatAuthority = engineeringSummary?.p19SeatAuthority
-        ?? designReviewHandoff?.p19SeatAuthority
-        ?? designReviewHandoff?.rating?.p19SeatAuthority
-        ?? null;
+    const authorityReportPending = !engineeringSummary;
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
     useEffect(() => {
