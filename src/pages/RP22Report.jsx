@@ -66,10 +66,9 @@ function RP22ReportInner() {
 
     // ── Authoritative Read-Only Mode ──────────────────────────────────────
     // While the Technical Report is mounted, authoritative write boundaries
-    // (publishDesignReviewHandoff, publishCompletedBassContract, markBass
-    // Authority, syncBassAuthority) emit a console warning if called. The
-    // report must be a pure consumer — zero authoritative publishes, zero
-    // bass recalculations, zero cache invalidations. Cleared on unmount.
+    // emit a console warning if called. The report is a pure consumer of the
+    // published engineering summary: zero publishes, recalculations, or cache
+    // hydration. Cleared on unmount.
     useEffect(() => {
         setAuthoritativeReadOnlyMode(true);
         return () => setAuthoritativeReadOnlyMode(false);
@@ -418,10 +417,9 @@ function RP22ReportInner() {
             return;
         }
         const t = setTimeout(() => {
-            // FIX 5: Project consistency guard before window.print().
-            // Assert the report is still bound to the same explicit project
-            // and the bass authority scope matches. Cancel print if any
-            // identity mismatch is detected — never substitute another project.
+            // Project consistency guard before window.print().
+            // The report must remain bound to its explicit project; never
+            // substitute another project's published engineering summary.
             if (!explicitProjectId || reportReadyProjectId !== explicitProjectId || reportHydrating) {
                 logAutoPrintBlock('print trigger: project identity mismatch guard', 440);
                 setExportStatus("Print cancelled — project identity mismatch.");
@@ -668,7 +666,7 @@ function RP22ReportInner() {
         reportReady: !reportHydrating && !!explicitProjectId && reportReadyProjectId === explicitProjectId,
         designReviewHandoffReady: !!designReviewHandoff,
         analysisResultReady: !!analysisResult && !!analysisResult.gradedParameters,
-        completedBassAuthorityReady: !!engineeringSummary,
+        engineeringSummaryReady: !!engineeringSummary,
         recommendationsReady: designRecommendations != null,
         renderGatePassed: !!analysisResult && !!analysisResult.gradedParameters && !showLoadingReport,
         planCaptureReady: planImageDataUrl !== null && planDimsImageDataUrl !== null && planSpeakerDimsImageDataUrl !== null,
@@ -676,7 +674,7 @@ function RP22ReportInner() {
         isPrinting: !!isPrinting,
         autoPrintDone: !!autoPrintDone,
         isAutoPrintPreparing: !!autoPrintRequested && !autoPrintDone,
-        bassReportPending: !!authorityReportPending,
+        authoritySummaryPending: !!authorityReportPending,
     };
     useAutoPrintReadinessInstrumentation(autoPrintState);
 
