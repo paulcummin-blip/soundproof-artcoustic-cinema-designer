@@ -235,6 +235,7 @@ function buildReportCounts(parameters, seats, seatHudById) {
     seatLevelCounts,
     seatCountsByRow,
     seatCompromiseById,
+    compromisedSeatCount: Object.values(seatCompromiseById).filter((seat) => seat.isCompromised).length,
     seatResultsByParameter,
   };
 }
