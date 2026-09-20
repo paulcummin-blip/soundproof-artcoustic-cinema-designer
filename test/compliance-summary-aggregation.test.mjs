@@ -107,6 +107,48 @@ test("canonical room result overwrites a stale legacy project-scoped grade", () 
   assert.equal(summary.roomResultsByParameter[12].value, 106);
 });
 
+test("visual-report P17 rows and composite read the same canonical seat grades", () => {
+  const timbreSeats = [
+    { id: "seat-a", isPrimary: true, priority: "primary", row: 1, indexInRow: 1 },
+    { id: "seat-b", isPrimary: false, priority: "secondary", row: 2, indexInRow: 1 },
+  ];
+  const base = buildArtcousticDesignRatingAuthority({ seats: timbreSeats });
+  const seatParameter = (key, levels) => ({
+    key,
+    scope: "seat",
+    state: "scored",
+    seats: Object.fromEntries(timbreSeats.map((seat) => [
+      seat.id,
+      { state: "scored", level: levels[seat.id], rawValue: 1 },
+    ])),
+  });
+  const authority = {
+    ...base,
+    parameters: {
+      ...base.parameters,
+      p16: seatParameter("p16", { "seat-a": "L4", "seat-b": "L4" }),
+      p17: seatParameter("p17", { "seat-a": "L3", "seat-b": "L2" }),
+    },
+  };
+  const summary = summariseEngineeringResults({
+    designRatingAuthority: authority,
+    seats: timbreSeats,
+  });
+
+  assert.deepEqual(
+    summary.project.reportCounts.seatResultsByParameter.p17.map((seat) => seat.level),
+    ["L3", "L2"],
+  );
+  assert.deepEqual(
+    summary.project.reportCounts.clientSeatComposites.timbreConsistency.seats.map((seat) => seat.levels.p17),
+    ["L3", "L2"],
+  );
+  assert.deepEqual(
+    summary.project.reportCounts.clientSeatComposites.timbreConsistency.seats.map((seat) => seat.worstLevel),
+    ["L3", "L2"],
+  );
+});
+
 test("published summary is isolated from later engine-object mutation", () => {
   const summary = makeSummary("L4");
   assert.equal(Object.isFrozen(summary), true);
