@@ -25,6 +25,7 @@ import { getLowestPerformanceResults } from "@/components/designreview/needsAtte
 import { getCategoryForParam } from "@/components/report/technical/technicalParameterMeta";
 import { buildRp22SeatCoverageResult } from "@/components/utils/rp22SeatCoverageSentence";
 import { getScopedSeatIds, buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
+import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 
 export const ENGINEERING_SUMMARY_SCHEMA_VERSION = 1;
 
@@ -275,6 +276,47 @@ function buildReportCounts(parameters, seats, seatHudById) {
   };
 }
 
+function buildViewingSummary(perSeatRp23, seats, primarySeatIds, secondarySeatIds) {
+  const primaryIds = new Set((primarySeatIds || []).map(String));
+  const secondaryIds = new Set((secondarySeatIds || []).map(String));
+  const perSeat = (Array.isArray(seats) ? seats : []).map((seat) => {
+    const engineResult = perSeatRp23?.[seat?.id];
+    const angleDeg = Number.isFinite(Number(engineResult?.angleDeg)) ? Number(engineResult.angleDeg) : null;
+    return {
+      seat_id: seat?.id || null,
+      priority: secondaryIds.has(String(seat?.id)) ? "secondary" : primaryIds.has(String(seat?.id)) ? "primary" : null,
+      horizontal_angle_deg: angleDeg,
+      rp23_level: angleDeg == null ? null : rp23LevelForAngleDeg(angleDeg),
+    };
+  });
+
+  const floorFor = (seatIds = null) => {
+    const included = Array.isArray(seatIds) ? new Set(seatIds.map(String)) : null;
+    const levels = perSeat
+      .filter((seat) => !included || included.has(String(seat.seat_id)))
+      .map((seat) => normalizeLevel(seat.rp23_level))
+      .filter(Boolean);
+    if (!levels.length) return null;
+    return RANK_LEVEL[Math.min(...levels.map((level) => LEVEL_RANK[level]))] || null;
+  };
+
+  const angles = perSeat.map((seat) => seat.horizontal_angle_deg).filter(Number.isFinite);
+  const available = angles.length > 0;
+  const minimum = available ? Math.min(...angles) : null;
+  const maximum = available ? Math.max(...angles) : null;
+
+  return {
+    available,
+    per_seat: available ? perSeat : [],
+    primary_floor: available ? floorFor(primarySeatIds) : null,
+    secondary_floor: available ? floorFor(secondarySeatIds) : null,
+    project_floor: available ? floorFor() : null,
+    summary: available
+      ? `Viewing angles calculated for ${angles.length} seat${angles.length === 1 ? "" : "s"}. Horizontal viewing angle ranges from ${minimum.toFixed(0)}° to ${maximum.toFixed(0)}°.`
+      : "Viewing angles not calculated.",
+  };
+}
+
 function buildCategorySummary(rating) {
   const available = !!rating && rating.status !== "NOT_ASSESSED" && rating.status !== "NOT_CONFIGURED";
   return {
@@ -324,6 +366,7 @@ function buildScorecard(projectRating) {
  * @param {Object} params.seatHudById Canonical per-seat published engineering results.
  * @param {Object} params.roomResultsByParameter Canonical room result presentation.
  * @param {Object|null} params.p19SeatAuthority Canonical P19 seat publication.
+ * @param {Object} params.perSeatRp23 Canonical per-seat RP23 result publication.
  */
 export function summariseEngineeringResults({
   designRatingAuthority,
@@ -331,6 +374,7 @@ export function summariseEngineeringResults({
   seatHudById,
   roomResultsByParameter = {},
   p19SeatAuthority = null,
+  perSeatRp23 = {},
 }) {
   if (!designRatingAuthority) return null;
 
@@ -380,6 +424,7 @@ export function summariseEngineeringResults({
   const compliance = buildComplianceSummary(designRatingAuthority.parameters);
   const reportCounts = buildReportCounts(designRatingAuthority.parameters, canonicalSeats, seatHudById || {});
   const scorecard = buildScorecard(projectRating);
+  const viewing = buildViewingSummary(perSeatRp23, canonicalSeats, primarySeatIds, secondarySeatIds);
 
   const summary = {
     schemaVersion: ENGINEERING_SUMMARY_SCHEMA_VERSION,
@@ -388,6 +433,7 @@ export function summariseEngineeringResults({
     roomResultsByParameter: roomResultsByParameter || {},
     seatHudById: seatHudById || {},
     p19SeatAuthority,
+    viewing,
     parameterSummaries,
     primary: {
       seatIds: primarySeatIds,
