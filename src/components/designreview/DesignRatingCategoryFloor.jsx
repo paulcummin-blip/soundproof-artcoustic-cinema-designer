@@ -205,8 +205,7 @@ function CategoryBlock({ label, primary, secondary }) {
  * Four-category floor-authority grid. Reads the exact published summary used
  * by the sidebar, reports and PDFs.
  */
-export default function DesignRatingCategoryFloor({ rating }) {
-  const engineeringSummary = rating?.engineeringSummary || null;
+export default function DesignRatingCategoryFloor({ engineeringSummary }) {
   const primaryCats = engineeringSummary?.primary?.categories || [];
   const secondaryCats = engineeringSummary?.secondary?.categories || [];
 
