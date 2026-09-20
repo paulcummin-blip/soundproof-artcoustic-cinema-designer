@@ -394,9 +394,6 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             </div>
             <div className="client-report-print-drawing">
               <ClientP19HeatMap
-                projectId={printData.projectId}
-                versionId={printData.versionId}
-                completedBassAuthority={printData.completedBassAuthority}
                 bassPerformance={printData.bassPerformance}
                 roomDims={printData.roomDims}
                 seatingPositions={printData.seatingPositions}
@@ -404,7 +401,6 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 screenFrontPlaneM={printData.screenFrontPlaneM}
                 screenWidthM={printData.screenWidthM}
                 subwooferInstances={printData.subwooferInstances}
-                earHeightM={printData.earHeightM}
                 print
               />
             </div>
