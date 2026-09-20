@@ -113,17 +113,9 @@ export default function RP22ReportParameterGrid({
     const category = getCategoryForParam(param.id);
     const asdrFooter = buildAsdrFooter(param.id);
 
-    // P6 presentation: show seat spread across all seats, omit RSP label.
-    let achievedValue = getHudValueForParam(param, { isPrintVariant });
-    let lvl = getHudLevelForParam(param);
-    let rspLabel = authority.lockedSeatId ? formatSeatLabel(authority.lockedSeatId) : null;
-
-    if (param.id === 6) {
-      const p6 = buildP6Presentation();
-      achievedValue = p6.achievedValue;
-      if (p6.lvl !== null) lvl = p6.lvl;
-      rspLabel = null;
-    }
+    const achievedValue = getHudValueForParam(param, { isPrintVariant });
+    const lvl = getHudLevelForParam(param);
+    const rspLabel = authority.lockedSeatId ? formatSeatLabel(authority.lockedSeatId) : null;
 
     const isP15P21 = param.id === 15 || param.id === 21;
     return (
