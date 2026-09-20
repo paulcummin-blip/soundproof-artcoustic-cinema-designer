@@ -1,0 +1,243 @@
+{
+  "name": "AiClientSummary",
+  "type": "object",
+  "description": "An AI-generated client-facing performance summary for a project version (or comparison of versions). Generated from the settled Design Rating authority via the generateAiSummary backend function. Stores the AI-generated base text, the current edited text (which may differ after manual editing), and the fingerprint identity it was generated from so staleness can be detected when the design changes. The AI layer is a consumer of the Engineering Summary \u2014 it never recalculates engineering values.",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "ID of the parent Project this summary belongs to."
+    },
+    "version_id": {
+      "type": "string",
+      "description": "ID of the ProjectVersion this summary belongs to. For comparison summaries, this is the primary version; selected_version_ids lists all compared versions.",
+      "nullable": true
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Denormalized account_id from the parent Project, used for RLS."
+    },
+    "summary_type": {
+      "type": "string",
+      "enum": [
+        "single",
+        "comparison"
+      ],
+      "default": "single",
+      "description": "Type of AI summary. 'single' = one design version. 'comparison' = side-by-side comparison of two or more versions."
+    },
+    "selected_version_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Array of ProjectVersion IDs this summary covers. For 'single', exactly one. For 'comparison', two or more."
+    },
+    "ai_generated_text": {
+      "type": "string",
+      "description": "The original AI-generated base text. Preserved so manual edits can be compared against the AI base. Never overwritten automatically when the app recalculates \u2014 only by explicit Regenerate."
+    },
+    "edited_text": {
+      "type": "string",
+      "description": "The current edited text shown to the user and used for PDF export. Starts equal to ai_generated_text; diverges when the user manually edits. This is the authoritative text for PDF output."
+    },
+    "generated_from_fingerprints": {
+      "type": "object",
+      "description": "Fingerprint identity of the Design Rating authority the summary was generated from. Used for stale detection: when the current published snapshot's fingerprints differ, the summary is marked stale.",
+      "properties": {
+        "calculationFingerprint": {
+          "type": "string",
+          "nullable": true,
+          "description": "Bass calculation fingerprint at generation time."
+        },
+        "seatPriorityFingerprint": {
+          "type": "string",
+          "nullable": true,
+          "description": "Seat-priority fingerprint at generation time."
+        }
+      },
+      "nullable": true
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the AI generation."
+    },
+    "last_edited_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the last manual edit. Null = never manually edited (ai_generated_text === edited_text).",
+      "nullable": true
+    },
+    "model_used": {
+      "type": "string",
+      "description": "The LLM model used for generation (e.g. 'automatic').",
+      "nullable": true
+    },
+    "payload_snapshot": {
+      "type": "object",
+      "description": "The structured canonical payload used for generation. Stored for source transparency \u2014 the generated text is traceable back to canonical project data. Not passed to the client-facing text.",
+      "properties": {},
+      "nullable": true
+    }
+  },
+  "required": [
+    "project_id",
+    "account_id",
+    "summary_type"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

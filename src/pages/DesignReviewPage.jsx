@@ -36,7 +36,8 @@ import RecommendationsBlock from "@/components/designreview/RecommendationsBlock
 import TechnicalInstalledCalibration from "@/components/report/technical/TechnicalInstalledCalibration";
 import DesignReviewActions from "@/components/designreview/DesignReviewActions";
 import ProjectSummaryCard from "@/components/designreview/ProjectSummaryCard";
-import { BarChart3, PenTool, ListChecks, Package } from "lucide-react";
+import { BarChart3, PenTool, ListChecks, Package, Sparkles } from "lucide-react";
+import AiSummaryPanel from "@/components/aiSummary/AiSummaryPanel";
 
 const COLORS = {
   bg: "#F1F0EE",
@@ -307,6 +308,18 @@ export default function DesignReviewPage() {
           />
           <div style={{ height: 12 }} />
           <RecommendationsBlock asdrData={asdrData} priceData={priceData} />
+        </CollapsiblePanel>
+
+        <CollapsiblePanel
+          title="AI Client Summary"
+          icon={<Sparkles style={{ width: 16, height: 16, color: COLORS.primary }} />}
+        >
+          <AiSummaryPanel
+            projectId={projectId}
+            versionId={activeVersionId}
+            publishedSnapshot={asdrData}
+            projectDetails={projectDetails}
+          />
         </CollapsiblePanel>
       </div>
     </div>
