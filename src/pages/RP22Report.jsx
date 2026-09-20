@@ -494,8 +494,8 @@ function RP22ReportInner() {
 
     const reportP12Mode = app?.p12Mode || "minimum";
     const reportP13Mode = app?.splConfig?.p13Mode || "minimum";
-    const reportP14Mode = completedBassPresentation.parameters.p14.targetBasis || app?.splConfig?.p14Mode || "minimum";
-    const reportP18Mode = completedBassPresentation.parameters.p18.targetBasis || app?.splConfig?.p18Mode || "minimum";
+    const reportP14Mode = engineeringSummary?.roomResultsByParameter?.[14]?.targetBasis || app?.splConfig?.p14Mode || "minimum";
+    const reportP18Mode = engineeringSummary?.roomResultsByParameter?.[18]?.targetBasis || app?.splConfig?.p18Mode || "minimum";
 
     const cleanAspectLabel = (v) => {
         const s = String(v ?? "").trim();
@@ -620,11 +620,8 @@ function RP22ReportInner() {
         }
     }, [app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.borderThicknessM, app?.screen]);
 
-    // When P14 target is unselected, bassReadiness.ready is false but pending is
-    // also false (reason: 'p14-target-not-selected'). The report must RENDER and
-    // show "Select Bass Target" for bass parameters — NOT hang on "Loading…".
-    // Only block while report inputs or saved bass authority are hydrating.
-    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || bassReportPending;
+    // The report waits only for project hydration and the one published summary.
+    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending;
 
     // READ-ONLY: useAnalysisSpeakers, useAllSeatSplMetrics, and
     // useRP22AnalysisEngine are NOT called here. The authoritative RP22
@@ -654,11 +651,11 @@ function RP22ReportInner() {
     // Room Designer already computed and published to the Design Review
     // handoff. No buildArtcousticDesignRatingAuthority, calculateRoomDesignRating,
     // calculateScopedRoomDesignRating, or calculateSeatDesignRating calls.
-    const roomDesignRating = (showDesignRating && !p14Selection.noP14TargetSelected)
-        ? (designReviewHandoff?.rating ?? null)
+    const roomDesignRating = showDesignRating
+        ? (engineeringSummary?.project?.rating ?? null)
         : null;
-    const scopedRatings = roomDesignRating?.scopedRatings ?? null;
-    const seatDesignRatings = designReviewHandoff?.seatDesignRatings ?? null;
+    const scopedRatings = engineeringSummary?.designRating?.scopedRatings ?? null;
+    const seatDesignRatings = engineeringSummary?.designRating?.seatDesignRatings ?? null;
 
     // Export gate: recommendations are read from the handoff, not evaluated
     // locally. The gate checks the published settlement state only.
@@ -674,7 +671,7 @@ function RP22ReportInner() {
         reportReady: !reportHydrating && !!explicitProjectId && reportReadyProjectId === explicitProjectId,
         designReviewHandoffReady: !!designReviewHandoff,
         analysisResultReady: !!analysisResult && !!analysisResult.gradedParameters,
-        completedBassAuthorityReady: !bassReportPending,
+        completedBassAuthorityReady: !!engineeringSummary,
         recommendationsReady: designRecommendations != null,
         renderGatePassed: !!analysisResult && !!analysisResult.gradedParameters && !showLoadingReport,
         planCaptureReady: planImageDataUrl !== null && planDimsImageDataUrl !== null && planSpeakerDimsImageDataUrl !== null,
@@ -682,7 +679,7 @@ function RP22ReportInner() {
         isPrinting: !!isPrinting,
         autoPrintDone: !!autoPrintDone,
         isAutoPrintPreparing: !!autoPrintRequested && !autoPrintDone,
-        bassReportPending: !!bassReportPending,
+        bassReportPending: !!authorityReportPending,
     };
     useAutoPrintReadinessInstrumentation(autoPrintState);
 
