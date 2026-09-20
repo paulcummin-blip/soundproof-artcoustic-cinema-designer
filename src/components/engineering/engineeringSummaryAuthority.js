@@ -125,7 +125,7 @@ function buildComplianceSummary(parameters) {
   };
 }
 
-function buildReportCounts(parameters, seats) {
+function buildReportCounts(parameters, seats, seatHudById) {
   const roomLevelCounts = { L4: 0, L3: 0, L2: 0, L1: 0, fail: 0, unassessed: 0 };
   const seatParameterEntries = Object.entries(parameters || {})
     .filter(([key, parameter]) => key !== "screen" && parameter?.scope === "seat");
@@ -210,12 +210,28 @@ function buildReportCounts(parameters, seats) {
     };
   }
 
+  const seatResultsByParameter = {};
+  for (const [key] of seatParameterEntries) {
+    seatResultsByParameter[key] = (Array.isArray(seats) ? seats : []).map((seat) => {
+      const metric = seatHudById?.[seat?.id]?.rp22?.[key] || null;
+      return {
+        seatId: seat?.id,
+        isPrimary: seat?.isPrimary === true || String(seat?.priority || "").toLowerCase() !== "secondary",
+        valueFormatted: metric?.formatted || metric?.hudLabel || "—",
+        level: metric?.level || "—",
+        status: metric?.status || null,
+        value: metric?.value ?? metric?.valueDb ?? null,
+      };
+    });
+  }
+
   return {
     roomLevelCounts,
     roomCalculatedCount: roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1 + roomLevelCounts.fail,
     seatLevelCounts,
     seatCountsByRow,
     seatCompromiseById,
+    seatResultsByParameter,
   };
 }
 
@@ -302,7 +318,7 @@ export function summariseEngineeringResults({
     seats: canonicalSeats,
   });
   const compliance = buildComplianceSummary(designRatingAuthority.parameters);
-  const reportCounts = buildReportCounts(designRatingAuthority.parameters, canonicalSeats);
+  const reportCounts = buildReportCounts(designRatingAuthority.parameters, canonicalSeats, seatHudById || {});
   const scorecard = buildScorecard(projectRating);
 
   const summary = {
