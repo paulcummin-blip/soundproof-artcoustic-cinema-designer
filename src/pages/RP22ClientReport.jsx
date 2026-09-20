@@ -89,7 +89,6 @@ export default function RP22ClientReport() {
     subwooferInstances,
     analysisResult,
     allSeatSplMetrics,
-    earHeightM,
   } = authority;
 
   // A report is ready only when the one canonical publication is available.
@@ -568,7 +567,6 @@ export default function RP22ClientReport() {
             screenFrontPlaneM={screenFrontPlaneM}
             screenWidthM={screenWidthM}
             subwooferInstances={subwooferInstances}
-            earHeightM={earHeightM}
           />
         ),
         printData: {
@@ -580,7 +578,6 @@ export default function RP22ClientReport() {
           screenFrontPlaneM,
           screenWidthM,
           subwooferInstances,
-          earHeightM,
         },
       });
     }
