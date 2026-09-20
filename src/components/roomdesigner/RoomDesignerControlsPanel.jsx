@@ -98,6 +98,7 @@ export default function RoomDesignerControlsPanel({
   rearSubsForRendering,
   // Report
   analysisResult,
+  engineeringSummary,
   p19SeatAuthority,
   freeMoveLcr,
   // Options
@@ -354,6 +355,7 @@ export default function RoomDesignerControlsPanel({
           <Suspense fallback={<div>Loading...</div>}>
             <RP22CompliancePanel
               analysisResult={analysisResult}
+              engineeringSummary={engineeringSummary}
               p19SeatAuthority={p19SeatAuthority}
               screen={_screen}
               seatingPositions={_seatingPositions}
