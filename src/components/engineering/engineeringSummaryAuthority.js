@@ -227,9 +227,10 @@ function buildReportCounts(parameters, seats, seatHudById) {
 
   const seatResultsByParameter = {};
   const seatResultRowsByParameter = {};
-  for (const [key] of seatParameterEntries) {
+  for (const [key, parameter] of seatParameterEntries) {
     const results = (Array.isArray(seats) ? seats : []).map((seat, fallbackIndex) => {
       const metric = seatHudById?.[seat?.id]?.rp22?.[key] || null;
+      const seatAuthority = parameter?.seats?.[seat?.id] || null;
       const fallbackMatch = String(seat?.id || "").match(/^seat-r(\d+)-c(\d+)$/);
       const row = Number(seat?.row ?? seat?.rowNumber ?? fallbackMatch?.[1]) || 1;
       const column = Number(seat?.indexInRow ?? seat?.column ?? fallbackMatch?.[2]) || fallbackIndex + 1;
@@ -240,9 +241,10 @@ function buildReportCounts(parameters, seats, seatHudById) {
         priority: String(seat?.priority || "").toLowerCase() === "secondary" ? "secondary" : "primary",
         isPrimary: seat?.isPrimary === true || String(seat?.priority || "").toLowerCase() !== "secondary",
         valueFormatted: metric?.formatted || metric?.hudLabel || "—",
-        level: metric?.level || "—",
-        status: metric?.status || null,
-        value: metric?.value ?? metric?.valueDb ?? null,
+        level: seatAuthority?.state === "scored" ? (normalizeLevel(seatAuthority.level) || "—") : "—",
+        status: seatAuthority?.state || metric?.status || null,
+        value: seatAuthority?.rawValue ?? metric?.value ?? metric?.valueDb ?? null,
+        worstFrequencyHz: metric?.worstFrequencyHz ?? null,
       };
     });
     seatResultsByParameter[key] = results;
