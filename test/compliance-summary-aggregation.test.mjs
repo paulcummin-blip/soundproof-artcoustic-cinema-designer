@@ -66,6 +66,8 @@ test("P19 FAIL is published identically to every consumer view", () => {
   assert.equal(summary.project.compliance.byParameter.p19.level, "FAIL");
   assert.equal(summary.project.compliance.byParameter.p19.presentationStatus, "calculated");
   assert.equal(summary.project.compliance.counts.fail, 1);
+  const timbreCategory = summary.project.categories.find((category) => category.label === "Timbre Matching");
+  assert.deepEqual(timbreCategory.limitingParams.map((parameter) => parameter.key), ["p19"]);
 });
 
 test("one authoritative seat-result change fans out through the one summary", () => {
