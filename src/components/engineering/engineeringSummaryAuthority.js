@@ -131,10 +131,17 @@ function buildComplianceSummary(parameters) {
       if (level) calculatedSeatParams += 1;
     }
 
+    const state = parameter?.state || "provisional";
+    const presentationStatus = state === "scored"
+      ? ((key === "p15" || key === "p21") ? "assumed" : "calculated")
+      : state === "na"
+        ? "not_applicable"
+        : "not_verified";
     byParameter[key] = {
       key,
       scope: parameter?.scope || null,
-      state: parameter?.state || "provisional",
+      state,
+      presentationStatus,
       level,
     };
 
