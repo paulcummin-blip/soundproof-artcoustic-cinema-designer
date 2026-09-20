@@ -147,17 +147,16 @@ export default function RP22ClientReport() {
     });
   }, [hydrating, analysisResult, seatingPositions, rsp]);
 
-  // ── Timbre Consistency (pure selector, no new analysis) ──
+  // ── Timbre Consistency — passive read from the canonical summary ──
   const timbreConsistency = useMemo(() => {
-    if (hydrating || !analysisResult || !Array.isArray(seatingPositions)) {
+    if (hydrating || !engineeringSummary || !Array.isArray(seatingPositions)) {
       return { seats: [], counts: {}, hasAnyValidResult: false };
     }
     return selectClientTimbreConsistency({
-      analysisResult,
+      engineeringSummary,
       seatingPositions,
-      rsp,
     });
-  }, [hydrating, analysisResult, seatingPositions, rsp]);
+  }, [hydrating, engineeringSummary, seatingPositions]);
 
   // ── P9 Overhead per-seat (pure selector — reads canonical perSeatRp22) ──
   // P9 is a SEAT-scope parameter. This selector reads each seat's canonical
