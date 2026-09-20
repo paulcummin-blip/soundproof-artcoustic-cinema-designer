@@ -78,10 +78,10 @@ export default function Layout({ children, currentPageName }) {
     incompletePriceCount: 0,
   });
 
-  // ASDR visibility (shared between app and report) + rating data from RoomDesigner
+  // ASDR visibility plus the one canonical published engineering summary.
+  // The sidebar reads this object directly; it never depends on a nested live-only rating.
   const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
-  const [asdrRating, setAsdrRating] = React.useState(null);
-  const [asdrRecommendations, setAsdrRecommendations] = React.useState(null);
+  const [engineeringSummary, setEngineeringSummary] = React.useState(null);
   const [bassPending, setBassPending] = React.useState(false);
   const [asdrUnavailable, setAsdrUnavailable] = React.useState(false);
   const [p14TargetUnselected, setP14TargetUnselected] = React.useState(false);
@@ -145,14 +145,16 @@ export default function Layout({ children, currentPageName }) {
   // authority as every report. It never rebuilds or polls a separate rating.
   React.useEffect(() => {
     if (!activeProjectId) {
-      setAsdrRating(null);
-      setAsdrRecommendations(null);
+      setEngineeringSummary(null);
       return undefined;
     }
     const applyPublication = (snapshot) => {
       const published = snapshot || readDesignReviewHandoff(activeProjectId);
-      setAsdrRating(published?.rating || null);
-      setAsdrRecommendations(published?.recommendations || null);
+      setEngineeringSummary(
+        published?.engineeringSummary
+          ?? published?.rating?.engineeringSummary
+          ?? null
+      );
     };
     applyPublication(readDesignReviewHandoff(activeProjectId));
     return subscribeDesignReviewHandoff(activeProjectId, (snapshot, fromStorage) => {
@@ -184,8 +186,7 @@ export default function Layout({ children, currentPageName }) {
       const unavailable = readAsdrUnavailableIndicator(activeProjectId);
       setAsdrUnavailable(unavailable);
       if (unavailable) {
-        setAsdrRating(null);
-        setAsdrRecommendations(null);
+        setEngineeringSummary(null);
       }
 
       // Stale-scope detection: compare the published rating's seat-priority
@@ -476,8 +477,7 @@ export default function Layout({ children, currentPageName }) {
               <div className="border-t border-brand-border">
                 <DesignRatingSummary
                   showAsdr={showAsdr}
-                  rating={asdrRating}
-                  recommendations={asdrRecommendations}
+                  engineeringSummary={engineeringSummary}
                   bassPending={bassPending}
                   asdrUnavailable={asdrUnavailable}
                   p14TargetUnselected={p14TargetUnselected}
