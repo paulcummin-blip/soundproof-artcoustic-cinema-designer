@@ -1293,7 +1293,7 @@ function RP22ReportInner() {
                             <div style={{ fontFamily: "'Futura PT Light', 'Century Gothic', sans-serif", fontSize: 16, fontWeight: 400, color: '#213428', marginBottom: 12, letterSpacing: '0.01em' }}>
                                 ARTCOUSTIC SYSTEM DESIGN RATING
                             </div>
-                            <ScopedAsdrSummary scopedRatings={scopedRatings} />
+                            <ScopedAsdrSummary engineeringSummary={engineeringSummary} />
                             <div style={{ marginTop: 12, fontSize: 10, color: '#9B8E82', fontStyle: 'italic', fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif" }}>
                                 Sound Proof proprietary design metric. Not part of CEDIA RP22 or RP23.
                             </div>
