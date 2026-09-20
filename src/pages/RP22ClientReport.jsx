@@ -158,15 +158,13 @@ export default function RP22ClientReport() {
     });
   }, [hydrating, engineeringSummary, seatingPositions]);
 
-  // ── P9 Overhead per-seat (pure selector — reads canonical perSeatRp22) ──
-  // P9 is a SEAT-scope parameter. This selector reads each seat's canonical
-  // P9 result from analysisResult.perSeatRp22 — no RSP-only room-level grade.
+  // ── P9 Overhead — passive read from the canonical summary ──
   const p9Overhead = useMemo(() => {
-    if (hydrating || !analysisResult || !Array.isArray(seatingPositions)) {
+    if (hydrating || !engineeringSummary || !Array.isArray(seatingPositions)) {
       return { seats: [], counts: {}, hasAnyValidResult: false, summary: "" };
     }
-    return selectClientP9Overhead({ analysisResult, seatingPositions });
-  }, [hydrating, analysisResult, seatingPositions]);
+    return selectClientP9Overhead({ engineeringSummary, seatingPositions });
+  }, [hydrating, engineeringSummary, seatingPositions]);
 
   // ── P2 System Architecture (pure selector — reads canonical gradedParameters.primary[2]) ──
   const p2SystemArchitecture = useMemo(() => {
