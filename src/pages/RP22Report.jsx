@@ -211,7 +211,6 @@ function RP22ReportInner() {
                     created_date: p.created_date,
                     updated_date: p.updated_date,
                 });
-                setReportVersionId(p.active_version_id || null);
             }).catch(() => { /* non-blocking metadata fetch */ });
             return () => { cancelled = true; };
         }
