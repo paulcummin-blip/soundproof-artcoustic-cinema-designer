@@ -2,9 +2,9 @@
  * DesignRatingCategoryFloor.jsx
  * ------------------------------
  * Shared four-category floor-authority grid for the in-app Technical / Design
- * Review page. Consumes the SAME getCategoryFloorSummaries() authority as the
- * Room Designer sidebar (DesignRatingSummary.jsx) — no separate report-only
- * calculation. Presentation-only; does NOT modify ASDR/DPI maths, RP22 grading,
+ * Review page. Reads the category floors already published by
+ * summariseEngineeringResults() — no report-side calculation.
+ * Presentation-only; does NOT modify ASDR/DPI maths, RP22 grading,
  * RP23 grading, or category membership.
  *
  * Hierarchy: Spatial Resolution, Dynamic Range, Timbre Matching, Screen /
@@ -16,7 +16,6 @@
 import React from 'react';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
-import { getCategoryFloorSummaries } from '@/components/report/technical/designRatingPresentation';
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -203,16 +202,13 @@ function CategoryBlock({ label, primary, secondary }) {
 }
 
 /**
- * Four-category floor-authority grid. Accepts the full roomDesignRating
- * (with .scopedRatings) — the same object the sidebar consumes.
+ * Four-category floor-authority grid. Reads the exact published summary used
+ * by the sidebar, reports and PDFs.
  */
 export default function DesignRatingCategoryFloor({ rating }) {
-  const scopedRatings = rating?.scopedRatings || null;
-  const primaryRating = scopedRatings?.primary || null;
-  const secondaryRating = scopedRatings?.secondary || null;
-
-  const primaryCats = primaryRating ? getCategoryFloorSummaries(primaryRating) : [];
-  const secondaryCats = secondaryRating ? getCategoryFloorSummaries(secondaryRating) : [];
+  const engineeringSummary = rating?.engineeringSummary || null;
+  const primaryCats = engineeringSummary?.primary?.categories || [];
+  const secondaryCats = engineeringSummary?.secondary?.categories || [];
 
   return (
     <TooltipProvider delayDuration={200}>
