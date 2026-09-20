@@ -169,6 +169,11 @@ export default function DesignReviewPage() {
     window.__ROOM_DESIGNER_PRICE__ = priceData;
   }, [priceData, projectId]);
 
+  const engineeringSummary =
+    asdrData?.engineeringSummary
+      ?? asdrData?.rating?.engineeringSummary
+      ?? null;
+
   // Stage C: Handle Lowest Performance Results row click from Design Overview
   const handleParamClick = useCallback((paramKey) => {
     if (!paramKey) return;
@@ -247,7 +252,7 @@ export default function DesignReviewPage() {
           defaultOpen={true}
         >
           <DesignOverviewBlock
-            rating={asdrData?.rating}
+            engineeringSummary={engineeringSummary}
             recommendations={asdrData?.recommendations}
             onParamClick={handleParamClick}
             onShowRecommendations={handleShowRecommendations}
@@ -272,15 +277,12 @@ export default function DesignReviewPage() {
           onToggle={() => setParamDetailsOpen(prev => !prev)}
         >
           <ParameterExplorer
-            rating={asdrData?.rating}
-            analysisResult={asdrData?.analysisResult}
-            projectId={projectId}
+            engineeringSummary={engineeringSummary}
             expandedParamKey={expandedParamKey}
             onExpandParam={handleExpandParam}
             activeFilter={activeFilter}
             onFilterChange={handleFilterChange}
             seatingPositions={resolvedSeatingPositions}
-            p19SeatAuthority={asdrData?.p19SeatAuthority ?? asdrData?.rating?.p19SeatAuthority ?? null}
           />
         </CollapsiblePanel>
 
