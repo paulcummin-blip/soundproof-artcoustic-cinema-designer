@@ -8,6 +8,7 @@
 
 import { CONFIDENCE } from './confidence';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
+import { resolveSpeakerModelsByRole } from './resolveSpeakerModelsByRole';
 
 function parseDolbyConfig(config) {
   if (!config || typeof config !== 'string') return { bed: 0, sub: 0, overhead: 0, text: 'Not configured' };
@@ -43,7 +44,7 @@ function resolveOverheadModel(project) {
 
 export function buildSystemAuthority(project, _version, placedSpeakers) {
   const dolbyConfig = parseDolbyConfig(project?.dolby_config);
-  const speakersByRole = project?.selected_speakers_by_role || {};
+  const speakersByRole = resolveSpeakerModelsByRole(project, placedSpeakers);
   const subwooferInstances = Array.isArray(project?.subwooferInstances) ? project.subwooferInstances : [];
   const ampPower = Number(project?.amplifier_power) || null;
   const overhead = resolveOverheadModel(project);
