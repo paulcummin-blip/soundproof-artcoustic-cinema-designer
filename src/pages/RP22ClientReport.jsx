@@ -135,17 +135,17 @@ export default function RP22ClientReport() {
     });
   }, [hydrating, engineeringSummary, seatingPositions, screenFrontPlaneM, screenWidthM, screen?.aspectRatio]);
 
-  // ── Best Listening Area (pure selector, no new analysis) ──
+  // ── Best Listening Area — passive read from the canonical summary ──
   const bestListeningArea = useMemo(() => {
-    if (hydrating || !analysisResult || !Array.isArray(seatingPositions)) {
+    if (hydrating || !engineeringSummary || !Array.isArray(seatingPositions)) {
       return { seats: [], rsp: null, counts: {}, hasAny: false, hasPrimary: false, explanation: "" };
     }
     return selectClientBestListeningArea({
-      analysisResult,
+      engineeringSummary,
       seatingPositions,
       rsp,
     });
-  }, [hydrating, analysisResult, seatingPositions, rsp]);
+  }, [hydrating, engineeringSummary, seatingPositions, rsp]);
 
   // ── Timbre Consistency — passive read from the canonical summary ──
   const timbreConsistency = useMemo(() => {
