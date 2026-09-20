@@ -167,7 +167,7 @@ function buildReportCounts(parameters, seats, seatHudById) {
   const seatParameterEntries = Object.entries(parameters || {})
     .filter(([key, parameter]) => key !== "screen" && parameter?.scope === "seat");
   const roomParameterEntries = Object.entries(parameters || {})
-    .filter(([key, parameter]) => key !== "screen" && parameter?.scope === "room");
+    .filter(([key, parameter]) => key !== "screen" && parameter?.scope !== "seat");
 
   for (const [, parameter] of roomParameterEntries) {
     const level = parameterAggregateLevel(parameter);
