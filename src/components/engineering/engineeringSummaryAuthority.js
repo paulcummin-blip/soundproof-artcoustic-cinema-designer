@@ -288,6 +288,77 @@ function buildReportCounts(parameters, seats, seatHudById) {
       }));
   }
 
+  const resultByParameterAndSeat = {};
+  const seatParameterDistributions = {};
+  for (const [key, results] of Object.entries(seatResultsByParameter)) {
+    resultByParameterAndSeat[key] = Object.fromEntries(
+      results.map((result) => [String(result.seatId), result]),
+    );
+    const levelCounts = { L4: 0, L3: 0, L2: 0, L1: 0, FAIL: 0, unassessed: 0 };
+    for (const result of results) {
+      const level = normalizeLevel(result.level);
+      if (level) levelCounts[level] += 1;
+      else levelCounts.unassessed += 1;
+    }
+    const assessedCount = results.length - levelCounts.unassessed;
+    const assessedLevels = Object.entries(levelCounts)
+      .filter(([level, count]) => level !== "unassessed" && count > 0)
+      .map(([level]) => level);
+    seatParameterDistributions[key] = {
+      levelCounts,
+      assessedCount,
+      seatCount: results.length,
+      uniformLevel: assessedLevels.length === 1 ? assessedLevels[0] : null,
+    };
+  }
+
+  const makeComposite = (parameterKeys, categoryForLevel) => {
+    const compositeSeats = (Array.isArray(seats) ? seats : []).map((seat) => {
+      const levels = {};
+      for (const key of parameterKeys) {
+        levels[key] = normalizeLevel(resultByParameterAndSeat?.[key]?.[String(seat?.id)]?.level);
+      }
+      const assessedLevels = Object.values(levels).filter(Boolean);
+      const worstLevel = assessedLevels.length
+        ? assessedLevels.reduce((worst, level) => LEVEL_RANK[level] < LEVEL_RANK[worst] ? level : worst)
+        : null;
+      return {
+        seatId: seat?.id,
+        isPrimary: seat?.isPrimary === true || String(seat?.priority || "").toLowerCase() !== "secondary",
+        levels,
+        worstLevel,
+        categoryKey: categoryForLevel(worstLevel),
+      };
+    });
+    const counts = {};
+    for (const seat of compositeSeats) counts[seat.categoryKey] = (counts[seat.categoryKey] || 0) + 1;
+    return {
+      seats: compositeSeats,
+      counts,
+      hasAnyValidResult: compositeSeats.some((seat) => seat.worstLevel !== null),
+    };
+  };
+
+  // Composite report classifications are authoritative engineering summaries too.
+  // Calculate them here once; report components only join these rows to geometry.
+  const clientSeatComposites = {
+    bestListeningArea: makeComposite(["p4", "p6", "p10"], (level) => {
+      if (level === "L4" || level === "L3") return "primary";
+      if (level === "L2") return "good";
+      if (level === "L1") return "acceptable";
+      if (level === "FAIL") return "improvement";
+      return "not_assessed";
+    }),
+    timbreConsistency: makeComposite(["p16", "p17"], (level) => {
+      if (level === "L4") return "highly_consistent";
+      if (level === "L3") return "very_consistent";
+      if (level === "L2") return "consistent";
+      if (level === "L1") return "acceptable";
+      if (level === "FAIL") return "improvement";
+      return "not_assessed";
+    }),
+  };
+
   return {
     roomLevelCounts,
     roomCalculatedCount: roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1 + roomLevelCounts.fail,
@@ -301,6 +372,8 @@ function buildReportCounts(parameters, seats, seatHudById) {
     compromisedSeatCount: Object.values(seatCompromiseById).filter((seat) => seat.isCompromised).length,
     seatResultsByParameter,
     seatResultRowsByParameter,
+    seatParameterDistributions,
+    clientSeatComposites,
   };
 }
 
