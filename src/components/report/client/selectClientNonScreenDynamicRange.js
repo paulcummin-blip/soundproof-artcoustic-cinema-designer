@@ -31,14 +31,6 @@
  *   }
  */
 
-// ── P13 target-basis thresholds (mirror RP22CompliancePanel / RP22ReportParameterGrid) ──
-const P13_THRESHOLDS_MINIMUM = { direction: ">=", L1: 96, L2: 99, L3: 102, L4: 105 };
-const P13_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 99, L2: 102, L3: 105, L4: 108 };
-
-function resolveP13Thresholds(p13Mode) {
-  return p13Mode === "recommended" ? P13_THRESHOLDS_RECOMMENDED : P13_THRESHOLDS_MINIMUM;
-}
-
 const RESULT_HEADINGS = {
   L4: "Level 4",
   L3: "Level 3",
