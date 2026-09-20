@@ -299,7 +299,7 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                         allowDecimals={false}
                     />
-                    <Tooltip content={(props) => <BassGraphTooltip {...props} series={isMulti ? multiSeries : []} operatingLevelOffsetDb={operatingLevelOffsetDb} />} shared cursor={false} />
+                    <Tooltip content={(props) => <BassGraphTooltip {...props} series={isMulti ? multiSeries : []} operatingLevelOffsetDb={operatingLevelOffsetDb} yDomain={[finalYMin, finalYMax]} />} shared cursor={false} />
 
                     {/* Schroeder frequency line (on-scale only) */}
                     {Number.isFinite(schroederFrequency) && schroederFrequency > 0 && schroederFrequency <= 200 && (

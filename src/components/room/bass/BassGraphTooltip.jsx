@@ -1,19 +1,26 @@
 // BassGraphTooltip — compact, non-interactive hover readout for the bass graph.
 //
 // Presentation-only: does NOT recompute, re-grade, or alter any authority data.
-// All values are read from the already-computed chart data row (which already
-// reflects the displayed smoothing — 1/3 octave or otherwise) via the pure
-// resolveTooltipCurveAuthority helper.
 //
-// CURVE AUTHORITY:
-//   The primary SPL comes from the ACTIVE RESPONSE CURVE (by priority:
-//   post-eq > seat-overlay > rsp > raw > room > sub-max > product-max),
-//   NEVER from the House Target. The House Target is always a comparison
-//   reference, sampled independently at the same cursor frequency.
+// CURSOR COORDINATES (headline):
+//   FREQUENCY comes from the cursor X position (Recharts `label`, already
+//   converted through the log frequency scale).
+//   SPL comes from the cursor Y pixel position, converted through the
+//   chart's current Y-axis domain via inverse Y-axis scale. This is a pure
+//   graph-coordinate readout — it works over empty graph area, above/below
+//   curves, and between curves, independent of any curve value.
+//
+// CURVE VALUES (secondary):
+//   The active response curve (by priority: post-eq > seat-overlay > rsp >
+//   raw > room > sub-max > product-max) is sampled at the cursor frequency
+//   and shown below the headline. The House Target is a comparison reference.
 //
 // Layout:
-//   FREQUENCY              [ACTIVE CURVE LABEL]
-//   113.3 Hz               96.4 dBC
+//   FREQUENCY              SPL
+//   113.3 Hz               105.0 dBC  (cursor Y)
+//
+//   FINAL EQ RESPONSE
+//   96.4 dBC               (curve value at cursor frequency)
 //
 //   TARGET
 //   102.6 dBC
@@ -74,6 +81,27 @@ function Row({ label, value, valueColor }) {
 }
 
 /**
+ * Convert cursor pixel Y to SPL (dBC) using the chart's Y-axis domain and
+ * plot area geometry. Y-axis is inverted: top = yMax, bottom = yMin.
+ *
+ * @param {object} coordinate - Recharts cursor pixel position { x, y }
+ * @param {object} viewBox   - Recharts plot area { x, y, width, height }
+ * @param {number} yMin       - Y-axis minimum (bottom)
+ * @param {number} yMax       - Y-axis maximum (top)
+ * @returns {number|null} SPL in dBC, or null if geometry unavailable
+ */
+function computeCursorSpl(coordinate, viewBox, yMin, yMax) {
+  if (!coordinate || !viewBox) return null;
+  const cursorY = Number(coordinate.y);
+  const plotTop = Number(viewBox.y);
+  const plotHeight = Number(viewBox.height);
+  if (!Number.isFinite(cursorY) || !Number.isFinite(plotTop) || !Number.isFinite(plotHeight) || plotHeight <= 0) return null;
+  const fraction = (cursorY - plotTop) / plotHeight;
+  const clamped = Math.max(0, Math.min(1, fraction));
+  return yMax - clamped * (yMax - yMin);
+}
+
+/**
  * Compact bass graph hover tooltip.
  *
  * @param {boolean} active - whether the tooltip is active (cursor over chart)
@@ -86,34 +114,44 @@ export default function BassGraphTooltip({
   active,
   payload,
   label,
+  coordinate,
+  viewBox,
   series = [],
   operatingLevelOffsetDb = 0,
+  yDomain = [70, 140],
 }) {
-  if (!active || !payload?.length) return null;
+  if (!active) return null;
 
-  const row = payload[0]?.payload;
-  if (!row) return null;
+  const [yMin, yMax] = yDomain;
 
-  // ── Resolve curve authority via the pure helper ──
-  // The primary SPL comes from the active response curve (by priority),
-  // NOT from payload[0] (which is merely the closest series to the cursor).
-  const authority = resolveTooltipCurveAuthority({
-    row,
-    series,
-    fallbackDataKey: payload[0]?.dataKey || null,
-  });
+  // ── HEADLINE: cursor coordinates (not curve values) ──
+  // Frequency from cursor X — Recharts `label` is the X-axis value at the
+  // cursor position, already converted through the log frequency scale.
+  const freqValue = isFinite(label) ? Number(label) : null;
+  const freqDisplay = freqValue !== null ? formatHz(freqValue) : "—";
 
-  if (!authority) return null;
+  // SPL from cursor Y — pixel → inverse Y-axis scale → dBC.
+  // Works over empty graph area, above/below curves, and between curves.
+  const cursorSpl = computeCursorSpl(coordinate, viewBox, yMin, yMax);
+  const cursorSplDisplay = cursorSpl !== null ? formatSpl(cursorSpl) : "—";
 
-  const freqDisplay = isFinite(authority.frequency)
-    ? formatHz(authority.frequency)
-    : (isFinite(label) ? formatHz(label) : String(label));
+  // ── SECONDARY: curve values at cursor frequency ──
+  // The active response curve (by priority: post-eq > seat-overlay > rsp >
+  // raw > room > sub-max > product-max), sampled at the cursor frequency.
+  const row = payload?.[0]?.payload;
+  const authority = row
+    ? resolveTooltipCurveAuthority({
+        row,
+        series,
+        fallbackDataKey: payload[0]?.dataKey || null,
+      })
+    : null;
 
-  const currentValue = authority.responseSpl;
-  const houseCurveValue = authority.targetSpl;
-  const diffFromTarget = authority.delta;
-  const aboveTarget = authority.aboveTarget;
-  const activeCurveLabel = authority.activeCurveLabel || "RESPONSE";
+  const finalEqSpl = authority?.responseSpl;
+  const finalEqLabel = authority?.activeCurveLabel || "FINAL EQ RESPONSE";
+  const houseCurveValue = authority?.targetSpl;
+  const diffFromTarget = authority?.delta;
+  const aboveTarget = authority?.aboveTarget;
 
   // Calibration (static line, no expansion)
   const hasCalibration = isFinite(operatingLevelOffsetDb) && Number(operatingLevelOffsetDb) !== 0;
@@ -144,7 +182,7 @@ export default function BassGraphTooltip({
       // Ensure the card never captures pointer events — pure readout.
       pointerEvents: "none",
     }}>
-      {/* ── PRIMARY HOVER READOUT: FREQUENCY + ACTIVE CURVE SPL ── */}
+      {/* ── HEADLINE: cursor X/Y coordinates ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
         <div>
           <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}>
@@ -156,13 +194,22 @@ export default function BassGraphTooltip({
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.green }}>
-            {activeCurveLabel}
+            SPL
           </div>
           <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.green, lineHeight: 1.2 }}>
-            {formatSpl(currentValue)}
+            {cursorSplDisplay}
           </div>
         </div>
       </div>
+
+      {/* ── SECONDARY: Final EQ curve value at cursor frequency ── */}
+      {isFinite(finalEqSpl) && (
+        <>
+          <Divider />
+          <SectionLabel color={COLORS.dark}>{finalEqLabel}</SectionLabel>
+          <Row label="Curve value" value={formatSpl(finalEqSpl)} valueColor={COLORS.dark} />
+        </>
+      )}
 
       {/* ── TARGET COMPARISON ── */}
       {isFinite(houseCurveValue) && (
