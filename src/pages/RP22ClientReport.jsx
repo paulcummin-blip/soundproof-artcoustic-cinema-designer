@@ -138,17 +138,17 @@ export default function RP22ClientReport() {
 
   // ── RP23 Screen Size / Seating (uses existing RP23 viewing-angle authority) ──
   const screenSeating = useMemo(() => {
-    if (hydrating || !Array.isArray(seatingPositions) || !screenWidthM) {
+    if (hydrating || !engineeringSummary || !Array.isArray(seatingPositions) || !screenWidthM) {
       return { seats: [], zones: [], hasAny: false, explanation: "" };
     }
     return selectClientScreenSeating({
       seatingPositions,
       screenFrontPlaneM,
       screenWidthM,
-      roomLengthM: roomDims.lengthM,
       aspectRatio: screen?.aspectRatio,
+      engineeringSummary,
     });
-  }, [hydrating, seatingPositions, screenFrontPlaneM, screenWidthM, roomDims.lengthM, screen?.aspectRatio]);
+  }, [hydrating, engineeringSummary, seatingPositions, screenFrontPlaneM, screenWidthM, screen?.aspectRatio]);
 
   // ── Best Listening Area (pure selector, no new analysis) ──
   const bestListeningArea = useMemo(() => {
