@@ -64,6 +64,7 @@ test("P19 FAIL is published identically to every consumer view", () => {
   assert.equal(summary.project.reportCounts.seatResultsByParameter.p19[0].valueFormatted, "±7.0 dB");
   assert.equal(summary.seatHudById["seat-1"].rp22.p19.level, "FAIL");
   assert.equal(summary.project.compliance.byParameter.p19.level, "FAIL");
+  assert.equal(summary.project.compliance.byParameter.p19.presentationStatus, "calculated");
   assert.equal(summary.project.compliance.counts.fail, 1);
 });
 
