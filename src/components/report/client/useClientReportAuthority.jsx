@@ -29,13 +29,11 @@ import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat } from "@/components/utils/rp22UpperSeatMetrics";
 import { levelP9_upperSpacing } from "@/components/utils/rp22/levels";
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
-import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
 import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
-import { computeAllSeatSplMetrics } from "@/components/utils/spl/centralSplEngine";
-import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { resolveEffectiveVisibleWidthInches, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
+import { readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 
 // TV preset → viewable width in inches (matches RoomDesigner TV_KEY_TO_INCHES)
 const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
@@ -321,50 +319,19 @@ export function useClientReportAuthority(projectId) {
     dolbyPreset: reportDolbyLayout,
   });
 
-  // ── 5b) All-seat SPL metrics (mirrors RP22Report exactly) ───────────────
-  const mlpBasis = app?.mlpBasis || "front";
-  const hasSeats = seatingPositions.length > 0;
-  const hasSpeakers = placedSpeakers.length > 0;
-
-  const allSeatSplMetrics = useMemo(() => {
-    if (!hasSeats || !hasSpeakers) return [];
-    const getCanonicalRoleSpl = (role) => {
-      const map = { SL: 'SL', LS: 'SL', SR: 'SR', RS: 'SR', SBL: 'SBL', SBR: 'SBR', LW: 'LW', RW: 'RW', FL: 'FL', L: 'FL', FC: 'FC', C: 'FC', FR: 'FR', R: 'FR', TFL: 'TFL', TFR: 'TFR', TML: 'TML', TMR: 'TMR', TRL: 'TRL', TRR: 'TRR' };
-      return map[String(role || '').toUpperCase()] || String(role || '').toUpperCase();
-    };
-    return computeAllSeatSplMetrics({
-      seats: seatingPositions, placedSpeakers, getCanonicalRole: getCanonicalRoleSpl,
-      getEffectiveSplInputs: app?.getEffectiveSplInputs || (() => ({ powerW: 100, eqHeadroomDb: 0 })),
-      getModelDimsM: (model) => {
-        const meta = getSpeakerModelMeta(model);
-        if (meta && !meta.notFound) return { ...meta, sensitivity_db_1w_1m: meta.sensitivity_dB_1w1m || 87, power_handling_w: meta.max_power || Infinity, max_spl_cont_db_1m: meta.max_spl || null };
-        return { widthM: 0.27, depthM: 0.082, sensitivity_dB_1w1m: 87 };
-      },
-      screenLoss_dB: Number(app?.splConfig?.screenLossDb) || 0,
-      eqHeadroom_dB: Number(app?.splConfig?.globalEqHeadroomDb) || 0,
-      mlpPoint: rsp,
-    });
-  }, [seatingPositions, placedSpeakers, rsp, app?.splConfig, app?.getEffectiveSplInputs, hasSeats, hasSpeakers]);
-
-  // ── 5c) Canonical RP22 analysis engine (exactly one mount, same inputs as RP22Report) ──
-  const analysisResult = useRP22AnalysisEngine({
-    diagnosticOwner: "client-report-authority",
-    placedSpeakers,
-    visiblePlanSpeakers: analysisSpeakers,
-    seatingPositions,
-    dimensions: stableDimensions,
-    mlpBasis,
-    sevenBedLayoutType: app?.sevenBedLayoutType,
-    extraSurroundCount: app?.extraSurroundCount,
-    seatSplMetrics: allSeatSplMetrics,
-    mlpPointOverride: rsp,
-    overheadState: { globalModel: app?.overheadGlobalModel, frontOverride: app?.overheadFrontOverride, midOverride: app?.overheadMidOverride, rearOverride: app?.overheadRearOverride, useFrontGlobal: app?.useFrontGlobal ?? true, useMidGlobal: app?.useMidGlobal ?? true, useRearGlobal: app?.useRearGlobal ?? true, aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
-    aimState: { aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP, lcrAimMode: app?.lcrAimMode },
-    assumedP15Level: app?.assumedP15Level,
-    screen,
-    dolbyLayout: canonicalP2Layout,
-    includeBassAnalysis: false,
-  });
+  // ── 5b) Published engineering authority ───────────────────────────────
+  // Visual reports are passive consumers. They never mount the RP22 engine or
+  // rebuild SPL metrics; every engineering result comes from the Room Designer
+  // publication for this project.
+  const publishedEngineering = useMemo(
+    () => projectId ? readDesignReviewHandoff(projectId) : null,
+    [projectId, hydratedProjectId, hydrating]
+  );
+  const engineeringSummary = publishedEngineering?.engineeringSummary
+    ?? publishedEngineering?.rating?.engineeringSummary
+    ?? null;
+  const analysisResult = publishedEngineering?.analysisResult ?? null;
+  const allSeatSplMetrics = null;
 
   // ── 5d) Completed bass authority (lightweight useSyncExternalStore, no engine) ──
   const completedBassAuthority = useCompletedBassAuthority(projectId || "free", resolveEffectiveVersionId(versionId, app));
@@ -705,7 +672,8 @@ export function useClientReportAuthority(projectId) {
     p5Snapshot: p5SnapshotFinal,
     p9Snapshot: p9SnapshotFinal,
     analysisSpeakers,
-    // Canonical authorities (Stage B)
+    // Canonical published authorities
+    engineeringSummary,
     analysisResult,
     completedBassAuthority,
     completedBassContract,
