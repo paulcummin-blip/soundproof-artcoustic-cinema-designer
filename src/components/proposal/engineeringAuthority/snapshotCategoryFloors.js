@@ -1,71 +1,33 @@
 /**
- * snapshotCategoryFloors.js
- * --------------------------------
- * Reads canonical published category floors from the scoped Design Rating
- * authority. Does NOT rebuild floors from raw parameter values.
- *
- * Consumes the same getCategoryGoverningLevels() that drives the Room Designer
- * sidebar, Design Rating, and Technical/Compliance presentation.
- *
- * Pure function. No React. No side effects. No re-grading.
+ * Passive proposal adapter for canonical category summaries.
+ * No floor, grouping, grading, or index calculation is permitted here.
  */
 
-import {
-  getCategoryGoverningLevels,
-  getCategorySummaries,
-  getDesignPerformanceIndex,
-  getRoomDesignRatingDesignation,
-} from '@/components/report/technical/designRatingPresentation';
+const EMPTY = Object.freeze({ available: false, categories: [] });
 
-const CATEGORY_LABELS = [
-  'Spatial Resolution',
-  'Dynamic Range',
-  'Timbre Matching',
-  'Screen / Viewing Geometry',
-];
-
-/**
- * Build category floors for one scope (primary, secondary, or all-seat).
- *
- * @param {Object} scopedRating — a calculateScopedRoomDesignRating result
- * @returns {{ categories: Array<{label, floor, designation, index}>, available: boolean }}
- */
-export function buildScopedCategoryFloors(scopedRating) {
-  if (!scopedRating || scopedRating.status === 'NOT_ASSESSED' || scopedRating.status === 'NOT_CONFIGURED') {
-    return {
-      available: false,
-      categories: CATEGORY_LABELS.map((label) => ({ label, floor: null, designation: null, index: null })),
-    };
-  }
-
-  const governingLevels = getCategoryGoverningLevels(scopedRating);
-  const summaries = getCategorySummaries(scopedRating);
-  const summaryByLabel = new Map((summaries || []).map((s) => [s.label, s]));
-
-  const categories = CATEGORY_LABELS.map((label) => {
-    const gov = governingLevels?.find((g) => g.label === label);
-    const sum = summaryByLabel.get(label);
-    return {
-      label,
-      floor: gov?.governingLevel || null,
-      designation: sum?.designation || null,
-      index: sum?.index ?? null,
-    };
-  });
-
-  return { available: true, categories };
+function readScope(scope) {
+  if (!scope) return EMPTY;
+  return {
+    available: !!scope.rating && scope.rating.status !== "NOT_ASSESSED" && scope.rating.status !== "NOT_CONFIGURED",
+    categories: Array.isArray(scope.categories)
+      ? scope.categories.map((category) => ({
+          label: category.label,
+          floor: category.governingLevel ?? category.floorLevel ?? null,
+          designation: category.designation ?? null,
+          index: category.index ?? null,
+        }))
+      : [],
+  };
 }
 
-/**
- * Build the full category-floors block for all three scopes.
- *
- * @param {Object} scopedRatings — { primary, secondary, all } from useAppDesignRating
- * @returns {{ primary, secondary, all_seat }}
- */
-export function buildSnapshotCategoryFloors(scopedRatings) {
-  const primary = buildScopedCategoryFloors(scopedRatings?.primary);
-  const secondary = buildScopedCategoryFloors(scopedRatings?.secondary);
-  const allSeat = buildScopedCategoryFloors(scopedRatings?.all);
+export function buildScopedCategoryFloors(scope) {
+  return readScope(scope);
+}
 
-  return { primary, secondary, all_seat: allSeat };
+export function buildSnapshotCategoryFloors(engineeringSummary) {
+  return {
+    primary: readScope(engineeringSummary?.primary),
+    secondary: readScope(engineeringSummary?.secondary),
+    all_seat: readScope(engineeringSummary?.project),
+  };
 }
