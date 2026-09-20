@@ -427,11 +427,19 @@ function buildViewingSummary(perSeatRp23, seats, primarySeatIds, secondarySeatId
 
 function buildCategorySummary(rating) {
   const available = !!rating && rating.status !== "NOT_ASSESSED" && rating.status !== "NOT_CONFIGURED";
+  const categories = available
+    ? getCategoryFloorSummaries(rating).map((category) => ({
+        ...category,
+        limitingParams: category?.isScreen || !category?.floorLevel
+          ? []
+          : (category.paramDetails || []).filter((parameter) => parameter.level === category.floorLevel),
+      }))
+    : [];
   return {
     available,
     designPerformanceIndex: available ? getDesignPerformanceIndex(rating) : null,
     supportingSentence: available ? getDesignRatingSupportingSentence(rating) : null,
-    categories: available ? getCategoryFloorSummaries(rating) : [],
+    categories,
   };
 }
 
