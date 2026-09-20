@@ -333,6 +333,7 @@ export function useAppDesignRating({
         seatHudById: reportSeatHudById,
         roomResultsByParameter,
         p19SeatAuthority,
+        perSeatRp23: analysisResult?.perSeatRp23 || {},
       });
       if (!engineeringSummary) return null;
 
