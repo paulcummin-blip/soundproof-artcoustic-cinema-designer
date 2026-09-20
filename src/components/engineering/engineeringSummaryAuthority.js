@@ -256,16 +256,20 @@ function buildReportCounts(parameters, seats, seatHudById) {
       const fallbackMatch = String(seat?.id || "").match(/^seat-r(\d+)-c(\d+)$/);
       const row = Number(seat?.row ?? seat?.rowNumber ?? fallbackMatch?.[1]) || 1;
       const column = Number(seat?.indexInRow ?? seat?.column ?? fallbackMatch?.[2]) || fallbackIndex + 1;
+      const rawValue = seatAuthority?.rawValue ?? metric?.value ?? metric?.valueDb ?? null;
+      const isBassDeviation = (key === "p19" || key === "p20") && Number.isFinite(Number(rawValue));
       return {
         seatId: seat?.id,
         row,
         column,
         priority: String(seat?.priority || "").toLowerCase() === "secondary" ? "secondary" : "primary",
         isPrimary: seat?.isPrimary === true || String(seat?.priority || "").toLowerCase() !== "secondary",
-        valueFormatted: metric?.formatted || metric?.hudLabel || "—",
+        valueFormatted: isBassDeviation
+          ? `±${Number(rawValue).toFixed(1)} dB`
+          : (metric?.formatted || metric?.hudLabel || "—"),
         level: seatAuthority?.state === "scored" ? (normalizeLevel(seatAuthority.level) || "—") : "—",
         status: seatAuthority?.state || metric?.status || null,
-        value: seatAuthority?.rawValue ?? metric?.value ?? metric?.valueDb ?? null,
+        value: rawValue,
         worstFrequencyHz: metric?.worstFrequencyHz ?? null,
       };
     });
