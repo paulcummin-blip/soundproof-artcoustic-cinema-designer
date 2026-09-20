@@ -1,18 +1,21 @@
-// BassGraphTooltip — designer-friendly hover tooltip for the bass response graph.
-//
-// Prioritises what a cinema designer needs at a glance:
-//   • How loud is the system here? (Current SPL)
-//   • Above or below target? (Target + difference)
-//   • How much headroom remains? (Maximum usable SPL)
-//   • Is the room helping or hurting? (Room contribution)
-//   • Calibration offset (when enabled)
-//
-// Engineering calculations (flat reference, product-only max, raw product+room
-// max, power-summed capability, internal values) are preserved in a
-// collapsible <details> section — hidden by default, expandable on demand.
+// BassGraphTooltip — compact, non-interactive hover readout for the bass graph.
 //
 // Presentation-only: does NOT recompute, re-grade, or alter any authority data.
-// All values are read from the already-computed chart data row.
+// All values are read from the already-computed chart data row (which already
+// reflects the displayed smoothing — 1/3 octave or otherwise).
+//
+// Layout:
+//   FREQUENCY       SPL
+//   80.7 Hz         103.4 dBC
+//
+//   TARGET
+//   103.4 dBC
+//   Δ +0.0 dB
+//
+//   CALIBRATION
+//   Operating level adjustment -27.0 dB
+//
+// No expandable sections, no submenus, no interaction required.
 
 import React from "react";
 
@@ -22,11 +25,10 @@ const COLORS = {
   grey: "#64748B",
   brown: "#625143",
   orange: "#B45309",
-  purple: "#7C3AED",
   dark: "#1B1A1A",
   muted: "#625143",
   border: "#DCDBD6",
-  bg: "rgba(255,255,255,0.92)",
+  bg: "rgba(255,255,255,0.94)",
 };
 
 const isFinite = (v) => v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v));
@@ -38,6 +40,10 @@ const formatSignedDb = (v) => {
   const n = Number(v);
   return `${n >= 0 ? "+" : ""}${n.toFixed(1)} dB`;
 };
+
+function Divider() {
+  return <div style={{ borderTop: `1px solid ${COLORS.border}`, marginTop: 7, paddingTop: 7 }} />;
+}
 
 function SectionLabel({ children, color }) {
   return (
@@ -61,35 +67,8 @@ function Row({ label, value, valueColor }) {
   );
 }
 
-function Divider() {
-  return <div style={{ borderTop: `1px solid ${COLORS.border}`, marginTop: 6, paddingTop: 6 }} />;
-}
-
 /**
- * Derive a human-readable "curve" label from the selected series.
- * Shows "Reference Position (RSP)" for the RSP curve, or the seat label
- * for seat-specific curves.
- */
-function deriveCurveLabel(series) {
-  if (!series) return "Response";
-  const label = series.tooltipLabel || series.label || series.id || "Response";
-  // Shorten common labels for the header
-  if (label.includes("RSP after EQ")) return "Reference Position (RSP)";
-  if (label.includes("RSP before EQ")) return "Reference Position (RSP) — before EQ";
-  if (label.includes("Physical RSP")) return "Reference Position (RSP) — before EQ";
-  // Seat-specific curves: "R2S1 after EQ" → "Row 2 · Seat 1"
-  const seatMatch = label.match(/^R(\d+)S(\d+)/);
-  if (seatMatch) {
-    const row = Number(seatMatch[1]);
-    const seat = Number(seatMatch[2]);
-    const suffix = label.includes("before EQ") ? " — before EQ" : label.includes("after EQ") ? " — after EQ" : "";
-    return `Row ${row} · Seat ${seat}${suffix}`;
-  }
-  return label;
-}
-
-/**
- * Redesigned bass graph tooltip.
+ * Compact bass graph hover tooltip.
  *
  * @param {boolean} active - whether the tooltip is active (cursor over chart)
  * @param {Array}  payload - Recharts payload entries (closest series with shared=false)
@@ -114,7 +93,8 @@ export default function BassGraphTooltip({
     ? formatHz(actualFreq)
     : (isFinite(label) ? formatHz(label) : String(label));
 
-  // Identify the closest (selected) series from the first payload entry.
+  // Identify the closest (hovered) series from the first payload entry.
+  // The SPL shown must correspond to the currently hovered response curve.
   const selectedDataKey = payload[0]?.dataKey;
   const selectedSeriesId = selectedDataKey
     ? String(selectedDataKey).replace(/^spl_/, "")
@@ -122,32 +102,19 @@ export default function BassGraphTooltip({
   const selectedSeries = series.find((s) => s?.id === selectedSeriesId) || null;
   const selectedValue = selectedDataKey ? row[selectedDataKey] : null;
 
-  // Categorise all visible series by kind for structured display.
-  const findSeries = (kind) => series.find((s) => s?.kind === kind);
-  const findValue = (kind) => {
-    const s = findSeries(kind);
-    return s ? row[`spl_${s.id}`] : null;
-  };
-
-  const postEqSeries = findSeries("post-eq");
-  const postEqValue = findValue("post-eq");
-  const houseCurveSeries = findSeries("house-curve") || findSeries("normalized-target");
+  // House curve target (kind: "house-curve" or "normalized-target")
+  const houseCurveSeries = series.find((s) => s?.kind === "house-curve") || series.find((s) => s?.kind === "normalized-target");
   const houseCurveValue = houseCurveSeries ? row[`spl_${houseCurveSeries.id}`] : null;
-  const maximumSplSeries = findSeries("maximum-spl");
-  const maximumSplValue = findValue("maximum-spl");
-  const maximumSplMargin = maximumSplSeries?.safetyMarginDb;
-  const productMaximumSeries = findSeries("product-maximum");
-  const productMaximumValue = findValue("product-maximum");
-  const roomResponseSeries = findSeries("room-response");
-  const roomResponseValue = findValue("room-response");
-  const roomResponseReferenceDb = roomResponseSeries?.systemPowerReferenceDb;
-  const rawSeries = findSeries("raw");
-  const rawValue = rawSeries ? row[`spl_${rawSeries.id}`] : null;
 
-  // The "current SPL" is the value of whichever curve the cursor is closest to.
-  // If no specific series is identified, fall back to the post-EQ RSP.
-  const currentValue = isFinite(selectedValue) ? Number(selectedValue) : (isFinite(postEqValue) ? Number(postEqValue) : null);
-  const currentLabel = deriveCurveLabel(selectedSeries || postEqSeries);
+  // The displayed SPL is the value of the hovered curve at the cursor frequency.
+  // Falls back to post-EQ RSP only if no specific series is identified.
+  const currentValue = isFinite(selectedValue)
+    ? Number(selectedValue)
+    : (() => {
+        const postEq = series.find((s) => s?.kind === "post-eq");
+        const v = postEq ? row[`spl_${postEq.id}`] : null;
+        return isFinite(v) ? Number(v) : null;
+      })();
 
   // Difference from target
   const diffFromTarget = isFinite(currentValue) && isFinite(houseCurveValue)
@@ -155,68 +122,44 @@ export default function BassGraphTooltip({
     : null;
   const aboveTarget = isFinite(diffFromTarget) ? diffFromTarget >= 0 : null;
 
-  // Remaining headroom
-  const remainingHeadroom = isFinite(maximumSplValue) && isFinite(currentValue)
-    ? Number(maximumSplValue) - Number(currentValue)
-    : null;
-  const capabilityLimited = isFinite(remainingHeadroom) && remainingHeadroom < 0;
-
-  // Room contribution: room response vs its flat power-summed reference
-  const roomContribution = isFinite(roomResponseValue) && isFinite(roomResponseReferenceDb)
-    ? Number(roomResponseValue) - Number(roomResponseReferenceDb)
-    : null;
-
-  // Calibration
+  // Calibration (static line, no expansion)
   const hasCalibration = isFinite(operatingLevelOffsetDb) && Number(operatingLevelOffsetDb) !== 0;
   const calibrationDb = hasCalibration ? Number(operatingLevelOffsetDb) : null;
-
-  // Engineering values
-  const rawSimulatedDb = isFinite(rawValue) && hasCalibration
-    ? Number(rawValue) - Number(operatingLevelOffsetDb)
-    : (isFinite(rawValue) ? Number(rawValue) : null);
-  const peqAppliedDb = isFinite(rawValue) && isFinite(postEqValue)
-    ? Number(postEqValue) - Number(rawValue)
-    : null;
-  const residualDb = isFinite(postEqValue) && isFinite(houseCurveValue)
-    ? Number(postEqValue) - Number(houseCurveValue)
-    : null;
-  const rawInRoomMaxDb = isFinite(maximumSplValue) && isFinite(maximumSplMargin)
-    ? Number(maximumSplValue) + Number(maximumSplMargin)
-    : null;
-  const roomLayoutEffectDb = isFinite(rawInRoomMaxDb) && isFinite(productMaximumValue)
-    ? Number(rawInRoomMaxDb) - Number(productMaximumValue)
-    : null;
 
   return (
     <div style={{
       background: COLORS.bg, backdropFilter: "blur(6px)",
       border: `1px solid ${COLORS.border}`, borderRadius: 8,
-      padding: 10, maxWidth: 280, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+      padding: 10, maxWidth: 220, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
       fontFamily: "inherit",
+      // Ensure the card never captures pointer events — pure readout.
+      pointerEvents: "none",
     }}>
-      {/* ── HEADER ── */}
-      <div style={{ marginBottom: 6 }}>
-        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}>
-          Frequency
+      {/* ── PRIMARY HOVER READOUT: FREQUENCY + SPL together ── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}>
+            Frequency
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.dark, lineHeight: 1.2 }}>
+            {freqDisplay}
+          </div>
         </div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.dark, lineHeight: 1.2 }}>
-          {freqDisplay}
-        </div>
-        <div style={{ fontSize: 10, fontWeight: 600, color: COLORS.muted, marginTop: 2 }}>
-          {currentLabel}
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.green }}>
+            SPL
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.green, lineHeight: 1.2 }}>
+            {formatSpl(currentValue)}
+          </div>
         </div>
       </div>
 
-      {/* ── CURRENT POINT ── */}
-      <Divider />
-      <SectionLabel color={COLORS.green}>Measured / Predicted SPL</SectionLabel>
-      <Row label="SPL at cursor" value={formatSpl(currentValue)} valueColor={COLORS.green} />
-
-      {/* ── TARGET ── */}
+      {/* ── TARGET COMPARISON ── */}
       {isFinite(houseCurveValue) && (
         <>
           <Divider />
-          <SectionLabel color={COLORS.blue}>Target House Curve</SectionLabel>
+          <SectionLabel color={COLORS.blue}>Target</SectionLabel>
           <Row label="Target SPL" value={formatSpl(houseCurveValue)} valueColor={COLORS.blue} />
           {isFinite(diffFromTarget) && (
             <Row
@@ -228,35 +171,7 @@ export default function BassGraphTooltip({
         </>
       )}
 
-      {/* ── HEADROOM ── */}
-      {isFinite(maximumSplValue) && (
-        <>
-          <Divider />
-          <SectionLabel color={COLORS.green}>Headroom</SectionLabel>
-          <Row label="Maximum usable SPL" value={formatSpl(maximumSplValue)} valueColor={COLORS.green} />
-          {capabilityLimited ? (
-            <Row label="Status" value="Capability limited" valueColor={COLORS.orange} />
-          ) : isFinite(remainingHeadroom) && (
-            <Row label="Remaining headroom" value={formatSignedDb(remainingHeadroom)} valueColor={COLORS.green} />
-          )}
-        </>
-      )}
-
-      {/* ── ROOM EFFECT ── */}
-      {isFinite(roomContribution) && (
-        <>
-          <Divider />
-          <SectionLabel color={COLORS.blue}>Room Effect</SectionLabel>
-          <Row label="Room contribution" value={formatSignedDb(roomContribution)} valueColor={COLORS.blue} />
-          <div style={{ fontSize: 9, color: COLORS.muted, marginTop: 2, lineHeight: 1.4 }}>
-            {roomContribution >= 0
-              ? "Positive — room gain is boosting output at this frequency."
-              : "Negative — room cancellation is reducing output at this frequency."}
-          </div>
-        </>
-      )}
-
-      {/* ── CALIBRATION ── */}
+      {/* ── CALIBRATION (static line) ── */}
       {hasCalibration && (
         <>
           <Divider />
@@ -264,49 +179,6 @@ export default function BassGraphTooltip({
           <Row label="Operating level adjustment" value={formatSignedDb(calibrationDb)} valueColor={COLORS.grey} />
         </>
       )}
-
-      {/* ── ENGINEERING DETAILS (collapsible) ── */}
-      <details style={{ marginTop: 6, borderTop: `1px solid ${COLORS.border}`, paddingTop: 6 }}>
-        <summary style={{
-          fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
-          textTransform: "uppercase", color: COLORS.grey, cursor: "pointer",
-          userSelect: "none", outline: "none",
-        }}>
-          Engineering Details
-        </summary>
-        <div style={{ marginTop: 4, display: "grid", gap: 2 }}>
-          {isFinite(roomResponseReferenceDb) && (
-            <Row label="Flat reference SPL" value={formatSpl(roomResponseReferenceDb)} valueColor={COLORS.grey} />
-          )}
-          {isFinite(productMaximumValue) && (
-            <Row label="Product-only maximum" value={formatSpl(productMaximumValue)} valueColor={COLORS.grey} />
-          )}
-          {isFinite(rawInRoomMaxDb) && (
-            <Row label="Raw product + room max" value={formatSpl(rawInRoomMaxDb)} valueColor={COLORS.grey} />
-          )}
-          {isFinite(roomLayoutEffectDb) && (
-            <Row label="Room/layout effect on max" value={formatSignedDb(roomLayoutEffectDb)} valueColor={COLORS.grey} />
-          )}
-          {isFinite(rawSimulatedDb) && (
-            <Row label="Raw simulated RSP" value={formatSpl(rawSimulatedDb)} valueColor={COLORS.grey} />
-          )}
-          {isFinite(peqAppliedDb) && (
-            <Row label="PEQ applied" value={formatSignedDb(peqAppliedDb)} valueColor={COLORS.grey} />
-          )}
-          {isFinite(residualDb) && (
-            <Row label="Final residual vs target" value={formatSignedDb(residualDb)} valueColor={COLORS.grey} />
-          )}
-          {/* Per-series raw values for complete traceability */}
-          {series.filter((s) => isFinite(row[`spl_${s.id}`])).map((s) => (
-            <Row
-              key={s.id}
-              label={s.tooltipLabel || s.label || s.id}
-              value={formatSpl(row[`spl_${s.id}`])}
-              valueColor={COLORS.grey}
-            />
-          ))}
-        </div>
-      </details>
     </div>
   );
 }
