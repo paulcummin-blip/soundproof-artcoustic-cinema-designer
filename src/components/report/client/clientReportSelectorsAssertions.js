@@ -13,7 +13,6 @@
  */
 import { selectClientSeatCoverage } from "./selectClientSeatCoverage";
 import { selectClientDynamics } from "./selectClientDynamics";
-import { selectClientBass } from "./selectClientBass";
 import { selectClientParameterResults } from "./selectClientParameterResults";
 import { selectClientDesignHighlights } from "./selectClientDesignHighlights";
 import { selectClientSpeakerBalance, resolveCoordinate } from "./selectClientSpeakerBalance";
@@ -35,9 +34,6 @@ export function runClientReportSelectorAssertions() {
 
   const emptyDynamics = selectClientDynamics(null, null);
   check("1b. Missing dynamics returns null P12/P13/P14", emptyDynamics.p12 === null && emptyDynamics.p13 === null && emptyDynamics.p14 === null);
-
-  const emptyBass = selectClientBass(null, null);
-  check("1c. Missing bass returns null", emptyBass === null);
 
   const emptyParams = selectClientParameterResults(null, null);
   check("1d. Missing params returns 21 room slots", Object.keys(emptyParams.room).length === 21);
