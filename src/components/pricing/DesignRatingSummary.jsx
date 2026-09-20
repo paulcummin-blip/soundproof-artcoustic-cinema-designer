@@ -16,10 +16,6 @@
 import React from 'react';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
-import {
-  getDesignPerformanceIndex,
-  getCategoryFloorSummaries,
-} from '@/components/report/technical/designRatingPresentation';
 
 const SCREEN_DESCRIPTOR = {
   L4: 'Exceptional Performance',
@@ -220,24 +216,30 @@ export default function DesignRatingSummary({
   // calculated with the current priority set is available.
   if (staleScope && rating) return unavailableCard('Updating seat priorities…');
 
-  const scopedRatings = rating?.scopedRatings || null;
-  const primaryRating = scopedRatings?.primary || null;
-  const secondaryRating = scopedRatings?.secondary || null;
-  const allRating = scopedRatings?.all || rating || null;
+  // Direct read only: floors, scoped ratings and DPIs are published together by
+  // summariseEngineeringResults(). The sidebar must never rebuild them.
+  const engineeringSummary = rating?.engineeringSummary || null;
+  const primarySummary = engineeringSummary?.primary || null;
+  const secondarySummary = engineeringSummary?.secondary || null;
+  const projectSummary = engineeringSummary?.project || null;
+  const allRating = projectSummary?.rating || null;
 
   const isNotAssessed = !allRating || allRating.status === 'NOT_ASSESSED';
 
-  const primaryCats = primaryRating ? getCategoryFloorSummaries(primaryRating) : [];
-  const secondaryCats = secondaryRating ? getCategoryFloorSummaries(secondaryRating) : [];
+  const primaryCats = primarySummary?.categories || [];
+  const secondaryCats = secondarySummary?.categories || [];
 
+  const secondaryRating = secondarySummary?.rating || null;
   const secondaryIsConfigured =
     secondaryRating &&
     secondaryRating.status !== 'NOT_ASSESSED' &&
     secondaryRating.status !== 'NOT_CONFIGURED';
 
-  const primaryIndex = primaryRating ? getDesignPerformanceIndex(primaryRating) : null;
-  const secondaryIndex = secondaryIsConfigured ? getDesignPerformanceIndex(secondaryRating) : null;
-  const allIndex = allRating ? getDesignPerformanceIndex(allRating) : null;
+  const primaryIndex = primarySummary?.designPerformanceIndex ?? null;
+  const secondaryIndex = secondaryIsConfigured
+    ? (secondarySummary?.designPerformanceIndex ?? null)
+    : null;
+  const allIndex = projectSummary?.designPerformanceIndex ?? null;
 
   const CATEGORY_LABELS = ['Spatial Resolution', 'Dynamic Range', 'Timbre Matching', 'Screen / Viewing Geometry'];
 
