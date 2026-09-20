@@ -350,6 +350,7 @@ export function useAppDesignRating({
         ...engineeringSummary.designRating.rating,
         scopedRatings: engineeringSummary.designRating.scopedRatings,
         seatDesignRatings: engineeringSummary.designRating.seatDesignRatings,
+        seatDesignPerformanceIndexById: engineeringSummary.designRating.seatDesignPerformanceIndexById,
         seatLevels: engineeringSummary.designRating.seatLevels,
         seatPriorityFingerprint: engineeringSummary.seatPriorityFingerprint,
         p12RawDb,
