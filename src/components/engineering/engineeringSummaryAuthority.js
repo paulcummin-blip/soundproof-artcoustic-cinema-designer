@@ -82,7 +82,7 @@ function buildCanonicalRoomResults(parameters, publishedResults) {
   const canonical = { ...(publishedResults || {}) };
   for (const [key, parameter] of Object.entries(parameters || {})) {
     if (parameter?.scope !== "room") continue;
-    const match = String(key).match(/^p(\d+)$/i);
+    const match = String(key).match(/^(?:p)?(\d+)$/i);
     if (!match) continue;
     const parameterNumber = Number(match[1]);
     const existing = canonical[parameterNumber] || canonical[String(parameterNumber)] || {};
