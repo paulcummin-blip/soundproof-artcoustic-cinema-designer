@@ -257,12 +257,14 @@ function buildScorecard(projectRating) {
  * @param {Object} params.designRatingAuthority Final authoritative parameter object.
  * @param {Array} params.seats Canonical seating positions carrying priorities.
  * @param {Object} params.seatHudById Canonical per-seat published engineering results.
+ * @param {Object} params.roomResultsByParameter Canonical room result presentation.
  * @param {Object|null} params.p19SeatAuthority Canonical P19 seat publication.
  */
 export function summariseEngineeringResults({
   designRatingAuthority,
   seats,
   seatHudById,
+  roomResultsByParameter = {},
   p19SeatAuthority = null,
 }) {
   if (!designRatingAuthority) return null;
@@ -307,6 +309,7 @@ export function summariseEngineeringResults({
     schemaVersion: ENGINEERING_SUMMARY_SCHEMA_VERSION,
     seatPriorityFingerprint: buildSeatPriorityFingerprint(canonicalSeats),
     parameterAuthority: designRatingAuthority.parameters,
+    roomResultsByParameter: roomResultsByParameter || {},
     seatHudById: seatHudById || {},
     p19SeatAuthority,
     primary: {
