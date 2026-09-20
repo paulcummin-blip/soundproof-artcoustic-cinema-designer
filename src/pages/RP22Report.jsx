@@ -19,7 +19,7 @@ import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { deriveSubwoofersFromCfg } from '@/components/utils/deriveSubwoofersFromCfg';
 import { hydrateProjectIntoAppState } from '@/components/utils/hydrateProjectIntoAppState';
-import { mergeProjectAndVersion, resolveEffectiveVersionId } from '@/lib/versionAuthority';
+import { mergeProjectAndVersion } from '@/lib/versionAuthority';
 import { base44 } from '@/api/base44Client';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
 import { resolveDesignatedRspSeat, resolveRowDerivedRspYByMode } from '@/components/room/rsp/rspInputResolver';
@@ -44,10 +44,6 @@ import PrintRp23Pill from '@/components/report/PrintRp23Pill';
 import { usePlanCapture } from '@/components/report/usePlanCapture.jsx';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '../components/utils/viewingAngleUtils';
 import { getP21PresetResult, levelP21_earlyReflections } from '@/components/utils/rp22/levels';
-import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
-import { bassCacheKey } from '@/components/room/bass/bassCacheKey';
-import { buildComplianceBassExportData, buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
-import { resolveP14TargetSelectionState } from '@/components/room/bass/p14TargetSelectionState';
 import TechnicalProjectOverview from '@/components/report/technical/TechnicalProjectOverview';
 import TechnicalPerformanceSummary from '@/components/report/technical/TechnicalPerformanceSummary';
 import TechnicalAsdrScorecard from '@/components/report/technical/TechnicalAsdrScorecard';
@@ -60,7 +56,6 @@ import { resolveSeatPriority, getPrimarySeats, getSecondarySeats } from '@/compo
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
 import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReportPage';
-import { resolveBassReadiness } from '@/components/hooks/useAppDesignRating';
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { setAuthoritativeReadOnlyMode } from '@/components/state/authoritativeReadOnlyMode';
 import { useAutoPrintReadinessInstrumentation, logAutoPrintBlock } from '@/components/report/useAutoPrintReadinessInstrumentation';
@@ -94,7 +89,6 @@ function RP22ReportInner() {
     const [projectDetails, setProjectDetails] = useState(null);
     const [reportHydrating, setReportHydrating] = useState(true);
     const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
-    const [reportVersionId, setReportVersionId] = useState(null);
     const showDesignRating = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
 
     // ── ASDR recommendation wiring ───────────────────────────────────────
