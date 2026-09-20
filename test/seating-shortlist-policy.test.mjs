@@ -55,6 +55,36 @@ function makeCandidate({ offsetMm, ...resultOpts }) {
   };
 }
 
+// Multi-seat helpers for two-row Case C fixtures.
+// seats: [{ seatId, isPrimary, p19Level, p19Raw, p20Level, p20Raw }]
+function makeMultiSeatResult({ seats, candidateId }) {
+  return {
+    candidateId,
+    achievedP19Level: seats[0]?.p19Level || 'L3',
+    achievedP19VariationDb: Math.max(...seats.map((s) => s.p19Raw || 0)),
+    achievedP20Level: seats[0]?.p20Level || 'L3',
+    achievedP20VariationDb: Math.max(...seats.map((s) => s.p20Raw || 0)),
+    p18AchievedLevel: 'L3',
+    p14AchievedLevel: 'L3',
+    p14AchievedDb: 100,
+    achievedP18Hz: 20,
+    perSeatP19: seats.map((s) => ({ seatId: s.seatId, isPrimary: s.isPrimary !== false, level: s.p19Level, variationDbRaw: s.p19Raw })),
+    perSeatP20: seats.map((s) => ({ seatId: s.seatId, isPrimary: s.isPrimary !== false, level: s.p20Level, variationDbRaw: s.p20Raw })),
+  };
+}
+
+function makeMultiSeatBaseline({ seats }) {
+  return makeMultiSeatResult({ seats, candidateId: 'current' });
+}
+
+function makeMultiSeatCandidate({ offsetMm, seats }) {
+  return {
+    result: makeMultiSeatResult({ seats, candidateId: `seating:${offsetMm}` }),
+    seatingOffsetMm: offsetMm,
+    seatingPositions: [],
+  };
+}
+
 let passed = 0;
 let failed = 0;
 
@@ -217,6 +247,97 @@ function testUnsafeProxyWinnerRejected() {
   assert(winner?.seatingOffsetMm === 100, `Proxy #8 should win (safe + material), got offset ${winner?.seatingOffsetMm}`);
 }
 
+// ── Case C1: Room C, four-sub, two rows — Primary level drop ─────────────
+
+function testCaseC1() {
+  // Baseline: two primary seats, both P19 L2 (raw 4.5), P20 L2 (raw 4.5)
+  const baseline = makeMultiSeatBaseline({
+    seats: [
+      { seatId: 'r1c1', isPrimary: true, p19Level: 'L2', p19Raw: 4.5, p20Level: 'L2', p20Raw: 4.5 },
+      { seatId: 'r2c1', isPrimary: true, p19Level: 'L2', p19Raw: 4.5, p20Level: 'L2', p20Raw: 4.5 },
+    ],
+  });
+
+  // Proxy #1: -400mm — seat r1c1 P19 L2→L1 (primary regression)
+  const proxy1 = makeMultiSeatCandidate({
+    offsetMm: -400,
+    seats: [
+      { seatId: 'r1c1', isPrimary: true, p19Level: 'L1', p19Raw: 5.5, p20Level: 'L2', p20Raw: 4.5 },
+      { seatId: 'r2c1', isPrimary: true, p19Level: 'L2', p19Raw: 4.5, p20Level: 'L2', p20Raw: 4.5 },
+    ],
+  });
+
+  // Canonical winner: +100mm — both seats P19 L2→L3 (level improvement)
+  const winner = makeMultiSeatCandidate({
+    offsetMm: 100,
+    seats: [
+      { seatId: 'r1c1', isPrimary: true, p19Level: 'L3', p19Raw: 3.5, p20Level: 'L3', p20Raw: 3.5 },
+      { seatId: 'r2c1', isPrimary: true, p19Level: 'L3', p19Raw: 3.5, p20Level: 'L3', p20Raw: 3.5 },
+    ],
+  });
+
+  const { winner: selected, evaluations } = selectSeatingWinner([proxy1, winner], baseline);
+
+  const proxy1Eval = evaluations.find((e) => e.offsetMm === -400);
+  assert(proxy1Eval?.status === 'safety-rejected', `C1: Proxy #1 (-400mm) should be safety-rejected, got ${proxy1Eval?.status}`);
+  assert(selected?.seatingOffsetMm === 100, `C1: +100mm should win, got ${selected?.seatingOffsetMm}`);
+}
+
+// ── Case C2: Room B, two-sub, two rows — Primary P19 L1→FAIL ─────────────
+
+function testCaseC2() {
+  // Baseline: two primary seats, both P19 L1 (raw 5.5, passing), P20 L2 (raw 4.5)
+  const baseline = makeMultiSeatBaseline({
+    seats: [
+      { seatId: 'r1c1', isPrimary: true, p19Level: 'L1', p19Raw: 5.5, p20Level: 'L2', p20Raw: 4.5 },
+      { seatId: 'r2c1', isPrimary: true, p19Level: 'L1', p19Raw: 5.5, p20Level: 'L2', p20Raw: 4.5 },
+    ],
+  });
+
+  // Proxy #1: -500mm — seat r1c1 P19 L1→FAIL (level drop + failing count worsens)
+  const proxy1 = makeMultiSeatCandidate({
+    offsetMm: -500,
+    seats: [
+      { seatId: 'r1c1', isPrimary: true, p19Level: 0, p19Raw: 6.5, p20Level: 'L2', p20Raw: 4.5 },
+      { seatId: 'r2c1', isPrimary: true, p19Level: 'L1', p19Raw: 5.5, p20Level: 'L2', p20Raw: 4.5 },
+    ],
+  });
+
+  // Canonical winner: +100mm — both seats P19 L1→L2 (level improvement)
+  const winner = makeMultiSeatCandidate({
+    offsetMm: 100,
+    seats: [
+      { seatId: 'r1c1', isPrimary: true, p19Level: 'L2', p19Raw: 4.5, p20Level: 'L3', p20Raw: 3.5 },
+      { seatId: 'r2c1', isPrimary: true, p19Level: 'L2', p19Raw: 4.5, p20Level: 'L3', p20Raw: 3.5 },
+    ],
+  });
+
+  const { winner: selected, evaluations } = selectSeatingWinner([proxy1, winner], baseline);
+
+  const proxy1Eval = evaluations.find((e) => e.offsetMm === -500);
+  assert(proxy1Eval?.status === 'safety-rejected', `C2: Proxy #1 (-500mm) should be safety-rejected (P19 L1→FAIL), got ${proxy1Eval?.status}`);
+  assert(selected?.seatingOffsetMm === 100, `C2: +100mm should win, got ${selected?.seatingOffsetMm}`);
+}
+
+// ── Case C3: Room C, four-sub, one row — Primary P19 raw materially regresses ─
+
+function testCaseC3() {
+  // Baseline: one primary seat, P19 L3 (raw 3.0), P20 L3 (raw 3.0)
+  const baseline = makeBaseline({ p19Level: 'L3', p19Raw: 3.0, p20Level: 'L3', p20Raw: 3.0 });
+
+  // Proxy #1: -500mm — P19 stays L3 but raw regresses 3.0→4.2 (1.2 dB > 1.0 threshold)
+  const proxy1 = makeCandidate({ offsetMm: -500, p19Level: 'L3', p19Raw: 4.2, p20Level: 'L3', p20Raw: 3.0 });
+
+  // Canonical winner: +100mm — P19 L3→L4 (level improvement)
+  const winner = makeCandidate({ offsetMm: 100, p19Level: 'L4', p19Raw: 1.5, p20Level: 'L4', p20Raw: 1.5 });
+
+  const { winner: selected, evaluations } = selectSeatingWinner([proxy1, winner], baseline);
+
+  const proxy1Eval = evaluations.find((e) => e.offsetMm === -500);
+  assert(proxy1Eval?.status === 'safety-rejected', `C3: Proxy #1 (-500mm) should be safety-rejected (raw regression 1.2 dB), got ${proxy1Eval?.status}`);
+  assert(selected?.seatingOffsetMm === 100, `C3: +100mm should win, got ${selected?.seatingOffsetMm}`);
+}
+
 // ── Run all tests ────────────────────────────────────────────────────────
 
 console.log('Running seating shortlist policy tests...\n');
@@ -228,6 +349,9 @@ testGradeFirstOrdering();
 testPrimarySafetyProtection();
 testMaterialityGate();
 testUnsafeProxyWinnerRejected();
+testCaseC1();
+testCaseC2();
+testCaseC3();
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {

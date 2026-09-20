@@ -9,17 +9,21 @@
 // Policy:
 //   1. Take the top 8 proxy candidates by proxy P19 (lower = better).
 //   2. Canonically confirm all 8 (or fewer if fewer valid candidates exist).
-//   3. Apply materiality gate (zero-fail-first: fail-count reduction is
-//      always material; moved fails are not; blanket primary-seat regression
-//      veto has been removed).
-//   4. Zero-fail-first canonical ordering: failing-seat count first, then
+//   3. Apply Primary-seat hard safety gate (hasPrimarySeatRegression):
+//      reject any candidate that causes an unacceptable Primary-seat
+//      regression — P19/P20 level drop (including passing → FAIL) or
+//      same-level raw deviation regression > 1.0 dB. This prevents trading
+//      a strong primary seat to improve secondary seats.
+//   4. Apply materiality gate (zero-fail-first: fail-count reduction is
+//      always material; moved fails are not).
+//   5. Zero-fail-first canonical ordering: failing-seat count first, then
 //      primary-seat floor (worst-first), then raw margins.
 //   6. Smaller-movement tie-break: when canonical outcomes are equivalent,
 //      prefer the candidate with the smaller abs(seating offset).
 //      Direction is irrelevant: -100 mm and +100 mm are equivalent magnitude.
 //   7. Final fallback: stable candidate ID ordering.
 
-import { isMaterialImprovement } from "./materialityGate.js";
+import { isMaterialImprovement, hasPrimarySeatRegression } from "./materialityGate.js";
 import { compareZeroFailFirst } from "./zeroFailOptimiser.js";
 
 export const SEATING_SHORTLIST_SIZE = 8;
@@ -73,10 +77,11 @@ export function compareSeatingCandidates(a, b) {
  * Select the seating winner from canonically confirmed candidates.
  *
  * Applies in order:
- *   1. Materiality gate (zero-fail-first: isMaterialImprovement)
- *   2. Zero-fail-first canonical ordering (compareZeroFailFirst)
- *   3. Smaller-movement tie-break (abs(offsetMm), direction-agnostic)
- *   4. Stable candidate ID (final fallback)
+ *   1. Primary-seat hard safety gate (hasPrimarySeatRegression)
+ *   2. Materiality gate (zero-fail-first: isMaterialImprovement)
+ *   3. Zero-fail-first canonical ordering (compareZeroFailFirst)
+ *   4. Smaller-movement tie-break (abs(offsetMm), direction-agnostic)
+ *   5. Stable candidate ID (final fallback)
  *
  * @param {Array} confirmedCandidates - [{ result, seatingOffsetMm, seatingPositions }]
  * @param {object} baseline - existing authority (Current control)
@@ -91,9 +96,24 @@ export function selectSeatingWinner(confirmedCandidates, baseline) {
   for (const candidate of confirmedCandidates || []) {
     if (!candidate?.result) continue;
 
-    // Zero-fail-first: no blanket primary-seat regression veto.
-    // Materiality gate handles fail-count reduction and moved-fail detection.
-    // Materiality gate
+    // Primary-seat hard safety gate — applied BEFORE materiality and
+    // canonical ranking. Rejects any candidate that causes an
+    // unacceptable Primary-seat regression:
+    //   - P19 or P20 level drop (including passing → FAIL)
+    //   - Same-level raw deviation regression > 1.0 dB
+    // This prevents trading a strong primary seat to improve secondary seats.
+    const safety = hasPrimarySeatRegression(baseline, candidate.result);
+    if (safety.regressed) {
+      evaluations.push({
+        candidateId: candidate.result.candidateId,
+        offsetMm: candidate.seatingOffsetMm,
+        status: "safety-rejected",
+        safety,
+      });
+      continue;
+    }
+
+    // Materiality gate (zero-fail-first)
     const materiality = isMaterialImprovement(baseline, candidate.result);
     evaluations.push({
       candidateId: candidate.result.candidateId,
