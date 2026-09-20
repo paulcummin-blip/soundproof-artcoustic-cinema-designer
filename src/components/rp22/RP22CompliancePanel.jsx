@@ -5,21 +5,11 @@ import { computeScreenMetrics } from "@/components/utils/screenMetrics";
 import { renderPrimitive } from "@/components/utils/renderSafe";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
-import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
-import P19SeatBlock from "@/components/room/bass/P19SeatBlock";
-import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
-import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
-import { useActiveProjectId } from "@/components/state/project-session";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 import { resolveParamThresholds, resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import ComplianceParameterMatrix from "@/components/rp22/ComplianceParameterMatrix";
-import { resolveSeatMetric as resolveSeatMetricHelper } from "@/components/rp22/resolveSeatMetric";
-import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
-import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
-import { normalizeLevelForDisplay } from "@/components/utils/rp22LevelDisplay";
 import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl";
 import {
   getAssumedP15DisplayValue,
@@ -227,7 +217,6 @@ const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
 export default function RP22CompliancePanel({
   analysisResult,
   engineeringSummary = null,
-  p19SeatAuthority = null,
   screen,
   seatingPositions,
   seatHudSnapshots,
@@ -241,47 +230,11 @@ export default function RP22CompliancePanel({
   freeMoveLcr = false,
 }) {
   const appState = useAppState();
-  const activeProjectId = useActiveProjectId();
-  const bassAuthority = useCompletedBassAuthority(activeProjectId || "free", appState?.activeVersionId || "free");
-  const p14Selection = React.useMemo(
-    () => resolveP14TargetSelectionState(appState?.splConfig),
-    [appState?.splConfig?.selectedP14TargetBasis, appState?.splConfig?.selectedP14Level]
-  );
-  const bassPresentation = React.useMemo(
-    () => buildComplianceBassPresentation({ completedBassAuthority: bassAuthority }, null, p14Selection.noP14TargetSelected),
-    [bassAuthority, p14Selection.noP14TargetSelected]
-  );
-  const selectedP20Results = bassPresentation.perSeatP20Results;
-  const p12Mode = appState?.p12Mode || "minimum";
-  const p13Mode = appState?.splConfig?.p13Mode || "minimum";
-  const p14Mode = bassPresentation.parameters.p14.targetBasis || appState?.splConfig?.p14Mode || "minimum";
-  // Match pages/RP22Report.jsx fallback for P2
-  const p2SystemConfig = React.useMemo(() => {
-    const preset = dolbyLayout || "5.1";
-    const base = String(preset).split(" ")[0];
-    const parts = base.split(".");
-    const bed = parts[0] || "5";
-    const heights = parts[2] || "";
-
-    const frontCount = Number(frontSubsCount ?? 0);
-    const rearCount = Number(rearSubsCount ?? 0);
-    const totalSubs = frontCount + rearCount;
-
-    const systemConfigStr = heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-
-    const p = systemConfigStr.split(".");
-    const bedCount = parseInt(p[0], 10) || 5;
-    const overheadCount = parseInt(p[2], 10) || 0;
-
-    const discreteCount = bedCount + overheadCount;
-
-    let p2Level = "L1";
-    if (discreteCount >= 15) p2Level = "L4";
-    else if (discreteCount >= 11) p2Level = "L2";
-    else p2Level = "L1";
-
-    return { discreteSpeakerCount: discreteCount, p2Level };
-  }, [dolbyLayout, frontSubsCount, rearSubsCount]);
+  // Threshold presentation follows the same target basis published with the
+  // authoritative engineering result; this panel never resolves modes locally.
+  const p12Mode = engineeringSummary?.roomResultsByParameter?.[12]?.targetBasis || "minimum";
+  const p13Mode = engineeringSummary?.roomResultsByParameter?.[13]?.targetBasis || "minimum";
+  const p14Mode = engineeringSummary?.roomResultsByParameter?.[14]?.targetBasis || "minimum";
 
   // RP23 range (50–65°)
   const rp23 = React.useMemo(() => {
