@@ -3,20 +3,10 @@
  * ----------------
  * Visual Report PAGE — Bass Performance: P19 Response Quality Heat Map
  *
- * A dedicated page showing the validated P19 spatial heat map across the room.
- * Each 30×30 grid cell is coloured by its P19 grade (L4/L3/L2/L1/FAIL) using
- * the canonical Sound Proof level colours (diluted for the spatial field).
- *
- * Overlays: room boundary, screen/front wall, actual seats (with canonical
- * P19 result markers), RSP, and subwoofer positions — kept crisp and visually
- * separate from the heat-map fill.
- *
- * Heat-map generation is lazy/background — does not block the report opening.
- * Shows a clear loading state while generating. Cached by calibration
- * fingerprint + authority version + grid size + ear height.
- *
- * Print/PDF: fits one A4 page, renders identically in preview and PDF.
- * Never exports as a blank page — shows "Map not yet generated" if not ready.
+ * A passive spatial presentation of the canonical published P19 seat results.
+ * It does not calculate a room grid or evaluate P19 again. The same published
+ * seat grades used by the app, scorecard and technical report are drawn over
+ * the room plan for both screen and PDF output.
  */
 
 import React from "react";
@@ -93,9 +83,6 @@ function buildBassSeats(seatingPositions, p19PerSeat) {
 }
 
 export default function ClientP19HeatMap({
-  projectId,
-  versionId,
-  completedBassAuthority,
   bassPerformance,
   roomDims,
   seatingPositions,
@@ -103,25 +90,9 @@ export default function ClientP19HeatMap({
   screenFrontPlaneM,
   screenWidthM,
   subwooferInstances,
-  earHeightM,
   print,
   printPart,
 }) {
-  // Resolve seat coordinates for explicit heat-map probes.
-  // Each seat carries its own Z (ear height) matching the production engine's
-  // convention (seat.z ?? seat.position?.z ?? seat.earHeightM ?? seat.ear_h)
-  // so the heat-map evaluator computes P19 at the exact same (x, y, z) as the
-  // published per-seat P19 authority.
-  const seatPositions = (Array.isArray(seatingPositions) ? seatingPositions : [])
-    .filter((s) => s && s.id != null)
-    .map((s) => {
-      const x = resolveCoordinate(s.x, s.position?.x);
-      const y = resolveCoordinate(s.y, s.position?.y);
-      const z = Number(s.z ?? s.position?.z ?? s.earHeightM ?? s.ear_h);
-      return { id: s.id, x, y, z: Number.isFinite(z) && z > 0 ? z : Number(earHeightM) || 1.2 };
-    })
-    .filter((s) => s.x !== null && s.y !== null);
-
   // Passive report rule: never run the heat-map evaluator here. It previously
   // produced a second set of P19 deviations that contradicted the published
   // seat authority. This page now visualises only canonical published seats.
