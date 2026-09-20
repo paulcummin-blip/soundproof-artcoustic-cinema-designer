@@ -280,30 +280,11 @@ export function publishDesignReviewHandoff(snapshot) {
     priceData: published.priceData,
   };
 
-  const key = storageKey(projectId, versionId);
   try {
-    window.localStorage.setItem(key, JSON.stringify(stored));
+    window.localStorage.setItem(storageKey(projectId, versionId), JSON.stringify(stored));
   } catch {
-    // analysisResult and seatDesignRatings are convenience fields for direct
-    // report loads, not Proposal engineering authority. If the full transport
-    // exceeds browser quota, persist the version-scoped canonical authority
-    // without those heavy fields so a previous stale snapshot cannot survive.
-    const compactStored = {
-      ...stored,
-      analysisResult: null,
-      seatDesignRatings: null,
-    };
-    try {
-      window.localStorage.setItem(key, JSON.stringify(compactStored));
-    } catch {
-      // Fail closed. Keeping an older value would make stale engineering data
-      // appear authoritative after navigation or a new-tab load.
-      try {
-        window.localStorage.removeItem(key);
-      } catch {
-        // Storage is wholly unavailable; the live same-window Map remains.
-      }
-    }
+    // Live same-window handoff remains authoritative if storage is unavailable
+    // or the browser quota cannot hold the snapshot.
   }
 
   window.dispatchEvent(new CustomEvent(HANDOFF_EVENT, {
