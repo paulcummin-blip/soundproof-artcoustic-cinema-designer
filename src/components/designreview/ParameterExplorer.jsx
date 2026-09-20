@@ -24,8 +24,6 @@
  */
 
 import React, { useMemo, useCallback, useRef, useEffect } from "react";
-import { useAppState } from "@/components/AppStateProvider";
-import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
 import { useParameterGridAuthority } from "@/components/report/technical/useParameterGridAuthority.jsx";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import { getCategoryForParam, getHumanTitleForParam } from "@/components/report/technical/technicalParameterMeta";
@@ -58,33 +56,6 @@ const FILTERS = [
   { key: "dynamic", label: "DYNAMIC" },
   { key: "timbre", label: "TIMBRE" },
 ];
-
-// Map numeric RP22 keys to string keys (same as useAppDesignRating)
-const SEAT_PARAM_KEY_MAP = {
-  1: 'p1', 4: 'p4', 5: 'p5', 6: 'p6',
-  9: 'p9', 10: 'p10', 16: 'p16', 17: 'p17',
-  19: 'p19', 20: 'p20',
-};
-
-/** Build lightweight seatHudSnapshots from analysisResult.perSeatRp22. */
-function buildSeatHudFromAnalysis(analysisResult, seats) {
-  const out = {};
-  const perSeatRp22 = analysisResult?.perSeatRp22;
-  if (!perSeatRp22) return out;
-  for (const seat of seats) {
-    if (!seat?.id) continue;
-    const seatData = perSeatRp22[seat.id];
-    if (!seatData) continue;
-    const rp22 = {};
-    const srcRp22 = seatData?.rp22 || {};
-    for (const [numKey, strKey] of Object.entries(SEAT_PARAM_KEY_MAP)) {
-      const metric = srcRp22[numKey];
-      if (metric != null) rp22[strKey] = metric;
-    }
-    out[seat.id] = { rp22, seatId: seat.id, isPrimary: !!seat.isPrimary };
-  }
-  return out;
-}
 
 /** Canonical level pill colours from the single Sound Proof authority. */
 function levelPillColors(norm) {
@@ -193,43 +164,11 @@ export default function ParameterExplorer({
   seatingPositions,
   p19SeatAuthority = null,
 }) {
-  const app = useAppState();
+  const engineeringSummary = rating?.engineeringSummary || null;
   const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
-  const mlpSeatId = useMemo(() => {
-    const primary = seats.find((s) => s?.isPrimary && s?.id);
-    return primary?.id || seats[0]?.id || "";
-  }, [seats]);
-
-  const completedBassAuthority = useCompletedBassAuthority(projectId || "free", app?.activeVersionId || "free");
-  const bassErrorMessage = completedBassAuthority?.errorMessage || null;
-
-  // Build seatHudSnapshots from analysisResult.perSeatRp22
-  const seatHudSnapshots = useMemo(
-    () => buildSeatHudFromAnalysis(analysisResult, seats),
-    [analysisResult, seats]
-  );
-
-  // Build contributionsByKey from rating
-  const contributionsByKey = useMemo(() => {
-    if (!rating?.contributions) return null;
-    const map = {};
-    for (const contrib of rating.contributions) {
-      map[contrib.key] = contrib;
-    }
-    return map;
-  }, [rating]);
 
   const authority = useParameterGridAuthority({
-    analysisResult,
-    seatHudSnapshots,
-    seatingPositions: seats,
-    mlpSeatId,
-    assumedP15Level: app?.assumedP15Level,
-    assumedP21Level: app?.assumedP21Level,
-    bassAuthority: completedBassAuthority,
-    p19SeatAuthority,
-    bassErrorMessage,
-    contributionsByKey,
+    engineeringSummary,
   });
 
   const {
@@ -298,7 +237,7 @@ export default function ParameterExplorer({
     [expandedParamKey, onExpandParam]
   );
 
-  if (!analysisResult) {
+  if (!engineeringSummary) {
     return (
       <div
         style={{
