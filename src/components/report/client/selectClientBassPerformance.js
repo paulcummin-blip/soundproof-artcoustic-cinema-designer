@@ -1,130 +1,105 @@
 /**
- * selectClientBassPerformance
- * ----------------------------
- * Pure selector for the Visual Report bass performance section.
+ * Passive Visual Report bass adapter.
  *
- * Extracts P14/P18/P19/P20 from the canonical completed bass authority +
- * bass presentation. No new simulation, no interpolation, no regrading.
- *
- * P14 and P18 are room-scope (single result).
- * P19 and P20 are seat-scope (per-seat results).
- *
- * Returns null when no genuine assessed bass result exists — the Visual
- * Report omits the bass section entirely in that case (per the agreed rule:
- * do not create a detailed parameter sheet if entirely unavailable).
- *
- * @param {Object} completedBassAuthority - from useCompletedBassAuthority
- * @param {Object} bassPresentation - from buildComplianceBassPresentation
- * @param {Array} seatingPositions - for seat labels/priority
- * @returns {Object|null} bass performance summary or null
+ * P14/P18 room results, P19/P20 seat results, scoped floors and grades are
+ * copied exclusively from the published engineering summary. In particular,
+ * P20 can never be reintroduced as FAIL by reading the raw bass contract.
  */
-export function selectClientBassPerformance(completedBassAuthority, bassPresentation, seatingPositions, p19SeatAuthority = null) {
-  if (!completedBassAuthority?.contract) return null;
 
-  const contract = completedBassAuthority.contract;
-  const params = contract?.productAnalysis?.parameters || {};
-  const selectedCandidate = contract?.selectedCandidate || {};
-  const presentationParams = bassPresentation?.parameters || {};
+function finite(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
 
-  // P14 — LFE total SPL capability (room-scope)
-  // The headline level is the USER-SELECTED target level (selectedLevel),
-  // matching the Room Designer / Compliance authority (bassCompliancePresentation
-  // overrides level to selectedLevel). The capability-derived achievedLevel
-  // (e.g. L4 from 118.8 dBC) is never used as the Visual Report headline —
-  // the Visual Report must not independently re-grade raw capability dB.
-  // Available capability dB is retained as supporting engineering information.
-  const p14Param = params.p14 || null;
-  const p14Presentation = presentationParams.p14 || null;
-  const p14 = p14Param ? {
-    achievedCapabilityDb: Number.isFinite(Number(p14Param.achievedCapabilityDb))
-      ? Number(p14Param.achievedCapabilityDb) : null,
-    achievedLevel: p14Param.selectedLevel ?? p14Param.achievedLevel ?? null,
-    rawAchievedLevel: p14Param.achievedLevel ?? null,
-    selectedLevel: p14Param.selectedLevel ?? null,
-    requestedTargetDb: Number.isFinite(Number(p14Param.requestedTargetDb))
-      ? Number(p14Param.requestedTargetDb) : null,
-    headroomOrShortfallDb: Number.isFinite(Number(p14Param.headroomOrShortfallDb))
-      ? Number(p14Param.headroomOrShortfallDb) : null,
-    pass: p14Param.pass ?? null,
-    targetBasis: p14Presentation?.targetBasis || null,
-    targetBasisLabel: p14Presentation?.targetBasis === "recommended" ? "Recommended" : "Minimum",
-    publicationVerified: p14Presentation?.publicationVerified ?? false,
+export function selectClientBassPerformance(engineeringSummary, seatingPositions) {
+  if (!engineeringSummary) return null;
+
+  const roomResults = engineeringSummary.roomResultsByParameter || {};
+  const summaries = engineeringSummary.parameterSummaries || {};
+  const reportCounts = engineeringSummary.project?.reportCounts || {};
+  const p19Authority = engineeringSummary.p19SeatAuthority || null;
+  const p14Result = roomResults[14] || null;
+  const p18Result = roomResults[18] || null;
+  const p19Rows = reportCounts.seatResultsByParameter?.p19 || [];
+  const p20Rows = reportCounts.seatResultsByParameter?.p20 || [];
+
+  const p14 = p14Result ? {
+    achievedCapabilityDb: finite(p14Result.achievedCapabilityDb),
+    achievedLevel: p14Result.level ?? null,
+    rawAchievedLevel: p14Result.level ?? null,
+    selectedLevel: p14Result.selectedLevel ?? p14Result.level ?? null,
+    requestedTargetDb: finite(p14Result.requestedTargetDb ?? p14Result.value),
+    headroomOrShortfallDb: finite(p14Result.headroomOrShortfallDb),
+    pass: p14Result.pass ?? null,
+    targetBasis: p14Result.targetBasis || null,
+    targetBasisLabel: p14Result.targetBasisLabel || (p14Result.targetBasis === "recommended" ? "Recommended" : "Minimum"),
+    publicationVerified: p14Result.isAuthoritative === true,
   } : null;
 
-  // P18 — low-frequency extension (room-scope)
-  const p18Param = params.p18 || null;
-  const p18Presentation = presentationParams.p18 || null;
-  const p18 = p18Param ? {
-    achievedLevel: p18Param.level ?? null,
-    achievedHz: Number.isFinite(Number(p18Param.value)) ? Number(p18Param.value) : null,
-    designHz: Number.isFinite(Number(p18Param.designHz)) ? Number(p18Param.designHz) : null,
-    targetBasis: p18Presentation?.targetBasis || null,
-    targetBasisLabel: p18Presentation?.targetBasis === "recommended" ? "Recommended" : "Minimum",
-    publicationVerified: p18Presentation?.publicationVerified ?? false,
+  const p18 = p18Result ? {
+    achievedLevel: p18Result.level ?? null,
+    achievedHz: finite(p18Result.value),
+    designHz: finite(p18Result.designHz),
+    targetBasis: p18Result.targetBasis || null,
+    targetBasisLabel: p18Result.targetBasisLabel || (p18Result.targetBasis === "recommended" ? "Recommended" : "Minimum"),
+    publicationVerified: p18Result.isAuthoritative === true,
   } : null;
 
-  // P19 — read the already-published seat authority. No contract remap,
-  // priority interpretation, grouping, floor calculation or re-grading here.
-  const p19Presentation = presentationParams.p19 || null;
-  const p19 = p19SeatAuthority ? {
-    achievedLevel: p19SeatAuthority.project?.floor ?? null,
+  const p19BySeat = new Map(
+    (p19Authority?.seats || []).map((seat) => [String(seat?.seatId), seat]),
+  );
+  const p19 = p19Rows.length ? {
+    achievedLevel: summaries.project?.p19?.level ?? null,
     achievedVariationDb: null,
-    targetBasis: p19Presentation?.targetBasis || null,
-    publicationVerified: p19Presentation?.publicationVerified ?? false,
-    primary: p19SeatAuthority.primary,
-    secondary: p19SeatAuthority.secondary,
-    project: p19SeatAuthority.project,
-    perSeatResults: p19SeatAuthority.seats.map((seat) => ({
-      seatId: seat.seatId,
-      isPrimary: seat.priority === "primary",
-      priority: seat.priority,
-      level: seat.grade,
-      grade: seat.grade,
-      variationDbRaw: seat.rawValue,
-      displayedValue: seat.displayedValue,
-      worstFrequencyHz: seat.worstFrequencyHz,
+    targetBasis: null,
+    publicationVerified: true,
+    primary: p19Authority?.primary || null,
+    secondary: p19Authority?.secondary || null,
+    project: p19Authority?.project || null,
+    perSeatResults: p19Rows.map((row) => {
+      const detail = p19BySeat.get(String(row.seatId));
+      return {
+        seatId: row.seatId,
+        isPrimary: row.priority === "primary",
+        priority: row.priority,
+        level: row.level,
+        grade: row.level,
+        variationDbRaw: row.value,
+        displayedValue: row.valueFormatted,
+        worstFrequencyHz: detail?.worstFrequencyHz ?? row.worstFrequencyHz ?? null,
+      };
+    }),
+  } : null;
+
+  const p20 = p20Rows.length ? {
+    achievedLevel: summaries.project?.p20?.level ?? null,
+    achievedVariationDb: null,
+    targetBasis: null,
+    publicationVerified: true,
+    perSeatResults: p20Rows.map((row) => ({
+      seatId: row.seatId,
+      isPrimary: row.priority === "primary",
+      priority: row.priority,
+      // This level is the canonical design-rating authority. P20 has no FAIL.
+      level: row.level,
+      variationDbRaw: finite(row.value),
+      displayedValue: row.valueFormatted,
+      worstFrequencyHz: finite(row.worstFrequencyHz),
     })),
   } : null;
 
-  // P20 — seat-to-seat variance (SEAT-scope)
-  const perSeatP20Results = Array.isArray(selectedCandidate.perSeatP20Results)
-    ? selectedCandidate.perSeatP20Results
-    : (bassPresentation?.perSeatP20Results || []);
-  const p20Param = params.p20 || null;
-  const p20Presentation = presentationParams.p20 || null;
-  const p20 = p20Param ? {
-    achievedLevel: p20Param.level ?? null,
-    achievedVariationDb: Number.isFinite(Number(p20Param.value)) ? Number(p20Param.value) : null,
-    targetBasis: p20Presentation?.targetBasis || null,
-    publicationVerified: p20Presentation?.publicationVerified ?? false,
-    perSeatResults: perSeatP20Results.map((s) => ({
-      seatId: s.seatId,
-      isPrimary: !!s.isPrimary,
-      level: s.level,
-      variationDbRaw: Number.isFinite(Number(s.variationDbRaw)) ? Number(s.variationDbRaw) : null,
-      worstFrequencyHz: Number.isFinite(Number(s.worstFrequencyHz)) ? Number(s.worstFrequencyHz) : null,
-    })),
-  } : null;
-
-  // Determine if ANY bass parameter has a genuine assessed result
   const hasAssessed = [
     p14?.achievedLevel,
     p18?.achievedLevel,
     p19?.achievedLevel,
     p20?.achievedLevel,
-  ].some((l) => l != null && l !== "N/A" && l !== "—" && String(l) !== "0" && l !== "not_applicable");
-
+  ].some((level) => level != null && level !== "N/A" && level !== "—" && level !== "not_applicable");
   if (!hasAssessed) return null;
 
-  // Build seat label map from seatingPositions
   const seatLabelMap = new Map();
-  if (Array.isArray(seatingPositions)) {
-    seatingPositions.forEach((seat, i) => {
-      const id = seat?.id || `seat-${i}`;
-      const label = seat?.label || `Seat ${i + 1}`;
-      seatLabelMap.set(id, label);
-    });
-  }
+  (Array.isArray(seatingPositions) ? seatingPositions : []).forEach((seat, index) => {
+    seatLabelMap.set(seat?.id || `seat-${index}`, seat?.label || `Seat ${index + 1}`);
+  });
 
   return {
     p14,
@@ -132,6 +107,6 @@ export function selectClientBassPerformance(completedBassAuthority, bassPresenta
     p19,
     p20,
     seatLabelMap,
-    publicationVerified: bassPresentation?.publicationVerified === true,
+    publicationVerified: true,
   };
 }
