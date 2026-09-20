@@ -31,7 +31,7 @@ const CHAIN = [
   'reportReady',
   'designReviewHandoffReady',
   'analysisResultReady',
-  'completedBassAuthorityReady',
+  'engineeringSummaryReady',
   'renderGatePassed',
   'autoPrintTriggered',
   'isPrinting',
@@ -126,15 +126,11 @@ export function useAutoPrintReadinessInstrumentation(autoPrintState) {
           console.log(`[AUTOPRINT] ${ts()} Waiting because: ${key} = false`);
           return;
         }
-        if (key === 'bassReportPending' && val === true) {
-          console.log(`[AUTOPRINT] ${ts()} Waiting because: bassReportPending = true`);
-          return;
-        }
       }
 
-      // Special case: bassReportPending is a positive-blocking flag
-      if (snap.bassReportPending === true) {
-        console.log(`[AUTOPRINT] ${ts()} Waiting because: bassReportPending = true`);
+      // The engineering summary is the sole positive-blocking authority gate.
+      if (snap.authoritySummaryPending === true) {
+        console.log(`[AUTOPRINT] ${ts()} Waiting because: authoritySummaryPending = true`);
         return;
       }
 
