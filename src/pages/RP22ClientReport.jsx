@@ -51,8 +51,6 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
 import { useAppState } from "@/components/AppStateProvider";
 import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
-import { resolveBassReadiness } from "@/components/hooks/useAppDesignRating";
-import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
 
 export default function RP22ClientReport() {
@@ -90,24 +88,12 @@ export default function RP22ClientReport() {
     placedSpeakers,
     subwooferInstances,
     analysisResult,
-    completedBassAuthority,
-    bassPresentation,
     allSeatSplMetrics,
     earHeightM,
-    versionId,
   } = authority;
 
-  // Use the same completed-bass readiness gate as the Technical Report.
-  // A pending contract is not evidence that this project has no bass pages.
-  const p14Selection = resolveP14TargetSelectionState(appState?.splConfig);
-  const bassApplicable = Number(appState?.frontSubsCfg?.count) > 0
-    || Number(appState?.rearSubsCfg?.count) > 0
-    || subwooferInstances?.length > 0
-    || appState?.subwoofers?.length > 0;
-  const bassReadiness = resolveBassReadiness(
-    completedBassAuthority, bassApplicable, !p14Selection.noP14TargetSelected
-  );
-  const bassReportPending = !!projectId && bassApplicable && bassReadiness.pending;
+  // A report is ready only when the one canonical publication is available.
+  // No secondary bass-store lifecycle may override or reinterpret it.
   const reportPending = hydrating || !engineeringSummary;
 
   // ── Design Summary (static intro — pure selector, no analysis) ──
@@ -575,9 +561,6 @@ export default function RP22ClientReport() {
         id: "p19-heatmap",
         visual: (
           <ClientP19HeatMap
-            projectId={projectId}
-            versionId={versionId}
-            completedBassAuthority={completedBassAuthority}
             bassPerformance={bassPerformance}
             roomDims={roomDims}
             seatingPositions={seatingPositions}
@@ -590,9 +573,6 @@ export default function RP22ClientReport() {
         ),
         printData: {
           type: "p19-heatmap",
-          projectId,
-          versionId,
-          completedBassAuthority,
           bassPerformance,
           roomDims,
           seatingPositions,
@@ -799,9 +779,7 @@ export default function RP22ClientReport() {
             boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
             border: "1px solid #DCDBD6",
           }}>
-            {bassReportPending && !hydrating
-              ? "Bass results are not ready for this design. Return to the project, wait for Analysis ready, then reopen the Visual Report."
-              : "Preparing Visual Report…"}
+            Preparing Visual Report…
           </div>
         ) : !projectId ? (
           <div className="client-report-screen-only" style={{
