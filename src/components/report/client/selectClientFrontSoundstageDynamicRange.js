@@ -138,7 +138,10 @@ export function selectClientFrontSoundstageDynamicRange({
   const minimum = p12 && Number.isFinite(Number(p12.value))
     ? { value: Number(p12.value), formatted: p12.formatted || `${p12.value} dB` }
     : null;
-  const level = p12?.level ?? engineeringSummary?.parameterAuthority?.p12?.level ?? null;
+  const level = engineeringSummary?.parameterSummaries?.project?.p12?.level
+    ?? engineeringSummary?.parameterSummaries?.project?.[12]?.level
+    ?? p12?.level
+    ?? null;
   const resultHeading = level ? RESULT_HEADINGS[level] || "" : "";
 
   const hasAny = !!(fl || fc || fr) || !!(minimum && level);
