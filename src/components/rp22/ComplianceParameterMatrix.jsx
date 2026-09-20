@@ -8,16 +8,11 @@ import SeatScopeBadge from "@/components/report/SeatScopeBadge";
 import { ChevronDown } from "lucide-react";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
 
-const deriveStatus = (achievedValue, paramId) => {
-  const v = String(achievedValue || "");
-  if (/not verified|waiting for bass|waiting for authoritative/i.test(v)) return { label: "Not verified", color: "#8B7F76" };
-  // P15 and P21 are designer-assumed parameters, not calculated results.
-  if (Number(paramId) === 15 || Number(paramId) === 21) {
-    if (/not calculated/i.test(v) || v === "" || v === "—") return { label: "Not calculated", color: "#8B7F76" };
-    return { label: "Assumed", color: "#2d7a4f" };
-  }
-  if (/not calculated|insufficient|—|^n\/a$/i.test(v) || v === "") return { label: "Not calculated", color: "#8B7F76" };
-  return { label: "Calculated", color: "#2d7a4f" };
+const STATUS_PRESENTATION = {
+  calculated: { label: "Calculated", color: "#2d7a4f" },
+  assumed: { label: "Assumed", color: "#2d7a4f" },
+  not_applicable: { label: "Not applicable", color: "#8B7F76" },
+  not_verified: { label: "Not verified", color: "#8B7F76" },
 };
 
 const SummaryTile = ({ label, count, tone }) => (
@@ -43,10 +38,11 @@ export default function ComplianceParameterMatrix({
         const lvl = getLevelForParam(p);
         const achievedValue = getValueForParam(p);
         const isSeatScope = String(p.scope || "").toLowerCase() === "seat";
-        const status = deriveStatus(achievedValue, p.id);
+        const statusKey = summary?.byParameter?.[`p${Number(p.id)}`]?.presentationStatus || "not_verified";
+        const status = STATUS_PRESENTATION[statusKey] || STATUS_PRESENTATION.not_verified;
         return { p, lvl, achievedValue, isSeatScope, status };
       }),
-    [parameters, getLevelForParam, getValueForParam]
+    [parameters, getLevelForParam, getValueForParam, summary]
   );
 
   const publishedSummary = summary || {
