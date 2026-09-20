@@ -2329,7 +2329,8 @@ function RoomDesignerWithState() {
             frontSubsForRendering={frontSubsForRendering}
             rearSubsForRendering={rearSubsForRendering}
             analysisResult={analysisResult}
-            p19SeatAuthority={appDesignRating?.p19SeatAuthority ?? null}
+            engineeringSummary={appDesignRating?.engineeringSummary ?? null}
+            p19SeatAuthority={appDesignRating?.engineeringSummary?.p19SeatAuthority ?? appDesignRating?.p19SeatAuthority ?? null}
             freeMoveLcr={freeMoveLcr}
             showPrices={showPrices}
             setShowPrices={setShowPrices}
