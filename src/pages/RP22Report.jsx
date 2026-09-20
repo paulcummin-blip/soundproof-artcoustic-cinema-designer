@@ -243,7 +243,6 @@ function RP22ReportInner() {
                 created_date: p.created_date,
                 updated_date: p.updated_date,
             });
-            setReportVersionId(p.active_version_id || null);
             // Merge with the active ProjectVersion so per-version design fields
             // come from design_state, not from the legacy Project position.
             let merged = p;
