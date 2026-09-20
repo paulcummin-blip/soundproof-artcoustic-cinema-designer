@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAppState } from "@/components/AppStateProvider";
 import { base44 } from "@/api/base44Client";
-import { mergeProjectAndVersion } from "@/lib/versionAuthority";
+import { mergeProjectAndVersion, resolveEffectiveVersionId } from "@/lib/versionAuthority";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { useAnalysisSpeakers } from "@/components/hooks/useAnalysisSpeakers";
 import { useEffectiveRsp } from "@/components/room/rsp/useEffectiveRsp";
@@ -28,6 +28,8 @@ import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat } from "@/components/utils/rp22UpperSeatMetrics";
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
+import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
+import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { resolveEffectiveVisibleWidthInches, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
@@ -339,6 +341,17 @@ export function useClientReportAuthority(projectId) {
   const analysisResult = publishedEngineering?.analysisResult ?? null;
   const allSeatSplMetrics = null;
 
+  // The completed contract remains available only for the spatial P19 heat-map
+  // renderer. All report grades, floors, counts and seat results come from
+  // engineeringSummary and never from this presentation adapter.
+  const completedBassAuthority = useCompletedBassAuthority(projectId || "free", resolveEffectiveVersionId(versionId, app));
+  const completedBassContract = completedBassAuthority.contract;
+  const bassErrorMessage = completedBassAuthority.errorMessage || null;
+  const bassPresentation = useMemo(
+    () => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage),
+    [completedBassAuthority, bassErrorMessage]
+  );
+
   // ── 6) P5 snapshot — depends only on settled RSP + analysis speakers ─────
   const p5Snapshot = useMemo(() => {
     if (!rsp || !analysisSpeakers.length) return null;
@@ -647,6 +660,9 @@ export function useClientReportAuthority(projectId) {
     // Canonical published authorities
     engineeringSummary,
     analysisResult,
+    completedBassAuthority,
+    completedBassContract,
+    bassPresentation,
     allSeatSplMetrics,
     authoritativeSeat,
     seatingPositions,
