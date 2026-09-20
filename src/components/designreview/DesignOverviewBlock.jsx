@@ -381,10 +381,10 @@ function FullScorecard({ contributions, pillarMap, scorecardPillars, open, onTog
 
 // ── Main component ──────────────────────────────────────────────────
 
-export default function DesignOverviewBlock({ rating, recommendations, onParamClick, onShowRecommendations }) {
+export default function DesignOverviewBlock({ engineeringSummary, recommendations, onParamClick, onShowRecommendations }) {
   const [scorecardOpen, setScorecardOpen] = React.useState(false);
 
-  if (!rating || rating.status === "NOT_ASSESSED") {
+  if (!engineeringSummary || engineeringSummary?.project?.rating?.status === "NOT_ASSESSED") {
     return (
       <div
         style={{
@@ -403,7 +403,6 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
 
   // Direct read only: every grouping, floor, DPI and lowest-result list is
   // part of the one published engineering summary.
-  const engineeringSummary = rating.engineeringSummary || null;
   const primarySummary = engineeringSummary?.primary || null;
   const secondarySummary = engineeringSummary?.secondary || null;
   const projectSummary = engineeringSummary?.project || null;
@@ -433,7 +432,7 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "4px 0" }}>
       {/* Four design categories — lead story (shared floor authority) */}
-      <DesignRatingCategoryFloor rating={rating} />
+      <DesignRatingCategoryFloor engineeringSummary={engineeringSummary} />
 
       {/* Divider */}
       <div style={{ borderTop: `2px solid ${COLORS.borderStrong}`, margin: "4px 0" }} />
