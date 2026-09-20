@@ -179,17 +179,17 @@ export default function RP22ClientReport() {
     return selectClientP7FrontWides(analysisResult, placedSpeakers, rsp);
   }, [hydrating, analysisResult, placedSpeakers, rsp]);
 
-  // ── Recommended seating position (pure selector, no new analysis) ──
+  // ── Recommended seating position — passive P1 authority read ──
   const recommendedSeatingPosition = useMemo(() => {
-    if (hydrating || !analysisResult || !Array.isArray(seatingPositions)) {
+    if (hydrating || !engineeringSummary || !Array.isArray(seatingPositions)) {
       return { seats: [], rsp: null, hasAny: false };
     }
     return selectClientRecommendedSeatingPosition({
-      analysisResult,
+      engineeringSummary,
       seatingPositions,
       rsp,
     });
-  }, [hydrating, analysisResult, seatingPositions, rsp]);
+  }, [hydrating, engineeringSummary, seatingPositions, rsp]);
 
   // P12 presentation reads the published value and published level directly.
   const frontSoundstage = useMemo(() => {
