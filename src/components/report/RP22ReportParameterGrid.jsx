@@ -31,6 +31,7 @@ const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
  *   contributionsByKey  — ASDR contributions by key
  */
 export default function RP22ReportParameterGrid({
+  engineeringSummary,
   analysisResult,
   seatHudSnapshots,
   seatingPositions,
@@ -48,15 +49,7 @@ export default function RP22ReportParameterGrid({
   const isPrintVariant = variant === "print";
 
   const authority = useParameterGridAuthority({
-    analysisResult,
-    seatHudSnapshots,
-    seatingPositions,
-    mlpSeatId,
-    assumedP15Level,
-    assumedP21Level,
-    bassAuthority,
-    p19SeatAuthority,
-    bassErrorMessage,
+    engineeringSummary,
     contributionsByKey,
   });
 
@@ -66,7 +59,6 @@ export default function RP22ReportParameterGrid({
     buildSeatGridData,
     buildAsdrFooter,
     resolveThresholds,
-    resolveP12P13DualLevels,
     bassPresentation,
     renderSeatPillGrid,
     buildP6Presentation,
@@ -80,13 +72,9 @@ export default function RP22ReportParameterGrid({
       : param;
     const isSeatScope = String(param.scope || "").toLowerCase() === "seat";
     const targetBasisNote =
-      (param.id === 12 || param.id === 13)
-        ? (() => {
-            const v = analysisResult?.gradedParameters?.primary?.[param.id]?.value;
-            const dual = resolveP12P13DualLevels(param.id, v);
-            return dual ? `Minimum ${dual.minimum} · Recommended ${dual.recommended}` : null;
-          })()
-        : param.id === 14 ? bassPresentation.parameters.p14.detail : null;
+      engineeringSummary?.roomResultsByParameter?.[param.id]?.targetBasisNote
+      ?? engineeringSummary?.roomResultsByParameter?.[param.id]?.detail
+      ?? null;
     const isP15P21 = param.id === 15 || param.id === 21;
     return (
       <div key={param.id} className="rp22-card-wrap print-avoid-break" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
@@ -116,13 +104,9 @@ export default function RP22ReportParameterGrid({
       ? { ...param, thresholds: resolvedThresholds }
       : param;
     const targetBasisNote =
-      (param.id === 12 || param.id === 13)
-        ? (() => {
-            const v = analysisResult?.gradedParameters?.primary?.[param.id]?.value;
-            const dual = resolveP12P13DualLevels(param.id, v);
-            return dual ? `Minimum ${dual.minimum} · Recommended ${dual.recommended}` : null;
-          })()
-        : param.id === 14 ? bassPresentation.parameters.p14.detail : null;
+      engineeringSummary?.roomResultsByParameter?.[param.id]?.targetBasisNote
+      ?? engineeringSummary?.roomResultsByParameter?.[param.id]?.detail
+      ?? null;
     const isSeatScope = String(param.scope || "").toLowerCase() === "seat";
     const seatGridData = isSeatScope ? buildSeatGridData(param.id) : null;
     const humanTitle = getHumanTitleForParam(param.id);
