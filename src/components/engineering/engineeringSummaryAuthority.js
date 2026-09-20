@@ -81,7 +81,10 @@ function parameterAggregateLevel(parameter, seatIds = null) {
 function buildCanonicalRoomResults(parameters, publishedResults) {
   const canonical = { ...(publishedResults || {}) };
   for (const [key, parameter] of Object.entries(parameters || {})) {
-    if (parameter?.scope !== "room") continue;
+    // Every non-seat numeric parameter is project/room authority. Some legacy
+    // inputs label this scope "project" rather than "room"; neither may leave a
+    // stale pre-summary grade in roomResultsByParameter.
+    if (parameter?.scope === "seat") continue;
     const match = String(key).match(/^(?:p)?(\d+)$/i);
     if (!match) continue;
     const parameterNumber = Number(match[1]);
