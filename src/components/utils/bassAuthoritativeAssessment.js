@@ -1,7 +1,7 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { isReferenceSeatIdentity } from "@/components/room/bass/normalizedRoomInputAdapters";
-import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
-import { evaluateP19AbsoluteTargetDeviation } from "@/components/utils/p19AbsoluteTargetDeviation";
+import { levelP19_lfResponse, levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
+import { evaluateP19AbsoluteTargetDeviation, centerResidualForP19Assessment } from "@/components/utils/p19AbsoluteTargetDeviation";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
@@ -61,10 +61,26 @@ export function computeOfficialP19Assessment({ rspPostEqCurve, canonicalTargetCu
 }
 
 /**
- * Per-seat P19 assessment — same canonical max-abs deviation as the RSP P19,
- * applied to each real seat's post-EQ curve against the same absolute target.
- * Protected null regions (identified on the RSP) are excluded from every seat.
- * Returns an array of per-seat P19 results with seatId, level, variationDbRaw.
+ * Per-seat P19 assessment — centered minimax ± deviation.
+ *
+ * Each seat's post-EQ response is smoothed and the residual (response −
+ * canonical target) is computed by the same canonical primitive as the RSP
+ * P19. The residual is then centered analytically so P19 measures
+ * response-SHAPE deviation, not absolute-level error:
+ *
+ *   centeringDb   = -(maxResidual + minResidual) / 2
+ *   p19VariationDb = (maxResidual - minResidual) / 2
+ *
+ * This centering is assessment normalisation only — it is NOT a physical EQ
+ * filter, boost/cut request, or installed calibration setting. It is
+ * unconstrained by P14 headroom because it measures shape, not operating
+ * level. The RSP P19 path is unchanged (it uses performGlobalLevelAlignment).
+ *
+ * Protected null regions (identified on the RSP) are excluded from every
+ * seat's centering and worst-frequency scan.
+ *
+ * Returns an array of per-seat P19 results with seatId, level, variationDbRaw,
+ * worstFrequencyHz, centeringDb.
  */
 export function computeOfficialPerSeatP19Assessment({ perSeatPostEqCurves, canonicalTargetCurve, assessmentStartHz, assessmentEndHz, protectedNullRegions = [] }) {
   return (Array.isArray(perSeatPostEqCurves) ? perSeatPostEqCurves : [])
@@ -78,13 +94,21 @@ export function computeOfficialPerSeatP19Assessment({ perSeatPostEqCurves, canon
         protectedNullRegions,
       });
       if (!result || result.variationDbRaw == null) return null;
+      // Center the residual curve analytically (minimax ± deviation) so the
+      // per-seat P19 measures shape, not the seat-specific constant offset
+      // left by inheriting the RSP's global trim.
+      const centered = centerResidualForP19Assessment(result.residualCurve);
+      if (!centered || centered.variationDbRaw == null) return null;
+      const level = numericRp22Level(levelP19_lfResponse(centered.variationDbRaw));
       return {
         seatId: seat.seatId,
-        variationDbRaw: result.variationDbRaw,
-        totalRspToTargetDifferenceDbRaw: result.totalRspToTargetDifferenceDbRaw,
-        displayVariationDb: result.displayVariationDb,
-        level: result.level,
-        worstFrequencyHz: result.worstFrequencyHz,
+        variationDbRaw: centered.variationDbRaw,
+        totalRspToTargetDifferenceDbRaw: centered.variationDbRaw,
+        displayVariationDb: centered.variationDbRaw,
+        level,
+        worstFrequencyHz: centered.worstFrequencyHz,
+        // Assessment-only centering offset (diagnostic, NOT a physical trim).
+        centeringDb: centered.centeringDb,
       };
     })
     .filter(Boolean);
