@@ -55,8 +55,7 @@ export function useParameterGridAuthority({
     const id = Number(param?.id);
     const key = `p${id}`;
     const room = roomResultFor(engineeringSummary, id);
-    if (room) return room.level || parameterSummaries[key]?.level || "—";
-    return parameterSummaries[key]?.level || "—";
+    return parameterSummaries[key]?.level || room?.level || "—";
   }, [engineeringSummary, parameterSummaries]);
 
   const getHudValueForParam = React.useCallback((param) => {
@@ -117,7 +116,7 @@ export function useParameterGridAuthority({
   const makeBassParam = (id) => {
     const result = roomResultFor(engineeringSummary, id);
     return {
-      level: result?.level || parameterSummaries[`p${id}`]?.level || "—",
+      level: parameterSummaries[`p${id}`]?.level || result?.level || "—",
       valueText: result?.formatted || "—",
       detail: result?.detail || null,
       targetBasis: result?.targetBasis || null,
