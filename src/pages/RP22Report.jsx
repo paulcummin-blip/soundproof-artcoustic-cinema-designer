@@ -61,7 +61,7 @@ import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSenten
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
 import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReportPage';
 import { resolveBassReadiness } from '@/components/hooks/useAppDesignRating';
-import { readDesignReviewHandoff, storageKey as getDesignReviewHandoffStorageKey } from '@/components/state/designReviewHandoff';
+import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { setAuthoritativeReadOnlyMode } from '@/components/state/authoritativeReadOnlyMode';
 import { useAutoPrintReadinessInstrumentation, logAutoPrintBlock } from '@/components/report/useAutoPrintReadinessInstrumentation';
 
@@ -153,15 +153,12 @@ function RP22ReportInner() {
         // One-shot read — handles SPA navigation (window value) and direct
         // load (localStorage fallback). Re-runs when projectDetails load.
         read();
-        // Cross-tab refresh — re-read when another browser tab writes the
-        // handoff to localStorage. preferStored bypasses any stale same-window
-        // value so the fresh localStorage payload from the other tab wins.
-        const expectedKey = getDesignReviewHandoffStorageKey(explicitProjectId);
-        const onStorage = (event) => {
-            if (event.key === expectedKey) read(true);
-        };
-        window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
+        // Same-window and cross-tab publications push the exact canonical
+        // snapshot into every open consumer immediately.
+        return subscribeDesignReviewHandoff(explicitProjectId, (snapshot, preferStored) => {
+            if (snapshot) setDesignReviewHandoff(snapshot);
+            else read(preferStored);
+        });
     }, [explicitProjectId, projectDetails?.updated_date]);
     const designRecommendations = designReviewHandoff?.recommendations ?? null;
 
