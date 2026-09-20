@@ -53,6 +53,7 @@ test("P20 has no FAIL: every finite result is at least L1", () => {
   assert.equal(summary.parameterAuthority.p20.seats["seat-1"].level, "L1");
   assert.equal(summary.designRating.seatLevels.p20["seat-1"], "L1");
   assert.equal(summary.project.reportCounts.seatResultsByParameter.p20[0].level, "L1");
+  assert.equal(summary.project.reportCounts.seatResultsByParameter.p20[0].valueFormatted, "±12.0 dB");
 });
 
 test("P19 FAIL is published identically to every consumer view", () => {
@@ -60,6 +61,7 @@ test("P19 FAIL is published identically to every consumer view", () => {
   assert.equal(summary.parameterAuthority.p19.seats["seat-1"].level, "FAIL");
   assert.equal(summary.designRating.seatLevels.p19["seat-1"], "FAIL");
   assert.equal(summary.project.reportCounts.seatResultsByParameter.p19[0].level, "FAIL");
+  assert.equal(summary.project.reportCounts.seatResultsByParameter.p19[0].valueFormatted, "±7.0 dB");
   assert.equal(summary.seatHudById["seat-1"].rp22.p19.level, "FAIL");
   assert.equal(summary.project.compliance.byParameter.p19.level, "FAIL");
   assert.equal(summary.project.compliance.counts.fail, 1);
