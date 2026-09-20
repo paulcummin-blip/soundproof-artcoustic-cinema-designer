@@ -54,7 +54,6 @@ import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
 import { resolveBassReadiness } from "@/components/hooks/useAppDesignRating";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
-import { readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 
 export default function RP22ClientReport() {
   const navigate = useNavigate();
@@ -71,23 +70,11 @@ export default function RP22ClientReport() {
   );
 
   const authority = useClientReportAuthority(projectId);
-  const publishedEngineering = useMemo(
-    () => projectId ? readDesignReviewHandoff(projectId) : null,
-    [projectId]
-  );
-  const engineeringSummary = publishedEngineering?.engineeringSummary
-    ?? publishedEngineering?.rating?.engineeringSummary
-    ?? null;
-  const p19SeatAuthority = engineeringSummary?.p19SeatAuthority
-    ?? publishedEngineering?.p19SeatAuthority
-    ?? publishedEngineering?.rating?.p19SeatAuthority
-    ?? null;
+  const engineeringSummary = authority.engineeringSummary || null;
+  const p19SeatAuthority = engineeringSummary?.p19SeatAuthority || null;
   const appState = useAppState();
-  // Active P12 target basis — the same authority that drives the App compliance
-  // panel and the Technical Report (RP22CompliancePanel / RP22ReportParameterGrid).
-  const p12Mode = appState?.p12Mode || "minimum";
-  // Active P13 target basis — same authority chain (appState.splConfig.p13Mode).
-  const p13Mode = appState?.splConfig?.p13Mode || "minimum";
+  const p12Mode = engineeringSummary?.roomResultsByParameter?.[12]?.targetBasis || "minimum";
+  const p13Mode = engineeringSummary?.roomResultsByParameter?.[13]?.targetBasis || "minimum";
   const {
     hydrating,
     projectDetails,
@@ -121,7 +108,7 @@ export default function RP22ClientReport() {
     completedBassAuthority, bassApplicable, !p14Selection.noP14TargetSelected
   );
   const bassReportPending = !!projectId && bassApplicable && bassReadiness.pending;
-  const reportPending = hydrating || bassReportPending;
+  const reportPending = hydrating || !engineeringSummary;
 
   // ── Design Summary (static intro — pure selector, no analysis) ──
   const highlights = useMemo(() => selectClientDesignHighlights(), []);
