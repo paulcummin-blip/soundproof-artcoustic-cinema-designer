@@ -13,10 +13,6 @@
  * sentence helpers plus the new unweighted modal helpers. No recalculation.
  */
 import React from "react";
-import {
-  getDesignPerformanceIndex,
-  getDesignRatingSupportingSentence,
-} from "./designRatingPresentation";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -36,15 +32,10 @@ function isConfigured(rating) {
   );
 }
 
-function SeatingBlock({ label, rating, emphasize, concise }) {
-  const configured = isConfigured(rating);
-  const index = configured ? getDesignPerformanceIndex(rating) : null;
-
-  let supportLine = null;
-
-  if (configured && concise) {
-    supportLine = getDesignRatingSupportingSentence(rating);
-  }
+function SeatingBlock({ label, summary, emphasize, concise }) {
+  const configured = isConfigured(summary?.rating);
+  const index = configured ? (summary?.designPerformanceIndex ?? null) : null;
+  const supportLine = configured && concise ? (summary?.supportingSentence ?? null) : null;
 
   return (
     <div style={{ marginBottom: emphasize ? "4mm" : "3mm" }}>
@@ -106,11 +97,11 @@ export default function AsdrSeatingSummary({ primary, secondary, all }) {
       className="print-avoid-break tech-asdr-seating-summary"
       style={{ breakInside: "avoid", pageBreakInside: "avoid" }}
     >
-      <SeatingBlock label="Primary Seating" rating={primary} emphasize concise={false} />
-      {secondary && (
-        <SeatingBlock label="Secondary Seating" rating={secondary} emphasize={false} concise={false} />
+      <SeatingBlock label="Primary Seating" summary={primary} emphasize concise={false} />
+      {secondary?.rating && (
+        <SeatingBlock label="Secondary Seating" summary={secondary} emphasize={false} concise={false} />
       )}
-      <SeatingBlock label="All Seating" rating={all} emphasize={false} concise />
+      <SeatingBlock label="All Seating" summary={all} emphasize={false} concise />
     </div>
   );
 }
