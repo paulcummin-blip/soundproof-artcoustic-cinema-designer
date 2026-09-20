@@ -381,23 +381,16 @@ export default function RP22CompliancePanel({
   // per-seat pills, notes, debug). Rendered only when a matrix row is expanded.
   // Lifted verbatim from the previous always-on card stack — no logic changed.
   const renderParamDetailCard = (p) => {
-    const lvl = p.id === 20 ? bassPresentation.parameters.p20.level : getHudLevelForParam(p);
-    const achievedValue = p.id === 20 ? bassPresentation.parameters.p20.valueText : getHudValueForParam(p);
+    const lvl = getHudLevelForParam(p);
+    const achievedValue = getHudValueForParam(p);
     const isSeatScope = String(p.scope || "").toLowerCase() === "seat";
     const resolvedParam = (p.id === 12 || p.id === 13 || p.id === 14)
       ? { ...p, thresholds: resolveParamThresholds(p, p12Mode, p13Mode, p14Mode) }
       : p;
     const targetBasisNote =
-      (p.id === 12 || p.id === 13)
-        ? (() => {
-            const v = analysisResult?.gradedParameters?.primary?.[p.id]?.value;
-            const dual = resolveP12P13DualLevels(p.id, v);
-            return dual ? `Minimum ${dual.minimum} · Recommended ${dual.recommended}` : null;
-          })()
-        : p.id === 14 ? bassPresentation.parameters.p14.detail :
-      p.id === 18 ? "Official room result from the completed authoritative bass analysis." :
-      p.id === 19 ? "Per-seat evaluation from the completed authoritative bass analysis." :
-      null;
+      engineeringSummary?.roomResultsByParameter?.[p.id]?.targetBasisNote
+      ?? engineeringSummary?.roomResultsByParameter?.[p.id]?.detail
+      ?? null;
     const debugMetric = String(reportSource).startsWith("seat:")
       ? (() => {
           const seatId = String(reportSource).split(":")[1];
