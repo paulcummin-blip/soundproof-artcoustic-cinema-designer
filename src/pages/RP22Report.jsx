@@ -931,9 +931,6 @@ function RP22ReportInner() {
         p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
         setAssumedP15LevelSafe: app?.setAssumedP15LevelSafe,
         setAssumedP21LevelSafe: app?.setAssumedP21LevelSafe,
-        bassAuthority: completedBassAuthority,
-        p19SeatAuthority,
-        bassErrorMessage,
         contributionsByKey: showDesignRating ? asdrContributionsByKey : null,
     };
 
@@ -1071,8 +1068,8 @@ function RP22ReportInner() {
                         setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
-                        exportDisabled={reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || bassReportPending || recommendationsPending}
-                        exportDisabledMessage={bassReportPending ? "Bass analysis updating" : (recommendationsPending ? "Recommendations evaluating" : "Report loading")}
+                        exportDisabled={reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || recommendationsPending}
+                        exportDisabledMessage={authorityReportPending ? "Engineering summary loading" : (recommendationsPending ? "Recommendations evaluating" : "Report loading")}
                         lcrAngleInfo={(() => {
                             // Compute LCR angles exactly as Plan View does:
                             // lcrAimMode === 'angled' → compute yaw from speaker position to MLP
@@ -1305,13 +1302,10 @@ function RP22ReportInner() {
                         <section
                           id="pdf-room-parameters"
                           className="print-page-break-before"
-                          data-bass-result-fingerprint={complianceBassExportData.resultFingerprint || ""}
-                          data-bass-selected-candidate={complianceBassExportData.selectedCandidateId || ""}
                         >
                              <div>
                                  <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 16, fontWeight: 400, color: '#213428', marginBottom: 2, letterSpacing: '0.01em' }}>RP22 Parameters</div>
                                 <div style={{ color: '#625143', fontSize: 9, marginBottom: 8, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>Engineering Evidence</div>
-                                {bassErrorMessage && <div style={{ color: '#625143', fontSize: 10, marginBottom: 8, fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>Bass analysis unavailable</div>}
                                 <RP22ReportParameterGrid {...parameterGridProps} variant="print" />
                             </div>
                         </section>
