@@ -354,26 +354,11 @@ export default function RoomDesignerControlsPanel({
           }
           <Suspense fallback={<div>Loading...</div>}>
             <RP22CompliancePanel
-              analysisResult={analysisResult}
               engineeringSummary={engineeringSummary}
-              p19SeatAuthority={p19SeatAuthority}
               screen={_screen}
               seatingPositions={_seatingPositions}
-              seatHudSnapshots={
-                (appState?.seatSnapshotBySeatId && Object.keys(appState.seatSnapshotBySeatId).length > 0)
-                  ? appState.seatSnapshotBySeatId
-                  : ((appState?.seatMetricsById && Object.keys(appState.seatMetricsById).length > 0)
-                      ? appState.seatMetricsById
-                      : {})
-              }
-              roomHudSnapshot={appState?.roomHudSnapshot || analysisResult?.roomHudSnapshot || null}
-              mlpSeatId={"mlp"}
-              dolbyLayout={appState?.dolbyLayout}
-              frontSubsCount={appState?.frontSubsCfg?.count}
-              rearSubsCount={appState?.rearSubsCfg?.count}
               assumedP15Level={appState?.assumedP15Level}
-              assumedP21Level={appState?.assumedP21Level}
-              freeMoveLcr={freeMoveLcr} />
+              assumedP21Level={appState?.assumedP21Level} />
           </Suspense>
         </CollapsiblePanel>
 
