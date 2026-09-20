@@ -101,7 +101,10 @@ export function selectClientNonScreenDynamicRange({
   const minimum = p13 && Number.isFinite(Number(p13.value))
     ? { value: Number(p13.value), formatted: p13.formatted || `${p13.value} dB` }
     : null;
-  const level = p13?.level ?? engineeringSummary?.parameterAuthority?.p13?.level ?? null;
+  const level = engineeringSummary?.parameterSummaries?.project?.p13?.level
+    ?? engineeringSummary?.parameterSummaries?.project?.[13]?.level
+    ?? p13?.level
+    ?? null;
   const resultHeading = level ? RESULT_HEADINGS[level] || "" : "";
 
   const hasAny = speakerSplValues.length > 0 || !!(minimum && level);
