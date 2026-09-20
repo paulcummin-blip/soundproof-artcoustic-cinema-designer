@@ -1,147 +1,101 @@
 /**
- * useEngineeringSnapshot.js
- * --------------------------------
- * React hook that assembles the frozen Engineering Snapshot from the SAME
- * settled authorities already used by Room Designer / Compliance / Design Rating.
+ * Passive Engineering Snapshot adapter.
  *
- * This hook is designed to run in a context where the Room Designer state is
- * available — either the Room Designer itself, or a report page that has
- * hydrated AppState for the selected version.
- *
- * It calls:
- *   - useCompletedBassAuthority(projectId, versionId)
- *   - buildComplianceBassPresentation
- *   - useAppDesignRating (for scopedRatings + p19SeatAuthority + designRating)
- *   - usePriceCalculation (for commercial pricing)
- *   - buildEngineeringSnapshot (pure builder)
- *
- * The returned snapshot is frozen and version-safe. Later design edits do not
- * silently change an existing snapshot — the snapshot is stored on the
- * Proposal at generation time.
+ * The Room Designer is the only producer. This hook never mounts an analysis,
+ * bass, rating, grading, grouping, or pricing engine; it copies the selected
+ * version's published authority into the frozen proposal/PDF snapshot.
  */
 
 import { useMemo } from 'react';
-import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
-import { buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
-import { useAppDesignRating } from '@/components/hooks/useAppDesignRating';
-import { usePriceCalculation } from '@/components/pricing/usePriceCalculation';
 import { buildEngineeringSnapshot } from './buildEngineeringSnapshot';
 
-/**
- * @param {Object} params
- * @param {string} params.projectId — REQUIRED
- * @param {string} params.versionId — REQUIRED
- * @param {Object} params.project — Project entity
- * @param {Object} params.version — ProjectVersion entity
- * @param {Object} params.mergedProject — mergeProjectAndVersion result
- * @param {Object} params.appState — from useAppState()
- * @param {Array}  params.seats — canonical seating positions
- * @param {Object} params.analysisResult — from useRP22AnalysisEngine
- * @param {Array}  params.placedSpeakers — placed speaker objects
- * @param {boolean} [params.minimumSystemMet=true]
- * @param {Object} [params.priceCalculationOverrides] — optional pre-computed price calc
- * @param {Array}  [params.proposalAssets]
- * @param {Object} [params.brandAsset]
- * @param {Object} [params.proposalMetadata]
- * @param {Object} [params.assumedLevels]
- * @param {Object} [params.assessmentModes]
- * @param {Object} [params.priceCalcInputs] — inputs for usePriceCalculation if not provided
- * @returns {{ snapshot: Object|null, loading: boolean, error: string|null }}
- */
 export function useEngineeringSnapshot({
   projectId,
   versionId,
   project,
   version,
   mergedProject,
-  appState,
+  publishedEngineering,
+  engineeringSummary: explicitEngineeringSummary,
   seats,
-  analysisResult,
   placedSpeakers,
-  minimumSystemMet = true,
+  priceCalculation,
   proposalAssets,
   brandAsset,
   proposalMetadata,
   assumedLevels,
   assessmentModes,
-  priceCalcInputs,
 }) {
-  const effectiveVersionId = versionId || version?.id || null;
-
-  // ── Canonical bass authority (version-keyed) ──
-  const completedBassAuthority = useCompletedBassAuthority(projectId || 'free', effectiveVersionId || 'free');
-  const bassErrorMessage = completedBassAuthority?.errorMessage || null;
-
-  const completedBassPresentation = useMemo(
-    () => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage),
-    [completedBassAuthority, bassErrorMessage],
-  );
-
-  // ── Canonical design rating (scopedRatings + p19SeatAuthority) ──
-  const designRating = useAppDesignRating({
-    appState,
-    seats,
-    analysisResult,
-    placedSpeakers,
-    projectId,
-    versionId: effectiveVersionId,
-    minimumSystemMet,
-  });
-
-  // ── Canonical pricing (separate from engineering) ──
-  const defaultPriceInputs = useMemo(() => ({
-    placedSpeakers: placedSpeakers || [],
-    frontSubsCfg: mergedProject?.front_subs_cfg || appState?.frontSubsCfg || null,
-    rearSubsCfg: mergedProject?.rear_subs_cfg || appState?.rearSubsCfg || null,
-    difficultyMultiplier: Number(appState?.difficultyMultiplier) || 1.0,
-    priceMode: appState?.priceMode || 'incVat',
-    soundbarSelections: appState?.soundbarSelections || {},
-    acousticTreatmentEnabled: mergedProject?.acoustic_treatment_enabled || false,
-    selectedAbfuserQty: Number(mergedProject?.selected_abfuser_qty) || 0,
-  }), [placedSpeakers, mergedProject, appState]);
-
-  const priceCalculation = usePriceCalculation(priceCalcInputs || defaultPriceInputs);
-
-  // ── Assemble the frozen snapshot ──
-  const result = useMemo(() => {
-    if (!projectId || !effectiveVersionId) {
+  return useMemo(() => {
+    if (!projectId || !versionId) {
       return { snapshot: null, loading: false, error: 'projectId and versionId are required.' };
+    }
+
+    const publication = publishedEngineering || null;
+    const publicationVersionId = String(publication?.versionId || '');
+    if (publicationVersionId && publicationVersionId !== String(versionId)) {
+      return {
+        snapshot: null,
+        loading: false,
+        error: 'The selected version has no matching published engineering result. Open that version in Room Designer and calculate it first.',
+      };
+    }
+
+    const engineeringSummary =
+      explicitEngineeringSummary ||
+      publication?.engineeringSummary ||
+      publication?.rating?.engineeringSummary ||
+      null;
+
+    if (!engineeringSummary) {
+      return {
+        snapshot: null,
+        loading: false,
+        error: 'No published engineering result is available for the selected version.',
+      };
     }
 
     try {
       const snapshot = buildEngineeringSnapshot({
         projectId,
-        versionId: effectiveVersionId,
+        versionId,
         project,
         version,
         mergedProject,
-        analysisResult,
-        completedBassAuthority,
-        completedBassPresentation,
-        designRating,
-        seats,
-        placedSpeakers,
-        priceCalculation,
+        engineeringSummary,
+        designRating: publication?.rating || null,
+        completedBassAuthority: publication?.calculationFingerprint
+          ? { currentFingerprint: publication.calculationFingerprint }
+          : null,
+        seats: seats || publication?.seatingPositions || [],
+        placedSpeakers: placedSpeakers || publication?.placedSpeakers || [],
+        priceCalculation: priceCalculation || publication?.priceData || null,
         proposalAssets,
         brandAsset,
         proposalMetadata,
         assumedLevels,
         assessmentModes,
       });
-      return { snapshot, loading: false, error: null };
+      return {
+        snapshot: snapshot?.available === false ? null : snapshot,
+        loading: false,
+        error: snapshot?.available === false ? snapshot.error : null,
+      };
     } catch (err) {
-      return { snapshot: null, loading: false, error: err?.message || 'Failed to build engineering snapshot.' };
+      return {
+        snapshot: null,
+        loading: false,
+        error: err?.message || 'Failed to build engineering snapshot.',
+      };
     }
   }, [
     projectId,
-    effectiveVersionId,
+    versionId,
     project,
     version,
     mergedProject,
-    analysisResult,
-    completedBassAuthority,
-    completedBassPresentation,
-    designRating,
+    publishedEngineering,
+    explicitEngineeringSummary,
     seats,
     placedSpeakers,
     priceCalculation,
@@ -151,6 +105,4 @@ export function useEngineeringSnapshot({
     assumedLevels,
     assessmentModes,
   ]);
-
-  return result;
 }
