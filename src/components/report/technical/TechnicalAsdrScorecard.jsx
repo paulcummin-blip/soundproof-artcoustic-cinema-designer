@@ -19,7 +19,6 @@
 import React from "react";
 import AsdrCategorySection from "./AsdrCategorySection";
 import AsdrSeatingSummary from "./AsdrSeatingSummary";
-import { getCategoryFloorSummaries } from "./designRatingPresentation";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -45,21 +44,19 @@ const CATEGORY_DISPLAY = [
 export default function TechnicalAsdrScorecard({
   roomDesignRating,
   showDesignRating = false,
-  scopedRatings = null,
+  engineeringSummary = null,
 }) {
-  if (!showDesignRating || !roomDesignRating) {
+  if (!showDesignRating || !roomDesignRating || !engineeringSummary) {
     return null;
   }
 
-  const scopes = scopedRatings || { all: roomDesignRating };
-  const primaryRating = scopes.primary || scopes.all;
-  const secondaryRating = scopes.secondary || null;
-  const allRating = scopes.all || roomDesignRating;
-
-  const primaryCats = getCategoryFloorSummaries(primaryRating);
-  const secondaryCats = secondaryRating
-    ? getCategoryFloorSummaries(secondaryRating)
-    : null;
+  // Direct read only. Category floors and scoped DPIs were calculated once
+  // inside summariseEngineeringResults().
+  const primarySummary = engineeringSummary.primary;
+  const secondarySummary = engineeringSummary.secondary;
+  const projectSummary = engineeringSummary.project;
+  const primaryCats = primarySummary?.categories || [];
+  const secondaryCats = secondarySummary?.categories || null;
 
   return (
     <div
@@ -133,9 +130,9 @@ export default function TechnicalAsdrScorecard({
 
       {/* ── Overall seating summaries (supporting) ── */}
       <AsdrSeatingSummary
-        primary={primaryRating}
-        secondary={secondaryRating}
-        all={allRating}
+        primary={primarySummary}
+        secondary={secondarySummary}
+        all={projectSummary}
       />
 
       {/* ── Client language note (proprietary disclaimer) ── */}
