@@ -1802,7 +1802,7 @@ function RoomDesignerWithState() {
     // Review until the system has LCR, surrounds, and at least one subwoofer.
     // Clear any previously published snapshot so a partial system cannot leak.
     if (!minimumSystemMet) {
-      clearDesignReviewHandoff(handoffProjectId);
+      clearDesignReviewHandoff(handoffProjectId, appState?.activeVersionId || null);
       return;
     }
 

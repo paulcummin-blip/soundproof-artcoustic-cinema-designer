@@ -92,6 +92,7 @@ export default function Layout({ children, currentPageName }) {
     id: null,
     name: null,
     client_name: null,
+    active_version_id: null,
   });
 
   React.useEffect(() => {
@@ -108,7 +109,7 @@ export default function Layout({ children, currentPageName }) {
       if (projectId) {
         setActiveProjectId(projectId);
       } else {
-        setActiveProjectSummary({ id: null, name: null, client_name: null });
+        setActiveProjectSummary({ id: null, name: null, client_name: null, active_version_id: null });
         return;
       }
 
@@ -122,6 +123,7 @@ export default function Layout({ children, currentPageName }) {
               id: projectId,
               name: project?.name || "Untitled Project",
               client_name: project?.client_name || "",
+              active_version_id: project?.active_version_id || null,
             });
           }
         } catch (err) {
@@ -133,7 +135,7 @@ export default function Layout({ children, currentPageName }) {
       })();
     } catch (e) {
       console.error("[Layout] Failed to parse URL for active project:", e);
-      setActiveProjectSummary({ id: null, name: null, client_name: null });
+      setActiveProjectSummary({ id: null, name: null, client_name: null, active_version_id: null });
     }
 
     return () => {
@@ -143,26 +145,28 @@ export default function Layout({ children, currentPageName }) {
   
   // The sidebar is a direct subscriber to the same published engineering
   // authority as every report. It never rebuilds or polls a separate rating.
+  const activeVersionId = activeProjectSummary?.active_version_id || null;
+
   React.useEffect(() => {
-    if (!activeProjectId) {
+    if (!activeProjectId || !activeVersionId) {
       setEngineeringSummary(null);
       return undefined;
     }
     const applyPublication = (snapshot) => {
-      const published = snapshot || readDesignReviewHandoff(activeProjectId);
+      const published = snapshot || readDesignReviewHandoff(activeProjectId, activeVersionId);
       setEngineeringSummary(
         published?.engineeringSummary
           ?? published?.rating?.engineeringSummary
           ?? null
       );
     };
-    applyPublication(readDesignReviewHandoff(activeProjectId));
-    return subscribeDesignReviewHandoff(activeProjectId, (snapshot, fromStorage) => {
+    applyPublication(readDesignReviewHandoff(activeProjectId, activeVersionId));
+    return subscribeDesignReviewHandoff(activeProjectId, activeVersionId, (snapshot, fromStorage) => {
       applyPublication(snapshot || (fromStorage
-        ? readDesignReviewHandoff(activeProjectId, { preferStored: true })
+        ? readDesignReviewHandoff(activeProjectId, activeVersionId, { preferStored: true })
         : null));
     });
-  }, [activeProjectId]);
+  }, [activeProjectId, activeVersionId]);
 
   // Listen for price and lightweight pending-indicator updates.
   React.useEffect(() => {

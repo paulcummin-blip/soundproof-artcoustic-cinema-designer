@@ -127,17 +127,18 @@ function RP22ReportInner() {
     // for direct loads it is already in localStorage. A single useEffect read
     // suffices. A storage event listener covers the rare case where another
     // browser tab updates the project while the report is already open.
+    const reportVersionId = projectDetails?.active_version_id || null;
+
     const [designReviewHandoff, setDesignReviewHandoff] = useState(
-        () => explicitProjectId ? readDesignReviewHandoff(explicitProjectId) : null
+        () => (explicitProjectId && reportVersionId) ? readDesignReviewHandoff(explicitProjectId, reportVersionId) : null
     );
     useEffect(() => {
-        if (!explicitProjectId) {
+        if (!explicitProjectId || !reportVersionId) {
             setDesignReviewHandoff(null);
             return;
         }
         const read = (preferStored = false) => {
-            const shared = readDesignReviewHandoff(explicitProjectId, {
-                projectUpdatedAt: projectDetails?.updated_date,
+            const shared = readDesignReviewHandoff(explicitProjectId, reportVersionId, {
                 allowStored: true,
                 preferStored,
             });
@@ -148,11 +149,11 @@ function RP22ReportInner() {
         read();
         // Same-window and cross-tab publications push the exact canonical
         // snapshot into every open consumer immediately.
-        return subscribeDesignReviewHandoff(explicitProjectId, (snapshot, preferStored) => {
+        return subscribeDesignReviewHandoff(explicitProjectId, reportVersionId, (snapshot, preferStored) => {
             if (snapshot) setDesignReviewHandoff(snapshot);
             else read(preferStored);
         });
-    }, [explicitProjectId, projectDetails?.updated_date]);
+    }, [explicitProjectId, reportVersionId]);
     const designRecommendations = designReviewHandoff?.recommendations ?? null;
 
     // One published engineering summary is the sole report authority.

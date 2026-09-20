@@ -320,18 +320,18 @@ export function useClientReportAuthority(projectId) {
   // rebuild SPL metrics; every engineering result comes from the Room Designer
   // publication for this project.
   const [publishedEngineering, setPublishedEngineering] = useState(
-    () => projectId ? readDesignReviewHandoff(projectId) : null
+    () => (projectId && versionId) ? readDesignReviewHandoff(projectId, versionId) : null
   );
   useEffect(() => {
-    if (!projectId) {
+    if (!projectId || !versionId) {
       setPublishedEngineering(null);
       return undefined;
     }
-    setPublishedEngineering(readDesignReviewHandoff(projectId));
-    return subscribeDesignReviewHandoff(projectId, (snapshot) => {
-      setPublishedEngineering(snapshot || readDesignReviewHandoff(projectId, { preferStored: true }));
+    setPublishedEngineering(readDesignReviewHandoff(projectId, versionId));
+    return subscribeDesignReviewHandoff(projectId, versionId, (snapshot) => {
+      setPublishedEngineering(snapshot || readDesignReviewHandoff(projectId, versionId, { preferStored: true }));
     });
-  }, [projectId, hydratedProjectId, hydrating]);
+  }, [projectId, versionId, hydratedProjectId, hydrating]);
   const engineeringSummary = publishedEngineering?.engineeringSummary
     ?? publishedEngineering?.rating?.engineeringSummary
     ?? null;

@@ -146,20 +146,25 @@ export default function DesignReviewPage() {
   // Read the live same-window handoff first, then the project-scoped stored
   // snapshot for direct/new-tab loads. Stored data is accepted only after the
   // current Project record has loaded and passed the freshness check.
+  const activeVersionId = projectDetails?.active_version_id || null;
+
   useEffect(() => {
+    if (!projectId || !activeVersionId) {
+      setAsdrData(null);
+      return undefined;
+    }
     const read = () => {
-      const shared = readDesignReviewHandoff(projectId, {
-        projectUpdatedAt: projectDetails?.updated_date,
+      const shared = readDesignReviewHandoff(projectId, activeVersionId, {
         allowStored: !loadingProject,
       });
       setAsdrData(shared);
     };
     read();
-    return subscribeDesignReviewHandoff(projectId, (snapshot) => {
+    return subscribeDesignReviewHandoff(projectId, activeVersionId, (snapshot) => {
       if (snapshot) setAsdrData(snapshot);
       else read();
     });
-  }, [projectId, projectDetails?.updated_date, loadingProject]);
+  }, [projectId, activeVersionId, loadingProject]);
 
   // Keep the persistent sidebar on the same project-scoped price snapshot,
   // including on a direct/new-tab Design Review load.

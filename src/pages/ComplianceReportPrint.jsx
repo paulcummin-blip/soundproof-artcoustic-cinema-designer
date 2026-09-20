@@ -6,17 +6,42 @@ import SeatComplianceSummary from '@/components/report/SeatComplianceSummary';
 import { formatSeatLabel } from '@/components/utils/seatLabel';
 import { RP22_PRESENTATION_PARAMETERS, RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
+import { base44 } from '@/api/base44Client';
 
 export default function ComplianceReportPrint() {
   const [isReady, setIsReady] = useState(false);
   const reportScopeId = new URLSearchParams(window.location.search).get('projectId') || new URLSearchParams(window.location.search).get('id') || 'free';
-  const [publishedEngineering, setPublishedEngineering] = useState(() => readDesignReviewHandoff(reportScopeId));
+  const [reportVersionId, setReportVersionId] = useState(null);
+  const [publishedEngineering, setPublishedEngineering] = useState(null);
+
+  // Fetch the project record to resolve the active version ID. The handoff
+  // is version-scoped; no project-only fallback is used.
   useEffect(() => {
-    setPublishedEngineering(readDesignReviewHandoff(reportScopeId));
-    return subscribeDesignReviewHandoff(reportScopeId, (snapshot) => {
-      setPublishedEngineering(snapshot || readDesignReviewHandoff(reportScopeId, { preferStored: true }));
-    });
+    if (!reportScopeId || reportScopeId === 'free') return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const results = await base44.entities.Project.filter({ id: reportScopeId });
+        if (cancelled) return;
+        const p = Array.isArray(results) && results.length ? results[0] : null;
+        setReportVersionId(p?.active_version_id || null);
+      } catch {
+        if (!cancelled) setReportVersionId(null);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [reportScopeId]);
+
+  useEffect(() => {
+    if (!reportScopeId || !reportVersionId) {
+      setPublishedEngineering(null);
+      return undefined;
+    }
+    setPublishedEngineering(readDesignReviewHandoff(reportScopeId, reportVersionId));
+    return subscribeDesignReviewHandoff(reportScopeId, reportVersionId, (snapshot) => {
+      setPublishedEngineering(snapshot || readDesignReviewHandoff(reportScopeId, reportVersionId, { preferStored: true }));
+    });
+  }, [reportScopeId, reportVersionId]);
   const engineeringSummary = publishedEngineering?.engineeringSummary
     ?? publishedEngineering?.rating?.engineeringSummary
     ?? null;

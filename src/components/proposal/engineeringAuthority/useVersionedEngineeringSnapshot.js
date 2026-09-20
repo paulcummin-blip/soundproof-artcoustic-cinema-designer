@@ -19,21 +19,21 @@ export function useVersionedEngineeringSnapshot(projectId, versionId, options = 
   const [project, setProject] = useState(null);
   const [version, setVersion] = useState(null);
   const [publishedEngineering, setPublishedEngineering] = useState(
-    () => (projectId ? readDesignReviewHandoff(projectId) : null),
+    () => (projectId && versionId ? readDesignReviewHandoff(projectId, versionId) : null),
   );
 
   useEffect(() => {
-    if (!projectId) {
+    if (!projectId || !versionId) {
       setPublishedEngineering(null);
       return undefined;
     }
-    setPublishedEngineering(readDesignReviewHandoff(projectId));
-    return subscribeDesignReviewHandoff(projectId, (snapshot, fromStorage) => {
+    setPublishedEngineering(readDesignReviewHandoff(projectId, versionId));
+    return subscribeDesignReviewHandoff(projectId, versionId, (snapshot, fromStorage) => {
       setPublishedEngineering(
-        snapshot || (fromStorage ? readDesignReviewHandoff(projectId, { preferStored: true }) : null),
+        snapshot || (fromStorage ? readDesignReviewHandoff(projectId, versionId, { preferStored: true }) : null),
       );
     });
-  }, [projectId]);
+  }, [projectId, versionId]);
 
   useEffect(() => {
     let cancelled = false;
