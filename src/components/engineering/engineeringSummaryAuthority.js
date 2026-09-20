@@ -78,6 +78,25 @@ function parameterAggregateLevel(parameter, seatIds = null) {
   return floorForSeatParameter(parameter, seatIds);
 }
 
+function buildCanonicalRoomResults(parameters, publishedResults) {
+  const canonical = { ...(publishedResults || {}) };
+  for (const [key, parameter] of Object.entries(parameters || {})) {
+    if (parameter?.scope !== "room") continue;
+    const match = String(key).match(/^p(\d+)$/i);
+    if (!match) continue;
+    const parameterNumber = Number(match[1]);
+    const existing = canonical[parameterNumber] || canonical[String(parameterNumber)] || {};
+    canonical[parameterNumber] = {
+      ...existing,
+      state: parameter.state || "provisional",
+      status: parameter.state || existing.status || null,
+      value: parameter.state === "scored" ? (parameter.rawValue ?? existing.value ?? null) : null,
+      level: parameter.state === "scored" ? normalizeLevel(parameter.level) : null,
+    };
+  }
+  return canonical;
+}
+
 function buildParameterScopeSummary(parameters, seatIds) {
   const summary = {};
   for (const [key, parameter] of Object.entries(parameters || {})) {
@@ -419,6 +438,10 @@ export function summariseEngineeringResults({
     secondary: buildParameterScopeSummary(designRatingAuthority.parameters, secondarySeatIds),
     project: buildParameterScopeSummary(designRatingAuthority.parameters, allSeatIds),
   };
+  const canonicalRoomResultsByParameter = buildCanonicalRoomResults(
+    designRatingAuthority.parameters,
+    roomResultsByParameter,
+  );
   const coverage = buildRp22SeatCoverageResult({
     paramAuthority: designRatingAuthority.parameters,
     seats: canonicalSeats,
@@ -432,7 +455,7 @@ export function summariseEngineeringResults({
     schemaVersion: ENGINEERING_SUMMARY_SCHEMA_VERSION,
     seatPriorityFingerprint: buildSeatPriorityFingerprint(canonicalSeats),
     parameterAuthority: designRatingAuthority.parameters,
-    roomResultsByParameter: roomResultsByParameter || {},
+    roomResultsByParameter: canonicalRoomResultsByParameter,
     seatHudById: seatHudById || {},
     p19SeatAuthority,
     viewing,
