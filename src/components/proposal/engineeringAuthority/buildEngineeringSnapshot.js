@@ -5,12 +5,9 @@
  *
  * Assembles one version-safe, canonical engineering snapshot from the SAME
  * settled authorities already used by Room Designer / Compliance / Design Rating:
- *   - useRP22AnalysisEngine          → analysisResult
- *   - useCompletedBassAuthority      → completedBassAuthority
- *   - buildComplianceBassPresentation → completedBassPresentation
- *   - useAppDesignRating             → designRating (with scopedRatings + p19SeatAuthority)
- *   - usePriceCalculation            → priceCalculation
- *   - resolveSeatPriority            → seat priority
+ *   - summariseEngineeringResults    → engineeringSummary
+ *   - usePriceCalculation             → priceCalculation
+ *   - versioned project metadata      → room/system/products
  *
  * The backend must NOT independently reconstruct engineering results from raw
  * Project fields. This snapshot IS the engineering truth.
@@ -48,10 +45,8 @@ export const ENGINEERING_SNAPSHOT_VERSION = '1.0';
  * @param {Object} params.project — Project entity (shared metadata)
  * @param {Object} params.version — ProjectVersion entity (design_state authority)
  * @param {Object} params.mergedProject — mergeProjectAndVersion(project, version) result
- * @param {Object} params.analysisResult — from useRP22AnalysisEngine
- * @param {Object} params.completedBassAuthority — from useCompletedBassAuthority
- * @param {Object} params.completedBassPresentation — from buildComplianceBassPresentation
- * @param {Object} params.designRating — from useAppDesignRating (includes scopedRatings + p19SeatAuthority)
+ * @param {Object} params.engineeringSummary — the published canonical engineering summary
+ * @param {Object} params.designRating — compatibility envelope carrying engineeringSummary
  * @param {Array}  params.seats — canonical seating positions
  * @param {Array}  params.placedSpeakers — placed speaker objects
  * @param {Object} params.priceCalculation — from usePriceCalculation
@@ -71,8 +66,8 @@ export function buildEngineeringSnapshot(params = {}) {
     mergedProject,
     analysisResult,
     completedBassAuthority,
-    completedBassPresentation,
     designRating,
+    engineeringSummary: explicitEngineeringSummary,
     seats,
     placedSpeakers,
     priceCalculation,
@@ -93,7 +88,17 @@ export function buildEngineeringSnapshot(params = {}) {
     };
   }
 
-  // ── 2. Version-merged design state is the design identity ──
+  const engineeringSummary = explicitEngineeringSummary || designRating?.engineeringSummary || null;
+  if (!engineeringSummary) {
+    return {
+      schema_version: ENGINEERING_SNAPSHOT_VERSION,
+      available: false,
+      error: 'Published canonical engineering summary is required.',
+      identity: { projectId, versionId, generatedAt: new Date().toISOString() },
+    };
+  }
+
+  // ── 2. Version-merged design state is metadata only ──
   const designProject = mergedProject || project;
 
   // ── 3. Identity ──
@@ -119,34 +124,22 @@ export function buildEngineeringSnapshot(params = {}) {
 
   // ── 7. RP22 (parameter headlines + assumed; category floors from published authority) ──
   const rp22Authority = buildRp22Authority(
-    analysisResult,
-    designRating,
-    seats,
-    assumedLevels || {
-      p15: project?.assumed_p15_level || designProject?.assumed_p15_level || null,
-      p21: project?.assumed_p21_level || designProject?.assumed_p21_level || null,
-    },
+    engineeringSummary,
+    null,
+    null,
+    null,
     assessmentModes || {},
   );
 
-  const categoryFloors = buildSnapshotCategoryFloors(designRating?.scopedRatings);
-  const dpi = buildSnapshotDpi(designRating?.scopedRatings);
+  const categoryFloors = buildSnapshotCategoryFloors(engineeringSummary);
+  const dpi = buildSnapshotDpi(engineeringSummary);
 
-  // ── 8. Bass (P14/P18/P19/P20 from completed bass authority) ──
-  const bassAuthority = buildBassAuthority(completedBassAuthority, completedBassPresentation);
+  // ── 8. Bass — passive reads from the canonical engineering summary ──
+  const bassAuthority = buildBassAuthority(engineeringSummary);
+  const p19Snapshot = buildSnapshotP19(engineeringSummary);
+  const p20Snapshot = buildSnapshotP20(engineeringSummary);
 
-  const p19Snapshot = buildSnapshotP19(
-    designRating?.p19SeatAuthority || null,
-    completedBassPresentation,
-  );
-
-  const p20Snapshot = buildSnapshotP20(
-    seats,
-    completedBassPresentation?.perSeatP20Results || [],
-    completedBassPresentation,
-  );
-
-  // ── 9. Viewing / RP23 (from canonical engine perSeatRp23) ──
+  // ── 9. Viewing / RP23 — presentation-only legacy adapter ──
   const viewing = buildSnapshotViewing(analysisResult, seats);
 
   // ── 10. Pricing (separate from engineering) ──
