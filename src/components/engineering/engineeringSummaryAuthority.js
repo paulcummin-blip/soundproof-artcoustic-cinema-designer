@@ -30,6 +30,12 @@ export const ENGINEERING_SUMMARY_SCHEMA_VERSION = 1;
 
 const LEVEL_RANK = { FAIL: 0, L1: 1, L2: 2, L3: 3, L4: 4 };
 const RANK_LEVEL = ["FAIL", "L1", "L2", "L3", "L4"];
+const SCORECARD_CATEGORY_ORDER = [
+  "Spatial Resolution",
+  "Dynamic Range",
+  "Timbre Matching",
+  "Screen / Viewing Geometry",
+];
 
 function normalizeLevel(level) {
   const value = String(level ?? "").trim().toUpperCase();
@@ -233,10 +239,14 @@ function buildScorecard(projectRating) {
     if (!byCategory[category]) byCategory[category] = [];
     byCategory[category].push(contribution);
   }
+  const categories = [
+    ...SCORECARD_CATEGORY_ORDER.filter((category) => byCategory[category]),
+    ...Object.keys(byCategory).filter((category) => !SCORECARD_CATEGORY_ORDER.includes(category)),
+  ];
   return {
     contributions,
     byCategory,
-    categories: Object.keys(byCategory),
+    categories,
     lowestPerformanceResults: getLowestPerformanceResults(contributions),
   };
 }
