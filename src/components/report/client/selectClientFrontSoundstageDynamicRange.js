@@ -111,6 +111,7 @@ function normalizeSeatGeometry(seat) {
 
 export function selectClientFrontSoundstageDynamicRange({
   analysisResult,
+  engineeringSummary,
   allSeatSplMetrics,
   seatingPositions,
   rsp,
@@ -153,8 +154,9 @@ export function selectClientFrontSoundstageDynamicRange({
     minimum = { value: p12.value, formatted: p12.formatted || `${p12.value} dB` };
   }
 
-  // Achieved level — re-graded from the canonical value using the active basis
-  const level = minimum ? gradeP12ForBasis(minimum.value, targetBasis) : null;
+  // Achieved level is read directly from the canonical published parameter
+  // authority. The Visual Report never re-grades the achieved value.
+  const level = engineeringSummary?.parameterAuthority?.p12?.level ?? null;
   const resultHeading = level ? RESULT_HEADINGS[level] || "" : "";
 
   const hasAny = !!(fl || fc || fr) || !!(minimum && level);
