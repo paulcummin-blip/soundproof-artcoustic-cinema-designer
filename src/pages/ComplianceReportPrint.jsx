@@ -139,8 +139,6 @@ export default function ComplianceReportPrint() {
             <p className="text-xs text-[#625143] mt-1">{dolbyLayout} Configuration</p>
           </div>
 
-          {bassErrorMessage && <p className="text-sm text-[#625143] mb-4">Bass analysis unavailable</p>}
-
           {/* Summary Counts — ROOM and SEAT separated */}
           <div className="space-y-6">
             <div>
@@ -155,7 +153,7 @@ export default function ComplianceReportPrint() {
                 <RP22GradingPill level="L3" count={roomCounts.L3} />
                 <RP22GradingPill level="L2" count={roomCounts.L2} />
                 <RP22GradingPill level="L1" count={roomCounts.L1} />
-                <RP22GradingPill level="FAIL" count={roomCounts.FAIL} />
+                <RP22GradingPill level="FAIL" count={roomCounts.fail || 0} />
               </div>
             </div>
 
@@ -185,10 +183,7 @@ export default function ComplianceReportPrint() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {roomParams.map(param => {
-                const authority = [14, 18, 19].includes(param.id) ? bassPresentation.parameters[`p${param.id}`] : null;
-                const roomResult = authority
-                  ? { status: authority.status, formatted: authority.valueText, level: authority.level, detail: authority.detail }
-                  : analysis?.gradedParameters?.primary?.[param.id] || null;
+                const roomResult = roomResultsByParameter[param.id] || null;
                 return (
                   <div key={param.id} className="print-avoid-break">
                     <ParameterCard parameter={param} roomResult={roomResult} />
