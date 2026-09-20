@@ -38,7 +38,9 @@ const RSP_DOT_R = 3;
 
 function levelToLabel(level) {
   if (level == null) return null;
-  if (level === "N/A" || level === "not_applicable") return null;
+  const normalized = String(level).trim().toUpperCase();
+  if (normalized === "FAIL") return "FAIL";
+  if (normalized === "N/A" || normalized === "NOT_APPLICABLE") return null;
   const n = Number(level);
   if (Number.isFinite(n) && n >= 1 && n <= 4) return `L${n}`;
   if (n === 0) return "FAIL";
