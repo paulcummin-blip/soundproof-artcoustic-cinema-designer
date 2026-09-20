@@ -83,7 +83,7 @@ function MetricDelta({ label, beforeLevel, beforeRaw, afterLevel, afterRaw, isRs
   const levelChanged = numericLevel(beforeLevel) !== numericLevel(afterLevel);
   const rawChanged = Math.abs(Math.abs(Number(beforeRaw)) - Math.abs(Number(afterRaw))) > 0.05;
   const hasLevels = beforeLevel != null && afterLevel != null;
-  const labelWithSuffix = isRspOnly ? `${label} (RSP)` : label;
+  const labelWithSuffix = isRspOnly ? `RSP ${label}` : label;
 
   // RSP-only or raw-only display (no level pills available)
   if (!hasLevels) {
@@ -180,9 +180,16 @@ function StageCard({ stage }) {
     <div className="rounded-md border border-[#E7E4DF] bg-white/60 px-3 py-2.5 space-y-2">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-[12px] font-semibold text-[#1B1A1A]">
-          {stage.label}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[12px] font-semibold text-[#1B1A1A]">
+            {stage.label}
+          </span>
+          {stage.isAdvisory && stage.verdict === "improvement" && (
+            <span className="rounded bg-amber-100 border border-amber-300 px-1 py-0.5 text-[9px] font-bold text-amber-800">
+              ADVISORY — NOT APPLIED
+            </span>
+          )}
+        </div>
         <span className="text-[10px] text-[#8A7B6A]">
           {stage.combinationsTested > 0
             ? `${stage.combinationsTested} ${
@@ -225,11 +232,11 @@ function StageCard({ stage }) {
             ) : (
               <ChevronRight className="h-2.5 w-2.5" />
             )}
-            Internal search metric
+            Internal search metric (RSP P19 — not seat P19)
           </button>
           {showInternal && (
             <div className="ml-4 mt-1 text-[9px] text-[#8A7B6A]">
-              RSP P19 proxy:{" "}
+              RSP P19:{" "}
               <span className="font-medium text-[#625143]">
                 {stage.internal.currentP19 != null ? `${stage.internal.currentP19.toFixed(2)} dB` : "—"}
               </span>
@@ -268,10 +275,10 @@ function OutcomeHeader({ outcome }) {
       <CheckCircle2 className="h-4 w-4 text-[#213428] flex-shrink-0 mt-0.5" />
       <div>
         <div className="text-[12px] font-semibold text-[#1B1A1A]">
-          No further automatic calibration improvements found.
+          No further automatically applicable calibration improvements were accepted.
         </div>
         <div className="text-[11px] text-[#625143] mt-0.5">
-          The current calibration is the best automatically achievable result.
+          Phase, delay and gain options were evaluated against the current design. Physical layout recommendations may still be available separately.
         </div>
       </div>
     </div>

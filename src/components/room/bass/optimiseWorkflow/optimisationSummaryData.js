@@ -118,6 +118,7 @@ function buildCanonicalStageEntry({
     combinationsTested: combinations,
     verdict,
     classification,
+    isAdvisory: key === "subPositions" || key === "seating",
     p19: {
       beforeLevel: p19Before?.level ?? null,
       beforeRaw: p19Before?.variationDbRaw ?? null,
