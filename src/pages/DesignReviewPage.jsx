@@ -25,7 +25,7 @@ import { useActiveProjectId } from "@/components/state/project-session";
 import { useAppState } from "@/components/AppStateProvider";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { mergeProjectAndVersion } from "@/lib/versionAuthority";
-import { readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
+import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 import { base44 } from "@/api/base44Client";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import ReportCover from "@/components/report/ReportCover";
@@ -155,8 +155,10 @@ export default function DesignReviewPage() {
       setAsdrData(shared);
     };
     read();
-    const interval = setInterval(read, 500);
-    return () => clearInterval(interval);
+    return subscribeDesignReviewHandoff(projectId, (snapshot) => {
+      if (snapshot) setAsdrData(snapshot);
+      else read();
+    });
   }, [projectId, projectDetails?.updated_date, loadingProject]);
 
   // Keep the persistent sidebar on the same project-scoped price snapshot,
