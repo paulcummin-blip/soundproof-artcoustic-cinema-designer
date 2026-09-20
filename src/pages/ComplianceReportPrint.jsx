@@ -1,18 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useAppState } from '@/components/AppStateProvider';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
 import ParameterCard from '@/components/report/ParameterCard';
 import SeatScopedParameterCard from '@/components/report/SeatScopedParameterCard';
 import SeatComplianceSummary from '@/components/report/SeatComplianceSummary';
-import { useRP22AnalysisEngine } from '@/components/hooks/useRP22AnalysisEngine';
 import { formatSeatLabel } from '@/components/utils/seatLabel';
-import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
-import { buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { RP22_PRESENTATION_PARAMETERS, RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
-import { formatAuthoritativeP20Result, p20LevelText } from '@/components/room/bass/p20SeatPresentation';
 import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
-import { resolveEffectiveVersionId } from '@/lib/versionAuthority';
 
 export default function ComplianceReportPrint() {
   const app = useAppState();
