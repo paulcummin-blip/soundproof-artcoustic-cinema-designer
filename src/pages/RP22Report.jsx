@@ -632,7 +632,6 @@ function RP22ReportInner() {
     // PASSIVE CONSUMER: all seat grouping, counts, floors and diagnostics
     // are read from the immutable summary published by Room Designer.
     const reportSeatHudById = engineeringSummary?.seatHudById || {};
-    const parameterAuthority = engineeringSummary?.parameterAuthority || {};
     const reportCounts = engineeringSummary?.project?.reportCounts || {};
     const roomLevelCounts = reportCounts.roomLevelCounts || { L4: 0, L3: 0, L2: 0, L1: 0, fail: 0, unassessed: 0 };
     const roomCalculatedCount = reportCounts.roomCalculatedCount || 0;
