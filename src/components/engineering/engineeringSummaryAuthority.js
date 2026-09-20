@@ -228,6 +228,10 @@ function buildReportCounts(parameters, seats, seatHudById) {
   return {
     roomLevelCounts,
     roomCalculatedCount: roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1 + roomLevelCounts.fail,
+    roomParameterCount: roomParameterEntries.length,
+    seatParameterCount: seatParameterEntries.length,
+    seatsEvaluated: seatLevelCounts.length,
+    seatCalculatedParamCount: seatLevelCounts.reduce((maximum, seat) => Math.max(maximum, seat.activeCount || 0), 0),
     seatLevelCounts,
     seatCountsByRow,
     seatCompromiseById,
@@ -295,8 +299,14 @@ export function summariseEngineeringResults({
   const scopedRatings = { primary: primaryRating, secondary: secondaryRating, all: projectRating };
 
   const seatDesignRatings = {};
+  const seatDesignPerformanceIndexById = {};
   for (const seatId of allSeatIds) {
-    seatDesignRatings[seatId] = calculateSeatDesignRating(designRatingAuthority, seatId);
+    const seatRating = calculateSeatDesignRating(designRatingAuthority, seatId);
+    seatDesignRatings[seatId] = seatRating;
+    seatDesignPerformanceIndexById[seatId] =
+      seatRating && seatRating.status !== "NOT_ASSESSED" && seatRating.status !== "NOT_CONFIGURED"
+        ? getDesignPerformanceIndex(seatRating)
+        : null;
   }
 
   const seatLevels = {};
@@ -357,6 +367,7 @@ export function summariseEngineeringResults({
       rating: projectRating,
       scopedRatings,
       seatDesignRatings,
+      seatDesignPerformanceIndexById,
       seatLevels,
       categoryFloors,
     },
