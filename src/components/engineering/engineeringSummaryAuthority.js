@@ -19,6 +19,7 @@ import {
 import {
   getCategoryFloorSummaries,
   getDesignPerformanceIndex,
+  getDesignRatingSupportingSentence,
 } from "@/components/report/technical/designRatingPresentation";
 import { getLowestPerformanceResults } from "@/components/designreview/needsAttentionAuthority";
 import { getCategoryForParam } from "@/components/report/technical/technicalParameterMeta";
@@ -217,6 +218,7 @@ function buildCategorySummary(rating) {
   return {
     available,
     designPerformanceIndex: available ? getDesignPerformanceIndex(rating) : null,
+    supportingSentence: available ? getDesignRatingSupportingSentence(rating) : null,
     categories: available ? getCategoryFloorSummaries(rating) : [],
   };
 }
@@ -301,18 +303,21 @@ export function summariseEngineeringResults({
       seatIds: primarySeatIds,
       rating: primaryRating,
       designPerformanceIndex: categoryFloors.primary.designPerformanceIndex,
+      supportingSentence: categoryFloors.primary.supportingSentence,
       categories: categoryFloors.primary.categories,
     },
     secondary: {
       seatIds: secondarySeatIds,
       rating: secondaryRating,
       designPerformanceIndex: categoryFloors.secondary.designPerformanceIndex,
+      supportingSentence: categoryFloors.secondary.supportingSentence,
       categories: categoryFloors.secondary.categories,
     },
     project: {
       seatIds: allSeatIds,
       rating: projectRating,
       designPerformanceIndex: categoryFloors.project.designPerformanceIndex,
+      supportingSentence: categoryFloors.project.supportingSentence,
       categories: categoryFloors.project.categories,
       coverage,
       compliance,
