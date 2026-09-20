@@ -116,15 +116,13 @@ function ThresholdTable({ thresholds, unit }) {
 
 export default function ExpandedParameterDetail({
   param,
-  analysisResult,
+  engineeringSummary,
   bassPresentation,
   resolveThresholds,
-  resolveP12P13DualLevels,
   getHudValueForParam,
   getHudLevelForParam,
   buildSeatGridData,
   buildAsdrFooter,
-  buildP6Presentation,
   lockedSeatId,
   category,
   humanTitle,
@@ -137,31 +135,14 @@ export default function ExpandedParameterDetail({
       ? { ...param, thresholds: resolvedThresholds }
       : param;
 
-  // Minimum / Recommended target basis note
   const targetBasisNote =
-    param.id === 12 || param.id === 13
-      ? (() => {
-          const v = analysisResult?.gradedParameters?.primary?.[param.id]?.value;
-          const dual = resolveP12P13DualLevels(param.id, v);
-          return dual
-            ? `Minimum ${dual.minimum} · Recommended ${dual.recommended}`
-            : null;
-        })()
-      : param.id === 14
-      ? bassPresentation.parameters.p14.detail
-      : null;
+    engineeringSummary?.roomResultsByParameter?.[param.id]?.targetBasisNote
+    ?? engineeringSummary?.roomResultsByParameter?.[param.id]?.detail
+    ?? null;
 
-  let achievedValue = getHudValueForParam(param);
-  let lvl = getHudLevelForParam(param);
-  let rspLabel = lockedSeatId ? formatSeatLabel(lockedSeatId) : null;
-
-  // P6 special case: seat spread
-  if (param.id === 6) {
-    const p6 = buildP6Presentation();
-    achievedValue = p6.achievedValue;
-    if (p6.lvl !== null) lvl = p6.lvl;
-    rspLabel = null;
-  }
+  const achievedValue = getHudValueForParam(param);
+  const lvl = getHudLevelForParam(param);
+  const rspLabel = lockedSeatId ? formatSeatLabel(lockedSeatId) : null;
 
   const asdrFooter = buildAsdrFooter(param.id);
   const seatGridData = isSeatScope ? buildSeatGridData(param.id) : null;
