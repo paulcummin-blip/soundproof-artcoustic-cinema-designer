@@ -312,10 +312,26 @@ export function useAppDesignRating({
         p19SeatAuthority,
       });
       const authority = buildArtcousticDesignRatingAuthority(input);
+      const roomResultsByParameter = {
+        ...(analysisResult?.gradedParameters?.primary || {}),
+      };
+      for (const parameterNumber of [14, 18]) {
+        const presentation = completedBassPresentation?.parameters?.[`p${parameterNumber}`];
+        if (!presentation) continue;
+        roomResultsByParameter[parameterNumber] = {
+          ...(roomResultsByParameter[parameterNumber] || {}),
+          status: presentation.status,
+          value: presentation.rawValue,
+          formatted: presentation.valueText,
+          level: presentation.level,
+          detail: presentation.detail,
+        };
+      }
       const engineeringSummary = summariseEngineeringResults({
         designRatingAuthority: authority,
         seats,
         seatHudById: reportSeatHudById,
+        roomResultsByParameter,
         p19SeatAuthority,
       });
       if (!engineeringSummary) return null;
