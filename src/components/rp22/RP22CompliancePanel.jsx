@@ -300,82 +300,22 @@ export default function RP22CompliancePanel({
     };
   }, [screen]);
 
-  // --- Seat layout pill grids (HUD-matched) ---
+  // --- Canonical engineering publication reads ---
   const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
+  const reportCounts = engineeringSummary?.project?.reportCounts || {};
+  const projectParameterSummaries = engineeringSummary?.parameterSummaries?.project || {};
+  const lockedSeatId = engineeringSummary?.primary?.seatIds?.[0]
+    ?? engineeringSummary?.project?.seatIds?.[0]
+    ?? null;
+  const reportSource = lockedSeatId ? `seat:${lockedSeatId}` : "room";
 
-  const seatHudSnapshotsCache = seatHudSnapshots || {};
-
-  const getSnapshotForSeat = React.useCallback((seat) => {
-    if (!seat) return null;
-
-    const sid = String(seat.id || "").trim();
-    if (!sid) return null;
-
-    const cache = seatHudSnapshotsCache || {};
-
-    // 0) exact key match (fast path)
-    if (cache[sid]) return cache[sid];
-
-    // 1) common key pattern: "seatId|sig"
-    const prefKey = Object.keys(cache).find((k) => String(k).startsWith(`${sid}|`));
-    if (prefKey) return cache[prefKey];
-
-    // 2) fallback: search values by snapshot.seatId (handles "mlp", etc.)
-    const values = Object.values(cache);
-    const direct = values.find((snap) => String(snap?.seatId || "").trim() === sid);
-    if (direct) return direct;
-
-    // 3) Primary seat fallback: if this seat is the primary seat, also accept "mlp"
-    const isPrimarySeat =
-      (!!seat?.isPrimary) ||
-      (String(mlpSeatId || "").trim() && sid === String(mlpSeatId).trim());
-
-    if (isPrimarySeat) {
-      if (cache["mlp"]) return cache["mlp"];
-
-      const mlpKey = Object.keys(cache).find((k) => String(k).startsWith(`mlp|`));
-      if (mlpKey) return cache[mlpKey];
-
-      const mlpDirect = values.find((snap) => String(snap?.seatId || "").trim() === "mlp");
-      if (mlpDirect) return mlpDirect;
-    }
-
-    return null;
-  }, [seatHudSnapshotsCache, mlpSeatId]);
-
-  const rows = React.useMemo(() => {
-    // Group by row number (fallback: 1)
-    const map = new Map();
-    for (const s of seats) {
-      const r = Number(s?.row || s?.rowNumber) || 1;
-      if (!map.has(r)) map.set(r, []);
-      map.get(r).push(s);
-    }
-
-    // Sort rows front-to-back: Row 1, Row 2, ...
-    const rowNums = Array.from(map.keys()).sort((a, b) => a - b);
-
-    // Within a row: show Seat 1 on the RIGHT (so indexInRow DESC for display)
-    return rowNums.map((r) => {
-      const list = map.get(r) || [];
-      const sorted = list.slice().sort((a, b) => {
-        const ia = Number(a?.indexInRow) || 0;
-        const ib = Number(b?.indexInRow) || 0;
-        return ib - ia;
-      });
-      return { row: r, seats: sorted };
-    });
-  }, [seats]);
+  const resolveSeatMetric = React.useCallback((seatId, paramKey) => (
+    engineeringSummary?.seatHudById?.[seatId]?.rp22?.[paramKey] || null
+  ), [engineeringSummary]);
 
   const renderSeatPillGridForParam = (pId) => {
-    if (Number(pId) === 20) return <P20SeatBlock seatingPositions={seats} perSeatP20Results={selectedP20Results} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassAuthority?.authorityStatus} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
-    if (Number(pId) === 19) {
-      return <P19SeatBlock rows={p19SeatAuthority?.rows || []} publicationVerified={bassPresentation.publicationVerified} authorityStatus={bassAuthority?.authorityStatus} p14TargetUnselected={bassPresentation.p14TargetUnselected} compact />;
-    }
+    const rows = reportCounts.seatResultRowsByParameter?.[`p${Number(pId)}`] || [];
     if (!rows.length) return null;
-
-    const pKey = `p${Number(pId)}`; // "p1" etc
-
     return (
       <div style={{ display: "grid", gap: 6 }}>
         {rows.map((rowObj) => (
@@ -389,379 +329,53 @@ export default function RP22CompliancePanel({
               gap: 6,
             }}
           >
-            {rowObj.seats.map((seat) => {
-              const metric = resolveSeatMetric(seat?.id, pKey);
-              const display = getMetricDisplayState(metric);
-              const lvl = display.text === 'N/A' ? 'N/A' : normalizeLevelForDisplay(metric?.level);
-              const isPrimary = !!seat?.isPrimary;
-
-              return (
-                <span
-                  key={`seat-${seat?.id || `${rowObj.row}-${seat?.indexInRow || ""}`}`}
-                  title={`${seat?.id || ""}  Row ${seat?.row || seat?.rowNumber || 1} Seat ${
-                    seat?.indexInRow || ""
-                  }${isPrimary ? " (RSP)" : ""}`}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    // Primary seat highlight (keep your existing idea, just applied around the standard pill)
-                    boxShadow: isPrimary ? "0 0 0 2px rgba(33,52,40,0.10)" : "none",
-                    borderRadius: 6,
-                  }}
-                >
-                  <RP22GradingPill level={lvl} />
-                </span>
-              );
-            })}
+            {(rowObj.seats || []).map((seat) => (
+              <span
+                key={seat.seatId}
+                title={`${seat.seatId || ""}  Row ${seat.row} Seat ${seat.column}${seat.isPrimary ? " (RSP)" : ""}`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: seat.isPrimary ? "0 0 0 2px rgba(33,52,40,0.10)" : "none",
+                  borderRadius: 6,
+                }}
+              >
+                <RP22GradingPill level={seat.level || "—"} />
+              </span>
+            ))}
           </div>
         ))}
       </div>
     );
   };
 
-  // Build simple seat ID map from cache (cache keys are "seatId|signature")
-  const seatSnapshotsById = React.useMemo(() => {
-    const cache = (seatHudSnapshots && typeof seatHudSnapshots === "object") ? seatHudSnapshots : {};
-    const byId = {};
-    
-    for (const [cacheKey, snapshot] of Object.entries(cache)) {
-      const seatId = String(cacheKey).split('|')[0];
-      if (seatId) {
-        byId[seatId] = snapshot;
-      }
-    }
-    
-    return byId;
-  }, [seatHudSnapshots]);
-
-
-
-  const defaultSeatKey = React.useMemo(() => {
-    // Always prefer synthetic mlp if present
-    if (seatSnapshotsById["mlp"]) return "seat:mlp";
-    if (mlpSeatId && seatSnapshotsById[mlpSeatId]) return `seat:${mlpSeatId}`;
-    const first = Object.keys(seatSnapshotsById)[0];
-    return first ? `seat:${first}` : "room";
-  }, [seatSnapshotsById, mlpSeatId]);
-
-  // Always drive Compliance Report from the RSP/primary seat snapshot.
-  // Priority:
-  // 1) mlpSeatId (passed from RoomDesigner)
-  // 2) any seat flagged isPrimary in seatingPositions
-  // 3) "mlp" if present in cache
-  // 4) first available seat in cache
-  // A1 — Derive the reporting seat from the canonical seating authority
-  // (seatingPositions), NOT from the UI cache (seatSnapshotsById). The cache
-  // may be empty when Plan/RoomVisualisation is not mounted, which previously
-  // caused valid fresh engine results to be presented as "Not Calculated / N/A"
-  // because reportSource fell back to "room" and the seat branch was never
-  // entered. The cache remains a fallback DATA SOURCE inside
-  // resolveSeatMetricHelper — it must not decide whether a canonical seat
-  // EXISTS.
-  const lockedSeatId = React.useMemo(() => {
-    // 1. Canonical Primary/RSP/MLP seat from seatingPositions
-    const primaryFromSeats = (Array.isArray(seatingPositions) ? seatingPositions : [])
-      .find(s => s?.isPrimary && s?.id);
-    const primaryId = String(primaryFromSeats?.id || "").trim();
-    if (primaryId) return primaryId;
-
-    // 2. mlpSeatId if provided and valid
-    const fromProp = String(mlpSeatId || "").trim();
-    if (fromProp) return fromProp;
-
-    // 3. First valid seat as established fallback
-    const firstSeat = (Array.isArray(seatingPositions) ? seatingPositions : [])
-      .find(s => s?.id);
-    return String(firstSeat?.id || "").trim();
-  }, [mlpSeatId, seatingPositions]);
-
-  const reportSource = React.useMemo(() => {
-    return lockedSeatId ? `seat:${lockedSeatId}` : "room";
-  }, [lockedSeatId]);
-
-  // Resolve a seat-scoped RP22 metric, preferring the FRESH engine authority
-  // (analysisResult.perSeatRp22 — the same source the Design Rating consumes)
-  // over the UI-view-dependent cache (seatSnapshotsById). This eliminates the
-  // data-source mismatch where Compliance showed a stale "Not Calculated"
-  // while the Design Rating showed the fresh engine grade (e.g. P5 90° = L1).
-  //
-  // The UI cache is retained as a fallback for locally-computed metrics (P16,
-  // P6, P1, P4) that buildSeatHudSnapshot derives from live plan-view geometry
-  // and which the engine may not have published.
-  const resolveSeatMetric = React.useCallback(
-    (seatId, paramKey) => resolveSeatMetricHelper(seatId, paramKey, analysisResult, seatSnapshotsById, mlpSeatId),
-    [analysisResult, seatSnapshotsById, mlpSeatId]
-  );
-
-  // Pull a usable numeric value out of HUD metric objects.
-  // Metrics often store numbers as valueM/valueDb/valueDeg/etc (not metric.value).
-  const getMetricNumericValue = (metric) => {
-    if (!metric || typeof metric !== "object") return null;
-
-    const candidates = [
-      metric.value,          // generic (rare in this app)
-      metric.valueM,
-      metric.valueDb,
-      metric.valueDeg,
-      metric.valueHz,
-      metric.valueMs,
-      metric.valueS,
-      metric.valuePct,
-      metric.valuePercent,
-      metric.valueRatio,
-    ];
-
-    for (const v of candidates) {
-      if (Number.isFinite(v)) return v;
-    }
-
-    // Last resort: first finite numeric in an object key starting with "value"
-    for (const [k, v] of Object.entries(metric)) {
-      if (k.startsWith("value") && Number.isFinite(v)) return v;
-    }
-
-    return null;
-  };
-
-  // Format fallback numeric values when formatted/hudLabel are missing.
-  const formatMetricFallback = (n, unit) => {
-    if (!Number.isFinite(n)) return "—";
-    const u = String(unit || "").trim();
-
-    if (u === "m") return `${n.toFixed(2)}m`;
-    if (u === "dB" || u === "± dB") return `${n.toFixed(1)} dB`;
-    if (u === "dB SPL (C)") return formatSplDisplay(n);
-    if (u === "Hz") return `${Math.round(n)} Hz`;
-    if (u === "°") return `${Math.round(n)}°`;
-    if (u === "%") return `${Math.round(n)}%`;
-
-    // Default: keep a sensible precision without inventing meaning
-    return `${n.toFixed(2)} ${u}`.trim();
-  };
-
-  // Grade a value against RP22 thresholds (returns "L1".."L4" or "—")
-  const gradeByThresholds = (thresholds, v) => {
-    if (!thresholds || !Number.isFinite(v)) return "—";
-
-    const dir = String(thresholds.direction || "").trim();
-    const L1 = Number(thresholds.L1);
-    const L2 = Number(thresholds.L2);
-    const L3 = Number(thresholds.L3);
-    const L4 = Number(thresholds.L4);
-
-    const okNum = (n) => typeof n === "number" && Number.isFinite(n);
-
-    if (dir === "<=") {
-      if (okNum(L4) && v <= L4) return "L4";
-      if (okNum(L3) && v <= L3) return "L3";
-      if (okNum(L2) && v <= L2) return "L2";
-      if (okNum(L1) && v <= L1) return "L1";
-      return "—";
-    }
-
-    // default >=
-    if (okNum(L4) && v >= L4) return "L4";
-    if (okNum(L3) && v >= L3) return "L3";
-    if (okNum(L2) && v >= L2) return "L2";
-    if (okNum(L1) && v >= L1) return "L1";
-    return "—";
-  };
-
   const getHudLevelForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
-    if (pid === 19) return p19SeatAuthority?.project?.floor || "NOT CALCULATED";
-    if ([14, 18, 20].includes(pid)) return bassPresentation.parameters[`p${pid}`].level;
-    const scope = String(param?.scope || "").toLowerCase();
-    const isRoomScope = scope === "room";
-
-    // Room-level: prefer RP22 engine result; fallback to valueFromAnalysis + thresholds
-    if (isRoomScope) {
-      const res = analysisResult?.gradedParameters?.primary?.[pid] || null;
-
-      // P12/P13: re-grade from raw value using the canonical mode-aware thresholds
-      if ((pid === 12 || pid === 13) && res && res.status !== "no_data" && Number.isFinite(res.value)) {
-        const thresholds = resolveParamThresholds({ id: pid }, p12Mode, p13Mode, p14Mode);
-        const v = res.value;
-        if (v >= thresholds.L4) return "L4";
-        if (v >= thresholds.L3) return "L3";
-        if (v >= thresholds.L2) return "L2";
-        if (v >= thresholds.L1) return "L1";
-        return "—";
-      }
-
-      // P14: show FAIL pill when a live P14 value is below L1 (114 dB).
-      // "—" only when there is genuinely no calculated P14 data.
-      if (pid === 14) {
-        if (res && res.status === "no_data") return "—";
-        if (res && Number.isFinite(res.value) && res.value < 114) return "FAIL";
-        if (res && res.status !== "no_data" && res.status !== "fail" && res.level != null) {
-          return res.level;
-        }
-        return "—";
-      }
-
-      // P19: a valid calculated deviation above L1 is FAIL, not missing data.
-      if (pid === 19) {
-        if (!res || res.status === "no_data" || !Number.isFinite(res.value)) return "—";
-        if (res.status === "fail" || String(res.level).toUpperCase() === "FAIL") return "FAIL";
-        return res.level ?? "—";
-      }
-
-      if (pid === 21 && res?.status === "error") return "—";
-      if (pid === 21 && res && res.status !== "no_data" && res.status !== "fail" && Number.isFinite(res.value)) {
-        return levelP21_earlyReflections(res.value).level;
-      }
-
-      // If engine gave a usable level, use it
-      if (res && res.status !== "no_data" && res.status !== "fail" && res.level != null) {
-        return res.level; // may be "L1".."L4" or numeric
-      }
-
-      // Report-page fallback rules
-      if (pid === 2 && p2SystemConfig) return p2SystemConfig.p2Level; // "L1".."L4"
-      if (pid === 3) {
-        const p3 = analysisResult?.gradedParameters?.primary?.[3];
-        return (p3 && p3.status === "ok") ? p3.level : "—";
-      }
-      if (pid === 8) return "L4";
-      if (pid === 11) return "L4";
-
-      // P15/P21: null (not yet assumed) = NOT CALCULATED → return null so the
-      // matrix displays "—" and the Design Rating excludes it from the floor.
-      // Only a genuine designer selection is a scored result. This keeps
-      // Compliance and Design Rating in agreement on eligibility.
-      if (pid === 15) {
-        return normalizeAssumedLevel(assumedP15Level);
-      }
-
-      if (pid === 21) {
-        return normalizeAssumedLevel(assumedP21Level);
-      }
-
-      return "—";
-    }
-
-    // Seat-level
-    if (String(reportSource).startsWith("seat:")) {
-      const seatId = String(reportSource).split(":")[1];
-      const key = `p${pid}`;
-      const metric = resolveSeatMetric(seatId, key);
-      return normalizeLevelForDisplay(getMetricDisplayState(metric).level);
-    }
-
-    return "—";
-  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation, assumedP15Level, assumedP21Level, resolveSeatMetric, p19SeatAuthority]);
+    const key = `p${pid}`;
+    const roomResult = engineeringSummary?.roomResultsByParameter?.[pid] || null;
+    if (roomResult) return roomResult.level || projectParameterSummaries[key]?.level || "—";
+    const selectedSeat = (reportCounts.seatResultsByParameter?.[key] || [])
+      .find((seat) => String(seat.seatId) === String(lockedSeatId));
+    return selectedSeat?.level || projectParameterSummaries[key]?.level || "—";
+  }, [engineeringSummary, projectParameterSummaries, reportCounts, lockedSeatId]);
 
   const getHudValueForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
-    if (pid === 19) return p19SeatAuthority?.project?.coverageSummary || "NOT CALCULATED";
-    if ([14, 18, 20].includes(pid)) return bassPresentation.parameters[`p${pid}`].valueText;
-    const scope = String(param?.scope || "").toLowerCase();
-    const isRoomScope = scope === "room";
-
-    // Room-level: prefer RP22 engine result; fallback to valueFromAnalysis
-    if (isRoomScope) {
-      const res = analysisResult?.gradedParameters?.primary?.[pid] || null;
-
-      if (pid === 21 && res?.status === "error") return "Analysis error";
-
-      // Engine value if present
-      if (res && res.status !== "no_data" && res.status !== "fail" && res.status !== "error") {
-        const v = res.value;
-
-        // P3 must always show a whole-speaker count, never the engine's preformatted decimal string
-        if (pid === 3 && v !== null && v !== undefined && typeof v === "number" && Number.isFinite(v)) {
-          const paramDef = RP22_PARAMS.find(p => p.id === pid);
-          const unit = paramDef?.unit || "";
-          return unit ? `${Math.round(v)} ${unit}` : String(Math.round(v));
-        }
-
-        // P14: display ceil'd achieved SPL (e.g. 111.4 → "112 dBC"). Display only.
-        if (pid === 14 && typeof v === "number" && Number.isFinite(v)) {
-          return formatSplDisplay(v);
-        }
-
-        if (typeof v === "number" && Number.isFinite(v)) {
-          const paramDef = RP22_PARAMS.find(p => p.id === pid);
-          const unit = paramDef?.unit || "";
-          if (unit === "dB SPL (C)") return formatSplDisplay(v);
-        }
-
-        if (res.formatted) return res.formatted;
-
-        if (v !== null && v !== undefined) {
-          if (typeof v === "number" && Number.isFinite(v)) {
-            const paramDef = RP22_PARAMS.find(p => p.id === pid);
-            const unit = paramDef?.unit || "";
-            return unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1);
-          }
-          return String(v);
-        }
-      }
-
-      // Report-page fallback values where needed
-      if (pid === 2 && p2SystemConfig) return `${p2SystemConfig.discreteSpeakerCount} speakers`;
-      if (pid === 3) {
-        const p3 = analysisResult?.gradedParameters?.primary?.[3];
-        if (p3 && p3.status === "ok" && p3.formatted) return p3.formatted;
-        return "—";
-      }
-      if (pid === 8) return "No";
-      if (pid === 11) return "0";
-
-      // P15 / P21 are assumed design parameters. null (not yet assumed) =
-      // NOT CALCULATED — show "Not Calculated" instead of a default L2 value.
-      if (pid === 15) {
-        return normalizeAssumedLevel(assumedP15Level)
-          ? getAssumedP15DisplayValue(assumedP15Level)
-          : "Not Calculated";
-      }
-
-      if (pid === 21) {
-        return normalizeAssumedLevel(assumedP21Level)
-          ? getAssumedP21DisplayValue(assumedP21Level)
-          : "Not Calculated";
-      }
-
-      return "—";
+    const key = `p${pid}`;
+    const roomResult = engineeringSummary?.roomResultsByParameter?.[pid] || null;
+    if (roomResult) {
+      return roomResult.formatted || roomResult.hudLabel || (roomResult.value ?? "—");
     }
-
-    // Seat-level
-    if (String(reportSource).startsWith("seat:")) {
-      const seatId = String(reportSource).split(":")[1];
-      const key = `p${pid}`;
-      const metric = resolveSeatMetric(seatId, key);
-      if (!metric) return "Not Calculated";
-
-      if (pid === 17) {
-        const display = getMetricDisplayState(metric);
-        if (display.text === 'N/A' || display.text === 'Not Calculated') return display.text;
-        const parts = [];
-        if (metric.worstRole) parts.push(String(metric.worstRole));
-        const details = [];
-        if (Number.isFinite(metric.worstAngleDeg)) details.push(`${Math.round(metric.worstAngleDeg)}°`);
-        if (Number.isFinite(metric.worstLossDb)) details.push(`${Number(metric.worstLossDb).toFixed(1)} dB`);
-        if (details.length > 0) {
-          return parts.length > 0 ? `${parts.join(" ")} (${details.join(" / ")})` : details.join(" / ");
-        }
-        return parts.length > 0 ? parts.join(" ") : display.text;
-      }
-
-      const display = getMetricDisplayState(metric);
-      if (display.text && display.text !== '—') return display.text;
-
-      const param = RP22_PARAMS.find(p => p.id === pid);
-      const unit = param?.unit || "";
-
-      const n = getMetricNumericValue(metric);
-      if (Number.isFinite(n)) return formatMetricFallback(n, unit);
-      
-      return "Not Calculated";
+    if (pid === 19) {
+      return engineeringSummary?.p19SeatAuthority?.project?.coverageSummary
+        ?? engineeringSummary?.project?.coverage?.sentence
+        ?? "NOT CALCULATED";
     }
-
-    return "—";
-  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation, assumedP15Level, assumedP21Level, resolveSeatMetric, p19SeatAuthority]);
+    const selectedSeat = (reportCounts.seatResultsByParameter?.[key] || [])
+      .find((seat) => String(seat.seatId) === String(lockedSeatId));
+    return selectedSeat?.valueFormatted || "Seat results";
+  }, [engineeringSummary, reportCounts, lockedSeatId]);
 
   // Full per-parameter detail card (title, description, achieved, scope, thresholds,
   // per-seat pills, notes, debug). Rendered only when a matrix row is expanded.
