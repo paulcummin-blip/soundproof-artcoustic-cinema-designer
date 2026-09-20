@@ -1374,7 +1374,7 @@ function RP22ReportInner() {
                                     <TechnicalAsdrScorecard
                                         roomDesignRating={roomDesignRating}
                                         showDesignRating={showDesignRating}
-                                        scopedRatings={scopedRatings}
+                                        engineeringSummary={engineeringSummary}
                                     />
                                 </div>
                             )}
