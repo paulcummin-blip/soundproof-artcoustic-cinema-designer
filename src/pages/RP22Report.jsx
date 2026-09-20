@@ -638,10 +638,8 @@ function RP22ReportInner() {
     const roomCalculatedCount = reportCounts.roomCalculatedCount || 0;
     const seatCountsByRow = reportCounts.seatCountsByRow || [];
     const seatCompromiseById = reportCounts.seatCompromiseById || {};
-    const roomScopedParamCount = Object.entries(parameterAuthority)
-        .filter(([key, parameter]) => key !== "screen" && parameter?.scope === "room").length;
-    const seatScopedParamCount = Object.entries(parameterAuthority)
-        .filter(([key, parameter]) => key !== "screen" && parameter?.scope === "seat").length;
+    const roomScopedParamCount = reportCounts.roomParameterCount || 0;
+    const seatScopedParamCount = reportCounts.seatParameterCount || 0;
     const coverageResult = engineeringSummary?.project?.coverage || null;
     const coverageSentence = coverageResult?.statement || null;
 
