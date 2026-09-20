@@ -23,11 +23,10 @@ import { useEffectiveRsp } from "@/components/room/rsp/useEffectiveRsp";
 import { resolveDesignatedRspSeat } from "@/components/room/rsp/rspInputResolver";
 import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from "@/components/room/rsp/screenGeometryResolver";
 import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
-import { computeSurroundRingGaps, rp22LevelForP5 } from "@/components/utils/p5SurroundGaps";
+import { computeSurroundRingGaps } from "@/components/utils/p5SurroundGaps";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat } from "@/components/utils/rp22UpperSeatMetrics";
-import { levelP9_upperSpacing } from "@/components/utils/rp22/levels";
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
 import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
@@ -353,7 +352,6 @@ export function useClientReportAuthority(projectId) {
     });
 
     const worstGapDeg = ringGaps.worstGapDeg;
-    const level = rp22LevelForP5(worstGapDeg);
 
     // Bed-layer speakers for display (exclude overheads)
     const bedSpeakers = analysisSpeakers.filter((s) => {
@@ -389,7 +387,7 @@ export function useClientReportAuthority(projectId) {
       rsp,
       rspSourceLabel,
       worstGapDeg,
-      level,
+      level: null,
       gaps: ringGaps.gaps,
       sortedSurrounds: ringGaps.sortedSurrounds,
       speakersWithAzimuth,
@@ -570,14 +568,13 @@ export function useClientReportAuthority(projectId) {
       };
     }
 
-    // C. Two or three overhead rows: authoritative P9
-    const levelResult = levelP9_upperSpacing(maxVerticalGapDeg);
-
+    // C. Two or three overhead rows: geometry only. The published summary
+    // below supplies the authoritative value and grade.
     return {
       authoritativeSeatId: authoritativeSeat.id,
       authoritativeSeat,
       value: maxVerticalGapDeg,
-      level: levelResult.level,
+      level: null,
       worstGapDeg: worstGap?.deg ?? maxVerticalGapDeg,
       rowElevations,
       gaps,
