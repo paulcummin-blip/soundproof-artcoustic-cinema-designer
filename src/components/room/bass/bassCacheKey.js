@@ -45,3 +45,22 @@ export function parseBassCacheKey(key) {
   const [pid, vid] = String(key || "free::free").split("::");
   return { projectId: pid || "free", versionId: vid || "free" };
 }
+
+/**
+ * Compare a completed-bass-authority's projectId (which is always the composite
+ * "{projectId}::{versionId}" key) against the expected project+version identity.
+ *
+ * This is the single canonical identity-match used by the Design Rating
+ * cold-hydration gate. It ensures the hydrated authority belongs to the SAME
+ * project and version the UI is currently rendering — never a different version
+ * of the same project, or a different project entirely.
+ *
+ * @param {Object|null} completedBassAuthority - authority from useCompletedBassAuthority
+ * @param {string} projectId - raw project ID (or "free")
+ * @param {string} versionId - effective version ID (or "free")
+ * @returns {boolean}
+ */
+export function bassProjectIdMatch(completedBassAuthority, projectId, versionId) {
+  const expectedKey = bassCacheKey(projectId, versionId);
+  return String(completedBassAuthority?.projectId || "free") === expectedKey;
+}

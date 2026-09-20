@@ -17,6 +17,7 @@
 import { useMemo, useEffect, useRef } from 'react';
 import { resolveEffectiveVersionId } from '@/lib/versionAuthority';
 import { useCompletedBassAuthority, BASS_AUTHORITY_STATUS } from '@/components/room/bass/completedBassResultStore';
+import { bassProjectIdMatch } from '@/components/room/bass/bassCacheKey';
 import { buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { buildDesignRatingInput } from '@/components/report/technical/buildDesignRatingInput';
 import { buildArtcousticDesignRatingAuthority } from '@/components/report/technical/artcousticSystemDesignRating';
@@ -219,7 +220,12 @@ export function useAppDesignRating({
   versionId,
   minimumSystemMet = true,
 }) {
-  const completedBassAuthority = useCompletedBassAuthority(projectId || 'free', resolveEffectiveVersionId(versionId, appState));
+  // Canonical effective version — the SAME resolver used by the bass store
+  // (useCompletedBassAuthority keys by this value). Computed once so the
+  // projectIdMatch guard below compares the same composite identity the store
+  // uses, not a raw projectId against a composite key.
+  const effectiveVersionId = resolveEffectiveVersionId(versionId, appState);
+  const completedBassAuthority = useCompletedBassAuthority(projectId || 'free', effectiveVersionId);
   const bassErrorMessage = completedBassAuthority?.errorMessage || null;
 
   const completedBassPresentation = useMemo(
@@ -262,8 +268,11 @@ export function useAppDesignRating({
 
   // ── Bass readiness gate ── (moved before roomRating so retainedFromRefresh
   // can be passed to buildDesignRatingInput as retainedBass)
-  const expectedProjectKey = String(projectId || 'free');
-  const projectIdMatch = String(completedBassAuthority?.projectId || 'free') === expectedProjectKey;
+  // Composite-key identity match: completedBassAuthority.projectId is always
+  // the composite "{projectId}::{versionId}" bass cache key. Compare against
+  // the SAME composite key so a valid hydrated AUTHORITATIVE authority is
+  // accepted instead of permanently rejected as "project-id-mismatch".
+  const projectIdMatch = bassProjectIdMatch(completedBassAuthority, projectId || 'free', effectiveVersionId);
   const p14SelectionState = useMemo(
     () => resolveP14TargetSelectionState(appState?.splConfig),
     [appState?.splConfig?.selectedP14TargetBasis, appState?.splConfig?.selectedP14Level]
