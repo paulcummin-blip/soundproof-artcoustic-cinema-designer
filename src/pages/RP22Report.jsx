@@ -1019,6 +1019,7 @@ function RP22ReportInner() {
     }
 
     const parameterGridProps = {
+        engineeringSummary,
         analysisResult,
         seatHudSnapshots: reportSeatHudById,
         seatingPositions: seats,
