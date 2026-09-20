@@ -77,6 +77,34 @@ test("one authoritative seat-result change fans out through the one summary", ()
   assert.equal(after.project.compliance.counts.fail, 0);
 });
 
+test("canonical room result overwrites a stale legacy project-scoped grade", () => {
+  const base = buildArtcousticDesignRatingAuthority({ seats });
+  const authority = {
+    ...base,
+    parameters: {
+      ...base.parameters,
+      p12: {
+        key: "p12",
+        scope: "project",
+        state: "scored",
+        level: "L3",
+        rawValue: 106,
+      },
+    },
+  };
+  const summary = summariseEngineeringResults({
+    designRatingAuthority: authority,
+    seats,
+    roomResultsByParameter: {
+      12: { level: "L2", value: 106, formatted: "106 dBC" },
+    },
+  });
+
+  assert.equal(summary.parameterSummaries.project.p12.level, "L3");
+  assert.equal(summary.roomResultsByParameter[12].level, "L3");
+  assert.equal(summary.roomResultsByParameter[12].value, 106);
+});
+
 test("published summary is isolated from later engine-object mutation", () => {
   const summary = makeSummary("L4");
   assert.equal(Object.isFrozen(summary), true);
