@@ -23,7 +23,7 @@ import { buildArtcousticDesignRatingAuthority } from '@/components/report/techni
 import { summariseEngineeringResults } from '@/components/engineering/engineeringSummaryAuthority';
 import { attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
 import { summariseAuthoritativeP19Seats } from '@/components/room/bass/p19SeatAuthority';
-import { getScopedSeatIds, buildSeatPriorityFingerprint } from '@/components/utils/seatScopeAuthority';
+import { getScopedSeatIds } from '@/components/utils/seatScopeAuthority';
 import { hasMinimumSystemForAsdr } from '@/components/utils/minimumSystemForAsdr';
 import { resolveP14TargetSelectionState } from '@/components/room/bass/p14TargetSelectionState';
 
@@ -230,11 +230,6 @@ export function useAppDesignRating({
   const completedP19Results = completedBassAuthority?.contract?.selectedCandidate?.perSeatP19Results || [];
   const completedP20Results = completedBassPresentation?.perSeatP20Results || [];
 
-  // Seat arrays can be hydrated or updated in place. Use the canonical
-  // content fingerprint as the memo invalidation authority so a priority
-  // change always rebuilds and republishes the scoped Design Rating.
-  const seatPriorityFingerprint = buildSeatPriorityFingerprint(seats);
-
   // The single canonical P19 seat object. It preserves the engine-published
   // grades from selectedCandidate.perSeatP19Results and owns all grouping.
   const p19SeatAuthority = useMemo(() => {
@@ -245,7 +240,7 @@ export function useAppDesignRating({
       secondarySeatIds,
       seatingPositions: seats,
     });
-  }, [completedP19Results, seats, seatPriorityFingerprint]);
+  }, [completedP19Results, seats]);
 
   const reportP12Mode = appState?.p12Mode || 'minimum';
   const reportP13Mode = appState?.splConfig?.p13Mode || 'minimum';
@@ -369,7 +364,7 @@ export function useAppDesignRating({
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;
     }
-  }, [seats, seatPriorityFingerprint, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, minimumSystemMet, appState?.assumedP15Level, appState?.assumedP21Level, retainedFromRefresh, p19SeatAuthority]);
+  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, minimumSystemMet, appState?.assumedP15Level, appState?.assumedP21Level, retainedFromRefresh, p19SeatAuthority]);
 
   // Capture bass-specific inputs when bass is authoritative, for same-fingerprint
   // retention during a temporary bass refresh. Only bass parameters
