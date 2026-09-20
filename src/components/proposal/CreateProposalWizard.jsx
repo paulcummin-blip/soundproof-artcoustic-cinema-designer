@@ -50,10 +50,11 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
   // the Proposal at generation time. Later Room Designer edits do NOT silently
   // change an existing proposal.
   const snapshotVersionId = selectedVersionIds[0] || null;
-  const { snapshot: engineeringSnapshot, loading: snapshotLoading } = useVersionedEngineeringSnapshot(
-    selectedProjectId,
-    snapshotVersionId,
-  );
+  const {
+    snapshot: engineeringSnapshot,
+    loading: snapshotLoading,
+    error: snapshotError,
+  } = useVersionedEngineeringSnapshot(selectedProjectId, snapshotVersionId);
 
   const handleSelectProject = useCallback((projectId) => {
     setSelectedProjectId(projectId);
@@ -67,6 +68,10 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
 
   const handleGenerate = async () => {
     if (!selectedProjectId || selectedVersionIds.length === 0) return;
+    if (!engineeringSnapshot) {
+      setError(snapshotError || 'Open the selected version in Room Designer and calculate its engineering results before generating the proposal.');
+      return;
+    }
     setGenerating(true);
     setError(null);
     try {
@@ -172,10 +177,16 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
               last
             />
           </div>
-          <p className="text-sm text-[#8A8477] mb-10 leading-relaxed">
+          <p className="text-sm text-[#8A8477] mb-4 leading-relaxed">
             Generate to create the proposal and open the editor. A complete first draft will be
             written using the selected project, design versions and proposal objectives.
           </p>
+          {snapshotLoading && (
+            <p className="text-sm text-[#8A8477] mb-6">Reading the published engineering result…</p>
+          )}
+          {!snapshotLoading && snapshotError && (
+            <p className="text-sm text-[#7A2E10] mb-6">{snapshotError}</p>
+          )}
         </div>
       )}
 
@@ -202,7 +213,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
         {step === STEPS.length - 1 && (
           <button
             onClick={handleGenerate}
-            disabled={!canProceed[0] || !canProceed[2] || !canProceed[3]}
+            disabled={!canProceed[0] || !canProceed[2] || !canProceed[3] || snapshotLoading || !engineeringSnapshot}
             className="px-6 py-2.5 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
             style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
           >
