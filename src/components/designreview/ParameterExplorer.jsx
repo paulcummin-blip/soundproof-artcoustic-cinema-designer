@@ -154,17 +154,13 @@ function DistributionText({ gridData }) {
 }
 
 export default function ParameterExplorer({
-  rating,
-  analysisResult,
-  projectId,
+  engineeringSummary,
   expandedParamKey,
   onExpandParam,
   activeFilter,
   onFilterChange,
   seatingPositions,
-  p19SeatAuthority = null,
 }) {
-  const engineeringSummary = rating?.engineeringSummary || null;
   const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
 
   const authority = useParameterGridAuthority({
