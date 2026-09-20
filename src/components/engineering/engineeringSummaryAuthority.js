@@ -74,7 +74,7 @@ function floorForSeatParameter(parameter, seatIds = null) {
 
 function parameterAggregateLevel(parameter, seatIds = null) {
   if (!parameter || parameter.state !== "scored") return null;
-  if (parameter.scope === "room") return normalizeLevel(parameter.level);
+  if (parameter.scope !== "seat") return normalizeLevel(parameter.level);
   return floorForSeatParameter(parameter, seatIds);
 }
 
