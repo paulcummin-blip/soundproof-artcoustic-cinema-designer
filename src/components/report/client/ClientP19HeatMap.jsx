@@ -20,15 +20,12 @@
  */
 
 import React from "react";
-import { useP19HeatMap } from "./useP19HeatMap";
-import { buildHeatMapSummary } from "./p19HeatMapEngine";
 import { RP22_GRADE_TOKENS } from "@/components/utils/rp22Colors";
 import SeatMarker from "./SeatMarker";
 import { computeHaloRadiusPx, BASS_TWO_SEGMENT_LAYOUT, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry";
 import { resolveCoordinate } from "./selectClientSpeakerBalance";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { Loader2 } from "lucide-react";
-import P19SeatProbeTable from "./P19SeatProbeTable";
 
 const HEADING_FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
 const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -125,16 +122,13 @@ export default function ClientP19HeatMap({
     })
     .filter((s) => s.x !== null && s.y !== null);
 
-  const { status, grid, gridN, error, seatProbes, rspProbe } = useP19HeatMap({
-    projectId,
-    versionId,
-    completedBassAuthority,
-    roomDims,
-    subwooferInstances,
-    rsp,
-    earHeightM,
-    seatPositions,
-  });
+  // Passive report rule: never run the heat-map evaluator here. It previously
+  // produced a second set of P19 deviations that contradicted the published
+  // seat authority. This page now visualises only canonical published seats.
+  const status = "ready";
+  const grid = null;
+  const gridN = 0;
+  const error = null;
 
   const W = Number(roomDims?.widthM) || 4.5;
   const L = Number(roomDims?.lengthM) || 6.0;
@@ -182,8 +176,9 @@ export default function ClientP19HeatMap({
       y: Number(s.position.y) || 0,
     }));
 
-  // Summary
-  const summary = grid && grid.length > 0 ? buildHeatMapSummary(grid, rsp, roomDims) : null;
+  // Presentation summary from the canonical publication only.
+  const summary = bassPerformance?.p19?.project?.coverageSummary
+    || "Published per-seat P19 response quality across the listening area.";
 
   const showDrawing = !print || printPart !== "support";
   const showSupport = !print || printPart !== "drawing";
@@ -490,15 +485,6 @@ export default function ClientP19HeatMap({
           }}>
             Higher levels indicate smoother predicted bass response across the assessed frequency band.
           </p>
-
-          {/* ── Seat P19 parity table (heat-map vs published) ── */}
-          <P19SeatProbeTable
-            seatProbes={seatProbes}
-            rspProbe={rspProbe}
-            bassPerformance={bassPerformance}
-            seatingPositions={seatingPositions}
-            print={print}
-          />
 
           {/* ── Summary ── */}
           {summary && (
