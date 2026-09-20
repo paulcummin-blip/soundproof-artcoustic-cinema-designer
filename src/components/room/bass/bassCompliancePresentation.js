@@ -3,9 +3,11 @@ import { isCompletedBassContract } from "@/components/room/bass/completedBassRes
 
 const levelLabel = (level) => level == null ? "—" : Number(level) === 0 ? "FAIL" : `L${Number(level)}`;
 
-// RP22 P20 does not define Level 1. Sound Proof grades >4 dB as L1 (not FAIL)
-// since P20 is not applicable at Level 1. Only level 0 displays as "FAIL".
-const p20LevelLabel = (level) => level == null ? "—" : Number(level) === 0 ? "FAIL" : `L${Number(level)}`;
+// P20 has no FAIL outcome. Any finite assessed result is at least L1.
+const p20LevelLabel = (level) => {
+  if (level == null || !Number.isFinite(Number(level))) return "—";
+  return `L${Math.max(1, Number(level))}`;
+};
 
 // C6.2D1: Resolve publication state from the completed bass authority object.
 // Do NOT infer authority from structural contract completion — only
@@ -87,11 +89,6 @@ export function formatAuthoritativeBassParameter(completedBassAuthority, key, er
 
   const parameter = contract?.productAnalysis?.parameters?.[key];
 
-  // C6.2D1A: P20 may return N/A when genuinely not applicable, before the publication gate.
-  if (key === "p20" && parameter?.status === "not_applicable") {
-    return { key, valueText: "N/A", level: "N/A", status: parameter.status, isAuthoritative: false, publicationRejectionReason: null };
-  }
-
   // C6.2D1A: P14/P18/P19 — publication gate takes precedence over not_applicable.
   if (!publicationVerified) {
     const rawValue = Number.isFinite(Number(parameter?.value)) ? Number(parameter.value) : null;
@@ -114,8 +111,21 @@ export function formatAuthoritativeBassParameter(completedBassAuthority, key, er
     return result;
   }
 
-  // C6.2D1A: P14/P18/P19 — not_applicable only reachable when verified.
+  // P20's missing L1 threshold means any finite assessed result is at least L1;
+  // it must never be displayed as N/A or FAIL. Other parameters retain N/A.
   if (parameter?.status === "not_applicable") {
+    const p20Value = Number(parameter?.value);
+    if (key === "p20" && Number.isFinite(p20Value)) {
+      return {
+        key,
+        valueText: formatBassParameterValue(key, p20Value),
+        level: "L1",
+        status: "complete",
+        isAuthoritative: true,
+        publicationRejectionReason: null,
+        rawValue: p20Value,
+      };
+    }
     return { key, valueText: "N/A", level: "N/A", status: parameter.status, isAuthoritative: false, publicationRejectionReason: null };
   }
 
