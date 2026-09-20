@@ -341,9 +341,9 @@ function scoreP18(rawValue, mode) {
 }
 
 function scoreP20(rawValue) {
-  // RP22 P20 has no L1: >4 dB is below the L2 threshold (FAIL). canFail=true
-  // so the FAIL level propagates instead of being silently coerced to L1.
-  return applyMapper(rawValue, levelP20_lfConsistency, true);
+  // P20 has no FAIL outcome. Any finite result below the L2 threshold remains
+  // L1, matching the canonical bass authority and RP22 applicability rule.
+  return applyMapper(rawValue, levelP20_lfConsistency, false);
 }
 
 function scoreScreen(angleDeg) {
