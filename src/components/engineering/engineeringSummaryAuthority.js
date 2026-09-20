@@ -59,21 +59,35 @@ function freezeDeep(value, seen = new WeakSet()) {
   return Object.freeze(value);
 }
 
-function floorForSeatParameter(parameter) {
+function floorForSeatParameter(parameter, seatIds = null) {
   if (!parameter || parameter.scope !== "seat") return null;
-  const levels = Object.values(parameter.seats || {})
-    .filter((seat) => seat?.state === "scored")
-    .map((seat) => normalizeLevel(seat?.level))
+  const includedSeatIds = Array.isArray(seatIds) ? new Set(seatIds.map(String)) : null;
+  const levels = Object.entries(parameter.seats || {})
+    .filter(([seatId, seat]) => (!includedSeatIds || includedSeatIds.has(String(seatId))) && seat?.state === "scored")
+    .map(([, seat]) => normalizeLevel(seat?.level))
     .filter(Boolean);
   if (levels.length === 0) return null;
   const floorRank = Math.min(...levels.map((level) => LEVEL_RANK[level]));
   return RANK_LEVEL[floorRank] || null;
 }
 
-function parameterAggregateLevel(parameter) {
+function parameterAggregateLevel(parameter, seatIds = null) {
   if (!parameter || parameter.state !== "scored") return null;
   if (parameter.scope === "room") return normalizeLevel(parameter.level);
-  return floorForSeatParameter(parameter);
+  return floorForSeatParameter(parameter, seatIds);
+}
+
+function buildParameterScopeSummary(parameters, seatIds) {
+  const summary = {};
+  for (const [key, parameter] of Object.entries(parameters || {})) {
+    summary[key] = {
+      key,
+      scope: parameter?.scope || null,
+      state: parameter?.state || "provisional",
+      level: parameterAggregateLevel(parameter, seatIds),
+    };
+  }
+  return summary;
 }
 
 function buildComplianceSummary(parameters) {
@@ -324,6 +338,11 @@ export function summariseEngineeringResults({
     secondary: buildCategorySummary(secondaryRating),
     project: buildCategorySummary(projectRating),
   };
+  const parameterSummaries = {
+    primary: buildParameterScopeSummary(designRatingAuthority.parameters, primarySeatIds),
+    secondary: buildParameterScopeSummary(designRatingAuthority.parameters, secondarySeatIds),
+    project: buildParameterScopeSummary(designRatingAuthority.parameters, allSeatIds),
+  };
   const coverage = buildRp22SeatCoverageResult({
     paramAuthority: designRatingAuthority.parameters,
     seats: canonicalSeats,
@@ -339,6 +358,7 @@ export function summariseEngineeringResults({
     roomResultsByParameter: roomResultsByParameter || {},
     seatHudById: seatHudById || {},
     p19SeatAuthority,
+    parameterSummaries,
     primary: {
       seatIds: primarySeatIds,
       rating: primaryRating,
