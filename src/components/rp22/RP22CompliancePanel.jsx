@@ -226,6 +226,7 @@ const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
 
 export default function RP22CompliancePanel({
   analysisResult,
+  engineeringSummary = null,
   p19SeatAuthority = null,
   screen,
   seatingPositions,
@@ -977,6 +978,7 @@ export default function RP22CompliancePanel({
         getValueForParam={getHudValueForParam}
         renderDetailCard={renderParamDetailCard}
         seatCount={seats.length}
+        summary={engineeringSummary?.project?.compliance || null}
       />
     </div>
   );
