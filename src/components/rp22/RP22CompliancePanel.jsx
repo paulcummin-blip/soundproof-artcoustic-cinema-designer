@@ -1,5 +1,5 @@
 // components/rp22/RP22CompliancePanel.jsx
-import React, { useMemo, useCallback } from "react";
+import React from "react";
 import { useAppState } from "@/components/AppStateProvider";
 import { computeScreenMetrics } from "@/components/utils/screenMetrics";
 import { renderPrimitive } from "@/components/utils/renderSafe";
@@ -215,19 +215,11 @@ const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
 /* ---------- Panel ---------- */
 
 export default function RP22CompliancePanel({
-  analysisResult,
   engineeringSummary = null,
   screen,
   seatingPositions,
-  seatHudSnapshots,
-  roomHudSnapshot,
-  mlpSeatId,
-  dolbyLayout,
-  frontSubsCount,
-  rearSubsCount,
   assumedP15Level,
   assumedP21Level,
-  freeMoveLcr = false,
 }) {
   const appState = useAppState();
   // Threshold presentation follows the same target basis published with the
