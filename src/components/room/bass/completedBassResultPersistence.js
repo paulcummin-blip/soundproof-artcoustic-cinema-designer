@@ -511,7 +511,15 @@ export function resolvePersistedBassAuthority(projectId, persisted) {
     )
   );
 
-  const current = state.status === "complete" && currentFingerprint ? validSnapshots[currentFingerprint] || null : null;
+  const matchingCurrent = currentFingerprint ? validSnapshots[currentFingerprint] || null : null;
+  // Reconcile contradictory parent metadata on hydration. A matching child
+  // that independently satisfies the full authoritative contract must win
+  // over a stale/updating parent flag; otherwise an already-complete result
+  // remains visible in Bass Simulation but is withheld from Design Rating.
+  // Invalid or incomplete matching children still follow the parent status.
+  const current = state.status === "complete"
+    ? matchingCurrent
+    : (isAuthoritativeBassContract(matchingCurrent) ? matchingCurrent : null);
   const staleContract = Object.values(validSnapshots)
     .filter((snapshot) => snapshot !== current && isStructurallyCompleteBassContract(snapshot))
     .sort((left, right) => Number(right?.job?.completedAtMs || 0) - Number(left?.job?.completedAtMs || 0))[0] || null;
