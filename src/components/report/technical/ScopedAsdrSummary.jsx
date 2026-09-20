@@ -4,8 +4,8 @@
  * Shared presentation of the three scoped ASDR results
  * (Primary, Secondary, All).
  *
- * Pure presentation — consumes scopedRatings produced by
- * calculateScopedRoomDesignRating (Stage B authority). No recalculation,
+ * Pure presentation — consumes the published engineering summary.
+ * No recalculation,
  * no percentages, no "out of" scores, no report-only scoring.
  *
  * Used by:
@@ -15,7 +15,6 @@
  */
 
 import React from "react";
-import { getDesignPerformanceIndex } from "./designRatingPresentation";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -30,12 +29,13 @@ const COLORS = {
  * One scoped rating line: label, designation, Design Performance Index.
  * NOT_CONFIGURED scopes show "Not configured" with no index.
  */
-function ScopeLine({ label, rating, emphasize }) {
+function ScopeLine({ label, summary, emphasize }) {
+  const rating = summary?.rating;
   const isConfigured =
     rating &&
     rating.status !== "NOT_ASSESSED" &&
     rating.status !== "NOT_CONFIGURED";
-  const index = isConfigured ? getDesignPerformanceIndex(rating) : null;
+  const index = isConfigured ? (summary?.designPerformanceIndex ?? null) : null;
 
   return (
     <div style={{ marginBottom: emphasize ? "3mm" : "2.5mm" }}>
@@ -78,14 +78,13 @@ function ScopeLine({ label, rating, emphasize }) {
   );
 }
 
-export default function ScopedAsdrSummary({ scopedRatings }) {
-  if (!scopedRatings) return null;
-  const { primary, secondary, all } = scopedRatings;
+export default function ScopedAsdrSummary({ engineeringSummary }) {
+  if (!engineeringSummary) return null;
   return (
     <div>
-      <ScopeLine label="Primary Seating" rating={primary} emphasize />
-      <ScopeLine label="Secondary Seating" rating={secondary} />
-      <ScopeLine label="All Seating" rating={all} />
+      <ScopeLine label="Primary Seating" summary={engineeringSummary.primary} emphasize />
+      <ScopeLine label="Secondary Seating" summary={engineeringSummary.secondary} />
+      <ScopeLine label="All Seating" summary={engineeringSummary.project} />
     </div>
   );
 }
