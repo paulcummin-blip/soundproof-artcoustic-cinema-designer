@@ -2,22 +2,28 @@
 //
 // Presentation-only: does NOT recompute, re-grade, or alter any authority data.
 // All values are read from the already-computed chart data row (which already
-// reflects the displayed smoothing — 1/3 octave or otherwise).
+// reflects the displayed smoothing — 1/3 octave or otherwise) via the pure
+// resolveTooltipCurveAuthority helper.
+//
+// CURVE AUTHORITY:
+//   The primary SPL comes from the ACTIVE RESPONSE CURVE (by priority:
+//   post-eq > seat-overlay > rsp > raw > room > sub-max > product-max),
+//   NEVER from the House Target. The House Target is always a comparison
+//   reference, sampled independently at the same cursor frequency.
 //
 // Layout:
-//   FREQUENCY       SPL
-//   80.7 Hz         103.4 dBC
+//   FREQUENCY              [ACTIVE CURVE LABEL]
+//   113.3 Hz               96.4 dBC
 //
 //   TARGET
-//   103.4 dBC
-//   Δ +0.0 dB
+//   102.6 dBC
+//   Below target           -6.2 dB
 //
 //   CALIBRATION
 //   Operating level adjustment -27.0 dB
-//
-// No expandable sections, no submenus, no interaction required.
 
 import React from "react";
+import { resolveTooltipCurveAuthority } from "./bassTooltipCurveAuthority";
 
 const COLORS = {
   green: "#16A34A",
@@ -73,7 +79,7 @@ function Row({ label, value, valueColor }) {
  * @param {boolean} active - whether the tooltip is active (cursor over chart)
  * @param {Array}  payload - Recharts payload entries (closest series with shared=false)
  * @param {number|string} label - the X-axis value (frequency)
- * @param {Array}  series - series metadata array [{id, kind, color, label, tooltipLabel, ...}]
+ * @param {Array}  series - series metadata array [{id, kind, color, label, ...}]
  * @param {number} operatingLevelOffsetDb - calibration operating-level offset
  */
 export default function BassGraphTooltip({
@@ -88,43 +94,46 @@ export default function BassGraphTooltip({
   const row = payload[0]?.payload;
   if (!row) return null;
 
-  const actualFreq = row?.frequency;
-  const freqDisplay = isFinite(actualFreq)
-    ? formatHz(actualFreq)
+  // ── Resolve curve authority via the pure helper ──
+  // The primary SPL comes from the active response curve (by priority),
+  // NOT from payload[0] (which is merely the closest series to the cursor).
+  const authority = resolveTooltipCurveAuthority({
+    row,
+    series,
+    fallbackDataKey: payload[0]?.dataKey || null,
+  });
+
+  if (!authority) return null;
+
+  const freqDisplay = isFinite(authority.frequency)
+    ? formatHz(authority.frequency)
     : (isFinite(label) ? formatHz(label) : String(label));
 
-  // Identify the closest (hovered) series from the first payload entry.
-  // The SPL shown must correspond to the currently hovered response curve.
-  const selectedDataKey = payload[0]?.dataKey;
-  const selectedSeriesId = selectedDataKey
-    ? String(selectedDataKey).replace(/^spl_/, "")
-    : null;
-  const selectedSeries = series.find((s) => s?.id === selectedSeriesId) || null;
-  const selectedValue = selectedDataKey ? row[selectedDataKey] : null;
-
-  // House curve target (kind: "house-curve" or "normalized-target")
-  const houseCurveSeries = series.find((s) => s?.kind === "house-curve") || series.find((s) => s?.kind === "normalized-target");
-  const houseCurveValue = houseCurveSeries ? row[`spl_${houseCurveSeries.id}`] : null;
-
-  // The displayed SPL is the value of the hovered curve at the cursor frequency.
-  // Falls back to post-EQ RSP only if no specific series is identified.
-  const currentValue = isFinite(selectedValue)
-    ? Number(selectedValue)
-    : (() => {
-        const postEq = series.find((s) => s?.kind === "post-eq");
-        const v = postEq ? row[`spl_${postEq.id}`] : null;
-        return isFinite(v) ? Number(v) : null;
-      })();
-
-  // Difference from target
-  const diffFromTarget = isFinite(currentValue) && isFinite(houseCurveValue)
-    ? Number(currentValue) - Number(houseCurveValue)
-    : null;
-  const aboveTarget = isFinite(diffFromTarget) ? diffFromTarget >= 0 : null;
+  const currentValue = authority.responseSpl;
+  const houseCurveValue = authority.targetSpl;
+  const diffFromTarget = authority.delta;
+  const aboveTarget = authority.aboveTarget;
+  const activeCurveLabel = authority.activeCurveLabel || "RESPONSE";
 
   // Calibration (static line, no expansion)
   const hasCalibration = isFinite(operatingLevelOffsetDb) && Number(operatingLevelOffsetDb) !== 0;
   const calibrationDb = hasCalibration ? Number(operatingLevelOffsetDb) : null;
+
+  // Delta label: "Above target" / "Below target" / "Vs target" (when equal)
+  const deltaLabel = aboveTarget === null
+    ? "Vs target"
+    : diffFromTarget > 0
+      ? "Above target"
+      : diffFromTarget < 0
+        ? "Below target"
+        : "Vs target";
+  const deltaColor = aboveTarget === null
+    ? COLORS.grey
+    : diffFromTarget > 0
+      ? COLORS.orange
+      : diffFromTarget < 0
+        ? COLORS.blue
+        : COLORS.grey;
 
   return (
     <div style={{
@@ -135,7 +144,7 @@ export default function BassGraphTooltip({
       // Ensure the card never captures pointer events — pure readout.
       pointerEvents: "none",
     }}>
-      {/* ── PRIMARY HOVER READOUT: FREQUENCY + SPL together ── */}
+      {/* ── PRIMARY HOVER READOUT: FREQUENCY + ACTIVE CURVE SPL ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
         <div>
           <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}>
@@ -147,7 +156,7 @@ export default function BassGraphTooltip({
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.green }}>
-            SPL
+            {activeCurveLabel}
           </div>
           <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.green, lineHeight: 1.2 }}>
             {formatSpl(currentValue)}
@@ -163,9 +172,9 @@ export default function BassGraphTooltip({
           <Row label="Target SPL" value={formatSpl(houseCurveValue)} valueColor={COLORS.blue} />
           {isFinite(diffFromTarget) && (
             <Row
-              label={aboveTarget ? "Above target" : "Below target"}
+              label={deltaLabel}
               value={formatSignedDb(diffFromTarget)}
-              valueColor={aboveTarget ? COLORS.orange : COLORS.blue}
+              valueColor={deltaColor}
             />
           )}
         </>
