@@ -28,7 +28,7 @@ import BrandIntroOverlay from "@/components/ui/BrandIntroOverlay";
 import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
 import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
-import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUnselectedIndicator, readSeatPriorityFingerprint } from "@/components/state/designReviewHandoff";
+import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUnselectedIndicator, readSeatPriorityFingerprint, readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
@@ -141,7 +141,28 @@ export default function Layout({ children, currentPageName }) {
     };
   }, [currentPageName]);
   
-  // Listen for price updates from Room Designer
+  // The sidebar is a direct subscriber to the same published engineering
+  // authority as every report. It never rebuilds or polls a separate rating.
+  React.useEffect(() => {
+    if (!activeProjectId) {
+      setAsdrRating(null);
+      setAsdrRecommendations(null);
+      return undefined;
+    }
+    const applyPublication = (snapshot) => {
+      const published = snapshot || readDesignReviewHandoff(activeProjectId);
+      setAsdrRating(published?.rating || null);
+      setAsdrRecommendations(published?.recommendations || null);
+    };
+    applyPublication(readDesignReviewHandoff(activeProjectId));
+    return subscribeDesignReviewHandoff(activeProjectId, (snapshot, fromStorage) => {
+      applyPublication(snapshot || (fromStorage
+        ? readDesignReviewHandoff(activeProjectId, { preferStored: true })
+        : null));
+    });
+  }, [activeProjectId]);
+
+  // Listen for price and lightweight pending-indicator updates.
   React.useEffect(() => {
     const interval = setInterval(() => {
       if (typeof window !== 'undefined') {
@@ -158,23 +179,6 @@ export default function Layout({ children, currentPageName }) {
             : previous);
         }
       }
-      if (typeof window !== 'undefined' && window.__ROOM_DESIGNER_ASDR__) {
-        const sharedAsdr = window.__ROOM_DESIGNER_ASDR__;
-        const sameProjectAsdr =
-          sharedAsdr &&
-          activeProjectId &&
-          String(sharedAsdr.projectId || '') === String(activeProjectId);
-        if (sameProjectAsdr) {
-          setAsdrRating(sharedAsdr.rating || null);
-          setAsdrRecommendations(sharedAsdr.recommendations || null);
-        } else {
-          setAsdrRating(null);
-          setAsdrRecommendations(null);
-        }
-      } else {
-        setAsdrRating(null);
-        setAsdrRecommendations(null);
-      }
       setBassPending(readBassPendingIndicator(activeProjectId));
       setP14TargetUnselected(readP14TargetUnselectedIndicator(activeProjectId));
       const unavailable = readAsdrUnavailableIndicator(activeProjectId);
@@ -190,7 +194,7 @@ export default function Layout({ children, currentPageName }) {
       // than the current one — do not display its Primary/Secondary floors as
       // current.
       const liveFp = readSeatPriorityFingerprint(activeProjectId);
-      const publishedFp = asdrRating?.seatPriorityFingerprint ?? null;
+      const publishedFp = window.__ROOM_DESIGNER_ASDR__?.rating?.seatPriorityFingerprint ?? null;
       if (liveFp && publishedFp && liveFp !== publishedFp) {
         setStaleScope(true);
       } else {
