@@ -11,10 +11,8 @@
  * panel (RP22CompliancePanel) and the Technical Report (RP22ReportParameterGrid):
  *   appState.splConfig.p13Mode  →  "minimum" | "recommended"  (default "minimum")
  *
- * The threshold tables below mirror those two authorities EXACTLY. Keep in sync.
- * The achieved SPL (gradedParameters.primary[13].value) does NOT change with the
- * target basis. The RP22 level DOES, because the level is re-graded from the
- * achieved value using the active thresholds.
+ * The achieved value and RP22 level are read directly from the published
+ * engineering summary. This selector never grades them.
  *
  * ── Canonical P13 result ──
  *   analysisResult.gradedParameters.primary[13].value       → achieved minimum SPL
@@ -39,16 +37,6 @@ const P13_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 99, L2: 102, L3: 105, 
 
 function resolveP13Thresholds(p13Mode) {
   return p13Mode === "recommended" ? P13_THRESHOLDS_RECOMMENDED : P13_THRESHOLDS_MINIMUM;
-}
-
-function gradeP13ForBasis(value, p13Mode) {
-  if (!Number.isFinite(value)) return null;
-  const t = resolveP13Thresholds(p13Mode);
-  if (value >= t.L4) return "L4";
-  if (value >= t.L3) return "L3";
-  if (value >= t.L2) return "L2";
-  if (value >= t.L1) return "L1";
-  return "FAIL";
 }
 
 const RESULT_HEADINGS = {
@@ -116,16 +104,12 @@ export function selectClientNonScreenDynamicRange({
   }
   speakerSplValues.sort((a, b) => roleOrderIndex(a.role) - roleOrderIndex(b.role));
 
-  // Canonical P13 achieved value (room-scope) — does NOT change with basis
-  const p13 = analysisResult?.gradedParameters?.primary?.[13] ?? null;
-  let minimum = null;
-  if (p13 && Number.isFinite(p13.value)) {
-    minimum = { value: p13.value, formatted: p13.formatted || `${p13.value} dB` };
-  }
-
-  // Achieved level is read directly from the canonical published parameter
-  // authority. The Visual Report never re-grades the achieved value.
-  const level = engineeringSummary?.parameterAuthority?.p13?.level ?? null;
+  // Direct reads from the canonical publication. No report-side grading.
+  const p13 = engineeringSummary?.roomResultsByParameter?.[13] ?? null;
+  const minimum = p13 && Number.isFinite(Number(p13.value))
+    ? { value: Number(p13.value), formatted: p13.formatted || `${p13.value} dB` }
+    : null;
+  const level = p13?.level ?? engineeringSummary?.parameterAuthority?.p13?.level ?? null;
   const resultHeading = level ? RESULT_HEADINGS[level] || "" : "";
 
   const hasAny = speakerSplValues.length > 0 || !!(minimum && level);
