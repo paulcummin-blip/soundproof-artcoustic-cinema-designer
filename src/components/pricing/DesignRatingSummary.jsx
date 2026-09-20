@@ -35,16 +35,6 @@ function paramLabel(key) {
   return num ? `P${num}` : String(key || '');
 }
 
-// Return the included parameters whose achieved level equals the category
-// floor for this scope. For a FAIL floor, returns the FAIL parameters.
-// Screen / Viewing Geometry is excluded (RP23, separately governed).
-function getLimitingParams(scope) {
-  if (!scope || !scope.paramDetails || scope.isScreen) return [];
-  const floor = scope.floorLevel;
-  if (!floor) return [];
-  return scope.paramDetails.filter((p) => p.level === floor);
-}
-
 // Tooltip body: category title + one row per limiting parameter.
 function FloorTooltipBody({ label, isPrimary, limiting }) {
   return (
@@ -67,7 +57,7 @@ function FloorTooltipBody({ label, isPrimary, limiting }) {
 // Wrap a pill in a hover/focus tooltip showing the limiting parameters,
 // but only when there are limiting parameters to show.
 function FloorPillWithTooltip({ pill, scope, label, isPrimary }) {
-  const limiting = getLimitingParams(scope);
+  const limiting = scope?.limitingParams || [];
   if (limiting.length === 0) return pill;
   return (
     <Tooltip>
