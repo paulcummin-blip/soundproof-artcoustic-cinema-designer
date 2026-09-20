@@ -83,7 +83,7 @@ export function hasPrimarySeatLevelRegression(candidateResult, currentResult) {
  * Find the best P19 primary-seat material improvement (level or raw).
  * P19 is a primary-seat metric — only primary seats are assessed.
  */
-function findBestP19Improvement(candidateResult, currentResult) {
+export function findBestP19Improvement(candidateResult, currentResult) {
   const candidateP19 = Array.isArray(candidateResult?.perSeatP19) ? candidateResult.perSeatP19 : [];
   const currentP19Map = new Map((Array.isArray(currentResult?.perSeatP19) ? currentResult.perSeatP19 : []).map(s => [String(s.seatId), s]));
 
@@ -116,7 +116,7 @@ function findBestP19Improvement(candidateResult, currentResult) {
  * Find the best P20 worst-seat material improvement (level or raw).
  * P20 is a seat-consistency metric — assessed on the WORST seat across ALL seats.
  */
-function findBestP20Improvement(candidateResult, currentResult) {
+export function findBestP20Improvement(candidateResult, currentResult) {
   const candidateP20 = Array.isArray(candidateResult?.perSeatP20) ? candidateResult.perSeatP20 : [];
   const currentP20Map = new Map((Array.isArray(currentResult?.perSeatP20) ? currentResult.perSeatP20 : []).map(s => [String(s.seatId), s]));
 
@@ -167,7 +167,7 @@ function findBestImprovement(candidateResult, currentResult) {
  * Find P19 primary-seat same-level raw worsening (trade-off signal).
  * Only checks seats where the displayed level is preserved but raw deviation worsens.
  */
-function findP19Worsening(candidateResult, currentResult) {
+export function findP19Worsening(candidateResult, currentResult) {
   const candidateP19 = Array.isArray(candidateResult?.perSeatP19) ? candidateResult.perSeatP19 : [];
   const currentP19Map = new Map((Array.isArray(currentResult?.perSeatP19) ? currentResult.perSeatP19 : []).map(s => [String(s.seatId), s]));
 
@@ -194,7 +194,7 @@ function findP19Worsening(candidateResult, currentResult) {
  * Find P20 worst-seat same-level raw worsening (trade-off signal).
  * Checks ALL seats (not just primary) because P20 is a seat-consistency metric.
  */
-function findP20Worsening(candidateResult, currentResult) {
+export function findP20Worsening(candidateResult, currentResult) {
   const candidateP20 = Array.isArray(candidateResult?.perSeatP20) ? candidateResult.perSeatP20 : [];
   const currentP20Map = new Map((Array.isArray(currentResult?.perSeatP20) ? currentResult.perSeatP20 : []).map(s => [String(s.seatId), s]));
 

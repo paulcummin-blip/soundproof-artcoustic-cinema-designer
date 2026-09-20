@@ -2,33 +2,74 @@
 // Pure presentation-layer data extraction for the Bass Optimisation summary.
 //
 // Transforms the V2 engine's selection, stage verdicts, and completed bass
-// authority into a designer-friendly summary that explains WHY the optimiser
-// reached its conclusion.
+// authority into a designer-friendly summary showing canonical P19/P20
+// before→after, failing-seat count, primary floor, and 6-way classification.
 //
 // This module does NOT alter the optimiser, materiality thresholds, RP22
 // grading, or published authoritative results. It only reads data the engine
 // already produces and reshapes it for display.
 
 import { buildStageResults } from "../improveBassV2/improveBassV2StageAuthority";
+import { countFailingSeats } from "../improveBassV2/zeroFailOptimiser";
+import { classifyOptimisationStage } from "./optimisationStageClassifier";
 
 function num(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
 
-function getBaselineP19(selection, completedBassAuthority) {
-  const fromSelection = num(selection?.currentResult?.achievedP19VariationDb);
-  if (fromSelection != null) return fromSelection;
-  return num(
-    completedBassAuthority?.contract?.selectedCandidate?.achievedP19VariationDb,
-  );
+function numericLevel(value) {
+  if (Number.isFinite(Number(value))) return Math.max(0, Math.min(4, Number(value)));
+  const match = String(value || "").match(/^L([1-4])$/i);
+  return match ? Number(match[1]) : 0;
+}
+
+// ── Worst primary seat for P19 (lowest level, then highest raw) ──
+function worstPrimarySeat(perSeatArray) {
+  if (!Array.isArray(perSeatArray) || !perSeatArray.length) return null;
+  const primary = perSeatArray.filter((s) => s.isPrimary);
+  const candidates = primary.length ? primary : perSeatArray;
+  return candidates.reduce((worst, seat) => {
+    const seatLevel = numericLevel(seat.level);
+    const worstLevel = numericLevel(worst.level);
+    if (seatLevel < worstLevel) return seat;
+    if (seatLevel === worstLevel) {
+      const seatRaw = Math.abs(Number(seat.variationDbRaw) || 0);
+      const worstRaw = Math.abs(Number(worst.variationDbRaw) || 0);
+      if (seatRaw > worstRaw) return seat;
+    }
+    return worst;
+  }, candidates[0]);
+}
+
+// ── Worst seat for P20 (lowest level, then highest raw) ──
+function worstSeat(perSeatArray) {
+  if (!Array.isArray(perSeatArray) || !perSeatArray.length) return null;
+  return perSeatArray.reduce((worst, seat) => {
+    const seatLevel = numericLevel(seat.level);
+    const worstLevel = numericLevel(worst.level);
+    if (seatLevel < worstLevel) return seat;
+    if (seatLevel === worstLevel) {
+      const seatRaw = Math.abs(Number(seat.variationDbRaw) || 0);
+      const worstRaw = Math.abs(Number(worst.variationDbRaw) || 0);
+      if (seatRaw > worstRaw) return seat;
+    }
+    return worst;
+  }, perSeatArray[0]);
+}
+
+// ── Primary floor: minimum level across primary seats (P19 + P20) ──
+function primaryFloor(result) {
+  const p19 = (Array.isArray(result?.perSeatP19) ? result.perSeatP19 : []).filter((s) => s.isPrimary);
+  const p20 = (Array.isArray(result?.perSeatP20) ? result.perSeatP20 : []).filter((s) => s.isPrimary);
+  const grades = [...p19, ...p20].map((s) => numericLevel(s.level));
+  return grades.length ? Math.min(...grades) : 0;
 }
 
 function getGlobalLevelAlignment(completedBassAuthority) {
   return (
     completedBassAuthority?.contract?.selectedCandidate?.globalLevelAlignment ||
-    completedBassAuthority?.contract?.productAnalysis?.parameters
-      ?.globalLevelAlignment ||
+    completedBassAuthority?.contract?.productAnalysis?.parameters?.globalLevelAlignment ||
     null
   );
 }
@@ -45,61 +86,53 @@ function sumFunnelGenerated(evaluationCounts) {
   return total;
 }
 
-const STAGE_REASONS = {
-  phase: {
-    improvement: "Phase alignment reduced seat-to-seat variation.",
-    no_improvement:
-      "Every phase combination increased the overall response error.",
-    not_tested: "No differential phase control is applicable to this configuration.",
-  },
-  delay: {
-    improvement: "Timing alignment reduced seat-to-seat variation.",
-    no_improvement:
-      "Timing improvements benefited some seats but degraded others.",
-    not_tested: "Delay adjustment was not applicable to this configuration.",
-  },
-  gain: {
-    improvement: "Gain balance reduced the overall response deviation.",
-    no_improvement: "No gain balance reduced the overall response deviation.",
-    not_tested: "Gain adjustment was not applicable to this configuration.",
-  },
-  globalTrim: {
-    improvement: "A better operating level was found.",
-    no_improvement: "The optimum operating level was already selected.",
-    not_tested: "Global trim was not evaluated.",
-  },
-  subPositions: {
-    improvement: "A better subwoofer layout was found.",
-    no_improvement: "Improvement below the materiality threshold.",
-    not_tested: "Position search was not applicable.",
-  },
-};
+// ── Build a stage entry from canonical before/after results ──
+function buildCanonicalStageEntry({
+  key,
+  label,
+  combinations,
+  currentResult,
+  candidateResult,
+  verdict,
+  internalProxy,
+}) {
+  const hasCandidate = !!candidateResult;
+  const classification = hasCandidate
+    ? classifyOptimisationStage(currentResult, candidateResult)
+    : "NO_MATERIAL_IMPROVEMENT";
 
-function getReason(stageKey, verdict) {
-  const reasons = STAGE_REASONS[stageKey] || {};
-  return reasons[verdict] || reasons.no_improvement || "No improvement found.";
-}
+  const p19Before = worstPrimarySeat(currentResult?.perSeatP19);
+  const p19After = hasCandidate ? worstPrimarySeat(candidateResult?.perSeatP19) : p19Before;
+  const p20Before = worstSeat(currentResult?.perSeatP20);
+  const p20After = hasCandidate ? worstSeat(candidateResult?.perSeatP20) : p20Before;
 
-function hasSeatFails(perSeatArr) {
-  if (!Array.isArray(perSeatArr)) return false;
-  return perSeatArr.some((s) => {
-    const lvl = s?.level;
-    return lvl === null || lvl === undefined || lvl === "FAIL" || lvl === "fail";
-  });
-}
+  const failsBefore = countFailingSeats(currentResult);
+  const failsAfter = hasCandidate ? countFailingSeats(candidateResult) : failsBefore;
 
-function buildStageEntry(key, label, combinations, baselineP19, bestP19, verdict) {
-  const improvement =
-    baselineP19 != null && bestP19 != null ? baselineP19 - bestP19 : null;
+  const floorBefore = primaryFloor(currentResult);
+  const floorAfter = hasCandidate ? primaryFloor(candidateResult) : floorBefore;
+
   return {
     key,
     label,
     combinationsTested: combinations,
-    currentP19: baselineP19,
-    bestP19,
-    improvement,
-    outcome: verdict,
-    reason: getReason(key, verdict),
+    verdict,
+    classification,
+    p19: {
+      beforeLevel: p19Before?.level ?? null,
+      beforeRaw: p19Before?.variationDbRaw ?? null,
+      afterLevel: p19After?.level ?? null,
+      afterRaw: p19After?.variationDbRaw ?? null,
+    },
+    p20: {
+      beforeLevel: p20Before?.level ?? null,
+      beforeRaw: p20Before?.variationDbRaw ?? null,
+      afterLevel: p20After?.level ?? null,
+      afterRaw: p20After?.variationDbRaw ?? null,
+    },
+    failingSeats: { before: failsBefore, after: failsAfter },
+    primaryFloor: { before: floorBefore, after: floorAfter },
+    internal: internalProxy,
   };
 }
 
@@ -118,7 +151,7 @@ export function buildOptimisationSummaryData({
   subwooferCount,
 }) {
   const stageResults = buildStageResults(selection);
-  const baselineP19 = getBaselineP19(selection, completedBassAuthority);
+  const currentResult = selection?.currentResult;
   const gla = getGlobalLevelAlignment(completedBassAuthority);
   const verdicts = stageVerdicts || {};
 
@@ -133,7 +166,9 @@ export function buildOptimisationSummaryData({
     ? "improvements_applied"
     : "no_improvements";
 
-  // ── Per-stage data ──
+  // Proxy metric (internal search metric — behind debug disclosure)
+  const baselineP19 = num(currentResult?.achievedP19VariationDb);
+
   const stages = [];
 
   // Phase
@@ -141,100 +176,134 @@ export function buildOptimisationSummaryData({
     num(selection?.phaseDiagnostics?.tested) ??
     num(selection?.phaseDiagnostics?.optionCount) ??
     0;
-  const phaseBestP19 =
-    stageResults.phase.verdict === "improvement"
-      ? num(selection?.phaseResult?.achievedP19VariationDb)
-      : baselineP19;
+  const phaseCandidate = stageResults.phase.verdict === "improvement" ? stageResults.phase.result : null;
   stages.push(
-    buildStageEntry(
-      "phase",
-      "Phase",
-      phaseCombinations,
-      baselineP19,
-      phaseBestP19,
-      stageResults.phase.verdict,
-    ),
+    buildCanonicalStageEntry({
+      key: "phase",
+      label: "Phase",
+      combinations: phaseCombinations,
+      currentResult,
+      candidateResult: phaseCandidate,
+      verdict: stageResults.phase.verdict,
+      internalProxy: {
+        currentP19: baselineP19,
+        bestP19: phaseCandidate ? num(phaseCandidate.achievedP19VariationDb) : baselineP19,
+      },
+    }),
   );
 
   // Delay
   const delayCombinations =
     (num(selection?.calibrationDiagnostics?.coarseCount) ?? 0) +
     (num(selection?.calibrationDiagnostics?.fineCount) ?? 0);
-  const delayBestP19 =
-    stageResults.delay.verdict === "improvement"
-      ? num(selection?.calibrationResult?.achievedP19VariationDb)
-      : baselineP19;
+  const delayCandidate = stageResults.delay.verdict === "improvement" ? stageResults.delay.result : null;
   stages.push(
-    buildStageEntry(
-      "delay",
-      "Delay",
-      delayCombinations,
-      baselineP19,
-      delayBestP19,
-      stageResults.delay.verdict,
-    ),
+    buildCanonicalStageEntry({
+      key: "delay",
+      label: "Delay",
+      combinations: delayCombinations,
+      currentResult,
+      candidateResult: delayCandidate,
+      verdict: stageResults.delay.verdict,
+      internalProxy: {
+        currentP19: baselineP19,
+        bestP19: delayCandidate ? num(delayCandidate.achievedP19VariationDb) : baselineP19,
+      },
+    }),
   );
 
   // Gain
   const gainCombinations =
     (num(selection?.gainDiagnostics?.coarseCount) ?? 0) +
     (num(selection?.gainDiagnostics?.fineCount) ?? 0);
-  const gainBestP19 =
-    stageResults.gain.verdict === "improvement"
-      ? num(selection?.gainResult?.achievedP19VariationDb)
-      : baselineP19;
+  const gainCandidate = stageResults.gain.verdict === "improvement" ? stageResults.gain.result : null;
   stages.push(
-    buildStageEntry(
-      "gain",
-      "Relative Gain",
-      gainCombinations,
-      baselineP19,
-      gainBestP19,
-      stageResults.gain.verdict,
-    ),
+    buildCanonicalStageEntry({
+      key: "gain",
+      label: "Relative Gain",
+      combinations: gainCombinations,
+      currentResult,
+      candidateResult: gainCandidate,
+      verdict: stageResults.gain.verdict,
+      internalProxy: {
+        currentP19: baselineP19,
+        bestP19: gainCandidate ? num(gainCandidate.achievedP19VariationDb) : baselineP19,
+      },
+    }),
   );
 
-  // Global Bass Trim
+  // Global Bass Trim (special: no separate per-seat results — only RSP P19)
   const stepDb = num(gla?.stepDb) ?? 0.25;
   const trimCombinations = gla
-    ? Math.round(
-        ((num(gla.downwardBoundDb) ?? 0) + (num(gla.upwardBoundDb) ?? 0)) /
-          stepDb,
-      ) + 1
+    ? Math.round(((num(gla.downwardBoundDb) ?? 0) + (num(gla.upwardBoundDb) ?? 0)) / stepDb) + 1
     : 0;
-  const trimCurrentP19 = gla ? num(gla.originalP19Db) : baselineP19;
-  const trimBestP19 = gla ? num(gla.alignedP19Db) : baselineP19;
-  const trimImprovement = gla ? num(gla.improvementDb) : 0;
-  const trimOutcome = gla?.aligned ? "improvement" : "no_improvement";
+  const trimAligned = gla?.aligned ?? false;
   stages.push({
     key: "globalTrim",
     label: "Global Bass Trim",
     combinationsTested: trimCombinations,
-    currentP19: trimCurrentP19,
-    bestP19: trimBestP19,
-    improvement: trimImprovement,
-    outcome: trimOutcome,
-    reason: getReason("globalTrim", trimOutcome),
+    verdict: trimAligned ? "improvement" : "no_improvement",
+    classification: trimAligned ? "IMPROVES_P19" : "NO_MATERIAL_IMPROVEMENT",
+    p19: {
+      beforeLevel: null,
+      beforeRaw: gla ? num(gla.originalP19VariationDb) : null,
+      afterLevel: null,
+      afterRaw: gla ? num(gla.alignedP19VariationDb) : null,
+      isRspOnly: true,
+    },
+    p20: {
+      beforeLevel: null,
+      beforeRaw: null,
+      afterLevel: null,
+      afterRaw: null,
+      isNoChange: true,
+    },
+    failingSeats: { before: null, after: null, isNoChange: true },
+    primaryFloor: { before: null, after: null, isNoChange: true },
+    internal: {
+      currentP19: gla ? num(gla.originalP19VariationDb) : baselineP19,
+      bestP19: gla ? num(gla.alignedP19VariationDb) : baselineP19,
+    },
   });
 
   // Subwoofer Positions
   const subCombinations = sumFunnelGenerated(
     selection?.evaluationCounts || selection?.funnel,
   );
-  const subBestP19 =
-    stageResults.subPositions.verdict === "improvement"
-      ? num(stageResults.subPositions.result?.achievedP19VariationDb)
-      : baselineP19;
+  const subCandidate = stageResults.subPositions.verdict === "improvement" ? stageResults.subPositions.result : null;
   stages.push(
-    buildStageEntry(
-      "subPositions",
-      "Subwoofer Positions",
-      subCombinations,
-      baselineP19,
-      subBestP19,
-      stageResults.subPositions.verdict,
-    ),
+    buildCanonicalStageEntry({
+      key: "subPositions",
+      label: "Subwoofer Positions",
+      combinations: subCombinations,
+      currentResult,
+      candidateResult: subCandidate,
+      verdict: stageResults.subPositions.verdict,
+      internalProxy: {
+        currentP19: baselineP19,
+        bestP19: subCandidate ? num(subCandidate.achievedP19VariationDb) : baselineP19,
+      },
+    }),
   );
+
+  // Seating (where applicable)
+  const seatingCandidate = stageResults.seating.verdict === "improvement" ? stageResults.seating.result : null;
+  if (stageResults.seating.verdict !== "not_tested") {
+    stages.push(
+      buildCanonicalStageEntry({
+        key: "seating",
+        label: "Seating Positions",
+        combinations: 0,
+        currentResult,
+        candidateResult: seatingCandidate,
+        verdict: stageResults.seating.verdict,
+        internalProxy: {
+          currentP19: baselineP19,
+          bestP19: seatingCandidate ? num(seatingCandidate.achievedP19VariationDb) : baselineP19,
+        },
+      }),
+    );
+  }
 
   // ── Confidence ──
   const coreStageKeys = ["phase_polarity", "delays", "gain", "sub_positions"];
@@ -259,11 +328,7 @@ export function buildOptimisationSummaryData({
   ];
 
   // ── Physical limitation ──
-  const perSeatP19 =
-    completedBassAuthority?.contract?.selectedCandidate?.perSeatP19 || [];
-  const perSeatP20 =
-    completedBassAuthority?.contract?.selectedCandidate?.perSeatP20 || [];
-  const hasFails = hasSeatFails(perSeatP19) || hasSeatFails(perSeatP20);
+  const hasFails = currentResult ? countFailingSeats(currentResult) > 0 : false;
 
   const recommendations = [];
   if (hasFails) {
