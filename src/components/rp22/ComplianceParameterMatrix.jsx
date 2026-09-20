@@ -7,7 +7,6 @@ import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import SeatScopeBadge from "@/components/report/SeatScopeBadge";
 import { ChevronDown } from "lucide-react";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
-import { aggregateComplianceSummary } from "@/components/rp22/complianceSummaryAggregator";
 
 const deriveStatus = (achievedValue, paramId) => {
   const v = String(achievedValue || "");
@@ -34,6 +33,7 @@ export default function ComplianceParameterMatrix({
   getValueForParam,
   renderDetailCard,
   seatCount = 0,
+  summary = null,
 }) {
   const [expandedId, setExpandedId] = useState(null);
 
@@ -49,10 +49,14 @@ export default function ComplianceParameterMatrix({
     [parameters, getLevelForParam, getValueForParam]
   );
 
-  const summary = useMemo(
-    () => aggregateComplianceSummary(rowsData),
-    [rowsData]
-  );
+  const publishedSummary = summary || {
+    counts: { L4: 0, L3: 0, L2: 0, L1: 0, fail: 0, notVerified: 0 },
+    lowestLabel: "—",
+    active: 0,
+    unavailable: 0,
+    calculatedSeatParams: 0,
+    seatParamCount: 0,
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -62,21 +66,21 @@ export default function ComplianceParameterMatrix({
           Compliance Summary
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: 6 }}>
-          <SummaryTile label="L4" count={summary.counts.L4} />
-          <SummaryTile label="L3" count={summary.counts.L3} />
-          <SummaryTile label="L2" count={summary.counts.L2} />
-          <SummaryTile label="L1" count={summary.counts.L1} />
-          <SummaryTile label="Fail" count={summary.counts.fail} tone="fail" />
-          <SummaryTile label="Not verified" count={summary.counts.notVerified} tone="muted" />
+          <SummaryTile label="L4" count={publishedSummary.counts.L4} />
+          <SummaryTile label="L3" count={publishedSummary.counts.L3} />
+          <SummaryTile label="L2" count={publishedSummary.counts.L2} />
+          <SummaryTile label="L1" count={publishedSummary.counts.L1} />
+          <SummaryTile label="Fail" count={publishedSummary.counts.fail} tone="fail" />
+          <SummaryTile label="Not verified" count={publishedSummary.counts.notVerified} tone="muted" />
         </div>
         <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11, color: "#625143", flexWrap: "wrap" }}>
-          <span>Lowest achieved: <strong style={{ color: "#1B1A1A" }}>{summary.lowestLabel}</strong></span>
-          <span>Active: <strong style={{ color: "#1B1A1A" }}>{summary.active}</strong></span>
-          <span>Unavailable: <strong style={{ color: "#1B1A1A" }}>{summary.unavailable}</strong></span>
+          <span>Lowest achieved: <strong style={{ color: "#1B1A1A" }}>{publishedSummary.lowestLabel}</strong></span>
+          <span>Active: <strong style={{ color: "#1B1A1A" }}>{publishedSummary.active}</strong></span>
+          <span>Unavailable: <strong style={{ color: "#1B1A1A" }}>{publishedSummary.unavailable}</strong></span>
         </div>
-        {summary.seatParamCount > 0 && (
+        {publishedSummary.seatParamCount > 0 && (
           <div style={{ display: "flex", gap: 12, marginTop: 4, fontSize: 11, color: "#625143", flexWrap: "wrap" }}>
-            <span>Calculated seat parameters: <strong style={{ color: "#1B1A1A" }}>{summary.calculatedSeatParams}</strong></span>
+            <span>Calculated seat parameters: <strong style={{ color: "#1B1A1A" }}>{publishedSummary.calculatedSeatParams}</strong></span>
             <span>Seats evaluated: <strong style={{ color: "#1B1A1A" }}>{seatCount}</strong></span>
           </div>
         )}
