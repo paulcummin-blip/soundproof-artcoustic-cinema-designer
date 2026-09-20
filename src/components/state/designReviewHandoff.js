@@ -169,6 +169,9 @@ export function clearDesignReviewHandoff(projectId) {
     // Storage may be unavailable or blocked — live same-window handoff is
     // already cleared above.
   }
+  window.dispatchEvent(new CustomEvent(HANDOFF_EVENT, {
+    detail: { projectId: pid, snapshot: null },
+  }));
 }
 
 export function publishDesignReviewHandoff(snapshot) {
@@ -199,6 +202,9 @@ export function publishDesignReviewHandoff(snapshot) {
   // Keep the persistent handoff intentionally compact. Recommendations can
   // contain full scenario reruns and remain a live same-window authority; the
   // direct-load cache carries only the settled report/result fields.
+  const storedRating = published.rating
+    ? Object.fromEntries(Object.entries(published.rating).filter(([key]) => key !== "engineeringSummary"))
+    : null;
   const stored = {
     projectId,
     versionId: published.versionId ?? null,
@@ -206,7 +212,7 @@ export function publishDesignReviewHandoff(snapshot) {
     calculationFingerprint: published.calculationFingerprint ?? null,
     publishedAt: published.publishedAt,
     showAsdr: published.showAsdr,
-    rating: published.rating,
+    rating: storedRating,
     engineeringSummary: published.engineeringSummary ?? published.rating?.engineeringSummary ?? null,
     p19SeatAuthority: published.p19SeatAuthority ?? published.engineeringSummary?.p19SeatAuthority ?? published.rating?.p19SeatAuthority ?? null,
     seatPriorityFingerprint: published.rating?.seatPriorityFingerprint ?? null,
