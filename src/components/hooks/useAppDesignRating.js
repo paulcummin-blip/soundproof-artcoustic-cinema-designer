@@ -320,6 +320,7 @@ export function useAppDesignRating({
         if (!presentation) continue;
         roomResultsByParameter[parameterNumber] = {
           ...(roomResultsByParameter[parameterNumber] || {}),
+          ...presentation,
           status: presentation.status,
           value: presentation.rawValue,
           formatted: presentation.valueText,
