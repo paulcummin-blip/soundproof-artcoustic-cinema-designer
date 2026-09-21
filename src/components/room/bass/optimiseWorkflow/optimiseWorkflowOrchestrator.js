@@ -36,6 +36,7 @@ import { buildProvenance } from "../improveBassV2/appliedProvenance";
 import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Fingerprint";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import { normalisePhaseControlDeg } from "../../../../bass/core/subwooferPhaseControl";
+import { classifyOptimisationStage } from "./optimisationStageClassifier";
 
 /**
  * Run the V2 optimisation engine and return the selection result.
@@ -278,10 +279,23 @@ export function buildAutoApplySummary(selection, currentInstances) {
   // result. The overall calibration winner can carry the current coordinates,
   // which previously produced a false “Move subwoofers” Apply card even when
   // the position stage reported no material improvement.
+  const safePhysicalClassifications = new Set([
+    "IMPROVES_BOTH",
+    "IMPROVES_P19",
+    "IMPROVES_P20",
+  ]);
+  const positionClassification = classifyOptimisationStage(
+    selection.currentResult,
+    stageResults?.subPositions?.result,
+  );
+  const seatingClassification = classifyOptimisationStage(
+    selection.currentResult,
+    stageResults?.seating?.result,
+  );
   const hasPositions = stageResults?.subPositions?.verdict === "improvement"
-    && !!stageResults?.subPositions?.result;
+    && safePhysicalClassifications.has(positionClassification);
   const hasSeating = stageResults?.seating?.verdict === "improvement"
-    && !!stageResults?.seating?.result;
+    && safePhysicalClassifications.has(seatingClassification);
 
   let changeSummary = null;
   if (tuning) {
