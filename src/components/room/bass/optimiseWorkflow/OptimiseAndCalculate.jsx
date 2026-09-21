@@ -237,8 +237,12 @@ export default function OptimiseAndCalculate({
       }
 
       const recommendations = {
-        subPositions: autoApplySummary.hasPositions ? autoApplySummary.winnerResult : null,
-        seating: autoApplySummary.hasSeating ? autoApplySummary.winnerResult : null,
+        subPositions: autoApplySummary.hasPositions
+          ? autoApplySummary.stageResults?.subPositions?.result || null
+          : null,
+        seating: autoApplySummary.hasSeating
+          ? autoApplySummary.stageResults?.seating?.result || null
+          : null,
         addSubs: false, // could be determined from Stage 2 results in future
       };
 
