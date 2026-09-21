@@ -8,6 +8,10 @@ import {
   gradeP19,
   gradeP20,
 } from "@/components/utils/rp22/bassGradingAuthority";
+import {
+  buildCanonicalBassResult,
+  validateCanonicalBassResult,
+} from "@/components/room/bass/canonicalBassResult";
 
 export { COMPLETED_BASS_CACHE_VERSION };
 
@@ -70,6 +74,12 @@ export function isAuthoritativeBassContract(contract) {
   if (!hasCanonicalSeatMetricAuthority(contract)) return false;
   const envelopeValidation = validateAssessmentEnvelopeAuthority(contract);
   if (!envelopeValidation.valid) return false;
+  // Full worker contracts are projected during compaction. Every compact,
+  // persisted or hydrated contract must carry and validate one BassResult.
+  if (!contract?.finalOptimisedBassResponse) {
+    const bassResultValidation = validateCanonicalBassResult(contract);
+    if (!bassResultValidation.valid) return false;
+  }
   const pub = contract?.metricPublication;
   return !!pub && pub.canonicalMetricPublicationValid === true;
 }
@@ -328,6 +338,12 @@ function buildGraphPayload(contract) {
 
 export function compactCompletedBassContract(contract, { graphPayloadTimings = null } = {}) {
   if (!isCompletedBassContract(contract)) return null;
+  const graphStartedAt = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+  const graphPayload = buildGraphPayload(contract);
+  if (graphPayloadTimings) {
+    graphPayloadTimings.graphPayload = (((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now()) - graphStartedAt);
+  }
+  const bassResult = buildCanonicalBassResult(contract, graphPayload);
   return {
     version: contract.version,
     instanceAuthorityVersion: INSTANCE_AUTHORITY_VERSION,
@@ -357,14 +373,8 @@ export function compactCompletedBassContract(contract, { graphPayloadTimings = n
     assessmentEnvelope: buildAssessmentEnvelope(contract),
     metricPublication: contract.metricPublication || null,
     provenance: contract.provenance || {},
-    graphPayload: graphPayloadTimings
-      ? (() => {
-          const s = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
-          const r = buildGraphPayload(contract);
-          graphPayloadTimings.graphPayload = (((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now()) - s);
-          return r;
-        })()
-      : buildGraphPayload(contract),
+    graphPayload,
+    bassResult,
   };
 }
 
