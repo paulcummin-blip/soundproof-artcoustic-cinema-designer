@@ -21,6 +21,7 @@ import { extractGainAdjustmentDb } from "./gainRationaleBuilder";
 import { usePreviewState, resetPreview } from "./selectedCombinationPreviewStore";
 import { runSelectedCombinationPreview } from "./selectedCombinationPreview";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
+import { lowestPrimaryP19P20Level } from "@/components/utils/rp22/bassGradingAuthority";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ function MetricDelta({ label, beforeValue, afterValue, formatFn, levelBased = fa
     : Math.abs(Number(beforeValue) - Number(afterValue)) > 0.05;
   return (
     <div className="flex items-center gap-1.5 text-[10px]">
-      <span className="text-[#8A7B6A] w-10">{label}</span>
+      <span className="text-[#8A7B6A] min-w-10">{label}</span>
       {levelBased
         ? <RP22GradingPill level={beforeValue} compact />
         : <span className="text-[#625143]">{before}</span>}
@@ -147,6 +148,7 @@ function buildImprovementList(selection) {
         p19Raw: beforeP19?.variationDbRaw,
         p20Level: beforeP20?.level,
         p20Raw: beforeP20?.variationDbRaw,
+        primaryFloor: lowestPrimaryP19P20Level(currentResult),
       },
       after: {
         failingSeats: afterFails,
@@ -154,6 +156,7 @@ function buildImprovementList(selection) {
         p19Raw: afterP19?.variationDbRaw,
         p20Level: afterP20?.level,
         p20Raw: afterP20?.variationDbRaw,
+        primaryFloor: lowestPrimaryP19P20Level(result),
       },
     });
   }
@@ -284,14 +287,12 @@ export default function ImproveBassV2SimplifiedResults({
   // ── Current system metrics ──────────────────────────────────────────
   const currentResult = selection?.currentResult;
   const currentFails = countFailingSeats(currentResult);
-  const currentPrimaryP20 = primarySeatMetric(currentResult?.perSeatP20);
-  const currentFloor = currentPrimaryP20?.level || "FAIL";
+  const currentFloor = lowestPrimaryP19P20Level(currentResult) || "FAIL";
 
   // ── Preview metrics ─────────────────────────────────────────────────
   const previewResult = previewState.result;
   const previewFails = previewResult ? countFailingSeats(previewResult) : null;
-  const previewPrimaryP20 = previewResult ? primarySeatMetric(previewResult.perSeatP20) : null;
-  const previewFloor = previewPrimaryP20?.level || "FAIL";
+  const previewFloor = previewResult ? (lowestPrimaryP19P20Level(previewResult) || "FAIL") : "FAIL";
 
   const isPreviewRunning = ["preparing", "retuning", "confirming"].includes(previewState.status);
   const isPreviewComplete = previewState.status === "complete" && !!previewResult;
@@ -322,7 +323,7 @@ export default function ImproveBassV2SimplifiedResults({
             <span className={currentFails > 0 ? "text-red-600 font-semibold" : "text-[#213428]"}>{currentFails}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-[#8A7B6A] w-10">Floor</span>
+            <span className="text-[10px] text-[#8A7B6A] w-36">Lowest P19/P20 level</span>
             <RP22GradingPill level={currentFloor} compact />
           </div>
           <div className="flex items-center gap-1.5">
@@ -393,9 +394,9 @@ export default function ImproveBassV2SimplifiedResults({
                 <FailingSeatsDelta before={imp.before.failingSeats} after={imp.after.failingSeats} />
               )}
               <MetricDelta
-                label="Floor"
-                beforeValue={imp.before.p20Level}
-                afterValue={imp.after.p20Level}
+                label="Lowest P19/P20 level"
+                beforeValue={imp.before.primaryFloor}
+                afterValue={imp.after.primaryFloor}
                 formatFn={levelText}
                 levelBased
               />
@@ -449,7 +450,7 @@ export default function ImproveBassV2SimplifiedResults({
             <div className="space-y-1">
               <FailingSeatsDelta before={currentFails} after={previewFails} />
               <MetricDelta
-                label="Floor"
+                label="Lowest P19/P20 level"
                 beforeValue={currentFloor}
                 afterValue={previewFloor}
                 formatFn={levelText}
