@@ -87,7 +87,11 @@ export function formatAuthoritativeBassParameter(completedBassAuthority, key, er
     };
   }
 
-  const parameter = contract?.productAnalysis?.parameters?.[key];
+  const parameter = key === "p19"
+    ? contract?.bassResult?.P19
+    : key === "p20"
+      ? contract?.bassResult?.P20
+      : contract?.productAnalysis?.parameters?.[key];
 
   // C6.2D1A: P14/P18/P19 — publication gate takes precedence over not_applicable.
   if (!publicationVerified) {
@@ -185,11 +189,11 @@ export function buildComplianceBassPresentation({ completedBassAuthority }, erro
   // per-seat L1/L2/L3/L4 results when the contract is canonically published.
   // When NOT_VERIFIED / UPDATING, return empty arrays so the UI shows a
   // consistent non-verified state — never mixed verified/unverified per-seat.
-  const perSeatP19Results = publicationVerified && Array.isArray(contract?.selectedCandidate?.perSeatP19Results)
-    ? contract.selectedCandidate.perSeatP19Results
+  const perSeatP19Results = publicationVerified && Array.isArray(contract?.bassResult?.seatResults?.P19)
+    ? contract.bassResult.seatResults.P19
     : [];
-  const perSeatP20Results = publicationVerified && Array.isArray(contract?.selectedCandidate?.perSeatP20Results)
-    ? contract.selectedCandidate.perSeatP20Results
+  const perSeatP20Results = publicationVerified && Array.isArray(contract?.bassResult?.seatResults?.P20)
+    ? contract.bassResult.seatResults.P20
     : [];
   return {
     completed: isCompletedBassContract(contract),
