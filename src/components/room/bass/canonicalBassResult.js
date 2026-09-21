@@ -10,29 +10,53 @@ import {
   lowestPrimaryP19P20Level,
 } from "@/components/utils/rp22/bassGradingAuthority";
 
-export const CANONICAL_BASS_RESULT_VERSION = 1;
+export const CANONICAL_BASS_RESULT_VERSION = 2;
 
 function cloneRows(rows) {
   return (Array.isArray(rows) ? rows : []).map((row) => ({ ...row }));
 }
 
-function numericLevelLabel(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? bassLevelFromRank(Math.max(0, Math.min(4, Math.round(n)))) : null;
+function markPrimaryRows(rows, primarySeatIds) {
+  const primaryIds = new Set((Array.isArray(primarySeatIds) ? primarySeatIds : []).map(String));
+  return cloneRows(rows).map((seat) => ({
+    ...seat,
+    isPrimary: primaryIds.has(String(seat?.seatId || "")),
+  }));
+}
+
+function primaryAggregate(parameter, rows) {
+  const primaryRows = rows.filter((seat) => seat?.isPrimary === true);
+  if (!parameter || !primaryRows.length) return null;
+  const worst = primaryRows.reduce((selected, seat) => {
+    if (!selected) return seat;
+    const seatLevel = Number(seat?.level);
+    const selectedLevel = Number(selected?.level);
+    if (seatLevel < selectedLevel) return seat;
+    if (seatLevel > selectedLevel) return selected;
+    return Number(seat?.variationDbRaw) > Number(selected?.variationDbRaw) ? seat : selected;
+  }, null);
+  return {
+    ...parameter,
+    level: Number(worst.level),
+    value: Number(worst.variationDbRaw),
+    seatId: worst.seatId,
+  };
 }
 
 export function buildCanonicalBassResult(contract, graphPayload = null) {
   const candidate = contract?.selectedCandidate;
   const parameters = contract?.productAnalysis?.parameters;
-  if (!candidate || !parameters) return null;
+  const primarySeatIds = contract?.provenance?.primarySeatIds;
+  if (!candidate || !parameters || !Array.isArray(primarySeatIds) || !primarySeatIds.length) return null;
 
-  const perSeatP19 = cloneRows(candidate.perSeatP19Results);
-  const perSeatP20 = cloneRows(candidate.perSeatP20Results);
-  const p19 = parameters.p19 ? { ...parameters.p19 } : null;
-  const p20 = parameters.p20 ? { ...parameters.p20 } : null;
+  const perSeatP19 = markPrimaryRows(candidate.perSeatP19Results, primarySeatIds);
+  const perSeatP20 = markPrimaryRows(candidate.perSeatP20Results, primarySeatIds);
+  const p19 = primaryAggregate(parameters.p19, perSeatP19);
+  const p20 = primaryAggregate(parameters.p20, perSeatP20);
+  if (!p19 || !p20) return null;
   const resultForFloor = {
-    perSeatP19: perSeatP19.map((seat) => ({ ...seat, isPrimary: seat.isPrimary === true })),
-    perSeatP20: perSeatP20.map((seat) => ({ ...seat, isPrimary: seat.isPrimary === true })),
+    perSeatP19,
+    perSeatP20,
   };
 
   return Object.freeze({
@@ -53,8 +77,8 @@ export function buildCanonicalBassResult(contract, graphPayload = null) {
       eqFilterBank: graphPayload.eqFilterBank || [],
     }) : null,
     grading: Object.freeze({
-      P19: numericLevelLabel(p19?.level),
-      P20: numericLevelLabel(p20?.level),
+      P19: bassLevelFromRank(p19.level),
+      P20: bassLevelFromRank(p20.level),
       primaryFloor: lowestPrimaryP19P20Level(resultForFloor),
     }),
   });
@@ -87,9 +111,19 @@ export function validateCanonicalBassResult(contract) {
   if (!sameSeatRows(result?.seatResults?.P20, contract?.selectedCandidate?.perSeatP20Results)) {
     return { valid: false, reason: "canonical-bass-result-p20-mismatch" };
   }
-  const p19Level = numericLevelLabel(contract?.productAnalysis?.parameters?.p19?.level);
-  const p20Level = numericLevelLabel(contract?.productAnalysis?.parameters?.p20?.level);
-  if (result?.grading?.P19 !== p19Level || result?.grading?.P20 !== p20Level) {
+  const primarySeatIds = contract?.provenance?.primarySeatIds;
+  if (!Array.isArray(primarySeatIds) || !primarySeatIds.length) {
+    return { valid: false, reason: "canonical-bass-result-primary-scope-missing" };
+  }
+  const resultForFloor = {
+    perSeatP19: result?.seatResults?.P19 || [],
+    perSeatP20: result?.seatResults?.P20 || [],
+  };
+  const p19Level = bassLevelFromRank(result?.P19?.level);
+  const p20Level = bassLevelFromRank(result?.P20?.level);
+  if (result?.grading?.P19 !== p19Level
+    || result?.grading?.P20 !== p20Level
+    || result?.grading?.primaryFloor !== lowestPrimaryP19P20Level(resultForFloor)) {
     return { valid: false, reason: "canonical-bass-result-grading-mismatch" };
   }
   return { valid: true, reason: null };
