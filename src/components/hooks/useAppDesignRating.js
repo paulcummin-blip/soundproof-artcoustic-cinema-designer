@@ -234,7 +234,7 @@ export function useAppDesignRating({
   );
 
   // Same canonical P19/P20 sources as RP22Report.jsx
-  const completedP19Results = completedBassAuthority?.contract?.selectedCandidate?.perSeatP19Results || [];
+  const completedP19Results = completedBassAuthority?.contract?.bassResult?.seatResults?.P19 || [];
   const completedP20Results = completedBassPresentation?.perSeatP20Results || [];
 
   // The single canonical P19 seat object. It preserves the engine-published
