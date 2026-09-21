@@ -172,6 +172,12 @@ function buildCurrentFinalist(subwooferInstances, roomDims) {
     sources: instances.map((inst) => ({
       xNorm: (Number(inst.position?.x) || 0) / W,
       yNorm: (Number(inst.position?.y) || 0) / L,
+      // Carry the installed source identity into the canonical evaluator.
+      // Preview and Apply must use the same per-instance model and height.
+      sourceId: inst.id,
+      modelKey: inst.model,
+      bottomHeightM: inst.bottomHeightM,
+      orientation: inst.orientation,
     })),
   };
 }
@@ -541,12 +547,30 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
   // proxy/tuning/promotion/canonical checks using this request's targets.
   const transferRunId = {};
   async function prepareFullTransfer(finalist, candidateId, consumer) {
+    const activeInstances = (subwooferInstances || []).filter((instance) => instance.enabled !== false);
+    const authoritativeFinalist = {
+      ...finalist,
+      sources: (finalist?.sources || []).map((source, index) => {
+        const instance = activeInstances[index] || null;
+        return {
+          ...source,
+          sourceId: source.sourceId || instance?.id || null,
+          modelKey: source.modelKey || instance?.model || selectedSubModel,
+          bottomHeightM: Number.isFinite(Number(source.bottomHeightM))
+            ? Number(source.bottomHeightM)
+            : Number.isFinite(Number(instance?.bottomHeightM))
+              ? Number(instance.bottomHeightM)
+              : subwooferBottomHeightM,
+          orientation: source.orientation || instance?.orientation || null,
+        };
+      }),
+    };
     return fullTransferReuseCache.getOrCompute({
       projectId, runId: transferRunId, signal: controller.signal, isStale,
-      params: { finalist, roomDims, rspPosition, seatingPositions,
+      params: { finalist: authoritativeFinalist, roomDims, rspPosition, seatingPositions,
         selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM },
       compute: () => runInWorker(worker, "placement", {
-        finalist, roomDims, rspPosition, seatingPositions,
+        finalist: authoritativeFinalist, roomDims, rspPosition, seatingPositions,
         selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
       }, controller.signal),
       onOperation: operation => {
