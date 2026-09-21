@@ -74,7 +74,7 @@ function MetricDelta({ label, beforeLevel, beforeRaw, afterLevel, afterRaw, isRs
   if (isNoChange) {
     return (
       <div className="flex items-center gap-1.5 text-[10px]">
-        <span className="text-[#8A7B6A] w-14">{label}</span>
+        <span className="text-[#8A7B6A] w-32">{label}</span>
         <span className="text-[#8A7B6A]">No change</span>
       </div>
     );
@@ -89,7 +89,7 @@ function MetricDelta({ label, beforeLevel, beforeRaw, afterLevel, afterRaw, isRs
   if (!hasLevels) {
     return (
       <div className="flex items-center gap-1.5 text-[10px]">
-        <span className="text-[#8A7B6A] w-14">{labelWithSuffix}</span>
+        <span className="text-[#8A7B6A] w-32">{labelWithSuffix}</span>
         <span className="text-[#625143]">{fmtDb(beforeRaw)}</span>
         {rawChanged && <ArrowRight className="h-2.5 w-2.5 text-[#8A7B6A]" />}
         {rawChanged && <span className="text-[#213428] font-medium">{fmtDb(afterRaw)}</span>}
@@ -102,7 +102,7 @@ function MetricDelta({ label, beforeLevel, beforeRaw, afterLevel, afterRaw, isRs
   return (
     <div className="space-y-0.5">
       <div className="flex items-center gap-1.5 text-[10px]">
-        <span className="text-[#8A7B6A] w-14">{labelWithSuffix}</span>
+        <span className="text-[#8A7B6A] w-32">{labelWithSuffix}</span>
         <RP22GradingPill level={beforeLevel} compact />
         {(levelChanged || rawChanged) && <ArrowRight className="h-2.5 w-2.5 text-[#8A7B6A]" />}
         {(levelChanged || rawChanged) && <RP22GradingPill level={afterLevel} compact />}
@@ -123,7 +123,7 @@ function FailingSeatsDelta({ before, after, isNoChange }) {
   if (isNoChange) {
     return (
       <div className="flex items-center gap-1.5 text-[10px]">
-        <span className="text-[#8A7B6A] w-14">Fails</span>
+        <span className="text-[#8A7B6A] w-32">Fails</span>
         <span className="text-[#8A7B6A]">No change</span>
       </div>
     );
@@ -131,7 +131,7 @@ function FailingSeatsDelta({ before, after, isNoChange }) {
   const changed = before !== after;
   return (
     <div className="flex items-center gap-1.5 text-[10px]">
-      <span className="text-[#8A7B6A] w-14">Fails</span>
+      <span className="text-[#8A7B6A] w-32">Fails</span>
       <span className={before > 0 ? "text-red-600 font-semibold" : "text-[#213428]"}>
         {before ?? "—"}
       </span>
@@ -150,7 +150,7 @@ function PrimaryFloorDelta({ before, after, isNoChange }) {
   if (isNoChange) {
     return (
       <div className="flex items-center gap-1.5 text-[10px]">
-        <span className="text-[#8A7B6A] w-14">Floor</span>
+        <span className="text-[#8A7B6A] w-32">Lowest P19/P20 level</span>
         <span className="text-[#8A7B6A]">No change</span>
       </div>
     );
@@ -160,7 +160,7 @@ function PrimaryFloorDelta({ before, after, isNoChange }) {
   const afterLabel = after === 0 ? "FAIL" : after > 0 ? `L${after}` : "—";
   return (
     <div className="flex items-center gap-1.5 text-[10px]">
-      <span className="text-[#8A7B6A] w-14">Floor</span>
+      <span className="text-[#8A7B6A] w-32">Lowest P19/P20 level</span>
       <RP22GradingPill level={beforeLabel} compact />
       {changed && <ArrowRight className="h-2.5 w-2.5 text-[#8A7B6A]" />}
       {changed && <RP22GradingPill level={afterLabel} compact />}
