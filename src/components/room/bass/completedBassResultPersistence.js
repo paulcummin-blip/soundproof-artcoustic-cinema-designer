@@ -4,6 +4,10 @@ import {
   INSTANCE_AUTHORITY_VERSION,
   RP22_BASS_METRIC_SCHEMA_VERSION,
 } from "@/lib/bassAuthorityVersion";
+import {
+  gradeP19,
+  gradeP20,
+} from "@/components/utils/rp22/bassGradingAuthority";
 
 export { COMPLETED_BASS_CACHE_VERSION };
 
@@ -104,35 +108,10 @@ function cloneCurve(curve) {
 // become authoritative when the achieved P18 crossing is higher.
 // ---------------------------------------------------------------------------
 
-/**
- * Grade P19 from raw deviation using the current shared whole-dB rule.
- * wholeDb = floor(abs(rawDeviationDb))
- * 0–2 → L4 (4), 3 → L3 (3), 4 → L2 (2), 5 → L1 (1), 6+ → FAIL (0)
- */
-export function gradeP19FromRaw(rawDeviationDb) {
-  if (!Number.isFinite(Number(rawDeviationDb))) return null;
-  const wholeDb = Math.floor(Math.abs(Number(rawDeviationDb)));
-  if (wholeDb <= 2) return 4;
-  if (wholeDb <= 3) return 3;
-  if (wholeDb <= 4) return 2;
-  if (wholeDb <= 5) return 1;
-  return 0;
-}
-
-/**
- * Grade P20 from raw deviation using the current shared whole-dB rule.
- * wholeDb = floor(abs(rawDeviationDb))
- * 0–2 → L4 (4), 3 → L3 (3), 4 → L2 (2), 5+ → L1 (1)
- * P20 never FAILs — floored ≥5 dB maps to L1 (not FAIL).
- */
-export function gradeP20FromRaw(rawDeviationDb) {
-  if (!Number.isFinite(Number(rawDeviationDb))) return null;
-  const wholeDb = Math.floor(Math.abs(Number(rawDeviationDb)));
-  if (wholeDb <= 2) return 4;
-  if (wholeDb <= 3) return 3;
-  if (wholeDb <= 4) return 2;
-  return 1;
-}
+// Backward-compatible export names. The grading policy itself lives only in
+// bassGradingAuthority.js so persistence cannot diverge from the live app.
+export const gradeP19FromRaw = gradeP19;
+export const gradeP20FromRaw = gradeP20;
 
 /**
  * Build the authoritative assessment/marker envelope from a full contract's
