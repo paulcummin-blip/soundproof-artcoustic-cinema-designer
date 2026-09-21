@@ -32,22 +32,29 @@ function formatCategoryFloors(floors) {
     .join("; ");
 }
 
+function formatBassSeatResults(perSeat) {
+  return Object.entries(perSeat || {})
+    .map(([seatId, seat]) => {
+      const raw = Number.isFinite(Number(seat?.value)) ? `, ±${Number(seat.value).toFixed(1)} dB` : "";
+      return `${seatId}: ${seat?.level || "—"}${raw}`;
+    })
+    .join("; ");
+}
+
 function formatBass(bass) {
   if (!bass) return "Not available";
   const parts = [];
-  if (bass.p14) parts.push(`P14: ${bass.p14.level}`);
-  if (bass.p18) parts.push(`P18: ${bass.p18.level}`);
+  if (bass.p14) parts.push(`P14 LFE capability (Dynamic Range): ${bass.p14.level}`);
+  if (bass.p18) parts.push(`P18 bass extension (Timbre Matching): ${bass.p18.level}`);
   if (bass.p19) {
-    parts.push(`P19 Primary floor: ${bass.p19.primaryFloor || "—"}`);
-    parts.push(`P19 Secondary floor: ${bass.p19.secondaryFloor || "—"}`);
-    const seatCount = Object.keys(bass.p19.perSeat || {}).length;
-    if (seatCount) parts.push(`P19 per-seat results: ${seatCount} seats`);
+    parts.push(`P19 response vs target (Timbre Matching) — Primary floor: ${bass.p19.primaryFloor || "—"}; Secondary floor: ${bass.p19.secondaryFloor || "—"}`);
+    const seats = formatBassSeatResults(bass.p19.perSeat);
+    if (seats) parts.push(`P19 canonical per-seat results: ${seats}`);
   }
   if (bass.p20) {
-    parts.push(`P20 Primary floor: ${bass.p20.primaryFloor || "—"}`);
-    parts.push(`P20 Secondary floor: ${bass.p20.secondaryFloor || "—"}`);
-    const seatCount = Object.keys(bass.p20.perSeat || {}).length;
-    if (seatCount) parts.push(`P20 per-seat results: ${seatCount} seats`);
+    parts.push(`P20 seat-to-seat consistency (Timbre Matching) — Primary floor: ${bass.p20.primaryFloor || "—"}; Secondary floor: ${bass.p20.secondaryFloor || "—"}`);
+    const seats = formatBassSeatResults(bass.p20.perSeat);
+    if (seats) parts.push(`P20 canonical per-seat results: ${seats}`);
   }
   return parts.join("\n") || "Not available";
 }
@@ -69,6 +76,11 @@ WRITING RULES (strict):
 - Do NOT produce a parameter-by-parameter dump. Explain what the design does well, where performance varies by seat, what trade-offs exist, and what is materially different between Primary and Secondary seats.
 - Do not invent design constraints that are not in the project data.
 - Do not invent missing values.
+- Copy every Design Performance Index and every L1/L2/L3/L4/FAIL result exactly. Never regrade, round, reinterpret, or replace a category floor with a parameter floor.
+- RP22 category floors are the sole authority for the Spatial Resolution, Dynamic Range, and Timbre Matching section headings and highlights table.
+- P14 is Dynamic Range. P18, P19, and P20 are Timbre Matching. Never describe P19 or P20 as Dynamic Range.
+- P20 is seat-to-seat bass consistency. If P20 is L1 or FAIL, state that consistency varies materially across seats; never call the bass response consistent, stable, uniform, or standardized across the room.
+- Keep engineering claims tied to a supplied value. If evidence is unavailable, omit the claim.
 
 PROJECT DATA:
 - Project: ${project?.name || "—"}
