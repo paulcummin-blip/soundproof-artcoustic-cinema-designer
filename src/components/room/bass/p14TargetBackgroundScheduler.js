@@ -522,6 +522,7 @@ export class P14TargetBackgroundScheduler {
       usableLfHz: this.designContext.usableLfHz,
       rspRawCurve: this.designContext.rspRawCurve,
       perSeatRawCurves: this.designContext.perSeatRawCurves,
+      primarySeatIds: this.designContext.primarySeatIds,
       fingerprints: this.designContext.fingerprints,
       target,
       timings,
