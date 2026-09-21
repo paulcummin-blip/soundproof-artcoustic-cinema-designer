@@ -37,25 +37,13 @@ function extractCategoryFloors(categories) {
     }));
 }
 
-function extractParameterLevel(parameter, seatIds = null) {
-  if (!parameter || parameter.state !== "scored") return null;
-  if (parameter.scope !== "seat") return parameter.level || null;
-  // Seat-scoped: floor across included seats
-  const included = Array.isArray(seatIds) ? new Set(seatIds.map(String)) : null;
-  const levels = Object.entries(parameter.seats || {})
-    .filter(([seatId, seat]) => (!included || included.has(String(seatId))) && seat?.state === "scored")
-    .map(([, seat]) => seat?.level)
-    .filter((level) => GENUINE_LEVELS.has(level));
-  if (!levels.length) return null;
-  const rank = { FAIL: 0, L1: 1, L2: 2, L3: 3, L4: 4 };
-  return levels.reduce((worst, level) => rank[level] < rank[worst] ? level : worst);
-}
-
-function extractGenuineParameters(parameterAuthority, seatIds = null) {
+function extractGenuineParameters(parameterAuthority, parameterSummary = null) {
   const result = {};
   for (const [key, parameter] of Object.entries(parameterAuthority || {})) {
     if (key === "screen") continue;
-    const level = extractParameterLevel(parameter, seatIds);
+    const level = parameter?.scope === "seat"
+      ? parameterSummary?.[key]?.level
+      : parameter?.level;
     if (!level || !GENUINE_LEVELS.has(level)) continue;
     result[key] = {
       key,
@@ -95,8 +83,8 @@ function extractBassSummary(engineeringSummary, parameterAuthority) {
     }
     if (Object.keys(perSeat).length) {
       bass.p19 = {
-        primaryFloor: extractParameterLevel(p19, engineeringSummary?.primary?.seatIds),
-        secondaryFloor: extractParameterLevel(p19, engineeringSummary?.secondary?.seatIds),
+        primaryFloor: engineeringSummary?.parameterSummaries?.primary?.p19?.level || null,
+        secondaryFloor: engineeringSummary?.parameterSummaries?.secondary?.p19?.level || null,
         perSeat,
       };
     }
@@ -116,8 +104,8 @@ function extractBassSummary(engineeringSummary, parameterAuthority) {
     }
     if (Object.keys(perSeat).length) {
       bass.p20 = {
-        primaryFloor: extractParameterLevel(p20, engineeringSummary?.primary?.seatIds),
-        secondaryFloor: extractParameterLevel(p20, engineeringSummary?.secondary?.seatIds),
+        primaryFloor: engineeringSummary?.parameterSummaries?.primary?.p20?.level || null,
+        secondaryFloor: engineeringSummary?.parameterSummaries?.secondary?.p20?.level || null,
         perSeat,
       };
     }
@@ -242,9 +230,9 @@ export function buildAiSummaryPayload({ publishedSnapshot, projectDetails, proje
 
   // ── Genuine Parameters (excluding N/A, pending, provisional) ──
   const parameters = {
-    primary: extractGenuineParameters(parameterAuthority, summary.primary?.seatIds),
-    secondary: extractGenuineParameters(parameterAuthority, summary.secondary?.seatIds),
-    all: extractGenuineParameters(parameterAuthority, summary.project?.seatIds),
+    primary: extractGenuineParameters(parameterAuthority, summary.parameterSummaries?.primary),
+    secondary: extractGenuineParameters(parameterAuthority, summary.parameterSummaries?.secondary),
+    all: extractGenuineParameters(parameterAuthority, summary.parameterSummaries?.project),
   };
 
   // ── Bass ──
