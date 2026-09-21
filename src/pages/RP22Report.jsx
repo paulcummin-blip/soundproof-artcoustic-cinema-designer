@@ -210,6 +210,7 @@ function RP22ReportInner() {
                     notes: p.notes,
                     created_date: p.created_date,
                     updated_date: p.updated_date,
+                    active_version_id: p.active_version_id || null,
                 });
             }).catch(() => { /* non-blocking metadata fetch */ });
             return () => { cancelled = true; };
