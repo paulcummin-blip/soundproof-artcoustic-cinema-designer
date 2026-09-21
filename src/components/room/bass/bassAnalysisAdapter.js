@@ -280,6 +280,7 @@ export function adaptCurrentBassOptimisationResult({
   detailedElapsedMs = null,
   rspRawCurve = [],
   perSeatRawCurves = [],
+  primarySeatIds = [],
   activeSubs = [],
   usableLfHz = null,
   sourceLayout = null,
@@ -405,6 +406,9 @@ export function adaptCurrentBassOptimisationResult({
   contract.provenance.postEqCurveSignature = finalResponse?.postEqCurveSignature || optimisationResult?.postEqCurveSignature || null;
   contract.provenance.engineVersion = optimisationResult?.engineVersion || null;
   contract.provenance.realSeatCount = realSeatCount;
+  contract.provenance.primarySeatIds = Array.from(new Set(
+    (Array.isArray(primarySeatIds) ? primarySeatIds : []).map((id) => String(id || "")).filter(Boolean)
+  ));
   contract.provenance.createdAtMs = null;
 
   // --- Analysis ID (from calibration fingerprint + pool identity) ---
