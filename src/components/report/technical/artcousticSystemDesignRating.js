@@ -29,7 +29,6 @@ import {
   levelP10_upperDelta,
   levelP16_screenFR,
   levelP17_wsFR,
-  levelP20_lfConsistency,
 } from "@/components/utils/rp22/levels";
 import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 import gradeP1Distance from "@/components/utils/rp22/p1LevelAuthority";
@@ -340,12 +339,6 @@ function scoreP18(rawValue, mode) {
   };
 }
 
-function scoreP20(rawValue) {
-  // P20 has no FAIL outcome. Any finite result below the L2 threshold remains
-  // L1, matching the canonical bass authority and RP22 applicability rule.
-  return applyMapper(rawValue, levelP20_lfConsistency, false);
-}
-
 function scoreScreen(angleDeg) {
   return applyScreenThresholds(angleDeg);
 }
@@ -446,13 +439,12 @@ function scoreRoomParam(key, input) {
  * @returns {{ state: string, level: string|null, multiplier: number|null, reason: string|null }}
  */
 function scoreSeatParam(key, input) {
-  // P19 arrives pre-graded from selectedCandidate.perSeatP19Results through
-  // summariseAuthoritativeP19Seats(). Raw deviation remains diagnostic only.
-  // Missing shared authority is provisional; it is never independently graded.
-  if (key === "p19") {
+  // P19/P20 arrive pre-graded from the canonical BassResult. Raw deviation
+  // remains diagnostic only; Design Rating never grades bass a second time.
+  if (key === "p19" || key === "p20") {
     const authoritativeLevel = String(input?.authoritativeLevel || "").toUpperCase();
     if (input?.verified !== true || !/^(L[1-4]|FAIL)$/.test(authoritativeLevel)) {
-      return { state: "provisional", level: null, multiplier: null, reason: "missing-authoritative-p19-seat-grade" };
+      return { state: "provisional", level: null, multiplier: null, reason: `missing-authoritative-${key}-seat-grade` };
     }
     return {
       state: "scored",
@@ -478,7 +470,6 @@ function scoreSeatParam(key, input) {
     case "p10": scored = scoreP10(norm.rawValue); break;
     case "p16": scored = scoreP16(norm.rawValue); break;
     case "p17": scored = scoreP17(norm.rawValue); break;
-    case "p20": scored = scoreP20(norm.rawValue); break;
     case "screen": scored = scoreScreen(norm.rawValue); break;
     default: return { state: "provisional", level: null, multiplier: null, reason: "unknown-seat-param" };
   }
