@@ -15,7 +15,6 @@
 
 import { isValidFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
 import { BASS_ANALYSIS_CONTRACT_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
-import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 
 export { isValidFingerprint };
 
@@ -123,13 +122,12 @@ export function createBassParameterResult({
   targetBasisDetail = null,
 } = {}) {
   const finiteValue = Number.isFinite(value) ? value : null;
-  const authoritativeLevel = parameter === PARAM_P20 && finiteValue != null && [PARAM_STATUS_COMPLETE, PARAM_STATUS_UPDATING].includes(status)
-    ? numericRp22Level(levelP20_lfConsistency(finiteValue))
-    : level;
   return {
     parameter,
     status,
-    level: authoritativeLevel == null ? null : Math.max(0, Math.min(4, Math.round(authoritativeLevel))),
+    // The engine-supplied level is authoritative. This contract factory must
+    // never re-grade a value or a persisted result can change on read.
+    level: level == null ? null : Math.max(0, Math.min(4, Math.round(level))),
     value: finiteValue,
     unit,
     passedL1,
