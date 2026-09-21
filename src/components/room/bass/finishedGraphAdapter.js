@@ -51,11 +51,11 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
   // Reconstruct finalSeatVariationData from the persisted assessment envelope
   // (v9) so buildRp22GraphMarkers produces identical markers after cold reopen.
   const envelope = compactContract.assessmentEnvelope || null;
-  const perSeatP20Results = Array.isArray(compactContract.selectedCandidate?.perSeatP20Results)
-    ? compactContract.selectedCandidate.perSeatP20Results.map((seat) => ({ ...seat }))
+  const perSeatP20Results = Array.isArray(compactContract.bassResult?.seatResults?.P20)
+    ? compactContract.bassResult.seatResults.P20.map((seat) => ({ ...seat }))
     : [];
-  const perSeatP19Results = Array.isArray(compactContract.selectedCandidate?.perSeatP19Results)
-    ? compactContract.selectedCandidate.perSeatP19Results.map((seat) => ({ ...seat }))
+  const perSeatP19Results = Array.isArray(compactContract.bassResult?.seatResults?.P19)
+    ? compactContract.bassResult.seatResults.P19.map((seat) => ({ ...seat }))
     : [];
   const finalSeatVariationData = candidateId ? {
     p18: { candidateId, level: null, extensionHz: envelope?.achievedP18FrequencyHz ?? null, achievedExtensionBounded: envelope?.achievedP18Bounded === true, authority: null },
