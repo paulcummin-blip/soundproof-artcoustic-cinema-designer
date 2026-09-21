@@ -290,6 +290,7 @@ export function createBassAnalysisResult() {
       postEqCurveSignature: null,
       engineVersion: null,
       realSeatCount: 0,
+      primarySeatIds: [],
       assessmentPosition: "rsp",
       createdAtMs: null,
     },
