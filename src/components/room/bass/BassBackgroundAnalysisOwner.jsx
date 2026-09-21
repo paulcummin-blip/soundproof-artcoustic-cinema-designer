@@ -1354,12 +1354,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const p19SeatAuthority = useMemo(() => {
     const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(seatingPositions);
     return summariseAuthoritativeP19Seats({
-      authoritativeSeatResults: completedBassAuthority?.contract?.selectedCandidate?.perSeatP19Results || [],
+      authoritativeSeatResults: completedBassAuthority?.contract?.bassResult?.seatResults?.P19 || [],
       primarySeatIds,
       secondarySeatIds,
       seatingPositions,
     });
-  }, [completedBassAuthority?.contract?.selectedCandidate?.perSeatP19Results, seatingPositions]);
+  }, [completedBassAuthority?.contract?.bassResult?.seatResults?.P19, seatingPositions]);
 
   const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
