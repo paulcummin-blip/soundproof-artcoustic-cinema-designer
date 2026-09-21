@@ -111,19 +111,20 @@ export function validateCanonicalBassResult(contract) {
   if (!sameSeatRows(result?.seatResults?.P20, contract?.selectedCandidate?.perSeatP20Results)) {
     return { valid: false, reason: "canonical-bass-result-p20-mismatch" };
   }
-  const primarySeatIds = contract?.provenance?.primarySeatIds;
-  if (!Array.isArray(primarySeatIds) || !primarySeatIds.length) {
+  const expected = buildCanonicalBassResult(contract);
+  if (!expected) {
     return { valid: false, reason: "canonical-bass-result-primary-scope-missing" };
   }
-  const resultForFloor = {
-    perSeatP19: result?.seatResults?.P19 || [],
-    perSeatP20: result?.seatResults?.P20 || [],
-  };
-  const p19Level = bassLevelFromRank(result?.P19?.level);
-  const p20Level = bassLevelFromRank(result?.P20?.level);
-  if (result?.grading?.P19 !== p19Level
-    || result?.grading?.P20 !== p20Level
-    || result?.grading?.primaryFloor !== lowestPrimaryP19P20Level(resultForFloor)) {
+  const sameAggregate = (actual, canonical) => (
+    Number(actual?.level) === Number(canonical?.level)
+    && Number(actual?.value) === Number(canonical?.value)
+    && String(actual?.seatId || "") === String(canonical?.seatId || "")
+  );
+  if (!sameAggregate(result?.P19, expected.P19)
+    || !sameAggregate(result?.P20, expected.P20)
+    || result?.grading?.P19 !== expected.grading.P19
+    || result?.grading?.P20 !== expected.grading.P20
+    || result?.grading?.primaryFloor !== expected.grading.primaryFloor) {
     return { valid: false, reason: "canonical-bass-result-grading-mismatch" };
   }
   return { valid: true, reason: null };
