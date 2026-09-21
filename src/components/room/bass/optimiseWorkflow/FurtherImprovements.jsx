@@ -107,9 +107,9 @@ export default function FurtherImprovements({
     markApplied("placement");
 
     if (typeof onRecalculate === "function") {
-      setTimeout(() => onRecalculate(), 100);
+      onRecalculate({ previousCacheKey: shared?.cacheKey || null });
     }
-  }, [hasSubPositions, commitInstances, hasCanonicalInstances, selection, recommendations, currentInstances, roomDims, selectedSubModel, onRecalculate, markApplied]);
+  }, [hasSubPositions, commitInstances, hasCanonicalInstances, selection, recommendations, currentInstances, roomDims, selectedSubModel, shared?.cacheKey, onRecalculate, markApplied]);
 
   const handleApplySeating = useCallback(() => {
     if (!hasSeating || !commitSeating || !selection) return;
@@ -142,7 +142,7 @@ export default function FurtherImprovements({
     markApplied("seating");
 
     if (typeof onRecalculate === "function") {
-      setTimeout(() => onRecalculate(), 100);
+      onRecalculate({ previousCacheKey: shared?.cacheKey || null });
     }
   }, [hasSeating, commitSeating, selection, recommendations, roomDims, appState, currentInstances, selectedSubModel, shared, commitSeatingProvenance, onRecalculate, markApplied]);
 
