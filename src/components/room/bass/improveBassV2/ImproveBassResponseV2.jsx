@@ -453,6 +453,7 @@ export default function ImproveBassResponseV2({
           try {
             return computeV2DesignFingerprint({
               ...d,
+              subwooferInstances: next,
               seatingPositions: result.seatingPositions,
               ...d.p14Params,
             });
