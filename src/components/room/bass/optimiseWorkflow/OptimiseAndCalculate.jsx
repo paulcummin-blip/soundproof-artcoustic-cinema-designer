@@ -268,6 +268,23 @@ export default function OptimiseAndCalculate({
     resetImproveBassV2(projectId, versionId);
   }, [projectId, versionId]);
 
+  // A physical Apply commits room state first. Wait until React has produced
+  // the new calculation fingerprint, then calculate that exact design. Calling
+  // the render-captured handler immediately queues the previous fingerprint and
+  // leaves the newly applied design permanently stale.
+  const handlePhysicalRecalculate = useCallback(async ({ previousCacheKey = null } = {}) => {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      await sleep(SLEEP_MS);
+      const live = sharedRef.current;
+      const fingerprintAdvanced = !previousCacheKey
+        || (!!live?.cacheKey && live.cacheKey !== previousCacheKey);
+      if (fingerprintAdvanced && live?.canCalculate === true && typeof live?.onCalculate === "function") {
+        return live.onCalculate();
+      }
+    }
+    return { action: "blocked", reason: "applied-design-fingerprint-not-ready" };
+  }, []);
+
   // ── Build the simplified progress display ──
   const stageDisplay = React.useMemo(() => {
     if (!isBusy) return null;
@@ -447,7 +464,7 @@ export default function OptimiseAndCalculate({
                 hasCanonicalInstances={hasCanonicalInstances}
                 appState={appState}
                 shared={shared}
-                onRecalculate={() => shared?.onCalculate?.()}
+                onRecalculate={handlePhysicalRecalculate}
               />
             </div>
           )}
