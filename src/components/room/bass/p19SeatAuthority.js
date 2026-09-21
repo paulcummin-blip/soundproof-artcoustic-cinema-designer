@@ -9,9 +9,9 @@
 
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { resolveSeatPriority, PRIMARY, SECONDARY } from "@/components/utils/seatPriorityAuthority";
+import { canonicalBassLevel, lowestBassLevel } from "@/components/utils/rp22/bassGradingAuthority";
 
 const REFERENCE_IDS = new Set(["rsp", "mlp", "synthetic-rsp", "synthetic_rsp"]);
-const LEVEL_RANK = Object.freeze({ FAIL: 0, L1: 1, L2: 2, L3: 3, L4: 4 });
 
 // Identity cache: one immutable publication per engine result array + seat snapshot.
 // Multiple upstream readers may encounter the same completed contract in the same
@@ -21,29 +21,14 @@ const PUBLICATION_BY_RESULTS = new WeakMap();
 const cleanId = (value) => String(value ?? "").trim();
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
-function canonicalGrade(level) {
-  if (level === 0 || String(level ?? "").toUpperCase() === "FAIL") return "FAIL";
-  const match = String(level ?? "").toUpperCase().match(/^L?([1-4])$/);
-  return match ? `L${match[1]}` : "NOT CALCULATED";
-}
-
 function formatValue(rawValue) {
   if (!finite(rawValue)) return "NOT CALCULATED";
   return `±${resolveRp22DesignValue(19, Math.abs(Number(rawValue)))} dB`;
 }
 
-function floorFor(seats) {
-  const calculated = seats.filter((seat) => seat.calculated && LEVEL_RANK[seat.grade] != null);
-  if (!calculated.length) return "NOT CALCULATED";
-  return calculated.reduce(
-    (floor, seat) => LEVEL_RANK[seat.grade] < LEVEL_RANK[floor] ? seat.grade : floor,
-    calculated[0].grade,
-  );
-}
-
 function groupSummary(name, seats) {
   const grades = seats.map((seat) => seat.grade);
-  const floor = floorFor(seats);
+  const floor = lowestBassLevel(seats.filter((seat) => seat.calculated).map((seat) => seat.grade)) || "NOT CALCULATED";
   return Object.freeze({
     name,
     seatIds: Object.freeze(seats.map((seat) => seat.seatId)),
@@ -140,7 +125,7 @@ export function summariseAuthoritativeP19Seats({
     const source = sourceById.get(id) || null;
     const position = positionById.get(id) || null;
     const rawValue = finite(source?.variationDbRaw) ? Number(source.variationDbRaw) : null;
-    const grade = source ? canonicalGrade(source.level) : "NOT CALCULATED";
+    const grade = source ? (canonicalBassLevel(source.level) || "NOT CALCULATED") : "NOT CALCULATED";
     const calculated = rawValue != null && grade !== "NOT CALCULATED";
     return Object.freeze({
       seatId: id,
