@@ -20,6 +20,6 @@
  */
 
 export const INSTANCE_AUTHORITY_VERSION = 4;
-export const BASS_ANALYSIS_CONTRACT_VERSION = 19;
-export const COMPLETED_BASS_CACHE_VERSION = 10;
+export const BASS_ANALYSIS_CONTRACT_VERSION = 20;
+export const COMPLETED_BASS_CACHE_VERSION = 11;
 export const RP22_BASS_METRIC_SCHEMA_VERSION = 19; // v19: per-seat P19 uses centered half-span (minimax) normalization instead of the older absolute/max-abs deviation. Old completed authority (v18) is rejected as incompatible and must be regenerated.
