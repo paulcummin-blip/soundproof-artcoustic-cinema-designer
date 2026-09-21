@@ -3,6 +3,13 @@
  * Returns {level: string, ok: boolean}
  */
 
+import {
+  floorBassDeviation,
+  gradeP19,
+  gradeP20,
+  bassLevelFromRank,
+} from "./bassGradingAuthority";
+
 export function levelP4_screenDelta(dB) {
   if (!Number.isFinite(dB)) return { level: 'N/A', ok: false };
   if (dB <= 2) return { level: 'L4', ok: true };
@@ -66,24 +73,19 @@ export function levelP17_wsFR(dB) {
 }
 
 function directBassDeviation(dB) {
-  return Number.isFinite(dB) ? Number(dB) : null;
+  const numeric = Number(dB);
+  return Number.isFinite(numeric) ? numeric : null;
 }
 
 function formatDirectBassDeviation(dB) {
-  const direct = directBassDeviation(dB);
-  if (direct == null) return '—';
-  // Sound Proof design grade: display the floored whole-dB value, never the
-  // fractional decimal. 2.86 dB displays as "2", not "2.86".
-  return String(Math.floor(direct));
+  const floored = floorBassDeviation(dB);
+  return floored == null ? '—' : String(floored);
 }
 
-// Sound Proof design grade: floor the full-precision deviation to a whole
-// integer dB. The floored value is the authoritative RP22 design grade —
-// fractions of a decibel do not change a Performance Level.
-export function floorP19Deviation(dB) {
-  const direct = directBassDeviation(dB);
-  return direct == null ? null : Math.floor(direct);
-}
+// Backward-compatible names. Flooring and grading live only in
+// bassGradingAuthority.js.
+export const floorP19Deviation = floorBassDeviation;
+export const floorP20Deviation = floorBassDeviation;
 
 export function formatP19Deviation(dB) {
   const direct = directBassDeviation(dB);
@@ -91,21 +93,9 @@ export function formatP19Deviation(dB) {
 }
 
 export function levelP19_lfResponse(dB) {
-  const direct = directBassDeviation(dB);
-  if (direct == null) return { level: 'N/A', ok: false };
-  // Sound Proof design grade: floor to whole dB before grading. Fractions of
-  // a decibel do not change a Performance Level (2.99 → 2 → L4, not L3).
-  const floored = Math.floor(direct);
-  if (floored <= 2) return { level: 'L4', ok: true };
-  if (floored <= 3) return { level: 'L3', ok: true };
-  if (floored <= 4) return { level: 'L2', ok: true };
-  if (floored <= 5) return { level: 'L1', ok: true };
-  return { level: 'FAIL', ok: false };
-}
-
-export function floorP20Deviation(dB) {
-  const direct = directBassDeviation(dB);
-  return direct == null ? null : Math.floor(direct);
+  const rank = gradeP19(dB);
+  const level = bassLevelFromRank(rank);
+  return level == null ? { level: 'N/A', ok: false } : { level, ok: rank > 0 };
 }
 
 export function formatP20Deviation(dB) {
@@ -114,19 +104,9 @@ export function formatP20Deviation(dB) {
 }
 
 export function levelP20_lfConsistency(dB) {
-  const direct = directBassDeviation(dB);
-  if (direct == null) return { level: 'N/A', ok: false };
-  // Sound Proof design grade: floor to whole dB before grading. Fractions of
-  // a decibel do not change a Performance Level (4.99 → 4 → L2, not L1).
-  const floored = Math.floor(direct);
-  if (floored <= 2) return { level: 'L4', ok: true };
-  if (floored <= 3) return { level: 'L3', ok: true };
-  if (floored <= 4) return { level: 'L2', ok: true };
-  // RP22 P20 does not define Level 1. Sound Proof rule: floored ≥5 dB maps to
-  // L1 (not FAIL) because P20 is not applicable at Level 1. The large deviation
-  // is still shown numerically — we grade at the highest level whose P20
-  // requirement can be satisfied.
-  return { level: 'L1', ok: true };
+  const rank = gradeP20(dB);
+  const level = bassLevelFromRank(rank);
+  return level == null ? { level: 'N/A', ok: false } : { level, ok: true };
 }
 
 export function levelP21_earlyReflections(dB) {
