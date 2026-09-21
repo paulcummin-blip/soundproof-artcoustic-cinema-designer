@@ -51,6 +51,7 @@ import ImproveBassV2InfoPopover from "./ImproveBassV2InfoPopover";
 import ImproveBassV2CompletedInvestigation from "./ImproveBassV2CompletedInvestigation";
 import OptimisationDiagnosticsReport from "./OptimisationDiagnosticsReport";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
+import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 
 export default function ImproveBassResponseV2({
   roomDims,
@@ -102,6 +103,11 @@ export default function ImproveBassResponseV2({
 
   const selectedSubModel = frontSubsCfg?.model || rearSubsCfg?.model || null;
   const subwooferBottomHeightM = frontSubsCfg?.bottomHeightM ?? rearSubsCfg?.bottomHeightM ?? 0;
+  const resolvedAmplifierPowerPerSubW = Number.isFinite(Number(amplifierPowerPerSubW))
+    ? Number(amplifierPowerPerSubW)
+    : Number.isFinite(Number(appState?.splConfig?.subwooferAmplifierPowerW))
+      ? Number(appState.splConfig.subwooferAmplifierPowerW)
+      : DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W;
 
   // BLOCKER 3: Live stale detection — use a ref to always read the LATEST design
   // inputs at stale-check time. The ref is updated on every render, so the
@@ -115,7 +121,7 @@ export default function ImproveBassResponseV2({
     rspPosition,
     selectedSubModel,
     p14Params,
-    amplifierPowerPerSubW: amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0,
+    amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
   };
 
   const canStart = shared?.hasCurrentResult === true && !state?.status === "running";
@@ -137,13 +143,13 @@ export default function ImproveBassResponseV2({
         p14TargetLevel: p14Params.p14TargetLevel,
         p14TargetDb: p14Params.p14TargetDb,
         p18TargetBasis: p14Params.p18TargetBasis,
-        amplifierPowerPerSubW: amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0,
+        amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
       });
     } catch {
       return null;
     }
   }, [subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel,
-    p14Params, amplifierPowerPerSubW, frontSubsCfg]);
+    p14Params, resolvedAmplifierPowerPerSubW]);
 
   const completedResultStale =
     state?.status === "complete"
@@ -180,7 +186,7 @@ export default function ImproveBassResponseV2({
           p14TargetLevel: p14Params.p14TargetLevel,
           p14TargetDb: p14Params.p14TargetDb,
           p18TargetBasis: p14Params.p18TargetBasis,
-          amplifierPowerPerSubW: amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0,
+          amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
         });
       } catch {
         return null;
@@ -266,7 +272,7 @@ export default function ImproveBassResponseV2({
       seatingPositions,
       rspPosition,
       selectedSubModel,
-      amplifierPowerPerSubW: amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0,
+      amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
       subwooferBottomHeightM,
       p14TargetBasis: p14Params.p14TargetBasis,
       p14TargetLevel: p14Params.p14TargetLevel,
@@ -628,7 +634,7 @@ export default function ImproveBassResponseV2({
           projectId={projectId}
           versionId={versionId}
           rspPosition={rspPosition}
-          amplifierPowerPerSubW={amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0}
+          amplifierPowerPerSubW={resolvedAmplifierPowerPerSubW}
           subwooferBottomHeightM={subwooferBottomHeightM}
           p14TargetBasis={p14Params.p14TargetBasis}
           p14TargetLevel={p14Params.p14TargetLevel}
