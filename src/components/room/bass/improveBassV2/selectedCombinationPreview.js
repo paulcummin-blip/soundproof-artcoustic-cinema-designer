@@ -131,10 +131,23 @@ export async function runSelectedCombinationPreview(params) {
         }
         return null;
       }
+      const activeInstances = (subwooferInstances || []).filter((instance) => instance.enabled !== false);
       const finalist = {
         id: "preview-combined",
         familyId: "preview",
-        sources: coords.map((c) => ({ xNorm: Number(c.x) / W, yNorm: Number(c.y) / L })),
+        sources: coords.map((c, index) => {
+          const instance = activeInstances[index] || null;
+          return {
+            xNorm: Number(c.x) / W,
+            yNorm: Number(c.y) / L,
+            sourceId: instance?.id || null,
+            modelKey: instance?.model || selectedSubModel,
+            bottomHeightM: Number.isFinite(Number(instance?.bottomHeightM))
+              ? Number(instance.bottomHeightM)
+              : subwooferBottomHeightM,
+            orientation: instance?.orientation || null,
+          };
+        }),
       };
       const seatingPos = selection?.seatingResult?.seatingPositions || seatingPositions;
       rawTransfer = await runInWorker(worker, "placement", {
