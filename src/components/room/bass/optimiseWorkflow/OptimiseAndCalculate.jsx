@@ -46,6 +46,7 @@ import {
   hasPhysicalRecommendations,
 } from "./optimiseWorkflowOrchestrator";
 import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Fingerprint";
+import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import BassOptimisationSummary from "./BassOptimisationSummary";
 import FurtherImprovements from "./FurtherImprovements";
@@ -98,6 +99,12 @@ export default function OptimiseAndCalculate({
     return instances.some((i) => i?.enabled !== false && i?.model);
   }, [subwooferInstances]);
 
+  const resolvedAmplifierPowerPerSubW = Number.isFinite(Number(amplifierPowerPerSubW))
+    ? Number(amplifierPowerPerSubW)
+    : Number.isFinite(Number(appState?.splConfig?.subwooferAmplifierPowerW))
+      ? Number(appState.splConfig.subwooferAmplifierPowerW)
+      : DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W;
+
   const bassActionDisabled = disabled
     || !hasActiveSubModel
     || shared?.canCalculate !== true;
@@ -143,7 +150,7 @@ export default function OptimiseAndCalculate({
         seatingPositions,
         frontSubsCfg,
         rearSubsCfg,
-        amplifierPowerPerSubW,
+        amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
         subwooferBottomHeightM: frontSubsCfg?.bottomHeightM ?? rearSubsCfg?.bottomHeightM ?? 0,
         appState,
       });
@@ -180,7 +187,7 @@ export default function OptimiseAndCalculate({
               p14TargetLevel: requested.requestedLevel || 2,
               p14TargetDb: requested.selectedP14TargetDb || 117,
               p18TargetBasis: requested.p18TargetBasis || "minimum",
-              amplifierPowerPerSubW: amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0,
+              amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
             });
           } catch { return null; }
         })();
@@ -256,7 +263,7 @@ export default function OptimiseAndCalculate({
       phaseRef.current = "idle";
     }
   }, [projectId, versionId, shared, subwooferInstances, roomDims, seatingPositions,
-      frontSubsCfg, rearSubsCfg, amplifierPowerPerSubW, commitInstances, hasCanonicalInstances,
+      frontSubsCfg, rearSubsCfg, resolvedAmplifierPowerPerSubW, commitInstances, hasCanonicalInstances,
       appState, bassActionDisabled]);
 
   const handleCancel = useCallback(() => {
@@ -468,6 +475,7 @@ export default function OptimiseAndCalculate({
                 hasCanonicalInstances={hasCanonicalInstances}
                 appState={appState}
                 shared={shared}
+                amplifierPowerPerSubW={resolvedAmplifierPowerPerSubW}
                 onRecalculate={handlePhysicalRecalculate}
               />
             </div>
@@ -534,7 +542,7 @@ export default function OptimiseAndCalculate({
             appliedSeatingProvenance={appState?.appliedSeatingProvenance}
             hasCanonicalInstances={hasCanonicalInstances}
             appState={appState}
-            amplifierPowerPerSubW={amplifierPowerPerSubW}
+            amplifierPowerPerSubW={resolvedAmplifierPowerPerSubW}
           />
         </div>
       )}
