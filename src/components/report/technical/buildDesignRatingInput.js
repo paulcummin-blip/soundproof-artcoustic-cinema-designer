@@ -242,17 +242,28 @@ export function buildDesignRatingInput({
     }
 
     for (const seatId of seatIds) {
-      // P19 is already graded by the bass engine. Preserve that exact grade
-      // from the shared seat authority; Design Rating must never re-grade it.
-      if (key === "p19") {
-        const p19Seat = p19SeatAuthority?.bySeatId?.[seatId] || null;
-        seatScope[key][seatId] = p19Seat?.calculated
-          ? {
-              rawValue: p19Seat.rawValue,
-              authoritativeLevel: p19Seat.grade,
-              verified: true,
-            }
-          : null;
+      // P19 and P20 are already graded by the canonical BassResult.
+      // Design Rating preserves those exact grades and never re-grades raw dB.
+      if (key === "p19" || key === "p20") {
+        const hud = reportSeatHudById?.[seatId];
+        const p19Seat = key === "p19" ? (p19SeatAuthority?.bySeatId?.[seatId] || null) : null;
+        const metric = key === "p20" ? hud?.rp22?.p20 : null;
+        const rawValue = key === "p19" ? p19Seat?.rawValue : extractRawValue(metric);
+        const authoritativeLevel = key === "p19" ? p19Seat?.grade : metric?.level;
+        const calculated = key === "p19" ? p19Seat?.calculated === true : !isMetricIneligible(metric);
+        if (bassVerified && calculated && isNum(rawValue) && authoritativeLevel) {
+          seatScope[key][seatId] = { rawValue, authoritativeLevel, verified: true };
+        } else if (retainedBassActive) {
+          const retainedRawMap = key === "p19" ? retainedBass.p19BySeat : retainedBass.p20BySeat;
+          const retainedLevelMap = key === "p19" ? retainedBass.p19LevelBySeat : retainedBass.p20LevelBySeat;
+          const retainedRaw = retainedRawMap?.[seatId];
+          const retainedLevel = retainedLevelMap?.[seatId];
+          seatScope[key][seatId] = isNum(retainedRaw) && retainedLevel
+            ? { rawValue: retainedRaw, authoritativeLevel: retainedLevel, verified: true }
+            : null;
+        } else {
+          seatScope[key][seatId] = null;
+        }
         continue;
       }
 
@@ -284,21 +295,7 @@ export function buildDesignRatingInput({
 
       const rawValue = extractRawValue(metric);
 
-      if (key === "p19" || key === "p20") {
-        // Bass seat-scope: use current verified bass, or retained same-fingerprint
-        // bass when current publication is temporarily unavailable.
-        if (bassVerified && isNum(rawValue)) {
-          seatScope[key][seatId] = { rawValue, verified: true };
-        } else if (retainedBassActive) {
-          const retainedMap = key === 'p19' ? retainedBass.p19BySeat : retainedBass.p20BySeat;
-          const retainedVal = retainedMap?.[seatId];
-          seatScope[key][seatId] = isNum(retainedVal) ? { rawValue: retainedVal, verified: true } : null;
-        } else {
-          seatScope[key][seatId] = null;
-        }
-      } else {
-        seatScope[key][seatId] = isNum(rawValue) ? rawValue : null;
-      }
+      seatScope[key][seatId] = isNum(rawValue) ? rawValue : null;
     }
   }
 
