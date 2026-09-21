@@ -9,6 +9,7 @@
 import React, { useCallback, useState } from "react";
 import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { buildOptimisedInstances } from "../improveBassV2/improveBassV2Apply";
+import { applyCalibrationTuning } from "../improveBassV2/improveBassV2ApplyCalibration";
 import { buildProvenance } from "../improveBassV2/appliedProvenance";
 import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Fingerprint";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
@@ -116,14 +117,22 @@ export default function FurtherImprovements({
     const winner = recommendations.seating;
     if (!winner?.seatingPositions) return;
 
-    commitSeating(winner.seatingPositions);
-
     const fingerprint = selection.applyFingerprint;
+    const tuning = winner.appliedTuning || winner.tuning || [];
+    const provisionalProvenance = buildProvenance(
+      "seating_positions",
+      winner.candidateId || "further",
+      fingerprint,
+      fingerprint,
+    );
+    const nextInstances = Array.isArray(tuning) && tuning.length
+      ? applyCalibrationTuning(currentInstances, tuning, provisionalProvenance)
+      : currentInstances;
     const rspPosition = buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m, appState?.designatedRspSeatId);
     const postMutationFingerprint = (() => {
       try {
         return computeV2DesignFingerprint({
-          subwooferInstances: currentInstances,
+          subwooferInstances: nextInstances,
           roomDims,
           seatingPositions: winner.seatingPositions,
           rspPosition,
@@ -137,6 +146,14 @@ export default function FurtherImprovements({
       } catch { return null; }
     })();
     const provenance = buildProvenance("seating_positions", winner.candidateId || "further", fingerprint, postMutationFingerprint);
+    if (Array.isArray(tuning) && tuning.length && commitInstances) {
+      const finalInstances = applyCalibrationTuning(currentInstances, tuning, provenance);
+      commitInstances(finalInstances, {
+        front: { placementMode: "manual", isManual: true },
+        rear: { placementMode: "manual", isManual: true },
+      });
+    }
+    commitSeating(winner.seatingPositions);
     if (commitSeatingProvenance) commitSeatingProvenance(provenance);
 
     markApplied("seating");
@@ -144,7 +161,7 @@ export default function FurtherImprovements({
     if (typeof onRecalculate === "function") {
       onRecalculate({ previousCacheKey: shared?.cacheKey || null });
     }
-  }, [hasSeating, commitSeating, selection, recommendations, roomDims, appState, currentInstances, selectedSubModel, shared, commitSeatingProvenance, onRecalculate, markApplied]);
+  }, [hasSeating, commitSeating, commitInstances, selection, recommendations, roomDims, appState, currentInstances, selectedSubModel, shared, commitSeatingProvenance, onRecalculate, markApplied]);
 
   if (!recommendations || (!hasSubPositions && !hasSeating)) return null;
 
