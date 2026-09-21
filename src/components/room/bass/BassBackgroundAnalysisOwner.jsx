@@ -1098,8 +1098,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const designContextRef = useRef(null);
   designContextRef.current = useMemo(() => ({
     payload, sources, usableLfHz: designEqSystemLimits?.usableLfHz,
-    rspRawCurve, perSeatRawCurves, fingerprints, fingerprintInputs,
-  }), [payload, sources, designEqSystemLimits, rspRawCurve, perSeatRawCurves, fingerprints, fingerprintInputs]);
+    rspRawCurve, perSeatRawCurves,
+    primarySeatIds: getScopedSeatIds(seatingPositions).primarySeatIds,
+    fingerprints, fingerprintInputs,
+  }), [payload, sources, designEqSystemLimits, rspRawCurve, perSeatRawCurves, seatingPositions, fingerprints, fingerprintInputs]);
 
   useEffect(() => {
     // FIX 2-5: Automatic P18 target preparation. The background P14 target
