@@ -76,16 +76,30 @@ const STAGE2_POSITION_LABELS = ["left", "right"];
 export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, rspPosition, zeroTuning = false) {
   const W = Number(roomDims.widthM);
   const L = Number(roomDims.lengthM);
-  const bottomHeightM = (subwooferBottomHeightM != null && Number.isFinite(Number(subwooferBottomHeightM)))
+  const fallbackBottomHeightM = (subwooferBottomHeightM != null && Number.isFinite(Number(subwooferBottomHeightM)))
     ? Math.max(0, Number(subwooferBottomHeightM))
     : STAGE2_FALLBACK_SOURCE_HEIGHT_M;
-  const modelKey = normaliseModelKey(selectedSubModel);
-  const centreZ = deriveCentreZ({ bottomHeightM, model: modelKey });
+  const fallbackModelKey = normaliseModelKey(selectedSubModel);
 
-  const sourcePositions = finalist.sources.map((s) => ({
+  // A finalist may move an installed source, but it must not replace that
+  // source's model or acoustic height. Carry these per-source values through
+  // preview so the same applied instances produce the same canonical result.
+  const sourceDescriptors = finalist.sources.map((source) => {
+    const modelKey = normaliseModelKey(source?.modelKey || source?.model || fallbackModelKey);
+    const bottomHeightM = Number.isFinite(Number(source?.bottomHeightM))
+      ? Math.max(0, Number(source.bottomHeightM))
+      : fallbackBottomHeightM;
+    return {
+      modelKey,
+      bottomHeightM,
+      centreZ: deriveCentreZ({ bottomHeightM, model: modelKey, orientation: source?.orientation }),
+    };
+  });
+
+  const sourcePositions = finalist.sources.map((s, index) => ({
     x: s.xNorm * W,
     y: s.yNorm * L,
-    z: centreZ,
+    z: sourceDescriptors[index].centreZ,
   }));
 
   const frontSubsLive = [];
@@ -112,14 +126,15 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
     const indexInGroup = group === "front" ? frontIdx++ : rearIdx++;
     const canonicalId = `${group}-sub-${STAGE2_POSITION_LABELS[indexInGroup] ?? indexInGroup}`;
     const autoDelay = autoAlignDelays[canonicalId] ?? 0;
+    const descriptor = sourceDescriptors[i];
     return {
       id: `stage2-src-${i + 1}`,
-      modelKey,
-      bassCapability: resolveSubwooferBassCapability(selectedSubModel),
+      modelKey: descriptor.modelKey,
+      bassCapability: resolveSubwooferBassCapability(descriptor.modelKey),
       subwooferAmplifierPowerW: amplifierPowerPerSubW,
       x: sourcePositions[i].x,
       y: sourcePositions[i].y,
-      z: centreZ,
+      z: descriptor.centreZ,
       // Preserve normalised position for front/rear group splitting in
       // delay/level tuning search (confirmation phase re-summation).
       yNorm: s.yNorm,
