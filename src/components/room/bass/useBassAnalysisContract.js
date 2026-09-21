@@ -23,6 +23,7 @@ import {
 import { adaptCurrentBassOptimisationResult } from "@/components/room/bass/bassAnalysisAdapter";
 import { ARTCOUSTIC_HOUSE_CURVE } from "@/components/utils/artcousticHouseCurve";
 import { getDesignEqFitProfile } from "@/components/utils/designEqCalibration";
+import { getScopedSeatIds } from "@/components/utils/seatScopeAuthority";
 
 // Stable house-curve fingerprint — the Artcoustic curve points are a constant,
 // so this is memoized once per module load.
@@ -155,10 +156,16 @@ export function useBassAnalysisContract({
     return rewSourceCurveMode === "product" ? "legacy_product_aware" : "normalized_room_transfer";
   }, [rspRawCurve, rewSourceCurveMode]);
 
+  const contractPrimarySeatIds = useMemo(
+    () => getScopedSeatIds(seatingPositions).primarySeatIds,
+    [seatingPositions],
+  );
+
   // Adapt the current live result into the contract. Pure, no recalculation.
   const bassAnalysisContract = useMemo(() => adaptCurrentBassOptimisationResult({
     optimisationResult, detailedStatus, detailedProgress, detailedElapsedMs,
     rspRawCurve, perSeatRawCurves,
+    primarySeatIds: contractPrimarySeatIds,
     activeSubs: designEqSystemLimits?.activeSubs,
     usableLfHz: designEqSystemLimits?.usableLfHz,
     sourceLayout: subsForSimulation,
@@ -177,7 +184,7 @@ export function useBassAnalysisContract({
     collectDiagnostics,
     metricPublication,
   }), [optimisationResult, detailedStatus, detailedProgress, detailedElapsedMs,
-    rspRawCurve, perSeatRawCurves, designEqSystemLimits, subsForSimulation,
+    rspRawCurve, perSeatRawCurves, contractPrimarySeatIds, designEqSystemLimits, subsForSimulation,
     optimiserPriorityMode, contractGeometryFp, contractProductFp, contractCalibrationFp,
     contractResponseDomain, fingerprintsOverride, backgroundLifecycle,
     selectedP14TargetBasis, selectedP14Level, selectedP14TargetDb, selectedP14RequiredExtensionHz,
