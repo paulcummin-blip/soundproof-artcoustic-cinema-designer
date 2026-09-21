@@ -384,11 +384,19 @@ export function useAppDesignRating({
     if (bassReadiness.ready && roomRating) {
       const p19BySeat = {};
       const p20BySeat = {};
+      const p19LevelBySeat = {};
+      const p20LevelBySeat = {};
       for (const [seatId, hud] of Object.entries(reportSeatHudById || {})) {
         const p19Raw = extractMetricRawValue(hud?.rp22?.p19);
         const p20Raw = extractMetricRawValue(hud?.rp22?.p20);
-        if (p19Raw != null) p19BySeat[seatId] = p19Raw;
-        if (p20Raw != null) p20BySeat[seatId] = p20Raw;
+        if (p19Raw != null) {
+          p19BySeat[seatId] = p19Raw;
+          p19LevelBySeat[seatId] = hud?.rp22?.p19?.level || null;
+        }
+        if (p20Raw != null) {
+          p20BySeat[seatId] = p20Raw;
+          p20LevelBySeat[seatId] = hud?.rp22?.p20?.level || null;
+        }
       }
       lastVerifiedBassRef.current = {
         fingerprint: bassReadiness.fingerprint,
@@ -399,6 +407,8 @@ export function useAppDesignRating({
         p18Qualified: completedBassPresentation?.parameters?.p18?.qualifiedAtSelectedP14Output !== false,
         p19BySeat,
         p20BySeat,
+        p19LevelBySeat,
+        p20LevelBySeat,
       };
     }
   }, [bassReadiness.ready, bassReadiness.fingerprint, roomRating, reportSeatHudById, completedBassPresentation, reportP14Mode, reportP18Mode]);
