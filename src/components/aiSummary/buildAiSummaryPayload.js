@@ -30,11 +30,11 @@ function isFiniteNumber(v) {
 function extractCategoryFloors(categories) {
   if (!Array.isArray(categories)) return [];
   return categories
-    .filter((cat) => RP22_CATEGORIES.includes(cat?.name))
     .map((cat) => ({
-      name: cat.name,
-      floorLevel: cat.floorLevel || null,
-    }));
+      name: cat?.name || cat?.label || null,
+      floorLevel: cat?.floorLevel || null,
+    }))
+    .filter((cat) => RP22_CATEGORIES.includes(cat.name));
 }
 
 function extractGenuineParameters(parameterAuthority, parameterSummary = null) {
@@ -56,28 +56,42 @@ function extractGenuineParameters(parameterAuthority, parameterSummary = null) {
 
 function extractBassSummary(engineeringSummary, parameterAuthority) {
   const bass = {};
+  const roomResults = engineeringSummary?.roomResultsByParameter || {};
+  const seatResults = engineeringSummary?.project?.reportCounts?.seatResultsByParameter || {};
 
-  // P14 — room-scoped
+  const roomValue = (parameterNumber, parameter) =>
+    parameter?.rawValue ??
+    roomResults?.[parameterNumber]?.value ??
+    roomResults?.[String(parameterNumber)]?.value ??
+    null;
+
+  const seatValueMap = (parameterKey) =>
+    Object.fromEntries(
+      (seatResults?.[parameterKey] || []).map((seat) => [String(seat?.seatId), seat?.value ?? null]),
+    );
+
+  // P14 — room-scoped. Copy the already-published value; never recalculate.
   const p14 = parameterAuthority?.p14;
   if (p14 && p14.state === "scored") {
-    bass.p14 = { level: p14.level || null, value: p14.rawValue ?? null };
+    bass.p14 = { level: p14.level || null, value: roomValue(14, p14) };
   }
 
-  // P18 — room-scoped
+  // P18 — room-scoped. Copy the already-published value; never recalculate.
   const p18 = parameterAuthority?.p18;
   if (p18 && p18.state === "scored") {
-    bass.p18 = { level: p18.level || null, value: p18.rawValue ?? null };
+    bass.p18 = { level: p18.level || null, value: roomValue(18, p18) };
   }
 
-  // P19 — seat-scoped, per-seat results
+  // P19 — seat-scoped, copied from the canonical engineering summary.
   const p19 = parameterAuthority?.p19;
   if (p19 && p19.state === "scored" && p19.scope === "seat") {
     const perSeat = {};
+    const values = seatValueMap("p19");
     for (const [seatId, seat] of Object.entries(p19.seats || {})) {
       if (seat?.state === "scored" && GENUINE_LEVELS.has(seat.level)) {
         perSeat[seatId] = {
           level: seat.level,
-          value: seat.rawValue ?? null,
+          value: seat.rawValue ?? values[String(seatId)] ?? null,
         };
       }
     }
@@ -90,15 +104,16 @@ function extractBassSummary(engineeringSummary, parameterAuthority) {
     }
   }
 
-  // P20 — seat-scoped, per-seat results
+  // P20 — seat-scoped, copied from the canonical engineering summary.
   const p20 = parameterAuthority?.p20;
   if (p20 && p20.state === "scored" && p20.scope === "seat") {
     const perSeat = {};
+    const values = seatValueMap("p20");
     for (const [seatId, seat] of Object.entries(p20.seats || {})) {
       if (seat?.state === "scored" && GENUINE_LEVELS.has(seat.level)) {
         perSeat[seatId] = {
           level: seat.level,
-          value: seat.rawValue ?? null,
+          value: seat.rawValue ?? values[String(seatId)] ?? null,
         };
       }
     }
