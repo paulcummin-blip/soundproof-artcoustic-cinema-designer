@@ -12,6 +12,7 @@
 import { buildStageResults } from "../improveBassV2/improveBassV2StageAuthority";
 import { countFailingSeats } from "../improveBassV2/zeroFailOptimiser";
 import { classifyOptimisationStage } from "./optimisationStageClassifier";
+import { lowestPrimaryP19P20Level, bassRankFromLevel } from "@/components/utils/rp22/bassGradingAuthority";
 
 function num(value) {
   const n = Number(value);
@@ -58,12 +59,9 @@ function worstSeat(perSeatArray) {
   }, perSeatArray[0]);
 }
 
-// ── Primary floor: minimum level across primary seats (P19 + P20) ──
+// ── Primary floor: canonical minimum across primary P19 + P20 ──
 function primaryFloor(result) {
-  const p19 = (Array.isArray(result?.perSeatP19) ? result.perSeatP19 : []).filter((s) => s.isPrimary);
-  const p20 = (Array.isArray(result?.perSeatP20) ? result.perSeatP20 : []).filter((s) => s.isPrimary);
-  const grades = [...p19, ...p20].map((s) => numericLevel(s.level));
-  return grades.length ? Math.min(...grades) : 0;
+  return bassRankFromLevel(lowestPrimaryP19P20Level(result)) ?? 0;
 }
 
 function getGlobalLevelAlignment(completedBassAuthority) {
