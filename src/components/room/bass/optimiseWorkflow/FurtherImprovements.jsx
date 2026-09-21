@@ -78,6 +78,7 @@ export default function FurtherImprovements({
   hasCanonicalInstances,
   appState,
   shared,
+  amplifierPowerPerSubW,
   onRecalculate,
 }) {
   const hasSubPositions = !!recommendations?.subPositions;
@@ -141,7 +142,7 @@ export default function FurtherImprovements({
           p14TargetLevel: shared?.authoritative?.requested?.requestedLevel || 2,
           p14TargetDb: shared?.authoritative?.requested?.selectedP14TargetDb || 117,
           p18TargetBasis: shared?.authoritative?.requested?.p18TargetBasis || "minimum",
-          amplifierPowerPerSubW: 0,
+          amplifierPowerPerSubW,
         });
       } catch { return null; }
     })();
@@ -161,7 +162,7 @@ export default function FurtherImprovements({
     if (typeof onRecalculate === "function") {
       onRecalculate({ previousCacheKey: shared?.cacheKey || null });
     }
-  }, [hasSeating, commitSeating, commitInstances, selection, recommendations, roomDims, appState, currentInstances, selectedSubModel, shared, commitSeatingProvenance, onRecalculate, markApplied]);
+  }, [hasSeating, commitSeating, commitInstances, selection, recommendations, roomDims, appState, currentInstances, selectedSubModel, shared, amplifierPowerPerSubW, commitSeatingProvenance, onRecalculate, markApplied]);
 
   if (!recommendations || (!hasSubPositions && !hasSeating)) return null;
 
