@@ -274,8 +274,14 @@ export function buildAutoApplySummary(selection, currentInstances) {
   const stageResults = buildStageResults(selection);
   const winner = selection.winner;
   const tuning = extractCalibrationTuning(selection);
-  const hasPositions = !!(winner?.positionCoordinates?.length || winner?.coordinates?.length);
-  const hasSeating = !!(winner?.seatingPositions?.length);
+  // Physical recommendations must use their own canonically confirmed stage
+  // result. The overall calibration winner can carry the current coordinates,
+  // which previously produced a false “Move subwoofers” Apply card even when
+  // the position stage reported no material improvement.
+  const hasPositions = stageResults?.subPositions?.verdict === "improvement"
+    && !!stageResults?.subPositions?.result;
+  const hasSeating = stageResults?.seating?.verdict === "improvement"
+    && !!stageResults?.seating?.result;
 
   let changeSummary = null;
   if (tuning) {
