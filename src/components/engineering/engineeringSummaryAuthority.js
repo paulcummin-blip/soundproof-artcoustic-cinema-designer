@@ -26,11 +26,14 @@ import { getCategoryForParam } from "@/components/report/technical/technicalPara
 import { buildRp22SeatCoverageResult } from "@/components/utils/rp22SeatCoverageSentence";
 import { getScopedSeatIds, buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
 import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
+import {
+  BASS_LEVEL_RANK as LEVEL_RANK,
+  BASS_RANK_LEVEL as RANK_LEVEL,
+  canonicalBassLevel,
+  lowestBassLevel,
+} from "@/components/utils/rp22/bassGradingAuthority";
 
 export const ENGINEERING_SUMMARY_SCHEMA_VERSION = 1;
-
-const LEVEL_RANK = { FAIL: 0, L1: 1, L2: 2, L3: 3, L4: 4 };
-const RANK_LEVEL = ["FAIL", "L1", "L2", "L3", "L4"];
 const SCORECARD_CATEGORY_ORDER = [
   "Spatial Resolution",
   "Dynamic Range",
@@ -39,9 +42,7 @@ const SCORECARD_CATEGORY_ORDER = [
 ];
 
 function normalizeLevel(level) {
-  const value = String(level ?? "").trim().toUpperCase();
-  if (value === "FAIL" || value === "L1" || value === "L2" || value === "L3" || value === "L4") return value;
-  return null;
+  return canonicalBassLevel(level);
 }
 
 function clonePlain(value, seen = new WeakMap()) {
@@ -68,8 +69,7 @@ function floorForSeatParameter(parameter, seatIds = null) {
     .map(([, seat]) => normalizeLevel(seat?.level))
     .filter(Boolean);
   if (levels.length === 0) return null;
-  const floorRank = Math.min(...levels.map((level) => LEVEL_RANK[level]));
-  return RANK_LEVEL[floorRank] || null;
+  return lowestBassLevel(levels);
 }
 
 function parameterAggregateLevel(parameter, seatIds = null) {
@@ -326,9 +326,7 @@ function buildReportCounts(parameters, seats, seatHudById) {
         levels[key] = normalizeLevel(resultByParameterAndSeat?.[key]?.[String(seat?.id)]?.level);
       }
       const assessedLevels = Object.values(levels).filter(Boolean);
-      const worstLevel = assessedLevels.length
-        ? assessedLevels.reduce((worst, level) => LEVEL_RANK[level] < LEVEL_RANK[worst] ? level : worst)
-        : null;
+      const worstLevel = lowestBassLevel(assessedLevels);
       return {
         seatId: seat?.id,
         isPrimary: seat?.isPrimary === true || String(seat?.priority || "").toLowerCase() !== "secondary",
@@ -405,7 +403,7 @@ function buildViewingSummary(perSeatRp23, seats, primarySeatIds, secondarySeatId
       .map((seat) => normalizeLevel(seat.rp23_level))
       .filter(Boolean);
     if (!levels.length) return null;
-    return RANK_LEVEL[Math.min(...levels.map((level) => LEVEL_RANK[level]))] || null;
+    return lowestBassLevel(levels);
   };
 
   const angles = perSeat.map((seat) => seat.horizontal_angle_deg).filter(Number.isFinite);
