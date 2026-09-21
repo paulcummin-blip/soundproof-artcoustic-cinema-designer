@@ -148,6 +148,10 @@ WRITING RULES (strict):
 - Structure the comparison around: Spatial Resolution, Dynamic Range, Timbre Matching.
 - Also compare: speaker products, channel count, subwoofer configuration, screen/viewing result, authoritative bass result.
 - Do not invent missing values.
+- Copy every Design Performance Index and every L1/L2/L3/L4/FAIL result exactly. Never regrade, round, reinterpret, or replace a category floor with a parameter floor.
+- RP22 category floors are the sole authority for the Spatial Resolution, Dynamic Range, and Timbre Matching comparison rows.
+- P14 is Dynamic Range. P18, P19, and P20 are Timbre Matching. Never describe P19 or P20 as Dynamic Range.
+- If P20 is L1 or FAIL, describe material seat-to-seat bass variation; never call the bass response consistent, stable, uniform, or standardized across the room.
 
 VERSION DATA:
 ${versionData}
