@@ -475,17 +475,20 @@ export default function ImproveBassResponseV2({
       // Sequence: validate baseline → commit seating → derive new fingerprint
       // → persist provenance with new fingerprint.
       if (commitSeating && result.seatingPositions) {
-        // Step C: Commit the seating coordinates
+        // The confirmed seating candidate may include calibration that was
+        // retuned for the moved seats. Commit both parts of the exact
+        // candidate so the applied design can reproduce the preview.
+        const tuning = result.appliedTuning || result.tuning || [];
+        const next = applyCalibrationTuning(subwooferInstances, tuning);
+        commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
         commitSeating(result.seatingPositions);
 
-        // Step D: Derive the NEW current design fingerprint from the moved
-        // seating positions. We compute it synchronously from the new array
-        // since commitSeating is a React state setter that won't reflect in
-        // the current render cycle.
+        // Derive the NEW fingerprint from the complete applied candidate.
         const postMutationFingerprint = (() => {
           try {
             return computeV2DesignFingerprint({
               ...d,
+              subwooferInstances: next,
               seatingPositions: result.seatingPositions,
               ...d.p14Params,
             });
@@ -552,7 +555,14 @@ export default function ImproveBassResponseV2({
     if (candidate.seatingPositions && commitSeating) {
       commitSeating(candidate.seatingPositions);
       const postMutationFingerprint = (() => {
-        try { return computeV2DesignFingerprint({ ...d, seatingPositions: candidate.seatingPositions, ...d.p14Params }); } catch { return null; }
+        try {
+          return computeV2DesignFingerprint({
+            ...d,
+            subwooferInstances: next,
+            seatingPositions: candidate.seatingPositions,
+            ...d.p14Params,
+          });
+        } catch { return null; }
       })();
       const seatingProvenance = buildProvenance("seating_positions", "preview-apply", selection.applyFingerprint, postMutationFingerprint);
       if (commitSeatingProvenance) commitSeatingProvenance(seatingProvenance);
