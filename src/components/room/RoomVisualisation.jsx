@@ -220,7 +220,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   // bass fingerprint — if the fingerprint ever misses a geometry field, the
   // seatId-set mismatch catches it here.
   const currentP19Results = useMemo(() => {
-    const results = currentBassContract?.selectedCandidate?.perSeatP19Results || [];
+    const results = currentBassContract?.bassResult?.seatResults?.P19 || [];
     if (!Array.isArray(results) || results.length === 0) return [];
     const seatIds = new Set(
       (Array.isArray(seatingPositions) ? seatingPositions : [])
@@ -239,9 +239,9 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       });
     }
     return filtered;
-  }, [currentBassContract?.selectedCandidate?.perSeatP19Results, seatingPositions]);
+  }, [currentBassContract?.bassResult?.seatResults?.P19, seatingPositions]);
   const currentP20Results = useMemo(() => {
-    const results = currentBassContract?.selectedCandidate?.perSeatP20Results || [];
+    const results = currentBassContract?.bassResult?.seatResults?.P20 || [];
     if (!Array.isArray(results) || results.length === 0) return [];
     const seatIds = new Set(
       (Array.isArray(seatingPositions) ? seatingPositions : [])
@@ -250,7 +250,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     );
     if (seatIds.size === 0) return results;
     return results.filter((r) => seatIds.has(String(r?.seatId || "")));
-  }, [currentBassContract?.selectedCandidate?.perSeatP20Results, seatingPositions]);
+  }, [currentBassContract?.bassResult?.seatResults?.P20, seatingPositions]);
   const widthM  = Number(appState?.roomDims?.widthM)  || 4.5;
   const lengthM = Number(appState?.roomDims?.lengthM) || 6.0;
   const heightM = Number(appState?.roomDims?.heightM) || 2.4;
