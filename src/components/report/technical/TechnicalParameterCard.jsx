@@ -126,11 +126,11 @@ export default function TechnicalParameterCard({
         fsValue: "22px", fsBody: "13px", fsThreshold: "11px",
       }
     : {
-        pad: "5mm 6mm", gap: "2.5mm", brk: true,
-        mt1: "1mm", mt2: "1.5mm", ptTop: "2.5mm", ptTop2: "1.5mm",
-        resultPad: "3mm 4mm", metaGap: "2mm 4mm",
-        fsLabel: "7.5pt", fsCategory: "7pt", fsTitle: "12.5pt",
-        fsValue: "18pt", fsBody: "8.5pt", fsThreshold: "8pt",
+        pad: "3mm 4.5mm", gap: "1.4mm", brk: true,
+        mt1: "0.5mm", mt2: "0.8mm", ptTop: "1.5mm", ptTop2: "0.8mm",
+        resultPad: "1.8mm 3mm", metaGap: "1.2mm 3mm",
+        fsLabel: "7pt", fsCategory: "6.5pt", fsTitle: "11.5pt",
+        fsValue: "16pt", fsBody: "7.6pt", fsThreshold: "7.2pt",
       };
 
   return (
