@@ -349,16 +349,14 @@ export default function ReportPrintStyles() {
                     print-color-adjust: exact !important;
                 }
 
-                /* ── Technical Report seat-result pills: 2× size in print/PDF only ──
-                   Affects only the per-seat L1–L4 / FAIL badges (TechnicalLevelBadge
-                   size="small") inside the Technical Report. Web UI, Room Designer,
-                   compliance panel and category-summary pills are unchanged. */
+                /* Compact seat-result pills keep all three parameter panels inside
+                   the A4 frame while remaining easy to scan. */
                 .rp22-report .tech-seat-badge {
-                    width: 52px !important;
-                    height: 36px !important;
-                    min-width: 52px !important;
-                    font-size: 16pt !important;
-                    border-radius: 6px !important;
+                    width: 36px !important;
+                    height: 24px !important;
+                    min-width: 36px !important;
+                    font-size: 11pt !important;
+                    border-radius: 4px !important;
                 }
             }
 
@@ -769,7 +767,7 @@ export default function ReportPrintStyles() {
                 min-height: 272mm !important;
                 height: 272mm !important;
                 max-height: 272mm !important;
-                padding: 4mm 3mm 3mm 3mm !important;
+                padding: 3mm 2.5mm 2.5mm 2.5mm !important;
                 overflow: hidden !important;
                 break-inside: avoid-page !important;
                 page-break-inside: avoid !important;
@@ -777,6 +775,8 @@ export default function ReportPrintStyles() {
 
               .rp22-report .tech-param-page__cards {
                 min-height: 0 !important;
+                justify-content: flex-start !important;
+                gap: 2mm !important;
               }
 
               .rp22-report .tech-param-page__cards > div,
