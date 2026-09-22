@@ -934,10 +934,6 @@ function RP22ReportInner() {
         seatHudSnapshots: reportSeatHudById,
         seatingPositions: seats,
         mlpSeatId: rspSeatId,
-        assumedP15Level: app?.assumedP15Level,
-        p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
-        setAssumedP15LevelSafe: app?.setAssumedP15LevelSafe,
-        setAssumedP21LevelSafe: app?.setAssumedP21LevelSafe,
         contributionsByKey: showDesignRating ? asdrContributionsByKey : null,
     };
 
