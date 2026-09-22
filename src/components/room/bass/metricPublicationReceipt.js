@@ -83,6 +83,8 @@ export function buildMetricPublicationReceipt(optimisationResult) {
     completedCandidateId: d.metricCompletedCandidateId || null,
     candidateCompletedFingerprint: d.metricCompletedCandidateFingerprint || null,
     postEqCurveHash: d.metricPostEqCurveHash || null,
+    referenceEqHash: d.metricReferenceEqHash || null,
+    referenceEqParityValid: d.referenceEqParityValid === true,
     targetCurveHash: d.metricTargetCurveHash || null,
     graphPostEqCurveHash: graphSource?.postEqCurveHash || null,
     graphTargetCurveHash: graphSource?.targetCurveHash || null,
