@@ -43,7 +43,22 @@ export default function SpeakerPositionPlan({
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div style={{ width: '100%', background: '#FFFFFF', padding: '8mm 10mm', fontFamily: BODY_FONT, color: COLORS.text, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+    <div
+      className="speaker-position-plan"
+      style={{
+        width: '100%',
+        height: '100%',
+        boxSizing: 'border-box',
+        background: '#FFFFFF',
+        padding: '8mm',
+        fontFamily: BODY_FONT,
+        color: COLORS.text,
+        breakInside: 'avoid',
+        pageBreakInside: 'avoid',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, borderBottom: `1.5px solid ${COLORS.text}`, paddingBottom: 5 }}>
@@ -72,18 +87,45 @@ export default function SpeakerPositionPlan({
       </div>
 
       {/* ── Plan image ── */}
-      <div style={{ width: '100%', border: `1px solid ${COLORS.border}`, borderRadius: 4, overflow: 'hidden', marginBottom: 6 }}>
+      <div
+        className="speaker-position-plan__drawing"
+        style={{
+          width: '100%',
+          flex: '1 1 auto',
+          minHeight: 0,
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: 4,
+          overflow: 'hidden',
+          marginBottom: 6,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         {planImageDataUrl ? (
-          <img src={planImageDataUrl} alt="Speaker position plan" style={{ width: '100%', display: 'block', maxHeight: '115mm', objectFit: 'contain' }} />
+          <img
+            className="speaker-position-plan__image"
+            src={planImageDataUrl}
+            alt="Speaker position plan"
+            style={{
+              width: '100%',
+              height: '100%',
+              maxWidth: '100%',
+              maxHeight: '100%',
+              display: 'block',
+              objectFit: 'contain',
+              objectPosition: 'center center',
+            }}
+          />
         ) : (
-          <div style={{ height: '115mm', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.muted, fontSize: 10 }}>
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.muted, fontSize: 10 }}>
             Plan capture unavailable
           </div>
         )}
       </div>
 
       {/* ── Coordinate datum + key dimensions ── */}
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, fontSize: 8, color: COLORS.muted, gap: 10 }}>
+      <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', fontSize: 8, color: COLORS.muted, gap: 10 }}>
         <div style={{ flex: '1 1 auto', minWidth: 0 }}>
           <strong style={{ color: COLORS.text }}>Coordinate datum:</strong>{' '}
           X from left wall · Y from front datum · Z centre height AFFL
