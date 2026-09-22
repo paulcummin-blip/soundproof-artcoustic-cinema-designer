@@ -584,8 +584,7 @@ export default function ReportPrintStyles() {
 
               .rp22-report .report-page-block--cover,
               .rp22-report .report-page-block--summary,
-              .rp22-report .report-drawing-page,
-              .rp22-report .tech-param-page {
+              .rp22-report .report-drawing-page {
                 min-height: 272mm !important;
                 height: 272mm !important;
                 max-height: 272mm !important;
@@ -767,13 +766,28 @@ export default function ReportPrintStyles() {
 
               .rp22-report .tech-param-page,
               .rp22-report .tech-param-page--first {
+                min-height: 272mm !important;
+                height: auto !important;
+                max-height: none !important;
                 padding: 6mm 4mm 4mm 4mm !important;
-                break-inside: avoid-page !important;
-                page-break-inside: avoid !important;
+                overflow: visible !important;
+                break-inside: auto !important;
+                page-break-inside: auto !important;
               }
 
-              /* Oversize is diagnostic only; the fixed page owners above keep
-                 every supported drawing and card group inside one page. */
+              .rp22-report .tech-param-page__cards {
+                min-height: 0 !important;
+              }
+
+              .rp22-report .tech-param-page__cards > div,
+              .rp22-report .tech-param-page__cards .tech-param-card {
+                break-inside: avoid-page !important;
+                page-break-inside: avoid !important;
+                -webkit-column-break-inside: avoid !important;
+              }
+
+              /* Oversize is diagnostic only. Drawings keep a fixed frame;
+                 parameter pages may grow and fragment only between complete cards. */
               .rp22-report [data-report-block-oversize="true"] {
                 outline: none !important;
               }
