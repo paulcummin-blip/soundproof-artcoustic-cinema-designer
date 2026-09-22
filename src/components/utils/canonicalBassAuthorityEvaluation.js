@@ -138,7 +138,7 @@ function buildP14PassReturnObject(params) {
     selectedP14RequiredExtensionHz: p14AssessmentStartHz,
     idealHouseTarget,
     practicalCalibrationTarget,
-    p19TargetIdentity: practicalCalibrationTarget.length ? "practical-calibration-target" : "ideal-house-target",
+    calibrationTargetIdentity: practicalCalibrationTarget.length ? "practical-calibration-target" : "ideal-house-target",
     assessmentStartHz: assessmentBand.valid ? assessmentBand.lowerHz : null,
     assessmentEndHz: assessmentBand.valid ? assessmentBand.upperHz : null,
     assessmentBandValid: assessmentBand.valid,
