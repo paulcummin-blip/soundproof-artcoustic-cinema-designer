@@ -1,6 +1,6 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { isReferenceSeatIdentity } from "@/components/room/bass/normalizedRoomInputAdapters";
-import { levelP19_lfResponse, levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
+import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 import { evaluateP19AbsoluteTargetDeviation, evaluateP19ReferenceEqDeviation } from "@/components/utils/p19AbsoluteTargetDeviation";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
