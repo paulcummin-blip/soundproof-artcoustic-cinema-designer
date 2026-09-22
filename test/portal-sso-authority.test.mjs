@@ -8,6 +8,10 @@ import {
   validatePilotPortalAccessIfRequired,
 } from '../base44/shared/portalSsoAuthority.js';
 
+const BRIDGE_OPTIONS = {
+  bridgeUrl: 'https://partner-config.example/functions/v1/soundproof-launch-service',
+};
+
 function matches(row, query) {
   return Object.entries(query).every(([key, value]) => row?.[key] === value);
 }
@@ -126,6 +130,7 @@ test('consume stores no raw binding secret and requires the pre-assigned Base44 
     base44,
     { id: 'base44-user-1' },
     'A'.repeat(43),
+    BRIDGE_OPTIONS,
   );
   assert.equal(result.ok, true);
   assert.equal(rows.identities.length, 1);
@@ -135,7 +140,12 @@ test('consume stores no raw binding secret and requires the pre-assigned Base44 
 
   rows.memberships[0].user_id = 'different-user';
   await assert.rejects(
-    () => consumePilotPortalLaunch(base44, { id: 'base44-user-1' }, 'B'.repeat(43)),
+    () => consumePilotPortalLaunch(
+      base44,
+      { id: 'base44-user-1' },
+      'B'.repeat(43),
+      BRIDGE_OPTIONS,
+    ),
     /PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED/,
   );
 });
@@ -172,6 +182,7 @@ test('ongoing access revalidates the live portal session and canonical name', as
     base44,
     { id: 'base44-user-1' },
     account,
+    BRIDGE_OPTIONS,
   );
   assert.equal(result.allowed, true);
   assert.equal(account.name, 'iCubed Home Cinema Ltd');
@@ -203,6 +214,7 @@ test('foreign, tampered or revoked portal sessions fail closed', async (t) => {
     base44,
     { id: 'base44-user-1' },
     account,
+    BRIDGE_OPTIONS,
   );
   assert.equal(foreign.allowed, false);
 
@@ -212,6 +224,7 @@ test('foreign, tampered or revoked portal sessions fail closed', async (t) => {
     base44,
     { id: 'base44-user-1' },
     account,
+    BRIDGE_OPTIONS,
   );
   assert.equal(revoked.allowed, false);
   assert.equal(revoked.reason, 'PORTAL_SESSION_REJECTED');
