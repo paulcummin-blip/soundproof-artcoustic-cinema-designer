@@ -67,6 +67,9 @@ export default function Layout({ children, currentPageName }) {
   const availableMenuItems = menuItems.filter((item) =>
   (item.alwaysVisible || hasCapability(user, item.capability)) && (!item.adminOnly || isMasterAdmin(user))
   );
+  const isReportAutoPrint = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("autoPrint") === "1"
+    && /\/RP22(?:Client)?Report\/?$/.test(window.location.pathname);
   const [dealerAccountUrl, setDealerAccountUrl] = React.useState(null);
 
   // Price summary state (read from window.__ROOM_DESIGNER_PRICE__ set by RoomDesigner)
@@ -258,8 +261,9 @@ export default function Layout({ children, currentPageName }) {
       <ToastProvider>
         <AppStateProvider>
         <PartnerPortalIdentityProvider>
-        <BrandIntroOverlay />
+        {!isReportAutoPrint && <BrandIntroOverlay />}
         <div className="flex min-h-screen w-full bg-brand-background">
+          {!isReportAutoPrint && (
           <aside className="app-shell-sidebar w-64 border-r border-brand-border bg-brand-sidebar-bg flex flex-col" data-app-shell-sidebar="true">
             <div className="p-4">
               <img
@@ -496,6 +500,7 @@ export default function Layout({ children, currentPageName }) {
               </div>
             )}
           </aside>
+          )}
 
           <main className="app-shell-main flex-1 min-w-0 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto">
