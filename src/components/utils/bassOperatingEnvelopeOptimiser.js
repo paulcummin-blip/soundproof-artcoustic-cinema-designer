@@ -1,6 +1,6 @@
 import { calculateDesignEqCurve, DESIGN_EQ_FIT_PROFILES } from "@/components/utils/designEqCalibration";
 import { computeParam18AchievedExtension, computeP19DeviationBelowSchroeder, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
-import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
+import { computeCorrectableP19Diagnostic, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { selectCandidateFromPool } from "@/components/utils/bassCandidatePoolSelection";
@@ -87,7 +87,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
   const rspMeanSignedResidualDb = rspResiduals.length ? rspResiduals.reduce((sum, value) => sum + value, 0) / rspResiduals.length : null;
   const rspMeanAbsoluteResidualDb = rspResiduals.length ? rspResiduals.reduce((sum, value) => sum + Math.abs(value), 0) / rspResiduals.length : null;
   const rspShapeRmsResidualDb = rspResiduals.length ? Math.sqrt(rspResiduals.reduce((sum, value) => sum + (value - rspMeanSignedResidualDb) ** 2, 0) / rspResiduals.length) : null;
-  const officialP19 = computeOfficialP19Assessment({
+  const officialP19 = computeCorrectableP19Diagnostic({
     rspPostEqCurve: finalPostEqCurve,
     canonicalTargetCurve: productionHouseCurveTarget,
     assessmentStartHz,
