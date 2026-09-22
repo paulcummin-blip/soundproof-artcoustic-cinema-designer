@@ -12,7 +12,7 @@ export default function ReportCover({ variant = 'screen' }) {
                 <img
                     src={LOGO_URL}
                     alt="Sound Proof"
-                    style={{ width: '100%', height: 'auto', marginBottom: '14mm' }}
+                    style={{ width: '100%', height: 'auto', marginBottom: '8mm' }}
                 />
                 <div
                     style={{
@@ -22,7 +22,7 @@ export default function ReportCover({ variant = 'screen' }) {
                         textTransform: 'uppercase',
                         color: '#1B1A1A',
                         fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                        marginBottom: '3mm',
+                        marginBottom: '2mm',
                     }}
                 >
                     Professional Home Cinema Engineering
@@ -35,13 +35,13 @@ export default function ReportCover({ variant = 'screen' }) {
                         textTransform: 'uppercase',
                         color: '#625143',
                         fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                        marginBottom: '10mm',
+                        marginBottom: '6mm',
                     }}
                 >
                     Powered by Artcoustic Design Intelligence (ADI)
                 </div>
-                <div style={{ width: '30mm', height: 1, backgroundColor: '#C1B6AD', margin: '0 auto 10mm' }} />
-                <div style={{ fontSize: '30pt', fontWeight: 700, color: '#1B1A1A', lineHeight: 1.15, marginBottom: '12mm' }}>
+                <div style={{ width: '30mm', height: 1, backgroundColor: '#C1B6AD', margin: '0 auto 6mm' }} />
+                <div style={{ fontSize: '30pt', fontWeight: 700, color: '#1B1A1A', lineHeight: 1.1, marginBottom: '7mm' }}>
                     RP22 Compliance Report
                 </div>
             </div>
