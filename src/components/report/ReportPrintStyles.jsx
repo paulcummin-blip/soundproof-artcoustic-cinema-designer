@@ -580,7 +580,7 @@ export default function ReportPrintStyles() {
                 position: relative !important;
               }
 
-              .rp22-report .report-page-block[data-report-page-start="true"]:not(:first-child),
+              .rp22-report .report-page-block[data-report-page-start="true"],
               .rp22-report .report-force-new-page {
                 break-before: page !important;
                 page-break-before: always !important;
