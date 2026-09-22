@@ -28,6 +28,7 @@ import { getScopedSeatIds } from '@/components/utils/seatScopeAuthority';
 import { hasMinimumSystemForAsdr } from '@/components/utils/minimumSystemForAsdr';
 import { resolveP14TargetSelectionState } from '@/components/room/bass/p14TargetSelectionState';
 import { isDesignRatingPublishable } from '@/components/state/designRatingPublicationAuthority';
+import { resolveAssumedParameterResult } from '@/components/utils/assumedParameterAuthority';
 
 // Map numeric RP22 parameter IDs to the string keys expected by buildDesignRatingInput
 const SEAT_PARAM_KEY_MAP = {
@@ -325,6 +326,10 @@ export function useAppDesignRating({
       const roomResultsByParameter = {
         ...(analysisResult?.gradedParameters?.primary || {}),
       };
+      // Publish the permanent assumptions as ordinary scored room results so
+      // every downstream consumer receives the same L2 authority and display.
+      roomResultsByParameter[15] = resolveAssumedParameterResult(15, roomResultsByParameter[15]);
+      roomResultsByParameter[21] = resolveAssumedParameterResult(21, roomResultsByParameter[21]);
       for (const parameterNumber of [14, 18]) {
         const presentation = completedBassPresentation?.parameters?.[`p${parameterNumber}`];
         if (!presentation) continue;
