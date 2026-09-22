@@ -29,16 +29,26 @@ export default function TechnicalParameterPage({ params, children, isFirst = fal
 
   return (
     <div
-      className={`tech-param-page${isFirst ? " tech-param-page--first" : ""}`}
+      className={`tech-param-page report-page-block${isFirst ? " tech-param-page--first" : ""}`}
+      data-report-block={`rp22-parameters-${params?.[0]?.id || "page"}`}
+      data-report-block-kind="rp22-parameter-cards"
+      data-report-page-start="true"
       style={{
         display: "flex",
         flexDirection: "column",
         gap: "5mm",
-        breakInside: "auto",
-        pageBreakInside: "auto",
+        breakInside: "avoid",
+        pageBreakInside: "avoid",
       }}
     >
-      {/* Category heading bar — small, does not consume excessive vertical space */}
+      {isFirst && (
+        <div className="tech-param-report-heading">
+          <div className="tech-param-report-title">RP22 PARAMETERS</div>
+          <div className="tech-param-report-subtitle">ENGINEERING EVIDENCE</div>
+        </div>
+      )}
+
+      {/* Category heading bar — part of the same atomic page as its cards */}
       <div
         style={{
           display: "flex",
