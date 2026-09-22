@@ -25,7 +25,7 @@ const ICONS = { MessageCircle, Headphones, ChevronUp, Waves, Zap };
 
 const CATEGORY_ORDER = ["Spatial Resolution", "Dynamic Range", "Timbre Matching"];
 
-export default function ClientDesignHighlights({ highlights, print, recommendationFooter, coverageSentence }) {
+export default function ClientDesignHighlights({ highlights, print, recommendationFooter, coverageSentence, assumptions }) {
   const grouped = useMemo(() => {
     const map = {};
     for (const h of (highlights || [])) {
@@ -97,6 +97,24 @@ export default function ClientDesignHighlights({ highlights, print, recommendati
       {!print && coverageSentence && (
         <div style={{ marginBottom: 20 }}>
           <Rp22SeatCoverageSentence sentence={coverageSentence} variant="screen" />
+        </div>
+      )}
+      {assumptions && (
+        <div style={{ padding: print ? "10px 12px" : "12px 14px", border: "1px solid #DCDBD6", borderRadius: 8, background: "#F8F7F5" }}>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#625143", marginBottom: 8 }}>
+            Design Assumptions
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {[assumptions.p15, assumptions.p21].filter(Boolean).map((item) => (
+              <div key={item.label} style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
+                  <strong style={{ fontSize: 12, color: "#213428" }}>{item.label}</strong>
+                  <span style={{ padding: "2px 6px", borderRadius: 4, border: "1px solid #B99B70", color: "#4A230F", background: "#FBF3E6", fontSize: 10, fontWeight: 700 }}>{item.level}</span>
+                </div>
+                <div style={{ fontSize: 11, color: "#625143", lineHeight: 1.35 }}>{item.status} · {item.detail}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {grouped.map(({ category, items }) => (
