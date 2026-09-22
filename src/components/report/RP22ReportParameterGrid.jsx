@@ -24,8 +24,6 @@ export const TECHNICAL_PARAMETER_CARDS_PER_PAGE = 3;
  *   dolbyLayout         — e.g. "7.1.4"
  *   frontSubsCount      — number
  *   rearSubsCount       — number
- *   assumedP15Level
- *   assumedP21Level
  *   variant             — "screen" (default) or "print"
  *   contributionsByKey  — ASDR contributions by key
  */
@@ -35,10 +33,6 @@ export default function RP22ReportParameterGrid({
   seatHudSnapshots,
   seatingPositions,
   mlpSeatId,
-  assumedP15Level,
-  assumedP21Level,
-  setAssumedP15LevelSafe,
-  setAssumedP21LevelSafe,
   variant = "screen",
   contributionsByKey = null,
 }) {
@@ -84,8 +78,6 @@ export default function RP22ReportParameterGrid({
         {isP15P21 && (
           <P15P21AssumptionControl
             paramId={param.id}
-            value={param.id === 15 ? assumedP15Level : assumedP21Level}
-            onChange={param.id === 15 ? setAssumedP15LevelSafe : setAssumedP21LevelSafe}
             variant="screen"
           />
         )}
@@ -130,7 +122,6 @@ export default function RP22ReportParameterGrid({
         {isP15P21 && (
           <P15P21AssumptionControl
             paramId={param.id}
-            value={param.id === 15 ? assumedP15Level : assumedP21Level}
             variant="print"
           />
         )}
