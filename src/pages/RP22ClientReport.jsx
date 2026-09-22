@@ -95,8 +95,12 @@ export default function RP22ClientReport() {
   // No secondary bass-store lifecycle may override or reinterpret it.
   const reportPending = hydrating || !engineeringSummary;
 
-  // ── Design Summary (static intro — pure selector, no analysis) ──
+  // ── Design Summary (static intro + canonical design assumptions) ──
   const highlights = useMemo(() => selectClientDesignHighlights(), []);
+  const designAssumptions = useMemo(() => ({
+    p15: { label: "Background Noise Floor", status: "Assumed", level: "L2", detail: "Design target: NCB 22" },
+    p21: { label: "Early Reflections", status: "Assumed", level: "L2", detail: "Early reflections have not been measured." },
+  }), []);
 
   // PASSIVE CONSUMER: the Visual Report reads the exact coverage result
   // published by the Room Designer's canonical engineering summary.
@@ -241,6 +245,7 @@ export default function RP22ClientReport() {
           <ClientDesignHighlights
             highlights={highlights}
             coverageSentence={coverageSentence}
+            assumptions={designAssumptions}
             recommendationFooter={<ClientRecommendationFooter recommendations={publishedRecommendations} />}
           />
         ),
@@ -249,6 +254,7 @@ export default function RP22ClientReport() {
           highlights,
           recommendations: publishedRecommendations,
           coverageSentence,
+          assumptions: designAssumptions,
         },
       });
     }
@@ -646,7 +652,7 @@ export default function RP22ClientReport() {
       printData: { type: "about-sound-proof" },
     });
     return pages;
-  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence]);
+  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, designAssumptions, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: reportPending ? 0 : activePages.length,
