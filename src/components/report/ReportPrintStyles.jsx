@@ -194,6 +194,22 @@ export default function ReportPrintStyles() {
                     display: none !important;
                 }
 
+                .app-shell-sidebar,
+                [data-app-shell-sidebar="true"] {
+                    display: none !important;
+                    width: 0 !important;
+                    height: 0 !important;
+                    min-width: 0 !important;
+                    overflow: hidden !important;
+                }
+
+                .app-shell-main {
+                    display: block !important;
+                    width: 100% !important;
+                    min-width: 0 !important;
+                    flex: none !important;
+                }
+
                 .print-only {
                     display: block !important;
                     width: 100% !important;
@@ -578,6 +594,13 @@ export default function ReportPrintStyles() {
               .rp22-report .report-force-new-page {
                 break-before: page !important;
                 page-break-before: always !important;
+              }
+
+              /* The cover is already the first printable block. Starting it with a
+                 forced page break creates an orphan leading page in Chromium. */
+              .rp22-report .report-page-block--cover[data-report-page-start="true"] {
+                break-before: auto !important;
+                page-break-before: auto !important;
               }
 
               .rp22-report .report-page-block--cover,
