@@ -109,7 +109,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
               </div>
             )}
             <div className="client-report-print-drawing" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <ClientDesignHighlights highlights={printData.highlights} print />
+              <ClientDesignHighlights highlights={printData.highlights} assumptions={printData.assumptions} print />
             </div>
           </>
         )}
