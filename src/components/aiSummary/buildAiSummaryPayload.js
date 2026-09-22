@@ -129,6 +129,26 @@ function extractBassSummary(engineeringSummary, parameterAuthority) {
   return Object.keys(bass).length ? bass : null;
 }
 
+function extractDesignAssumptions(engineeringSummary) {
+  const roomResults = engineeringSummary?.roomResultsByParameter || {};
+  const p15 = roomResults?.[15] || roomResults?.["15"] || null;
+  const p21 = roomResults?.[21] || roomResults?.["21"] || null;
+  return {
+    p15: {
+      level: p15?.level || "L2",
+      status: "Assumed",
+      value: p15?.formatted || "NCB 22",
+      note: "Design target: NCB 22",
+    },
+    p21: {
+      level: p21?.level || "L2",
+      status: "Assumed",
+      value: null,
+      note: "Early reflections have not been measured. Level 2 is used as the design assumption.",
+    },
+  };
+}
+
 function extractViewing(engineeringSummary) {
   const viewing = engineeringSummary?.viewing;
   if (!viewing || !viewing.available) return null;
@@ -253,6 +273,9 @@ export function buildAiSummaryPayload({ publishedSnapshot, projectDetails, proje
   // ── Bass ──
   const bass = extractBassSummary(summary, parameterAuthority);
 
+  // ── Permanent unmeasured design assumptions ──
+  const assumptions = extractDesignAssumptions(summary);
+
   // ── Viewing ──
   const viewing = extractViewing(summary);
 
@@ -267,6 +290,7 @@ export function buildAiSummaryPayload({ publishedSnapshot, projectDetails, proje
     categoryFloors,
     parameters,
     bass,
+    assumptions,
     viewing,
   };
 }
