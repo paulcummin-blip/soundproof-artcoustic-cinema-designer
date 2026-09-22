@@ -25,6 +25,9 @@ test('dealer identity request sends only the authenticated bearer token', async 
     assert.equal(url, ENDPOINT);
     assert.equal(request.method, 'GET');
     assert.equal(request.headers.authorization, 'Bearer verified-sso-token');
+    assert.equal(request.headers['cache-control'], 'no-store');
+    assert.equal(request.cache, 'no-store');
+    assert.equal(request.redirect, 'error');
     assert.equal('body' in request, false);
     return new Response(JSON.stringify(validIdentity()), { status: 200 });
   };
@@ -97,6 +100,7 @@ test('browser identity provider has no persistent or URL-derived dealer identity
   assert.doesNotMatch(resolver, /providerIdToken/);
   assert.match(resolver, /secrets\.get\("PARTNER_PORTAL_DEALER_IDENTITY_URL"\)/);
   assert.doesNotMatch(resolver, /req\.json\(|req\.url|searchParams|dealer_account_id/);
+  assert.match(resolver, /Cache-Control\": \"no-store, private, max-age=0\"/);
 
   assert.doesNotMatch(identityClient, /supabase\.co/);
   assert.doesNotMatch(identityClient, /DEFAULT_DEALER_IDENTITY_URL/);
