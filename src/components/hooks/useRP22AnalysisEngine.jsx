@@ -402,7 +402,7 @@ const getCanonicalRole = (role) => String(role || "").toUpperCase();
 // so that the seatResponses reference never changes between unrelated renders.
 const EMPTY_SEAT_RESPONSES = Object.freeze([]);
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, assumedP15Level, screen, screenFrontPlaneM, dolbyLayout, visiblePlanSpeakers, includeBassAnalysis = true, diagnosticOwner = "unknown/unattributed", _diagnosticIsRspSettled = null, _diagnosticProjectInfo = null, _diagnosticEngineSpeakers = null, _diagnosticSettledPlacedSpeakersLength = null, _diagnosticAnalysisSpeakers = null } = {}) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, screen, screenFrontPlaneM, dolbyLayout, visiblePlanSpeakers, includeBassAnalysis = true, diagnosticOwner = "unknown/unattributed", _diagnosticIsRspSettled = null, _diagnosticProjectInfo = null, _diagnosticEngineSpeakers = null, _diagnosticSettledPlacedSpeakersLength = null, _diagnosticAnalysisSpeakers = null } = {}) => {
   // Report consumers disable this calculation path and present only the completed bass authority.
   const liveSeatResponses = useSeatResponses(includeBassAnalysis);
   const seatResponses = includeBassAnalysis ? liveSeatResponses : EMPTY_SEAT_RESPONSES;
@@ -1934,7 +1934,6 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     aimState?.aimRearSurroundsAtMLP,
     aimState?.lcrAimMode,
     overheadState?.lcrAimMode,
-    assumedP15Level,
     dolbyLayout,
     screen?.mountMode,
     screen?.floatDepthM,
