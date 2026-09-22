@@ -1,6 +1,5 @@
 // components/rp22/RP22CompliancePanel.jsx
 import React from "react";
-import { useAppState } from "@/components/AppStateProvider";
 import { computeScreenMetrics } from "@/components/utils/screenMetrics";
 import { renderPrimitive } from "@/components/utils/renderSafe";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
@@ -11,13 +10,6 @@ import { resolveParamThresholds, resolveP12P13DualLevels } from "@/components/re
 import ComplianceParameterMatrix from "@/components/rp22/ComplianceParameterMatrix";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
 import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl";
-import {
-  getAssumedP15DisplayValue,
-  getAssumedP21DisplayValue,
-  resolveAssumedP15Level,
-  resolveAssumedP21Level,
-  normalizeAssumedLevel,
-} from "@/components/utils/assumedParameterAuthority";
 
 /* ---------- Helpers */
 
@@ -221,7 +213,6 @@ export default function RP22CompliancePanel({
   assumedP15Level,
   assumedP21Level,
 }) {
-  const appState = useAppState();
   // Threshold presentation follows the same target basis published with the
   // authoritative engineering result; this panel never resolves modes locally.
   const p12Mode = engineeringSummary?.roomResultsByParameter?.[12]?.targetBasis || "minimum";
@@ -491,7 +482,6 @@ export default function RP22CompliancePanel({
             <P15P21AssumptionControl
             paramId={p.id}
             value={p.id === 15 ? assumedP15Level : assumedP21Level}
-            onChange={p.id === 15 ? appState?.setAssumedP15LevelSafe : appState?.setAssumedP21LevelSafe}
             variant="screen"
             />
             )}
