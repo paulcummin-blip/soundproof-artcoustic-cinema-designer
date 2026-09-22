@@ -9,7 +9,7 @@ import {
 } from "@/components/utils/p14CapabilityAuthority";
 import { integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
 import { computeOfficialP19Assessment, computeOfficialPerSeatP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
-import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
+
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { buildPostEqBassCapabilityOutcome } from "@/components/utils/postEqBassCapabilityOutcome";
 import { assessP18AgainstRequiredExtension, buildBassTargetWarning } from "@/components/utils/bassDesignPhilosophyAuthority";
@@ -421,70 +421,61 @@ export function evaluateCanonicalBassAuthority({
     };
   }
 
-  // P19: canonical post-EQ RSP versus the Practical Calibration Target T(f)
-  // (RSP only — the official RP22 P19 result is at the RSP relative to target).
-  // Protected null regions identified on the RSP are excluded from the max-abs
-  // scan so that narrow uncorrectable nulls do not cause a false FAIL.
+  // The practical target remains the calibration objective used to choose the
+  // final system-wide level. It is an internal target-fit diagnostic only.
   const protectedNullRegions = Array.isArray(canonicalResult.protectedNullRegions)
     ? canonicalResult.protectedNullRegions
     : [];
-  const p19 = computeOfficialP19Assessment({
+  const p14HeadroomDb = Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb)
+    ? achievedP14Db - selectedTargetDb
+    : 0;
+  const globalLevelAlignment = performGlobalLevelAlignment({
     rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
     canonicalTargetCurve: p19TargetCurve,
+    assessmentStartHz: p19AssessmentStartHz,
+    assessmentEndHz: p19AssessmentEndHz,
+    p14HeadroomDb,
+    protectedNullRegions,
+  });
+
+  const recommendedGlobalBassTrimDb = globalLevelAlignment?.recommendedTrimDb ?? 0;
+  const alignedPostEqRsp = Number.isFinite(recommendedGlobalBassTrimDb)
+    ? applyGlobalBassTrimToCurve(canonicalResult.canonicalPostEqRsp, recommendedGlobalBassTrimDb)
+    : canonicalResult.canonicalPostEqRsp;
+  const alignedPostEqSeatResponses = Number.isFinite(recommendedGlobalBassTrimDb)
+    ? applyGlobalBassTrimToSeatCurves(canonicalResult.canonicalPostEqSeatResponses, recommendedGlobalBassTrimDb)
+    : canonicalResult.canonicalPostEqSeatResponses;
+
+  // Canonical Sound Proof P19 authority: after every calibration stage has
+  // finished, the calibrated RSP response is stored as Reference EQ. Published
+  // RSP P19 compares that stored response with the exact same stored reference.
+  const referenceEq = alignedPostEqRsp;
+  const p19 = computeOfficialP19Assessment({
+    rspPostEqCurve: referenceEq,
+    referenceEqCurve: referenceEq,
     assessmentStartHz: p19AssessmentStartHz,
     assessmentEndHz: p19AssessmentEndHz,
     protectedNullRegions,
   });
   const officialP19VariationDb = p19?.variationDbRaw ?? null;
-  const officialP19Level = houseCurveP19Level(officialP19VariationDb);
+  const officialP19Level = p19?.level ?? null;
   const p19AssessmentReady = isCanonicalP19Ready({
-    canonicalPostEqRsp: canonicalResult.canonicalPostEqRsp,
-    canonicalTargetCurve: p19TargetCurve,
+    canonicalPostEqRsp: referenceEq,
+    canonicalTargetCurve: referenceEq,
     officialVariationDb: officialP19VariationDb,
     officialLevel: officialP19Level,
   });
-
-  // ── Global Level Alignment — final calibration trim ──
-  // After the final predicted post-EQ response is produced, a professional
-  // calibrator would set the overall subwoofer trim to the best operating
-  // level before assessing the finished result. This sweeps a single global
-  // vertical offset (0.25 dB steps) bounded by available P14 headroom upward
-  // and unrestricted downward, and selects the offset producing the minimum
-  // P19 error. The response shape is never altered — only a vertical
-  // translation. P14 is never improved; only genuine available headroom is
-  // used. If no better operating level exists, trim = 0.0 dB and P19 is
-  // unchanged.
-  const p14HeadroomDb = Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb)
-    ? achievedP14Db - selectedTargetDb
-    : 0;
-  const globalLevelAlignment = p19AssessmentReady
-    ? performGlobalLevelAlignment({
-        rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
-        canonicalTargetCurve: p19TargetCurve,
+  const achievedP19VariationDb = p19AssessmentReady ? officialP19VariationDb : null;
+  const achievedP19Level = p19AssessmentReady ? officialP19Level : null;
+  const perSeatP19Results = p19AssessmentReady
+    ? computeOfficialPerSeatP19Assessment({
+        perSeatPostEqCurves: alignedPostEqSeatResponses,
+        referenceEqCurve: referenceEq,
         assessmentStartHz: p19AssessmentStartHz,
         assessmentEndHz: p19AssessmentEndHz,
-        p14HeadroomDb,
         protectedNullRegions,
       })
-    : null;
-
-  const alignedP19VariationDb = globalLevelAlignment?.alignedP19Db ?? officialP19VariationDb;
-  const achievedP19VariationDb = p19AssessmentReady ? alignedP19VariationDb : null;
-  const achievedP19Level = p19AssessmentReady ? houseCurveP19Level(alignedP19VariationDb) : null;
-  const recommendedGlobalBassTrimDb = globalLevelAlignment?.recommendedTrimDb ?? 0;
-  const alignedPostEqRsp = p19AssessmentReady && Number.isFinite(recommendedGlobalBassTrimDb)
-    ? applyGlobalBassTrimToCurve(canonicalResult.canonicalPostEqRsp, recommendedGlobalBassTrimDb)
-    : canonicalResult.canonicalPostEqRsp;
-  const alignedPostEqSeatResponses = p19AssessmentReady && Number.isFinite(recommendedGlobalBassTrimDb)
-    ? applyGlobalBassTrimToSeatCurves(canonicalResult.canonicalPostEqSeatResponses, recommendedGlobalBassTrimDb)
-    : canonicalResult.canonicalPostEqSeatResponses;
-  const perSeatP19Results = computeOfficialPerSeatP19Assessment({
-    perSeatPostEqCurves: alignedPostEqSeatResponses,
-    canonicalTargetCurve: p19TargetCurve,
-    assessmentStartHz: p19AssessmentStartHz,
-    assessmentEndHz: p19AssessmentEndHz,
-    protectedNullRegions,
-  });
+    : [];
 
   // P20: final post-EQ real seats versus the final post-EQ RSP. The same
   // system-wide alignment trim is present on both sides and therefore cancels,
@@ -547,8 +538,8 @@ export function evaluateCanonicalBassAuthority({
     globalLevelAlignment: globalLevelAlignment
       ? {
           recommendedTrimDb: globalLevelAlignment.recommendedTrimDb,
-          originalP19VariationDb: globalLevelAlignment.originalP19Db,
-          alignedP19VariationDb: globalLevelAlignment.alignedP19Db,
+          originalTargetFitVariationDb: globalLevelAlignment.originalP19Db,
+          alignedTargetFitVariationDb: globalLevelAlignment.alignedP19Db,
           improvementDb: globalLevelAlignment.improvementDb,
           aligned: globalLevelAlignment.aligned,
           p14HeadroomDb: globalLevelAlignment.p14HeadroomDb,
@@ -558,6 +549,9 @@ export function evaluateCanonicalBassAuthority({
           statusMessage: globalLevelAlignment.statusMessage,
         }
       : null,
+    referenceEq,
+    p19TargetIdentity: "reference-eq",
+    referenceEqTargetFitVariationDb: globalLevelAlignment?.alignedP19Db ?? null,
     alignedPostEqRsp,
     alignedPostEqSeatResponses,
     achievedP20VariationDb,
