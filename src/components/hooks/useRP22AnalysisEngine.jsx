@@ -35,7 +35,7 @@ import { computeP11Compliance } from "@/components/utils/rp22/computeP11Complian
 import { clampLcrZoneDepth, computeLcrZones, isCentreInZone } from "@/components/utils/rp22/lcrZoneAuthority";
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 import { logRp22EngineDiagnostic } from "@/components/utils/rp22RuntimeDiagnostic";
-import { getEffectiveAssumedLevel, P15_LEVEL_TO_NCB as ASSUMED_P15_NCB_MAP } from "@/components/utils/assumedParameterAuthority";
+import { resolveAssumedParameterResult } from "@/components/utils/assumedParameterAuthority";
 
 // TEMPORARY P18/P19 execution trace — display-only, no calculation control flow.
 let temporaryAnalysisRunId = 0;
@@ -855,20 +855,13 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       status: "no_data"
     };
 
-    // RP22 Parameter 15 — Background noise floor (designer-assumed level)
-    // Consumes the single shared project-level assumedP15Level (L1–L4).
-    // null defaults to L2 (NCB 22) via the canonical effective-level authority.
+    // RP22 Parameter 15 — permanent L2 design assumption until a measured
+    // result is published. The canonical helper owns the level and display.
     const p15CatalogEntry = RP22_CATALOG["15"];
-    const p15Level = getEffectiveAssumedLevel(assumedP15Level);
-    const p15Value = ASSUMED_P15_NCB_MAP[p15Level];
-
     gradedParameters.primary[15] = {
       title: p15CatalogEntry?.title || "Background noise floor",
-      level: p15Level,
-      value: p15Value,
-      formatted: `NCB ${p15Value}`,
       unit: p15CatalogEntry?.unit || "NCB",
-      status: "ok"
+      ...resolveAssumedParameterResult(15),
     };
 
     gradedParameters.secondary = null;
