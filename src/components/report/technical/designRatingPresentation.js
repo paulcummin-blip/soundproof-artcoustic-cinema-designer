@@ -787,15 +787,13 @@ export function getCategoryModalSummaries(roomDesignRating) {
 //   Dynamic Range:        P12–P15
 //   Timbre Matching:      P16–P21
 //   Screen / Viewing Geometry: RP23 (separately governed, not floored)
-// P15 and P21 are designer-assumed levels; they contribute to the floor ONLY
-// when genuinely assumed (non-null). Null assumed levels are excluded as
-// NOT CALCULATED — they never default to L1 or any fallback grade.
+// P15 and P21 are permanent L2 design assumptions until measured data exists.
+// They are scored room parameters and contribute to their category floors.
 //
 // For each included parameter:
 //   - Room-scoped: the room level applies equally to every seat.
 //   - Seat-scoped: the worst (lowest) seat level in the scope governs.
 // The category floor is the minimum across all included parameter levels.
-// P15 and P21 are excluded by range definition (not counted, no warning).
 
 const FLOOR_CATEGORY_RANGES = [
   { label: "Spatial Resolution", range: [1, 11] },
