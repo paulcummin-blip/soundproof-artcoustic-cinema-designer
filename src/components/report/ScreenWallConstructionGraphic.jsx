@@ -181,6 +181,7 @@ export default function ScreenWallConstructionGraphic({
   primarySeatingPosition,
   lcrAimMode,
   speakerClearanceM,
+  showHeader = true,
 }) {
   const roomW = Math.max(0.1, num(roomWidthM, 4.5));
   const roomH = Math.max(0.1, num(roomHeightM, 2.4));
@@ -372,11 +373,20 @@ export default function ScreenWallConstructionGraphic({
 
   return (
     <div className="bg-white text-black w-full print:block" style={{ background: '#fff' }}>
-      <svg viewBox={`0 0 ${PAGE.width} ${PAGE.height}`} className="w-full h-auto" role="img" aria-label="Screen wall construction detail">
+      <svg
+        viewBox={showHeader
+          ? `0 0 ${PAGE.width} ${PAGE.height}`
+          : `0 96 ${PAGE.width} ${PAGE.height - 96}`}
+        className="w-full h-auto"
+        role="img"
+        aria-label="Screen wall construction detail"
+      >
         <rect x="0" y="0" width={PAGE.width} height={PAGE.height} fill={COLORS.bg} />
-        <rect x={PAGE.margin} y={PAGE.margin} width={PAGE.width - PAGE.margin * 2} height={PAGE.height - PAGE.margin * 2} fill="none" stroke={COLORS.border} strokeWidth="0.9" />
+        {showHeader && (
+          <rect x={PAGE.margin} y={PAGE.margin} width={PAGE.width - PAGE.margin * 2} height={PAGE.height - PAGE.margin * 2} fill="none" stroke={COLORS.border} strokeWidth="0.9" />
+        )}
 
-        {/* Header */}
+        {showHeader && (
         <g>
           <text x={PAGE.margin + 18} y={PAGE.margin + 26} fontSize="18" fill={COLORS.text} fontWeight="600" fontFamily={HEADING_FONT}>
             SCREEN WALL CONSTRUCTION DETAIL
@@ -391,6 +401,7 @@ export default function ScreenWallConstructionGraphic({
           <text x={PAGE.width - PAGE.margin - 200} y={PAGE.margin + 70} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Status</text>
           <text x={PAGE.width - PAGE.margin - 120} y={PAGE.margin + 70} fontSize="9" fill={COLORS.text} fontFamily={BODY_FONT} fontWeight="600">NOT FOR SCALING</text>
         </g>
+        )}
 
         {/* Drawing label */}
         <text x={wallX + wallPxW / 2} y={Math.max(PAGE.margin + 82, wallY - 90)} fontSize="10" fill={COLORS.muted} textAnchor="middle" fontFamily={BODY_FONT} letterSpacing="1.2">
