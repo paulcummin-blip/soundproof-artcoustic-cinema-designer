@@ -1310,10 +1310,10 @@ function RP22ReportInner() {
                             <RP22ReportParameterGrid {...parameterGridProps} variant="print" />
                         </section>
 
-                        {/* ── Elevation Drawings page ── */}
-                        <section id="pdf-elevation-drawings" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
-                            <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>Elevation Drawings</div>
-                            <div className="print-avoid-break" style={{ marginBottom: 48 }}>
+                        {/* ── Elevation drawings: one complete drawing per atomic page ── */}
+                        <section id="pdf-elevation-front" className="report-page-block report-drawing-page" data-report-block="front-elevation" data-report-block-kind="drawing" data-report-page-start="true" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                            <div className="report-drawing-title">Elevation Drawing · Front</div>
+                            <div className="report-drawing-frame">
                                 <FrontElevation
                                     dimensions={stableDimensions}
                                     screen={screen}
@@ -1323,7 +1323,11 @@ function RP22ReportInner() {
                                     roomElements={(app?.roomElements || []).filter(el => el?.type !== 'projector')}
                                 />
                             </div>
-                            <div className="print-avoid-break print-page-break-before" style={{ marginBottom: 16 }}>
+                        </section>
+
+                        <section id="pdf-elevation-left" className="report-page-block report-drawing-page" data-report-block="left-elevation" data-report-block-kind="drawing" data-report-page-start="true" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                            <div className="report-drawing-title">Elevation Drawing · Left</div>
+                            <div className="report-drawing-frame">
                                 <SideElevation
                                     wall="left"
                                     dimensions={stableDimensions}
@@ -1338,7 +1342,11 @@ function RP22ReportInner() {
                                     roomElements={app?.roomElements || []}
                                 />
                             </div>
-                            <div className="print-avoid-break print-page-break-before">
+                        </section>
+
+                        <section id="pdf-elevation-right" className="report-page-block report-drawing-page" data-report-block="right-elevation" data-report-block-kind="drawing" data-report-page-start="true" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                            <div className="report-drawing-title">Elevation Drawing · Right</div>
+                            <div className="report-drawing-frame">
                                 <SideElevation
                                     wall="right"
                                     dimensions={stableDimensions}
@@ -1358,7 +1366,7 @@ function RP22ReportInner() {
                         {/* ── Sightlines & Viewing Angles (final page) ── */}
                         {canRenderSightlinePage && sightlineScreenMetrics && sightlineRowData.length > 0 && (
                             <>
-                                <section id="pdf-sightlines" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                                <section id="pdf-sightlines" className="report-page-block report-drawing-page" data-report-block="sightline-drawing" data-report-block-kind="drawing" data-report-page-start="true" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
                                     <div className="print-avoid-break">
                                     <SightlineGraphic
                                         projectName={app?.projectName || ''}
@@ -1388,8 +1396,11 @@ function RP22ReportInner() {
 
                                 <section
                                     id="pdf-screen-wall-construction"
-                                    className="print-page-break-before"
-                                    style={{ padding: '8mm 10mm', background: '#FFFFFF' }}
+                                    className="report-page-block report-drawing-page report-drawing-page--full-bleed"
+                                    data-report-block="screen-wall-detail"
+                                    data-report-block-kind="drawing"
+                                    data-report-page-start="true"
+                                    style={{ padding: 0, background: '#FFFFFF' }}
                                 >
                                     <div className="print-avoid-break">
                                     <ScreenWallConstructionGraphic
@@ -1419,7 +1430,9 @@ function RP22ReportInner() {
                         {/* ── About Sound Proof — final page (fixed brand closing page) ── */}
                         <section
                           id="pdf-about-sound-proof"
-                          className="print-page-break-before print-avoid-break"
+                          className="report-page-block report-page-block--summary"
+                          data-report-block="about-sound-proof"
+                          data-report-page-start="true"
                           style={{ background: '#FFFFFF', padding: 0, margin: 0 }}
                         >
                             <AboutSoundProofReportPage />
