@@ -13,6 +13,7 @@ import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl
 
 /* ---------- Canonical RP22 parameter definitions ---------- */
 const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
+export const TECHNICAL_PARAMETER_CARDS_PER_PAGE = 2;
 
 /**
  * Props:
@@ -139,8 +140,8 @@ export default function RP22ReportParameterGrid({
 
   if (isPrintVariant) {
     const groups = [];
-    for (let i = 0; i < RP22_PARAMS.length; i += 3) {
-      groups.push(RP22_PARAMS.slice(i, i + 3));
+    for (let i = 0; i < RP22_PARAMS.length; i += TECHNICAL_PARAMETER_CARDS_PER_PAGE) {
+      groups.push(RP22_PARAMS.slice(i, i + TECHNICAL_PARAMETER_CARDS_PER_PAGE));
     }
     return (
       <div className="rp22-params-grid rp22-params-print-groups tech-params-print-groups">
