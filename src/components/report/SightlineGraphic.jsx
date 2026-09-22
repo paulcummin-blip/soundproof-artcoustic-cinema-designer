@@ -439,7 +439,7 @@ export default function SightlineGraphic({
   const pad  = 28;
 
   return (
-    <div style={{ width: '100%', background: '#FFFFFF', pageBreakBefore: 'always' }}>
+    <div style={{ width: '100%', background: '#FFFFFF', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, borderBottom: `2px solid ${PALETTE.room}`, paddingBottom: 6 }}>
