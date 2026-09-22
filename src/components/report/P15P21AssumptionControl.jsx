@@ -1,157 +1,72 @@
 /**
- * P15P21AssumptionControl.jsx
- * ---------------------------
- * Shared L1–L4 pill selector for the designer-assumed RP22 parameters P15
- * (background noise floor) and P21 (early reflections).
+ * Fixed presentation for the permanent P15/P21 design assumptions.
  *
- * Both the Compliance Report and the Technical Report render this same
- * control. The value is owned by AppState (assumedP15Level / assumedP21Level)
- * and persisted via the normal autosave path. A change immediately updates
- * the single shared project assumption — last change wins everywhere.
- *
- * null defaults to L2 via the canonical effective-level authority. Once the
- * designer selects a level, the status becomes "Assumed" and the derived
- * display value (NCB / dB) is shown.
- *
- * No local state — pure presentation of the shared authority.
+ * Both parameters remain L2 until a measured result is published by the
+ * engineering authority. This component is deliberately read-only: it cannot
+ * create a competing grade or persistence path.
  */
 import React from "react";
-import {
-  ASSUMED_P15_OPTIONS,
-  ASSUMED_P21_OPTIONS,
-  getAssumedP15DisplayValue,
-  getAssumedP21DisplayValue,
-  resolveAssumedP15Level,
-  resolveAssumedP21Level,
-  normalizeAssumedLevel,
-} from "@/components/utils/assumedParameterAuthority";
+import RP22GradingPill from "@/components/ui/RP22GradingPill";
+import { DEFAULT_ASSUMED_LEVEL } from "@/components/utils/assumedParameterAuthority";
 
 const LABEL_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
 
 export default function P15P21AssumptionControl({
   paramId,
-  value,
-  onChange,
   variant = "screen",
 }) {
   const isP15 = Number(paramId) === 15;
-  const options = isP15 ? ASSUMED_P15_OPTIONS : ASSUMED_P21_OPTIONS;
-  // null (not yet assumed) = NOT CALCULATED. No button is selected — the
-  // designer has not yet made a selection. This keeps the selector in
-  // agreement with the Compliance matrix and the Design Rating floor.
-  const currentLevel = normalizeAssumedLevel(value);
-  const displayValue = currentLevel
-    ? (isP15 ? getAssumedP15DisplayValue(value) : getAssumedP21DisplayValue(value))
-    : null;
+  const detail = isP15
+    ? "Design target: NCB 22"
+    : "Early reflections have not been measured. Level 2 is used as the design assumption.";
 
-  // ── Print mode: read-only descriptive text ──
   if (variant === "print") {
     return (
       <div
+        className="p15-p21-assumption-note"
         style={{
-          marginTop: "1.5mm",
-          padding: "1.5mm 2mm",
+          marginTop: "1.2mm",
+          padding: "1.3mm 2mm",
           background: "#F8F7F5",
           borderRadius: 3,
           border: "1px solid #EFEEEA",
-          fontSize: "8pt",
+          fontSize: "7.4pt",
           color: "#625143",
           fontFamily: LABEL_FONT,
           lineHeight: 1.3,
+          breakInside: "avoid",
+          pageBreakInside: "avoid",
         }}
       >
-        <span style={{ fontWeight: 600, color: "#1B1A1A" }}>
-          {currentLevel ? `Assumed · ${currentLevel}` : "Not Calculated"}
-        </span>
-        {displayValue && (
-          <span style={{ color: "#625143", marginLeft: 4 }}>
-            — Design target: {displayValue}
-          </span>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
+          <strong style={{ color: "#1B1A1A" }}>Assumed</strong>
+          <strong style={{ color: "#213428" }}>{DEFAULT_ASSUMED_LEVEL}</strong>
+        </div>
+        <div style={{ marginTop: "0.6mm" }}>{detail}</div>
       </div>
     );
   }
 
-  // ── Screen mode: interactive L1–L4 pill selector ──
-  // The selected button IS the level indicator — no duplicate pill elsewhere.
   return (
     <div
       style={{
         marginTop: 8,
-        padding: "8px 10px",
+        padding: "9px 10px",
         background: "#F8F7F5",
         borderRadius: 6,
         border: "1px solid #EFEEEA",
+        fontFamily: LABEL_FONT,
       }}
     >
-      <div style={{ marginBottom: 6 }}>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: "#1B1A1A",
-            fontFamily: LABEL_FONT,
-            letterSpacing: "0.02em",
-          }}
-        >
-          Assumed Performance Level
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "#1B1A1A", letterSpacing: "0.02em" }}>
+          Assumed
         </span>
+        <RP22GradingPill level={DEFAULT_ASSUMED_LEVEL} />
       </div>
-      <div style={{ display: "flex", gap: 6 }}>
-        {options.map((opt) => {
-          const selected = currentLevel === opt.level;
-          return (
-            <button
-              key={opt.level}
-              type="button"
-              onClick={() => onChange?.(opt.level)}
-              style={{
-                flex: "1 1 0",
-                padding: "6px 4px",
-                borderRadius: 5,
-                border: selected
-                  ? "2px solid #213428"
-                  : "1px solid #DCDBD6",
-                background: selected ? "#213428" : "#FFFFFF",
-                color: selected ? "#FFFFFF" : "#1B1A1A",
-                cursor: "pointer",
-                fontFamily: LABEL_FONT,
-                fontWeight: 600,
-                fontSize: 12,
-                lineHeight: 1.2,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 2,
-                transition: "all 150ms ease",
-              }}
-            >
-              <span>{opt.level}</span>
-              <span
-                style={{
-                  fontSize: 9,
-                  fontWeight: 500,
-                  color: selected ? "rgba(255,255,255,0.8)" : "#625143",
-                }}
-              >
-                {opt.sublabel}
-              </span>
-            </button>
-          );
-        })}
+      <div style={{ marginTop: 6, fontSize: 10, lineHeight: 1.4, color: "#625143" }}>
+        {detail}
       </div>
-      {currentLevel && displayValue && (
-        <div
-          style={{
-            marginTop: 6,
-            fontSize: 10,
-            color: "#625143",
-            fontFamily: LABEL_FONT,
-          }}
-        >
-          Design target: {displayValue}
-        </div>
-      )}
     </div>
   );
 }
