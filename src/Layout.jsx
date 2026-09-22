@@ -20,7 +20,8 @@ import {
   UserCog,
   FileText,
   Presentation,
-  Images
+  Images,
+  Palette
 } from "lucide-react";
 
 import ApiBadge from "@/components/ui/ApiBadge";
@@ -36,6 +37,7 @@ import PriceSummary from "@/components/pricing/PriceSummary";
 import DesignRatingSummary from "@/components/pricing/DesignRatingSummary";
 import { PartnerPortalIdentityProvider } from "@/components/providers/PartnerPortalIdentityProvider";
 import DealerIdentityDiagnostic from "@/components/dev/DealerIdentityDiagnostic";
+import HeroBanner from "@/components/ui/HeroBanner";
 import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAuth } from "@/lib/AuthContext";
 import { hasCapability, isMasterAdmin } from "@/lib/accountAccess";
@@ -49,6 +51,7 @@ const menuItems = [
   { title: "RP22 Speaker Capability", url: "/SPLCalculator", icon: Calculator, capability: "soundProof" },
   { title: "Price List", url: "/PriceList", icon: Tags, capability: "priceList" },
   { title: "About Sound Proof", url: "/AboutSoundProof", icon: FileText, alwaysVisible: true },
+  { title: "Dealer Branding", url: "/DealerBranding", icon: Palette, capability: "soundProof" },
   { title: "Users & Permissions", url: "/account/users", icon: UserCog, capability: "manageUsers" },
 ];
 
@@ -495,7 +498,7 @@ export default function Layout({ children, currentPageName }) {
           </aside>
 
           <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto">
               <SafeBootErrorBoundary>
                 <SegmentBoundary name="page-content">
                   <style>{`
@@ -534,6 +537,7 @@ export default function Layout({ children, currentPageName }) {
                       min-width: 0;
                     }
                   `}</style>
+                  <HeroBanner />
                   {children}
                 </SegmentBoundary>
               </SafeBootErrorBoundary>

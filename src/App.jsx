@@ -31,6 +31,7 @@ import PurchaseProjects from './pages/PurchaseProjects';
 import PriceList from './pages/PriceList';
 import AccountUsers from './pages/AccountUsers';
 import AboutSoundProof from './pages/AboutSoundProof';
+import DealerBranding from './pages/DealerBranding';
 import AccessGate from '@/components/AccessGate';
 import AccessDeniedScreen from '@/components/AccessDeniedScreen';
 import AdminOnlyRoute from '@/components/AdminOnlyRoute';
@@ -116,6 +117,7 @@ const AuthenticatedApp = () => {
         <Route path="/PriceList" element={<AccessGate capability="priceList"><PriceList /></AccessGate>} />
         <Route path="/account/users" element={<AccessGate capability="manageUsers"><AccountUsers /></AccessGate>} />
         <Route path="/AboutSoundProof" element={<AboutSoundProof />} />
+        <Route path="/DealerBranding" element={<AccessGate capability="soundProof"><DealerBranding /></AccessGate>} />
         <Route path="/admin" element={<AccessGate masterAdmin><AdminDashboard /></AccessGate>} />
         <Route path="/admin/accounts" element={<AccessGate masterAdmin><AdminAccounts /></AccessGate>} />
         <Route path="/admin/accounts/:accountId" element={<AccessGate masterAdmin><AccountDashboard /></AccessGate>} />

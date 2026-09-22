@@ -1,7 +1,7 @@
 {
   "name": "BrandAsset",
   "type": "object",
-  "description": "Global brand assets for a dealer account. One record per account. Stores company identity, logos, contact details, social media, marketing copy (rich text), brand colours, proposal default toggles, and proposal tone. Automatically available to every future proposal generated within this account.",
+  "description": "Global brand assets for a dealer account. One record per account. Stores company identity, logos, hero banner background, contact details, social media, marketing copy (rich text), brand colours, proposal default toggles, and proposal tone. Automatically available to every future proposal generated within this account.",
   "properties": {
     "account_id": {
       "type": "string",
@@ -9,7 +9,7 @@
     },
     "company_name": {
       "type": "string",
-      "description": "Dealer company name shown on proposals."
+      "description": "Dealer company name shown on proposals and the hero banner."
     },
     "dealer_logo_url": {
       "type": "string",
@@ -19,6 +19,21 @@
     "white_logo_url": {
       "type": "string",
       "description": "White/reversed logo URL for dark backgrounds.",
+      "nullable": true
+    },
+    "hero_background_url": {
+      "type": "string",
+      "description": "Hero background image URL for the in-app dealer banner. Uploaded by the dealer to personalise the banner shown at the top of every page. Rendered with a subtle blur and dark overlay for text legibility.",
+      "nullable": true
+    },
+    "display_name_override": {
+      "type": "string",
+      "description": "Optional company display name override shown in the hero banner. Null = use company_name.",
+      "nullable": true
+    },
+    "tagline": {
+      "type": "string",
+      "description": "Optional company tagline shown in the hero banner beneath the dealer name.",
       "nullable": true
     },
     "address": {
