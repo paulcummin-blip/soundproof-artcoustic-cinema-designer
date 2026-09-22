@@ -1,171 +1,77 @@
 /**
- * Regression test: P15/P21 effective-level authority.
- *
- * Verifies that the canonical assumedParameterAuthority.js is the single
- * source of truth for the effective assumed level of P15 (background noise
- * floor) and P21 (early reflections), and that the persistence layer
- * (serializeProject) round-trips the raw selection correctly.
- *
- * Confirmations:
- *  - null/legacy P15 → L2 / NCB 22
- *  - null/legacy P21 → L2 / −8 dB
- *  - explicit user overrides (L1, L3, L4) still win
- *  - overrides persist on reopen (serialize → null stays null; L3 stays L3)
- *  - no other RP22 parameter has its NOT CALCULATED behaviour changed
+ * Regression: P15/P21 permanent L2 assumption authority.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  P15_LEVEL_TO_NCB,
-  P21_LEVEL_TO_DB,
   DEFAULT_ASSUMED_LEVEL,
-  isAssumedLevelSet,
-  normalizeAssumedLevel,
+  P15_ASSUMPTION_RESULT,
+  P21_ASSUMPTION_RESULT,
   getEffectiveAssumedLevel,
   getAssumedP15DisplayValue,
   getAssumedP21DisplayValue,
   resolveAssumedP15Level,
   resolveAssumedP21Level,
   getAssumedLevelForRating,
+  resolveAssumedParameterResult,
 } from "../src/components/utils/assumedParameterAuthority.js";
 
-// ── 1. Canonical defaults ───────────────────────────────────────────
-
-test("null P15 → effective L2, display NCB 22", () => {
-  assert.equal(getEffectiveAssumedLevel(null), "L2");
-  assert.equal(resolveAssumedP15Level(null), "L2");
-  assert.equal(getAssumedP15DisplayValue(null), "NCB 22");
-  assert.equal(P15_LEVEL_TO_NCB[getEffectiveAssumedLevel(null)], 22);
+test("unmeasured P15 is always Assumed L2 / NCB 22", () => {
+  for (const legacy of [null, undefined, "", "L1", "L3", "L4", "garbage"]) {
+    assert.equal(getEffectiveAssumedLevel(legacy), "L2");
+    assert.equal(resolveAssumedP15Level(legacy), "L2");
+    assert.equal(getAssumedP15DisplayValue(legacy), "NCB 22");
+  }
+  assert.deepEqual(P15_ASSUMPTION_RESULT, {
+    parameter: 15,
+    level: "L2",
+    value: 22,
+    formatted: "NCB 22",
+    hudLabel: "NCB 22",
+    status: "assumed",
+    state: "scored",
+    assumed: true,
+    assumptionText: "Design target: NCB 22",
+  });
 });
 
-test("null P21 → effective L2, display −8 dB", () => {
-  assert.equal(getEffectiveAssumedLevel(null), "L2");
-  assert.equal(resolveAssumedP21Level(null), "L2");
-  assert.equal(getAssumedP21DisplayValue(null), "-8 dB");
-  assert.equal(P21_LEVEL_TO_DB[getEffectiveAssumedLevel(null)], -8);
+test("unmeasured P21 is always Assumed L2 and never N/A", () => {
+  for (const legacy of [null, undefined, "", "L1", "L3", "L4", "garbage"]) {
+    assert.equal(getEffectiveAssumedLevel(legacy), "L2");
+    assert.equal(resolveAssumedP21Level(legacy), "L2");
+    assert.equal(getAssumedP21DisplayValue(legacy), "-8 dB");
+    assert.notEqual(getAssumedP21DisplayValue(legacy), "N/A");
+  }
+  assert.equal(P21_ASSUMPTION_RESULT.level, "L2");
+  assert.equal(P21_ASSUMPTION_RESULT.status, "assumed");
+  assert.equal(P21_ASSUMPTION_RESULT.assumed, true);
+  assert.match(P21_ASSUMPTION_RESULT.assumptionText, /not been measured/i);
 });
 
-test("undefined P15 → effective L2", () => {
-  assert.equal(getEffectiveAssumedLevel(undefined), "L2");
-  assert.equal(resolveAssumedP15Level(undefined), "L2");
-  assert.equal(getAssumedP15DisplayValue(undefined), "NCB 22");
-});
-
-test("undefined P21 → effective L2", () => {
-  assert.equal(getEffectiveAssumedLevel(undefined), "L2");
-  assert.equal(resolveAssumedP21Level(undefined), "L2");
-  assert.equal(getAssumedP21DisplayValue(undefined), "-8 dB");
-});
-
-// ── 2. Legacy / malformed inputs ───────────────────────────────────
-
-test("legacy lowercase p15 'l2' → L2", () => {
-  assert.equal(normalizeAssumedLevel("l2"), "L2");
-  assert.equal(getEffectiveAssumedLevel("l2"), "L2");
-  assert.equal(getAssumedP15DisplayValue("l2"), "NCB 22");
-});
-
-test("legacy lowercase p21 'l3' → L3", () => {
-  assert.equal(normalizeAssumedLevel("l3"), "L3");
-  assert.equal(getEffectiveAssumedLevel("l3"), "L3");
-  assert.equal(getAssumedP21DisplayValue("l3"), "-10 dB");
-});
-
-test("garbage string → effective L2 (default)", () => {
-  assert.equal(normalizeAssumedLevel("garbage"), null);
-  assert.equal(getEffectiveAssumedLevel("garbage"), "L2");
-  assert.equal(getAssumedP15DisplayValue("garbage"), "NCB 22");
-  assert.equal(getAssumedP21DisplayValue("garbage"), "-8 dB");
-});
-
-test("empty string → effective L2", () => {
-  assert.equal(normalizeAssumedLevel(""), null);
-  assert.equal(getEffectiveAssumedLevel(""), "L2");
-});
-
-// ── 3. Explicit user overrides win ─────────────────────────────────
-
-test("explicit P15 L1 → L1 / NCB 26", () => {
-  assert.equal(getEffectiveAssumedLevel("L1"), "L1");
-  assert.equal(resolveAssumedP15Level("L1"), "L1");
-  assert.equal(getAssumedP15DisplayValue("L1"), "NCB 26");
-});
-
-test("explicit P15 L3 → L3 / NCB 18", () => {
-  assert.equal(getEffectiveAssumedLevel("L3"), "L3");
-  assert.equal(getAssumedP15DisplayValue("L3"), "NCB 18");
-});
-
-test("explicit P15 L4 → L4 / NCB 15", () => {
-  assert.equal(getEffectiveAssumedLevel("L4"), "L4");
-  assert.equal(getAssumedP15DisplayValue("L4"), "NCB 15");
-});
-
-test("explicit P21 L1 → L1 / N/A", () => {
-  assert.equal(getEffectiveAssumedLevel("L1"), "L1");
-  assert.equal(resolveAssumedP21Level("L1"), "L1");
-  assert.equal(getAssumedP21DisplayValue("L1"), "N/A");
-});
-
-test("explicit P21 L3 → L3 / −10 dB", () => {
-  assert.equal(getEffectiveAssumedLevel("L3"), "L3");
-  assert.equal(getAssumedP21DisplayValue("L3"), "-10 dB");
-});
-
-test("explicit P21 L4 → L4 / −12 dB", () => {
-  assert.equal(getEffectiveAssumedLevel("L4"), "L4");
-  assert.equal(getAssumedP21DisplayValue("L4"), "-12 dB");
-});
-
-// ── 4. Rating-engine consumption ───────────────────────────────────
-
-test("getAssumedLevelForRating defaults null → L2", () => {
-  assert.equal(getAssumedLevelForRating(null), "L2");
-  assert.equal(getAssumedLevelForRating(undefined), "L2");
-});
-
-test("getAssumedLevelForRating respects explicit override", () => {
-  assert.equal(getAssumedLevelForRating("L4"), "L4");
-  assert.equal(getAssumedLevelForRating("L1"), "L1");
-});
-
-// ── 5. isAssumedLevelSet distinguishes null from explicit ──────────
-
-test("isAssumedLevelSet returns false for null/undefined", () => {
-  assert.equal(isAssumedLevelSet(null), false);
-  assert.equal(isAssumedLevelSet(undefined), false);
-});
-
-test("isAssumedLevelSet returns true for L1–L4", () => {
-  assert.equal(isAssumedLevelSet("L1"), true);
-  assert.equal(isAssumedLevelSet("L2"), true);
-  assert.equal(isAssumedLevelSet("L3"), true);
-  assert.equal(isAssumedLevelSet("L4"), true);
-});
-
-// ── 6. DEFAULT_ASSUMED_LEVEL constant ───────────────────────────────
-
-test("DEFAULT_ASSUMED_LEVEL is L2", () => {
+test("Design Rating consumes permanent L2 for every legacy input", () => {
   assert.equal(DEFAULT_ASSUMED_LEVEL, "L2");
+  for (const legacy of [null, "L1", "L2", "L3", "L4"]) {
+    assert.equal(getAssumedLevelForRating(legacy), "L2");
+  }
 });
 
-// ── 7. P21 L1 edge case — N/A display ───────────────────────────────
-
-test("P21 L1 display is N/A (not a dB value)", () => {
-  assert.equal(P21_LEVEL_TO_DB["L1"], null);
-  assert.equal(getAssumedP21DisplayValue("L1"), "N/A");
+test("a genuine measured result replaces the assumption without an override", () => {
+  const measured = {
+    status: "measured",
+    state: "scored",
+    level: "L3",
+    value: 18,
+    formatted: "NCB 18",
+  };
+  const resolved = resolveAssumedParameterResult(15, measured);
+  assert.equal(resolved.assumed, false);
+  assert.equal(resolved.level, "L3");
+  assert.equal(resolved.value, 18);
 });
 
-// ── 8. Monotonic level mapping ─────────────────────────────────────
-
-test("P15 NCB values decrease monotonically L1→L4", () => {
-  assert.ok(P15_LEVEL_TO_NCB.L1 > P15_LEVEL_TO_NCB.L2);
-  assert.ok(P15_LEVEL_TO_NCB.L2 > P15_LEVEL_TO_NCB.L3);
-  assert.ok(P15_LEVEL_TO_NCB.L3 > P15_LEVEL_TO_NCB.L4);
-});
-
-test("P21 dB values decrease (more negative) monotonically L2→L4", () => {
-  assert.ok(P21_LEVEL_TO_DB.L2 > P21_LEVEL_TO_DB.L3);
-  assert.ok(P21_LEVEL_TO_DB.L3 > P21_LEVEL_TO_DB.L4);
+test("non-measured legacy results cannot displace the permanent assumption", () => {
+  const legacy = { status: "ok", level: "L4", value: 15, formatted: "NCB 15" };
+  assert.deepEqual(resolveAssumedParameterResult(15, legacy), { ...P15_ASSUMPTION_RESULT });
+  assert.deepEqual(resolveAssumedParameterResult(21, legacy), { ...P21_ASSUMPTION_RESULT });
 });
