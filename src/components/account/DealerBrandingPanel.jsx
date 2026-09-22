@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { base44 } from "@/api/base44Client";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import ImageUploadField from "@/components/proposal/ImageUploadField";
+import { loadDealerBrand, saveDealerBrand } from "@/components/account/dealerBrandAuthority";
 
 const DEFAULTS = {
   company_name: "",
@@ -29,6 +29,9 @@ export default function DealerBrandingPanel({ accountId }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const recordRef = useRef(null);
+  const saveQueueRef = useRef(Promise.resolve());
+  const pendingSavesRef = useRef(0);
 
   const load = useCallback(async () => {
     if (!accountId) {
@@ -37,8 +40,8 @@ export default function DealerBrandingPanel({ accountId }) {
     }
     setLoading(true);
     try {
-      const results = await base44.entities.BrandAsset.filter({ account_id: accountId });
-      const existing = Array.isArray(results) && results.length > 0 ? results[0] : null;
+      const existing = await loadDealerBrand(accountId);
+      recordRef.current = existing;
       setRecord(existing);
       setForm({ ...DEFAULTS, ...existing });
     } catch (err) {
@@ -57,25 +60,47 @@ export default function DealerBrandingPanel({ accountId }) {
     setSaved(false);
   };
 
-  const handleSave = async () => {
+  const persist = useCallback((values, failureMessage = "Failed to save dealer branding. Please try again.") => {
+    pendingSavesRef.current += 1;
     setSaving(true);
-    try {
-      const payload = { ...form, account_id: accountId };
-      if (record) {
-        const updated = await base44.entities.BrandAsset.update(record.id, payload);
-        setRecord(updated);
-      } else {
-        const created = await base44.entities.BrandAsset.create(payload);
-        setRecord(created);
-      }
+
+    const operation = saveQueueRef.current.then(async () => {
+      const savedRecord = await saveDealerBrand({
+        accountId,
+        record: recordRef.current,
+        values,
+      });
+      recordRef.current = savedRecord;
+      setRecord(savedRecord);
+      setForm((previous) => ({ ...previous, ...savedRecord }));
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
-      console.error("Failed to save brand assets:", err);
-      alert("Failed to save. Please try again.");
-    } finally {
-      setSaving(false);
-    }
+      return savedRecord;
+    });
+
+    saveQueueRef.current = operation.catch(() => undefined);
+    return operation
+      .catch((err) => {
+        console.error("Failed to save brand assets:", err);
+        alert(failureMessage);
+        throw err;
+      })
+      .finally(() => {
+        pendingSavesRef.current -= 1;
+        if (pendingSavesRef.current === 0) setSaving(false);
+      });
+  }, [accountId]);
+
+  const updateAndPersist = (field, value) => {
+    update(field, value);
+    void persist(
+      { [field]: value },
+      "The image uploaded, but its branding reference could not be saved. Please try again.",
+    ).catch(() => undefined);
+  };
+
+  const handleSave = () => {
+    void persist(form).catch(() => undefined);
   };
 
   if (!accountId) {
@@ -105,8 +130,8 @@ export default function DealerBrandingPanel({ accountId }) {
         <ImageUploadField
           label="Company Logo"
           value={form.dealer_logo_url}
-          onUpload={(url) => update("dealer_logo_url", url)}
-          onRemove={() => update("dealer_logo_url", null)}
+          onUpload={(url) => updateAndPersist("dealer_logo_url", url)}
+          onRemove={() => updateAndPersist("dealer_logo_url", null)}
           showCaption={false}
         />
       </div>
@@ -120,8 +145,8 @@ export default function DealerBrandingPanel({ accountId }) {
         <ImageUploadField
           label="White Logo"
           value={form.white_logo_url}
-          onUpload={(url) => update("white_logo_url", url)}
-          onRemove={() => update("white_logo_url", null)}
+          onUpload={(url) => updateAndPersist("white_logo_url", url)}
+          onRemove={() => updateAndPersist("white_logo_url", null)}
           showCaption={false}
         />
       </div>
@@ -135,8 +160,8 @@ export default function DealerBrandingPanel({ accountId }) {
         <ImageUploadField
           label="Hero Background Image"
           value={form.hero_background_url}
-          onUpload={(url) => update("hero_background_url", url)}
-          onRemove={() => update("hero_background_url", null)}
+          onUpload={(url) => updateAndPersist("hero_background_url", url)}
+          onRemove={() => updateAndPersist("hero_background_url", null)}
           showCaption={false}
         />
       </div>
@@ -150,6 +175,7 @@ export default function DealerBrandingPanel({ accountId }) {
         <Input
           value={form.display_name_override || ""}
           onChange={(e) => update("display_name_override", e.target.value)}
+          onBlur={() => void persist({ display_name_override: form.display_name_override }).catch(() => undefined)}
           className={inputClasses}
           placeholder="e.g. iCubed Home Cinema"
         />
@@ -164,6 +190,7 @@ export default function DealerBrandingPanel({ accountId }) {
         <Input
           value={form.tagline || ""}
           onChange={(e) => update("tagline", e.target.value)}
+          onBlur={() => void persist({ tagline: form.tagline }).catch(() => undefined)}
           className={inputClasses}
           placeholder="e.g. Premium Home Cinema Installation"
         />
