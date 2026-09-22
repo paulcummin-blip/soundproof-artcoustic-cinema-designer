@@ -343,15 +343,9 @@ function scoreScreen(angleDeg) {
   return applyScreenThresholds(angleDeg);
 }
 
-// P15 / P21 are designer-assumed RP22 performance levels. The selected level
-// IS the authority — no acoustic calculation is involved. The rating engine
-// consumes the assumed level directly as the scored level.
-//
-// FUNDAMENTAL ELIGIBILITY RULE: null (not yet assumed) is NOT a calculated
-// result. It must NEVER influence the category floor — it must not default
-// to L1, L2, FAIL, or any fallback grade. Null → provisional (excluded from
-// contributions, floors, tooltips, and distributions). Only a genuine
-// designer selection (L1–L4) is a scored result.
+// P15 / P21 consume the canonical room-level authority. While unmeasured,
+// buildDesignRatingInput supplies the permanent L2 design assumption. A future
+// measured authority may supply its measured grade through the same input.
 function scoreP15Assumed(assumedLevel) {
   const normalized = normalizeAssumedLevel(assumedLevel);
   if (normalized == null) return { level: null, provisional: true };
@@ -391,8 +385,8 @@ function scoreRoomParam(key, input) {
     return { state: "scored", level: result.level, multiplier: multiplierForLevel(result.level), reason: null };
   }
 
-  // P15 / P21 are designer-assumed levels — the level itself IS the authority.
-  // Input is the raw assumed level string (e.g. "L3") or null.
+  // P15 / P21 arrive as canonical grades (permanent L2 assumptions or a
+  // future measured grade). The rating engine does not re-grade them.
   if (key === "p15") {
     const result = scoreP15Assumed(input);
     if (result.provisional) {
