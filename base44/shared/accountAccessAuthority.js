@@ -90,6 +90,8 @@ function publicUser(authoritativeUser) {
     account_role: authoritativeUser.account_role || 'account_user',
     access_level: authoritativeUser.access_level || ACCESS_LEVELS.FULL_ACCESS,
     app_role: authoritativeUser.app_role || null,
+    dealer_account_id: authoritativeUser.dealer_account_id || null,
+    dealer_name: authoritativeUser.dealer_name || null,
   };
 }
 

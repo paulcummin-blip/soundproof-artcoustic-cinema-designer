@@ -1,7 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
-import { secrets } from "base44:runtime";
-import { providerAccessToken } from "../../shared/portalSsoAuthority.js";
-import { resolvePartnerPortalDealerIdentity } from "../../shared/partnerPortalIdentityClient.js";
+import { associateDealerIdentityCore } from "../../shared/dealerIdentityAssociation.js";
 
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store, private, max-age=0",
@@ -18,20 +16,9 @@ function noStoreJson(body, init = {}) {
 /**
  * Partner Portal Dealer Identity association + validation.
  *
- * Called on every app mount for the authenticated user.
- *
- * First launch (user has no stored dealer_account_id):
- *   - Resolve dealer identity from the Partner Portal Dealer Identity Service
- *   - Store the immutable dealer_account_id and dealer_name on the User record
- *   - Never overwrite automatically afterwards
- *
- * Future logins (user has a stored dealer_account_id):
- *   - Resolve dealer identity
- *   - Validate that the stored dealer_account_id matches the resolved identity
- *   - If mismatch: fail closed (DEALER_IDENTITY_MISMATCH) — do not silently relink
- *
- * Users without a Partner Portal SSO token (e.g. central admins, email/password
- * users) receive NO_PORTAL_TOKEN — this is expected, not an error.
+ * Called on every app mount by the PartnerPortalIdentityProvider.
+ * The core logic lives in the shared module so that consumePortalLaunch
+ * can invoke the exact same association during the live launch path.
  */
 export default async function associateDealerIdentity(req) {
   try {
@@ -44,67 +31,20 @@ export default async function associateDealerIdentity(req) {
       );
     }
 
-    // Obtain the authenticated Partner Portal access token via SSO.
-    let accessToken;
-    try {
-      accessToken = await providerAccessToken(base44, user.id);
-    } catch {
-      return noStoreJson({ resolved: false, reason: "NO_PORTAL_TOKEN" });
+    const result = await associateDealerIdentityCore(base44, user.id);
+
+    if (result.resolved) {
+      return noStoreJson(result);
     }
 
-    // Resolve dealer identity from the Partner Portal Dealer Identity Service.
-    let identity;
-    try {
-      identity = await resolvePartnerPortalDealerIdentity({
-        url: secrets.get("PARTNER_PORTAL_DEALER_IDENTITY_URL"),
-        accessToken,
-      });
-    } catch (error) {
-      return noStoreJson({
-        resolved: false,
-        reason: String(error?.message || error || "RESOLUTION_FAILED"),
-      });
+    // DEALER_IDENTITY_MISMATCH is a 403 security failure.
+    if (result.reason === "DEALER_IDENTITY_MISMATCH") {
+      return noStoreJson(result, { status: 403 });
     }
 
-    // Get the authoritative user record (service role bypasses RLS).
-    const userRecords = await base44.asServiceRole.entities.User.filter({ id: user.id });
-    const authoritativeUser =
-      Array.isArray(userRecords) && userRecords.length > 0 ? userRecords[0] : null;
-    const storedDealerAccountId = authoritativeUser?.dealer_account_id || null;
-
-    if (!storedDealerAccountId) {
-      // First launch: store the immutable Dealer Account ID and dealer name.
-      await base44.asServiceRole.entities.User.update(user.id, {
-        dealer_account_id: identity.dealer_account_id,
-        dealer_name: identity.dealer_name,
-      });
-      return noStoreJson({
-        resolved: true,
-        identity,
-        association: "NEWLY_LINKED",
-      });
-    }
-
-    // Future login: validate that the stored Dealer Account ID matches.
-    if (storedDealerAccountId !== identity.dealer_account_id) {
-      // Mismatch — fail closed. Do not silently relink.
-      return noStoreJson(
-        {
-          resolved: false,
-          reason: "DEALER_IDENTITY_MISMATCH",
-          stored_dealer_account_id: storedDealerAccountId,
-          resolved_dealer_account_id: identity.dealer_account_id,
-        },
-        { status: 403 },
-      );
-    }
-
-    // Match — identity validated.
-    return noStoreJson({
-      resolved: true,
-      identity,
-      association: "VALIDATED",
-    });
+    // NO_PORTAL_TOKEN, RESOLUTION_FAILED, etc. — 200 with resolved: false
+    // (expected for admins / email-password users without a portal token).
+    return noStoreJson(result);
   } catch (error) {
     return noStoreJson(
       {

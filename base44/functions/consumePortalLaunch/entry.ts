@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.43';
 import { consumePilotPortalLaunch, PORTAL_TARGET } from '../../shared/portalSsoAuthority.js';
+import { associateDealerIdentityCore } from '../../shared/dealerIdentityAssociation.js';
 
 const json = (status: number, body: Record<string, unknown>) =>
   Response.json(body, {
@@ -35,6 +36,20 @@ Deno.serve(async (req: Request) => {
     }
 
     const result = await consumePilotPortalLaunch(base44, user, body.launch_pass);
+
+    // After a successful Partner Portal launch (membership claimed +
+    // PortalIdentity created), associate the dealer identity onto the User
+    // record. This stamps the immutable dealer_account_id and dealer_name
+    // (first launch) or validates the existing association (future logins).
+    // A mismatch or NO_PORTAL_TOKEN here does not block the launch — the
+    // PartnerPortalIdentityProvider re-attempts on mount and surfaces the
+    // mismatch screen if needed.
+    try {
+      await associateDealerIdentityCore(base44, user.id);
+    } catch {
+      // Non-fatal: association will be re-attempted by the provider on mount.
+    }
+
     return json(200, result);
   } catch (error) {
     const reason = String(error?.message || 'PORTAL_LAUNCH_REJECTED');
