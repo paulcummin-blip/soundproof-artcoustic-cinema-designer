@@ -30,7 +30,7 @@ function readyMatchesCurrent(result) {
 function parameterLabel(key, result) {
   if (key === "p14") return "Estimated LFE Capability";
   if (key === "p18") return "Bass Extension";
-  if (key === "p19") return "Seat Consistency";
+  if (key === "p19") return "P19 Response Fit";
   if (key === "p20") return "Seat Consistency";
   return key.toUpperCase();
 }
@@ -105,9 +105,8 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  * While calculating / updating / NOT_VERIFIED, pills show "Calculating…"
  * or "NOT VERIFIED" consistently — never preliminary live values.
  *
- * P19 is a SEAT-scoped RP22 parameter (Room/Seat = Seat):
- *   P19 main pill: "SEAT" — per-seat results in the P19 — All Seats grid below.
- *   No RSP headline, no aggregate level — seat results are the only P19 results.
+ * P19 headline is the canonical RSP result against stored Reference EQ.
+ * Per-seat P19 diagnostics remain in the P19 — All Seats grid below.
  * P20 is a SEAT-scoped parameter:
  *   P20 main pill: "SEAT" — per-seat results in the P20 — All Seats grid below.
  *   Coverage summary ("Primary Seats L{X} · No seat lower than L{Y}") appears
@@ -294,13 +293,13 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P19 — SEAT-scoped RP22 parameter (Room/Seat = Seat). The headline always
-  // displays "SEAT" — no RSP result, no aggregate level. Per-seat grades are
-  // in the P19 — All Seats panel below. When P14 fails (or LIMITED), P19 is
-  // not evaluated.
+  // P19 — canonical RSP result against the stored Reference EQ.
+  // Per-seat diagnostics remain available in the P19 — All Seats panel.
   pills.p19 = p14Failed
     ? { label: "P19 Response Fit", resultText: "FAIL", text: "P19 Response Fit FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
-    : seatScopeHeadlinePill("P19 Response Fit");
+    : isAuthoritative
+      ? readyPill("p19", contract?.productAnalysis?.parameters?.p19, contract)
+      : { label: "P19 Response Fit", resultText: officialStateText(authorityStatus, isCalculating), text: `P19 Response Fit ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
 
   // P20 — SEAT-scoped parameter. The headline always displays "SEAT" — no
   // "worst seat" headline, no aggregate level. When P14 fails (or LIMITED),
