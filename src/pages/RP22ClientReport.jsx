@@ -49,6 +49,7 @@ import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReport
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
+import ReportDependencyChecker from "@/components/report/ReportDependencyChecker";
 import { useAppState } from "@/components/AppStateProvider";
 import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
@@ -670,7 +671,7 @@ export default function RP22ClientReport() {
   }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, designAssumptions, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
-    activePageCount: reportPending ? 0 : activePages.length,
+    activePageCount: showDependencyChecker ? 0 : activePages.length,
     projectName: projectDetails?.name,
     logoUrl: LOGO_URL,
   });
@@ -684,6 +685,17 @@ export default function RP22ClientReport() {
     if (!projectId) return;
     navigate(`/DesignReview?projectId=${projectId}`);
   };
+
+  const handleOpenBassSimulation = () => {
+    if (!projectId) return;
+    navigate(`/RoomDesigner?projectId=${projectId}`);
+  };
+
+  // The report requires bass simulation to be complete. When bass has never
+  // been calculated (or is actively running), the dependency checker explains
+  // exactly what is missing instead of showing a generic loading message.
+  const bassMissing = !hydrating && !!engineeringSummary && !bassPerformance;
+  const showDependencyChecker = reportPending || bassMissing;
 
   return (
     <div className="client-report-root" style={{
@@ -758,7 +770,7 @@ export default function RP22ClientReport() {
           <Button
             type="button"
             onClick={handleExport}
-            disabled={reportPending || activePages.length === 0 || exporting}
+            disabled={showDependencyChecker || activePages.length === 0 || exporting}
             className="client-report-screen-only"
             style={{
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",
@@ -782,18 +794,18 @@ export default function RP22ClientReport() {
         maxWidth: 900,
         margin: "0 auto",
       }}>
-        {reportPending ? (
-          <div className="client-report-screen-only" style={{
-            background: "#FFFFFF",
-            borderRadius: 16,
-            padding: 64,
-            textAlign: "center",
-            color: "#625143",
-            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-            boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
-            border: "1px solid #DCDBD6",
-          }}>
-            Preparing Visual Report…
+        {showDependencyChecker ? (
+          <div className="client-report-screen-only">
+            <ReportDependencyChecker
+              projectId={projectId}
+              hydrating={hydrating}
+              projectDetails={projectDetails}
+              roomDims={roomDims}
+              placedSpeakers={placedSpeakers}
+              engineeringSummary={engineeringSummary}
+              bassPerformance={bassPerformance}
+              onOpenBassSimulation={handleOpenBassSimulation}
+            />
           </div>
         ) : !projectId ? (
           <div className="client-report-screen-only" style={{
