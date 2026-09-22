@@ -17,6 +17,11 @@ function seatRowsFor(engineeringSummary, paramId) {
   return engineeringSummary?.project?.reportCounts?.seatResultRowsByParameter?.[`p${Number(paramId)}`] || [];
 }
 
+function formatAsdrInteger(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? String(Math.round(numeric)) : null;
+}
+
 function adaptSeatRows(rows) {
   return rows.map((row) => ({
     row: row.row,
@@ -87,9 +92,9 @@ export function useParameterGridAuthority({
     return [
       "ASDR",
       contribution.mode === "recommended" ? "Recommended" : null,
-      contribution.effectiveWeight != null ? `Weight ${contribution.effectiveWeight}` : null,
+      contribution.effectiveWeight != null ? `Weight ${formatAsdrInteger(contribution.effectiveWeight)}` : null,
       contribution.earnedPoints != null && contribution.maximumPoints != null
-        ? `${scoreText} ${contribution.earnedPoints} / ${contribution.maximumPoints}`
+        ? `${scoreText} ${formatAsdrInteger(contribution.earnedPoints)} / ${formatAsdrInteger(contribution.maximumPoints)}`
         : null,
     ].filter(Boolean).join(" · ");
   }, [canonicalContributionsByKey]);
