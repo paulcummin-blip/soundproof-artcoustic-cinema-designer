@@ -642,18 +642,13 @@ function useDesignerState() {
   // Latest seat snapshot (no signature, just seat.id -> full snapshot)
   const [seatSnapshotBySeatId, setSeatSnapshotBySeatId] = useState({});
 
-  const [assumedP15Level, setAssumedP15Level] = useState(() => (
-    (__autosavePayload && __autosavePayload.assumedP15Level) ? __autosavePayload.assumedP15Level : null
-  ));
+  // P15/P21 are permanent L2 design assumptions until measured data is
+  // published by the engineering authority. Legacy stored selections are
+  // intentionally ignored so every consumer starts from the same result.
+  const [assumedP15Level, setAssumedP15Level] = useState("L2");
+  const setAssumedP15LevelSafe = useCallback(() => setAssumedP15Level("L2"), []);
 
-  const setAssumedP15LevelSafe = useCallback((next) => {
-    const allowed = new Set(["L1", "L2", "L3", "L4", null]);
-    setAssumedP15Level(allowed.has(next) ? next : null);
-  }, []);
-
-  const [assumedP21Level, setAssumedP21Level] = useState(() => (
-    (__autosavePayload && __autosavePayload.assumedP21Level) ? __autosavePayload.assumedP21Level : "L2"
-  ));
+  const [assumedP21Level, setAssumedP21Level] = useState("L2");
 
   const [designEqEnabled, setDesignEqEnabled] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.designEqEnabled === "boolean") ? __autosavePayload.designEqEnabled : true
@@ -669,10 +664,7 @@ function useDesignerState() {
   }, []);
   const [p12Level, setP12Level] = useState(null);
 
-  const setAssumedP21LevelSafe = useCallback((next) => {
-    const allowed = new Set(["L1", "L2", "L3", "L4", null]);
-    setAssumedP21Level(allowed.has(next) ? next : null);
-  }, []);
+  const setAssumedP21LevelSafe = useCallback(() => setAssumedP21Level("L2"), []);
 
   const [mlpOverride, setMlpOverride] = useState(() => (
     (__autosavePayload && __autosavePayload.mlpOverride) ? __autosavePayload.mlpOverride : null
