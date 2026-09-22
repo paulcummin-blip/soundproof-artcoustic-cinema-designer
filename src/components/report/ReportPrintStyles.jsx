@@ -590,9 +590,9 @@ export default function ReportPrintStyles() {
               .rp22-report .report-page-block--summary,
               .rp22-report .report-drawing-page,
               .rp22-report .tech-param-page {
-                min-height: 273mm !important;
-                height: 273mm !important;
-                max-height: 273mm !important;
+                min-height: 272mm !important;
+                height: 272mm !important;
+                max-height: 272mm !important;
                 overflow: hidden !important;
               }
 
@@ -604,8 +604,8 @@ export default function ReportPrintStyles() {
 
               .rp22-report .plan-fitbox {
                 width: 186mm !important;
-                height: 273mm !important;
-                max-height: 273mm !important;
+                height: 272mm !important;
+                max-height: 272mm !important;
                 display: flex !important;
                 align-items: flex-start !important;
                 justify-content: center !important;
@@ -615,7 +615,7 @@ export default function ReportPrintStyles() {
               .rp22-report .plan-fitbox > img {
                 width: 100% !important;
                 height: auto !important;
-                max-height: 273mm !important;
+                max-height: 272mm !important;
                 object-fit: contain !important;
               }
 
@@ -659,16 +659,16 @@ export default function ReportPrintStyles() {
               }
 
               .rp22-report #pdf-screen-wall-construction > .print-avoid-break {
-                height: 273mm !important;
-                max-height: 273mm !important;
+                height: 272mm !important;
+                max-height: 272mm !important;
               }
 
               .rp22-report #pdf-screen-wall-construction svg {
                 display: block !important;
                 width: auto !important;
                 max-width: 100% !important;
-                height: 273mm !important;
-                max-height: 273mm !important;
+                height: 272mm !important;
+                max-height: 272mm !important;
                 margin: 0 auto !important;
                 object-fit: contain !important;
               }
