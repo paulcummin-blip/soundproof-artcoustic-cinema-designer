@@ -6,7 +6,7 @@ const SP_LOGO_URL =
   "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg";
 
 const GAP_PX = 32;
-const HEIGHT_RATIO = 0.65; // logos occupy ~65% of hero height
+const HEIGHT_RATIO = 0.60; // logos occupy ~60% of hero height — centred with breathing room
 const SP_WIDER = 1.1; // SP rendered width = 1.1 × dealer rendered width
 const MAX_LOGO_WIDTH = 420; // hard cap so extreme aspect ratios don't overflow
 
@@ -138,7 +138,7 @@ export default function DealerHero() {
       ref={heroRef}
       className="relative w-full flex-shrink-0 overflow-hidden"
       style={{
-        height: "clamp(260px, 22vw, 340px)",
+        height: "clamp(380px, 30vw, 520px)",
         background: heroBg ? "#1B1A1A" : "#F8F8F7",
         borderBottom: `1px solid ${heroBg ? "rgba(255,255,255,0.12)" : "#DCDBD6"}`,
       }}
