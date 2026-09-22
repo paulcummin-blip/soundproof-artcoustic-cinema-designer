@@ -91,7 +91,7 @@ WRITING RULES (strict):
 - P14 is Dynamic Range. P18, P19, and P20 are Timbre Matching. Never describe P19 or P20 as Dynamic Range.
 - P20 is seat-to-seat bass consistency. If P20 is L1 or FAIL, state that consistency varies materially across seats; never call the bass response consistent, stable, uniform, or standardized across the room.
 - Keep engineering claims tied to a supplied value. If evidence is unavailable, omit the claim.
-- State both supplied design assumptions once: background noise floor is Assumed L2 at NCB 22; early reflections are Assumed L2 because they have not been measured. Do not describe either as calculated or measured.
+- Report the supplied P15/P21 status exactly. When marked Assumed, state it once and do not describe it as calculated or measured. When marked Measured, use the measured result instead.
 
 PROJECT DATA:
 - Project: ${project?.name || "—"}
@@ -167,7 +167,7 @@ WRITING RULES (strict):
 - RP22 category floors are the sole authority for the Spatial Resolution, Dynamic Range, and Timbre Matching comparison rows.
 - P14 is Dynamic Range. P18, P19, and P20 are Timbre Matching. Never describe P19 or P20 as Dynamic Range.
 - If P20 is L1 or FAIL, describe material seat-to-seat bass variation; never call the bass response consistent, stable, uniform, or standardized across the room.
-- State that background noise floor and early reflections are Assumed L2 in every version unless the supplied data explicitly marks them measured.
+- Report each version's supplied background-noise and early-reflection status exactly; an Assumed result must not be described as measured.
 
 VERSION DATA:
 ${versionData}
