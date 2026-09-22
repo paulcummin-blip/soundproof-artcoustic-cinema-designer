@@ -600,119 +600,155 @@ export default function ReportPrintStyles() {
                 overflow: hidden !important;
               }
 
-              .rp22-report .report-drawing-page {
-                display: flex !important;
-                flex-direction: column !important;
-                justify-content: flex-start !important;
-              }
-
-              .rp22-report .plan-fitbox {
-                width: 186mm !important;
+              /* One page frame and one contain algorithm for every engineering drawing.
+                 The content rectangle is fixed; media scales by the smaller width/height
+                 ratio, keeps its aspect ratio, and is centred on both axes. */
+              .rp22-report .report-drawing-page.standard-drawing-page {
+                width: 100% !important;
                 height: 272mm !important;
-                max-height: 272mm !important;
+                padding: 8mm 10mm !important;
+                box-sizing: border-box !important;
+                display: grid !important;
+                grid-template-rows: 18mm minmax(0, 1fr) !important;
+                gap: 6mm !important;
+                overflow: hidden !important;
+                background: #FFFFFF !important;
+              }
+
+              .rp22-report .standard-drawing-page__header {
+                height: 18mm !important;
+                min-height: 18mm !important;
                 display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
+                align-items: flex-start !important;
+                justify-content: space-between !important;
+                gap: 8mm !important;
+                padding: 0 0 3mm 0 !important;
+                border-bottom: 0.45mm solid #1B1A1A !important;
+                box-sizing: border-box !important;
                 overflow: hidden !important;
               }
 
-              /* A fixed available rectangle plus object-fit: contain implements
-                 scale = min(availableWidth / drawingWidth,
-                             availableHeight / drawingHeight).
-                 Both dimensions are constrained so browser print layout cannot
-                 restore the image's intrinsic height and crop the room. */
-              .rp22-report .plan-fitbox > img {
-                width: 100% !important;
-                height: 100% !important;
-                max-width: 100% !important;
-                max-height: 100% !important;
-                margin: auto !important;
-                object-fit: contain !important;
-                object-position: center center !important;
+              .rp22-report .standard-drawing-page__heading {
+                min-width: 0 !important;
               }
 
-              .rp22-report .speaker-position-plan {
-                width: 100% !important;
-                height: 100% !important;
-                max-height: 100% !important;
-                box-sizing: border-box !important;
+              .rp22-report .standard-drawing-page__title {
+                font-family: 'Century Gothic', 'Futura PT Light', sans-serif !important;
+                font-size: 16pt !important;
+                font-weight: 700 !important;
+                line-height: 1.05 !important;
+                color: #1B1A1A !important;
+                white-space: nowrap !important;
+              }
+
+              .rp22-report .standard-drawing-page__project {
+                margin-top: 1.5mm !important;
+                font-size: 8pt !important;
+                line-height: 1 !important;
+                color: #625143 !important;
+                white-space: nowrap !important;
+              }
+
+              .rp22-report .standard-drawing-page__metadata {
+                flex: 0 0 auto !important;
+                display: flex !important;
+                justify-content: flex-end !important;
+                gap: 7mm !important;
+                text-align: right !important;
+              }
+
+              .rp22-report .standard-drawing-page__metadata > div {
                 display: flex !important;
                 flex-direction: column !important;
-                overflow: hidden !important;
+                gap: 0.8mm !important;
               }
 
-              .rp22-report .speaker-position-plan__drawing {
-                flex: 1 1 auto !important;
+              .rp22-report .standard-drawing-page__metadata span {
+                font-size: 6.5pt !important;
+                line-height: 1 !important;
+                color: #625143 !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.04em !important;
+              }
+
+              .rp22-report .standard-drawing-page__metadata strong {
+                font-size: 8pt !important;
+                line-height: 1 !important;
+                color: #1B1A1A !important;
+                white-space: nowrap !important;
+              }
+
+              .rp22-report .standard-drawing-page__frame {
+                width: 100% !important;
+                height: 100% !important;
+                min-width: 0 !important;
                 min-height: 0 !important;
-                max-height: none !important;
+                box-sizing: border-box !important;
+                border: 0.25mm solid #D9D5CE !important;
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
-                overflow: hidden !important;
-              }
-
-              .rp22-report .speaker-position-plan__image {
-                width: 100% !important;
-                height: 100% !important;
-                max-width: 100% !important;
-                max-height: 100% !important;
-                margin: auto !important;
-                object-fit: contain !important;
-                object-position: center center !important;
-              }
-
-              .rp22-report .report-drawing-title {
-                flex: 0 0 auto !important;
-                font-family: 'Century Gothic', 'Futura PT Light', sans-serif !important;
-                font-size: 18pt !important;
-                font-weight: 700 !important;
-                color: #1B1A1A !important;
-                line-height: 1.1 !important;
-                margin: 0 0 6mm 0 !important;
-              }
-
-              .rp22-report .report-drawing-frame {
-                flex: 1 1 auto !important;
-                min-height: 0 !important;
-                max-height: 240mm !important;
                 overflow: hidden !important;
                 break-inside: avoid-page !important;
                 page-break-inside: avoid !important;
               }
 
-              .rp22-report .report-drawing-frame > * {
-                max-height: 240mm !important;
+              .rp22-report .standard-drawing-page__content {
+                width: 100% !important;
+                height: 100% !important;
+                min-width: 0 !important;
+                min-height: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
                 overflow: hidden !important;
               }
 
-              .rp22-report .report-drawing-frame svg {
+              .rp22-report .standard-drawing-page__image {
+                display: block !important;
+                width: 100% !important;
+                height: 100% !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
+                margin: auto !important;
+                object-fit: contain !important;
+                object-position: center center !important;
+              }
+
+              .rp22-report .standard-drawing-page__content > * {
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
+                margin: auto !important;
+                overflow: hidden !important;
+              }
+
+              .rp22-report .standard-drawing-page__content svg {
                 display: block !important;
                 width: 100% !important;
                 height: auto !important;
-                max-height: 232mm !important;
-                object-fit: contain !important;
-              }
-
-              .rp22-report #pdf-sightlines > .print-avoid-break,
-              .rp22-report #pdf-screen-wall-construction > .print-avoid-break {
-                width: 100% !important;
-                max-height: 257mm !important;
-                overflow: hidden !important;
-              }
-
-              .rp22-report #pdf-screen-wall-construction > .print-avoid-break {
-                height: 272mm !important;
-                max-height: 272mm !important;
-              }
-
-              .rp22-report #pdf-screen-wall-construction svg {
-                display: block !important;
-                width: auto !important;
                 max-width: 100% !important;
-                height: 272mm !important;
-                max-height: 272mm !important;
-                margin: 0 auto !important;
+                max-height: 100% !important;
+                margin: auto !important;
                 object-fit: contain !important;
+              }
+
+              .rp22-report #pdf-elevation-front .standard-drawing-page__content > div,
+              .rp22-report #pdf-elevation-left .standard-drawing-page__content > div,
+              .rp22-report #pdf-elevation-right .standard-drawing-page__content > div {
+                padding: 0 !important;
+                background: #FFFFFF !important;
+              }
+
+              .rp22-report #pdf-elevation-left button,
+              .rp22-report #pdf-elevation-right button {
+                display: none !important;
+              }
+
+              .rp22-report #pdf-screen-wall-construction .standard-drawing-page__content > div,
+              .rp22-report #pdf-screen-wall-construction svg {
+                width: 100% !important;
+                height: 100% !important;
               }
 
               .rp22-report .tech-param-report-heading {
