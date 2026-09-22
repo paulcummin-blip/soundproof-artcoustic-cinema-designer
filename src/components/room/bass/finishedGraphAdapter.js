@@ -35,6 +35,7 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
   const gp = compactContract.graphPayload;
   const candidateId = gp.selectedCandidateId || compactContract.selectedCandidateId || null;
   const postEqRspCurve = Array.isArray(gp.postEqRspCurve) ? gp.postEqRspCurve : [];
+  const referenceEq = Array.isArray(gp.referenceEq) ? gp.referenceEq : [];
   const eqFilterBank = Array.isArray(gp.eqFilterBank) ? gp.eqFilterBank : [];
   const productionHouseCurveTarget = Array.isArray(gp.productionHouseCurveTarget)
     ? gp.productionHouseCurveTarget
@@ -66,6 +67,10 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
   const finalOptimisedBassResponse = {
     selectedCandidateId: candidateId,
     postEqRspCurve,
+    canonicalPostEqRsp: postEqRspCurve,
+    referenceEq,
+    referenceEqSignature: buildCurveSignature(referenceEq),
+    p19TargetIdentity: "reference-eq",
     postEqPerSeatCurves: Array.isArray(gp.postEqPerSeatCurves) ? gp.postEqPerSeatCurves : [],
     maximumSplCurveAfterEq: Array.isArray(gp.maximumSplCurveAfterEq) ? gp.maximumSplCurveAfterEq : [],
     maximumSplSafetyMarginDb: Number.isFinite(gp.maximumSplSafetyMarginDb) ? gp.maximumSplSafetyMarginDb : 0,
