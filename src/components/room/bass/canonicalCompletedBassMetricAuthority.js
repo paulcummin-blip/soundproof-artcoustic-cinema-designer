@@ -173,6 +173,8 @@ export function buildCanonicalCompletedBassMetricAuthority({
     fingerprintParityValid: false,
     // Curve / P14 diagnostics
     metricPostEqCurveHash: null,
+    metricReferenceEqHash: null,
+    referenceEqParityValid: false,
     metricTargetCurveHash: null,
     metricCurvePointCount: 0,
     targetCurvePointCount: 0,
@@ -194,10 +196,15 @@ export function buildCanonicalCompletedBassMetricAuthority({
   }
 
   const postEqRsp = finalOptimisedBassResponse.canonicalPostEqRsp;
+  const referenceEq = finalOptimisedBassResponse.referenceEq;
   const targetCurve = finalOptimisedBassResponse.canonicalTargetCurve;
 
   if (!Array.isArray(postEqRsp) || !postEqRsp.length) {
     diagnostics.rejectionReason = "missing-canonical-post-eq-rsp";
+    return { authority: null, diagnostics };
+  }
+  if (!Array.isArray(referenceEq) || !referenceEq.length) {
+    diagnostics.rejectionReason = "missing-reference-eq";
     return { authority: null, diagnostics };
   }
   if (!Array.isArray(targetCurve) || !targetCurve.length) {
@@ -207,13 +214,20 @@ export function buildCanonicalCompletedBassMetricAuthority({
 
   // --- Identity hashes ---
   const postEqCurveHash = finalOptimisedBassResponse.postEqCurveSignature || buildCurveSignature(postEqRsp);
+  const referenceEqHash = buildCurveSignature(referenceEq);
   const targetCurveHash = buildCurveSignature(targetCurve);
   const filterBankSignature = finalOptimisedBassResponse.filterBankSignature
     || buildFilterBankSignature({ generatedFilterBank: finalOptimisedBassResponse.eqFilterBank });
   const resolvedCandidateId = candidateId || finalOptimisedBassResponse.selectedCandidateId;
 
   diagnostics.metricPostEqCurveHash = postEqCurveHash;
+  diagnostics.metricReferenceEqHash = referenceEqHash;
+  diagnostics.referenceEqParityValid = referenceEqHash === postEqCurveHash;
   diagnostics.metricTargetCurveHash = targetCurveHash;
+  if (!diagnostics.referenceEqParityValid) {
+    diagnostics.rejectionReason = "reference-eq-calibrated-rsp-mismatch";
+    return { authority: null, diagnostics };
+  }
   diagnostics.metricCurvePointCount = postEqRsp.length;
   diagnostics.targetCurvePointCount = targetCurve.length;
   diagnostics.legacyMetricCurveDetected = postEqRsp.length === LEGACY_CURVE_LENGTH;
@@ -411,10 +425,12 @@ export function buildCanonicalCompletedBassMetricAuthority({
       },
       filterBankSignature,
       postEqCurveHash,
+      referenceEqHash,
       targetCurveHash,
     },
     curves: {
       canonicalPostEqRsp: postEqRsp,
+      referenceEq,
       productionHouseCurveTarget: targetCurve,
     },
     p14: {
@@ -471,7 +487,8 @@ export function buildCanonicalCompletedBassMetricAuthority({
     },
     p19Input: {
       canonicalPostEqRsp: postEqRsp,
-      productionHouseCurveTarget: targetCurve,
+      referenceEq,
+      p19TargetIdentity: "reference-eq",
       assessmentBand: assessmentBand.valid
         ? { lowerHz: assessmentBand.lowerHz, upperHz: assessmentBand.upperHz }
         : { lowerHz: null, upperHz: null },
