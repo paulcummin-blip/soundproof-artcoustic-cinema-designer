@@ -542,7 +542,7 @@ export default function Layout({ children, currentPageName }) {
                       min-width: 0;
                     }
                   `}</style>
-                  {!isReportAutoPrint && <HeroBanner />}
+                  <>{!isReportAutoPrint && <HeroBanner />}</>
                   {children}
                 </SegmentBoundary>
               </SafeBootErrorBoundary>
