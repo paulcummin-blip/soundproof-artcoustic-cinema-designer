@@ -219,7 +219,9 @@ export default function TechnicalParameterCard({
               </div>
             )}
             <div style={{ fontSize: u.fsValue, fontWeight: 700, color: "#213428" }}>
-              {achievedValue || (assumed ? "L2 design assumption" : "—")}
+              {assumed && Number(param?.id) === 21
+                ? "Level 2 design assumption"
+                : (achievedValue || (assumed ? "L2 design assumption" : "—"))}
             </div>
           </div>
         )}
