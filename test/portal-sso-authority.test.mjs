@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   consumePilotPortalLaunch,
+  providerAccessToken,
   PILOT_EXTERNAL_SUBJECT,
   PILOT_SOUND_PROOF_ACCOUNT_ID,
   resolvePilotPortalMapping,
@@ -79,6 +80,9 @@ function fixture() {
         async getIdToken() {
           return { id_token: 'verified-provider-id-token' };
         },
+        async getAccessToken() {
+          return { access_token: 'verified-provider-access-token' };
+        },
       },
     },
   };
@@ -96,6 +100,12 @@ function bridgeBinding(overrides = {}) {
     ...overrides,
   };
 }
+
+test('dealer API token authority reads the provider access token', async () => {
+  const { base44 } = fixture();
+  const token = await providerAccessToken(base44, 'base44-user-1');
+  assert.equal(token, 'verified-provider-access-token');
+});
 
 test('non-pilot Sound Proof accounts retain their existing access path', async () => {
   const result = await resolvePilotPortalMapping({ entities: {} }, 'another-account');
