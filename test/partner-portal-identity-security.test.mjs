@@ -84,12 +84,17 @@ test('browser identity provider has no persistent or URL-derived dealer identity
     'utf8',
   );
 
-  assert.match(provider, /invoke\("resolveDealerIdentity", \{\}\)/);
-  assert.doesNotMatch(provider, /localStorage|sessionStorage|URLSearchParams|location\.search|searchParams/);
-  assert.doesNotMatch(provider, /dealerAccountId:/);
+  const executableProvider = provider
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+
+  assert.match(executableProvider, /invoke\("resolveDealerIdentity", \{\}\)/);
+  assert.doesNotMatch(executableProvider, /localStorage|sessionStorage|URLSearchParams|location\.search|searchParams/);
+  assert.doesNotMatch(executableProvider, /dealerAccountId:/);
 
   assert.match(resolver, /base44\.auth\.me\(\)/);
-  assert.match(resolver, /providerIdToken\(base44, user\.id\)/);
+  assert.match(resolver, /providerAccessToken\(base44, user\.id\)/);
+  assert.doesNotMatch(resolver, /providerIdToken/);
   assert.match(resolver, /secrets\.get\("PARTNER_PORTAL_DEALER_IDENTITY_URL"\)/);
   assert.doesNotMatch(resolver, /req\.json\(|req\.url|searchParams|dealer_account_id/);
 
