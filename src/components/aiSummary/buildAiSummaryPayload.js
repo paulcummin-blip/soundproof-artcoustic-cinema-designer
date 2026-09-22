@@ -133,18 +133,20 @@ function extractDesignAssumptions(engineeringSummary) {
   const roomResults = engineeringSummary?.roomResultsByParameter || {};
   const p15 = roomResults?.[15] || roomResults?.["15"] || null;
   const p21 = roomResults?.[21] || roomResults?.["21"] || null;
+  const p15Measured = p15?.status === "measured";
+  const p21Measured = p21?.status === "measured";
   return {
     p15: {
       level: p15?.level || "L2",
-      status: "Assumed",
-      value: p15?.formatted || "NCB 22",
-      note: "Design target: NCB 22",
+      status: p15Measured ? "Measured" : "Assumed",
+      value: p15?.formatted || (p15Measured ? null : "NCB 22"),
+      note: p15Measured ? null : "Design target: NCB 22",
     },
     p21: {
       level: p21?.level || "L2",
-      status: "Assumed",
-      value: null,
-      note: "Early reflections have not been measured. Level 2 is used as the design assumption.",
+      status: p21Measured ? "Measured" : "Assumed",
+      value: p21Measured ? (p21?.formatted || null) : null,
+      note: p21Measured ? null : "Early reflections have not been measured. Level 2 is used as the design assumption.",
     },
   };
 }
