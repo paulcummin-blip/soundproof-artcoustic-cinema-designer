@@ -47,7 +47,7 @@ function providerTokenValue(response) {
   return token;
 }
 
-async function providerIdToken(base44, base44UserId) {
+export async function providerIdToken(base44, base44UserId) {
   const response = await base44.asServiceRole.sso.getIdToken(base44UserId);
   return providerTokenValue(response);
 }

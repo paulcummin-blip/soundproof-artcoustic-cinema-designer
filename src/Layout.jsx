@@ -34,6 +34,8 @@ import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
 import PriceSummary from "@/components/pricing/PriceSummary";
 import DesignRatingSummary from "@/components/pricing/DesignRatingSummary";
+import { PartnerPortalIdentityProvider } from "@/components/providers/PartnerPortalIdentityProvider";
+import DealerIdentityDiagnostic from "@/components/dev/DealerIdentityDiagnostic";
 import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAuth } from "@/lib/AuthContext";
 import { hasCapability, isMasterAdmin } from "@/lib/accountAccess";
@@ -252,6 +254,7 @@ export default function Layout({ children, currentPageName }) {
     <SafeBootErrorBoundary>
       <ToastProvider>
         <AppStateProvider>
+        <PartnerPortalIdentityProvider>
         <BrandIntroOverlay />
         <div className="flex min-h-screen w-full bg-brand-background">
           <aside className="w-64 border-r border-brand-border bg-brand-sidebar-bg flex flex-col">
@@ -537,6 +540,8 @@ export default function Layout({ children, currentPageName }) {
             </div>
           </main>
         </div>
+        <DealerIdentityDiagnostic />
+        </PartnerPortalIdentityProvider>
         </AppStateProvider>
         </ToastProvider>
     </SafeBootErrorBoundary>
