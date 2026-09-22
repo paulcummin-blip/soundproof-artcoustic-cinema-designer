@@ -1,4 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.40";
+import { secrets } from "base44:runtime";
 import { providerIdToken } from "../../shared/portalSsoAuthority.js";
 import { resolvePartnerPortalDealerIdentity } from "../../shared/partnerPortalIdentityClient.js";
 
@@ -39,7 +40,10 @@ export default async function resolveDealerIdentity(req) {
 
     let identity;
     try {
-      identity = await resolvePartnerPortalDealerIdentity({ accessToken });
+      identity = await resolvePartnerPortalDealerIdentity({
+        url: secrets.get("PARTNER_PORTAL_DEALER_IDENTITY_URL"),
+        accessToken,
+      });
     } catch (error) {
       return Response.json({
         resolved: false,
