@@ -54,7 +54,11 @@ export function paginateTechnicalReportBlocks(root) {
 
   const pageHeight = A4_PRINTABLE_HEIGHT_MM * pixelsPerMillimetre(root);
   const plan = planReportBlockPagination({
-    blockHeights: blocks.map((block) => block.getBoundingClientRect().height),
+    blockHeights: blocks.map((block) => {
+      const renderedHeight = block.getBoundingClientRect().height;
+      const contentHeight = block.scrollHeight;
+      return Math.max(renderedHeight, contentHeight);
+    }),
     pageHeight,
     forcePageStart: blocks.map((block) => block.dataset.reportPageStart === "true"),
   });
