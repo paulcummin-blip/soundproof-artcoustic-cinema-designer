@@ -231,7 +231,8 @@ export function buildOptimisationSummaryData({
     }),
   );
 
-  // Global Bass Trim (special: no separate per-seat results — only RSP P19)
+  // Global Bass Trim changes calibration target fit, while published P19 remains
+  // Reference EQ versus itself and therefore does not change.
   const stepDb = num(gla?.stepDb) ?? 0.25;
   const trimCombinations = gla
     ? Math.round(((num(gla.downwardBoundDb) ?? 0) + (num(gla.upwardBoundDb) ?? 0)) / stepDb) + 1
@@ -242,13 +243,13 @@ export function buildOptimisationSummaryData({
     label: "Global Bass Trim",
     combinationsTested: trimCombinations,
     verdict: trimAligned ? "improvement" : "no_improvement",
-    classification: trimAligned ? "IMPROVES_P19" : "NO_MATERIAL_IMPROVEMENT",
+    classification: "NO_MATERIAL_IMPROVEMENT",
     p19: {
-      beforeLevel: null,
-      beforeRaw: gla ? num(gla.originalP19VariationDb) : null,
-      afterLevel: null,
-      afterRaw: gla ? num(gla.alignedP19VariationDb) : null,
-      isRspOnly: true,
+      beforeLevel: 4,
+      beforeRaw: 0,
+      afterLevel: 4,
+      afterRaw: 0,
+      isNoChange: true,
     },
     p20: {
       beforeLevel: null,
@@ -260,8 +261,8 @@ export function buildOptimisationSummaryData({
     failingSeats: { before: null, after: null, isNoChange: true },
     primaryFloor: { before: null, after: null, isNoChange: true },
     internal: {
-      currentP19: gla ? num(gla.originalP19VariationDb) : baselineP19,
-      bestP19: gla ? num(gla.alignedP19VariationDb) : baselineP19,
+      currentP19: gla ? num(gla.originalTargetFitVariationDb) : baselineP19,
+      bestP19: gla ? num(gla.alignedTargetFitVariationDb) : baselineP19,
     },
   });
 
