@@ -661,31 +661,11 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     appState.setViewingPriority(vp);
   }
 
-  // 10e2) P15/P21 ASSUMED DESIGN LEVELS
-  // Single shared project-level authority. null = NOT CALCULATED (no silent
-  // default). Legacy p15_construction_level / p21_early_reflection_preset
-  // values are migrated ONCE into the new L1–L4 authority so existing projects
-  // don't lose their assumptions. After migration the legacy fields are dead.
-  if (typeof appState?.setAssumedP15LevelSafe === "function") {
-    const P15_ALLOWED = new Set(["L1", "L2", "L3", "L4"]);
-    const P15_LEGACY_MAP = { standard: "L1", "purpose-built": "L2", reference: "L3", studio: "L4" };
-    let p15 = P15_ALLOWED.has(p?.assumed_p15_level) ? p.assumed_p15_level : null;
-    // Legacy migration: if new field is null but old construction level exists, map once
-    if (!p15 && p?.p15_construction_level) {
-      p15 = P15_LEGACY_MAP[String(p.p15_construction_level).toLowerCase()] || null;
-    }
-    appState.setAssumedP15LevelSafe(p15);
-  }
-  if (typeof appState?.setAssumedP21LevelSafe === "function") {
-    const P21_ALLOWED = new Set(["L1", "L2", "L3", "L4"]);
-    const P21_LEGACY_MAP = { l1: "L1", l2: "L2", l3: "L3", l4: "L4" };
-    let p21 = P21_ALLOWED.has(p?.assumed_p21_level) ? p.assumed_p21_level : "L2";
-    // Legacy migration: if new field is null but old early-reflection preset exists, map once
-    if (!p21 && p?.p21_early_reflection_preset) {
-      p21 = P21_LEGACY_MAP[String(p.p21_early_reflection_preset).toLowerCase()] || null;
-    }
-    appState.setAssumedP21LevelSafe(p21);
-  }
+  // 10e2) P15/P21 PERMANENT DESIGN ASSUMPTIONS
+  // Old selectable assumption fields are ignored. Until a measured result is
+  // published by the engineering authority, both parameters are always L2.
+  appState?.setAssumedP15LevelSafe?.("L2");
+  appState?.setAssumedP21LevelSafe?.("L2");
 
   // 10f) ACOUSTIC TREATMENT (Abfuser product selection)
   if (typeof appState?.setAcousticTreatmentEnabled === "function") {
