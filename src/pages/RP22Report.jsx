@@ -35,7 +35,7 @@ import ProjectDetailsCard from '../components/report/ProjectDetailsCard';
 import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
 import SightlineGraphic from '../components/report/SightlineGraphic';
 import ScreenWallConstructionGraphic from '../components/report/ScreenWallConstructionGraphic';
-import SpeakerPositionPlan from '../components/report/SpeakerPositionPlan';
+import ReportDrawingPage from '../components/report/ReportDrawingPage';
 import { fovForDistance } from '../components/utils/screenMetrics';
 import ElevationDrawing from '../components/report/ElevationDrawing';
 import FrontElevation from '../components/room/FrontElevation';
@@ -1281,29 +1281,41 @@ function RP22ReportInner() {
                             </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan" className="report-page-block report-drawing-page" data-report-block="floor-plan" data-report-block-kind="drawing" data-report-page-start="true" style={{ background: 'transparent', padding: 0, margin: 0 }}>
-                                <div className="plan-fitbox"><img src={planImageDataUrl} alt="Room plan" style={{ background: 'transparent' }} /></div>
-                            </section>
+                            <ReportDrawingPage
+                                id="pdf-room-plan"
+                                blockName="floor-plan"
+                                title="Room Plan"
+                                projectName={projectDetails?.name || ''}
+                                clientName={projectDetails?.client_name || ''}
+                                imageSrc={planImageDataUrl}
+                                imageAlt="Room plan"
+                            />
                         )}
 
                         {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-dims" className="report-page-block report-drawing-page" data-report-block="dimensioned-floor-plan" data-report-block-kind="drawing" data-report-page-start="true" style={{ background: 'transparent', padding: 0, margin: 0 }}>
-                                <div className="plan-fitbox"><img src={planDimsImageDataUrl} alt="Room plan (dimensions)" style={{ background: 'transparent' }} /></div>
-                            </section>
+                            <ReportDrawingPage
+                                id="pdf-room-plan-dims"
+                                blockName="dimensioned-floor-plan"
+                                title="Room Dimensions"
+                                projectName={projectDetails?.name || ''}
+                                clientName={projectDetails?.client_name || ''}
+                                imageSrc={planDimsImageDataUrl}
+                                imageAlt="Room dimensions plan"
+                            />
                         )}
 
                         {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-positions" className="report-page-block report-drawing-page" data-report-block="speaker-plan" data-report-block-kind="drawing" data-report-page-start="true" style={{ background: '#FFFFFF', padding: 0, margin: 0 }}>
-                                <SpeakerPositionPlan
-                                    projectName={projectDetails?.name || ''}
-                                    clientName={projectDetails?.client_name || ''}
-                                    planImageDataUrl={planSpeakerDimsImageDataUrl}
-                                    roomWidthM={stableDimensions.width}
-                                    roomLengthM={stableDimensions.length}
-                                    screenFrontPlaneM={reportScreenFrontPlaneM}
-                                    projector={projector}
-                                />
-                            </section>
+                            <ReportDrawingPage
+                                id="pdf-room-plan-positions"
+                                blockName="speaker-plan"
+                                title="Speaker Position Plan"
+                                projectName={projectDetails?.name || ''}
+                                clientName={projectDetails?.client_name || ''}
+                                sheetCode="SP-01"
+                                status="NOT FOR SCALING"
+                                imageSrc={planSpeakerDimsImageDataUrl}
+                                imageAlt="Speaker position plan"
+                            />
                         )}
 
                         <section id="pdf-room-parameters">
