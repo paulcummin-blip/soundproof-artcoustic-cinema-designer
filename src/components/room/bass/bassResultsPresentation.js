@@ -293,13 +293,11 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P19 — canonical RSP result against the stored Reference EQ.
-  // Per-seat diagnostics remain available in the P19 — All Seats panel.
+  // P19 — SEAT-scoped parameter. The headline always displays "SEAT" — no
+  // RSP/aggregate headline. When P14 fails (or LIMITED), P19 is not evaluated.
   pills.p19 = p14Failed
     ? { label: "P19 Response Fit", resultText: "FAIL", text: "P19 Response Fit FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
-    : isAuthoritative
-      ? readyPill("p19", contract?.productAnalysis?.parameters?.p19, contract)
-      : { label: "P19 Response Fit", resultText: officialStateText(authorityStatus, isCalculating), text: `P19 Response Fit ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
+    : seatScopeHeadlinePill("P19 Response Fit");
 
   // P20 — SEAT-scoped parameter. The headline always displays "SEAT" — no
   // "worst seat" headline, no aggregate level. When P14 fails (or LIMITED),
