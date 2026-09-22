@@ -73,7 +73,10 @@ export async function resolvePartnerPortalDealerIdentity({ url, accessToken }) {
     headers: {
       authorization: `Bearer ${accessToken}`,
       'content-type': 'application/json',
+      'cache-control': 'no-store',
     },
+    cache: 'no-store',
+    redirect: 'error',
     signal: AbortSignal.timeout(15000),
   });
 
