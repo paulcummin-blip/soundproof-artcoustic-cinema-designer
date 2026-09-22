@@ -59,6 +59,7 @@ import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReport
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { setAuthoritativeReadOnlyMode } from '@/components/state/authoritativeReadOnlyMode';
 import { useAutoPrintReadinessInstrumentation, logAutoPrintBlock } from '@/components/report/useAutoPrintReadinessInstrumentation';
+import useReportBlockPagination from '@/components/report/useReportBlockPagination';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -313,6 +314,11 @@ function RP22ReportInner() {
     }, [explicitProjectId]);
 
     const [printReady, setPrintReady] = useState(false);
+    const printReportRef = useRef(null);
+    useReportBlockPagination(
+        printReportRef,
+        `${printReady}:${isPrinting}:${planImageDataUrl?.length || 0}:${planDimsImageDataUrl?.length || 0}:${planSpeakerDimsImageDataUrl?.length || 0}`,
+    );
     const [debugPlanCapture, setDebugPlanCapture] = useState(false);
     const printLockRef = React.useRef(false);
     const originalPrintTitleRef = React.useRef(null);
@@ -1213,11 +1219,11 @@ function RP22ReportInner() {
 
             {/* Print-only layout */}
             <div className="print-only print-keep-layout">
-                <div className="print-root">
+                <div className="print-root" ref={printReportRef}>
                     <div className="print-container rp22-report">
                         <section id="pdf-cover">
                             {/* ── Page 1: Logo + title + RP22/RP23 explanations ── */}
-                            <div className="print-page-break-after print-summary">
+                            <div className="print-summary report-page-block report-page-block--cover" data-report-block="cover" data-report-page-start="true">
                                 <ReportCover variant="print" />
                                 {/* RP22 explanation */}
                                 <div style={{ maxWidth: '185mm', margin: '0 auto', paddingTop: '8mm', borderTop: '1px solid #D9D5CE', fontFamily: 'Century Gothic, Futura PT Light, Didact Gothic, sans-serif', fontSize: '10.5pt', color: '#3E4349', lineHeight: 1.75, textAlign: 'left' }}>
@@ -1239,7 +1245,7 @@ function RP22ReportInner() {
                             </div>
 
                             {/* ── Page 2: Project & System Overview ── */}
-                            <div className="print-page-break-after">
+                            <div className="report-page-block report-page-block--summary" data-report-block="project-overview" data-report-page-start="true">
                                 <TechnicalProjectOverview
                                     projectDetails={projectDetails}
                                     exportDateLabel={exportDateLabel}
@@ -1254,7 +1260,7 @@ function RP22ReportInner() {
                             </div>
 
                             {/* ── Page 3: RP22 Performance Summary ── */}
-                            <div className="print-page-break-after">
+                            <div className="report-page-block report-page-block--summary" data-report-block="performance-summary" data-report-page-start="true">
                                 <TechnicalPerformanceSummary
                                     engineeringSummary={engineeringSummary}
                                     rspSeatId={rspSeatId}
@@ -1264,7 +1270,7 @@ function RP22ReportInner() {
 
                             {/* ── Page 3b: ASDR Scorecard ── */}
                             {showDesignRating && roomDesignRating && (
-                                <div className="print-page-break-after">
+                                <div className="report-page-block report-page-block--summary" data-report-block="asdr-scorecard" data-report-page-start="true">
                                     <TechnicalAsdrScorecard
                                         roomDesignRating={roomDesignRating}
                                         showDesignRating={showDesignRating}
@@ -1275,19 +1281,19 @@ function RP22ReportInner() {
                             </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan" className="print-avoid-break" style={{ background: 'transparent', padding: 0, margin: 0 }}>
+                            <section id="pdf-room-plan" className="report-page-block report-drawing-page" data-report-block="floor-plan" data-report-block-kind="drawing" data-report-page-start="true" style={{ background: 'transparent', padding: 0, margin: 0 }}>
                                 <div className="plan-fitbox"><img src={planImageDataUrl} alt="Room plan" style={{ background: 'transparent' }} /></div>
                             </section>
                         )}
 
                         {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-dims" className="print-page-break-before print-avoid-break" style={{ background: 'transparent', padding: 0, margin: 0 }}>
+                            <section id="pdf-room-plan-dims" className="report-page-block report-drawing-page" data-report-block="dimensioned-floor-plan" data-report-block-kind="drawing" data-report-page-start="true" style={{ background: 'transparent', padding: 0, margin: 0 }}>
                                 <div className="plan-fitbox"><img src={planDimsImageDataUrl} alt="Room plan (dimensions)" style={{ background: 'transparent' }} /></div>
                             </section>
                         )}
 
                         {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-positions" className="print-page-break-before print-avoid-break" style={{ background: '#FFFFFF', padding: 0, margin: 0 }}>
+                            <section id="pdf-room-plan-positions" className="report-page-block report-drawing-page" data-report-block="speaker-plan" data-report-block-kind="drawing" data-report-page-start="true" style={{ background: '#FFFFFF', padding: 0, margin: 0 }}>
                                 <SpeakerPositionPlan
                                     projectName={projectDetails?.name || ''}
                                     clientName={projectDetails?.client_name || ''}
@@ -1300,15 +1306,8 @@ function RP22ReportInner() {
                             </section>
                         )}
 
-                        <section
-                          id="pdf-room-parameters"
-                          className="print-page-break-before"
-                        >
-                             <div>
-                                 <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 16, fontWeight: 400, color: '#213428', marginBottom: 2, letterSpacing: '0.01em' }}>RP22 Parameters</div>
-                                <div style={{ color: '#625143', fontSize: 9, marginBottom: 8, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>Engineering Evidence</div>
-                                <RP22ReportParameterGrid {...parameterGridProps} variant="print" />
-                            </div>
+                        <section id="pdf-room-parameters">
+                            <RP22ReportParameterGrid {...parameterGridProps} variant="print" />
                         </section>
 
                         {/* ── Elevation Drawings page ── */}
