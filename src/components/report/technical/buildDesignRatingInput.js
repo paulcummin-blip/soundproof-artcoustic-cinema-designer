@@ -324,6 +324,7 @@ export function buildDesignRatingInput({
     // P15: a published measured grade wins; otherwise the permanent L2
     // design assumption contributes to the rating.
     p15: analysisResult?.gradedParameters?.primary?.[15]?.status === "measured"
+      && normalizeAssumedLevel(analysisResult.gradedParameters.primary[15].level)
       ? normalizeAssumedLevel(analysisResult.gradedParameters.primary[15].level)
       : resolveAssumedP15Level(assumedP15Level),
     p18,
@@ -341,6 +342,7 @@ export function buildDesignRatingInput({
     // P21: a published measured grade wins; otherwise the permanent L2
     // design assumption contributes to the rating.
     p21: analysisResult?.gradedParameters?.primary?.[21]?.status === "measured"
+      && normalizeAssumedLevel(analysisResult.gradedParameters.primary[21].level)
       ? normalizeAssumedLevel(analysisResult.gradedParameters.primary[21].level)
       : resolveAssumedP21Level(assumedP21Level),
     screen: screenInput,
