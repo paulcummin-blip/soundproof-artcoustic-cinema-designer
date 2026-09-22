@@ -13,7 +13,7 @@ import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl
 
 /* ---------- Canonical RP22 parameter definitions ---------- */
 const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
-export const TECHNICAL_PARAMETER_CARDS_PER_PAGE = 2;
+export const TECHNICAL_PARAMETER_CARDS_PER_PAGE = 3;
 
 /**
  * Props:
