@@ -948,7 +948,7 @@ function buildCanonicalCandidate({
     practicalCalibrationTarget: (Array.isArray(practicalCalibrationTarget) ? practicalCalibrationTarget : targetCurve).map((point) => ({ ...point })),
     // Explicit P19 target identity: confirms the predictor and P19 grading
     // both use the same practical calibration target authority.
-    p19TargetIdentity: (Array.isArray(practicalCalibrationTarget) && practicalCalibrationTarget.length)
+    calibrationTargetIdentity: (Array.isArray(practicalCalibrationTarget) && practicalCalibrationTarget.length)
       ? "practical-calibration-target"
       : "ideal-house-target",
     fitterHouseCurveTarget: (eq.fitterHouseCurveTarget || targetCurve).map((point) => ({ ...point })),
