@@ -55,6 +55,8 @@ function fixture() {
     id: 'membership-1',
     account_id: PILOT_SOUND_PROOF_ACCOUNT_ID,
     user_id: 'base44-user-1',
+    email: 'dealer@example.com',
+    membership_role: 'dealer_admin',
     status: 'pending',
     is_account_admin: true,
     access_level: 'FULL_ACCESS',
@@ -123,6 +125,119 @@ test('the pilot requires one exact UUID-to-account link', async () => {
   const duplicate = await resolvePilotPortalMapping(service, PILOT_SOUND_PROOF_ACCOUNT_ID);
   assert.equal(duplicate.allowed, false);
   assert.equal(duplicate.reason, 'PORTAL_MAPPING_AMBIGUOUS');
+});
+
+test('first launch claims one matching pending administrator seat and repeat launch is idempotent', async (t) => {
+  const { base44, rows } = fixture();
+  rows.memberships[0].user_id = null;
+
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ ok: true, binding: bridgeBinding() }), { status: 200 });
+
+  const user = { id: 'base44-user-1', email: 'Dealer@Example.com' };
+  const first = await consumePilotPortalLaunch(
+    base44,
+    user,
+    'C'.repeat(43),
+    BRIDGE_OPTIONS,
+  );
+  assert.equal(first.ok, true);
+  assert.equal(rows.memberships[0].user_id, user.id);
+  assert.equal(rows.identities.length, 1);
+  assert.equal(rows.identities[0].base44_user_id, user.id);
+
+  const second = await consumePilotPortalLaunch(
+    base44,
+    user,
+    'D'.repeat(43),
+    BRIDGE_OPTIONS,
+  );
+  assert.equal(second.ok, true);
+  assert.equal(rows.memberships[0].user_id, user.id);
+  assert.equal(rows.identities.length, 1);
+});
+
+test('auto-claim fails closed for email mismatch, ambiguity, account mismatch and claimed seats', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ ok: true, binding: bridgeBinding() }), { status: 200 });
+
+  {
+    const { base44, rows } = fixture();
+    rows.memberships[0].user_id = null;
+    await assert.rejects(
+      () => consumePilotPortalLaunch(
+        base44,
+        { id: 'base44-user-1', email: 'wrong@example.com' },
+        'E'.repeat(43),
+        BRIDGE_OPTIONS,
+      ),
+      /PORTAL_MEMBERSHIP_EMAIL_MISMATCH/,
+    );
+    assert.equal(rows.memberships[0].user_id, null);
+    assert.equal(rows.identities.length, 0);
+  }
+
+  {
+    const { base44, rows } = fixture();
+    rows.memberships[0].user_id = null;
+    rows.memberships.push({
+      ...rows.memberships[0],
+      id: 'membership-2',
+      email: 'other@example.com',
+    });
+    await assert.rejects(
+      () => consumePilotPortalLaunch(
+        base44,
+        { id: 'base44-user-1', email: 'dealer@example.com' },
+        'F'.repeat(43),
+        BRIDGE_OPTIONS,
+      ),
+      /PORTAL_MEMBERSHIP_AMBIGUOUS/,
+    );
+    assert.equal(rows.identities.length, 0);
+  }
+
+  {
+    const { base44, rows } = fixture();
+    rows.memberships[0].user_id = null;
+    rows.memberships[0].email = 'different@example.com';
+    rows.memberships.push({
+      ...rows.memberships[0],
+      id: 'other-account-membership',
+      account_id: 'other-account',
+      email: 'dealer@example.com',
+    });
+    await assert.rejects(
+      () => consumePilotPortalLaunch(
+        base44,
+        { id: 'base44-user-1', email: 'dealer@example.com' },
+        'G'.repeat(43),
+        BRIDGE_OPTIONS,
+      ),
+      /PORTAL_MEMBERSHIP_ACCOUNT_MISMATCH/,
+    );
+    assert.equal(rows.identities.length, 0);
+  }
+
+  {
+    const { base44, rows } = fixture();
+    rows.memberships[0].user_id = 'different-user';
+    await assert.rejects(
+      () => consumePilotPortalLaunch(
+        base44,
+        { id: 'base44-user-1', email: 'dealer@example.com' },
+        'H'.repeat(43),
+        BRIDGE_OPTIONS,
+      ),
+      /PORTAL_MEMBERSHIP_ALREADY_CLAIMED/,
+    );
+    assert.equal(rows.memberships[0].user_id, 'different-user');
+    assert.equal(rows.identities.length, 0);
+  }
 });
 
 test('consume stores no raw binding secret and requires the pre-assigned Base44 user seat', async (t) => {
