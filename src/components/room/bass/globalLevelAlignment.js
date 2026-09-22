@@ -1,6 +1,6 @@
 // globalLevelAlignment.js
 //
-// Global Level Alignment — the final calibration stage before P19 publication.
+// Global Level Alignment — the final calibration stage before Reference EQ publication.
 //
 // PURPOSE
 //   After the final predicted post-EQ response has been produced by all
@@ -22,8 +22,8 @@
 //      steps.
 //   4. For every offset: shift the ENTIRE response vertically — do not alter
 //      response shape, EQ, phase, delay, or relative gain.
-//   5. Calculate the P19 metric at each offset.
-//   6. Select the offset producing the minimum P19 error.
+//   5. Calculate the internal target-fit metric at each offset.
+//   6. Select the offset producing the minimum internal target-fit error.
 //
 // CONSTRAINTS
 //   - This stage must never improve P14. It can only use genuine available
@@ -35,7 +35,7 @@
 //     0.0 dB and P19 remains unchanged.
 //   - No RP22 grading thresholds are altered. No P14 calculations are altered.
 
-import { computeOfficialP19Assessment } from "@/components/utils/bassAuthoritativeAssessment";
+import { computeCorrectableP19Diagnostic } from "@/components/utils/bassAuthoritativeAssessment";
 
 const STEP_DB = 0.25;
 const DOWNWARD_RANGE_DB = 12; // generous downward sweep (unrestricted by capability)
@@ -70,7 +70,7 @@ export function performGlobalLevelAlignment({
   protectedNullRegions = [],
 }) {
   // Original P19 at the as-calibrated operating level (offset = 0)
-  const originalP19 = computeOfficialP19Assessment({
+  const originalP19 = computeCorrectableP19Diagnostic({
     rspPostEqCurve,
     canonicalTargetCurve,
     assessmentStartHz,
@@ -118,7 +118,7 @@ export function performGlobalLevelAlignment({
     if (offset > upwardBoundDb + 1e-9) break;
 
     const shiftedCurve = shiftCurve(rspPostEqCurve, offset);
-    const p19 = computeOfficialP19Assessment({
+    const p19 = computeCorrectableP19Diagnostic({
       rspPostEqCurve: shiftedCurve,
       canonicalTargetCurve,
       assessmentStartHz,
