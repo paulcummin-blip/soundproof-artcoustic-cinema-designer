@@ -571,6 +571,10 @@ export default function ReportPrintStyles() {
                  A4 portrait with 12 mm page margins leaves 273 mm of usable
                  height. Every major report block is measured by
                  useReportBlockPagination before print and is kept atomic. */
+              .rp22-report {
+                padding-bottom: 0 !important;
+              }
+
               .rp22-report .report-page-block {
                 box-sizing: border-box !important;
                 width: 100% !important;
