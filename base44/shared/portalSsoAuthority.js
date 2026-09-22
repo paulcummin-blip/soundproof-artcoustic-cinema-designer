@@ -111,6 +111,88 @@ async function uniqueRows(entity, query) {
   return Array.isArray(rows) ? rows : [];
 }
 
+function normaliseEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isPortalAdministratorMembership(membership) {
+  return (
+    membership?.is_account_admin === true
+    && membership?.membership_role === 'dealer_admin'
+    && membership?.access_level === 'FULL_ACCESS'
+  );
+}
+
+async function resolveOrClaimPortalAdministratorMembership(
+  service,
+  base44User,
+  accountId,
+) {
+  const accountMemberships = await uniqueRows(
+    service.entities.AccountMembership,
+    { account_id: accountId },
+  );
+
+  const linked = accountMemberships.filter(
+    (membership) => membership?.user_id === base44User.id,
+  );
+  if (linked.length > 1) throw new Error('PORTAL_MEMBERSHIP_AMBIGUOUS');
+  if (linked.length === 1) {
+    const membership = linked[0];
+    if (
+      !['pending', 'active'].includes(membership.status)
+      || !isPortalAdministratorMembership(membership)
+    ) {
+      throw new Error('PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED');
+    }
+    return { membership, claimed: false };
+  }
+
+  const email = normaliseEmail(base44User?.email);
+  if (!hasText(email)) throw new Error('PORTAL_MEMBERSHIP_EMAIL_REQUIRED');
+
+  const membershipsForEmail = await uniqueRows(
+    service.entities.AccountMembership,
+    { email },
+  );
+  if (membershipsForEmail.some(
+    (membership) => membership?.user_id && membership.user_id !== base44User.id,
+  )) {
+    throw new Error('PORTAL_MEMBERSHIP_ALREADY_CLAIMED');
+  }
+  if (membershipsForEmail.some(
+    (membership) => membership?.account_id !== accountId,
+  )) {
+    throw new Error('PORTAL_MEMBERSHIP_ACCOUNT_MISMATCH');
+  }
+
+  const unclaimedAdministrators = accountMemberships.filter(
+    (membership) =>
+      membership?.status === 'pending'
+      && !membership?.user_id
+      && isPortalAdministratorMembership(membership),
+  );
+  if (unclaimedAdministrators.length > 1) {
+    throw new Error('PORTAL_MEMBERSHIP_AMBIGUOUS');
+  }
+
+  const candidates = unclaimedAdministrators.filter(
+    (membership) => normaliseEmail(membership?.email) === email,
+  );
+  if (candidates.length !== 1) {
+    if (unclaimedAdministrators.length === 1) {
+      throw new Error('PORTAL_MEMBERSHIP_EMAIL_MISMATCH');
+    }
+    throw new Error('PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED');
+  }
+
+  const membership = await service.entities.AccountMembership.update(
+    candidates[0].id,
+    { user_id: base44User.id },
+  );
+  return { membership, claimed: true };
+}
+
 export async function resolvePilotPortalMapping(service, accountId) {
   if (accountId !== PILOT_SOUND_PROOF_ACCOUNT_ID) {
     return { required: false, allowed: true, link: null };
@@ -195,19 +277,14 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
     throw new Error('PORTAL_ACCOUNT_INACTIVE');
   }
 
-  const memberships = await uniqueRows(service.entities.AccountMembership, {
-    account_id: link.account_id,
-    user_id: base44User.id,
-  });
-  const membership = memberships.length === 1 ? memberships[0] : null;
-  if (
-    !membership
-    || !['pending', 'active'].includes(membership.status)
-    || membership.is_account_admin !== true
-    || membership.access_level !== 'FULL_ACCESS'
-  ) {
-    throw new Error('PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED');
-  }
+  // First successful portal launch may claim the one pre-created dealer-admin
+  // seat, but only when account and normalised email both match exactly.
+  // Ambiguous, foreign or already-claimed seats fail closed.
+  await resolveOrClaimPortalAdministratorMembership(
+    service,
+    base44User,
+    link.account_id,
+  );
 
   const identities = await uniqueRows(service.entities.PortalIdentity, {
     base44_user_id: base44User.id,
