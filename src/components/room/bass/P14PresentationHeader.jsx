@@ -128,7 +128,7 @@ export default function P14PresentationHeader({
           <div style={titleStyle}>P19 Response Fit</div>
           <div style={valueStyle(p19Pass ? "#213428" : "#b45309")}>{formatP19Deviation(p19Variation)}</div>
           <div style={subtitleStyle(p19Pass ? "#213428" : "#b45309")}>{p19Pass ? "PASS" : "FAIL"}</div>
-          <div style={captionStyle}>Response deviation from house target</div>
+          <div style={captionStyle}>RSP deviation from stored Reference EQ</div>
         </div>
       )}
     </div>
