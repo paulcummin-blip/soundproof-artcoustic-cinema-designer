@@ -28,7 +28,7 @@ import { assessP18AgainstRequiredExtension } from "@/components/utils/bassDesign
 import { assessP18Extension, p18ThresholdHzForLevel } from "@/components/utils/p18ExtensionAuthority";
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 import {
-  computeOfficialP19Assessment,
+  computeCorrectableP19Diagnostic,
   computeOfficialPerSeatP19Assessment,
   computeOfficialP20Assessment,
 } from "@/components/utils/bassAuthoritativeAssessment";
@@ -658,7 +658,7 @@ function buildCanonicalCandidate({
     let p20Db = null, p20Level = null, p20Available = false;
     let perSeatP20 = [];
     if (assessmentBand.valid) {
-      const p19 = computeOfficialP19Assessment({
+      const p19 = computeCorrectableP19Diagnostic({
         rspPostEqCurve: finalPost,
         canonicalTargetCurve: predictorTargetCurve,
         assessmentStartHz: assessmentBand.lowerHz,
@@ -671,7 +671,7 @@ function buildCanonicalCandidate({
 
       const rawPerSeatP19 = computeOfficialPerSeatP19Assessment({
         perSeatPostEqCurves: candidatePerSeatCurves,
-        canonicalTargetCurve: predictorTargetCurve,
+        referenceEqCurve: finalPost,
         assessmentStartHz: assessmentBand.lowerHz,
         assessmentEndHz: assessmentBand.upperHz,
         protectedNullRegions,
