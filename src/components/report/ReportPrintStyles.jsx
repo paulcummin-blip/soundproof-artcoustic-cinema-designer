@@ -665,9 +665,11 @@ export default function ReportPrintStyles() {
 
               .rp22-report #pdf-screen-wall-construction svg {
                 display: block !important;
-                width: 100% !important;
+                width: auto !important;
+                max-width: 100% !important;
                 height: 273mm !important;
                 max-height: 273mm !important;
+                margin: 0 auto !important;
                 object-fit: contain !important;
               }
 
