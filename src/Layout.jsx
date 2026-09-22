@@ -38,6 +38,7 @@ import DesignRatingSummary from "@/components/pricing/DesignRatingSummary";
 import { PartnerPortalIdentityProvider } from "@/components/providers/PartnerPortalIdentityProvider";
 import DealerIdentityDiagnostic from "@/components/dev/DealerIdentityDiagnostic";
 import DealerHero from "@/components/ui/HeroBanner";
+import BrandBar from "@/components/ui/BrandBar";
 import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAuth } from "@/lib/AuthContext";
 import { hasCapability, isMasterAdmin } from "@/lib/accountAccess";
@@ -542,7 +543,12 @@ export default function Layout({ children, currentPageName }) {
                       min-width: 0;
                     }
                   `}</style>
-                  <>{!isReportAutoPrint && <DealerHero />}</>
+                  {!isReportAutoPrint && (
+                    <>
+                      <DealerHero />
+                      <BrandBar />
+                    </>
+                  )}
                   {children}
                 </SegmentBoundary>
               </SafeBootErrorBoundary>
