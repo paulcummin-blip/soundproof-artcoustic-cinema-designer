@@ -6,16 +6,26 @@ const SP_LOGO_URL =
   "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg";
 
 /**
- * HeroBanner — centred banner shown at the top of the main content area.
+ * HeroBanner — premium full-width brand partnership banner.
  *
- * Sound Proof is always visually dominant. Dealer branding (logo + name) is
- * secondary and never exceeds ~60% of the Sound Proof logo prominence.
+ * Displays:  Sound Proof logo  ×  Dealer logo (or dealer name)
+ * No marketing copy. The logos communicate the relationship.
  *
- * If the dealer has uploaded a hero background image, it is rendered with a
- * subtle blur and a translucent dark overlay for text legibility. If no
- * background image exists, the neutral Sound Proof background is used.
+ * Sound Proof is always first and visually dominant.
+ * Dealer logo is 75% of the Sound Proof logo height.
+ * The × symbol is the partnership mark.
  *
- * The banner is not sticky — it scrolls naturally out of view with the page.
+ * Background:
+ *   If a dealer hero image exists, it is rendered full-width, cover,
+ *   centred, with a ~50% dark overlay for logo legibility. No blur.
+ *   If no hero image, a clean neutral background is used.
+ *
+ * Fallbacks:
+ *   - Dealer logo present:  SP × Dealer Logo
+ *   - Dealer logo missing:  SP × Dealer Name
+ *   - No dealer at all:     SP logo only, centred
+ *
+ * Height: ~300px on desktop, ~200px on mobile.
  */
 export default function DealerHero() {
   const { user } = useAuth();
@@ -56,27 +66,24 @@ export default function DealerHero() {
 
   const heroBg = brand?.hero_background_url || null;
   const dealerName = brand?.display_name_override || brand?.company_name || null;
-  const dealerTagline = brand?.tagline || null;
-  // On dark hero backgrounds, prefer the white logo if available.
   const dealerLogo = heroBg
     ? (brand?.white_logo_url || brand?.dealer_logo_url || null)
     : (brand?.dealer_logo_url || brand?.white_logo_url || null);
   const hasDealer = !!(dealerLogo || dealerName);
 
   const textColor = heroBg ? "#FFFFFF" : "#1B1A1A";
-  const subTextColor = heroBg ? "rgba(255,255,255,0.82)" : "#625143";
-  const partnerColor = heroBg ? "rgba(255,255,255,0.55)" : "#9C9A95";
-  const separatorColor = heroBg ? "rgba(255,255,255,0.25)" : "#DCDBD6";
+  const crossColor = heroBg ? "rgba(255,255,255,0.45)" : "rgba(27,26,26,0.30)";
 
   return (
     <div
-      className="relative w-full flex-shrink-0"
+      className="relative w-full flex-shrink-0 overflow-hidden"
       style={{
+        height: "clamp(200px, 20vw, 300px)",
         background: heroBg ? "#1B1A1A" : "#F8F8F7",
         borderBottom: `1px solid ${heroBg ? "rgba(255,255,255,0.12)" : "#DCDBD6"}`,
       }}
     >
-      {/* Blurred background image */}
+      {/* Hero background image — full width, cover, centred, no blur */}
       {heroBg && (
         <>
           <div
@@ -85,88 +92,78 @@ export default function DealerHero() {
               backgroundImage: `url(${heroBg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
-              filter: "blur(4px)",
-              transform: "scale(1.08)",
             }}
           />
-          <div
-            className="absolute inset-0"
-            style={{ background: "rgba(0,0,0,0.55)" }}
-          />
+          <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.5)" }} />
         </>
       )}
 
-      {/* Centred content */}
+      {/* Centred brand partnership */}
       <div
-        className="relative flex flex-col items-center justify-center text-center px-4 py-8"
+        className="relative h-full flex items-center justify-center px-6 sm:px-10"
         style={{ fontFamily: "Didact Gothic, Century Gothic, sans-serif" }}
       >
-        {/* Sound Proof — primary brand */}
-        <img
-          src={SP_LOGO_URL}
-          alt="Sound Proof"
-          style={{ height: 56, objectFit: "contain", maxWidth: 280 }}
-        />
         <div
-          className="mt-2 font-semibold"
-          style={{ color: textColor, fontSize: 14, letterSpacing: "0.04em" }}
+          className="flex items-center justify-center"
+          style={{ gap: "clamp(24px, 4vw, 48px)" }}
         >
-          Professional Home Cinema Engineering
-        </div>
-        <div
-          className="mt-0.5"
-          style={{ color: subTextColor, fontSize: 11, letterSpacing: "0.03em" }}
-        >
-          Powered by Artcoustic Design Intelligence
-        </div>
+          {/* Sound Proof — primary brand, always first, always dominant */}
+          <img
+            src={SP_LOGO_URL}
+            alt="Sound Proof"
+            style={{
+              height: "clamp(40px, 5vw, 64px)",
+              objectFit: "contain",
+              maxWidth: 320,
+              flexShrink: 0,
+            }}
+          />
 
-        {/* Dealer branding — secondary */}
-        {hasDealer && (
-          <>
-            {/* Separator */}
-            <div
-              className="flex items-center gap-3 my-4"
-              style={{ width: "100%", maxWidth: 360 }}
-            >
-              <div style={{ flex: 1, height: 1, background: separatorColor }} />
-              <span style={{ color: partnerColor, fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                In partnership with
+          {/* Partnership mark + dealer branding */}
+          {hasDealer && (
+            <>
+              <span
+                style={{
+                  fontSize: "clamp(20px, 2.5vw, 30px)",
+                  fontWeight: 300,
+                  color: crossColor,
+                  lineHeight: 1,
+                  userSelect: "none",
+                  flexShrink: 0,
+                }}
+              >
+                ×
               </span>
-              <div style={{ flex: 1, height: 1, background: separatorColor }} />
-            </div>
 
-            <div className="flex items-center gap-3 flex-wrap justify-center">
-              {dealerLogo && (
+              {dealerLogo ? (
                 <img
                   src={dealerLogo}
                   alt={dealerName || "Dealer"}
-                  style={{ height: 34, objectFit: "contain", maxWidth: 200 }}
+                  style={{
+                    height: "clamp(30px, 3.75vw, 48px)",
+                    objectFit: "contain",
+                    maxWidth: 240,
+                    flexShrink: 0,
+                  }}
                 />
-              )}
-              {dealerName && (
+              ) : (
                 <span
                   style={{
                     color: textColor,
-                    fontSize: 16,
+                    fontSize: "clamp(18px, 2vw, 26px)",
                     fontWeight: 700,
                     letterSpacing: "0.02em",
+                    lineHeight: 1,
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
                   }}
                 >
                   {dealerName}
                 </span>
               )}
-            </div>
-
-            {dealerTagline && (
-              <div
-                className="mt-1.5"
-                style={{ color: subTextColor, fontSize: 11, fontStyle: "italic" }}
-              >
-                {dealerTagline}
-              </div>
-            )}
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

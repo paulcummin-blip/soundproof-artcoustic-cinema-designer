@@ -13,7 +13,7 @@ export default function DealerBranding() {
         <div className="mb-6">
           <h1 className="m-0 text-2xl font-bold">Dealer Branding</h1>
           <p className="mt-1 text-sm text-[#3E4349]">
-            Personalise the hero banner shown to your clients. Sound Proof remains the primary brand — your branding appears as a secondary "in partnership with" element.
+            Personalise the hero banner shown to your clients. Your logo appears alongside the Sound Proof brand as a premium partnership statement.
           </p>
         </div>
         <DealerBrandingPanel accountId={accountId} />

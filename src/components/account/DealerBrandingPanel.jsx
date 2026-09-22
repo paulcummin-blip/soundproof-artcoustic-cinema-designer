@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import ImageUploadField from "@/components/proposal/ImageUploadField";
 import { loadDealerBrand, saveDealerBrand } from "@/components/account/dealerBrandAuthority";
+import { LOGO_UPLOAD_CONFIG, HERO_UPLOAD_CONFIG } from "@/components/utils/brandAssetValidation";
 
 const DEFAULTS = {
   company_name: "",
@@ -125,7 +126,7 @@ export default function DealerBrandingPanel({ accountId }) {
       <div className="space-y-2">
         <Label className={labelClasses}>Company Logo</Label>
         <p className="text-xs text-[#8A8477]">
-          Shown in the hero banner alongside the Sound Proof logo. Use a transparent PNG for best results.
+          SVG (preferred) or transparent PNG. Minimum 1200px wide. Aspect ratio approximately 4:1 to 1:1. No JPG, WebP, or screenshots.
         </p>
         <ImageUploadField
           label="Company Logo"
@@ -133,6 +134,8 @@ export default function DealerBrandingPanel({ accountId }) {
           onUpload={(url) => updateAndPersist("dealer_logo_url", url)}
           onRemove={() => updateAndPersist("dealer_logo_url", null)}
           showCaption={false}
+          accept={LOGO_UPLOAD_CONFIG.accept}
+          validate={LOGO_UPLOAD_CONFIG.validate}
         />
       </div>
 
@@ -140,7 +143,7 @@ export default function DealerBrandingPanel({ accountId }) {
       <div className="space-y-2">
         <Label className={labelClasses}>White Logo (for dark backgrounds)</Label>
         <p className="text-xs text-[#8A8477]">
-          Used when a hero background image is uploaded. Recommended for legibility on dark overlays.
+          Required for dark hero images. Same standards as the company logo — SVG or transparent PNG, minimum 1200px wide.
         </p>
         <ImageUploadField
           label="White Logo"
@@ -148,6 +151,8 @@ export default function DealerBrandingPanel({ accountId }) {
           onUpload={(url) => updateAndPersist("white_logo_url", url)}
           onRemove={() => updateAndPersist("white_logo_url", null)}
           showCaption={false}
+          accept={LOGO_UPLOAD_CONFIG.accept}
+          validate={LOGO_UPLOAD_CONFIG.validate}
         />
       </div>
 
@@ -155,7 +160,7 @@ export default function DealerBrandingPanel({ accountId }) {
       <div className="space-y-2">
         <Label className={labelClasses}>Hero Background Image</Label>
         <p className="text-xs text-[#8A8477]">
-          Displayed behind the hero banner with a subtle blur and dark overlay. If omitted, a neutral Sound Proof background is used.
+          JPG or PNG. Minimum 2400×900px, recommended 3200×1200px. Architectural, cinema, interior, or premium residential imagery. No screenshots or images containing text.
         </p>
         <ImageUploadField
           label="Hero Background Image"
@@ -163,6 +168,8 @@ export default function DealerBrandingPanel({ accountId }) {
           onUpload={(url) => updateAndPersist("hero_background_url", url)}
           onRemove={() => updateAndPersist("hero_background_url", null)}
           showCaption={false}
+          accept={HERO_UPLOAD_CONFIG.accept}
+          validate={HERO_UPLOAD_CONFIG.validate}
         />
       </div>
 
@@ -170,7 +177,7 @@ export default function DealerBrandingPanel({ accountId }) {
       <div className="space-y-2">
         <Label className={labelClasses}>Company Display Name (optional)</Label>
         <p className="text-xs text-[#8A8477]">
-          Overrides the company name shown in the hero banner. Leave blank to use the company name from your Brand Assets.
+          Shown in the hero banner when no dealer logo is uploaded. Leave blank to use the company name from your Brand Assets.
         </p>
         <Input
           value={form.display_name_override || ""}
@@ -185,7 +192,7 @@ export default function DealerBrandingPanel({ accountId }) {
       <div className="space-y-2">
         <Label className={labelClasses}>Company Tagline (optional)</Label>
         <p className="text-xs text-[#8A8477]">
-          A short tagline shown beneath the dealer name in the hero banner.
+          A short tagline for proposals and other dealer materials. Not shown in the hero banner.
         </p>
         <Input
           value={form.tagline || ""}

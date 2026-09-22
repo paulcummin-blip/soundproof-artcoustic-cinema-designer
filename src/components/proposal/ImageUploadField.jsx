@@ -25,8 +25,11 @@ export default function ImageUploadField({
   caption,
   onCaptionChange,
   showCaption = true,
+  accept = 'image/*',
+  validate = null,
 }) {
   const [uploading, setUploading] = useState(false);
+  const [validationError, setValidationError] = useState(null);
   const [localCaption, setLocalCaption] = useState(caption || '');
   const fileInputRef = useRef(null);
 
@@ -36,6 +39,23 @@ export default function ImageUploadField({
 
   const handleFile = async (file) => {
     if (!file) return;
+    setValidationError(null);
+
+    if (validate) {
+      try {
+        const result = await validate(file);
+        if (!result.ok) {
+          setValidationError(result.error || 'This image does not meet the required standards.');
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+      } catch {
+        setValidationError('Failed to validate this image. Please try again.');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+    }
+
     setUploading(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
@@ -96,10 +116,13 @@ export default function ImageUploadField({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept={accept}
         className="hidden"
         onChange={(e) => e.target.files[0] && handleFile(e.target.files[0])}
       />
+      {validationError && (
+        <p className="text-xs text-red-600 leading-relaxed">{validationError}</p>
+      )}
     </div>
   );
 }

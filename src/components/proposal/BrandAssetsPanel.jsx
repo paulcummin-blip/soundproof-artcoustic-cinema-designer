@@ -10,6 +10,7 @@ import RichTextField from '@/components/proposal/RichTextField';
 import ProposalDefaultsPanel from '@/components/proposal/ProposalDefaultsPanel';
 import PublicationPreview from '@/components/proposal/PublicationPreview';
 import { loadDealerBrand, saveDealerBrand } from '@/components/account/dealerBrandAuthority';
+import { LOGO_UPLOAD_CONFIG } from '@/components/utils/brandAssetValidation';
 
 const DEFAULTS = {
   company_name: '',
@@ -175,6 +176,8 @@ export default function BrandAssetsPanel({ accountId }) {
               onUpload={(url) => updateAndPersist('dealer_logo_url', url)}
               onRemove={() => updateAndPersist('dealer_logo_url', null)}
               showCaption={false}
+              accept={LOGO_UPLOAD_CONFIG.accept}
+              validate={LOGO_UPLOAD_CONFIG.validate}
             />
             <ImageUploadField
               label="White Logo (for dark backgrounds)"
@@ -182,6 +185,8 @@ export default function BrandAssetsPanel({ accountId }) {
               onUpload={(url) => updateAndPersist('white_logo_url', url)}
               onRemove={() => updateAndPersist('white_logo_url', null)}
               showCaption={false}
+              accept={LOGO_UPLOAD_CONFIG.accept}
+              validate={LOGO_UPLOAD_CONFIG.validate}
             />
           </div>
         </Section>
