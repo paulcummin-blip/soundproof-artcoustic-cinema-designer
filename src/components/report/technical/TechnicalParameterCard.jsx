@@ -111,6 +111,7 @@ export default function TechnicalParameterCard({
   rspLabel,
   asdrFooter = null,
   variant = "print",
+  assumed = false,
 }) {
   const isSeatScope = String(param?.scope || "").toLowerCase() === "seat";
   const isScreen = variant === "screen";
@@ -211,17 +212,15 @@ export default function TechnicalParameterCard({
       >
         {isSeatScope ? <SeatScopeBadge variant="print" /> : <TechnicalLevelBadge level={lvl} />}
         {!isSeatScope && (
-          <div
-            style={{
-              fontSize: u.fsValue,
-              fontWeight: 700,
-              color: "#213428",
-              fontFamily: HEADING_FONT,
-              lineHeight: 1.1,
-              flex: 1,
-            }}
-          >
-            {achievedValue || "—"}
+          <div style={{ flex: 1, fontFamily: HEADING_FONT, lineHeight: 1.1 }}>
+            {assumed && (
+              <div style={{ fontSize: u.fsLabel, fontWeight: 600, color: "#625143", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: u.mt1 }}>
+                Assumed
+              </div>
+            )}
+            <div style={{ fontSize: u.fsValue, fontWeight: 700, color: "#213428" }}>
+              {achievedValue || (assumed ? "L2 design assumption" : "—")}
+            </div>
           </div>
         )}
       </div>
