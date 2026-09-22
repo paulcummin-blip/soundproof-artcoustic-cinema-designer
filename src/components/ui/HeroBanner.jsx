@@ -129,8 +129,8 @@ export default function DealerHero() {
         }
         const avgBrightness = sum / pixelCount; // 0–255
         if (avgBrightness > 128) {
-          // Bright image — increase overlay for white text contrast
-          setOverlayOpacity(Math.min(0.6, 0.45 + ((avgBrightness - 128) / 128) * 0.15));
+          // Bright image — increase overlay (capped at 50%)
+          setOverlayOpacity(Math.min(0.5, 0.45 + ((avgBrightness - 128) / 128) * 0.05));
         } else {
           setOverlayOpacity(0.45);
         }
@@ -139,7 +139,7 @@ export default function DealerHero() {
         setOverlayOpacity(0.5);
       }
     };
-    img.onerror = () => setOverlayOpacity(0.5);
+    img.onerror = () => setOverlayOpacity(0.48);
     img.src = heroBg;
   }, [heroBg]);
 
@@ -250,11 +250,21 @@ export default function DealerHero() {
               backgroundImage: `url(${heroBg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
+              filter: "brightness(0.9)",
             }}
           />
+          {/* Dark overlay — 45–50% to de-emphasise the image */}
           <div
             className="absolute inset-0"
             style={{ background: `rgba(0,0,0,${overlayOpacity})` }}
+          />
+          {/* Subtle vignette — darkens edges, keeps centre clear for logos */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.35) 100%)",
+            }}
           />
         </>
       )}
