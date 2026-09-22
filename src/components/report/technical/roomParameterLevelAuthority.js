@@ -9,7 +9,7 @@
  * room-parameter grading (e.g. P12/P13 mode-aware re-grading).
  */
 
-import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
+import { levelP21_earlyReflections } from "@/components/utils/rp22/levels";
 import { p18ThresholdsForBasis } from "@/components/utils/p18ExtensionAuthority";
 import { resolveAssumedP15Level, resolveAssumedP21Level } from "@/components/utils/assumedParameterAuthority";
 
