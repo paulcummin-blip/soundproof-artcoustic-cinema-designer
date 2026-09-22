@@ -10,6 +10,7 @@
 // Pure function — no React. Safe to call from hooks, effects, or tests.
 
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
+import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 
 const LCR_ROLES = new Set(['FL', 'FC', 'FR']);
 const SURROUND_ROLES = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
@@ -24,15 +25,26 @@ export function hasMinimumSystemForAsdr(placedSpeakers, appState) {
 
   const lcrPresent = new Set();
   let hasSurround = false;
+  let integratedLcr = false;
   for (const s of speakers) {
     const role = getCanonicalRole(s?.role);
     if (LCR_ROLES.has(role)) {
       lcrPresent.add(role);
+      // An integrated LCR soundbar (FC with frontStageType=integrated_lcr)
+      // provides FL+FC+FR in a single cabinet — equivalent to a complete
+      // discrete LCR stage for publication eligibility.
+      if (role === 'FC' && s?.model) {
+        const meta = getSpeakerModelMeta(s.model);
+        if (meta?.frontStageType === 'integrated_lcr') {
+          integratedLcr = true;
+        }
+      }
     } else if (SURROUND_ROLES.has(role)) {
       hasSurround = true;
     }
   }
-  const hasLcr = lcrPresent.has('FL') && lcrPresent.has('FC') && lcrPresent.has('FR');
+  const hasDiscreteLcr = lcrPresent.has('FL') && lcrPresent.has('FC') && lcrPresent.has('FR');
+  const hasLcr = hasDiscreteLcr || integratedLcr;
 
   const subs = Array.isArray(appState?.subwoofers) ? appState.subwoofers : [];
   const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
