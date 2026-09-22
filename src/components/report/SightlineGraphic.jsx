@@ -418,6 +418,7 @@ export default function SightlineGraphic({
   projectorBodyDepth,
   rowData = [],
   dolbyConfig,
+  showHeader = true,
 }) {
   if (!rowData.length) return null;
 
@@ -441,34 +442,35 @@ export default function SightlineGraphic({
   return (
     <div style={{ width: '100%', background: '#FFFFFF', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
 
-      {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, borderBottom: `2px solid ${PALETTE.room}`, paddingBottom: 6 }}>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: PALETTE.label, letterSpacing: '0.02em' }}>
-            Sightlines &amp; Viewing Angles
+      {showHeader && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, borderBottom: `2px solid ${PALETTE.room}`, paddingBottom: 6 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: PALETTE.label, letterSpacing: '0.02em' }}>
+              Sightlines &amp; Viewing Angles
+            </div>
+            {(projectName || clientName) && (
+              <div style={{ fontSize: 9, color: PALETTE.subLabel, marginTop: 2 }}>
+                {projectName && <span style={{ fontWeight: 600 }}>{projectName}</span>}
+                {projectName && clientName && <span style={{ margin: '0 6px', color: PALETTE.tableBorder }}>|</span>}
+                {clientName && <span>{clientName}</span>}
+              </div>
+            )}
           </div>
-          {(projectName || clientName) && (
-            <div style={{ fontSize: 9, color: PALETTE.subLabel, marginTop: 2 }}>
-              {projectName && <span style={{ fontWeight: 600 }}>{projectName}</span>}
-              {projectName && clientName && <span style={{ margin: '0 6px', color: PALETTE.tableBorder }}>|</span>}
-              {clientName && <span>{clientName}</span>}
-            </div>
-          )}
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {[
+              ['Room', `${roomLengthM?.toFixed(2)} × ${roomWidthM?.toFixed(2)} × ${roomHeightM?.toFixed(2)} m`],
+              ['Screen', screenInches],
+              ['Throw', throwDistM != null ? `${throwDistM.toFixed(2)} m` : null],
+              ['System', dolbyConfig],
+            ].filter(([, v]) => v).map(([label, value]) => (
+              <div key={label} style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 7, color: PALETTE.subLabel, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+                <div style={{ fontSize: 9, fontWeight: 600, color: PALETTE.label }}>{value}</div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {[
-            ['Room', `${roomLengthM?.toFixed(2)} × ${roomWidthM?.toFixed(2)} × ${roomHeightM?.toFixed(2)} m`],
-            ['Screen', screenInches],
-            ['Throw', throwDistM != null ? `${throwDistM.toFixed(2)} m` : null],
-            ['System', dolbyConfig],
-          ].filter(([, v]) => v).map(([label, value]) => (
-            <div key={label} style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 7, color: PALETTE.subLabel, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-              <div style={{ fontSize: 9, fontWeight: 600, color: PALETTE.label }}>{value}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* ── SVG side elevation ── */}
       <div style={{ width: '100%', border: `1px solid ${PALETTE.tableBorder}`, borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
