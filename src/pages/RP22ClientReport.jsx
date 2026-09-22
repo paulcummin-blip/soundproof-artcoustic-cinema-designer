@@ -97,10 +97,25 @@ export default function RP22ClientReport() {
 
   // ── Design Summary (static intro + canonical design assumptions) ──
   const highlights = useMemo(() => selectClientDesignHighlights(), []);
-  const designAssumptions = useMemo(() => ({
-    p15: { label: "Background Noise Floor", status: "Assumed", level: "L2", detail: "Design target: NCB 22" },
-    p21: { label: "Early Reflections", status: "Assumed", level: "L2", detail: "Early reflections have not been measured." },
-  }), []);
+  const designAssumptions = useMemo(() => {
+    const roomResults = engineeringSummary?.roomResultsByParameter || {};
+    const p15 = roomResults?.[15] || {};
+    const p21 = roomResults?.[21] || {};
+    return {
+      p15: {
+        label: "Background Noise Floor",
+        status: p15.status === "measured" ? "Measured" : "Assumed",
+        level: p15.level || "L2",
+        detail: p15.status === "measured" ? (p15.formatted || "Measured result") : "Design target: NCB 22",
+      },
+      p21: {
+        label: "Early Reflections",
+        status: p21.status === "measured" ? "Measured" : "Assumed",
+        level: p21.level || "L2",
+        detail: p21.status === "measured" ? (p21.formatted || "Measured result") : "Early reflections have not been measured.",
+      },
+    };
+  }, [engineeringSummary]);
 
   // PASSIVE CONSUMER: the Visual Report reads the exact coverage result
   // published by the Room Designer's canonical engineering summary.
