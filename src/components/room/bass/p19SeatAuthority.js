@@ -55,7 +55,11 @@ function rowNumber(seat) {
 
 function columnNumber(seat, fallback) {
   const value = Number(seat?.column ?? seat?.col ?? seat?.indexInRow ?? seat?.seatNumber);
-  return Number.isFinite(value) ? value : fallback;
+  if (Number.isFinite(value)) return value;
+  const idMatch = cleanId(seat?.id ?? seat?.seatId).match(/-c(\d+)$/i);
+  if (idMatch) return Number(idMatch[1]);
+  const x = Number(seat?.x ?? seat?.position?.x);
+  return Number.isFinite(x) ? x : fallback;
 }
 
 /**
