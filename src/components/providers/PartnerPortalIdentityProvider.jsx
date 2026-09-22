@@ -44,10 +44,7 @@ export function PartnerPortalIdentityProvider({ children }) {
           error: null,
           reason: null,
         });
-        console.log("[PartnerPortalIdentity] Dealer identity resolved", {
-          dealer: data.identity.dealer_name,
-          dealerAccountId: data.identity.dealer_account_id,
-        });
+        console.log("[PartnerPortalIdentity] Dealer identity resolved");
       } else {
         setState({
           identity: null,
