@@ -611,16 +611,54 @@ export default function ReportPrintStyles() {
                 height: 272mm !important;
                 max-height: 272mm !important;
                 display: flex !important;
-                align-items: flex-start !important;
+                align-items: center !important;
                 justify-content: center !important;
                 overflow: hidden !important;
               }
 
+              /* A fixed available rectangle plus object-fit: contain implements
+                 scale = min(availableWidth / drawingWidth,
+                             availableHeight / drawingHeight).
+                 Both dimensions are constrained so browser print layout cannot
+                 restore the image's intrinsic height and crop the room. */
               .rp22-report .plan-fitbox > img {
                 width: 100% !important;
-                height: auto !important;
-                max-height: 272mm !important;
+                height: 100% !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
+                margin: auto !important;
                 object-fit: contain !important;
+                object-position: center center !important;
+              }
+
+              .rp22-report .speaker-position-plan {
+                width: 100% !important;
+                height: 100% !important;
+                max-height: 100% !important;
+                box-sizing: border-box !important;
+                display: flex !important;
+                flex-direction: column !important;
+                overflow: hidden !important;
+              }
+
+              .rp22-report .speaker-position-plan__drawing {
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                overflow: hidden !important;
+              }
+
+              .rp22-report .speaker-position-plan__image {
+                width: 100% !important;
+                height: 100% !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
+                margin: auto !important;
+                object-fit: contain !important;
+                object-position: center center !important;
               }
 
               .rp22-report .report-drawing-title {
