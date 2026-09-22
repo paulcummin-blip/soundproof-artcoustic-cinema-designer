@@ -20,7 +20,7 @@ export default function BrandBar() {
       style={{
         background: "#FFFFFF",
         borderTop: "1px solid #DCDBD6",
-        padding: "14px 32px",
+        padding: "20px 32px",
       }}
     >
       <div style={{ fontFamily: FONT_FAMILY }}>
