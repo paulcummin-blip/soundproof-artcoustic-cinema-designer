@@ -90,6 +90,8 @@ export default function RP22ClientReport() {
     subwooferInstances,
     analysisResult,
     allSeatSplMetrics,
+    versionNumber,
+    versionName,
   } = authority;
 
   // A report is ready only when the one canonical publication is available.
@@ -680,6 +682,8 @@ export default function RP22ClientReport() {
     activePageCount: showDependencyChecker ? 0 : activePages.length,
     projectName: projectDetails?.name,
     logoUrl: LOGO_URL,
+    versionNumber,
+    versionName,
   });
 
   const handleBackToProject = () => {

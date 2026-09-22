@@ -87,6 +87,8 @@ function RP22ReportInner() {
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
     const [projectDetails, setProjectDetails] = useState(null);
+    const [reportVersionNumber, setReportVersionNumber] = useState(null);
+    const [reportVersionName, setReportVersionName] = useState(null);
     const [reportHydrating, setReportHydrating] = useState(true);
     const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
     const showDesignRating = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
@@ -254,7 +256,10 @@ function RP22ReportInner() {
                 try {
                     const versions = await base44.entities.ProjectVersion.filter({ id: versionId });
                     if (!cancelled && versions && versions.length > 0) {
-                        merged = mergeProjectAndVersion(p, versions[0]);
+                        const v = versions[0];
+                        merged = mergeProjectAndVersion(p, v);
+                        setReportVersionNumber(typeof v.version_number === "number" ? v.version_number : null);
+                        setReportVersionName(typeof v.version_name === "string" ? v.version_name : null);
                     }
                 } catch (verErr) {
                     console.warn("[RP22Report] Version fetch failed, using project-only:", verErr);
@@ -449,7 +454,7 @@ function RP22ReportInner() {
             if (originalPrintTitleRef.current === null) {
                 originalPrintTitleRef.current = document.title;
             }
-            document.title = buildTechnicalReportTitle(projectDetails?.name);
+            document.title = buildTechnicalReportTitle(projectDetails?.name, { number: reportVersionNumber, name: reportVersionName });
             window.addEventListener("afterprint", () => setAutoPrintDone(true), { once: true });
             window.print();
             cleanupTimeoutRef.current = setTimeout(() => {

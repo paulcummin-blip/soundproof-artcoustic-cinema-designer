@@ -76,6 +76,8 @@ export function useClientReportAuthority(projectId) {
   const [hydrating, setHydrating] = useState(true);
   const [hydratedProjectId, setHydratedProjectId] = useState(null);
   const [versionId, setVersionId] = useState(null);
+  const [versionNumber, setVersionNumber] = useState(null);
+  const [versionName, setVersionName] = useState(null);
 
   // ── 1) Fetch + hydrate ──────────────────────────────────────────────────
   useEffect(() => {
@@ -88,6 +90,8 @@ export function useClientReportAuthority(projectId) {
       setHydrating(false);
       setHydratedProjectId(null);
       setVersionId(null);
+      setVersionNumber(null);
+      setVersionName(null);
       return;
     }
 
@@ -152,7 +156,10 @@ export function useClientReportAuthority(projectId) {
           const versions = await base44.entities.ProjectVersion.filter({ id: activeVersionId });
           if (cancelled) return;
           if (versions && versions.length > 0) {
-            merged = mergeProjectAndVersion(p, versions[0]);
+            const v = versions[0];
+            merged = mergeProjectAndVersion(p, v);
+            setVersionNumber(typeof v.version_number === "number" ? v.version_number : null);
+            setVersionName(typeof v.version_name === "string" ? v.version_name : null);
           }
         } catch (verErr) {
           console.warn("[useClientReportAuthority] Version fetch failed, using project-only:", verErr);
@@ -631,6 +638,8 @@ export function useClientReportAuthority(projectId) {
   return {
     projectId,
     versionId,
+    versionNumber,
+    versionName,
     projectDetails,
     hydrating,
     hydrated: hydratedProjectId === projectId && !hydrating,

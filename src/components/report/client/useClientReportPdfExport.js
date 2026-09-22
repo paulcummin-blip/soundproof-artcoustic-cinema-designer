@@ -18,6 +18,9 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { buildVisualReportTitle } from "@/components/report/reportPdfTitle";
 
+// Version metadata is optional — only present when the project has a saved
+// named design version. The filename helper appends it when meaningful.
+
 const PRINT_TIMEOUT_MS = 60000;
 
 function decodeLogo(url) {
@@ -42,7 +45,7 @@ function decodeLogo(url) {
   });
 }
 
-export function useClientReportPdfExport({ activePageCount, projectName, logoUrl }) {
+export function useClientReportPdfExport({ activePageCount, projectName, logoUrl, versionNumber, versionName }) {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
   const printingRef = useRef(false);
@@ -101,7 +104,7 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
 
       // 4. Set temporary document title
       originalTitleRef.current = document.title;
-      document.title = buildVisualReportTitle(projectName);
+      document.title = buildVisualReportTitle(projectName, { number: versionNumber, name: versionName });
 
       // 5. Wait two animation frames for print layout to settle
       await new Promise((resolve) =>
