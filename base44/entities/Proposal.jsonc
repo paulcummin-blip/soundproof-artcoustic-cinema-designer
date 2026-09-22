@@ -44,12 +44,15 @@
         "draft",
         "generating",
         "generated",
+        "edited",
         "reviewed",
+        "issued",
+        "accepted",
         "sent",
         "archived"
       ],
       "default": "draft",
-      "description": "Proposal lifecycle status. draft = created but not yet generated. generating = generation in progress. generated = content populated. reviewed = human-reviewed. sent = delivered to client. archived = retired."
+      "description": "Proposal lifecycle status. Content-generation states: draft = created but not yet generated. generating = AI generation in progress. generated = initial AI output complete. Business lifecycle states: edited = manually reviewed or modified by the designer. reviewed = legacy equivalent of edited (retained for backward compatibility). issued = client-facing proposal sent or published. sent = legacy equivalent of issued (retained for backward compatibility). accepted = client accepted the proposal. archived = completed or closed. Full lifecycle: Draft \u2192 Generating \u2192 Generated \u2192 Edited \u2192 Issued \u2192 Accepted \u2192 Archived."
     },
     "narrative_goal": {
       "type": "string",
@@ -83,6 +86,21 @@
       "type": "number",
       "default": 1,
       "description": "Proposal version number for future versioning."
+    },
+    "version_label": {
+      "type": "string",
+      "description": "Independent proposal version label for proposal versioning (e.g. 'Proposal A', 'Revision 1', 'Final'). Null = not yet versioned. Each project may have multiple proposals with different version labels. Only one proposal per project can have is_current_version = true.",
+      "nullable": true
+    },
+    "is_current_version": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this is the current active version among proposals linked to the same project. Only one proposal per project should have this set to true. Previous versions remain read-only for audit and comparison."
+    },
+    "parent_proposal_id": {
+      "type": "string",
+      "description": "ID of the parent Proposal this proposal is a revision of. Null = this is an original proposal, not a revision. Links proposals in a version chain within the same project.",
+      "nullable": true
     },
     "template": {
       "type": "string",

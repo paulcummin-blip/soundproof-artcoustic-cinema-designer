@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import BrandAssetsPanel from '@/components/proposal/BrandAssetsPanel';
 import PlaceholderTab from '@/components/proposal/PlaceholderTab';
 import CreateProposalWizard from '@/components/proposal/CreateProposalWizard';
+import ProposalHistoryTab from '@/components/proposal/ProposalHistoryTab';
 import { Plus, ChevronLeft } from 'lucide-react';
 
 const TABS = [
@@ -113,7 +114,10 @@ export default function ProposalCentre() {
         </div>
 
         {activeTab === 'brand' && <BrandAssetsPanel accountId={accountId} />}
-        {activeTab !== 'brand' && (
+        {activeTab === 'history' && (
+          <ProposalHistoryTab onCreateProposal={() => setShowWizard(true)} />
+        )}
+        {activeTab !== 'brand' && activeTab !== 'history' && (
           <PlaceholderTab
             title={PLACEHOLDER_CONTENT[activeTab].title}
             description={PLACEHOLDER_CONTENT[activeTab].description}
