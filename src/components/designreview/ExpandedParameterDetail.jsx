@@ -203,7 +203,9 @@ export default function ExpandedParameterDetail({
                 Assumed
               </div>
             )}
-            {achievedValue || (isAssumed ? "L2 design assumption" : "—")}
+            {isAssumed && Number(param.id) === 21
+              ? "Level 2 design assumption"
+              : (achievedValue || (isAssumed ? "L2 design assumption" : "—"))}
           </div>
         )}
       </div>
