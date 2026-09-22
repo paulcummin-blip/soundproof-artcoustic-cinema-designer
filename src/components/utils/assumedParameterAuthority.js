@@ -3,15 +3,13 @@
 // Single canonical authority for the designer-assumed RP22 parameters P15
 // (background noise floor) and P21 (early reflections).
 //
-// P15 and P21 are ASSUMED design parameters — the designer selects the
-// achieved RP22 Performance Level (L1–L4); the display value (NCB / dB) is
-// derived from the canonical RP22 threshold definitions. They are NOT
-// calculated acoustic results.
+// P15 and P21 are permanent L2 design assumptions until measured data exists.
+// They are NOT calculation failures and they are never user-selected grades.
+// A future measured result must enter through the measured-result authority;
+// legacy stored assumption values are deliberately ignored.
 //
-// One project-level value per parameter (assumed_p15_level / assumed_p21_level).
-// null = no explicit user selection; the effective level defaults to L2.
-// Both Compliance Report and Technical Report read and write the same shared
-// value. The rating engine consumes the same effective level.
+// Every consumer — Room Designer, Design Review, Technical/Visual reports,
+// PDFs, Design Rating and AI Summary — resolves the same L2 authority here.
 //
 // Presentation only — no thresholds or grading maths of its own; the level
 // mapping below mirrors the existing RP22 catalog definitions.
@@ -66,18 +64,53 @@ export function normalizeAssumedLevel(raw) {
   return m ? `L${m[1]}` : null;
 }
 
-/** Default assumed level when the designer has not made a selection. */
+/** Permanent design assumption used while no measured result exists. */
 export const DEFAULT_ASSUMED_LEVEL = "L2";
 
 /**
- * Resolve the effective assumed level, defaulting to L2 when the designer
- * has not made an explicit selection. This is the single canonical
- * effective-value authority — every consumer should call this (or one of
- * the resolveAssumed* wrappers) rather than normalizeAssumedLevel directly
- * when it needs the level that actually applies.
+ * Resolve the effective design assumption. Legacy stored L1/L3/L4 values are
+ * ignored: an unmeasured P15/P21 result is always L2. Measured results do not
+ * pass through this helper and therefore replace the assumption naturally.
  */
-export function getEffectiveAssumedLevel(level) {
-  return normalizeAssumedLevel(level) || DEFAULT_ASSUMED_LEVEL;
+export function getEffectiveAssumedLevel(_legacyStoredLevel) {
+  return DEFAULT_ASSUMED_LEVEL;
+}
+
+export const P15_ASSUMPTION_RESULT = Object.freeze({
+  parameter: 15,
+  level: "L2",
+  value: 22,
+  formatted: "NCB 22",
+  hudLabel: "NCB 22",
+  status: "assumed",
+  state: "scored",
+  assumed: true,
+  assumptionText: "Design target: NCB 22",
+});
+
+export const P21_ASSUMPTION_RESULT = Object.freeze({
+  parameter: 21,
+  level: "L2",
+  value: -8,
+  formatted: "Assumed",
+  hudLabel: "Assumed",
+  status: "assumed",
+  state: "scored",
+  assumed: true,
+  assumptionText: "Early reflections have not been measured. Level 2 is used as the design assumption.",
+});
+
+/**
+ * Return a measured result when one is explicitly published; otherwise return
+ * the permanent canonical assumption presentation for P15/P21.
+ */
+export function resolveAssumedParameterResult(parameterId, measuredResult = null) {
+  if (measuredResult?.status === "measured" && normalizeAssumedLevel(measuredResult?.level)) {
+    return { ...measuredResult, assumed: false };
+  }
+  if (Number(parameterId) === 15) return { ...P15_ASSUMPTION_RESULT };
+  if (Number(parameterId) === 21) return { ...P21_ASSUMPTION_RESULT };
+  return measuredResult;
 }
 
 /** Derive the P15 display value (e.g. "NCB 22") from an assumed level. Defaults to L2 / NCB 22. */
@@ -86,7 +119,7 @@ export function getAssumedP15DisplayValue(level) {
   return `NCB ${P15_LEVEL_TO_NCB[lvl]}`;
 }
 
-/** Derive the P21 display value (e.g. "−10 dB" or "N/A") from an assumed level. Defaults to L2 / −8 dB. */
+/** Derive the permanent P21 design target. The unmeasured state is always L2 / −8 dB. */
 export function getAssumedP21DisplayValue(level) {
   const lvl = getEffectiveAssumedLevel(level);
   if (lvl === "L1") return "N/A";
