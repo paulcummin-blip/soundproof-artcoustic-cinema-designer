@@ -3,7 +3,7 @@ const PORTAL_TARGET = 'SOUND_PROOF';
 const PILOT_EXTERNAL_SUBJECT = 'b9d453e8-3386-4294-bd99-7ad2d80120b2';
 const PILOT_SOUND_PROOF_ACCOUNT_ID = '6a832be3d4e6c6df3df23ee3';
 const PILOT_PARTNER_PROFILE_ID = '42b93780-c13e-40c6-bac3-991c2bcfc938';
-const BRIDGE_URL = 'https://jzwuhrmbshfyybxbeckf.supabase.co/functions/v1/soundproof-launch-service';
+const BRIDGE_URL_SECRET = 'PARTNER_PORTAL_BRIDGE_URL';
 
 function hasText(value) {
   return typeof value === 'string' && value.trim().length > 0;
@@ -52,9 +52,27 @@ export async function providerIdToken(base44, base44UserId) {
   return providerTokenValue(response);
 }
 
-async function callBridge(base44, base44UserId, body) {
+function configuredBridgeUrl(override) {
+  const raw = hasText(override)
+    ? override
+    : globalThis.Deno?.env?.get?.(BRIDGE_URL_SECRET);
+  if (!hasText(raw)) throw new Error('PORTAL_BRIDGE_URL_UNAVAILABLE');
+
+  let endpoint;
+  try {
+    endpoint = new URL(raw.trim());
+  } catch {
+    throw new Error('PORTAL_BRIDGE_URL_INVALID');
+  }
+  if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.hash) {
+    throw new Error('PORTAL_BRIDGE_URL_INVALID');
+  }
+  return endpoint.toString();
+}
+
+async function callBridge(base44, base44UserId, body, bridgeUrl) {
   const token = await providerIdToken(base44, base44UserId);
-  const response = await fetch(BRIDGE_URL, {
+  const response = await fetch(configuredBridgeUrl(bridgeUrl), {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -123,13 +141,15 @@ function bindingMatches(binding, identity, mapping) {
   );
 }
 
-export async function consumePilotPortalLaunch(base44, base44User, launchPass) {
+export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
+  bridgeUrl,
+} = {}) {
   const service = base44.asServiceRole;
   const binding = await callBridge(base44, base44User.id, {
     action: 'consume',
     launch_pass: launchPass,
     target: PORTAL_TARGET,
-  });
+  }, bridgeUrl);
 
   if (
     binding?.target !== PORTAL_TARGET
@@ -219,7 +239,9 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass) {
   };
 }
 
-export async function validatePilotPortalAccessIfRequired(base44, base44User, account) {
+export async function validatePilotPortalAccessIfRequired(base44, base44User, account, {
+  bridgeUrl,
+} = {}) {
   const service = base44.asServiceRole;
   const mapping = await resolvePilotPortalMapping(service, account.id);
   if (!mapping.required) return { required: false, allowed: true };
@@ -242,7 +264,7 @@ export async function validatePilotPortalAccessIfRequired(base44, base44User, ac
       action: 'validate_session',
       portal_session_id: identity.portal_session_id,
       target: PORTAL_TARGET,
-    });
+    }, bridgeUrl);
     if (!bindingMatches(binding, identity, mapping)) {
       return { required: true, allowed: false, reason: 'PORTAL_SESSION_REJECTED' };
     }
