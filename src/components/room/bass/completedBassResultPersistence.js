@@ -12,6 +12,7 @@ import {
   buildCanonicalBassResult,
   validateCanonicalBassResult,
 } from "@/components/room/bass/canonicalBassResult";
+import { buildCurveSignature } from "@/components/room/bass/bassResultAuthority";
 
 export { COMPLETED_BASS_CACHE_VERSION };
 
@@ -167,11 +168,7 @@ export function buildAssessmentEnvelope(contract) {
     ? Number(worstP20.worstFrequencyHz)
     : null;
 
-  const p19TargetIdentity = (typeof finalResponse.p19TargetIdentity === "string" && finalResponse.p19TargetIdentity)
-    ? finalResponse.p19TargetIdentity
-    : (Array.isArray(finalResponse.practicalCalibrationTarget) && finalResponse.practicalCalibrationTarget.length
-      ? "practical-calibration-target"
-      : "ideal-house-target");
+  const p19TargetIdentity = finalResponse.p19TargetIdentity || "reference-eq";
 
   return {
     achievedP18FrequencyHz,
@@ -211,12 +208,23 @@ export function validateAssessmentEnvelopeAuthority(contract) {
   if (!Number.isFinite(Number(envelope.assessmentEndHz)))
     return { valid: false, reason: "missing-assessment-end-hz" };
 
-  // P19 target identity: must be present and one of the two canonical values.
-  // This ensures the persisted envelope records which target definition P19
-  // was assessed against (practical-calibration-target or ideal-house-target).
-  const P19_TARGET_IDENTITIES = new Set(["practical-calibration-target", "ideal-house-target"]);
-  if (typeof envelope.p19TargetIdentity !== "string" || !P19_TARGET_IDENTITIES.has(envelope.p19TargetIdentity))
+  if (envelope.p19TargetIdentity !== "reference-eq")
     return { valid: false, reason: `p19-target-identity-missing-or-invalid:${String(envelope.p19TargetIdentity)}` };
+
+  // Stored Reference EQ must be byte-for-byte equivalent under the canonical
+  // curve signature to the stored calibrated RSP response.
+  const referenceEq = isCompact
+    ? contract?.graphPayload?.referenceEq
+    : contract?.finalOptimisedBassResponse?.referenceEq;
+  const calibratedRsp = isCompact
+    ? contract?.graphPayload?.postEqRspCurve
+    : contract?.finalOptimisedBassResponse?.postEqRspCurve;
+  if (!Array.isArray(referenceEq) || !referenceEq.length)
+    return { valid: false, reason: "missing-reference-eq" };
+  if (!Array.isArray(calibratedRsp) || !calibratedRsp.length)
+    return { valid: false, reason: "missing-calibrated-rsp-response" };
+  if (buildCurveSignature(referenceEq) !== buildCurveSignature(calibratedRsp))
+    return { valid: false, reason: "reference-eq-calibrated-rsp-mismatch" };
 
   // Four-way P18 authority parity: the selected candidate, envelope, assessment
   // start, and product-analysis card must all carry the same canonical achieved
@@ -309,6 +317,7 @@ function buildGraphPayload(contract) {
   const candidate = contract?.selectedCandidate;
   return {
     postEqRspCurve: cloneCurve(finalResponse.postEqRspCurve),
+    referenceEq: cloneCurve(finalResponse.referenceEq),
     productionHouseCurveTarget: cloneCurve(finalResponse.canonicalTargetCurve),
     maximumSplCurveAfterEq: cloneCurve(finalResponse.maximumSplCurveAfterEq),
     postEqPerSeatCurves: (Array.isArray(finalResponse.postEqPerSeatCurves) ? finalResponse.postEqPerSeatCurves : [])
