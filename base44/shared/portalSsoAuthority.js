@@ -52,6 +52,25 @@ export async function providerIdToken(base44, base44UserId) {
   return providerTokenValue(response);
 }
 
+function providerAccessTokenValue(response) {
+  const candidate = response?.access_token
+    ?? response?.accessToken
+    ?? response?.data?.access_token
+    ?? response?.data?.accessToken
+    ?? response?.data
+    ?? response;
+  if (typeof candidate !== 'string' || !candidate.trim()) {
+    throw new Error('PROVIDER_ACCESS_TOKEN_UNAVAILABLE');
+  }
+  const token = candidate.trim();
+  return token.startsWith('Bearer ') ? token.slice(7) : token;
+}
+
+export async function providerAccessToken(base44, base44UserId) {
+  const response = await base44.asServiceRole.sso.getAccessToken(base44UserId);
+  return providerAccessTokenValue(response);
+}
+
 function configuredBridgeUrl(override) {
   const raw = hasText(override)
     ? override
