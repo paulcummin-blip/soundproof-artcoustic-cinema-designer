@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { base44 } from '@/api/base44Client';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +9,7 @@ import ColourField from '@/components/proposal/ColourField';
 import RichTextField from '@/components/proposal/RichTextField';
 import ProposalDefaultsPanel from '@/components/proposal/ProposalDefaultsPanel';
 import PublicationPreview from '@/components/proposal/PublicationPreview';
+import { loadDealerBrand, saveDealerBrand } from '@/components/account/dealerBrandAuthority';
 
 const DEFAULTS = {
   company_name: '',
@@ -63,6 +63,9 @@ export default function BrandAssetsPanel({ accountId }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const recordRef = useRef(null);
+  const saveQueueRef = useRef(Promise.resolve());
+  const pendingSavesRef = useRef(0);
 
   const load = useCallback(async () => {
     if (!accountId) {
@@ -71,8 +74,8 @@ export default function BrandAssetsPanel({ accountId }) {
     }
     setLoading(true);
     try {
-      const results = await base44.entities.BrandAsset.filter({ account_id: accountId });
-      const existing = Array.isArray(results) && results.length > 0 ? results[0] : null;
+      const existing = await loadDealerBrand(accountId);
+      recordRef.current = existing;
       setRecord(existing);
       setForm({ ...DEFAULTS, ...existing });
     } catch (err) {
@@ -91,25 +94,47 @@ export default function BrandAssetsPanel({ accountId }) {
     setSaved(false);
   };
 
-  const handleSave = async () => {
+  const persist = useCallback((values, failureMessage = 'Failed to save brand assets. Please try again.') => {
+    pendingSavesRef.current += 1;
     setSaving(true);
-    try {
-      const payload = { ...form, account_id: accountId };
-      if (record) {
-        const updated = await base44.entities.BrandAsset.update(record.id, payload);
-        setRecord(updated);
-      } else {
-        const created = await base44.entities.BrandAsset.create(payload);
-        setRecord(created);
-      }
+
+    const operation = saveQueueRef.current.then(async () => {
+      const savedRecord = await saveDealerBrand({
+        accountId,
+        record: recordRef.current,
+        values,
+      });
+      recordRef.current = savedRecord;
+      setRecord(savedRecord);
+      setForm((previous) => ({ ...previous, ...savedRecord }));
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
-      console.error('Failed to save brand assets:', err);
-      alert('Failed to save. Please try again.');
-    } finally {
-      setSaving(false);
-    }
+      return savedRecord;
+    });
+
+    saveQueueRef.current = operation.catch(() => undefined);
+    return operation
+      .catch((err) => {
+        console.error('Failed to save brand assets:', err);
+        alert(failureMessage);
+        throw err;
+      })
+      .finally(() => {
+        pendingSavesRef.current -= 1;
+        if (pendingSavesRef.current === 0) setSaving(false);
+      });
+  }, [accountId]);
+
+  const updateAndPersist = (field, value) => {
+    update(field, value);
+    void persist(
+      { [field]: value },
+      'The image uploaded, but its branding reference could not be saved. Please try again.',
+    ).catch(() => undefined);
+  };
+
+  const handleSave = () => {
+    void persist(form).catch(() => undefined);
   };
 
   if (!accountId) {
@@ -138,6 +163,7 @@ export default function BrandAssetsPanel({ accountId }) {
             <Input
               value={form.company_name}
               onChange={(e) => update('company_name', e.target.value)}
+              onBlur={() => void persist({ company_name: form.company_name }).catch(() => undefined)}
               className={inputClasses}
               placeholder="e.g. Artcoustic UK"
             />
@@ -146,15 +172,15 @@ export default function BrandAssetsPanel({ accountId }) {
             <ImageUploadField
               label="Dealer Logo"
               value={form.dealer_logo_url}
-              onUpload={(url) => update('dealer_logo_url', url)}
-              onRemove={() => update('dealer_logo_url', null)}
+              onUpload={(url) => updateAndPersist('dealer_logo_url', url)}
+              onRemove={() => updateAndPersist('dealer_logo_url', null)}
               showCaption={false}
             />
             <ImageUploadField
               label="White Logo (for dark backgrounds)"
               value={form.white_logo_url}
-              onUpload={(url) => update('white_logo_url', url)}
-              onRemove={() => update('white_logo_url', null)}
+              onUpload={(url) => updateAndPersist('white_logo_url', url)}
+              onRemove={() => updateAndPersist('white_logo_url', null)}
               showCaption={false}
             />
           </div>
