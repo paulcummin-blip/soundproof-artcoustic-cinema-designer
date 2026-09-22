@@ -260,7 +260,7 @@ export default function Layout({ children, currentPageName }) {
         <PartnerPortalIdentityProvider>
         <BrandIntroOverlay />
         <div className="flex min-h-screen w-full bg-brand-background">
-          <aside className="w-64 border-r border-brand-border bg-brand-sidebar-bg flex flex-col">
+          <aside className="app-shell-sidebar w-64 border-r border-brand-border bg-brand-sidebar-bg flex flex-col" data-app-shell-sidebar="true">
             <div className="p-4">
               <img
                 src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
@@ -497,7 +497,7 @@ export default function Layout({ children, currentPageName }) {
             )}
           </aside>
 
-          <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
+          <main className="app-shell-main flex-1 min-w-0 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto">
               <SafeBootErrorBoundary>
                 <SegmentBoundary name="page-content">
