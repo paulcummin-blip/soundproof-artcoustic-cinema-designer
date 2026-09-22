@@ -118,6 +118,7 @@ export default function RP22ReportParameterGrid({
           targetBasisNote={targetBasisNote}
           rspLabel={rspLabel}
           asdrFooter={asdrFooter}
+          assumed={engineeringSummary?.roomResultsByParameter?.[param.id]?.assumed === true}
         />
         {isP15P21 && (
           <P15P21AssumptionControl
