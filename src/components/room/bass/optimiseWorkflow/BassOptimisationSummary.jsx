@@ -232,11 +232,11 @@ function StageCard({ stage }) {
             ) : (
               <ChevronRight className="h-2.5 w-2.5" />
             )}
-            Internal search metric (RSP P19 — not seat P19)
+            Calibration target-fit metric (not published P19)
           </button>
           {showInternal && (
             <div className="ml-4 mt-1 text-[9px] text-[#8A7B6A]">
-              RSP P19:{" "}
+              Target fit:{" "}
               <span className="font-medium text-[#625143]">
                 {stage.internal.currentP19 != null ? `${stage.internal.currentP19.toFixed(2)} dB` : "—"}
               </span>
