@@ -670,6 +670,12 @@ export default function RP22ClientReport() {
     return pages;
   }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, designAssumptions, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence]);
 
+  // The report requires bass simulation to be complete. When bass has never
+  // been calculated (or is actively running), the dependency checker explains
+  // exactly what is missing instead of showing a generic loading message.
+  const bassMissing = !hydrating && !!engineeringSummary && !bassPerformance;
+  const showDependencyChecker = reportPending || bassMissing;
+
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: showDependencyChecker ? 0 : activePages.length,
     projectName: projectDetails?.name,
@@ -690,12 +696,6 @@ export default function RP22ClientReport() {
     if (!projectId) return;
     navigate(`/RoomDesigner?projectId=${projectId}`);
   };
-
-  // The report requires bass simulation to be complete. When bass has never
-  // been calculated (or is actively running), the dependency checker explains
-  // exactly what is missing instead of showing a generic loading message.
-  const bassMissing = !hydrating && !!engineeringSummary && !bassPerformance;
-  const showDependencyChecker = reportPending || bassMissing;
 
   return (
     <div className="client-report-root" style={{
