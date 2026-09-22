@@ -108,14 +108,6 @@ export default function ReportPrintStyles() {
                     box-shadow: none !important;
                     border: none !important;
                 }
-                
-                #pdf-room-plan, #pdf-room-plan-dims {
-                    background: #FFFFFF !important;
-                    padding-left: 0 !important;
-                    padding-right: 0 !important;
-                    margin-left: 0 !important;
-                    margin-right: 0 !important;
-                }
 
                 #root, #__next, .min-h-screen, .screen-only, .print-only {
                     height: auto !important;
