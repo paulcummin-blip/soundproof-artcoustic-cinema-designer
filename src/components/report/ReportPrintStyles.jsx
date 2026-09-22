@@ -567,12 +567,148 @@ export default function ReportPrintStyles() {
             }
 
             @media print {
-              #pdf-cover,
-              #pdf-room-parameters,
-              #pdf-seat-parameters {
-                zoom: 0.87 !important;
+              /* ── Canonical block pagination contract ──────────────────────
+                 A4 portrait with 12 mm page margins leaves 273 mm of usable
+                 height. Every major report block is measured by
+                 useReportBlockPagination before print and is kept atomic. */
+              .rp22-report .report-page-block {
+                box-sizing: border-box !important;
+                width: 100% !important;
+                break-inside: avoid-page !important;
+                page-break-inside: avoid !important;
+                -webkit-column-break-inside: avoid !important;
+                position: relative !important;
               }
 
+              .rp22-report .report-page-block[data-report-page-start="true"]:not(:first-child),
+              .rp22-report .report-force-new-page {
+                break-before: page !important;
+                page-break-before: always !important;
+              }
+
+              .rp22-report .report-page-block--cover,
+              .rp22-report .report-page-block--summary,
+              .rp22-report .report-drawing-page,
+              .rp22-report .tech-param-page {
+                min-height: 273mm !important;
+                height: 273mm !important;
+                max-height: 273mm !important;
+                overflow: hidden !important;
+              }
+
+              .rp22-report .report-drawing-page {
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: flex-start !important;
+              }
+
+              .rp22-report .plan-fitbox {
+                width: 186mm !important;
+                height: 273mm !important;
+                max-height: 273mm !important;
+                display: flex !important;
+                align-items: flex-start !important;
+                justify-content: center !important;
+                overflow: hidden !important;
+              }
+
+              .rp22-report .plan-fitbox > img {
+                width: 100% !important;
+                height: auto !important;
+                max-height: 273mm !important;
+                object-fit: contain !important;
+              }
+
+              .rp22-report .report-drawing-title {
+                flex: 0 0 auto !important;
+                font-family: 'Century Gothic', 'Futura PT Light', sans-serif !important;
+                font-size: 18pt !important;
+                font-weight: 700 !important;
+                color: #1B1A1A !important;
+                line-height: 1.1 !important;
+                margin: 0 0 6mm 0 !important;
+              }
+
+              .rp22-report .report-drawing-frame {
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
+                max-height: 240mm !important;
+                overflow: hidden !important;
+                break-inside: avoid-page !important;
+                page-break-inside: avoid !important;
+              }
+
+              .rp22-report .report-drawing-frame > * {
+                max-height: 240mm !important;
+                overflow: hidden !important;
+              }
+
+              .rp22-report .report-drawing-frame svg {
+                display: block !important;
+                width: 100% !important;
+                height: auto !important;
+                max-height: 232mm !important;
+                object-fit: contain !important;
+              }
+
+              .rp22-report #pdf-sightlines > .print-avoid-break,
+              .rp22-report #pdf-screen-wall-construction > .print-avoid-break {
+                width: 100% !important;
+                max-height: 257mm !important;
+                overflow: hidden !important;
+              }
+
+              .rp22-report #pdf-screen-wall-construction > .print-avoid-break {
+                height: 273mm !important;
+                max-height: 273mm !important;
+              }
+
+              .rp22-report #pdf-screen-wall-construction svg {
+                display: block !important;
+                width: 100% !important;
+                height: 273mm !important;
+                max-height: 273mm !important;
+                object-fit: contain !important;
+              }
+
+              .rp22-report .tech-param-report-heading {
+                flex: 0 0 auto !important;
+                margin: 0 0 1mm 0 !important;
+              }
+
+              .rp22-report .tech-param-report-title {
+                font-family: 'Century Gothic', 'Futura PT Light', sans-serif !important;
+                font-size: 16pt !important;
+                font-weight: 400 !important;
+                color: #213428 !important;
+                line-height: 1.1 !important;
+                letter-spacing: 0.01em !important;
+              }
+
+              .rp22-report .tech-param-report-subtitle {
+                margin-top: 1mm !important;
+                color: #625143 !important;
+                font-size: 8pt !important;
+                letter-spacing: 0.08em !important;
+                text-transform: uppercase !important;
+              }
+
+              .rp22-report .tech-param-page,
+              .rp22-report .tech-param-page--first {
+                padding: 6mm 4mm 4mm 4mm !important;
+                break-inside: avoid-page !important;
+                page-break-inside: avoid !important;
+              }
+
+              /* Oversize is diagnostic only; the fixed page owners above keep
+                 every supported drawing and card group inside one page. */
+              .rp22-report [data-report-block-oversize="true"] {
+                outline: none !important;
+              }
+
+              #pdf-cover,
+              #pdf-room-parameters,
+              #pdf-seat-parameters,
               #pdf-room-plan,
               #pdf-room-plan-dims,
               #pdf-room-plan-positions {
