@@ -359,15 +359,12 @@ export function adaptCurrentBassOptimisationResult({
   contract.selectedCandidate = buildCandidateRef(selectedCandidate, collectDiagnostics);
   contract.bassAuthority = selectedCandidate?.postEqCapabilityAssessment || null;
   contract.finalOptimisedBassResponse = finalResponse;
-  // Explicit target identities on the contract so downstream consumers (graph,
-  // report, persistence) can distinguish which definition a curve uses.
-  // P18 references idealHouseTarget; P19 references practicalCalibrationTarget.
+  // Explicit curve identities. The practical target remains an optimiser input;
+  // published P19 uses the stored final calibrated RSP response as Reference EQ.
   contract.idealHouseTarget = finalResponse?.canonicalTargetCurve || null;
   contract.practicalCalibrationTarget = finalResponse?.practicalCalibrationTarget || null;
-  contract.p19TargetIdentity = finalResponse?.p19TargetIdentity
-    || (Array.isArray(contract.practicalCalibrationTarget) && contract.practicalCalibrationTarget.length
-      ? "practical-calibration-target"
-      : "ideal-house-target");
+  contract.referenceEq = finalResponse?.referenceEq || null;
+  contract.p19TargetIdentity = "reference-eq";
   contract.achievedP14Db = selectedCandidate?.achievedP14Db ?? null;
   contract.achievedP14Level = selectedCandidate?.achievedP14Level ?? null;
   contract.achievedP18FrequencyHz = selectedCandidate?.achievedP18FrequencyHz ?? null;
@@ -556,8 +553,8 @@ export function adaptCurrentBassOptimisationResult({
   const p19Ready = optimisationResult?.p19AssessmentReady === true
     && hasCanonicalSeatResults(selectedCandidate?.perSeatP19Results, realSeatCount)
     && isCanonicalP19Ready({
-      canonicalPostEqRsp: finalResponse?.canonicalPostEqRsp,
-      canonicalTargetCurve: finalResponse?.practicalCalibrationTarget || finalResponse?.canonicalTargetCurve,
+      canonicalPostEqRsp: finalResponse?.referenceEq,
+      canonicalTargetCurve: finalResponse?.referenceEq,
       officialVariationDb: authorityP19?.variationDb,
       officialLevel: authorityP19?.level,
     });
@@ -573,7 +570,7 @@ export function adaptCurrentBassOptimisationResult({
   contract.productAnalysis.parameters.p19 = createBassParameterResult({
     parameter: PARAM_P19, status: p19Status, level: p19Level, value: p19Value,
     unit: "dB", passedL1: p19Ready ? p19Level >= 1 : null, isStale,
-    reason: p19Ready ? null : "Canonical post-EQ response, target curve, or official P19 assessment is pending",
+    reason: p19Ready ? null : "Canonical Reference EQ or official P19 assessment is pending",
   });
 
   // P20 — not applicable without a valid non-RSP comparison result.
@@ -634,6 +631,7 @@ export function adaptCurrentBassOptimisationResult({
   if (hasRspCurve) {
     contract.roomResponse.rspCurve = rspRawCurve;
     contract.roomResponse.postEqRspCurve = finalResponse?.postEqRspCurve || [];
+    contract.roomResponse.referenceEqCurve = finalResponse?.referenceEq || [];
     contract.roomResponse.postEqSeatCurves = finalResponse?.postEqPerSeatCurves || [];
     contract.roomResponse.status = "complete";
   } else {
