@@ -24,14 +24,13 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     selectedCandidateId: candidate.candidateId,
     canonicalFilterBank: eqFilterBank,
     canonicalPostEqRsp: postEqRspCurve,
+    referenceEq: postEqRspCurve,
+    referenceEqSignature: buildCurveSignature(postEqRspCurve),
     canonicalPostEqSeatResponses: postEqPerSeatCurves,
     canonicalHouseCurveShape: cloneCurve(candidate.canonicalHouseCurveShape),
     canonicalTargetCurve: cloneCurve(candidate.productionHouseCurveTarget),
     practicalCalibrationTarget: cloneCurve(candidate.practicalCalibrationTarget),
-    p19TargetIdentity: candidate.p19TargetIdentity
-      || (Array.isArray(candidate.practicalCalibrationTarget) && candidate.practicalCalibrationTarget.length
-        ? "practical-calibration-target"
-        : "ideal-house-target"),
+    p19TargetIdentity: "reference-eq",
     canonicalVerticalOffsetDb: candidate.canonicalVerticalOffsetDb ?? null,
     operatingLevelOffsetDb: candidate.operatingLevelOffsetDb ?? 0,
     requestedOperatingLevelOffsetDb: Number.isFinite(candidate.requestedOperatingLevelOffsetDb) ? candidate.requestedOperatingLevelOffsetDb : 0,
@@ -175,6 +174,9 @@ export function applyAuthorityToCanonicalResult(canonicalResult, authorityBearin
     // The global alignment is one system trim, so RSP and all seats move
     // together. Consumers must not graph the pre-alignment seat curves.
     canonicalPostEqRsp: alignedRsp,
+    referenceEq: alignedRsp,
+    referenceEqSignature: buildCurveSignature(alignedRsp),
+    p19TargetIdentity: "reference-eq",
     postEqRspCurve: alignedRsp,
     canonicalPostEqSeatResponses: alignedSeats,
     postEqPerSeatCurves: alignedSeats,
@@ -228,5 +230,7 @@ export function finalOptimisedBassAuthorityMatches(response) {
     && response.finalSeatVariationData?.p19?.candidateId === candidateId
     && response.finalSeatVariationData?.p20?.candidateId === candidateId
     && response.filterBankSignature === buildFilterBankSignature({ generatedFilterBank: response.eqFilterBank })
-    && response.postEqCurveSignature === buildCurveSignature(response.postEqRspCurve);
+    && response.postEqCurveSignature === buildCurveSignature(response.postEqRspCurve)
+    && response.referenceEqSignature === response.postEqCurveSignature
+    && buildCurveSignature(response.referenceEq) === response.postEqCurveSignature;
 }
