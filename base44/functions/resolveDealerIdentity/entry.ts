@@ -1,6 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.40";
 import { secrets } from "base44:runtime";
-import { providerIdToken } from "../../shared/portalSsoAuthority.js";
+import { providerAccessToken } from "../../shared/portalSsoAuthority.js";
 import { resolvePartnerPortalDealerIdentity } from "../../shared/partnerPortalIdentityClient.js";
 
 /**
@@ -33,7 +33,7 @@ export default async function resolveDealerIdentity(req) {
     // a Partner Portal identity linked — that is expected, not an error.
     let accessToken;
     try {
-      accessToken = await providerIdToken(base44, user.id);
+      accessToken = await providerAccessToken(base44, user.id);
     } catch {
       return Response.json({ resolved: false, reason: "NO_PORTAL_TOKEN" });
     }
