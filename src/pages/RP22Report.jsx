@@ -450,9 +450,9 @@ function RP22ReportInner() {
                 originalPrintTitleRef.current = document.title;
             }
             document.title = buildTechnicalReportTitle(projectDetails?.name);
+            window.addEventListener("afterprint", () => setAutoPrintDone(true), { once: true });
             window.print();
             cleanupTimeoutRef.current = setTimeout(() => {
-                setAutoPrintDone(true);
                 if (isPrinting) {
                     setIsPrinting(false); setPlanImageDataUrl(null);
                     setPlanDimsImageDataUrl(null); setPlanSpeakerDimsImageDataUrl(null);
