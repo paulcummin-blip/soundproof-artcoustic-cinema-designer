@@ -127,11 +127,11 @@ export default function TechnicalParameterCard({
         fsValue: "22px", fsBody: "13px", fsThreshold: "11px",
       }
     : {
-        pad: "3mm 4.5mm", gap: "1.4mm", brk: true,
-        mt1: "0.5mm", mt2: "0.8mm", ptTop: "1.5mm", ptTop2: "0.8mm",
-        resultPad: "1.8mm 3mm", metaGap: "1.2mm 3mm",
-        fsLabel: "7pt", fsCategory: "6.5pt", fsTitle: "11.5pt",
-        fsValue: "16pt", fsBody: "7.6pt", fsThreshold: "7.2pt",
+        pad: "2mm 3.5mm", gap: "0.8mm", brk: true,
+        mt1: "0.3mm", mt2: "0.5mm", ptTop: "0.8mm", ptTop2: "0.4mm",
+        resultPad: "1mm 2.5mm", metaGap: "0.8mm 2.5mm",
+        fsLabel: "6.5pt", fsCategory: "6pt", fsTitle: "10.5pt",
+        fsValue: "14pt", fsBody: "7.2pt", fsThreshold: "6.8pt",
       };
 
   return (
@@ -232,7 +232,7 @@ export default function TechnicalParameterCard({
         style={{
           fontSize: u.fsBody,
           color: "#3E4349",
-          lineHeight: 1.45,
+          lineHeight: isScreen ? 1.45 : 1.3,
           fontFamily: BODY_FONT,
         }}
       >
@@ -248,7 +248,7 @@ export default function TechnicalParameterCard({
           fontSize: u.fsLabel,
           color: "#625143",
           fontFamily: BODY_FONT,
-          lineHeight: 1.3,
+          lineHeight: isScreen ? 1.3 : 1.15,
         }}
       >
         <span>
