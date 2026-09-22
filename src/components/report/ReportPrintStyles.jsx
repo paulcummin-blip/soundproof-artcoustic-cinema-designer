@@ -749,7 +749,7 @@ export default function ReportPrintStyles() {
 
               .rp22-report .tech-param-report-title {
                 font-family: 'Century Gothic', 'Futura PT Light', sans-serif !important;
-                font-size: 16pt !important;
+                font-size: 14pt !important;
                 font-weight: 400 !important;
                 color: #213428 !important;
                 line-height: 1.1 !important;
@@ -757,9 +757,9 @@ export default function ReportPrintStyles() {
               }
 
               .rp22-report .tech-param-report-subtitle {
-                margin-top: 1mm !important;
+                margin-top: 0.5mm !important;
                 color: #625143 !important;
-                font-size: 8pt !important;
+                font-size: 7.5pt !important;
                 letter-spacing: 0.08em !important;
                 text-transform: uppercase !important;
               }
@@ -767,12 +767,12 @@ export default function ReportPrintStyles() {
               .rp22-report .tech-param-page,
               .rp22-report .tech-param-page--first {
                 min-height: 272mm !important;
-                height: auto !important;
-                max-height: none !important;
-                padding: 6mm 4mm 4mm 4mm !important;
-                overflow: visible !important;
-                break-inside: auto !important;
-                page-break-inside: auto !important;
+                height: 272mm !important;
+                max-height: 272mm !important;
+                padding: 4mm 3mm 3mm 3mm !important;
+                overflow: hidden !important;
+                break-inside: avoid-page !important;
+                page-break-inside: avoid !important;
               }
 
               .rp22-report .tech-param-page__cards {
@@ -786,8 +786,8 @@ export default function ReportPrintStyles() {
                 -webkit-column-break-inside: avoid !important;
               }
 
-              /* Oversize is diagnostic only. Drawings keep a fixed frame;
-                 parameter pages may grow and fragment only between complete cards. */
+              /* Oversize is diagnostic only. Drawings and three-card parameter
+                 groups use fixed A4 frames after their contents are fitted. */
               .rp22-report [data-report-block-oversize="true"] {
                 outline: none !important;
               }
