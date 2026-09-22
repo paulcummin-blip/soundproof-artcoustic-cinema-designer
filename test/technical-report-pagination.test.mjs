@@ -40,13 +40,14 @@ test("ASDR recommendations stay together and the redesigned scorecard leads with
   assert.match(styles, /\.tech-asdr-seating-summary[\s\S]*?break-inside:\s*avoid\s*!important/);
 });
 
-test("technical parameter pages fit at most two atomic cards and never clip overflow", () => {
-  assert.match(parameterGrid, /TECHNICAL_PARAMETER_CARDS_PER_PAGE\s*=\s*2/);
-  assert.match(parameterPage, /breakInside:\s*"auto"/);
-  assert.match(parameterPage, /pageBreakInside:\s*"auto"/);
+test("technical parameter pages keep three compact atomic cards inside one A4 frame", () => {
+  assert.match(parameterGrid, /TECHNICAL_PARAMETER_CARDS_PER_PAGE\s*=\s*3/);
+  assert.match(parameterPage, /breakInside:\s*"avoid"/);
+  assert.match(parameterPage, /pageBreakInside:\s*"avoid"/);
   assert.match(parameterPage, /className="tech-param-page__cards"/);
+  assert.match(parameterPage, /gap:\s*"3mm"/);
   assert.match(styles, /\.tech-param-page:not\(:last-child\)[\s\S]*?break-after:\s*page/);
   assert.doesNotMatch(styles, /\.tech-param-page\s*\+\s*\.tech-param-page[\s\S]*?break-before:\s*page/);
-  assert.match(styles, /\.tech-param-page,[\s\S]*?height:\s*auto\s*!important;[\s\S]*?max-height:\s*none\s*!important;[\s\S]*?overflow:\s*visible\s*!important;/);
+  assert.match(styles, /\.tech-param-page,[\s\S]*?height:\s*272mm\s*!important;[\s\S]*?max-height:\s*272mm\s*!important;[\s\S]*?overflow:\s*hidden\s*!important;/);
   assert.match(styles, /\.tech-param-page__cards[\s\S]*?\.tech-param-card[\s\S]*?break-inside:\s*avoid-page\s*!important/);
 });
