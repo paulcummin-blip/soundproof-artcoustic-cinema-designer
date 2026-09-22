@@ -9,8 +9,7 @@
  * never persists, stores, or stamps anything.
  */
 
-const DEFAULT_DEALER_IDENTITY_URL =
-  'https://jzwuhrmbshfyybxbeckf.supabase.co/functions/v1/dealer-identity-resolve';
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -18,6 +17,30 @@ function isPlainObject(value) {
 
 function hasText(value) {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function validatedEndpoint(value) {
+  if (!hasText(value)) {
+    throw new Error('DEALER_IDENTITY_URL_UNAVAILABLE');
+  }
+
+  let endpoint;
+  try {
+    endpoint = new URL(value.trim());
+  } catch {
+    throw new Error('DEALER_IDENTITY_URL_INVALID');
+  }
+
+  if (
+    endpoint.protocol !== 'https:'
+    || endpoint.username
+    || endpoint.password
+    || endpoint.hash
+  ) {
+    throw new Error('DEALER_IDENTITY_URL_INVALID');
+  }
+
+  return endpoint.toString();
 }
 
 /**
@@ -33,7 +56,7 @@ function hasText(value) {
  * substitute values.
  *
  * @param {object} params
- * @param {string} [params.url] - Endpoint URL override (from secrets).
+ * @param {string} params.url - Deployment-configured endpoint URL.
  * @param {string} params.accessToken - Authenticated Partner Portal access token.
  * @returns {Promise<{dealer_account_id: string, dealer_name: string, organisation_type: string, status: string, identity_version: number}>}
  * @throws {Error} on any validation failure or HTTP error.
@@ -43,7 +66,7 @@ export async function resolvePartnerPortalDealerIdentity({ url, accessToken }) {
     throw new Error('ACCESS_TOKEN_UNAVAILABLE');
   }
 
-  const endpoint = hasText(url) ? url : DEFAULT_DEALER_IDENTITY_URL;
+  const endpoint = validatedEndpoint(url);
 
   const response = await fetch(endpoint, {
     method: 'GET',
@@ -71,8 +94,11 @@ export async function resolvePartnerPortalDealerIdentity({ url, accessToken }) {
     throw new Error('DEALER_IDENTITY_UNSUPPORTED_VERSION');
   }
 
-  if (!hasText(payload.dealer_account_id)) {
-    throw new Error('DEALER_IDENTITY_MISSING_ACCOUNT_ID');
+  const dealerAccountId = hasText(payload.dealer_account_id)
+    ? payload.dealer_account_id.trim()
+    : '';
+  if (!UUID_PATTERN.test(dealerAccountId)) {
+    throw new Error('DEALER_IDENTITY_INVALID_ACCOUNT_ID');
   }
 
   if (!hasText(payload.dealer_name)) {
@@ -80,9 +106,11 @@ export async function resolvePartnerPortalDealerIdentity({ url, accessToken }) {
   }
 
   return {
-    dealer_account_id: payload.dealer_account_id,
-    dealer_name: payload.dealer_name,
-    organisation_type: payload.organisation_type,
+    dealer_account_id: dealerAccountId.toLowerCase(),
+    dealer_name: payload.dealer_name.trim(),
+    organisation_type: hasText(payload.organisation_type)
+      ? payload.organisation_type.trim()
+      : '',
     status: payload.status,
     identity_version: payload.identity_version,
   };
