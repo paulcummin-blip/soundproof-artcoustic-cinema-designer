@@ -68,15 +68,29 @@ export default function RvRoomBaseLayers(props) {
           {/* --- Export-only report labels (clean-plan page enhancements) --- */}
           {exportMode !== 'clean' && overlaysForRendering?.EXPORT_CEILING_LABEL && (
             <g data-layer="export-ceiling-label" pointerEvents="none">
+              {/* Keep this as a separate two-line annotation. The value baseline
+                  sits 53 CSS px (≈14 mm at 96 dpi) above the room-width
+                  dimension baseline, so the two measurements cannot read as one. */}
               <text
                 x={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) * (2 / 3)}
-                y={(roomRect?.y ?? 0) - 48}
+                y={(roomRect?.y ?? 0) - 98}
+                textAnchor="middle"
+                fontFamily="Century Gothic, sans-serif"
+                fontSize={10}
+                fontWeight={600}
+                fill="#625143"
+              >
+                Ceiling Height
+              </text>
+              <text
+                x={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) * (2 / 3)}
+                y={(roomRect?.y ?? 0) - 81}
                 textAnchor="middle"
                 fontFamily="Century Gothic, sans-serif"
                 fontSize={11}
                 fill="#1B1A1A"
               >
-                {`Ceiling height: ${(heightM ?? 0).toFixed(2)} m`}
+                {`${(heightM ?? 0).toFixed(2)} m`}
               </text>
             </g>
           )}
