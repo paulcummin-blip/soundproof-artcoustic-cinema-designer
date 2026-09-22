@@ -106,10 +106,17 @@ export default function DealerHero() {
     }
   }, []);
 
-  // Auto-adjust dark overlay based on hero image brightness (45–60%)
+  const heroBg = brand?.hero_background_url || null;
+  const dealerName = brand?.display_name_override || brand?.company_name || null;
+  const dealerLogo = heroBg
+    ? (brand?.white_logo_url || brand?.dealer_logo_url || null)
+    : (brand?.dealer_logo_url || brand?.white_logo_url || null);
+  const hasDealer = !!(dealerLogo || dealerName);
+
+  // Auto-adjust dark overlay based on hero image brightness (45–50%)
   useEffect(() => {
     if (!heroBg) {
-      setOverlayOpacity(0.5);
+      setOverlayOpacity(0.48);
       return;
     }
     const img = new Image();
@@ -142,13 +149,6 @@ export default function DealerHero() {
     img.onerror = () => setOverlayOpacity(0.48);
     img.src = heroBg;
   }, [heroBg]);
-
-  const heroBg = brand?.hero_background_url || null;
-  const dealerName = brand?.display_name_override || brand?.company_name || null;
-  const dealerLogo = heroBg
-    ? (brand?.white_logo_url || brand?.dealer_logo_url || null)
-    : (brand?.dealer_logo_url || brand?.white_logo_url || null);
-  const hasDealer = !!(dealerLogo || dealerName);
 
   // Reset dealer natural dims when the logo URL changes
   useEffect(() => {
