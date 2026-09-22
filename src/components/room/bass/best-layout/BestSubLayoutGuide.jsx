@@ -225,7 +225,7 @@ export default function BestSubLayoutGuide({
         </Button>
       )}
       <p className="mt-3 text-[10px] leading-relaxed text-[#8A7B6A]">
-        Applying a layout only moves the subwoofers. Press Calculate Parameter Results to run the authoritative bass analysis.
+        Applying a layout only moves the subwoofers. Press Optimise & Calculate to run the authoritative bass analysis.
       </p>
 
     </div>

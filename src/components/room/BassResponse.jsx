@@ -639,7 +639,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           <p className="mt-1 text-[11px] text-[#625143]">
             {bassAuthorityStatus === "STALE"
               ? "The design changed after the last calculation. Previous values are excluded from the current RP22 score and report."
-              : "Choose Calculate Bass Performance in the Subwoofers panel when the layout is ready."}
+              : "Choose Optimise & Calculate in the Subwoofers panel when the layout is ready."}
           </p>
         </div>
       )}
@@ -680,7 +680,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       ) : !hasCurrentBassResult ? (
         <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#625143" }}>
-            {bassAuthorityStatus === "STALE" ? "Response needs recalculation" : "Calculate Bass Performance"}
+            {bassAuthorityStatus === "STALE" ? "Response needs recalculation" : "Optimise & Calculate"}
           </div>
           <div style={{ fontSize: 12, color: "#8B7F76", marginTop: 4 }}>
             The authoritative response graph appears after the current design has been calculated.
