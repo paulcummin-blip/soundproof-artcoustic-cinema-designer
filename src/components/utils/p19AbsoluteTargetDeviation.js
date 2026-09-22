@@ -1,17 +1,13 @@
 // p19AbsoluteTargetDeviation.js
 //
-// THE CANONICAL P19 EVALUATION AUTHORITY.
+// P19 deviation primitives.
 //
-// Definition:
-//   P19 is the maximum absolute deviation from the P14-anchored practical
-//   calibration target after calibration, excluding protected null regions.
+// Published Sound Proof P19 compares a calibrated response with the stored
+// final calibrated RSP response (Reference EQ). The RSP therefore compares
+// Reference EQ with the same Reference EQ and resolves naturally to 0 dB.
 //
-// This module is the sole authority for P19 evaluation. Both the published
-// P19 assessment (bassAuthoritativeAssessment.js) and the house-curve fitter
-// (houseCurveFitterCore.js) call this helper. The optimiser and the published
-// report always evaluate the response using exactly the same logic.
-//
-// There must never be a separate optimisation metric and reporting metric.
+// The earlier practical target remains available only to the calibration
+// optimiser as a target-fit diagnostic. It is not a published P19 authority.
 //
 // What this helper does:
 //   1. Residual calculation: response(f) − T(f), where T(f) is the
@@ -127,6 +123,42 @@ export function evaluateP19AbsoluteTargetDeviation({
     maxAbsDeviationDb,
     residualCurve,
     sourceCurve: smoothedAssessedCurve,
+  };
+}
+
+/**
+ * Published P19 evaluation against the stored Reference EQ.
+ *
+ * Both curves receive the same normalisation and 1/3-octave smoothing before
+ * comparison. Equal stored curves therefore remain mathematically identical;
+ * no RSP override or forced grade is needed.
+ */
+export function evaluateP19ReferenceEqDeviation({
+  responseCurve,
+  referenceEqCurve,
+  assessmentStartHz,
+  assessmentEndHz,
+  protectedNullRegions = [],
+}) {
+  const smoothedResponse = normalizedSmoothedAssessedCurve(responseCurve, assessmentStartHz, assessmentEndHz);
+  const smoothedReferenceEq = normalizedSmoothedAssessedCurve(referenceEqCurve, assessmentStartHz, assessmentEndHz);
+  if (!smoothedResponse.length || !smoothedReferenceEq.length) return null;
+
+  const scan = scanMaxAbsoluteDeviation(smoothedResponse, smoothedReferenceEq, protectedNullRegions);
+  if (!scan) return null;
+
+  const { maxAbsDeviationDb, worstFrequencyHz, residualCurve } = scan;
+  const level = numericRp22Level(levelP19_lfResponse(maxAbsDeviationDb));
+  return {
+    variationDbRaw: maxAbsDeviationDb,
+    totalRspToTargetDifferenceDbRaw: maxAbsDeviationDb,
+    displayVariationDb: maxAbsDeviationDb,
+    level,
+    worstFrequencyHz,
+    maxAbsDeviationDb,
+    residualCurve,
+    sourceCurve: smoothedResponse,
+    referenceEqCurve: smoothedReferenceEq,
   };
 }
 
