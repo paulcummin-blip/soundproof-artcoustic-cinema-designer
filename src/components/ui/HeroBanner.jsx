@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { DEALER_BRAND_UPDATED_EVENT, loadDealerBrand } from "@/components/account/dealerBrandAuthority";
+import { useNavigate } from "react-router-dom";
 
 const SP_WORDMARK = "SOUND PROOF";
 const BASE_FONT_SIZE = 40; // px — reference size for text width measurement
@@ -47,6 +48,8 @@ export default function DealerHero() {
   const [heroHeight, setHeroHeight] = useState(520);
   const [baseTextWidth, setBaseTextWidth] = useState(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0.5);
+  const [hoveredEl, setHoveredEl] = useState(null);
+  const navigate = useNavigate();
   const heroRef = useRef(null);
   const measureRef = useRef(null);
 
@@ -112,6 +115,13 @@ export default function DealerHero() {
     ? (brand?.white_logo_url || brand?.dealer_logo_url || null)
     : (brand?.dealer_logo_url || brand?.white_logo_url || null);
   const hasDealer = !!(dealerLogo || dealerName);
+  const hasCustomLogo = !!(brand?.dealer_logo_url || brand?.white_logo_url);
+  const hasCustomHero = !!brand?.hero_background_url;
+
+  const tooltipText = hoveredEl === "wordmark" ? "Sound Proof branding is fixed."
+    : hoveredEl === "logo" ? (hasCustomLogo ? "Change your company logo" : "Personalise this logo with your own branding. Upload your company logo from Dealer Branding.")
+    : hoveredEl === "hero" ? (hasCustomHero ? "Change your Hero Image" : "Personalise this Hero Image from Dealer Branding.")
+    : null;
 
   // Auto-adjust dark overlay based on hero image brightness (45–50%)
   useEffect(() => {
@@ -215,10 +225,21 @@ export default function DealerHero() {
     <div
       ref={heroRef}
       className="relative w-full flex-shrink-0 overflow-hidden"
+      onMouseOver={(e) => {
+        const el = e.target.dataset?.heroEl || "hero";
+        setHoveredEl(el);
+      }}
+      onMouseLeave={() => setHoveredEl(null)}
+      onClick={(e) => {
+        const el = e.target.dataset?.heroEl || "hero";
+        if (el !== "wordmark") navigate("/DealerBranding");
+      }}
+      data-hero-el="hero"
       style={{
         height: "clamp(380px, 30vw, 520px)",
         background: heroBg ? "#1B1A1A" : "#F8F8F7",
         borderBottom: `1px solid ${heroBg ? "rgba(255,255,255,0.12)" : "#DCDBD6"}`,
+        cursor: "pointer",
       }}
     >
       {/* Hidden measurement span — determines text width at reference font size */}
@@ -276,6 +297,7 @@ export default function DealerHero() {
       >
         {/* Sound Proof wordmark — white text, no panel, floats over photography */}
         <span
+          data-hero-el="wordmark"
           style={{
             fontSize: spFontSize,
             fontWeight: FONT_WEIGHT,
@@ -309,6 +331,7 @@ export default function DealerHero() {
               <img
                 src={dealerLogo}
                 alt={dealerName || "Dealer"}
+                data-hero-el="logo"
                 onLoad={(e) => {
                   const img = e.currentTarget;
                   setDealerNatural({ w: img.naturalWidth, h: img.naturalHeight });
@@ -321,6 +344,7 @@ export default function DealerHero() {
               />
             ) : (
               <span
+                data-hero-el="logo"
                 style={{
                   color: textColor,
                   fontSize: "clamp(18px, 2vw, 26px)",
@@ -337,6 +361,31 @@ export default function DealerHero() {
           </>
         )}
       </div>
+
+      {/* Hover discovery tooltip — only visible on hover, no permanent UI */}
+      {tooltipText && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(0,0,0,0.78)",
+            color: "#FFFFFF",
+            fontSize: 12,
+            fontFamily: FONT_FAMILY,
+            padding: "6px 14px",
+            borderRadius: 4,
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+            zIndex: 10,
+            letterSpacing: "0.02em",
+            maxWidth: "90%",
+          }}
+        >
+          {tooltipText}
+        </div>
+      )}
     </div>
   );
 }
