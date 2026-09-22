@@ -56,12 +56,12 @@ export default async function syncUkTurnoverRewards(req) {
       return Response.json({ status: "INVALID_YEAR" }, { status: 400 });
     }
 
-    const entitlementUrl = secrets.get("PARTNER_PORTAL_ENTITLEMENT_URL");
+    const entitlementUrl = secrets.get("PARTNER_PORTAL_TURNOVER_URL");
     const bridgeKey = secrets.get("PARTNER_PORTAL_TURNOVER_API_KEY");
     if (!entitlementUrl || !bridgeKey) {
       return Response.json({
         status: "SECRETS_MISSING",
-        message: "PARTNER_PORTAL_ENTITLEMENT_URL and PARTNER_PORTAL_TURNOVER_API_KEY must be configured.",
+        message: "PARTNER_PORTAL_TURNOVER_URL and PARTNER_PORTAL_TURNOVER_API_KEY must be configured.",
         dry_run: dryRun,
       }, { status: 503 });
     }
@@ -76,7 +76,7 @@ export default async function syncUkTurnoverRewards(req) {
     } catch {
       return Response.json({
         status: "CONFIGURATION_INVALID",
-        message: "PARTNER_PORTAL_ENTITLEMENT_URL must be a valid HTTPS URL.",
+        message: "PARTNER_PORTAL_TURNOVER_URL must be a valid HTTPS URL.",
         dry_run: dryRun,
       }, { status: 503 });
     }
