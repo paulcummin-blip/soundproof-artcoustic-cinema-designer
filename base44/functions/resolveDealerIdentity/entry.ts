@@ -3,6 +3,18 @@ import { secrets } from "base44:runtime";
 import { providerAccessToken } from "../../shared/portalSsoAuthority.js";
 import { resolvePartnerPortalDealerIdentity } from "../../shared/partnerPortalIdentityClient.js";
 
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, private, max-age=0",
+  Pragma: "no-cache",
+};
+
+function noStoreJson(body, init = {}) {
+  return Response.json(body, {
+    ...init,
+    headers: { ...NO_STORE_HEADERS, ...(init.headers || {}) },
+  });
+}
+
 /**
  * Read-only Partner Portal Dealer Identity resolver.
  *
@@ -22,7 +34,7 @@ export default async function resolveDealerIdentity(req) {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) {
-      return Response.json(
+      return noStoreJson(
         { resolved: false, reason: "UNAUTHENTICATED" },
         { status: 401 },
       );
@@ -35,7 +47,7 @@ export default async function resolveDealerIdentity(req) {
     try {
       accessToken = await providerAccessToken(base44, user.id);
     } catch {
-      return Response.json({ resolved: false, reason: "NO_PORTAL_TOKEN" });
+      return noStoreJson({ resolved: false, reason: "NO_PORTAL_TOKEN" });
     }
 
     let identity;
@@ -45,15 +57,15 @@ export default async function resolveDealerIdentity(req) {
         accessToken,
       });
     } catch (error) {
-      return Response.json({
+      return noStoreJson({
         resolved: false,
         reason: String(error?.message || error || "RESOLUTION_FAILED"),
       });
     }
 
-    return Response.json({ resolved: true, identity });
+    return noStoreJson({ resolved: true, identity });
   } catch (error) {
-    return Response.json(
+    return noStoreJson(
       {
         resolved: false,
         reason: String(error?.message || error || "INTERNAL_ERROR"),
