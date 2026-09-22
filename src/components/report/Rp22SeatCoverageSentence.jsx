@@ -35,11 +35,11 @@ export default function Rp22SeatCoverageSentence({
   const style =
     variant === "cover"
       ? {
-          fontSize: "10.5pt",
+          fontSize: "10pt",
           color: "#3E4349",
           fontFamily: FONT_BODY,
-          lineHeight: 1.75,
-          marginTop: "5mm",
+          lineHeight: 1.55,
+          marginTop: "3mm",
         }
       : variant === "print"
         ? {
