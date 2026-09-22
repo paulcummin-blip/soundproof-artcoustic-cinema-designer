@@ -135,10 +135,9 @@ export default function ExpandedParameterDetail({
       ? { ...param, thresholds: resolvedThresholds }
       : param;
 
-  const targetBasisNote =
-    engineeringSummary?.roomResultsByParameter?.[param.id]?.targetBasisNote
-    ?? engineeringSummary?.roomResultsByParameter?.[param.id]?.detail
-    ?? null;
+  const roomResult = engineeringSummary?.roomResultsByParameter?.[param.id] || null;
+  const targetBasisNote = roomResult?.targetBasisNote ?? roomResult?.detail ?? null;
+  const isAssumed = roomResult?.assumed === true;
 
   const achievedValue = getHudValueForParam(param);
   const lvl = getHudLevelForParam(param);
@@ -199,7 +198,12 @@ export default function ExpandedParameterDetail({
               lineHeight: 1.1,
             }}
           >
-            {achievedValue || "—"}
+            {isAssumed && (
+              <div style={{ fontSize: 10, fontWeight: 600, color: "#625143", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>
+                Assumed
+              </div>
+            )}
+            {achievedValue || (isAssumed ? "L2 design assumption" : "—")}
           </div>
         )}
       </div>
@@ -254,6 +258,14 @@ export default function ExpandedParameterDetail({
               <strong style={{ fontWeight: 600 }}>RSP:</strong> {rspLabel}
             </span>
           )}
+        </div>
+      )}
+
+      {isAssumed && (
+        <div style={{ marginBottom: 10, padding: "8px 10px", background: "#F8F7F5", border: "1px solid #EFEEEA", borderRadius: 4, fontSize: 11, lineHeight: 1.45, color: "#625143", fontFamily: BODY_FONT }}>
+          {Number(param.id) === 15
+            ? "Assumed. Design target: NCB 22."
+            : "Assumed. Early reflections have not been measured. Level 2 is used as the design assumption."}
         </div>
       )}
 
