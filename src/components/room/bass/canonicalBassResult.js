@@ -7,10 +7,10 @@
 
 import {
   bassLevelFromRank,
-  lowestPrimaryP19P20Level,
+  lowestBassLevel,
 } from "@/components/utils/rp22/bassGradingAuthority";
 
-export const CANONICAL_BASS_RESULT_VERSION = 2;
+export const CANONICAL_BASS_RESULT_VERSION = 3;
 
 function cloneRows(rows) {
   return (Array.isArray(rows) ? rows : []).map((row) => ({ ...row }));
@@ -51,14 +51,9 @@ export function buildCanonicalBassResult(contract, graphPayload = null) {
 
   const perSeatP19 = markPrimaryRows(candidate.perSeatP19Results, primarySeatIds);
   const perSeatP20 = markPrimaryRows(candidate.perSeatP20Results, primarySeatIds);
-  const p19 = primaryAggregate(parameters.p19, perSeatP19);
+  const p19 = parameters.p19 ? { ...parameters.p19 } : null;
   const p20 = primaryAggregate(parameters.p20, perSeatP20);
   if (!p19 || !p20) return null;
-  const resultForFloor = {
-    perSeatP19,
-    perSeatP20,
-  };
-
   return Object.freeze({
     version: CANONICAL_BASS_RESULT_VERSION,
     candidateId: candidate.id || contract.selectedCandidateId || null,
@@ -79,7 +74,7 @@ export function buildCanonicalBassResult(contract, graphPayload = null) {
     grading: Object.freeze({
       P19: bassLevelFromRank(p19.level),
       P20: bassLevelFromRank(p20.level),
-      primaryFloor: lowestPrimaryP19P20Level(resultForFloor),
+      primaryFloor: lowestBassLevel([p19.level, p20.level]),
     }),
   });
 }
