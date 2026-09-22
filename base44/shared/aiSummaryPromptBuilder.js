@@ -45,9 +45,15 @@ function formatAssumptions(assumptions) {
   if (!assumptions) return "P15 Background noise floor: Assumed L2, design target NCB 22\nP21 Early reflections: Assumed L2; early reflections have not been measured.";
   const p15 = assumptions.p15 || {};
   const p21 = assumptions.p21 || {};
+  const p15Status = p15.status || "Assumed";
+  const p21Status = p21.status || "Assumed";
+  const p15Detail = p15.value ? `, ${p15.value}` : "";
+  const p21Detail = p21Status === "Measured"
+    ? (p21.value ? `, ${p21.value}` : "")
+    : `; ${p21.note || "early reflections have not been measured."}`;
   return [
-    `P15 Background noise floor: ${p15.status || "Assumed"} ${p15.level || "L2"}, ${p15.value || "NCB 22"}`,
-    `P21 Early reflections: ${p21.status || "Assumed"} ${p21.level || "L2"}; ${p21.note || "early reflections have not been measured."}`,
+    `P15 Background noise floor: ${p15Status} ${p15.level || "L2"}${p15Detail}`,
+    `P21 Early reflections: ${p21Status} ${p21.level || "L2"}${p21Detail}`,
   ].join("\n");
 }
 
