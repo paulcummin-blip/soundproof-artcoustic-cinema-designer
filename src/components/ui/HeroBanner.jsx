@@ -6,26 +6,29 @@ const SP_LOGO_URL =
   "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg";
 
 /**
- * HeroBanner — premium full-width brand partnership banner.
+ * HeroBanner — premium full-width brand partnership banner (vertical hierarchy).
  *
- * Displays:  Sound Proof logo  ×  Dealer logo (or dealer name)
+ * Displays vertically:
+ *   Sound Proof logo
+ *       ×
+ *   Dealer logo (or dealer name)
+ *
  * No marketing copy. The logos communicate the relationship.
  *
- * Sound Proof is always first and visually dominant.
- * Dealer logo is 75% of the Sound Proof logo height.
- * The × symbol is the partnership mark.
+ * Sound Proof is always first and ~10% wider than the dealer logo.
+ * Both logos maintain their original aspect ratio (never distorted).
+ * The × symbol is the partnership mark with 32px spacing above and below.
  *
  * Background:
- *   If a dealer hero image exists, it is rendered full-width, cover,
- *   centred, with a ~50% dark overlay for logo legibility. No blur.
- *   If no hero image, a clean neutral background is used.
+ *   Dealer hero image rendered full-width, cover, centred, no blur,
+ *   with a ~50% dark overlay for logo legibility.
  *
  * Fallbacks:
  *   - Dealer logo present:  SP × Dealer Logo
  *   - Dealer logo missing:  SP × Dealer Name
  *   - No dealer at all:     SP logo only, centred
  *
- * Height: ~300px on desktop, ~200px on mobile.
+ * Height: ~340px on desktop, ~260px on mobile.
  */
 export default function DealerHero() {
   const { user } = useAuth();
@@ -78,7 +81,7 @@ export default function DealerHero() {
     <div
       className="relative w-full flex-shrink-0 overflow-hidden"
       style={{
-        height: "clamp(200px, 20vw, 300px)",
+        height: "clamp(260px, 22vw, 340px)",
         background: heroBg ? "#1B1A1A" : "#F8F8F7",
         borderBottom: `1px solid ${heroBg ? "rgba(255,255,255,0.12)" : "#DCDBD6"}`,
       }}
@@ -98,72 +101,75 @@ export default function DealerHero() {
         </>
       )}
 
-      {/* Centred brand partnership */}
+      {/* Vertically centred brand hierarchy */}
       <div
-        className="relative h-full flex items-center justify-center px-6 sm:px-10"
-        style={{ fontFamily: "Didact Gothic, Century Gothic, sans-serif" }}
+        className="relative h-full flex flex-col items-center justify-center px-6"
+        style={{ fontFamily: "Didact Gothic, Century Gothic, sans-serif", gap: 32 }}
       >
+        {/* Sound Proof — primary brand, always first, ~10% wider than dealer */}
         <div
-          className="flex items-center justify-center"
-          style={{ gap: "clamp(24px, 4vw, 48px)" }}
+          style={{
+            width: "clamp(180px, 15vw, 280px)",
+            height: "clamp(50px, 6vw, 80px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          {/* Sound Proof — primary brand, always first, always dominant */}
           <img
             src={SP_LOGO_URL}
             alt="Sound Proof"
-            style={{
-              height: "clamp(40px, 5vw, 64px)",
-              objectFit: "contain",
-              maxWidth: 320,
-              flexShrink: 0,
-            }}
+            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
           />
+        </div>
 
-          {/* Partnership mark + dealer branding */}
-          {hasDealer && (
-            <>
-              <span
+        {/* Partnership mark + dealer branding */}
+        {hasDealer && (
+          <>
+            <span
+              style={{
+                fontSize: "clamp(20px, 2.5vw, 30px)",
+                fontWeight: 300,
+                color: crossColor,
+                lineHeight: 1,
+                userSelect: "none",
+              }}
+            >
+              ×
+            </span>
+
+            {dealerLogo ? (
+              <div
                 style={{
-                  fontSize: "clamp(20px, 2.5vw, 30px)",
-                  fontWeight: 300,
-                  color: crossColor,
-                  lineHeight: 1,
-                  userSelect: "none",
-                  flexShrink: 0,
+                  width: "clamp(162px, 13.5vw, 252px)",
+                  height: "clamp(45px, 5.4vw, 72px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
-                ×
-              </span>
-
-              {dealerLogo ? (
                 <img
                   src={dealerLogo}
                   alt={dealerName || "Dealer"}
-                  style={{
-                    height: "clamp(30px, 3.75vw, 48px)",
-                    objectFit: "contain",
-                    maxWidth: 240,
-                    flexShrink: 0,
-                  }}
+                  style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
                 />
-              ) : (
-                <span
-                  style={{
-                    color: textColor,
-                    fontSize: "clamp(18px, 2vw, 26px)",
-                    fontWeight: 700,
-                    letterSpacing: "0.02em",
-                    lineHeight: 1,
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
-                >
-                  {dealerName}
-                </span>
-              )}
-            </>
-          )}
-        </div>
+              </div>
+            ) : (
+              <span
+                style={{
+                  color: textColor,
+                  fontSize: "clamp(18px, 2vw, 26px)",
+                  fontWeight: 700,
+                  letterSpacing: "0.02em",
+                  lineHeight: 1,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {dealerName}
+              </span>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
