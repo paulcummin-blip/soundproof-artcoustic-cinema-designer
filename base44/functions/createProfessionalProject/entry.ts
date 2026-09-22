@@ -46,6 +46,8 @@ export default async function(req) {
     const userRecords = await base44.asServiceRole.entities.User.filter({ id: user.id });
     const authoritativeUser = (Array.isArray(userRecords) && userRecords.length > 0) ? userRecords[0] : null;
     const accountId = authoritativeUser?.account_id || null;
+    const dealerAccountId = authoritativeUser?.dealer_account_id || null;
+    const dealerName = authoritativeUser?.dealer_name || null;
     const userRole = authoritativeUser?.role || user?.role || 'user';
     const isAdmin = userRole === 'admin';
 
@@ -54,6 +56,16 @@ export default async function(req) {
       return Response.json({
         status: 'ACCOUNT_NOT_LINKED',
         message: 'Your user account is not linked to an organisation. Contact your administrator.'
+      }, { status: 403 });
+    }
+
+    // Every new project must be stamped with the authenticated dealer's
+    // Dealer Account ID. Non-admin users without a resolved dealer identity
+    // cannot create projects — no orphaned projects are allowed.
+    if (!isAdmin && (!dealerAccountId || dealerAccountId === '')) {
+      return Response.json({
+        status: 'DEALER_NOT_LINKED',
+        message: 'Unable to determine your Dealer Account. Please launch Sound Proof from your Partner Portal.'
       }, { status: 403 });
     }
 
@@ -100,6 +112,8 @@ export default async function(req) {
         adminProject = await base44.asServiceRole.entities.Project.create({
           ...projectFields,
           account_id: accountId || null,
+          dealer_account_id: dealerAccountId || null,
+          dealer_name: dealerName || null,
           commercial_tier: 'INTERNAL',
           lifecycle_status: 'Draft',
         });
@@ -155,6 +169,8 @@ export default async function(req) {
         promoProject = await base44.asServiceRole.entities.Project.create({
           ...projectFields,
           account_id: accountId,
+          dealer_account_id: dealerAccountId,
+          dealer_name: dealerName,
           commercial_tier: 'PROFESSIONAL',
           commercial_source: 'PROMOTION',
           promotion_id: effectivePromotion.id,
@@ -241,6 +257,8 @@ export default async function(req) {
       project = await base44.asServiceRole.entities.Project.create({
         ...projectFields,
         account_id: accountId,
+        dealer_account_id: dealerAccountId,
+        dealer_name: dealerName,
         commercial_tier: 'PROFESSIONAL',
         professional_activated_date: nowIso,
         commercial_source: 'PILOT',

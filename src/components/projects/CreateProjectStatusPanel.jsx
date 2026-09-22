@@ -62,6 +62,30 @@ export default function CreateProjectStatusPanel({ status, onPurchaseProjects, o
     );
   }
 
+  if (status === 'DEALER_NOT_LINKED') {
+    return (
+      <div className="space-y-6 font-body py-4">
+        <div className="text-center space-y-2">
+          <h3 className="text-lg font-bold text-[#1B1A1A]">
+            Dealer Account not resolved
+          </h3>
+          <p className="text-sm text-[#3E4349]">
+            Unable to determine your Dealer Account. Please launch Sound Proof
+            from your Partner Portal.
+          </p>
+        </div>
+        <div className="flex justify-center">
+          <Button
+            onClick={onClose}
+            style={{ backgroundColor: "#1B1A1A", color: "#FFFFFF" }}
+          >
+            Close
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // CREATION_FAILED (default)
   return (
     <div className="space-y-6 font-body py-4">

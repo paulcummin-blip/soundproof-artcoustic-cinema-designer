@@ -351,6 +351,16 @@
       "type": "string",
       "description": "ID of the Account this project belongs to"
     },
+    "dealer_account_id": {
+      "type": "string",
+      "description": "Immutable Dealer Account UUID from the Partner Portal Dealer Identity Service. Stamped at project creation from the authenticated user's dealer_account_id. The permanent ownership model \u2014 every project belongs to exactly one dealer. Never overwritten automatically after creation. Null for admin-created internal projects.",
+      "nullable": true
+    },
+    "dealer_name": {
+      "type": "string",
+      "description": "Dealer display name from the Partner Portal Dealer Identity Service. Stamped at project creation from the authenticated user's dealer_name.",
+      "nullable": true
+    },
     "active_version_id": {
       "type": "string",
       "description": "ID of the active ProjectVersion. Single source of truth for which version is currently loaded in the Room Designer. Null = not yet migrated (legacy project). When set, the Room Designer loads this version's design_state. There is NO is_active flag on ProjectVersion \u2014 this pointer is the only authority.",

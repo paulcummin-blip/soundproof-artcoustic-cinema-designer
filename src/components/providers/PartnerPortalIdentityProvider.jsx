@@ -6,6 +6,7 @@ import React, {
   useCallback,
 } from "react";
 import { base44 } from "@/api/base44Client";
+import DealerIdentityMismatchScreen from "@/components/DealerIdentityMismatchScreen";
 
 /**
  * Single in-memory identity provider for the Partner Portal Dealer Identity.
@@ -22,6 +23,7 @@ const PartnerPortalIdentityContext = createContext(null);
 export function PartnerPortalIdentityProvider({ children }) {
   const [state, setState] = useState({
     identity: null,
+    association: null,
     loading: true,
     error: null,
     reason: null,
@@ -35,21 +37,22 @@ export function PartnerPortalIdentityProvider({ children }) {
       reason: null,
     }));
     try {
-      const response = await base44.functions.invoke("resolveDealerIdentity", {});
+      const response = await base44.functions.invoke("associateDealerIdentity", {});
       const data = response?.data || response;
       if (data?.resolved === true && data?.identity) {
         setState({
           identity: data.identity,
+          association: data.association || null,
           loading: false,
           error: null,
           reason: null,
         });
-        console.log("[PartnerPortalIdentity] Dealer identity resolved");
       } else {
         setState({
           identity: null,
+          association: null,
           loading: false,
-          error: null,
+          error: data?.reason === "DEALER_IDENTITY_MISMATCH" ? "DEALER_IDENTITY_MISMATCH" : null,
           reason: data?.reason || "NOT_RESOLVED",
         });
       }
@@ -68,6 +71,10 @@ export function PartnerPortalIdentityProvider({ children }) {
   }, [resolve]);
 
   const value = { ...state, refetch: resolve };
+
+  if (state.error === "DEALER_IDENTITY_MISMATCH") {
+    return <DealerIdentityMismatchScreen />;
+  }
 
   return (
     <PartnerPortalIdentityContext.Provider value={value}>

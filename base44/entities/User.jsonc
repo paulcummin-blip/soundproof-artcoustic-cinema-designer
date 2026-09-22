@@ -90,6 +90,30 @@
         }
       }
     },
+    "dealer_account_id": {
+      "type": "string",
+      "description": "Immutable Dealer Account UUID from the Partner Portal Dealer Identity Service. Stored on first launch from the Partner Portal and never overwritten automatically. The permanent ownership stamp for every project created by this user. Backend-managed \u2014 only the associateDealerIdentity function (service role) writes this.",
+      "nullable": true,
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
+    },
+    "dealer_name": {
+      "type": "string",
+      "description": "Dealer display name from the Partner Portal Dealer Identity Service. Stored on first launch alongside dealer_account_id. Backend-managed.",
+      "nullable": true,
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
+    },
     "license_account_type": {
       "type": "string",
       "enum": [

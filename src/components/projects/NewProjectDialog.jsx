@@ -143,6 +143,8 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
             setCreateStatus('OUT_OF_CAPACITY');
           } else if (result?.status === 'ACCOUNT_NOT_LINKED') {
             setCreateStatus('ACCOUNT_NOT_LINKED');
+          } else if (result?.status === 'DEALER_NOT_LINKED') {
+            setCreateStatus('DEALER_NOT_LINKED');
           } else {
             setCreateStatus('CREATION_FAILED');
           }
