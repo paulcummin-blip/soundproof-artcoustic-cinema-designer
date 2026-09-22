@@ -87,8 +87,8 @@ function scanMaxAbsoluteDeviation(smoothedAssessedCurve, canonicalTargetCurve, p
 /**
  * Full P19 evaluation: smooth, assess, scan, grade.
  *
- * This is the canonical P19 authority called by both the published P19
- * assessment (computeOfficialP19Assessment) and the house-curve fitter.
+ * This is the calibration target-fit evaluator used by the optimiser and
+ * house-curve fitter. Published P19 uses evaluateP19ReferenceEqDeviation.
  *
  * @param {object} params
  * @param {Array}  params.rspPostEqCurve        - post-EQ RSP curve [{frequency, spl}]
