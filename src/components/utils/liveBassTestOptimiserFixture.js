@@ -5,7 +5,7 @@ import { bassInputAdapter } from "@/components/utils/subwooferInstanceMigration"
 import { generateCandidatePool, selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
 import { buildCurveSignature } from "@/components/room/bass/bassResultAuthority";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
-import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
+import { computeCorrectableP19Diagnostic, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 import { assessP18AgainstRequiredExtension } from "@/components/utils/bassDesignPhilosophyAuthority";
 import { assessP18Extension } from "@/components/utils/p18ExtensionAuthority";
 
@@ -54,7 +54,7 @@ function summariseCandidate(selected, targetDb) {
     configuredUsableLfHz: 20,
   });
   const p18Grade = assessP18Extension(p18?.achievedExtensionHz, "minimum");
-  const p19 = computeOfficialP19Assessment({
+  const p19 = computeCorrectableP19Diagnostic({
     rspPostEqCurve: finalCurve,
     canonicalTargetCurve: target,
     assessmentStartHz: candidate.assessmentStartHz,
