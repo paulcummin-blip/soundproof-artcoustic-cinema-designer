@@ -240,7 +240,7 @@ test('auto-claim fails closed for email mismatch, ambiguity, account mismatch an
   }
 });
 
-test('consume stores no raw binding secret and requires the pre-assigned Base44 user seat', async (t) => {
+test('consume stores no raw binding secret and rejects a seat claimed by another user', async (t) => {
   const { base44, rows } = fixture();
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
@@ -267,11 +267,11 @@ test('consume stores no raw binding secret and requires the pre-assigned Base44 
   await assert.rejects(
     () => consumePilotPortalLaunch(
       base44,
-      { id: 'base44-user-1' },
+      { id: 'base44-user-1', email: 'dealer@example.com' },
       'B'.repeat(43),
       BRIDGE_OPTIONS,
     ),
-    /PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED/,
+    /PORTAL_MEMBERSHIP_ALREADY_CLAIMED/,
   );
 });
 
