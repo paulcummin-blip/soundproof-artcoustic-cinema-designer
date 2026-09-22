@@ -41,6 +41,16 @@ function formatBassSeatResults(perSeat) {
     .join("; ");
 }
 
+function formatAssumptions(assumptions) {
+  if (!assumptions) return "P15 Background noise floor: Assumed L2, design target NCB 22\nP21 Early reflections: Assumed L2; early reflections have not been measured.";
+  const p15 = assumptions.p15 || {};
+  const p21 = assumptions.p21 || {};
+  return [
+    `P15 Background noise floor: ${p15.status || "Assumed"} ${p15.level || "L2"}, ${p15.value || "NCB 22"}`,
+    `P21 Early reflections: ${p21.status || "Assumed"} ${p21.level || "L2"}; ${p21.note || "early reflections have not been measured."}`,
+  ].join("\n");
+}
+
 function formatBass(bass) {
   if (!bass) return "Not available";
   const parts = [];
@@ -65,7 +75,7 @@ function formatBass(bass) {
  * @returns {string}
  */
 export function buildSingleSummaryPrompt(payload) {
-  const { identity, project, system, designRating, categoryFloors, parameters, bass, viewing } = payload || {};
+  const { identity, project, system, designRating, categoryFloors, parameters, bass, assumptions, viewing } = payload || {};
 
   return `You are a professional home cinema design engineer writing a client-facing performance summary for a cinema design project. The summary must be factual, professional, and based ONLY on the engineering data provided below. Do not editorialise beyond the evidence.
 
@@ -81,6 +91,7 @@ WRITING RULES (strict):
 - P14 is Dynamic Range. P18, P19, and P20 are Timbre Matching. Never describe P19 or P20 as Dynamic Range.
 - P20 is seat-to-seat bass consistency. If P20 is L1 or FAIL, state that consistency varies materially across seats; never call the bass response consistent, stable, uniform, or standardized across the room.
 - Keep engineering claims tied to a supplied value. If evidence is unavailable, omit the claim.
+- State both supplied design assumptions once: background noise floor is Assumed L2 at NCB 22; early reflections are Assumed L2 because they have not been measured. Do not describe either as calculated or measured.
 
 PROJECT DATA:
 - Project: ${project?.name || "—"}
@@ -99,6 +110,9 @@ RP22 CATEGORY FLOORS:
 
 BASS (when authoritative):
 ${formatBass(bass)}
+
+DESIGN ASSUMPTIONS:
+${formatAssumptions(assumptions)}
 
 VIEWING:
 ${viewing ? `${viewing.summary || "Calculated"} (Primary: ${viewing.primaryFloor || "—"}, Secondary: ${viewing.secondaryFloor || "—"})` : "Not calculated"}
@@ -132,6 +146,7 @@ export function buildComparisonSummaryPrompt({ payloads, versionLabels }) {
 - Category Floors Primary: ${formatCategoryFloors(payload?.categoryFloors?.primary)}
 - Category Floors Secondary: ${formatCategoryFloors(payload?.categoryFloors?.secondary)}
 - Bass: ${formatBass(payload?.bass)}
+- Design assumptions: ${formatAssumptions(payload?.assumptions)}
 - Subwoofers: ${payload?.system?.subwooferCount || 0} (${(payload?.system?.subwooferModels || []).join(", ") || "—"})
 - Screen: ${payload?.system?.screen?.size || "—"}" ${payload?.system?.screen?.aspectRatio || ""}
 - Viewing: ${payload?.viewing?.summary || "Not calculated"}`;
@@ -152,6 +167,7 @@ WRITING RULES (strict):
 - RP22 category floors are the sole authority for the Spatial Resolution, Dynamic Range, and Timbre Matching comparison rows.
 - P14 is Dynamic Range. P18, P19, and P20 are Timbre Matching. Never describe P19 or P20 as Dynamic Range.
 - If P20 is L1 or FAIL, describe material seat-to-seat bass variation; never call the bass response consistent, stable, uniform, or standardized across the room.
+- State that background noise floor and early reflections are Assumed L2 in every version unless the supplied data explicitly marks them measured.
 
 VERSION DATA:
 ${versionData}
