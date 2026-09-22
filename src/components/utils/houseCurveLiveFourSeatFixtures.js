@@ -2,7 +2,7 @@ import { buildCurveFromBank, evaluateProvisionalBankLimits, peakingEqResponseDb 
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { buildBassGraphSeries } from "@/components/room/bass/bassGraphDomainBuilder";
 import { buildFinalOptimisedBassResponse } from "@/components/room/bass/finalOptimisedBassResponse";
-import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
+import { computeCorrectableP19Diagnostic, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { stableBankSignature } from "@/components/utils/houseCurveEvaluationMemo";
 import { runProfessionalResidualCleanup } from "@/components/utils/houseCurveResidualCleanup";
@@ -87,7 +87,7 @@ export function runHouseCurveLiveFourSeatFixtures() {
     profile: { maximumCutDb: 15, maximumAggregateBoostDb: 6 },
     priorIterationTrace: [],
   });
-  const postP19 = computeOfficialP19Assessment({
+  const postP19 = computeCorrectableP19Diagnostic({
     rspPostEqCurve: result.curve,
     canonicalTargetCurve: fixture.canonicalTargetCurve,
     assessmentStartHz: 20,
