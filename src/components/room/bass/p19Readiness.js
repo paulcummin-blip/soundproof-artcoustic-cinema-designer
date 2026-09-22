@@ -23,11 +23,11 @@ export function hasReadyCanonicalP19Contract(contract) {
   const graph = contract?.graphPayload;
   return parameter?.status === "complete"
     && isCanonicalP19Ready({
-      canonicalPostEqRsp: response?.canonicalPostEqRsp
-        || response?.postEqRspCurve
-        || graph?.postEqRspCurve,
-      canonicalTargetCurve: response?.canonicalTargetCurve
-        || graph?.productionHouseCurveTarget,
+      canonicalPostEqRsp: response?.referenceEq
+        || response?.canonicalPostEqRsp
+        || graph?.referenceEq,
+      canonicalTargetCurve: response?.referenceEq
+        || graph?.referenceEq,
       officialVariationDb: parameter?.value,
       officialLevel: parameter?.level,
     });
