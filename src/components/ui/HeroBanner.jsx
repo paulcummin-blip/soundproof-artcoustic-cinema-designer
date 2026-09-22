@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { base44 } from "@/api/base44Client";
+import { DEALER_BRAND_UPDATED_EVENT, loadDealerBrand } from "@/components/account/dealerBrandAuthority";
 
 const SP_LOGO_URL =
   "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg";
@@ -17,25 +17,41 @@ const SP_LOGO_URL =
  *
  * The banner is not sticky — it scrolls naturally out of view with the page.
  */
-export default function HeroBanner() {
+export default function DealerHero() {
   const { user } = useAuth();
   const accountId = user?.account_id || user?.access_context?.account?.id || null;
   const [brand, setBrand] = useState(null);
 
   useEffect(() => {
-    if (!accountId) return;
     let cancelled = false;
+
+    if (!accountId) {
+      setBrand(null);
+      return () => { cancelled = true; };
+    }
+
+    setBrand(null);
     (async () => {
       try {
-        const results = await base44.entities.BrandAsset.filter({ account_id: accountId });
-        if (!cancelled) {
-          setBrand(Array.isArray(results) && results.length > 0 ? results[0] : null);
-        }
+        const loadedBrand = await loadDealerBrand(accountId);
+        if (!cancelled) setBrand(loadedBrand);
       } catch {
         if (!cancelled) setBrand(null);
       }
     })();
-    return () => { cancelled = true; };
+
+    const handleBrandUpdated = (event) => {
+      const detail = event?.detail || {};
+      if (String(detail.accountId || "") === String(accountId)) {
+        setBrand(detail.brand || null);
+      }
+    };
+    window.addEventListener(DEALER_BRAND_UPDATED_EVENT, handleBrandUpdated);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(DEALER_BRAND_UPDATED_EVENT, handleBrandUpdated);
+    };
   }, [accountId]);
 
   const heroBg = brand?.hero_background_url || null;
