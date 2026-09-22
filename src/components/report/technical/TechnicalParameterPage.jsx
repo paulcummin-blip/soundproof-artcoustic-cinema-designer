@@ -4,8 +4,8 @@
  * Page wrapper for the Technical Report RP22 parameter print layout.
  *
  * Renders a small category heading bar at the top, followed by at most
- * 2 atomic parameter cards. The smaller group leaves enough printable
- * height for variable descriptions, seat rows, thresholds and footers.
+ * 3 atomic parameter cards. Print spacing is deliberately compact so the
+ * complete three-card group fits inside the A4 printable frame.
  *
  * The page background is #F1F0EE (Sound Proof page tone); cards are white.
  */
@@ -37,9 +37,9 @@ export default function TechnicalParameterPage({ params, children, isFirst = fal
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: "5mm",
-        breakInside: "auto",
-        pageBreakInside: "auto",
+        gap: "3mm",
+        breakInside: "avoid",
+        pageBreakInside: "avoid",
       }}
     >
       {isFirst && (
@@ -90,14 +90,14 @@ export default function TechnicalParameterPage({ params, children, isFirst = fal
         </span>
       </div>
 
-      {/* Cards remain atomic; the page wrapper may fragment only between cards. */}
+      {/* The three-card group and each card remain atomic on the printed page. */}
       <div
         className="tech-param-page__cards"
         style={{
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          gap: "5mm",
+          gap: "3mm",
           flex: 1,
         }}
       >
