@@ -1322,65 +1322,87 @@ function RP22ReportInner() {
                             <RP22ReportParameterGrid {...parameterGridProps} variant="print" />
                         </section>
 
-                        {/* ── Elevation drawings: one complete drawing per atomic page ── */}
-                        <section id="pdf-elevation-front" className="report-page-block report-drawing-page" data-report-block="front-elevation" data-report-block-kind="drawing" data-report-page-start="true" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
-                            <div className="report-drawing-title">Elevation Drawing · Front</div>
-                            <div className="report-drawing-frame">
-                                <FrontElevation
-                                    dimensions={stableDimensions}
-                                    screen={screen}
-                                    placedSpeakers={placedSpeakers}
-                                    frontSubs={frontSubs}
-                                    frontSubsCfg={frontSubsCfg}
-                                    roomElements={(app?.roomElements || []).filter(el => el?.type !== 'projector')}
-                                />
-                            </div>
-                        </section>
+                        {/* ── Drawing set: every page uses one fixed printable frame ── */}
+                        <ReportDrawingPage
+                            id="pdf-elevation-front"
+                            blockName="front-elevation"
+                            title="Elevation Drawing · Front"
+                            projectName={projectDetails?.name || ''}
+                            clientName={projectDetails?.client_name || ''}
+                            sheetCode="EL-F"
+                            status="NOT FOR SCALING"
+                        >
+                            <FrontElevation
+                                dimensions={stableDimensions}
+                                screen={screen}
+                                placedSpeakers={placedSpeakers}
+                                frontSubs={frontSubs}
+                                frontSubsCfg={frontSubsCfg}
+                                roomElements={(app?.roomElements || []).filter(el => el?.type !== 'projector')}
+                            />
+                        </ReportDrawingPage>
 
-                        <section id="pdf-elevation-left" className="report-page-block report-drawing-page" data-report-block="left-elevation" data-report-block-kind="drawing" data-report-page-start="true" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
-                            <div className="report-drawing-title">Elevation Drawing · Left</div>
-                            <div className="report-drawing-frame">
-                                <SideElevation
-                                    wall="left"
-                                    dimensions={stableDimensions}
-                                    screen={screen}
-                                    placedSpeakers={placedSpeakers}
-                                    frontSubs={frontSubs}
-                                    frontSubsCfg={frontSubsCfg}
-                                    rearSubs={safeArray(app?.subwoofers).filter(s => s?.group === 'rear')}
-                                    rearSubsCfg={rearSubsCfg}
-                                    seatingPositions={seats}
-                                    mlpPoint={primarySeatingPosition}
-                                    roomElements={app?.roomElements || []}
-                                />
-                            </div>
-                        </section>
+                        <ReportDrawingPage
+                            id="pdf-elevation-left"
+                            blockName="left-elevation"
+                            title="Elevation Drawing · Left"
+                            projectName={projectDetails?.name || ''}
+                            clientName={projectDetails?.client_name || ''}
+                            sheetCode="EL-L"
+                            status="NOT FOR SCALING"
+                        >
+                            <SideElevation
+                                wall="left"
+                                dimensions={stableDimensions}
+                                screen={screen}
+                                placedSpeakers={placedSpeakers}
+                                frontSubs={frontSubs}
+                                frontSubsCfg={frontSubsCfg}
+                                rearSubs={safeArray(app?.subwoofers).filter(s => s?.group === 'rear')}
+                                rearSubsCfg={rearSubsCfg}
+                                seatingPositions={seats}
+                                mlpPoint={primarySeatingPosition}
+                                roomElements={app?.roomElements || []}
+                            />
+                        </ReportDrawingPage>
 
-                        <section id="pdf-elevation-right" className="report-page-block report-drawing-page" data-report-block="right-elevation" data-report-block-kind="drawing" data-report-page-start="true" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
-                            <div className="report-drawing-title">Elevation Drawing · Right</div>
-                            <div className="report-drawing-frame">
-                                <SideElevation
-                                    wall="right"
-                                    dimensions={stableDimensions}
-                                    screen={screen}
-                                    placedSpeakers={placedSpeakers}
-                                    frontSubs={frontSubs}
-                                    frontSubsCfg={frontSubsCfg}
-                                    rearSubs={safeArray(app?.subwoofers).filter(s => s?.group === 'rear')}
-                                    rearSubsCfg={rearSubsCfg}
-                                    seatingPositions={seats}
-                                    mlpPoint={primarySeatingPosition}
-                                    roomElements={app?.roomElements || []}
-                                />
-                            </div>
-                        </section>
+                        <ReportDrawingPage
+                            id="pdf-elevation-right"
+                            blockName="right-elevation"
+                            title="Elevation Drawing · Right"
+                            projectName={projectDetails?.name || ''}
+                            clientName={projectDetails?.client_name || ''}
+                            sheetCode="EL-R"
+                            status="NOT FOR SCALING"
+                        >
+                            <SideElevation
+                                wall="right"
+                                dimensions={stableDimensions}
+                                screen={screen}
+                                placedSpeakers={placedSpeakers}
+                                frontSubs={frontSubs}
+                                frontSubsCfg={frontSubsCfg}
+                                rearSubs={safeArray(app?.subwoofers).filter(s => s?.group === 'rear')}
+                                rearSubsCfg={rearSubsCfg}
+                                seatingPositions={seats}
+                                mlpPoint={primarySeatingPosition}
+                                roomElements={app?.roomElements || []}
+                            />
+                        </ReportDrawingPage>
 
-                        {/* ── Sightlines & Viewing Angles (final page) ── */}
                         {canRenderSightlinePage && sightlineScreenMetrics && sightlineRowData.length > 0 && (
                             <>
-                                <section id="pdf-sightlines" className="report-page-block report-drawing-page" data-report-block="sightline-drawing" data-report-block-kind="drawing" data-report-page-start="true" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
-                                    <div className="print-avoid-break">
+                                <ReportDrawingPage
+                                    id="pdf-sightlines"
+                                    blockName="sightline-drawing"
+                                    title="Sightlines & Viewing Angles"
+                                    projectName={projectDetails?.name || ''}
+                                    clientName={projectDetails?.client_name || ''}
+                                    sheetCode="SL-01"
+                                    status="NOT FOR SCALING"
+                                >
                                     <SightlineGraphic
+                                        showHeader={false}
                                         projectName={app?.projectName || ''}
                                         clientName={app?.clientName || ''}
                                         roomWidthM={stableDimensions.width}
@@ -1403,19 +1425,19 @@ function RP22ReportInner() {
                                         rowData={sightlineRowData}
                                         dolbyConfig={exportSystemConfiguration || ''}
                                     />
-                                    </div>
-                                </section>
+                                </ReportDrawingPage>
 
-                                <section
+                                <ReportDrawingPage
                                     id="pdf-screen-wall-construction"
-                                    className="report-page-block report-drawing-page report-drawing-page--full-bleed"
-                                    data-report-block="screen-wall-detail"
-                                    data-report-block-kind="drawing"
-                                    data-report-page-start="true"
-                                    style={{ padding: 0, background: '#FFFFFF' }}
+                                    blockName="screen-wall-detail"
+                                    title="Screen Wall Construction Detail"
+                                    projectName={projectDetails?.name || ''}
+                                    clientName={projectDetails?.client_name || ''}
+                                    sheetCode="SW-01"
+                                    status="NOT FOR SCALING"
                                 >
-                                    <div className="print-avoid-break">
                                     <ScreenWallConstructionGraphic
+                                        showHeader={false}
                                         projectName={projectDetails?.name || ''}
                                         clientName={projectDetails?.client_name || ''}
                                         roomWidthM={stableDimensions.width}
@@ -1434,8 +1456,7 @@ function RP22ReportInner() {
                                         lcrAimMode={app?.lcrAimMode}
                                         speakerClearanceM={app?.speaker_clearance_m}
                                     />
-                                    </div>
-                                </section>
+                                </ReportDrawingPage>
                             </>
                         )}
 
