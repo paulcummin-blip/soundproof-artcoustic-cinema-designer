@@ -7,9 +7,6 @@ import {
 
 const SOURCE_SYSTEM = "ARTCOUSTIC_PARTNER_PORTAL";
 const CONTRACT_VERSION = 1;
-const DEFAULT_ENTITLEMENT_URL =
-  "https://jzwuhrmbshfyybxbeckf.supabase.co/functions/v1/soundproof-credit-entitlements";
-
 function summarizeError(error) {
   return String(error?.message || error || "Unknown error").slice(0, 500);
 }
@@ -59,13 +56,27 @@ export default async function syncUkTurnoverRewards(req) {
       return Response.json({ status: "INVALID_YEAR" }, { status: 400 });
     }
 
-    const entitlementUrl =
-      secrets.get("PARTNER_PORTAL_ENTITLEMENT_URL") || DEFAULT_ENTITLEMENT_URL;
+    const entitlementUrl = secrets.get("PARTNER_PORTAL_ENTITLEMENT_URL");
     const bridgeKey = secrets.get("PARTNER_PORTAL_TURNOVER_API_KEY");
-    if (!bridgeKey) {
+    if (!entitlementUrl || !bridgeKey) {
       return Response.json({
         status: "SECRETS_MISSING",
-        message: "PARTNER_PORTAL_TURNOVER_API_KEY must be configured.",
+        message: "PARTNER_PORTAL_ENTITLEMENT_URL and PARTNER_PORTAL_TURNOVER_API_KEY must be configured.",
+        dry_run: dryRun,
+      }, { status: 503 });
+    }
+
+    let validatedEntitlementUrl;
+    try {
+      const parsed = new URL(entitlementUrl);
+      if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hash) {
+        throw new Error("invalid endpoint");
+      }
+      validatedEntitlementUrl = parsed.toString();
+    } catch {
+      return Response.json({
+        status: "CONFIGURATION_INVALID",
+        message: "PARTNER_PORTAL_ENTITLEMENT_URL must be a valid HTTPS URL.",
         dry_run: dryRun,
       }, { status: 503 });
     }
@@ -96,7 +107,7 @@ export default async function syncUkTurnoverRewards(req) {
 
     let rawContract;
     try {
-      const response = await fetch(entitlementUrl, {
+      const response = await fetch(validatedEntitlementUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
