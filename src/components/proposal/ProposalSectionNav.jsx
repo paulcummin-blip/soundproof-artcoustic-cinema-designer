@@ -12,13 +12,17 @@ import { PROPOSAL_SECTIONS } from '@/components/proposal/proposalSections';
  * - onSelect: (section_key) => void
  * - onToggleVisibility: (section_id) => void
  * - onReorder: (reorderedSections) => void
+ * - readOnly: boolean
  */
-export default function ProposalSectionNav({ sections, activeSectionKey, onSelect, onToggleVisibility, onReorder }) {
+export default function ProposalSectionNav({ sections, activeSectionKey, onSelect, onToggleVisibility, onReorder, readOnly = false }) {
   const sorted = [...sections].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
   const [dragIndex, setDragIndex] = useState(null);
 
-  const handleDragStart = (index) => setDragIndex(index);
+  const handleDragStart = (index) => {
+    if (!readOnly) setDragIndex(index);
+  };
   const handleDragOver = (e, index) => {
+    if (readOnly) return;
     e.preventDefault();
     if (dragIndex === null || dragIndex === index) return;
     const reordered = [...sorted];
@@ -27,7 +31,9 @@ export default function ProposalSectionNav({ sections, activeSectionKey, onSelec
     onReorder(reordered.map((s, i) => ({ ...s, order_index: i })));
     setDragIndex(index);
   };
-  const handleDragEnd = () => setDragIndex(null);
+  const handleDragEnd = () => {
+    if (!readOnly) setDragIndex(null);
+  };
 
   return (
     <div className="space-y-1">
@@ -43,7 +49,7 @@ export default function ProposalSectionNav({ sections, activeSectionKey, onSelec
         return (
           <div
             key={section.id || section.section_key}
-            draggable
+            draggable={!readOnly}
             onDragStart={() => handleDragStart(index)}
             onDragOver={(e) => handleDragOver(e, index)}
             onDragEnd={handleDragEnd}
@@ -58,7 +64,7 @@ export default function ProposalSectionNav({ sections, activeSectionKey, onSelec
             <span className="flex-1 text-sm" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
               {def.label}
             </span>
-            {def.canHide && (
+            {def.canHide && !readOnly && (
               <button
                 type="button"
                 onClick={(e) => {
