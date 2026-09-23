@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 
 const SECTIONS = [
   { type: 'cover', key: 'cover', title: 'Cover', canEditBody: false },
