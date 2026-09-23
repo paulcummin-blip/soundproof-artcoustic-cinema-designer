@@ -36,9 +36,17 @@ import {
 const listeners = new Set();
 const states = new Map();
 
+// Stable empty-state reference. useSyncExternalStore requires getSnapshot to
+// return a referentially-stable value when state has not changed; returning a
+// new object literal each call causes an infinite render loop (React #185).
+const EMPTY_RECOMMENDATION_STATE = { current: null, history: [] };
+
 function getState(projectId, versionId) {
   const key = bassCacheKey(projectId, versionId);
-  return states.get(key) || { current: null, history: [] };
+  if (!states.has(key)) {
+    states.set(key, EMPTY_RECOMMENDATION_STATE);
+  }
+  return states.get(key);
 }
 
 function subscribe(listener) {
