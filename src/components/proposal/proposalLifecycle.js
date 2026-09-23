@@ -145,8 +145,11 @@ export function canTransitionTo(fromStatus, toStatus) {
 export function getRestoreStatus(rawStatus, previousStatus, hasContent) {
   const status = normaliseStatus(rawStatus);
   if (status !== 'archived') return null;
-  const prev = normaliseStatus(previousStatus);
-  if (prev && prev !== 'archived') return prev;
+  const hasStoredPreviousStatus = typeof previousStatus === 'string' && previousStatus.trim().length > 0;
+  if (hasStoredPreviousStatus) {
+    const prev = normaliseStatus(previousStatus);
+    if (prev !== 'archived') return prev;
+  }
   return hasContent ? 'edited' : 'draft';
 }
 
