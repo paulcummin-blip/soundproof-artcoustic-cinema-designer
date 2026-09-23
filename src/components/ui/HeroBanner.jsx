@@ -10,9 +10,12 @@ const FONT_FAMILY = "Didact Gothic, Century Gothic, sans-serif";
 const FONT_WEIGHT = 300;
 
 const GAP_PX = 32;
-const HEIGHT_RATIO = 0.60; // logos occupy ~60% of hero height
 const SP_WIDER = 1.1; // SP rendered width = 1.1 × dealer rendered width
-const MAX_LOGO_WIDTH = 460;
+const DEALER_WIDTH_RATIO = 0.44; // approved larger dealer mark within the hero
+const MAX_DEALER_WIDTH = 520;
+const HERO_HORIZONTAL_PADDING = 48;
+const HERO_VERTICAL_PADDING = 48;
+const CROSS_HEIGHT_PX = 30;
 
 /**
  * HeroBanner — premium full-width brand partnership banner (vertical hierarchy).
@@ -29,7 +32,8 @@ const MAX_LOGO_WIDTH = 460;
  *     logo rendered width (e.g. dealer 300px → SP 330px).
  *   - Both logos preserve their original proportions (text scales proportionally;
  *     dealer image uses width + height:auto).
- *   - The two logos together occupy approximately 60% of the hero height.
+ *   - The dealer mark is width-led for a strong visual presence, with a
+ *     height safety bound for unusually tall uploaded logos.
  *
  * Contrast:
  *   The dark overlay auto-adjusts (45–60%) based on hero image brightness so
@@ -45,7 +49,7 @@ export default function DealerHero() {
   const accountId = user?.account_id || user?.access_context?.account?.id || null;
   const [brand, setBrand] = useState(null);
   const [dealerNatural, setDealerNatural] = useState(null);
-  const [heroHeight, setHeroHeight] = useState(520);
+  const [heroSize, setHeroSize] = useState({ width: 1200, height: 520 });
   const [baseTextWidth, setBaseTextWidth] = useState(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0.5);
   const [hoveredEl, setHoveredEl] = useState(null);
@@ -82,11 +86,16 @@ export default function DealerHero() {
     };
   }, [accountId]);
 
-  // Measure actual hero height
+  // Measure the actual hero box. Width-led sizing restores the approved
+  // larger dealer mark while the height bound keeps unusual logo shapes safe.
   useEffect(() => {
     if (!heroRef.current) return;
     const update = () => {
-      if (heroRef.current) setHeroHeight(heroRef.current.offsetHeight);
+      if (!heroRef.current) return;
+      setHeroSize({
+        width: heroRef.current.offsetWidth,
+        height: heroRef.current.offsetHeight,
+      });
     };
     update();
     const observer = new ResizeObserver(update);
@@ -168,58 +177,48 @@ export default function DealerHero() {
   const textColor = heroBg ? "#FFFFFF" : "#1B1A1A";
   const crossColor = heroBg ? "rgba(255,255,255,0.45)" : "rgba(27,26,26,0.30)";
 
-  // Calculate rendered sizes from the 10% width rule and 60% height target.
-  //
-  // For the SP wordmark (text):
-  //   textWidth(fs) = fs × (baseTextWidth / BASE_FONT_SIZE)   [proportional]
-  //   textHeight(fs) = fs                                     [lineHeight: 1]
-  //
-  // Constraints:
-  //   spWidth  = SP_WIDER × dealerWidth        (10% wider)
-  //   spHeight + dealerHeight = availableHeight (60% of hero)
-  //
-  // Solving:
-  //   spFontSize × textFactor = SP_WIDER × dealerWidth
-  //   spFontSize + dealerWidth / dealerAspect = availableHeight
-  //   → dealerWidth = availableHeight / (SP_WIDER/textFactor + 1/dealerAspect)
-  //   → spFontSize  = SP_WIDER × dealerWidth / textFactor
+  // Width leads the settled lockup: the dealer mark is deliberately large,
+  // and Sound Proof remains exactly 10% wider. A separate height bound only
+  // reduces the pair when an unusually tall uploaded logo would overflow.
   const { spFontSize, dealerWidth } = useMemo(() => {
-    const availableHeight = heroHeight * HEIGHT_RATIO;
-    const maxW = Math.min(window.innerWidth * 0.3, MAX_LOGO_WIDTH);
+    const { width: heroWidth, height: heroHeight } = heroSize;
 
-    // Before measurement — use reasonable defaults
+    // Before measurement — use stable, deliberately generous defaults.
     if (!baseTextWidth) {
-      return { spFontSize: 44, dealerWidth: 200 };
+      return { spFontSize: 56, dealerWidth: 360 };
     }
 
-    const textFactor = baseTextWidth / BASE_FONT_SIZE; // text width per unit font size
+    const textFactor = baseTextWidth / BASE_FONT_SIZE;
+    const usableWidth = Math.max(0, heroWidth - HERO_HORIZONTAL_PADDING);
+    const desiredDealerWidth = Math.min(
+      usableWidth * DEALER_WIDTH_RATIO,
+      MAX_DEALER_WIDTH,
+    );
 
     if (!hasDealer || !dealerLogo || !dealerNatural) {
-      // No dealer — SP wordmark fills available height
-      let fontSize = availableHeight;
-      const textW = fontSize * textFactor;
-      if (textW > maxW) {
-        fontSize = maxW / textFactor;
-      }
-      return { spFontSize: fontSize, dealerWidth: 0 };
+      const maxWordmarkWidth = Math.min(usableWidth * 0.58, MAX_DEALER_WIDTH * SP_WIDER);
+      const maxWordmarkHeight = Math.max(36, heroHeight - HERO_VERTICAL_PADDING * 2);
+      return {
+        spFontSize: Math.min(maxWordmarkWidth / textFactor, maxWordmarkHeight),
+        dealerWidth: 0,
+      };
     }
 
     const dealerAspect = dealerNatural.w / dealerNatural.h;
-    const spFontFactor = SP_WIDER / textFactor; // spFontSize per unit dealerWidth
+    const sizeCoefficient = (SP_WIDER / textFactor) + (1 / dealerAspect);
+    const availableVariableHeight = Math.max(
+      0,
+      heroHeight - HERO_VERTICAL_PADDING * 2 - CROSS_HEIGHT_PX - GAP_PX * 2,
+    );
+    const heightBoundDealerWidth = availableVariableHeight / sizeCoefficient;
+    const dWidth = Math.max(
+      0,
+      Math.min(desiredDealerWidth, heightBoundDealerWidth),
+    );
+    const fontSize = (SP_WIDER * dWidth) / textFactor;
 
-    // dealerWidth × (spFontFactor + 1/dealerAspect) = availableHeight
-    let dWidth = availableHeight / (spFontFactor + 1 / dealerAspect);
-    let spWidth = SP_WIDER * dWidth;
-
-    // Cap to max width — maintain 10% rule when capping
-    if (spWidth > maxW) {
-      spWidth = maxW;
-      dWidth = spWidth / SP_WIDER;
-    }
-
-    const fontSize = spWidth / textFactor;
     return { spFontSize: fontSize, dealerWidth: dWidth };
-  }, [dealerNatural, heroHeight, hasDealer, dealerLogo, baseTextWidth]);
+  }, [dealerNatural, heroSize, hasDealer, dealerLogo, baseTextWidth]);
 
   return (
     <div
@@ -235,6 +234,7 @@ export default function DealerHero() {
         if (el !== "wordmark") navigate("/DealerBranding");
       }}
       data-hero-el="hero"
+      data-dealer-hero="true"
       style={{
         height: "clamp(380px, 30vw, 520px)",
         background: heroBg ? "#1B1A1A" : "#F8F8F7",
@@ -339,6 +339,7 @@ export default function DealerHero() {
                 style={{
                   width: dealerWidth,
                   height: "auto",
+                  objectFit: "contain",
                   flexShrink: 0,
                 }}
               />
