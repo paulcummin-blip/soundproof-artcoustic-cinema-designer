@@ -62,7 +62,7 @@ export function validateTransition(currentRawStatus, targetRawStatus, previousSt
 
   // Unarchive: archived → restore status
   if (current === 'archived') {
-    const restoreStatus = normaliseStatus(previousStatus) || (hasContent ? 'edited' : 'draft');
+    const restoreStatus = computeRestoreStatus(previousStatus, hasContent);
     if (target !== restoreStatus) {
       return { valid: false, reason: `Archived proposal can only be restored to "${restoreStatus}".`, previousStatus: null };
     }
@@ -83,7 +83,10 @@ export function validateTransition(currentRawStatus, targetRawStatus, previousSt
  * Returns the normalised status to restore to.
  */
 export function computeRestoreStatus(previousStatus, hasContent) {
-  const restored = normaliseStatus(previousStatus);
-  if (restored && restored !== 'archived') return restored;
+  const hasStoredPreviousStatus = typeof previousStatus === 'string' && previousStatus.trim().length > 0;
+  if (hasStoredPreviousStatus) {
+    const restored = normaliseStatus(previousStatus);
+    if (restored !== 'archived') return restored;
+  }
   return hasContent ? 'edited' : 'draft';
 }
