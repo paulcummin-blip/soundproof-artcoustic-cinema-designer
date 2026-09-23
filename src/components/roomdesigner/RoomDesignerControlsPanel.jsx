@@ -24,6 +24,9 @@ const RoomElements = React.lazy(() =>
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
 );
+const BassDesignAssistant = React.lazy(() =>
+  import("@/components/room/bass/BassDesignAssistant").then((m) => ({ default: m.default }))
+);
 
 export default function RoomDesignerControlsPanel({
   appState,
@@ -320,6 +323,33 @@ export default function RoomDesignerControlsPanel({
               view={speakerPositionsView} />
           </CollapsiblePanel>
         </div>
+
+        {/* ── Bass Design Assistant — Stage 1 shell ──
+            Recommendation-first Bass workspace above the existing detailed
+            surfaces. Consumes existing shared authority only; does not change
+            maths, grading, or optimiser logic. Old Subwoofers and Bass
+            Simulation panels remain intact beneath and will be removed in
+            Stage 3. */}
+        <CollapsiblePanel
+          title="Bass Design Assistant"
+          icon={<Waves className="w-5 h-5" />}
+          defaultOpen={true}>
+          {isFrozen('bass') &&
+            <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
+              This tab is frozen. Unlock to make changes.
+            </div>
+          }
+          <Suspense fallback={<div>Loading...</div>}>
+            <BassDesignAssistant
+              appState={appState}
+              frontSubsCfg={frontSubsCfg}
+              rearSubsCfg={rearSubsCfg}
+              disabled={isFrozen('bass')}
+              roomDims={stableDimensions}
+              seatingPositions={seatingPositions}
+            />
+          </Suspense>
+        </CollapsiblePanel>
 
         <CollapsiblePanel
           title="Bass Simulation"
