@@ -20,7 +20,8 @@ test('proposal creation is idempotent and creates the canonical ten sections onc
   assert.match(generate, /existing\[0\]\.status === 'generated' && existingSections\.length === SECTIONS\.length/);
 });
 
-test('failed generation cannot be presented as complete', () => {
+test('failed generation cannot be presented as complete and reports the error', () => {
+  const wizard = read('src/components/proposal/CreateProposalWizard.jsx');
   const generate = read('base44/functions/generateProposal/entry.ts');
   const failureGate = generate.indexOf('if (failedSections.length > 0)');
   const generatedTransition = generate.indexOf("status: 'generated'", failureGate);
@@ -30,6 +31,8 @@ test('failed generation cannot be presented as complete', () => {
   assert.match(generate, /ProposalSection\.delete/);
   assert.match(generate, /Proposal\.delete/);
   assert.match(generate, /Proposal\.update\(proposalId, \{ status: 'draft' \}\)/);
+  assert.match(wizard, /role="alert"/);
+  assert.match(wizard, /\{error\}/);
 });
 
 test('duplication is server-owned, independent, lineage-aware, and resets lifecycle state', () => {
