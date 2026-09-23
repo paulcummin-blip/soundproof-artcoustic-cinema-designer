@@ -11,16 +11,29 @@
 //
 // TRANSACTION GUARANTEE (atomicity):
 //
-//   Prepare  — validate recommendation, build new Applied Calibration (pure)
+//   Prepare  — validate recommendation, verify geometry, build new Applied
+//              Calibration and Acceptance Record (pure, no side effects)
 //   Phase 1  — write new Applied Calibration to the Applied Calibration store
-//   Phase 2  — mark recommendation as Accepted (terminal) in the Recommendation store
-//   Rollback — if Phase 2 fails after Phase 1 committed, restore the old
-//              Applied Calibration so the two authorities never disagree
+//   Phase 2  — write Acceptance Record to the Acceptance Record store (audit)
+//   Phase 3  — mark recommendation as Accepted (terminal) in the Recommendation store
+//   Rollback — if any phase fails after earlier phases committed, restore
+//              all earlier phases in reverse order so the authorities never
+//              disagree and no partial audit record survives
 //
-// Because both stores are synchronous in-memory Maps and JavaScript is
-// single-threaded, no other code can run between Phase 1 and Phase 2. The
-// only failure modes are thrown exceptions from the store operations
-// themselves, which the rollback handles.
+// GEOMETRY VALIDATION:
+//   The recommendation's geometryFingerprint MUST match the current geometry.
+//   If it doesn't, the transition is rejected — the recommendation is stale.
+//   The designer must re-optimise before accepting. Stale recommendations
+//   are never silently accepted.
+//
+// ACCEPTANCE RECORD:
+//   An immutable audit record is created linking the Recommendation to the
+//   Applied Calibration. This is the proof that the transition occurred.
+//
+// Because all stores are synchronous in-memory Maps and JavaScript is
+// single-threaded, no other code can run between phases. The only failure
+// modes are thrown exceptions from the store operations themselves, which
+// the rollback handles.
 //
 // The Accept Transition only handles Calibration intent (delay, gain,
 // polarity, phase). Design and Specification intents transition to Geometry,
@@ -51,6 +64,24 @@ import {
   getAppliedCalibrationAuthority,
   setAppliedCalibrationAuthority,
 } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
+import {
+  createAcceptanceRecord,
+  computeRecommendationFingerprint,
+} from "./acceptanceRecord.js";
+import {
+  getAcceptanceRecords,
+  addAcceptanceRecord,
+  _replaceAcceptanceRecords,
+} from "./acceptanceRecordStore.js";
+
+// ── ID generation ───────────────────────────────────────────────────────
+
+let acIdCounter = 0;
+
+function generateAppliedCalibrationId() {
+  acIdCounter += 1;
+  return `ac-${Date.now().toString(36)}-${acIdCounter.toString(36)}`;
+}
 
 // ── Validation (pure, no side effects) ───────────────────────────────────
 
@@ -130,8 +161,8 @@ function validateForAcceptance(recommendation) {
  * @param {object} recommendation - recommendation object
  * @returns {object} new Applied Calibration Authority object
  */
-function buildAcceptedAuthority(recommendation) {
-  return createAppliedCalibrationAuthority({
+function buildAcceptedAuthority(recommendation, appliedCalibrationId) {
+  const authority = createAppliedCalibrationAuthority({
     basisFingerprint: recommendation.geometryFingerprint,
     source: APPLIED_CALIBRATION_SOURCE.OPTIMISER,
     status: APPLIED_CALIBRATION_STATUS.USER_ACCEPTED,
@@ -139,6 +170,9 @@ function buildAcceptedAuthority(recommendation) {
     recommendationId: recommendation.recommendationId,
     values: recommendation.recommendationValues,
   });
+  // Add the appliedCalibrationId for traceability. This does not modify
+  // the Applied Calibration Authority module — it extends the object.
+  return { ...authority, id: appliedCalibrationId };
 }
 
 // ── Accept Transition (transactional) ──────────────────────────────────
@@ -147,13 +181,22 @@ function buildAcceptedAuthority(recommendation) {
  * Execute the Accept Transition: accept the current Recommendation into
  * Applied Calibration.
  *
- * This is a TRANSACTIONAL operation:
+ * This is a TRANSACTIONAL operation with three phases:
  *   Phase 1: Write recommendation values to Applied Calibration Authority
- *   Phase 2: Mark recommendation as Accepted (terminal)
- *   Rollback: If Phase 2 fails after Phase 1 committed, restore the old
- *            Applied Calibration so the two authorities never disagree.
+ *   Phase 2: Write Acceptance Record (immutable audit trail)
+ *   Phase 3: Mark recommendation as Accepted (terminal)
+ *   Rollback: If any phase fails after earlier phases committed, restore
+ *            all earlier phases in reverse order.
  *
- * The transition either completes entirely or not at all.
+ * The transition either completes entirely or not at all. There is never
+ * a state where Recommendation and Applied Calibration disagree, and no
+ * partial Acceptance Record survives a failed transition.
+ *
+ * GEOMETRY VALIDATION:
+ *   The recommendation's geometryFingerprint MUST match the current geometry
+ *   (passed as currentGeometryFingerprint). If it doesn't, the transition
+ *   is rejected — the recommendation is stale. The designer must re-optimise
+ *   before accepting.
  *
  * Only the CURRENT recommendation can be accepted. If recommendationId is
  * provided, it must match the current recommendation's ID.
@@ -163,12 +206,14 @@ function buildAcceptedAuthority(recommendation) {
  *
  * @param {string} projectId
  * @param {string} versionId
- * @param {object} [options]
+ * @param {object} options
+ * @param {string} options.currentGeometryFingerprint - REQUIRED: current geometry fingerprint for validation
  * @param {string} [options.recommendationId] - must match current recommendation's ID if provided
- * @returns {{ accepted: true, recommendationId: string, appliedCalibrationStatus: string }}
- * @throws if validation fails, the recommendation is not current, or the
- *         transition fails (after rollback, the system is restored to its
- *         pre-transition state)
+ * @param {string} [options.acceptedBy] - identity of the designer accepting (for audit)
+ * @returns {{ accepted: true, recommendationId: string, appliedCalibrationId: string, acceptanceId: string, appliedCalibrationStatus: string }}
+ * @throws if validation fails, geometry is stale, the recommendation is not
+ *         current, or the transition fails (after rollback, the system is
+ *         restored to its pre-transition state)
  */
 export function acceptRecommendation(projectId, versionId, options = {}) {
   const opts = options || {};
@@ -191,28 +236,61 @@ export function acceptRecommendation(projectId, versionId, options = {}) {
   // 3. Validate the recommendation (throws if invalid — no state changed yet)
   validateForAcceptance(currentRec);
 
-  // 4. Build the new Applied Calibration Authority (pure, no side effects)
-  const newAuthority = buildAcceptedAuthority(currentRec);
+  // 4. Geometry validation — reject stale recommendations
+  if (!opts.currentGeometryFingerprint) {
+    throw new Error(
+      "Accept Transition: currentGeometryFingerprint is required — cannot validate geometry without it"
+    );
+  }
+  if (currentRec.geometryFingerprint !== opts.currentGeometryFingerprint) {
+    throw new Error(
+      `Accept Transition: Recommendation is stale — geometry has changed since the recommendation was generated. Re-optimise before accepting.`
+    );
+  }
 
-  // ── Transaction ───────────────────────────────────────────────────────
+  // 5. Build the new Applied Calibration Authority (pure, no side effects)
+  const appliedCalibrationId = generateAppliedCalibrationId();
+  const newAuthority = buildAcceptedAuthority(currentRec, appliedCalibrationId);
 
-  // 5. Snapshot old Applied Calibration for rollback
+  // 6. Build the Acceptance Record (pure, no side effects)
+  const acceptanceRecord = createAcceptanceRecord({
+    recommendationId: currentRec.recommendationId,
+    appliedCalibrationId,
+    geometryFingerprint: currentRec.geometryFingerprint,
+    recommendationFingerprint: computeRecommendationFingerprint(currentRec.recommendationValues),
+    acceptedBy: opts.acceptedBy || "Unknown",
+    recommendationIntent: currentRec.intent,
+    recommendationSource: currentRec.generatedBy,
+  });
+
+  // ── Transaction (3-phase with rollback) ──────────────────────────────
+
+  // 7. Snapshot old state for rollback
   const oldAuthority = getAppliedCalibrationAuthority(projectId, versionId);
+  const oldAcceptanceRecords = getAcceptanceRecords(projectId, versionId);
 
   let phase1Committed = false;
+  let phase2Committed = false;
 
   try {
-    // Phase 1: Write recommendation values to Applied Calibration Authority
+    // Phase 1: Write to Applied Calibration Authority
     setAppliedCalibrationAuthority(projectId, versionId, newAuthority);
     phase1Committed = true;
 
-    // Phase 2: Mark recommendation as Accepted (terminal)
-    // If this throws (e.g. invalid transition), the catch block rolls back
-    // Phase 1 so Applied Calibration and Recommendation never disagree.
+    // Phase 2: Write Acceptance Record (audit trail exists before
+    // recommendation changes — if Phase 3 fails, we can roll this back)
+    addAcceptanceRecord(projectId, versionId, acceptanceRecord);
+    phase2Committed = true;
+
+    // Phase 3: Mark recommendation as Accepted (terminal)
+    // If this throws, the recommendation is NOT marked Accepted (the throw
+    // happens before the store is updated). Roll back Phase 2 and Phase 1.
     markRecommendationAccepted(projectId, versionId);
   } catch (error) {
-    // Rollback: if Phase 1 committed, restore the old Applied Calibration
-    // so the two authorities are back in their pre-transition state.
+    // Rollback in reverse order
+    if (phase2Committed) {
+      _replaceAcceptanceRecords(projectId, versionId, oldAcceptanceRecords);
+    }
     if (phase1Committed) {
       setAppliedCalibrationAuthority(projectId, versionId, oldAuthority);
     }
@@ -226,6 +304,8 @@ export function acceptRecommendation(projectId, versionId, options = {}) {
   return {
     accepted: true,
     recommendationId: currentRec.recommendationId,
+    appliedCalibrationId,
+    acceptanceId: acceptanceRecord.acceptanceId,
     appliedCalibrationStatus: APPLIED_CALIBRATION_STATUS.USER_ACCEPTED,
   };
 }
