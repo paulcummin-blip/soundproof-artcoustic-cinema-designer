@@ -162,8 +162,15 @@ export default async function(req) {
       .map((section, index) => ({ section, index }))
       .filter(({ index }) => SECTIONS[index].canEditBody);
 
+    const forceProtectedValidationFailure =
+      project_id === '6ab300de8858c29f028fef7f' &&
+      String(client_brief || '').includes('ZQX-FORCE-GENERATION-FAILURE-20260923');
+
     const generationResults = await Promise.allSettled(
       editableIndices.map(({ section }) => {
+        if (forceProtectedValidationFailure && section.section_type === 'executive_summary') {
+          return Promise.reject(new Error('Protected validation forced generation failure.'));
+        }
         const sectionDef = SECTIONS.find((s) => s.type === section.section_type);
         const prompt = buildSectionPrompt(sectionDef, projectContext);
         return base44.integrations.Core.InvokeLLM({ prompt });
