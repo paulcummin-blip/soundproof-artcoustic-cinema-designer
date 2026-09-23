@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Loader2, FileText, Plus, RefreshCw } from 'lucide-react';
 import ProposalCard from './ProposalCard';
+import { isArchived, getRestoreStatus } from './proposalLifecycle';
 
 /**
  * Proposal History tab — queries persisted Proposal and ProposalSection records
- * and renders a responsive card grid. Proves persistence: no editing, just display.
+ * and renders a responsive card grid with Active/Archived views.
  *
  * Props:
  * - onCreateProposal: () => void  (opens the wizard)
@@ -18,6 +19,7 @@ export default function ProposalHistoryTab({ onCreateProposal }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
+  const [view, setView] = useState('active'); // 'active' | 'archived'
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -139,20 +141,49 @@ export default function ProposalHistoryTab({ onCreateProposal }) {
     }
   }, [load]);
 
-  // ── Archive a proposal ──
+  // ── Archive a proposal (server-authoritative transition) ──
   const handleArchive = useCallback(async (proposal) => {
     const confirmed = window.confirm(
-      `Archive "${proposal.title || 'this proposal'}"? Archived proposals are hidden from the active list but remain accessible.`
+      `Archive "${proposal.title || 'this proposal'}"? Archived proposals are hidden from the active list but can be restored.`
     );
     if (!confirmed) return;
 
     setActionLoading(`arch-${proposal.id}`);
     try {
-      await base44.entities.Proposal.update(proposal.id, { status: 'archived' });
-      await load();
+      const response = await base44.functions.invoke('transitionProposalStatus', {
+        proposal_id: proposal.id,
+        target_status: 'archived',
+      });
+      if (response?.data?.error) {
+        alert(response.data.error);
+      } else {
+        await load();
+      }
     } catch (err) {
       console.error('[ProposalHistoryTab] Archive failed:', err);
       alert('Failed to archive proposal. Please try again.');
+    } finally {
+      setActionLoading(null);
+    }
+  }, [load]);
+
+  // ── Restore an archived proposal (server-authoritative transition) ──
+  const handleRestore = useCallback(async (proposal) => {
+    setActionLoading(`restore-${proposal.id}`);
+    try {
+      const restoreStatus = getRestoreStatus(proposal.status, proposal.previous_status, true);
+      const response = await base44.functions.invoke('transitionProposalStatus', {
+        proposal_id: proposal.id,
+        target_status: restoreStatus || 'edited',
+      });
+      if (response?.data?.error) {
+        alert(response.data.error);
+      } else {
+        await load();
+      }
+    } catch (err) {
+      console.error('[ProposalHistoryTab] Restore failed:', err);
+      alert('Failed to restore proposal. Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -211,13 +242,44 @@ export default function ProposalHistoryTab({ onCreateProposal }) {
     );
   }
 
+  // ── Filter by view ──
+  const activeProposals = proposals.filter((p) => !isArchived(p.status));
+  const archivedProposals = proposals.filter((p) => isArchived(p.status));
+  const visibleProposals = view === 'archived' ? archivedProposals : activeProposals;
+
   // ── Render: Card grid ──
   return (
     <div className="border-t border-[#E5E1D8] pt-8">
       <div className="flex items-center justify-between mb-6">
-        <p className="text-sm text-[#8A8477]">
-          {proposals.length} {proposals.length === 1 ? 'proposal' : 'proposals'}
-        </p>
+        <div className="flex items-center gap-4">
+          {/* Active / Archived view toggle */}
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-[#F5F4F0] border border-[#E5E1D8]">
+            <button
+              onClick={() => setView('active')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                view === 'active'
+                  ? 'bg-white text-[#213428] shadow-sm'
+                  : 'text-[#8A8477] hover:text-[#1B1A1A]'
+              }`}
+              style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+            >
+              Active
+              <span className="ml-1.5 text-[10px] text-[#A79E8C]">{activeProposals.length}</span>
+            </button>
+            <button
+              onClick={() => setView('archived')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                view === 'archived'
+                  ? 'bg-white text-[#213428] shadow-sm'
+                  : 'text-[#8A8477] hover:text-[#1B1A1A]'
+              }`}
+              style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+            >
+              Archived
+              <span className="ml-1.5 text-[10px] text-[#A79E8C]">{archivedProposals.length}</span>
+            </button>
+          </div>
+        </div>
         <button
           onClick={load}
           className="flex items-center gap-1.5 text-xs text-[#8A8477] hover:text-[#213428] transition-colors"
@@ -227,28 +289,38 @@ export default function ProposalHistoryTab({ onCreateProposal }) {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {proposals.map((proposal) => {
-          const project = projectMap[proposal.project_id];
-          return (
-            <div key={proposal.id} className={actionLoading ? 'relative' : ''}>
-              {actionLoading && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 rounded-lg">
-                  <Loader2 className="w-5 h-5 text-[#625143] animate-spin" />
-                </div>
-              )}
-              <ProposalCard
-                proposal={proposal}
-                projectName={project?.name || null}
-                versionLabel={resolveVersionLabel(proposal)}
-                sectionCount={sectionCounts[proposal.id] || 0}
-                onDuplicate={handleDuplicate}
-                onArchive={handleArchive}
-              />
-            </div>
-          );
-        })}
-      </div>
+      {visibleProposals.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16">
+          <FileText className="w-8 h-8 text-[#DCDBD6] mb-3" />
+          <p className="text-sm text-[#8A8477]">
+            {view === 'archived' ? 'No archived proposals.' : 'No active proposals.'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {visibleProposals.map((proposal) => {
+            const project = projectMap[proposal.project_id];
+            return (
+              <div key={proposal.id} className={actionLoading ? 'relative' : ''}>
+                {actionLoading && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 rounded-lg">
+                    <Loader2 className="w-5 h-5 text-[#625143] animate-spin" />
+                  </div>
+                )}
+                <ProposalCard
+                  proposal={proposal}
+                  projectName={project?.name || null}
+                  versionLabel={resolveVersionLabel(proposal)}
+                  sectionCount={sectionCounts[proposal.id] || 0}
+                  onDuplicate={handleDuplicate}
+                  onArchive={handleArchive}
+                  onRestore={handleRestore}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

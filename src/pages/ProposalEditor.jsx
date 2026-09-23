@@ -184,13 +184,14 @@ export default function ProposalEditor() {
   const activeSection = sections.find((s) => s.section_key === activeSectionKey);
 
   const handleToggleLock = async () => {
-    if (!activeSection) return;
+    if (!activeSection || archived) return;
     const updated = { ...activeSection, locked: !activeSection.locked };
     setSections((prev) => prev.map((s) => (s.id === activeSection.id ? updated : s)));
     await base44.entities.ProposalSection.update(activeSection.id, { locked: updated.locked });
   };
 
   const handleToggleVisibility = async (sectionId) => {
+    if (archived) return;
     const section = sections.find((s) => s.id === sectionId);
     if (!section) return;
     const updated = { ...section, is_enabled: !section.is_enabled };
@@ -199,6 +200,7 @@ export default function ProposalEditor() {
   };
 
   const handleReorder = async (reorderedSections) => {
+    if (archived) return;
     setSections(reorderedSections);
     try {
       await base44.entities.ProposalSection.bulkUpdate(

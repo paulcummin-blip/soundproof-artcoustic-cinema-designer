@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { FileText, Copy, Download, Archive, MoreVertical, Layers, Clock, Calendar } from 'lucide-react';
+import { FileText, Copy, Download, Archive, MoreVertical, Layers, Clock, Calendar, RotateCcw } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import ProposalStatusBadge from './ProposalStatusBadge';
 import { getProposalType } from './proposalTypes';
@@ -24,8 +24,9 @@ import { isArchived } from './proposalLifecycle';
  * - sectionCount: number  (count of ProposalSection records)
  * - onDuplicate: (proposal) => void
  * - onArchive: (proposal) => void
+ * - onRestore: (proposal) => void  (restore from archived)
  */
-function ProposalCard({ proposal, projectName, versionLabel, sectionCount, onDuplicate, onArchive }) {
+function ProposalCard({ proposal, projectName, versionLabel, sectionCount, onDuplicate, onArchive, onRestore }) {
   const navigate = useNavigate();
 
   if (!proposal) return null;
@@ -40,6 +41,10 @@ function ProposalCard({ proposal, projectName, versionLabel, sectionCount, onDup
 
   const handleArchive = () => {
     if (onArchive) onArchive(proposal);
+  };
+
+  const handleRestore = () => {
+    if (onRestore) onRestore(proposal);
   };
 
   const handleExport = () => {
@@ -83,22 +88,35 @@ function ProposalCard({ proposal, projectName, versionLabel, sectionCount, onDup
                 <FileText className="w-4 h-4 mr-2" />
                 Open
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDuplicate} className="cursor-pointer hover:!bg-[#F8F8F7]">
-                <Copy className="w-4 h-4 mr-2" />
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExport} className="cursor-pointer hover:!bg-[#F8F8F7]">
-                <Download className="w-4 h-4 mr-2" />
-                Export PDF
-              </DropdownMenuItem>
-              {!archived && (
-                <DropdownMenuItem
-                  onClick={handleArchive}
-                  className="cursor-pointer !text-[#8A8477] hover:!bg-[#F5F4F0]"
-                >
-                  <Archive className="w-4 h-4 mr-2" />
-                  Archive
-                </DropdownMenuItem>
+              {archived ? (
+                <>
+                  <DropdownMenuItem onClick={handleRestore} className="cursor-pointer hover:!bg-[#F8F8F7]">
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Restore
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExport} className="cursor-pointer hover:!bg-[#F8F8F7]">
+                    <Download className="w-4 h-4 mr-2" />
+                    Export PDF
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <>
+                  <DropdownMenuItem onClick={handleDuplicate} className="cursor-pointer hover:!bg-[#F8F8F7]">
+                    <Copy className="w-4 h-4 mr-2" />
+                    Duplicate
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExport} className="cursor-pointer hover:!bg-[#F8F8F7]">
+                    <Download className="w-4 h-4 mr-2" />
+                    Export PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleArchive}
+                    className="cursor-pointer !text-[#8A8477] hover:!bg-[#F5F4F0]"
+                  >
+                    <Archive className="w-4 h-4 mr-2" />
+                    Archive
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -136,18 +154,32 @@ function ProposalCard({ proposal, projectName, versionLabel, sectionCount, onDup
         </div>
       </CardContent>
 
-      {/* Footer with primary Open button */}
+      {/* Footer with primary action — Open (active) or Restore (archived) */}
       <div className="px-4 pb-4 pt-2">
-        <button
-          onClick={handleOpen}
-          className="w-full px-4 py-2 text-xs uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#3E4349]"
-          style={{
-            backgroundColor: '#213428',
-            fontFamily: 'Didact Gothic, sans-serif',
-          }}
-        >
-          Open Proposal
-        </button>
+        {archived ? (
+          <button
+            onClick={handleRestore}
+            className="w-full flex items-center justify-center gap-1.5 px-4 py-2 text-xs uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#3E4349]"
+            style={{
+              backgroundColor: '#213428',
+              fontFamily: 'Didact Gothic, sans-serif',
+            }}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Restore
+          </button>
+        ) : (
+          <button
+            onClick={handleOpen}
+            className="w-full px-4 py-2 text-xs uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#3E4349]"
+            style={{
+              backgroundColor: '#213428',
+              fontFamily: 'Didact Gothic, sans-serif',
+            }}
+          >
+            Open Proposal
+          </button>
+        )}
       </div>
     </Card>
   );
