@@ -11,6 +11,11 @@
       "type": "string",
       "description": "Denormalized account_id from the parent Project, used for RLS."
     },
+    "creation_request_id": {
+      "type": "string",
+      "description": "Client-generated idempotency key for proposal creation or duplication. Never copied from a source proposal.",
+      "nullable": true
+    },
     "proposal_type": {
       "type": "string",
       "enum": [
