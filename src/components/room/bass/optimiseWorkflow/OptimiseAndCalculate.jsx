@@ -53,12 +53,12 @@ import FurtherImprovements from "./FurtherImprovements";
 import ImproveBassResponseV2 from "../improveBassV2/ImproveBassResponseV2";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY } from "../bassCalculationLifecycle";
 import {
-  computeCalibrationBasisFingerprint,
-  extractCalibrationValues,
-} from "../calibrationAuthority/calibrationAuthority.js";
+  computeAppliedCalibrationBasisFingerprint,
+  extractAppliedCalibrationValues,
+} from "../appliedCalibrationAuthority/appliedCalibrationAuthority.js";
 import {
-  markCalibrationOptimiserGenerated,
-} from "../calibrationAuthority/calibrationAuthorityStore.js";
+  markAppliedCalibrationOptimiserGenerated,
+} from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -208,10 +208,10 @@ export default function OptimiseAndCalculate({
 
         const next = autoApplyCalibration(subwooferInstances, autoApplySummary.tuning, commitInstances, fingerprint);
         appliedTuning = !!next;
-        // Stamp the Calibration Authority — calibration is part of the design.
+        // Stamp the Applied Calibration Authority — calibration is part of the design.
         if (next) {
           try {
-            const basisFp = computeCalibrationBasisFingerprint({
+            const basisFp = computeAppliedCalibrationBasisFingerprint({
               subwooferInstances: next,
               roomDims,
               seatingPositions,
@@ -222,10 +222,10 @@ export default function OptimiseAndCalculate({
               p14TargetDb: requested.selectedP14TargetDb || 117,
               p18TargetBasis: requested.p18TargetBasis || "minimum",
             });
-            markCalibrationOptimiserGenerated(projectId, versionId, {
+            markAppliedCalibrationOptimiserGenerated(projectId, versionId, {
               basisFingerprint: basisFp,
               candidateId: "auto-optimise",
-              values: extractCalibrationValues(next),
+              values: extractAppliedCalibrationValues(next),
               stageKey: "calibration",
             });
           } catch {

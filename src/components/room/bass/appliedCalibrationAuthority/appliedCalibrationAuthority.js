@@ -1,20 +1,30 @@
-// calibrationAuthority.js
+// appliedCalibrationAuthority.js
 // ---------------------------------------------------------------------------
-// Calibration Authority — the lifecycle layer that makes calibration
-// (delay, gain, polarity, phase) a first-class, explainable engineering state
-// with the same lifecycle discipline as every other authority in Sound Proof.
+// Applied Calibration Authority — the lifecycle layer that makes applied
+// calibration (delay, gain, polarity, phase) a first-class, explainable
+// engineering state with the same lifecycle discipline as every other
+// authority in Sound Proof.
 //
 // DESIGN PRINCIPLE:
-//   "Calibration is part of the design, not a hidden optimiser setting."
+//   "Sound Proof owns recommendations. The designer owns the design.
+//    Engineering predictions are always made from the designer's chosen
+//    design, never directly from the optimiser's recommendations."
 //
-// Three separate authorities:
-//   1. Geometry — physical room/listener/source geometry
-//   2. Calibration — delay, gain, polarity, phase per active subwoofer
-//   3. Engineering — P14/P18/P19/P20 results
+// Four authorities (frozen architecture):
+//   1. Geometry              (Designer)            — physical room/listener/source geometry
+//   2. Recommendation        (Sound Proof)         — optimiser recommendations (NOT the design)
+//   3. Applied Calibration   (Designer/Installer)  — calibration accepted into the design
+//   4. Engineering Prediction (Sound Proof)       — P14/P18/P19/P20 from Geometry + Applied Calibration
 //
-// Engineering results are only valid when both Geometry AND Calibration are
-// current. When Geometry changes, Calibration becomes Stale, and Engineering
-// becomes Stale. The user is informed and can Recalculate or Reset.
+// Applied Calibration represents the calibration currently assumed by the
+// engineering prediction. It is NOT the optimiser recommendation.
+// Recommendations become Applied Calibration only through an explicit,
+// designer-gated Accept transition (implemented in a later stage).
+//
+// Engineering results are only valid when both Geometry AND Applied
+// Calibration are current. When Geometry changes, Applied Calibration
+// becomes Stale, and Engineering becomes Stale. The user is informed and
+// can Recalculate, Keep (User Accepted), or Reset.
 //
 // This module is PURE: no React, no side effects, no I/O.
 // It produces authority objects and resolves their status from fingerprints.
@@ -24,9 +34,10 @@ import { normaliseModelKey } from "@/components/utils/modelKeyNormaliser";
 
 // ── Status enum ──────────────────────────────────────────────────────────
 
-export const CALIBRATION_STATUS = {
+export const APPLIED_CALIBRATION_STATUS = {
   CURRENT: "Current",
   STALE: "Stale",
+  USER_ACCEPTED: "User Accepted",
   USER_MODIFIED: "User Modified",
   MANUAL: "Manual",
   OPTIMISER_GENERATED: "Optimiser Generated",
@@ -36,7 +47,7 @@ export const CALIBRATION_STATUS = {
 
 // ── Source enum ──────────────────────────────────────────────────────────
 
-export const CALIBRATION_SOURCE = {
+export const APPLIED_CALIBRATION_SOURCE = {
   OPTIMISER: "Bass Optimiser",
   MANUAL: "Manual Entry",
   IMPORTED: "Imported",
@@ -47,10 +58,14 @@ export const CALIBRATION_SOURCE = {
 //
 // Bumped independently of bassAnalysisFingerprints.FINGERPRINT_VERSION.
 // This fingerprint covers ONLY the engineering inputs that determine whether
-// calibration is still valid — it does NOT include the calibration values
-// themselves (delay, gain, polarity, phase). Changing calibration values
-// must NOT change this fingerprint; changing geometry MUST.
-const CALIBRATION_BASIS_VERSION = 1;
+// applied calibration is still valid — it does NOT include the calibration
+// values themselves (delay, gain, polarity, phase). Changing calibration
+// values must NOT change this fingerprint; changing geometry MUST.
+//
+// NOTE: The fingerprint string prefix "calbasis:v1:" is a persisted cache key
+// and is deliberately NOT renamed. Changing it would invalidate existing
+// caches — a behavioural change. The prefix is retained for compatibility.
+const APPLIED_CALIBRATION_BASIS_VERSION = 1;
 
 // ── Stable serialization (same approach as bassAnalysisFingerprints) ────
 
@@ -93,12 +108,13 @@ function fingerprint64(canonical) {
   return hashA + hashB;
 }
 
-// ── Calibration basis fingerprint ─────────────────────────────────────────
+// ── Applied Calibration basis fingerprint ─────────────────────────────────
 //
-// Hashes the engineering inputs that determine whether calibration is still
-// valid. Deliberately EXCLUDES: delayMs, gainDb, polarity, phaseControlDeg.
-// Includes: room dims, sub positions (x,y,z), sub count, sub model, sub
-// rotation, sub enabled state, seating positions, RSP, P14/P18 targets.
+// Hashes the engineering inputs that determine whether applied calibration
+// is still valid. Deliberately EXCLUDES: delayMs, gainDb, polarity,
+// phaseControlDeg. Includes: room dims, sub positions (x,y,z), sub count,
+// sub model, sub rotation, sub enabled state, seating positions, RSP,
+// P14/P18 targets.
 
 function sortById(arr) {
   return arr.slice().sort((a, b) => {
@@ -111,8 +127,9 @@ function sortById(arr) {
 }
 
 /**
- * Compute the calibration basis fingerprint — a deterministic hash of the
- * engineering inputs that determine whether calibration is still valid.
+ * Compute the applied calibration basis fingerprint — a deterministic hash of
+ * the engineering inputs that determine whether applied calibration is still
+ * valid.
  *
  * This fingerprint changes when:
  *   - Room dimensions change
@@ -132,7 +149,7 @@ function sortById(arr) {
  * @param {object} inputs - { subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel, p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis }
  * @returns {string} deterministic fingerprint string "calbasis:v1:<hash>"
  */
-export function computeCalibrationBasisFingerprint(inputs) {
+export function computeAppliedCalibrationBasisFingerprint(inputs) {
   const i = inputs || {};
 
   const instances = Array.isArray(i.subwooferInstances)
@@ -185,29 +202,29 @@ export function computeCalibrationBasisFingerprint(inputs) {
     },
   };
 
-  return `calbasis:v${CALIBRATION_BASIS_VERSION}:${fingerprint64(canonical)}`;
+  return `calbasis:v${APPLIED_CALIBRATION_BASIS_VERSION}:${fingerprint64(canonical)}`;
 }
 
 // ── Authority creation ───────────────────────────────────────────────────
 
 /**
- * Create a new Calibration Authority object.
+ * Create a new Applied Calibration Authority object.
  *
  * @param {object} params
- * @param {string} params.basisFingerprint - calibration basis fingerprint at creation time
- * @param {string} params.source - one of CALIBRATION_SOURCE
+ * @param {string} params.basisFingerprint - applied calibration basis fingerprint at creation time
+ * @param {string} params.source - one of APPLIED_CALIBRATION_SOURCE
  * @param {string} [params.candidateId] - originating optimiser candidate ID
  * @param {string} [params.recommendationId] - originating recommendation ID
  * @param {Array} [params.values] - per-sub calibration values [{ id, delayMs, gainDb, polarity, phaseControlDeg }]
  * @param {string} [params.stageKey] - which stage produced this calibration
- * @returns {object} calibration authority object
+ * @returns {object} applied calibration authority object
  */
-export function createCalibrationAuthority(params) {
+export function createAppliedCalibrationAuthority(params) {
   const p = params || {};
   return {
     basisFingerprint: String(p.basisFingerprint || ""),
-    status: p.status || CALIBRATION_STATUS.UNKNOWN,
-    source: p.source || CALIBRATION_SOURCE.UNKNOWN,
+    status: p.status || APPLIED_CALIBRATION_STATUS.UNKNOWN,
+    source: p.source || APPLIED_CALIBRATION_SOURCE.UNKNOWN,
     candidateId: String(p.candidateId || ""),
     recommendationId: String(p.recommendationId || ""),
     stageKey: String(p.stageKey || ""),
@@ -219,12 +236,12 @@ export function createCalibrationAuthority(params) {
 }
 
 /**
- * Extract per-subwoofer calibration values from subwooferInstances.
+ * Extract per-subwoofer applied calibration values from subwooferInstances.
  *
  * @param {Array} subwooferInstances - current subwoofer instances (ALL)
  * @returns {Array} [{ id, delayMs, gainDb, polarity, phaseControlDeg }] for active subs
  */
-export function extractCalibrationValues(subwooferInstances) {
+export function extractAppliedCalibrationValues(subwooferInstances) {
   if (!Array.isArray(subwooferInstances)) return [];
   return subwooferInstances
     .filter((s) => s.enabled !== false)
@@ -238,33 +255,33 @@ export function extractCalibrationValues(subwooferInstances) {
 }
 
 /**
- * Resolve the effective calibration status by comparing the authority's
- * stored basis fingerprint against the current basis fingerprint.
+ * Resolve the effective applied calibration status by comparing the
+ * authority's stored basis fingerprint against the current basis fingerprint.
  *
- * If the fingerprints differ, the calibration is Stale regardless of its
- * stored status — geometry changed since the calibration was generated.
+ * If the fingerprints differ, the applied calibration is Stale regardless of
+ * its stored status — geometry changed since the calibration was applied.
  *
- * User Modified and Manual statuses are preserved even when stale — the
- * user's manual edits are not lost, but they are flagged as needing
- * recalculation.
+ * User Modified, User Accepted, and Manual statuses are preserved even when
+ * stale — the user's deliberate choices are not lost, but they are flagged as
+ * needing recalculation.
  *
- * @param {object} authority - calibration authority object
- * @param {string} currentBasisFingerprint - current calibration basis fingerprint
+ * @param {object} authority - applied calibration authority object
+ * @param {string} currentBasisFingerprint - current applied calibration basis fingerprint
  * @returns {{ status: string, isStale: boolean, staleReason: string|null }}
  */
-export function resolveCalibrationStatus(authority, currentBasisFingerprint) {
+export function resolveAppliedCalibrationStatus(authority, currentBasisFingerprint) {
   if (!authority || !authority.basisFingerprint) {
-    return { status: CALIBRATION_STATUS.UNKNOWN, isStale: false, staleReason: null };
+    return { status: APPLIED_CALIBRATION_STATUS.UNKNOWN, isStale: false, staleReason: null };
   }
 
   if (!currentBasisFingerprint) {
-    return { status: authority.status || CALIBRATION_STATUS.UNKNOWN, isStale: false, staleReason: null };
+    return { status: authority.status || APPLIED_CALIBRATION_STATUS.UNKNOWN, isStale: false, staleReason: null };
   }
 
   const fingerprintsMatch = authority.basisFingerprint === currentBasisFingerprint;
 
   if (!fingerprintsMatch) {
-    // Geometry changed since calibration was generated → Stale
+    // Geometry changed since applied calibration was generated → Stale
     // Preserve the original source info but flag as stale
     return {
       status: authority.status,
@@ -274,22 +291,22 @@ export function resolveCalibrationStatus(authority, currentBasisFingerprint) {
   }
 
   return {
-    status: authority.status || CALIBRATION_STATUS.UNKNOWN,
+    status: authority.status || APPLIED_CALIBRATION_STATUS.UNKNOWN,
     isStale: false,
     staleReason: null,
   };
 }
 
 /**
- * Check whether the calibration authority is current (not stale) and can
- * be safely consumed by engineering calculations.
+ * Check whether the applied calibration authority is current (not stale) and
+ * can be safely consumed by engineering calculations.
  *
- * @param {object} authority - calibration authority object
- * @param {string} currentBasisFingerprint - current calibration basis fingerprint
+ * @param {object} authority - applied calibration authority object
+ * @param {string} currentBasisFingerprint - current applied calibration basis fingerprint
  * @returns {boolean}
  */
-export function isCalibrationConsumable(authority, currentBasisFingerprint) {
+export function isAppliedCalibrationConsumable(authority, currentBasisFingerprint) {
   if (!authority || !authority.basisFingerprint || !currentBasisFingerprint) return false;
-  const { isStale } = resolveCalibrationStatus(authority, currentBasisFingerprint);
+  const { isStale } = resolveAppliedCalibrationStatus(authority, currentBasisFingerprint);
   return !isStale;
 }
