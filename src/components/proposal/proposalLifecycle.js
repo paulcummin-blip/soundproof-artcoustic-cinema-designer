@@ -98,22 +98,64 @@ export function getStatusLabel(rawStatus) {
   return getStatusConfig(rawStatus).label;
 }
 
+// Adjacent valid transitions (normal progression only — no skips, no reversals).
+const ADJACENT_TRANSITIONS = {
+  draft: ['generating'],
+  generating: ['generated'],
+  generated: ['edited'],
+  edited: ['issued'],
+  issued: ['accepted'],
+  accepted: [],
+  archived: [],
+};
+
 /**
  * Valid next stages from a given status.
- * Used for lifecycle progression dropdowns.
+ * Includes archive as a valid target from any non-archived status.
+ * Used for lifecycle progression dropdowns and UI hints.
+ * NOTE: The server-authoritative transitionProposalStatus function is the
+ * single source of truth for enforcement. This mirror is for UI hints only.
  */
 export function getNextStages(rawStatus) {
   const status = normaliseStatus(rawStatus);
-  const idx = LIFECYCLE_STAGES.indexOf(status);
-  if (idx === -1 || idx === LIFECYCLE_STAGES.length - 1) return [];
-  return LIFECYCLE_STAGES.slice(idx + 1);
+  if (status === 'archived') return [];
+  const adjacent = ADJACENT_TRANSITIONS[status] || [];
+  // Archive is always available from any non-archived status.
+  return [...adjacent, 'archived'];
 }
 
 /**
  * Check if a transition from one status to another is valid.
+ * Adjacent-only normal progression + archive from any non-archived status.
+ * Does NOT cover unarchive (use getRestoreStatus for that).
  */
 export function canTransitionTo(fromStatus, toStatus) {
-  return getNextStages(fromStatus).includes(toStatus);
+  const from = normaliseStatus(fromStatus);
+  const to = normaliseStatus(toStatus);
+  if (from === to) return false;
+  if (to === 'archived' && from !== 'archived') return true;
+  const adjacent = ADJACENT_TRANSITIONS[from] || [];
+  return adjacent.includes(to);
+}
+
+/**
+ * Compute the restore status for an archived proposal.
+ * Returns the normalised status to restore to, or null if not archived.
+ */
+export function getRestoreStatus(rawStatus, previousStatus, hasContent) {
+  const status = normaliseStatus(rawStatus);
+  if (status !== 'archived') return null;
+  const prev = normaliseStatus(previousStatus);
+  if (prev && prev !== 'archived') return prev;
+  return hasContent ? 'edited' : 'draft';
+}
+
+/**
+ * Check if the proposal is in a read-only state (archived).
+ * Archived proposals cannot be edited and autosave must not run.
+ */
+export function isReadOnly(rawStatus) {
+  return normaliseStatus(rawStatus) === 'archived';
 }
 
 /**
