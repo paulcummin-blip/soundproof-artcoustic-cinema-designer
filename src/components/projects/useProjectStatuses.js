@@ -39,6 +39,28 @@ function sortStatuses(list) {
   });
 }
 
+// Deduplicate by status_id — the stable key used in React lists and stored
+// on Project.project_status. The database can contain duplicate status_id
+// values if the seeding race condition (two tabs loading simultaneously, or
+// partial deletion followed by re-seed) creates parallel records. When
+// duplicates exist, prefer the non-archived record so the active status
+// is the one that appears in the active list and selector options.
+function deduplicateByStatusId(list) {
+  const seen = new Map();
+  for (const s of list) {
+    const id = s.status_id;
+    if (!id) continue;
+    const existing = seen.get(id);
+    if (!existing) {
+      seen.set(id, s);
+    } else if (existing.is_archived && !s.is_archived) {
+      // Prefer non-archived over archived
+      seen.set(id, s);
+    }
+  }
+  return Array.from(seen.values());
+}
+
 // Loads (and seeds) the ProjectStatus definitions for the current account/workspace.
 // Returns the active+archived status list plus CRUD helpers.
 export function useProjectStatuses() {
@@ -59,10 +81,10 @@ export function useProjectStatuses() {
         // UI still works (e.g. before the entity is deployed).
         list = DEFAULT_STATUSES.map((d) => ({ ...d, account_id: scopeId }));
       }
-      setStatuses(sortStatuses(list));
+      setStatuses(sortStatuses(deduplicateByStatusId(list)));
     } catch (err) {
       console.error("[useProjectStatuses] load failed:", err);
-      setStatuses(DEFAULT_STATUSES.map((d) => ({ ...d, account_id: scopeId })));
+      setStatuses(sortStatuses(deduplicateByStatusId(DEFAULT_STATUSES.map((d) => ({ ...d, account_id: scopeId })))));
     } finally {
       setLoading(false);
     }
@@ -92,7 +114,7 @@ export function useProjectStatuses() {
         account_id: scopeId,
         is_default: false,
       });
-      setStatuses((arr) => sortStatuses([...arr, created]));
+      setStatuses((arr) => sortStatuses(deduplicateByStatusId([...arr, created])));
       return created;
     },
     [scopeId, statuses]
