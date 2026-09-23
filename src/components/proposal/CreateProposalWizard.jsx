@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { getProposalType } from '@/components/proposal/proposalTypes';
@@ -43,6 +43,8 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
   const [clientBrief, setClientBrief] = useState('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
+  const generationInFlightRef = useRef(false);
+  const creationRequestIdRef = useRef(null);
 
   // ── Stage 2A: Frozen Engineering Snapshot ──
   // Assemble the snapshot from the canonical authorities for the first selected
@@ -59,23 +61,39 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
   const handleSelectProject = useCallback((projectId) => {
     setSelectedProjectId(projectId);
     setSelectedVersionIds([]);
+    creationRequestIdRef.current = null;
   }, []);
 
   const handleSelectType = useCallback((type) => {
     setProposalType(type);
     setSelectedVersionIds([]);
+    creationRequestIdRef.current = null;
+  }, []);
+
+  const handleSelectVersions = useCallback((versionIds) => {
+    setSelectedVersionIds(versionIds);
+    creationRequestIdRef.current = null;
+  }, []);
+
+  const handleClientBriefChange = useCallback((brief) => {
+    setClientBrief(brief);
+    creationRequestIdRef.current = null;
   }, []);
 
   const handleGenerate = async () => {
-    if (!selectedProjectId || selectedVersionIds.length === 0) return;
+    if (generationInFlightRef.current || !selectedProjectId || selectedVersionIds.length === 0) return;
     if (!engineeringSnapshot) {
       setError(snapshotError || 'Open the selected version in Room Designer and calculate its engineering results before generating the proposal.');
       return;
     }
+    generationInFlightRef.current = true;
     setGenerating(true);
     setError(null);
+    const requestId = creationRequestIdRef.current || createRequestId();
+    creationRequestIdRef.current = requestId;
     try {
       const response = await base44.functions.invoke('generateProposal', {
+        request_id: requestId,
         project_id: selectedProjectId,
         proposal_type: proposalType,
         selected_version_ids: selectedVersionIds,
@@ -94,8 +112,14 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
       }
     } catch (err) {
       console.error('Generation failed:', err);
-      setError(err?.message || 'Generation failed. Please try again.');
+      const errorData = err?.response?.data;
+      if (errorData?.cleanup_succeeded === true) {
+        creationRequestIdRef.current = null;
+      }
+      setError(errorData?.error || err?.message || 'Generation failed. Please try again.');
       setGenerating(false);
+    } finally {
+      generationInFlightRef.current = false;
     }
   };
 
@@ -149,13 +173,13 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
           projectId={selectedProjectId}
           proposalType={proposalType}
           selectedVersionIds={selectedVersionIds}
-          onSelect={setSelectedVersionIds}
+          onSelect={handleSelectVersions}
         />
       )}
 
       {/* Step 3 — Client Brief & Narrative Focus */}
       {step === 3 && (
-        <ClientBriefStep value={clientBrief} onChange={setClientBrief} />
+        <ClientBriefStep value={clientBrief} onChange={handleClientBriefChange} />
       )}
 
       {/* Step 4 — Review & Generate */}
@@ -231,6 +255,11 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
       </div>
     </div>
   );
+}
+
+function createRequestId() {
+  return globalThis.crypto?.randomUUID?.()
+    || `proposal-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function ReviewRow({ label, value, last }) {
