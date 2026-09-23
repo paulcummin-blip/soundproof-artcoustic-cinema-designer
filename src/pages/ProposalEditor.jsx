@@ -8,7 +8,6 @@ import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
 import ProposalSectionNav from '@/components/proposal/ProposalSectionNav';
 import { isArchived, getRestoreStatus } from '@/components/proposal/proposalLifecycle';
-import { appParams } from '@/lib/app-params';
 import { Loader2, FileText, Download, ChevronLeft, Archive, RotateCcw } from 'lucide-react';
 
 const SAVE_STATUS = { IDLE: 'idle', SAVING: 'saving', SAVED: 'saved', FAILED: 'failed', UNSAVED: 'unsaved' };
@@ -73,158 +72,178 @@ export default function ProposalEditor() {
   }, [load]);
 
   // ── Auto-save section body ──
-  // Tracks dirty sections, flushes pending saves on unmount, and transitions
-  // Generated → Edited after the first successful manual section save.
-  const saveTimers = useRef({});
-  const pendingSavesRef = useRef({}); // sectionId -> { html, promise }
+  // One server-owned persistence path handles normal autosave and keepalive
+  // teardown saves. A proposal becomes Edited only after the section write
+  // succeeds; failed or superseded requests never clear the latest dirty draft.
   const proposalRef = useRef(proposal);
   proposalRef.current = proposal;
   const dirtySectionsRef = useRef(new Set());
+  const dirtyDraftsRef = useRef({});
+  const pendingSavesRef = useRef({});
+  const unloadSavesRef = useRef({});
+  const saveRequestIdRef = useRef(0);
+  const savedIndicatorTimersRef = useRef({});
   const archivedRef = useRef(false);
   archivedRef.current = isArchived(proposal?.status);
 
-  const transitionToEdited = useCallback(async () => {
-    const current = proposalRef.current;
-    if (!current) return;
-    const rawStatus = current.status;
-    // Only transition from 'generated' (or legacy 'reviewed' normalised to 'edited')
-    if (rawStatus !== 'generated') return;
-    try {
-      const response = await base44.functions.invoke('transitionProposalStatus', {
-        proposal_id: current.id,
-        target_status: 'edited',
-      });
-      if (response?.data?.error) {
-        console.error('[ProposalEditor] Generated→Edited transition rejected:', response.data.error);
-        return;
-      }
-      setProposal((prev) => prev ? { ...prev, status: 'edited' } : prev);
-    } catch (err) {
-      console.error('[ProposalEditor] Generated→Edited transition failed:', err);
-    }
-  }, []);
-
-  // Mark a section dirty immediately on user input (before debounce fires).
-  const handleDirty = useCallback((sectionId) => {
+  const handleDirty = useCallback((sectionId, html, editedAt) => {
     if (archivedRef.current) return;
+    dirtyDraftsRef.current[sectionId] = { html, editedAt };
     setDirtySections((prev) => {
-      if (prev.has(sectionId)) return prev;
       const next = new Set(prev);
       next.add(sectionId);
       dirtySectionsRef.current = next;
       return next;
     });
-    setSaveStatuses((prev) => {
-      if (prev[sectionId] === SAVE_STATUS.SAVING) return prev;
-      return { ...prev, [sectionId]: SAVE_STATUS.UNSAVED };
-    });
+    setSaveStatuses((prev) => ({ ...prev, [sectionId]: SAVE_STATUS.UNSAVED }));
   }, []);
 
-  // Keepalive flush — survives page teardown. Used on unmount when edits are unsaved.
-  const handleUnloadSave = useCallback((sectionId, html) => {
-    if (archivedRef.current) return;
-    const token = appParams.token;
-    if (!token || !sectionId) return;
-    const url = `${appParams.serverUrl}/api/apps/${appParams.appId}/entities/ProposalSection/${sectionId}`;
-    try {
-      fetch(url, {
-        method: 'PUT',
+  const persistSectionEdit = useCallback(async (sectionId, html, editedAt, keepalive = false) => {
+    const payload = {
+      proposal_id: proposalId,
+      section_id: sectionId,
+      html,
+      edited_at: editedAt,
+    };
+
+    if (keepalive) {
+      const response = await base44.functions.fetch('/persistProposalSectionEdit', {
+        method: 'POST',
         keepalive: true,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-App-Id': String(appParams.appId),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          body: html,
-          last_user_edited_at: new Date().toISOString(),
-        }),
-      }).catch(() => {});
-    } catch (e) {
-      // Swallow — best-effort during teardown
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.error) {
+        throw new Error(data?.error || `Save failed (${response.status})`);
+      }
+      return data;
     }
-  }, []);
 
-  const flushSave = useCallback(async (sectionId) => {
-    const timer = saveTimers.current[sectionId];
-    if (timer) {
-      clearTimeout(timer);
-      delete saveTimers.current[sectionId];
-    }
-    const pending = pendingSavesRef.current[sectionId];
-    if (!pending) return;
-    delete pendingSavesRef.current[sectionId];
-    try {
-      await pending.promise;
-    } catch (e) {
-      // Error already handled in the save function; swallow here.
-    }
-  }, []);
+    const response = await base44.functions.invoke('persistProposalSectionEdit', payload);
+    const data = response?.data ?? response;
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }, [proposalId]);
 
-  const handleBodySave = useCallback((sectionId, html) => {
-    // Mark dirty immediately — the edit is not yet persisted.
-    setDirtySections((prev) => new Set(prev).add(sectionId));
+  const commitDraft = useCallback((sectionId, html, editedAt, keepalive = false) => {
+    if (archivedRef.current || !sectionId || typeof html !== 'string') {
+      return Promise.resolve({ ok: false });
+    }
+
+    const draft = {
+      html,
+      editedAt: editedAt || new Date().toISOString(),
+    };
+    dirtyDraftsRef.current[sectionId] = draft;
+
+    if (
+      keepalive &&
+      unloadSavesRef.current[sectionId]?.html === draft.html &&
+      unloadSavesRef.current[sectionId]?.editedAt === draft.editedAt
+    ) {
+      return unloadSavesRef.current[sectionId].promise;
+    }
+
+    const requestId = ++saveRequestIdRef.current;
+    const request = { requestId, ...draft, keepalive, promise: null };
     setSaveStatuses((prev) => ({ ...prev, [sectionId]: SAVE_STATUS.SAVING }));
-    if (saveTimers.current[sectionId]) clearTimeout(saveTimers.current[sectionId]);
 
-    const savePromise = (async () => {
+    request.promise = (async () => {
       try {
-        await base44.entities.ProposalSection.update(sectionId, {
-          body: html,
-          last_user_edited_at: new Date().toISOString(),
-        });
-        setSaveStatuses((prev) => ({ ...prev, [sectionId]: SAVE_STATUS.SAVED }));
-        setDirtySections((prev) => {
-          const next = new Set(prev);
-          next.delete(sectionId);
-          dirtySectionsRef.current = next;
-          return next;
-        });
-        setTimeout(() => {
-          setSaveStatuses((prev) => {
-            const current = prev[sectionId];
-            if (current === SAVE_STATUS.SAVED) {
+        const result = await persistSectionEdit(sectionId, draft.html, draft.editedAt, keepalive);
+
+        if (result?.proposal_status) {
+          proposalRef.current = proposalRef.current
+            ? { ...proposalRef.current, status: result.proposal_status }
+            : proposalRef.current;
+          setProposal((prev) => prev ? { ...prev, status: result.proposal_status } : prev);
+        }
+
+        const currentRequest = pendingSavesRef.current[sectionId];
+        const latestDraft = dirtyDraftsRef.current[sectionId];
+        const isCurrentRequest = currentRequest?.requestId === requestId;
+        const isLatestDraft =
+          latestDraft?.html === draft.html && latestDraft?.editedAt === draft.editedAt;
+
+        if (isCurrentRequest) delete pendingSavesRef.current[sectionId];
+
+        if (isLatestDraft || (isCurrentRequest && !latestDraft)) {
+          if (isLatestDraft) delete dirtyDraftsRef.current[sectionId];
+          setDirtySections((prev) => {
+            const next = new Set(prev);
+            next.delete(sectionId);
+            dirtySectionsRef.current = next;
+            return next;
+          });
+          setSaveStatuses((prev) => ({ ...prev, [sectionId]: SAVE_STATUS.SAVED }));
+
+          if (savedIndicatorTimersRef.current[sectionId]) {
+            clearTimeout(savedIndicatorTimersRef.current[sectionId]);
+          }
+          savedIndicatorTimersRef.current[sectionId] = setTimeout(() => {
+            setSaveStatuses((prev) => {
+              if (prev[sectionId] !== SAVE_STATUS.SAVED) return prev;
               const next = { ...prev };
               delete next[sectionId];
               return next;
-            }
-            return prev;
-          });
-        }, 2000);
-        // Transition Generated → Edited after the first successful save.
-        await transitionToEdited();
+            });
+            delete savedIndicatorTimersRef.current[sectionId];
+          }, 2000);
+        } else if (isCurrentRequest) {
+          setSaveStatuses((prev) => ({ ...prev, [sectionId]: SAVE_STATUS.UNSAVED }));
+        }
+
+        return { ok: true, result };
       } catch (err) {
         console.error('Save failed:', err);
-        setSaveStatuses((prev) => ({ ...prev, [sectionId]: SAVE_STATUS.FAILED }));
-        // Keep the section marked dirty — the edit was not persisted.
+        if (pendingSavesRef.current[sectionId]?.requestId === requestId) {
+          delete pendingSavesRef.current[sectionId];
+          if (dirtyDraftsRef.current[sectionId]) {
+            setSaveStatuses((prev) => ({ ...prev, [sectionId]: SAVE_STATUS.FAILED }));
+          }
+        }
+        return { ok: false, error: err };
+      } finally {
+        if (unloadSavesRef.current[sectionId]?.requestId === requestId) {
+          delete unloadSavesRef.current[sectionId];
+        }
       }
     })();
 
-    pendingSavesRef.current[sectionId] = { html, promise: savePromise };
-    saveTimers.current[sectionId] = setTimeout(() => {
-      // The savePromise is already running — just clear the timer ref.
-      delete saveTimers.current[sectionId];
-    }, 500);
-  }, [transitionToEdited]);
+    pendingSavesRef.current[sectionId] = request;
+    if (keepalive) unloadSavesRef.current[sectionId] = request;
+    return request.promise;
+  }, [persistSectionEdit]);
 
-  // Flush all pending saves on unmount and warn before navigating away with unsaved changes.
+  const handleBodySave = useCallback(
+    (sectionId, html, editedAt) => commitDraft(sectionId, html, editedAt, false),
+    [commitDraft]
+  );
+
+  const handleUnloadSave = useCallback(
+    (sectionId, html, editedAt) => commitDraft(sectionId, html, editedAt, true),
+    [commitDraft]
+  );
+
   useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      const hasPending = Object.keys(pendingSavesRef.current).length > 0 || dirtySectionsRef.current.size > 0;
-      if (hasPending) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
+    const handleBeforeUnload = (event) => {
+      const drafts = Object.entries(dirtyDraftsRef.current);
+      const hasPending = drafts.length > 0 || Object.keys(pendingSavesRef.current).length > 0;
+      if (!hasPending) return;
+
+      drafts.forEach(([sectionId, draft]) => {
+        handleUnloadSave(sectionId, draft.html, draft.editedAt);
+      });
+      event.preventDefault();
+      event.returnValue = '';
     };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Keepalive-flush saves still in-flight (SDK fetch may be aborted during teardown).
-      Object.entries(pendingSavesRef.current).forEach(([sid, pending]) => {
-        if (pending?.html) handleUnloadSave(sid, pending.html);
-      });
-      Object.values(saveTimers.current).forEach((t) => clearTimeout(t));
-      saveTimers.current = {};
+      Object.values(savedIndicatorTimersRef.current).forEach((timer) => clearTimeout(timer));
+      savedIndicatorTimersRef.current = {};
     };
   }, [handleUnloadSave]);
 
@@ -401,6 +420,7 @@ export default function ProposalEditor() {
             onSelect={setActiveSectionKey}
             onToggleVisibility={handleToggleVisibility}
             onReorder={handleReorder}
+            readOnly={archived}
           />
         </div>
       </div>
@@ -479,9 +499,9 @@ export default function ProposalEditor() {
                 {def.canEditBody ? (
                   <InlineRichTextEditor
                     html={section.body}
-                    onSave={(html) => handleBodySave(section.id, html)}
-                    onDirty={() => handleDirty(section.id)}
-                    onUnloadSave={(html) => handleUnloadSave(section.id, html)}
+                    onSave={(html, editedAt) => handleBodySave(section.id, html, editedAt)}
+                    onDirty={(html, editedAt) => handleDirty(section.id, html, editedAt)}
+                    onUnloadSave={(html, editedAt) => handleUnloadSave(section.id, html, editedAt)}
                     editable={isActive && !archived}
                     saveStatus={saveStatuses[section.id] || SAVE_STATUS.IDLE}
                   />
@@ -525,20 +545,23 @@ export default function ProposalEditor() {
           </p>
           <textarea
             value={clientBrief}
+            readOnly={archived}
             onChange={(e) => setClientBrief(e.target.value)}
             placeholder="e.g. The client is passionate about music and wants invisible loudspeakers…"
             rows={10}
             className="w-full p-3 text-xs text-[#1B1A1A] bg-[#F5F4F0] border border-[#DCDBD6] rounded-lg resize-y focus:outline-none focus:border-[#213428] focus:ring-1 focus:ring-[#213428] transition-colors"
             style={{ fontFamily: 'Inter, sans-serif', lineHeight: 1.6 }}
           />
-          <button
-            onClick={handleSaveClientBrief}
-            disabled={savingBrief}
-            className="w-full mt-3 px-4 py-2 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
-            style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
-          >
-            {savingBrief ? 'Saving…' : 'Save Brief'}
-          </button>
+          {!archived && (
+            <button
+              onClick={handleSaveClientBrief}
+              disabled={savingBrief}
+              className="w-full mt-3 px-4 py-2 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
+              style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
+            >
+              {savingBrief ? 'Saving…' : 'Save Brief'}
+            </button>
+          )}
           <div className="mt-4 p-2.5 bg-[#F5F4F0] border-l-2 border-[#213428] rounded-r">
             <p className="text-[10px] text-[#625143] leading-relaxed">
               <strong className="text-[#213428]">Note:</strong> Changing the Client Brief changes
