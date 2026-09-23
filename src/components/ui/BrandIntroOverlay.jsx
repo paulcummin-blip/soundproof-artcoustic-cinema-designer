@@ -1,23 +1,25 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/lib/AuthContext";
+import { loadDealerBrand } from "@/components/account/dealerBrandAuthority";
 
-// Sound Proof brand intro animation.
-// Plays once per browser session: the logo appears large and centred,
-// holds still for 2s, then moves smoothly to the sidebar position over 3s.
-// Total ~5s. The overlay is removed only after the animation completes.
-//
-// Respects prefers-reduced-motion (brief fade, no movement) — but only
-// when the media query actually matches; never suppresses for normal users.
-//
-// DEBUG / TESTING:
-//   - Call window.__resetSoundProofIntro() from the console, then reload.
-//   - Or append ?resetIntro to the URL and reload.
-// Either clears the session flag so the animation replays.
+// Opening brand treatment. It uses the same account-owned hero image and logo
+// authority as the settled header, then contracts into that header's live box.
+// Plays once per browser session and respects reduced-motion preferences.
 
-const LOGO_URL =
-  "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg";
-const STORAGE_KEY = "soundproof_intro_played_v2";
+const STORAGE_KEY = "soundproof_intro_played_v3";
+const SP_WORDMARK = "SOUND PROOF";
+const BASE_FONT_SIZE = 40;
+const LETTER_SPACING = "0.15em";
+const FONT_FAMILY = "Didact Gothic, Century Gothic, sans-serif";
+const FONT_WEIGHT = 300;
+const SP_WIDER = 1.1;
+const DEALER_WIDTH_RATIO = 0.44;
+const MAX_SETTLED_DEALER_WIDTH = 520;
+const GAP_PX = 32;
+const CROSS_HEIGHT_PX = 30;
+const HORIZONTAL_PADDING = 48;
+const VERTICAL_PADDING = 48;
 
-// Expose a debug reset helper on window so it can be called from the console.
 if (typeof window !== "undefined" && !window.__resetSoundProofIntro) {
   window.__resetSoundProofIntro = () => {
     try { sessionStorage.removeItem(STORAGE_KEY); } catch (_) {}
@@ -27,100 +29,436 @@ if (typeof window !== "undefined" && !window.__resetSoundProofIntro) {
   };
 }
 
-// Safe sessionStorage helpers — never throw even in sandboxed iframes.
 function hasPlayed() {
   try { return !!sessionStorage.getItem(STORAGE_KEY); } catch (_) { return false; }
 }
+
 function markPlayed() {
   try { sessionStorage.setItem(STORAGE_KEY, "1"); } catch (_) {}
 }
 
+function calculateLockup({
+  width,
+  height,
+  baseTextWidth,
+  hasDealer,
+  hasDealerLogo,
+  dealerNatural,
+  maxDealerWidth,
+}) {
+  if (!baseTextWidth) {
+    return { spFontSize: 56, dealerWidth: hasDealerLogo ? 360 : 0 };
+  }
+
+  const textFactor = baseTextWidth / BASE_FONT_SIZE;
+  const usableWidth = Math.max(0, width - HORIZONTAL_PADDING);
+
+  if (!hasDealer || !hasDealerLogo || !dealerNatural) {
+    const maxWordmarkWidth = Math.min(usableWidth * 0.58, maxDealerWidth * SP_WIDER);
+    const maxWordmarkHeight = Math.max(36, height - VERTICAL_PADDING * 2);
+    return {
+      spFontSize: Math.min(maxWordmarkWidth / textFactor, maxWordmarkHeight),
+      dealerWidth: 0,
+    };
+  }
+
+  const dealerAspect = dealerNatural.w / dealerNatural.h;
+  const desiredDealerWidth = Math.min(
+    usableWidth * DEALER_WIDTH_RATIO,
+    maxDealerWidth,
+  );
+  const sizeCoefficient = (SP_WIDER / textFactor) + (1 / dealerAspect);
+  const availableVariableHeight = Math.max(
+    0,
+    height - VERTICAL_PADDING * 2 - CROSS_HEIGHT_PX - GAP_PX * 2,
+  );
+  const heightBoundDealerWidth = availableVariableHeight / sizeCoefficient;
+  const dealerWidth = Math.max(
+    0,
+    Math.min(desiredDealerWidth, heightBoundDealerWidth),
+  );
+
+  return {
+    spFontSize: (SP_WIDER * dealerWidth) / textFactor,
+    dealerWidth,
+  };
+}
+
 export default function BrandIntroOverlay() {
+  const { user, isLoadingAuth } = useAuth();
+  const accountId = user?.account_id || user?.access_context?.account?.id || null;
+
+  const [brand, setBrand] = useState(null);
+  const [brandReady, setBrandReady] = useState(false);
   const [show, setShow] = useState(false);
-  // Stages: hold → move → fade → done
   const [stage, setStage] = useState("hold");
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [geometry, setGeometry] = useState(null);
+  const [viewport, setViewport] = useState({ width: 1440, height: 900 });
+  const [targetRect, setTargetRect] = useState(null);
+  const [dealerNatural, setDealerNatural] = useState(null);
+  const [baseTextWidth, setBaseTextWidth] = useState(null);
+  const [overlayOpacity, setOverlayOpacity] = useState(0.5);
+  const measureRef = useRef(null);
 
   useEffect(() => {
-    // Debug: ?resetIntro clears the flag so the animation replays on reload.
+    if (isLoadingAuth) return undefined;
+
+    let cancelled = false;
+    setBrandReady(false);
+
+    if (!accountId) {
+      setBrand(null);
+      setBrandReady(true);
+      return () => { cancelled = true; };
+    }
+
+    (async () => {
+      try {
+        const loadedBrand = await loadDealerBrand(accountId);
+        if (!cancelled) setBrand(loadedBrand || null);
+      } catch {
+        if (!cancelled) setBrand(null);
+      } finally {
+        if (!cancelled) setBrandReady(true);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [accountId, isLoadingAuth]);
+
+  useEffect(() => {
+    if (!brandReady || hasPlayed()) return undefined;
+
     try {
       if (new URLSearchParams(window.location.search).get("resetIntro") !== null) {
         try { sessionStorage.removeItem(STORAGE_KEY); } catch (_) {}
       }
     } catch (_) {}
 
-    if (hasPlayed()) return;
-    markPlayed();
+    let frame = 0;
+    let attempts = 0;
+    const locateTarget = () => {
+      const target = document.querySelector('[data-dealer-hero="true"]');
+      const rect = target?.getBoundingClientRect();
+      if ((!rect || rect.width < 10 || rect.height < 10) && attempts < 120) {
+        attempts += 1;
+        frame = requestAnimationFrame(locateTarget);
+        return;
+      }
+      if (!rect) return;
 
-    // Only skip movement when the media query genuinely matches.
-    try {
-      setReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    } catch (_) {
-      setReducedMotion(false);
-    }
+      let prefersReducedMotion = false;
+      try {
+        prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      } catch (_) {}
 
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    // Start large and centred so the brand clearly registers.
-    const startW = Math.min(480, Math.max(280, vw - 80));
-    setGeometry({
-      start: {
-        left: Math.round((vw - startW) / 2),
-        top: Math.round((vh - startW * 0.3) / 2),
-        width: startW,
-      },
-      // Matches the sidebar logo position (p-4 padding = 16px, width 300).
-      end: { left: 16, top: 16, width: 300 },
-    });
-    setShow(true);
-  }, []);
+      setReducedMotion(prefersReducedMotion);
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+      setTargetRect({
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      });
+      markPlayed();
+      setShow(true);
+    };
+
+    frame = requestAnimationFrame(locateTarget);
+    return () => cancelAnimationFrame(frame);
+  }, [brandReady]);
 
   useEffect(() => {
-    if (!show) return;
+    if (!show) return undefined;
     const timers = [];
+
     if (reducedMotion) {
-      // Reduced motion: show logo briefly, fade out, no movement.
       timers.push(setTimeout(() => setStage("fade"), 800));
-      timers.push(setTimeout(() => setStage("done"), 1200));
+      timers.push(setTimeout(() => setStage("done"), 1100));
     } else {
-      // 0–2s: hold centred. 2–5s: move to sidebar. 4.7–5s: fade. 5s: done.
-      timers.push(setTimeout(() => setStage("move"), 2000));
-      timers.push(setTimeout(() => setStage("fade"), 4700));
-      timers.push(setTimeout(() => setStage("done"), 5000));
+      timers.push(setTimeout(() => setStage("settle"), 1200));
+      timers.push(setTimeout(() => setStage("fade"), 3050));
+      timers.push(setTimeout(() => setStage("done"), 3350));
     }
+
     return () => timers.forEach(clearTimeout);
   }, [show, reducedMotion]);
 
-  if (!show || stage === "done" || !geometry) return null;
+  useEffect(() => {
+    const measure = () => {
+      if (!measureRef.current) return;
+      const measured = measureRef.current.offsetWidth;
+      if (measured > 0) setBaseTextWidth(measured);
+    };
+    measure();
+    if (document.fonts?.ready) document.fonts.ready.then(measure);
+  }, [show]);
 
-  const { start, end } = geometry;
-  const atEnd = stage === "move" || stage === "fade";
+  const heroBg = brand?.hero_background_url || null;
+  const dealerName = brand?.display_name_override || brand?.company_name || null;
+  const dealerLogo = heroBg
+    ? (brand?.white_logo_url || brand?.dealer_logo_url || null)
+    : (brand?.dealer_logo_url || brand?.white_logo_url || null);
+  const hasDealer = !!(dealerLogo || dealerName);
+
+  useEffect(() => {
+    setDealerNatural(null);
+  }, [dealerLogo]);
+
+  useEffect(() => {
+    if (!heroBg) {
+      setOverlayOpacity(0.48);
+      return undefined;
+    }
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = 60;
+        canvas.height = 60;
+        ctx.drawImage(img, 0, 0, 60, 60);
+        const data = ctx.getImageData(0, 0, 60, 60).data;
+        let sum = 0;
+        for (let index = 0; index < data.length; index += 4) {
+          sum += (data[index] + data[index + 1] + data[index + 2]) / 3;
+        }
+        const average = sum / (data.length / 4);
+        setOverlayOpacity(
+          average > 128
+            ? Math.min(0.5, 0.45 + ((average - 128) / 128) * 0.05)
+            : 0.45,
+        );
+      } catch {
+        setOverlayOpacity(0.5);
+      }
+    };
+    img.onerror = () => setOverlayOpacity(0.48);
+    img.src = heroBg;
+    return undefined;
+  }, [heroBg]);
+
+  const geometry = useMemo(() => {
+    if (!targetRect) return null;
+    const margin = Math.max(
+      12,
+      Math.min(36, Math.round(Math.min(viewport.width, viewport.height) * 0.035)),
+    );
+    return {
+      start: {
+        left: margin,
+        top: margin,
+        width: Math.max(0, viewport.width - margin * 2),
+        height: Math.max(0, viewport.height - margin * 2),
+      },
+      end: targetRect,
+    };
+  }, [targetRect, viewport]);
+
+  const settled = stage === "settle" || stage === "fade";
+  const frameBox = geometry ? (settled ? geometry.end : geometry.start) : null;
+
+  const startLockup = useMemo(() => {
+    if (!geometry) return { spFontSize: 56, dealerWidth: 360 };
+    return calculateLockup({
+      width: geometry.start.width,
+      height: geometry.start.height,
+      baseTextWidth,
+      hasDealer,
+      hasDealerLogo: !!dealerLogo,
+      dealerNatural,
+      maxDealerWidth: Math.min(720, geometry.start.width * 0.5),
+    });
+  }, [geometry, baseTextWidth, hasDealer, dealerLogo, dealerNatural]);
+
+  const endLockup = useMemo(() => {
+    if (!geometry) return { spFontSize: 56, dealerWidth: 360 };
+    return calculateLockup({
+      width: geometry.end.width,
+      height: geometry.end.height,
+      baseTextWidth,
+      hasDealer,
+      hasDealerLogo: !!dealerLogo,
+      dealerNatural,
+      maxDealerWidth: MAX_SETTLED_DEALER_WIDTH,
+    });
+  }, [geometry, baseTextWidth, hasDealer, dealerLogo, dealerNatural]);
+
+  if (!show || stage === "done" || !geometry || !frameBox) return null;
+
+  const lockup = settled ? endLockup : startLockup;
+  const textColor = heroBg ? "#FFFFFF" : "#1B1A1A";
+  const crossColor = heroBg ? "rgba(255,255,255,0.45)" : "rgba(27,26,26,0.30)";
+  const transition = reducedMotion
+    ? "none"
+    : "left 1.8s cubic-bezier(0.22,1,0.36,1), top 1.8s cubic-bezier(0.22,1,0.36,1), width 1.8s cubic-bezier(0.22,1,0.36,1), height 1.8s cubic-bezier(0.22,1,0.36,1)";
 
   return (
     <div
+      aria-hidden="true"
       style={{
         position: "fixed",
         inset: 0,
-        background: "#FFFFFF",
         zIndex: 99999,
-        opacity: stage === "fade" ? 0 : 1,
-        transition: "opacity 0.3s ease",
+        pointerEvents: "none",
+        overflow: "hidden",
+        background: settled ? "rgba(15,15,15,0)" : "rgba(15,15,15,0.94)",
+        transition: reducedMotion ? "none" : "background 1.8s cubic-bezier(0.22,1,0.36,1)",
       }}
     >
-      <img
-        src={LOGO_URL}
-        alt="Sound Proof"
+      <div
         style={{
-          position: "absolute",
-          objectFit: "contain",
-          left: atEnd ? end.left : start.left,
-          top: atEnd ? end.top : start.top,
-          width: atEnd ? end.width : start.width,
-          transition:
-            "left 3s cubic-bezier(0.4,0,0.2,1), top 3s cubic-bezier(0.4,0,0.2,1), width 3s cubic-bezier(0.4,0,0.2,1)",
+          position: "fixed",
+          left: frameBox.left,
+          top: frameBox.top,
+          width: frameBox.width,
+          height: frameBox.height,
+          overflow: "hidden",
+          background: heroBg ? "#1B1A1A" : "#F8F8F7",
+          borderBottom: `1px solid ${heroBg ? "rgba(255,255,255,0.12)" : "#DCDBD6"}`,
+          boxShadow: settled ? "0 0 0 rgba(0,0,0,0)" : "0 28px 80px rgba(0,0,0,0.30)",
+          opacity: stage === "fade" ? 0 : 1,
+          transition: `${transition}, box-shadow 1.8s ease, opacity 0.28s ease`,
         }}
-      />
+      >
+        <span
+          ref={measureRef}
+          style={{
+            position: "absolute",
+            visibility: "hidden",
+            fontSize: BASE_FONT_SIZE,
+            letterSpacing: LETTER_SPACING,
+            fontFamily: FONT_FAMILY,
+            fontWeight: FONT_WEIGHT,
+            lineHeight: 1,
+            whiteSpace: "nowrap",
+            left: -9999,
+          }}
+        >
+          {SP_WORDMARK}
+        </span>
+
+        {heroBg && (
+          <>
+            <div
+              style={{
+                position: "absolute",
+                inset: -10,
+                backgroundImage: `url(${heroBg})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                filter: settled
+                  ? "brightness(0.9) blur(0px)"
+                  : "brightness(0.78) blur(6px)",
+                transform: settled ? "scale(1)" : "scale(1.025)",
+                transition: reducedMotion
+                  ? "none"
+                  : "filter 1.8s cubic-bezier(0.22,1,0.36,1), transform 1.8s cubic-bezier(0.22,1,0.36,1)",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: `rgba(0,0,0,${settled ? overlayOpacity : Math.max(0.56, overlayOpacity)})`,
+                transition: reducedMotion ? "none" : "background 1.8s ease",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.35) 100%)",
+              }}
+            />
+          </>
+        )}
+
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 24px",
+            boxSizing: "border-box",
+            gap: settled ? GAP_PX : Math.max(GAP_PX, 40),
+            fontFamily: FONT_FAMILY,
+            transition: reducedMotion ? "none" : "gap 1.8s cubic-bezier(0.22,1,0.36,1)",
+          }}
+        >
+          <span
+            style={{
+              fontSize: lockup.spFontSize,
+              fontWeight: FONT_WEIGHT,
+              letterSpacing: LETTER_SPACING,
+              lineHeight: 1,
+              color: textColor,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+              transition: reducedMotion ? "none" : "font-size 1.8s cubic-bezier(0.22,1,0.36,1)",
+            }}
+          >
+            {SP_WORDMARK}
+          </span>
+
+          {hasDealer && (
+            <>
+              <span
+                style={{
+                  fontSize: settled ? 30 : 40,
+                  fontWeight: 300,
+                  color: crossColor,
+                  lineHeight: 1,
+                  userSelect: "none",
+                  flexShrink: 0,
+                  transition: reducedMotion ? "none" : "font-size 1.8s cubic-bezier(0.22,1,0.36,1)",
+                }}
+              >
+                ×
+              </span>
+
+              {dealerLogo ? (
+                <img
+                  src={dealerLogo}
+                  alt=""
+                  onLoad={(event) => {
+                    const img = event.currentTarget;
+                    setDealerNatural({ w: img.naturalWidth, h: img.naturalHeight });
+                  }}
+                  style={{
+                    width: lockup.dealerWidth,
+                    height: "auto",
+                    objectFit: "contain",
+                    flexShrink: 0,
+                    transition: reducedMotion ? "none" : "width 1.8s cubic-bezier(0.22,1,0.36,1)",
+                  }}
+                />
+              ) : (
+                <span
+                  style={{
+                    color: textColor,
+                    fontSize: settled ? 26 : 36,
+                    fontWeight: 700,
+                    letterSpacing: "0.02em",
+                    lineHeight: 1,
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    transition: reducedMotion ? "none" : "font-size 1.8s cubic-bezier(0.22,1,0.36,1)",
+                  }}
+                >
+                  {dealerName}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
