@@ -48,6 +48,7 @@ import { buildProvenance } from "./appliedProvenance";
 import ImproveBassV2Progress from "./ImproveBassV2Progress";
 import ImproveBassV2SimplifiedResults from "./ImproveBassV2SimplifiedResults";
 import ImproveBassV2InfoPopover from "./ImproveBassV2InfoPopover";
+import { generateRecommendation, publishRecommendation } from "@/components/recommendationEngine";
 import ImproveBassV2CompletedInvestigation from "./ImproveBassV2CompletedInvestigation";
 import OptimisationDiagnosticsReport from "./OptimisationDiagnosticsReport";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
@@ -327,6 +328,28 @@ export default function ImproveBassResponseV2({
           setWinner(projectId, versionId, { ...selection, applyFingerprint: startFingerprint,
             applyCandidateId: selection.winner?.candidateId ?? null,
             applyCalibrationId: selection.calibrationResult?.candidateId ?? null });
+        }
+
+        // ── Generate and persist the Recommendation Engine output ──────
+        // Pure reasoning layer — consumes the selection, produces a
+        // structured recommendation, and persists it alongside the canonical
+        // bass result. Never recalculates engineering.
+        try {
+          const recommendation = generateRecommendation(selection, {
+            context: {
+              p14TargetDb: p14Params.p14TargetDb,
+              subwooferCount: subwooferInstances?.filter((s) => s.enabled !== false).length || 0,
+              roomDims,
+            },
+          });
+          const resultFingerprint = selection?.currentResult?.inputIdentity
+            || shared?.completedBassAuthority?.currentFingerprint
+            || startFingerprint;
+          if (resultFingerprint) {
+            publishRecommendation(projectId, versionId, recommendation, resultFingerprint);
+          }
+        } catch {
+          // Recommendation generation failure is non-fatal.
         }
       }
       // Store runtime metrics for acceptance verification

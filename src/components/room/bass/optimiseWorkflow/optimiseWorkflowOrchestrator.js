@@ -37,6 +37,8 @@ import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Finger
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import { normalisePhaseControlDeg } from "../../../../bass/core/subwooferPhaseControl";
 import { classifyOptimisationStage } from "./optimisationStageClassifier";
+import { generateRecommendation } from "@/components/recommendationEngine";
+import { publishRecommendation } from "@/components/recommendationEngine";
 
 /**
  * Run the V2 optimisation engine and return the selection result.
@@ -224,6 +226,32 @@ export async function runOptimisation(opts) {
           applyCandidateId: selection.winner?.candidateId ?? null,
           applyCalibrationId: selection.calibrationResult?.candidateId ?? null,
         });
+      }
+
+      // ── Generate and persist the Recommendation Engine output ──────
+      // The Recommendation Engine is a pure reasoning layer that consumes
+      // the optimiser's selection and produces a structured recommendation
+      // object. It never recalculates engineering — it interprets existing
+      // results. The output is persisted alongside the canonical bass result.
+      try {
+        const recommendation = generateRecommendation(selection, {
+          context: {
+            p14TargetDb: p14Params.p14TargetDb,
+            p18TargetHz: null, // P18 target Hz not directly available here
+            subwooferCount: subwooferInstances?.filter((s) => s.enabled !== false).length || 0,
+            roomDims,
+          },
+        });
+        const resultFingerprint = selection?.currentResult?.inputIdentity
+          || shared?.completedBassAuthority?.currentFingerprint
+          || startFingerprint;
+        if (resultFingerprint) {
+          publishRecommendation(projectId, versionId, recommendation, resultFingerprint);
+        }
+      } catch {
+        // Recommendation generation failure is non-fatal — the optimiser
+        // result is still valid. The recommendation is a reasoning layer,
+        // not a calculation.
       }
     }
 
