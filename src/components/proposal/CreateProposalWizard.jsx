@@ -211,6 +211,9 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
           {!snapshotLoading && snapshotError && (
             <p className="text-sm text-[#7A2E10] mb-6">{snapshotError}</p>
           )}
+          {!snapshotLoading && error && (
+            <p role="alert" className="text-sm text-[#7A2E10] mb-6">{error}</p>
+          )}
         </div>
       )}
 
