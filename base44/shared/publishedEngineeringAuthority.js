@@ -129,6 +129,46 @@ export function upsertPublication(cacheRecord, fingerprint, publication) {
 }
 
 /**
+ * Reconcile orphaned publications — Phase 1A.5 recovery mechanism.
+ *
+ * An "orphan" is a publication in the engineering_publications map that no
+ * ProjectVersion pointer references. With the pointer-first write order in
+ * publishEngineering, new orphans are impossible. This function cleans up
+ * any pre-existing orphans (from the old publication-first write order) by
+ * removing publications that are not referenced by any known version pointer.
+ *
+ * This is a soft reconciliation: it only removes publications that are
+ * definitively orphaned (not referenced by the provided version pointer).
+ * It never removes the publication matching the current pointer.
+ *
+ * @param {Object} cacheRecord — the ProjectAnalysisCache record
+ * @param {string|null} currentPointerFingerprint — the version's published_fingerprint
+ * @returns {{ publications: Object, removed: string[] }} — cleaned map + removed keys
+ */
+export function reconcileOrphanedPublications(cacheRecord, currentPointerFingerprint) {
+  const pubs = cacheRecord?.engineering_publications;
+  if (!pubs || typeof pubs !== 'object') {
+    return { publications: {}, removed: [] };
+  }
+
+  const removed = [];
+  const cleaned = {};
+
+  for (const [key, entry] of Object.entries(pubs)) {
+    if (key === currentPointerFingerprint) {
+      // Always keep the publication the current pointer references.
+      cleaned[key] = entry;
+    } else {
+      // This publication is not referenced by the current pointer.
+      // It is an orphan — remove it.
+      removed.push(key);
+    }
+  }
+
+  return { publications: cleaned, removed };
+}
+
+/**
  * Clean a publication entry for API response.
  * Strips nothing — the full publication is returned for read.
  */

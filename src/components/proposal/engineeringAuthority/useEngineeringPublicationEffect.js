@@ -1,7 +1,7 @@
 /**
  * useEngineeringPublicationEffect.js
  * ---------------------------------
- * Phase 1A auto-publish effect.
+ * Phase 1A.5 auto-publish effect.
  *
  * Watches the Room Designer's settled design rating and publishes the
  * engineering summary to the database-backed Published Engineering Authority
@@ -13,6 +13,15 @@
  * handoff is the legacy compatibility mirror; the database publication is the
  * authoritative store.
  *
+ * Phase 1A.5 changes:
+ *   - Uses the FULL engineering fingerprint (not bass-only). The fingerprint
+ *     changes whenever any published engineering result could change —
+ *     room, seating, speakers, subwoofers, screen, RSP, RP22 assumptions,
+ *     engine/RP22/algorithm revisions.
+ *   - The bass fingerprint is preserved inside the publication provenance for
+ *     bass cache lookup, but the publication key is the full engineering
+ *     fingerprint.
+ *
  * Debounce: the publish is debounced by PUBLISH_DEBOUNCE_MS so intermediate
  * design states (while the user is still dragging, or bass is still settling)
  * do not hammer the backend. The publish fires once after the design settles.
@@ -20,15 +29,19 @@
  * Failures are logged but do not block the UI or the browser handoff.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { ENGINEERING_AUTHORITY_VERSION } from '@/components/proposal/engineeringAuthority';
 import { ENGINEERING_SNAPSHOT_VERSION } from '@/components/proposal/engineeringAuthority/buildEngineeringSnapshot';
+import { ENGINEERING_SUMMARY_SCHEMA_VERSION } from '@/components/engineering/engineeringSummaryAuthority';
 import {
   INSTANCE_AUTHORITY_VERSION,
   BASS_ANALYSIS_CONTRACT_VERSION,
   RP22_BASS_METRIC_SCHEMA_VERSION,
 } from '@/lib/bassAuthorityVersion';
+import {
+  computeEngineeringFingerprint,
+} from '@/components/proposal/engineeringAuthority/engineeringFingerprint';
 
 const PUBLISH_DEBOUNCE_MS = 2000;
 
@@ -39,19 +52,34 @@ const PUBLISH_DEBOUNCE_MS = 2000;
  * @param {Object|null} params.designRating  — the appDesignRating object
  * @param {boolean} params.isPublishable      — appDesignRating.isPublishable
  * @param {Object|null} params.engineeringSummary — appDesignRating.engineeringSummary
- * @param {string|null} params.fingerprint     — appDesignRating.bassReadiness.fingerprint
+ * @param {string|null} params.bassFingerprint  — appDesignRating.bassReadiness.fingerprint (bass-only, kept for provenance)
  * @param {boolean} params.ready               — hydration/load ready gate
+ * @param {Object}  params.designState         — curated design state for fingerprint computation
  */
 export function useEngineeringPublicationEffect({
   projectId,
   versionId,
   isPublishable,
   engineeringSummary,
-  fingerprint,
+  bassFingerprint,
   ready,
+  designState,
 }) {
   const lastPublishedFingerprintRef = useRef(null);
   const debounceTimerRef = useRef(null);
+
+  // Compute the full engineering fingerprint from the design state + versions.
+  // This is memoized so it only changes when the design state actually changes.
+  const engineeringFingerprint = useMemo(() => {
+    if (!designState) return null;
+    return computeEngineeringFingerprint(designState, {
+      engineVersion: ENGINEERING_AUTHORITY_VERSION,
+      rp22Version: String(RP22_BASS_METRIC_SCHEMA_VERSION),
+      algorithmVersion: String(BASS_ANALYSIS_CONTRACT_VERSION),
+      instanceAuthorityVersion: INSTANCE_AUTHORITY_VERSION,
+      summarySchemaVersion: ENGINEERING_SUMMARY_SCHEMA_VERSION,
+    });
+  }, [designState]);
 
   useEffect(() => {
     // Clear any pending debounce on input change
@@ -65,15 +93,15 @@ export function useEngineeringPublicationEffect({
       return;
     }
 
-    // Must have an engineering summary and fingerprint
-    if (!engineeringSummary || !fingerprint) {
+    // Must have an engineering summary and the full engineering fingerprint
+    if (!engineeringSummary || !engineeringFingerprint) {
       return;
     }
 
     // Idempotency: skip if we already published this exact fingerprint
     // in this session (the backend is also idempotent, but this avoids
     // redundant network calls).
-    if (lastPublishedFingerprintRef.current === fingerprint) {
+    if (lastPublishedFingerprintRef.current === engineeringFingerprint) {
       return;
     }
 
@@ -83,7 +111,7 @@ export function useEngineeringPublicationEffect({
           project_id: projectId,
           version_id: versionId,
           engineering_summary: engineeringSummary,
-          engineering_fingerprint: fingerprint,
+          engineering_fingerprint: engineeringFingerprint,
           engine_version: ENGINEERING_AUTHORITY_VERSION,
           rp22_version: String(RP22_BASS_METRIC_SCHEMA_VERSION),
           algorithm_version: String(BASS_ANALYSIS_CONTRACT_VERSION),
@@ -91,9 +119,11 @@ export function useEngineeringPublicationEffect({
           provenance: {
             snapshot_version: ENGINEERING_SNAPSHOT_VERSION,
             instance_authority_version: INSTANCE_AUTHORITY_VERSION,
+            summary_schema_version: ENGINEERING_SUMMARY_SCHEMA_VERSION,
+            bass_fingerprint: bassFingerprint || null,
           },
         });
-        lastPublishedFingerprintRef.current = fingerprint;
+        lastPublishedFingerprintRef.current = engineeringFingerprint;
       } catch (err) {
         // Database publish failure does not block the UI or the browser
         // handoff. Log for diagnostics; the next design change will retry.
@@ -107,5 +137,5 @@ export function useEngineeringPublicationEffect({
         debounceTimerRef.current = null;
       }
     };
-  }, [projectId, versionId, ready, isPublishable, engineeringSummary, fingerprint]);
+  }, [projectId, versionId, ready, isPublishable, engineeringSummary, engineeringFingerprint, bassFingerprint]);
 }

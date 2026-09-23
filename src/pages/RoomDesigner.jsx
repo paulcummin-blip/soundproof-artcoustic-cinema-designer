@@ -1941,15 +1941,76 @@ function RoomDesignerWithState() {
   // The browser handoff remains exactly as-is for legacy compatibility.
   // This effect publishes the settled engineering summary to the database
   // via the publishEngineering backend function (debounced, idempotent).
+  // Phase 1A.5: Full engineering fingerprint — the publication key represents
+  // the entire published engineering summary, not just bass. Built from the
+  // curated design state below (room, seating, speakers, subs, screen, RSP,
+  // RP22 assumptions, engine/RP22/algorithm revisions).
+  const engineeringPublicationDesignState = React.useMemo(() => {
+    if (!appState) return null;
+    return {
+      // Room geometry
+      roomDims: appState.roomDims,
+      roomOrientation: appState.roomOrientation,
+      screenWall: appState.screenWall,
+      // Seating
+      seatingPositions: appState.seatingPositions,
+      rowSpacingM: appState.rowSpacingM,
+      seatsPerRowByRow: appState.seatsPerRowByRow,
+      seatingBlockOffset: appState.seatingBlockOffset,
+      mlpBasis: appState.mlpBasis,
+      linkEarPlatformHeights: appState.linkEarPlatformHeights,
+      // Speakers
+      selectedSpeakersByRole: appState.selectedSpeakersByRole,
+      globalSurroundModel: appState.globalSurroundModel,
+      sevenBedLayoutType: appState.sevenBedLayoutType,
+      enableFrontWides: appState.enableFrontWides,
+      extraSurroundCount: appState.extraSurroundCount,
+      // Overheads
+      overheadGlobalModel: appState.overheadGlobalModel,
+      overheadFrontOverride: appState.overheadFrontOverride,
+      overheadMidOverride: appState.overheadMidOverride,
+      overheadRearOverride: appState.overheadRearOverride,
+      useFrontGlobal: appState.useFrontGlobal,
+      useMidGlobal: appState.useMidGlobal,
+      useRearGlobal: appState.useRearGlobal,
+      // Subwoofers
+      subwooferInstances: appState.subwooferInstances,
+      // Screen
+      screen: appState.screen,
+      screenFrontPlaneM: appState.screenFrontPlaneM,
+      lcrAimMode: appState.lcrAimMode,
+      // RSP
+      rspMode: appState.rspMode,
+      manualRspX_m: appState.manualRspX_m,
+      manualRspY_m: appState.manualRspY_m,
+      designatedRspSeatId: appState.designatedRspSeatId,
+      // SPL config
+      splConfig: appState.splConfig,
+      targetSpl: appState.targetSpl,
+      // RP22 assumptions
+      assumedP15Level: appState.assumedP15Level,
+      assumedP21Level: appState.assumedP21Level,
+      p15ConstructionLevel: appState.p15ConstructionLevel,
+      // Acoustic treatment
+      acousticTreatmentEnabled: appState.acousticTreatmentEnabled,
+      selectedAbfuserQty: appState.selectedAbfuserQty,
+      // Aiming
+      aimFrontWidesAtMLP: appState.aimFrontWidesAtMLP,
+      aimRearSurroundsAtMLP: appState.aimRearSurroundsAtMLP,
+      aimSideSurroundsAtMLP: appState.aimSideSurroundsAtMLP,
+    };
+  }, [appState]);
+
   useEngineeringPublicationEffect({
     projectId: resolvedProjectId || projectIdState || null,
     versionId: appState?.activeVersionId || null,
     isPublishable: appDesignRating?.isPublishable === true,
     engineeringSummary: appDesignRating?.engineeringSummary ?? null,
-    fingerprint: appDesignRating?.bassReadiness?.fingerprint || null,
+    bassFingerprint: appDesignRating?.bassReadiness?.fingerprint || null,
     ready: loadState?.phase === "loaded"
       && appState?.isProjectHydrationReady === true
       && minimumSystemMet,
+    designState: engineeringPublicationDesignState,
   });
 
   // Publish the current live seat-priority fingerprint so the sidebar can
