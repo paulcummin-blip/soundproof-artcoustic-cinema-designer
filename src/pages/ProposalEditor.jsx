@@ -7,9 +7,10 @@ import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
 import ProposalSectionNav from '@/components/proposal/ProposalSectionNav';
-import { Loader2, FileText, Download, ChevronLeft } from 'lucide-react';
+import { isArchived, getRestoreStatus } from '@/components/proposal/proposalLifecycle';
+import { Loader2, FileText, Download, ChevronLeft, Archive, RotateCcw } from 'lucide-react';
 
-const SAVE_STATUS = { IDLE: 'idle', SAVING: 'saving', SAVED: 'saved' };
+const SAVE_STATUS = { IDLE: 'idle', SAVING: 'saving', SAVED: 'saved', FAILED: 'failed', UNSAVED: 'unsaved' };
 
 /**
  * Proposal Editor — the publishing tool.
@@ -28,11 +29,13 @@ export default function ProposalEditor() {
   const [loading, setLoading] = useState(true);
   const [showNotes, setShowNotes] = useState(false);
   const [saveStatuses, setSaveStatuses] = useState({});
+  const [dirtySections, setDirtySections] = useState(new Set());
   const [regenerating, setRegenerating] = useState(null);
   const [showProperties, setShowProperties] = useState(false);
   const [clientBrief, setClientBrief] = useState('');
   const [showClientBrief, setShowClientBrief] = useState(false);
   const [savingBrief, setSavingBrief] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   // ── Load proposal + sections by ID ──
   const load = useCallback(async () => {
@@ -69,26 +72,113 @@ export default function ProposalEditor() {
   }, [load]);
 
   // ── Auto-save section body ──
+  // Tracks dirty sections, flushes pending saves on unmount, and transitions
+  // Generated → Edited after the first successful manual section save.
   const saveTimers = useRef({});
+  const pendingSavesRef = useRef({}); // sectionId -> { html, promise }
+  const proposalRef = useRef(proposal);
+  proposalRef.current = proposal;
+
+  const transitionToEdited = useCallback(async () => {
+    const current = proposalRef.current;
+    if (!current) return;
+    const rawStatus = current.status;
+    // Only transition from 'generated' (or legacy 'reviewed' normalised to 'edited')
+    if (rawStatus !== 'generated') return;
+    try {
+      const response = await base44.functions.invoke('transitionProposalStatus', {
+        proposal_id: current.id,
+        target_status: 'edited',
+      });
+      if (response?.data?.error) {
+        console.error('[ProposalEditor] Generated→Edited transition rejected:', response.data.error);
+        return;
+      }
+      setProposal((prev) => prev ? { ...prev, status: 'edited' } : prev);
+    } catch (err) {
+      console.error('[ProposalEditor] Generated→Edited transition failed:', err);
+    }
+  }, []);
+
+  const flushSave = useCallback(async (sectionId) => {
+    const timer = saveTimers.current[sectionId];
+    if (timer) {
+      clearTimeout(timer);
+      delete saveTimers.current[sectionId];
+    }
+    const pending = pendingSavesRef.current[sectionId];
+    if (!pending) return;
+    delete pendingSavesRef.current[sectionId];
+    try {
+      await pending.promise;
+    } catch (e) {
+      // Error already handled in the save function; swallow here.
+    }
+  }, []);
+
   const handleBodySave = useCallback((sectionId, html) => {
+    // Mark dirty immediately — the edit is not yet persisted.
+    setDirtySections((prev) => new Set(prev).add(sectionId));
     setSaveStatuses((prev) => ({ ...prev, [sectionId]: SAVE_STATUS.SAVING }));
     if (saveTimers.current[sectionId]) clearTimeout(saveTimers.current[sectionId]);
-    saveTimers.current[sectionId] = setTimeout(async () => {
+
+    const savePromise = (async () => {
       try {
         await base44.entities.ProposalSection.update(sectionId, {
           body: html,
           last_user_edited_at: new Date().toISOString(),
         });
         setSaveStatuses((prev) => ({ ...prev, [sectionId]: SAVE_STATUS.SAVED }));
+        setDirtySections((prev) => {
+          const next = new Set(prev);
+          next.delete(sectionId);
+          return next;
+        });
         setTimeout(() => {
-          setSaveStatuses((prev) => ({ ...prev, [sectionId]: SAVE_STATUS.IDLE }));
+          setSaveStatuses((prev) => {
+            const current = prev[sectionId];
+            if (current === SAVE_STATUS.SAVED) {
+              const next = { ...prev };
+              delete next[sectionId];
+              return next;
+            }
+            return prev;
+          });
         }, 2000);
+        // Transition Generated → Edited after the first successful save.
+        await transitionToEdited();
       } catch (err) {
         console.error('Save failed:', err);
-        setSaveStatuses((prev) => ({ ...prev, [sectionId]: SAVE_STATUS.IDLE }));
+        setSaveStatuses((prev) => ({ ...prev, [sectionId]: SAVE_STATUS.FAILED }));
+        // Keep the section marked dirty — the edit was not persisted.
       }
+    })();
+
+    pendingSavesRef.current[sectionId] = { html, promise: savePromise };
+    saveTimers.current[sectionId] = setTimeout(() => {
+      // The savePromise is already running — just clear the timer ref.
+      delete saveTimers.current[sectionId];
     }, 500);
-  }, []);
+  }, [transitionToEdited]);
+
+  // Flush all pending saves on unmount and warn before navigating away with unsaved changes.
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      const hasPending = Object.keys(pendingSavesRef.current).length > 0 || dirtySections.size > 0;
+      if (hasPending) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Flush all pending saves synchronously (fire-and-forget).
+      Object.keys(pendingSavesRef.current).forEach((sid) => flushSave(sid));
+      Object.values(saveTimers.current).forEach((t) => clearTimeout(t));
+      saveTimers.current = {};
+    };
+  }, [dirtySections, flushSave]);
 
   // ── Section handlers ──
   const activeSection = sections.find((s) => s.section_key === activeSectionKey);
@@ -137,6 +227,31 @@ export default function ProposalEditor() {
     } catch (err) {
       console.error('Failed to save client brief:', err);
       setSavingBrief(false);
+    }
+  };
+
+  // ── Archived read-only + restore ──
+  const archived = isArchived(proposal?.status);
+
+  const handleRestore = async () => {
+    if (!proposal) return;
+    setRestoring(true);
+    try {
+      const restoreStatus = getRestoreStatus(proposal.status, proposal.previous_status, true);
+      const response = await base44.functions.invoke('transitionProposalStatus', {
+        proposal_id: proposal.id,
+        target_status: restoreStatus || 'edited',
+      });
+      if (response?.data?.error) {
+        alert(response.data.error);
+      } else {
+        setProposal((prev) => prev ? { ...prev, status: response.data.status, previous_status: null } : prev);
+      }
+    } catch (err) {
+      console.error('Restore failed:', err);
+      alert('Failed to restore proposal. Please try again.');
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -198,6 +313,7 @@ export default function ProposalEditor() {
 
   const visibleSections = sections.filter((s) => s.is_enabled !== false);
   const typeLabel = getProposalType(proposal?.proposal_type)?.label || 'Single Design Proposal';
+  const hasUnsavedChanges = dirtySections.size > 0;
 
   return (
     <div className="flex h-screen bg-[#F5F4F0] overflow-hidden">
@@ -242,6 +358,32 @@ export default function ProposalEditor() {
       {/* ── Centre: The document ── */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-12 py-16">
+          {archived && (
+            <div className="mb-8 rounded-lg border border-[#A79E8C] bg-[#F5F4F0] px-6 py-4 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold text-[#625143]" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+                  <Archive className="w-4 h-4" />
+                  Archived proposal — restore to edit.
+                </div>
+                <p className="text-xs text-[#8A8477] mt-1">This proposal is read-only. Restore it to make changes.</p>
+              </div>
+              <button
+                onClick={handleRestore}
+                disabled={restoring}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
+                style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                {restoring ? 'Restoring…' : 'Restore'}
+              </button>
+            </div>
+          )}
+          {hasUnsavedChanges && !archived && (
+            <div className="mb-4 text-xs text-amber-700 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              Unsaved changes — {dirtySections.size} {dirtySections.size === 1 ? 'section' : 'sections'} pending. Do not close this tab until saved.
+            </div>
+          )}
           {visibleSections.map((section) => {
             const def = getSectionDef(section.section_type);
             if (!def) return null;
@@ -262,7 +404,7 @@ export default function ProposalEditor() {
                   </h2>
                 )}
 
-                {isActive && def.canEditBody && (
+                {isActive && def.canEditBody && !archived && (
                   <div className="mb-3">
                     <SectionToolbar
                       section={section}
@@ -274,7 +416,7 @@ export default function ProposalEditor() {
                   </div>
                 )}
 
-                {isActive && showNotes && def.canEditBody && (
+                {isActive && showNotes && def.canEditBody && !archived && (
                   <div className="mb-4">
                     <DealerNotesPanel
                       section={section}
@@ -288,7 +430,7 @@ export default function ProposalEditor() {
                   <InlineRichTextEditor
                     html={section.body}
                     onSave={(html) => handleBodySave(section.id, html)}
-                    editable={isActive}
+                    editable={isActive && !archived}
                     saveStatus={saveStatuses[section.id] || SAVE_STATUS.IDLE}
                   />
                 ) : (

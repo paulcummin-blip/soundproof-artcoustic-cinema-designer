@@ -16,13 +16,15 @@ import { Loader2 } from 'lucide-react';
  * - html: string (initial HTML content)
  * - onSave: (html) => Promise<void>
  * - editable: boolean (default true)
- * - saveStatus: 'idle' | 'saving' | 'saved'
+ * - saveStatus: 'idle' | 'saving' | 'saved' | 'failed' | 'unsaved'
  */
 export default function InlineRichTextEditor({ html, onSave, editable = true, saveStatus = 'idle' }) {
   const editorRef = useRef(null);
   const [showToolbar, setShowToolbar] = useState(false);
   const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0 });
   const lastSavedHtml = useRef(html);
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
 
   // Set initial content
   React.useEffect(() => {
@@ -38,12 +40,27 @@ export default function InlineRichTextEditor({ html, onSave, editable = true, sa
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       const currentHtml = editorRef.current?.innerHTML || '';
-      if (currentHtml !== lastSavedHtml.current && onSave) {
+      if (currentHtml !== lastSavedHtml.current && onSaveRef.current) {
         lastSavedHtml.current = currentHtml;
-        onSave(currentHtml);
+        onSaveRef.current(currentHtml);
       }
     }, 1500);
-  }, [onSave]);
+  }, []);
+
+  // Flush pending debounce on unmount so edits are not lost on navigation.
+  React.useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+        debounceTimer.current = null;
+        const currentHtml = editorRef.current?.innerHTML || '';
+        if (currentHtml !== lastSavedHtml.current && onSaveRef.current) {
+          lastSavedHtml.current = currentHtml;
+          onSaveRef.current(currentHtml);
+        }
+      }
+    };
+  }, []);
 
   const handleInput = () => {
     triggerSave();
@@ -138,10 +155,16 @@ export default function InlineRichTextEditor({ html, onSave, editable = true, sa
       <div className="flex items-center gap-1 mt-1 text-xs text-[#625143] h-4">
         {saveStatus === 'saving' && (
           <>
-            <Loader2 className="w-3 h-3 animate-spin" /> Saving...
+            <Loader2 className="w-3 h-3 animate-spin" /> Saving…
           </>
         )}
         {saveStatus === 'saved' && <span className="text-green-700">✓ Saved</span>}
+        {saveStatus === 'failed' && (
+          <span className="text-red-600">⚠ Save failed — your edit was not saved. Try editing again.</span>
+        )}
+        {saveStatus === 'unsaved' && (
+          <span className="text-amber-700">● Unsaved changes</span>
+        )}
       </div>
     </div>
   );

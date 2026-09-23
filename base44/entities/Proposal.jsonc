@@ -54,6 +54,21 @@
       "default": "draft",
       "description": "Proposal lifecycle status. Content-generation states: draft = created but not yet generated. generating = AI generation in progress. generated = initial AI output complete. Business lifecycle states: edited = manually reviewed or modified by the designer. reviewed = legacy equivalent of edited (retained for backward compatibility). issued = client-facing proposal sent or published. sent = legacy equivalent of issued (retained for backward compatibility). accepted = client accepted the proposal. archived = completed or closed. Full lifecycle: Draft \u2192 Generating \u2192 Generated \u2192 Edited \u2192 Issued \u2192 Accepted \u2192 Archived."
     },
+    "previous_status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "generating",
+        "generated",
+        "edited",
+        "reviewed",
+        "issued",
+        "accepted",
+        "sent"
+      ],
+      "description": "The lifecycle status before this proposal was archived. Set by the server-authoritative transition function when archiving. Used to restore the proposal to its previous status on unarchive. Null = never archived or already restored.",
+      "nullable": true
+    },
     "narrative_goal": {
       "type": "string",
       "enum": [
