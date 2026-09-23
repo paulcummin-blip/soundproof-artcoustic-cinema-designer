@@ -127,13 +127,15 @@ export default function BrandIntroOverlay() {
   }, [accountId, isLoadingAuth]);
 
   useEffect(() => {
-    if (!brandReady || hasPlayed()) return undefined;
+    if (!brandReady) return undefined;
 
     try {
       if (new URLSearchParams(window.location.search).get("resetIntro") !== null) {
         try { sessionStorage.removeItem(STORAGE_KEY); } catch (_) {}
       }
     } catch (_) {}
+
+    if (hasPlayed()) return undefined;
 
     let frame = 0;
     let attempts = 0;
