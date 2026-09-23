@@ -740,7 +740,7 @@ export default function ProjectsPage() {
   return (
     <div
       style={{
-        padding: 24,
+        padding: "36px 24px 24px",
         background: BRAND.bg,
         minHeight: "100vh",
         color: BRAND.text,
