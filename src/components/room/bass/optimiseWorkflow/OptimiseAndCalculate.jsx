@@ -51,6 +51,7 @@ import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import BassOptimisationSummary from "./BassOptimisationSummary";
 import FurtherImprovements from "./FurtherImprovements";
 import ImproveBassResponseV2 from "../improveBassV2/ImproveBassResponseV2";
+import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY } from "../bassCalculationLifecycle";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -110,6 +111,12 @@ export default function OptimiseAndCalculate({
     || shared?.canCalculate !== true;
 
   const isBusy = ["calculating", "optimising", "applying", "recalculating", "publishing"].includes(workflowState.status);
+  // Unified calculation state: a real calculation may be in progress even
+  // when the workflow store is idle (background auto-calculate). Cancel must
+  // be visible whenever a real active job exists.
+  const isCalculating = isBusy || shared?.calculationInProgress === true;
+  const bassLifecycleState = shared?.bassLifecycleState || BASS_LIFECYCLE_STATE.IDLE;
+  const isTimedOut = bassLifecycleState === BASS_LIFECYCLE_STATE.TIMED_OUT && !isCalculating;
   const { engineeringMode } = useEngineeringMode();
 
   // ── Main orchestration: triggered by the OPTIMISE & CALCULATE button ──
@@ -270,6 +277,10 @@ export default function OptimiseAndCalculate({
     phaseRef.current = "cancelled";
     requestCancel(projectId, versionId);
     cancelBassHeavyAction(projectId, versionId, "Optimise & Calculate cancelled");
+    // Also cancel the background controller's active worker
+    if (typeof sharedRef.current?.onCancel === "function") {
+      sharedRef.current.onCancel();
+    }
     setCancelled(projectId, versionId);
     runningRef.current = false;
   }, [projectId, versionId]);
@@ -277,6 +288,9 @@ export default function OptimiseAndCalculate({
   const handleReset = useCallback(() => {
     resetWorkflow(projectId, versionId);
     resetImproveBassV2(projectId, versionId);
+    if (typeof sharedRef.current?.onClearTerminal === "function") {
+      sharedRef.current.onClearTerminal();
+    }
   }, [projectId, versionId]);
 
   // A physical Apply commits room state first. Wait until React has produced
@@ -363,7 +377,7 @@ export default function OptimiseAndCalculate({
   return (
     <div className="mt-3 rounded-lg border border-[#D9D5CE] bg-white px-4 py-4">
       {/* ── Main button ── */}
-      {!isBusy && !isComplete && !isError && !isCancelledState && (
+      {!isCalculating && !isComplete && !isError && !isCancelledState && !isTimedOut && (
         <>
           <button
             type="button"
@@ -384,16 +398,15 @@ export default function OptimiseAndCalculate({
       )}
 
       {/* ── Simplified progress display ── */}
-      {isBusy && (
+      {isCalculating && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin text-[#213428]" />
             <span className="text-[13px] font-semibold text-[#1B1A1A]">
-              {status === "calculating" && "Calculating bass performance…"}
-              {status === "optimising" && "Optimising bass calibration…"}
-              {status === "applying" && "Applying improvements…"}
-              {status === "recalculating" && "Calculating final RP22…"}
-              {status === "publishing" && "Publishing results…"}
+              {shared?.calculationPhaseLabel
+                || (status === "applying" && "Applying improvements\u2026")
+                || (status === "publishing" && "Publishing results\u2026")
+                || BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.PREPARING]}
             </span>
           </div>
 
@@ -518,6 +531,25 @@ export default function OptimiseAndCalculate({
           <button type="button" onClick={handleReset} className="mt-2 text-[11px] text-amber-700 underline underline-offset-2">
             Retry
           </button>
+        </div>
+      )}
+
+      {/* ── Timed out state ── */}
+      {isTimedOut && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-700" />
+            <span className="text-[12px] font-semibold text-amber-800">Calculation timed out</span>
+          </div>
+          <p className="mt-1 text-[10px] leading-relaxed text-amber-700">{BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.TIMED_OUT]}</p>
+          <div className="mt-2 flex gap-3">
+            <button type="button" onClick={handleReset} className="text-[11px] font-semibold text-amber-700 underline underline-offset-2">
+              Retry
+            </button>
+            <button type="button" onClick={handleReset} className="text-[11px] text-amber-700 underline underline-offset-2">
+              Clear
+            </button>
+          </div>
         </div>
       )}
 

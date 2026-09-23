@@ -7,7 +7,8 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityStale, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, publishCachedLimitedBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract, bassContractMatchesRequestedP14 } from "./completedBassResultStore";
+import { BASS_AUTHORITY_STATUS, markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityStale, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, publishCachedLimitedBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract, bassContractMatchesRequestedP14 } from "./completedBassResultStore";
+import { resolveBassLifecycleState, BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, BASS_COLD_RELOAD_RECOVERY_COPY } from "./bassCalculationLifecycle";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
 import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
@@ -58,6 +59,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // or rejected — so the UI can show an explicit status instead of silently
   // returning to idle.
   const [lastTerminalOutcome, setLastTerminalOutcome] = useState(null);
+  // Cold-reload recovery: set when a persisted UPDATING authority is found
+  // with no active job after reload. Cleared when a new calculation starts.
+  const [coldReloadRecovered, setColdReloadRecovered] = useState(false);
   const manualRequestSequenceRef = useRef(0);
   const dispatchedManualRequestRef = useRef(null);
 
@@ -411,6 +415,22 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       }
     }
 
+    // Cold-reload recovery: if the persisted authority is UPDATING but no
+    // active job exists (the worker from the previous session is gone), mark
+    // as stale_needs_recalculation — not endless "Calculating…".
+    if (
+      bassAuthorityHydrationSettled
+      && !manualAnalysisRequest
+      && completedBassAuthority?.authorityStatus === BASS_AUTHORITY_STATUS.UPDATING
+    ) {
+      setColdReloadRecovered(true);
+      if (completedBassAuthority.contract || completedBassAuthority.staleContract) {
+        markBassAuthorityStale(scopeId, versionId, cacheKey);
+      } else {
+        markBassAuthorityBlocked(scopeId, versionId);
+      }
+    }
+
     if (manualAnalysisRequest && !manualRequestMatchesCurrent) {
       dispatchedManualRequestRef.current = null;
       // FIX 3: Design changed during calculation — terminal "cancelled" state.
@@ -475,6 +495,49 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       }
     };
   }, [manualAnalysisRequest?.id, manualAnalysisRequest?.fingerprint, scopeId]);
+
+  // Worker-phase watchdog: covers the optimiser worker phase from dispatch
+  // to completion. Bounded at 120 seconds — generous for real calculations,
+  // but finite. When it fires: terminate the worker, mark timed_out (not
+  // error), clear calculating state, and surface a plain-language message.
+  // This ensures the primary action never remains disabled indefinitely.
+  const WORKER_WATCHDOG_MS = 120000;
+  const workerWatchdogRef = useRef(null);
+
+  useEffect(() => {
+    if (!manualAnalysisRequest || !manualRequestMatchesCurrent) {
+      if (workerWatchdogRef.current) {
+        clearTimeout(workerWatchdogRef.current);
+        workerWatchdogRef.current = null;
+      }
+      return;
+    }
+    // Only start the worker watchdog once the request is dispatched to the
+    // optimiser. Before dispatch, the preparation watchdog covers the phase.
+    if (dispatchedManualRequestRef.current !== manualAnalysisRequest.id) return;
+    if (workerWatchdogRef.current) return; // Already armed for this request
+
+    const requestId = manualAnalysisRequest.id;
+    const requestFingerprint = manualAnalysisRequest.fingerprint;
+    workerWatchdogRef.current = setTimeout(() => {
+      // Guard: only fire if this exact request is still active and dispatched.
+      if (!manualAnalysisRequest || manualAnalysisRequest.id !== requestId || manualAnalysisRequest.fingerprint !== requestFingerprint) return;
+      if (dispatchedManualRequestRef.current !== requestId) return;
+      const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV === true;
+      if (isDev) console.log("[bass-worker-watchdog]", "TIMEOUT", { requestId, requestFingerprint });
+      controller.cancelActive("timed_out");
+      dispatchedManualRequestRef.current = null;
+      markBassAuthorityFailed(scopeId, versionId, requestFingerprint, "Bass calculation timed out \u2014 please retry.");
+      setLastTerminalOutcome({ outcome: "timeout", fingerprint: requestFingerprint });
+      setManualAnalysisRequest(null);
+    }, WORKER_WATCHDOG_MS);
+    return () => {
+      if (workerWatchdogRef.current) {
+        clearTimeout(workerWatchdogRef.current);
+        workerWatchdogRef.current = null;
+      }
+    };
+  }, [manualAnalysisRequest?.id, manualAnalysisRequest?.fingerprint, manualRequestMatchesCurrent, controller, scopeId, versionId]);
 
   // Once the authoritative raw response preparation has completed for the exact
   // submitted fingerprint, dispatch exactly one existing full optimiser run.
@@ -933,6 +996,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const onCalculate = useCallback(
     ({ collectDiagnostics = false } = {}) => {
       if (!canCalculate) return { action: "blocked" };
+      setColdReloadRecovered(false);
       const diagnosticToken = collectDiagnostics ? createDiagToken("manual-authoritative") : null;
       if (diagnosticToken) recordDiagStage(diagnosticToken, "token-created", { origin: "manual-authoritative", collectDiagnostics: true });
 
@@ -972,6 +1036,22 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     [controller, scopeId, canCalculate, cacheKey, calibrationFingerprint]
   );
   const onRetry = onCalculate;
+  // Cancel handler: visible whenever a real active job exists. Terminates
+  // the background controller's worker, clears the manual request, and sets
+  // the terminal outcome to "cancelled". Does NOT mutate the design.
+  const onCancel = useCallback(() => {
+    if (!manualAnalysisRequest) return;
+    controller.cancelActive("cancelled");
+    dispatchedManualRequestRef.current = null;
+    setLastTerminalOutcome({ outcome: "cancelled", fingerprint: manualAnalysisRequest.fingerprint });
+    setManualAnalysisRequest(null);
+  }, [controller, manualAnalysisRequest, scopeId, versionId, cacheKey]);
+  // Clear terminal: clears the last terminal outcome and cold-reload flag so
+  // the UI returns to a clean idle/complete state. Used by Retry/Clear buttons.
+  const onClearTerminal = useCallback(() => {
+    setLastTerminalOutcome(null);
+    setColdReloadRecovered(false);
+  }, []);
   // ── P14 target background scheduler ──────────────────────────────────
   // After the foreground result is complete (cached or fresh), quietly
   // precompute remaining P14 targets one at a time. The scheduler's schedule()
@@ -1266,11 +1346,11 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         ? "optimising" // Optimiser worker in flight
         : "finalising"; // Publication / fingerprint validation
   const calculationPhaseLabel = calculationPhase === "preparing"
-    ? "Preparing bass response…"
+    ? BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.PREPARING]
     : calculationPhase === "optimising"
-      ? "Optimising bass performance…"
+      ? BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.SEARCHING]
       : calculationPhase === "finalising"
-        ? "Finalising results…"
+        ? BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.VALIDATING]
         : null;
 
   // PASS 1: When calculation is no longer in progress, mark the timing trace
@@ -1340,16 +1420,25 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
             : completedBassAuthority?.authorityStatus === "ERROR" ? "error"
             : completedBassAuthority?.authorityStatus === "NOT_VERIFIED" ? "rejected"
             : "idle")));
-  const terminalMessage = calculationOutcome === "error"
-    ? (lastTerminalOutcome?.message || "Bass calculation could not be completed. Please try again.")
-    : calculationOutcome === "timeout"
-      ? "Bass calculation timed out before completion."
-      : calculationOutcome === "cancelled"
-        ? "Design changed during calculation. Recalculate to analyse the current layout."
-        : calculationOutcome === "stale"
-          ? "Needs recalculation"
-          : calculationOutcome === "rejected"
-            ? "Bass calculation could not be verified. Please try again."
+  // Unified lifecycle state — the single lifecycle consumed by all visible
+  // Bass surfaces. Maps the existing split-state model into one canonical
+  // state with plain-language copy.
+  const bassLifecycleState = resolveBassLifecycleState({
+    calculationInProgress,
+    calculationPhase,
+    calculationOutcome,
+    authorityStatus: completedBassAuthority?.authorityStatus,
+  });
+  const terminalMessage = coldReloadRecovered && !calculationInProgress
+    ? BASS_COLD_RELOAD_RECOVERY_COPY
+    : bassLifecycleState === BASS_LIFECYCLE_STATE.TIMED_OUT
+      ? BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.TIMED_OUT]
+      : bassLifecycleState === BASS_LIFECYCLE_STATE.FAILED
+        ? (lastTerminalOutcome?.message || BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.FAILED])
+        : bassLifecycleState === BASS_LIFECYCLE_STATE.CANCELLED
+          ? BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.CANCELLED]
+          : bassLifecycleState === BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION
+            ? BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION]
             : null;
 
   // Single P19 seat authority instance for every Room Designer consumer.
@@ -1363,6 +1452,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     });
   }, [completedBassAuthority?.contract?.bassResult?.seatResults?.P19, seatingPositions]);
 
-  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress });
+  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
