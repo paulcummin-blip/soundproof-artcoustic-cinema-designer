@@ -2,6 +2,14 @@
 // ---------------------------------------------------------------------------
 // Zero-fail-first optimisation policy for Improve Bass Response V2.
 //
+// Stage 1: engineering-first comparator — raw metrics compared before
+// RP22 level equivalents within zeroFailTuple. See engineeringRankingConstants.
+
+import { COMPARISON_TOLERANCE } from "./engineeringRankingConstants.js";
+
+// ---------------------------------------------------------------------------
+// Zero-fail-first optimisation policy for Improve Bass Response V2.
+//
 // Philosophy:
 //   1. FIRST: minimise the number of failing seats (P19 OR P20 FAIL).
 //   2. THEN: maximise the primary-seat floor (worst-first lexicographic).
@@ -120,18 +128,23 @@ function rowVariation(result, isPrimary) {
 export function zeroFailTuple(result) {
   return [
     countFailingSeats(result),
-    ...floorVector(result, true),
+    // Primary: raw engineering metrics before RP22 levels
     ...rawMarginVector(result, true),
     rowVariation(result, true),
-    ...floorVector(result, false),
+    ...floorVector(result, true),
+    // Secondary: raw engineering metrics before RP22 levels
     ...rawMarginVector(result, false),
     rowVariation(result, false),
+    ...floorVector(result, false),
+    // Overall raw metrics
     Number(result?.achievedP19VariationDb) || 0,
     Number(result?.achievedP20VariationDb) || 0,
-    -numericLevel(result?.p18AchievedLevel),
+    // P18: raw extension before RP22 level
     Number(result?.achievedP18Hz) || 0,
-    -numericLevel(result?.p14AchievedLevel),
+    -numericLevel(result?.p18AchievedLevel),
+    // P14: raw SPL before RP22 level
     -Number(result?.p14AchievedDb) || 0,
+    -numericLevel(result?.p14AchievedLevel),
   ];
 }
 
@@ -144,7 +157,7 @@ export function compareZeroFailFirst(a, b) {
   const len = Math.max(left.length, right.length);
   for (let i = 0; i < len; i++) {
     const lv = left[i] ?? 0, rv = right[i] ?? 0;
-    if (Math.abs(lv - rv) > 1e-8) return lv - rv;
+    if (Math.abs(lv - rv) > COMPARISON_TOLERANCE) return lv - rv;
   }
   return 0;
 }
