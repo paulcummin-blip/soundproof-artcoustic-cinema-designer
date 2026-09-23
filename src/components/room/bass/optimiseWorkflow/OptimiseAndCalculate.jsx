@@ -41,11 +41,9 @@ import {
 import {
   runOptimisation,
   buildAutoApplySummary,
-  autoApplyCalibration,
   hasCalibrationImprovement,
   hasPhysicalRecommendations,
 } from "./optimiseWorkflowOrchestrator";
-import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Fingerprint";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import BassOptimisationSummary from "./BassOptimisationSummary";
@@ -54,14 +52,44 @@ import ImproveBassResponseV2 from "../improveBassV2/ImproveBassResponseV2";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY } from "../bassCalculationLifecycle";
 import {
   computeAppliedCalibrationBasisFingerprint,
-  extractAppliedCalibrationValues,
 } from "../appliedCalibrationAuthority/appliedCalibrationAuthority.js";
 import {
-  markAppliedCalibrationOptimiserGenerated,
+  getAppliedCalibrationAuthority,
 } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
+import {
+  createRecommendation,
+  RECOMMENDATION_INTENT,
+} from "../recommendationAuthority/recommendationAuthority.js";
+import {
+  setRecommendation,
+} from "../recommendationAuthority/recommendationAuthorityStore.js";
+import {
+  acceptRecommendation,
+} from "../recommendationAuthority/acceptTransition.js";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ── Helper: apply recommendation values to subwoofer instances ──
+// Mirrors BassDecisionActions.applyRecommendationToInstances — the single
+// canonical way to commit accepted calibration values to instances after
+// an Accept Transition. No provenance stamping (the Accept Transition
+// owns the authority write; this helper only updates the instances).
+function applyRecommendationToInstances(instances, values) {
+  if (!Array.isArray(instances) || !Array.isArray(values)) return instances;
+  const byId = new Map(values.map((v) => [String(v.id), v]));
+  return instances.map((inst) => {
+    const v = byId.get(String(inst.id));
+    if (!v) return inst;
+    return {
+      ...inst,
+      delayMs: Number(v.delayMs) || 0,
+      gainDb: Number(v.gainDb) || 0,
+      polarity: Number(v.polarity) || 1,
+      phaseControlDeg: Number(v.phaseControlDeg) || 0,
+    };
+  });
+}
 
 export default function OptimiseAndCalculate({
   roomDims,
@@ -178,7 +206,15 @@ export default function OptimiseAndCalculate({
         return;
       }
 
-      // Phase 3: Auto-apply calibration improvements
+      // Phase 3: Route through the Recommendation Authority
+      // The optimiser's calibration tuning is now a RECOMMENDATION, not an
+      // auto-apply. The Recommendation Authority owns the proposal; the
+      // Accept Transition owns the mutation.
+      //
+      // First run (no Applied Calibration): auto-accept to preserve the
+      //   one-click behaviour — there is no existing design to protect.
+      // Existing calibration: STOP — the recommendation is set, and
+      //   BassDecisionActions renders the Accept/Continue decision.
       phaseRef.current = "applying";
       setApplying(projectId, versionId);
 
@@ -188,31 +224,15 @@ export default function OptimiseAndCalculate({
       const hasCal = hasCalibrationImprovement(stageResults);
       const hasPhysical = hasPhysicalRecommendations(autoApplySummary);
 
-      let appliedTuning = false;
-      if (hasCal && autoApplySummary.tuning && commitInstances) {
+      if (hasCal && autoApplySummary.tuning) {
         const rspPosition = buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m, appState?.designatedRspSeatId);
         const selectedSubModel = frontSubsCfg?.model || rearSubsCfg?.model || null;
         const requested = shared?.authoritative?.requested || {};
-        const fingerprint = (() => {
-          try {
-            return computeV2DesignFingerprint({
-              subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel,
-              p14TargetBasis: requested.p14TargetBasis || "minimum",
-              p14TargetLevel: requested.requestedLevel || 2,
-              p14TargetDb: requested.selectedP14TargetDb || 117,
-              p18TargetBasis: requested.p18TargetBasis || "minimum",
-              amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
-            });
-          } catch { return null; }
-        })();
 
-        const next = autoApplyCalibration(subwooferInstances, autoApplySummary.tuning, commitInstances, fingerprint);
-        appliedTuning = !!next;
-        // Stamp the Applied Calibration Authority — calibration is part of the design.
-        if (next) {
+        const basisFp = (() => {
           try {
-            const basisFp = computeAppliedCalibrationBasisFingerprint({
-              subwooferInstances: next,
+            return computeAppliedCalibrationBasisFingerprint({
+              subwooferInstances: subInstancesRef.current,
               roomDims,
               seatingPositions,
               rspPosition,
@@ -222,14 +242,66 @@ export default function OptimiseAndCalculate({
               p14TargetDb: requested.selectedP14TargetDb || 117,
               p18TargetBasis: requested.p18TargetBasis || "minimum",
             });
-            markAppliedCalibrationOptimiserGenerated(projectId, versionId, {
-              basisFingerprint: basisFp,
-              candidateId: "auto-optimise",
-              values: extractAppliedCalibrationValues(next),
-              stageKey: "calibration",
-            });
-          } catch {
-            // Non-fatal: stamp failure must not block the workflow
+          } catch { return null; }
+        })();
+
+        if (basisFp) {
+          // 1. Build recommendationValues from the optimiser tuning
+          const recommendationValues = autoApplySummary.tuning.map((t) => ({
+            id: String(t.sourceId || ""),
+            delayMs: Number(t.delayMs) || 0,
+            gainDb: Number(t.gainDb) || 0,
+            polarity: (Number(t.polarity) < 0 || Number(t.polarity) === 180) ? -1 : 1,
+            phaseControlDeg: Number(t.phaseControlDeg ?? t.phaseAdjust) || 0,
+          }));
+
+          // 2. Create and set the Recommendation Authority object
+          const recommendation = createRecommendation({
+            geometryFingerprint: basisFp,
+            intent: RECOMMENDATION_INTENT.CALIBRATION,
+            recommendationValues,
+            generatedBy: "Bass Optimiser V2",
+            originatingCandidateId: selection?.winner?.candidateId || "auto-optimise",
+          });
+          setRecommendation(projectId, versionId, recommendation);
+
+          // 3. First run (no Applied Calibration): auto-accept.
+          //    Existing calibration: STOP — let BassDecisionActions decide.
+          const existingCalibration = getAppliedCalibrationAuthority(projectId, versionId);
+          if (!existingCalibration) {
+            try {
+              acceptRecommendation(projectId, versionId, {
+                currentGeometryFingerprint: basisFp,
+              });
+              if (commitInstances) {
+                const newInstances = applyRecommendationToInstances(
+                  subInstancesRef.current,
+                  recommendationValues,
+                );
+                commitInstances(newInstances);
+              }
+            } catch {
+              // Accept transition failed — non-fatal, workflow continues
+            }
+          } else {
+            // Existing calibration — STOP. Recommendation is ready.
+            // No recalculation — the designer's Accept/Continue triggers it.
+            setComplete(projectId, versionId, {
+              phase: false,
+              delay: false,
+              gain: false,
+              globalBassTrim: false,
+              details: autoApplySummary.changeSummary,
+            }, {
+              subPositions: autoApplySummary.hasPositions
+                ? autoApplySummary.stageResults?.subPositions?.result || null
+                : null,
+              seating: autoApplySummary.hasSeating
+                ? autoApplySummary.stageResults?.seating?.result || null
+                : null,
+              addSubs: false,
+            }, false);
+            return;
           }
         }
       }
