@@ -18,21 +18,37 @@ import { Loader2 } from 'lucide-react';
  * - editable: boolean (default true)
  * - saveStatus: 'idle' | 'saving' | 'saved' | 'failed' | 'unsaved'
  */
-export default function InlineRichTextEditor({ html, onSave, editable = true, saveStatus = 'idle' }) {
+export default function InlineRichTextEditor({ html, onSave, onDirty, onUnloadSave, editable = true, saveStatus = 'idle' }) {
   const editorRef = useRef(null);
   const [showToolbar, setShowToolbar] = useState(false);
   const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0 });
   const lastSavedHtml = useRef(html);
+  const latestHtmlRef = useRef(html);
+  const savingHtmlRef = useRef(html);
   const onSaveRef = useRef(onSave);
+  const onDirtyRef = useRef(onDirty);
+  const onUnloadSaveRef = useRef(onUnloadSave);
   onSaveRef.current = onSave;
+  onDirtyRef.current = onDirty;
+  onUnloadSaveRef.current = onUnloadSave;
 
   // Set initial content
   React.useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== html) {
       editorRef.current.innerHTML = html || '';
       lastSavedHtml.current = html || '';
+      latestHtmlRef.current = html || '';
     }
   }, [html]);
+
+  // Update lastSavedHtml only when parent confirms save succeeded.
+  // Uses savingHtmlRef (the content passed to onSave) so edits typed after
+  // the save was initiated are still detected as unsaved on unmount.
+  React.useEffect(() => {
+    if (saveStatus === 'saved') {
+      lastSavedHtml.current = savingHtmlRef.current;
+    }
+  }, [saveStatus]);
 
   const debounceTimer = useRef(null);
 
@@ -40,29 +56,32 @@ export default function InlineRichTextEditor({ html, onSave, editable = true, sa
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       const currentHtml = editorRef.current?.innerHTML || '';
+      latestHtmlRef.current = currentHtml;
       if (currentHtml !== lastSavedHtml.current && onSaveRef.current) {
-        lastSavedHtml.current = currentHtml;
+        savingHtmlRef.current = currentHtml;
         onSaveRef.current(currentHtml);
       }
     }, 1500);
   }, []);
 
-  // Flush pending debounce on unmount so edits are not lost on navigation.
+  // Flush unsaved content on unmount via keepalive (survives page teardown).
   React.useEffect(() => {
     return () => {
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
         debounceTimer.current = null;
-        const currentHtml = editorRef.current?.innerHTML || '';
-        if (currentHtml !== lastSavedHtml.current && onSaveRef.current) {
-          lastSavedHtml.current = currentHtml;
-          onSaveRef.current(currentHtml);
-        }
+      }
+      const currentHtml = latestHtmlRef.current || '';
+      if (currentHtml !== lastSavedHtml.current) {
+        const fn = onUnloadSaveRef.current || onSaveRef.current;
+        if (fn) fn(currentHtml);
       }
     };
   }, []);
 
   const handleInput = () => {
+    latestHtmlRef.current = editorRef.current?.innerHTML || '';
+    if (onDirtyRef.current) onDirtyRef.current();
     triggerSave();
   };
 
@@ -89,6 +108,8 @@ export default function InlineRichTextEditor({ html, onSave, editable = true, sa
   const exec = (command, value) => {
     document.execCommand(command, false, value);
     editorRef.current?.focus();
+    latestHtmlRef.current = editorRef.current?.innerHTML || '';
+    if (onDirtyRef.current) onDirtyRef.current();
     triggerSave();
   };
 

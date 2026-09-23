@@ -8,6 +8,7 @@ import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
 import ProposalSectionNav from '@/components/proposal/ProposalSectionNav';
 import { isArchived, getRestoreStatus } from '@/components/proposal/proposalLifecycle';
+import { appParams } from '@/lib/app-params';
 import { Loader2, FileText, Download, ChevronLeft, Archive, RotateCcw } from 'lucide-react';
 
 const SAVE_STATUS = { IDLE: 'idle', SAVING: 'saving', SAVED: 'saved', FAILED: 'failed', UNSAVED: 'unsaved' };
@@ -78,6 +79,9 @@ export default function ProposalEditor() {
   const pendingSavesRef = useRef({}); // sectionId -> { html, promise }
   const proposalRef = useRef(proposal);
   proposalRef.current = proposal;
+  const dirtySectionsRef = useRef(new Set());
+  const archivedRef = useRef(false);
+  archivedRef.current = isArchived(proposal?.status);
 
   const transitionToEdited = useCallback(async () => {
     const current = proposalRef.current;
@@ -97,6 +101,47 @@ export default function ProposalEditor() {
       setProposal((prev) => prev ? { ...prev, status: 'edited' } : prev);
     } catch (err) {
       console.error('[ProposalEditor] Generated→Edited transition failed:', err);
+    }
+  }, []);
+
+  // Mark a section dirty immediately on user input (before debounce fires).
+  const handleDirty = useCallback((sectionId) => {
+    if (archivedRef.current) return;
+    setDirtySections((prev) => {
+      if (prev.has(sectionId)) return prev;
+      const next = new Set(prev);
+      next.add(sectionId);
+      dirtySectionsRef.current = next;
+      return next;
+    });
+    setSaveStatuses((prev) => {
+      if (prev[sectionId] === SAVE_STATUS.SAVING) return prev;
+      return { ...prev, [sectionId]: SAVE_STATUS.UNSAVED };
+    });
+  }, []);
+
+  // Keepalive flush — survives page teardown. Used on unmount when edits are unsaved.
+  const handleUnloadSave = useCallback((sectionId, html) => {
+    if (archivedRef.current) return;
+    const token = appParams.token;
+    if (!token || !sectionId) return;
+    const url = `${appParams.serverUrl}/api/apps/${appParams.appId}/entities/ProposalSection/${sectionId}`;
+    try {
+      fetch(url, {
+        method: 'PUT',
+        keepalive: true,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-App-Id': String(appParams.appId),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          body: html,
+          last_user_edited_at: new Date().toISOString(),
+        }),
+      }).catch(() => {});
+    } catch (e) {
+      // Swallow — best-effort during teardown
     }
   }, []);
 
@@ -132,6 +177,7 @@ export default function ProposalEditor() {
         setDirtySections((prev) => {
           const next = new Set(prev);
           next.delete(sectionId);
+          dirtySectionsRef.current = next;
           return next;
         });
         setTimeout(() => {
@@ -164,7 +210,7 @@ export default function ProposalEditor() {
   // Flush all pending saves on unmount and warn before navigating away with unsaved changes.
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      const hasPending = Object.keys(pendingSavesRef.current).length > 0 || dirtySections.size > 0;
+      const hasPending = Object.keys(pendingSavesRef.current).length > 0 || dirtySectionsRef.current.size > 0;
       if (hasPending) {
         e.preventDefault();
         e.returnValue = '';
@@ -173,12 +219,14 @@ export default function ProposalEditor() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Flush all pending saves synchronously (fire-and-forget).
-      Object.keys(pendingSavesRef.current).forEach((sid) => flushSave(sid));
+      // Keepalive-flush saves still in-flight (SDK fetch may be aborted during teardown).
+      Object.entries(pendingSavesRef.current).forEach(([sid, pending]) => {
+        if (pending?.html) handleUnloadSave(sid, pending.html);
+      });
       Object.values(saveTimers.current).forEach((t) => clearTimeout(t));
       saveTimers.current = {};
     };
-  }, [dirtySections, flushSave]);
+  }, [handleUnloadSave]);
 
   // ── Section handlers ──
   const activeSection = sections.find((s) => s.section_key === activeSectionKey);
@@ -432,6 +480,8 @@ export default function ProposalEditor() {
                   <InlineRichTextEditor
                     html={section.body}
                     onSave={(html) => handleBodySave(section.id, html)}
+                    onDirty={() => handleDirty(section.id)}
+                    onUnloadSave={(html) => handleUnloadSave(section.id, html)}
                     editable={isActive && !archived}
                     saveStatus={saveStatuses[section.id] || SAVE_STATUS.IDLE}
                   />
