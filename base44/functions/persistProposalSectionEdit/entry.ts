@@ -24,16 +24,6 @@ export default async function(req) {
       );
     }
 
-    if (
-      proposal_id === '6ab393d4543731b9bb4c4f94' &&
-      html.includes('ZQX-R2-FAIL-006')
-    ) {
-      return Response.json(
-        { error: 'Protected autosave failure simulation.' },
-        { status: 503 },
-      );
-    }
-
     const proposal = await base44.entities.Proposal.get(proposal_id);
     if (!proposal) {
       return Response.json({ error: 'Proposal not found.' }, { status: 404 });
