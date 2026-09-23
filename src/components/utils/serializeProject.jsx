@@ -137,6 +137,11 @@ export function serializeProject(input = {}) {
     aimFrontWidesAtMLP = false,
     aimSideSurroundsAtMLP = false,
     aimRearSurroundsAtMLP = false,
+
+    // Applied Calibration Authority — persisted per-version so the designer's
+    // accepted calibration survives page refresh, application restart, and
+    // project reopen. Null = no calibration applied.
+    appliedCalibration = null,
   } = input;
 
   // Normalised room dims (support legacy dimensions as a fallback)
@@ -356,5 +361,9 @@ export function serializeProject(input = {}) {
     aim_front_wides_at_mlp: !!aimFrontWidesAtMLP,
     aim_side_surrounds_at_mlp: !!aimSideSurroundsAtMLP,
     aim_rear_surrounds_at_mlp: !!aimRearSurroundsAtMLP,
+
+    // Applied Calibration Authority — persisted inside design_state (per-version).
+    // The authority store is in-memory; this field makes it durable.
+    applied_calibration: appliedCalibration || null,
   };
 }

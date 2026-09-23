@@ -16,6 +16,10 @@ import { migrateP12Mode } from "@/components/utils/p12ModeAuthority";
 import { resolveVisibleWidthInches } from "@/components/hooks/useSeatingRebuild";
 import { computeEffectiveRsp } from "@/components/room/rsp/computeEffectiveRsp";
 import { normaliseP14Level } from "@/components/room/bass/p14TargetSelectionState";
+import {
+  hydrateAppliedCalibration,
+  migrateLegacyAppliedCalibration,
+} from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationPersistence";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -750,5 +754,31 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       ...(prev || {}),
       placedSpeakers: mergedSpeakers,
     }));
+  }
+
+  // 12) APPLIED CALIBRATION AUTHORITY — hydrate from persisted state
+  // The authority store is in-memory; this step reconstructs it from the
+  // persisted applied_calibration field in design_state so the designer's
+  // accepted calibration survives page refresh, application restart, and
+  // project reopen.
+  //
+  // Legacy migration: if no persisted authority exists but the subwoofer
+  // instances have optimiser tuning provenance (tuningSource === "v2-optimised"
+  // or appliedV2Provenance), reconstruct an authority with source = Unknown.
+  const _hydrateProjectId = p?.id || null;
+  const _hydrateVersionId = p?._version_id || p?.active_version_id || null;
+  if (_hydrateProjectId && _hydrateVersionId) {
+    const persistedCal = p?.applied_calibration ?? null;
+    if (persistedCal && persistedCal.basisFingerprint) {
+      hydrateAppliedCalibration(_hydrateProjectId, _hydrateVersionId, persistedCal, null);
+    } else {
+      // Legacy migration — no persisted authority, check instance provenance
+      const _instancesForMigration = Array.isArray(appState?.subwooferInstances)
+        ? appState.subwooferInstances
+        : [];
+      if (_instancesForMigration.length > 0) {
+        migrateLegacyAppliedCalibration(_hydrateProjectId, _hydrateVersionId, _instancesForMigration, null);
+      }
+    }
   }
 }

@@ -22,7 +22,7 @@
 //   instances in that legacyGroup. This is the only way instance models change
 //   via the Front/Rear controls.
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import {
   applyModelChange,
   applyCountChange,
@@ -37,6 +37,8 @@ import {
   MIGRATION_STATE,
 } from "@/components/utils/subwooferInstanceCompatibility";
 import { subwooferModelKey } from "@/components/utils/subwooferDisplayLabel";
+import { markAppliedCalibrationUserModified } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
+import { extractAppliedCalibrationValues } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthority.js";
 
 /**
  * @param {Object} appState - From useAppState()
@@ -44,9 +46,27 @@ import { subwooferModelKey } from "@/components/utils/subwooferDisplayLabel";
  * @param {Object} rearSubsCfg - Legacy rear config
  * @returns {Object} canonical-first handlers + stable-ID handlers
  */
-export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg) {
+export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg, options = {}) {
   const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
   const status = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
+
+  // Project/version identity for Applied Calibration Authority stamping.
+  // Stored in refs so setInstanceCalibration's useCallback doesn't capture
+  // stale values — the refs are updated on every render.
+  // Prefer explicit options, fall back to appState/URL for backward compatibility
+  // (the RoomDesigner page is too large to modify the call site).
+  const projectIdRef = useRef(options?.projectId ?? null);
+  if (options?.projectId) {
+    projectIdRef.current = options.projectId;
+  } else if (typeof window !== "undefined") {
+    try {
+      const url = new URL(window.location.href);
+      const urlId = url.searchParams.get("projectId") || url.searchParams.get("project") || url.searchParams.get("id");
+      if (urlId) projectIdRef.current = urlId;
+    } catch { /* ignore */ }
+  }
+  const versionIdRef = useRef(options?.versionId ?? null);
+  versionIdRef.current = options?.versionId ?? appState?.activeVersionId ?? versionIdRef.current;
   // A valid empty instance array is authoritative but editable.
   // hasCanonical is driven by status, not array length.
   const hasCanonical = status === INSTANCE_STATUS.VALID;
@@ -234,7 +254,22 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
     if (Number.isFinite(Number(calibration?.gainDb))) patch.gainDb = Number(calibration.gainDb);
     if (Number.isFinite(Number(calibration?.delayMs))) patch.delayMs = Number(calibration.delayMs);
     if (calibration?.polarity === 1 || calibration?.polarity === -1) patch.polarity = calibration.polarity;
-    commitInstances(patchInstanceByIdUtil(instances, id, patch));
+    const nextInstances = patchInstanceByIdUtil(instances, id, patch);
+    commitInstances(nextInstances);
+    // Stamp the Applied Calibration Authority — manual edit.
+    // Source becomes Manual; the Recommendation Authority is unchanged.
+    if (projectIdRef.current && versionIdRef.current) {
+      try {
+        markAppliedCalibrationUserModified(
+          projectIdRef.current,
+          versionIdRef.current,
+          null,
+          extractAppliedCalibrationValues(nextInstances),
+        );
+      } catch {
+        // Non-fatal: authority stamp failure must not block the edit
+      }
+    }
   }, [hasCanonical, instances, commitInstances]);
 
   return {

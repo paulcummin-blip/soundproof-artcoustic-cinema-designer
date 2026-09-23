@@ -14,6 +14,8 @@ import { INSTANCE_STATUS, MIGRATION_STATE } from "@/components/utils/subwooferIn
 import { canSave as hydrationCanSave, markLoaded, markError, createAuthority } from "@/components/state/hydrationAuthority";
 import { logSaveEvent } from "@/components/state/saveAuditLog";
 import { checkDestructiveSave } from "@/components/state/destructiveSaveTripwire";
+import { useAppliedCalibrationAuthority } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
+import { serializeAppliedCalibration } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationPersistence.js";
 
 // Hook to encapsulate project loading, saving, and state management
 export function useProjectLoader(
@@ -103,6 +105,15 @@ appState, // Pass appState directly for setters
   // to the correct ProjectVersion record.
   const activeVersionIdRef = useRef(null);
 
+  // Subscribe to the Applied Calibration Authority so autosave re-runs when
+  // the authority changes (accept, continue, reset, manual edit). The hook
+  // returns the current authority object; serializeAppliedCalibration converts
+  // it to a plain object for persistence in design_state.
+  const appliedCalAuthority = useAppliedCalibrationAuthority(
+    activeProjectId || projectIdState || null,
+    appState?.activeVersionId || null,
+  );
+
   // SHARED PAYLOAD BUILDER — single source of truth for both autosave and manual save.
   // Both paths must use this function so their signatures are always identical.
   const buildSharedProjectPayload = useCallback(() => {
@@ -163,6 +174,7 @@ appState, // Pass appState directly for setters
       p15ConstructionLevel: appState?.p15ConstructionLevel,
       p21EarlyReflectionPreset: appState?.p21EarlyReflectionPreset,
       existingRoomDimensionsEdited: loadedRoomDimensionsEditedRef.current,
+      appliedCalibration: serializeAppliedCalibration(appliedCalAuthority),
     });
     return projectData;
   }, [
@@ -175,6 +187,7 @@ appState, // Pass appState directly for setters
     useFrontGlobal, useMidGlobal, useRearGlobal,
     appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty,
     appState?.aimFrontWidesAtMLP, appState?.aimSideSurroundsAtMLP, appState?.aimRearSurroundsAtMLP,
+    appliedCalAuthority,
   ]);
 
   const parseMaybe = useCallback((val, fallback) => {
@@ -403,6 +416,7 @@ appState, // Pass appState directly for setters
           p21EarlyReflectionPreset: mergedP?.p21_early_reflection_preset || "l3",
           existingRoomDimensionsEdited: mergedP?.room_dimensions_edited === true,
           linkEarPlatformHeights: typeof mergedP?.link_ear_platform_heights === "boolean" ? mergedP.link_ear_platform_heights : true,
+          appliedCalibration: mergedP?.applied_calibration ?? null,
         });
         delete loadedProjectData.name;
         delete loadedProjectData.client_name;
@@ -796,7 +810,8 @@ appState, // Pass appState directly for setters
   appState?.selectedAbfuserQty,
   appState?.p15ConstructionLevel,
   appState?.p21EarlyReflectionPreset,
-  appState?.linkEarPlatformHeights]
+  appState?.linkEarPlatformHeights,
+    appliedCalAuthority]
   );
 
   // Boot logic: run when hydrated or target changes – either load a project or initialise defaults
