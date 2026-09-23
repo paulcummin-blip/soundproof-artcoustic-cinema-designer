@@ -13,7 +13,8 @@ test('proposal creation is idempotent and creates the canonical ten sections onc
 
   assert.match(entity, /"creation_request_id"/);
   assert.match(wizard, /generationInFlightRef/);
-  assert.match(wizard, /request_id:\s*creationRequestIdRef\.current/);
+  assert.match(wizard, /const requestId = creationRequestIdRef\.current \|\| createRequestId\(\)/);
+  assert.match(wizard, /request_id:\s*requestId/);
   assert.equal((sectionBlock.match(/\{ type:/g) || []).length, 10);
   assert.ok(generate.indexOf('creation_request_id: request_id') < generate.indexOf('ProposalSection.bulkCreate'));
   assert.match(generate, /existing\[0\]\.status === 'generated' && existingSections\.length === SECTIONS\.length/);
