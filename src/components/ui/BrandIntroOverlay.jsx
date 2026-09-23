@@ -19,6 +19,9 @@ const GAP_PX = 32;
 const CROSS_HEIGHT_PX = 30;
 const HORIZONTAL_PADDING = 48;
 const VERTICAL_PADDING = 48;
+const INTRO_HOLD_MS = 2000;
+const INTRO_MOVE_MS = 4500;
+const INTRO_FADE_MS = 500;
 
 if (typeof window !== "undefined" && !window.__resetSoundProofIntro) {
   window.__resetSoundProofIntro = () => {
@@ -178,9 +181,10 @@ export default function BrandIntroOverlay() {
       timers.push(setTimeout(() => setStage("fade"), 800));
       timers.push(setTimeout(() => setStage("done"), 1100));
     } else {
-      timers.push(setTimeout(() => setStage("settle"), 1200));
-      timers.push(setTimeout(() => setStage("fade"), 3050));
-      timers.push(setTimeout(() => setStage("done"), 3350));
+      const fadeAt = INTRO_HOLD_MS + INTRO_MOVE_MS;
+      timers.push(setTimeout(() => setStage("settle"), INTRO_HOLD_MS));
+      timers.push(setTimeout(() => setStage("fade"), fadeAt));
+      timers.push(setTimeout(() => setStage("done"), fadeAt + INTRO_FADE_MS));
     }
 
     return () => timers.forEach(clearTimeout);
@@ -295,7 +299,7 @@ export default function BrandIntroOverlay() {
   const crossColor = heroBg ? "rgba(255,255,255,0.45)" : "rgba(27,26,26,0.30)";
   const transition = reducedMotion
     ? "none"
-    : "left 1.8s cubic-bezier(0.22,1,0.36,1), top 1.8s cubic-bezier(0.22,1,0.36,1), width 1.8s cubic-bezier(0.22,1,0.36,1), height 1.8s cubic-bezier(0.22,1,0.36,1)";
+    : "left 4.5s cubic-bezier(0.22,1,0.36,1), top 4.5s cubic-bezier(0.22,1,0.36,1), width 4.5s cubic-bezier(0.22,1,0.36,1), height 4.5s cubic-bezier(0.22,1,0.36,1)";
 
   return (
     <div
@@ -307,7 +311,7 @@ export default function BrandIntroOverlay() {
         pointerEvents: "none",
         overflow: "hidden",
         background: settled ? "rgba(15,15,15,0)" : "rgba(15,15,15,0.94)",
-        transition: reducedMotion ? "none" : "background 1.8s cubic-bezier(0.22,1,0.36,1)",
+        transition: reducedMotion ? "none" : "background 4.5s cubic-bezier(0.22,1,0.36,1)",
       }}
     >
       <div
@@ -322,7 +326,7 @@ export default function BrandIntroOverlay() {
           borderBottom: `1px solid ${heroBg ? "rgba(255,255,255,0.12)" : "#DCDBD6"}`,
           boxShadow: settled ? "0 0 0 rgba(0,0,0,0)" : "0 28px 80px rgba(0,0,0,0.30)",
           opacity: stage === "fade" ? 0 : 1,
-          transition: `${transition}, box-shadow 1.8s ease, opacity 0.28s ease`,
+          transition: `${transition}, box-shadow 4.5s ease, opacity 0.5s ease`,
         }}
       >
         <span
@@ -357,7 +361,7 @@ export default function BrandIntroOverlay() {
                 transform: settled ? "scale(1)" : "scale(1.025)",
                 transition: reducedMotion
                   ? "none"
-                  : "filter 1.8s cubic-bezier(0.22,1,0.36,1), transform 1.8s cubic-bezier(0.22,1,0.36,1)",
+                  : "filter 4.5s cubic-bezier(0.22,1,0.36,1), transform 4.5s cubic-bezier(0.22,1,0.36,1)",
               }}
             />
             <div
@@ -365,7 +369,7 @@ export default function BrandIntroOverlay() {
                 position: "absolute",
                 inset: 0,
                 background: `rgba(0,0,0,${settled ? overlayOpacity : Math.max(0.56, overlayOpacity)})`,
-                transition: reducedMotion ? "none" : "background 1.8s ease",
+                transition: reducedMotion ? "none" : "background 4.5s ease",
               }}
             />
             <div
@@ -391,7 +395,7 @@ export default function BrandIntroOverlay() {
             boxSizing: "border-box",
             gap: settled ? GAP_PX : Math.max(GAP_PX, 40),
             fontFamily: FONT_FAMILY,
-            transition: reducedMotion ? "none" : "gap 1.8s cubic-bezier(0.22,1,0.36,1)",
+            transition: reducedMotion ? "none" : "gap 4.5s cubic-bezier(0.22,1,0.36,1)",
           }}
         >
           <span
@@ -403,7 +407,7 @@ export default function BrandIntroOverlay() {
               color: textColor,
               whiteSpace: "nowrap",
               flexShrink: 0,
-              transition: reducedMotion ? "none" : "font-size 1.8s cubic-bezier(0.22,1,0.36,1)",
+              transition: reducedMotion ? "none" : "font-size 4.5s cubic-bezier(0.22,1,0.36,1)",
             }}
           >
             {SP_WORDMARK}
@@ -419,7 +423,7 @@ export default function BrandIntroOverlay() {
                   lineHeight: 1,
                   userSelect: "none",
                   flexShrink: 0,
-                  transition: reducedMotion ? "none" : "font-size 1.8s cubic-bezier(0.22,1,0.36,1)",
+                  transition: reducedMotion ? "none" : "font-size 4.5s cubic-bezier(0.22,1,0.36,1)",
                 }}
               >
                 ×
@@ -438,7 +442,7 @@ export default function BrandIntroOverlay() {
                     height: "auto",
                     objectFit: "contain",
                     flexShrink: 0,
-                    transition: reducedMotion ? "none" : "width 1.8s cubic-bezier(0.22,1,0.36,1)",
+                    transition: reducedMotion ? "none" : "width 4.5s cubic-bezier(0.22,1,0.36,1)",
                   }}
                 />
               ) : (
@@ -451,7 +455,7 @@ export default function BrandIntroOverlay() {
                     lineHeight: 1,
                     whiteSpace: "nowrap",
                     flexShrink: 0,
-                    transition: reducedMotion ? "none" : "font-size 1.8s cubic-bezier(0.22,1,0.36,1)",
+                    transition: reducedMotion ? "none" : "font-size 4.5s cubic-bezier(0.22,1,0.36,1)",
                   }}
                 >
                   {dealerName}
