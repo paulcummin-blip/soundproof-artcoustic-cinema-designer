@@ -35,6 +35,7 @@ import BassDesignRecommendation from "@/components/room/bass/BassDesignRecommend
 import SharedP19P20SeatResults from "@/components/room/bass/SharedP19P20SeatResults";
 import BassTargetLevelControl from "@/components/room/bass/BassTargetLevelControl";
 import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
+import BassRecommendationSection from "@/components/room/bass/recommendationAuthority/BassRecommendationSection";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 
 // ── Shell copy per unified lifecycle state ──
@@ -197,6 +198,11 @@ export default function BassDesignAssistant({
 
       {/* ── Recommended next action ── */}
       <p className="text-[12px] text-[#625143] leading-relaxed">{copy.nextAction}</p>
+
+      {/* ── Stage 2: Recommendation vs Applied Calibration (presentation only) ── */}
+      {/* Displays the Recommendation Authority and Applied Calibration Authority
+          side by side, plus a difference summary. No actions — read-only. */}
+      <BassRecommendationSection appState={appState} />
 
       {/* ── Single shared P14/P18/P19/P20 summary ── */}
       {/* BassHeadlinePills consumes the same shared authority and is
