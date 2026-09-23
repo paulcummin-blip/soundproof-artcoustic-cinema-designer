@@ -22,9 +22,8 @@ export default function InlineRichTextEditor({ html, onSave, onDirty, onUnloadSa
   const editorRef = useRef(null);
   const [showToolbar, setShowToolbar] = useState(false);
   const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0 });
-  const lastSavedHtml = useRef(html);
-  const latestHtmlRef = useRef(html);
-  const savingHtmlRef = useRef(html);
+  const latestDraftRef = useRef({ html: html || '', editedAt: null });
+  const dirtySinceSaveRef = useRef(false);
   const onSaveRef = useRef(onSave);
   const onDirtyRef = useRef(onDirty);
   const onUnloadSaveRef = useRef(onUnloadSave);
@@ -36,30 +35,31 @@ export default function InlineRichTextEditor({ html, onSave, onDirty, onUnloadSa
   React.useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== html) {
       editorRef.current.innerHTML = html || '';
-      lastSavedHtml.current = html || '';
-      latestHtmlRef.current = html || '';
+      latestDraftRef.current = { html: html || '', editedAt: null };
+      dirtySinceSaveRef.current = false;
     }
   }, [html]);
-
-  // Update lastSavedHtml only when parent confirms save succeeded.
-  // Uses savingHtmlRef (the content passed to onSave) so edits typed after
-  // the save was initiated are still detected as unsaved on unmount.
-  React.useEffect(() => {
-    if (saveStatus === 'saved') {
-      lastSavedHtml.current = savingHtmlRef.current;
-    }
-  }, [saveStatus]);
 
   const debounceTimer = useRef(null);
 
   const triggerSave = useCallback(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      const currentHtml = editorRef.current?.innerHTML || '';
-      latestHtmlRef.current = currentHtml;
-      if (currentHtml !== lastSavedHtml.current && onSaveRef.current) {
-        savingHtmlRef.current = currentHtml;
-        onSaveRef.current(currentHtml);
+    debounceTimer.current = setTimeout(async () => {
+      const draft = latestDraftRef.current;
+      if (!dirtySinceSaveRef.current || !draft.editedAt || !onSaveRef.current) return;
+
+      try {
+        const outcome = await onSaveRef.current(draft.html, draft.editedAt);
+        const latest = latestDraftRef.current;
+        if (
+          outcome?.ok &&
+          latest.html === draft.html &&
+          latest.editedAt === draft.editedAt
+        ) {
+          dirtySinceSaveRef.current = false;
+        }
+      } catch (error) {
+        // Parent owns the visible failed/dirty state.
       }
     }, 1500);
   }, []);
@@ -71,18 +71,28 @@ export default function InlineRichTextEditor({ html, onSave, onDirty, onUnloadSa
         clearTimeout(debounceTimer.current);
         debounceTimer.current = null;
       }
-      const currentHtml = latestHtmlRef.current || '';
-      if (currentHtml !== lastSavedHtml.current) {
+      const draft = latestDraftRef.current;
+      if (dirtySinceSaveRef.current && draft.editedAt) {
         const fn = onUnloadSaveRef.current || onSaveRef.current;
-        if (fn) fn(currentHtml);
+        if (fn) fn(draft.html, draft.editedAt);
       }
     };
   }, []);
 
-  const handleInput = () => {
-    latestHtmlRef.current = editorRef.current?.innerHTML || '';
-    if (onDirtyRef.current) onDirtyRef.current();
+  const markDirty = () => {
+    const currentHtml = editorRef.current?.innerHTML || '';
+    const previousTime = Date.parse(latestDraftRef.current.editedAt || '');
+    const nextTime = Math.max(Date.now(), Number.isFinite(previousTime) ? previousTime + 1 : 0);
+    const editedAt = new Date(nextTime).toISOString();
+
+    latestDraftRef.current = { html: currentHtml, editedAt };
+    dirtySinceSaveRef.current = true;
+    if (onDirtyRef.current) onDirtyRef.current(currentHtml, editedAt);
     triggerSave();
+  };
+
+  const handleInput = () => {
+    markDirty();
   };
 
   const handleSelection = () => {
@@ -108,9 +118,7 @@ export default function InlineRichTextEditor({ html, onSave, onDirty, onUnloadSa
   const exec = (command, value) => {
     document.execCommand(command, false, value);
     editorRef.current?.focus();
-    latestHtmlRef.current = editorRef.current?.innerHTML || '';
-    if (onDirtyRef.current) onDirtyRef.current();
-    triggerSave();
+    markDirty();
   };
 
   const toolbarBtn = (label, command, value) => (
