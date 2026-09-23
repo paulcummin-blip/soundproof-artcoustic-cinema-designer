@@ -88,8 +88,10 @@ function generateAppliedCalibrationId() {
 /**
  * Validate that a recommendation can be accepted into Applied Calibration.
  *
- * Only Generated or Stale recommendations with Calibration intent can be
- * accepted. Declined, Accepted, and Superseded recommendations are rejected.
+ * Only Generated recommendations with Calibration intent can be accepted.
+ * Stale, Declined, Accepted, and Superseded recommendations are rejected.
+ * A Stale recommendation belongs to a previous geometry and must never be
+ * accepted — the designer must re-optimise to produce a fresh recommendation.
  *
  * @param {object} recommendation - recommendation object
  * @throws if the recommendation cannot be accepted
@@ -116,7 +118,12 @@ function validateForAcceptance(recommendation) {
       `Accept Transition: recommendation ${recommendation.recommendationId} is Declined — cannot accept a declined recommendation`
     );
   }
-  if (status !== RECOMMENDATION_STATUS.GENERATED && status !== RECOMMENDATION_STATUS.STALE) {
+  if (status === RECOMMENDATION_STATUS.STALE) {
+    throw new Error(
+      `Accept Transition: Recommendation is stale. Re-optimise required.`
+    );
+  }
+  if (status !== RECOMMENDATION_STATUS.GENERATED) {
     throw new Error(
       `Accept Transition: recommendation ${recommendation.recommendationId} has invalid status '${status}'`
     );
@@ -155,8 +162,9 @@ function validateForAcceptance(recommendation) {
  * The recommendation's recommendationValues (per-sub tuning) become the
  * Applied Calibration's values.
  *
- * The status is USER_ACCEPTED — the designer explicitly accepted this
- * recommendation into the design.
+ * The status is CURRENT — the calibration matches the geometry at the
+ * moment of acceptance. USER_ACCEPTED is reserved for the designer's
+ * explicit Keep decision after the calibration later becomes Stale.
  *
  * @param {object} recommendation - recommendation object
  * @returns {object} new Applied Calibration Authority object
@@ -165,7 +173,7 @@ function buildAcceptedAuthority(recommendation, appliedCalibrationId) {
   const authority = createAppliedCalibrationAuthority({
     basisFingerprint: recommendation.geometryFingerprint,
     source: APPLIED_CALIBRATION_SOURCE.OPTIMISER,
-    status: APPLIED_CALIBRATION_STATUS.USER_ACCEPTED,
+    status: APPLIED_CALIBRATION_STATUS.CURRENT,
     candidateId: recommendation.originatingCandidateId,
     recommendationId: recommendation.recommendationId,
     values: recommendation.recommendationValues,
@@ -244,7 +252,7 @@ export function acceptRecommendation(projectId, versionId, options = {}) {
   }
   if (currentRec.geometryFingerprint !== opts.currentGeometryFingerprint) {
     throw new Error(
-      `Accept Transition: Recommendation is stale — geometry has changed since the recommendation was generated. Re-optimise before accepting.`
+      `Accept Transition: Recommendation is stale. Re-optimise required.`
     );
   }
 
@@ -306,6 +314,6 @@ export function acceptRecommendation(projectId, versionId, options = {}) {
     recommendationId: currentRec.recommendationId,
     appliedCalibrationId,
     acceptanceId: acceptanceRecord.acceptanceId,
-    appliedCalibrationStatus: APPLIED_CALIBRATION_STATUS.USER_ACCEPTED,
+    appliedCalibrationStatus: APPLIED_CALIBRATION_STATUS.CURRENT,
   };
 }

@@ -25,7 +25,7 @@
 //   Generated  → Accepted     (designer accepted — terminal)
 //   Generated  → Superseded   (newer recommendation for same geometry)
 //   Stale      → Declined     (designer rejects stale recommendation)
-//   Stale      → Accepted     (designer accepts stale recommendation — terminal)
+//   Stale      → Superseded   (newer recommendation replaces stale one)
 //   Declined   → Stale       (geometry changes after decline)
 //
 //   Declined is NOT permanent — it belongs only to the geometry against which
@@ -86,7 +86,6 @@ const VALID_TRANSITIONS = {
   ]),
   [RECOMMENDATION_STATUS.STALE]: new Set([
     RECOMMENDATION_STATUS.DECLINED,
-    RECOMMENDATION_STATUS.ACCEPTED,
     RECOMMENDATION_STATUS.SUPERSEDED,
   ]),
   [RECOMMENDATION_STATUS.DECLINED]: new Set([

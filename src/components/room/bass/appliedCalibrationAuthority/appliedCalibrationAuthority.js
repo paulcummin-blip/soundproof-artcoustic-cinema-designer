@@ -281,10 +281,19 @@ export function resolveAppliedCalibrationStatus(authority, currentBasisFingerpri
   const fingerprintsMatch = authority.basisFingerprint === currentBasisFingerprint;
 
   if (!fingerprintsMatch) {
-    // Geometry changed since applied calibration was generated → Stale
-    // Preserve the original source info but flag as stale
+    // User Accepted is a deliberate designer override — it persists
+    // even when geometry has changed. The designer chose to keep this
+    // calibration despite the geometry change, so it is not stale.
+    if (authority.status === APPLIED_CALIBRATION_STATUS.USER_ACCEPTED) {
+      return {
+        status: APPLIED_CALIBRATION_STATUS.USER_ACCEPTED,
+        isStale: false,
+        staleReason: null,
+      };
+    }
+    // Current calibration with different geometry → Stale
     return {
-      status: authority.status,
+      status: APPLIED_CALIBRATION_STATUS.STALE,
       isStale: true,
       staleReason: "Current calibration belongs to an earlier version of this design and is no longer authoritative.",
     };
@@ -309,4 +318,20 @@ export function isAppliedCalibrationConsumable(authority, currentBasisFingerprin
   if (!authority || !authority.basisFingerprint || !currentBasisFingerprint) return false;
   const { isStale } = resolveAppliedCalibrationStatus(authority, currentBasisFingerprint);
   return !isStale;
+}
+
+/**
+ * Mark an Applied Calibration Authority as User Accepted — the designer's
+ * explicit Keep decision after the calibration became Stale due to a
+ * geometry change.
+ *
+ * This is the ONLY way Applied Calibration enters the User Accepted state.
+ * It is never created directly by Accept Recommendation.
+ *
+ * @param {object} authority - existing applied calibration authority object
+ * @returns {object} new authority object with status USER_ACCEPTED
+ */
+export function markAsUserAccepted(authority) {
+  if (!authority) return authority;
+  return { ...authority, status: APPLIED_CALIBRATION_STATUS.USER_ACCEPTED };
 }
