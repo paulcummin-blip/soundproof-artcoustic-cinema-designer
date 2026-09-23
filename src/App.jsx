@@ -15,6 +15,7 @@ import AccountDashboard from './pages/AccountDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminSystemHealth from './pages/AdminSystemHealth';
 import AdminPlaceholderPage from './pages/AdminPlaceholderPage';
+import AdminPublicationContent from './pages/AdminPublicationContent';
 import AdminDatasetManager from './pages/AdminDatasetManager';
 import AdminProjectLicensing from './pages/AdminProjectLicensing';
 import AdminUserLicensingDetail from './pages/AdminUserLicensingDetail';
@@ -128,6 +129,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/pricing" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Pricing" description="Price lists, discounts and difficulty multipliers." /></AccessGate>} />
         <Route path="/admin/product-prices" element={<AccessGate masterAdmin><Navigate to="/PriceList" replace /></AccessGate>} />
         <Route path="/admin/rp22-config" element={<AccessGate masterAdmin><AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." /></AccessGate>} />
+        <Route path="/admin/content" element={<AccessGate masterAdmin><AdminPublicationContent /></AccessGate>} />
         <Route path="/admin/speaker-database" element={<AccessGate masterAdmin><AdminSpeakerDatabase /></AccessGate>} />
         <Route path="/admin/speaker-database/product/:productId" element={<AccessGate masterAdmin><AdminSpeakerProductDetail /></AccessGate>} />
         <Route path="/admin/speaker-database/add-speaker" element={<AccessGate masterAdmin><AdminAddSpeaker /></AccessGate>} />

@@ -92,6 +92,13 @@ export default function AdminDashboard() {
       href: "/PriceList",
     },
     {
+      title: "Content Management",
+      description: "Publication content — the canonical source for About Sound Proof and future client-facing text used in the app, Visual Report, Technical Report, and proposals.",
+      status: "Ready",
+      count: "1 document",
+      href: "/admin/content",
+    },
+    {
       title: "RP22 Configuration",
       description: "Compliance parameters and grading thresholds.",
       status: "Healthy",

@@ -1,0 +1,88 @@
+{
+  "name": "PublicationContent",
+  "type": "object",
+  "description": "Canonical administrator-managed publication content. One record per content_key (e.g. 'about_sound_proof'). Stores published HTML (the canonical source every consumer reads), an optional draft HTML (private until published), and an append-only version history of previously published content. Designed as a generic CMS \u2014 'about_sound_proof' is the first managed document; the same architecture supports future keys (executive_summary_intro, rp22_explanation, bass_design_assistant_explanation, proposal_introductions, company_profile, warranty, installation_methodology, calibration_methodology, terms_conditions) without schema changes.",
+  "properties": {
+    "content_key": {
+      "type": "string",
+      "description": "Unique stable slug identifying this content document (e.g. 'about_sound_proof', 'rp22_explanation'). One record per key. Used by all consumers to read the canonical published content."
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable display title for this content document (e.g. 'About Sound Proof'). Shown in the admin CMS list."
+    },
+    "published_html": {
+      "type": "string",
+      "description": "The canonical published HTML content. Every consumer (About page, Visual Report, Technical Report, Proposal Centre) reads from this field. Null or empty = no custom content published yet; consumers fall back to the application default.",
+      "nullable": true
+    },
+    "draft_html": {
+      "type": "string",
+      "description": "Private draft HTML content. Not shown to any consumer until published. The admin can save drafts and preview them without affecting the live published content.",
+      "nullable": true
+    },
+    "version_history": {
+      "type": "array",
+      "description": "Append-only history of previously published versions. Each entry: { html, published_at, published_by }. The admin can restore any previous version. Ordered newest-first.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "html": {
+            "type": "string"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "published_by": {
+            "type": "string"
+          }
+        }
+      },
+      "default": []
+    },
+    "last_published_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the last publish action. Null = never published.",
+      "nullable": true
+    },
+    "last_published_by": {
+      "type": "string",
+      "description": "Name or ID of the admin who last published this content.",
+      "nullable": true
+    },
+    "last_draft_saved_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the last draft save. Null = no draft saved.",
+      "nullable": true
+    }
+  },
+  "required": [
+    "content_key",
+    "title"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

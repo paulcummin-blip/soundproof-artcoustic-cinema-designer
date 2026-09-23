@@ -158,3 +158,29 @@ button:focus-visible {
     @apply bg-background text-foreground;
   }
 }
+
+/* Quill WYSIWYG editor — brand integration */
+.ql-toolbar.ql-snow {
+  border: 1px solid #DCDBD6 !important;
+  border-radius: 8px 8px 0 0;
+  background: #fafafa;
+}
+.ql-container.ql-snow {
+  border: 1px solid #DCDBD6 !important;
+  border-top: none !important;
+  border-radius: 0 0 8px 8px;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+}
+.ql-editor {
+  min-height: 300px;
+  color: #3E4349;
+  line-height: 1.6;
+}
+.ql-editor.ql-blank::before {
+  color: #aaa;
+  font-style: normal;
+}
+.ql-snow .ql-tooltip {
+  z-index: 100;
+}
