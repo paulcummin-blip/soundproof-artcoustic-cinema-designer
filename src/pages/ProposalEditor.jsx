@@ -212,7 +212,7 @@ export default function ProposalEditor() {
   };
 
   const handleSaveNotes = async (notes) => {
-    if (!activeSection) return;
+    if (!activeSection || archived) return;
     setSections((prev) =>
       prev.map((s) => (s.id === activeSection.id ? { ...s, dealer_notes: notes } : s))
     );
@@ -221,7 +221,7 @@ export default function ProposalEditor() {
 
   // ── Save Client Brief to Proposal record ──
   const handleSaveClientBrief = async () => {
-    if (!proposal) return;
+    if (!proposal || archived) return;
     setSavingBrief(true);
     try {
       await base44.entities.Proposal.update(proposal.id, { client_brief: clientBrief });
@@ -259,7 +259,7 @@ export default function ProposalEditor() {
 
   // ── Regeneration — uses Current Report + Client Brief + Dealer Notes + Authoritative data ──
   const handleRegenerate = async (action) => {
-    if (!activeSection || !proposal) return;
+    if (!activeSection || !proposal || archived) return;
     if (activeSection.locked) {
       const confirmed = window.confirm(
         'This section is locked. Regeneration will replace your manual edits. Continue?'
