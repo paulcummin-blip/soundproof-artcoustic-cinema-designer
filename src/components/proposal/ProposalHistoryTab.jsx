@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Loader2, FileText, Plus, RefreshCw } from 'lucide-react';
 import ProposalCard from './ProposalCard';
@@ -20,6 +20,7 @@ export default function ProposalHistoryTab({ onCreateProposal }) {
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
   const [view, setView] = useState('active'); // 'active' | 'archived'
+  const actionInFlightRef = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,61 +86,38 @@ export default function ProposalHistoryTab({ onCreateProposal }) {
     return null;
   }, [versionMap]);
 
-  // ── Duplicate a proposal ──
+  // ── Duplicate a proposal (server-owned, rollback-safe) ──
   const handleDuplicate = useCallback(async (proposal) => {
+    if (actionInFlightRef.current) return;
+    actionInFlightRef.current = true;
     setActionLoading(`dup-${proposal.id}`);
     try {
-      // Create a copy of the proposal
-      const newProposal = await base44.entities.Proposal.create({
-        project_id: proposal.project_id,
-        account_id: proposal.account_id,
-        proposal_type: proposal.proposal_type,
-        selected_version_ids: proposal.selected_version_ids || [],
-        version_id: proposal.version_id || null,
-        title: `Copy of ${proposal.title || 'Untitled Proposal'}`,
-        status: 'draft',
-        client_brief: proposal.client_brief || null,
-        narrative_goal: proposal.narrative_goal || 'luxury_cinema',
-        version_label: null,
-        is_current_version: true,
-        parent_proposal_id: proposal.id,
-        engineering_snapshot: proposal.engineering_snapshot || null,
-        metadata: proposal.metadata || null,
+      const response = await base44.functions.invoke('duplicateProposal', {
+        source_proposal_id: proposal.id,
+        request_id: createRequestId('duplicate'),
       });
-
-      // Copy all sections from the original proposal
-      const sections = await base44.entities.ProposalSection.filter({
-        proposal_id: proposal.id,
-      });
-
-      if (Array.isArray(sections) && sections.length > 0 && newProposal?.id) {
-        const sectionCopies = sections
-          .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-          .map((s) => ({
-            proposal_id: newProposal.id,
-            account_id: proposal.account_id,
-            section_type: s.section_type,
-            section_key: s.section_key,
-            title: s.title,
-            body: s.body || '',
-            dealer_notes: s.dealer_notes || '',
-            order_index: s.order_index || 0,
-            is_enabled: s.is_enabled !== false,
-            locked: false,
-            metadata: s.metadata || {},
-          }));
-        await base44.entities.ProposalSection.bulkCreate(sectionCopies);
+      const data = response?.data ?? response;
+      if (data?.error || !data?.proposal?.id) {
+        throw new Error(data?.error || 'No duplicate proposal was returned.');
       }
 
-      // Reload to show the new proposal
-      await load();
+      setProposals((previous) => [
+        data.proposal,
+        ...previous.filter((item) => item.id !== data.proposal.id),
+      ]);
+      setSectionCounts((previous) => ({
+        ...previous,
+        [data.proposal.id]: data.section_count || 0,
+      }));
+      setView('active');
     } catch (err) {
       console.error('[ProposalHistoryTab] Duplicate failed:', err);
-      alert('Failed to duplicate proposal. Please try again.');
+      alert(err?.response?.data?.error || err?.message || 'Failed to duplicate proposal. Please try again.');
     } finally {
+      actionInFlightRef.current = false;
       setActionLoading(null);
     }
-  }, [load]);
+  }, []);
 
   // ── Archive a proposal (server-authoritative transition) ──
   const handleArchive = useCallback(async (proposal) => {
@@ -154,10 +132,15 @@ export default function ProposalHistoryTab({ onCreateProposal }) {
         proposal_id: proposal.id,
         target_status: 'archived',
       });
-      if (response?.data?.error) {
-        alert(response.data.error);
+      const data = response?.data ?? response;
+      if (data?.error) {
+        alert(data.error);
       } else {
-        await load();
+        setProposals((previous) => previous.map((item) =>
+          item.id === proposal.id
+            ? { ...item, status: data.status, previous_status: data.previous_status }
+            : item
+        ));
       }
     } catch (err) {
       console.error('[ProposalHistoryTab] Archive failed:', err);
@@ -165,7 +148,7 @@ export default function ProposalHistoryTab({ onCreateProposal }) {
     } finally {
       setActionLoading(null);
     }
-  }, [load]);
+  }, []);
 
   // ── Restore an archived proposal (server-authoritative transition) ──
   const handleRestore = useCallback(async (proposal) => {
@@ -176,10 +159,15 @@ export default function ProposalHistoryTab({ onCreateProposal }) {
         proposal_id: proposal.id,
         target_status: restoreStatus || 'edited',
       });
-      if (response?.data?.error) {
-        alert(response.data.error);
+      const data = response?.data ?? response;
+      if (data?.error) {
+        alert(data.error);
       } else {
-        await load();
+        setProposals((previous) => previous.map((item) =>
+          item.id === proposal.id
+            ? { ...item, status: data.status, previous_status: data.previous_status }
+            : item
+        ));
       }
     } catch (err) {
       console.error('[ProposalHistoryTab] Restore failed:', err);
@@ -187,7 +175,7 @@ export default function ProposalHistoryTab({ onCreateProposal }) {
     } finally {
       setActionLoading(null);
     }
-  }, [load]);
+  }, []);
 
   // ── Render: Loading ──
   if (loading) {
@@ -301,8 +289,8 @@ export default function ProposalHistoryTab({ onCreateProposal }) {
           {visibleProposals.map((proposal) => {
             const project = projectMap[proposal.project_id];
             return (
-              <div key={proposal.id} className={actionLoading ? 'relative' : ''}>
-                {actionLoading && (
+              <div key={proposal.id} className={actionLoading?.endsWith(proposal.id) ? 'relative' : ''}>
+                {actionLoading?.endsWith(proposal.id) && (
                   <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 rounded-lg">
                     <Loader2 className="w-5 h-5 text-[#625143] animate-spin" />
                   </div>
@@ -323,4 +311,9 @@ export default function ProposalHistoryTab({ onCreateProposal }) {
       )}
     </div>
   );
+}
+
+function createRequestId(prefix) {
+  return globalThis.crypto?.randomUUID?.()
+    || `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
