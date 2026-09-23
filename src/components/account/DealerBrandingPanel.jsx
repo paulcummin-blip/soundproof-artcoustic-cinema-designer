@@ -14,6 +14,9 @@ const DEFAULTS = {
   hero_background_url: null,
   display_name_override: "",
   tagline: "",
+  logo_scale: 100,
+  logo_vertical_offset: 0,
+  logo_type: "auto",
 };
 
 const inputClasses =
@@ -154,6 +157,71 @@ export default function DealerBrandingPanel({ accountId }) {
           accept={LOGO_UPLOAD_CONFIG.accept}
           validate={LOGO_UPLOAD_CONFIG.validate}
         />
+      </div>
+
+      {/* Advanced Logo Controls */}
+      <div className="space-y-4 p-4 border border-[#E5E1D8] rounded-lg bg-[#FAFAF8]">
+        <div>
+          <Label className={labelClasses}>Advanced Logo Controls</Label>
+          <p className="text-xs text-[#8A8477] mt-1">
+            Fine-tune how your logo appears in the hero banner. Defaults work for most logos — adjust only if needed.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label className={labelClasses}>
+            Logo Scale: {form.logo_scale || 100}%
+          </Label>
+          <input
+            type="range"
+            min={80}
+            max={120}
+            step={1}
+            value={form.logo_scale || 100}
+            onChange={(e) => update("logo_scale", Number(e.target.value))}
+            onMouseUp={() => void persist({ logo_scale: form.logo_scale }).catch(() => undefined)}
+            onTouchEnd={() => void persist({ logo_scale: form.logo_scale }).catch(() => undefined)}
+            className="w-full accent-[#213428]"
+          />
+          <p className="text-[10px] text-[#A89F8D]">80% smaller — 100% automatic — 120% larger</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label className={labelClasses}>
+            Logo Vertical Offset: {form.logo_vertical_offset || 0}px
+          </Label>
+          <input
+            type="range"
+            min={-20}
+            max={20}
+            step={1}
+            value={form.logo_vertical_offset || 0}
+            onChange={(e) => update("logo_vertical_offset", Number(e.target.value))}
+            onMouseUp={() => void persist({ logo_vertical_offset: form.logo_vertical_offset }).catch(() => undefined)}
+            onTouchEnd={() => void persist({ logo_vertical_offset: form.logo_vertical_offset }).catch(() => undefined)}
+            className="w-full accent-[#213428]"
+          />
+          <p className="text-[10px] text-[#A89F8D]">-20px up — 0 default — +20px down</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label className={labelClasses}>Logo Type</Label>
+          <select
+            value={form.logo_type || "auto"}
+            onChange={(e) => {
+              update("logo_type", e.target.value);
+              void persist({ logo_type: e.target.value }).catch(() => undefined);
+            }}
+            className={inputClasses + " w-full cursor-pointer"}
+          >
+            <option value="auto">Auto (detect from image)</option>
+            <option value="wordmark">Wordmark (wide text logo)</option>
+            <option value="square">Square / balanced logo</option>
+            <option value="tall">Tall logo</option>
+            <option value="icon_wordmark">Icon + wordmark</option>
+          </select>
+          <p className="text-[10px] text-[#A89F8D]">Override the automatic shape detection if your logo is misclassified.</p>
+        </div>
       </div>
 
       {/* Hero Background Image */}

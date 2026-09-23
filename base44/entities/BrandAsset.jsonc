@@ -1,7 +1,7 @@
 {
   "name": "BrandAsset",
   "type": "object",
-  "description": "Global brand assets for a dealer account. One record per account. Stores company identity, logos, hero banner background, contact details, social media, marketing copy (rich text), brand colours, proposal default toggles, and proposal tone. Automatically available to every future proposal generated within this account.",
+  "description": "Global brand assets for a dealer account. One record per account. Stores company identity, logos, hero banner background, contact details, social media, marketing copy (rich text), brand colours, proposal default toggles, proposal tone, and partner-logo lockup controls. Automatically available to every future proposal generated within this account.",
   "properties": {
     "account_id": {
       "type": "string",
@@ -149,6 +149,28 @@
       ],
       "default": "luxury_residential",
       "description": "Default narrative tone for GPT-generated proposals. luxury_residential = premium home cinema language, technical = engineering-focused, architect = design-led, commercial = business/commercial cinema."
+    },
+    "logo_scale": {
+      "type": "number",
+      "default": 100,
+      "description": "Manual scale adjustment for the partner logo in the hero banner lockup. 80-120% (100 = automatic). Allows fine-tuning when the automatic shape-based sizing needs correction."
+    },
+    "logo_vertical_offset": {
+      "type": "number",
+      "default": 0,
+      "description": "Manual vertical offset for the partner logo in the hero banner lockup. -20 to +20px. Allows fine-tuning of vertical position."
+    },
+    "logo_type": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "wordmark",
+        "square",
+        "tall",
+        "icon_wordmark"
+      ],
+      "default": "auto",
+      "description": "Manual logo type override for the hero banner lockup. auto = detect from image aspect ratio. wordmark = wide text logo. square = balanced/square logo. tall = tall logo. icon_wordmark = icon + wordmark combination."
     }
   },
   "required": [

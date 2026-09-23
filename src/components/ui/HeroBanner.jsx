@@ -2,6 +2,12 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { DEALER_BRAND_UPDATED_EVENT, loadDealerBrand } from "@/components/account/dealerBrandAuthority";
 import { useNavigate } from "react-router-dom";
+import {
+  resolveLogoShape,
+  computeLogoDimensions,
+  estimateLogoHeightFraction,
+  LOGO_TYPES,
+} from "@/components/ui/logoLockup";
 
 const SP_WORDMARK = "SOUND PROOF";
 const BASE_FONT_SIZE = 40; // px — reference size for text width measurement
@@ -10,12 +16,11 @@ const FONT_FAMILY = "Didact Gothic, Century Gothic, sans-serif";
 const FONT_WEIGHT = 300;
 
 const GAP_PX = 32;
-const SP_WIDER = 1.1; // SP rendered width = 1.1 × dealer rendered width
-const DEALER_WIDTH_RATIO = 0.44; // approved larger dealer mark within the hero
-const MAX_DEALER_WIDTH = 520;
 const HERO_HORIZONTAL_PADDING = 48;
 const HERO_VERTICAL_PADDING = 48;
-const CROSS_HEIGHT_PX = 30;
+const CROSS_SIZE_PX = 28; // fixed — does not scale with partner logo
+const SP_WIDTH_RATIO = 0.58; // SP wordmark max width as fraction of usable hero width
+const SP_MAX_FONT_SIZE = 80; // cap SP wordmark font size
 
 /**
  * HeroBanner — premium full-width brand partnership banner (vertical hierarchy).
@@ -27,13 +32,19 @@ const CROSS_HEIGHT_PX = 30;
  * The Sound Proof wordmark is pure text floating directly over the hero
  * photography. No blue rectangle, no wave graphic, no background panel.
  *
- * Sizing rules (mandatory):
- *   - Sound Proof rendered width is always exactly 10% wider than the dealer
- *     logo rendered width (e.g. dealer 300px → SP 330px).
- *   - Both logos preserve their original proportions (text scales proportionally;
- *     dealer image uses width + height:auto).
- *   - The dealer mark is width-led for a strong visual presence, with a
- *     height safety bound for unusually tall uploaded logos.
+ * Logo lockup system:
+ *   - Sound Proof wordmark is the master brand and visual anchor.
+ *   - Partner logo is always secondary — sized relative to SP width.
+ *   - Logo shape is detected from aspect ratio (very wide / wide / balanced /
+ *     tall / very tall) and shape-based sizing rules are applied.
+ *   - Wide wordmarks may use up to ~88% of SP width.
+ *   - Square/balanced logos use ~60% of SP width.
+ *   - Tall logos use ~42% of SP width.
+ *   - Very tall logos use ~35% of SP width.
+ *   - Partner logo height is capped so it never visually dominates SP.
+ *   - The × mark is fixed size (28px) and visually neutral.
+ *   - Admin overrides (scale, vertical offset, logo type) available in
+ *     Dealer Branding → Advanced Logo Controls.
  *
  * Contrast:
  *   The dark overlay auto-adjusts (45–60%) based on hero image brightness so
@@ -175,50 +186,64 @@ export default function DealerHero() {
   }, [dealerLogo]);
 
   const textColor = heroBg ? "#FFFFFF" : "#1B1A1A";
-  const crossColor = heroBg ? "rgba(255,255,255,0.45)" : "rgba(27,26,26,0.30)";
+  const crossColor = heroBg ? "rgba(255,255,255,0.50)" : "rgba(27,26,26,0.30)";
 
-  // Width leads the settled lockup: the dealer mark is deliberately large,
-  // and Sound Proof remains exactly 10% wider. A separate height bound only
-  // reduces the pair when an unusually tall uploaded logo would overflow.
-  const { spFontSize, dealerWidth } = useMemo(() => {
+  // Admin override fields from BrandAsset
+  const logoScale = (brand?.logo_scale || 100) / 100;
+  const logoVerticalOffset = brand?.logo_vertical_offset || 0;
+  const logoType = brand?.logo_type || LOGO_TYPES.AUTO;
+
+  // Logo lockup: SP wordmark is the anchor (sized from available width).
+  // Partner logo is sized relative to SP width based on detected shape
+  // (or manual override). The × mark is fixed size and visually neutral.
+  const { spFontSize, logoWidth, logoHeight } = useMemo(() => {
     const { width: heroWidth, height: heroHeight } = heroSize;
 
-    // Before measurement — use stable, deliberately generous defaults.
+    // Before measurement — use stable defaults
     if (!baseTextWidth) {
-      return { spFontSize: 56, dealerWidth: 360 };
+      return { spFontSize: 56, logoWidth: 300, logoHeight: 80 };
     }
 
     const textFactor = baseTextWidth / BASE_FONT_SIZE;
     const usableWidth = Math.max(0, heroWidth - HERO_HORIZONTAL_PADDING);
-    const desiredDealerWidth = Math.min(
-      usableWidth * DEALER_WIDTH_RATIO,
-      MAX_DEALER_WIDTH,
-    );
+    const availableHeight = Math.max(0, heroHeight - HERO_VERTICAL_PADDING * 2);
+
+    // SP wordmark — sized from available width, independent of dealer
+    const spMaxWidth = Math.min(usableWidth * SP_WIDTH_RATIO, 900);
+    let fontSize = Math.min(spMaxWidth / textFactor, SP_MAX_FONT_SIZE);
 
     if (!hasDealer || !dealerLogo || !dealerNatural) {
-      const maxWordmarkWidth = Math.min(usableWidth * 0.58, MAX_DEALER_WIDTH * SP_WIDER);
-      const maxWordmarkHeight = Math.max(36, heroHeight - HERO_VERTICAL_PADDING * 2);
+      const maxWordmarkHeight = availableHeight;
       return {
-        spFontSize: Math.min(maxWordmarkWidth / textFactor, maxWordmarkHeight),
-        dealerWidth: 0,
+        spFontSize: Math.min(fontSize, maxWordmarkHeight),
+        logoWidth: 0,
+        logoHeight: 0,
       };
     }
 
-    const dealerAspect = dealerNatural.w / dealerNatural.h;
-    const sizeCoefficient = (SP_WIDER / textFactor) + (1 / dealerAspect);
-    const availableVariableHeight = Math.max(
-      0,
-      heroHeight - HERO_VERTICAL_PADDING * 2 - CROSS_HEIGHT_PX - GAP_PX * 2,
-    );
-    const heightBoundDealerWidth = availableVariableHeight / sizeCoefficient;
-    const dWidth = Math.max(
-      0,
-      Math.min(desiredDealerWidth, heightBoundDealerWidth),
-    );
-    const fontSize = (SP_WIDER * dWidth) / textFactor;
+    // Detect logo shape (or use manual override)
+    const shape = resolveLogoShape(logoType, dealerNatural.w, dealerNatural.h);
+    const logoAspect = dealerNatural.w / dealerNatural.h;
 
-    return { spFontSize: fontSize, dealerWidth: dWidth };
-  }, [dealerNatural, heroSize, hasDealer, dealerLogo, baseTextWidth]);
+    // Height constraint: fontSize + gaps + cross + logoHeight ≤ availableHeight
+    const fixedHeight = GAP_PX * 2 + CROSS_SIZE_PX;
+    const logoHeightFraction = estimateLogoHeightFraction(shape, logoScale);
+    const heightMaxFontSize = Math.max(
+      20,
+      (availableHeight - fixedHeight) / (1 + textFactor * logoHeightFraction),
+    );
+    fontSize = Math.min(fontSize, heightMaxFontSize);
+
+    const spWidth = fontSize * textFactor;
+    const { logoWidth: lW, logoHeight: lH } = computeLogoDimensions({
+      spWidth,
+      logoAspect,
+      shape,
+      scale: logoScale,
+    });
+
+    return { spFontSize: fontSize, logoWidth: lW, logoHeight: lH };
+  }, [dealerNatural, heroSize, hasDealer, dealerLogo, baseTextWidth, logoScale, logoType]);
 
   return (
     <div
@@ -316,7 +341,7 @@ export default function DealerHero() {
           <>
             <span
               style={{
-                fontSize: "clamp(20px, 2.5vw, 30px)",
+                fontSize: CROSS_SIZE_PX,
                 fontWeight: 300,
                 color: crossColor,
                 lineHeight: 1,
@@ -337,10 +362,13 @@ export default function DealerHero() {
                   setDealerNatural({ w: img.naturalWidth, h: img.naturalHeight });
                 }}
                 style={{
-                  width: dealerWidth,
+                  maxWidth: logoWidth,
+                  maxHeight: logoHeight,
+                  width: "auto",
                   height: "auto",
                   objectFit: "contain",
                   flexShrink: 0,
+                  transform: `translateY(${logoVerticalOffset}px)`,
                 }}
               />
             ) : (

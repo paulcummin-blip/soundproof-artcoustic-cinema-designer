@@ -33,6 +33,9 @@ const WRITABLE_FIELDS = new Set([
   "include_rp22_overview",
   "include_technical_appendix",
   "proposal_tone",
+  "logo_scale",
+  "logo_vertical_offset",
+  "logo_type",
 ]);
 
 function updatedTimestamp(record) {
