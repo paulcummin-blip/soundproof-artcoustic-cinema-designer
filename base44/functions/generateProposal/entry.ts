@@ -34,15 +34,38 @@ const SECTION_PROMPTS = {
 };
 
 export default async function(req) {
+  let base44 = null;
+  let proposal = null;
+  let sectionRecords = [];
+
   try {
-    const base44 = createClientFromRequest(req);
+    base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, engineering_snapshot } = body;
+    const { request_id, project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, engineering_snapshot } = body;
 
+    if (!request_id) return Response.json({ error: 'request_id required' }, { status: 400 });
     if (!project_id) return Response.json({ error: 'project_id required' }, { status: 400 });
+
+    const existing = await base44.entities.Proposal.filter({ creation_request_id: request_id });
+    if (existing?.[0]) {
+      const existingSections = await base44.entities.ProposalSection.filter({ proposal_id: existing[0].id });
+      if (existing[0].status === 'generated' && existingSections.length === SECTIONS.length) {
+        return Response.json({
+          proposal_id: existing[0].id,
+          proposal: existing[0],
+          section_count: existingSections.length,
+          status: 'generated',
+          idempotent_replay: true,
+        });
+      }
+      return Response.json({
+        error: 'This proposal request is already in progress or requires recovery.',
+        proposal_id: existing[0].id,
+      }, { status: 409 });
+    }
 
     // ── Load project data ──
     const projects = await base44.entities.Project.filter({ id: project_id });
@@ -51,7 +74,13 @@ export default async function(req) {
 
     // ── Load brand assets ──
     let brandAsset = null;
-    const effectiveAccountId = account_id || project.account_id;
+    const effectiveAccountId = project.account_id;
+    if (!effectiveAccountId) {
+      return Response.json({ error: 'Project account is missing.' }, { status: 409 });
+    }
+    if (account_id && account_id !== effectiveAccountId) {
+      return Response.json({ error: 'Project account does not match the active account.' }, { status: 403 });
+    }
     if (effectiveAccountId) {
       const brandResults = await base44.entities.BrandAsset.filter({ account_id: effectiveAccountId });
       brandAsset = brandResults?.[0] || null;
@@ -66,13 +95,35 @@ export default async function(req) {
       : version_id
         ? [version_id]
         : [];
+    if (!['single', 'comparison'].includes(resolvedType)) {
+      return Response.json({ error: 'Unsupported proposal_type.' }, { status: 400 });
+    }
+    const expectedVersionCountValid = resolvedType === 'single'
+      ? resolvedVersionIds.length === 1
+      : resolvedVersionIds.length >= 2;
+    if (!expectedVersionCountValid) {
+      return Response.json({
+        error: resolvedType === 'single'
+          ? 'Single proposals require exactly one version.'
+          : 'Comparison proposals require at least two versions.',
+      }, { status: 400 });
+    }
+
+    const projectVersions = await base44.entities.ProjectVersion.filter({ project_id });
+    const projectVersionIds = new Set((projectVersions || []).map((item) => item.id));
+    const invalidVersionIds = resolvedVersionIds.filter((id) => !projectVersionIds.has(id));
+    if (invalidVersionIds.length > 0) {
+      return Response.json({ error: 'One or more selected versions do not belong to this project.' }, { status: 400 });
+    }
+
     // For backward compatibility, version_id = first selected version.
     const legacyVersionId = resolvedVersionIds[0] || null;
 
     // ── Create Proposal record ──
-    const proposal = await base44.entities.Proposal.create({
+    proposal = await base44.entities.Proposal.create({
       project_id,
       account_id: effectiveAccountId,
+      creation_request_id: request_id,
       proposal_type: resolvedType,
       selected_version_ids: resolvedVersionIds,
       version_id: legacyVersionId,
@@ -88,7 +139,7 @@ export default async function(req) {
     });
 
     // ── Create 10 ProposalSection records ──
-    const sectionRecords = await base44.entities.ProposalSection.bulkCreate(
+    sectionRecords = await base44.entities.ProposalSection.bulkCreate(
       SECTIONS.map((s, i) => ({
         proposal_id: proposal.id,
         account_id: effectiveAccountId,
@@ -119,27 +170,77 @@ export default async function(req) {
       })
     );
 
-    // ── Update sections with generated content ──
-    const updatePromises = editableIndices.map(({ section }, i) => {
-      const result = generationResults[i];
-      if (result.status === 'fulfilled') {
-        const html = typeof result.value === 'string' ? result.value : result.value?.content || '';
-        return base44.entities.ProposalSection.update(section.id, {
-          body: html,
-          last_gpt_generated_at: new Date().toISOString(),
-        });
-      }
-      return Promise.resolve();
+    const generatedContent = editableIndices.map(({ section }, index) => {
+      const result = generationResults[index];
+      const html = result.status === 'fulfilled'
+        ? (typeof result.value === 'string' ? result.value : result.value?.content || '').trim()
+        : '';
+      return { section, html, failed: result.status === 'rejected' || html.length === 0 };
     });
+    const failedSections = generatedContent.filter((item) => item.failed);
+    if (failedSections.length > 0) {
+      throw new Error(`Proposal generation failed for ${failedSections.length} section(s). No proposal was saved.`);
+    }
 
-    await Promise.all(updatePromises);
+    // ── Update sections with generated content ──
+    const generatedAt = new Date().toISOString();
+    await Promise.all(generatedContent.map(({ section, html }) =>
+      base44.entities.ProposalSection.update(section.id, {
+        body: html,
+        last_gpt_generated_at: generatedAt,
+      })
+    ));
 
     // ── Update Proposal status ──
     await base44.entities.Proposal.update(proposal.id, { status: 'generated' });
 
-    return Response.json({ proposal_id: proposal.id, status: 'generated' });
+    const completedProposal = { ...proposal, status: 'generated' };
+    return Response.json({
+      proposal_id: proposal.id,
+      proposal: completedProposal,
+      section_count: sectionRecords.length,
+      status: 'generated',
+      idempotent_replay: false,
+    });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    const cleanupSucceeded = proposal?.id
+      ? await rollbackCreatedProposal(base44, proposal.id, sectionRecords)
+      : true;
+    return Response.json({
+      error: error?.message || 'Proposal generation failed.',
+      cleanup_succeeded: cleanupSucceeded,
+      proposal_id: cleanupSucceeded ? null : proposal?.id || null,
+    }, { status: 500 });
+  }
+}
+
+async function rollbackCreatedProposal(base44, proposalId, knownSections = []) {
+  if (!base44 || !proposalId) return true;
+  try {
+    const discovered = await base44.entities.ProposalSection.filter({ proposal_id: proposalId });
+    const sectionIds = [...new Set([
+      ...knownSections.map((section) => section?.id),
+      ...(discovered || []).map((section) => section?.id),
+    ].filter(Boolean))];
+
+    const sectionDeletes = await Promise.allSettled(
+      sectionIds.map((sectionId) => base44.entities.ProposalSection.delete(sectionId))
+    );
+    const sectionsRemoved = sectionDeletes.every((result) => result.status === 'fulfilled');
+    if (!sectionsRemoved) {
+      await base44.entities.Proposal.update(proposalId, { status: 'draft' });
+      return false;
+    }
+
+    await base44.entities.Proposal.delete(proposalId);
+    return true;
+  } catch {
+    try {
+      await base44.entities.Proposal.update(proposalId, { status: 'draft' });
+    } catch {
+      // Best effort: a remaining Draft card is safer than a misleading Generated card.
+    }
+    return false;
   }
 }
 
