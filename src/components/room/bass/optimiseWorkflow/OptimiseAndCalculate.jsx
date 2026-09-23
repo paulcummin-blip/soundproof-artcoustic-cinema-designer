@@ -52,6 +52,13 @@ import BassOptimisationSummary from "./BassOptimisationSummary";
 import FurtherImprovements from "./FurtherImprovements";
 import ImproveBassResponseV2 from "../improveBassV2/ImproveBassResponseV2";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY } from "../bassCalculationLifecycle";
+import {
+  computeCalibrationBasisFingerprint,
+  extractCalibrationValues,
+} from "../calibrationAuthority/calibrationAuthority.js";
+import {
+  markCalibrationOptimiserGenerated,
+} from "../calibrationAuthority/calibrationAuthorityStore.js";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -183,11 +190,11 @@ export default function OptimiseAndCalculate({
 
       let appliedTuning = false;
       if (hasCal && autoApplySummary.tuning && commitInstances) {
+        const rspPosition = buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m, appState?.designatedRspSeatId);
+        const selectedSubModel = frontSubsCfg?.model || rearSubsCfg?.model || null;
+        const requested = shared?.authoritative?.requested || {};
         const fingerprint = (() => {
           try {
-            const rspPosition = buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m, appState?.designatedRspSeatId);
-            const selectedSubModel = frontSubsCfg?.model || rearSubsCfg?.model || null;
-            const requested = shared?.authoritative?.requested || {};
             return computeV2DesignFingerprint({
               subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel,
               p14TargetBasis: requested.p14TargetBasis || "minimum",
@@ -201,6 +208,30 @@ export default function OptimiseAndCalculate({
 
         const next = autoApplyCalibration(subwooferInstances, autoApplySummary.tuning, commitInstances, fingerprint);
         appliedTuning = !!next;
+        // Stamp the Calibration Authority — calibration is part of the design.
+        if (next) {
+          try {
+            const basisFp = computeCalibrationBasisFingerprint({
+              subwooferInstances: next,
+              roomDims,
+              seatingPositions,
+              rspPosition,
+              selectedSubModel,
+              p14TargetBasis: requested.p14TargetBasis || "minimum",
+              p14TargetLevel: requested.requestedLevel || 2,
+              p14TargetDb: requested.selectedP14TargetDb || 117,
+              p18TargetBasis: requested.p18TargetBasis || "minimum",
+            });
+            markCalibrationOptimiserGenerated(projectId, versionId, {
+              basisFingerprint: basisFp,
+              candidateId: "auto-optimise",
+              values: extractCalibrationValues(next),
+              stageKey: "calibration",
+            });
+          } catch {
+            // Non-fatal: stamp failure must not block the workflow
+          }
+        }
       }
 
       // Phase 4: Recalculate with the optimised system

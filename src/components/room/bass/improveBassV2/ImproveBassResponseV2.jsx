@@ -53,6 +53,19 @@ import ImproveBassV2CompletedInvestigation from "./ImproveBassV2CompletedInvesti
 import OptimisationDiagnosticsReport from "./OptimisationDiagnosticsReport";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
+import {
+  computeCalibrationBasisFingerprint,
+  extractCalibrationValues,
+  resolveCalibrationStatus,
+  CALIBRATION_STATUS,
+} from "../calibrationAuthority/calibrationAuthority.js";
+import {
+  useCalibrationAuthority,
+  markCalibrationOptimiserGenerated,
+  markCalibrationStale,
+  resetCalibrationAuthority,
+} from "../calibrationAuthority/calibrationAuthorityStore.js";
+import CalibrationAuthorityPanel from "../calibrationAuthority/CalibrationAuthorityPanel.jsx";
 
 export default function ImproveBassResponseV2({
   roomDims,
@@ -157,6 +170,92 @@ export default function ImproveBassResponseV2({
     && !!state?.winner?.applyFingerprint
     && !!currentDesignFingerprint
     && currentDesignFingerprint !== state.winner.applyFingerprint;
+
+  // ── Calibration Authority lifecycle ─────────────────────────────────
+  // Calibration is part of the design, not a hidden optimiser setting.
+  // The basis fingerprint tracks engineering inputs that determine whether
+  // calibration is still valid — WITHOUT including the calibration values
+  // themselves. When geometry changes, calibration becomes Stale.
+  const calibrationBasisFingerprint = useMemo(() => {
+    try {
+      return computeCalibrationBasisFingerprint({
+        subwooferInstances,
+        roomDims,
+        seatingPositions,
+        rspPosition,
+        selectedSubModel,
+        p14TargetBasis: p14Params.p14TargetBasis,
+        p14TargetLevel: p14Params.p14TargetLevel,
+        p14TargetDb: p14Params.p14TargetDb,
+        p18TargetBasis: p14Params.p18TargetBasis,
+      });
+    } catch {
+      return null;
+    }
+  }, [subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel, p14Params]);
+
+  const calibrationAuthority = useCalibrationAuthority(projectId, versionId);
+  const calibrationStatus = useMemo(() => {
+    if (!calibrationAuthority || !calibrationBasisFingerprint) return null;
+    return resolveCalibrationStatus(calibrationAuthority, calibrationBasisFingerprint);
+  }, [calibrationAuthority, calibrationBasisFingerprint]);
+
+  // Auto-detect stale calibration when geometry changes
+  React.useEffect(() => {
+    if (!calibrationAuthority || !calibrationBasisFingerprint) return;
+    if (calibrationAuthority.basisFingerprint !== calibrationBasisFingerprint) {
+      markCalibrationStale(projectId, versionId,
+        "Current calibration belongs to an earlier version of this design and is no longer authoritative.");
+    }
+  }, [calibrationAuthority, calibrationBasisFingerprint, projectId, versionId]);
+
+  const handleRecalculateCalibration = useCallback(() => {
+    // Recalculate = re-run the optimiser to produce fresh calibration
+    handleStart();
+  }, [handleStart]);
+
+  const handleResetCalibration = useCallback(() => {
+    if (!commitInstances || !hasCanonicalInstances) return;
+    const reset = (subwooferInstances || []).map((inst) => ({
+      ...inst,
+      delayMs: 0,
+      gainDb: 0,
+      polarity: 1,
+      phaseControlDeg: 0,
+      tuningSource: "manual",
+      appliedV2Provenance: null,
+    }));
+    commitInstances(reset, { front: { placementMode: "manual", isManual: true }, rear: { placementMode: "manual", isManual: true } });
+    resetCalibrationAuthority(projectId, versionId);
+  }, [commitInstances, hasCanonicalInstances, subwooferInstances, projectId, versionId]);
+
+  // Stamp the Calibration Authority after a successful optimiser Apply.
+  // The basis fingerprint is computed from the POST-apply design so the
+  // authority is Current against the new geometry.
+  const stampCalibrationAuthority = useCallback((nextInstances, candidateId, stageKey) => {
+    try {
+      const basisFp = computeCalibrationBasisFingerprint({
+        subwooferInstances: nextInstances,
+        roomDims,
+        seatingPositions,
+        rspPosition,
+        selectedSubModel,
+        p14TargetBasis: p14Params.p14TargetBasis,
+        p14TargetLevel: p14Params.p14TargetLevel,
+        p14TargetDb: p14Params.p14TargetDb,
+        p18TargetBasis: p14Params.p18TargetBasis,
+      });
+      const values = extractCalibrationValues(nextInstances);
+      markCalibrationOptimiserGenerated(projectId, versionId, {
+        basisFingerprint: basisFp,
+        candidateId,
+        values,
+        stageKey,
+      });
+    } catch {
+      // If fingerprint computation fails, don't block the apply
+    }
+  }, [roomDims, seatingPositions, rspPosition, selectedSubModel, p14Params, projectId, versionId]);
 
   const handleStart = useCallback(async () => {
     if (runningRef.current) return;
@@ -401,7 +500,8 @@ export default function ImproveBassResponseV2({
       ? applyCalibrationTuning(subwooferInstances,rec.result.appliedTuning,_provenance)
       : buildOptimisedInstances(rec.result,subwooferInstances,roomDims,selectedSubModel,_provenance);
     commitInstances(next,{front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
-  },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,versionId,subwooferInstances,roomDims,selectedSubModel]);
+    stampCalibrationAuthority(next, rec.result.candidateId, rec.interventionType || "calibration");
+  },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,versionId,subwooferInstances,roomDims,selectedSubModel,stampCalibrationAuthority]);
   const handleApplyCalibration=handleApply;
 
   // ── Trade-off Apply handler ──────────────────────────────────────────
@@ -427,7 +527,8 @@ export default function ImproveBassResponseV2({
       ? applyCalibrationTuning(subwooferInstances,entry.result.appliedTuning,_provenance)
       : buildOptimisedInstances(entry.result,subwooferInstances,roomDims,selectedSubModel,_provenance);
     commitInstances(next,{front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
-  },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,versionId,subwooferInstances,roomDims,selectedSubModel]);
+    stampCalibrationAuthority(next, entry.result.candidateId, entry.result.candidateKind || "calibration");
+  },[state?.status,state?.winner,commitInstances,hasCanonicalInstances,projectId,versionId,subwooferInstances,roomDims,selectedSubModel,stampCalibrationAuthority]);
 
   // ── Per-stage Apply handler ──────────────────────────────────────────
   // Each stage has its own independent Apply action. The user may choose
@@ -447,11 +548,13 @@ export default function ImproveBassResponseV2({
       const _provenance = buildProvenance(stageKey, result.candidateId, state.winner.applyFingerprint, fingerprint);
       const next = applyCalibrationTuning(subwooferInstances, result.appliedTuning || result.tuning || [], _provenance);
       commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
+      stampCalibrationAuthority(next, result.candidateId, stageKey);
     } else if (stageKey === "subPositions") {
       // Apply subwoofer position change
       const _provenance = buildProvenance("subPositions", result.candidateId, state.winner.applyFingerprint, fingerprint);
       const next = buildOptimisedInstances(result, subwooferInstances, roomDims, selectedSubModel, _provenance);
       commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
+      stampCalibrationAuthority(next, result.candidateId, "subPositions");
     } else if (stageKey === "combined") {
       // Combined apply: may include sub positions + retuned calibration,
       // OR calibration + seating, OR all three. Apply ALL components in
@@ -468,6 +571,7 @@ export default function ImproveBassResponseV2({
         next = applyCalibrationTuning(subwooferInstances, result.appliedTuning || result.tuning || [], _provenance);
       }
       commitInstances(next, {front:{placementMode:"manual",isManual:true},rear:{placementMode:"manual",isManual:true}});
+      stampCalibrationAuthority(next, result.candidateId, "combined");
 
       // Step 2: Apply seating changes if present (calibration+seating combined)
       if (result.seatingPositions && commitSeating) {
@@ -575,6 +679,7 @@ export default function ImproveBassResponseV2({
       next = applyCalibrationTuning(subwooferInstances, candidate.appliedTuning || [], _provenance);
     }
     commitInstances(next, { front: { placementMode: "manual", isManual: true }, rear: { placementMode: "manual", isManual: true } });
+    stampCalibrationAuthority(next, candidate.candidateId || "preview-apply", hasCoords ? "subPositions" : "calibration");
 
     if (candidate.seatingPositions && commitSeating) {
       commitSeating(candidate.seatingPositions);
@@ -636,6 +741,19 @@ export default function ImproveBassResponseV2({
       <p className="mt-1 text-[11px] leading-relaxed text-[#625143]">
         Test practical placement, timing, polarity and level improvements before recommending more hardware.
       </p>
+
+      {/* ── Calibration Authority lifecycle panel ── */}
+      {/* Calibration is part of the design, not a hidden optimiser setting. */}
+      {calibrationAuthority && (
+        <CalibrationAuthorityPanel
+          authority={calibrationAuthority}
+          isStale={calibrationStatus?.isStale || false}
+          staleReason={calibrationStatus?.staleReason || null}
+          onRecalculate={handleRecalculateCalibration}
+          onReset={handleResetCalibration}
+          busy={isBusy}
+        />
+      )}
 
       <div className="mt-3">
         <Button
