@@ -226,6 +226,61 @@ export default function ProposalEditor() {
     [commitDraft]
   );
 
+  const flushDirtyDrafts = useCallback(async () => {
+    const drafts = Object.entries(dirtyDraftsRef.current);
+    if (drafts.length > 0) {
+      const results = await Promise.all(
+        drafts.map(([sectionId, draft]) =>
+          commitDraft(sectionId, draft.html, draft.editedAt, false)
+        )
+      );
+      return results.every((result) => result?.ok) &&
+        Object.keys(dirtyDraftsRef.current).length === 0;
+    }
+
+    const pending = Object.values(pendingSavesRef.current)
+      .map((request) => request?.promise)
+      .filter(Boolean);
+    if (pending.length === 0) return true;
+
+    const results = await Promise.all(pending);
+    return results.every((result) => result?.ok) &&
+      Object.keys(dirtyDraftsRef.current).length === 0;
+  }, [commitDraft]);
+
+  useEffect(() => {
+    const handleInternalNavigation = async (event) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) return;
+
+      const target = event.target instanceof Element ? event.target : null;
+      const anchor = target?.closest('a[href]');
+      if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+
+      const destination = new URL(anchor.href, window.location.href);
+      if (destination.origin !== window.location.origin || destination.href === window.location.href) return;
+
+      const hasUnsavedWork =
+        Object.keys(dirtyDraftsRef.current).length > 0 ||
+        Object.keys(pendingSavesRef.current).length > 0;
+      if (!hasUnsavedWork) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      const saved = await flushDirtyDrafts();
+      if (saved) window.location.assign(destination.href);
+    };
+
+    document.addEventListener('click', handleInternalNavigation, true);
+    return () => document.removeEventListener('click', handleInternalNavigation, true);
+  }, [flushDirtyDrafts]);
+
   useEffect(() => {
     const handleBeforeUnload = (event) => {
       const drafts = Object.entries(dirtyDraftsRef.current);
