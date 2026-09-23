@@ -88,6 +88,7 @@ export default async function(req) {
     const payload = {
       project_id: projectId,
       version_id: resolvedVersionId,
+      account_id: projectAccountId || null,
       current_fingerprint:
         input.current_fingerprint == null ? null : String(input.current_fingerprint),
       status,

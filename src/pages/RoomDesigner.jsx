@@ -20,6 +20,7 @@ import { useActiveProjectId } from "@/components/state/project-session";
 import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint, readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 import { isRetainedSummaryStillValid } from "@/components/state/designRatingPublicationAuthority";
 import { buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
+import { useEngineeringPublicationEffect } from "@/components/proposal/engineeringAuthority/useEngineeringPublicationEffect";
 
 // Hooks and utils (kept eager; they are light and provide guards below)
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
@@ -1934,6 +1935,22 @@ function RoomDesignerWithState() {
       priceData: publishedPriceData,
     });
   }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState, _seatingPositions, placedSpeakers, frontSubsForRendering, rearSubsForRendering, _screen, dolbyPreset, mlpAnchorEffective, publishedPriceData, loadState?.phase, appState?.isProjectHydrationReady, minimumSystemMet]);
+
+  // Phase 1A: Database-backed Published Engineering Authority.
+  // This runs ALONGSIDE the browser handoff above — it does NOT replace it.
+  // The browser handoff remains exactly as-is for legacy compatibility.
+  // This effect publishes the settled engineering summary to the database
+  // via the publishEngineering backend function (debounced, idempotent).
+  useEngineeringPublicationEffect({
+    projectId: resolvedProjectId || projectIdState || null,
+    versionId: appState?.activeVersionId || null,
+    isPublishable: appDesignRating?.isPublishable === true,
+    engineeringSummary: appDesignRating?.engineeringSummary ?? null,
+    fingerprint: appDesignRating?.bassReadiness?.fingerprint || null,
+    ready: loadState?.phase === "loaded"
+      && appState?.isProjectHydrationReady === true
+      && minimumSystemMet,
+  });
 
   // Publish the current live seat-priority fingerprint so the sidebar can
   // detect when a published scoped rating was calculated from a different

@@ -24,6 +24,37 @@
       "type": "object",
       "description": "The authoritative serialisation of the Room Designer state. Contains every field required to completely reconstruct a design version \u2014 speakers, subwoofers, seating, screen, overlays, SPL config, RSP, acoustic treatment, calibration assumptions, and all other per-version design data. No per-version design field should remain on the Project entity. Future per-version fields automatically belong inside design_state without requiring schema changes.",
       "properties": {}
+    },
+    "published_fingerprint": {
+      "type": "string",
+      "description": "Engineering fingerprint of the last Published Engineering result. Written only by publishEngineering(). Null = not yet published. When set, a matching entry exists in ProjectAnalysisCache.engineering_publications under this key.",
+      "nullable": true
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the last engineering publication. Written only by publishEngineering(). Null = never published.",
+      "nullable": true
+    },
+    "published_engine_version": {
+      "type": "string",
+      "description": "Engineering Authority schema version at publication time. Written only by publishEngineering().",
+      "nullable": true
+    },
+    "published_rp22_version": {
+      "type": "string",
+      "description": "RP22 bass metric schema version at publication time. Written only by publishEngineering().",
+      "nullable": true
+    },
+    "published_algorithm_version": {
+      "type": "string",
+      "description": "Bass analysis contract version at publication time. Written only by publishEngineering().",
+      "nullable": true
+    },
+    "publication_reason": {
+      "type": "string",
+      "description": "Reason for the last publication (e.g. 'auto-settled', 'legacy-migration'). Written only by publishEngineering().",
+      "nullable": true
     }
   },
   "required": [

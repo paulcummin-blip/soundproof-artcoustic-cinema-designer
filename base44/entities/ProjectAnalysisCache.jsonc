@@ -1,7 +1,7 @@
 {
   "name": "ProjectAnalysisCache",
   "type": "object",
-  "description": "Persistent completed bass-analysis authority for a project version, keyed by exact result fingerprint.",
+  "description": "Persistent completed bass-analysis authority for a project version, keyed by exact result fingerprint. Also stores immutable Published Engineering publications keyed by engineering fingerprint \u2014 the database-backed Published Engineering Authority.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -10,6 +10,11 @@
     "version_id": {
       "type": "string",
       "description": "ProjectVersion identifier owning this analysis authority. Together with project_id and fingerprint, this is the sole cache lookup key. No NULL version_id fallback path exists \u2014 every cache row must have a valid version_id."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Denormalized account_id from the parent Project, used for RLS. Must be set at creation time from the parent Project's account_id.",
+      "nullable": true
     },
     "completed_cache_version": {
       "type": "integer",
@@ -43,10 +48,169 @@
     "target_cache": {
       "type": "object",
       "description": "Persistent P14 background target cache. Contains: { metricSchemaVersion: number, baseDesignFingerprint: string, targets: { targetKey -> compact authoritative bass contract } }. All 8 P14 target combinations share the same baseDesignFingerprint. Invalidated when any bass-relevant design input changes."
+    },
+    "engineering_publications": {
+      "type": "object",
+      "description": "Immutable Published Engineering publications keyed by exact engineering fingerprint. Each entry: { engineering_summary, engineering_fingerprint, published_at, engine_version, rp22_version, algorithm_version, publication_reason, provenance }. Publications are write-once: once an entry exists for a fingerprint, it is never modified or deleted. The ProjectVersion.published_fingerprint pointer selects the current publication. Null when no publications exist yet.",
+      "nullable": true
     }
   },
   "required": [
     "project_id",
     "version_id"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
 }
