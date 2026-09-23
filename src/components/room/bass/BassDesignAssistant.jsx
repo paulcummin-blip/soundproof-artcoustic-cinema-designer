@@ -37,7 +37,8 @@ import BassTargetLevelControl from "@/components/room/bass/BassTargetLevelContro
 import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
 import BassRecommendationSection from "@/components/room/bass/recommendationAuthority/BassRecommendationSection";
 import BassDecisionActions from "@/components/room/bass/recommendationAuthority/BassDecisionActions";
-import RecommendationNarration from "@/components/recommendationEngine/RecommendationNarration";
+// SHELFED: RecommendationNarration — see audit. Not wired until the
+// "Optimise, Accept & Calculate" workflow is proven end-to-end.
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 
 // ── Shell copy per unified lifecycle state ──
@@ -200,13 +201,6 @@ export default function BassDesignAssistant({
 
       {/* ── Recommended next action ── */}
       <p className="text-[12px] text-[#625143] leading-relaxed">{copy.nextAction}</p>
-
-      {/* ── Stage 1: Recommendation Narration ── */}
-      {/* Engineering explanation from the Recommendation Engine. Reads like an
-          experienced cinema designer explaining the next best action.
-          Renders nothing when no engine output is available (the lifecycle
-          copy above serves as the fallback). */}
-      <RecommendationNarration appState={appState} />
 
       {/* ── Stage 2: Recommendation vs Applied Calibration (presentation only) ── */}
       {/* Displays the Recommendation Authority and Applied Calibration Authority
