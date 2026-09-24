@@ -28,6 +28,7 @@ const RewPlotRangeDebug = ({ chartData, yDomain }) => {
 export default function BassGraph({ 
   responseData, 
   multiSeries,
+  flexHeight = false,
   schroederFrequency = 0, 
   rp22Levels = [], 
   toggles = {}, 
@@ -263,7 +264,7 @@ export default function BassGraph({
     }, [multiSeries]);
 
     return (
-        <div className="w-full h-[575px]">
+        <div className={flexHeight ? "w-full h-full" : "w-full h-[575px]"} style={flexHeight ? { minHeight: 400 } : undefined}>
             {rewStyleMode && (
                 <>
                     <div className="text-[10px] text-gray-500 mb-1 flex items-center justify-between">

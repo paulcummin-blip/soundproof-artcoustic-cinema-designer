@@ -105,6 +105,8 @@ export default function OptimiseAndCalculate({
   appState,
   amplifierPowerPerSubW,
   disabled,
+  hasResults = false,
+  registerRecalculate = null,
 }) {
   const projectId = useActiveProjectId();
   const versionId = appState?.activeVersionId || null;
@@ -392,6 +394,23 @@ export default function OptimiseAndCalculate({
     }
   }, [projectId, versionId]);
 
+  // Expose a recalculate function via registerRecalculate so the compact
+  // Recalculate control in the Performance header can trigger the full
+  // optimise-and-calculate workflow without duplicating orchestration logic.
+  const handleStartRef = useRef(handleStart);
+  const handleResetRef = useRef(handleReset);
+  handleStartRef.current = handleStart;
+  handleResetRef.current = handleReset;
+
+  useEffect(() => {
+    if (!registerRecalculate) return;
+    registerRecalculate(() => {
+      handleResetRef.current();
+      setTimeout(() => handleStartRef.current(), 50);
+    });
+    return () => registerRecalculate(null);
+  }, [registerRecalculate]);
+
   // A physical Apply commits room state first. Wait until React has produced
   // the new calculation fingerprint, then calculate that exact design. Calling
   // the render-captured handler immediately queues the previous fingerprint and
@@ -476,7 +495,7 @@ export default function OptimiseAndCalculate({
   return (
     <div className="mt-3 rounded-lg border border-[#D9D5CE] bg-white px-4 py-4">
       {/* ── Main button ── */}
-      {!isCalculating && !isComplete && !isError && !isCancelledState && !isTimedOut && (
+      {!isCalculating && !isComplete && !isError && !isCancelledState && !isTimedOut && !hasResults && (
         <>
           <button
             type="button"

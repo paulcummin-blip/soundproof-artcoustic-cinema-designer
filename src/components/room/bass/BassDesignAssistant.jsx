@@ -40,6 +40,7 @@ import CurrentLayoutBanner from "@/components/room/bass/bda/CurrentLayoutBanner"
 import CapabilitySelector from "@/components/room/bass/bda/CapabilitySelector";
 import ImproveDesignCard from "@/components/room/bass/bda/ImproveDesignCard";
 import PresentationModeToggle from "@/components/room/bass/bda/PresentationModeToggle";
+import PerformanceHeader from "@/components/room/bass/bda/PerformanceHeader";
 
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
@@ -58,6 +59,7 @@ export default function BassDesignAssistant({
   const shared = useSharedBassResults();
   const [showLayoutCards, setShowLayoutCards] = useState(true);
   const [presentationMode, setPresentationMode] = useState(false);
+  const [recalculateFn, setRecalculateFn] = useState(null);
   const hadSubsRef = useRef(false);
 
   const subwooferInstances = appState?.subwooferInstances || [];
@@ -157,22 +159,32 @@ export default function BassDesignAssistant({
           hasCanonicalInstances={compat.hasCanonicalInstances}
           appState={appState}
           disabled={disabled}
+          hasResults={hasResults}
+          registerRecalculate={setRecalculateFn}
         />
       )}
 
       {/* ── Stage 3: Performance ── */}
       {hasResults && !presentationMode && (
         <div className="space-y-3" data-bda-stage="performance">
-          <BassHeadlinePills />
+          <PerformanceHeader
+            hasResults={hasResults}
+            isCalculating={isCalculating}
+            isStale={isStale}
+            onRecalculate={recalculateFn}
+          />
           <CapabilitySelector disabled={disabled} />
           <React.Suspense fallback={<div className="p-4 text-sm text-[#625143]">Loading graph…</div>}>
             <BassResponse
               hideHeader
+              engineeringDetailCollapsed
+              isCalculating={isCalculating}
               frontSubsCfg={frontSubsCfg}
               rearSubsCfg={rearSubsCfg}
               subWarnings={subWarnings || {}}
             />
           </React.Suspense>
+          <BassHeadlinePills />
         </div>
       )}
 

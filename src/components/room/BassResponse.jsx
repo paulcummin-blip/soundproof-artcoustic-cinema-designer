@@ -1,4 +1,5 @@
 import React, { useMemo, useEffect, useState, useRef } from "react";
+import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ import { resolveP14TargetSelectionState } from "@/components/room/bass/p14Target
 
 const IS_DEVELOPMENT_MODE = false;
 
-export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, hideHeader = false }) {
+export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, hideHeader = false, engineeringDetailCollapsed = false, isCalculating = false }) {
   const appState = useAppState();
   const { setFrontSubsCfg, setRearSubsCfg, designEqEnabled, setDesignEqEnabled } = appState;
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
@@ -681,7 +682,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           <div style={{ fontSize: 14, fontWeight: 600, color: "#625143" }}>Select Bass Target</div>
           <div style={{ fontSize: 12, color: "#8B7F76", marginTop: 4 }}>Choose a bass target to view the response graph</div>
         </div>
-      ) : !hasCurrentBassResult ? (
+      ) : !hasCurrentBassResult && visibleMultiSeries.length === 0 ? (
         <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#625143" }}>
             {bassAuthorityStatus === "STALE" ? "Response needs recalculation" : "Optimise & Calculate"}
@@ -691,7 +692,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           </div>
         </div>
       ) : (
-      <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
+      <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12, ...(engineeringDetailCollapsed ? { display: "flex", flexDirection: "column", flex: 1, minHeight: 600 } : {}) }}>
+        {!engineeringDetailCollapsed && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
             Bass Response
@@ -754,32 +756,58 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
             )}
           </div>
         </div>
+        )}
 
+        {engineeringDetailCollapsed ? (
+          <CollapsiblePanel title="Engineering Detail" defaultOpen={false}>
+            <div className="space-y-3 pt-2">
+              <SeatResponseScopeControls
+                rspPosition={rspPosition}
+                orderedSeats={orderedSeats}
+                selectedSeatIds={selectedSeatIds}
+                getSeatColor={getSeatColor}
+                onSelectRsp={selectRsp}
+                onSelectSeat={selectSeat}
+                onSelectAll={selectAllSeats}
+              />
+              <BassCurveVisibilityControls
+                visibility={curveVisibility}
+                availability={layerAvailability}
+                onChange={setCurveVisibility}
+              />
+              <BassSmoothingControl value={bassSmoothingMode} onChange={setBassSmoothingMode} />
+              <Rp22GraphMarkerKey markers={rp22GraphMarkers} />
+            </div>
+          </CollapsiblePanel>
+        ) : (
+          <>
+            {/* P14 presentation header removed from default view — values shown in result cards above */}
 
+            <SeatResponseScopeControls
+              rspPosition={rspPosition}
+              orderedSeats={orderedSeats}
+              selectedSeatIds={selectedSeatIds}
+              getSeatColor={getSeatColor}
+              onSelectRsp={selectRsp}
+              onSelectSeat={selectSeat}
+              onSelectAll={selectAllSeats}
+            />
 
-        {/* P14 presentation header removed from default view — values shown in result cards above */}
+            <BassCurveVisibilityControls
+              visibility={curveVisibility}
+              availability={layerAvailability}
+              onChange={setCurveVisibility}
+            />
 
-        <SeatResponseScopeControls
-          rspPosition={rspPosition}
-          orderedSeats={orderedSeats}
-          selectedSeatIds={selectedSeatIds}
-          getSeatColor={getSeatColor}
-          onSelectRsp={selectRsp}
-          onSelectSeat={selectSeat}
-          onSelectAll={selectAllSeats}
-        />
+            <Rp22GraphMarkerKey markers={rp22GraphMarkers} />
+          </>
+        )}
 
-        <BassCurveVisibilityControls
-          visibility={curveVisibility}
-          availability={layerAvailability}
-          onChange={setCurveVisibility}
-        />
-
-        <Rp22GraphMarkerKey markers={rp22GraphMarkers} />
-
-        <div className="mt-2">
+        <div className={engineeringDetailCollapsed ? "mt-2 flex-1 min-h-[400px] relative" : "mt-2"}>
           {visibleMultiSeries.length > 0 ? (
+            <>
             <BassGraph
+              flexHeight={engineeringDetailCollapsed}
               multiSeries={visibleMultiSeries}
               responseData={(visibleMultiSeries.find((series) => series.kind === "post-eq") || visibleMultiSeries[0])?.data ?? []}
               schroederFrequency={schroederFrequency}
@@ -801,6 +829,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               operatingLevelOffsetDb={operatingLevelOffsetDb}
               rp22Markers={rp22GraphMarkers}
             />
+            {isCalculating && engineeringDetailCollapsed && (
+              <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(248, 247, 244, 0.6)", borderRadius: 8, pointerEvents: "none" }}>
+                <div className="flex items-center gap-2 text-[#625143]">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-[12px] font-semibold">Recalculating…</span>
+                </div>
+              </div>
+            )}
+            </>
           ) : (
             <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>
               {multiSeriesForGraph.length > 0
