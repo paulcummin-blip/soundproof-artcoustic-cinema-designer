@@ -264,7 +264,7 @@ export default function BassGraph({
     }, [multiSeries]);
 
     return (
-        <div className={flexHeight ? "w-full h-full" : "w-full h-[575px]"} style={flexHeight ? { minHeight: 400 } : undefined}>
+        <div className="w-full h-[575px]" style={flexHeight ? { minHeight: 400 } : undefined}>
             {rewStyleMode && (
                 <>
                     <div className="text-[10px] text-gray-500 mb-1 flex items-center justify-between">
