@@ -163,6 +163,7 @@ export default function BassDesignAssistant({
               rearSubsCfg={rearSubsCfg}
               subWarnings={subWarnings}
               hideHeader={true}
+              engineeringDetailCollapsed={true}
             />
           </Suspense>
         </div>

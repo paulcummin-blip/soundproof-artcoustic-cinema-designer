@@ -92,7 +92,7 @@ function RoomPlanPreview({ roomDims, seatingPositions, layoutSources, rspPositio
     <svg
       viewBox={`${-pad} ${-pad} ${width + pad * 2} ${length + pad * 2}`}
       className="w-full rounded-md border border-[#D9D5CE] bg-[#F8F7F4]"
-      style={{ minHeight: 240 }}
+      style={{ minHeight: 180 }}
       role="img"
       aria-label="Room plan showing seating and subwoofer positions"
     >
@@ -191,7 +191,7 @@ function LayoutMiniSchematic({ layout, roomDims }) {
   return (
     <svg
       viewBox={`0 0 ${width} ${length}`}
-      className="h-10 w-full rounded border border-[#E7E4DF] bg-[#F8F7F4]"
+      className="h-16 w-full rounded border border-[#E7E4DF] bg-[#F8F7F4]"
       role="img"
       aria-label={`Schematic: ${layout?.sources?.length || 0} subwoofers`}
     >
@@ -221,19 +221,19 @@ function LayoutCard({ quantity, layout, roomDims, isSelected, onSelect, isApplie
     <button
       type="button"
       onClick={() => onSelect(quantity)}
-      className={`text-left rounded-lg border p-2.5 transition-all ${
+      className={`text-left rounded-lg border p-3.5 transition-all ${
         isSelected || isApplied
           ? "border-2 border-[#213428] bg-[#F3F1EC]"
           : "border border-[#D9D5CE] bg-white hover:border-[#BFB9AE]"
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="text-[12px] font-semibold text-[#1B1A1A]">{LAYOUT_TITLES[quantity]}</div>
+        <div className="text-[13px] font-semibold text-[#1B1A1A]">{LAYOUT_TITLES[quantity]}</div>
         {isApplied && (
           <span className="rounded-full bg-[#213428] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">Applied</span>
         )}
       </div>
-      <div className="mt-0.5 text-[10px] leading-snug text-[#625143]">{describeLayout(quantity, layout)}</div>
+      <div className="mt-1 text-[11px] leading-snug text-[#625143]">{describeLayout(quantity, layout)}</div>
       <div className="mt-1.5">
         <LayoutMiniSchematic layout={layout} roomDims={roomDims} />
       </div>

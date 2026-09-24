@@ -1,10 +1,10 @@
 import React from "react";
 
 export const DEFAULT_BASS_CURVE_VISIBILITY = Object.freeze({
-  room: true,
-  product: true,
+  room: false,
+  product: false,
   combined: true,
-  house: true,
+  house: false,
   finalEq: true,
 });
 

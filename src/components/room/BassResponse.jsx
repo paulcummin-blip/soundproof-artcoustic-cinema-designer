@@ -759,26 +759,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         )}
 
         {engineeringDetailCollapsed ? (
-          <CollapsiblePanel title="Engineering Detail" defaultOpen={false}>
-            <div className="space-y-3 pt-2">
-              <SeatResponseScopeControls
-                rspPosition={rspPosition}
-                orderedSeats={orderedSeats}
-                selectedSeatIds={selectedSeatIds}
-                getSeatColor={getSeatColor}
-                onSelectRsp={selectRsp}
-                onSelectSeat={selectSeat}
-                onSelectAll={selectAllSeats}
-              />
-              <BassCurveVisibilityControls
-                visibility={curveVisibility}
-                availability={layerAvailability}
-                onChange={setCurveVisibility}
-              />
-              <BassSmoothingControl value={bassSmoothingMode} onChange={setBassSmoothingMode} />
-              <Rp22GraphMarkerKey markers={rp22GraphMarkers} />
-            </div>
-          </CollapsiblePanel>
+          <>
+            <SeatResponseScopeControls
+              rspPosition={rspPosition}
+              orderedSeats={orderedSeats}
+              selectedSeatIds={selectedSeatIds}
+              getSeatColor={getSeatColor}
+              onSelectRsp={selectRsp}
+              onSelectSeat={selectSeat}
+              onSelectAll={selectAllSeats}
+            />
+            <CollapsiblePanel title="Engineering Detail" defaultOpen={false}>
+              <div className="space-y-3 pt-2">
+                <BassCurveVisibilityControls
+                  visibility={curveVisibility}
+                  availability={layerAvailability}
+                  onChange={setCurveVisibility}
+                />
+                <BassSmoothingControl value={bassSmoothingMode} onChange={setBassSmoothingMode} />
+                <Rp22GraphMarkerKey markers={rp22GraphMarkers} />
+              </div>
+            </CollapsiblePanel>
+          </>
         ) : (
           <>
             {/* P14 presentation header removed from default view — values shown in result cards above */}
@@ -814,9 +816,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               rp22Levels={[]}
               toggles={{}}
               crossoverFrequency={80}
-              showModeMarkers={showRoomModes}
-              modeMarkers={modeMarkersForGraph}
-              protectedNullAnnotations={protectedNullAnnotations}
+              showModeMarkers={engineeringDetailCollapsed ? false : showRoomModes}
+              modeMarkers={engineeringDetailCollapsed ? [] : modeMarkersForGraph}
+              protectedNullAnnotations={engineeringDetailCollapsed ? [] : protectedNullAnnotations}
               linearHzAxis={false}
               rewStyleMode={true}
               yDomain={[70, 140]}
@@ -846,7 +848,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
             </div>
           )}
         </div>
-        <ProtectedNullWarningSummary annotations={protectedNullAnnotations} />
+        {!engineeringDetailCollapsed && <ProtectedNullWarningSummary annotations={protectedNullAnnotations} />}
 
         {/* Displayed smoothing label */}
         <div style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace', marginTop: 4 }}>

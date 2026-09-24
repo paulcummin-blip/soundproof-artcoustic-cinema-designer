@@ -77,83 +77,55 @@ export default function ChooseDesignTarget({ disabled }) {
   const displayLevel = selectedLevel || DEFAULT_LEVEL;
 
   return (
-    <div className="space-y-3" data-bda-stage="design-target">
-      {/* Workspace header */}
-      <div>
-        <h4
-          className="text-[15px] font-semibold text-[#1B1A1A]"
-          style={{ fontFamily: "Didact Gothic, sans-serif" }}
-        >
-          Design Target
-        </h4>
-      </div>
-
+    <div className="flex items-center gap-4 flex-wrap" data-bda-stage="design-target">
+      <span className="text-[13px] font-semibold text-[#1B1A1A]" style={{ fontFamily: "Didact Gothic, sans-serif" }}>
+        Design Target
+      </span>
       {/* P14 Capability */}
-      <div className="rounded-lg border border-[#E7E4DF] bg-white px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">P14 Capability</div>
-            <div className="mt-0.5 text-[11px] text-[#8A7B6A]">The SPL level you are designing to</div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            {[1, 2, 3, 4].map((level) => {
-              const isActive = displayLevel === level;
-              return (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => handleLevelChange(level)}
-                  disabled={disabled}
-                  className={`rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all ${
-                    isActive
-                      ? "bg-[#213428] text-white border border-[#213428]"
-                      : "bg-white text-[#213428] border border-[#D9D5CE] hover:bg-[#F5F5F0]"
-                  } disabled:cursor-not-allowed disabled:opacity-45`}
-                  aria-pressed={isActive}
-                >
-                  L{level}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="mt-2 text-[11px] text-[#625143]">
-          {LEVEL_LABELS[displayLevel]}
-        </div>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">P14</span>
+        {[1, 2, 3, 4].map((level) => {
+          const isActive = displayLevel === level;
+          return (
+            <button
+              key={level}
+              type="button"
+              onClick={() => handleLevelChange(level)}
+              disabled={disabled}
+              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                isActive
+                  ? "bg-[#213428] text-white border border-[#213428]"
+                  : "bg-white text-[#213428] border border-[#D9D5CE] hover:bg-[#F5F5F0]"
+              } disabled:cursor-not-allowed disabled:opacity-45`}
+              aria-pressed={isActive}
+            >
+              L{level}
+            </button>
+          );
+        })}
       </div>
-
       {/* P18 Extension */}
-      <div className="rounded-lg border border-[#E7E4DF] bg-white px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">P18 Extension</div>
-            <div className="mt-0.5 text-[11px] text-[#8A7B6A]">How deep the bass should reach</div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            {["minimum", "recommended"].map((basis) => {
-              const isActive = selectedP18Basis === basis;
-              return (
-                <button
-                  key={basis}
-                  type="button"
-                  onClick={() => handleP18BasisChange(basis)}
-                  disabled={disabled}
-                  className={`rounded-md px-3 py-1.5 text-[12px] font-semibold capitalize transition-all ${
-                    isActive
-                      ? "bg-[#213428] text-white border border-[#213428]"
-                      : "bg-white text-[#213428] border border-[#D9D5CE] hover:bg-[#F5F5F0]"
-                  } disabled:cursor-not-allowed disabled:opacity-45`}
-                  aria-pressed={isActive}
-                >
-                  {basis}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="mt-2 text-[11px] text-[#625143]">
-          {P18_LABELS[selectedP18Basis]}
-        </div>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">P18</span>
+        {["minimum", "recommended"].map((basis) => {
+          const isActive = selectedP18Basis === basis;
+          return (
+            <button
+              key={basis}
+              type="button"
+              onClick={() => handleP18BasisChange(basis)}
+              disabled={disabled}
+              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold capitalize transition-all ${
+                isActive
+                  ? "bg-[#213428] text-white border border-[#213428]"
+                  : "bg-white text-[#213428] border border-[#D9D5CE] hover:bg-[#F5F5F0]"
+              } disabled:cursor-not-allowed disabled:opacity-45`}
+              aria-pressed={isActive}
+            >
+              {basis}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -170,30 +170,25 @@ export default function FurtherImprovements({
   const seatingApplied = appliedStages.has("seating");
 
   return (
-    <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A] mb-2">
-        Further Design Improvements
-      </div>
-      <div className="space-y-2">
-        {hasSubPositions && (
-          <ImprovementCard
-            title="Move subwoofers"
-            description="Repositioning the subwoofers could further improve bass consistency across the seating area."
-            onApply={handleApplySubPositions}
-            applyLabel="Apply"
-            appliedSummary={placementApplied ? "Subwoofer positions updated. Estimated improvement achieved." : null}
-          />
-        )}
-        {hasSeating && (
-          <ImprovementCard
-            title="Move seating"
-            description="Small seating position changes could further improve bass uniformity."
-            onApply={handleApplySeating}
-            applyLabel="Apply"
-            appliedSummary={seatingApplied ? "Seating position updated. Estimated improvement achieved." : null}
-          />
-        )}
-      </div>
+    <div className="mt-2 space-y-2">
+      {hasSubPositions && (
+        <ImprovementCard
+          title="Move subwoofers"
+          description="Repositioning the subwoofers could further improve bass consistency across the seating area."
+          onApply={handleApplySubPositions}
+          applyLabel="Apply"
+          appliedSummary={placementApplied ? "Subwoofer positions updated. Estimated improvement achieved." : null}
+        />
+      )}
+      {hasSeating && (
+        <ImprovementCard
+          title="Move seating"
+          description="Small seating position changes could further improve bass uniformity."
+          onApply={handleApplySeating}
+          applyLabel="Apply"
+          appliedSummary={seatingApplied ? "Seating position updated. Estimated improvement achieved." : null}
+        />
+      )}
     </div>
   );
 }

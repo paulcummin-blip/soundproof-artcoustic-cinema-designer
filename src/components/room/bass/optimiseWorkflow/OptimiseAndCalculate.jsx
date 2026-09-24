@@ -607,7 +607,6 @@ export default function OptimiseAndCalculate({
         <>
           <BassOptimisationSummary
             autoApplied={workflowState.autoApplied}
-            noImprovementsFound={workflowState.noImprovementsFound}
             v2State={v2State}
             completedBassAuthority={shared?.completedBassAuthority}
             subwooferCount={
@@ -617,6 +616,9 @@ export default function OptimiseAndCalculate({
                   ).length
                 : 0
             }
+            shared={shared}
+            roomDims={roomDims}
+            seatingPositions={seatingPositions}
           />
 
           {/* ── Further Design Improvements (physical recommendations) ── */}
