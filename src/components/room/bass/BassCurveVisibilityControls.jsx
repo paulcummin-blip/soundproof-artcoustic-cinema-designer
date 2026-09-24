@@ -4,7 +4,7 @@ export const DEFAULT_BASS_CURVE_VISIBILITY = Object.freeze({
   room: false,
   product: false,
   combined: true,
-  house: false,
+  house: true,
   finalEq: true,
 });
 
