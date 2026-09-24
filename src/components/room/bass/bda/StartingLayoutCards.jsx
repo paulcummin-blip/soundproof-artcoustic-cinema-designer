@@ -62,24 +62,6 @@ function currentSourcesFrom(subs) {
     .filter((source) => Number.isFinite(source.x) && Number.isFinite(source.y));
 }
 
-function describeLayout(quantity, layout) {
-  if (!layout || !layout.sources) return "No layout available";
-  const sources = layout.sources;
-  const hasFront = sources.some((s) => s.placement === "front");
-  const hasRear = sources.some((s) => s.placement === "rear");
-
-  if (quantity === 1) return "Front centre · simplest installation";
-  if (quantity === 2) {
-    if (hasFront && hasRear) return "Front and rear · balanced response";
-    return "Front quarter lines · mirrors the seating geometry";
-  }
-  if (quantity === 4) {
-    if (hasFront && hasRear) return "Front and rear quarter lines · highest installation commitment";
-    return "Four-point placement · comprehensive coverage";
-  }
-  return "";
-}
-
 // ── Room plan preview ──
 function RoomPlanPreview({ roomDims, seatingPositions, layoutSources, rspPosition }) {
   const width = Number(roomDims?.widthM) || 1;
@@ -233,7 +215,6 @@ function LayoutCard({ quantity, layout, roomDims, isSelected, onSelect, isApplie
           <span className="rounded-full bg-[#213428] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">Applied</span>
         )}
       </div>
-      <div className="mt-0.5 text-[10px] leading-snug text-[#8A7B6A]">{describeLayout(quantity, layout)}</div>
       <div className="mt-2">
         <LayoutMiniSchematic layout={layout} roomDims={roomDims} />
       </div>
@@ -345,7 +326,7 @@ export default function StartingLayoutCards({
           {selectedLayout && (
             <div className="text-[11px] text-[#625143]">
               <span className="font-semibold">Current Selection:</span>{" "}
-              {LAYOUT_TITLES[selectedQuantity]} · {describeLayout(selectedQuantity, selectedLayout).split(" · ")[0]}
+              {LAYOUT_TITLES[selectedQuantity]}
             </div>
           )}
           <SeatingBadges
