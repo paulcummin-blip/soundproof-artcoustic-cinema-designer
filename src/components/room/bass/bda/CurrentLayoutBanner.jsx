@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import React from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 function LayoutThumbnail({ subwooferInstances, roomDims }) {
   const enabled = (Array.isArray(subwooferInstances) ? subwooferInstances : [])
@@ -81,11 +81,29 @@ function deriveLayoutLabel(subwooferInstances) {
   return { count, layoutName };
 }
 
-export default function CurrentLayoutBanner({ subwooferInstances, roomDims, hasResults, onChange }) {
+export default function CurrentLayoutBanner({ subwooferInstances, roomDims, hasResults, isCalculating, isStale, onChange }) {
   const layout = deriveLayoutLabel(subwooferInstances);
   if (!layout) return null;
 
-  const statusText = hasResults ? "Performance calculated" : "Not yet analysed";
+  let statusText;
+  let StatusIcon = null;
+  let statusColor = "#8A7B6A";
+
+  if (isCalculating) {
+    statusText = "Recalculating…";
+    StatusIcon = Loader2;
+    statusColor = "#625143";
+  } else if (!hasResults) {
+    statusText = "Ready to calculate performance";
+  } else if (isStale) {
+    statusText = "Performance is out of date";
+    StatusIcon = AlertCircle;
+    statusColor = "#B87333";
+  } else {
+    statusText = "Performance is current";
+    StatusIcon = CheckCircle2;
+    statusColor = "#3A6B4A";
+  }
 
   return (
     <div
@@ -99,7 +117,10 @@ export default function CurrentLayoutBanner({ subwooferInstances, roomDims, hasR
           {layout.count} Subwoofer{layout.count > 1 ? "s" : ""}
         </div>
         <div className="text-[12px] text-[#625143]">{layout.layoutName}</div>
-        <div className="mt-1 text-[10px] text-[#8A7B6A]">{statusText}</div>
+        <div className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: statusColor }}>
+          {StatusIcon && <StatusIcon className={`h-3 w-3 ${isCalculating ? "animate-spin" : ""}`} />}
+          {statusText}
+        </div>
       </div>
       <button
         type="button"

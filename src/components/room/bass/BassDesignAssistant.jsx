@@ -63,6 +63,8 @@ export default function BassDesignAssistant({
   const subwooferInstances = appState?.subwooferInstances || [];
   const hasSubwoofers = subwooferInstances.some((s) => s?.enabled !== false);
   const hasResults = shared?.hasCurrentResult === true;
+  const isCalculating = shared?.calculationInProgress === true;
+  const isStale = shared?.bassLifecycleState === "stale_needs_recalculation" || shared?.calculationOutcome === "stale";
 
   // Auto-collapse layout cards when subwoofers first appear
   useEffect(() => {
@@ -134,6 +136,8 @@ export default function BassDesignAssistant({
           subwooferInstances={subwooferInstances}
           roomDims={roomDims}
           hasResults={hasResults}
+          isCalculating={isCalculating}
+          isStale={isStale}
           onChange={() => setShowLayoutCards(true)}
         />
       )}
