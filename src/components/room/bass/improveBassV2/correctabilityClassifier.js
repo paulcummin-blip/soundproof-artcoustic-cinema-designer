@@ -10,17 +10,26 @@
 // restates it in plain engineering language. ADI never classifies.
 //
 // Class 1 — Absolute cancellation:
-//   Deep null with no usable energy. Do not boost.
+//   Very deep null (>15 dB) with negligible remaining energy, OR
+//   extreme narrow null (>10 dB) at a low modal frequency (<80 Hz)
+//   that is likely non-minimum-phase. Do not boost.
 //   Recommend seating, movement, or additional subwoofers.
 //
 // Class 2 — Recoverable feature:
-//   Usable energy remains. Correction compatible with design objectives.
-//   Allow constrained EQ.
+//   Broad depressions, moderate nulls with recoverable energy, tonal
+//   imbalance, and response features that professional calibration systems
+//   (Trinnov, Dirac, StormAudio, REW) would normally correct.
+//   EQ is permitted because the response is physically recoverable and
+//   the correction remains compatible with the selected design objectives.
 //
 // Class 3 — Capability-limited feature:
 //   Correction is mathematically possible but prevents achieving the
 //   selected capability (P14) or extension (P18) objective.
 //   Explain the trade-off rather than automatically applying.
+//
+// The optimiser does NOT ask "Is there a null?"
+// It asks: "Is this response physically recoverable, and is the
+// engineering trade-off worthwhile for the selected design objective?"
 //
 // This module is PURE: no React, no side effects.
 // ---------------------------------------------------------------------------
@@ -41,12 +50,32 @@ export const CORRECTABILITY_CLASS = {
 // these as the single authoritative implementation.
 
 export const CORRECTABILITY_THRESHOLDS = {
-  absoluteCancellationDb: 6.0,
+  // Absolute cancellation: very deep null with negligible remaining energy.
+  // Only truly unrecoverable nulls — not a blanket "never boost" rule.
+  absoluteCancellationDb: 15.0,
+
+  // Extreme narrow null: deep null at a low modal frequency.
+  // Likely non-minimum-phase — EQ boost cannot recover the energy.
+  extremeNarrowNullDb: 10.0,
+  extremeNarrowNullMaxFreqHz: 80,
+
   capabilityHeadroomMarginDb: 1.0,
 };
 
 /**
  * Classify the correctability of the dominant response feature.
+ *
+ * Replaces the blanket "never boost nulls" rule with a physical-recoverability
+ * assessment. The optimiser asks: "Is this response physically recoverable,
+ * and is the engineering trade-off worthwhile for the selected design objective?"
+ *
+ * EQ is permitted for broad depressions, moderate nulls, tonal imbalance,
+ * and recoverable response features that professional calibration systems
+ * (Trinnov, Dirac, StormAudio, REW) would normally correct.
+ *
+ * EQ is NOT permitted for absolute cancellations, extreme narrow nulls
+ * with negligible remaining energy, clearly non-minimum-phase behaviour,
+ * or corrections that would violate the selected P14/P18 objectives.
  *
  * Called by the optimiser after its search completes. The result is included
  * in the selection object and consumed by ADI as part of the authoritative
@@ -94,15 +123,32 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
   }
 
   // ── Class 1: Absolute cancellation ──
-  const isDeepNull = deviation > t.absoluteCancellationDb;
+  // Two pathways to absolute cancellation:
+  //   a) Very deep null (>15 dB) — negligible remaining energy at any frequency.
+  //   b) Extreme narrow null (>10 dB) at a low modal frequency (<80 Hz) —
+  //      likely non-minimum-phase; EQ boost cannot recover the energy.
+  //
+  // This replaces the blanket "never boost nulls" rule. Moderate nulls
+  // (6–10 dB) and broad depressions are now correctly classified as
+  // recoverable, matching professional calibration practice (Trinnov,
+  // Dirac, StormAudio, REW).
   const isModalOrCancellation =
     problem.type === PROBLEM_TYPE.LOCAL_CANCELLATION
     || problem.type === PROBLEM_TYPE.ROOM_MODE;
 
-  if (isDeepNull && isModalOrCancellation) {
+  const isAbsoluteDeepNull = deviation > t.absoluteCancellationDb;
+  const isExtremeNarrowNull =
+    deviation > t.extremeNarrowNullDb
+    && freq > 0 && freq < t.extremeNarrowNullMaxFreqHz
+    && isModalOrCancellation;
+
+  if (isAbsoluteDeepNull || isExtremeNarrowNull) {
+    const reason = isAbsoluteDeepNull
+      ? `a ${deviation.toFixed(1)} dB null at ${freq.toFixed(0)} Hz leaves negligible remaining energy`
+      : `a ${deviation.toFixed(1)} dB null at ${freq.toFixed(0)} Hz is an extreme narrow null at a low modal frequency — likely non-minimum-phase`;
     return {
       class: CORRECTABILITY_CLASS.ABSOLUTE_CANCELLATION,
-      description: `Absolute cancellation — a ${deviation.toFixed(1)} dB null at ${freq.toFixed(0)} Hz leaves no usable energy. EQ boost cannot recover this; physical changes are required.`,
+      description: `Absolute cancellation — ${reason}. EQ boost cannot recover this; physical changes are required.`,
       eqAllowed: false,
       physicalRecommended: true,
     };
@@ -133,9 +179,17 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
   }
 
   // ── Class 2: Recoverable feature ──
+  // Broad depressions, moderate nulls with recoverable energy, tonal
+  // imbalance, and response features that professional calibration systems
+  // (Trinnov, Dirac, StormAudio, REW) would normally correct.
+  // EQ is permitted because the response is physically recoverable and
+  // the correction remains compatible with the selected design objectives.
+  const featureType = deviation <= 6
+    ? 'broad depression'
+    : (freq > 0 && freq < t.extremeNarrowNullMaxFreqHz ? 'moderate null' : 'response feature');
   return {
     class: CORRECTABILITY_CLASS.RECOVERABLE,
-    description: `Recoverable — a ${deviation.toFixed(1)} dB deviation at ${freq.toFixed(0)} Hz with usable energy remaining. Constrained EQ is permitted within the design objectives.`,
+    description: `Recoverable — a ${deviation.toFixed(1)} dB ${featureType} at ${freq.toFixed(0)} Hz with usable energy remaining. The response is physically recoverable; constrained EQ is permitted within the selected design objectives.`,
     eqAllowed: true,
     physicalRecommended: false,
   };
