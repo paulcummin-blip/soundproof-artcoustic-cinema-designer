@@ -601,7 +601,11 @@ export default function OptimiseAndCalculate({
       )}
 
       {/* ── Recommended Improvement: ADI Recommendation ── */}
-      {(isComplete || (hasResults && !isCalculating && !isError && !isCancelledState && !isTimedOut)) && (
+      {/* Authoritative project state drives the zone; workflow status only
+          modifies presentation. When authoritative bass results exist, the
+          zone always renders — AdiRecommendation internally resolves to one
+          of: Recommended Improvement, No further engineering, or No further EQ. */}
+      {hasResults && (
         <div className="mt-3">
           <AdiRecommendation
             autoApplied={workflowState.autoApplied}
