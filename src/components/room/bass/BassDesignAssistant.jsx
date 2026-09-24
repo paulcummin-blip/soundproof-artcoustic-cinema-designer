@@ -133,6 +133,7 @@ export default function BassDesignAssistant({
         <CurrentLayoutBanner
           subwooferInstances={subwooferInstances}
           roomDims={roomDims}
+          hasResults={hasResults}
           onChange={() => setShowLayoutCards(true)}
         />
       )}

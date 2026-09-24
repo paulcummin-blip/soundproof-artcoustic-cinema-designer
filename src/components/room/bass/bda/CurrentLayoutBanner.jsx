@@ -81,9 +81,11 @@ function deriveLayoutLabel(subwooferInstances) {
   return { count, layoutName };
 }
 
-export default function CurrentLayoutBanner({ subwooferInstances, roomDims, onChange }) {
+export default function CurrentLayoutBanner({ subwooferInstances, roomDims, hasResults, onChange }) {
   const layout = deriveLayoutLabel(subwooferInstances);
   if (!layout) return null;
+
+  const statusText = hasResults ? "Performance calculated" : "Not yet analysed";
 
   return (
     <div
@@ -97,6 +99,7 @@ export default function CurrentLayoutBanner({ subwooferInstances, roomDims, onCh
           {layout.count} Subwoofer{layout.count > 1 ? "s" : ""}
         </div>
         <div className="text-[12px] text-[#625143]">{layout.layoutName}</div>
+        <div className="mt-1 text-[10px] text-[#8A7B6A]">{statusText}</div>
       </div>
       <button
         type="button"
@@ -104,7 +107,7 @@ export default function CurrentLayoutBanner({ subwooferInstances, roomDims, onCh
         className="flex items-center gap-1.5 rounded-md border border-[#D9D5CE] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#213428] transition-colors hover:bg-[#F5F5F0]"
       >
         <RefreshCw className="h-3.5 w-3.5" />
-        Change
+        Change Layout
       </button>
     </div>
   );
