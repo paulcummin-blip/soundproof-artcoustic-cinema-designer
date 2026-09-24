@@ -290,6 +290,7 @@ export function createBassAnalysisResult() {
       poolId: null,
       candidateSignature: null,
       filterBankSignature: null,
+      correctionCurveSignature: null,
       postEqCurveSignature: null,
       engineVersion: null,
       realSeatCount: 0,

@@ -66,7 +66,7 @@ export function buildCandidateId(candidate) {
     candidateStartStrategy(candidate),
     fixed(candidate.canonicalVerticalOffsetDb),
     fixed(candidate.assessmentStartHz), fixed(candidate.assessmentEndHz),
-    buildFilterBankSignature(candidate), buildCurveSignature(candidate.finalPostEqCurve),
+    buildCorrectionCurveSignature(candidate), buildCurveSignature(candidate.finalPostEqCurve),
   ].join("|");
   return `bass-candidate:${hashText(identity)}`;
 }
@@ -87,11 +87,13 @@ export function stampCandidateAuthority(candidate) {
   if (!candidate) return candidate;
   const candidateId = buildCandidateId(candidate);
   const filterBankSignature = buildFilterBankSignature(candidate);
+  const correctionCurveSignature = buildCorrectionCurveSignature(candidate);
   const postEqCurveSignature = buildCurveSignature(candidate.finalPostEqCurve);
   const stampProtectedRegions = (regions) => (Array.isArray(regions) ? regions : []).map((region) => ({
     ...region,
     selectedCandidateId: candidateId,
     curveSignature: postEqCurveSignature,
+    correctionCurveSignature,
     filterBankSignature,
   }));
   const protectedNullRegions = stampProtectedRegions(candidate.protectedNullRegions);
@@ -103,6 +105,7 @@ export function stampCandidateAuthority(candidate) {
     ...candidate,
     candidateId,
     filterBankSignature,
+    correctionCurveSignature,
     postEqCurveSignature,
     protectedNullRegions,
     houseCurveDiagnostics,
@@ -169,8 +172,11 @@ export function validateCachedBassResult(result, expectedIdentity = {}) {
       : "Candidate pool generation completed without candidates";
     return { valid: false, reason, message };
   }
-  if (candidates.some((candidate) => candidate.filterBankSignature !== buildFilterBankSignature(candidate))) {
-    return { valid: false, reason: "candidate-filter-signature-mismatch" };
+  // The corrected response is the sole engineering authority. The candidate
+  // identity is validated against the correction-curve signature, NOT the
+  // filter-bank signature. The filter bank is diagnostic-only.
+  if (candidates.some((candidate) => candidate.correctionCurveSignature !== buildCorrectionCurveSignature(candidate))) {
+    return { valid: false, reason: "candidate-correction-signature-mismatch" };
   }
   if (result.collectDiagnostics === true) {
     const houseCandidates = candidates.filter((candidate) => candidate.designEqFitProfile === "house_curve");
@@ -188,8 +194,8 @@ export function validateCachedBassResult(result, expectedIdentity = {}) {
   if (result.contractCandidateId && result.productionCandidateId && result.contractCandidateId !== result.productionCandidateId) {
     return { valid: false, reason: "contract-production-candidate-mismatch" };
   }
-  if (result.graphFilterBankSignature && result.filterBankSignature && result.graphFilterBankSignature !== result.filterBankSignature) {
-    return { valid: false, reason: "graph-filter-signature-mismatch" };
+  if (result.graphCorrectionCurveSignature && result.correctionCurveSignature && result.graphCorrectionCurveSignature !== result.correctionCurveSignature) {
+    return { valid: false, reason: "graph-correction-signature-mismatch" };
   }
   return { valid: true, reason: null };
 }

@@ -4,7 +4,7 @@ import { calculateAllSeatMetricsFromCorrected } from "@/components/utils/houseCu
 import { annotateCandidatePoolForHouseCurveRanking } from "@/components/utils/houseCurveCandidateRankingMetrics";
 import { isPhysicallyCredibleBassCandidate } from "@/components/utils/bassCandidatePoolEligibility";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
-import { buildCurveSignature, buildFilterBankSignature, stampPoolAuthority } from "@/components/room/bass/bassResultAuthority";
+import { buildCurveSignature, buildFilterBankSignature, buildCorrectionCurveSignature, stampPoolAuthority } from "@/components/room/bass/bassResultAuthority";
 import { BASS_OPTIMISER_POOL_VERSION } from "@/components/room/bass/bassOptimiserWorkerProtocol";
 import {
   buildCanonicalAbsoluteHouseCurveTarget,
@@ -623,7 +623,7 @@ function buildCanonicalCandidate({
     const pairedP14P18Authority = calculatePairedP14P18ProductionAuthority({
       ...(pairedAuthorityInputs || {}),
       combinedEqCurve: correctionCurve,
-      selectedEqBankIdentity: buildFilterBankSignature({ generatedFilterBank: eq.filters || [] }),
+      selectedCorrectionIdentity: buildCurveSignature(correctionCurve),
     });
     const p14Pass = pairedP14P18Authority?.status === "PASS";
     const p14MarginDb = pairedP14P18Authority?.limitingResult?.marginDb ?? null;
@@ -891,7 +891,7 @@ function buildCanonicalCandidate({
   const pairedP14P18Authority = calculatePairedP14P18ProductionAuthority({
     ...(pairedAuthorityInputs || {}),
     combinedEqCurve: realisticCorrectionCurve,
-    selectedEqBankIdentity: buildFilterBankSignature({ generatedFilterBank: eq.filters || [] }),
+    selectedCorrectionIdentity: buildCurveSignature(realisticCorrectionCurve),
   });
   const pairedP14P18Summary = buildPairedP14P18CandidateSummary(pairedP14P18Authority);
   return {

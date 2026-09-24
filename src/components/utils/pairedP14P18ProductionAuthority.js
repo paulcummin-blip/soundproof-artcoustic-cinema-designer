@@ -194,10 +194,10 @@ function buildLimitingResult(assessment, shadow, requestedLevel = null) {
   };
 }
 
-function buildEqHeadroom(shadow, upperFrequencyHz, selectedEqBankIdentity) {
+function buildEqHeadroom(shadow, upperFrequencyHz, selectedCorrectionIdentity) {
   const points = (shadow.postEqDeliveredCurve || []).filter((point) => point.frequency >= 20 && point.frequency <= Math.min(120, upperFrequencyHz));
   const maximum = points.reduce((best, point) => Number(point.positiveEqCostDb) > best.costDb ? { costDb: Number(point.positiveEqCostDb), frequencyHz: Number(point.frequency) } : best, { costDb: 0, frequencyHz: null });
-  return { assessmentRangeHz: [20, Math.min(120, upperFrequencyHz)], maximumPositiveEqCostDb: maximum.costDb, maximumPositiveEqCostFrequencyHz: maximum.frequencyHz, selectedEqBankIdentity: selectedEqBankIdentity ?? null };
+  return { assessmentRangeHz: [20, Math.min(120, upperFrequencyHz)], maximumPositiveEqCostDb: maximum.costDb, maximumPositiveEqCostFrequencyHz: maximum.frequencyHz, selectedCorrectionIdentity: selectedCorrectionIdentity ?? null };
 }
 
 function buildSourceResult(activeSubs, transfers, sourceDiagnostics) {
@@ -254,7 +254,7 @@ export function calculatePairedP14P18ProductionAuthority(inputs = {}) {
     },
     coverage,
     limitingResult: buildLimitingResult(selectedAssessment, selectedShadow, requestedLevel),
-    eqHeadroom: buildEqHeadroom(selectedShadow, upperFrequencyHz, inputs.selectedEqBankIdentity),
+    eqHeadroom: buildEqHeadroom(selectedShadow, upperFrequencyHz, inputs.selectedCorrectionIdentity),
     sources: buildSourceResult(activeSubs, perSourceComplexTransfers, sourceDiagnostics),
     methodDiagnostics: {
       smoothing: selectedShadow.method?.smoothing || "one-third-octave power mean: mean(10^(dB/10)), then 10log10",

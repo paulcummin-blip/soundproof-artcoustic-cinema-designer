@@ -71,9 +71,13 @@ function describeCalibrationAction(winner, currentResult) {
   if (polarityChanges.length) parts.push(`Invert polarity — ${polarityChanges.join(', ')}.`);
 
   // EQ
-  if (winner.canonicalAuthorityReceipt?.filterBankSignature
-    && currentResult?.canonicalAuthorityReceipt?.filterBankSignature
-    && winner.canonicalAuthorityReceipt.filterBankSignature !== currentResult.canonicalAuthorityReceipt.filterBankSignature) {
+  // EQ change detection uses the correction-curve signature (the corrected
+  // response authority), NOT the filter-bank signature. The filter bank is
+  // diagnostic-only; two different filter banks that produce the same
+  // corrected response are engineering-equivalent.
+  if (winner.canonicalAuthorityReceipt?.correctionCurveSignature
+    && currentResult?.canonicalAuthorityReceipt?.correctionCurveSignature
+    && winner.canonicalAuthorityReceipt.correctionCurveSignature !== currentResult.canonicalAuthorityReceipt.correctionCurveSignature) {
     parts.push('Apply updated common calibration EQ.');
   }
 

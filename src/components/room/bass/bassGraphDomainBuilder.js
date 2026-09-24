@@ -232,9 +232,11 @@ export function buildBassGraphSeries({
           const rawSeat = rawBySeat.get(seatId);
           return { id: `${seatId}-eq`, kind: "post-eq", label: `${seatId} after EQ`, tooltipLabel: `${seatId} after EQ`,
             candidateId: finalResponse.selectedCandidateId, filterBankSignature: finalResponse.filterBankSignature,
+            correctionCurveSignature: finalResponse.correctionCurveSignature,
             sourcePostEqCurveHash: graphIdentity?.postEqCurveHash || null,
             sourceCandidateId: graphIdentity?.candidateId || null,
             sourceFilterBankSignature: graphIdentity?.filterBankSignature || null,
+            sourceCorrectionCurveSignature: graphIdentity?.correctionCurveSignature || null,
             sourceFingerprint: graphIdentity?.fingerprint || null,
             sourceCalibrationFingerprint: graphIdentity?.calibrationFingerprint || null,
             color: rawSeat?.color || ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"][index % 6],
@@ -251,9 +253,11 @@ export function buildBassGraphSeries({
             : isSalvagedCandidate ? "RSP after EQ — partial EQ bank applied"
             : "RSP after EQ",
           candidateId: finalResponse.selectedCandidateId, filterBankSignature: finalResponse.filterBankSignature,
+          correctionCurveSignature: finalResponse.correctionCurveSignature,
           sourcePostEqCurveHash: graphIdentity?.postEqCurveHash || null,
           sourceCandidateId: graphIdentity?.candidateId || null,
           sourceFilterBankSignature: graphIdentity?.filterBankSignature || null,
+          sourceCorrectionCurveSignature: graphIdentity?.correctionCurveSignature || null,
           sourceFingerprint: graphIdentity?.fingerprint || null,
           sourceCalibrationFingerprint: graphIdentity?.calibrationFingerprint || null,
           color: "#16A34A", strokeWidth: 2.5, data: applyBassSmoothing(finalResponse.postEqRspCurve, smoothingMode) });
@@ -261,6 +265,7 @@ export function buildBassGraphSeries({
           .filter((seat) => multiSeries.some((item) => item.id === seat.seatId))
           .map((seat, index) => ({ id: seat.seatId, kind: "real-seat-overlay", label: `${seat.seatId} after EQ`, tooltipLabel: `${seat.seatId} after EQ`,
             candidateId: finalResponse.selectedCandidateId, filterBankSignature: finalResponse.filterBankSignature,
+            correctionCurveSignature: finalResponse.correctionCurveSignature,
             color: multiSeries.find((item) => item.id === seat.seatId)?.color || ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"][index % 6],
             strokeWidth: 1.25, strokeOpacity: 0.5, data: applyBassSmoothing(seat.responseData, smoothingMode) })));
       }

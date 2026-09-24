@@ -122,6 +122,7 @@ function buildCandidateRef(candidate, collectDiagnostics = false) {
     startStrategy: candidate.startStrategy || null,
     selectedStart: candidate.selectedStart || null,
     filterBankSignature: candidate.filterBankSignature || null,
+    correctionCurveSignature: candidate.correctionCurveSignature || null,
     requestedP14Level: candidate.requestedP14Level ?? null,
     requestedP18Level: candidate.requestedP18Level ?? null,
     requestedP19Level: candidate.requestedP19Level ?? null,
@@ -400,6 +401,7 @@ export function adaptCurrentBassOptimisationResult({
   contract.provenance.poolId = poolId;
   contract.provenance.candidateSignature = buildProvenanceSignature(selectedCandidate, poolId);
   contract.provenance.filterBankSignature = finalResponse?.filterBankSignature || optimisationResult?.filterBankSignature || selectedCandidate?.filterBankSignature || null;
+  contract.provenance.correctionCurveSignature = finalResponse?.correctionCurveSignature || optimisationResult?.correctionCurveSignature || selectedCandidate?.correctionCurveSignature || null;
   contract.provenance.postEqCurveSignature = finalResponse?.postEqCurveSignature || optimisationResult?.postEqCurveSignature || null;
   contract.provenance.engineVersion = optimisationResult?.engineVersion || null;
   contract.provenance.realSeatCount = realSeatCount;
