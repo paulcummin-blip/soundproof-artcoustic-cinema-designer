@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 
 import { buildBassGraphSeries } from "@/components/room/bass/bassGraphDomainBuilder";
 import { buildRp22GraphMarkers, formatP18MarkerLabel } from "@/components/room/bass/rp22GraphMarkers";
-import { buildFinalOptimisedBassResponse } from "@/components/room/bass/finalOptimisedBassResponse";
+import { buildFinalOptimisedBassResponse, finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 import { compactCompletedBassContract } from "@/components/room/bass/completedBassResultPersistence";
 import { buildFinishedGraphOptimisationResult } from "@/components/room/bass/finishedGraphAdapter";
 import { BASS_ANALYSIS_CONTRACT_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
@@ -399,6 +399,8 @@ test("Defect 2: buildFinishedGraphOptimisationResult restores perSeatRawCurves f
     },
     graphPayload: {
       postEqRspCurve: postEqRsp,
+      correctionCurve: postEqRsp,
+      referenceEq: postEqRsp,
       productionHouseCurveTarget: postEqRsp,
       maximumSplCurveAfterEq: [],
       postEqPerSeatCurves: [mkSeatCurve("R1S1", 95), mkSeatCurve("R1S2", 97)],
@@ -423,6 +425,8 @@ test("Defect 2: buildFinishedGraphOptimisationResult restores perSeatRawCurves f
   assert.equal(result.finalOptimisedBassResponse.perSeatRawCurves[0].seatId, "R1S1", "first restored seat ID");
   assert.equal(result.finalOptimisedBassResponse.perSeatRawCurves[1].seatId, "R1S2", "second restored seat ID");
   assert.ok(result.finalOptimisedBassResponse.perSeatRawCurves[0].responseData.length > 0, "R1S1 restored raw curve has data");
+  assert.deepEqual(result.finalOptimisedBassResponse.correctionCurve, postEqRsp, "canonical correction curve restored verbatim");
+  assert.equal(finalOptimisedBassAuthorityMatches(result.finalOptimisedBassResponse), true, "hydrated result passes the same production graph authority gate as a live result");
 });
 
 // ---------------------------------------------------------------------------
