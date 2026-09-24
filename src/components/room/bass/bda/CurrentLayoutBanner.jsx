@@ -98,16 +98,16 @@ export default function CurrentLayoutBanner({ subwooferInstances, roomDims, hasR
   } else if (isStale) {
     statusText = "Performance is out of date";
     StatusIcon = AlertCircle;
-    statusColor = "#B87333";
+    statusColor = "#7A4F1A";
   } else {
     statusText = "Performance is current";
     StatusIcon = CheckCircle2;
-    statusColor = "#3A6B4A";
+    statusColor = "#4A7560";
   }
 
   return (
     <div
-      className="flex items-center gap-3 rounded-lg border border-[#213428] bg-[#F3F1EC] px-4 py-3"
+      className="flex items-center gap-3 rounded-lg border border-[#D9D5CE] bg-[#F8F7F4] px-4 py-3"
       data-bda-stage="current-layout"
     >
       <LayoutThumbnail subwooferInstances={subwooferInstances} roomDims={roomDims} />
