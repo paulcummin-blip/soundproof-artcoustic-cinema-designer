@@ -55,7 +55,9 @@ export default function BassGraph({
     p19WorstFrequencyHz: null,
     p20WorstFrequencyHz: null,
     p20WorstSeatId: null,
-  }
+  },
+  highlightFrequencyHz = null,
+  highlightLabel = null,
 }) {
     // Multi-series: merge all series data into one keyed chartData array
     const isMulti = rewStyleMode && Array.isArray(multiSeries) && multiSeries.length > 0;
@@ -350,6 +352,38 @@ export default function BassGraph({
                         strokeWidth={1.25}
                         strokeDasharray="3 4"
                       />
+                    )}
+
+                    {/* Click-to-highlight: prominent marker when a header pill
+                        is selected. This is the visual explanation of the RP22
+                        result — the graph proves the summary. */}
+                    {Number.isFinite(highlightFrequencyHz) && highlightFrequencyHz > 0 && (
+                      <>
+                        <ReferenceArea
+                          x1={highlightFrequencyHz * 0.94}
+                          x2={highlightFrequencyHz * 1.06}
+                          fill="#213428"
+                          fillOpacity={0.06}
+                          stroke="#213428"
+                          strokeOpacity={0.35}
+                          strokeDasharray="2 2"
+                          ifOverflow="extendDomain"
+                        />
+                        <ReferenceLine
+                          x={highlightFrequencyHz}
+                          stroke="#213428"
+                          strokeWidth={2.5}
+                          ifOverflow="extendDomain"
+                          label={{
+                            value: highlightLabel || `${highlightFrequencyHz.toFixed(0)} Hz`,
+                            position: 'top',
+                            fill: '#213428',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            className: 'font-body',
+                          }}
+                        />
+                      </>
                     )}
 
                     <ProtectedNullOverlay annotations={protectedNullAnnotations} />

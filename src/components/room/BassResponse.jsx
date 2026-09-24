@@ -42,6 +42,7 @@ import { normaliseHouseCurveToP14Total, diagnoseHouseCurveP14Integration } from 
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
+import { useGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
 
 const IS_DEVELOPMENT_MODE = false;
 
@@ -451,6 +452,35 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     [finalBassResponse, selectedSeatForMarkers]
   );
 
+  // ── Click-to-highlight: derive the prominent graph highlight from the
+  // RP22 header pill selection. The graph is the visual proof of the RP22
+  // summary — selecting a pill highlights the limiting frequency and the
+  // responsible response deviation on the graph.
+  const graphInteraction = useGraphInteraction();
+  const highlightFromInteraction = useMemo(() => {
+    const metric = graphInteraction?.selectedMetric;
+    if (!metric || !rp22GraphMarkers) return null;
+    if (metric === "p19" && Number.isFinite(rp22GraphMarkers.p19WorstFrequencyHz)) {
+      return {
+        frequencyHz: rp22GraphMarkers.p19WorstFrequencyHz,
+        label: `P19 worst · ${rp22GraphMarkers.p19WorstFrequencyHz.toFixed(0)} Hz`,
+      };
+    }
+    if (metric === "p20" && Number.isFinite(rp22GraphMarkers.p20WorstFrequencyHz)) {
+      return {
+        frequencyHz: rp22GraphMarkers.p20WorstFrequencyHz,
+        label: `P20 worst · ${rp22GraphMarkers.p20WorstFrequencyHz.toFixed(0)} Hz`,
+      };
+    }
+    if (metric === "p18" && Number.isFinite(rp22GraphMarkers.p18FrequencyHz)) {
+      return {
+        frequencyHz: rp22GraphMarkers.p18FrequencyHz,
+        label: `P18 extension · ${rp22GraphMarkers.p18FrequencyHz.toFixed(0)} Hz`,
+      };
+    }
+    return null;
+  }, [graphInteraction?.selectedMetric, rp22GraphMarkers]);
+
   // C6.1A/C6.1B2: Graph boundary hash check — compare the ACTUAL rendered-series
   // source identity metadata (embedded by bassGraphDomainBuilder) with the
   // canonical metric authority hashes. This breaks the circular dependency
@@ -830,6 +860,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               p14TotalDb={p14PresentationData.targetDb}
               operatingLevelOffsetDb={operatingLevelOffsetDb}
               rp22Markers={rp22GraphMarkers}
+              highlightFrequencyHz={highlightFromInteraction?.frequencyHz ?? null}
+              highlightLabel={highlightFromInteraction?.label ?? null}
             />
             {isCalculating && engineeringDetailCollapsed && (
               <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(248, 247, 244, 0.6)", borderRadius: 8, pointerEvents: "none" }}>

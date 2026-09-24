@@ -34,12 +34,11 @@ import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/Optimi
 import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards";
 import ChooseDesignTarget from "@/components/room/bass/bda/ChooseDesignTarget";
 import CurrentDesignBar from "@/components/room/bass/bda/CurrentDesignBar";
+import GraphHeaderPills from "@/components/room/bass/bda/GraphHeaderPills";
+import PerSeatResults from "@/components/room/bass/bda/PerSeatResults";
 
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
-);
-const BassResultCards = React.lazy(() =>
-  import("@/components/room/bass/BassResultCards").then((m) => ({ default: m.default }))
 );
 
 export default function BassDesignAssistant({
@@ -159,23 +158,30 @@ export default function BassDesignAssistant({
       )}
 
       {/* ── Zone 3: Performance ── */}
+      {/* The graph is the primary workspace. P14/P18/P19/P20 are the graph
+          header summary — not a separate panel. Click-to-highlight links the
+          pills to the graph's limiting frequency. */}
       {layoutChosen && hasResults && (
         <div className="space-y-2">
           <h4 className="text-[14px] font-bold text-[#1B1A1A]" style={{ fontFamily: "Didact Gothic, sans-serif" }}>
             Performance
           </h4>
-          <Suspense fallback={<div className="text-[11px] text-[#8A7B6A]">Loading results…</div>}>
-            <BassResultCards />
-          </Suspense>
           <Suspense fallback={<div className="text-[11px] text-[#8A7B6A]">Loading graph…</div>}>
-            <BassResponse
-              frontSubsCfg={frontSubsCfg}
-              rearSubsCfg={rearSubsCfg}
-              subWarnings={subWarnings}
-              hideHeader={true}
-              engineeringDetailCollapsed={true}
-            />
+            <div className="rounded-xl border border-[#DCDBD6] bg-white p-3 space-y-2">
+              {/* RP22 summary as graph header strip */}
+              <GraphHeaderPills />
+              {/* The graph — visual authority for every RP22 result */}
+              <BassResponse
+                frontSubsCfg={frontSubsCfg}
+                rearSubsCfg={rearSubsCfg}
+                subWarnings={subWarnings}
+                hideHeader={true}
+                engineeringDetailCollapsed={true}
+              />
+            </div>
           </Suspense>
+          {/* Per-seat P19/P20 detail below the graph */}
+          <PerSeatResults />
         </div>
       )}
 
