@@ -45,6 +45,7 @@ import { useGraphInteraction } from "@/components/room/bass/bda/graphInteraction
 import { buildParameterFocus } from "@/components/room/bass/storyteller/parameterFocusOverlays";
 import ParameterFocusBar from "@/components/room/bass/storyteller/ParameterFocusBar";
 import StorytellerExplanation from "@/components/room/bass/storyteller/StorytellerExplanation";
+import { traceBassGraphPipeline, formatPipelineTraceTable } from "@/components/room/bass/bassGraphPipelineTrace";
 
 const IS_DEVELOPMENT_MODE = false;
 
@@ -427,6 +428,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     if (series.kind === "raw") return false;
     return true;
   }), [multiSeriesForGraph, curveVisibility]);
+
+  // ── Graph pipeline diagnostic trace ──
+  // Logs the full pipeline trace to the console so the exact stage where
+  // production series disappear can be identified. Read-only diagnostic.
+  useEffect(() => {
+    if (!finalBassResponse && multiSeriesForGraph.length === 0) return;
+    const trace = traceBassGraphPipeline({
+      finalBassResponse,
+      multiSeriesForGraph,
+      visibleMultiSeries,
+      curveVisibility,
+      layerAvailability,
+      hasValidDetailedResult,
+      designEqEnabled,
+    });
+    // eslint-disable-next-line no-console
+    console.log(formatPipelineTraceTable(trace));
+  }, [finalBassResponse, multiSeriesForGraph, visibleMultiSeries, curveVisibility, layerAvailability, hasValidDetailedResult, designEqEnabled]);
 
   // Stage 5: Derive actual layer availability from the built graph series.
   // Selection (visibility) is separate from availability. A layer that has
