@@ -49,6 +49,7 @@ import TechnicalPerformanceSummary from '@/components/report/technical/Technical
 import TechnicalAsdrScorecard from '@/components/report/technical/TechnicalAsdrScorecard';
 import ScopedAsdrSummary from '@/components/report/technical/ScopedAsdrSummary';
 import TechnicalReportRecommendations from '@/components/report/technical/TechnicalReportRecommendations';
+import TechnicalAdiAssessment from '@/components/report/technical/TechnicalAdiAssessment';
 import { subscribeAsdrVisibility, getAsdrVisibility } from '@/components/state/asdrVisibilityStore';
 import { useAuth } from '@/lib/AuthContext';
 import { DEFAULT_TERRITORY, getTerritoryConfig } from '@/components/pricing/territoryConfig';
@@ -92,6 +93,7 @@ function RP22ReportInner() {
     const [reportHydrating, setReportHydrating] = useState(true);
     const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
     const showDesignRating = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
+    const [includeAdiAssessment, setIncludeAdiAssessment] = useState(true);
 
     // ── ASDR recommendation wiring ───────────────────────────────────────
     // READ-ONLY REPORT: The report does NOT mount DesignRecommendationEngine.
@@ -1081,6 +1083,8 @@ function RP22ReportInner() {
                         setIsPrinting={setIsPrinting}
                         exportDisabled={reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || recommendationsPending}
                         exportDisabledMessage={authorityReportPending ? "Engineering summary loading" : (recommendationsPending ? "Recommendations evaluating" : "Report loading")}
+                        includeAdiAssessment={includeAdiAssessment}
+                        onToggleAdiAssessment={showDesignRating ? setIncludeAdiAssessment : null}
                         lcrAngleInfo={(() => {
                             // Compute LCR angles exactly as Plan View does:
                             // lcrAimMode === 'angled' → compute yaw from speaker position to MLP
@@ -1212,6 +1216,11 @@ function RP22ReportInner() {
                         </div>
                     )}
 
+                    {/* ── Screen-only ADI Assessment ── */}
+                    {showDesignRating && includeAdiAssessment && engineeringSummary && (
+                        <TechnicalAdiAssessment engineeringSummary={engineeringSummary} />
+                    )}
+
                     {/* ── Screen-only Recommendations section (NOT in PDF) ── */}
                     {showDesignRating && (
                         <TechnicalReportRecommendations recommendations={designRecommendations} />
@@ -1280,6 +1289,13 @@ function RP22ReportInner() {
                                         showDesignRating={showDesignRating}
                                         engineeringSummary={engineeringSummary}
                                     />
+                                </div>
+                            )}
+
+                            {/* ── Page 3c: ADI Assessment (optional) ── */}
+                            {showDesignRating && includeAdiAssessment && engineeringSummary && (
+                                <div className="report-page-block report-page-block--summary" data-report-block="adi-assessment" data-report-page-start="true">
+                                    <TechnicalAdiAssessment engineeringSummary={engineeringSummary} />
                                 </div>
                             )}
                             </section>

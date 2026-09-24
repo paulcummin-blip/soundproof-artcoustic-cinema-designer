@@ -38,6 +38,8 @@ export default function ReportHeader({
     // Plan View aiming state — passed to cadExport so CAD angles match Plan View
     lcrAngleInfo,
     aimToggles,
+    includeAdiAssessment = true,
+    onToggleAdiAssessment = null,
     exportDisabled = false,
     exportDisabledMessage = "Bass analysis updating",
 }) {
@@ -305,6 +307,25 @@ export default function ReportHeader({
                 </div>
             </div>
         </div>
+        {onToggleAdiAssessment && (
+            <div className="flex justify-end mb-4">
+                <label
+                    className="flex items-center gap-2 text-sm cursor-pointer"
+                    style={{
+                        fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif",
+                        color: '#3E4349',
+                    }}
+                >
+                    <input
+                        type="checkbox"
+                        checked={includeAdiAssessment}
+                        onChange={(e) => onToggleAdiAssessment(e.target.checked)}
+                        style={{ accentColor: '#213428', width: '16px', height: '16px' }}
+                    />
+                    <span>Include Artcoustic Design Intelligence Assessment</span>
+                </label>
+            </div>
+        )}
         </div>
     );
 }
