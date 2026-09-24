@@ -21,8 +21,12 @@ const METRIC_LABELS = {
   p20: "P20 Seat Consistency",
 };
 
-// ── P14: capability band, target line, headroom ──
-function buildP14Focus({ p14PresentationData, rp22GraphMarkers }) {
+// ── P14: capability band, target line, headroom, operating response ──
+// P14 measures the integrated C-weighted SPL the subwoofer system can sustain
+// across the assessment band. The graph must display the same engineering
+// quantity: the Operating Response (post-EQ RSP curve) vs the House Target,
+// with the capability band and achieved/target levels overlaid.
+function buildP14Focus({ p14PresentationData, rp22GraphMarkers, finalBassResponse, smoothingMode }) {
   const targetDb = finite(p14PresentationData?.targetDb) ? Number(p14PresentationData.targetDb) : null;
   const achieved = finite(p14PresentationData?.availableCapability) ? Number(p14PresentationData.availableCapability) : null;
   const headroom = (achieved != null && targetDb != null) ? achieved - targetDb : null;
@@ -51,11 +55,44 @@ function buildP14Focus({ p14PresentationData, rp22GraphMarkers }) {
     });
   }
 
+  // The same engineering quantity P14 measures: the operating response curve
+  // (post-EQ RSP at operating level) and the house target it is integrated
+  // against. Showing these on the graph makes the C-weighted capability
+  // comparison visible — not just a number on a badge.
+  const operatingResponse = finalBassResponse?.postEqRspCurve || finalBassResponse?.canonicalPostEqRsp || [];
+  const houseTarget = finalBassResponse?.canonicalTargetCurve || finalBassResponse?.canonicalHouseCurveShape || [];
+  const additionalSeries = [];
+  if (Array.isArray(operatingResponse) && operatingResponse.length > 0) {
+    additionalSeries.push({
+      id: "focus-operating-response",
+      kind: "focus-operating-response",
+      label: "Operating Response",
+      tooltipLabel: "Operating Response — the post-EQ RSP curve P14 integrates to measure C-weighted capability",
+      color: "#059669",
+      strokeWidth: 2.5,
+      data: applyBassSmoothing(operatingResponse, smoothingMode || "third"),
+    });
+  }
+  if (Array.isArray(houseTarget) && houseTarget.length > 0) {
+    additionalSeries.push({
+      id: "focus-house-target",
+      kind: "focus-house-target",
+      label: "House Target",
+      tooltipLabel: "House Target — the normalised target curve the operating response is integrated against",
+      color: "#213428",
+      strokeWidth: 2,
+      strokeDasharray: "8 4",
+      data: applyBassSmoothing(houseTarget, smoothingMode || "third"),
+    });
+  }
+
   const lines = [];
   if (targetDb != null) lines.push(`Target: ${formatSplDisplay(targetDb)} dBC (${p14PresentationData?.basis || "minimum"} L${p14PresentationData?.levelNum || "?"})`);
   if (achieved != null) lines.push(`Achieved capability: ${formatSplDisplay(achieved)} dBC`);
   if (headroom != null) lines.push(`Headroom: ${headroom >= 0 ? "+" : ""}${headroom.toFixed(1)} dB${headroom < 0 ? " (shortfall)" : ""}`);
   lines.push(`Assessment band: ${P14_EQ_ASSESSMENT_RANGE_HZ.lowerHz}–${P14_EQ_ASSESSMENT_RANGE_HZ.upperHz} Hz (C-weighted integration)`);
+  lines.push("Operating Response = the post-EQ RSP curve (green solid)");
+  lines.push("House Target = the normalised target curve (dark dashed)");
 
   return {
     metric: "p14",
@@ -70,7 +107,7 @@ function buildP14Focus({ p14PresentationData, rp22GraphMarkers }) {
       ifOverflow: "extendDomain",
     }],
     referenceLines,
-    additionalSeries: [],
+    additionalSeries,
     dimKinds: [],
     explanation: {
       title: "P14 — Bass SPL Capability",
@@ -80,12 +117,46 @@ function buildP14Focus({ p14PresentationData, rp22GraphMarkers }) {
   };
 }
 
-// ── P18: extension region, F3 line ──
-function buildP18Focus({ rp22GraphMarkers, finalBassResponse }) {
+// ── P18: extension region, F3 line, house target + operating response ──
+// P18 measures the lowest frequency the system sustains within -3 dB of the
+// reference band (60–200 Hz median). The graph must display the same
+// engineering quantity: the Operating Response vs the House Target, so the
+// designer can see exactly where the response drops below the -3 dB threshold.
+function buildP18Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
   const f3 = finite(rp22GraphMarkers?.p18FrequencyHz) ? Number(rp22GraphMarkers.p18FrequencyHz) : null;
   const bounded = rp22GraphMarkers?.p18Bounded === true;
-  const p18Authority = finalBassResponse?.finalSeatVariationData?.p18?.authority;
   const refBandLabel = "60–200 Hz median";
+
+  // The same engineering quantity P18 measures: the operating response curve
+  // vs the house target. The F3 line marks where the operating response drops
+  // below -3 dB relative to the reference band — showing these curves makes
+  // the extension measurement visually obvious.
+  const operatingResponse = finalBassResponse?.postEqRspCurve || finalBassResponse?.canonicalPostEqRsp || [];
+  const houseTarget = finalBassResponse?.canonicalTargetCurve || finalBassResponse?.canonicalHouseCurveShape || [];
+  const additionalSeries = [];
+  if (Array.isArray(operatingResponse) && operatingResponse.length > 0) {
+    additionalSeries.push({
+      id: "focus-operating-response",
+      kind: "focus-operating-response",
+      label: "Operating Response",
+      tooltipLabel: "Operating Response — the post-EQ RSP curve whose -3 dB point defines the extension",
+      color: "#059669",
+      strokeWidth: 2.5,
+      data: applyBassSmoothing(operatingResponse, smoothingMode || "third"),
+    });
+  }
+  if (Array.isArray(houseTarget) && houseTarget.length > 0) {
+    additionalSeries.push({
+      id: "focus-house-target",
+      kind: "focus-house-target",
+      label: "House Target",
+      tooltipLabel: "House Target — the reference band (60–200 Hz median) the extension is measured against",
+      color: "#213428",
+      strokeWidth: 2,
+      strokeDasharray: "8 4",
+      data: applyBassSmoothing(houseTarget, smoothingMode || "third"),
+    });
+  }
 
   const lines = [];
   if (f3 != null) {
@@ -95,6 +166,8 @@ function buildP18Focus({ rp22GraphMarkers, finalBassResponse }) {
   } else {
     lines.push("P18 extension not achieved at the selected operating point");
   }
+  lines.push("Operating Response = the post-EQ RSP curve (green solid)");
+  lines.push("House Target = the reference band (dark dashed)");
 
   return {
     metric: "p18",
@@ -124,7 +197,7 @@ function buildP18Focus({ rp22GraphMarkers, finalBassResponse }) {
       labelPosition: "top",
       ifOverflow: "extendDomain",
     }] : [],
-    additionalSeries: [],
+    additionalSeries,
     dimKinds: [],
     explanation: {
       title: "P18 — Low-Frequency Extension",
@@ -134,7 +207,13 @@ function buildP18Focus({ rp22GraphMarkers, finalBassResponse }) {
   };
 }
 
-// ── P19: assessment band, Reference EQ overlay, limiting frequency ──
+// ── P19: selected seat vs RSP Reference EQ, deviation, limiting frequency ──
+// P19 measures the maximum deviation between a seat's calibrated response and
+// the RSP Reference EQ (the post-EQ RSP curve). The graph must display the
+// same engineering quantity: the Selected Seat curve vs the RSP Reference EQ,
+// with the deviation between them and the limiting frequency highlighted.
+// The House Target is deliberately NOT shown — P19 does not measure against
+// the house curve, it measures against the Reference EQ.
 function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, smoothingMode, seatingPositions }) {
   const startHz = finite(rp22GraphMarkers?.p19StartHz) ? Number(rp22GraphMarkers.p19StartHz) : null;
   const endHz = finite(rp22GraphMarkers?.p19EndHz) ? Number(rp22GraphMarkers.p19EndHz) : null;
@@ -148,15 +227,35 @@ function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, sm
   const level = seatResult?.level || p19Data?.level || null;
 
   // Reference EQ = the calibrated RSP post-EQ curve. This is the curve P19
-  // actually compares against — NOT the house-curve target. Showing it on the
-  // graph is the key fix that makes P19 visually explainable.
+  // actually compares against — NOT the house-curve target.
   const referenceEqCurve = finalBassResponse?.postEqRspCurve || finalBassResponse?.canonicalPostEqRsp || [];
   const additionalSeries = [];
+
+  // Selected Seat curve — the other half of the deviation P19 measures.
+  // When a real seat is selected, show its post-EQ curve so the designer can
+  // see the deviation from the Reference EQ directly. When RSP is selected,
+  // the seat curve IS the Reference EQ, so only one curve is shown.
+  if (seatId) {
+    const postEqPerSeat = finalBassResponse?.postEqPerSeatCurves || finalBassResponse?.canonicalPostEqSeatResponses || [];
+    const seatCurve = postEqPerSeat.find((s) => String(s?.seatId) === String(seatId));
+    if (seatCurve?.responseData && Array.isArray(seatCurve.responseData) && seatCurve.responseData.length > 0) {
+      additionalSeries.push({
+        id: "focus-selected-seat",
+        kind: "focus-selected-seat",
+        label: `Seat ${seatId}`,
+        tooltipLabel: `Selected seat ${seatId} — the calibrated response P19 compares to the Reference EQ`,
+        color: "#B45309",
+        strokeWidth: 2.5,
+        data: applyBassSmoothing(seatCurve.responseData, smoothingMode || "third"),
+      });
+    }
+  }
+
   if (Array.isArray(referenceEqCurve) && referenceEqCurve.length > 0) {
     additionalSeries.push({
       id: "focus-reference-eq",
       kind: "reference-eq",
-      label: "Reference EQ (RSP after EQ)",
+      label: "RSP (Reference EQ)",
       tooltipLabel: "Reference EQ — the calibrated RSP response P19 measures against",
       color: "#2563EB",
       strokeWidth: 2.5,
@@ -167,15 +266,17 @@ function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, sm
 
   const lines = [];
   if (seatId) {
-    lines.push(`Seat: ${seatId}`);
+    lines.push(`Selected Seat: ${seatId} (amber solid)`);
+    lines.push(`RSP Reference EQ: the calibrated RSP response (blue dashed)`);
   } else {
     lines.push("Seat: RSP (Reference Seat Position)");
+    lines.push("RSP Reference EQ: the calibrated RSP response (blue dashed)");
   }
   if (startHz != null && endHz != null) {
     lines.push(`Assessment band: ${Math.round(startHz)}–${Math.round(endHz)} Hz (1/3-octave smoothed)`);
   }
   if (worstFreq != null) {
-    lines.push(`Limiting frequency: ${Math.round(worstFreq)} Hz`);
+    lines.push(`Limiting frequency: ${Math.round(worstFreq)} Hz — where the deviation is greatest`);
   }
   if (variation != null) {
     lines.push(`Max deviation: ±${variation.toFixed(1)} dB`);
@@ -183,7 +284,7 @@ function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, sm
   if (level) {
     lines.push(`Grade: ${level}`);
   }
-  lines.push("Reference EQ = the calibrated RSP response (blue dashed line)");
+  lines.push("P19 = max |Selected Seat − RSP| across the assessment band");
 
   return {
     metric: "p19",
@@ -214,10 +315,12 @@ function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, sm
       ifOverflow: "extendDomain",
     }] : [],
     additionalSeries,
-    dimKinds: ["room-response", "product-maximum", "maximum-spl"],
+    // Dim the house-curve and raw room response — P19 does not measure against
+    // these, so showing them prominently would tell a different engineering story.
+    dimKinds: ["room-response", "product-maximum", "maximum-spl", "house-curve", "normalized-target"],
     explanation: {
       title: "P19 — Response Fit vs Reference EQ",
-      subtitle: "Maximum deviation between the seat's calibrated response and the RSP Reference EQ",
+      subtitle: "Maximum deviation between the selected seat's calibrated response and the RSP Reference EQ",
       lines,
     },
   };
