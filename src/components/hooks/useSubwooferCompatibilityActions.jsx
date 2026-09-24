@@ -278,7 +278,6 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
           seatingPositions: appState?.seatingPositions,
           rspPosition,
           selectedSubModel: nextInstances?.find((s) => s?.enabled !== false)?.model || null,
-          p14TargetLevel: appState?.splConfig?.selectedP14Level ?? null,
         });
         markAppliedCalibrationUserModified(
           projectIdRef.current,

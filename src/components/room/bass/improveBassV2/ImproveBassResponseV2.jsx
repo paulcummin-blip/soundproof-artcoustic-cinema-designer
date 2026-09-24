@@ -184,15 +184,11 @@ export default function ImproveBassResponseV2({
         seatingPositions,
         rspPosition,
         selectedSubModel,
-        p14TargetBasis: p14Params.p14TargetBasis,
-        p14TargetLevel: p14Params.p14TargetLevel,
-        p14TargetDb: p14Params.p14TargetDb,
-        p18TargetBasis: p14Params.p18TargetBasis,
       });
     } catch {
       return null;
     }
-  }, [subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel, p14Params]);
+  }, [subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel]);
 
   const appliedCalibrationAuthority = useAppliedCalibrationAuthority(projectId, versionId);
   const appliedCalibrationStatus = useMemo(() => {
@@ -240,10 +236,6 @@ export default function ImproveBassResponseV2({
         seatingPositions,
         rspPosition,
         selectedSubModel,
-        p14TargetBasis: p14Params.p14TargetBasis,
-        p14TargetLevel: p14Params.p14TargetLevel,
-        p14TargetDb: p14Params.p14TargetDb,
-        p18TargetBasis: p14Params.p18TargetBasis,
       });
       const values = extractAppliedCalibrationValues(nextInstances);
       markAppliedCalibrationOptimiserGenerated(projectId, versionId, {

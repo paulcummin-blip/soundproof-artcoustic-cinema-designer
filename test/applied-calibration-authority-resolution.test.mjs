@@ -418,22 +418,6 @@ test("TEST 7: Fingerprint Sensitivity — changing any canonical input produces 
         })),
       }),
     },
-    {
-      label: "P14 target basis",
-      inputs: buildCanonicalInputs({ p14TargetBasis: "fullrange" }),
-    },
-    {
-      label: "P14 target level",
-      inputs: buildCanonicalInputs({ p14TargetLevel: 3 }),
-    },
-    {
-      label: "P14 target dB",
-      inputs: buildCanonicalInputs({ p14TargetDb: 115 }),
-    },
-    {
-      label: "P18 target basis",
-      inputs: buildCanonicalInputs({ p18TargetBasis: "flat" }),
-    },
   ];
 
   for (const { label, inputs } of variants) {
@@ -441,6 +425,53 @@ test("TEST 7: Fingerprint Sensitivity — changing any canonical input produces 
     assert.notEqual(variantFp, baseFp,
       `Fingerprint must differ when ${label} changes`);
   }
+});
+
+// ── TEST 8: P14/P18 targets do NOT change the fingerprint ──────────────────
+
+test("TEST 8: P14/P18 target changes do NOT change the fingerprint (Engineering Prediction is not Geometry)", () => {
+  const baseInputs = buildCanonicalInputs();
+  const baseFp = computeAppliedCalibrationBasisFingerprint(baseInputs);
+
+  const p14p18Variants = [
+    { label: "P14 target basis", overrides: { p14TargetBasis: "fullrange" } },
+    { label: "P14 target level", overrides: { p14TargetLevel: 3 } },
+    { label: "P14 target dB", overrides: { p14TargetDb: 115 } },
+    { label: "P18 target basis", overrides: { p18TargetBasis: "flat" } },
+    { label: "all P14/P18 changed", overrides: { p14TargetBasis: "fullrange", p14TargetLevel: 4, p14TargetDb: 120, p18TargetBasis: "flat" } },
+    { label: "P14/P18 null (cold hydration)", overrides: { p14TargetBasis: null, p14TargetLevel: null, p14TargetDb: null, p18TargetBasis: null } },
+  ];
+
+  for (const { label, overrides } of p14p18Variants) {
+    const variantFp = computeAppliedCalibrationBasisFingerprint(buildCanonicalInputs(overrides));
+    assert.equal(variantFp, baseFp,
+      `Fingerprint must NOT change when ${label} changes — P14/P18 are Engineering Prediction, not Geometry`);
+  }
+});
+
+// ── TEST 9: Cold hydration — fingerprint computable from geometry alone ───
+
+test("TEST 9: Cold hydration — fingerprint computable immediately from persisted geometry (no P14/P18, no optimiser)", () => {
+  // Simulate cold hydration: only geometry is available, no P14/P18 targets
+  const geometryOnlyInputs = {
+    subwooferInstances: buildCanonicalInputs().subwooferInstances,
+    roomDims: buildCanonicalInputs().roomDims,
+    seatingPositions: buildCanonicalInputs().seatingPositions,
+    rspPosition: buildCanonicalInputs().rspPosition,
+    selectedSubModel: "SUB2-12",
+    // NO p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis
+  };
+
+  const fp = computeAppliedCalibrationBasisFingerprint(geometryOnlyInputs);
+
+  assert.ok(fp, "Fingerprint must be computable from geometry alone");
+  assert.ok(fp.startsWith("calbasis:v1:"), "Fingerprint must have correct prefix");
+
+  // Must match the fingerprint computed with P14/P18 present (same geometry)
+  const fullInputs = buildCanonicalInputs();
+  const fullFp = computeAppliedCalibrationBasisFingerprint(fullInputs);
+  assert.equal(fp, fullFp,
+    "Geometry-only fingerprint must equal full-input fingerprint (P14/P18 excluded)");
 });
 
 // ── Bonus: Calibration values do NOT change the fingerprint ────────────────

@@ -110,11 +110,18 @@ function fingerprint64(canonical) {
 
 // ── Applied Calibration basis fingerprint ─────────────────────────────────
 //
-// Hashes the engineering inputs that determine whether applied calibration
+// Hashes the GEOMETRY inputs that determine whether applied calibration
 // is still valid. Deliberately EXCLUDES: delayMs, gainDb, polarity,
-// phaseControlDeg. Includes: room dims, sub positions (x,y,z), sub count,
-// sub model, sub rotation, sub enabled state, seating positions, RSP,
-// P14/P18 targets.
+// phaseControlDeg (that IS the calibration). Includes: room dims, sub
+// positions (x,y,z), sub count, sub model, sub rotation, sub enabled
+// state, seating positions, RSP.
+//
+// P14/P18 targets are NOT included — they are Engineering Prediction
+// inputs, not Geometry. The frozen authority model is:
+//   Geometry → Applied Calibration → Engineering Prediction
+// Applied Calibration depends only on Geometry. Changing P14/P18 targets
+// does not invalidate the physical calibration; it only changes what the
+// optimiser might recommend.
 
 function sortById(arr) {
   return arr.slice().sort((a, b) => {
@@ -140,13 +147,13 @@ function sortById(arr) {
  *   - Subwoofer model changes
  *   - Seating positions change
  *   - RSP position changes
- *   - P14/P18 target changes
  *
  * This fingerprint does NOT change when:
  *   - Delay, gain, polarity, or phase values change (that IS the calibration)
+ *   - P14 or P18 targets change (Engineering Prediction, not Geometry)
  *   - UI state, overlay visibility, or graph settings change
  *
- * @param {object} inputs - { subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel, p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis }
+ * @param {object} inputs - { subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel }
  * @returns {string} deterministic fingerprint string "calbasis:v1:<hash>"
  */
 export function computeAppliedCalibrationBasisFingerprint(inputs) {
@@ -192,14 +199,6 @@ export function computeAppliedCalibrationBasisFingerprint(inputs) {
     sources,
     sourceCount: sources.length,
     seats,
-    p14Target: {
-      basis: i.p14TargetBasis || null,
-      level: i.p14TargetLevel ?? null,
-      db: num(i.p14TargetDb),
-    },
-    p18Target: {
-      basis: i.p18TargetBasis || null,
-    },
   };
 
   return `calbasis:v${APPLIED_CALIBRATION_BASIS_VERSION}:${fingerprint64(canonical)}`;

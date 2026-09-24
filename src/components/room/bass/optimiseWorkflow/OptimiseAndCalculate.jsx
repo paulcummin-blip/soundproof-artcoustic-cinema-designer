@@ -237,10 +237,6 @@ export default function OptimiseAndCalculate({
               seatingPositions,
               rspPosition,
               selectedSubModel,
-              p14TargetBasis: requested.p14TargetBasis || "minimum",
-              p14TargetLevel: requested.requestedLevel || 2,
-              p14TargetDb: requested.selectedP14TargetDb || 117,
-              p18TargetBasis: requested.p18TargetBasis || "minimum",
             });
           } catch { return null; }
         })();
