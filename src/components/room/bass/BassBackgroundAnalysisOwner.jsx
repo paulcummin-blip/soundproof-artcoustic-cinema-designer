@@ -1365,10 +1365,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // and may be displayed regardless of whether the design has changed. The
   // live fingerprint determines recalculation, not graph restoration.
   const cachedGraphOptimisationResult = useMemo(() => {
-    if (!isProjectHydrationReady || optimisationResult || !hasPublishedContract || !completedContract) return null;
-    return buildFinishedGraphOptimisationResult(completedContract);
-  }, [isProjectHydrationReady, optimisationResult, hasPublishedContract, completedContract]);
-  const effectiveOptimisationResult = optimisationResult || cachedGraphOptimisationResult;
+    if (!isProjectHydrationReady || !effectiveContract || !isAuthoritativeBassContract(effectiveContract) || !hasGraphPayload(effectiveContract)) return null;
+    return buildFinishedGraphOptimisationResult(effectiveContract);
+  }, [isProjectHydrationReady, effectiveContract]);
+  // The published contract is the engineering truth. Prefer its finished graph
+  // payload over any leftover live optimiser object; the latter may belong to a
+  // previously selected target and must not suppress the current published graph.
+  const effectiveOptimisationResult = cachedGraphOptimisationResult || optimisationResult;
   // PASS 1: User-facing phase states. Replaces the single ambiguous
   // long-running message with a small number of useful phases:
   //   "Preparing bass response…"  — authoritative simulation running
