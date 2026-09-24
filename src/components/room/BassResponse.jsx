@@ -15,7 +15,6 @@ import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThree
 import { bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 import BassEngineeringDetails from "@/components/room/bass/BassEngineeringDetails";
 import BassResultCards from "@/components/room/bass/BassResultCards";
-import BassDesignRecommendation from "@/components/room/bass/BassDesignRecommendation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -660,9 +659,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           {hasCurrentBassResult ? (
             <>
               <BassResultCards />
-              {!p14Selection.noP14TargetSelected && (
-                <BassDesignRecommendation recommendation={sharedBassResults.contract?.designRecommendation} />
-              )}
             </>
           ) : (
             <div className={`rounded-xl border px-4 py-4 ${bassAuthorityStatus === "STALE" ? "border-amber-200 bg-amber-50" : "border-[#DCDBD6] bg-white"}`}>
