@@ -60,7 +60,7 @@ function buildP14Focus({ p14PresentationData, rp22GraphMarkers, finalBassRespons
   // against. Showing these on the graph makes the C-weighted capability
   // comparison visible — not just a number on a badge.
   const operatingResponse = finalBassResponse?.postEqRspCurve || finalBassResponse?.canonicalPostEqRsp || [];
-  const houseTarget = finalBassResponse?.canonicalTargetCurve || finalBassResponse?.canonicalHouseCurveShape || [];
+  const houseTarget = finalBassResponse?.canonicalTargetCurve || finalBassResponse?.canonicalHouseCurveShape || finalBassResponse?.productionHouseCurveTarget || [];
   const additionalSeries = [];
   if (Array.isArray(operatingResponse) && operatingResponse.length > 0) {
     additionalSeries.push({
@@ -132,7 +132,7 @@ function buildP18Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
   // below -3 dB relative to the reference band — showing these curves makes
   // the extension measurement visually obvious.
   const operatingResponse = finalBassResponse?.postEqRspCurve || finalBassResponse?.canonicalPostEqRsp || [];
-  const houseTarget = finalBassResponse?.canonicalTargetCurve || finalBassResponse?.canonicalHouseCurveShape || [];
+  const houseTarget = finalBassResponse?.canonicalTargetCurve || finalBassResponse?.canonicalHouseCurveShape || finalBassResponse?.productionHouseCurveTarget || [];
   const additionalSeries = [];
   if (Array.isArray(operatingResponse) && operatingResponse.length > 0) {
     additionalSeries.push({
@@ -221,7 +221,21 @@ function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, sm
 
   const p19Data = finalBassResponse?.finalSeatVariationData?.p19;
   const perSeat = Array.isArray(p19Data?.perSeatResults) ? p19Data.perSeatResults : [];
-  const seatId = selectedSeatId && selectedSeatId !== "rsp" ? selectedSeatId : null;
+
+  // Auto-select the worst P19 seat when no specific seat is selected. This is
+  // the critical P19 validation: clicking P19 must immediately show the seat
+  // that caused the published grade. The designer sees the deviation between
+  // the worst seat and the Reference EQ without manually selecting a seat.
+  let seatId = selectedSeatId && selectedSeatId !== "rsp" ? selectedSeatId : null;
+  if (!seatId && perSeat.length > 0) {
+    let worst = null;
+    for (const seat of perSeat) {
+      if (!finite(seat?.variationDbRaw)) continue;
+      if (!worst || Number(seat.variationDbRaw) > Number(worst.variationDbRaw)) worst = seat;
+    }
+    if (worst) seatId = worst.seatId;
+  }
+
   const seatResult = seatId ? perSeat.find((s) => String(s?.seatId) === String(seatId)) : null;
   const variation = finite(seatResult?.variationDbRaw) ? Number(seatResult.variationDbRaw) : (finite(p19Data?.variationDb) ? Number(p19Data.variationDb) : null);
   const level = seatResult?.level || p19Data?.level || null;

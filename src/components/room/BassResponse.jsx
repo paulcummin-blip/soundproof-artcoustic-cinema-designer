@@ -454,7 +454,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   // worst frequency, not the RSP/overall worst. RSP selection uses the
   // established RSP presentation. When the interaction store has a
   // selectedSeatId (from a per-seat pill click), it takes precedence.
-  const selectedSeatForMarkers = graphInteraction?.selectedSeatId || selectedSeatIds[0] || null;
+  //
+  // P19 auto-seat-selection: when P19 is the selected metric and no specific
+  // seat is selected, auto-select the worst P19 seat so the graph markers,
+  // focus curves, and explanation all show the seat that caused the published
+  // P19 grade. This is the critical P19 validation — the designer immediately
+  // sees why the grade was awarded without manually selecting a seat.
+  const explicitSeatId = graphInteraction?.selectedSeatId || selectedSeatIds[0] || null;
+  const selectedSeatForMarkers = useMemo(() => {
+    if (graphInteraction?.selectedMetric === "p19" && (!explicitSeatId || explicitSeatId === "rsp")) {
+      const p19PerSeat = finalBassResponse?.finalSeatVariationData?.p19?.perSeatResults;
+      if (Array.isArray(p19PerSeat) && p19PerSeat.length > 0) {
+        let worst = null;
+        for (const seat of p19PerSeat) {
+          const v = Number(seat?.variationDbRaw);
+          if (!Number.isFinite(v)) continue;
+          if (!worst || v > Number(worst.variationDbRaw)) worst = seat;
+        }
+        if (worst) return worst.seatId;
+      }
+    }
+    return explicitSeatId;
+  }, [graphInteraction?.selectedMetric, explicitSeatId, finalBassResponse?.finalSeatVariationData?.p19?.perSeatResults]);
   const rp22GraphMarkers = useMemo(
     () => buildRp22GraphMarkers(finalBassResponse, selectedSeatForMarkers),
     [finalBassResponse, selectedSeatForMarkers]
