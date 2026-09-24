@@ -51,6 +51,11 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     rawResponseSignature: candidate.rawResponseSignature || buildCurveSignature(candidate.rawResponseCurve),
     eqFilterBank,
     filterBankSignature: candidate.filterBankSignature || buildFilterBankSignature(candidate),
+    // The correction curve (EQ delta) must be carried on the response so
+    // buildCorrectionCurveSignature(response) can recompute and validate the
+    // correction-curve signature. Without this, finalOptimisedBassAuthorityMatches
+    // always fails (curve:empty ≠ real hash), suppressing all post-EQ graph series.
+    correctionCurve: cloneCurve(candidate.combinedEqCurve || candidate.correctionCurve || []),
     correctionCurveSignature: candidate.correctionCurveSignature || buildCorrectionCurveSignature(candidate),
     postEqCurveSignature: candidate.postEqCurveSignature || buildCurveSignature(postEqRspCurve),
     postEqRspCurve,
