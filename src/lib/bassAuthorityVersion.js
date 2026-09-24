@@ -21,5 +21,5 @@
 
 export const INSTANCE_AUTHORITY_VERSION = 4;
 export const BASS_ANALYSIS_CONTRACT_VERSION = 21;
-export const COMPLETED_BASS_CACHE_VERSION = 13;
+export const COMPLETED_BASS_CACHE_VERSION = 14; // v14: compact graph authority persists the canonical correction curve required by the production graph gate.
 export const RP22_BASS_METRIC_SCHEMA_VERSION = 20; // v20: published P19 uses stored Reference EQ. The calibrated RSP and Reference EQ must have identical curve authority; every seat is compared directly with that reference. Older completed authority is rejected and regenerated.
