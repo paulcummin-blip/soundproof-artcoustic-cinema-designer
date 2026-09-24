@@ -255,7 +255,7 @@ export default function AdiRecommendation({
     );
   }
 
-  const { recommendation, diagnosis, outcome, intent, explanation, eqDecisionExplanation } = adiDecision;
+  const { recommendation, outcome, intent } = adiDecision;
 
   // No improvement case — first-class outcomes
   const isNoEngineering = outcome === ADI_OUTCOME.NO_FURTHER_ENGINEERING;
@@ -299,9 +299,6 @@ export default function AdiRecommendation({
     actionText = `Move the seating row ${seatingDisplacement.distanceMm} mm ${seatingDisplacement.direction}.`;
   }
 
-  // Determine the cause (one sentence)
-  const causeText = diagnosis?.physicalCause?.description || diagnosis?.problem?.description || "";
-
   // Format RP22 evidence
   const rp22Changes = formatRp22Evidence(recommendation.rp22Evidence);
 
@@ -336,33 +333,45 @@ export default function AdiRecommendation({
         )}
       </div>
 
-      {/* What should I do? */}
+      {/* Assessment — what is happening */}
+      {recommendation?.assessment && (
+        <div className="space-y-0.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+            Assessment
+          </div>
+          <div className="text-[11px] text-[#3E4349] leading-relaxed">
+            {recommendation.assessment}
+          </div>
+        </div>
+      )}
+
+      {/* Recommendation — what to do */}
       <div className="space-y-0.5">
         <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-          What should I do?
+          Recommendation
         </div>
         <div className="text-[12px] font-medium text-[#1B1A1A] leading-relaxed">
           {actionText}
         </div>
       </div>
 
-      {/* Why? */}
-      {causeText && (
+      {/* Why — what physical behaviour caused this */}
+      {recommendation?.why && (
         <div className="space-y-0.5">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-            Why?
+            Why
           </div>
           <div className="text-[11px] text-[#3E4349] leading-relaxed">
-            {causeText}
+            {recommendation.why}
           </div>
         </div>
       )}
 
-      {/* What improves? */}
+      {/* Expected Result — which RP22 values improve */}
       {rp22Changes && (
         <div className="space-y-0.5">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-            What improves?
+            Expected Result
           </div>
           <div className="space-y-0.5">
             {rp22Changes.map((change, i) => (
@@ -375,54 +384,14 @@ export default function AdiRecommendation({
         </div>
       )}
 
-      {/* What remains limiting? */}
+      {/* Remaining Limitation — what still cannot be improved */}
       {recommendation?.remainingLimitation && (
         <div className="space-y-0.5">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-            What remains limiting?
+            Remaining Limitation
           </div>
           <div className="text-[11px] text-[#3E4349] leading-relaxed">
             {recommendation.remainingLimitation}
-          </div>
-        </div>
-      )}
-
-      {/* EQ Decision Explanation */}
-      {eqDecisionExplanation?.explanation && (
-        <div className="space-y-0.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-            EQ Decision
-          </div>
-          <div className="text-[11px] text-[#3E4349] leading-relaxed">
-            {eqDecisionExplanation.explanation}
-          </div>
-        </div>
-      )}
-
-      {/* Trade-offs (when applicable) */}
-      {explanation?.tradeOffs && explanation.tradeOffs.length > 0 && (
-        <div className="space-y-0.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-            Trade-offs
-          </div>
-          <div className="space-y-0.5">
-            {explanation.tradeOffs.map((t, i) => (
-              <div key={i} className="text-[11px] text-[#3E4349] leading-relaxed">
-                {t.description}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Next Steps */}
-      {explanation?.nextSteps && (
-        <div className="space-y-0.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-            Next Steps
-          </div>
-          <div className="text-[11px] text-[#3E4349] leading-relaxed">
-            {explanation.nextSteps}
           </div>
         </div>
       )}

@@ -35,21 +35,50 @@ function levelText(level) {
   return n > 0 ? `L${n}` : 'FAIL';
 }
 
-// ── Action ──
+// ── Assessment (what is happening) ──
+function deriveAssessment(problem) {
+  if (!problem) return '';
+  const freq = Number(problem.worstSeat?.worstFrequencyHz) || 0;
+
+  switch (problem.type) {
+    case PROBLEM_TYPE.CAPABILITY:
+      return 'The system cannot reach the target bass output level at the lowest frequencies.';
+    case PROBLEM_TYPE.EXTENSION:
+      return 'The system cannot reach the target bass extension.';
+    case PROBLEM_TYPE.SEAT_CONSISTENCY:
+      return 'The bass response varies too much between seats.';
+    case PROBLEM_TYPE.RESPONSE_SMOOTHNESS:
+      return freq > 0
+        ? `The bass response deviates from the target at ${freq.toFixed(0)} Hz at the worst seat.`
+        : 'The bass response deviates from the target at the worst seat.';
+    case PROBLEM_TYPE.ROOM_MODE:
+      return freq > 0
+        ? `A room mode at ${freq.toFixed(0)} Hz is causing the bass response to deviate at the worst seat.`
+        : 'A room mode is causing the bass response to deviate at the worst seat.';
+    case PROBLEM_TYPE.LOCAL_CANCELLATION:
+      return freq > 0
+        ? `A cancellation at ${freq.toFixed(0)} Hz is causing a deep null in the bass response at the worst seat.`
+        : 'A cancellation is causing a deep null in the bass response at the worst seat.';
+    default:
+      return '';
+  }
+}
+
+// ── Recommendation (what to do) ──
 function summariseAction(dominant, appropriateLever) {
-  if (!dominant || !appropriateLever) return 'Apply the recommended changes.';
+  if (!dominant || !appropriateLever) return '';
 
   const leverClass = appropriateLever.class;
   const lever = appropriateLever.lever;
 
   if (leverClass === LEVER_CLASS.CALIBRATION) {
-    return 'Apply calibration.';
+    return 'Apply the recommended equalisation.';
   }
 
   if (leverClass === LEVER_CLASS.PHYSICAL) {
     if (lever === 'move_subwoofer') return 'Move the subwoofers.';
     if (lever === 'move_seating') return 'Move the seating row.';
-    return 'Adjust the physical layout.';
+    return 'Adjust the subwoofer or seating positions.';
   }
 
   if (leverClass === LEVER_CLASS.SPECIFICATION) {
@@ -58,67 +87,12 @@ function summariseAction(dominant, appropriateLever) {
     return 'Change the subwoofer specification.';
   }
 
-  return 'Apply the recommended changes.';
-}
-
-// ── Benefit ──
-function deriveBenefit(problem, appropriateLever) {
-  if (!problem) return 'Improves the bass response';
-
-  switch (problem.type) {
-    case PROBLEM_TYPE.CAPABILITY:
-      return 'Increases low-frequency capability and headroom';
-    case PROBLEM_TYPE.EXTENSION:
-      return 'Improves low-frequency extension to meet the design target';
-    case PROBLEM_TYPE.SEAT_CONSISTENCY:
-      return 'Reduces seat-to-seat variation and improves consistency across the seating area';
-    case PROBLEM_TYPE.RESPONSE_SMOOTHNESS:
-      return 'Improves response smoothness at the worst seat';
-    case PROBLEM_TYPE.ROOM_MODE:
-      return 'Addresses the room mode causing the worst seat deviation';
-    case PROBLEM_TYPE.LOCAL_CANCELLATION:
-      return 'Addresses the cancellation causing a deep null at the worst seat';
-    default:
-      return 'Improves the bass response';
-  }
-}
-
-// ── Expected Engineering Effect ──
-function deriveExpectedEffect(dominant, problem) {
-  if (!dominant || !problem) return 'Improved bass performance';
-
-  const assessment = dominant.materialAssessment;
-  if (assessment?.isTradeOff) {
-    const imp = assessment.improvement;
-    const wkn = assessment.worsening;
-    if (imp && wkn) {
-      const impLabel = imp.parameter === 'P19' ? 'primary seat response' : 'seat consistency';
-      const wknLabel = wkn.parameter === 'P19' ? 'primary seat response' : 'seat consistency';
-      return `Improves ${impLabel} but reduces ${wknLabel} — a genuine engineering trade-off`;
-    }
-  }
-
-  switch (problem.type) {
-    case PROBLEM_TYPE.CAPABILITY:
-      return 'Greater extension and output capability';
-    case PROBLEM_TYPE.EXTENSION:
-      return 'Deeper bass extension within the target capability';
-    case PROBLEM_TYPE.SEAT_CONSISTENCY:
-      return 'Tighter, more consistent bass across all seats';
-    case PROBLEM_TYPE.RESPONSE_SMOOTHNESS:
-      return 'Smoother response at the worst seat';
-    case PROBLEM_TYPE.ROOM_MODE:
-      return 'Reduced modal excitation at the worst seat';
-    case PROBLEM_TYPE.LOCAL_CANCELLATION:
-      return 'Recovered energy at the cancellation frequency';
-    default:
-      return 'Improved bass performance';
-  }
+  return '';
 }
 
 // ── RP22 Evidence ──
 function deriveRp22Evidence(dominant, currentResult) {
-  if (!dominant?.result || !currentResult) return 'RP22 results available after recalculation';
+  if (!dominant?.result || !currentResult) return '';
 
   const candidateP19 = Array.isArray(dominant.result.perSeatP19) ? dominant.result.perSeatP19 : [];
   const currentP19Map = new Map((currentResult.perSeatP19 || []).map(s => [String(s.seatId), s]));
@@ -160,35 +134,35 @@ function deriveRp22Evidence(dominant, currentResult) {
     }
   }
 
-  if (changes.length === 0) return 'RP22 results available after recalculation';
+  if (changes.length === 0) return '';
   return changes.join('; ');
 }
 
 // ── Remaining Limitation ──
 function deriveRemainingLimitation(problem, correctability, candidateResult, designObjectives) {
-  if (!problem) return 'No significant limitation identified';
+  if (!problem) return '';
 
   const freq = Number(problem.worstSeat?.worstFrequencyHz) || 0;
 
   switch (problem.type) {
     case PROBLEM_TYPE.CAPABILITY:
-      return 'Subwoofer capability remains the limiting factor. The system cannot exceed the physical output of the current subwoofer(s).';
+      return 'The system cannot exceed the physical output of the current subwoofer(s). Louder or deeper bass requires a different or additional subwoofer.';
     case PROBLEM_TYPE.EXTENSION:
-      return 'Low-frequency extension remains limited by the subwoofer capability. Deeper extension requires a different subwoofer.';
+      return 'Bass extension is limited by the subwoofer capability. Deeper extension requires a different subwoofer.';
     case PROBLEM_TYPE.ROOM_MODE:
       return freq > 0
-        ? `A room mode at ${freq.toFixed(0)} Hz still affects the response. Complete elimination may require additional subwoofers.`
+        ? `A room mode at ${freq.toFixed(0)} Hz still affects the response. Full elimination may require additional subwoofers.`
         : 'Room mode interaction still affects the response.';
     case PROBLEM_TYPE.LOCAL_CANCELLATION:
       return correctability?.class === CORRECTABILITY_CLASS.ABSOLUTE_CANCELLATION
-        ? 'A physically unrecoverable cancellation remains — EQ cannot recover this. Physical changes or additional subwoofers are required.'
+        ? 'A physically unrecoverable cancellation remains. EQ cannot fix this — a physical change is required.'
         : 'A local cancellation still affects the worst seat.';
     case PROBLEM_TYPE.SEAT_CONSISTENCY:
-      return 'Some seat-to-seat variation remains inherent to the room geometry and subwoofer count.';
+      return 'Some seat-to-seat variation is inherent to the room geometry and subwoofer count.';
     case PROBLEM_TYPE.RESPONSE_SMOOTHNESS:
       return 'Some response deviation remains at the worst seat.';
     default:
-      return 'No significant limitation identified';
+      return '';
   }
 }
 
@@ -208,12 +182,12 @@ function deriveRemainingLimitation(problem, correctability, candidateResult, des
  * @returns {{ action: string, benefit: string, expectedEngineeringEffect: string, rp22Evidence: string, remainingLimitation: string }}
  */
 export function buildRecommendation(params) {
-  const { dominant, problem, correctability, appropriateLever, currentResult, designObjectives } = params;
+  const { dominant, problem, physicalCause, correctability, appropriateLever, currentResult, designObjectives } = params;
 
   return {
+    assessment: deriveAssessment(problem),
     action: summariseAction(dominant, appropriateLever),
-    benefit: deriveBenefit(problem, appropriateLever),
-    expectedEngineeringEffect: deriveExpectedEffect(dominant, problem),
+    why: physicalCause?.description || '',
     rp22Evidence: deriveRp22Evidence(dominant, currentResult),
     remainingLimitation: deriveRemainingLimitation(problem, correctability, dominant?.result, designObjectives),
   };
