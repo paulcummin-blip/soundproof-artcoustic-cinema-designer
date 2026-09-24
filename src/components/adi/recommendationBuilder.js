@@ -239,10 +239,10 @@ export function buildNoFurtherEngineering() {
  */
 export function buildNoFurtherEq() {
   return {
-    action: 'No further engineering changes are recommended.',
+    action: 'No further EQ is recommended.',
     benefit: '',
     expectedEngineeringEffect: '',
     rp22Evidence: '',
-    remainingLimitation: '',
+    remainingLimitation: 'The remaining limitation requires a physical change.',
   };
 }
