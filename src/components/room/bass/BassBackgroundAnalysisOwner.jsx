@@ -1358,14 +1358,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const effectiveDetailedStatus = (isProjectHydrationReady && effectiveContract && !cachedContract && !contract && hasPublishedContract)
     ? (publishedContractIsStale ? "UPDATING" : "COMPLETE")
     : detailedStatus;
-  // ── Stage 3: Finished graph restore from cached graphPayload ──────────
-  // When no live optimisation result exists (controller idle after route
-  // return, project reopen, or fresh session) but a matching authoritative
-  // completed contract with a graphPayload exists, build a synthetic
-  // optimisationResult from the saved graph curves. This restores the
-  // finished graph without running the foreground optimiser.
-  // Authority priority: live result takes precedence; cached graph is only
-  // used when the live result is null AND the completed contract matches.
+  // ── Stage 3: Finished graph restore from published contract ──────────
   // Restoration: the finished graph is restored from the published contract's
   // graphPayload whenever no live optimisation result exists. No live
   // fingerprint comparison — the published contract is the engineering truth
