@@ -13,12 +13,12 @@
 //   - Every result carries a version prefix: "geo:v1:hash", "prod:v1:hash", "cal:v1:hash".
 //   - NaN, Infinity, and non-serializable values are coerced to null before hashing.
 
-// Stage 1 subwoofer instance migration: bump from 2 to 3 so old CFG-keyed
-// cache entries safely miss. This is NOT equivalent to v2_instance — it is a
-// new fingerprint version that, combined with the instanceAuthorityVersion
-// in completedBassResultPersistence.js, forms an explicit instance-authority
-// cache namespace. Old CFG results always miss.
-export const FINGERPRINT_VERSION = 7;
+// v8: Room-physics / design-objective decoupling. The geometry fingerprint
+// now gates the authoritative room-response worker (room-physics cache key),
+// while the calibration fingerprint gates the optimiser. Bumping from 7 to 8
+// invalidates all old caches (optimiser LRU, P14 target cache, completed bass
+// authority) in one shot so no stale entries from the old coupling survive.
+export const FINGERPRINT_VERSION = 8;
 
 // ---------------------------------------------------------------------------
 // 1. Stable serialization primitives

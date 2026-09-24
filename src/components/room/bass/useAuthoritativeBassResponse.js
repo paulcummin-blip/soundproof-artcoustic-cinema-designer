@@ -7,6 +7,7 @@ import { simulateAuthoritativeBassResponse } from "./authoritativeBassResponseEn
 export { simulateAuthoritativeBassResponse } from "./authoritativeBassResponseEngine";
 import { ARTCOUSTIC_HOUSE_CURVE } from "@/components/utils/artcousticHouseCurve";
 import { computeCalibrationFingerprint, computeGeometryFingerprint, computeHouseCurveFingerprint, computeProductFingerprint } from "./bassAnalysisFingerprints";
+import { getCachedRoomPhysics, setCachedRoomPhysics } from "./roomPhysicsCache";
 import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import {
   DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W,
@@ -295,26 +296,42 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     }
 
     // Manual-authority gate: raw authoritative room simulation may start only
-    // for an explicit request whose submitted full calibration fingerprint is
-    // still the live design fingerprint. Geometry/target changes invalidate the
-    // request before any replacement worker can start.
-    if (!analysisRequestId || !analysisRequestFingerprint || analysisRequestFingerprint !== fingerprints?.calibration) {
+    // for an explicit request whose submitted GEOMETRY fingerprint is still
+    // the live geometry fingerprint. Design-objective changes (P14/P18) do
+    // NOT invalidate room physics — only geometry changes do. The gate uses
+    // the geometry fingerprint so that a P14-only change reuses the cached
+    // room response and only re-runs the optimiser.
+    if (!analysisRequestId || !analysisRequestFingerprint || analysisRequestFingerprint !== fingerprints?.geometry) {
       setSimulationState({ request: null, status: "idle", result: null, error: null });
       return undefined;
     }
 
-    setSimulationState({ request: simulationRequest, status: "calculating", result: null, error: null });
+    // Room-physics cache: if a result for the current geometry fingerprint
+    // already exists (e.g. from a previous calculation before a P14-only
+    // change), reuse it immediately without starting a new worker. Room
+    // physics is geometry-dependent only — the flat 94 dB source means
+    // the transfer functions and seat responses are model-independent.
+    const geometryFingerprint = fingerprints?.geometry;
     let cancelled = false;
     const finish = (nextState) => {
       if (!cancelled && simulationGenerationRef.current === generation) {
         setSimulationState({ request: simulationRequest, ...nextState });
       }
     };
+    const cachedRoomPhysics = geometryFingerprint ? getCachedRoomPhysics(geometryFingerprint) : null;
+    if (cachedRoomPhysics) {
+      finish({ status: "complete", result: cachedRoomPhysics, error: null });
+      return () => { cancelled = true; };
+    }
+
+    setSimulationState({ request: simulationRequest, status: "calculating", result: null, error: null });
 
     if (typeof Worker === "undefined") {
       const timer = setTimeout(() => {
         try {
-          finish({ status: "complete", result: runSimulation(qStrategy), error: null });
+          const result = runSimulation(qStrategy);
+          if (geometryFingerprint && result) setCachedRoomPhysics(geometryFingerprint, result);
+          finish({ status: "complete", result, error: null });
         } catch (error) {
           finish({ status: "error", result: null, error: error?.message || String(error) });
         }
@@ -359,6 +376,12 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       const message = event.data || {};
       if (message.generation !== generation) return;
       if (message.type === "complete") {
+        // Store the room-physics result in the geometry-keyed cache so that
+        // a subsequent P14-only change reuses it without re-running the
+        // modal engine. Room physics is geometry-dependent only.
+        if (geometryFingerprint && message.result) {
+          setCachedRoomPhysics(geometryFingerprint, message.result);
+        }
         finish({ status: "complete", result: message.result, error: null });
       } else {
         finish({ status: "error", result: null, error: message.error || "Authoritative bass simulation failed" });
@@ -514,7 +537,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   const responseStatus = analysisBlocked
     ? "blocked"
     : blockedReason ? "error"
-      : !analysisRequestId || analysisRequestFingerprint !== fingerprints?.calibration
+      : !analysisRequestId || analysisRequestFingerprint !== fingerprints?.geometry
         ? "idle"
         : simulationReady ? "ready" : "calculating";
 

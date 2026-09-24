@@ -99,11 +99,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     frontSubsLive,
     rearSubsLive,
     analysisRequestId: manualAnalysisRequest?.id || null,
-    // FIX 1: Pass the BARE calibration fingerprint to the authoritative hook,
-    // not the full result/cache fingerprint. The hook checks
-    // analysisRequestFingerprint === fingerprints.calibration — these must
-    // match for the authoritative worker to start.
-    analysisRequestFingerprint: manualAnalysisRequest?.calibrationFingerprint || null,
+    // Pass the GEOMETRY fingerprint to the authoritative hook for the
+    // room-physics gate. Room physics is geometry-dependent only — a P14
+    // target change does not invalidate room physics. The hook checks
+    // analysisRequestFingerprint === fingerprints.geometry, so a P14-only
+    // change reuses the cached room response.
+    analysisRequestFingerprint: manualAnalysisRequest?.geometryFingerprint || null,
   });
   const {
     roomDims, seatingPositions, rspPosition, sources, rspRawCurve, perSeatRawCurves,
@@ -112,6 +113,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     canonicalRoomResponseCurve,
   } = authoritative;
   const calibrationFingerprint = fingerprints?.calibration ?? null;
+  const geometryFingerprint = fingerprints?.geometry ?? null;
   const normalizedPhysicsOptions = useNormalizedPhysicsOptions(authoritative);
   // PASS 2: The normalized room-transfer hook is NO LONGER driven by the manual
   // Calculate request. perSourceRspComplexTransfers now come from the
@@ -1015,14 +1017,19 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       // (full calibration fingerprint) is the sole identity check.
       setManualAnalysisRequest({
         id,
-        // FIX 1: fingerprint = full result/cache fingerprint for authority
+        // fingerprint = full result/cache fingerprint for authority
         // and cache identity checks (manualRequestMatchesCurrent, watchdog,
-        // controller.requestManual).
+        // controller.requestManual). This is calibration-based — the
+        // optimiser correctly depends on P14 target identity.
         fingerprint: cacheKey,
-        // FIX 1: calibrationFingerprint = BARE calibration fingerprint for the
-        // authoritative hook (analysisRequestFingerprint). This is what
-        // useAuthoritativeBassResponse compares against fingerprints.calibration.
+        // calibrationFingerprint = BARE calibration fingerprint, retained
+        // for diagnostic/identity purposes.
         calibrationFingerprint,
+        // geometryFingerprint = BARE geometry fingerprint for the
+        // authoritative room-physics hook (analysisRequestFingerprint).
+        // Room physics is geometry-dependent only — a P14-only change
+        // reuses the cached room response.
+        geometryFingerprint,
         collectDiagnostics: collectDiagnostics === true,
         diagnosticToken,
       });
@@ -1033,7 +1040,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       // actually starts (see the effect below), not at button-click time.
       return { action: "queued", requestId: id, fingerprint: cacheKey };
     },
-    [controller, scopeId, canCalculate, cacheKey, calibrationFingerprint]
+    [controller, scopeId, canCalculate, cacheKey, calibrationFingerprint, geometryFingerprint]
   );
   const onRetry = onCalculate;
   // Cancel handler: visible whenever a real active job exists. Terminates
