@@ -3,10 +3,14 @@
 // Bass Design Assistant — Frozen UX Workflow
 //
 // The workflow is:
-//   Room → Choose Starting Layout → Current Layout → Calculate Performance →
-//   Performance → Improve Design → Presentation Mode
+//   1. Choose Layout
+//   2. Choose Design Target
+//   3. Calculate Performance
+//   4. Understand Performance   (Sprint 2)
+//   5. Optimise Bass             (Sprint 2)
+//   6. Presentation              (Sprint 2)
 //
-// This sequence is fixed. Do not redesign it. Do not reinterpret it.
+// Sprint 1 implements stages 1–3 only.
 //
 // This is a PRESENTATION and INFORMATION-ARCHITECTURE change only.
 // It does NOT change acoustics maths, P14/P18/P19/P20 grading, optimiser
@@ -14,37 +18,23 @@
 //
 // It consumes existing shared authority only:
 //   - useSharedBassResults()           → lifecycle, authority, seating
-//   - BassHeadlinePills                 → P14/P18/P19/P20 pills
 //   - OptimiseAndCalculate              → single calculation action
-//   - StartingLayoutCards              → Stage 1 (replaces BestSubLayoutGuide)
+//   - StartingLayoutCards              → Stage 1 (Choose Layout)
 //   - CurrentLayoutBanner              → compact layout summary
-//   - CapabilitySelector               → P14 renamed, instant switching
-//   - ImproveDesignCard                → single recommendation card
-//   - PresentationModeToggle           → viewing mode
-//   - BassResponse                     → graph (embedded, header hidden)
+//   - ChooseDesignTarget               → Stage 2 (P14 + P18 design objectives)
 //
-// The four designer questions:
-//   1. Where should the subs go?
-//   2. How well does this perform?
-//   3. How can I improve it?
-//   4. How do I explain it?
+// When implementation decisions conflict with the existing UI, prefer the
+// frozen workflow over the existing interface. The Subwoofer Design
+// Experience is now the product authority.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Waves } from "lucide-react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
-import BassHeadlinePills from "@/components/room/bass/BassHeadlinePills";
 import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
 import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards";
 import CurrentLayoutBanner from "@/components/room/bass/bda/CurrentLayoutBanner";
-import CapabilitySelector from "@/components/room/bass/bda/CapabilitySelector";
-import ImproveDesignCard from "@/components/room/bass/bda/ImproveDesignCard";
-import PresentationModeToggle from "@/components/room/bass/bda/PresentationModeToggle";
-import PerformanceHeader from "@/components/room/bass/bda/PerformanceHeader";
-
-const BassResponse = React.lazy(() =>
-  import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
-);
+import ChooseDesignTarget from "@/components/room/bass/bda/ChooseDesignTarget";
 
 export default function BassDesignAssistant({
   appState,
@@ -57,10 +47,6 @@ export default function BassDesignAssistant({
 }) {
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
   const shared = useSharedBassResults();
-  const [showLayoutCards, setShowLayoutCards] = useState(true);
-  const [presentationMode, setPresentationMode] = useState(false);
-  const [recalculateFn, setRecalculateFn] = useState(null);
-  const hadSubsRef = useRef(false);
 
   const subwooferInstances = appState?.subwooferInstances || [];
   const hasSubwoofers = subwooferInstances.some((s) => s?.enabled !== false);
@@ -68,7 +54,13 @@ export default function BassDesignAssistant({
   const isCalculating = shared?.calculationInProgress === true;
   const isStale = shared?.bassLifecycleState === "stale_needs_recalculation" || shared?.calculationOutcome === "stale";
 
-  // Auto-collapse layout cards when subwoofers first appear
+  // Fix flash: initialize based on whether subs already exist at first render.
+  // This prevents the one-frame flash of layout cards on projects that
+  // already have subwoofers.
+  const [showLayoutCards, setShowLayoutCards] = useState(!hasSubwoofers);
+  const hadSubsRef = useRef(hasSubwoofers);
+
+  // Collapse layout cards when subwoofers first appear (async hydration)
   useEffect(() => {
     if (hasSubwoofers && !hadSubsRef.current) {
       setShowLayoutCards(false);
@@ -102,6 +94,9 @@ export default function BassDesignAssistant({
     handleLayoutApplied();
   };
 
+  // Stages 2–3 are visible only when the layout has been chosen
+  const layoutChosen = hasSubwoofers && !showLayoutCards;
+
   return (
     <div className="rounded-xl border border-[#DCDBD6] bg-white p-4 space-y-4" data-bda-workflow="true">
       {/* ── Header ── */}
@@ -115,7 +110,7 @@ export default function BassDesignAssistant({
         </h3>
       </div>
 
-      {/* ── Stage 1: Choose Starting Layout ── */}
+      {/* ── Stage 1: Choose Layout ── */}
       {showLayoutCards && (
         <StartingLayoutCards
           roomDims={roomDims}
@@ -133,7 +128,7 @@ export default function BassDesignAssistant({
       )}
 
       {/* ── Current Layout banner ── */}
-      {!showLayoutCards && hasSubwoofers && (
+      {layoutChosen && (
         <CurrentLayoutBanner
           subwooferInstances={subwooferInstances}
           roomDims={roomDims}
@@ -144,8 +139,13 @@ export default function BassDesignAssistant({
         />
       )}
 
-      {/* ── Stage 2: Calculate Performance ── */}
-      {hasSubwoofers && (
+      {/* ── Stage 2: Choose Design Target ── */}
+      {layoutChosen && (
+        <ChooseDesignTarget disabled={disabled} />
+      )}
+
+      {/* ── Stage 3: Calculate Performance ── */}
+      {layoutChosen && (
         <OptimiseAndCalculate
           roomDims={roomDims || appState?.roomDims}
           seatingPositions={seatingPositions}
@@ -160,60 +160,7 @@ export default function BassDesignAssistant({
           appState={appState}
           disabled={disabled}
           hasResults={hasResults}
-          registerRecalculate={setRecalculateFn}
         />
-      )}
-
-      {/* ── Stage 3: Performance ── */}
-      {hasResults && !presentationMode && (
-        <div className="space-y-3" data-bda-stage="performance">
-          <PerformanceHeader
-            hasResults={hasResults}
-            isCalculating={isCalculating}
-            isStale={isStale}
-            onRecalculate={recalculateFn}
-          />
-          <CapabilitySelector disabled={disabled} />
-          <React.Suspense fallback={<div className="p-4 text-sm text-[#625143]">Loading graph…</div>}>
-            <BassResponse
-              hideHeader
-              engineeringDetailCollapsed
-              isCalculating={isCalculating}
-              frontSubsCfg={frontSubsCfg}
-              rearSubsCfg={rearSubsCfg}
-              subWarnings={subWarnings || {}}
-            />
-          </React.Suspense>
-          <BassHeadlinePills />
-        </div>
-      )}
-
-      {/* ── Stage 4: Improve Design ── */}
-      {hasResults && !presentationMode && (
-        <ImproveDesignCard appState={appState} commitInstances={compat.commitInstances} />
-      )}
-
-      {/* ── Stage 5: Presentation Mode ── */}
-      {hasResults && (
-        <>
-          <PresentationModeToggle
-            isPresentationMode={presentationMode}
-            onToggle={setPresentationMode}
-          />
-          {presentationMode && (
-            <div className="space-y-3" data-bda-stage="presentation">
-              <BassHeadlinePills />
-              <React.Suspense fallback={<div className="p-4 text-sm text-[#625143]">Loading graph…</div>}>
-                <BassResponse
-                  hideHeader
-                  frontSubsCfg={frontSubsCfg}
-                  rearSubsCfg={rearSubsCfg}
-                  subWarnings={subWarnings || {}}
-                />
-              </React.Suspense>
-            </div>
-          )}
-        </>
       )}
     </div>
   );
