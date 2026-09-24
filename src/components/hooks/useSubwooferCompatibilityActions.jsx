@@ -38,7 +38,7 @@ import {
 } from "@/components/utils/subwooferInstanceCompatibility";
 import { subwooferModelKey } from "@/components/utils/subwooferDisplayLabel";
 import { markAppliedCalibrationUserModified } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
-import { extractAppliedCalibrationValues } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthority.js";
+import { extractAppliedCalibrationValues, computeAppliedCalibrationBasisFingerprint } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthority.js";
 
 /**
  * @param {Object} appState - From useAppState()
@@ -258,12 +258,32 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
     commitInstances(nextInstances);
     // Stamp the Applied Calibration Authority — manual edit.
     // Source becomes Manual; the Recommendation Authority is unchanged.
+    // Compute the basis fingerprint from the current design state so the
+    // authority has a non-empty basisFingerprint and is persisted by
+    // serializeAppliedCalibration. Without this, manual edits are lost on
+    // reload (serializeAppliedCalibration rejects empty fingerprints).
     if (projectIdRef.current && versionIdRef.current) {
       try {
+        const rspPosition = (Number.isFinite(Number(appState?.mlpX_m)) || Number.isFinite(Number(appState?.mlpY_m)))
+          ? {
+              x: Number(appState.mlpX_m) || 0,
+              y: Number(appState.mlpY_m) || 0,
+              z: null,
+              designatedRspSeatId: appState?.designatedRspSeatId ?? null,
+            }
+          : null;
+        const basisFp = computeAppliedCalibrationBasisFingerprint({
+          subwooferInstances: nextInstances,
+          roomDims: appState?.roomDims,
+          seatingPositions: appState?.seatingPositions,
+          rspPosition,
+          selectedSubModel: nextInstances?.find((s) => s?.enabled !== false)?.model || null,
+          p14TargetLevel: appState?.splConfig?.selectedP14Level ?? null,
+        });
         markAppliedCalibrationUserModified(
           projectIdRef.current,
           versionIdRef.current,
-          null,
+          basisFp,
           extractAppliedCalibrationValues(nextInstances),
         );
       } catch {
