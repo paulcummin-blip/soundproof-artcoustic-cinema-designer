@@ -230,14 +230,40 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // calculate). Starting before hydration settles wastes a worker that gets
   // cancelled the moment the persisted authority arrives.
   const bassAuthorityHydrationSettled = completedBassAuthority?.hydrationSettled === true;
-  // Restore a persisted contract from its own published authority identity.
-  // The live calibration fingerprint decides whether the design is current and
-  // needs recalculation; it must not suppress the last authoritative published
-  // graph while the hydrated design fingerprint settles or changes.
+  // A persisted completed contract may be reused as AUTHORITATIVE only when it
+  // is structurally complete AND metricPublication.canonicalMetricPublicationValid
+  // === true (isAuthoritativeBassContract). A NOT_VERIFIED contract with a
+  // matching fingerprint (e.g. old 360/320 snapshots) must NOT be treated as a
+  // matching completed result — it must not block the foreground recalculation
+  // or be displayed as COMPLETE.
+  // ── Separation of Restoration and Recalculation ──────────────────────
+  // The Published Engineering Contract is the engineering truth. Restoration
+  // (displaying the published graph, RP22, ADI) uses the contract directly —
+  // no live fingerprint comparison required. Recalculation (deciding whether
+  // the design changed and a new calculation is needed) uses the live
+  // fingerprint. These two responsibilities are intentionally separate.
+  //
+  // completedContractMatches: DB fingerprint === live fingerprint. Used for
+  //   RECALCULATION decisions (success terminal, persistence, foreground
+  //   readiness). NOT used to gate restoration.
   const completedContractMatches = isAuthoritativeBassContract(completedContract)
-    && completedBassAuthority?.authoritative === true
     && completedFingerprint
-    && completedBassAuthority?.currentFingerprint === completedFingerprint;
+    && cacheKey
+    && completedFingerprint === cacheKey;
+  // hasPublishedContract: the contract is structurally authoritative and
+  // carries a graph payload. This is the RESTORATION authority — the published
+  // contract may be displayed regardless of whether the live fingerprint
+  // matches. The live fingerprint determines recalculation, not restoration.
+  const hasPublishedContract = isAuthoritativeBassContract(completedContract)
+    && !!completedFingerprint
+    && hasGraphPayload(completedContract);
+  // publishedContractIsStale: the live fingerprint differs from the published
+  // contract's fingerprint — the design changed and recalculation is needed.
+  // The published contract remains visible (restoration) until the new
+  // calculation replaces it.
+  const publishedContractIsStale = hasPublishedContract
+    && !!cacheKey
+    && completedFingerprint !== cacheKey;
 
   // PASS 2: manualRequestMatchesCurrent no longer depends on the normalized
   // transfer fingerprint. The cacheKey (full calibration fingerprint) captures
@@ -1317,12 +1343,21 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // cached contract on the FIRST render after a target switch — before the
   // publish effect has promoted it to the live authority store.
   const visibleCachedContract = (manualRequestMatchesCurrent || !manualAnalysisRequest) ? cachedContract : null;
+  // Restoration: the published contract is displayed when no cached/live
+  // contract is available, regardless of whether the live fingerprint matches.
+  // The live fingerprint determines recalculation, not whether the published
+  // result may be displayed.
   const effectiveContract = isProjectHydrationReady
-    ? (visibleCachedContract || contract || (completedContractMatches ? completedContract : null))
+    ? (visibleCachedContract || contract || (hasPublishedContract ? completedContract : null))
     : null;
-  // When using the fallback completed contract (controller skipped), show
-  // COMPLETE status so the bass graph and status indicators don't flash IDLE.
-  const effectiveDetailedStatus = (isProjectHydrationReady && effectiveContract && !cachedContract && !contract && completedContractMatches) ? "COMPLETE" : detailedStatus;
+  // Restoration status: when the published contract is the effective contract
+  // (no cached/live contract), show COMPLETE if the published contract is
+  // current (fingerprint matches), or UPDATING if the design changed (fingerprint
+  // mismatch). The published result remains visible in both cases — only the
+  // status reflects whether recalculation is needed.
+  const effectiveDetailedStatus = (isProjectHydrationReady && effectiveContract && !cachedContract && !contract && hasPublishedContract)
+    ? (publishedContractIsStale ? "UPDATING" : "COMPLETE")
+    : detailedStatus;
   // ── Stage 3: Finished graph restore from cached graphPayload ──────────
   // When no live optimisation result exists (controller idle after route
   // return, project reopen, or fresh session) but a matching authoritative
@@ -1331,11 +1366,15 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // finished graph without running the foreground optimiser.
   // Authority priority: live result takes precedence; cached graph is only
   // used when the live result is null AND the completed contract matches.
+  // Restoration: the finished graph is restored from the published contract's
+  // graphPayload whenever no live optimisation result exists. No live
+  // fingerprint comparison — the published contract is the engineering truth
+  // and may be displayed regardless of whether the design has changed. The
+  // live fingerprint determines recalculation, not graph restoration.
   const cachedGraphOptimisationResult = useMemo(() => {
-    if (!isProjectHydrationReady || optimisationResult || !completedContractMatches || !completedContract) return null;
-    if (!hasGraphPayload(completedContract)) return null;
+    if (!isProjectHydrationReady || optimisationResult || !hasPublishedContract || !completedContract) return null;
     return buildFinishedGraphOptimisationResult(completedContract);
-  }, [isProjectHydrationReady, optimisationResult, completedContractMatches, completedContract]);
+  }, [isProjectHydrationReady, optimisationResult, hasPublishedContract, completedContract]);
   const effectiveOptimisationResult = optimisationResult || cachedGraphOptimisationResult;
   // PASS 1: User-facing phase states. Replaces the single ambiguous
   // long-running message with a small number of useful phases:
