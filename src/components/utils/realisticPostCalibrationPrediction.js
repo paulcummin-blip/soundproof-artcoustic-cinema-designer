@@ -13,7 +13,9 @@
  *   if error < 0 (above target):  cut  = max(error, -15 dB)
  *
  * Constraints:
- *   - globalTrimDb = min(0, median(target - smoothedMaximum)) over the P19 band.
+ *   - globalTrimDb = min(0, minDifference + MAX_CUT_DB) — cut-preferred: the
+ *     highest practical operating level where the largest peak is at the max
+ *     cut limit, minimising required boost by accepting additional cut.
  *   - Deep narrow nulls (≥10 dB below surroundings, ≤6 Hz wide) are not boosted.
  *   - Boost is further limited by product capability (source-domain headroom
  *     and frequency coverage).
@@ -102,8 +104,15 @@ function interpolateValue(curve, frequency) {
  * Product + room maximum capability and the house target across the P19
  * assessment band.
  *
+ * Cut-preferred philosophy (experienced calibrator / Trinnov / Dirac):
  *   difference(f) = HouseTarget(f) - ProductRoomMaximum(f)
- *   globalTrimDb  = min(0, median(valid difference(f)))
+ *   minDifference = most negative difference (highest peak above target)
+ *   globalTrimDb  = min(0, minDifference + MAX_CUT_DB)
+ *
+ * The highest practical operating level places the largest peak at exactly the
+ * maximum cut limit. This minimises required boost by starting the operating
+ * response as close to the target as possible, accepting additional cut over
+ * additional boost. Cuts are inexpensive; boost consumes capability.
  *
  * Uses 1/3-octave-smoothed response so isolated modal spikes/nulls do not
  * dominate the master volume decision. Frequencies inside protected
@@ -115,7 +124,7 @@ function interpolateValue(curve, frequency) {
  * @param {number} params.assessmentStartHz      - P19 band start
  * @param {number} params.assessmentEndHz        - P19 band end
  * @param {Array}  [params.protectedNullRegions]  - Deep narrow null regions
- * @returns {number} globalTrimDb (≤ 0; 0 when no valid data or positive median)
+ * @returns {number} globalTrimDb (≤ 0; 0 when no valid data or peak within cut limit)
  */
 export function computeGlobalOperatingTrimDb({
   maximumCapabilityCurve, targetCurve, assessmentStartHz, assessmentEndHz,
@@ -143,13 +152,14 @@ export function computeGlobalOperatingTrimDb({
   if (!differences.length) return 0;
 
   differences.sort((a, b) => a - b);
-  const mid = Math.floor(differences.length / 2);
-  const median = differences.length % 2 === 0
-    ? (differences[mid - 1] + differences[mid]) / 2
-    : differences[mid];
-
+  // Cut-preferred: highest practical operating level. The largest peak (most
+  // negative difference) is placed at exactly the maximum cut limit. This is
+  // the upper bound of the correction window — the operating level moves
+  // upward until additional boost is minimised and additional cut is accepted.
+  const minDifference = differences[0]; // most negative = highest peak above target
+  const upperBoundDb = minDifference + MAX_CUT_DB;
   // No positive global gain — the system is already at maximum capability.
-  return Math.min(0, median);
+  return Math.min(0, upperBoundDb);
 }
 
 /**

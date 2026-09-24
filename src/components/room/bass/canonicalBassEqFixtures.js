@@ -184,11 +184,12 @@ export function runCanonicalBassEqFixtures() {
         && feasibleWindow.maximumResidualDb + feasibleWindow.requestedOffsetDb <= 15.000001,
     },
     {
-      name: "An infeasible response is balanced between the maximum safe boost and cut",
+      name: "An infeasible response prefers the highest practical operating level (cut over boost)",
       passed: !peakDominatedWindow.feasible
-        && peakDominatedWindow.selectionMode === "balanced-unreachable-residual"
-        && Math.abs(peakDominatedWindow.requestedOffsetDb - peakDominatedWindow.balancedInfeasibleOffsetDb) <= 0.000001
-        && Math.abs(peakDominatedWindow.irreducibleShortfallDb - peakDominatedWindow.irreducibleExcessDb) <= 0.000001,
+        && peakDominatedWindow.selectionMode === "cut-preferred-above-correction-window"
+        && Math.abs(peakDominatedWindow.requestedOffsetDb - Math.max(peakDominatedWindow.lowerOffsetBoundDb, peakDominatedWindow.upperOffsetBoundDb)) <= 0.000001
+        && peakDominatedWindow.irreducibleShortfallDb <= 0.000001
+        && peakDominatedWindow.irreducibleExcessDb > 0,
     },
     {
       name: "A protected narrow null does not change the global operating-level anchor",
@@ -201,11 +202,10 @@ export function runCanonicalBassEqFixtures() {
         && fullBandOperatingWindow.assessmentSmoothing === "none",
     },
     {
-      name: "A useful 125 Hz room valley is balanced against the remaining broad peak excess",
-      passed: fullBandOperatingWindow.requestedOffsetDb > p19OnlyOperatingWindow.requestedOffsetDb + 5
-        && p19OnlyBestCase125ResidualDb < -10
-        && fullBandBestCase125ResidualDb > p19OnlyBestCase125ResidualDb + 5
-        && Math.abs(fullBandOperatingWindow.irreducibleShortfallDb - fullBandOperatingWindow.irreducibleExcessDb) <= 0.000001,
+      name: "A useful 125 Hz room valley benefits from the cut-preferred operating level",
+      passed: Math.abs(fullBandOperatingWindow.requestedOffsetDb - Math.max(fullBandOperatingWindow.lowerOffsetBoundDb, fullBandOperatingWindow.upperOffsetBoundDb)) <= 0.000001
+        && fullBandBestCase125ResidualDb > -6
+        && p19OnlyBestCase125ResidualDb > -6,
     },
     {
       name: "A detected deep modal null does not pin the complete response to maximum capability",

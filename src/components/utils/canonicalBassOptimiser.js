@@ -137,19 +137,22 @@ export function deriveCorrectionWindowOperatingOffsetDb({
   const upperOffsetBoundDb = Math.max(0, maximumCutDb) - maximumResidualDb;
   const meanAlignedOffsetDb = -meanResidualDb;
   const feasible = lowerOffsetBoundDb <= upperOffsetBoundDb;
-  // When the response span fits inside the available +6 / -15 dB PEQ window,
-  // centre it on the target without asking the filter bank for an impossible
-  // boost or cut. If it cannot fit, place the response halfway between the two
-  // incompatible bounds. This minimises the worst remaining error after the
-  // maximum safe boost and cut, rather than preserving every valley at the cost
-  // of leaving large peaks and turning the result into a level-only adjustment.
   const balancedInfeasibleOffsetDb = (lowerOffsetBoundDb + upperOffsetBoundDb) / 2;
-  const requestedOffsetDb = feasible
-    ? Math.min(upperOffsetBoundDb, Math.max(lowerOffsetBoundDb, meanAlignedOffsetDb))
-    : balancedInfeasibleOffsetDb;
+  // ── Cut-preferred operating-level optimisation ──
+  // An experienced cinema calibrator (Trinnov / Dirac) raises the master volume
+  // until the largest peak reaches the maximum cut limit, then cuts peaks
+  // rather than boosting dips. Cuts are inexpensive; boost consumes capability.
+  // The highest practical operating level is the most positive offset that
+  // keeps the response inside the correction window. In the feasible case this
+  // is the upper bound (peak at max cut, dips need less boost). In the
+  // infeasible case the response span exceeds the window; we still prefer the
+  // highest level (max of the two bounds), accepting that the peak may exceed
+  // max cut rather than asking for boost beyond the +6 dB limit. This
+  // minimises expensive EQ (boost) while accepting additional inexpensive cut.
+  const requestedOffsetDb = Math.max(lowerOffsetBoundDb, upperOffsetBoundDb);
   return {
     requestedOffsetDb,
-    selectionMode: feasible ? "mean-aligned-within-correction-window" : "balanced-unreachable-residual",
+    selectionMode: feasible ? "cut-preferred-within-correction-window" : "cut-preferred-above-correction-window",
     feasible,
     pointCount: correctablePoints.length,
     minimumResidualDb,
@@ -1107,11 +1110,15 @@ export function generateCanonicalCandidatePool({
   // the headroom calculation subtracts from the manufacturer capability curve).
   // Falls back to 114 dB when no tuning is configured on the sub objects.
   const baseRequestedSystemOutputDb = getCurrentSystemSourceOutput(activeSubs);
-  // ── Target-following global calibration level ──
+  // ── Target-following global calibration level (cut-preferred) ──
   // Place the physical RSP against the fixed house target across the complete
   // 20–200 Hz correction band. The operating trim and PEQ bank form one
   // correction window: every non-protected local dip must remain reachable by
   // the available +6 dB boost while peaks are left for the -15 dB cut bank.
+  // The operating level is placed at the highest practical position (max of
+  // the boost and cut bounds), preferring additional cut over additional boost
+  // — the same philosophy an experienced Trinnov or Dirac calibrator follows by
+  // raising the master volume until the largest peak reaches the cut limit.
   // This operating decision is deliberately unsmoothed; one-third-octave
   // smoothing remains the separate authority for RP22 P19/P20 grading.
   // Narrow cancellation nulls remain visible and are excluded from this anchor.
