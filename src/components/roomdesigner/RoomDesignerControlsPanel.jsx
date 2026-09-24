@@ -24,6 +24,15 @@ const RoomElements = React.lazy(() =>
 const BassDesignAssistant = React.lazy(() =>
   import("@/components/room/bass/BassDesignAssistant").then((m) => ({ default: m.default }))
 );
+// Temporary validation surfaces — restored beneath the BDA until it gains
+// equivalent physical-configuration controls (model, quantity, height,
+// orientation, screen lock). Do NOT remove until BDA validation is complete.
+const SubwooferPanel = React.lazy(() =>
+  import("@/components/room/SubwooferPanel").then((m) => ({ default: m.default ?? m.SubwooferPanel }))
+);
+const BassResponse = React.lazy(() =>
+  import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
+);
 
 export default function RoomDesignerControlsPanel({
   appState,
@@ -322,11 +331,9 @@ export default function RoomDesignerControlsPanel({
         </div>
 
         {/* ── Bass Design Assistant — Stage 1 shell ──
-            Recommendation-first Bass workspace above the existing detailed
-            surfaces. Consumes existing shared authority only; does not change
-            maths, grading, or optimiser logic. Old Subwoofers and Bass
-            Simulation panels remain intact beneath and will be removed in
-            Stage 3. */}
+            Recommendation-first Bass workspace. Primary bass workflow.
+            Consumes existing shared authority only; does not change maths,
+            grading, or optimiser logic. */}
         <CollapsiblePanel
           title="Bass Design Assistant"
           icon={<Waves className="w-5 h-5" />}
@@ -344,6 +351,43 @@ export default function RoomDesignerControlsPanel({
               disabled={isFrozen('bass')}
               roomDims={stableDimensions}
               seatingPositions={seatingPositions}
+              subWarnings={subWarnings}
+            />
+          </Suspense>
+        </CollapsiblePanel>
+
+        {/* ── Subwoofers (temporary validation surface) ──
+            Authoritative physical configuration surface: model, quantity,
+            height, orientation, screen lock, room-mode guide. Remains the
+            only UI for manual subwoofer configuration until the BDA gains
+            equivalent controls. Do NOT remove. */}
+        <Suspense fallback={<div>Loading...</div>}>
+          <SubwooferPanel
+            appState={appState}
+            disabled={isFrozen('bass')}
+            frontSubsCfg={frontSubsCfg}
+            rearSubsCfg={rearSubsCfg}
+            subWarnings={subWarnings}
+          />
+        </Suspense>
+
+        {/* ── Bass Simulation (temporary validation fallback) ──
+            Full-header BassResponse with Bass Target Settings, result cards,
+            recommendation, graph, and advanced diagnostics. Collapsed by
+            default. Engineering fallback during BDA validation. Do NOT remove. */}
+        <CollapsiblePanel
+          title="Bass Simulation"
+          icon={<Waves className="w-5 h-5" />}
+          defaultOpen={false}>
+          {isFrozen('bass') &&
+            <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
+              This tab is frozen. Unlock to make changes.
+            </div>
+          }
+          <Suspense fallback={<div>Loading...</div>}>
+            <BassResponse
+              frontSubsCfg={frontSubsCfg}
+              rearSubsCfg={rearSubsCfg}
               subWarnings={subWarnings}
             />
           </Suspense>
