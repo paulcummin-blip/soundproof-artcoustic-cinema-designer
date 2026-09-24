@@ -255,13 +255,19 @@ export default function AdiRecommendation({
     );
   }
 
-  const { recommendation, diagnosis, outcome, intent } = adiDecision;
+  const { recommendation, diagnosis, outcome, intent, explanation, eqDecisionExplanation } = adiDecision;
 
-  // No improvement case
-  const isNoImprovement =
-    outcome === ADI_OUTCOME.NO_FURTHER_ENGINEERING || outcome === ADI_OUTCOME.NO_FURTHER_EQ;
+  // No improvement case — first-class outcomes
+  const isNoEngineering = outcome === ADI_OUTCOME.NO_FURTHER_ENGINEERING;
+  const isNoEq = outcome === ADI_OUTCOME.NO_FURTHER_EQ;
 
-  if (isNoImprovement) {
+  if (isNoEngineering || isNoEq) {
+    const noImprovementText = isNoEq
+      ? recommendation?.action || "No further EQ is recommended."
+      : "No further engineering changes are recommended.";
+    const remainingText = isNoEq
+      ? recommendation?.remainingLimitation || "The remaining limitation requires a physical change."
+      : null;
     return (
       <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3">
         <div className="flex items-center gap-2">
@@ -274,8 +280,13 @@ export default function AdiRecommendation({
           </div>
         </div>
         <div className="mt-2 text-[12px] text-[#3E4349] leading-relaxed">
-          No further engineering changes are recommended.
+          {noImprovementText}
         </div>
+        {remainingText && (
+          <div className="mt-1 text-[11px] text-[#625143] leading-relaxed">
+            {remainingText}
+          </div>
+        )}
       </div>
     );
   }
@@ -360,6 +371,58 @@ export default function AdiRecommendation({
                 <span className="text-[#3E4349]">{change.change}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* What remains limiting? */}
+      {recommendation?.remainingLimitation && (
+        <div className="space-y-0.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+            What remains limiting?
+          </div>
+          <div className="text-[11px] text-[#3E4349] leading-relaxed">
+            {recommendation.remainingLimitation}
+          </div>
+        </div>
+      )}
+
+      {/* EQ Decision Explanation */}
+      {eqDecisionExplanation?.explanation && (
+        <div className="space-y-0.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+            EQ Decision
+          </div>
+          <div className="text-[11px] text-[#3E4349] leading-relaxed">
+            {eqDecisionExplanation.explanation}
+          </div>
+        </div>
+      )}
+
+      {/* Trade-offs (when applicable) */}
+      {explanation?.tradeOffs && explanation.tradeOffs.length > 0 && (
+        <div className="space-y-0.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+            Trade-offs
+          </div>
+          <div className="space-y-0.5">
+            {explanation.tradeOffs.map((t, i) => (
+              <div key={i} className="text-[11px] text-[#3E4349] leading-relaxed">
+                {t.description}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Next Steps */}
+      {explanation?.nextSteps && (
+        <div className="space-y-0.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+            Next Steps
+          </div>
+          <div className="text-[11px] text-[#3E4349] leading-relaxed">
+            {explanation.nextSteps}
           </div>
         </div>
       )}
