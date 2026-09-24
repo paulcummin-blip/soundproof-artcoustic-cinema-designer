@@ -36,6 +36,18 @@ export function buildFilterBankSignature(candidate) {
     .join("|") || "(none)";
 }
 
+// ── Corrected Response Authority ──
+// The correctionCurveSignature is the SOLE engineering authority identity.
+// It is derived from the corrected response (combinedEqCurve / correctionCurve),
+// NOT from the PEQ filter bank. Two candidates with identical corrected
+// responses but different filter banks are engineering-equivalent — the
+// filter bank is a diagnostic visualization, not the engineering truth.
+// The product answers: "If I build this room and calibrate it properly, what
+// will it measure like?" — and that answer is the corrected response.
+export function buildCorrectionCurveSignature(candidate) {
+  return buildCurveSignature(candidate?.combinedEqCurve || candidate?.correctionCurve);
+}
+
 export function buildCurveSignature(curve) {
   const points = Array.isArray(curve) ? curve : [];
   if (!points.length) return "curve:empty";
