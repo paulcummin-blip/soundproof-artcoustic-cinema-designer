@@ -74,16 +74,8 @@ function computeSeatingDisplacement(currentSeating, recommendedSeating) {
 // ── RP22 evidence formatting ──
 
 function formatRp22Evidence(evidence) {
-  if (!evidence || evidence === "RP22 results available after recalculation") return null;
-  const parts = evidence
-    .split("; ")
-    .map((part) => {
-      const match = part.match(/^(P\d+)\s+\S+:\s*(.+)$/);
-      if (match) return { parameter: match[1], change: match[2].replace("→", " → ") };
-      return null;
-    })
-    .filter(Boolean);
-  return parts.length > 0 ? parts : null;
+  if (Array.isArray(evidence) && evidence.length > 0) return evidence;
+  return null;
 }
 
 // ── Main component ──
@@ -330,14 +322,9 @@ export default function AdiRecommendation({
         </div>
       )}
 
-      {/* Recommendation — what to do */}
-      <div className="space-y-0.5">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-          Recommendation
-        </div>
-        <div className="text-[13px] font-semibold text-[#1B1A1A] leading-relaxed">
-          {actionText}
-        </div>
+      {/* The action — implicit recommendation, no label needed */}
+      <div className="text-[14px] font-semibold text-[#1B1A1A] leading-relaxed">
+        {actionText}
       </div>
 
       {/* Why — what physical behaviour caused this */}
@@ -352,17 +339,19 @@ export default function AdiRecommendation({
         </div>
       )}
 
-      {/* Expected Result — which RP22 values improve */}
+      {/* Expected Result — visual before → after transitions */}
       {rp22Changes && (
         <div className="space-y-0.5">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
             Expected Result
           </div>
-          <div className="space-y-0.5">
+          <div className="space-y-1">
             {rp22Changes.map((change, i) => (
               <div key={i} className="flex items-center gap-2 text-[11px]">
-                <span className="font-semibold text-[#1B1A1A]">{change.parameter}</span>
-                <span className="text-[#3E4349]">{change.change}</span>
+                <span className="font-semibold text-[#1B1A1A] w-8">{change.parameter}</span>
+                <span className="text-[#8A7B6A]">{change.from}</span>
+                <ArrowRight className="h-3 w-3 text-[#213428]" />
+                <span className="font-semibold text-[#213428]">{change.to}</span>
               </div>
             ))}
           </div>

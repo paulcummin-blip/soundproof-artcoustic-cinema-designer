@@ -3,10 +3,10 @@
 // ADI — Recommendation Builder
 //
 // Every recommendation must contain exactly five fields:
-//   1. Action — what to do
-//   2. Benefit — why
-//   3. Expected Engineering Effect — physical consequence
-//   4. RP22 Evidence — supporting parameter changes
+//   1. Assessment — the designer's conclusion (not a diagnosis)
+//   2. Action — what to do (specific, never vague)
+//   3. Why — the physical cause
+//   4. RP22 Evidence — visual before → after parameter changes
 //   5. Remaining Limitation — what still limits the design
 //
 // First-class outcomes:
@@ -38,27 +38,20 @@ function levelText(level) {
 // ── Assessment (what is happening) ──
 function deriveAssessment(problem) {
   if (!problem) return '';
-  const freq = Number(problem.worstSeat?.worstFrequencyHz) || 0;
 
   switch (problem.type) {
     case PROBLEM_TYPE.CAPABILITY:
-      return 'The system cannot reach the target bass output level at the lowest frequencies.';
+      return 'The current subwoofers cannot achieve the target bass level.';
     case PROBLEM_TYPE.EXTENSION:
-      return 'The system cannot reach the target bass extension.';
+      return 'The current subwoofers cannot reach the target bass extension.';
     case PROBLEM_TYPE.SEAT_CONSISTENCY:
-      return 'The bass response varies too much between seats.';
+      return 'The current layout produces inconsistent bass across the seating area.';
     case PROBLEM_TYPE.RESPONSE_SMOOTHNESS:
-      return freq > 0
-        ? `The bass response deviates from the target at ${freq.toFixed(0)} Hz at the worst seat.`
-        : 'The bass response deviates from the target at the worst seat.';
+      return 'The bass response is uneven at the worst seat.';
     case PROBLEM_TYPE.ROOM_MODE:
-      return freq > 0
-        ? `A room mode at ${freq.toFixed(0)} Hz is causing the bass response to deviate at the worst seat.`
-        : 'A room mode is causing the bass response to deviate at the worst seat.';
+      return 'The room\u2019s natural resonance is causing uneven bass at the worst seat.';
     case PROBLEM_TYPE.LOCAL_CANCELLATION:
-      return freq > 0
-        ? `A cancellation at ${freq.toFixed(0)} Hz is causing a deep null in the bass response at the worst seat.`
-        : 'A cancellation is causing a deep null in the bass response at the worst seat.';
+      return 'A deep null in the bass response affects the worst seat.';
     default:
       return '';
   }
@@ -92,7 +85,7 @@ function summariseAction(dominant, appropriateLever) {
 
 // ── RP22 Evidence ──
 function deriveRp22Evidence(dominant, currentResult) {
-  if (!dominant?.result || !currentResult) return '';
+  if (!dominant?.result || !currentResult) return [];
 
   const candidateP19 = Array.isArray(dominant.result.perSeatP19) ? dominant.result.perSeatP19 : [];
   const currentP19Map = new Map((currentResult.perSeatP19 || []).map(s => [String(s.seatId), s]));
@@ -106,13 +99,13 @@ function deriveRp22Evidence(dominant, currentResult) {
     const candLevel = numericLevel(seat.level);
     const curLevel = numericLevel(cur.level);
     if (candLevel > curLevel) {
-      changes.push(`P19 ${seat.seatId}: ${levelText(curLevel)}→${levelText(candLevel)}`);
+      changes.push({ parameter: 'P19', from: levelText(curLevel), to: levelText(candLevel) });
     } else if (candLevel === curLevel) {
       const candRaw = Math.abs(Number(seat.variationDbRaw) || 0);
       const curRaw = Math.abs(Number(cur.variationDbRaw) || 0);
       const delta = curRaw - candRaw;
       if (delta >= 1.0) {
-        changes.push(`P19 ${seat.seatId}: ${curRaw.toFixed(1)}→${candRaw.toFixed(1)} dB`);
+        changes.push({ parameter: 'P19', from: `${curRaw.toFixed(1)} dB`, to: `${candRaw.toFixed(1)} dB` });
       }
     }
   }
@@ -123,19 +116,18 @@ function deriveRp22Evidence(dominant, currentResult) {
     const candLevel = numericLevel(seat.level);
     const curLevel = numericLevel(cur.level);
     if (candLevel > curLevel) {
-      changes.push(`P20 ${seat.seatId}: ${levelText(curLevel)}→${levelText(candLevel)}`);
+      changes.push({ parameter: 'P20', from: levelText(curLevel), to: levelText(candLevel) });
     } else if (candLevel === curLevel) {
       const candRaw = Math.abs(Number(seat.variationDbRaw) || 0);
       const curRaw = Math.abs(Number(cur.variationDbRaw) || 0);
       const delta = curRaw - candRaw;
       if (delta >= 1.0) {
-        changes.push(`P20 ${seat.seatId}: ${curRaw.toFixed(1)}→${candRaw.toFixed(1)} dB`);
+        changes.push({ parameter: 'P20', from: `${curRaw.toFixed(1)} dB`, to: `${candRaw.toFixed(1)} dB` });
       }
     }
   }
 
-  if (changes.length === 0) return '';
-  return changes.join('; ');
+  return changes;
 }
 
 // ── Remaining Limitation ──
@@ -179,7 +171,7 @@ function deriveRemainingLimitation(problem, correctability, candidateResult, des
  * @param {object} params.appropriateLever - the appropriate engineering lever
  * @param {object} params.currentResult - baseline canonical result
  * @param {object} params.designObjectives - P14/P18 design objectives
- * @returns {{ action: string, benefit: string, expectedEngineeringEffect: string, rp22Evidence: string, remainingLimitation: string }}
+ * @returns {{ assessment: string, action: string, why: string, rp22Evidence: Array, remainingLimitation: string }}
  */
 export function buildRecommendation(params) {
   const { dominant, problem, physicalCause, correctability, appropriateLever, currentResult, designObjectives } = params;
@@ -200,9 +192,9 @@ export function buildRecommendation(params) {
 export function buildNoFurtherEngineering() {
   return {
     action: 'No further engineering changes are recommended.',
-    benefit: '',
-    expectedEngineeringEffect: '',
-    rp22Evidence: '',
+    assessment: '',
+    why: '',
+    rp22Evidence: [],
     remainingLimitation: '',
   };
 }
@@ -214,9 +206,9 @@ export function buildNoFurtherEngineering() {
 export function buildNoFurtherEq() {
   return {
     action: 'No further EQ is recommended.',
-    benefit: '',
-    expectedEngineeringEffect: '',
-    rp22Evidence: '',
+    assessment: '',
+    why: '',
+    rp22Evidence: [],
     remainingLimitation: 'The remaining limitation requires a physical change.',
   };
 }
