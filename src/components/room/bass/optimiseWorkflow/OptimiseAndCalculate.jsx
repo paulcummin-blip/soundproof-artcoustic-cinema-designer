@@ -519,7 +519,7 @@ export default function OptimiseAndCalculate({
   const isComplete = status === "complete";
 
   return (
-    <div className="mt-3 rounded-lg border border-[#D9D5CE] bg-white px-4 py-4">
+    <div className="space-y-3">
       {/* ── Main button ── */}
       {!isCalculating && !isComplete && !isError && !isCancelledState && !isTimedOut && !hasResults && (
         <>

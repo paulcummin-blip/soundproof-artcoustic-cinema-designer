@@ -108,13 +108,13 @@ export default function BassDesignAssistant({
       {/* ── Header ── */}
       <div>
         <h3
-          className="text-[15px] font-bold text-[#1B1A1A]"
+          className="text-[17px] font-bold text-[#1B1A1A] tracking-tight"
           style={{ fontFamily: "Didact Gothic, sans-serif" }}
         >
           Subwoofer Design
         </h3>
-        <div className="text-[10px] font-medium text-[#625143]" style={{ letterSpacing: '0.04em' }}>
-          Powered by Artcoustic Design Intelligence
+        <div className="text-[10px] font-medium uppercase text-[#625143]" style={{ letterSpacing: '0.08em' }}>
+          Artcoustic Design Intelligence
         </div>
       </div>
 
@@ -162,12 +162,9 @@ export default function BassDesignAssistant({
           header summary — not a separate panel. Click-to-highlight links the
           pills to the graph's limiting frequency. */}
       {layoutChosen && hasResults && (
-        <div className="space-y-2">
-          <h4 className="text-[14px] font-bold text-[#1B1A1A]" style={{ fontFamily: "Didact Gothic, sans-serif" }}>
-            Performance
-          </h4>
+        <div className="space-y-3">
           <Suspense fallback={<div className="text-[11px] text-[#8A7B6A]">Loading graph…</div>}>
-            <div className="rounded-xl border border-[#DCDBD6] bg-white p-3 space-y-2">
+            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3 space-y-2">
               {/* RP22 summary as graph header strip */}
               <GraphHeaderPills />
               {/* The graph — visual authority for every RP22 result */}

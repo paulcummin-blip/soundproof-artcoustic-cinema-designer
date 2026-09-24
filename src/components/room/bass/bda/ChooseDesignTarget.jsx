@@ -77,55 +77,55 @@ export default function ChooseDesignTarget({ disabled }) {
   const displayLevel = selectedLevel || DEFAULT_LEVEL;
 
   return (
-    <div className="flex items-center gap-4 flex-wrap" data-bda-stage="design-target">
-      <span className="text-[13px] font-semibold text-[#1B1A1A]" style={{ fontFamily: "Didact Gothic, sans-serif" }}>
-        Design Target
-      </span>
-      {/* P14 Capability */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">P14</span>
-        {[1, 2, 3, 4].map((level) => {
-          const isActive = displayLevel === level;
-          return (
-            <button
-              key={level}
-              type="button"
-              onClick={() => handleLevelChange(level)}
-              disabled={disabled}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
-                isActive
-                  ? "bg-[#213428] text-white border border-[#213428]"
-                  : "bg-white text-[#213428] border border-[#D9D5CE] hover:bg-[#F5F5F0]"
-              } disabled:cursor-not-allowed disabled:opacity-45`}
-              aria-pressed={isActive}
-            >
-              L{level}
-            </button>
-          );
-        })}
-      </div>
-      {/* P18 Extension */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">P18</span>
-        {["minimum", "recommended"].map((basis) => {
-          const isActive = selectedP18Basis === basis;
-          return (
-            <button
-              key={basis}
-              type="button"
-              onClick={() => handleP18BasisChange(basis)}
-              disabled={disabled}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold capitalize transition-all ${
-                isActive
-                  ? "bg-[#213428] text-white border border-[#213428]"
-                  : "bg-white text-[#213428] border border-[#D9D5CE] hover:bg-[#F5F5F0]"
-              } disabled:cursor-not-allowed disabled:opacity-45`}
-              aria-pressed={isActive}
-            >
-              {basis}
-            </button>
-          );
-        })}
+    <div className="rounded-lg border border-[#D9D5CE] bg-white px-4 py-3" data-bda-stage="design-target">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Design Target</div>
+      <div className="mt-2 flex items-center gap-6 flex-wrap">
+        {/* P14 Capability */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">P14</span>
+          {[1, 2, 3, 4].map((level) => {
+            const isActive = displayLevel === level;
+            return (
+              <button
+                key={level}
+                type="button"
+                onClick={() => handleLevelChange(level)}
+                disabled={disabled}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                  isActive
+                    ? "bg-[#213428] text-white border border-[#213428]"
+                    : "bg-white text-[#213428] border border-[#D9D5CE] hover:bg-[#F5F5F0]"
+                } disabled:cursor-not-allowed disabled:opacity-45`}
+                aria-pressed={isActive}
+              >
+                L{level}
+              </button>
+            );
+          })}
+        </div>
+        {/* P18 Extension */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">P18</span>
+          {["minimum", "recommended"].map((basis) => {
+            const isActive = selectedP18Basis === basis;
+            return (
+              <button
+                key={basis}
+                type="button"
+                onClick={() => handleP18BasisChange(basis)}
+                disabled={disabled}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold capitalize transition-all ${
+                  isActive
+                    ? "bg-[#213428] text-white border border-[#213428]"
+                    : "bg-white text-[#213428] border border-[#D9D5CE] hover:bg-[#F5F5F0]"
+                } disabled:cursor-not-allowed disabled:opacity-45`}
+                aria-pressed={isActive}
+              >
+                {basis}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

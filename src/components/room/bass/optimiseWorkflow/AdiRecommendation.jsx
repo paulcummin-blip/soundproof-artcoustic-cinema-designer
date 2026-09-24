@@ -238,15 +238,10 @@ export default function AdiRecommendation({
 
   if (!adiDecision?.recommendation) {
     return (
-      <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3">
+      <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-[#213428]" />
-          <div>
-            <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
-            <div className="text-[9px] font-medium text-[#8A7B6A]" style={{ letterSpacing: '0.04em' }}>
-              Powered by Artcoustic Design Intelligence
-            </div>
-          </div>
+          <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
         </div>
         <div className="mt-2 text-[12px] text-[#3E4349] leading-relaxed">
           No further engineering changes are recommended.
@@ -269,15 +264,10 @@ export default function AdiRecommendation({
       ? recommendation?.remainingLimitation || "The remaining limitation requires a physical change."
       : null;
     return (
-      <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3">
+      <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-[#213428]" />
-          <div>
-            <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
-            <div className="text-[9px] font-medium text-[#8A7B6A]" style={{ letterSpacing: '0.04em' }}>
-              Powered by Artcoustic Design Intelligence
-            </div>
-          </div>
+          <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
         </div>
         <div className="mt-2 text-[12px] text-[#3E4349] leading-relaxed">
           {noImprovementText}
@@ -315,16 +305,11 @@ export default function AdiRecommendation({
   const applyHandler = canApplySubPositions ? handleApplySubPositions : canApplySeating ? handleApplySeating : null;
 
   return (
-    <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3 space-y-3">
+    <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-2">
         <Activity className="h-4 w-4 text-[#213428]" />
-        <div>
-          <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
-          <div className="text-[9px] font-medium text-[#8A7B6A]" style={{ letterSpacing: '0.04em' }}>
-            Powered by Artcoustic Design Intelligence
-          </div>
-        </div>
+        <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
         {showAppliedBadge && (
           <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#213428] px-2 py-0.5 text-[9px] font-semibold uppercase text-white">
             <CheckCircle2 className="h-2.5 w-2.5" />
@@ -350,7 +335,7 @@ export default function AdiRecommendation({
         <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
           Recommendation
         </div>
-        <div className="text-[12px] font-medium text-[#1B1A1A] leading-relaxed">
+        <div className="text-[13px] font-semibold text-[#1B1A1A] leading-relaxed">
           {actionText}
         </div>
       </div>
