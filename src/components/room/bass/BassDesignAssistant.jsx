@@ -27,7 +27,7 @@
 // frozen workflow over the existing interface. The Subwoofer Design
 // Experience is now the product authority.
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { Waves } from "lucide-react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
@@ -35,6 +35,13 @@ import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/Optimi
 import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards";
 import CurrentLayoutBanner from "@/components/room/bass/bda/CurrentLayoutBanner";
 import ChooseDesignTarget from "@/components/room/bass/bda/ChooseDesignTarget";
+
+const BassResponse = React.lazy(() =>
+  import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
+);
+const BassResultCards = React.lazy(() =>
+  import("@/components/room/bass/BassResultCards").then((m) => ({ default: m.default }))
+);
 
 export default function BassDesignAssistant({
   appState,
@@ -144,7 +151,24 @@ export default function BassDesignAssistant({
         <ChooseDesignTarget disabled={disabled} />
       )}
 
-      {/* ── Stage 3: Calculate Performance ── */}
+      {/* ── Performance: graph + RP22 parameters ── */}
+      {layoutChosen && hasResults && (
+        <div className="space-y-3">
+          <Suspense fallback={<div className="text-[11px] text-[#8A7B6A]">Loading results…</div>}>
+            <BassResultCards />
+          </Suspense>
+          <Suspense fallback={<div className="text-[11px] text-[#8A7B6A]">Loading graph…</div>}>
+            <BassResponse
+              frontSubsCfg={frontSubsCfg}
+              rearSubsCfg={rearSubsCfg}
+              subWarnings={subWarnings}
+              hideHeader={true}
+            />
+          </Suspense>
+        </div>
+      )}
+
+      {/* ── Optimise Bass ── */}
       {layoutChosen && (
         <OptimiseAndCalculate
           roomDims={roomDims || appState?.roomDims}

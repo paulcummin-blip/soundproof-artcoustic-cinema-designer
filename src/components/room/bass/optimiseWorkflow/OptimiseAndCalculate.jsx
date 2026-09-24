@@ -21,7 +21,6 @@ import { useSyncExternalStore } from "react";
 import { Sparkles, CheckCircle2, Loader2, AlertCircle, RotateCcw } from "lucide-react";
 import { useSharedBassResults } from "../bassResultsStore";
 import { useActiveProjectId } from "@/components/state/project-session";
-import { useEngineeringMode } from "@/components/state/useEngineeringMode";
 import { getStage2State, subscribeStage2 } from "../stage2/stage2PlacementStore";
 import { useImproveBassV2State, requestCancel, resetImproveBassV2 } from "../improveBassV2/improveBassV2Store";
 import { cancelBassHeavyAction } from "../bassHeavyActionStore";
@@ -48,7 +47,6 @@ import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwoo
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import BassOptimisationSummary from "./BassOptimisationSummary";
 import FurtherImprovements from "./FurtherImprovements";
-import ImproveBassResponseV2 from "../improveBassV2/ImproveBassResponseV2";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY } from "../bassCalculationLifecycle";
 import {
   computeAppliedCalibrationBasisFingerprint,
@@ -156,7 +154,6 @@ export default function OptimiseAndCalculate({
   const isCalculating = isBusy || shared?.calculationInProgress === true;
   const bassLifecycleState = shared?.bassLifecycleState || BASS_LIFECYCLE_STATE.IDLE;
   const isTimedOut = bassLifecycleState === BASS_LIFECYCLE_STATE.TIMED_OUT && !isCalculating;
-  const { engineeringMode } = useEngineeringMode();
 
   // ── Main orchestration: triggered by the OPTIMISE & CALCULATE button ──
   const handleStart = useCallback(async () => {
@@ -702,32 +699,6 @@ export default function OptimiseAndCalculate({
         </div>
       )}
 
-      {/* ── Engineering Mode (advanced diagnostics) ──
-          The toggle lives in the Options panel so it can reveal engineering
-          workflows across the app, not just Bass. When enabled there, the full
-          Improve Bass Response V2 workflow is shown below the standard summary. */}
-      {engineeringMode && (
-        <div className="mt-4 pt-3 border-t border-[#E7E4DF]">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A] mb-2">
-            Engineering Diagnostics
-          </div>
-          <ImproveBassResponseV2
-            roomDims={roomDims}
-            seatingPositions={seatingPositions}
-            subwooferInstances={subwooferInstances}
-            frontSubsCfg={frontSubsCfg}
-            rearSubsCfg={rearSubsCfg}
-            commitInstances={commitInstances}
-            commitSeating={commitSeating}
-            commitSeatingProvenance={commitSeatingProvenance}
-            appliedSeatingProvenance={appState?.appliedSeatingProvenance}
-            hasCanonicalInstances={hasCanonicalInstances}
-            appState={appState}
-            amplifierPowerPerSubW={resolvedAmplifierPowerPerSubW}
-          />
-        </div>
-      )}
-
-    </div>
-  );
-}
+      </div>
+      );
+      }
