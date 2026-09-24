@@ -37,44 +37,28 @@ function levelText(level) {
 
 // ── Action ──
 function summariseAction(dominant, appropriateLever) {
-  if (!dominant || !appropriateLever) return 'Engineering action required';
+  if (!dominant || !appropriateLever) return 'Apply the recommended changes.';
 
   const leverClass = appropriateLever.class;
   const lever = appropriateLever.lever;
-  const values = dominant.recommendationValues;
 
-  if (leverClass === LEVER_CLASS.CALIBRATION && Array.isArray(values)) {
-    const changes = values.map((v) => {
-      const delay = Number(v.delayMs) || 0;
-      const gain = Number(v.gainDb) || 0;
-      const polarity = Number(v.polarity) || 1;
-      const phase = Number(v.phaseControlDeg) || 0;
-      const hasChange = delay !== 0 || gain !== 0 || polarity < 0 || phase !== 0;
-      return { delay, gain, polarity, phase, hasChange };
-    }).filter((c) => c.hasChange);
-
-    if (changes.length === 0) return 'Apply calibration alignment';
-    const parts = [];
-    if (changes.some((c) => c.delay !== 0)) parts.push('delay');
-    if (changes.some((c) => c.gain !== 0)) parts.push('gain');
-    if (changes.some((c) => c.polarity < 0)) parts.push('polarity');
-    if (changes.some((c) => c.phase !== 0)) parts.push('phase');
-    return `Adjust ${parts.join(', ')} across ${changes.length} subwoofer${changes.length > 1 ? 's' : ''}`;
+  if (leverClass === LEVER_CLASS.CALIBRATION) {
+    return 'Apply calibration.';
   }
 
   if (leverClass === LEVER_CLASS.PHYSICAL) {
-    if (lever === 'move_subwoofer') return 'Adjust subwoofer placement';
-    if (lever === 'move_seating') return 'Adjust seating position';
-    return 'Adjust subwoofer or seating placement';
+    if (lever === 'move_subwoofer') return 'Move the subwoofers.';
+    if (lever === 'move_seating') return 'Move the seating row.';
+    return 'Adjust the physical layout.';
   }
 
   if (leverClass === LEVER_CLASS.SPECIFICATION) {
-    if (lever === 'additional_subwoofer') return 'Add subwoofer(s)';
-    if (lever === 'different_subwoofer') return 'Change subwoofer specification';
-    return 'Change subwoofer specification';
+    if (lever === 'additional_subwoofer') return 'Add a subwoofer.';
+    if (lever === 'different_subwoofer') return 'Change the subwoofer model.';
+    return 'Change the subwoofer specification.';
   }
 
-  return 'Engineering action required';
+  return 'Apply the recommended changes.';
 }
 
 // ── Benefit ──
@@ -239,13 +223,13 @@ export function buildRecommendation(params) {
  * Build a "No further engineering changes" recommendation.
  * This is a first-class outcome — not an error state.
  */
-export function buildNoFurtherEngineering(physicalCause) {
+export function buildNoFurtherEngineering() {
   return {
     action: 'No further engineering changes are recommended.',
-    benefit: 'The current design achieves the best achievable engineering outcome for this room and system against the selected design objectives.',
-    expectedEngineeringEffect: 'No change — the current design is the engineering optimum.',
-    rp22Evidence: 'All available engineering levers have been evaluated. No candidate provides a material improvement.',
-    remainingLimitation: physicalCause?.description || 'The remaining limitation is inherent to the room geometry and system specification.',
+    benefit: '',
+    expectedEngineeringEffect: '',
+    rp22Evidence: '',
+    remainingLimitation: '',
   };
 }
 
@@ -253,12 +237,12 @@ export function buildNoFurtherEngineering(physicalCause) {
  * Build a "No further EQ is recommended" recommendation.
  * This is a first-class outcome — the remaining limitation requires a physical change.
  */
-export function buildNoFurtherEq(physicalCause) {
+export function buildNoFurtherEq() {
   return {
-    action: 'No further EQ is recommended. The remaining limitation requires a physical change.',
-    benefit: 'The response feature is not physically recoverable. EQ cannot address it.',
-    expectedEngineeringEffect: 'EQ cannot address the remaining issue. Physical changes (seating, subwoofer placement, or additional subwoofers) are required.',
-    rp22Evidence: 'EQ levers have been evaluated. No EQ candidate provides a material improvement — the feature is not physically recoverable.',
-    remainingLimitation: physicalCause?.description || 'The remaining limitation requires a physical change — seating, subwoofer placement, or additional subwoofers.',
+    action: 'No further engineering changes are recommended.',
+    benefit: '',
+    expectedEngineeringEffect: '',
+    rp22Evidence: '',
+    remainingLimitation: '',
   };
 }

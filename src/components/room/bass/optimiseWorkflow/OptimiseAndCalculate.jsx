@@ -9,16 +9,15 @@
 //   4. Recalculates using the optimised system
 //   5. Publishes the final authoritative RP22 results
 //
-// The user sees a simple progress display. After completion, a Bass Optimisation
-// Summary shows what was auto-applied, and optional "Further Improvements" are
-// presented for user-decision items (move seating, move subwoofers, add subs).
+// The user sees a simple progress display. After completion, a single ADI
+// Recommendation presents one coherent engineering action with an Apply button.
 //
 // The existing engineering workflow (Calculate + Improve Bass Response V2) is
 // retained behind an Advanced Diagnostics toggle.
 
 import React, { useCallback, useEffect, useRef } from "react";
 import { useSyncExternalStore } from "react";
-import { Sparkles, CheckCircle2, Loader2, AlertCircle, RotateCcw } from "lucide-react";
+import { Sparkles, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { useSharedBassResults } from "../bassResultsStore";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { getStage2State, subscribeStage2 } from "../stage2/stage2PlacementStore";
@@ -45,8 +44,7 @@ import {
 } from "./optimiseWorkflowOrchestrator";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
-import BassOptimisationSummary from "./BassOptimisationSummary";
-import FurtherImprovements from "./FurtherImprovements";
+import AdiRecommendation from "./AdiRecommendation";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY } from "../bassCalculationLifecycle";
 import {
   computeAppliedCalibrationBasisFingerprint,
@@ -602,10 +600,10 @@ export default function OptimiseAndCalculate({
         </div>
       )}
 
-      {/* ── Completion: Calibration Summary ── */}
+      {/* ── Completion: ADI Recommendation ── */}
       {isComplete && (
-        <>
-          <BassOptimisationSummary
+        <div className="mt-3">
+          <AdiRecommendation
             autoApplied={workflowState.autoApplied}
             v2State={v2State}
             completedBassAuthority={shared?.completedBassAuthority}
@@ -619,39 +617,18 @@ export default function OptimiseAndCalculate({
             shared={shared}
             roomDims={roomDims}
             seatingPositions={seatingPositions}
+            recommendations={workflowState.recommendations}
+            currentInstances={subwooferInstances}
+            selectedSubModel={frontSubsCfg?.model || rearSubsCfg?.model || null}
+            commitInstances={commitInstances}
+            commitSeating={commitSeating}
+            commitSeatingProvenance={commitSeatingProvenance}
+            hasCanonicalInstances={hasCanonicalInstances}
+            appState={appState}
+            amplifierPowerPerSubW={resolvedAmplifierPowerPerSubW}
+            onRecalculate={handlePhysicalRecalculate}
           />
-
-          {/* ── Further Design Improvements (physical recommendations) ── */}
-          {workflowState.recommendations && (
-            <div className="mt-3">
-              <FurtherImprovements
-                recommendations={workflowState.recommendations}
-                selection={v2State?.winner}
-                currentInstances={subwooferInstances}
-                roomDims={roomDims}
-                selectedSubModel={frontSubsCfg?.model || rearSubsCfg?.model || null}
-                commitInstances={commitInstances}
-                commitSeating={commitSeating}
-                commitSeatingProvenance={commitSeatingProvenance}
-                hasCanonicalInstances={hasCanonicalInstances}
-                appState={appState}
-                shared={shared}
-                amplifierPowerPerSubW={resolvedAmplifierPowerPerSubW}
-                onRecalculate={handlePhysicalRecalculate}
-              />
-            </div>
-          )}
-
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="text-[11px] text-[#625143] hover:text-[#1B1A1A] underline underline-offset-2"
-            >
-              Re-optimise Bass
-            </button>
-          </div>
-        </>
+        </div>
       )}
 
       {/* ── Error state ── */}
