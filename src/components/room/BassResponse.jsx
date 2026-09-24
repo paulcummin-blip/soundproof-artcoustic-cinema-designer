@@ -515,6 +515,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     return null;
   }, [graphInteraction?.selectedMetric, rp22GraphMarkers]);
 
+  // P14 presentation — the selected P14 dBC value is an integrated C-weighted
+  // total, NOT a per-frequency SPL target. The header cards and assessment-band
+  // marker communicate this clearly. No horizontal P14 line is drawn on the graph.
+  // MUST be declared before parameterFocus (and any other useMemo that references
+  // it) — a const referenced inside an earlier useMemo's factory/deps array is a
+  // temporal-dead-zone crash in production (minified) builds.
+  const p14PresentationData = React.useMemo(() => {
+    const basis = authoritative.requested?.p14TargetBasis || splConfig?.selectedP14TargetBasis || "minimum";
+    // Explicit null guard: Number(null) === 0, which would coerce to L1 via `|| 1`.
+    const rawLevel = authoritative.requested?.requestedLevel ?? splConfig?.selectedP14Level;
+    const levelNum = (Number.isFinite(Number(rawLevel)) && Number(rawLevel) > 0)
+      ? Math.max(1, Math.min(4, Math.round(Number(rawLevel))))
+      : null;
+    const targetDb = Number.isFinite(selectedP14TargetDb) ? selectedP14TargetDb : null;
+    const availableCapability = optimisationResult?.availableP14CapabilityDb ?? null;
+    const p19Variation = optimisationResult?.achievedP19VariationDb ?? null;
+    const p19Level = optimisationResult?.achievedP19Level ?? null;
+    return { basis, levelNum, targetDb, availableCapability, p19Variation, p19Level };
+  }, [authoritative.requested, splConfig?.selectedP14TargetBasis, splConfig?.selectedP14Level,
+    selectedP14TargetDb, optimisationResult?.availableP14CapabilityDb,
+    optimisationResult?.achievedP19VariationDb, optimisationResult?.achievedP19Level]);
+
   // ── Parameter-focus storyteller: build graph overlays + explanation ──
   // When the designer selects P14/P18/P19/P20 (via the ParameterFocusBar or
   // the headline pills) or a seat, this produces the ReferenceAreas,
@@ -647,25 +669,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
 
   // Shared transition frequency for graph markers and the optimiser validation path.
   const schroederFrequency = optimisationTransitionHz;
-
-  // P14 presentation — the selected P14 dBC value is an integrated C-weighted
-  // total, NOT a per-frequency SPL target. The header cards and assessment-band
-  // marker communicate this clearly. No horizontal P14 line is drawn on the graph.
-  const p14PresentationData = React.useMemo(() => {
-    const basis = authoritative.requested?.p14TargetBasis || splConfig?.selectedP14TargetBasis || "minimum";
-    // Explicit null guard: Number(null) === 0, which would coerce to L1 via `|| 1`.
-    const rawLevel = authoritative.requested?.requestedLevel ?? splConfig?.selectedP14Level;
-    const levelNum = (Number.isFinite(Number(rawLevel)) && Number(rawLevel) > 0)
-      ? Math.max(1, Math.min(4, Math.round(Number(rawLevel))))
-      : null;
-    const targetDb = Number.isFinite(selectedP14TargetDb) ? selectedP14TargetDb : null;
-    const availableCapability = optimisationResult?.availableP14CapabilityDb ?? null;
-    const p19Variation = optimisationResult?.achievedP19VariationDb ?? null;
-    const p19Level = optimisationResult?.achievedP19Level ?? null;
-    return { basis, levelNum, targetDb, availableCapability, p19Variation, p19Level };
-  }, [authoritative.requested, splConfig?.selectedP14TargetBasis, splConfig?.selectedP14Level,
-    selectedP14TargetDb, optimisationResult?.availableP14CapabilityDb,
-    optimisationResult?.achievedP19VariationDb, optimisationResult?.achievedP19Level]);
 
   // Expose drag state — dispatches events so the background analysis owner
   // can defer the heavy EQ worker during drag and run it once on pointer-up.
