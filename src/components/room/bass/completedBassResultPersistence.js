@@ -317,6 +317,10 @@ function buildGraphPayload(contract) {
   const candidate = contract?.selectedCandidate;
   return {
     postEqRspCurve: cloneCurve(finalResponse.postEqRspCurve),
+    // Canonical correction curve is a distinct engineering authority from the
+    // final post-EQ response. Persist it verbatim so cold hydration can satisfy
+    // the same finalOptimisedBassAuthorityMatches gate as a live calculation.
+    correctionCurve: cloneCurve(finalResponse.correctionCurve),
     referenceEq: cloneCurve(finalResponse.referenceEq),
     productionHouseCurveTarget: cloneCurve(finalResponse.canonicalTargetCurve),
     maximumSplCurveAfterEq: cloneCurve(finalResponse.maximumSplCurveAfterEq),
