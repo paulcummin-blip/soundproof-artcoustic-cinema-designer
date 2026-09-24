@@ -230,16 +230,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // calculate). Starting before hydration settles wastes a worker that gets
   // cancelled the moment the persisted authority arrives.
   const bassAuthorityHydrationSettled = completedBassAuthority?.hydrationSettled === true;
-  // A persisted completed contract may be reused as AUTHORITATIVE only when it
-  // is structurally complete AND metricPublication.canonicalMetricPublicationValid
-  // === true (isAuthoritativeBassContract). A NOT_VERIFIED contract with a
-  // matching fingerprint (e.g. old 360/320 snapshots) must NOT be treated as a
-  // matching completed result — it must not block the foreground recalculation
-  // or be displayed as COMPLETE.
+  // Restore a persisted contract from its own published authority identity.
+  // The live calibration fingerprint decides whether the design is current and
+  // needs recalculation; it must not suppress the last authoritative published
+  // graph while the hydrated design fingerprint settles or changes.
   const completedContractMatches = isAuthoritativeBassContract(completedContract)
+    && completedBassAuthority?.authoritative === true
     && completedFingerprint
-    && cacheKey
-    && completedFingerprint === cacheKey;
+    && completedBassAuthority?.currentFingerprint === completedFingerprint;
 
   // PASS 2: manualRequestMatchesCurrent no longer depends on the normalized
   // transfer fingerprint. The cacheKey (full calibration fingerprint) captures
