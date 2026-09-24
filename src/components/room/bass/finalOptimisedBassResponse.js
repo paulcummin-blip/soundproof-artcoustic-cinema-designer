@@ -1,4 +1,4 @@
-import { buildCurveSignature, buildFilterBankSignature } from "@/components/room/bass/bassResultAuthority";
+import { buildCurveSignature, buildFilterBankSignature, buildCorrectionCurveSignature } from "@/components/room/bass/bassResultAuthority";
 
 const cloneCurve = (curve) => (Array.isArray(curve) ? curve.map((point) => ({ ...point })) : []);
 
@@ -51,6 +51,7 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     rawResponseSignature: candidate.rawResponseSignature || buildCurveSignature(candidate.rawResponseCurve),
     eqFilterBank,
     filterBankSignature: candidate.filterBankSignature || buildFilterBankSignature(candidate),
+    correctionCurveSignature: candidate.correctionCurveSignature || buildCorrectionCurveSignature(candidate),
     postEqCurveSignature: candidate.postEqCurveSignature || buildCurveSignature(postEqRspCurve),
     postEqRspCurve,
     postEqPerSeatCurves,
@@ -230,6 +231,7 @@ export function finalOptimisedBassAuthorityMatches(response) {
     && response.finalSeatVariationData?.p19?.candidateId === candidateId
     && response.finalSeatVariationData?.p20?.candidateId === candidateId
     && response.filterBankSignature === buildFilterBankSignature({ generatedFilterBank: response.eqFilterBank })
+    && response.correctionCurveSignature === buildCorrectionCurveSignature(response)
     && response.postEqCurveSignature === buildCurveSignature(response.postEqRspCurve)
     && response.referenceEqSignature === response.postEqCurveSignature
     && buildCurveSignature(response.referenceEq) === response.postEqCurveSignature;

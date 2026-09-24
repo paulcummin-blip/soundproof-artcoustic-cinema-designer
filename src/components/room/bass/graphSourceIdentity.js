@@ -42,5 +42,6 @@ export function buildGraphSourceIdentity(optimisationResult) {
     fingerprint: optimisationResult.completedContractFingerprint || null,
     calibrationFingerprint: optimisationResult.calibrationFingerprint || null,
     filterBankSignature: finalResponse?.filterBankSignature || null,
+    correctionCurveSignature: finalResponse?.correctionCurveSignature || null,
   };
 }

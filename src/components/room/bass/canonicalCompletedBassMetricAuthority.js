@@ -218,6 +218,7 @@ export function buildCanonicalCompletedBassMetricAuthority({
   const targetCurveHash = buildCurveSignature(targetCurve);
   const filterBankSignature = finalOptimisedBassResponse.filterBankSignature
     || buildFilterBankSignature({ generatedFilterBank: finalOptimisedBassResponse.eqFilterBank });
+  const correctionCurveSignature = finalOptimisedBassResponse.correctionCurveSignature || null;
   const resolvedCandidateId = candidateId || finalOptimisedBassResponse.selectedCandidateId;
 
   diagnostics.metricPostEqCurveHash = postEqCurveHash;
@@ -424,6 +425,7 @@ export function buildCanonicalCompletedBassMetricAuthority({
         completedResultFingerprint: candidateReceiptCompletedFingerprint,
       },
       filterBankSignature,
+      correctionCurveSignature,
       postEqCurveHash,
       referenceEqHash,
       targetCurveHash,

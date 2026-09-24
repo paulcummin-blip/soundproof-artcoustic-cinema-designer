@@ -441,6 +441,9 @@ export function evaluateStage2Confirmation(rawTransfer, {
     canonicalAuthorityReceipt: {
       selectedCandidateId: selection.selectedCandidateId,
       filterBankSignature: selection.filterBankSignature,
+      correctionCurveSignature: selection.correctionCurveSignature
+        || selection.selectedCandidate?.correctionCurveSignature
+        || null,
       postEqCurveSignature: selection.postEqCurveSignature,
       poolId: pool.poolId,
       productEngineeringVersion: STAGE2_PRODUCT_ENGINEERING_VERSION,

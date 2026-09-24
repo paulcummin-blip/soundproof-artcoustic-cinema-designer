@@ -89,6 +89,7 @@ export function buildMetricPublicationReceipt(optimisationResult) {
     graphPostEqCurveHash: graphSource?.postEqCurveHash || null,
     graphTargetCurveHash: graphSource?.targetCurveHash || null,
     graphFilterBankSignature: graphSource?.filterBankSignature || null,
+    graphCorrectionCurveSignature: graphSource?.correctionCurveSignature || null,
     metricCurvePointCount: d.metricCurvePointCount || 0,
     targetCurvePointCount: d.targetCurvePointCount || 0,
     frequencyGridParityValid: d.frequencyGridParityValid === true,
