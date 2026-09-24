@@ -42,6 +42,9 @@ import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwoofe
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { useGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
+import { buildParameterFocus } from "@/components/room/bass/storyteller/parameterFocusOverlays";
+import ParameterFocusBar from "@/components/room/bass/storyteller/ParameterFocusBar";
+import StorytellerExplanation from "@/components/room/bass/storyteller/StorytellerExplanation";
 
 const IS_DEVELOPMENT_MODE = false;
 
@@ -491,6 +494,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     return null;
   }, [graphInteraction?.selectedMetric, rp22GraphMarkers]);
 
+  // ── Parameter-focus storyteller: build graph overlays + explanation ──
+  // When the designer selects P14/P18/P19/P20 (via the ParameterFocusBar or
+  // the headline pills) or a seat, this produces the ReferenceAreas,
+  // ReferenceLines, additional series (e.g., Reference EQ for P19), curve
+  // dimming, and explanation text that make the graph visually explain the
+  // published result.
+  const parameterFocus = useMemo(
+    () => buildParameterFocus({
+      selectedMetric: graphInteraction?.selectedMetric || null,
+      selectedSeatId: selectedSeatForMarkers,
+      optimisationResult,
+      finalBassResponse,
+      p14PresentationData,
+      rp22GraphMarkers,
+      smoothingMode: bassSmoothingMode,
+    }),
+    [graphInteraction?.selectedMetric, selectedSeatForMarkers, optimisationResult,
+      finalBassResponse, p14PresentationData, rp22GraphMarkers, bassSmoothingMode]
+  );
+
   // C6.1A/C6.1B2: Graph boundary hash check — compare the ACTUAL rendered-series
   // source identity metadata (embedded by bassGraphDomainBuilder) with the
   // canonical metric authority hashes. This breaks the circular dependency
@@ -842,6 +865,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           </>
         )}
 
+        <div className="mt-2">
+          <ParameterFocusBar disabled={!hasCurrentBassResult} />
+        </div>
+
         <div className={engineeringDetailCollapsed ? "mt-2 flex-1 min-h-[400px] relative" : "mt-2"}>
           {visibleMultiSeries.length > 0 ? (
             <>
@@ -869,6 +896,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               rp22Markers={rp22GraphMarkers}
               highlightFrequencyHz={highlightFromInteraction?.frequencyHz ?? null}
               highlightLabel={highlightFromInteraction?.label ?? null}
+              parameterFocus={parameterFocus}
             />
             {isCalculating && engineeringDetailCollapsed && (
               <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(248, 247, 244, 0.6)", borderRadius: 8, pointerEvents: "none" }}>
@@ -888,6 +916,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           )}
         </div>
         {!engineeringDetailCollapsed && <ProtectedNullWarningSummary annotations={protectedNullAnnotations} />}
+
+        {!engineeringDetailCollapsed && hasCurrentBassResult && (
+          <StorytellerExplanation focus={parameterFocus} />
+        )}
 
         {!engineeringDetailCollapsed && (
           <>

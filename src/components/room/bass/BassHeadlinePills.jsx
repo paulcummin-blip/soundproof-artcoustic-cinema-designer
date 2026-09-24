@@ -19,6 +19,7 @@ import BassResultDetailTooltip from "@/components/room/bass/BassResultDetailTool
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
+import { useGraphInteraction, setGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
 
 const CARD_TITLES = {
   p14: "P14 Bass SPL",
@@ -49,6 +50,8 @@ function splitPillContent(resultText) {
  */
 export default function BassHeadlinePills({ nowMs }) {
   const shared = useSharedBassResults();
+  const interaction = useGraphInteraction();
+  const activeMetric = interaction?.selectedMetric || null;
   const [clock, setClock] = useState(Date.now());
   const active = nowMs == null && (shared.calculationInProgress || shared.bassLifecycleState === "stale_needs_recalculation");
   useEffect(() => {
@@ -79,11 +82,18 @@ export default function BassHeadlinePills({ nowMs }) {
         const { pillLabel, supportingText } = isSeatScoped
           ? { pillLabel: pill.resultText, supportingText: null }
           : splitPillContent(pill.resultText);
+        const isActive = activeMetric === key;
         return (
           <div
             key={key}
-            className="flex flex-col items-center gap-1 rounded-lg border border-[#DCDBD6] bg-white p-3"
+            onClick={() => setGraphInteraction({ selectedMetric: isActive ? null : key })}
+            className={`flex flex-col items-center gap-1 rounded-lg border p-3 cursor-pointer transition-all duration-150 hover:shadow-md ${
+              isActive
+                ? "border-[#213428] bg-[#F8F8F7] shadow-md ring-1 ring-[#213428]"
+                : "border-[#DCDBD6] bg-white"
+            }`}
             aria-label={pill.text}
+            title={`Click to focus the graph on ${CARD_TITLES[key] || key}`}
           >
             <span className="text-[11px] font-semibold text-[#213428]">
               {CARD_TITLES[key] || pill.label}

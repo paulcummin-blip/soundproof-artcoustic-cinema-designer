@@ -58,14 +58,26 @@ export default function BassGraph({
   },
   highlightFrequencyHz = null,
   highlightLabel = null,
+  parameterFocus = null,
 }) {
+    // Merge parameter-focus additional series (e.g., Reference EQ for P19,
+    // best/worst seat curves for P20) into the graph series list.
+    const focusAdditionalSeries = Array.isArray(parameterFocus?.additionalSeries)
+      ? parameterFocus.additionalSeries
+      : [];
+    const allMultiSeries = Array.isArray(multiSeries)
+      ? [...multiSeries, ...focusAdditionalSeries]
+      : focusAdditionalSeries.length > 0
+        ? focusAdditionalSeries
+        : multiSeries;
+
     // Multi-series: merge all series data into one keyed chartData array
-    const isMulti = rewStyleMode && Array.isArray(multiSeries) && multiSeries.length > 0;
+    const isMulti = rewStyleMode && Array.isArray(allMultiSeries) && allMultiSeries.length > 0;
 
     const multiChartData = React.useMemo(() => {
       if (!isMulti) return null;
-      return mergeBassGraphSeries(multiSeries);
-    }, [isMulti, multiSeries]);
+      return mergeBassGraphSeries(allMultiSeries);
+    }, [isMulti, allMultiSeries]);
 
     let data = responseData;
     
@@ -241,13 +253,18 @@ export default function BassGraph({
     const modeMarkerCount = (normalizedMarkers.axial?.length || 0)
       + (normalizedMarkers.tangential?.length || 0)
       + (normalizedMarkers.oblique?.length || 0);
-    const chartRenderKey = `${isMulti ? 'multi' : 'single'}_rows${_rowCount}|${renderToken}|${_splSample}|${showModeMarkers ? 'modes-on' : 'modes-off'}|${modeMarkerCount}`;
+    const focusKey = parameterFocus
+      ? `${parameterFocus.metric || 'seat'}|${(parameterFocus.additionalSeries || []).length}|${(parameterFocus.referenceAreas || []).length}|${(parameterFocus.referenceLines || []).length}|${(parameterFocus.dimKinds || []).join(',')}`
+      : 'none';
+    const chartRenderKey = `${isMulti ? 'multi' : 'single'}_rows${_rowCount}|${renderToken}|${_splSample}|${showModeMarkers ? 'modes-on' : 'modes-off'}|${modeMarkerCount}|focus:${focusKey}`;
 
     // Presentation order follows the acoustic signal path. Reference layers
     // render first; the final EQ response renders last so target tracking remains
     // visible when curves overlap.
+    const focusDimKinds = new Set(Array.isArray(parameterFocus?.dimKinds) ? parameterFocus.dimKinds : []);
+
     const renderedMultiSeries = React.useMemo(() => {
-      if (!Array.isArray(multiSeries)) return [];
+      if (!Array.isArray(allMultiSeries)) return [];
       const orderByKind = {
         "room-response": 10,
         "product-maximum": 20,
@@ -257,13 +274,16 @@ export default function BassGraph({
         "normalized-target": 50,
         "post-eq": 60,
         "real-seat-overlay": 70,
+        "reference-eq": 55,
+        "focus-worst-seat": 65,
+        "focus-best-seat": 66,
       };
-      return multiSeries
+      return allMultiSeries
         .map((series, index) => ({ series, index }))
         .sort((left, right) => (orderByKind[left.series.kind] ?? 45) - (orderByKind[right.series.kind] ?? 45)
           || left.index - right.index)
         .map(({ series }) => series);
-    }, [multiSeries]);
+    }, [allMultiSeries]);
 
     return (
         <div className="w-full h-[575px]" style={flexHeight ? { minHeight: 400 } : undefined}>
@@ -302,7 +322,7 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                         allowDecimals={false}
                     />
-                    <Tooltip content={(props) => <BassGraphTooltip {...props} series={isMulti ? multiSeries : []} operatingLevelOffsetDb={operatingLevelOffsetDb} yDomain={[finalYMin, finalYMax]} />} shared cursor={false} />
+                    <Tooltip content={(props) => <BassGraphTooltip {...props} series={isMulti ? allMultiSeries : []} operatingLevelOffsetDb={operatingLevelOffsetDb} yDomain={[finalYMin, finalYMax]} />} shared cursor={false} />
 
                     {/* Schroeder frequency line (on-scale only) */}
                     {Number.isFinite(schroederFrequency) && schroederFrequency > 0 && schroederFrequency <= 200 && (
@@ -386,6 +406,47 @@ export default function BassGraph({
                       </>
                     )}
 
+                    {/* ── Parameter-focus overlays (storyteller) ──
+                        Additional ReferenceAreas, ReferenceLines, and emphasis
+                        from the selected P14/P18/P19/P20 or seat focus. */}
+                    {Array.isArray(parameterFocus?.referenceAreas) && parameterFocus.referenceAreas.map((area, index) => (
+                      <ReferenceArea
+                        key={`focus-area-${index}`}
+                        x1={area.x1}
+                        x2={area.x2}
+                        y1={area.y1}
+                        y2={area.y2}
+                        fill={area.fill || "#213428"}
+                        fillOpacity={area.fillOpacity ?? 0.06}
+                        stroke={area.stroke || "#213428"}
+                        strokeOpacity={area.strokeOpacity ?? 0.3}
+                        strokeDasharray={area.strokeDasharray || "3 3"}
+                        ifOverflow={area.ifOverflow || "extendDomain"}
+                        label={area.label}
+                      />
+                    ))}
+                    {Array.isArray(parameterFocus?.referenceLines) && parameterFocus.referenceLines.map((line, index) => {
+                      const isHorizontal = line.y != null && line.x == null;
+                      return (
+                        <ReferenceLine
+                          key={`focus-line-${index}`}
+                          {...(isHorizontal ? { y: line.y } : { x: line.x })}
+                          stroke={line.stroke || "#213428"}
+                          strokeWidth={line.strokeWidth ?? 2}
+                          strokeDasharray={line.strokeDasharray || "4 3"}
+                          ifOverflow={line.ifOverflow || "extendDomain"}
+                          label={line.label ? {
+                            value: line.label,
+                            position: line.labelPosition || "top",
+                            fill: line.stroke || "#213428",
+                            fontSize: 10,
+                            fontWeight: 600,
+                            className: "font-body",
+                          } : undefined}
+                        />
+                      );
+                    })}
+
                     <ProtectedNullOverlay annotations={protectedNullAnnotations} />
                     {showModeMarkers && <BassModeMarkers markers={normalizedMarkers} />}
 
@@ -393,11 +454,11 @@ export default function BassGraph({
                     {rewStyleMode && isMulti && renderedMultiSeries.map((s) => (
                       <Line
                         key={s.id}
-                        type="linear" 
+                        type="linear"
                          dataKey={`spl_${s.id}`}
                         stroke={s.color}
                         strokeWidth={s.strokeWidth ?? 2}
-                        strokeOpacity={s.strokeOpacity ?? 1}
+                        strokeOpacity={focusDimKinds.has(s.kind) ? 0.2 : (s.strokeOpacity ?? 1)}
                         strokeDasharray={s.strokeDasharray}
                         dot={false}
                         activeDot={false}
