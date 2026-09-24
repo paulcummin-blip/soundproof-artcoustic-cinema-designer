@@ -174,13 +174,17 @@ export default function BassDesignAssistant({
               {/* RP22 summary as graph header strip */}
               <GraphHeaderPills />
               {/* The graph — visual authority for every RP22 result */}
-              <BassResponse
-                frontSubsCfg={frontSubsCfg}
-                rearSubsCfg={rearSubsCfg}
-                subWarnings={subWarnings}
-                hideHeader={true}
-                engineeringDetailCollapsed={true}
-              />
+              {shared?.authoritative ? (
+                <BassResponse
+                  frontSubsCfg={frontSubsCfg}
+                  rearSubsCfg={rearSubsCfg}
+                  subWarnings={subWarnings}
+                  hideHeader={true}
+                  engineeringDetailCollapsed={true}
+                />
+              ) : (
+                <div className="text-[11px] text-[#8A7B6A]">Loading graph…</div>
+              )}
             </div>
           </Suspense>
           {/* Per-seat P19/P20 detail below the graph */}
