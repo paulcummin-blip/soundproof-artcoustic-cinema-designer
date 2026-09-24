@@ -279,13 +279,27 @@ export function markBassAuthorityUpdating(projectId, versionId, currentFingerpri
   if (previous.authoritative && previous.contract && currentFingerprint && previous.currentFingerprint === currentFingerprint) {
     return previous;
   }
+  // Published Engineering Authority model: the published contract remains the
+  // authoritative contract throughout recalculation. Only the authority status
+  // changes to UPDATING. The contract, its authority flags, and its fingerprint
+  // are preserved until publishCompletedBassContract() atomically replaces it.
+  if (previous.contract) {
+    return setMemory(projectId, versionId, {
+      ...previous,
+      status: "updating",
+      authorityStatus: BASS_AUTHORITY_STATUS.UPDATING,
+      currentFingerprint: currentFingerprint || previous.currentFingerprint || null,
+      errorMessage: null,
+      publicationRejectionReason: null,
+    });
+  }
+  // No published contract yet — fresh calculation, no contract to preserve.
   setMemory(projectId, versionId, {
     ...previous,
     status: currentFingerprint ? "updating" : "uncalculated",
     authorityStatus: currentFingerprint ? BASS_AUTHORITY_STATUS.UPDATING : BASS_AUTHORITY_STATUS.UNCALCULATED,
     currentFingerprint: currentFingerprint || null,
     contract: null,
-    staleContract: previous.contract || previous.staleContract || null,
     errorMessage: null,
     structurallyComplete: false,
     authoritative: false,
@@ -298,24 +312,20 @@ export function markBassAuthorityStale(projectId, versionId, currentFingerprint)
   assertNotAuthoritativeReadOnly('markBassAuthorityStale', 'mark-bass-stale');
   const key = projectKey(projectId, versionId);
   const previous = memoryByProject.get(key) || emptyAuthority(projectId, versionId);
-  const staleContract = previous.contract || previous.staleContract || null;
-  if (!staleContract) return previous;
+  if (!previous.contract) return previous;
   if (
     previous.authorityStatus === BASS_AUTHORITY_STATUS.STALE
     && previous.currentFingerprint === (currentFingerprint || null)
   ) return previous;
 
+  // Published Engineering Authority model: the published contract remains
+  // the authoritative contract. Only the authority status changes to STALE.
   const next = setMemory(projectId, versionId, {
     ...previous,
     status: "stale",
     authorityStatus: BASS_AUTHORITY_STATUS.STALE,
     currentFingerprint: currentFingerprint || null,
-    contract: null,
-    staleContract,
     errorMessage: null,
-    structurallyComplete: false,
-    authoritative: false,
-    exportable: false,
     publicationRejectionReason: null,
   });
   syncStaleBassAuthority(projectId, versionId, currentFingerprint || null);
@@ -325,13 +335,25 @@ export function markBassAuthorityStale(projectId, versionId, currentFingerprint)
 export function markBassAuthorityFailed(projectId, versionId, currentFingerprint, errorMessage) {
   assertNotAuthoritativeReadOnly('markBassAuthorityFailed', 'mark-bass-failed');
   const previous = memoryByProject.get(projectKey(projectId, versionId)) || emptyAuthority(projectId, versionId);
+  // Published Engineering Authority model: the published contract remains
+  // visible even when recalculation fails. Only the authority status changes
+  // to ERROR; the contract and its authority flags are preserved.
+  if (previous.contract) {
+    return setMemory(projectId, versionId, {
+      ...previous,
+      status: "error",
+      authorityStatus: BASS_AUTHORITY_STATUS.ERROR,
+      currentFingerprint: currentFingerprint || previous.currentFingerprint || null,
+      errorMessage: typeof errorMessage === "string" && errorMessage.trim() ? errorMessage : "Bass analysis failed",
+      publicationRejectionReason: null,
+    });
+  }
   setMemory(projectId, versionId, {
     ...previous,
     status: "error",
     authorityStatus: BASS_AUTHORITY_STATUS.ERROR,
     currentFingerprint: currentFingerprint || null,
     contract: null,
-    staleContract: previous.contract || previous.staleContract || null,
     errorMessage: typeof errorMessage === "string" && errorMessage.trim() ? errorMessage : "Bass analysis failed",
     structurallyComplete: false,
     authoritative: false,
