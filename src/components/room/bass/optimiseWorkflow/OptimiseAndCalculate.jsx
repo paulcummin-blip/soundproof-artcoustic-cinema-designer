@@ -485,13 +485,13 @@ export default function OptimiseAndCalculate({
             className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity hover:bg-[#3E4349] disabled:cursor-not-allowed disabled:opacity-45 flex items-center justify-center gap-2"
           >
             <Sparkles className="h-4 w-4" />
-            Optimise & Calculate
+            Calculate Performance
           </button>
           {!hasActiveSubModel && (
             <p className="mt-2 text-[11px] text-[#625143]">Select a subwoofer model and quantity before optimising.</p>
           )}
           {shared?.completedBassAuthority?.authorityStatus === "STALE" && (
-            <p className="mt-2 text-[11px] font-medium text-amber-700">Previous result needs recalculation — press Optimise & Calculate to update.</p>
+            <p className="mt-2 text-[11px] font-medium text-amber-700">Previous result needs recalculation — press Calculate Performance to update.</p>
           )}
         </>
       )}

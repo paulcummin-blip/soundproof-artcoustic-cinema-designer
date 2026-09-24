@@ -1,8 +1,12 @@
 // BassDesignAssistant.jsx
 //
-// Stage 1 Bass Design Assistant shell — a recommendation-first Bass workspace
-// that sits above the existing detailed Bass surfaces (Subwoofers panel,
-// Bass Simulation panel).
+// Bass Design Assistant — Frozen UX Workflow
+//
+// The workflow is:
+//   Room → Choose Starting Layout → Current Layout → Calculate Performance →
+//   Performance → Improve Design → Presentation Mode
+//
+// This sequence is fixed. Do not redesign it. Do not reinterpret it.
 //
 // This is a PRESENTATION and INFORMATION-ARCHITECTURE change only.
 // It does NOT change acoustics maths, P14/P18/P19/P20 grading, optimiser
@@ -10,108 +14,36 @@
 //
 // It consumes existing shared authority only:
 //   - useSharedBassResults()           → lifecycle, authority, seating
-//   - formatOfficialBassResults()       → P14/P18/P19/P20 formatted pills + rows
-//   - resolveBassLifecycleState()      → unified lifecycle state
-//   - BassHeadlinePills                 → single shared P14/P18/P19/P20 summary
-//   - OptimiseAndCalculate              → single primary calculation action
-//   - SharedP19P20SeatResults           → per-seat P19/P20 (engineering evidence)
-//   - BassDesignRecommendation          → limitation + improvement (if available)
-//   - BassTargetLevelControl            → P14/P18 target settings (evidence)
+//   - BassHeadlinePills                 → P14/P18/P19/P20 pills
+//   - OptimiseAndCalculate              → single calculation action
+//   - StartingLayoutCards              → Stage 1 (replaces BestSubLayoutGuide)
+//   - CurrentLayoutBanner              → compact layout summary
+//   - CapabilitySelector               → P14 renamed, instant switching
+//   - ImproveDesignCard                → single recommendation card
+//   - PresentationModeToggle           → viewing mode
+//   - BassResponse                     → graph (embedded, header hidden)
 //
-// Old duplicated surfaces (SubwooferPanel pills, BassResponse result cards)
-// will be removed in Stage 3. For Stage 1 they remain intact beneath this shell.
+// The four designer questions:
+//   1. Where should the subs go?
+//   2. How well does this perform?
+//   3. How can I improve it?
+//   4. How do I explain it?
 
-import React, { useState, useEffect } from "react";
-import { Waves, ChevronDown, ChevronRight } from "lucide-react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { Waves } from "lucide-react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
-import {
-  resolveBassLifecycleState,
-  BASS_LIFECYCLE_STATE,
-} from "@/components/room/bass/bassCalculationLifecycle";
-import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
-import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
-import BassHeadlinePills from "@/components/room/bass/BassHeadlinePills";
-import BassDesignRecommendation from "@/components/room/bass/BassDesignRecommendation";
-import SharedP19P20SeatResults from "@/components/room/bass/SharedP19P20SeatResults";
-import BassTargetLevelControl from "@/components/room/bass/BassTargetLevelControl";
-import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
-import BassRecommendationSection from "@/components/room/bass/recommendationAuthority/BassRecommendationSection";
-import BassDecisionActions from "@/components/room/bass/recommendationAuthority/BassDecisionActions";
-// SHELFED: RecommendationNarration — see audit. Not wired until the
-// "Optimise, Accept & Calculate" workflow is proven end-to-end.
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
+import BassHeadlinePills from "@/components/room/bass/BassHeadlinePills";
+import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
+import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards";
+import CurrentLayoutBanner from "@/components/room/bass/bda/CurrentLayoutBanner";
+import CapabilitySelector from "@/components/room/bass/bda/CapabilitySelector";
+import ImproveDesignCard from "@/components/room/bass/bda/ImproveDesignCard";
+import PresentationModeToggle from "@/components/room/bass/bda/PresentationModeToggle";
 
-// ── Shell copy per unified lifecycle state ──
-// Plain language. No implementation detail. No invented recommendations.
-const SHELL_COPY = {
-  [BASS_LIFECYCLE_STATE.IDLE]: {
-    badge: "Ready",
-    badgeColor: "#625143",
-    summary: "No bass calculation yet.",
-    nextAction: "Set your bass target, then press Optimise & Calculate.",
-  },
-  [BASS_LIFECYCLE_STATE.QUEUED]: {
-    badge: "Queued",
-    badgeColor: "#625143",
-    summary: "Bass calculation is queued.",
-    nextAction: "Waiting for the calculation to start.",
-  },
-  [BASS_LIFECYCLE_STATE.PREPARING]: {
-    badge: "Calculating",
-    badgeColor: "#2563EB",
-    summary: "Bass calculation is running.",
-    nextAction: "Wait for the calculation to complete.",
-  },
-  [BASS_LIFECYCLE_STATE.SEARCHING]: {
-    badge: "Calculating",
-    badgeColor: "#2563EB",
-    summary: "Bass calculation is running.",
-    nextAction: "Wait for the calculation to complete.",
-  },
-  [BASS_LIFECYCLE_STATE.VALIDATING]: {
-    badge: "Calculating",
-    badgeColor: "#2563EB",
-    summary: "Bass calculation is running.",
-    nextAction: "Wait for the calculation to complete.",
-  },
-  [BASS_LIFECYCLE_STATE.COMPLETE]: {
-    badge: "Current",
-    badgeColor: "#16A34A",
-    summary: "Bass result is current.",
-    nextAction: "Review the results below. Adjust your design and recalculate to explore improvements.",
-  },
-  [BASS_LIFECYCLE_STATE.CANCELLED]: {
-    badge: "Cancelled",
-    badgeColor: "#625143",
-    summary: "Calculation cancelled. Your current design was not changed.",
-    nextAction: "Press Optimise & Calculate to try again.",
-  },
-  [BASS_LIFECYCLE_STATE.TIMED_OUT]: {
-    badge: "Timed out",
-    badgeColor: "#B45309",
-    summary: "Calculation timed out. Your current design was not changed.",
-    nextAction: "Press Optimise & Calculate to try again.",
-  },
-  [BASS_LIFECYCLE_STATE.FAILED]: {
-    badge: "Failed",
-    badgeColor: "#DC2626",
-    summary: "Bass calculation failed. Your current design was not changed.",
-    nextAction: "Press Optimise & Calculate to try again.",
-  },
-  [BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION]: {
-    badge: "Stale",
-    badgeColor: "#B45309",
-    summary: "This result needs recalculation. The room, seating, target, or subwoofer layout has changed.",
-    nextAction: "Press Optimise & Calculate to recalculate with your current design.",
-  },
-};
-
-const UNSELECTED_COPY = {
-  badge: "Select Target",
-  badgeColor: "#625143",
-  summary: "Select a bass target to begin.",
-  nextAction: "Choose a P14 bass SPL target below, then press Optimise & Calculate.",
-};
+const BassResponse = React.lazy(() =>
+  import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
+);
 
 export default function BassDesignAssistant({
   appState,
@@ -120,181 +52,151 @@ export default function BassDesignAssistant({
   disabled,
   roomDims,
   seatingPositions,
+  subWarnings,
 }) {
-  const shared = useSharedBassResults();
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
-  const [evidenceOpen, setEvidenceOpen] = useState(false);
-  const [nowMs, setNowMs] = useState(Date.now());
+  const shared = useSharedBassResults();
+  const [showLayoutCards, setShowLayoutCards] = useState(true);
+  const [presentationMode, setPresentationMode] = useState(false);
+  const hadSubsRef = useRef(false);
 
-  // Tick clock while calculating so elapsed-time text stays live.
-  const isCalculating = shared.calculationInProgress
-    || ["queued", "stale", "calculating", "running"].includes(shared.lifecycle?.status);
+  const subwooferInstances = appState?.subwooferInstances || [];
+  const hasSubwoofers = subwooferInstances.some((s) => s?.enabled !== false);
+  const hasResults = shared?.hasCurrentResult === true;
+
+  // Auto-collapse layout cards when subwoofers first appear
   useEffect(() => {
-    if (!isCalculating) return undefined;
-    const timer = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [isCalculating, shared.lifecycle?.startedAtMs, shared.lifecycle?.queuedAtMs]);
+    if (hasSubwoofers && !hadSubsRef.current) {
+      setShowLayoutCards(false);
+    }
+    hadSubsRef.current = hasSubwoofers;
+  }, [hasSubwoofers]);
 
-  // ── Unified lifecycle state from existing authority ──
-  const lifecycleState = resolveBassLifecycleState({
-    calculationInProgress: shared.calculationInProgress,
-    calculationPhase: shared.calculationPhaseLabel,
-    calculationOutcome: shared.calculationOutcome,
-    authorityStatus: shared.completedBassAuthority?.authorityStatus,
-  });
+  // RSP position for the layout advisor
+  const rspPosition = useMemo(() => {
+    const appRsp = appState?.mlp;
+    if (Number.isFinite(appRsp?.x) && Number.isFinite(appRsp?.y)) return appRsp;
+    const widthM = Number(roomDims?.widthM ?? roomDims?.width);
+    const y = Number(appState?.mlpY_m);
+    return Number.isFinite(widthM) && Number.isFinite(y) ? { x: widthM / 2, y, z: 1.2 } : null;
+  }, [appState?.mlp, appState?.mlpY_m, roomDims]);
 
-  const p14Selection = resolveP14TargetSelectionState(shared.authoritative?.requested);
-  const copy = p14Selection.noP14TargetSelected
-    ? UNSELECTED_COPY
-    : (SHELL_COPY[lifecycleState] || SHELL_COPY[BASS_LIFECYCLE_STATE.IDLE]);
+  const sourceHeights = useMemo(() => ({
+    front: frontSubsCfg?.bottomHeightM,
+    rear: rearSubsCfg?.bottomHeightM,
+  }), [frontSubsCfg?.bottomHeightM, rearSubsCfg?.bottomHeightM]);
 
-  // ── Formatted official results for the engineering evidence section ──
-  // BassHeadlinePills calls formatOfficialBassResults internally too; this
-  // second call is for the per-seat rows and publication status used below.
-  const formatted = formatOfficialBassResults(
-    shared.completedBassAuthority,
-    shared.lifecycle,
-    shared.seatingPositions,
-    nowMs,
-    p14Selection.noP14TargetSelected,
-    {
-      p14TargetBasis: shared.authoritative?.requested?.p14TargetBasis,
-      p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
-    },
-    shared.p19SeatAuthority,
-  );
+  const handleLayoutApplied = () => {
+    setShowLayoutCards(false);
+  };
 
-  const recommendation = shared.contract?.designRecommendation || null;
-  const seats = seatingPositions || appState?.seatingPositions || [];
+  // Wrap commitInstances to auto-collapse after apply
+  const wrappedCommitInstances = (instances, ...rest) => {
+    if (typeof compat.commitInstances === "function") {
+      compat.commitInstances(instances, ...rest);
+    }
+    handleLayoutApplied();
+  };
 
   return (
-    <div className="rounded-xl border border-[#DCDBD6] bg-white p-4 space-y-4">
+    <div className="rounded-xl border border-[#DCDBD6] bg-white p-4 space-y-4" data-bda-workflow="true">
       {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Waves className="w-5 h-5 text-[#213428]" />
-          <h3
-            className="text-[15px] font-bold text-[#1B1A1A]"
-            style={{ fontFamily: "Didact Gothic, sans-serif" }}
-          >
-            Bass Design Assistant
-          </h3>
-        </div>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            padding: "3px 10px",
-            borderRadius: 999,
-            background: `${copy.badgeColor}15`,
-            color: copy.badgeColor,
-            border: `1px solid ${copy.badgeColor}40`,
-            whiteSpace: "nowrap",
-          }}
+      <div className="flex items-center gap-2">
+        <Waves className="w-5 h-5 text-[#213428]" />
+        <h3
+          className="text-[15px] font-bold text-[#1B1A1A]"
+          style={{ fontFamily: "Didact Gothic, sans-serif" }}
         >
-          {copy.badge}
-        </span>
+          Bass Design Assistant
+        </h3>
       </div>
 
-      {/* ── Plain-language summary ── */}
-      <p className="text-[13px] text-[#1B1A1A] leading-relaxed">{copy.summary}</p>
+      {/* ── Stage 1: Choose Starting Layout ── */}
+      {showLayoutCards && (
+        <StartingLayoutCards
+          roomDims={roomDims}
+          seatingPositions={seatingPositions}
+          rspPosition={rspPosition}
+          sourceHeights={sourceHeights}
+          roomElements={appState?.roomElements}
+          currentSubs={subwooferInstances}
+          frontSubsCfg={frontSubsCfg}
+          rearSubsCfg={rearSubsCfg}
+          subwooferInstances={subwooferInstances}
+          commitInstances={wrappedCommitInstances}
+          hasCanonicalInstances={compat.hasCanonicalInstances}
+        />
+      )}
 
-      {/* ── Recommended next action ── */}
-      <p className="text-[12px] text-[#625143] leading-relaxed">{copy.nextAction}</p>
+      {/* ── Current Layout banner ── */}
+      {!showLayoutCards && hasSubwoofers && (
+        <CurrentLayoutBanner
+          subwooferInstances={subwooferInstances}
+          onChange={() => setShowLayoutCards(true)}
+        />
+      )}
 
-      {/* ── Stage 2: Recommendation vs Applied Calibration (presentation only) ── */}
-      {/* Displays the Recommendation Authority and Applied Calibration Authority
-          side by side, plus a difference summary. No actions — read-only. */}
-      <BassRecommendationSection appState={appState} />
+      {/* ── Stage 2: Calculate Performance ── */}
+      {hasSubwoofers && (
+        <OptimiseAndCalculate
+          roomDims={roomDims || appState?.roomDims}
+          seatingPositions={seatingPositions}
+          subwooferInstances={subwooferInstances}
+          frontSubsCfg={frontSubsCfg}
+          rearSubsCfg={rearSubsCfg}
+          commitInstances={compat.commitInstances}
+          commitSeating={appState?.setSeatingPositions}
+          commitSeatingProvenance={appState?.setAppliedSeatingProvenance}
+          appliedSeatingProvenance={appState?.appliedSeatingProvenance}
+          hasCanonicalInstances={compat.hasCanonicalInstances}
+          appState={appState}
+          disabled={disabled}
+        />
+      )}
 
-      {/* ── Stage 3: Decision workflow (Accept / Continue / Recalculate / Reset) ── */}
-      {/* Renders only when an Applied Calibration exists. When no calibration
-          exists, this renders nothing and the single-step OptimiseAndCalculate
-          below handles the first-run workflow. */}
-      <BassDecisionActions
-        appState={appState}
-        commitInstances={compat.commitInstances}
-      />
-
-      {/* ── Single shared P14/P18/P19/P20 summary ── */}
-      {/* BassHeadlinePills consumes the same shared authority and is
-          publication-gated: stale/failed/calculating states show the correct
-          non-current text, never old grades as current. */}
-      <BassHeadlinePills nowMs={nowMs} />
-
-      {/* ── Primary action: single Optimise & Calculate ── */}
-      {/* Reusing the existing component so lifecycle, cancel, retry, timeout
-          and stale behaviour remain intact. No second calculate button. */}
-      <OptimiseAndCalculate
-        roomDims={roomDims || appState?.roomDims}
-        seatingPositions={seats}
-        subwooferInstances={appState?.subwooferInstances}
-        frontSubsCfg={frontSubsCfg}
-        rearSubsCfg={rearSubsCfg}
-        commitInstances={compat.commitInstances}
-        commitSeating={appState?.setSeatingPositions}
-        commitSeatingProvenance={appState?.setAppliedSeatingProvenance}
-        appliedSeatingProvenance={appState?.appliedSeatingProvenance}
-        hasCanonicalInstances={compat.hasCanonicalInstances}
-        appState={appState}
-        disabled={disabled}
-      />
-
-      {/* ── Engineering evidence — collapsed by default ── */}
-      {/* Stage 1 links users to existing evidence without moving all
-          engineering components. Old duplicated surfaces (SubwooferPanel,
-          BassResponse) remain available in their existing panels and will
-          be removed in Stage 3. */}
-      <div className="border-t border-[#DCDBD6] pt-3">
-        <button
-          type="button"
-          onClick={() => setEvidenceOpen((open) => !open)}
-          className="flex items-center gap-2 text-[12px] font-semibold text-[#625143] hover:text-[#213428] transition-colors"
-        >
-          {evidenceOpen ? (
-            <ChevronDown className="w-4 h-4" />
-          ) : (
-            <ChevronRight className="w-4 h-4" />
-          )}
-          Engineering evidence
-        </button>
-        {evidenceOpen && (
-          <div className="mt-3 space-y-3">
-            {/* P14/P18 target settings */}
-            <div className="rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-3">
-              <div className="text-[11px] font-semibold text-[#625143] mb-2 uppercase tracking-wide">
-                Target Settings
-              </div>
-              <BassTargetLevelControl disabled={disabled} />
-            </div>
-
-            {/* P19/P20 per-seat results */}
-            <SharedP19P20SeatResults
-              p19Rows={formatted.p19Rows}
-              p20Rows={formatted.p20Rows}
-              p19Summary={
-                formatted.p19SeatAuthority?.project?.coverageSummary || null
-              }
-              publicationVerified={formatted.publicationVerified}
-              authorityStatus={shared.completedBassAuthority?.authorityStatus}
-              p14TargetUnselected={p14Selection.noP14TargetSelected}
+      {/* ── Stage 3: Performance ── */}
+      {hasResults && !presentationMode && (
+        <div className="space-y-3" data-bda-stage="performance">
+          <BassHeadlinePills />
+          <CapabilitySelector disabled={disabled} />
+          <React.Suspense fallback={<div className="p-4 text-sm text-[#625143]">Loading graph…</div>}>
+            <BassResponse
+              hideHeader
+              frontSubsCfg={frontSubsCfg}
+              rearSubsCfg={rearSubsCfg}
+              subWarnings={subWarnings || {}}
             />
+          </React.Suspense>
+        </div>
+      )}
 
-            {/* Design recommendation (limitation + improvement) */}
-            {recommendation && !p14Selection.noP14TargetSelected && (
-              <BassDesignRecommendation recommendation={recommendation} />
-            )}
+      {/* ── Stage 4: Improve Design ── */}
+      {hasResults && !presentationMode && (
+        <ImproveDesignCard appState={appState} />
+      )}
 
-            {/* Authority / lifecycle status text */}
-            <div className="text-[10px] text-[#8B7F76] font-mono">
-              Authority:{" "}
-              {shared.completedBassAuthority?.authorityStatus ||
-                "UNCALCULATED"}{" "}
-              · Lifecycle: {lifecycleState}
+      {/* ── Stage 5: Presentation Mode ── */}
+      {hasResults && (
+        <>
+          <PresentationModeToggle
+            isPresentationMode={presentationMode}
+            onToggle={setPresentationMode}
+          />
+          {presentationMode && (
+            <div className="space-y-3" data-bda-stage="presentation">
+              <BassHeadlinePills />
+              <React.Suspense fallback={<div className="p-4 text-sm text-[#625143]">Loading graph…</div>}>
+                <BassResponse
+                  hideHeader
+                  frontSubsCfg={frontSubsCfg}
+                  rearSubsCfg={rearSubsCfg}
+                  subWarnings={subWarnings || {}}
+                />
+              </React.Suspense>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
