@@ -600,8 +600,8 @@ export default function OptimiseAndCalculate({
         </div>
       )}
 
-      {/* ── Completion: ADI Recommendation ── */}
-      {isComplete && (
+      {/* ── Recommended Improvement: ADI Recommendation ── */}
+      {(isComplete || (hasResults && !isCalculating && !isError && !isCancelledState && !isTimedOut)) && (
         <div className="mt-3">
           <AdiRecommendation
             autoApplied={workflowState.autoApplied}

@@ -236,7 +236,24 @@ export default function AdiRecommendation({
 
   // ── Render ──
 
-  if (!adiDecision?.recommendation) return null;
+  if (!adiDecision?.recommendation) {
+    return (
+      <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-[#213428]" />
+          <div>
+            <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
+            <div className="text-[9px] font-medium text-[#8A7B6A]" style={{ letterSpacing: '0.04em' }}>
+              Powered by Artcoustic Design Intelligence
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 text-[12px] text-[#3E4349] leading-relaxed">
+          No further engineering changes are recommended.
+        </div>
+      </div>
+    );
+  }
 
   const { recommendation, diagnosis, outcome, intent } = adiDecision;
 
