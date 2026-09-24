@@ -1,6 +1,41 @@
 /**
  * roomPhysicsCache.js
  * --------------------
+ * ════════════════════════════════════════════════════════════════════
+ * ARCHITECTURAL INVARIANT — ROOM PHYSICS CACHE
+ * ════════════════════════════════════════════════════════════════════
+ *
+ * Purpose:
+ *   Store authoritative room-transfer functions (modal engine output:
+ *   perSourceRspComplexTransfers, seatResponses, metrics, audit).
+ *
+ * Keyed by:
+ *   geometryFingerprint ONLY (room dims, source positions, seats,
+ *   absorption, physics flags). Never keyed by P14/P18 target.
+ *
+ * MUST NEVER CONTAIN:
+ *   - EQ filter banks
+ *   - P14 (low-frequency extension / operating level)
+ *   - P18 (LF extension grade)
+ *   - P19 (seat-to-seat consistency)
+ *   - P20 (seat-to-seat level deviation)
+ *   - Operating level / global trim
+ *   - Recommendations / candidate selections
+ *
+ * Only immutable room physics. These quantities are design-objective-
+ * independent and survive a P14/P18 target change without re-simulation.
+ *
+ * DO NOT MERGE this cache with the Optimiser Cache
+ * (bassBackgroundAnalysisStore.js). The two caches hold fundamentally
+ * different quantities with OPPOSITE invalidation semantics:
+ *   - Room Physics Cache: invalidated by geometry change ONLY.
+ *   - Optimiser Cache:     invalidated by P14/P18/product/house-curve
+ *                          change (includes geometry, since geometry is
+ *                          a component of the calibration fingerprint).
+ * Merging them would either falsely reuse stale EQ on a P14 change, or
+ * falsely re-run room physics on a P14-only change.
+ * ════════════════════════════════════════════════════════════════════
+ *
  * Geometry-keyed LRU cache for the authoritative room-physics simulation
  * result (perSourceRspComplexTransfers + seatResponses).
  *

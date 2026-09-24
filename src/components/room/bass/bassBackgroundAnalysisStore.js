@@ -1,4 +1,37 @@
 // Shared Phase 4 lifecycle for the existing detailed product-aware optimiser worker.
+// ════════════════════════════════════════════════════════════════════
+// ARCHITECTURAL INVARIANT — OPTIMISER CACHE
+// ════════════════════════════════════════════════════════════════════
+//
+// Purpose:
+//   Store engineering results (EQ filter banks, P14/P18/P19/P20
+//   metrics, operating level, global trim, candidate selections,
+//   recommendations).
+//
+// Keyed by:
+//   calibrationFingerprint (includes geometry + product + house-curve
+//   + P14/P18 target identity). This ensures a design-objective change
+//   (e.g. P14 L1→L2) correctly invalidates the cache and forces an
+//   optimiser re-run.
+//
+// MUST NEVER BE REUSED WHEN THE DESIGN OBJECTIVE CHANGES:
+//   A P14/P18 target change alters the optimiser's objective function.
+//   Returning a cached result computed for a different target would
+//   present stale EQ filters and stale RP22 grades as if they were
+//   calculated for the new target — a silent correctness violation.
+//
+// DO NOT MERGE this cache with the Room Physics Cache
+// (roomPhysicsCache.js). The two caches hold fundamentally different
+// quantities with OPPOSITE invalidation semantics:
+//   - Optimiser Cache:     invalidated by P14/P18/product/house-curve
+//                          change (includes geometry).
+//   - Room Physics Cache:  invalidated by geometry change ONLY; survives
+//                          a P14/P18-only change so room physics is not
+//                          re-simulated.
+// Merging them would either falsely reuse stale EQ on a P14 change, or
+// falsely re-run room physics on a P14-only change.
+// ════════════════════════════════════════════════════════════════════
+//
 // The controller owns scheduling, race rejection and the bounded memory cache;
 // acoustic calculation and candidate selection remain in their existing modules.
 import {
