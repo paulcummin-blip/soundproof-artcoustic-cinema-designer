@@ -489,7 +489,6 @@ export function resolvePersistedBassAuthority(projectId, persisted) {
       authorityStatus: BASS_AUTHORITY_STATUS.UNCALCULATED,
       currentFingerprint: null,
       contract: null,
-      staleContract: null,
       structurallyComplete: false,
       authoritative: false,
       exportable: false,
@@ -518,29 +517,44 @@ export function resolvePersistedBassAuthority(projectId, persisted) {
   const current = state.status === "complete"
     ? matchingCurrent
     : (isAuthoritativeBassContract(matchingCurrent) ? matchingCurrent : null);
-  const staleContract = Object.values(validSnapshots)
-    .filter((snapshot) => snapshot !== current && isStructurallyCompleteBassContract(snapshot))
-    .sort((left, right) => Number(right?.job?.completedAtMs || 0) - Number(left?.job?.completedAtMs || 0))[0] || null;
-  const structurallyComplete = isStructurallyCompleteBassContract(current);
-  const authoritative = isAuthoritativeBassContract(current);
-  const exportable = isExportableBassContract(current);
-  const publicationRejectionReason = structurallyComplete && !authoritative
-    ? (current?.metricPublication?.publicationRejectionReason || "metric-publication-invalid")
+  // ── Single Published Engineering Contract ──
+  // During UPDATING/STALE/FAILED, preserve the last published contract as
+  // `contract`. When the current fingerprint has no matching snapshot (new
+  // calculation in progress), fall back to the most recent valid snapshot.
+  // The authorityStatus reflects the lifecycle state (UPDATING/STALE), but
+  // the contract remains visible — matching the in-memory store semantics.
+  // There is no second `staleContract` authority path.
+  const fallbackContract = !current
+    ? Object.values(validSnapshots)
+        .filter((snapshot) => isStructurallyCompleteBassContract(snapshot))
+        .sort((left, right) => Number(right?.job?.completedAtMs || 0) - Number(left?.job?.completedAtMs || 0))[0] || null
     : null;
-  const authorityStatus = structurallyComplete
+  const contract = current || fallbackContract;
+  const structurallyComplete = isStructurallyCompleteBassContract(contract);
+  const authoritative = isAuthoritativeBassContract(contract);
+  const exportable = isExportableBassContract(contract);
+  const publicationRejectionReason = structurallyComplete && !authoritative
+    ? (contract?.metricPublication?.publicationRejectionReason || "metric-publication-invalid")
+    : null;
+  // authorityStatus: AUTHORITATIVE/NOT_VERIFIED only when status is "complete"
+  // AND the contract is the matching current fingerprint. During
+  // UPDATING/STALE, the contract is preserved for visibility but
+  // authorityStatus reflects the lifecycle state — the contract is the last
+  // published result, not the current authority.
+  const isCurrentAuthority = structurallyComplete && state.status === "complete" && contract === matchingCurrent;
+  const authorityStatus = isCurrentAuthority
     ? (authoritative ? BASS_AUTHORITY_STATUS.AUTHORITATIVE : BASS_AUTHORITY_STATUS.NOT_VERIFIED)
-    : (state.status === "uncalculated"
+    : (state.status === "uncalculated" && !structurallyComplete
       ? BASS_AUTHORITY_STATUS.UNCALCULATED
       : state.status === "stale"
         ? BASS_AUTHORITY_STATUS.STALE
         : BASS_AUTHORITY_STATUS.UPDATING);
   return {
     projectId: String(projectId || "free"),
-    status: current ? "complete" : state.status === "uncalculated" ? "uncalculated" : state.status === "stale" ? "stale" : "updating",
+    status: isCurrentAuthority ? "complete" : (state.status === "uncalculated" && !structurallyComplete ? "uncalculated" : state.status === "stale" ? "stale" : "updating"),
     authorityStatus,
     currentFingerprint,
-    contract: structurallyComplete ? current : null,
-    staleContract,
+    contract: structurallyComplete ? contract : null,
     structurallyComplete,
     authoritative,
     exportable,

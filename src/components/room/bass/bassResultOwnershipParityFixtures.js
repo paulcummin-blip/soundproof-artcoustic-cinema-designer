@@ -3,7 +3,7 @@ import { formatBassResults } from "./bassResultsPresentation.js";
 import { buildComplianceBassExportData, buildComplianceBassPresentation } from "./bassCompliancePresentation.js";
 import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot, buildSeatHudParameterRows } from "@/components/room/seatHudPresentation";
 import { RP22_SEAT_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
-import { buildPersistedBassAuthority, resolvePersistedBassAuthority } from "./completedBassResultPersistence.js";
+import { buildPersistedBassAuthority, resolvePersistedBassAuthority, BASS_AUTHORITY_STATUS } from "./completedBassResultPersistence.js";
 
 const FP = "cal:v1:ownership123456";
 const contractFixture = () => {
@@ -71,9 +71,9 @@ export function runBassResultOwnershipParityFixtures() {
   const newPageAuthority = resolvePersistedBassAuthority("project-1", JSON.parse(JSON.stringify(persisted)));
   check("12. New page context restores identical completed result", newPageAuthority.exportable && newPageAuthority.contract.job.resultFingerprint === FP && newPageAuthority.contract.selectedCandidateId === contract.selectedCandidateId);
   const updating = resolvePersistedBassAuthority("project-1", buildPersistedBassAuthority(persisted, "cal:v1:newfingerprint", null));
-  check("13. Export is blocked without a current completed fingerprint", !updating.exportable && updating.status === "updating" && updating.contract === null && updating.staleContract?.job?.resultFingerprint === FP);
+  check("13. Contract preserved during UPDATING, authorityStatus reflects lifecycle", updating.contract?.job?.resultFingerprint === FP && updating.authorityStatus === BASS_AUTHORITY_STATUS.UPDATING && updating.status === "updating");
   const refreshingSameFingerprint = resolvePersistedBassAuthority("project-1", buildPersistedBassAuthority(persisted, FP, null, true));
-  check("14. A recalculating matching fingerprint remains stale and non-exportable", !refreshingSameFingerprint.exportable && refreshingSameFingerprint.staleContract?.job?.resultFingerprint === FP);
+  check("14. Recalculating matching fingerprint preserves contract and authority", refreshingSameFingerprint.contract?.job?.resultFingerprint === FP && refreshingSameFingerprint.authorityStatus === BASS_AUTHORITY_STATUS.AUTHORITATIVE);
   check("15. PDF reads completed authority without independent bass calculation", pdf.completed && pdf.source === "completed-authoritative-bass-result" && pdf.independentBassCalculation === false);
 
   const passed = checks.filter((item) => item.passed).length;

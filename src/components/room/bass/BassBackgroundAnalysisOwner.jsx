@@ -410,7 +410,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       && completedBassAuthority?.currentFingerprint
       && completedBassAuthority.currentFingerprint !== cacheKey
     ) {
-      if (completedBassAuthority.contract || completedBassAuthority.staleContract) {
+      if (completedBassAuthority.contract) {
         markBassAuthorityStale(scopeId, versionId, cacheKey);
       } else {
         markBassAuthorityUpdating(scopeId, versionId, null);
@@ -426,7 +426,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       && completedBassAuthority?.authorityStatus === BASS_AUTHORITY_STATUS.UPDATING
     ) {
       setColdReloadRecovered(true);
-      if (completedBassAuthority.contract || completedBassAuthority.staleContract) {
+      if (completedBassAuthority.contract) {
         markBassAuthorityStale(scopeId, versionId, cacheKey);
       } else {
         markBassAuthorityBlocked(scopeId, versionId);
