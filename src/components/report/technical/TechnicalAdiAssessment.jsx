@@ -1,0 +1,280 @@
+/**
+ * TechnicalAdiAssessment.jsx
+ * ---------------------------
+ * Technical Report — Artcoustic Design Intelligence (ADI) Assessment.
+ *
+ * An optional premium section that presents professional engineering
+ * commentary explaining the completed design. It complements the Design
+ * Rating — it never replaces it, never adds a score, and never adds another
+ * RP22 parameter.
+ *
+ * Structure:
+ *   - Highlights: always begins positively — what the design already achieves
+ *   - Improvements to Consider: only meaningful engineering improvements
+ *     with why + expected benefit
+ *   - Overall Assessment: one concise engineering conclusion
+ *
+ * Visual language: established Sound Proof report styling — Futura PT Light
+ * for headings, Didact Gothic for body, the standard brand palette. No AI
+ * styling, no chat icons, no warning triangles, no coloured alert boxes.
+ * The presentation feels like a signed engineering review.
+ *
+ * Presentation-only: consumes the single authoritative ADI Assessment from
+ * adiAssessmentBuilder. Does NOT recalculate, re-derive, or duplicate any
+ * engineering commentary.
+ */
+
+import React from "react";
+import { buildAdiAssessment } from "./adiAssessmentBuilder";
+
+const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
+const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
+
+const COLORS = {
+  bg: "#F1F0EE",
+  cardBg: "#FFFFFF",
+  primary: "#213428",
+  body: "#3E4349",
+  secondary: "#625143",
+  border: "#E6E4DD",
+  borderStrong: "#D9D5CE",
+  label: "#9B8E82",
+};
+
+export default function TechnicalAdiAssessment({ engineeringSummary }) {
+  if (!engineeringSummary) return null;
+
+  const assessment = buildAdiAssessment(engineeringSummary);
+  if (!assessment) return null;
+
+  const { highlights, improvements, overallAssessment } = assessment;
+
+  return (
+    <div
+      className="tech-adi-assessment"
+      style={{
+        background: COLORS.bg,
+        minHeight: "268mm",
+        padding: "8mm 10mm",
+        boxSizing: "border-box",
+        WebkitPrintColorAdjust: "exact",
+        printColorAdjust: "exact",
+        fontFamily: FONT_BODY,
+        color: COLORS.body,
+      }}
+    >
+      {/* ── Heading ── */}
+      <div style={{ marginBottom: "6mm" }}>
+        <div
+          style={{
+            fontFamily: FONT_HEADING,
+            fontSize: "18pt",
+            fontWeight: 400,
+            color: COLORS.primary,
+            letterSpacing: "0.01em",
+            lineHeight: 1.1,
+          }}
+        >
+          ARTCOUSTIC DESIGN INTELLIGENCE
+        </div>
+        <div
+          style={{
+            fontSize: "9pt",
+            color: COLORS.secondary,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            fontFamily: FONT_BODY,
+            marginTop: "1mm",
+          }}
+        >
+          Engineering Assessment
+        </div>
+      </div>
+
+      {/* ── Highlights ── */}
+      <div
+        className="print-avoid-break"
+        style={{
+          background: COLORS.cardBg,
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: 6,
+          padding: "6mm 8mm",
+          marginBottom: "5mm",
+          breakInside: "avoid",
+          pageBreakInside: "avoid",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "10pt",
+            fontWeight: 700,
+            color: COLORS.primary,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            fontFamily: FONT_BODY,
+            marginBottom: "4mm",
+          }}
+        >
+          Highlights
+        </div>
+        {highlights.map((highlight, i) => (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              gap: "3mm",
+              marginBottom: "2.5mm",
+              fontSize: "10pt",
+              lineHeight: 1.5,
+              color: COLORS.body,
+              fontFamily: FONT_BODY,
+            }}
+          >
+            <span
+              style={{
+                color: COLORS.primary,
+                fontWeight: 600,
+                flexShrink: 0,
+                lineHeight: 1.5,
+              }}
+            >
+              —
+            </span>
+            <span>{highlight}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Improvements to Consider ── */}
+      {improvements.length > 0 && (
+        <div
+          className="print-avoid-break"
+          style={{
+            background: COLORS.cardBg,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: 6,
+            padding: "6mm 8mm",
+            marginBottom: "5mm",
+            breakInside: "avoid",
+            pageBreakInside: "avoid",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "10pt",
+              fontWeight: 700,
+              color: COLORS.primary,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              fontFamily: FONT_BODY,
+              marginBottom: "4mm",
+            }}
+          >
+            Improvements to Consider
+          </div>
+          {improvements.map((improvement, i) => (
+            <div
+              key={i}
+              style={{
+                marginBottom: i < improvements.length - 1 ? "4mm" : 0,
+                paddingBottom: i < improvements.length - 1 ? "4mm" : 0,
+                borderBottom:
+                  i < improvements.length - 1
+                    ? `1px solid ${COLORS.border}`
+                    : "none",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "10pt",
+                  lineHeight: 1.5,
+                  color: COLORS.body,
+                  fontFamily: FONT_BODY,
+                  marginBottom: "2mm",
+                }}
+              >
+                {improvement.action}
+              </div>
+              <div
+                style={{
+                  fontSize: "9pt",
+                  lineHeight: 1.45,
+                  color: COLORS.secondary,
+                  fontFamily: FONT_BODY,
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>Why: </span>
+                {improvement.why}
+              </div>
+              <div
+                style={{
+                  fontSize: "9pt",
+                  lineHeight: 1.45,
+                  color: COLORS.secondary,
+                  fontFamily: FONT_BODY,
+                  marginTop: "1mm",
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>Expected benefit: </span>
+                {improvement.benefit}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Overall Assessment ── */}
+      <div
+        className="print-avoid-break"
+        style={{
+          background: COLORS.cardBg,
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: 6,
+          padding: "6mm 8mm",
+          breakInside: "avoid",
+          pageBreakInside: "avoid",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "10pt",
+            fontWeight: 700,
+            color: COLORS.primary,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            fontFamily: FONT_BODY,
+            marginBottom: "4mm",
+          }}
+        >
+          Overall Assessment
+        </div>
+        <div
+          style={{
+            fontSize: "10.5pt",
+            lineHeight: 1.55,
+            color: COLORS.body,
+            fontFamily: FONT_BODY,
+          }}
+        >
+          {overallAssessment}
+        </div>
+      </div>
+
+      {/* ── Footer ── */}
+      <div
+        style={{
+          marginTop: "4mm",
+          fontSize: "8pt",
+          color: COLORS.secondary,
+          fontFamily: FONT_BODY,
+          lineHeight: 1.5,
+          fontStyle: "italic",
+        }}
+      >
+        Artcoustic Design Intelligence (ADI) is a professional engineering commentary
+        that complements the Artcoustic System Design Rating. It is not a CEDIA RP22
+        or RP23 Performance Level.
+      </div>
+    </div>
+  );
+}
