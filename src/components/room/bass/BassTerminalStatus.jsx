@@ -7,18 +7,22 @@ import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 // user always sees why the previous attempt ended.
 export default function BassTerminalStatus() {
   const shared = useSharedBassResults();
-  const outcome = shared?.calculationOutcome;
+  const lifecycleState = shared?.bassLifecycleState;
   const message = shared?.terminalMessage;
 
-  // Only show when there is a terminal outcome that is not idle/success/in-progress.
-  if (!outcome || outcome === "idle" || outcome === "success"
-    || outcome === "preparing" || outcome === "optimising" || outcome === "finalising") {
+  // Only show for terminal non-complete states. Active calculation phases
+  // (preparing, searching, validating, queued) and idle/complete are NOT
+  // terminal — they have no message to display.
+  if (!lifecycleState
+    || lifecycleState === "idle" || lifecycleState === "complete"
+    || lifecycleState === "preparing" || lifecycleState === "searching"
+    || lifecycleState === "validating" || lifecycleState === "queued") {
     return null;
   }
   if (!message) return null;
 
-  const isError = outcome === "error" || outcome === "timeout" || outcome === "rejected";
-  const isWarning = outcome === "cancelled" || outcome === "stale";
+  const isError = lifecycleState === "failed" || lifecycleState === "timed_out";
+  const isWarning = lifecycleState === "cancelled" || lifecycleState === "stale_needs_recalculation";
 
   const bg = isError ? "#fef2f2" : "#fffbeb";
   const border = isError ? "#fecaca" : "#fde68a";

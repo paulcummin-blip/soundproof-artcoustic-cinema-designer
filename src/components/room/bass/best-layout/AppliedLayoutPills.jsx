@@ -44,6 +44,7 @@ export default function AppliedLayoutPills({ seatingPositions = [] }) {
       p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
     },
     shared.p19SeatAuthority,
+    shared.bassLifecycleState,
   );
 
   // Publication-verified authoritative result required.

@@ -5,6 +5,7 @@ import { formatP14Capability, formatP14BasisLabel, normalizeP14TargetBasis } fro
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
 import { seatScopeHeadlinePill } from "@/components/utils/rp22ParameterPresentation";
 import { formatBassParameterValue } from "@/components/room/bass/bassParameterValueFormatter";
+import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, isBassLifecycleCalculating } from "./bassCalculationLifecycle";
 
 // Re-export so existing consumers (bassResultsPresentationFixtures, seatHudPresentation)
 // can still import formatBassParameterValue from this module without changes.
@@ -119,7 +120,7 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  * @param {object} displayBasis - current P14/P18 grading bases
  * @param {object|null} p19SeatAuthority - published canonical P19 seat authority
  */
-export function formatOfficialBassResults(completedBassAuthority, lifecycle = null, seatingPositions = [], nowMs = Date.now(), noP14TargetSelected = false, displayBasis = {}, p19SeatAuthority = null) {
+export function formatOfficialBassResults(completedBassAuthority, lifecycle = null, seatingPositions = [], nowMs = Date.now(), noP14TargetSelected = false, displayBasis = {}, p19SeatAuthority = null, bassLifecycleState = null) {
   const presentation = buildComplianceBassPresentation({ completedBassAuthority });
   const { publicationVerified, parameters } = presentation;
   const contract = completedBassAuthority?.contract || null;
@@ -132,7 +133,12 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
 
   const authorityStatus = completedBassAuthority?.authorityStatus || "UNCALCULATED";
   const lifecycleStatus = lifecycle?.status || "idle";
-  const isCalculating = ["calculating", "running", "queued", "stale"].includes(lifecycleStatus);
+  // Unified lifecycle — when provided, it is the sole authority for the
+  // calculation state. When not provided (legacy callers/fixtures), fall
+  // back to the raw controller status.
+  const isCalculating = bassLifecycleState != null
+    ? isBassLifecycleCalculating(bassLifecycleState)
+    : ["calculating", "running", "queued", "stale"].includes(lifecycleStatus);
   const timerStart = lifecycle?.startedAtMs ?? lifecycle?.queuedAtMs;
   const elapsedSeconds = secondsSince(timerStart, nowMs);
 
@@ -183,9 +189,13 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   const isAuthoritative = publicationVerified === true;
   const isNotVerified = authorityStatus === "NOT_VERIFIED";
   const isUpdating = ["UPDATING", "LOADING"].includes(authorityStatus) || isCalculating;
-  const isStale = authorityStatus === "STALE";
+  const isStale = bassLifecycleState != null
+    ? bassLifecycleState === BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION
+    : authorityStatus === "STALE";
   const isBlocked = authorityStatus === "BLOCKED";
-  const isError = authorityStatus === "ERROR";
+  const isError = bassLifecycleState != null
+    ? bassLifecycleState === BASS_LIFECYCLE_STATE.FAILED
+    : authorityStatus === "ERROR";
   const isUncalculated = authorityStatus === "UNCALCULATED" && !isCalculating;
   // LIMITED: P14 capability below the requested target. The calculation is
   // terminal (not pending), but P18/P19/P20 were not evaluated. Treat like
@@ -197,21 +207,23 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // has P14 pass === false, so include it in the p14Failed gating.
   const p14Failed = (isAuthoritative || isLimited) && contract?.productAnalysis?.parameters?.p14?.pass === false;
 
-  // Per-seat arrays are publication-gated. P19 is never rebuilt here:
-  // consumers receive the exact immutable object published by the room owner.
-  const publishedP19SeatAuthority = (isAuthoritative && !p14Failed) ? p19SeatAuthority : null;
+  // Per-seat arrays are publication-gated AND suppressed while calculating.
+  // When a calculation is in progress, old results must NOT be presented as
+  // current — the pills and per-seat grids show "Calculating…" instead.
+  const resultsVisible = isAuthoritative && !p14Failed && !isCalculating;
+  const publishedP19SeatAuthority = resultsVisible ? p19SeatAuthority : null;
   const perSeatP19Results = publishedP19SeatAuthority?.seats || [];
-  const perSeatP20Results = (isAuthoritative && !p14Failed) ? (presentation.perSeatP20Results || []) : [];
+  const perSeatP20Results = resultsVisible ? (presentation.perSeatP20Results || []) : [];
   const p19Rows = publishedP19SeatAuthority?.rows || [];
-  const p20Rows = (isAuthoritative && !p14Failed) ? buildP20SeatRows(seatingPositions, perSeatP20Results) : [];
+  const p20Rows = resultsVisible ? buildP20SeatRows(seatingPositions, perSeatP20Results) : [];
 
   // P19 compact: RSP + lowest seat (internal authority — presented as coverage summary)
-  const p19Rsp = (isAuthoritative && !p14Failed) ? p19RspResult(contract?.productAnalysis?.parameters?.p19) : null;
-  const p19Lowest = (isAuthoritative && !p14Failed) ? p19LowestSeat(p19Rows) : null;
+  const p19Rsp = resultsVisible ? p19RspResult(contract?.productAnalysis?.parameters?.p19) : null;
+  const p19Lowest = resultsVisible ? p19LowestSeat(p19Rows) : null;
 
   // P20 compact: best Primary + lowest seat (internal authority — presented as coverage summary)
-  const p20BestPrimary = (isAuthoritative && !p14Failed) ? p20BestPrimarySeat(p20Rows) : null;
-  const p20Lowest = (isAuthoritative && !p14Failed) ? p20WorstSeat(p20Rows) : null;
+  const p20BestPrimary = resultsVisible ? p20BestPrimarySeat(p20Rows) : null;
+  const p20Lowest = resultsVisible ? p20WorstSeat(p20Rows) : null;
 
   const pills = {};
 
@@ -221,7 +233,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // achievable, the pill shows strict FAIL + Available max — never a downgraded
   // level. A LIMITED contract also has P14 data (pass === false) and should
   // display the same FAIL pill.
-  if (isAuthoritative || isLimited) {
+  if ((isAuthoritative || isLimited) && !isCalculating) {
     const source = contract?.productAnalysis?.parameters?.p14;
     const selectedLevel = source?.selectedLevel ?? source?.level;
     const selectedTargetDb = source?.selectedTargetDb ?? source?.requestedTargetDb ?? source?.value;
@@ -267,7 +279,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // A bounded result (response still above -3 dB at the product validity floor)
   // is displayed as "≤{floor} Hz" — not a fake exact crossing below valid data.
   // LIMITED contracts have no P18 data (P14 failed → P18 not evaluated).
-  if (isAuthoritative && !p14Failed) {
+  if (resultsVisible) {
     const source = contract?.productAnalysis?.parameters?.p18;
     const achievedValue = isFiniteNumber(source?.value) ? Number(source.value) : null;
     const bounded = source?.achievedExtensionBounded === true;
@@ -294,17 +306,23 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   }
 
   // P19 — SEAT-scoped parameter. The headline always displays "SEAT" — no
-  // RSP/aggregate headline. When P14 fails (or LIMITED), P19 is not evaluated.
-  pills.p19 = p14Failed
-    ? { label: "P19 Response Fit", resultText: "FAIL", text: "P19 Response Fit FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
-    : seatScopeHeadlinePill("P19 Response Fit");
+  // RSP/aggregate headline. When calculating, show "Calculating…" — never
+  // old results. When P14 fails (or LIMITED), P19 is not evaluated.
+  pills.p19 = isCalculating
+    ? { label: "P19 Response Fit", resultText: "Calculating…", text: "P19 Response Fit Calculating…", level: "—" }
+    : p14Failed
+      ? { label: "P19 Response Fit", resultText: "FAIL", text: "P19 Response Fit FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
+      : seatScopeHeadlinePill("P19 Response Fit");
 
   // P20 — SEAT-scoped parameter. The headline always displays "SEAT" — no
-  // "worst seat" headline, no aggregate level. When P14 fails (or LIMITED),
-  // P20 is not evaluated.
-  pills.p20 = p14Failed
-    ? { label: "P20 Seat Consistency", resultText: "FAIL", text: "P20 Seat Consistency FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
-    : seatScopeHeadlinePill("P20 Seat Consistency");
+  // "worst seat" headline, no aggregate level. When calculating, show
+  // "Calculating…" — never old results. When P14 fails (or LIMITED), P20
+  // is not evaluated.
+  pills.p20 = isCalculating
+    ? { label: "P20 Seat Consistency", resultText: "Calculating…", text: "P20 Seat Consistency Calculating…", level: "—" }
+    : p14Failed
+      ? { label: "P20 Seat Consistency", resultText: "FAIL", text: "P20 Seat Consistency FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
+      : seatScopeHeadlinePill("P20 Seat Consistency");
 
   // Status text
   let statusText = "Waiting for complete design";

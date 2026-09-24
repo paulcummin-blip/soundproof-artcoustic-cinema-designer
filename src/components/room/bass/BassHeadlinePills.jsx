@@ -49,7 +49,7 @@ function splitPillContent(resultText) {
 export default function BassHeadlinePills({ nowMs }) {
   const shared = useSharedBassResults();
   const [clock, setClock] = useState(Date.now());
-  const active = nowMs == null && (shared.isUpdating || ["stale", "calculating", "running", "queued"].includes(shared.lifecycle?.status));
+  const active = nowMs == null && (shared.calculationInProgress || shared.bassLifecycleState === "stale_needs_recalculation");
   useEffect(() => {
     if (!active) return undefined;
     const timer = setInterval(() => setClock(Date.now()), 1000);
@@ -68,6 +68,7 @@ export default function BassHeadlinePills({ nowMs }) {
       p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
     },
     shared.p19SeatAuthority,
+    shared.bassLifecycleState,
   );
 
   return (

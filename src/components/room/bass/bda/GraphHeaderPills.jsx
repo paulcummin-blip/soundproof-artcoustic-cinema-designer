@@ -39,8 +39,7 @@ export default function GraphHeaderPills() {
   const interaction = useGraphInteraction();
   const [clock, setClock] = useState(Date.now());
 
-  const active = shared.isUpdating
-    || ["stale", "calculating", "running", "queued"].includes(shared.lifecycle?.status);
+  const active = shared.calculationInProgress || shared.bassLifecycleState === "stale_needs_recalculation";
   useEffect(() => {
     if (!active) return undefined;
     const timer = setInterval(() => setClock(Date.now()), 1000);
@@ -59,6 +58,7 @@ export default function GraphHeaderPills() {
       p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
     },
     shared.p19SeatAuthority,
+    shared.bassLifecycleState,
   );
 
   const handlePillClick = (key) => {

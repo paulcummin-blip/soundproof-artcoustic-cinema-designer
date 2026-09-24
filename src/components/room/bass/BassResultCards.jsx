@@ -16,7 +16,7 @@ import BassHeadlinePills from "@/components/room/bass/BassHeadlinePills";
 export default function BassResultCards() {
   const shared = useSharedBassResults();
   const [nowMs, setNowMs] = useState(Date.now());
-  const active = shared.isUpdating || ["stale", "calculating", "running", "queued"].includes(shared.lifecycle?.status);
+  const active = shared.calculationInProgress || shared.bassLifecycleState === "stale_needs_recalculation";
   useEffect(() => {
     if (!active) return undefined;
     const timer = setInterval(() => setNowMs(Date.now()), 1000);
@@ -35,6 +35,7 @@ export default function BassResultCards() {
       p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
     },
     shared.p19SeatAuthority,
+    shared.bassLifecycleState,
   );
 
   return (
@@ -53,7 +54,7 @@ export default function BassResultCards() {
       />
 
       <div className="flex items-center gap-2 text-[10px] font-medium text-[#625143]" aria-live="polite">
-        {shared.lifecycle?.status === "error" && shared.onRetry
+        {shared.bassLifecycleState === "failed" && shared.onRetry
           ? <button type="button" onClick={shared.onRetry} className="font-semibold text-red-700 underline">{formatted.statusText}</button>
           : <span>{formatted.statusText}</span>}
       </div>

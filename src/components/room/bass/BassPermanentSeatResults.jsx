@@ -36,6 +36,7 @@ export default function BassPermanentSeatResults() {
         p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
       },
       shared.p19SeatAuthority,
+      shared.bassLifecycleState,
     );
   }, [
     shared.completedBassAuthority,

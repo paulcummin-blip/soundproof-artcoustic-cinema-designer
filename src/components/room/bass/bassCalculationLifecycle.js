@@ -109,3 +109,16 @@ export function canRetryBassCalculation(lifecycleState) {
 export function canClearBassCalculation(lifecycleState) {
   return lifecycleState === BASS_LIFECYCLE_STATE.TIMED_OUT;
 }
+
+// Convenience: is the lifecycle in an active calculation phase?
+export function isBassLifecycleCalculating(state) {
+  return state === BASS_LIFECYCLE_STATE.PREPARING
+    || state === BASS_LIFECYCLE_STATE.SEARCHING
+    || state === BASS_LIFECYCLE_STATE.VALIDATING
+    || state === BASS_LIFECYCLE_STATE.QUEUED;
+}
+
+// Convenience: is the lifecycle in any state that needs a timer (calculating or stale)?
+export function isBassLifecycleActive(state) {
+  return isBassLifecycleCalculating(state) || state === BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION;
+}
