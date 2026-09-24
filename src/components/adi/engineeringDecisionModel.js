@@ -2,31 +2,35 @@
 // ---------------------------------------------------------------------------
 // Artcoustic Design Intelligence (ADI) — Engineering Decision Model
 //
-// The authoritative engineering reasoning layer. The pipeline:
+// ADI is a PURE reasoning layer. It consumes the optimiser's authoritative
+// result and produces an engineering explanation. It never:
+//   - Generates candidates
+//   - Validates engineering constraints
+//   - Ranks candidates
+//   - Selects a winner
+//   - Determines correctability
+//   - Knows about stores, React, or application state
 //
-//   Authoritative Baseline
-//     ↓
-//   Diagnose Physical Cause
-//     ↓
-//   Determine Correctability
-//     ↓
-//   Apply Engineering Levers
-//     ↓
-//   Validate Engineering Constraints
-//     ↓
-//   Compare Engineering Outcomes
-//     ↓
-//   Select Dominant Solution
-//     ↓
-//   Report RP22
-//     ↓
-//   Explain Remaining Limitation
+// The optimiser is the engineer. ADI is the interpreter.
 //
-// ADI is the reasoning layer. The optimiser is the execution layer.
-// RP22 is the reporting layer. The authority model is unchanged.
+// Pipeline:
+//   Optimiser Authoritative Result (selection)
+//     ↓
+//   Diagnose Physical Problem (from baseline)
+//     ↓
+//   Infer Physical Cause
+//     ↓
+//   Restate Optimiser's Correctability Classification
+//     ↓
+//   Identify Available Levers (from what the optimiser tested)
+//     ↓
+//   Determine Appropriate Lever (explanation, not enforcement)
+//     ↓
+//   Build 5-Field Recommendation (from the optimiser's winner)
+//     ↓
+//   Explain: Why Winner Won, Why Others Lost, Trade-offs, Remaining Limitation
 //
-// This module is PURE: no React, no side effects.
-// It consumes existing modules and produces an ADI decision object.
+// This module is PURE: no React, no side effects, no stores.
 // ---------------------------------------------------------------------------
 
 import { identifyProblem } from '@/components/recommendationEngine/recommendationProblem';
@@ -39,11 +43,7 @@ import {
 import { RECOMMENDATION_INTENT } from '@/components/room/bass/recommendationAuthority/recommendationAuthority';
 import { LEVER_CLASS } from '@/components/recommendationEngine/recommendationTypes';
 
-import { CORRECTABILITY_CLASS, ADI_OUTCOME, DEFAULT_MATERIALITY_THRESHOLDS } from './adiConstants';
-import { classifyCorrectability } from './correctabilityClassifier';
-import { validateEngineeringConstraints } from './engineeringConstraints';
-import { rankByDominance } from './engineeringDominance';
-import { assessMaterialImprovement } from './materialImprovement';
+import { CORRECTABILITY_CLASS, ADI_OUTCOME } from './adiConstants';
 import {
   buildRecommendation,
   buildNoFurtherEngineering,
@@ -58,134 +58,187 @@ function leverClassToIntent(leverClass) {
 }
 
 /**
+ * Explain why the winning candidate won.
+ * Derived from the appropriate lever reason and the optimiser's selection.
+ */
+function explainWhyWinnerWon(winner, appropriateLever, problem) {
+  if (!winner) return 'No winner was selected — the optimiser found no material improvement.';
+  if (!appropriateLever) return 'The optimiser selected the best available engineering candidate.';
+
+  const leverReason = appropriateLever.reason || 'The selected candidate best addresses the diagnosed engineering issue.';
+  const problemDesc = problem?.description || 'the identified engineering issue';
+
+  return `The winning candidate was selected because it directly addresses ${problemDesc}. ${leverReason}`;
+}
+
+/**
+ * Explain why other candidates lost.
+ * Derived from the optimiser's alternatives and terminal outcome.
+ */
+function explainWhyOthersLost(selection) {
+  if (!selection) return 'No alternative candidates were evaluated.';
+
+  const terminal = selection.terminalOutcome;
+  const reasons = [];
+
+  if (terminal === 'no-better-evaluated') {
+    reasons.push('Other candidates were evaluated but none provided a better engineering outcome than the winner.');
+  } else if (terminal === 'below-materiality') {
+    reasons.push('Other candidates were evaluated but their improvements were below the materiality threshold.');
+  }
+
+  const tradeOffs = selection.tradeOffs;
+  if (Array.isArray(tradeOffs) && tradeOffs.length > 0) {
+    reasons.push(`${tradeOffs.length} trade-off candidate(s) were identified but not selected because they involved material worsening in another parameter.`);
+  }
+
+  const confirmedCount = (selection.confirmedResults || []).length;
+  if (confirmedCount > 1) {
+    reasons.push(`${confirmedCount} candidates were confirmed during the search; the winner was selected by the optimiser's ranking.`);
+  }
+
+  if (reasons.length === 0) {
+    return 'The optimiser evaluated all available candidates and selected the dominant engineering solution.';
+  }
+
+  return reasons.join(' ');
+}
+
+/**
+ * Summarise trade-offs from the optimiser's selection.
+ */
+function summariseTradeOffs(selection) {
+  if (!selection) return null;
+
+  const tradeOffs = selection.tradeOffs;
+  if (!Array.isArray(tradeOffs) || tradeOffs.length === 0) return null;
+
+  return tradeOffs.map((t) => ({
+    candidateId: t.candidateId || null,
+    description: t.description || 'Trade-off candidate identified by the optimiser.',
+  }));
+}
+
+/**
+ * Determine next steps for the designer.
+ */
+function determineNextSteps(outcome, appropriateLever, problem) {
+  if (outcome === ADI_OUTCOME.NO_FURTHER_ENGINEERING) {
+    return 'No further engineering changes are recommended. The current design is the engineering optimum for this room and system.';
+  }
+  if (outcome === ADI_OUTCOME.NO_FURTHER_EQ) {
+    return 'EQ has been exhausted. Consider physical changes: seating position, subwoofer placement, or additional subwoofers.';
+  }
+  if (!appropriateLever) return 'Review the recommendation and apply if appropriate.';
+
+  const leverClass = appropriateLever.class;
+  if (leverClass === LEVER_CLASS.CALIBRATION) {
+    return 'Apply the recommended calibration changes and recalculate to confirm the improvement.';
+  }
+  if (leverClass === LEVER_CLASS.PHYSICAL) {
+    return 'Apply the recommended physical change (subwoofer placement or seating position) and recalculate.';
+  }
+  if (leverClass === LEVER_CLASS.SPECIFICATION) {
+    return 'Consider the recommended specification change (additional or different subwoofers) and recalculate.';
+  }
+  return 'Review the recommendation and apply if appropriate.';
+}
+
+/**
  * Run the ADI Engineering Decision Model.
  *
+ * ADI is a pure reasoning module. It receives the optimiser's authoritative
+ * result and produces an engineering explanation. It never retrieves
+ * engineering state from stores or infers it from application state.
+ *
  * @param {object} inputs
+ * @param {object} inputs.optimiserResult - the optimiser's authoritative selection:
+ *   { winner, confirmedResults, currentResult, terminalOutcome, tradeOffs,
+ *     correctabilityClassification, noMaterialImprovement, ... }
  * @param {object} inputs.currentResult - authoritative baseline canonical result
- * @param {Array}  inputs.candidateResults - optimiser candidate results
- *   Each: { id, result, recommendationValues, leverClass, originatingCandidateId }
+ *   (also available as optimiserResult.currentResult, but passed explicitly
+ *   to keep ADI pure — no reaching into the selection for baseline data)
  * @param {object} inputs.designObjectives - { p14TargetDb, p18TargetHz, p14Level, p18Basis }
- * @param {object} inputs.selection - optimiser selection (for lever availability)
  * @param {object} inputs.context - { subwooferCount, roomDims, seatingPositions }
- * @param {object} [inputs.thresholds] - optional materiality threshold overrides
- * @returns {object} ADI decision object
+ * @returns {object} ADI decision: { outcome, intent, recommendation, diagnosis, explanation }
  */
 export function runEngineeringDecisionModel(inputs) {
   const {
+    optimiserResult,
     currentResult,
-    candidateResults,
     designObjectives = {},
-    selection,
     context = {},
-    thresholds = {},
   } = inputs || {};
 
-  const t = { ...DEFAULT_MATERIALITY_THRESHOLDS, ...thresholds };
+  // The baseline is the current result — passed explicitly, not read from stores.
+  const baseline = currentResult || optimiserResult?.currentResult || null;
+  const selection = optimiserResult;
 
-  // ── Step 1: Authoritative Baseline ──
-  // The currentResult IS the authoritative baseline. No action needed.
+  // ── Step 1: Diagnose Physical Problem ──
+  const problem = identifyProblem(baseline, designObjectives);
+  const physicalCause = inferPhysicalCause(problem, baseline, context);
 
-  // ── Step 2: Diagnose Physical Cause ──
-  const problem = identifyProblem(currentResult, designObjectives);
-  const physicalCause = inferPhysicalCause(problem, currentResult, context);
+  // ── Step 2: Restate Optimiser's Correctability Classification ──
+  // ADI restates the optimiser's classification in plain language.
+  // It never classifies — the optimiser owns correctability.
+  const correctability = selection?.correctabilityClassification || null;
 
-  // ── Step 3: Determine Correctability ──
-  const correctability = classifyCorrectability(problem, currentResult, designObjectives, t);
-
-  // ── Step 4: Apply Engineering Levers ──
+  // ── Step 3: Identify Available Levers (from what the optimiser tested) ──
   const availableLevers = identifyAvailableLevers(selection);
   const appropriateLever = determineAppropriateLever(problem, physicalCause, availableLevers, selection);
 
-  // ── Step 5: Validate Engineering Constraints ──
-  // Every candidate must pass ALL hard gates before ranking.
-  const candidates = (Array.isArray(candidateResults) ? candidateResults : []).map((candidate) => {
-    const constraints = validateEngineeringConstraints(
-      candidate.result,
-      currentResult,
-      designObjectives,
-      t,
-    );
-    return { ...candidate, constraints };
-  });
+  // ── Step 4: Build 5-Field Recommendation from the Optimiser's Winner ──
+  const winner = selection?.winner || null;
+  const noMaterialImprovement = selection?.noMaterialImprovement || (!winner && (selection?.terminalOutcome === 'no-better-evaluated' || selection?.terminalOutcome === 'below-materiality'));
 
-  // Reject candidates that failed constraints — never rank them.
-  const passingCandidates = candidates.filter((c) => c.constraints.passed);
-  const rejectedCandidates = candidates.filter((c) => !c.constraints.passed);
-
-  // ── Step 6: Compare Engineering Outcomes ──
-  // Assess material improvement for each passing candidate.
-  const comparedCandidates = passingCandidates.map((candidate) => {
-    const materialAssessment = assessMaterialImprovement(currentResult, candidate.result, t);
-    return { ...candidate, materialAssessment };
-  });
-
-  // Filter to candidates with material improvement
-  const materialCandidates = comparedCandidates.filter((c) => c.materialAssessment.isMaterial);
-
-  // ── Step 7: Select Dominant Solution ──
-  // Rank by engineering dominance (not weighted score).
-  const ranked = rankByDominance(materialCandidates, problem);
-  const dominant = ranked.length > 0 ? ranked[0] : null;
-
-  // ── Step 8: Report RP22 ──
-  // RP22 results are already in the candidate results. No recalculation.
-  // The RP22 evidence is extracted by the recommendation builder.
-
-  // ── Step 9: Explain Remaining Limitation ──
-  // Build the 5-field recommendation.
   let outcome;
   let recommendation;
 
-  if (!dominant) {
-    // No material improvement found from any candidate.
+  if (noMaterialImprovement || !winner) {
+    // The optimiser found no material improvement.
     // Determine whether this is "no further EQ" or "no further engineering".
-    if (correctability.class === CORRECTABILITY_CLASS.ABSOLUTE_CANCELLATION) {
-      // The remaining limitation is an absolute cancellation — EQ cannot help.
+    if (correctability?.class === CORRECTABILITY_CLASS.ABSOLUTE_CANCELLATION) {
       outcome = ADI_OUTCOME.NO_FURTHER_EQ;
       recommendation = buildNoFurtherEq(physicalCause);
     } else if (areAllLeversExhausted(selection)) {
-      // All engineering levers have been exhausted.
       outcome = ADI_OUTCOME.NO_FURTHER_ENGINEERING;
       recommendation = buildNoFurtherEngineering(physicalCause);
-    } else if (correctability.class === CORRECTABILITY_CLASS.CAPABILITY_LIMITED) {
-      // The remaining limitation is capability — EQ cannot help.
+    } else if (correctability?.class === CORRECTABILITY_CLASS.CAPABILITY_LIMITED) {
       outcome = ADI_OUTCOME.NO_FURTHER_EQ;
       recommendation = buildNoFurtherEq(physicalCause);
     } else {
-      // Default: no further engineering changes.
       outcome = ADI_OUTCOME.NO_FURTHER_ENGINEERING;
       recommendation = buildNoFurtherEngineering(physicalCause);
     }
-  } else if (dominant.materialAssessment.isTradeOff) {
-    // Material improvement with material worsening — trade-off.
-    outcome = ADI_OUTCOME.TRADE_OFF;
-    recommendation = buildRecommendation({
-      dominant,
-      problem,
-      physicalCause,
-      correctability,
-      appropriateLever,
-      currentResult,
-      designObjectives,
-    });
   } else {
-    // Pure material improvement — recommendation.
-    outcome = ADI_OUTCOME.RECOMMENDATION;
+    // The optimiser found a material improvement.
+    // Check if the selection has trade-offs that make this a trade-off outcome.
+    const hasTradeOffs = Array.isArray(selection?.tradeOffs) && selection.tradeOffs.length > 0;
+    outcome = hasTradeOffs ? ADI_OUTCOME.TRADE_OFF : ADI_OUTCOME.RECOMMENDATION;
     recommendation = buildRecommendation({
-      dominant,
+      dominant: winner,
       problem,
       physicalCause,
       correctability,
       appropriateLever,
-      currentResult,
+      currentResult: baseline,
       designObjectives,
     });
   }
 
-  // Determine the recommendation intent from the lever class
-  const intent = dominant
-    ? leverClassToIntent(dominant.leverClass || appropriateLever.class)
+  // ── Step 5: Determine Recommendation Intent from the Lever Class ──
+  const intent = winner
+    ? leverClassToIntent(winner.leverClass || appropriateLever?.class)
     : RECOMMENDATION_INTENT.CALIBRATION;
+
+  // ── Step 6: Build the Engineering Explanation ──
+  const explanation = {
+    whyWinnerWon: explainWhyWinnerWon(winner, appropriateLever, problem),
+    whyOthersLost: explainWhyOthersLost(selection),
+    tradeOffs: summariseTradeOffs(selection),
+    remainingLimitation: recommendation?.remainingLimitation || null,
+    nextSteps: determineNextSteps(outcome, appropriateLever, problem),
+  };
 
   return {
     outcome,
@@ -200,17 +253,6 @@ export function runEngineeringDecisionModel(inputs) {
       availableLevers,
       appropriateLever,
     },
-    constraints: {
-      total: candidates.length,
-      passed: passingCandidates.length,
-      rejected: rejectedCandidates.length,
-      rejectedDetails: rejectedCandidates.map((c) => ({
-        candidateId: c.id,
-        failures: c.constraints.failures,
-      })),
-    },
-    dominanceRanking: ranked.map((c) => c.id),
-    dominantCandidate: dominant,
-    remainingLimitation: recommendation?.remainingLimitation || null,
+    explanation,
   };
 }

@@ -66,6 +66,7 @@ import {
 import {
   acceptRecommendation,
 } from "../recommendationAuthority/acceptTransition.js";
+import { runEngineeringDecisionModel } from "@/components/adi";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -121,6 +122,7 @@ export default function OptimiseAndCalculate({
 
   const runningRef = useRef(false);
   const phaseRef = useRef("idle"); // tracks which phase we're in to avoid double-trigger
+  const adiDecisionRef = useRef(null); // ADI reasoning output for the completed optimisation
 
   // Refs for live values that must be read during the async orchestration.
   // The `shared` context value is replaced on every state change, so the
@@ -206,6 +208,34 @@ export default function OptimiseAndCalculate({
       if (result.status === "error" || result.status === "stale") {
         setWorkflowError(projectId, versionId, result.error || "Optimisation failed.");
         return;
+      }
+
+      // ── ADI: Consume the optimiser's authoritative result ──────────
+      // ADI is a pure reasoning module. It receives the optimiser's
+      // selection (with correctability classification attached by the
+      // orchestrator) and produces an engineering explanation. ADI never
+      // generates candidates, validates constraints, or ranks — it
+      // interprets the optimiser's decision.
+      try {
+        const selection = result.selection;
+        const baseline = selection?.currentResult || null;
+        adiDecisionRef.current = runEngineeringDecisionModel({
+          optimiserResult: selection,
+          currentResult: baseline,
+          designObjectives: {
+            p14TargetDb: shared?.authoritative?.requested?.selectedP14TargetDb
+              || shared?.completedBassAuthority?.p14TargetDb
+              || 0,
+            p18TargetHz: null,
+          },
+          context: {
+            subwooferCount: subInstancesRef.current?.filter((s) => s.enabled !== false).length || 0,
+            roomDims,
+            seatingPositions,
+          },
+        });
+      } catch {
+        adiDecisionRef.current = null;
       }
 
       // Phase 3: Route through the Recommendation Authority
@@ -389,6 +419,7 @@ export default function OptimiseAndCalculate({
   const handleReset = useCallback(() => {
     resetWorkflow(projectId, versionId);
     resetImproveBassV2(projectId, versionId);
+    adiDecisionRef.current = null;
     if (typeof sharedRef.current?.onClearTerminal === "function") {
       sharedRef.current.onClearTerminal();
     }

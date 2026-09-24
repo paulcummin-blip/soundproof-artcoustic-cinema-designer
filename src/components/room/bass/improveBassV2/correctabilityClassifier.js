@@ -1,10 +1,13 @@
 // correctabilityClassifier.js
 // ---------------------------------------------------------------------------
-// ADI — Determine Correctability
+// Optimiser — EQ Correctability Classification
 //
 // Classifies the dominant response feature into one of three EQ
 // correctability classes. This determines whether EQ is permitted and
-// whether physical changes are recommended.
+// whether physical changes are recommended during the optimiser's search.
+//
+// The optimiser owns correctability. ADI consumes this classification and
+// restates it in plain engineering language. ADI never classifies.
 //
 // Class 1 — Absolute cancellation:
 //   Deep null with no usable energy. Do not boost.
@@ -20,24 +23,43 @@
 //   Explain the trade-off rather than automatically applying.
 //
 // This module is PURE: no React, no side effects.
-// It consumes the problem identification from recommendationProblem.js
-// and the design objectives from the project context.
 // ---------------------------------------------------------------------------
 
 import { PROBLEM_TYPE } from '@/components/recommendationEngine/recommendationTypes';
-import { CORRECTABILITY_CLASS, DEFAULT_MATERIALITY_THRESHOLDS } from './adiConstants';
+
+// ── EQ Correctability Classes ─────────────────────────────────────────────
+// Owned by the optimiser. Re-exported by adiConstants for ADI to restate.
+
+export const CORRECTABILITY_CLASS = {
+  ABSOLUTE_CANCELLATION: 'absolute_cancellation',
+  RECOVERABLE: 'recoverable',
+  CAPABILITY_LIMITED: 'capability_limited',
+};
+
+// ── Thresholds ─────────────────────────────────────────────────────────────
+// Materiality thresholds are empirical and configurable. The optimiser owns
+// these as the single authoritative implementation.
+
+export const CORRECTABILITY_THRESHOLDS = {
+  absoluteCancellationDb: 6.0,
+  capabilityHeadroomMarginDb: 1.0,
+};
 
 /**
  * Classify the correctability of the dominant response feature.
  *
+ * Called by the optimiser after its search completes. The result is included
+ * in the selection object and consumed by ADI as part of the authoritative
+ * optimiser result.
+ *
  * @param {object} problem - output of identifyProblem() from recommendationProblem.js
  * @param {object} currentResult - canonical result for the current design
  * @param {object} designObjectives - { p14TargetDb, p18TargetHz, p14Level, p18Basis }
- * @param {object} [thresholds] - optional override of materiality thresholds
+ * @param {object} [thresholds] - optional override of thresholds
  * @returns {{ class: string, description: string, eqAllowed: boolean, physicalRecommended: boolean }}
  */
 export function classifyCorrectability(problem, currentResult, designObjectives = {}, thresholds = {}) {
-  const t = { ...DEFAULT_MATERIALITY_THRESHOLDS, ...thresholds };
+  const t = { ...CORRECTABILITY_THRESHOLDS, ...thresholds };
 
   if (!problem || problem.type === PROBLEM_TYPE.NONE) {
     return {
@@ -53,7 +75,6 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
   const freq = Number(worstSeat?.worstFrequencyHz) || 0;
 
   // ── Capability / Extension problems are always capability-limited ──
-  // These are physical limits that calibration cannot overcome.
   if (problem.type === PROBLEM_TYPE.CAPABILITY) {
     return {
       class: CORRECTABILITY_CLASS.CAPABILITY_LIMITED,
@@ -73,8 +94,6 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
   }
 
   // ── Class 1: Absolute cancellation ──
-  // Deep null (>threshold) at a modal frequency, or a local cancellation
-  // with no usable energy remaining. EQ boost cannot recover this.
   const isDeepNull = deviation > t.absoluteCancellationDb;
   const isModalOrCancellation =
     problem.type === PROBLEM_TYPE.LOCAL_CANCELLATION
@@ -90,14 +109,10 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
   }
 
   // ── Class 3: Capability-limited feature ──
-  // The correction would require boost that eats into P14 headroom,
-  // or the problem is at the extension limit (P18).
   const p14TargetDb = Number(designObjectives.p14TargetDb) || 0;
   const p14AchievedDb = Number(currentResult?.p14AchievedDb) || 0;
   const p14Headroom = p14AchievedDb - p14TargetDb;
 
-  // If boosting by the deviation would consume the headroom margin,
-  // the correction prevents achieving the capability objective.
   if (p14TargetDb > 0 && p14Headroom < deviation + t.capabilityHeadroomMarginDb) {
     return {
       class: CORRECTABILITY_CLASS.CAPABILITY_LIMITED,
@@ -107,8 +122,6 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
     };
   }
 
-  // Check P18 extension: if the problem frequency is at or below the
-  // extension limit, EQ cannot help without risking the extension objective.
   const p18AchievedHz = Number(currentResult?.achievedP18Hz) || 0;
   if (freq > 0 && p18AchievedHz > 0 && freq < p18AchievedHz + 2) {
     return {
@@ -120,8 +133,6 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
   }
 
   // ── Class 2: Recoverable feature ──
-  // Usable energy remains and the correction is compatible with the
-  // selected design objectives. Allow constrained EQ.
   return {
     class: CORRECTABILITY_CLASS.RECOVERABLE,
     description: `Recoverable — a ${deviation.toFixed(1)} dB deviation at ${freq.toFixed(0)} Hz with usable energy remaining. Constrained EQ is permitted within the design objectives.`,

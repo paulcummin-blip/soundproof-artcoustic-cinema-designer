@@ -39,6 +39,8 @@ import { normalisePhaseControlDeg } from "../../../../bass/core/subwooferPhaseCo
 import { classifyOptimisationStage } from "./optimisationStageClassifier";
 import { generateRecommendation } from "@/components/recommendationEngine";
 import { publishRecommendation } from "@/components/recommendationEngine";
+import { identifyProblem } from "@/components/recommendationEngine/recommendationProblem";
+import { classifyCorrectability } from "../improveBassV2/correctabilityClassifier";
 
 /**
  * Run the V2 optimisation engine and return the selection result.
@@ -211,6 +213,31 @@ export async function runOptimisation(opts) {
       setError(projectId, versionId, result.error);
     } else if (result.status === "complete") {
       const selection = result.selection;
+
+      // ── Compute correctability classification ──────────────────────
+      // The optimiser owns correctability. The classification is computed
+      // from the baseline result and design objectives, then attached to
+      // the selection as the authoritative correctability output.
+      // ADI consumes this classification and restates it — it never
+      // classifies independently.
+      if (selection) {
+        try {
+          const baseline = selection.currentResult || null;
+          const problem = identifyProblem(baseline, {
+            p14TargetDb: p14Params.p14TargetDb,
+            p18TargetHz: null,
+          });
+          selection.correctabilityClassification = classifyCorrectability(
+            problem,
+            baseline,
+            { p14TargetDb: p14Params.p14TargetDb },
+          );
+          selection.noMaterialImprovement = !selection.winner;
+        } catch {
+          // Correctability classification failure is non-fatal.
+        }
+      }
+
       if (!selection) {
         setWinner(projectId, versionId, {
           isCurrent: true,
