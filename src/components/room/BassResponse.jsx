@@ -442,10 +442,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     return available;
   }, [multiSeriesForGraph]);
 
+  // Graph interaction store — bidirectional pill ↔ graph ↔ seat selection.
+  // When a designer clicks a seat pill in PerSeatResults, selectedSeatId
+  // drives the graph markers to that seat's worst frequency.
+  const graphInteraction = useGraphInteraction();
+
   // Pass the primary selected seat so P19/P20 markers reflect that seat's
   // worst frequency, not the RSP/overall worst. RSP selection uses the
-  // established RSP presentation.
-  const selectedSeatForMarkers = selectedSeatIds[0] || null;
+  // established RSP presentation. When the interaction store has a
+  // selectedSeatId (from a per-seat pill click), it takes precedence.
+  const selectedSeatForMarkers = graphInteraction?.selectedSeatId || selectedSeatIds[0] || null;
   const rp22GraphMarkers = useMemo(
     () => buildRp22GraphMarkers(finalBassResponse, selectedSeatForMarkers),
     [finalBassResponse, selectedSeatForMarkers]
@@ -455,7 +461,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   // RP22 header pill selection. The graph is the visual proof of the RP22
   // summary — selecting a pill highlights the limiting frequency and the
   // responsible response deviation on the graph.
-  const graphInteraction = useGraphInteraction();
   const highlightFromInteraction = useMemo(() => {
     const metric = graphInteraction?.selectedMetric;
     if (!metric || !rp22GraphMarkers) return null;
@@ -475,6 +480,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
       return {
         frequencyHz: rp22GraphMarkers.p18FrequencyHz,
         label: `P18 extension · ${rp22GraphMarkers.p18FrequencyHz.toFixed(0)} Hz`,
+      };
+    }
+    if (metric === "p14" && Number.isFinite(rp22GraphMarkers.p19WorstFrequencyHz)) {
+      return {
+        frequencyHz: rp22GraphMarkers.p19WorstFrequencyHz,
+        label: `P14 target · ${rp22GraphMarkers.p19WorstFrequencyHz.toFixed(0)} Hz`,
       };
     }
     return null;
