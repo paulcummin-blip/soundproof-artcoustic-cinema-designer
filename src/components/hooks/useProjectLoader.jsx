@@ -105,6 +105,18 @@ appState, // Pass appState directly for setters
   // to the correct ProjectVersion record.
   const activeVersionIdRef = useRef(null);
 
+  // Active Project ID — resolved from URL params / props. Declared early so
+  // hooks below (e.g. useAppliedCalibrationAuthority) can reference it
+  // without hitting a temporal-dead-zone error.
+  const activeProjectId = (() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("projectId") || params.get("project") || params.get("id") || projectIdFromUrl || null;
+    } catch {
+      return projectIdFromUrl || null;
+    }
+  })();
+
   // Subscribe to the Applied Calibration Authority so autosave re-runs when
   // the authority changes (accept, continue, reset, manual edit). The hook
   // returns the current authority object; serializeAppliedCalibration converts
@@ -199,15 +211,6 @@ appState, // Pass appState directly for setters
     }
     return fallback;
   }, []);
-
-  const activeProjectId = (() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("projectId") || params.get("project") || params.get("id") || projectIdFromUrl || null;
-    } catch {
-      return projectIdFromUrl || null;
-    }
-  })();
 
   const hydrateFromProject = useCallback((p) => {
     if (!p) return;
