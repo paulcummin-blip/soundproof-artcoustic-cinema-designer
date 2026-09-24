@@ -78,18 +78,14 @@ export default function ChooseDesignTarget({ disabled }) {
 
   return (
     <div className="space-y-3" data-bda-stage="design-target">
-      {/* Decision header */}
+      {/* Workspace header */}
       <div>
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Decision 2 of 6</div>
         <h4
           className="text-[15px] font-semibold text-[#1B1A1A]"
           style={{ fontFamily: "Didact Gothic, sans-serif" }}
         >
-          What performance level are you designing to?
+          Design Target
         </h4>
-        <p className="mt-1 text-[12px] text-[#625143]">
-          These are design objectives. They set the target for calculation.
-        </p>
       </div>
 
       {/* P14 Capability */}

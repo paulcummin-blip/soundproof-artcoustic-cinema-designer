@@ -92,7 +92,7 @@ function RoomPlanPreview({ roomDims, seatingPositions, layoutSources, rspPositio
     <svg
       viewBox={`${-pad} ${-pad} ${width + pad * 2} ${length + pad * 2}`}
       className="w-full rounded-md border border-[#D9D5CE] bg-[#F8F7F4]"
-      style={{ minHeight: 160 }}
+      style={{ minHeight: 240 }}
       role="img"
       aria-label="Room plan showing seating and subwoofer positions"
     >
@@ -311,24 +311,23 @@ export default function StartingLayoutCards({
 
   return (
     <div className="space-y-3" data-bda-stage="choose-layout" data-advisor-status={advisor.status}>
-      {/* Decision header */}
+      {/* Workspace header */}
       <div>
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Decision 1 of 6</div>
         <h4
           className="text-[15px] font-semibold text-[#1B1A1A]"
           style={{ fontFamily: "Didact Gothic, sans-serif" }}
         >
-          Where should the subwoofers go?
+          Choose Starting Layout
         </h4>
         <p className="mt-1 text-[12px] text-[#625143]">
-          Choose a geometrically sensible starting layout. Performance is deliberately not predicted yet.
+          Select the physical starting layout for this room.
         </p>
       </div>
 
       {/* Two-column: room plan + decision area */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Left: Room & Seating */}
-        <div className="space-y-2">
+      <div className="grid gap-4 md:grid-cols-5">
+        {/* Left: Room & Seating — the designer's mental model */}
+        <div className="space-y-2 md:col-span-3">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Room and Seating</div>
             <div className="text-[11px] text-[#8A7B6A]">
@@ -342,6 +341,13 @@ export default function StartingLayoutCards({
             layoutSources={selectedLayout?.sources}
             rspPosition={rspPosition}
           />
+          {/* Current Selection — tiny, calm, reinforces the plan */}
+          {selectedLayout && (
+            <div className="text-[11px] text-[#625143]">
+              <span className="font-semibold">Current Selection:</span>{" "}
+              {LAYOUT_TITLES[selectedQuantity]} · {describeLayout(selectedQuantity, selectedLayout).split(" · ")[0]}
+            </div>
+          )}
           <SeatingBadges
             seatingPositions={seatingPositions}
             rspPosition={rspPosition}
@@ -350,16 +356,7 @@ export default function StartingLayoutCards({
         </div>
 
         {/* Right: Decision cards */}
-        <div className="space-y-2">
-          {/* Recommendation info box */}
-          {recommendations[2] && (
-            <div className="rounded-lg border border-[#D9E4D9] bg-[#E6EFE6] px-3 py-2">
-              <p className="text-[11px] leading-snug text-[#3E5A42]">
-                Recommended starting point: two subs on the front quarter lines.
-              </p>
-            </div>
-          )}
-
+        <div className="space-y-2 md:col-span-2">
           {/* Loading state */}
           {!advisor.result && advisor.status !== "error" && (
             <div className="space-y-2">
@@ -407,15 +404,6 @@ export default function StartingLayoutCards({
         </div>
       </div>
 
-      {/* Footer link */}
-      <div className="text-center">
-        <button
-          type="button"
-          className="text-[11px] text-[#625143] underline underline-offset-2 hover:text-[#1B1A1A]"
-        >
-          Review room
-        </button>
-      </div>
     </div>
   );
 }
