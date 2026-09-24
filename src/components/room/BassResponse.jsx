@@ -44,7 +44,7 @@ import { resolveP14TargetSelectionState } from "@/components/room/bass/p14Target
 
 const IS_DEVELOPMENT_MODE = false;
 
-export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings }) {
+export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, hideHeader = false }) {
   const appState = useAppState();
   const { setFrontSubsCfg, setRearSubsCfg, designEqEnabled, setDesignEqEnabled } = appState;
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
@@ -611,37 +611,41 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         </div>
       )}
 
-      {/* 1. Bass Target Settings — always visible at the top (select P14 target before results are meaningful) */}
-      <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#FFFFFF", padding: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#1B1A1A", marginBottom: 8 }}>Bass Target Settings</div>
-        <BassTargetLevelControl disabled={detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"} />
-      </div>
-
-      <div className="flex flex-wrap gap-2 text-xs">
-        <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Room: {dimsTxt}</Badge>
-        <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Subs: {totalSubCount}</Badge>
-        <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
-      </div>
-
-      {/* Current authoritative results only. Stale values never read as current. */}
-      {hasCurrentBassResult ? (
+      {!hideHeader && (
         <>
-          <BassResultCards />
-          {!p14Selection.noP14TargetSelected && (
-            <BassDesignRecommendation recommendation={sharedBassResults.contract?.designRecommendation} />
+          {/* 1. Bass Target Settings — always visible at the top (select P14 target before results are meaningful) */}
+          <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#FFFFFF", padding: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#1B1A1A", marginBottom: 8 }}>Bass Target Settings</div>
+            <BassTargetLevelControl disabled={detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"} />
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Room: {dimsTxt}</Badge>
+            <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Subs: {totalSubCount}</Badge>
+            <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
+          </div>
+
+          {/* Current authoritative results only. Stale values never read as current. */}
+          {hasCurrentBassResult ? (
+            <>
+              <BassResultCards />
+              {!p14Selection.noP14TargetSelected && (
+                <BassDesignRecommendation recommendation={sharedBassResults.contract?.designRecommendation} />
+              )}
+            </>
+          ) : (
+            <div className={`rounded-xl border px-4 py-4 ${bassAuthorityStatus === "STALE" ? "border-amber-200 bg-amber-50" : "border-[#DCDBD6] bg-white"}`}>
+              <div className="text-[13px] font-semibold text-[#1B1A1A]">
+                {bassAuthorityStatus === "STALE" ? "Bass result needs recalculation" : "No current bass result"}
+              </div>
+              <p className="mt-1 text-[11px] text-[#625143]">
+                {bassAuthorityStatus === "STALE"
+                  ? "The design changed after the last calculation. Previous values are excluded from the current RP22 score and report."
+                  : "Choose Calculate Performance when the layout is ready."}
+              </p>
+            </div>
           )}
         </>
-      ) : (
-        <div className={`rounded-xl border px-4 py-4 ${bassAuthorityStatus === "STALE" ? "border-amber-200 bg-amber-50" : "border-[#DCDBD6] bg-white"}`}>
-          <div className="text-[13px] font-semibold text-[#1B1A1A]">
-            {bassAuthorityStatus === "STALE" ? "Bass result needs recalculation" : "No current bass result"}
-          </div>
-          <p className="mt-1 text-[11px] text-[#625143]">
-            {bassAuthorityStatus === "STALE"
-              ? "The design changed after the last calculation. Previous values are excluded from the current RP22 score and report."
-              : "Choose Optimise & Calculate in the Subwoofers panel when the layout is ready."}
-          </p>
-        </div>
       )}
       
       {(subWarnings?.front?.length > 0 || subWarnings?.rear?.length > 0) && (

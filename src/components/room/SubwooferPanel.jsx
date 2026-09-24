@@ -5,17 +5,9 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import HeightInput from '@/components/ui/HeightInput';
-import BassHeadlinePills from '@/components/room/bass/BassHeadlinePills';
-import BassPermanentSeatResults from '@/components/room/bass/BassPermanentSeatResults';
-import { useSharedBassResults } from '@/components/room/bass/bassResultsStore';
-import OptimiseAndCalculate from '@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate';
-import BassTargetLevelControl from '@/components/room/bass/BassTargetLevelControl';
-import BestSubLayoutGuide from '@/components/room/bass/best-layout/BestSubLayoutGuide';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { subwooferModelKey, subwooferDisplayLabel } from '@/components/utils/subwooferDisplayLabel';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
-import { useActiveProjectId } from '@/components/state/project-session';
-import { resolveBestSubLayoutContextId } from '@/components/room/bass/best-layout/bestSubLayoutContext';
 import { useSubwooferCompatibilityActions } from '@/components/hooks/useSubwooferCompatibilityActions';
 
 function rectsOverlap(a, b) {
@@ -63,57 +55,16 @@ function hasFrontLcrSubClash({ speakers, frontSubs, frontSubsCfg }) {
 export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings }) {
   const roomDimensions = appState?.roomDims;
   const seats = appState?.seatingPositions;
-  const activeProjectId = useActiveProjectId();
-  const layoutContextId = resolveBestSubLayoutContextId({ projectId: activeProjectId, roomDims: roomDimensions });
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
-  const sharedBassResults = useSharedBassResults();
   const hasLcrSubClash = useMemo(() => hasFrontLcrSubClash({
     speakers: appState?.speakerSystem?.placedSpeakers,
     frontSubs: appState?.subwoofers,
     frontSubsCfg,
   }), [appState?.speakerSystem?.placedSpeakers, appState?.subwoofers, frontSubsCfg]);
 
-  const rspPosition = useMemo(() => {
-    const appRsp = appState?.mlp;
-    if (Number.isFinite(appRsp?.x) && Number.isFinite(appRsp?.y)) return appRsp;
-    const widthM = Number(roomDimensions?.widthM ?? roomDimensions?.width);
-    const y = Number(appState?.mlpY_m);
-    return Number.isFinite(widthM) && Number.isFinite(y) ? { x: widthM / 2, y, z: 1.2 } : null;
-  }, [appState?.mlp, appState?.mlpY_m, roomDimensions]);
-
-  // No hidden fallback model: bass results only render once a subwoofer model
-  // is genuinely selected and enabled. Until then show a quiet waiting state
-  // instead of premature P14/P18/P19/P20 pills.
-  const hasActiveSubModel = useMemo(() => {
-    const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
-    return instances.some((i) => i?.enabled !== false && i?.model);
-  }, [appState?.subwooferInstances]);
-  const bassAuthorityStatus = sharedBassResults?.completedBassAuthority?.authorityStatus || 'UNCALCULATED';
-  const hasPreviousBassResult = !!sharedBassResults?.completedBassAuthority?.staleContract;
-  const bassCalculationInProgress = sharedBassResults?.calculationInProgress === true;
-  const bassCalculationPhaseLabel = sharedBassResults?.calculationPhaseLabel || null;
-  const bassActionDisabled = disabled
-    || !hasActiveSubModel
-    || sharedBassResults?.canCalculate !== true
-    || bassCalculationInProgress;
-
   return (
     <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
       <div className="rounded-none border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-4">
-        <BestSubLayoutGuide
-          roomDims={roomDimensions}
-          seatingPositions={seats}
-          rspPosition={rspPosition}
-          sourceHeights={{ front: frontSubsCfg?.bottomHeightM, rear: rearSubsCfg?.bottomHeightM }}
-          contextId={layoutContextId}
-          roomElements={appState?.roomElements}
-          currentSubs={appState?.subwooferInstances}
-          frontSubsCfg={frontSubsCfg}
-          rearSubsCfg={rearSubsCfg}
-          subwooferInstances={appState?.subwooferInstances}
-          commitInstances={compat.commitInstances}
-          hasCanonicalInstances={compat.hasCanonicalInstances}
-        />
         <div className="grid grid-cols-12 gap-x-4 gap-y-3">
           <div className="col-span-12 md:col-span-6">
             <h4 className="text-[15px] font-semibold text-[#1B1A1A] mb-2">Front Subwoofers</h4>
@@ -348,40 +299,6 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 {subWarnings.rear[0]}
               </div>
             )}
-          </div>
-
-          <div className="col-span-12 mt-4 border-t border-[#DCDBD6] pt-4">
-            {/* P14/P18 target controls — kept visually with the parameter pills */}
-            <div className="mb-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
-              <BassTargetLevelControl disabled={disabled} />
-            </div>
-
-            {/* P14/P18/P19/P20 headline pills — shared with Bass Simulation */}
-            <BassHeadlinePills />
-
-            {/* Permanent P19/P20 per-seat results — always visible beneath the pills */}
-            <BassPermanentSeatResults />
-
-            {/* Unified Optimise & Calculate workflow — replaces the separate
-                Calculate + Improve Bass Response engineering workflow with a
-                single button that internally calculates, optimises, auto-applies
-                calibration improvements, and recalculates. The existing
-                engineering UI is retained behind an Advanced Diagnostics toggle
-                inside this component. */}
-            <OptimiseAndCalculate
-              roomDims={roomDimensions}
-              seatingPositions={seats}
-              subwooferInstances={appState?.subwooferInstances}
-              frontSubsCfg={frontSubsCfg}
-              rearSubsCfg={rearSubsCfg}
-              commitInstances={compat.commitInstances}
-              commitSeating={appState?.setSeatingPositions}
-              commitSeatingProvenance={appState?.setAppliedSeatingProvenance}
-              appliedSeatingProvenance={appState?.appliedSeatingProvenance}
-              hasCanonicalInstances={compat.hasCanonicalInstances}
-              appState={appState}
-              disabled={disabled}
-            />
           </div>
 
           <div className="col-span-12 mt-4 border-t border-[#DCDBD6] pt-4">

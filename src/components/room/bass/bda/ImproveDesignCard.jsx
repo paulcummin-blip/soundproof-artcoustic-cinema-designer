@@ -94,7 +94,7 @@ function deriveExpectedEffect(intent) {
   return "Improved bass performance";
 }
 
-export default function ImproveDesignCard({ appState }) {
+export default function ImproveDesignCard({ appState, commitInstances }) {
   const projectId = useActiveProjectId();
   const versionId = appState?.activeVersionId || null;
   const { current: recommendation } = useRecommendationAuthority(projectId, versionId);
@@ -193,7 +193,7 @@ export default function ImproveDesignCard({ appState }) {
       {/* Decision actions — Accept / Continue / Recalculate / Reset */}
       <BassDecisionActions
         appState={appState}
-        commitInstances={appState?.setSubwooferInstances || null}
+        commitInstances={commitInstances}
       />
     </div>
   );

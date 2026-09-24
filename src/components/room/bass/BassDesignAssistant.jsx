@@ -172,7 +172,7 @@ export default function BassDesignAssistant({
 
       {/* ── Stage 4: Improve Design ── */}
       {hasResults && !presentationMode && (
-        <ImproveDesignCard appState={appState} />
+        <ImproveDesignCard appState={appState} commitInstances={compat.commitInstances} />
       )}
 
       {/* ── Stage 5: Presentation Mode ── */}

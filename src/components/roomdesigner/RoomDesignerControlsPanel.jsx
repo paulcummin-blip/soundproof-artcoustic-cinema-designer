@@ -21,9 +21,6 @@ const SpeakerPlacement = React.lazy(() =>
 const RoomElements = React.lazy(() =>
   import("@/components/room/RoomElements").then((m) => ({ default: m.default ?? m.RoomElements }))
 );
-const BassResponse = React.lazy(() =>
-  import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
-);
 const BassDesignAssistant = React.lazy(() =>
   import("@/components/room/bass/BassDesignAssistant").then((m) => ({ default: m.default }))
 );
@@ -347,29 +344,8 @@ export default function RoomDesignerControlsPanel({
               disabled={isFrozen('bass')}
               roomDims={stableDimensions}
               seatingPositions={seatingPositions}
-            />
-          </Suspense>
-        </CollapsiblePanel>
-
-        <CollapsiblePanel
-          title="Bass Simulation"
-          icon={<Waves className="w-5 h-5" />}
-          defaultOpen={false}>
-          {isFrozen('bass') &&
-            <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
-              This tab is frozen. Unlock to make changes.
-            </div>
-          }
-          <Suspense fallback={<div>Loading...</div>}>
-            <BassResponse
-              disabled={isFrozen('bass')}
-              frontSubsCfg={frontSubsCfg}
-              setFrontSubsCfg={setFrontSubsCfg}
-              rearSubsCfg={rearSubsCfg}
-              setRearSubsCfg={setRearSubsCfg}
               subWarnings={subWarnings}
-              frontSubsLive={frontSubsForRendering}
-              rearSubsLive={rearSubsForRendering} />
+            />
           </Suspense>
         </CollapsiblePanel>
 
