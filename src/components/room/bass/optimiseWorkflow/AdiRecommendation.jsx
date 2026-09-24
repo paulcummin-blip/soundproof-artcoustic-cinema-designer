@@ -249,7 +249,12 @@ export default function AdiRecommendation({
       <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-[#213428]" />
-          <span className="text-[13px] font-semibold text-[#1B1A1A]">ADI Recommendation</span>
+          <div>
+            <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
+            <div className="text-[9px] font-medium text-[#8A7B6A]" style={{ letterSpacing: '0.04em' }}>
+              Powered by Artcoustic Design Intelligence
+            </div>
+          </div>
         </div>
         <div className="mt-2 text-[12px] text-[#3E4349] leading-relaxed">
           No further engineering changes are recommended.
@@ -289,7 +294,12 @@ export default function AdiRecommendation({
       {/* Header */}
       <div className="flex items-center gap-2">
         <Activity className="h-4 w-4 text-[#213428]" />
-        <span className="text-[13px] font-semibold text-[#1B1A1A]">ADI Recommendation</span>
+        <div>
+          <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
+          <div className="text-[9px] font-medium text-[#8A7B6A]" style={{ letterSpacing: '0.04em' }}>
+            Powered by Artcoustic Design Intelligence
+          </div>
+        </div>
         {showAppliedBadge && (
           <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#213428] px-2 py-0.5 text-[9px] font-semibold uppercase text-white">
             <CheckCircle2 className="h-2.5 w-2.5" />

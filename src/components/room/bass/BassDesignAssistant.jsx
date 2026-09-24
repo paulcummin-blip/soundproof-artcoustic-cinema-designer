@@ -32,9 +32,8 @@ import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
 import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards";
-import CurrentLayoutBanner from "@/components/room/bass/bda/CurrentLayoutBanner";
 import ChooseDesignTarget from "@/components/room/bass/bda/ChooseDesignTarget";
-import CurrentSystemSummary from "@/components/room/bass/bda/CurrentSystemSummary";
+import CurrentDesignBar from "@/components/room/bass/bda/CurrentDesignBar";
 
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
@@ -120,18 +119,24 @@ export default function BassDesignAssistant({
         </div>
       </div>
 
-      {/* ── Current System summary (hardware owned by Speakers) ── */}
+      {/* ── Zone 1: Current Design ── */}
       {layoutChosen && (
-        <CurrentSystemSummary
+        <CurrentDesignBar
           frontModel={compat.frontModelDisplay}
           frontCount={compat.frontCount}
           rearModel={compat.rearModelDisplay}
           rearCount={compat.rearCount}
-          onChangeConfig={onChangeSpeakerConfig}
+          subwooferInstances={subwooferInstances}
+          roomDims={roomDims}
+          hasResults={hasResults}
+          isCalculating={isCalculating}
+          isStale={isStale}
+          onChangeSpeakers={onChangeSpeakerConfig}
+          onChangeLayout={() => setShowLayoutCards(true)}
         />
       )}
 
-      {/* ── Stage 1: Choose Layout ── */}
+      {/* ── Choose Layout (when no layout applied) ── */}
       {showLayoutCards && (
         <StartingLayoutCards
           roomDims={roomDims}
@@ -148,40 +153,17 @@ export default function BassDesignAssistant({
         />
       )}
 
-      {/* ── Current Layout banner ── */}
-      {layoutChosen && (
-        <CurrentLayoutBanner
-          subwooferInstances={subwooferInstances}
-          roomDims={roomDims}
-          hasResults={hasResults}
-          isCalculating={isCalculating}
-          isStale={isStale}
-          onChange={() => setShowLayoutCards(true)}
-        />
-      )}
-
-      {/* ── ADI presence ── */}
-      {layoutChosen && !hasResults && !isCalculating && (
-        <div className="flex items-center gap-1.5 text-[11px] text-[#625143]">
-          <span className="h-1 w-1 rounded-full bg-[#213428]" />
-          ADI is ready to analyse this design.
-        </div>
-      )}
-      {layoutChosen && isCalculating && (
-        <div className="flex items-center gap-1.5 text-[11px] text-[#625143]">
-          <span className="h-1 w-1 rounded-full bg-[#213428] animate-pulse" />
-          ADI is analysing this design…
-        </div>
-      )}
-
-      {/* ── Stage 2: Choose Design Target ── */}
+      {/* ── Zone 2: Design Target ── */}
       {layoutChosen && (
         <ChooseDesignTarget disabled={disabled} />
       )}
 
-      {/* ── Performance: graph + RP22 parameters ── */}
+      {/* ── Zone 3: Performance ── */}
       {layoutChosen && hasResults && (
-        <div className="space-y-3">
+        <div className="space-y-2">
+          <h4 className="text-[14px] font-bold text-[#1B1A1A]" style={{ fontFamily: "Didact Gothic, sans-serif" }}>
+            Performance
+          </h4>
           <Suspense fallback={<div className="text-[11px] text-[#8A7B6A]">Loading results…</div>}>
             <BassResultCards />
           </Suspense>
@@ -197,15 +179,7 @@ export default function BassDesignAssistant({
         </div>
       )}
 
-      {/* ── ADI presence: analysed ── */}
-      {layoutChosen && hasResults && !isStale && (
-        <div className="flex items-center gap-1.5 text-[11px] text-[#625143]">
-          <span className="h-1 w-1 rounded-full bg-[#213428]" />
-          ADI has analysed this design.
-        </div>
-      )}
-
-      {/* ── Optimise Bass ── */}
+      {/* ── Zone 4: Recommended Improvement ── */}
       {layoutChosen && (
         <OptimiseAndCalculate
           roomDims={roomDims || appState?.roomDims}

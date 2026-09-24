@@ -850,13 +850,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         </div>
         {!engineeringDetailCollapsed && <ProtectedNullWarningSummary annotations={protectedNullAnnotations} />}
 
-        {/* Displayed smoothing label */}
-        <div style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace', marginTop: 4 }}>
-          Displayed smoothing: {bassSmoothingLabel(bassSmoothingMode)}
-        </div>
-        <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
-          {graphStatusText}
-        </div>
+        {!engineeringDetailCollapsed && (
+          <>
+            <div style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace', marginTop: 4 }}>
+              Displayed smoothing: {bassSmoothingLabel(bassSmoothingMode)}
+            </div>
+            <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
+              {graphStatusText}
+            </div>
+          </>
+        )}
         {/* P14 target inline summary removed — target is shown in Bass Target Settings above */}
         {includeDiagnostics && p14IntegrationDiagnostic && p14IntegrationDiagnostic.integratedCWeightedDb != null && (() => {
           const err = Math.abs(p14IntegrationDiagnostic.errorDb || 0);
@@ -975,10 +978,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           normalizedTransferResult={normalizedLive.status === "ready" && normalizedLive.quality === "refined" ? normalizedLive.result : null}
         />
 
-        {/* Allen & Berkley model attribution — presentation only, no simulation/scaling logic */}
-        <p className="text-center text-[11px] font-normal text-muted-foreground mt-2 mb-2">
-          Simulation based on the Allen & Berkley (1978) room acoustics model with Artcoustic Loudspeakers engineering data.
-        </p>
+        {!engineeringDetailCollapsed && (
+          <p className="text-center text-[11px] font-normal text-muted-foreground mt-2 mb-2">
+            Simulation based on the Allen & Berkley (1978) room acoustics model with Artcoustic Loudspeakers engineering data.
+          </p>
+        )}
 
         {/* ── Temporary overlay toggle for the REW-style Absorption Authority candidate ── */}
         {includeDiagnostics && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
@@ -994,12 +998,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           </label>
         </div>}
 
-        <ModalResonanceLineToggles
-          show={showRoomModes}
-          onShowChange={setShowRoomModes}
-          toggles={modalLineToggles}
-          onToggle={toggleModalLine}
-        />
+        {!engineeringDetailCollapsed && (
+          <ModalResonanceLineToggles
+            show={showRoomModes}
+            onShowChange={setShowRoomModes}
+            toggles={modalLineToggles}
+            onToggle={toggleModalLine}
+          />
+        )}
       </div>
       )}
 
