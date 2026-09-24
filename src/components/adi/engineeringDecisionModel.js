@@ -20,7 +20,7 @@
 //     ↓
 //   Infer Physical Cause
 //     ↓
-//   Restate Optimiser's Correctability Classification
+//   Restate Optimiser's Physical Recoverability Assessment
 //     ↓
 //   Identify Available Levers (from what the optimiser tested)
 //     ↓
@@ -41,7 +41,7 @@ import {
   areAllLeversExhausted,
 } from '@/components/recommendationEngine/recommendationLevers';
 import { RECOMMENDATION_INTENT } from '@/components/room/bass/recommendationAuthority/recommendationAuthority';
-import { LEVER_CLASS } from '@/components/recommendationEngine/recommendationTypes';
+import { LEVER_CLASS, PROBLEM_TYPE } from '@/components/recommendationEngine/recommendationTypes';
 
 import { CORRECTABILITY_CLASS, ADI_OUTCOME } from './adiConstants';
 import {
@@ -145,6 +145,99 @@ function determineNextSteps(outcome, appropriateLever, problem) {
 }
 
 /**
+ * Compute recoverability evidence from the baseline and the winner.
+ *
+ * Engineering evidence — not exposed by default in the UI.
+ * Available to ADI when explaining the recommendation.
+ */
+function computeRecoverabilityEvidence(baseline, winner) {
+  if (!baseline) return null;
+  const baselineP19 = Array.isArray(baseline.perSeatP19) ? baseline.perSeatP19 : [];
+  if (!baselineP19.length) return null;
+
+  const baselineWorst = baselineP19
+    .map((s) => ({
+      seatId: s.seatId,
+      deviation: Math.abs(Number(s.variationDbRaw) || 0),
+      freq: Number(s.worstFrequencyHz) || 0,
+      isPrimary: !!s.isPrimary,
+    }))
+    .sort((a, b) => b.deviation - a.deviation)[0];
+  if (!baselineWorst) return null;
+
+  const winnerP19 = winner?.result?.perSeatP19;
+  const winnerWorst = Array.isArray(winnerP19)
+    ? winnerP19.find((s) => String(s.seatId) === String(baselineWorst.seatId))
+    : null;
+
+  const measuredDeviationDb = baselineWorst.deviation;
+  const correctedDeviationDb = winnerWorst
+    ? Math.abs(Number(winnerWorst.variationDbRaw) || 0)
+    : measuredDeviationDb;
+  const remainingDeviationDb = Math.max(0, measuredDeviationDb - correctedDeviationDb);
+
+  return {
+    measuredDeviationDb,
+    correctedDeviationDb,
+    remainingDeviationDb,
+    frequencyHz: baselineWorst.freq,
+    seatId: baselineWorst.seatId,
+  };
+}
+
+/**
+ * Build the ADI EQ decision explanation.
+ *
+ * Three patterns:
+ *   - eq_applied:  Physically recoverable, EQ applied, sufficient capability remains.
+ *   - eq_limited: Physically recoverable, EQ limited by design objectives.
+ *   - no_eq:      Not physically recoverable, no EQ, physical change required.
+ */
+function buildEqDecisionExplanation(correctability, problem, winner, recoverabilityEvidence) {
+  if (!correctability) return null;
+
+  const isCapabilityOrExtension =
+    problem?.type === PROBLEM_TYPE.CAPABILITY || problem?.type === PROBLEM_TYPE.EXTENSION;
+
+  // Not physically recoverable
+  if (correctability.class === CORRECTABILITY_CLASS.ABSOLUTE_CANCELLATION || isCapabilityOrExtension) {
+    return {
+      decision: 'no_eq',
+      explanation: 'This response feature is not physically recoverable. No further EQ is recommended. The remaining limitation requires a physical change.',
+    };
+  }
+
+  // Physically recoverable but capability-limited
+  if (correctability.class === CORRECTABILITY_CLASS.CAPABILITY_LIMITED) {
+    return {
+      decision: 'eq_limited',
+      explanation: 'This response feature is physically recoverable. Equalisation has been limited because additional correction would compromise the selected capability or extension objective.',
+    };
+  }
+
+  // Physically recoverable
+  if (winner) {
+    const remaining = recoverabilityEvidence?.remainingDeviationDb || 0;
+    if (remaining > 1.0) {
+      return {
+        decision: 'eq_limited',
+        explanation: 'This response feature is physically recoverable. Equalisation has been limited because additional correction would compromise the selected capability or extension objective.',
+      };
+    }
+    return {
+      decision: 'eq_applied',
+      explanation: 'This response feature is physically recoverable. Equalisation has been applied because sufficient capability remains to achieve the selected design objectives.',
+    };
+  }
+
+  // Recoverable but no winner found
+  return {
+    decision: 'eq_limited',
+    explanation: 'This response feature is physically recoverable. Equalisation has been limited because additional correction would compromise the selected capability or extension objective.',
+  };
+}
+
+/**
  * Run the ADI Engineering Decision Model.
  *
  * ADI is a pure reasoning module. It receives the optimiser's authoritative
@@ -178,9 +271,9 @@ export function runEngineeringDecisionModel(inputs) {
   const problem = identifyProblem(baseline, designObjectives);
   const physicalCause = inferPhysicalCause(problem, baseline, context);
 
-  // ── Step 2: Restate Optimiser's Correctability Classification ──
-  // ADI restates the optimiser's classification in plain language.
-  // It never classifies — the optimiser owns correctability.
+  // ── Step 2: Restate Optimiser's Physical Recoverability Assessment ──
+  // ADI restates the optimiser's physical recoverability assessment in plain language.
+  // It never assesses — the optimiser owns the Physical Recoverability Assessment (Layer 1).
   const correctability = selection?.correctabilityClassification || null;
 
   // ── Step 3: Identify Available Levers (from what the optimiser tested) ──
@@ -240,6 +333,13 @@ export function runEngineeringDecisionModel(inputs) {
     nextSteps: determineNextSteps(outcome, appropriateLever, problem),
   };
 
+  // ── Step 7: Compute Recoverability Evidence ──
+  // Engineering evidence — not exposed by default in the UI.
+  const recoverabilityEvidence = computeRecoverabilityEvidence(baseline, winner);
+
+  // ── Step 8: Build EQ Decision Explanation ──
+  const eqDecisionExplanation = buildEqDecisionExplanation(correctability, problem, winner, recoverabilityEvidence);
+
   return {
     outcome,
     intent,
@@ -254,5 +354,7 @@ export function runEngineeringDecisionModel(inputs) {
       appropriateLever,
     },
     explanation,
+    recoverabilityEvidence,
+    eqDecisionExplanation,
   };
 }

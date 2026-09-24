@@ -45,10 +45,11 @@ export default function BassOptimisationSummary({
 
   if (!adiDecision?.recommendation) return null;
 
-  const { recommendation, diagnosis } = adiDecision;
+  const { recommendation, diagnosis, eqDecisionExplanation } = adiDecision;
   const problemDesc = diagnosis?.problem?.description || "No significant issue identified";
   const causeDesc = diagnosis?.physicalCause?.description || "";
   const correctabilityDesc = diagnosis?.correctability?.description || "";
+  const eqExplanation = eqDecisionExplanation?.explanation || "";
 
   return (
     <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0]/60 px-4 py-3 space-y-3">
@@ -76,6 +77,7 @@ export default function BassOptimisationSummary({
           {problemDesc}
           {causeDesc && <div className="mt-0.5 text-[#625143]">{causeDesc}</div>}
           {correctabilityDesc && <div className="mt-0.5 text-[#625143]">{correctabilityDesc}</div>}
+          {eqExplanation && <div className="mt-1 font-medium text-[#213428]">{eqExplanation}</div>}
         </div>
       </div>
 

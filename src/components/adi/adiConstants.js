@@ -5,9 +5,9 @@
 // ADI is the reasoning layer. The optimiser is the execution layer.
 // RP22 is the reporting layer. The authority model is unchanged.
 //
-// CORRECTABILITY_CLASS is re-exported from the optimiser's correctability
-// module so ADI can restate the optimiser's classification using the same
-// constants. ADI never classifies — it restates.
+// CORRECTABILITY_CLASS is re-exported from the optimiser's Physical
+// Recoverability Assessment (Layer 1) so ADI can restate the optimiser's
+// assessment using the same constants. ADI never assesses — it restates.
 // ---------------------------------------------------------------------------
 
 // Re-export CORRECTABILITY_CLASS from the optimiser's authoritative implementation.

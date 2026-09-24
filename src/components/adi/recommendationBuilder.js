@@ -197,7 +197,7 @@ function deriveRemainingLimitation(problem, correctability, candidateResult, des
         : 'Room mode interaction still affects the response.';
     case PROBLEM_TYPE.LOCAL_CANCELLATION:
       return correctability?.class === CORRECTABILITY_CLASS.ABSOLUTE_CANCELLATION
-        ? 'An absolute cancellation remains — EQ cannot recover this. Physical changes or additional subwoofers are required.'
+        ? 'A physically unrecoverable cancellation remains — EQ cannot recover this. Physical changes or additional subwoofers are required.'
         : 'A local cancellation still affects the worst seat.';
     case PROBLEM_TYPE.SEAT_CONSISTENCY:
       return 'Some seat-to-seat variation remains inherent to the room geometry and subwoofer count.';
@@ -256,9 +256,9 @@ export function buildNoFurtherEngineering(physicalCause) {
 export function buildNoFurtherEq(physicalCause) {
   return {
     action: 'No further EQ is recommended. The remaining limitation requires a physical change.',
-    benefit: 'EQ has been exhausted. The remaining limitation is physical, not equalisable.',
+    benefit: 'The response feature is not physically recoverable. EQ cannot address it.',
     expectedEngineeringEffect: 'EQ cannot address the remaining issue. Physical changes (seating, subwoofer placement, or additional subwoofers) are required.',
-    rp22Evidence: 'EQ levers have been evaluated. No EQ candidate provides a material improvement within the design objectives.',
+    rp22Evidence: 'EQ levers have been evaluated. No EQ candidate provides a material improvement — the feature is not physically recoverable.',
     remainingLimitation: physicalCause?.description || 'The remaining limitation requires a physical change — seating, subwoofer placement, or additional subwoofers.',
   };
 }

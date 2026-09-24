@@ -1,43 +1,55 @@
 // correctabilityClassifier.js
 // ---------------------------------------------------------------------------
-// Optimiser — EQ Correctability Classification
+// Optimiser — Physical Recoverability Assessment (Layer 1)
 //
-// Classifies the dominant response feature into one of three EQ
-// correctability classes. This determines whether EQ is permitted and
-// whether physical changes are recommended during the optimiser's search.
+// Assesses whether the dominant response feature is physically recoverable.
+// This is a PHYSICS ASSESSMENT, not an engineering decision.
 //
-// The optimiser owns correctability. ADI consumes this classification and
-// restates it in plain engineering language. ADI never classifies.
+// This layer does NOT decide whether EQ will be applied.
+// It determines only whether the response feature is physically recoverable.
 //
-// Class 1 — Absolute cancellation:
+// The engineering decision — how much of the physically recoverable response
+// should actually be corrected — is made by Layer 2 (Engineering Optimisation),
+// which respects the selected P14/P18 design objectives, available capability,
+// available extension, and available headroom.
+//
+// The optimiser owns this assessment. ADI consumes it and restates it in plain
+// engineering language. ADI never assesses.
+//
+// Physical Recoverability Classes:
+//
+// Class 1 — Not physically recoverable (absolute cancellation):
 //   Very deep null (>15 dB) with negligible remaining energy, OR
 //   extreme narrow null (>10 dB) at a low modal frequency (<80 Hz)
-//   that is likely non-minimum-phase. Do not boost.
-//   Recommend seating, movement, or additional subwoofers.
+//   that is likely non-minimum-phase.
+//   EQ cannot recover this. Physical changes are required.
 //
-// Class 2 — Recoverable feature:
+// Class 2 — Physically recoverable:
 //   Broad depressions, moderate nulls with recoverable energy, tonal
 //   imbalance, and response features that professional calibration systems
 //   (Trinnov, Dirac, StormAudio, REW) would normally correct.
-//   EQ is permitted because the response is physically recoverable and
-//   the correction remains compatible with the selected design objectives.
+//   The response is physically recoverable. Whether EQ is actually applied,
+//   and how much, is decided by Layer 2 (Engineering Optimisation) based on
+//   the selected P14/P18 design objectives and available capability.
 //
-// Class 3 — Capability-limited feature:
-//   Correction is mathematically possible but prevents achieving the
-//   selected capability (P14) or extension (P18) objective.
-//   Explain the trade-off rather than automatically applying.
+// Class 3 — Capability-limited (physically recoverable but constrained):
+//   The feature is physically recoverable, but full correction would
+//   compromise the selected capability (P14) or extension (P18) objective.
+//   Layer 2 (Engineering Optimisation) limits the correction to preserve
+//   the selected design objectives.
 //
-// The optimiser does NOT ask "Is there a null?"
-// It asks: "Is this response physically recoverable, and is the
-// engineering trade-off worthwhile for the selected design objective?"
+// Physics determines: Physical Recoverability (this layer)
+// The optimiser determines: Engineering Optimisation (Layer 2)
+// RP22 reports: Engineering Outcome
+// ADI explains: Engineering Reasoning
 //
 // This module is PURE: no React, no side effects.
 // ---------------------------------------------------------------------------
 
 import { PROBLEM_TYPE } from '@/components/recommendationEngine/recommendationTypes';
 
-// ── EQ Correctability Classes ─────────────────────────────────────────────
-// Owned by the optimiser. Re-exported by adiConstants for ADI to restate.
+// ── Physical Recoverability Classes ───────────────────────────────────────
+// Owned by the optimiser (Layer 1). Re-exported by adiConstants for ADI to restate.
 
 export const CORRECTABILITY_CLASS = {
   ABSOLUTE_CANCELLATION: 'absolute_cancellation',
@@ -65,17 +77,20 @@ export const CORRECTABILITY_THRESHOLDS = {
 /**
  * Classify the correctability of the dominant response feature.
  *
- * Replaces the blanket "never boost nulls" rule with a physical-recoverability
- * assessment. The optimiser asks: "Is this response physically recoverable,
- * and is the engineering trade-off worthwhile for the selected design objective?"
+ * Layer 1 — Physical Recoverability Assessment.
  *
- * EQ is permitted for broad depressions, moderate nulls, tonal imbalance,
- * and recoverable response features that professional calibration systems
- * (Trinnov, Dirac, StormAudio, REW) would normally correct.
+ * This function assesses whether the dominant response feature is physically
+ * recoverable. It does NOT decide whether EQ will be applied — that is the
+ * role of Layer 2 (Engineering Optimisation), which respects the selected
+ * P14/P18 design objectives, available capability, and available headroom.
  *
- * EQ is NOT permitted for absolute cancellations, extreme narrow nulls
- * with negligible remaining energy, clearly non-minimum-phase behaviour,
- * or corrections that would violate the selected P14/P18 objectives.
+ * A response feature is physically recoverable when usable energy remains
+ * and the feature is minimum-phase (or approximately so). Broad depressions,
+ * moderate nulls, and tonal imbalance are typically physically recoverable.
+ *
+ * A response feature is NOT physically recoverable when it is an absolute
+ * cancellation (very deep null with negligible energy) or an extreme narrow
+ * null at a low modal frequency (likely non-minimum-phase).
  *
  * Called by the optimiser after its search completes. The result is included
  * in the selection object and consumed by ADI as part of the authoritative
@@ -107,7 +122,7 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
   if (problem.type === PROBLEM_TYPE.CAPABILITY) {
     return {
       class: CORRECTABILITY_CLASS.CAPABILITY_LIMITED,
-      description: 'Capability-limited — the subwoofer cannot produce the target output level. No calibration or EQ change can overcome this physical limit.',
+      description: 'Not physically recoverable — the subwoofer cannot produce the target output level. No calibration or EQ change can overcome this physical limit.',
       eqAllowed: false,
       physicalRecommended: true,
     };
@@ -116,7 +131,7 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
   if (problem.type === PROBLEM_TYPE.EXTENSION) {
     return {
       class: CORRECTABILITY_CLASS.CAPABILITY_LIMITED,
-      description: 'Capability-limited — the subwoofer cannot reach the target low-frequency extension. This requires a specification change, not EQ.',
+      description: 'Not physically recoverable — the subwoofer cannot reach the target low-frequency extension. This requires a specification change, not EQ.',
       eqAllowed: false,
       physicalRecommended: true,
     };
@@ -148,7 +163,7 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
       : `a ${deviation.toFixed(1)} dB null at ${freq.toFixed(0)} Hz is an extreme narrow null at a low modal frequency — likely non-minimum-phase`;
     return {
       class: CORRECTABILITY_CLASS.ABSOLUTE_CANCELLATION,
-      description: `Absolute cancellation — ${reason}. EQ boost cannot recover this; physical changes are required.`,
+      description: `Not physically recoverable — ${reason}. EQ cannot recover this; physical changes are required.`,
       eqAllowed: false,
       physicalRecommended: true,
     };
@@ -162,7 +177,7 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
   if (p14TargetDb > 0 && p14Headroom < deviation + t.capabilityHeadroomMarginDb) {
     return {
       class: CORRECTABILITY_CLASS.CAPABILITY_LIMITED,
-      description: `Capability-limited — correcting the ${deviation.toFixed(1)} dB deviation would require boost that consumes P14 headroom (only ${p14Headroom.toFixed(1)} dB remaining above target). The correction would prevent achieving the selected capability objective.`,
+      description: `Physically recoverable but capability-limited — correcting the ${deviation.toFixed(1)} dB deviation would require boost that consumes P14 headroom (only ${p14Headroom.toFixed(1)} dB remaining above target). The correction would compromise the selected capability objective.`,
       eqAllowed: false,
       physicalRecommended: false,
     };
@@ -172,7 +187,7 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
   if (freq > 0 && p18AchievedHz > 0 && freq < p18AchievedHz + 2) {
     return {
       class: CORRECTABILITY_CLASS.CAPABILITY_LIMITED,
-      description: `Capability-limited — the problem at ${freq.toFixed(0)} Hz is at the extension limit. EQ correction would risk the P18 extension objective.`,
+      description: `Physically recoverable but capability-limited — the problem at ${freq.toFixed(0)} Hz is at the extension limit. EQ correction would compromise the P18 extension objective.`,
       eqAllowed: false,
       physicalRecommended: false,
     };
@@ -189,7 +204,7 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
     : (freq > 0 && freq < t.extremeNarrowNullMaxFreqHz ? 'moderate null' : 'response feature');
   return {
     class: CORRECTABILITY_CLASS.RECOVERABLE,
-    description: `Recoverable — a ${deviation.toFixed(1)} dB ${featureType} at ${freq.toFixed(0)} Hz with usable energy remaining. The response is physically recoverable; constrained EQ is permitted within the selected design objectives.`,
+    description: `Physically recoverable — a ${deviation.toFixed(1)} dB ${featureType} at ${freq.toFixed(0)} Hz with usable energy remaining. The response is physically recoverable; whether EQ is applied is determined by the Engineering Optimisation layer based on the selected design objectives.`,
     eqAllowed: true,
     physicalRecommended: false,
   };
