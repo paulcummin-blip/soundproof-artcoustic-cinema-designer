@@ -1157,10 +1157,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         </div>
       )}
 
-      {/* Simulation Assumptions — room acoustics, useful but not the first thing a dealer needs */}
-      <CollapsiblePanel title="Simulation Assumptions" defaultOpen={false}>
+      {/* Absorption Coefficients — room acoustics, useful but not the first thing a dealer needs */}
+                <CollapsiblePanel title="Absorption Coefficients" defaultOpen={false}>
         <div className="pt-3">
-          <div className="text-xs text-[#3E4349] mb-3">Surface absorption coefficients (0.00 – 1.00). Default 0.30 = typical cinema.</div>
+          <div className="text-xs text-[#3E4349] mb-3">Enter the average absorption coefficient for each room surface. Default 0.30 represents a typical furnished home cinema.</div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-2">
             {[
               { key: 'front',   label: 'Front wall' },
