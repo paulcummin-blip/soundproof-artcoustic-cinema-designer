@@ -20,7 +20,7 @@
 //   - Bypass the publication gate — the caller must verify the contract is
 //     authoritative (isAuthoritativeBassContract) before calling this adapter.
 
-import { buildCurveSignature, buildFilterBankSignature } from "./bassResultAuthority.js";
+import { buildCurveSignature, buildFilterBankSignature, buildCorrectionCurveSignature } from "./bassResultAuthority.js";
 
 /**
  * Build a synthetic optimisationResult from a compact completed contract's
@@ -35,6 +35,7 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
   const gp = compactContract.graphPayload;
   const candidateId = gp.selectedCandidateId || compactContract.selectedCandidateId || null;
   const postEqRspCurve = Array.isArray(gp.postEqRspCurve) ? gp.postEqRspCurve : [];
+  const correctionCurve = Array.isArray(gp.correctionCurve) ? gp.correctionCurve : [];
   const referenceEq = Array.isArray(gp.referenceEq) ? gp.referenceEq : [];
   const eqFilterBank = Array.isArray(gp.eqFilterBank) ? gp.eqFilterBank : [];
   const productionHouseCurveTarget = Array.isArray(gp.productionHouseCurveTarget)
@@ -67,6 +68,8 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
   const finalOptimisedBassResponse = {
     selectedCandidateId: candidateId,
     postEqRspCurve,
+    correctionCurve,
+    correctionCurveSignature: buildCorrectionCurveSignature({ correctionCurve }),
     canonicalPostEqRsp: postEqRspCurve,
     referenceEq,
     referenceEqSignature: buildCurveSignature(referenceEq),
@@ -138,5 +141,7 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
  * Check whether a compact contract carries a usable graphPayload.
  */
 export function hasGraphPayload(compactContract) {
-  return !!compactContract?.graphPayload?.postEqRspCurve?.length;
+  const graphPayload = compactContract?.graphPayload;
+  return !!graphPayload?.postEqRspCurve?.length
+    && Array.isArray(graphPayload.correctionCurve);
 }
