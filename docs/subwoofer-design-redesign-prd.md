@@ -50,6 +50,10 @@ The designer's eye flows: **Current → Target → Measured → Improve**.
 
 That's how designers think.
 
+### The graph is the primary workspace
+
+The Performance graph is the primary design workspace. It is the visual authority for the engineering result. The RP22 parameters summarise the graph, and ADI explains it. Every published RP22 value must be directly traceable to the graph. Selecting a seat or RP22 result must immediately reveal the corresponding engineering feature on the graph. The graph, RP22 and ADI must always tell the same engineering story.
+
 ---
 
 ## 3. Zone Specifications
@@ -329,7 +333,30 @@ All four states render in Zone 4. The designer never scrolls to find the primary
 
 ---
 
-## 8. Implementation Order
+## 8. Implementation Rules
+
+### Rule 1: No duplicated ownership
+
+Every piece of information appears once.
+Every control has one owner.
+Every engineering decision has one authoritative source.
+
+### Rule 2: Every zone answers one question
+
+| Zone | Question |
+|------|----------|
+| Current Design | What am I designing with? |
+| Choose Layout | Where should the subwoofers go? |
+| Design Target | What am I trying to achieve? |
+| Performance | How well does this design perform? |
+| Recommended Improvement | What should I change? |
+| Engineering Detail | Why? |
+
+If a zone starts answering two questions, it should be simplified.
+
+---
+
+## 9. Implementation Order
 
 1. **Zone 1:** Merge CurrentSystemSummary + CurrentLayoutBanner → Current Design card.
 2. **Zone 2:** Convert ChooseDesignTarget → Design Objective (always visible, no collapse).
