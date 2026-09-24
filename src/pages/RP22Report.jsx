@@ -1217,8 +1217,8 @@ function RP22ReportInner() {
                     )}
 
                     {/* ── Screen-only ADI Assessment ── */}
-                    {showDesignRating && includeAdiAssessment && engineeringSummary && (
-                        <TechnicalAdiAssessment engineeringSummary={engineeringSummary} />
+                    {showDesignRating && includeAdiAssessment && designReviewHandoff && (
+                        <TechnicalAdiAssessment publishedAuthority={designReviewHandoff} />
                     )}
 
                     {/* ── Screen-only Recommendations section (NOT in PDF) ── */}
@@ -1293,9 +1293,9 @@ function RP22ReportInner() {
                             )}
 
                             {/* ── Page 3c: ADI Assessment (optional) ── */}
-                            {showDesignRating && includeAdiAssessment && engineeringSummary && (
+                            {showDesignRating && includeAdiAssessment && designReviewHandoff && (
                                 <div className="report-page-block report-page-block--summary" data-report-block="adi-assessment" data-report-page-start="true">
-                                    <TechnicalAdiAssessment engineeringSummary={engineeringSummary} />
+                                    <TechnicalAdiAssessment publishedAuthority={designReviewHandoff} />
                                 </div>
                             )}
                             </section>
