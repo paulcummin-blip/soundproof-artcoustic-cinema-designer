@@ -236,7 +236,7 @@ export default function AdiRecommendation({
 
   if (!adiDecision?.recommendation) {
     return (
-      <div className={`rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 transition-opacity duration-300 ${isCalculatingWithPublished ? "opacity-50" : ""}`}>
+      <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-[#213428]" />
           <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
@@ -262,7 +262,7 @@ export default function AdiRecommendation({
       ? recommendation?.remainingLimitation || "The remaining limitation requires a physical change."
       : null;
     return (
-      <div className={`rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 transition-opacity duration-300 ${isCalculatingWithPublished ? "opacity-50" : ""}`}>
+      <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-[#213428]" />
           <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
@@ -303,13 +303,13 @@ export default function AdiRecommendation({
   const applyHandler = canApplySubPositions ? handleApplySubPositions : canApplySeating ? handleApplySeating : null;
 
   return (
-    <div className={`rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 space-y-3 transition-opacity duration-300 ${isCalculatingWithPublished ? "opacity-50" : ""}`}>
+    <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-2">
         <Activity className="h-4 w-4 text-[#213428]" />
         <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
         {showAppliedBadge && (
-          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#213428] px-2 py-0.5 text-[9px] font-semibold uppercase text-white">
+          <span className={`ml-auto inline-flex items-center gap-1 rounded-full bg-[#213428] px-2 py-0.5 text-[9px] font-semibold uppercase text-white transition-opacity duration-300 ${isCalculatingWithPublished ? "opacity-60" : ""}`}>
             <CheckCircle2 className="h-2.5 w-2.5" />
             Applied
           </span>
@@ -382,7 +382,7 @@ export default function AdiRecommendation({
           type="button"
           onClick={applyHandler}
           disabled={applying}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#3E4349] disabled:opacity-50"
+          className={`inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#3E4349] disabled:opacity-50 ${isCalculatingWithPublished ? "opacity-60" : ""}`}
         >
           {applying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
           Apply

@@ -45,7 +45,7 @@ export default function BassResultCards() {
       <BassHeadlinePills nowMs={nowMs} />
 
       {/* Expanded P19/P20 per-seat views — shared component */}
-      <div className={`transition-opacity duration-300 ${formatted.isCalculatingWithPublishedResult ? "opacity-50" : ""}`}>
+      <div className={`transition-opacity duration-300 ${formatted.isCalculatingWithPublishedResult ? "opacity-80" : ""}`}>
         <SharedP19P20SeatResults
           p19Rows={formatted.p19Rows}
           p20Rows={formatted.p20Rows}

@@ -164,7 +164,13 @@ export default function BassDesignAssistant({
       {layoutChosen && hasResults && (
         <div className="space-y-3">
           <Suspense fallback={<div className="text-[11px] text-[#8A7B6A]">Loading graph…</div>}>
-            <div className={`rounded-lg border border-[#DCDBD6] bg-white p-3 space-y-2 transition-opacity duration-300 ${isCalculating && hasResults ? "opacity-50" : ""}`}>
+            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3 space-y-2 relative">
+              {isCalculating && hasResults && (
+                <div className="absolute top-2 right-2 flex items-center gap-1.5 text-[10px] font-medium text-[#625143] bg-[#F4F1EC] px-2 py-1 rounded-md border border-[#E0DCD5]" style={{ zIndex: 10 }}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#213428] animate-pulse" />
+                  Analysing updated design…
+                </div>
+              )}
               {/* RP22 summary as graph header strip */}
               <GraphHeaderPills />
               {/* The graph — visual authority for every RP22 result */}

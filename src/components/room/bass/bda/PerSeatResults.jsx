@@ -37,7 +37,7 @@ export default function PerSeatResults() {
 
   return (
     <div className="space-y-2">
-      <div className={`transition-opacity duration-300 ${formatted.isCalculatingWithPublishedResult ? "opacity-50" : ""}`}>
+      <div className={`transition-opacity duration-300 ${formatted.isCalculatingWithPublishedResult ? "opacity-80" : ""}`}>
         <SharedP19P20SeatResults
           p19Rows={formatted.p19Rows}
           p20Rows={formatted.p20Rows}

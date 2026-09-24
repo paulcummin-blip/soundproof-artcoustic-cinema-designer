@@ -333,14 +333,14 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
 
   // Status text
   let statusText = "Waiting for complete design";
-  if (isCalculatingWithPublished) statusText = "Calculating updated result…";
+  if (isCalculatingWithPublished) statusText = "Analysing updated design…";
   else if (isCalculating) statusText = `Calculating… · ${elapsedSeconds} s`;
   else if (isError) statusText = completedBassAuthority?.errorMessage || "Analysis failed";
   else if (isStale) statusText = "Needs recalculation";
   else if (isNotVerified) statusText = "NOT VERIFIED";
   else if (isBlocked) statusText = "Waiting for complete design";
   else if (isLimited) statusText = "P14 capability below target";
-  else if (isAuthoritative) statusText = contract?.job?.message || (contract?.job?.cacheStatus === "hit" ? "Restored from cache" : "Analysis ready");
+  else if (isAuthoritative) statusText = contract?.job?.message || (contract?.job?.cacheStatus === "hit" ? "Restored from cache" : "Performance is current.");
   else if (isUpdating) statusText = `Calculating… · ${elapsedSeconds} s`;
 
   return {

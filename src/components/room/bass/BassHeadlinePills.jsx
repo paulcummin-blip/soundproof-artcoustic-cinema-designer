@@ -73,7 +73,7 @@ export default function BassHeadlinePills({ nowMs }) {
   );
 
   return (
-    <div className={`grid grid-cols-2 gap-2 sm:grid-cols-4 transition-opacity duration-300 ${formatted.isCalculatingWithPublishedResult ? "opacity-50" : ""}`}>
+    <div className={`grid grid-cols-2 gap-2 sm:grid-cols-4 transition-opacity duration-300 ${formatted.isCalculatingWithPublishedResult ? "opacity-80" : ""}`}>
       {Object.entries(formatted.pills).map(([key, pill]) => {
         const isSeatScoped = SEAT_SCOPED_KEYS.has(key);
         const { pillLabel, supportingText } = isSeatScoped
