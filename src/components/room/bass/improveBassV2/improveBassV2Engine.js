@@ -494,6 +494,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
     p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
     currentAuthority, currentCanonicalResult, currentSources, liveCacheKey, stage2Result, placementFingerprint,
+    correctabilityAssessment,
   } = params;
 
   const worker = new Worker(new URL("./improveBassV2.worker.js", import.meta.url), { type: "module" });
@@ -739,7 +740,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
               rawTransfer: currentRawTransfer,
               tuning: retainedPhase[index].tuning,
               tuningVariant: "phase-all-pass",
-              p14TargetBasis,p14TargetLevel,p14TargetDb,p18TargetBasis,
+              p14TargetBasis,p14TargetLevel,p14TargetDb,p18TargetBasis, correctabilityAssessment,
             }, controller.signal);
             metrics.recordWorkerCall("confirmation", "phase:" + index, performance.now() - confirmStarted, false);
             if (isStale()) return {status:"stale",snapshot};
@@ -807,7 +808,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           const _confirmT0=performance.now();
           const response=await runInWorker(worker,"confirmation",{
             rawTransfer:currentRawTransfer,tuning:retained[index].tuning,tuningVariant:"delay-only",
-            p14TargetBasis,p14TargetLevel,p14TargetDb,p18TargetBasis,
+            p14TargetBasis,p14TargetLevel,p14TargetDb,p18TargetBasis, correctabilityAssessment,
           },controller.signal);
           metrics.recordWorkerCall("confirmation","calibration:"+index,performance.now()-_confirmT0,false);
           if(isStale()) return {status:"stale",snapshot};
@@ -871,7 +872,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           const gResponse = await runInWorker(worker, "confirmation", {
             rawTransfer: savedCurrentRawTransfer, tuning: gainRetained[gi].tuning,
             tuningVariant: "delay-polarity-trim",
-            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
           }, controller.signal);
           metrics.recordWorkerCall("confirmation", "gain:"+gi, performance.now() - gConfirmT0, false);
           if (isStale()) return {status: "stale", snapshot};
@@ -996,7 +997,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             rawTransfer: currentRawTransfer,
             tuning: installedTuning,
             tuningVariant: "delay-polarity-trim",
-            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
           }, controller.signal);
           metrics.recordWorkerCall("confirmation", "current",
             (typeof performance !== "undefined" ? performance.now() : Date.now()) - _confirmT0, false);
@@ -1152,7 +1153,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             rawTransfer: newPromoted[i].rawTransfer,
             tuning: option?.tuning,
             tuningVariant: "delay-polarity-trim",
-            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
           }, controller.signal);
           metrics.recordWorkerCall("confirmation", newPromoted[i].id,
             (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
@@ -1321,7 +1322,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
               rawTransfer: sc.seatingTransfer,
               tuning: existingAuthority?.appliedTuning || savedEffectiveBaseline || [],
               tuningVariant: "delay-polarity-trim",
-              p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+              p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
             }, controller.signal);
             const confirmMs = performance.now() - seatingConfirmT0;
             metrics.recordWorkerCall("confirmation", `seating-${i}`, confirmMs, false);

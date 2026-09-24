@@ -159,6 +159,29 @@ export async function runOptimisation(opts) {
     placementFingerprint = waitResult.stage2?.placementFingerprint;
   }
 
+  // ── Compute correctability BEFORE the optimisation ──
+  // The Physical Recoverability Assessment is the authoritative input to the
+  // EQ optimisation. It determines whether EQ is physically appropriate before
+  // the search begins. The legacy protection modules consume this result
+  // instead of independently deciding whether EQ is permitted.
+  let correctabilityAssessment = null;
+  try {
+    const baseline = shared?.optimisationResult || null;
+    if (baseline) {
+      const problem = identifyProblem(baseline, {
+        p14TargetDb: p14Params.p14TargetDb,
+        p18TargetHz: null,
+      });
+      correctabilityAssessment = classifyCorrectability(
+        problem,
+        baseline,
+        { p14TargetDb: p14Params.p14TargetDb },
+      );
+    }
+  } catch {
+    // Correctability classification failure is non-fatal.
+  }
+
   // ── Continue into V2 finalist/local optimisation ──
   startImproveBassV2(projectId, versionId, snapshot);
 
@@ -180,6 +203,7 @@ export async function runOptimisation(opts) {
     liveCacheKey: shared?.cacheKey,
     stage2Result,
     placementFingerprint,
+    correctabilityAssessment,
   };
 
   const callbacks = {

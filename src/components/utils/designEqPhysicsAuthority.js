@@ -9,6 +9,15 @@ const finite = (value) => Number.isFinite(Number(value));
 // deficits below the house curve are not blocked by minor local variation.
 const PEAK_CLASSIFICATION_THRESHOLD_DB = 2.5;
 
+// ── Module-level correctability gate ──────────────────────────────────────
+// Set by generateCanonicalCandidatePool before the EQ search begins. All
+// classifyEqCorrectionRegion calls during the search read this gate to
+// determine whether the Physical Recoverability Assessment permits EQ.
+// This avoids threading the assessment through every call site.
+let _correctabilityGate = null;
+export function setCorrectabilityGate(assessment) { _correctabilityGate = assessment; }
+export function clearCorrectabilityGate() { _correctabilityGate = null; }
+
 export function curveSplAt(curve, frequency) {
   const points = (Array.isArray(curve) ? curve : []).filter((point) => finite(point?.frequency) && finite(point?.spl));
   if (!points.length || !finite(frequency)) return null;
@@ -22,7 +31,7 @@ export function curveSplAt(curve, frequency) {
 }
 
 export function classifyEqCorrectionRegion({ frequency, rawSpl, currentSpl, targetSpl, protectedNull = false,
-  widthOctaves = null, requestedGainDb = null, permittedBoostDb = null }) {
+  widthOctaves = null, requestedGainDb = null, permittedBoostDb = null, eqAllowed = null }) {
   const rawResidualDb = finite(rawSpl) && finite(targetSpl) ? Number(rawSpl) - Number(targetSpl) : null;
   const currentResidualDb = finite(currentSpl) && finite(targetSpl) ? Number(currentSpl) - Number(targetSpl) : rawResidualDb;
   if (protectedNull) return { classification: "Null", expectedAction: "Protect", rawResidualDb, currentResidualDb,
@@ -43,7 +52,13 @@ export function classifyEqCorrectionRegion({ frequency, rawSpl, currentSpl, targ
     return { classification: "Peak", expectedAction: "Cut", rawResidualDb, currentResidualDb,
       reason: "Positive response residual exceeds the peak threshold and may only receive attenuation." };
   }
-  const narrowDeepDeficit = finite(currentResidualDb) && currentResidualDb <= -10 && finite(widthOctaves) && widthOctaves < 1 / 3;
+  // Physical Recoverability Assessment is authoritative: when EQ is permitted
+  // (eqAllowed === true or the module-level gate says so), the independent
+  // narrowDeepDeficit check is suppressed. The decision about whether EQ is
+  // physically appropriate is owned by the correctability classifier.
+  const gateEqAllowed = _correctabilityGate?.eqAllowed === true;
+  const effectiveEqAllowed = eqAllowed === true || gateEqAllowed;
+  const narrowDeepDeficit = !effectiveEqAllowed && finite(currentResidualDb) && currentResidualDb <= -10 && finite(widthOctaves) && widthOctaves < 1 / 3;
   if (narrowDeepDeficit) return { classification: "Null", expectedAction: "Protect", rawResidualDb, currentResidualDb,
     reason: "Deep narrow deficit is treated as likely destructive cancellation." };
   return { classification: "Valley", expectedAction: "Boost within +6 dB limit", rawResidualDb, currentResidualDb,

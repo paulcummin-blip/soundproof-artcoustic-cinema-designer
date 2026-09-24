@@ -12,7 +12,7 @@ import {
   resolveHouseCurveDomains,
 } from "@/components/utils/houseCurveTargetAuthority";
 import { identifyProtectedNullRegions, isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
-import { findAggregatePeakBoostViolations } from "@/components/utils/designEqPhysicsAuthority";
+import { findAggregatePeakBoostViolations, setCorrectabilityGate, clearCorrectabilityGate } from "@/components/utils/designEqPhysicsAuthority";
 import { normaliseHouseCurveToP14Total, integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
 import { assessP14Capability, P14_EQ_ASSESSMENT_RANGE_HZ, P14_SAFETY_MARGIN_DB } from "@/components/utils/p14CapabilityAuthority";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
@@ -1007,7 +1007,10 @@ export function generateCanonicalCandidatePool({
   p18TargetBasis = p14TargetBasis, selectedP18RequiredExtensionHz = null,
   perSourceComplexTransfers = [], normalizedTransferFingerprint = null,
   calibrationFingerprint = null,
+  correctabilityAssessment = null,
 } = {}) {
+  setCorrectabilityGate(correctabilityAssessment);
+  try {
   const missingInputs = [!rawCurve.length && "rawCurve", !activeSubs.length && "activeSubs"].filter(Boolean);
   if (missingInputs.length) return stampPoolAuthority({
     poolVersion: BASS_OPTIMISER_POOL_VERSION, candidates: [], selectablePool: [], poolId: null,
@@ -1176,10 +1179,17 @@ export function generateCanonicalCandidatePool({
       spl: Number.isFinite(point.spl) ? point.spl + appliedOperatingLevelOffsetDb : point.spl,
     })),
   }));
-  const protectedNullRegions = identifyProtectedNullRegions(
+  const identifiedProtectedNullRegions = identifyProtectedNullRegions(
     levelNormalisedRawCurve, domains.correctionStartHz, domains.correctionEndHz, verticalOffsetDb,
     activeSubs, usableLfHz, null, targetCurve,
   );
+  // Physical Recoverability Assessment is authoritative: when EQ is permitted
+  // (eqAllowed === true), protected null regions do not block boost. The
+  // frequency-domain identification remains for diagnostics; the decision
+  // about whether EQ is physically appropriate is owned by the correctability
+  // classifier, not this local check.
+  const eqAllowedByCorrectability = correctabilityAssessment?.eqAllowed === true;
+  const protectedNullRegions = eqAllowedByCorrectability ? [] : identifiedProtectedNullRegions;
   // ── Iterative PEQ fitting: conditional on collectDiagnostics ──
   // The default production path skips the expensive Standard/Accuracy/House
   // iterative PEQ fitters. The production finalPostEqCurve is produced by
@@ -1587,4 +1597,7 @@ export function generateCanonicalCandidatePool({
       seatCount: seats.length,
     },
   });
+  } finally {
+    clearCorrectabilityGate();
+  }
 }

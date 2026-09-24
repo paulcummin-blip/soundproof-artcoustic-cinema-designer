@@ -339,6 +339,7 @@ export function evaluateStage2Confirmation(rawTransfer, {
   p14TargetLevel,
   p14TargetDb,
   p18TargetBasis,
+  correctabilityAssessment = null,
 }) {
   const startedAt = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
 
@@ -363,6 +364,7 @@ export function evaluateStage2Confirmation(rawTransfer, {
     perSourceComplexTransfers: [],
     normalizedTransferFingerprint: null,
     calibrationFingerprint: null,
+    correctabilityAssessment,
   });
 
   const selection = selectCandidateFromPool(pool);
@@ -473,6 +475,7 @@ export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
   p14TargetLevel,
   p14TargetDb,
   p18TargetBasis,
+  correctabilityAssessment = null,
 }) {
   if (!rawTransfer?.perSourcePerSeatComplexTransfers?.length) return null;
   if (!Number.isFinite(p14TargetDb)) return null;
@@ -534,6 +537,7 @@ export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
     p14TargetLevel,
     p14TargetDb,
     p18TargetBasis,
+    correctabilityAssessment,
   });
 
   if (!result) return null;
