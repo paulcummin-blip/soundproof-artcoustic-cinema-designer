@@ -140,7 +140,6 @@ const emptyAuthority = (projectId, versionId) => ({
   authorityStatus: BASS_AUTHORITY_STATUS.LOADING,
   currentFingerprint: null,
   contract: null,
-  staleContract: null,
   errorMessage: null,
   structurallyComplete: false,
   authoritative: false,
@@ -189,7 +188,6 @@ export function publishCompletedBassContract(projectId, versionId, contract) {
     authorityStatus: authoritative ? BASS_AUTHORITY_STATUS.AUTHORITATIVE : BASS_AUTHORITY_STATUS.NOT_VERIFIED,
     currentFingerprint: compact.job.resultFingerprint,
     contract: compact,
-    staleContract: memoryByProject.get(projectKey(projectId, versionId))?.contract || null,
     errorMessage: null,
     structurallyComplete: true,
     authoritative,
@@ -225,7 +223,6 @@ export function publishCachedCompactBassContract(projectId, versionId, compactCo
     authorityStatus: BASS_AUTHORITY_STATUS.AUTHORITATIVE,
     currentFingerprint: resultFingerprint,
     contract: compactContract,
-    staleContract: memoryByProject.get(key)?.contract || null,
     errorMessage: null,
     structurallyComplete: true,
     authoritative: true,
@@ -262,7 +259,6 @@ export function publishCachedLimitedBassContract(projectId, versionId, compactCo
     authorityStatus: BASS_AUTHORITY_STATUS.LIMITED,
     currentFingerprint: resultFingerprint,
     contract: compactContract,
-    staleContract: memoryByProject.get(key)?.contract || null,
     errorMessage: null,
     structurallyComplete: true,
     authoritative: false,
@@ -378,7 +374,6 @@ export function markBassAuthorityBlocked(projectId, versionId) {
     authorityStatus: BASS_AUTHORITY_STATUS.BLOCKED,
     currentFingerprint: null,
     contract: null,
-    staleContract: null,
     errorMessage: null,
     structurallyComplete: false,
     authoritative: false,
@@ -562,16 +557,11 @@ export async function hydrateCompletedBassAuthority(projectId, versionId) {
       return current;
     }
     return setMemory(projectId, versionId, {
+      ...(current || emptyAuthority(projectId, versionId)),
       projectId: key,
       status: "error",
       authorityStatus: BASS_AUTHORITY_STATUS.ERROR,
-      currentFingerprint: current?.currentFingerprint || null,
-      contract: null,
-      staleContract: current?.contract || current?.staleContract || null,
       errorMessage: "Bass authority hydration failed",
-      structurallyComplete: false,
-      authoritative: false,
-      exportable: false,
       publicationRejectionReason: null,
     });
   }
