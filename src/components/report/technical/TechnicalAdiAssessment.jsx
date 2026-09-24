@@ -8,10 +8,19 @@
  * Rating — it never replaces it, never adds a score, and never adds another
  * RP22 parameter.
  *
- * ADI consumes the Published Engineering Authority directly (the full
- * design-review handoff snapshot), NOT the Engineering Summary. Both ADI
- * and the Engineering Summary are independent consumers of the same
- * published engineering truth.
+ * ADI consumes the Published Engineering Authority directly (the
+ * designReviewHandoff object), NOT the Engineering Summary. Both ADI and
+ * the Engineering Summary are independent consumers of the same published
+ * engineering truth. There is only ever one object with the Published
+ * Engineering Authority role — it is not a "snapshot", it is the permanent
+ * engineering truth for a design version.
+ *
+ * ARCHITECTURAL INVARIANTS — these protect the architecture forever:
+ *
+ *   • ADI is the authoritative narrative layer.
+ *   • The Published Engineering Authority is immutable.
+ *   • Audience selection changes presentation only.
+ *   • Engineering truth never changes.
  *
  * Structure:
  *   - Highlights: always begins positively — what the design already achieves
