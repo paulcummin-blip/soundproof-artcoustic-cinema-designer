@@ -103,8 +103,10 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  * canonicalMetricPublicationValid === true AND authority AUTHORITATIVE)
  * may be presented as an official RP22 P14/P18/P19/P20 result.
  *
- * While calculating / updating / NOT_VERIFIED, pills show "Calculating…"
- * or "NOT VERIFIED" consistently — never preliminary live values.
+ * Persistent visibility: during calculation with a published result, the
+ * last published values remain visible (greyed via isCalculatingWithPublishedResult)
+ * and the status shows "Calculating updated result…". Only when there is no
+ * published result (first-ever calculation) do pills show "Calculating…".
  *
  * P19 headline is the canonical RSP result against stored Reference EQ.
  * Per-seat P19 diagnostics remain in the P19 — All Seats grid below.
@@ -210,7 +212,12 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // Per-seat arrays are publication-gated AND suppressed while calculating.
   // When a calculation is in progress, old results must NOT be presented as
   // current — the pills and per-seat grids show "Calculating…" instead.
-  const resultsVisible = isAuthoritative && !p14Failed && !isCalculating;
+  // Persistent visibility: during calculation, the last published result
+  // remains visible (greyed) rather than being replaced with "Calculating…".
+  // Only show "Calculating…" when there is NO published result (first-ever).
+  const hasPublishedResult = isAuthoritative && !p14Failed;
+  const isCalculatingWithPublished = isCalculating && hasPublishedResult;
+  const resultsVisible = hasPublishedResult;
   const publishedP19SeatAuthority = resultsVisible ? p19SeatAuthority : null;
   const perSeatP19Results = publishedP19SeatAuthority?.seats || [];
   const perSeatP20Results = resultsVisible ? (presentation.perSeatP20Results || []) : [];
@@ -233,7 +240,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // achievable, the pill shows strict FAIL + Available max — never a downgraded
   // level. A LIMITED contract also has P14 data (pass === false) and should
   // display the same FAIL pill.
-  if ((isAuthoritative || isLimited) && !isCalculating) {
+  if (isAuthoritative || isLimited) {
     const source = contract?.productAnalysis?.parameters?.p14;
     const selectedLevel = source?.selectedLevel ?? source?.level;
     const selectedTargetDb = source?.selectedTargetDb ?? source?.requestedTargetDb ?? source?.value;
@@ -308,7 +315,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // P19 — SEAT-scoped parameter. The headline always displays "SEAT" — no
   // RSP/aggregate headline. When calculating, show "Calculating…" — never
   // old results. When P14 fails (or LIMITED), P19 is not evaluated.
-  pills.p19 = isCalculating
+  pills.p19 = (isCalculating && !hasPublishedResult)
     ? { label: "P19 Response Fit", resultText: "Calculating…", text: "P19 Response Fit Calculating…", level: "—" }
     : p14Failed
       ? { label: "P19 Response Fit", resultText: "FAIL", text: "P19 Response Fit FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
@@ -318,7 +325,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // "worst seat" headline, no aggregate level. When calculating, show
   // "Calculating…" — never old results. When P14 fails (or LIMITED), P20
   // is not evaluated.
-  pills.p20 = isCalculating
+  pills.p20 = (isCalculating && !hasPublishedResult)
     ? { label: "P20 Seat Consistency", resultText: "Calculating…", text: "P20 Seat Consistency Calculating…", level: "—" }
     : p14Failed
       ? { label: "P20 Seat Consistency", resultText: "FAIL", text: "P20 Seat Consistency FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
@@ -326,7 +333,8 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
 
   // Status text
   let statusText = "Waiting for complete design";
-  if (isCalculating) statusText = `Calculating… · ${elapsedSeconds} s`;
+  if (isCalculatingWithPublished) statusText = "Calculating updated result…";
+  else if (isCalculating) statusText = `Calculating… · ${elapsedSeconds} s`;
   else if (isError) statusText = completedBassAuthority?.errorMessage || "Analysis failed";
   else if (isStale) statusText = "Needs recalculation";
   else if (isNotVerified) statusText = "NOT VERIFIED";
@@ -358,6 +366,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     p20BestPrimary,
     p20Lowest,
     publicationVerified,
+    isCalculatingWithPublishedResult: isCalculatingWithPublished,
   };
 }
 

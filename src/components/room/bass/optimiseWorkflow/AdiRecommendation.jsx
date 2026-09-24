@@ -102,6 +102,12 @@ export default function AdiRecommendation({
   const [applying, setApplying] = useState(false);
   const [appliedStage, setAppliedStage] = useState(null);
 
+  // Persistent visibility: during calculation with a published result,
+  // the ADI recommendation stays visible (greyed) rather than disappearing.
+  const isCalculating = shared?.calculationInProgress === true;
+  const hasPublishedResult = shared?.hasCurrentResult === true;
+  const isCalculatingWithPublished = isCalculating && hasPublishedResult;
+
   // Run ADI decision model
   const adiDecision = useMemo(() => {
     try {
@@ -230,7 +236,7 @@ export default function AdiRecommendation({
 
   if (!adiDecision?.recommendation) {
     return (
-      <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3">
+      <div className={`rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 transition-opacity duration-300 ${isCalculatingWithPublished ? "opacity-50" : ""}`}>
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-[#213428]" />
           <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
@@ -256,7 +262,7 @@ export default function AdiRecommendation({
       ? recommendation?.remainingLimitation || "The remaining limitation requires a physical change."
       : null;
     return (
-      <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3">
+      <div className={`rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 transition-opacity duration-300 ${isCalculatingWithPublished ? "opacity-50" : ""}`}>
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-[#213428]" />
           <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
@@ -297,7 +303,7 @@ export default function AdiRecommendation({
   const applyHandler = canApplySubPositions ? handleApplySubPositions : canApplySeating ? handleApplySeating : null;
 
   return (
-    <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 space-y-3">
+    <div className={`rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 space-y-3 transition-opacity duration-300 ${isCalculatingWithPublished ? "opacity-50" : ""}`}>
       {/* Header */}
       <div className="flex items-center gap-2">
         <Activity className="h-4 w-4 text-[#213428]" />

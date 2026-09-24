@@ -8,8 +8,9 @@
 // supporting text "112 dBC".
 //
 // Publication-gated: only a canonically published completed result may be
-// presented as an official RP22 result. While calculating/updating, pills
-// show "Calculating…" — never preliminary live values.
+// presented as an official RP22 result. During calculation with a published
+// result, the last published values remain visible (greyed) — only the
+// first-ever calculation (no published result) shows "Calculating…".
 //
 // Tooltip: BassResultDetailTooltip (same canonical authority for both surfaces).
 import React, { useEffect, useState } from "react";
@@ -72,7 +73,7 @@ export default function BassHeadlinePills({ nowMs }) {
   );
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <div className={`grid grid-cols-2 gap-2 sm:grid-cols-4 transition-opacity duration-300 ${formatted.isCalculatingWithPublishedResult ? "opacity-50" : ""}`}>
       {Object.entries(formatted.pills).map(([key, pill]) => {
         const isSeatScoped = SEAT_SCOPED_KEYS.has(key);
         const { pillLabel, supportingText } = isSeatScoped

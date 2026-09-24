@@ -10,8 +10,9 @@
 // bass results authority as every other surface — one engineering truth.
 //
 // Publication-gated: only a canonically published completed result may be
-// presented as an official RP22 result. While calculating/updating, pills
-// show "Calculating…" — never preliminary live values.
+// presented as an official RP22 result. During calculation with a published
+// result, the last published values remain visible (greyed by the parent
+// graph container) — only the first-ever calculation shows "Calculating…".
 import React, { useEffect, useState } from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassResultDetailTooltip from "@/components/room/bass/BassResultDetailTooltip";

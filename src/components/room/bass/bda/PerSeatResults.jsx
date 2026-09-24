@@ -37,14 +37,16 @@ export default function PerSeatResults() {
 
   return (
     <div className="space-y-2">
-      <SharedP19P20SeatResults
-        p19Rows={formatted.p19Rows}
-        p20Rows={formatted.p20Rows}
-        p19Summary={formatted.p19SeatAuthority?.project?.coverageSummary || null}
-        publicationVerified={formatted.publicationVerified}
-        authorityStatus={shared.completedBassAuthority?.authorityStatus}
-        p14TargetUnselected={p14Selection.noP14TargetSelected}
-      />
+      <div className={`transition-opacity duration-300 ${formatted.isCalculatingWithPublishedResult ? "opacity-50" : ""}`}>
+        <SharedP19P20SeatResults
+          p19Rows={formatted.p19Rows}
+          p20Rows={formatted.p20Rows}
+          p19Summary={formatted.p19SeatAuthority?.project?.coverageSummary || null}
+          publicationVerified={formatted.publicationVerified}
+          authorityStatus={shared.completedBassAuthority?.authorityStatus}
+          p14TargetUnselected={p14Selection.noP14TargetSelected}
+        />
+      </div>
       <div className="flex items-center gap-2 text-[10px] font-medium text-[#625143]" aria-live="polite">
         {shared.bassLifecycleState === "failed" && shared.onRetry
           ? <button type="button" onClick={shared.onRetry} className="font-semibold text-red-700 underline">{formatted.statusText}</button>

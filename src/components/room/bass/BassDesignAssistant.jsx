@@ -164,7 +164,7 @@ export default function BassDesignAssistant({
       {layoutChosen && hasResults && (
         <div className="space-y-3">
           <Suspense fallback={<div className="text-[11px] text-[#8A7B6A]">Loading graph…</div>}>
-            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3 space-y-2">
+            <div className={`rounded-lg border border-[#DCDBD6] bg-white p-3 space-y-2 transition-opacity duration-300 ${isCalculating && hasResults ? "opacity-50" : ""}`}>
               {/* RP22 summary as graph header strip */}
               <GraphHeaderPills />
               {/* The graph — visual authority for every RP22 result */}
