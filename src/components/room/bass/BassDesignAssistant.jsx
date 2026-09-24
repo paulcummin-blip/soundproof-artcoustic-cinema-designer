@@ -28,13 +28,13 @@
 // Experience is now the product authority.
 
 import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
-import { Waves } from "lucide-react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
 import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards";
 import CurrentLayoutBanner from "@/components/room/bass/bda/CurrentLayoutBanner";
 import ChooseDesignTarget from "@/components/room/bass/bda/ChooseDesignTarget";
+import CurrentSystemSummary from "@/components/room/bass/bda/CurrentSystemSummary";
 
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
@@ -51,6 +51,7 @@ export default function BassDesignAssistant({
   roomDims,
   seatingPositions,
   subWarnings,
+  onChangeSpeakerConfig,
 }) {
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
   const shared = useSharedBassResults();
@@ -107,15 +108,28 @@ export default function BassDesignAssistant({
   return (
     <div className="rounded-xl border border-[#DCDBD6] bg-white p-4 space-y-4" data-bda-workflow="true">
       {/* ── Header ── */}
-      <div className="flex items-center gap-2">
-        <Waves className="w-5 h-5 text-[#213428]" />
+      <div>
         <h3
           className="text-[15px] font-bold text-[#1B1A1A]"
           style={{ fontFamily: "Didact Gothic, sans-serif" }}
         >
-          Bass Design Assistant
+          Subwoofer Design
         </h3>
+        <div className="text-[10px] font-medium text-[#625143]" style={{ letterSpacing: '0.04em' }}>
+          Powered by Artcoustic Design Intelligence
+        </div>
       </div>
+
+      {/* ── Current System summary (hardware owned by Speakers) ── */}
+      {layoutChosen && (
+        <CurrentSystemSummary
+          frontModel={compat.frontModelDisplay}
+          frontCount={compat.frontCount}
+          rearModel={compat.rearModelDisplay}
+          rearCount={compat.rearCount}
+          onChangeConfig={onChangeSpeakerConfig}
+        />
+      )}
 
       {/* ── Stage 1: Choose Layout ── */}
       {showLayoutCards && (
@@ -146,6 +160,20 @@ export default function BassDesignAssistant({
         />
       )}
 
+      {/* ── ADI presence ── */}
+      {layoutChosen && !hasResults && !isCalculating && (
+        <div className="flex items-center gap-1.5 text-[11px] text-[#625143]">
+          <span className="h-1 w-1 rounded-full bg-[#213428]" />
+          ADI is ready to analyse this design.
+        </div>
+      )}
+      {layoutChosen && isCalculating && (
+        <div className="flex items-center gap-1.5 text-[11px] text-[#625143]">
+          <span className="h-1 w-1 rounded-full bg-[#213428] animate-pulse" />
+          ADI is analysing this design…
+        </div>
+      )}
+
       {/* ── Stage 2: Choose Design Target ── */}
       {layoutChosen && (
         <ChooseDesignTarget disabled={disabled} />
@@ -166,6 +194,14 @@ export default function BassDesignAssistant({
               engineeringDetailCollapsed={true}
             />
           </Suspense>
+        </div>
+      )}
+
+      {/* ── ADI presence: analysed ── */}
+      {layoutChosen && hasResults && !isStale && (
+        <div className="flex items-center gap-1.5 text-[11px] text-[#625143]">
+          <span className="h-1 w-1 rounded-full bg-[#213428]" />
+          ADI has analysed this design.
         </div>
       )}
 

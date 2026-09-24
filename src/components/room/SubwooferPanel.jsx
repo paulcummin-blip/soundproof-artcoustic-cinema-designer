@@ -52,7 +52,7 @@ function hasFrontLcrSubClash({ speakers, frontSubs, frontSubsCfg }) {
   return lcrRects.some((lcrRect) => frontSubRects.some((subRect) => rectsOverlap(lcrRect, subRect)));
 }
 
-export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings }) {
+export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings, noWrapper = false }) {
   const roomDimensions = appState?.roomDims;
   const seats = appState?.seatingPositions;
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
@@ -62,8 +62,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
     frontSubsCfg,
   }), [appState?.speakerSystem?.placedSpeakers, appState?.subwoofers, frontSubsCfg]);
 
-  return (
-    <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
+  const innerContent = (
       <div className="rounded-none border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-4">
         <div className="grid grid-cols-12 gap-x-4 gap-y-3">
           <div className="col-span-12 md:col-span-6">
@@ -336,6 +335,12 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
           </div>
         </div>
       </div>
+  );
+
+  if (noWrapper) return innerContent;
+  return (
+    <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
+      {innerContent}
     </CollapsiblePanel>
   );
 }

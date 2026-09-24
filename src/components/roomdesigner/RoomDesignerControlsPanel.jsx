@@ -1,4 +1,4 @@
-import React, { Suspense } from "react";
+import React, { Suspense, useState } from "react";
 import { Ruler, Monitor, Users, Speaker, Waves, Box, FileText } from "lucide-react";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
@@ -24,9 +24,9 @@ const RoomElements = React.lazy(() =>
 const BassDesignAssistant = React.lazy(() =>
   import("@/components/room/bass/BassDesignAssistant").then((m) => ({ default: m.default }))
 );
-// Temporary validation surfaces — restored beneath the BDA until it gains
-// equivalent physical-configuration controls (model, quantity, height,
-// orientation, screen lock). Do NOT remove until BDA validation is complete.
+// Subwoofer hardware configuration (model, quantity, height, orientation,
+// screen lock). Owned by the Speakers section. Rendered with noWrapper
+// inside the Speakers CollapsiblePanel.
 const SubwooferPanel = React.lazy(() =>
   import("@/components/room/SubwooferPanel").then((m) => ({ default: m.default ?? m.SubwooferPanel }))
 );
@@ -143,6 +143,7 @@ export default function RoomDesignerControlsPanel({
   setSelectedAbfuserQty,
   recommendedAbfuserQty,
 }) {
+  const [speakersOpen, setSpeakersOpen] = useState(false);
   return (
     <aside className="relative z-30" style={{ minWidth: 0, minHeight: 0, flex: 1, display: "flex", flexDirection: "column" }}>
       <div
@@ -271,11 +272,12 @@ export default function RoomDesignerControlsPanel({
           </Suspense>
         </CollapsiblePanel>
 
-        <div className="mb-6">
+        <div className="mb-6" id="speakers-section">
           <CollapsiblePanel
             title="Speakers"
             icon={<Speaker className="w-5 h-5" />}
-            defaultOpen={false}>
+            isOpen={speakersOpen}
+            onToggle={() => setSpeakersOpen(!speakersOpen)}>
             {isFrozen('speakers') &&
               <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
                 This tab is frozen. Unlock to make changes.
@@ -324,6 +326,20 @@ export default function RoomDesignerControlsPanel({
               roomLength={stableDimensions.length}
               screenFrontPlaneM={appState?.screenFrontPlaneM}
               view={speakerPositionsView} />
+
+            <div className="mt-4 pt-3 border-t border-[#DCDBD6]">
+              <h4 className="text-[13px] font-semibold text-[#1B1A1A] mb-2">Subwoofers</h4>
+              <Suspense fallback={<div>Loading...</div>}>
+                <SubwooferPanel
+                  appState={appState}
+                  disabled={isFrozen('bass')}
+                  frontSubsCfg={frontSubsCfg}
+                  rearSubsCfg={rearSubsCfg}
+                  subWarnings={subWarnings}
+                  noWrapper
+                />
+              </Suspense>
+            </div>
           </CollapsiblePanel>
         </div>
 
@@ -332,7 +348,7 @@ export default function RoomDesignerControlsPanel({
             Consumes existing shared authority only; does not change maths,
             grading, or optimiser logic. */}
         <CollapsiblePanel
-          title="Bass Design Assistant"
+          title="Subwoofer Design"
           icon={<Waves className="w-5 h-5" />}
           defaultOpen={true}>
           {isFrozen('bass') &&
@@ -349,19 +365,15 @@ export default function RoomDesignerControlsPanel({
               roomDims={stableDimensions}
               seatingPositions={seatingPositions}
               subWarnings={subWarnings}
+              onChangeSpeakerConfig={() => {
+                setSpeakersOpen(true);
+                setTimeout(() => {
+                  document.getElementById('speakers-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 50);
+              }}
             />
           </Suspense>
         </CollapsiblePanel>
-
-        <Suspense fallback={<div>Loading...</div>}>
-          <SubwooferPanel
-            appState={appState}
-            disabled={isFrozen('bass')}
-            frontSubsCfg={frontSubsCfg}
-            rearSubsCfg={rearSubsCfg}
-            subWarnings={subWarnings}
-          />
-        </Suspense>
 
         <CollapsiblePanel
           title="Compliance Report"
