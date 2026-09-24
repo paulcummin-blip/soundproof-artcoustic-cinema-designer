@@ -386,6 +386,7 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
     lines.push(`Grade: ${worstSeat.level}`);
   }
   lines.push("Variation = max |seat − RSP| across the assessment band");
+  lines.push("Best and worst seat curves shown directly — the graph displays seat consistency");
 
   return {
     metric: "p20",
@@ -400,7 +401,10 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
       ifOverflow: "extendDomain",
     }] : [],
     additionalSeries,
-    dimKinds: ["room-response", "product-maximum", "maximum-spl", "house-curve"],
+    // Dim the house-curve and raw room response — P20 measures seat-to-seat
+    // consistency, not against the house target. Showing the house curve
+    // prominently would tell a different engineering story.
+    dimKinds: ["room-response", "product-maximum", "maximum-spl", "house-curve", "normalized-target"],
     explanation: {
       title: "P20 — Seat-to-Seat Consistency",
       subtitle: "Maximum deviation between any seat and the RSP across the assessment band",

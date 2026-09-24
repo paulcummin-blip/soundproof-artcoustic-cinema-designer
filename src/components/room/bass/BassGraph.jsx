@@ -272,11 +272,14 @@ export default function BassGraph({
         raw: 40,
         "house-curve": 50,
         "normalized-target": 50,
-        "post-eq": 60,
-        "real-seat-overlay": 70,
+        "focus-house-target": 52,
         "reference-eq": 55,
+        "post-eq": 60,
+        "focus-operating-response": 62,
+        "focus-selected-seat": 64,
         "focus-worst-seat": 65,
         "focus-best-seat": 66,
+        "real-seat-overlay": 70,
       };
       return allMultiSeries
         .map((series, index) => ({ series, index }))
