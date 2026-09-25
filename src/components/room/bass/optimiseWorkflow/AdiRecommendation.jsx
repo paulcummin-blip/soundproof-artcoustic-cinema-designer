@@ -28,6 +28,8 @@ import { applyCalibrationTuning } from "../improveBassV2/improveBassV2ApplyCalib
 import { buildProvenance } from "../improveBassV2/appliedProvenance";
 import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Fingerprint";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
+import { useActiveProjectId } from "@/components/state/project-session";
+import { useAppliedCalibrationAuthority } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore";
 
 // ── Displacement helpers ──
 
@@ -102,6 +104,18 @@ export default function AdiRecommendation({
 }) {
   const [applying, setApplying] = useState(false);
   const [appliedStage, setAppliedStage] = useState(null);
+
+  // Applied Calibration Authority — persisted per-project+version.
+  // Derive the APPLIED badge from this so it survives a page refresh.
+  // The transient `autoApplied` prop (from workflowState) covers the
+  // in-session workflow; the persisted authority covers cold-load restore.
+  const projectId = useActiveProjectId();
+  const versionId = appState?.activeVersionId || null;
+  const appliedCalibrationAuthority = useAppliedCalibrationAuthority(projectId, versionId);
+  const hasPersistedAppliedCalibration = !!appliedCalibrationAuthority
+    && Array.isArray(appliedCalibrationAuthority.values)
+    && appliedCalibrationAuthority.values.length > 0
+    && !appliedCalibrationAuthority.staleReason;
 
   // Persistent visibility: during calculation with a published result,
   // the ADI recommendation stays visible (greyed) rather than disappearing.
@@ -319,7 +333,9 @@ export default function AdiRecommendation({
   const canApplySubPositions = isPhysical && isSubPositionLever && hasSubPositions && hasCanonicalInstances && !appliedStage;
   const canApplySeating = isPhysical && isSeatingLever && hasSeating && !appliedStage;
   const showApplyButton = canApplySubPositions || canApplySeating;
-  const showAppliedBadge = (isCalibration && autoApplied) || appliedStage;
+  // APPLIED badge: derived from the transient workflow state OR the persisted
+  // Applied Calibration Authority so it is identical before and after refresh.
+  const showAppliedBadge = (isCalibration && (autoApplied || hasPersistedAppliedCalibration)) || appliedStage;
 
   const applyHandler = canApplySubPositions ? handleApplySubPositions : canApplySeating ? handleApplySeating : null;
 

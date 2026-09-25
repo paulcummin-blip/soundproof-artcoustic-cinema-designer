@@ -284,8 +284,15 @@ export async function runOptimisation(opts) {
       // the optimiser's selection and produces a structured recommendation
       // object. It never recalculates engineering — it interprets existing
       // results. The output is persisted alongside the canonical bass result.
+      //
+      // The recommendation is published with the PRE-auto-apply fingerprint
+      // here. The caller (OptimiseAndCalculate) will re-publish it with the
+      // POST-recalculation fingerprint after the auto-apply + recalculate
+      // phases complete, so the recommendation survives a page refresh
+      // against the current (final) fingerprint.
+      let generatedRecommendation = null;
       try {
-        const recommendation = generateRecommendation(selection, {
+        generatedRecommendation = generateRecommendation(selection, {
           context: {
             p14TargetDb: p14Params.p14TargetDb,
             p18TargetHz: null, // P18 target Hz not directly available here
@@ -297,13 +304,15 @@ export async function runOptimisation(opts) {
           || shared?.completedBassAuthority?.currentFingerprint
           || startFingerprint;
         if (resultFingerprint) {
-          publishRecommendation(projectId, versionId, recommendation, resultFingerprint);
+          publishRecommendation(projectId, versionId, generatedRecommendation, resultFingerprint);
         }
       } catch {
         // Recommendation generation failure is non-fatal — the optimiser
         // result is still valid. The recommendation is a reasoning layer,
         // not a calculation.
       }
+      // Attach to the result so the caller can re-publish after recalculation.
+      result.recommendation = generatedRecommendation;
     }
 
     if (result.runtimeMetrics) {

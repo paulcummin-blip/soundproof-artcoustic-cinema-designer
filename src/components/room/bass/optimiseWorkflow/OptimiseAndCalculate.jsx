@@ -43,6 +43,7 @@ import {
   hasCalibrationImprovement,
   hasPhysicalRecommendations,
 } from "./optimiseWorkflowOrchestrator";
+import { publishRecommendation } from "@/components/recommendationEngine";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import AdiRecommendation from "./AdiRecommendation";
@@ -412,6 +413,24 @@ export default function OptimiseAndCalculate({
       // (NOT the stale closure-captured `shared`) so layout/position changes
       // between runs don't freeze the break condition on an old snapshot.
       if (!(await waitForCurrentPublication(sharedRef, phaseRef))) return;
+
+      // ── Re-publish the recommendation with the POST-recalculation fingerprint ──
+      // The recommendation was initially published with the pre-auto-apply
+      // fingerprint. After the auto-apply + recalculate phases, the current
+      // fingerprint has changed. Re-publish the same recommendation against
+      // the new current fingerprint so it survives a page refresh and is
+      // available in completedBassAuthority.contract.recommendation for ADI
+      // cold-load restoration.
+      try {
+        const postRecalcFingerprint = sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint
+          || sharedRef.current?.completedBassAuthority?.currentFingerprint
+          || null;
+        if (postRecalcFingerprint && result?.recommendation) {
+          publishRecommendation(projectId, versionId, result.recommendation, postRecalcFingerprint);
+        }
+      } catch {
+        // Re-publish failure is non-fatal — the in-memory recommendation still works.
+      }
 
       // Phase 5: Publishing
       phaseRef.current = "publishing";
