@@ -47,11 +47,20 @@ export default function PublicationTracePanel() {
         <div className="text-gray-500 text-[11px] py-4 text-center">No trace captured yet. Press "Update Bass Performance" to capture.</div>
       ) : (
         <>
+          <Section title="Trace sequence">
+            {(trace.events || []).map((event, index) => (
+              <Row key={index} label={`${index + 1}. ${event.capturedAt}`} value={`${event.effectPhase || "unknown"}${event.firstGuard ? ` — ${event.firstGuard}` : ""}`} />
+            ))}
+            <Row label="latest phase" value={trace.latestPhase} />
+          </Section>
           <Section title="1. Request Identity">
             <Row label="cacheKey" value={trace.cacheKey} />
             <Row label="manualAnalysisRequest.fingerprint" value={trace.manualRequestFingerprint} />
             <Row label="dispatchedManualRequestRef.current" value={trace.dispatchedRef} />
             <Row label="manualRequestMatchesCurrent" value={trace.manualRequestMatchesCurrent} ok={trace.manualRequestMatchesCurrent} />
+            <Row label="requestId" value={trace.requestId} />
+            <Row label="authoritative.status" value={trace.authoritativeStatus} />
+            <Row label="authoritative.reason" value={trace.authoritativeReason} />
           </Section>
 
           <Section title="2. Worker / Lifecycle">
