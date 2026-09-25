@@ -1318,6 +1318,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     if (!isProjectHydrationReady || !targetKey || !canCalculate) return;
     if (manualAnalysisRequest || calculationInProgress) return;
     if (cachedContract) return; // Already cached — publish effect handles it
+    // A current Published Engineering Contract is already the foreground
+    // authority. Its separate bridge effect may still be seeding the target
+    // cache on this render; restoration must win that race and remain idle.
+    if (completedContractMatches) return;
     // Only auto-calculate once per target key + base design fingerprint
     const autoKey = `${targetKey}|${baseDesignFingerprint}`;
     if (autoCalculatedKeyRef.current === autoKey) return;
@@ -1333,7 +1337,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         autoCalculatedKeyRef.current = autoKey;
       }
     }
-  }, [isProjectHydrationReady, targetKey, canCalculate, manualAnalysisRequest, calculationInProgress, cachedContract, targetFamilyProgress.resolved, targetFamilyProgress.total, baseDesignFingerprint, onCalculate]);
+  }, [isProjectHydrationReady, targetKey, canCalculate, manualAnalysisRequest, calculationInProgress, cachedContract, completedContractMatches, targetFamilyProgress.resolved, targetFamilyProgress.total, baseDesignFingerprint, onCalculate]);
 
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target
