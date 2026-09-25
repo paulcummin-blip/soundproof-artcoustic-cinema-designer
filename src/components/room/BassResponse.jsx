@@ -383,7 +383,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   // identity parity, so stale authority is still rejected.
   const hasValidDetailedResult = !!designEqEnabled &&
     finalOptimisedBassAuthorityMatches(optimisationResult?.finalOptimisedBassResponse);
-  const selectedP14TargetDb = authoritative.requested?.selectedP14TargetDb;
+  const selectedP14TargetDb = optimisationResult?.selectedP14TargetDb ?? authoritative.requested?.selectedP14TargetDb;
   const selectedP18TargetBasis = authoritative.requested?.selectedP18TargetBasis || splConfig?.selectedP18TargetBasis || "minimum";
   const selectedP18RequiredExtensionHz = authoritative.requested?.selectedP18RequiredExtensionHz;
   const finalBassResponse = optimisationResult?.finalOptimisedBassResponse;
