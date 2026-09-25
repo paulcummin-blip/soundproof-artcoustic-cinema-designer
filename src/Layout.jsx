@@ -90,7 +90,11 @@ export default function Layout({ children, currentPageName }) {
   // ASDR visibility plus the one canonical published engineering summary.
   // The sidebar reads this object directly; it never depends on a nested live-only rating.
   const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
-  const [engineeringSummary, setEngineeringSummary] = React.useState(null);
+  const [engineeringPublication, setEngineeringPublication] = React.useState({
+    projectId: null,
+    versionId: null,
+    summary: null,
+  });
   const [bassPending, setBassPending] = React.useState(false);
   const [asdrUnavailable, setAsdrUnavailable] = React.useState(false);
   const [p14TargetUnselected, setP14TargetUnselected] = React.useState(false);
@@ -155,13 +159,16 @@ export default function Layout({ children, currentPageName }) {
   // The sidebar is a direct subscriber to the same published engineering
   // authority as every report. It never rebuilds or polls a separate rating.
   const activeVersionId = activeProjectSummary?.active_version_id || null;
+  const engineeringSummary =
+    String(engineeringPublication.projectId || '') === String(activeProjectId || '') &&
+    String(engineeringPublication.versionId || '') === String(activeVersionId || '')
+      ? engineeringPublication.summary
+      : null;
 
   React.useEffect(() => {
     if (!activeProjectId || !activeVersionId) {
-      setEngineeringSummary(null);
       return undefined;
     }
-    setEngineeringSummary(null);
     const applyPublication = (snapshot) => {
       const published = snapshot || readDesignReviewHandoff(activeProjectId, activeVersionId);
       const nextSummary =
@@ -174,7 +181,11 @@ export default function Layout({ children, currentPageName }) {
         nextRating.status !== 'NOT_ASSESSED' &&
         nextRating.status !== 'NOT_CONFIGURED';
       if (nextIsComplete) {
-        setEngineeringSummary(JSON.parse(JSON.stringify(nextSummary)));
+        setEngineeringPublication({
+          projectId: activeProjectId,
+          versionId: activeVersionId,
+          summary: JSON.parse(JSON.stringify(nextSummary)),
+        });
       }
     };
     applyPublication(readDesignReviewHandoff(activeProjectId, activeVersionId));
