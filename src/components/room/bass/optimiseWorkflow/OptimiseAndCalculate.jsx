@@ -22,7 +22,7 @@ import { useSharedBassResults } from "../bassResultsStore";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { getStage2State, subscribeStage2 } from "../stage2/stage2PlacementStore";
 import { useImproveBassV2State, requestCancel, resetImproveBassV2 } from "../improveBassV2/improveBassV2Store";
-import { cancelBassHeavyAction } from "../bassHeavyActionStore";
+import { cancelBassHeavyAction, useBassHeavyAction } from "../bassHeavyActionStore";
 import { buildStageDisplay } from "../improveBassV2/improveBassV2StageMapping";
 import {
   useOptimiseWorkflowState,
@@ -45,7 +45,7 @@ import {
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import AdiRecommendation from "./AdiRecommendation";
-import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY } from "../bassCalculationLifecycle";
+import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, canCancelBassCalculation } from "../bassCalculationLifecycle";
 import {
   computeAppliedCalibrationBasisFingerprint,
 } from "../appliedCalibrationAuthority/appliedCalibrationAuthority.js";
@@ -115,6 +115,7 @@ export default function OptimiseAndCalculate({
     () => getStage2State(projectId, versionId),
     () => getStage2State(projectId, versionId),
   );
+  const heavyAction = useBassHeavyAction(projectId, versionId);
 
   const runningRef = useRef(false);
   const phaseRef = useRef("idle"); // tracks which phase we're in to avoid double-trigger
@@ -151,6 +152,18 @@ export default function OptimiseAndCalculate({
   // be visible whenever a real active job exists.
   const isCalculating = isBusy || shared?.calculationInProgress === true;
   const bassLifecycleState = shared?.bassLifecycleState || BASS_LIFECYCLE_STATE.IDLE;
+  // hasActiveJob: composite of independent job-tracking signals (not an alias
+  // of isBusy or calculationInProgress). Observes whether ANY real cancellable
+  // job exists right now — background calculation, V2 optimiser, or heavy action.
+  const hasActiveJob = Boolean(
+    shared?.calculationInProgress
+    || v2State?.status === "running"
+    || v2State?.status === "awaiting_stage2"
+    || heavyAction?.status === "requested"
+    || heavyAction?.status === "running"
+  );
+  // Cancel visibility is owned solely by bassCalculationLifecycle.
+  const canCancel = canCancelBassCalculation(bassLifecycleState, hasActiveJob);
   const isTimedOut = bassLifecycleState === BASS_LIFECYCLE_STATE.TIMED_OUT && !isCalculating;
 
   // ── Main orchestration: triggered by the OPTIMISE & CALCULATE button ──
@@ -589,15 +602,18 @@ export default function OptimiseAndCalculate({
             </div>
           )}
 
-          {/* Cancel button */}
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="text-[11px] text-[#625143] hover:text-[#1B1A1A] underline underline-offset-2"
-          >
-            Cancel
-          </button>
         </div>
+      )}
+
+      {/* Cancel — visibility governed solely by bassCalculationLifecycle */}
+      {canCancel && (
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="text-[11px] text-[#625143] hover:text-[#1B1A1A] underline underline-offset-2"
+        >
+          Cancel
+        </button>
       )}
 
       {/* ── Recommended Improvement: ADI Recommendation ── */}
