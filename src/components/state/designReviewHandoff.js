@@ -23,22 +23,6 @@ const ACTIVE_MIRROR_KEY = "__ROOM_DESIGNER_ASDR__";
 const normaliseProjectId = (value) => String(value || "").trim();
 const normaliseVersionId = (value) => String(value || "").trim();
 
-const clonePublishedValue = (value) => {
-  if (value == null) return value;
-  if (typeof structuredClone === "function") {
-    try {
-      return structuredClone(value);
-    } catch {
-      // Fall through to the JSON-safe contract snapshot.
-    }
-  }
-  try {
-    return JSON.parse(JSON.stringify(value));
-  } catch {
-    return value;
-  }
-};
-
 export const storageKey = (projectId, versionId) =>
   `${STORAGE_PREFIX}${normaliseProjectId(projectId)}::${normaliseVersionId(versionId)}`;
 
@@ -254,10 +238,6 @@ export function publishDesignReviewHandoff(snapshot) {
   // consumers that need it, but it no longer gates publication.
   const published = {
     ...snapshot,
-    rating: clonePublishedValue(snapshot?.rating ?? null),
-    engineeringSummary: clonePublishedValue(
-      snapshot?.engineeringSummary ?? snapshot?.rating?.engineeringSummary ?? null
-    ),
     projectId,
     versionId,
     publishedAt: Date.now(),
