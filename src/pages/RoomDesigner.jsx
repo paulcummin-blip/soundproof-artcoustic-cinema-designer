@@ -34,7 +34,8 @@ import { debug } from "@/components/utils/consolePolyfill";
 import { safeGroup, safeTable } from "@/components/utils/safeLog"; // NEW: Import safe logging
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry"; // NEW: For model metadata
 import { yHalfExtentM_physical, isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives"; // PHYSICAL half-extent (no render stroke) for persisted geometry
-import { calculateLcrConstraints } from "@/components/room/constraints/lcrConstraints"; // NEW: For LCR constraints
+import { calculateLcrConstraints } from "@/components/room/constraints/lcrConstraints";
+import { detectFrontStageMode } from "@/components/roomdesigner/utils/lcrHeightAuthority";
 import { placeSubwoofers } from '@/components/room/placement/placeSubwoofers'; // NEW import // FIX: Added 'from' keyword
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones"; // NEW import
 import { SHOW_DEBUG_LOGS } from '../components/utils/diagnostics'; // NEW: Import SHOW_DEBUG_LOGS
@@ -1362,6 +1363,11 @@ function RoomDesignerWithState() {
     const gapM = 0.01;
     let needsUpdate = false;
     let maxFrontExtentY = 0;
+    // Detect front stage mode so FL/FR use their own height authority
+    // (lcrLRHeightM) in center_only mode, not the centre/soundbar height.
+    const frontStageMode = detectFrontStageMode(placedSpeakers);
+    const lcrHeightMVal = Number.isFinite(appState?.splConfig?.lcrHeightM) ? appState.splConfig.lcrHeightM : 1.2;
+    const lcrLRHeightMVal = Number.isFinite(appState?.splConfig?.lcrLRHeightM) ? appState.splConfig.lcrLRHeightM : lcrHeightMVal;
     const updated = placedSpeakers.map((spk) => {
       const role = safeCanon(spk.role);
       if (!['FL', 'FC', 'FR'].includes(role)) return spk;
@@ -1384,7 +1390,11 @@ function RoomDesignerWithState() {
       if (finalCentreY + halfExtentM > maxFrontExtentY) maxFrontExtentY = finalCentreY + halfExtentM;
       if (isDragging) return spk; // skip speaker position corrections during drag
       if (willStayAtActual) return spk;
-      const lcrTargetZ = Number.isFinite(appState?.splConfig?.lcrHeightM) ? appState.splConfig.lcrHeightM : 1.2;
+      // In center_only mode, FL/FR use lcrLRHeightM; FC uses lcrHeightM.
+      // In standard/integrated_lcr mode, all LCR use lcrHeightM.
+      const lcrTargetZ = (frontStageMode === 'center_only' && (role === 'FL' || role === 'FR'))
+        ? lcrLRHeightMVal
+        : lcrHeightMVal;
       if (Math.abs((spk.position?.y ?? 0) - wallY) > 0.001 || Math.abs((spk.position?.z ?? lcrTargetZ) - lcrTargetZ) > 0.001) {
         needsUpdate = true;
         return { ...spk, position: { ...spk.position, y: wallY, z: lcrTargetZ } };
@@ -1411,7 +1421,7 @@ function RoomDesignerWithState() {
         if ((Number(_screen?.speakerClearanceM) || 0) < req) _setScreen(prev => ({ ...prev, speakerClearanceM: req }));
       }
     }
-  }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode, mlpAnchorEffective, _screen, _setScreen, appState?.splConfig?.lcrHeightM, loadState?.phase]);
+  }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode, mlpAnchorEffective, _screen, _setScreen, appState?.splConfig?.lcrHeightM, appState?.splConfig?.lcrLRHeightM, loadState?.phase]);
 
   // NEW: Effect to lock FC speaker to room centerline.
   // GUARD: skip during hydration/load — derived geometry must not persist.
