@@ -296,7 +296,11 @@ export default function StartingLayoutCards({
       setApplyError(validation.reason);
       return;
     }
-    const next = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, null);
+    // A chosen starting layout must persist as valid canonical instances.
+    // Fresh projects can hydrate with no explicit sub model, so use the
+    // product default already presented by the subwoofer workflow.
+    const appliedModel = frontSubsCfg?.model || rearSubsCfg?.model || "SUB2-12";
+    const next = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, appliedModel);
     commitInstances(next, {
       front: { placementMode: "manual", isManual: true },
       rear: { placementMode: "manual", isManual: true },
