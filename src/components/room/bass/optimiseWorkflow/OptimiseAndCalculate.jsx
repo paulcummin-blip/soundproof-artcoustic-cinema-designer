@@ -66,6 +66,9 @@ import { runEngineeringDecisionModel } from "@/components/adi";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const hasPublishedCurrentDesign = (shared) =>
+  shared?.completedBassAuthority?.authorityStatus === "AUTHORITATIVE"
+  && shared?.completedBassAuthority?.contract?.job?.resultFingerprint === shared?.cacheKey;
 
 // ── Helper: apply recommendation values to subwoofer instances ──
 // Mirrors BassDecisionActions.applyRecommendationToInstances — the single
@@ -190,7 +193,7 @@ export default function OptimiseAndCalculate({
       while (true) {
         await sleep(SLEEP_MS);
         const s = sharedRef.current;
-        if (!s?.calculationInProgress && s?.hasCurrentResult) break;
+        if (!s?.calculationInProgress && hasPublishedCurrentDesign(s)) break;
         if (phaseRef.current === "cancelled") break;
       }
       if (phaseRef.current === "cancelled") return;
@@ -362,7 +365,7 @@ export default function OptimiseAndCalculate({
       while (true) {
         await sleep(SLEEP_MS);
         const s = sharedRef.current;
-        if (!s?.calculationInProgress && s?.hasCurrentResult) break;
+        if (!s?.calculationInProgress && hasPublishedCurrentDesign(s)) break;
         if (phaseRef.current === "cancelled") break;
       }
       if (phaseRef.current === "cancelled") return;
