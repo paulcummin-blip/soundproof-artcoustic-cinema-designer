@@ -30,6 +30,7 @@
 import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
+import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
 import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards";
 import ChooseDesignTarget from "@/components/room/bass/bda/ChooseDesignTarget";
@@ -97,6 +98,9 @@ export default function BassDesignAssistant({
   const wrappedCommitInstances = (instances, ...rest) => {
     if (typeof compat.commitInstances === "function") {
       compat.commitInstances(instances, ...rest);
+      // Applying a validated starting layout is also the recovery path for a
+      // previously malformed empty-model layout restored from persistence.
+      appState?.setSubwooferInstancesStatus?.(INSTANCE_STATUS.VALID);
     }
     handleLayoutApplied();
   };
