@@ -236,7 +236,28 @@ export function validateAssessmentEnvelopeAuthority(contract) {
 
   if (hasNotAssessable) {
     // Terminal not-assessable state — skip band limit, P18 parity, and
-    // per-seat grade validation. The contract carries the failure reason.
+    // per-seat grade validation. But still verify the not-assessable
+    // declaration is well-formed: a non-empty reason, level 0, and null
+    // value. A contract with notAssessable:true but no reason or a non-zero
+    // level is not a legitimate terminal state — reject it.
+    if (p19NotAssessable) {
+      const reason = p19Param?.notAssessableReason || p19Param?.reason;
+      if (typeof reason !== "string" || !reason.trim())
+        return { valid: false, reason: "p19-not-assessable-missing-reason" };
+      if (Number(p19Param?.level) !== 0)
+        return { valid: false, reason: `p19-not-assessable-invalid-level:${p19Param?.level}` };
+      if (p19Param?.value != null)
+        return { valid: false, reason: "p19-not-assessable-non-null-value" };
+    }
+    if (p20NotAssessable) {
+      const reason = p20Param?.notAssessableReason || p20Param?.reason;
+      if (typeof reason !== "string" || !reason.trim())
+        return { valid: false, reason: "p20-not-assessable-missing-reason" };
+      if (Number(p20Param?.level) !== 0)
+        return { valid: false, reason: `p20-not-assessable-invalid-level:${p20Param?.level}` };
+      if (p20Param?.value != null)
+        return { valid: false, reason: "p20-not-assessable-non-null-value" };
+    }
     return { valid: true, reason: null };
   }
 
