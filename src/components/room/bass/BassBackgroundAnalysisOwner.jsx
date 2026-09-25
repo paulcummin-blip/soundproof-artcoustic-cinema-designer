@@ -9,7 +9,7 @@ import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
 import { BASS_AUTHORITY_STATUS, markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityStale, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, publishCachedLimitedBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract, bassContractMatchesRequestedP14 } from "./completedBassResultStore";
 import { resolveBassLifecycleState, BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, BASS_COLD_RELOAD_RECOVERY_COPY } from "./bassCalculationLifecycle";
-import { getOptimiseWorkflowState } from "./optimiseWorkflow/optimiseWorkflowStore";
+import { useOptimiseWorkflowState } from "./optimiseWorkflow/optimiseWorkflowStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
 import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
@@ -1485,7 +1485,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // state with plain-language copy.
   // Workflow status from optimiseWorkflowStore — feeds the PUBLISHING state
   // into the unified lifecycle so bassCalculationLifecycle owns it.
-  const workflowStatus = getOptimiseWorkflowState(scopeId, versionId)?.status || "idle";
+  const workflowStatus = useOptimiseWorkflowState(scopeId, versionId)?.status || "idle";
   const bassLifecycleState = resolveBassLifecycleState({
     calculationInProgress,
     calculationPhase,
