@@ -90,11 +90,7 @@ export default function Layout({ children, currentPageName }) {
   // ASDR visibility plus the one canonical published engineering summary.
   // The sidebar reads this object directly; it never depends on a nested live-only rating.
   const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
-  const [engineeringPublication, setEngineeringPublication] = React.useState({
-    projectId: null,
-    versionId: null,
-    summary: null,
-  });
+  const [engineeringSummary, setEngineeringSummary] = React.useState(null);
   const [bassPending, setBassPending] = React.useState(false);
   const [asdrUnavailable, setAsdrUnavailable] = React.useState(false);
   const [p14TargetUnselected, setP14TargetUnselected] = React.useState(false);
@@ -120,11 +116,6 @@ export default function Layout({ children, currentPageName }) {
         if (uuidMatch) projectId = uuidMatch[0];
       }
       if (projectId) {
-        setEngineeringPublication((previous) => (
-          previous.projectId && String(previous.projectId) !== String(projectId)
-            ? { projectId: null, versionId: null, summary: null }
-            : previous
-        ));
         setActiveProjectId(projectId);
       } else {
         setActiveProjectSummary({ id: null, name: null, client_name: null, active_version_id: null });
@@ -164,30 +155,19 @@ export default function Layout({ children, currentPageName }) {
   // The sidebar is a direct subscriber to the same published engineering
   // authority as every report. It never rebuilds or polls a separate rating.
   const activeVersionId = activeProjectSummary?.active_version_id || null;
-  const engineeringSummary = engineeringPublication.summary;
 
   React.useEffect(() => {
     if (!activeProjectId || !activeVersionId) {
+      setEngineeringSummary(null);
       return undefined;
     }
     const applyPublication = (snapshot) => {
       const published = snapshot || readDesignReviewHandoff(activeProjectId, activeVersionId);
-      const nextSummary =
+      setEngineeringSummary(
         published?.engineeringSummary
           ?? published?.rating?.engineeringSummary
-          ?? null;
-      const nextRating = nextSummary?.project?.rating || null;
-      const nextIsComplete =
-        !!nextRating &&
-        nextRating.status !== 'NOT_ASSESSED' &&
-        nextRating.status !== 'NOT_CONFIGURED';
-      if (nextIsComplete) {
-        setEngineeringPublication({
-          projectId: activeProjectId,
-          versionId: activeVersionId,
-          summary: JSON.parse(JSON.stringify(nextSummary)),
-        });
-      }
+          ?? null
+      );
     };
     applyPublication(readDesignReviewHandoff(activeProjectId, activeVersionId));
     return subscribeDesignReviewHandoff(activeProjectId, activeVersionId, (snapshot, fromStorage) => {
@@ -218,6 +198,10 @@ export default function Layout({ children, currentPageName }) {
       setP14TargetUnselected(readP14TargetUnselectedIndicator(activeProjectId));
       const unavailable = readAsdrUnavailableIndicator(activeProjectId);
       setAsdrUnavailable(unavailable);
+      if (unavailable) {
+        setEngineeringSummary(null);
+      }
+
       // Stale-scope detection: compare the published rating's seat-priority
       // fingerprint against the current live fingerprint. If they differ, the
       // published scoped rating was calculated from a different priority set
