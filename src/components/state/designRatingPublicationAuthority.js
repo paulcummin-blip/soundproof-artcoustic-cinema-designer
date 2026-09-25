@@ -63,11 +63,8 @@ export function isDesignRatingPublishable({
 
 /**
  * Decide whether a previously published settled summary may remain visible
- * while the replacement rating is not yet publishable. The published summary
- * remains the engineering truth for the same project and version until a
- * complete replacement publishes atomically. Live target, geometry and seat
- * scope changes describe the pending replacement; they do not invalidate the
- * previously published contract.
+ * while the current rating is not publishable. The retained summary is safe
+ * only if its material authority identity still matches the current design.
  *
  * @param {Object}  existing           - Previously published handoff snapshot
  * @param {Object}  identity           - Current identity to match against
@@ -83,5 +80,12 @@ export function isRetainedSummaryStillValid(existing, identity) {
 
   const sameProject = String(existing.projectId || '') === String(identity.projectId || '');
   const sameVersion = String(existing.versionId || '') === String(identity.versionId || '');
-  return sameProject && sameVersion;
+  const sameSeatPriority =
+    String(existing.rating?.seatPriorityFingerprint || '') ===
+    String(identity.seatPriorityFingerprint || '');
+  const sameBassFingerprint =
+    String(existing.calculationFingerprint || '') ===
+    String(identity.bassFingerprint || '');
+
+  return sameProject && sameVersion && sameSeatPriority && sameBassFingerprint;
 }
