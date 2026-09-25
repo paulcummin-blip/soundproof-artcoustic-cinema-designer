@@ -37,6 +37,9 @@ import ChooseDesignTarget from "@/components/room/bass/bda/ChooseDesignTarget";
 import CurrentDesignBar from "@/components/room/bass/bda/CurrentDesignBar";
 import GraphHeaderPills from "@/components/room/bass/bda/GraphHeaderPills";
 import PerSeatResults from "@/components/room/bass/bda/PerSeatResults";
+import RestorePreviousDesignBar from "@/components/room/bass/bda/RestorePreviousDesignBar";
+import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpointAuthority";
+import { useActiveProjectId } from "@/components/state/project-session";
 
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
@@ -62,6 +65,21 @@ export default function BassDesignAssistant({
   const isPlacementPreview = shared?.placementPreviewActive === true;
   // Lifecycle state consumed from the sole authority — no independent derivation.
   const bassLifecycleState = shared?.bassLifecycleState || null;
+
+  // ── Safe bass design experimentation ────────────────────────────────────
+  // Wrap ALL physical Apply paths with checkpoint capture. One shared helper
+  // owns this — individual recommendation components do not duplicate it.
+  const activeProjectId = useActiveProjectId();
+  const bdaProjectId = activeProjectId || appState?.projectId || null;
+  const bdaVersionId = appState?.activeVersionId || null;
+  const { checkpointedCommitInstances, checkpointedCommitSeating } = useCheckpointedCommits({
+    projectId: bdaProjectId,
+    versionId: bdaVersionId,
+    appState,
+    completedBassAuthority: shared?.completedBassAuthority,
+    commitInstances: compat.commitInstances,
+    commitSeating: appState?.setSeatingPositions,
+  });
 
   // Fix flash: initialize based on whether subs already exist at first render.
   // This prevents the one-frame flash of layout cards on projects that
@@ -95,14 +113,14 @@ export default function BassDesignAssistant({
     setShowLayoutCards(false);
   };
 
-  // Wrap commitInstances to auto-collapse after apply
+  // Wrap checkpointed commitInstances to auto-collapse after apply.
+  // The checkpoint is captured by checkpointedCommitInstances BEFORE the
+  // original commit runs.
   const wrappedCommitInstances = (instances, ...rest) => {
-    if (typeof compat.commitInstances === "function") {
-      compat.commitInstances(instances, ...rest);
-      // Applying a validated starting layout is also the recovery path for a
-      // previously malformed empty-model layout restored from persistence.
-      appState?.setSubwooferInstancesStatus?.(INSTANCE_STATUS.VALID);
-    }
+    checkpointedCommitInstances(instances, ...rest);
+    // Applying a validated starting layout is also the recovery path for a
+    // previously malformed empty-model layout restored from persistence.
+    appState?.setSubwooferInstancesStatus?.(INSTANCE_STATUS.VALID);
     handleLayoutApplied();
   };
 
@@ -137,6 +155,25 @@ export default function BassDesignAssistant({
           statusText={isPlacementPreview ? "Subwoofer positions changed. Previewing room response only." : null}
           onChangeSpeakers={onChangeSpeakerConfig}
           onChangeLayout={() => setShowLayoutCards(true)}
+        />
+      )}
+
+      {/* ── Safe bass design experimentation: Restore / Keep ── */}
+      {layoutChosen && (
+        <RestorePreviousDesignBar
+          projectId={bdaProjectId}
+          versionId={bdaVersionId}
+          appState={appState}
+          shared={shared}
+          commitInstances={checkpointedCommitInstances}
+          commitSeating={checkpointedCommitSeating}
+          isCalculating={isCalculating}
+          isStale={bassLifecycleState === "stale_needs_recalculation"}
+          hasFailed={bassLifecycleState === "failed" || bassLifecycleState === "timed_out"}
+          hasCurrentResult={hasResults && !isCalculating && !isPlacementPreview
+            && shared?.completedBassAuthority?.authoritative === true}
+          onUpdateBass={typeof shared?.onCalculate === "function" ? shared.onCalculate : null}
+          onRetry={typeof shared?.onRetry === "function" ? shared.onRetry : null}
         />
       )}
 
@@ -209,8 +246,8 @@ export default function BassDesignAssistant({
           subwooferInstances={subwooferInstances}
           frontSubsCfg={frontSubsCfg}
           rearSubsCfg={rearSubsCfg}
-          commitInstances={compat.commitInstances}
-          commitSeating={appState?.setSeatingPositions}
+          commitInstances={checkpointedCommitInstances}
+          commitSeating={checkpointedCommitSeating}
           commitSeatingProvenance={appState?.setAppliedSeatingProvenance}
           appliedSeatingProvenance={appState?.appliedSeatingProvenance}
           hasCanonicalInstances={compat.hasCanonicalInstances}
