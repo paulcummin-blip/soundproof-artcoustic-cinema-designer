@@ -878,6 +878,60 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     collectDiagnostics: includeDiagnostics,
     metricPublication,
   });
+  // TEMPORARY TRACE: observe the worker-to-contract handoff for the active request.
+  useEffect(() => {
+    if (!manualAnalysisRequest || !manualRequestMatchesCurrent) return;
+    const jobStatus = contract?.job?.status;
+    const jobFinished = jobStatus === "ready" || jobStatus === "complete";
+    const p19Param = contract?.productAnalysis?.parameters?.p19;
+    const p20Param = contract?.productAnalysis?.parameters?.p20;
+    capturePublicationTrace({
+      effectPhase: `worker-${lifecycle.status}-contract-${jobStatus || "missing"}`,
+      firstGuard: null,
+      cacheKey,
+      requestId: manualAnalysisRequest.id,
+      manualRequestFingerprint: manualAnalysisRequest.fingerprint,
+      dispatchedRef: dispatchedManualRequestRef.current,
+      manualRequestMatchesCurrent,
+      authoritativeStatus: authoritative.status,
+      authoritativeReason: authoritative.reason,
+      lifecycleStatus: lifecycle.status,
+      lifecycleResultFingerprint: lifecycle.resultFingerprint,
+      lifecycleCurrentJobFingerprint: lifecycle.currentJobFingerprint,
+      workerStatus: lifecycle.workerStatus,
+      activeJobId: lifecycle.activeJobId,
+      calculationInProgress,
+      calculationOutcome,
+      lastTerminalOutcome: lastTerminalOutcome ? JSON.stringify(lastTerminalOutcome) : null,
+      contractJobStatus: jobStatus,
+      contractJobResultFingerprint: contract?.job?.resultFingerprint,
+      contractJobCurrentJobFingerprint: contract?.job?.currentJobFingerprint,
+      contractJobMetricSchemaVersion: contract?.job?.metricSchemaVersion,
+      contractVersion: contract?.version,
+      contractMetricSchemaVersion: contract?.metricSchemaVersion,
+      hasSelectedCandidate: !!contract?.selectedCandidate,
+      hasSelectedCandidateId: !!contract?.selectedCandidateId,
+      hasGraphPayload: hasGraphPayload(contract),
+      hasP14Parameter: !!contract?.productAnalysis?.parameters?.p14,
+      hasP18Parameter: !!contract?.productAnalysis?.parameters?.p18,
+      p19Status: p19Param?.status ?? null,
+      p19Level: p19Param?.level ?? null,
+      p19Value: p19Param?.value ?? null,
+      p19NotAssessable: p19Param?.notAssessable ?? null,
+      p19Reason: p19Param?.notAssessableReason || p19Param?.reason || null,
+      p20Status: p20Param?.status ?? null,
+      p20Level: p20Param?.level ?? null,
+      p20Value: p20Param?.value ?? null,
+      p20NotAssessable: p20Param?.notAssessable ?? null,
+      p20Reason: p20Param?.notAssessableReason || p20Param?.reason || null,
+      structuralComplete: jobFinished ? isStructurallyCompleteBassContract(contract) : null,
+      structuralDiagnosis: jobFinished ? diagnoseStructuralCompleteness(contract) : null,
+      authoritative: jobFinished ? isAuthoritativeBassContract(contract) : null,
+      authoritativeDiagnosis: jobFinished ? diagnoseAuthoritative(contract) : null,
+      publishRan: false,
+      syncRan: false,
+    });
+  }, [manualAnalysisRequest?.id, manualRequestMatchesCurrent, lifecycle.status, lifecycle.resultFingerprint, lifecycle.currentJobFingerprint, contract?.job?.status, contract?.job?.resultFingerprint, contract?.selectedCandidateId]);
   // PASS 1: Mark authoritative preparation completion for timing diagnostics.
   useEffect(() => {
     if (!manualAnalysisRequest || !manualRequestMatchesCurrent) return;
