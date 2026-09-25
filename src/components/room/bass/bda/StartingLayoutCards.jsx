@@ -27,6 +27,7 @@ import { useBestSubLayoutLiveInputs } from "@/components/room/bass/best-layout/b
 import { selectBestSubLayoutPhysics } from "@/components/room/bass/best-layout/bestSubLayoutPhysicsSnapshot";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { resolveBestSubLayoutContextId } from "@/components/room/bass/best-layout/bestSubLayoutContext";
+import { mergeWithFallbacks } from "@/components/room/bass/bda/startingLayoutFallbacks";
 
 const LAYOUT_TITLES = {
   1: "1 Subwoofer",
@@ -250,12 +251,20 @@ export default function StartingLayoutCards({
   });
   const [applyError, setApplyError] = useState(null);
   const currentSources = useMemo(() => currentSourcesFrom(currentSubs), [currentSubs]);
-  const recommendations = advisor.result?.recommendations || {};
+
+  // Merge advisor recommendations with geometric fallbacks so the selector
+  // ALWAYS has three usable cards — even for brand-new projects where the
+  // advisor is blocked (instanceStatus UNINITIALISED) or still debouncing.
+  const recommendations = useMemo(
+    () => mergeWithFallbacks(advisor.result?.recommendations, roomDims, sourceHeights),
+    [advisor.result?.recommendations, roomDims, sourceHeights],
+  );
 
   // Default selection: 2 subs (the recommended starting point)
   const [selectedQuantity, setSelectedQuantity] = useState(2);
 
-  // If the selected quantity has no layout, fall back to first available
+  // If the selected quantity has no layout (not even a fallback), fall back
+  // to first available. This only happens with invalid room dimensions.
   useEffect(() => {
     if (recommendations[selectedQuantity]) return;
     const firstAvailable = [2, 1, 4].find((q) => recommendations[q]);
@@ -265,11 +274,20 @@ export default function StartingLayoutCards({
   const selectedLayout = recommendations[selectedQuantity];
   const isApplied = (layout) => coordinatesMatch(currentSources, layout?.sources || []);
 
+  // Loading state: only show skeletons during the initial debounce period
+  // (advisor computing) AND when no fallback is available yet. Fallbacks are
+  // synchronous so this is typically a single frame.
+  const advisorLoading = !advisor.result && advisor.status !== "error" && !recommendations[2];
+  const advisorError = advisor.status === "error" && !recommendations[2];
+
   const apply = () => {
     const layout = recommendations[selectedQuantity];
     if (!layout) return;
     setApplyError(null);
-    if (!hasCanonicalInstances || typeof commitInstances !== "function") {
+    // commitInstances creates instances from scratch via buildAppliedInstances,
+    // so it works for brand-new projects where instanceStatus is UNINITIALISED.
+    // The only hard failure is a missing commitInstances function.
+    if (typeof commitInstances !== "function") {
       setApplyError("Subwoofer instances are not ready.");
       return;
     }
@@ -305,10 +323,10 @@ export default function StartingLayoutCards({
         </p>
       </div>
 
-      {/* Two-column: room plan + decision area */}
-      <div className="grid gap-4 md:grid-cols-5">
-        {/* Left: Room & Seating — the designer's mental model */}
-        <div className="space-y-2 md:col-span-3">
+      {/* Two-column: room plan (40%) + gutter (20%) + decision cards (40%) */}
+      <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-start">
+        {/* Left: Room & Seating — 40% width */}
+        <div className="space-y-2 md:w-[40%] md:max-w-[420px]">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Room and Seating</div>
             <div className="text-[11px] text-[#8A7B6A]">
@@ -336,14 +354,15 @@ export default function StartingLayoutCards({
           />
         </div>
 
-        {/* Right: Decision cards */}
-        <div className="space-y-2 md:col-span-2">
+        {/* Right: Decision cards — 40% width */}
+        <div className="space-y-2 md:w-[40%] md:max-w-[420px]">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Starting Layouts</div>
             <div className="text-[11px] text-[#8A7B6A]">Choose a physical arrangement</div>
           </div>
-          {/* Loading state */}
-          {!advisor.result && advisor.status !== "error" && (
+
+          {/* Loading state — only when no fallback available (invalid room) */}
+          {advisorLoading && (
             <div className="space-y-2">
               {[1, 2, 4].map((q) => (
                 <div key={q} className="h-20 animate-pulse rounded-lg border border-dashed border-[#C9C2B8] bg-[#F8F7F4]" />
@@ -351,13 +370,13 @@ export default function StartingLayoutCards({
             </div>
           )}
 
-          {/* Error state */}
-          {advisor.status === "error" && (
-            <p className="text-xs text-red-700">Layout guidance could not be prepared. Manual placement remains available.</p>
+          {/* Error state — advisor failed, but fallback cards still show */}
+          {advisorError && (
+            <p className="text-[11px] text-amber-700">Optimised placement unavailable — showing standard layouts. Manual placement remains available.</p>
           )}
 
-          {/* Cards */}
-          {advisor.result && (
+          {/* Cards — always render when recommendations exist (advisor or fallback) */}
+          {recommendations[2] && (
             <div className="space-y-2">
               {[1, 2, 4].map((quantity) => (
                 <LayoutCard
@@ -373,13 +392,14 @@ export default function StartingLayoutCards({
             </div>
           )}
 
-          {/* Action button */}
-          {advisor.result && selectedLayout && (
+          {/* Action button — enabled whenever a layout is selected and
+              commitInstances is available. Not gated by hasCanonicalInstances
+              because buildAppliedInstances creates instances from scratch. */}
+          {selectedLayout && (
             <button
               type="button"
               onClick={apply}
-              disabled={!hasCanonicalInstances}
-              className="w-full rounded-lg bg-[#213428] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349] disabled:cursor-not-allowed disabled:opacity-45"
+              className="w-full rounded-lg bg-[#213428] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349]"
             >
               Use {selectedQuantity}-sub layout
             </button>
