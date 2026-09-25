@@ -35,7 +35,9 @@ export function capturePublicationTrace(snapshot) {
     _firstFailure = event;
   }
   _trace = {
-    ...(_firstFailure || event),
+    ...event,
+    firstFailurePhase: _firstFailure?.effectPhase || null,
+    firstFailureGuard: _firstFailure?.firstGuard || null,
     latestPhase: event.effectPhase,
     latestCapturedAt: event.capturedAt,
     events: _events.map(({ capturedAt, effectPhase, firstGuard }) => ({ capturedAt, effectPhase, firstGuard })),
