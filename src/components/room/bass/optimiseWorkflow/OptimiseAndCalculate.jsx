@@ -70,6 +70,29 @@ const hasPublishedCurrentDesign = (shared) =>
   shared?.completedBassAuthority?.authorityStatus === "AUTHORITATIVE"
   && shared?.completedBassAuthority?.contract?.job?.resultFingerprint === shared?.cacheKey;
 
+// A preserved old contract is not completion. If the foreground job has ended
+// without publishing the current fingerprint, fail rather than wait forever.
+async function waitForCurrentPublication(sharedRef, phaseRef) {
+  let noActiveJobSince = null;
+  while (true) {
+    await sleep(SLEEP_MS);
+    const current = sharedRef.current;
+    if (!current?.calculationInProgress && hasPublishedCurrentDesign(current)) return true;
+    if (phaseRef.current === "cancelled") return false;
+    if (!current?.calculationInProgress) {
+      if (["error", "timeout", "rejected"].includes(current?.calculationOutcome)) {
+        throw new Error(current?.terminalMessage || "Bass calculation ended without publishing a result.");
+      }
+      noActiveJobSince ??= Date.now();
+      if (Date.now() - noActiveJobSince > 30000) {
+        throw new Error("Bass calculation ended without publishing the current design. Retry the update.");
+      }
+    } else {
+      noActiveJobSince = null;
+    }
+  }
+}
+
 // ── Helper: apply recommendation values to subwoofer instances ──
 // Mirrors BassDecisionActions.applyRecommendationToInstances — the single
 // canonical way to commit accepted calibration values to instances after
@@ -190,13 +213,7 @@ export default function OptimiseAndCalculate({
       }
 
       // Wait for the initial calculation to complete
-      while (true) {
-        await sleep(SLEEP_MS);
-        const s = sharedRef.current;
-        if (!s?.calculationInProgress && hasPublishedCurrentDesign(s)) break;
-        if (phaseRef.current === "cancelled") break;
-      }
-      if (phaseRef.current === "cancelled") return;
+      if (!(await waitForCurrentPublication(sharedRef, phaseRef))) return;
 
       // Phase 2: Run V2 optimisation
       phaseRef.current = "optimising";
@@ -362,13 +379,7 @@ export default function OptimiseAndCalculate({
       // Wait for recalculation to complete — read live state via sharedRef
       // (NOT the stale closure-captured `shared`) so layout/position changes
       // between runs don't freeze the break condition on an old snapshot.
-      while (true) {
-        await sleep(SLEEP_MS);
-        const s = sharedRef.current;
-        if (!s?.calculationInProgress && hasPublishedCurrentDesign(s)) break;
-        if (phaseRef.current === "cancelled") break;
-      }
-      if (phaseRef.current === "cancelled") return;
+      if (!(await waitForCurrentPublication(sharedRef, phaseRef))) return;
 
       // Phase 5: Publishing
       phaseRef.current = "publishing";
