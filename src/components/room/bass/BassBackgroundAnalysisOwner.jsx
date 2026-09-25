@@ -296,16 +296,16 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       return Number.isFinite(Number(appState?.manualRspY_m));
     }
 
-    // AUTO_FROM_SCREEN and row-derived modes: screenFrontPlaneM must be a
-    // real published value, and mlpY_m must match the canonical derivation
-    // from the current screenFrontPlaneM + screen width.
-    const sfp = Number(appState?.screenFrontPlaneM);
-    if (!Number.isFinite(sfp) || sfp <= 0) return false;
+    // AUTO_FROM_SCREEN and row-derived modes: use the same canonical screen
+    // plane resolver as the RSP writer. New rooms can have no LCR model yet,
+    // so no screen plane has been published; the resolver supplies the same
+    // stable fallback used to position the RSP until LCR geometry is ready.
+    const expectedSfp = resolveRspScreenFrontPlaneM(appState?.screenFrontPlaneM, appState?.screen);
+    if (!Number.isFinite(expectedSfp) || expectedSfp <= 0) return false;
 
     const mlpY = Number(appState?.mlpY_m);
     if (!Number.isFinite(mlpY) || mlpY <= 0) return false;
 
-    const expectedSfp = resolveRspScreenFrontPlaneM(appState?.screenFrontPlaneM, appState?.screen);
     const screenWidthM = resolveRspScreenWidthM(appState?.screen);
     const idealDistM = distanceFor57_5FromWidth(screenWidthM);
     const expectedMlpY = expectedSfp + idealDistM;
