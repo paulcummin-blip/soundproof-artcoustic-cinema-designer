@@ -61,12 +61,16 @@ export default function PublicationTracePanel() {
             <Row label="requestId" value={trace.requestId} />
             <Row label="authoritative.status" value={trace.authoritativeStatus} />
             <Row label="authoritative.reason" value={trace.authoritativeReason} />
+            <Row label="requestManual.action" value={trace.requestManualAction} />
+            <Row label="workerFactoryAvailable" value={trace.workerFactoryAvailable} />
           </Section>
 
           <Section title="2. Worker / Lifecycle">
             <Row label="lifecycle.status" value={trace.lifecycleStatus} />
             <Row label="lifecycle.resultFingerprint" value={trace.lifecycleResultFingerprint} />
             <Row label="lifecycle.currentJobFingerprint" value={trace.lifecycleCurrentJobFingerprint} />
+            <Row label="workerStatus" value={trace.workerStatus} />
+            <Row label="activeJobId" value={trace.activeJobId} />
             <Row label="calculationInProgress" value={trace.calculationInProgress} />
             <Row label="calculationOutcome" value={trace.calculationOutcome} />
             <Row label="lastTerminalOutcome" value={trace.lastTerminalOutcome} />
