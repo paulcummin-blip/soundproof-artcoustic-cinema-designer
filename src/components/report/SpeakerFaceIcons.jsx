@@ -197,7 +197,6 @@ export function C41FaceIcon({ x, y, width, height }) {
           </feComponentTransfer>
         </filter>
       </defs>
-      <rect x="0" y="0" width="1711" height="120" fill="#ffffff" />
       <image
         x="0"
         y="0"
