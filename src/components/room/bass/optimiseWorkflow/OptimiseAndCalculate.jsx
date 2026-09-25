@@ -303,6 +303,37 @@ export default function OptimiseAndCalculate({
         adiDecisionRef.current = null;
       }
 
+      // Persist the exact ADI decision shown for each published fingerprint.
+      // Existing calibration can end this workflow before the auto-apply path;
+      // a first-run auto-apply calls this again after its final recalculation.
+      const publishCurrentAdiRecommendation = async () => {
+        const fingerprint = sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint
+          || sharedRef.current?.completedBassAuthority?.currentFingerprint
+          || null;
+        if (!fingerprint || !result?.recommendation) return;
+        const decision = adiDecisionRef.current;
+        const recommendationForPublication = {
+          ...result.recommendation,
+          publishedAdiDecision: decision?.recommendation ? {
+            outcome: decision.outcome,
+            intent: decision.intent,
+            recommendation: {
+              assessment: decision.recommendation.assessment || null,
+              action: decision.recommendation.action || null,
+              why: decision.recommendation.why || null,
+              rp22Evidence: decision.recommendation.rp22Evidence || null,
+              remainingLimitation: decision.recommendation.remainingLimitation || null,
+            },
+            leverAssessment: {
+              appropriateLever: decision.leverAssessment?.appropriateLever || null,
+            },
+          } : null,
+        };
+        const persisted = await publishRecommendation(projectId, versionId, recommendationForPublication, fingerprint);
+        if (!persisted) throw new Error("The published ADI recommendation could not be saved.");
+      };
+      await publishCurrentAdiRecommendation();
+
       // Phase 3: Route through the Recommendation Authority
       // The optimiser's calibration tuning is now a RECOMMENDATION, not an
       // auto-apply. The Recommendation Authority owns the proposal; the
@@ -421,37 +452,7 @@ export default function OptimiseAndCalculate({
       // the new current fingerprint so it survives a page refresh and is
       // available in completedBassAuthority.contract.recommendation for ADI
       // cold-load restoration.
-      try {
-        const postRecalcFingerprint = sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint
-          || sharedRef.current?.completedBassAuthority?.currentFingerprint
-          || null;
-        if (postRecalcFingerprint && result?.recommendation) {
-          const decision = adiDecisionRef.current;
-          const recommendationForPublication = {
-            ...result.recommendation,
-            publishedAdiDecision: decision?.recommendation ? {
-              outcome: decision.outcome,
-              intent: decision.intent,
-              recommendation: {
-                assessment: decision.recommendation.assessment || null,
-                action: decision.recommendation.action || null,
-                why: decision.recommendation.why || null,
-                rp22Evidence: decision.recommendation.rp22Evidence || null,
-                remainingLimitation: decision.recommendation.remainingLimitation || null,
-              },
-              leverAssessment: {
-                appropriateLever: decision.leverAssessment?.appropriateLever || null,
-              },
-            } : null,
-          };
-          const persisted = await publishRecommendation(projectId, versionId, recommendationForPublication, postRecalcFingerprint);
-          if (!persisted) throw new Error("The published ADI recommendation could not be saved.");
-        }
-      } catch (error) {
-        // Do not complete the workflow with an in-memory-only recommendation
-        // that will disappear on refresh.
-        throw error;
-      }
+      await publishCurrentAdiRecommendation();
 
       // Phase 5: Publishing
       phaseRef.current = "publishing";
