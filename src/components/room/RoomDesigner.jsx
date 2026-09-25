@@ -46,7 +46,7 @@ function useAppState() {
   const [seatingBlockOffset, setSeatingBlockOffset] = useState(0);
   const [seatsPerRow, setSeatsPerRow] = useState(2);
   const [seatingRows, setSeatingRows] = useState(1);
-  const [seatSpacing, setSeatSpacing] = useState(0.8);
+  const [seatSpacing, setSeatSpacing] = useState(0.6);
   const [seatingPositions, setSeatingPositions] = useState([]);
 
   // New properties as per the outline's appState destructuring
@@ -300,7 +300,7 @@ function RoomDesignerWithState() {
     const newPositions = (generateSeatingPositionsFOV({
       seatsPerRow: seatsPerRow || 2,
       numberOfRows: seatingRows || 1,
-      seatSpacing: seatSpacing || 0.8,
+      seatSpacing: seatSpacing || 0.6,
       screenSize: screen?.visibleWidthInches || 120,
       aspectRatio: screen?.aspectRatio || "16:9",
       roomDimensions: dimensions,

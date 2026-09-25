@@ -160,7 +160,7 @@ export function useSeatingRebuild({
 
       const roomWidth = Number(stableDimensions?.width) || 4.5;
       const centerX = roomWidth / 2;
-      const spacingX = Number(_seatSpacing) || 0.8;
+      const spacingX = Number(_seatSpacing) || 0.6;
       const scratchPrevById = new Map(currentSeats.map(s => [s.id, s]));
 
       const seats = [];
@@ -443,7 +443,7 @@ export function useSeatingRebuild({
     // 3) Basic geometry
     const roomWidth = Number(stableDimensions?.width) || 4.5;
     const centerX = roomWidth / 2;
-    const spacingX = Number(_seatSpacing) || 0.8;
+    const spacingX = Number(_seatSpacing) || 0.6;
 
     // 4) Build all seats
     const prevSeatById = new Map(currentSeats.map(s => [s.id, s]));

@@ -316,7 +316,7 @@ export function computeRowCentersAroundAnchor({ mlpRef, mlpAnchorY, rowCount, ro
 export function generateSeatingPositionsFOV({
   seatsPerRow = 2,
   numberOfRows = 1,
-  seatSpacing = 0.8,
+  seatSpacing = 0.6,
   screenSize = 100,
   aspectRatio = "16:9",
   roomDimensions = { width: 4.5, length: 6.0, height: 2.8 },

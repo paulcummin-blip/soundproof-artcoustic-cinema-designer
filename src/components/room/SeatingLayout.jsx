@@ -80,7 +80,7 @@ export default function SeatingLayout({
   onSeatsPerRowChange,
   seatingRows = 1,
   onSeatingRowsChange,
-  seatSpacing = 0.8,
+  seatSpacing = 0.6,
   onSeatSpacingChange,
   rowSpacingM = 1.8,
   onRowSpacingChange,
@@ -610,7 +610,7 @@ export default function SeatingLayout({
               style={stepperBtnStyle}
               onClick={() => {
                 if (disabled) return;
-                const base = Number.isFinite(seatSpacing) ? seatSpacing : 0.8;
+                const base = Number.isFinite(seatSpacing) ? seatSpacing : 0.6;
                 const next = Math.max(0.5, Math.min(3.0, Math.round((base - 0.1) * 100) / 100));
                 onSeatSpacingChange?.(next);
               }}>
@@ -645,7 +645,7 @@ export default function SeatingLayout({
               style={stepperBtnStyle}
               onClick={() => {
                 if (disabled) return;
-                const base = Number.isFinite(seatSpacing) ? seatSpacing : 0.8;
+                const base = Number.isFinite(seatSpacing) ? seatSpacing : 0.6;
                 const next = Math.max(0.5, Math.min(3.0, Math.round((base + 0.1) * 100) / 100));
                 onSeatSpacingChange?.(next);
               }}>

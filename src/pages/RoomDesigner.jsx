@@ -1559,7 +1559,7 @@ function RoomDesignerWithState() {
 
     // 1. Spacing (use override if given, otherwise keep current)
     const seatSpacingVal =
-    Number(overrides.seatSpacing ?? _seatSpacing ?? 0.8) || 0.8;
+    Number(overrides.seatSpacing ?? _seatSpacing ?? 0.6) || 0.6;
 
     const rowSpacingVal =
     Number(overrides.rowSpacingM ?? _rowSpacingM ?? 1.8) || 1.8;

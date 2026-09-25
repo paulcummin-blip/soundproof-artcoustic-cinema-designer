@@ -385,7 +385,7 @@ function useDesignerState() {
     (__autosavePayload && typeof __autosavePayload.seatingBlockOffset === "number") ? __autosavePayload.seatingBlockOffset : 0
   ));
   const [seatSpacing, setSeatSpacing] = useState(() => (
-    (__autosavePayload && typeof __autosavePayload.seatSpacing === "number") ? __autosavePayload.seatSpacing : 0.8
+    (__autosavePayload && typeof __autosavePayload.seatSpacing === "number") ? __autosavePayload.seatSpacing : 0.6
   ));
   const [rowSpacingM, setRowSpacingM] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.rowSpacingM === "number") ? __autosavePayload.rowSpacingM : 1.8
