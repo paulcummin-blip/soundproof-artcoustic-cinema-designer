@@ -135,12 +135,11 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
 
   const authorityStatus = completedBassAuthority?.authorityStatus || "UNCALCULATED";
   const lifecycleStatus = lifecycle?.status || "idle";
-  // Unified lifecycle — when provided, it is the sole authority for the
-  // calculation state. When not provided (legacy callers/fixtures), fall
-  // back to the raw controller status.
-  const isCalculating = bassLifecycleState != null
-    ? isBassLifecycleCalculating(bassLifecycleState)
-    : ["calculating", "running", "queued", "stale"].includes(lifecycleStatus);
+  // Unified lifecycle is the SOLE authority for calculation state.
+  // No fallback to raw controller status — bassLifecycleState is always
+  // provided by BassBackgroundAnalysisOwner.
+  const effectiveLifecycleState = bassLifecycleState || BASS_LIFECYCLE_STATE.IDLE;
+  const isCalculating = isBassLifecycleCalculating(effectiveLifecycleState);
   const timerStart = lifecycle?.startedAtMs ?? lifecycle?.queuedAtMs;
   const elapsedSeconds = secondsSince(timerStart, nowMs);
 
@@ -191,13 +190,9 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   const isAuthoritative = publicationVerified === true;
   const isNotVerified = authorityStatus === "NOT_VERIFIED";
   const isUpdating = ["UPDATING", "LOADING"].includes(authorityStatus) || isCalculating;
-  const isStale = bassLifecycleState != null
-    ? bassLifecycleState === BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION
-    : authorityStatus === "STALE";
+  const isStale = effectiveLifecycleState === BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION;
   const isBlocked = authorityStatus === "BLOCKED";
-  const isError = bassLifecycleState != null
-    ? bassLifecycleState === BASS_LIFECYCLE_STATE.FAILED
-    : authorityStatus === "ERROR";
+  const isError = effectiveLifecycleState === BASS_LIFECYCLE_STATE.FAILED;
   const isUncalculated = authorityStatus === "UNCALCULATED" && !isCalculating;
   // LIMITED: P14 capability below the requested target. The calculation is
   // terminal (not pending), but P18/P19/P20 were not evaluated. Treat like
@@ -331,16 +326,18 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       ? { label: "P20 Seat Consistency", resultText: "FAIL", text: "P20 Seat Consistency FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
       : seatScopeHeadlinePill("P20 Seat Consistency");
 
-  // Status text
+  // Status text — lifecycle display comes from BASS_LIFECYCLE_COPY (sole
+  // authority). Engineering-specific text (NOT VERIFIED, P14 capability
+  // below target) remains here as it is not a lifecycle state.
   let statusText = "Waiting for complete design";
   if (isCalculatingWithPublished) statusText = "Analysing updated design…";
   else if (isCalculating) statusText = `Calculating… · ${elapsedSeconds} s`;
-  else if (isError) statusText = completedBassAuthority?.errorMessage || "Analysis failed";
-  else if (isStale) statusText = "Needs recalculation";
+  else if (isError) statusText = completedBassAuthority?.errorMessage || BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.FAILED];
+  else if (isStale) statusText = BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION];
   else if (isNotVerified) statusText = "NOT VERIFIED";
   else if (isBlocked) statusText = "Waiting for complete design";
   else if (isLimited) statusText = "P14 capability below target";
-  else if (isAuthoritative) statusText = contract?.job?.message || (contract?.job?.cacheStatus === "hit" ? "Restored from cache" : "Performance is current.");
+  else if (isAuthoritative) statusText = contract?.job?.message || (contract?.job?.cacheStatus === "hit" ? "Restored from cache" : BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.COMPLETE]);
   else if (isUpdating) statusText = `Calculating… · ${elapsedSeconds} s`;
 
   return {

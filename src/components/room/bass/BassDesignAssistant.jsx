@@ -58,7 +58,8 @@ export default function BassDesignAssistant({
   const hasSubwoofers = subwooferInstances.some((s) => s?.enabled !== false);
   const hasResults = shared?.hasCurrentResult === true;
   const isCalculating = shared?.calculationInProgress === true;
-  const isStale = shared?.bassLifecycleState === "stale_needs_recalculation";
+  // Lifecycle state consumed from the sole authority — no independent derivation.
+  const bassLifecycleState = shared?.bassLifecycleState || null;
 
   // Fix flash: initialize based on whether subs already exist at first render.
   // This prevents the one-frame flash of layout cards on projects that
@@ -127,9 +128,7 @@ export default function BassDesignAssistant({
           rearCount={compat.rearCount}
           subwooferInstances={subwooferInstances}
           roomDims={roomDims}
-          hasResults={hasResults}
-          isCalculating={isCalculating}
-          isStale={isStale}
+          bassLifecycleState={bassLifecycleState}
           onChangeSpeakers={onChangeSpeakerConfig}
           onChangeLayout={() => setShowLayoutCards(true)}
         />

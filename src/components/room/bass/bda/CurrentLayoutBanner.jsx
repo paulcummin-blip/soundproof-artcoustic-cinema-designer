@@ -8,10 +8,14 @@
 //
 // The thumbnail is a presentational schematic of the current sub positions.
 // Selecting Change restores the three layout cards (handled by parent).
+//
+// Lifecycle status is consumed from bassCalculationLifecycle — this component
+// does NOT derive lifecycle state independently.
 // ---------------------------------------------------------------------------
 
 import React from "react";
 import { RefreshCw, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { deriveBassDisplayStatus, BASS_DISPLAY_ICON, BASS_LIFECYCLE_STATE } from "../bassCalculationLifecycle";
 
 function LayoutThumbnail({ subwooferInstances, roomDims }) {
   const enabled = (Array.isArray(subwooferInstances) ? subwooferInstances : [])
@@ -81,29 +85,19 @@ function deriveLayoutLabel(subwooferInstances) {
   return { count, layoutName };
 }
 
-export default function CurrentLayoutBanner({ subwooferInstances, roomDims, hasResults, isCalculating, isStale, onChange }) {
+function StatusIcon({ icon, isCalculating }) {
+  if (icon === BASS_DISPLAY_ICON.LOADER) return <Loader2 className={`h-3 w-3 ${isCalculating ? "animate-spin" : ""}`} />;
+  if (icon === BASS_DISPLAY_ICON.CHECK) return <CheckCircle2 className="h-3 w-3" />;
+  if (icon === BASS_DISPLAY_ICON.ALERT) return <AlertCircle className="h-3 w-3" />;
+  return null;
+}
+
+export default function CurrentLayoutBanner({ subwooferInstances, roomDims, bassLifecycleState = BASS_LIFECYCLE_STATE.IDLE, onChange }) {
   const layout = deriveLayoutLabel(subwooferInstances);
   if (!layout) return null;
 
-  let statusText;
-  let StatusIcon = null;
-  let statusColor = "#8A7B6A";
-
-  if (isCalculating) {
-    statusText = "Recalculating…";
-    StatusIcon = Loader2;
-    statusColor = "#625143";
-  } else if (!hasResults) {
-    statusText = "Ready to calculate performance";
-  } else if (isStale) {
-    statusText = "Performance is out of date";
-    StatusIcon = AlertCircle;
-    statusColor = "#7A4F1A";
-  } else {
-    statusText = "Performance is current";
-    StatusIcon = CheckCircle2;
-    statusColor = "#4A7560";
-  }
+  // Lifecycle display from the sole authority — no independent derivation.
+  const display = deriveBassDisplayStatus(bassLifecycleState);
 
   return (
     <div
@@ -117,9 +111,9 @@ export default function CurrentLayoutBanner({ subwooferInstances, roomDims, hasR
           {layout.count} Subwoofer{layout.count > 1 ? "s" : ""}
         </div>
         <div className="text-[12px] text-[#625143]">{layout.layoutName}</div>
-        <div className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: statusColor }}>
-          {StatusIcon && <StatusIcon className={`h-3 w-3 ${isCalculating ? "animate-spin" : ""}`} />}
-          {statusText}
+        <div className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: display.color }}>
+          <StatusIcon icon={display.icon} isCalculating={display.isCalculating} />
+          {display.text}
         </div>
       </div>
       <button

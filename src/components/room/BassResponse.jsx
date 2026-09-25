@@ -45,6 +45,7 @@ import { useGraphInteraction } from "@/components/room/bass/bda/graphInteraction
 import { buildParameterFocus } from "@/components/room/bass/storyteller/parameterFocusOverlays";
 import ParameterFocusBar from "@/components/room/bass/storyteller/ParameterFocusBar";
 import StorytellerExplanation from "@/components/room/bass/storyteller/StorytellerExplanation";
+import { BASS_LIFECYCLE_STATE } from "@/components/room/bass/bassCalculationLifecycle";
 
 const IS_DEVELOPMENT_MODE = false;
 

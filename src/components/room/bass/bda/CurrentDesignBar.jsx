@@ -4,18 +4,19 @@
 //
 // One compact bar answering: "What am I designing?"
 //
-// Merges the former CurrentSystemSummary (speakers) and CurrentLayoutBanner
-// (layout + status) into a single current-state card.
-//
 // [thumbnail]  Current Design                    [Change Speakers] [Change Layout]
 //              SUB3-12 ×2
 //              2 Subwoofers · Pair Layout
 //              ● Performance is current
+//
+// Lifecycle status is consumed from bassCalculationLifecycle — this component
+// does NOT derive lifecycle state independently.
 // ---------------------------------------------------------------------------
 
 import React from "react";
 import { Settings2, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { subwooferDisplayLabel } from "@/components/utils/subwooferDisplayLabel";
+import { deriveBassDisplayStatus, BASS_DISPLAY_ICON, BASS_LIFECYCLE_STATE } from "../bassCalculationLifecycle";
 
 function LayoutThumbnail({ subwooferInstances, roomDims }) {
   const enabled = (Array.isArray(subwooferInstances) ? subwooferInstances : [])
@@ -84,10 +85,17 @@ function deriveLayoutLabel(subwooferInstances) {
   return { count, layoutName };
 }
 
+function StatusIcon({ icon, isCalculating }) {
+  if (icon === BASS_DISPLAY_ICON.LOADER) return <Loader2 className={`h-3 w-3 ${isCalculating ? "animate-spin" : ""}`} />;
+  if (icon === BASS_DISPLAY_ICON.CHECK) return <CheckCircle2 className="h-3 w-3" />;
+  if (icon === BASS_DISPLAY_ICON.ALERT) return <AlertCircle className="h-3 w-3" />;
+  return null;
+}
+
 export default function CurrentDesignBar({
   frontModel, frontCount, rearModel, rearCount,
   subwooferInstances, roomDims,
-  hasResults, isCalculating, isStale,
+  bassLifecycleState = BASS_LIFECYCLE_STATE.IDLE,
   onChangeSpeakers, onChangeLayout,
 }) {
   const hasFront = frontCount > 0 && frontModel;
@@ -118,25 +126,8 @@ export default function CurrentDesignBar({
 
   const layout = deriveLayoutLabel(subwooferInstances);
 
-  let statusText;
-  let StatusIcon = null;
-  let statusColor = "#8A7B6A";
-
-  if (isCalculating) {
-    statusText = "Recalculating…";
-    StatusIcon = Loader2;
-    statusColor = "#625143";
-  } else if (!hasResults) {
-    statusText = "Ready to calculate";
-  } else if (isStale) {
-    statusText = "Performance out of date";
-    StatusIcon = AlertCircle;
-    statusColor = "#7A4F1A";
-  } else {
-    statusText = "Performance is current";
-    StatusIcon = CheckCircle2;
-    statusColor = "#4A7560";
-  }
+  // Lifecycle display from the sole authority — no independent derivation.
+  const display = deriveBassDisplayStatus(bassLifecycleState);
 
   return (
     <div className="flex items-center gap-3 rounded-lg border border-[#D9D5CE] bg-white px-4 py-3">
@@ -151,9 +142,9 @@ export default function CurrentDesignBar({
             {layout.count} Subwoofer{layout.count > 1 ? "s" : ""} · {layout.layoutName}
           </div>
         )}
-        <div className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: statusColor }}>
-          {StatusIcon && <StatusIcon className={`h-3 w-3 ${isCalculating ? "animate-spin" : ""}`} />}
-          {statusText}
+        <div className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: display.color }}>
+          <StatusIcon icon={display.icon} isCalculating={display.isCalculating} />
+          {display.text}
         </div>
       </div>
       <div className="flex items-center gap-2">
