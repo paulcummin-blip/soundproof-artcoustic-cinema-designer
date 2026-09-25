@@ -986,7 +986,22 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       // Publish as a LIMITED authority (not AUTHORITATIVE) so the UI can show
       // the P14 capability shortfall without running the optimiser again.
       if (isValidLimitedP14Contract(cachedContract)) {
-        publishCachedLimitedBassContract(scopeId, versionId, cachedContract, cacheKey, requested);
+        const cachePublished = publishCachedLimitedBassContract(scopeId, versionId, cachedContract, cacheKey, requested);
+        capturePublicationTrace({
+          effectPhase: "cached-limited-short-circuit",
+          firstGuard: cachePublished ? null : "cached LIMITED contract rejected before fresh publication",
+          cacheKey,
+          manualRequestFingerprint: manualAnalysisRequest?.fingerprint || null,
+          dispatchedRef: dispatchedManualRequestRef.current,
+          manualRequestMatchesCurrent,
+          lifecycleStatus: lifecycle.status,
+          lifecycleResultFingerprint: lifecycle.resultFingerprint,
+          contractJobStatus: contract?.job?.status,
+          cachedContractFingerprint: cachedContract?.job?.resultFingerprint,
+          cachedFingerprintMatchesCurrent: cachedContract?.job?.resultFingerprint === cacheKey,
+          cachePublishReturned: cachePublished,
+          publishRan: false,
+        });
         return;
       }
       // Stage 4: publish cached compact contract with full safety guards.
@@ -994,7 +1009,32 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       // expected full result fingerprint. requested = the selected P14 target
       // identity. publishCachedCompactBassContract rejects any contract that
       // doesn't match both, or lacks the graph payload, or isn't AUTHORITATIVE.
-      publishCachedCompactBassContract(scopeId, versionId, cachedContract, cacheKey, requested);
+      const cachePublished = publishCachedCompactBassContract(scopeId, versionId, cachedContract, cacheKey, requested);
+      capturePublicationTrace({
+        effectPhase: "cached-compact-short-circuit",
+        firstGuard: cachePublished ? null : "cached compact contract rejected before fresh publication",
+        cacheKey,
+        manualRequestFingerprint: manualAnalysisRequest?.fingerprint || null,
+        dispatchedRef: dispatchedManualRequestRef.current,
+        manualRequestMatchesCurrent,
+        lifecycleStatus: lifecycle.status,
+        lifecycleResultFingerprint: lifecycle.resultFingerprint,
+        lifecycleCurrentJobFingerprint: lifecycle.currentJobFingerprint,
+        workerStatus: lifecycle.workerStatus,
+        activeJobId: lifecycle.activeJobId,
+        contractJobStatus: contract?.job?.status,
+        contractJobResultFingerprint: contract?.job?.resultFingerprint,
+        contractJobCurrentJobFingerprint: contract?.job?.currentJobFingerprint,
+        freshContractStructural: isStructurallyCompleteBassContract(contract),
+        freshContractAuthoritative: isAuthoritativeBassContract(contract),
+        cachedContractFingerprint: cachedContract?.job?.resultFingerprint,
+        cachedContractAuthoritative: isAuthoritativeBassContract(cachedContract),
+        cachedGraphPayload: hasGraphPayload(cachedContract),
+        cachedFingerprintMatchesCurrent: cachedContract?.job?.resultFingerprint === cacheKey,
+        cachedP14MatchesCurrent: bassContractMatchesRequestedP14(cachedContract, requested),
+        cachePublishReturned: cachePublished,
+        publishRan: false,
+      });
       return;
     }
     // ── Authority already restored: no publish, no sync, no recalculation ──
