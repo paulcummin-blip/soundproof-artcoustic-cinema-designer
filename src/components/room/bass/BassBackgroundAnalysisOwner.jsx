@@ -1343,19 +1343,34 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // cached contract on the FIRST render after a target switch — before the
   // publish effect has promoted it to the live authority store.
   const visibleCachedContract = (manualRequestMatchesCurrent || !manualAnalysisRequest) ? cachedContract : null;
-  // Restoration: the published contract is displayed when no cached/live
-  // contract is available, regardless of whether the live fingerprint matches.
-  // The live fingerprint determines recalculation, not whether the published
-  // result may be displayed.
+  // ── Published Engineering Contract lifecycle ──────────────────────────
+  // The graph must obey the SAME lifecycle as RP22, ADI, and Design Rating:
+  // it must never leave the Published Engineering Contract while it remains
+  // the published authority. The live `contract` from useBassAnalysisContract
+  // is always a non-null object (even during calculation), so the previous
+  // `|| contract ||` fallback prevented the published `completedContract`
+  // from ever being selected. This left the graph as the only consumer that
+  // abandoned the published contract during UPDATE/CANCEL/REFRESH/REOPEN.
+  //
+  // Priority: visibleCachedContract (P14 cache hit) → authoritative live
+  // contract (fresh calculation complete) → published contract (previous
+  // result, remains visible during UPDATE) → non-authoritative live contract
+  // (final fallback for lifecycle status only).
+  const authoritativeLiveContract = isAuthoritativeBassContract(contract) ? contract : null;
   const effectiveContract = isProjectHydrationReady
-    ? (visibleCachedContract || contract || (hasPublishedContract ? completedContract : null))
+    ? (visibleCachedContract || authoritativeLiveContract || (hasPublishedContract ? completedContract : null) || contract)
     : null;
   // Restoration status: when the published contract is the effective contract
-  // (no cached/live contract), show COMPLETE if the published contract is
-  // current (fingerprint matches), or UPDATING if the design changed (fingerprint
-  // mismatch). The published result remains visible in both cases — only the
-  // status reflects whether recalculation is needed.
-  const effectiveDetailedStatus = (isProjectHydrationReady && effectiveContract && !cachedContract && !contract && hasPublishedContract)
+  // (no cached/live authoritative contract), show COMPLETE if the published
+  // contract is current (fingerprint matches), or UPDATING if the design
+  // changed (fingerprint mismatch). The published result remains visible in
+  // both cases — only the status reflects whether recalculation is needed.
+  const showingPublishedContract = isProjectHydrationReady
+    && !!effectiveContract
+    && !visibleCachedContract
+    && !authoritativeLiveContract
+    && hasPublishedContract;
+  const effectiveDetailedStatus = showingPublishedContract
     ? (publishedContractIsStale ? "UPDATING" : "COMPLETE")
     : detailedStatus;
   // ── Stage 3: Finished graph restore from published contract ──────────
