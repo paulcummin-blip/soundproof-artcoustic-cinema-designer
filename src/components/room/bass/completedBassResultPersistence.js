@@ -478,7 +478,23 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
   // buildGraphPayload reads from finalOptimisedBassResponse which is absent.
   const isAlreadyCompact = contract && !contract.finalOptimisedBassResponse && contract.graphPayload;
   const compact = isAlreadyCompact ? contract : compactCompletedBassContract(contract);
-  if (compact) completedByFingerprint[compact.job.resultFingerprint] = compact;
+  if (compact) {
+    // Preserve the recommendation field from the existing snapshot.
+    // publishRecommendation attaches the Recommendation Engine output to the
+    // snapshot AFTER the bass result is published. Without this preservation,
+    // a subsequent cache sync would overwrite the snapshot with a fresh compact
+    // contract (which has no recommendation) and lose the recommendation —
+    // causing ADI to fall to "No further engineering changes" on refresh.
+    const existingSnapshot = completedByFingerprint[compact.job.resultFingerprint];
+    if (existingSnapshot?.recommendation) {
+      completedByFingerprint[compact.job.resultFingerprint] = {
+        ...compact,
+        recommendation: existingSnapshot.recommendation,
+      };
+    } else {
+      completedByFingerprint[compact.job.resultFingerprint] = compact;
+    }
+  }
   const bounded = Object.fromEntries(Object.entries(completedByFingerprint)
     .sort(([, left], [, right]) => Number(right?.job?.completedAtMs || 0) - Number(left?.job?.completedAtMs || 0))
     .slice(0, 3));
