@@ -662,23 +662,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     }
     if (timingTraceRef.current) timingTraceRef.current.mark("optimiserStartMs");
     dispatchedManualRequestRef.current = manualAnalysisRequest.id;
-    capturePublicationTrace({
-      effectPhase: "optimiser-dispatched",
-      firstGuard: null,
-      cacheKey,
-      requestId: manualAnalysisRequest.id,
-      manualRequestFingerprint: manualAnalysisRequest.fingerprint,
-      dispatchedRef: dispatchedManualRequestRef.current,
-      manualRequestMatchesCurrent,
-      authoritativeStatus: authoritative.status,
-      authoritativeReason: authoritative.reason,
-      lifecycleStatus: lifecycle.status,
-      lifecycleResultFingerprint: lifecycle.resultFingerprint,
-      lifecycleCurrentJobFingerprint: lifecycle.currentJobFingerprint,
-      contractJobStatus: contract?.job?.status,
-      publishRan: false,
-    });
-    controller.requestManual({
+    const requestResult = controller.requestManual({
       fingerprint: cacheKey,
       payload,
       identity: requestIdentity,
@@ -687,6 +671,27 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       diagnosticToken: manualAnalysisRequest.diagnosticToken || null,
       projectId: scopeId,
       versionId,
+    });
+    const workerSnapshot = controller.getSnapshot();
+    capturePublicationTrace({
+      effectPhase: "optimiser-request-returned",
+      firstGuard: null,
+      cacheKey,
+      requestId: manualAnalysisRequest.id,
+      manualRequestFingerprint: manualAnalysisRequest.fingerprint,
+      dispatchedRef: dispatchedManualRequestRef.current,
+      manualRequestMatchesCurrent,
+      authoritativeStatus: authoritative.status,
+      authoritativeReason: authoritative.reason,
+      requestManualAction: requestResult?.action,
+      workerFactoryAvailable: !!controller.workerFactory,
+      workerStatus: workerSnapshot?.workerStatus,
+      activeJobId: workerSnapshot?.activeJobId,
+      lifecycleStatus: workerSnapshot?.status,
+      lifecycleResultFingerprint: workerSnapshot?.resultFingerprint,
+      lifecycleCurrentJobFingerprint: workerSnapshot?.currentJobFingerprint,
+      contractJobStatus: contract?.job?.status,
+      publishRan: false,
     });
   }, [
     controller,
