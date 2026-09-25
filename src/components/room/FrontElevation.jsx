@@ -3,6 +3,7 @@ import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/spea
 import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
+import { detectFrontStageMode } from "@/components/roomdesigner/utils/lcrHeightAuthority";
 
 // Roles displayed in front elevation
 const FRONT_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
@@ -70,6 +71,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   // Live refs so mousemove handler can read current speaker positions without stale closure
   const lcrSpeakersRef = useRef([]);
   const subItemsRef = useRef([]);
+  const frontStageModeRef = useRef('standard');
 
   const clientToRoom = useCallback((clientX, clientY) => {
     const svg = svgRef.current;
@@ -187,11 +189,15 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           const fcSpk = lcrSpeakersRef.current.find(s => s.role === 'FC');
           const frSpk = lcrSpeakersRef.current.find(s => s.role === 'FR');
           const allSameModel = flSpk && fcSpk && frSpk && flSpk.modelKey === fcSpk.modelKey && fcSpk.modelKey === frSpk.modelKey;
+          const isCenterOnly = frontStageModeRef.current === 'center_only';
           if (allSameModel) {
             liveMap['FL'] = { x: liveMap['FL']?.x ?? flSpk?.x ?? snappedX, z: snappedZ };
             liveMap['FC'] = { x: liveMap['FC']?.x ?? fcSpk?.x ?? snappedX, z: snappedZ };
             liveMap['FR'] = { x: liveMap['FR']?.x ?? frSpk?.x ?? snappedX, z: snappedZ };
-          } else if (drag.role === 'FL' || drag.role === 'FR') {
+          } else if (!isCenterOnly && (drag.role === 'FL' || drag.role === 'FR')) {
+            // Only sync FL↔FR in standard/integrated mode.
+            // In center_only mode FL/FR are independent — the commit does not
+            // sync them, so the preview must not either.
             const otherRole = drag.role === 'FL' ? 'FR' : 'FL';
             const otherSpk = lcrSpeakersRef.current.find(s => s.role === otherRole);
             liveMap[otherRole] = { x: liveMap[otherRole]?.x ?? otherSpk?.x ?? snappedX, z: snappedZ };
@@ -308,10 +314,15 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       return { x, z, wM, hM, label: "SUB", index: i, id: s?.id };
     });
   }, [frontSubs, roomW, liveDragSubs]);
+  // Front stage mode — drives whether FL/FR z-drag syncs the paired speaker.
+  // Must match the commit logic in useElevationDragHandlers.
+  const frontStageMode = useMemo(() => detectFrontStageMode(placedSpeakers), [placedSpeakers]);
+
   // Keep snap refs current on every render
   lcrSpeakersRef.current = lcrSpeakers;
   subItemsRef.current = subItems;
   tvCentreRef.current = tvVerticalCentreM;
+  frontStageModeRef.current = frontStageMode;
 
   // Clash detection — recalculates live (also during drag via lcrSpeakers/subItems reactivity)
   const clashes = useMemo(() => {
