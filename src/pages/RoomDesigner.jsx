@@ -1868,10 +1868,13 @@ function RoomDesignerWithState() {
     // be published as the canonical Engineering Summary. The single
     // isDesignRatingPublishable predicate decides; no consumer duplicates the
     // readiness rule.
-    const candidateRatingStatus =
-      appDesignRating?.engineeringSummary?.project?.rating?.status || null;
+    const candidateRating =
+      appDesignRating?.engineeringSummary?.project?.rating || null;
+    const candidateRatingStatus = candidateRating?.status || null;
     const candidateIsProvisional =
-      candidateRatingStatus === "NOT_ASSESSED";
+      !candidateRating ||
+      candidateRatingStatus === "NOT_ASSESSED" ||
+      candidateRatingStatus === "NOT_CONFIGURED";
 
     if (appDesignRating.isPublishable !== true || candidateIsProvisional) {
       const versionId = appState?.activeVersionId || null;
