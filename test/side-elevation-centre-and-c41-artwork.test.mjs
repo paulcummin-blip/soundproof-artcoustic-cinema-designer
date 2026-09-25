@@ -18,8 +18,11 @@ test("side elevation includes FC alongside the viewed-wall main speaker", () => 
   assert.doesNotMatch(sideElevation, /FC \(centre\) is hidden/);
 });
 
-test("C4-1 artwork is normalised onto a white cabinet face", () => {
+test("C4-1 artwork is white without an outer backing rectangle", () => {
   assert.match(speakerFaceIcons, /id="c41-white-artwork"/);
-  assert.match(speakerFaceIcons, /width="1711" height="120" fill="#ffffff"/);
   assert.match(speakerFaceIcons, /filter="url\(#c41-white-artwork\)"/);
+  assert.doesNotMatch(
+    speakerFaceIcons,
+    /<rect x="0" y="0" width="1711" height="120" fill="#ffffff"/,
+  );
 });
