@@ -19,6 +19,17 @@ export function isCanonicalP19Ready({
 
 export function hasReadyCanonicalP19Contract(contract) {
   const parameter = contract?.productAnalysis?.parameters?.p19;
+  // Not-assessable P19 is a terminal state — the assessment has reached a
+  // conclusion (P19 cannot be graded because P18 extension was not achieved
+  // or the assessment band is invalid). This counts as ready for publication;
+  // the contract carries the failure reason instead of per-seat results.
+  if (parameter?.notAssessable === true
+    && parameter?.status === "complete"
+    && typeof parameter?.reason === "string"
+    && parameter.reason.length > 0) {
+    return true;
+  }
+  // Assessable P19 requires complete status, valid curves, and finite values.
   const response = contract?.finalOptimisedBassResponse;
   const graph = contract?.graphPayload;
   return parameter?.status === "complete"

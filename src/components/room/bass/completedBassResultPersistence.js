@@ -58,13 +58,19 @@ export function isStructurallyCompleteBassContract(contract) {
 function hasCanonicalSeatMetricAuthority(contract) {
   const realSeatCount = Number(contract?.provenance?.realSeatCount);
   if (!Number.isInteger(realSeatCount) || realSeatCount < 0) return false;
+  // Not-assessable P19/P20 is a terminal state with legitimately empty per-seat
+  // results. Skip the per-seat count check when the parameter declares
+  // notAssessable — the contract carries the failure reason instead.
+  const p19Param = contract?.productAnalysis?.parameters?.p19;
+  const p19NotAssessable = p19Param?.notAssessable === true;
   const p19Seats = contract?.selectedCandidate?.perSeatP19Results;
-  if (realSeatCount > 0 && (!Array.isArray(p19Seats)
+  if (!p19NotAssessable && realSeatCount > 0 && (!Array.isArray(p19Seats)
     || p19Seats.length !== realSeatCount
     || p19Seats.some((seat) => !seat?.seatId || !Number.isFinite(seat?.variationDbRaw) || !Number.isFinite(seat?.level)))) return false;
-  const p20 = contract?.productAnalysis?.parameters?.p20;
+  const p20Param = contract?.productAnalysis?.parameters?.p20;
+  const p20NotAssessable = p20Param?.notAssessable === true;
   const p20Seats = contract?.selectedCandidate?.perSeatP20Results;
-  if (p20?.status === "complete" && (!Array.isArray(p20Seats)
+  if (!p20NotAssessable && p20Param?.status === "complete" && (!Array.isArray(p20Seats)
     || p20Seats.length !== realSeatCount
     || p20Seats.some((seat) => !seat?.seatId || !Number.isFinite(seat?.variationDbRaw) || !Number.isFinite(seat?.level)))) return false;
   return true;
@@ -201,15 +207,17 @@ export function validateAssessmentEnvelopeAuthority(contract) {
 
   if (!envelope) return { valid: false, reason: "missing-assessment-envelope" };
 
-  if (!Number.isFinite(Number(envelope.achievedP18FrequencyHz)))
-    return { valid: false, reason: "missing-achieved-p18-frequency" };
-  if (!Number.isFinite(Number(envelope.assessmentStartHz)))
-    return { valid: false, reason: "missing-assessment-start-hz" };
-  if (!Number.isFinite(Number(envelope.assessmentEndHz)))
-    return { valid: false, reason: "missing-assessment-end-hz" };
-
-  if (envelope.p19TargetIdentity !== "reference-eq")
-    return { valid: false, reason: `p19-target-identity-missing-or-invalid:${String(envelope.p19TargetIdentity)}` };
+  // Not-assessable terminal state: when P19/P20 is declared not assessable
+  // (e.g. P18 extension not achieved or assessment band invalid), the
+  // assessment band limits are legitimately null. Skip the band limit, P18
+  // authority parity, and per-seat grade checks — the contract carries the
+  // failure reason instead. Still require the reference EQ and calibrated RSP
+  // curves for graph rendering.
+  const p19Param = contract?.productAnalysis?.parameters?.p19;
+  const p20Param = contract?.productAnalysis?.parameters?.p20;
+  const p19NotAssessable = p19Param?.notAssessable === true;
+  const p20NotAssessable = p20Param?.notAssessable === true;
+  const hasNotAssessable = p19NotAssessable || p20NotAssessable;
 
   // Stored Reference EQ must be byte-for-byte equivalent under the canonical
   // curve signature to the stored calibrated RSP response.
@@ -225,6 +233,22 @@ export function validateAssessmentEnvelopeAuthority(contract) {
     return { valid: false, reason: "missing-calibrated-rsp-response" };
   if (buildCurveSignature(referenceEq) !== buildCurveSignature(calibratedRsp))
     return { valid: false, reason: "reference-eq-calibrated-rsp-mismatch" };
+
+  if (hasNotAssessable) {
+    // Terminal not-assessable state — skip band limit, P18 parity, and
+    // per-seat grade validation. The contract carries the failure reason.
+    return { valid: true, reason: null };
+  }
+
+  if (!Number.isFinite(Number(envelope.achievedP18FrequencyHz)))
+    return { valid: false, reason: "missing-achieved-p18-frequency" };
+  if (!Number.isFinite(Number(envelope.assessmentStartHz)))
+    return { valid: false, reason: "missing-assessment-start-hz" };
+  if (!Number.isFinite(Number(envelope.assessmentEndHz)))
+    return { valid: false, reason: "missing-assessment-end-hz" };
+
+  if (envelope.p19TargetIdentity !== "reference-eq")
+    return { valid: false, reason: `p19-target-identity-missing-or-invalid:${String(envelope.p19TargetIdentity)}` };
 
   // Four-way P18 authority parity: the selected candidate, envelope, assessment
   // start, and product-analysis card must all carry the same canonical achieved

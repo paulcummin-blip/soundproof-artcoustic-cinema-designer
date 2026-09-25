@@ -552,31 +552,75 @@ export function adaptCurrentBassOptimisationResult({
   // post-EQ RSP against the finished canonical target. Candidate/legacy values
   // are deliberately not fallbacks for readiness.
   const authorityP19 = finalResponse?.finalSeatVariationData?.p19;
-  const p19Ready = optimisationResult?.p19AssessmentReady === true
-    && hasCanonicalSeatResults(selectedCandidate?.perSeatP19Results, realSeatCount)
-    && isCanonicalP19Ready({
-      canonicalPostEqRsp: finalResponse?.referenceEq,
-      canonicalTargetCurve: finalResponse?.referenceEq,
-      officialVariationDb: authorityP19?.variationDb,
-      officialLevel: authorityP19?.level,
+  const p19NotAssessable = optimisationResult?.p19NotAssessable === true;
+  const p19NotAssessableReason = optimisationResult?.p19NotAssessableReason || null;
+
+  if (p19NotAssessable) {
+    // Terminal not-assessable state — P19 cannot be graded (e.g. P18 extension
+    // not achieved or assessment band invalid). This is a complete engineering
+    // outcome, not a pending calculation. Do not mark UPDATING.
+    contract.productAnalysis.parameters.p19 = {
+      ...createBassParameterResult({
+        parameter: PARAM_P19,
+        status: isUpdating ? PARAM_STATUS_UPDATING : PARAM_STATUS_COMPLETE,
+        level: 0,
+        value: null,
+        unit: "dB",
+        passedL1: false,
+        isStale,
+        reason: p19NotAssessableReason,
+      }),
+      notAssessable: true,
+      notAssessableReason: p19NotAssessableReason,
+    };
+  } else {
+    const p19Ready = optimisationResult?.p19AssessmentReady === true
+      && hasCanonicalSeatResults(selectedCandidate?.perSeatP19Results, realSeatCount)
+      && isCanonicalP19Ready({
+        canonicalPostEqRsp: finalResponse?.referenceEq,
+        canonicalTargetCurve: finalResponse?.referenceEq,
+        officialVariationDb: authorityP19?.variationDb,
+        officialLevel: authorityP19?.level,
+      });
+    const p19Level = p19Ready ? authorityP19.level : null;
+    const p19Value = p19Ready ? authorityP19.variationDb : null;
+    const p19Status = p19Ready
+      ? paramStatus(true)
+      : contract.job.status === "error"
+        ? PARAM_STATUS_ERROR
+        : hasResult
+          ? PARAM_STATUS_UPDATING
+          : detailedStatus === "CALCULATING" ? PARAM_STATUS_CALCULATING : PARAM_STATUS_UNCALCULATED;
+    contract.productAnalysis.parameters.p19 = createBassParameterResult({
+      parameter: PARAM_P19, status: p19Status, level: p19Level, value: p19Value,
+      unit: "dB", passedL1: p19Ready ? p19Level >= 1 : null, isStale,
+      reason: p19Ready ? null : "Canonical Reference EQ or official P19 assessment is pending",
     });
-  const p19Level = p19Ready ? authorityP19.level : null;
-  const p19Value = p19Ready ? authorityP19.variationDb : null;
-  const p19Status = p19Ready
-    ? paramStatus(true)
-    : contract.job.status === "error"
-      ? PARAM_STATUS_ERROR
-      : hasResult
-        ? PARAM_STATUS_UPDATING
-        : detailedStatus === "CALCULATING" ? PARAM_STATUS_CALCULATING : PARAM_STATUS_UNCALCULATED;
-  contract.productAnalysis.parameters.p19 = createBassParameterResult({
-    parameter: PARAM_P19, status: p19Status, level: p19Level, value: p19Value,
-    unit: "dB", passedL1: p19Ready ? p19Level >= 1 : null, isStale,
-    reason: p19Ready ? null : "Canonical Reference EQ or official P19 assessment is pending",
-  });
+  }
 
   // P20 — not applicable without a valid non-RSP comparison result.
-  if (realSeatCount < 2 || selectedCandidate?.p20Available === false) {
+  const p20NotAssessable = optimisationResult?.p20NotAssessable === true;
+  const p20NotAssessableReason = optimisationResult?.p20NotAssessableReason || null;
+
+  if (p20NotAssessable) {
+    // Terminal not-assessable state — P20 cannot be graded because the
+    // assessment band is invalid (e.g. P18 extension not achieved). This is a
+    // complete engineering outcome, not a pending calculation.
+    contract.productAnalysis.parameters.p20 = {
+      ...createBassParameterResult({
+        parameter: PARAM_P20,
+        status: isUpdating ? PARAM_STATUS_UPDATING : PARAM_STATUS_COMPLETE,
+        level: 0,
+        value: null,
+        unit: "dB",
+        passedL1: false,
+        isStale,
+        reason: p20NotAssessableReason,
+      }),
+      notAssessable: true,
+      notAssessableReason: p20NotAssessableReason,
+    };
+  } else if (realSeatCount < 2 || selectedCandidate?.p20Available === false) {
     contract.productAnalysis.parameters.p20 = createBassParameterResult({
       parameter: PARAM_P20, status: PARAM_STATUS_NOT_APPLICABLE, level: null, value: null,
       unit: "dB", passedL1: null, isStale: false,

@@ -7,7 +7,7 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { BASS_AUTHORITY_STATUS, markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityStale, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, publishCachedLimitedBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, getCompletedBassContract, bassContractMatchesRequestedP14 } from "./completedBassResultStore";
+import { BASS_AUTHORITY_STATUS, markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityStale, markBassAuthorityUpdating, publishCompletedBassContract, publishCachedCompactBassContract, publishCachedLimitedBassContract, syncPersistentBassAuthority, syncCachedCompactBassAuthority, useCompletedBassAuthority, hasAuthoritativeResult, isAuthoritativeBassContract, isStructurallyCompleteBassContract, getCompletedBassContract, bassContractMatchesRequestedP14 } from "./completedBassResultStore";
 import { resolveBassLifecycleState, BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, BASS_COLD_RELOAD_RECOVERY_COPY } from "./bassCalculationLifecycle";
 import { useOptimiseWorkflowState } from "./optimiseWorkflow/optimiseWorkflowStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
@@ -29,7 +29,6 @@ import { buildFinishedGraphOptimisationResult, hasGraphPayload } from "./finishe
 import { evaluateCanonicalBassAuthority } from "@/components/utils/canonicalBassAuthorityEvaluation";
 import { buildCanonicalCompletedBassMetricAuthority } from "./canonicalCompletedBassMetricAuthority";
 import { buildMetricPublicationReceipt } from "./metricPublicationReceipt";
-import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 import { useRecommendationGate } from "@/components/state/recommendationGateStore";
 import { getBassHeavyAction, cancelBassHeavyAction, useBassHeavyAction } from "./bassHeavyActionStore";
@@ -934,8 +933,11 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       return;
     }
     const jobComplete = contract?.job?.status === "complete" || contract?.job?.status === "ready";
-    const p19Ready = hasReadyCanonicalP19Contract(contract);
-    if (jobComplete && !p19Ready) {
+    // Publication gate: structural completeness, not acoustic success.
+    // A failed P14/P18/P19/P20 is a completed engineering outcome that must
+    // publish. Only structural incompleteness (worker not finished, missing
+    // result, fingerprint mismatch, missing contract) blocks publication.
+    if (jobComplete && !isStructurallyCompleteBassContract(contract)) {
       if (!hasAuthoritativeResult(scopeId, versionId, cacheKey)) {
         markBassAuthorityUpdating(scopeId, versionId, cacheKey);
       }
@@ -949,9 +951,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       timingTraceRef.current.mark("publicationMs");
     }
     if (!published) {
-      // If the contract was structurally complete and P19-ready but
-      // publication returned false, it is NOT_VERIFIED — terminal rejected.
-      if (jobComplete && p19Ready) {
+      // If the contract was structurally complete but publication returned
+      // false, it is NOT_VERIFIED — terminal rejected.
+      if (jobComplete && isStructurallyCompleteBassContract(contract)) {
         if (timingTraceRef.current && timingTraceRef.current.trace.publicationMs === null) {
           timingTraceRef.current.mark("publicationMs");
         }
@@ -979,7 +981,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     const completedContract = getCompletedBassContract(scopeId, versionId);
     const resultFingerprint = completedContract?.job?.resultFingerprint || null;
     const canPersistCurrent = jobComplete
-      && p19Ready
       && isAuthoritativeBassContract(completedContract)
       && bassContractMatchesRequestedP14(completedContract, requested)
       && !!resultFingerprint
