@@ -177,7 +177,7 @@ function interpretScreenWall(project) {
 
 function interpretSeating(project) {
   const seatsPerRow = project?.seats_per_row_by_row || [];
-  const rowSpacing = Number(project?.row_spacing_m) || 1.8;
+  const rowSpacing = Number(project?.row_spacing_m) || 0.6;
   const mlpBasis = project?.mlp_basis || 'middle';
   const seatingPositions = project?.seating_positions || [];
 

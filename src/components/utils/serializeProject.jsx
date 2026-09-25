@@ -224,7 +224,7 @@ export function serializeProject(input = {}) {
     // Seating & layout
     seating_positions: asArray(seatingPositions),
     applied_seating_provenance: appliedSeatingProvenance || null,
-    row_spacing_m: Number(rowSpacingM) || 1.8,
+    row_spacing_m: Number(rowSpacingM) || 0.6,
     seats_per_row_by_row: asArray(seatsPerRowByRow),
     seating_rows: Number(seatingRows) || 1,
     seats_per_row: Number(seatsPerRow) || 1,

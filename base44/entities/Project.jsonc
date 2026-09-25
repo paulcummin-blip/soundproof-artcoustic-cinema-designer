@@ -98,7 +98,7 @@
     },
     "row_spacing_m": {
       "type": "number",
-      "default": 1.8,
+      "default": 0.6,
       "description": "Centre-to-centre spacing between seat rows in meters"
     },
     "seats_per_row_by_row": {
