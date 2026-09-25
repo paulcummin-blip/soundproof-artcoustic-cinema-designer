@@ -1035,7 +1035,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         cachePublishReturned: cachePublished,
         publishRan: false,
       });
-      return;
+      // A stale cache entry must not block publication of the fresh worker result.
+      if (cachePublished) return;
     }
     // ── Authority already restored: no publish, no sync, no recalculation ──
     // When returning from a report route, the completed bass store already
