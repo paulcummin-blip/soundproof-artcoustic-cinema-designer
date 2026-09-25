@@ -22,7 +22,7 @@ import { useSharedBassResults } from "../bassResultsStore";
 import { capturePublicationTrace } from "../publicationTraceStore";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { getStage2State, subscribeStage2 } from "../stage2/stage2PlacementStore";
-import { useImproveBassV2State, requestCancel, resetImproveBassV2 } from "../improveBassV2/improveBassV2Store";
+import { getImproveBassV2State, useImproveBassV2State, requestCancel, resetImproveBassV2 } from "../improveBassV2/improveBassV2Store";
 import { cancelBassHeavyAction, useBassHeavyAction } from "../bassHeavyActionStore";
 import { buildStageDisplay } from "../improveBassV2/improveBassV2StageMapping";
 import {
@@ -311,7 +311,21 @@ export default function OptimiseAndCalculate({
           || sharedRef.current?.completedBassAuthority?.currentFingerprint
           || null;
         if (!fingerprint || !result?.recommendation) return;
-        const decision = adiDecisionRef.current;
+        const currentShared = sharedRef.current;
+        const decision = runEngineeringDecisionModel({
+          optimiserResult: getImproveBassV2State(projectId, versionId),
+          currentResult: currentShared?.completedBassAuthority?.result || currentShared?.completedBassAuthority,
+          designObjectives: {
+            p14TargetDb: currentShared?.authoritative?.requested?.selectedP14TargetDb,
+            p14Level: currentShared?.authoritative?.requested?.requestedLevel,
+            p18TargetBasis: currentShared?.authoritative?.requested?.p18TargetBasis,
+          },
+          context: {
+            subwooferCount: subInstancesRef.current?.filter((i) => i?.enabled !== false && i?.model).length || 0,
+            roomDims,
+            seatingPositions,
+          },
+        });
         const recommendationForPublication = {
           ...result.recommendation,
           publishedAdiDecision: decision?.recommendation ? {
