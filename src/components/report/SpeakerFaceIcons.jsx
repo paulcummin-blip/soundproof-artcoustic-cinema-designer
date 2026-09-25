@@ -188,6 +188,16 @@ export function C41FaceIcon({ x, y, width, height }) {
       xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="xMidYMid meet"
     >
+      <defs>
+        <filter id="c41-white-artwork" colorInterpolationFilters="sRGB">
+          <feComponentTransfer>
+            <feFuncR type="linear" slope="1.08" intercept="-0.02" />
+            <feFuncG type="linear" slope="1.08" intercept="-0.02" />
+            <feFuncB type="linear" slope="1.08" intercept="-0.02" />
+          </feComponentTransfer>
+        </filter>
+      </defs>
+      <rect x="0" y="0" width="1711" height="120" fill="#ffffff" />
       <image
         x="0"
         y="0"
@@ -195,6 +205,7 @@ export function C41FaceIcon({ x, y, width, height }) {
         height="120"
         href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/2adee2973_Screenshot2026-06-05at132314.png"
         preserveAspectRatio="xMidYMid meet"
+        filter="url(#c41-white-artwork)"
       />
     </svg>
   );
