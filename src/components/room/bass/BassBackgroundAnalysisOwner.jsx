@@ -36,7 +36,6 @@ import { createManualBassTimingTrace } from "./manualBassTimingDiagnostics";
 import { consumeCalculateAllTargetsRequest, useCalculateAllTargetsRequest } from "./calculateAllTargetsStore";
 import { getStage2State, subscribeStage2 } from "./stage2/stage2PlacementStore";
 import { capturePublicationTrace, clearPublicationTrace, diagnoseStructuralCompleteness, diagnoseAuthoritative } from "./publicationTraceStore";
-import PublicationTracePanel from "./PublicationTracePanel";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -1800,5 +1799,5 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }, [completedBassAuthority?.contract?.bassResult?.seatResults?.P19, seatingPositions]);
 
   const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress });
-  return <BassResultsProvider value={value}>{children}<PublicationTracePanel /></BassResultsProvider>;
+  return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
