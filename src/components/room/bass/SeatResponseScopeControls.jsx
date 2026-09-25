@@ -1,4 +1,5 @@
 import React from "react";
+import { formatSeatPillLabel } from "@/components/utils/seatLabel";
 
 const seatId = (seat) => seat.id || `${seat.x}-${seat.y}`;
 
@@ -28,7 +29,7 @@ export default function SeatResponseScopeControls({ rspPosition, orderedSeats = 
     {[...rows.entries()].sort(([a], [b]) => a - b).map(([row, seats]) => <div key={row} style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
       {seats.map((seat, index) => {
         const id = seatId(seat);
-        const label = `R${row}S${index + 1}`;
+        const label = formatSeatPillLabel(id);
         const active = selectedSeatIds.length === 1 && selectedSeatIds[0] === id;
         return <button type="button" key={id} onClick={() => onSelectSeat(id)} title={label} style={pillStyle(active, getSeatColor(id))}>{label}</button>;
       })}
