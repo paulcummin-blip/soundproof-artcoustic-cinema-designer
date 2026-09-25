@@ -1473,13 +1473,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const calculationOutcome = calculationInProgress
     ? calculationPhase  // "preparing" | "optimising" | "finalising"
     : (hasValidCachedContractForOutcome ? "success"
-        : (lastTerminalOutcome?.outcome
-          || (completedBassAuthority?.authorityStatus === "AUTHORITATIVE" ? "success"
-            : completedBassAuthority?.authorityStatus === "LIMITED" ? "success"
-            : completedBassAuthority?.authorityStatus === "STALE" ? "stale"
-            : completedBassAuthority?.authorityStatus === "ERROR" ? "error"
-            : completedBassAuthority?.authorityStatus === "NOT_VERIFIED" ? "rejected"
-            : "idle")));
+        : (completedBassAuthority?.authorityStatus === "STALE" ? "stale"
+          : (lastTerminalOutcome?.outcome
+            || (completedBassAuthority?.authorityStatus === "AUTHORITATIVE" ? "success"
+              : completedBassAuthority?.authorityStatus === "LIMITED" ? "success"
+              : completedBassAuthority?.authorityStatus === "ERROR" ? "error"
+              : completedBassAuthority?.authorityStatus === "NOT_VERIFIED" ? "rejected"
+              : "idle"))));
   // Unified lifecycle state — the single lifecycle consumed by all visible
   // Bass surfaces. Maps the existing split-state model into one canonical
   // state with plain-language copy.
