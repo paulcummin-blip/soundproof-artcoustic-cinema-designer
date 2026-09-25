@@ -130,6 +130,9 @@ function authoritySignature(a) {
     cf: a.currentFingerprint || null,
     rf: a.contract?.job?.resultFingerprint || null,
     sc: a.contract?.selectedCandidateId || null,
+    // Recommendation is part of the published snapshot. A cold-load compact
+    // contract without it must not suppress hydration of the saved decision.
+    rec: a.contract?.recommendation || null,
     sc2: a.structurallyComplete,
     au: a.authoritative,
     ex: a.exportable,
