@@ -694,7 +694,7 @@ export default function OptimiseAndCalculate({
           zone always renders — AdiRecommendation internally resolves to one
           of: Recommended Improvement, No further engineering, or No further EQ. */}
       {hasResults && (
-        <div className="mt-3">
+        <div className={`mt-3 ${shared?.placementPreviewActive ? "opacity-45" : ""}`}>
           <AdiRecommendation
             autoApplied={workflowState.autoApplied}
             v2State={v2State}
