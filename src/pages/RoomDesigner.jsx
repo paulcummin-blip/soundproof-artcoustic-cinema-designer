@@ -1868,7 +1868,12 @@ function RoomDesignerWithState() {
     // be published as the canonical Engineering Summary. The single
     // isDesignRatingPublishable predicate decides; no consumer duplicates the
     // readiness rule.
-    if (appDesignRating.isPublishable !== true) {
+    const candidateRatingStatus =
+      appDesignRating?.engineeringSummary?.project?.rating?.status || null;
+    const candidateIsProvisional =
+      candidateRatingStatus === "NOT_ASSESSED";
+
+    if (appDesignRating.isPublishable !== true || candidateIsProvisional) {
       const versionId = appState?.activeVersionId || null;
       const existing = versionId
         ? readDesignReviewHandoff(handoffProjectId, versionId)
@@ -1887,7 +1892,10 @@ function RoomDesignerWithState() {
         return;
       }
 
-      // Fail closed: publish neutral loading state. The bass-pending
+      // Fail closed: a provisional NOT_ASSESSED summary must never
+      // replace the last complete published contract during the render gap
+      // before the bass authority transitions to pending.
+      // The bass-pending
       // indicator (published separately) lets the sidebar show
       // "Calculating bass analysis…" without a partial numeric score.
       publishDesignReviewHandoff({
