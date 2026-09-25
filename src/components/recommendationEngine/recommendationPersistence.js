@@ -20,6 +20,8 @@ import { bassDbFilter, parseBassCacheKey } from '@/components/room/bass/bassCach
 // In-memory cache for the current recommendation (per project+version)
 const memoryByProject = new Map();
 const listeners = new Set();
+const persistenceWrites = new Map();
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function notify() {
   listeners.forEach((l) => l());
@@ -45,39 +47,41 @@ export async function publishRecommendation(projectId, versionId, recommendation
   });
   notify();
 
-  // Persist to ProjectAnalysisCache
-  if (!projectId || projectId === 'free' || !resultFingerprint) return;
+  // The final bass contract may be authoritative in memory before its cache
+  // snapshot has finished writing. Wait for that exact fingerprint instead of
+  // silently dropping the recommendation during the auto-apply handoff.
+  if (!projectId || projectId === 'free' || !resultFingerprint || !recommendation) return false;
 
-  try {
+  const previousWrite = persistenceWrites.get(key) || Promise.resolve();
+  const write = previousWrite.catch(() => {}).then(async () => {
     const dbFilter = bassDbFilter(projectId, versionId);
-    const records = await base44.entities.ProjectAnalysisCache.filter(dbFilter, '-updated_date', 1);
-    const record = Array.isArray(records) ? records[0] : null;
-
-    if (!record) return; // No cache record to attach to
-
-    // Read the existing completed_by_fingerprint map
-    const completedByFingerprint = record.completed_by_fingerprint || {};
-    const snapshot = completedByFingerprint[resultFingerprint];
-
-    if (!snapshot) return; // No snapshot for this fingerprint
-
-    // Attach the recommendation to the snapshot
-    const updatedSnapshot = {
-      ...snapshot,
-      recommendation,
-    };
-
-    const updatedCompletedByFingerprint = {
-      ...completedByFingerprint,
-      [resultFingerprint]: updatedSnapshot,
-    };
-
-    await base44.entities.ProjectAnalysisCache.update(record.id, {
-      completed_by_fingerprint: updatedCompletedByFingerprint,
-    });
-  } catch (e) {
-    // Persistence failure is non-fatal — the in-memory store still works
-    console.warn('[RecommendationPersistence] Failed to persist recommendation:', e);
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      try {
+        const records = await base44.entities.ProjectAnalysisCache.filter(dbFilter, '-updated_date', 1);
+        const record = Array.isArray(records) ? records[0] : null;
+        const completedByFingerprint = record?.completed_by_fingerprint || {};
+        const snapshot = completedByFingerprint[resultFingerprint];
+        if (record && snapshot) {
+          await base44.entities.ProjectAnalysisCache.update(record.id, {
+            completed_by_fingerprint: {
+              ...completedByFingerprint,
+              [resultFingerprint]: { ...snapshot, recommendation },
+            },
+          });
+          return true;
+        }
+      } catch (e) {
+        if (attempt === 19) console.warn('[RecommendationPersistence] Failed to persist recommendation:', e);
+      }
+      await sleep(250);
+    }
+    return false;
+  });
+  persistenceWrites.set(key, write);
+  try {
+    return await write;
+  } finally {
+    if (persistenceWrites.get(key) === write) persistenceWrites.delete(key);
   }
 }
 
