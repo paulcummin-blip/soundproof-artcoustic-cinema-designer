@@ -922,6 +922,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               onSelectRsp={selectRsp}
               onSelectSeat={selectSeat}
               onSelectAll={selectAllSeats}
+              previewActive={placementPreviewActive}
             />
             <CollapsiblePanel title="Engineering Detail" defaultOpen={false}>
               <div className="space-y-3 pt-2">
@@ -947,6 +948,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               onSelectRsp={selectRsp}
               onSelectSeat={selectSeat}
               onSelectAll={selectAllSeats}
+              previewActive={placementPreviewActive}
             />
 
             <BassCurveVisibilityControls
@@ -964,6 +966,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         </div>
 
         <div className={engineeringDetailCollapsed ? "mt-2 flex-1 min-h-[400px] relative" : "mt-2"}>
+          {placementPreviewActive && <div className="flex flex-wrap items-center gap-4 mb-2 text-[11px] font-semibold">
+            <span style={{ color: "#16A34A" }}>━━ Room Response Preview</span>
+            {previousResultFadedSeries && <span style={{ color: "#6B7280" }}>━━ Previous result — out of date</span>}
+          </div>}
           {effectiveVisibleSeries.length > 0 ? (
             <>
             <BassGraph
