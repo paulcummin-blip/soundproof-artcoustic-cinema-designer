@@ -17,7 +17,7 @@ import {
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
 import { useActiveProjectId } from "@/components/state/project-session";
-import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint } from "@/components/state/designReviewHandoff";
+import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint } from "@/components/state/designReviewHandoff";
 import { buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
 import { useEngineeringPublicationEffect } from "@/components/proposal/engineeringAuthority/useEngineeringPublicationEffect";
 
@@ -1799,16 +1799,11 @@ function RoomDesignerWithState() {
   React.useEffect(() => {
     const handoffProjectId = resolvedProjectId || projectIdState || null;
 
-    // Minimum 5.1 system gate: do not publish any ASDR snapshot to Design
-    // Review until the system has LCR, surrounds, and at least one subwoofer.
-    // Clear any previously published snapshot so a partial system cannot leak.
+    // Minimum 5.1 system gate: do not publish a replacement until the
+    // system again has LCR, surrounds and at least one subwoofer. The separate
+    // unavailable indicator owns that UI state; the last complete publication
+    // remains intact so transient layout rebuilds cannot erase it.
     if (!minimumSystemMet) {
-      const layoutIsRefreshing =
-        appState?.layoutRefreshPending === true ||
-        appState?.geometryReflowInProgress === true;
-      if (!layoutIsRefreshing) {
-        clearDesignReviewHandoff(handoffProjectId, appState?.activeVersionId || null);
-      }
       return;
     }
 
