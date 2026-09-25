@@ -174,7 +174,7 @@ export default function Layout({ children, currentPageName }) {
         nextRating.status !== 'NOT_ASSESSED' &&
         nextRating.status !== 'NOT_CONFIGURED';
       if (nextIsComplete) {
-        setEngineeringSummary(nextSummary);
+        setEngineeringSummary(JSON.parse(JSON.stringify(nextSummary)));
       }
     };
     applyPublication(readDesignReviewHandoff(activeProjectId, activeVersionId));
