@@ -130,8 +130,9 @@ export default function AdiRecommendation({
   // as Graph and RP22 — never "No further engineering changes" when a valid
   // recommendation was published.
   const adiDecision = useMemo(() => {
+    let liveDecision = null;
     try {
-      const liveDecision = runEngineeringDecisionModel({
+      liveDecision = runEngineeringDecisionModel({
         optimiserResult: v2State,
         currentResult: completedBassAuthority?.result || completedBassAuthority,
         designObjectives: {
@@ -141,24 +142,19 @@ export default function AdiRecommendation({
         },
         context: { subwooferCount, roomDims, seatingPositions },
       });
-
-      // If the live V2 optimiser produced a real recommendation, use it.
-      if (liveDecision?.recommendation && liveDecision.outcome !== ADI_OUTCOME.NO_FURTHER_ENGINEERING) {
-        return liveDecision;
-      }
-
-      // Cold-load fallback: restore from the persisted Recommendation Engine
-      // output inside the published bass authority contract.
-      const persistedRecommendation = completedBassAuthority?.contract?.recommendation || null;
-      const restoredDecision = buildAdiDecisionFromPersistedRecommendation(persistedRecommendation);
-      if (restoredDecision) {
-        return restoredDecision;
-      }
-
-      return liveDecision;
     } catch {
-      return null;
+      // A cold-load live decision can fail on a compact published contract.
+      // The persisted display decision is still independently restorable.
     }
+
+    if (liveDecision?.recommendation && liveDecision.outcome !== ADI_OUTCOME.NO_FURTHER_ENGINEERING) {
+      return liveDecision;
+    }
+
+    const persistedRecommendation = completedBassAuthority?.contract?.recommendation || null;
+    const publishedDecision = persistedRecommendation?.publishedAdiDecision;
+    if (publishedDecision?.recommendation) return publishedDecision;
+    return buildAdiDecisionFromPersistedRecommendation(persistedRecommendation) || liveDecision;
   }, [v2State, completedBassAuthority, shared, subwooferCount, roomDims, seatingPositions]);
 
   // Determine the physical lever from the ADI decision
