@@ -120,6 +120,11 @@ export default function Layout({ children, currentPageName }) {
         if (uuidMatch) projectId = uuidMatch[0];
       }
       if (projectId) {
+        setEngineeringPublication((previous) => (
+          previous.projectId && String(previous.projectId) !== String(projectId)
+            ? { projectId: null, versionId: null, summary: null }
+            : previous
+        ));
         setActiveProjectId(projectId);
       } else {
         setActiveProjectSummary({ id: null, name: null, client_name: null, active_version_id: null });
@@ -159,11 +164,7 @@ export default function Layout({ children, currentPageName }) {
   // The sidebar is a direct subscriber to the same published engineering
   // authority as every report. It never rebuilds or polls a separate rating.
   const activeVersionId = activeProjectSummary?.active_version_id || null;
-  const engineeringSummary =
-    String(engineeringPublication.projectId || '') === String(activeProjectId || '') &&
-    String(engineeringPublication.versionId || '') === String(activeVersionId || '')
-      ? engineeringPublication.summary
-      : null;
+  const engineeringSummary = engineeringPublication.summary;
 
   React.useEffect(() => {
     if (!activeProjectId || !activeVersionId) {
