@@ -144,14 +144,22 @@ export function resolveBassLifecycleState({
   authorityStatus,        // BASS_AUTHORITY_STATUS value
   workflowStatus,         // optimiseWorkflowStore status (idle|calculating|optimising|applying|recalculating|publishing|complete|error|cancelled)
 }) {
-  // PUBLISHING — workflow is in its publishing phase (post-calculation).
-  // Takes precedence over authority-status fallbacks because the
-  // calculation is done but the final publication hasn't completed.
-  if (workflowStatus === "publishing" && !calculationInProgress) {
-    return BASS_LIFECYCLE_STATE.PUBLISHING;
-  }
+  // Active workflow phases take precedence over terminal outcomes.
+  // The workflow orchestrates: calculating → optimising → applying →
+  // recalculating → publishing → complete. A result must NOT be marked
+  // COMPLETE while the workflow is still in any active phase, even if a
+  // background calculation has already published an intermediate result.
+  // Without this gate, the first calculation's "success" outcome resolves
+  // to COMPLETE during Phases 2-4, showing "Performance is current" while
+  // the progress UI still shows "Preparing calculation…".
+  const ACTIVE_WORKFLOW_PHASES = [
+    "calculating", "optimising", "applying", "recalculating", "publishing",
+  ];
+  const isActiveWorkflow = ACTIVE_WORKFLOW_PHASES.includes(workflowStatus);
 
-  // Active calculation phases
+  // If a real calculation is in progress (background auto-calculate or
+  // workflow Phase 1/4), use the calculation phase. This covers both the
+  // workflow's calculation phases and the standalone background controller.
   if (calculationInProgress) {
     if (calculationPhase === "preparing") return BASS_LIFECYCLE_STATE.PREPARING;
     if (calculationPhase === "optimising") return BASS_LIFECYCLE_STATE.SEARCHING;
@@ -159,7 +167,19 @@ export function resolveBassLifecycleState({
     return BASS_LIFECYCLE_STATE.PREPARING;
   }
 
-  // Terminal outcomes from lastTerminalOutcome
+  // No active calculation, but the workflow is still running — map the
+  // workflow phase to the appropriate active lifecycle state. This prevents
+  // a premature COMPLETE from an intermediate calculation result.
+  if (isActiveWorkflow) {
+    if (workflowStatus === "publishing") return BASS_LIFECYCLE_STATE.PUBLISHING;
+    if (workflowStatus === "optimising") return BASS_LIFECYCLE_STATE.SEARCHING;
+    if (workflowStatus === "applying") return BASS_LIFECYCLE_STATE.VALIDATING;
+    // "calculating" or "recalculating" with no calculationInProgress —
+    // between the workflow's calculation phases.
+    return BASS_LIFECYCLE_STATE.PREPARING;
+  }
+
+  // Terminal outcomes — only evaluated when the workflow is NOT active.
   if (calculationOutcome === "success") return BASS_LIFECYCLE_STATE.COMPLETE;
   if (calculationOutcome === "cancelled") {
     // Published Engineering Authority model: when a published result exists,
