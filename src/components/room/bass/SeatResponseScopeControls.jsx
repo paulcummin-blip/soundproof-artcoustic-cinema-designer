@@ -2,7 +2,8 @@ import React from "react";
 
 const seatId = (seat) => seat.id || `${seat.x}-${seat.y}`;
 
-export default function SeatResponseScopeControls({ rspPosition, orderedSeats = [], selectedSeatIds = [], getSeatColor, onSelectRsp, onSelectSeat, onSelectAll }) {
+export default function SeatResponseScopeControls({ rspPosition, orderedSeats = [], selectedSeatIds = [], getSeatColor, onSelectRsp, onSelectSeat, onSelectAll, previewActive = false }) {
+  if (previewActive) return <div style={{ fontSize: 11, color: "#625143", marginBottom: 12 }}>Previewing room response at the RSP from current sub positions</div>;
   const allSelected = orderedSeats.length > 1 && selectedSeatIds.length === orderedSeats.length;
   const rows = orderedSeats.reduce((map, seat) => {
     const row = Number(seat?.row || seat?.rowNumber) || 1;
