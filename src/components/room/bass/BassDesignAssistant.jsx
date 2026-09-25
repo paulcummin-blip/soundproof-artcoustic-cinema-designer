@@ -134,15 +134,10 @@ export default function BassDesignAssistant({
           subwooferInstances={subwooferInstances}
           roomDims={roomDims}
           bassLifecycleState={bassLifecycleState}
+          statusText={isPlacementPreview ? "Subwoofer positions changed. Previewing room response only." : null}
           onChangeSpeakers={onChangeSpeakerConfig}
           onChangeLayout={() => setShowLayoutCards(true)}
         />
-      )}
-
-      {layoutChosen && isPlacementPreview && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] font-semibold text-amber-900" role="status">
-          Subwoofer positions changed. Previewing room response only.
-        </div>
       )}
 
       {/* ── Choose Layout (when no layout applied) ── */}
