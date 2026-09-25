@@ -1426,7 +1426,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     }
   }, [manualAnalysisRequest]);
   const hasCurrentResult = completedBassAuthority?.authoritative === true
-    && completedBassAuthority?.currentFingerprint === cacheKey;
+    && !!completedBassAuthority?.contract;
 
   // FIX 3: Explicit success terminal — clear the manual request only after
   // the completed contract becomes the current authoritative result and the
