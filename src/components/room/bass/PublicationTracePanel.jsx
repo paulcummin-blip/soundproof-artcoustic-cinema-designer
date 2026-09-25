@@ -52,6 +52,8 @@ export default function PublicationTracePanel() {
               <Row key={index} label={`${index + 1}. ${event.capturedAt}`} value={`${event.effectPhase || "unknown"}${event.firstGuard ? ` — ${event.firstGuard}` : ""}`} />
             ))}
             <Row label="latest phase" value={trace.latestPhase} />
+            <Row label="first failure phase" value={trace.firstFailurePhase} />
+            <Row label="first failure guard" value={trace.firstFailureGuard} />
           </Section>
           <Section title="1. Request Identity">
             <Row label="cacheKey" value={trace.cacheKey} />
