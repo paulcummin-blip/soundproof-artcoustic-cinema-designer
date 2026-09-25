@@ -17,6 +17,8 @@ import { validateCanonicalBassResult } from "./canonicalBassResult";
 // ── External store ──────────────────────────────────────────────────────
 
 let _trace = null;
+let _events = [];
+let _firstFailure = null;
 const _subscribers = new Set();
 
 function notify() {
@@ -26,7 +28,18 @@ function notify() {
 }
 
 export function capturePublicationTrace(snapshot) {
-  _trace = { ...snapshot, capturedAt: new Date().toISOString() };
+  const event = { ...snapshot, capturedAt: new Date().toISOString() };
+  _events = [..._events.slice(-24), event];
+  // Preserve the first failed handoff even if a later render captures an idle shell.
+  if (!_firstFailure && event.firstGuard && event.firstGuard !== "post-publish-non-authoritative") {
+    _firstFailure = event;
+  }
+  _trace = {
+    ...(_firstFailure || event),
+    latestPhase: event.effectPhase,
+    latestCapturedAt: event.capturedAt,
+    events: _events.map(({ capturedAt, effectPhase, firstGuard }) => ({ capturedAt, effectPhase, firstGuard })),
+  };
   notify();
 }
 
@@ -41,6 +54,8 @@ export function subscribePublicationTrace(cb) {
 
 export function clearPublicationTrace() {
   _trace = null;
+  _events = [];
+  _firstFailure = null;
   notify();
 }
 
