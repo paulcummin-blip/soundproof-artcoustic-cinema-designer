@@ -194,7 +194,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     setExtraSurroundCount(Number.isFinite(nextExtraCount) ? nextExtraCount : 0);
   }
 
-  const rowSpacing = Number(p?.row_spacing_m) || 0.6;
+  const rowSpacing = Number(p?.row_spacing_m) || 1.8;
   if (typeof setRowSpacingM === "function") setRowSpacingM(rowSpacing);
 
   const seatsPerRowByRowData = parseMaybe(p?.seats_per_row_by_row, []);

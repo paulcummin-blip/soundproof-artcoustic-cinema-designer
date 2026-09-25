@@ -378,7 +378,7 @@ appState, // Pass appState directly for setters
           screen: loadedScreen,
           seatingPositions: _parseMaybe(mergedP?.seating_positions, []),
           seatsPerRowByRow: _parseMaybe(mergedP?.seats_per_row_by_row, []),
-          rowSpacingM: Number(mergedP?.row_spacing_m) || 0.6,
+          rowSpacingM: Number(mergedP?.row_spacing_m) || 1.8,
           placedSpeakers: _parseMaybe(mergedP?.selected_speakers, []),
           roomElements: _parseMaybe(mergedP?.room_elements, []),
           selectedSpeakersByRole: _parseMaybe(mergedP?.selected_speakers_by_role, {}),

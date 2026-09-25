@@ -388,7 +388,7 @@ function useDesignerState() {
     (__autosavePayload && typeof __autosavePayload.seatSpacing === "number") ? __autosavePayload.seatSpacing : 0.8
   ));
   const [rowSpacingM, setRowSpacingM] = useState(() => (
-    (__autosavePayload && typeof __autosavePayload.rowSpacingM === "number") ? __autosavePayload.rowSpacingM : 0.6
+    (__autosavePayload && typeof __autosavePayload.rowSpacingM === "number") ? __autosavePayload.rowSpacingM : 1.8
   ));
   const [mlpBasis, setMlpBasis] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.mlpBasis === "string") ? __autosavePayload.mlpBasis : "front"
