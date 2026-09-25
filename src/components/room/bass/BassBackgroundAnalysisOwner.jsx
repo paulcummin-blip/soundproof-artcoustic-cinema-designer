@@ -35,7 +35,7 @@ import { getBassHeavyAction, cancelBassHeavyAction, useBassHeavyAction } from ".
 import { createManualBassTimingTrace } from "./manualBassTimingDiagnostics";
 import { consumeCalculateAllTargetsRequest, useCalculateAllTargetsRequest } from "./calculateAllTargetsStore";
 import { getStage2State, subscribeStage2 } from "./stage2/stage2PlacementStore";
-import { capturePublicationTrace, diagnoseStructuralCompleteness, diagnoseAuthoritative } from "./publicationTraceStore";
+import { capturePublicationTrace, clearPublicationTrace, diagnoseStructuralCompleteness, diagnoseAuthoritative } from "./publicationTraceStore";
 import PublicationTracePanel from "./PublicationTracePanel";
 
 
@@ -460,6 +460,27 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     }
 
     if (manualAnalysisRequest && !manualRequestMatchesCurrent) {
+      capturePublicationTrace({
+        effectPhase: "request-fingerprint-mismatch",
+        firstGuard: "manualAnalysisRequest.fingerprint !== cacheKey",
+        cacheKey,
+        requestId: manualAnalysisRequest.id,
+        manualRequestFingerprint: manualAnalysisRequest.fingerprint,
+        dispatchedRef: dispatchedManualRequestRef.current,
+        manualRequestMatchesCurrent: false,
+        authoritativeStatus: authoritative.status,
+        authoritativeReason: authoritative.reason,
+        lifecycleStatus: lifecycle.status,
+        lifecycleResultFingerprint: lifecycle.resultFingerprint,
+        lifecycleCurrentJobFingerprint: lifecycle.currentJobFingerprint,
+        calculationInProgress,
+        calculationOutcome,
+        lastTerminalOutcome: lastTerminalOutcome ? JSON.stringify(lastTerminalOutcome) : null,
+        contractJobStatus: contract?.job?.status,
+        contractJobResultFingerprint: contract?.job?.resultFingerprint,
+        contractJobCurrentJobFingerprint: contract?.job?.currentJobFingerprint,
+        publishRan: false,
+      });
       dispatchedManualRequestRef.current = null;
       // FIX 3: Design changed during calculation — terminal "cancelled" state.
       setLastTerminalOutcome({ outcome: "cancelled", fingerprint: manualAnalysisRequest.fingerprint });
@@ -578,6 +599,22 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // workflow. Its failure must immediately terminate the request, clear
     // calculating state, and surface a concise error. No stranded spinner.
     if (authoritative.status === "error") {
+      capturePublicationTrace({
+        effectPhase: "preparation-error",
+        firstGuard: "authoritative.status === error before optimiser dispatch",
+        cacheKey,
+        requestId: manualAnalysisRequest.id,
+        manualRequestFingerprint: manualAnalysisRequest.fingerprint,
+        dispatchedRef: dispatchedManualRequestRef.current,
+        manualRequestMatchesCurrent,
+        authoritativeStatus: authoritative.status,
+        authoritativeReason: authoritative.reason,
+        lifecycleStatus: lifecycle.status,
+        lifecycleResultFingerprint: lifecycle.resultFingerprint,
+        lifecycleCurrentJobFingerprint: lifecycle.currentJobFingerprint,
+        contractJobStatus: contract?.job?.status,
+        publishRan: false,
+      });
       if (timingTraceRef.current) timingTraceRef.current.mark("preparationFailMs");
       markBassAuthorityFailed(scopeId, versionId, cacheKey, authoritative.reason || "Bass analysis preparation failed");
       dispatchedManualRequestRef.current = null;
@@ -592,6 +629,22 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // request — terminate immediately instead of sitting in "Preparing" until
     // the 90-second watchdog fires.
     if (authoritative.status === "idle") {
+      capturePublicationTrace({
+        effectPhase: "preparation-idle",
+        firstGuard: "authoritative.status === idle before optimiser dispatch",
+        cacheKey,
+        requestId: manualAnalysisRequest.id,
+        manualRequestFingerprint: manualAnalysisRequest.fingerprint,
+        dispatchedRef: dispatchedManualRequestRef.current,
+        manualRequestMatchesCurrent,
+        authoritativeStatus: authoritative.status,
+        authoritativeReason: authoritative.reason,
+        lifecycleStatus: lifecycle.status,
+        lifecycleResultFingerprint: lifecycle.resultFingerprint,
+        lifecycleCurrentJobFingerprint: lifecycle.currentJobFingerprint,
+        contractJobStatus: contract?.job?.status,
+        publishRan: false,
+      });
       if (timingTraceRef.current) timingTraceRef.current.mark("preparationFingerprintMismatchMs");
       markBassAuthorityFailed(scopeId, versionId, cacheKey, "Design changed during calculation. Recalculate to analyse the current layout.");
       dispatchedManualRequestRef.current = null;
@@ -609,6 +662,22 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     }
     if (timingTraceRef.current) timingTraceRef.current.mark("optimiserStartMs");
     dispatchedManualRequestRef.current = manualAnalysisRequest.id;
+    capturePublicationTrace({
+      effectPhase: "optimiser-dispatched",
+      firstGuard: null,
+      cacheKey,
+      requestId: manualAnalysisRequest.id,
+      manualRequestFingerprint: manualAnalysisRequest.fingerprint,
+      dispatchedRef: dispatchedManualRequestRef.current,
+      manualRequestMatchesCurrent,
+      authoritativeStatus: authoritative.status,
+      authoritativeReason: authoritative.reason,
+      lifecycleStatus: lifecycle.status,
+      lifecycleResultFingerprint: lifecycle.resultFingerprint,
+      lifecycleCurrentJobFingerprint: lifecycle.currentJobFingerprint,
+      contractJobStatus: contract?.job?.status,
+      publishRan: false,
+    });
     controller.requestManual({
       fingerprint: cacheKey,
       payload,
@@ -1134,6 +1203,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const onCalculate = useCallback(
     ({ collectDiagnostics = false } = {}) => {
       if (!canCalculate) return { action: "blocked" };
+      clearPublicationTrace();
       setColdReloadRecovered(false);
       const diagnosticToken = collectDiagnostics ? createDiagToken("manual-authoritative") : null;
       if (diagnosticToken) recordDiagStage(diagnosticToken, "token-created", { origin: "manual-authoritative", collectDiagnostics: true });
