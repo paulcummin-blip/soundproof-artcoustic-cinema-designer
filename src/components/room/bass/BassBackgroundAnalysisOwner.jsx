@@ -35,6 +35,8 @@ import { getBassHeavyAction, cancelBassHeavyAction, useBassHeavyAction } from ".
 import { createManualBassTimingTrace } from "./manualBassTimingDiagnostics";
 import { consumeCalculateAllTargetsRequest, useCalculateAllTargetsRequest } from "./calculateAllTargetsStore";
 import { getStage2State, subscribeStage2 } from "./stage2/stage2PlacementStore";
+import { capturePublicationTrace, diagnoseStructuralCompleteness, diagnoseAuthoritative } from "./publicationTraceStore";
+import PublicationTracePanel from "./PublicationTracePanel";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -938,6 +940,56 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // publish. Only structural incompleteness (worker not finished, missing
     // result, fingerprint mismatch, missing contract) blocks publication.
     if (jobComplete && !isStructurallyCompleteBassContract(contract)) {
+      // TEMPORARY TRACE: capture exact failure reason for the structural
+      // completeness guard. Does not change publication behaviour.
+      const structuralDiagnosis = diagnoseStructuralCompleteness(contract);
+      const authoritativeDiagnosis = diagnoseAuthoritative(contract);
+      const p19Param = contract?.productAnalysis?.parameters?.p19;
+      const p20Param = contract?.productAnalysis?.parameters?.p20;
+      capturePublicationTrace({
+        effectPhase: "structural-completeness-guard-return",
+        firstGuard: "jobComplete && !isStructurallyCompleteBassContract",
+        cacheKey,
+        manualRequestFingerprint: manualAnalysisRequest?.fingerprint || null,
+        dispatchedRef: dispatchedManualRequestRef.current,
+        manualRequestMatchesCurrent,
+        lifecycleStatus: lifecycle?.status,
+        lifecycleResultFingerprint: lifecycle?.resultFingerprint,
+        lifecycleCurrentJobFingerprint: lifecycle?.currentJobFingerprint,
+        calculationInProgress,
+        calculationOutcome,
+        lastTerminalOutcome: lastTerminalOutcome ? JSON.stringify(lastTerminalOutcome) : null,
+        contractJobStatus: contract?.job?.status,
+        contractJobResultFingerprint: contract?.job?.resultFingerprint,
+        contractJobCurrentJobFingerprint: contract?.job?.currentJobFingerprint,
+        contractJobMetricSchemaVersion: contract?.job?.metricSchemaVersion,
+        contractVersion: contract?.version,
+        contractMetricSchemaVersion: contract?.metricSchemaVersion,
+        hasSelectedCandidate: !!contract?.selectedCandidate,
+        hasSelectedCandidateId: !!contract?.selectedCandidateId,
+        hasGraphPayload: hasGraphPayload(contract),
+        hasP14Parameter: !!contract?.productAnalysis?.parameters?.p14,
+        hasP18Parameter: !!contract?.productAnalysis?.parameters?.p18,
+        p19Status: p19Param?.status ?? null,
+        p19Level: p19Param?.level ?? null,
+        p19Value: p19Param?.value ?? null,
+        p19NotAssessable: p19Param?.notAssessable ?? null,
+        p19Reason: p19Param?.notAssessableReason || p19Param?.reason || null,
+        p20Status: p20Param?.status ?? null,
+        p20Level: p20Param?.level ?? null,
+        p20Value: p20Param?.value ?? null,
+        p20NotAssessable: p20Param?.notAssessable ?? null,
+        p20Reason: p20Param?.notAssessableReason || p20Param?.reason || null,
+        structuralComplete: false,
+        structuralDiagnosis,
+        authoritative: false,
+        authoritativeDiagnosis,
+        publishRan: false,
+        publishedFingerprint: null,
+        syncRan: false,
+        canPersistCurrent: false,
+        completedResultFingerprint: null,
+      });
       if (!hasAuthoritativeResult(scopeId, versionId, cacheKey)) {
         markBassAuthorityUpdating(scopeId, versionId, cacheKey);
       }
@@ -949,6 +1001,64 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     const published = publishCompletedBassContract(scopeId, versionId, contract);
     if (published && timingTraceRef.current && timingTraceRef.current.trace.publicationMs === null) {
       timingTraceRef.current.mark("publicationMs");
+    }
+    // TEMPORARY TRACE: capture publication result and persistence state.
+    {
+      const completedContract = getCompletedBassContract(scopeId, versionId);
+      const completedResultFp = completedContract?.job?.resultFingerprint || null;
+      const canPersist = jobComplete
+        && isAuthoritativeBassContract(completedContract)
+        && bassContractMatchesRequestedP14(completedContract, requested)
+        && !!completedResultFp
+        && !!cacheKey
+        && completedResultFp === cacheKey
+        && hasGraphPayload(completedContract);
+      const p19Param = contract?.productAnalysis?.parameters?.p19;
+      const p20Param = contract?.productAnalysis?.parameters?.p20;
+      capturePublicationTrace({
+        effectPhase: published ? "publish-completed" : "publish-rejected",
+        firstGuard: published ? null : (jobComplete && isStructurallyCompleteBassContract(contract) ? "publishCompletedBassContract-returned-false" : "post-publish-non-authoritative"),
+        cacheKey,
+        manualRequestFingerprint: manualAnalysisRequest?.fingerprint || null,
+        dispatchedRef: dispatchedManualRequestRef.current,
+        manualRequestMatchesCurrent,
+        lifecycleStatus: lifecycle?.status,
+        lifecycleResultFingerprint: lifecycle?.resultFingerprint,
+        lifecycleCurrentJobFingerprint: lifecycle?.currentJobFingerprint,
+        calculationInProgress,
+        calculationOutcome,
+        lastTerminalOutcome: lastTerminalOutcome ? JSON.stringify(lastTerminalOutcome) : null,
+        contractJobStatus: contract?.job?.status,
+        contractJobResultFingerprint: contract?.job?.resultFingerprint,
+        contractJobCurrentJobFingerprint: contract?.job?.currentJobFingerprint,
+        contractJobMetricSchemaVersion: contract?.job?.metricSchemaVersion,
+        contractVersion: contract?.version,
+        contractMetricSchemaVersion: contract?.metricSchemaVersion,
+        hasSelectedCandidate: !!contract?.selectedCandidate,
+        hasSelectedCandidateId: !!contract?.selectedCandidateId,
+        hasGraphPayload: hasGraphPayload(contract),
+        hasP14Parameter: !!contract?.productAnalysis?.parameters?.p14,
+        hasP18Parameter: !!contract?.productAnalysis?.parameters?.p18,
+        p19Status: p19Param?.status ?? null,
+        p19Level: p19Param?.level ?? null,
+        p19Value: p19Param?.value ?? null,
+        p19NotAssessable: p19Param?.notAssessable ?? null,
+        p19Reason: p19Param?.notAssessableReason || p19Param?.reason || null,
+        p20Status: p20Param?.status ?? null,
+        p20Level: p20Param?.level ?? null,
+        p20Value: p20Param?.value ?? null,
+        p20NotAssessable: p20Param?.notAssessable ?? null,
+        p20Reason: p20Param?.notAssessableReason || p20Param?.reason || null,
+        structuralComplete: isStructurallyCompleteBassContract(contract),
+        structuralDiagnosis: diagnoseStructuralCompleteness(contract),
+        authoritative: isAuthoritativeBassContract(contract),
+        authoritativeDiagnosis: diagnoseAuthoritative(contract),
+        publishRan: true,
+        publishedFingerprint: published ? (contract?.job?.resultFingerprint || null) : null,
+        syncRan: canPersist,
+        canPersistCurrent: canPersist,
+        completedResultFingerprint: completedResultFp,
+      });
     }
     if (!published) {
       // If the contract was structurally complete but publication returned
@@ -1520,5 +1630,5 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }, [completedBassAuthority?.contract?.bassResult?.seatResults?.P19, seatingPositions]);
 
   const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress });
-  return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
+  return <BassResultsProvider value={value}>{children}<PublicationTracePanel /></BassResultsProvider>;
 }
