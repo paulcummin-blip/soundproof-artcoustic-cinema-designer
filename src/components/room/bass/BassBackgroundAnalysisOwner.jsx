@@ -116,47 +116,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const calibrationFingerprint = fingerprints?.calibration ?? null;
   const geometryFingerprint = fingerprints?.geometry ?? null;
   const normalizedPhysicsOptions = useNormalizedPhysicsOptions(authoritative);
-  // PASS 2: The normalized room-transfer hook is NO LONGER driven by the manual
-  // Calculate request. perSourceRspComplexTransfers now come from the
-  // authoritative simulation itself (flat-source RSP transfers, same mode
-  // bank). The hook is retained for potential non-manual live features but
-  // stays idle during manual Calculate (no analysisRequestId passed).
-  // ── Placement Preview ─────────────────────────────────────────────────
-  // When a published bass result exists but the design is stale (subwoofer
-  // moved) and no full calculation is running, enter Placement Preview mode.
-  // The live normalized room-transfer hook is re-enabled with a non-null
-  // analysisRequestId and a geometry-based analysisRequestFingerprint so the
-  // designer sees a live room-response preview while dragging subs. The
-  // preview is advisory-only — it never writes or publishes any authority.
-  const placementPreviewActive = hasPublishedContract
-    && publishedContractIsStale
-    && !calculationInProgress
-    && !manualAnalysisRequest
-    && !!geometryFingerprint;
-
-  // The live hook requires analysisRequestFingerprint === its own internally
-  // computed geometryFingerprint (prefix "nrt"). The authoritative geometry
-  // fingerprint (prefix "geo") differs, so we feed the hook's own computed
-  // fingerprint back on the next render via state. This is a one-render delay
-  // which is negligible given the hook's 50 ms debounce.
-  const [placementPreviewFp, setPlacementPreviewFp] = useState(null);
-  useEffect(() => {
-    if (placementPreviewActive && normalizedLive.geometryFingerprint && placementPreviewFp !== normalizedLive.geometryFingerprint) {
-      setPlacementPreviewFp(normalizedLive.geometryFingerprint);
-    } else if (!placementPreviewActive && placementPreviewFp !== null) {
-      setPlacementPreviewFp(null);
-    }
-  }, [placementPreviewActive, normalizedLive.geometryFingerprint, placementPreviewFp]);
-
-  const normalizedLive = useNormalizedRoomTransferLive({
-    roomDims,
-    rspPosition,
-    seatingPositions,
-    subsForSimulation: sources,
-    physicsOptions: normalizedPhysicsOptions,
-    analysisRequestId: placementPreviewActive ? "placement-preview" : null,
-    analysisRequestFingerprint: placementPreviewActive ? placementPreviewFp : null,
-  });
   // PASS 2: Use perSourceRspComplexTransfers from the authoritative simulation.
   // The authoritative engine produces these from a flat 94 dB source (same
   // physics as the normalized engine) reusing the same precomputed mode bank.
@@ -178,11 +137,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // is false (P14 target identity may still be in pre-hydration/default/
   // transitional state).
   const isProjectHydrationReady = !!appState?.isProjectHydrationReady;
-  const sharedAuthoritative = useMemo(() => ({
-    ...authoritative,
-    normalizedLive,
-    normalizedPhysicsOptions,
-  }), [authoritative, normalizedLive, normalizedPhysicsOptions]);
 
   const cacheKey = useMemo(() => fingerprints ? buildBassResultCacheKey(calibrationFingerprint) : null, [fingerprints, OPTIMISER_VERSION_SIGNATURE]);
   const requestIdentity = useMemo(() => ({
@@ -299,6 +253,58 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // sufficient to confirm the request is still valid.
   const manualRequestMatchesCurrent = !!manualAnalysisRequest
     && manualAnalysisRequest.fingerprint === cacheKey;
+
+  // ── Placement Preview ─────────────────────────────────────────────────
+  // When a published bass result exists but the design is stale (subwoofer
+  // moved) and no full calculation is running, enter Placement Preview mode.
+  // The live normalized room-transfer hook is re-enabled with a non-null
+  // analysisRequestId and a geometry-based analysisRequestFingerprint so the
+  // designer sees a live room-response preview while dragging subs. The
+  // preview is advisory-only — it never writes or publishes any authority.
+  const calculationInProgress = !!manualAnalysisRequest
+    && manualRequestMatchesCurrent
+    && (
+      dispatchedManualRequestRef.current !== manualAnalysisRequest.id
+      || lifecycle.status === "queued"
+      || lifecycle.status === "calculating"
+    );
+
+  const placementPreviewActive = hasPublishedContract
+    && publishedContractIsStale
+    && !calculationInProgress
+    && !manualAnalysisRequest
+    && !!geometryFingerprint;
+
+  // The live hook requires analysisRequestFingerprint === its own internally
+  // computed geometryFingerprint (prefix "nrt"). The authoritative geometry
+  // fingerprint (prefix "geo") differs, so we feed the hook's own computed
+  // fingerprint back on the next render via state. This is a one-render delay
+  // which is negligible given the hook's 50 ms debounce.
+  const [placementPreviewFp, setPlacementPreviewFp] = useState(null);
+
+  const normalizedLive = useNormalizedRoomTransferLive({
+    roomDims,
+    rspPosition,
+    seatingPositions,
+    subsForSimulation: sources,
+    physicsOptions: normalizedPhysicsOptions,
+    analysisRequestId: placementPreviewActive ? "placement-preview" : null,
+    analysisRequestFingerprint: placementPreviewActive ? placementPreviewFp : null,
+  });
+
+  useEffect(() => {
+    if (placementPreviewActive && normalizedLive.geometryFingerprint && placementPreviewFp !== normalizedLive.geometryFingerprint) {
+      setPlacementPreviewFp(normalizedLive.geometryFingerprint);
+    } else if (!placementPreviewActive && placementPreviewFp !== null) {
+      setPlacementPreviewFp(null);
+    }
+  }, [placementPreviewActive, normalizedLive.geometryFingerprint, placementPreviewFp]);
+
+  const sharedAuthoritative = useMemo(() => ({
+    ...authoritative,
+    normalizedLive,
+    normalizedPhysicsOptions,
+  }), [authoritative, normalizedLive, normalizedPhysicsOptions]);
   // Semantic geometry readiness: proves the geometry feeding the calibration
   // fingerprint is fully resolved and internally consistent. This is NOT a
   // timing heuristic — it checks the mathematical invariant that mlpY_m
@@ -1612,15 +1618,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   //      queue and the user switched to it): do nothing — the scheduler's job
   //      is reused, and the publish effect publishes the result when it completes.
   // Prevents duplicate jobs: at most one calculation per base fingerprint + target.
-  // Declare this before the effect below because it is read in both the effect
-  // body and dependency array. A later const declaration triggers a runtime TDZ.
-  const calculationInProgress = !!manualAnalysisRequest
-    && manualRequestMatchesCurrent
-    && (
-      dispatchedManualRequestRef.current !== manualAnalysisRequest.id
-      || lifecycle.status === "queued"
-      || lifecycle.status === "calculating"
-    );
+  // calculationInProgress is declared earlier (before placement preview) so
+  // it is available in both the effect body and dependency array below.
   const autoCalculatedKeyRef = useRef(null);
   useEffect(() => {
     if (!isProjectHydrationReady || !targetKey || !canCalculate) return;

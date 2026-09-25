@@ -452,9 +452,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
 
   const previousResultFadedSeries = useMemo(() => {
     if (!placementPreviewActive) return null;
-    const prevCurve = Array.isArray(canonicalRoomResponseCurve) && canonicalRoomResponseCurve.length
-      ? canonicalRoomResponseCurve
-      : null;
+    // Use the published contract's room-response series (from visibleMultiSeries,
+    // which is built from the published contract's graph payload) — NOT the live
+    // canonicalRoomResponseCurve, which reflects the NEW sub positions.
+    const prevRoomSeries = visibleMultiSeries.find((s) => s.kind === "room-response");
+    const prevCurve = prevRoomSeries?.data || null;
     if (!prevCurve) return null;
     return {
       id: "previous-result",
@@ -463,7 +465,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
       kind: "previous-result-faded",
       label: "Previous result — out of date",
     };
-  }, [placementPreviewActive, canonicalRoomResponseCurve]);
+  }, [placementPreviewActive, visibleMultiSeries]);
 
   const placementPreviewGraphSeries = useMemo(() => {
     if (!placementPreviewActive) return null;
@@ -762,11 +764,29 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
             <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
           </div>
 
+          {/* Placement Preview banner — advisory-only room response while sub
+              positions are stale. Engineering layers are suppressed below. */}
+          {placementPreviewActive && (
+            <div style={{ border: "1px solid #F59E0B", borderRadius: 10, background: "#FFFBEB", padding: "10px 14px", marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E" }}>
+                Subwoofer positions changed. Previewing room response only.
+              </div>
+              <div style={{ fontSize: 11, color: "#B45309", marginTop: 2 }}>
+                Press Update Bass Performance to recalculate the full engineering result.
+              </div>
+            </div>
+          )}
+
           {/* Current authoritative results only. Stale values never read as current. */}
           {hasCurrentBassResult ? (
-            <>
+            <div style={{ transition: "opacity 0.3s", opacity: placementPreviewActive ? 0.45 : 1 }}>
+              {placementPreviewActive && (
+                <div style={{ fontSize: 10, fontWeight: 600, color: "#8B7F76", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
+                  Previous result — out of date
+                </div>
+              )}
               <BassResultCards />
-            </>
+            </div>
           ) : (
             <div className={`rounded-xl border px-4 py-4 ${bassAuthorityStatus === "STALE" ? "border-amber-200 bg-amber-50" : "border-[#DCDBD6] bg-white"}`}>
               <div className="text-[13px] font-semibold text-[#1B1A1A]">
@@ -934,12 +954,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               onChange={setCurveVisibility}
             />
 
-            <Rp22GraphMarkerKey markers={rp22GraphMarkers} />
+            {!placementPreviewActive && <Rp22GraphMarkerKey markers={rp22GraphMarkers} />}
           </>
         )}
 
         <div className="mt-2">
-          <ParameterFocusBar disabled={!hasCurrentBassResult} />
+          <ParameterFocusBar disabled={!hasCurrentBassResult || placementPreviewActive} />
         </div>
 
         <div className={engineeringDetailCollapsed ? "mt-2 flex-1 min-h-[400px] relative" : "mt-2"}>
@@ -953,23 +973,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               rp22Levels={[]}
               toggles={{}}
               crossoverFrequency={80}
-              showModeMarkers={engineeringDetailCollapsed ? false : showRoomModes}
-              modeMarkers={engineeringDetailCollapsed ? [] : modeMarkersForGraph}
-              protectedNullAnnotations={engineeringDetailCollapsed ? [] : protectedNullAnnotations}
+              showModeMarkers={placementPreviewActive ? false : (engineeringDetailCollapsed ? false : showRoomModes)}
+              modeMarkers={placementPreviewActive ? [] : (engineeringDetailCollapsed ? [] : modeMarkersForGraph)}
+              protectedNullAnnotations={placementPreviewActive ? [] : (engineeringDetailCollapsed ? [] : protectedNullAnnotations)}
               linearHzAxis={false}
               rewStyleMode={true}
               yDomain={[70, 140]}
               xDomain={effectiveVisibleSeries[0]?.data?.some(p => p.frequency > 200) ? [15, 300] : [15, 200]}
               showAxialOnly={false}
               refDb={85}
-              disableHighlight={false}
+              disableHighlight={placementPreviewActive}
               renderToken={qStrategy}
-              p14TotalDb={p14PresentationData.targetDb}
+              p14TotalDb={placementPreviewActive ? null : p14PresentationData.targetDb}
               operatingLevelOffsetDb={operatingLevelOffsetDb}
-              rp22Markers={rp22GraphMarkers}
-              highlightFrequencyHz={highlightFromInteraction?.frequencyHz ?? null}
-              highlightLabel={highlightFromInteraction?.label ?? null}
-              parameterFocus={parameterFocus}
+              rp22Markers={placementPreviewActive ? null : rp22GraphMarkers}
+              highlightFrequencyHz={placementPreviewActive ? null : (highlightFromInteraction?.frequencyHz ?? null)}
+              highlightLabel={placementPreviewActive ? null : (highlightFromInteraction?.label ?? null)}
+              parameterFocus={placementPreviewActive ? null : parameterFocus}
             />
             {isCalculating && engineeringDetailCollapsed && (
               <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(248, 247, 244, 0.6)", borderRadius: 8, pointerEvents: "none" }}>
@@ -988,9 +1008,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
             </div>
           )}
         </div>
-        {!engineeringDetailCollapsed && <ProtectedNullWarningSummary annotations={protectedNullAnnotations} />}
+        {!engineeringDetailCollapsed && !placementPreviewActive && <ProtectedNullWarningSummary annotations={protectedNullAnnotations} />}
 
-        {!engineeringDetailCollapsed && hasCurrentBassResult && (
+        {!engineeringDetailCollapsed && !placementPreviewActive && hasCurrentBassResult && (
           <StorytellerExplanation focus={parameterFocus} />
         )}
 
