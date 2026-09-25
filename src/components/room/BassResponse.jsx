@@ -452,11 +452,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
 
   const previousResultFadedSeries = useMemo(() => {
     if (!placementPreviewActive) return null;
-    // Use the published contract's room-response series (from visibleMultiSeries,
-    // which is built from the published contract's graph payload) — NOT the live
-    // canonicalRoomResponseCurve, which reflects the NEW sub positions.
-    const prevRoomSeries = visibleMultiSeries.find((s) => s.kind === "room-response");
-    const prevCurve = prevRoomSeries?.data || null;
+    // Use the previous published graph, independent of the user's normal
+    // layer-visibility choices. Some published results have no room-response
+    // layer, so fall back to their saved final response.
+    const prevPublishedSeries = multiSeriesForGraph.find((s) => s.kind === "room-response")
+      || multiSeriesForGraph.find((s) => s.kind === "post-eq");
+    const prevCurve = prevPublishedSeries?.data || null;
     if (!prevCurve) return null;
     return {
       id: "previous-result",
@@ -465,7 +466,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
       kind: "previous-result-faded",
       label: "Previous result — out of date",
     };
-  }, [placementPreviewActive, visibleMultiSeries]);
+  }, [placementPreviewActive, multiSeriesForGraph]);
 
   const placementPreviewGraphSeries = useMemo(() => {
     if (!placementPreviewActive) return null;
