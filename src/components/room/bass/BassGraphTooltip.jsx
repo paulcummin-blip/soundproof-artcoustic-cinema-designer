@@ -147,14 +147,20 @@ export default function BassGraphTooltip({
       })
     : null;
 
+  const isPlacementPreview = series.some((s) => s?.kind === "room-response-preview");
+  const hoveredPreviewSeries = isPlacementPreview
+    ? series.find((s) => `spl_${s.id}` === payload?.[0]?.dataKey)
+    : null;
   const finalEqSpl = authority?.responseSpl;
-  const finalEqLabel = authority?.activeCurveLabel || "FINAL EQ RESPONSE";
+  const finalEqLabel = isPlacementPreview
+    ? (hoveredPreviewSeries?.label || "Room Response Preview")
+    : (authority?.activeCurveLabel || "FINAL EQ RESPONSE");
   const houseCurveValue = authority?.targetSpl;
   const diffFromTarget = authority?.delta;
   const aboveTarget = authority?.aboveTarget;
 
   // Calibration (static line, no expansion)
-  const hasCalibration = isFinite(operatingLevelOffsetDb) && Number(operatingLevelOffsetDb) !== 0;
+  const hasCalibration = !isPlacementPreview && isFinite(operatingLevelOffsetDb) && Number(operatingLevelOffsetDb) !== 0;
   const calibrationDb = hasCalibration ? Number(operatingLevelOffsetDb) : null;
 
   // Delta label: "Above target" / "Below target" / "Vs target" (when equal)
