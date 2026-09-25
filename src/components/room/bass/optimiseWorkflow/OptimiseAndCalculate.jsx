@@ -426,10 +426,13 @@ export default function OptimiseAndCalculate({
           || sharedRef.current?.completedBassAuthority?.currentFingerprint
           || null;
         if (postRecalcFingerprint && result?.recommendation) {
-          publishRecommendation(projectId, versionId, result.recommendation, postRecalcFingerprint);
+          const persisted = await publishRecommendation(projectId, versionId, result.recommendation, postRecalcFingerprint);
+          if (!persisted) throw new Error("The published ADI recommendation could not be saved.");
         }
-      } catch {
-        // Re-publish failure is non-fatal — the in-memory recommendation still works.
+      } catch (error) {
+        // Do not complete the workflow with an in-memory-only recommendation
+        // that will disappear on refresh.
+        throw error;
       }
 
       // Phase 5: Publishing
