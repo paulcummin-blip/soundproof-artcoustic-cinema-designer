@@ -121,14 +121,41 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // authoritative simulation itself (flat-source RSP transfers, same mode
   // bank). The hook is retained for potential non-manual live features but
   // stays idle during manual Calculate (no analysisRequestId passed).
+  // ── Placement Preview ─────────────────────────────────────────────────
+  // When a published bass result exists but the design is stale (subwoofer
+  // moved) and no full calculation is running, enter Placement Preview mode.
+  // The live normalized room-transfer hook is re-enabled with a non-null
+  // analysisRequestId and a geometry-based analysisRequestFingerprint so the
+  // designer sees a live room-response preview while dragging subs. The
+  // preview is advisory-only — it never writes or publishes any authority.
+  const placementPreviewActive = hasPublishedContract
+    && publishedContractIsStale
+    && !calculationInProgress
+    && !manualAnalysisRequest
+    && !!geometryFingerprint;
+
+  // The live hook requires analysisRequestFingerprint === its own internally
+  // computed geometryFingerprint (prefix "nrt"). The authoritative geometry
+  // fingerprint (prefix "geo") differs, so we feed the hook's own computed
+  // fingerprint back on the next render via state. This is a one-render delay
+  // which is negligible given the hook's 50 ms debounce.
+  const [placementPreviewFp, setPlacementPreviewFp] = useState(null);
+  useEffect(() => {
+    if (placementPreviewActive && normalizedLive.geometryFingerprint && placementPreviewFp !== normalizedLive.geometryFingerprint) {
+      setPlacementPreviewFp(normalizedLive.geometryFingerprint);
+    } else if (!placementPreviewActive && placementPreviewFp !== null) {
+      setPlacementPreviewFp(null);
+    }
+  }, [placementPreviewActive, normalizedLive.geometryFingerprint, placementPreviewFp]);
+
   const normalizedLive = useNormalizedRoomTransferLive({
     roomDims,
     rspPosition,
     seatingPositions,
     subsForSimulation: sources,
     physicsOptions: normalizedPhysicsOptions,
-    analysisRequestId: null,
-    analysisRequestFingerprint: null,
+    analysisRequestId: placementPreviewActive ? "placement-preview" : null,
+    analysisRequestFingerprint: placementPreviewActive ? placementPreviewFp : null,
   });
   // PASS 2: Use perSourceRspComplexTransfers from the authoritative simulation.
   // The authoritative engine produces these from a flat 94 dB source (same
@@ -1798,6 +1825,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     });
   }, [completedBassAuthority?.contract?.bassResult?.seatResults?.P19, seatingPositions]);
 
-  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress });
+  const placementPreviewResult = placementPreviewActive && normalizedLive.status === "ready" && normalizedLive.result
+    ? normalizedLive.result
+    : null;
+  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, placementPreviewActive, placementPreviewResult });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

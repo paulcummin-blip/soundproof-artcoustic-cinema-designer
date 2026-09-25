@@ -429,6 +429,54 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     return true;
   }), [multiSeriesForGraph, curveVisibility]);
 
+  // ── Placement Preview ─────────────────────────────────────────────────
+  // When active, the graph shows ONLY the live Room Response Preview from
+  // current sub positions. All engineering layers (Product + Room Maximum,
+  // Final Corrected Response, House Target, RP22 overlays, P14/P18/P19/P20
+  // markers, protected-null overlays) are suppressed. The previous published
+  // room response is optionally shown faded and labelled "Previous result —
+  // out of date".
+  const placementPreviewActive = sharedBassResults?.placementPreviewActive === true;
+  const placementPreviewResult = sharedBassResults?.placementPreviewResult || null;
+
+  const placementPreviewSeries = useMemo(() => {
+    if (!placementPreviewActive || !placementPreviewResult?.rspCurve?.length) return null;
+    return {
+      id: "placement-preview",
+      color: "#16A34A",
+      data: placementPreviewResult.rspCurve,
+      kind: "room-response-preview",
+      label: "Room Response Preview",
+    };
+  }, [placementPreviewActive, placementPreviewResult?.rspCurve]);
+
+  const previousResultFadedSeries = useMemo(() => {
+    if (!placementPreviewActive) return null;
+    const prevCurve = Array.isArray(canonicalRoomResponseCurve) && canonicalRoomResponseCurve.length
+      ? canonicalRoomResponseCurve
+      : null;
+    if (!prevCurve) return null;
+    return {
+      id: "previous-result",
+      color: "#9CA3AF",
+      data: prevCurve,
+      kind: "previous-result-faded",
+      label: "Previous result — out of date",
+    };
+  }, [placementPreviewActive, canonicalRoomResponseCurve]);
+
+  const placementPreviewGraphSeries = useMemo(() => {
+    if (!placementPreviewActive) return null;
+    const series = [];
+    if (previousResultFadedSeries) series.push(previousResultFadedSeries);
+    if (placementPreviewSeries) series.push(placementPreviewSeries);
+    return series.length > 0 ? series : null;
+  }, [placementPreviewActive, placementPreviewSeries, previousResultFadedSeries]);
+
+  const effectiveVisibleSeries = placementPreviewActive
+    ? (placementPreviewGraphSeries || [])
+    : visibleMultiSeries;
+
   // Stage 5: Derive actual layer availability from the built graph series.
   // Selection (visibility) is separate from availability. A layer that has
   // no corresponding series in the built graph is unavailable — the control
@@ -767,7 +815,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           <div style={{ fontSize: 14, fontWeight: 600, color: "#625143" }}>Select Bass Target</div>
           <div style={{ fontSize: 12, color: "#8B7F76", marginTop: 4 }}>Choose a bass target to view the response graph</div>
         </div>
-      ) : !hasCurrentBassResult && visibleMultiSeries.length === 0 ? (
+      ) : !hasCurrentBassResult && effectiveVisibleSeries.length === 0 ? (
         <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#625143" }}>
             {bassAuthorityStatus === "STALE" ? "Response needs recalculation" : "Optimise & Calculate"}
@@ -895,12 +943,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         </div>
 
         <div className={engineeringDetailCollapsed ? "mt-2 flex-1 min-h-[400px] relative" : "mt-2"}>
-          {visibleMultiSeries.length > 0 ? (
+          {effectiveVisibleSeries.length > 0 ? (
             <>
             <BassGraph
               flexHeight={engineeringDetailCollapsed}
-              multiSeries={visibleMultiSeries}
-              responseData={(visibleMultiSeries.find((series) => series.kind === "post-eq") || visibleMultiSeries[0])?.data ?? []}
+              multiSeries={effectiveVisibleSeries}
+              responseData={(effectiveVisibleSeries.find((series) => series.kind === "post-eq") || effectiveVisibleSeries[0])?.data ?? []}
               schroederFrequency={schroederFrequency}
               rp22Levels={[]}
               toggles={{}}
@@ -911,7 +959,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               linearHzAxis={false}
               rewStyleMode={true}
               yDomain={[70, 140]}
-              xDomain={visibleMultiSeries[0]?.data?.some(p => p.frequency > 200) ? [15, 300] : [15, 200]}
+              xDomain={effectiveVisibleSeries[0]?.data?.some(p => p.frequency > 200) ? [15, 300] : [15, 200]}
               showAxialOnly={false}
               refDb={85}
               disableHighlight={false}

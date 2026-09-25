@@ -29,6 +29,8 @@ export const emptyBassResults = () => ({
   p19SeatAuthority: null,
   p14FamilyProgress: null,
   seatingPositions: [],
+  placementPreviewActive: false,
+  placementPreviewResult: null,
 });
 
 export function createBassResultsScope(scopeId) {
