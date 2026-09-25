@@ -32,6 +32,8 @@ export function useElevationDragHandlers({
     const fcModel = getModel('FC');
     const frModel = getModel('FR');
     const allSameModel = flModel && fcModel && frModel && flModel === fcModel && fcModel === frModel;
+    const frontStageMode = detectFrontStageMode(placedSpeakers);
+    const isCenterOnly = frontStageMode === 'center_only';
 
     setSpeakers(prev => prev.map(spk => {
       const canon = safeCanon(spk.role);
@@ -40,6 +42,7 @@ export function useElevationDragHandlers({
       if (canon === role) {
         return {
           ...spk,
+          positionSource: 'user',
           position: {
             ...spk.position,
             ...(axis === 'x' ? { x: newX } : {}),
@@ -55,17 +58,19 @@ export function useElevationDragHandlers({
       }
       if (axis === 'z' && isLcrRole) {
         if (allSameModel) {
-          return { ...spk, position: { ...spk.position, z: newZ } };
+          return { ...spk, positionSource: 'user', position: { ...spk.position, z: newZ } };
         }
-        if ((role === 'FL' || role === 'FR') && (canon === 'FL' || canon === 'FR')) {
-          return { ...spk, position: { ...spk.position, z: newZ } };
+        // In center_only mode, FL and FR are independent — don't sync them.
+        // Only sync FL/FR in standard/integrated_lcr modes where matched L/R
+        // height is the intended behaviour.
+        if (!isCenterOnly && (role === 'FL' || role === 'FR') && (canon === 'FL' || canon === 'FR')) {
+          return { ...spk, positionSource: 'user', position: { ...spk.position, z: newZ } };
         }
       }
       return spk;
     }));
 
     if (axis === 'z') {
-      const frontStageMode = detectFrontStageMode(placedSpeakers);
       const patch = resolveLcrHeightAuthority({ role, newZ, frontStageMode });
       appState?.updateGlobalSpl?.(patch);
     }
