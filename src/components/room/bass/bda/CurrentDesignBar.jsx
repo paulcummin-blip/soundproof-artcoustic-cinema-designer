@@ -96,6 +96,7 @@ export default function CurrentDesignBar({
   frontModel, frontCount, rearModel, rearCount,
   subwooferInstances, roomDims,
   bassLifecycleState = BASS_LIFECYCLE_STATE.IDLE,
+  statusText = null,
   onChangeSpeakers, onChangeLayout,
 }) {
   const hasFront = frontCount > 0 && frontModel;
@@ -139,7 +140,7 @@ export default function CurrentDesignBar({
         )}
         <div className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: display.color }}>
           <StatusIcon icon={display.icon} isCalculating={display.isCalculating} />
-          {display.text}
+          {statusText || display.text}
         </div>
       </div>
       <div className="flex items-center gap-2">
