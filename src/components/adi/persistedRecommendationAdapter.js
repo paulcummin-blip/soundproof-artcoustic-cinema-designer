@@ -67,7 +67,9 @@ export function buildAdiDecisionFromPersistedRecommendation(recommendation) {
   // Map the Recommendation Engine output to the ADI 5-field structure.
   const adiRecommendation = {
     assessment: recommendation.assessment?.summary || null,
-    action: recommendation.recommendedAction || null,
+    action: typeof recommendation.recommendedAction === 'string'
+      ? recommendation.recommendedAction
+      : recommendation.recommendedAction?.description || null,
     why: recommendation.physicalCause?.description || null,
     rp22Evidence: Array.isArray(recommendation.rp22Evidence) ? recommendation.rp22Evidence : null,
     remainingLimitation: recommendation.remainingLimitation?.description || null,
