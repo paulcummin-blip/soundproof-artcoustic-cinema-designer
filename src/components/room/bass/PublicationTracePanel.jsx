@@ -116,6 +116,14 @@ export default function PublicationTracePanel() {
 
           <Section title="6. Publication">
             <Row label="publishCompletedBassContract ran" value={trace.publishRan} ok={trace.publishRan} />
+            <Row label="cached contract fingerprint" value={trace.cachedContractFingerprint} />
+            <Row label="cached fingerprint matches current" value={trace.cachedFingerprintMatchesCurrent} />
+            <Row label="cached contract authoritative" value={trace.cachedContractAuthoritative} />
+            <Row label="cached graph payload" value={trace.cachedGraphPayload} />
+            <Row label="cached P14 matches current" value={trace.cachedP14MatchesCurrent} />
+            <Row label="cached publish returned" value={trace.cachePublishReturned} />
+            <Row label="fresh contract structural" value={trace.freshContractStructural} />
+            <Row label="fresh contract authoritative" value={trace.freshContractAuthoritative} />
             <Row label="published fingerprint" value={trace.publishedFingerprint} />
             <Row label="first guard that returned" value={trace.firstGuard} ok={false} />
           </Section>
