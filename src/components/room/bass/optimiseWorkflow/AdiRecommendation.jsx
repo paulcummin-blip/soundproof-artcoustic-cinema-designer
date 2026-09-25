@@ -20,6 +20,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { CheckCircle2, ArrowRight, Loader2, Activity } from "lucide-react";
 import { runEngineeringDecisionModel } from "@/components/adi";
+import { buildAdiDecisionFromPersistedRecommendation } from "@/components/adi/persistedRecommendationAdapter";
 import { RECOMMENDATION_INTENT } from "@/components/room/bass/recommendationAuthority/recommendationAuthority";
 import { ADI_OUTCOME } from "@/components/adi/adiConstants";
 import { buildOptimisedInstances } from "../improveBassV2/improveBassV2Apply";
@@ -108,10 +109,15 @@ export default function AdiRecommendation({
   const hasPublishedResult = shared?.hasCurrentResult === true;
   const isCalculatingWithPublished = isCalculating && hasPublishedResult;
 
-  // Run ADI decision model
+  // Run ADI decision model.
+  // On cold load / refresh, v2State (transient V2 optimiser memory) is empty.
+  // Fall back to the persisted Recommendation Engine output stored inside the
+  // published bass authority contract so ADI restores from the same authority
+  // as Graph and RP22 — never "No further engineering changes" when a valid
+  // recommendation was published.
   const adiDecision = useMemo(() => {
     try {
-      return runEngineeringDecisionModel({
+      const liveDecision = runEngineeringDecisionModel({
         optimiserResult: v2State,
         currentResult: completedBassAuthority?.result || completedBassAuthority,
         designObjectives: {
@@ -121,6 +127,21 @@ export default function AdiRecommendation({
         },
         context: { subwooferCount, roomDims, seatingPositions },
       });
+
+      // If the live V2 optimiser produced a real recommendation, use it.
+      if (liveDecision?.recommendation && liveDecision.outcome !== ADI_OUTCOME.NO_FURTHER_ENGINEERING) {
+        return liveDecision;
+      }
+
+      // Cold-load fallback: restore from the persisted Recommendation Engine
+      // output inside the published bass authority contract.
+      const persistedRecommendation = completedBassAuthority?.contract?.recommendation || null;
+      const restoredDecision = buildAdiDecisionFromPersistedRecommendation(persistedRecommendation);
+      if (restoredDecision) {
+        return restoredDecision;
+      }
+
+      return liveDecision;
     } catch {
       return null;
     }

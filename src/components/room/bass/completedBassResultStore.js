@@ -17,6 +17,7 @@ import {
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 import { bassCacheKey, bassDbFilter, parseBassCacheKey } from "./bassCacheKey";
 import { assertNotAuthoritativeReadOnly } from "@/components/state/authoritativeReadOnlyMode";
+import { hydrateRecommendation } from "@/components/recommendationEngine/recommendationPersistence";
 
 export {
   BASS_AUTHORITY_STATUS,
@@ -75,6 +76,13 @@ function markHydrationSettled(key) {
   if (current) {
     const { projectId, versionId } = parseBassCacheKey(key);
     setMemory(projectId, versionId, { ...current });
+    // Wire existing recommendation hydration: restore the persisted
+    // Recommendation Engine output from ProjectAnalysisCache into the
+    // in-memory recommendation store so ADI can read it on cold load.
+    const resultFingerprint = current?.contract?.job?.resultFingerprint || current?.currentFingerprint || null;
+    if (resultFingerprint) {
+      hydrateRecommendation(projectId, versionId, resultFingerprint).catch(() => {});
+    }
   } else {
     notify();
   }
