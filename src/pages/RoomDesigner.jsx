@@ -17,7 +17,8 @@ import {
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
 import { useActiveProjectId } from "@/components/state/project-session";
-import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint } from "@/components/state/designReviewHandoff";
+import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint, readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
+import { isRetainedSummaryStillValid } from "@/components/state/designRatingPublicationAuthority";
 import { buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
 import { useEngineeringPublicationEffect } from "@/components/proposal/engineeringAuthority/useEngineeringPublicationEffect";
 
@@ -1799,11 +1800,11 @@ function RoomDesignerWithState() {
   React.useEffect(() => {
     const handoffProjectId = resolvedProjectId || projectIdState || null;
 
-    // Minimum 5.1 system gate: do not publish a replacement until the
-    // system again has LCR, surrounds and at least one subwoofer. The separate
-    // unavailable indicator owns that UI state; the last complete publication
-    // remains intact so transient layout rebuilds cannot erase it.
+    // Minimum 5.1 system gate: do not publish any ASDR snapshot to Design
+    // Review until the system has LCR, surrounds, and at least one subwoofer.
+    // Clear any previously published snapshot so a partial system cannot leak.
     if (!minimumSystemMet) {
+      clearDesignReviewHandoff(handoffProjectId, appState?.activeVersionId || null);
       return;
     }
 
@@ -1867,19 +1868,46 @@ function RoomDesignerWithState() {
     // be published as the canonical Engineering Summary. The single
     // isDesignRatingPublishable predicate decides; no consumer duplicates the
     // readiness rule.
-    const candidateRating =
-      appDesignRating?.engineeringSummary?.project?.rating || null;
-    const candidateRatingStatus = candidateRating?.status || null;
-    const candidateIsProvisional =
-      !candidateRating ||
-      candidateRatingStatus === "NOT_ASSESSED" ||
-      candidateRatingStatus === "NOT_CONFIGURED";
+    if (appDesignRating.isPublishable !== true) {
+      const versionId = appState?.activeVersionId || null;
+      const existing = versionId
+        ? readDesignReviewHandoff(handoffProjectId, versionId)
+        : null;
+      const currentSeatPriorityFp = buildSeatPriorityFingerprint(currentSeats);
+      const stillValid = isRetainedSummaryStillValid(existing, {
+        projectId: handoffProjectId,
+        versionId,
+        seatPriorityFingerprint: currentSeatPriorityFp,
+        bassFingerprint: appDesignRating?.bassReadiness?.fingerprint || null,
+      });
 
-    if (appDesignRating.isPublishable !== true || candidateIsProvisional) {
-      // A pending or provisional replacement is not a publication. Leaving
-      // the handoff untouched preserves the last complete contract; when no
-      // contract exists, the separate pending indicator already owns the
-      // loading state.
+      if (stillValid) {
+        // Retain the existing settled same-fingerprint summary — do not
+        // overwrite it with a newly computed partial one.
+        return;
+      }
+
+      // Fail closed: publish neutral loading state. The bass-pending
+      // indicator (published separately) lets the sidebar show
+      // "Calculating bass analysis…" without a partial numeric score.
+      publishDesignReviewHandoff({
+        projectId: handoffProjectId,
+        versionId,
+        calculationFingerprint: appDesignRating?.bassReadiness?.fingerprint || null,
+        showAsdr,
+        rating: null,
+        engineeringSummary: null,
+        recommendations: null,
+        analysisResult,
+        seatingPositions: currentSeats,
+        placedSpeakers,
+        frontSubs: frontSubsForRendering,
+        rearSubs: rearSubsForRendering,
+        screen: _screen,
+        dolbyLayout: dolbyPreset,
+        mlpPoint: mlpAnchorEffective,
+        priceData: publishedPriceData,
+      });
       return;
     }
 
@@ -2022,23 +2050,11 @@ function RoomDesignerWithState() {
   React.useEffect(() => {
     const indicatorProjectId = resolvedProjectId || projectIdState || null;
     if (!indicatorProjectId) return;
-    const layoutIsRefreshing =
-      appState?.layoutRefreshPending === true ||
-      appState?.geometryReflowInProgress === true;
-    publishAsdrUnavailableIndicator(
-      indicatorProjectId,
-      !minimumSystemMet && !layoutIsRefreshing
-    );
+    publishAsdrUnavailableIndicator(indicatorProjectId, !minimumSystemMet);
     return () => {
       clearAsdrUnavailableIndicator(indicatorProjectId);
     };
-  }, [
-    resolvedProjectId,
-    projectIdState,
-    minimumSystemMet,
-    appState?.layoutRefreshPending,
-    appState?.geometryReflowInProgress,
-  ]);
+  }, [resolvedProjectId, projectIdState, minimumSystemMet]);
 
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {
