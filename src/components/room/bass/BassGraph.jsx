@@ -6,6 +6,7 @@ import ProtectedNullOverlay from '@/components/room/bass/ProtectedNullOverlay';
 import BassGraphTooltip from '@/components/room/bass/BassGraphTooltip';
 import { P14_EQ_ASSESSMENT_RANGE_HZ } from '@/components/utils/p14CapabilityAuthority';
 import { formatSplDisplay } from '@/components/utils/splDisplayFormatter';
+import LimitingSeatLabel from '@/components/room/bass/storyteller/LimitingSeatLabel';
 
 // REW mode plot range debug (proof we're plotting the right numbers)
 const RewPlotRangeDebug = ({ chartData, yDomain }) => {
@@ -430,6 +431,7 @@ export default function BassGraph({
                     ))}
                     {Array.isArray(parameterFocus?.referenceLines) && parameterFocus.referenceLines.map((line, index) => {
                       const isHorizontal = line.y != null && line.x == null;
+                      const hasPillLabel = line.seatPillLabel != null;
                       return (
                         <ReferenceLine
                           key={`focus-line-${index}`}
@@ -438,14 +440,20 @@ export default function BassGraph({
                           strokeWidth={line.strokeWidth ?? 2}
                           strokeDasharray={line.strokeDasharray || "4 3"}
                           ifOverflow={line.ifOverflow || "extendDomain"}
-                          label={line.label ? {
+                          label={hasPillLabel ? (
+                            <LimitingSeatLabel
+                              seatPillLabel={line.seatPillLabel}
+                              limitingFrequencyHz={line.limitingFrequencyHz}
+                              color={line.stroke || "#213428"}
+                            />
+                          ) : (line.label ? {
                             value: line.label,
                             position: line.labelPosition || "top",
                             fill: line.stroke || "#213428",
                             fontSize: 10,
                             fontWeight: 600,
                             className: "font-body",
-                          } : undefined}
+                          } : undefined)}
                         />
                       );
                     })}
