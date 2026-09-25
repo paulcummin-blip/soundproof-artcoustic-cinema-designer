@@ -426,7 +426,25 @@ export default function OptimiseAndCalculate({
           || sharedRef.current?.completedBassAuthority?.currentFingerprint
           || null;
         if (postRecalcFingerprint && result?.recommendation) {
-          const persisted = await publishRecommendation(projectId, versionId, result.recommendation, postRecalcFingerprint);
+          const decision = adiDecisionRef.current;
+          const recommendationForPublication = {
+            ...result.recommendation,
+            publishedAdiDecision: decision?.recommendation ? {
+              outcome: decision.outcome,
+              intent: decision.intent,
+              recommendation: {
+                assessment: decision.recommendation.assessment || null,
+                action: decision.recommendation.action || null,
+                why: decision.recommendation.why || null,
+                rp22Evidence: decision.recommendation.rp22Evidence || null,
+                remainingLimitation: decision.recommendation.remainingLimitation || null,
+              },
+              leverAssessment: {
+                appropriateLever: decision.leverAssessment?.appropriateLever || null,
+              },
+            } : null,
+          };
+          const persisted = await publishRecommendation(projectId, versionId, recommendationForPublication, postRecalcFingerprint);
           if (!persisted) throw new Error("The published ADI recommendation could not be saved.");
         }
       } catch (error) {
