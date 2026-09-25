@@ -1427,6 +1427,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }, [manualAnalysisRequest]);
   const hasCurrentResult = completedBassAuthority?.authoritative === true
     && !!completedBassAuthority?.contract;
+  const hasPublishedCurrentDesign = completedBassAuthority?.authorityStatus === BASS_AUTHORITY_STATUS.AUTHORITATIVE
+    && completedBassAuthority?.contract?.job?.resultFingerprint === cacheKey;
 
   // FIX 3: Explicit success terminal — clear the manual request only after
   // the completed contract becomes the current authoritative result and the
@@ -1434,14 +1436,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // because the optimiser became ready.
   useEffect(() => {
     if (!manualAnalysisRequest || !manualRequestMatchesCurrent) return;
-    if (hasCurrentResult && !calculationInProgress) {
+    if (hasPublishedCurrentDesign && !calculationInProgress) {
       if (timingTraceRef.current && timingTraceRef.current.trace.publicationAcceptedMs === null) {
         timingTraceRef.current.mark("publicationAcceptedMs");
       }
       setLastTerminalOutcome({ outcome: "success", fingerprint: cacheKey });
       setManualAnalysisRequest(null);
     }
-  }, [manualAnalysisRequest, manualRequestMatchesCurrent, hasCurrentResult, calculationInProgress, cacheKey]);
+  }, [manualAnalysisRequest, manualRequestMatchesCurrent, hasPublishedCurrentDesign, calculationInProgress, cacheKey]);
 
   // FIX 5: After the foreground manual Calculate completes (manualAnalysisRequest
   // cleared), resume the background P14 sweep if it was paused for the manual
