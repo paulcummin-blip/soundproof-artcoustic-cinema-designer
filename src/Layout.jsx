@@ -168,7 +168,12 @@ export default function Layout({ children, currentPageName }) {
         published?.engineeringSummary
           ?? published?.rating?.engineeringSummary
           ?? null;
-      if (nextSummary) {
+      const nextRating = nextSummary?.project?.rating || null;
+      const nextIsComplete =
+        !!nextRating &&
+        nextRating.status !== 'NOT_ASSESSED' &&
+        nextRating.status !== 'NOT_CONFIGURED';
+      if (nextIsComplete) {
         setEngineeringSummary(nextSummary);
       }
     };
