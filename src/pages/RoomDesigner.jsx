@@ -110,10 +110,8 @@ import("@/components/room/RoomElements").
 then((m) => ({ default: m.default ?? m.RoomElements }))
 );
 
-const BassResponse = React.lazy(() =>
-import("@/components/room/BassResponse").
-then((m) => ({ default: m.default ?? m.BassResponse }))
-);
+// BassResponse is now rendered exclusively inside BassDesignAssistant.
+// The standalone import was dead code — removed to avoid confusion.
 
 // Direct imports (these are default exports)
 // Fix: Change RoomVisualisation to be lazy-loaded as it's used within Suspense.

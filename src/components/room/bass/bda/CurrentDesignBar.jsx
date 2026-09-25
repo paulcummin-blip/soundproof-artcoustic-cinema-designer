@@ -13,10 +13,14 @@
 // does NOT derive lifecycle state independently.
 // ---------------------------------------------------------------------------
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Settings2, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { formatSubwooferSystemLabel } from "@/components/utils/subwooferDisplayLabel";
 import { deriveBassDisplayStatus, BASS_DISPLAY_ICON, BASS_LIFECYCLE_STATE } from "../bassCalculationLifecycle";
+import { useSharedBassResults } from "../bassResultsStore";
+import { formatOfficialBassResults } from "../bassResultsPresentation";
+import { resolveP14TargetSelectionState } from "../p14TargetSelectionState";
+import RP22GradingPill from "@/components/ui/RP22GradingPill";
 
 function LayoutThumbnail({ subwooferInstances, roomDims }) {
   const enabled = (Array.isArray(subwooferInstances) ? subwooferInstances : [])
@@ -92,6 +96,16 @@ function StatusIcon({ icon, isCalculating }) {
   return null;
 }
 
+function splitPillContent(resultText) {
+  const text = String(resultText || "");
+  const sepIndex = text.indexOf(" · ");
+  if (sepIndex === -1) return { pillLabel: text, supportingText: null };
+  return {
+    pillLabel: text.slice(0, sepIndex),
+    supportingText: text.slice(sepIndex + 3),
+  };
+}
+
 export default function CurrentDesignBar({
   frontModel, frontCount, rearModel, rearCount,
   subwooferInstances, roomDims,
@@ -101,6 +115,37 @@ export default function CurrentDesignBar({
 }) {
   const hasFront = frontCount > 0 && frontModel;
   const hasRear = rearCount > 0 && rearModel;
+
+  // Authoritative P19/P20 from the sole shared authority — presentation only.
+  const shared = useSharedBassResults();
+  const [nowMs, setNowMs] = useState(Date.now());
+  const active = shared.calculationInProgress || shared.bassLifecycleState === "stale_needs_recalculation";
+  useEffect(() => {
+    if (!active) return undefined;
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [active, shared.lifecycle?.startedAtMs, shared.lifecycle?.queuedAtMs]);
+
+  const p14Selection = resolveP14TargetSelectionState(shared.authoritative?.requested);
+  const formatted = formatOfficialBassResults(
+    shared.completedBassAuthority,
+    shared.lifecycle,
+    shared.seatingPositions,
+    nowMs,
+    p14Selection.noP14TargetSelected,
+    {
+      p14TargetBasis: shared.authoritative?.requested?.p14TargetBasis,
+      p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
+    },
+    shared.p19SeatAuthority,
+    shared.bassLifecycleState,
+  );
+
+  const p19Pill = formatted.pills?.p19 || null;
+  const p20Pill = formatted.pills?.p20 || null;
+  const hasAuthoritativeResults = shared?.hasCurrentResult === true && !formatted?.isCalculatingWithPublishedResult;
+  const p19Label = p19Pill ? splitPillContent(p19Pill.resultText).pillLabel : null;
+  const p20Label = p20Pill ? splitPillContent(p20Pill.resultText).pillLabel : null;
 
   if (!hasFront && !hasRear) {
     return (
@@ -136,6 +181,22 @@ export default function CurrentDesignBar({
         {layout && (
           <div className="text-[12px] text-[#625143]">
             {layout.count} Subwoofer{layout.count > 1 ? "s" : ""} · {layout.layoutName}
+          </div>
+        )}
+        {hasAuthoritativeResults && (p19Pill || p20Pill) && (
+          <div className="mt-1 flex items-center gap-2">
+            {p19Pill && (
+              <span className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-[#625143]">P19</span>
+                <RP22GradingPill level={p19Pill.level} compact>{p19Label}</RP22GradingPill>
+              </span>
+            )}
+            {p20Pill && (
+              <span className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-[#625143]">P20</span>
+                <RP22GradingPill level={p20Pill.level} compact>{p20Label}</RP22GradingPill>
+              </span>
+            )}
           </div>
         )}
         <div className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: display.color }}>

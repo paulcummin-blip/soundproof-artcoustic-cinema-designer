@@ -14,11 +14,9 @@ import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
 import { bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 import BassEngineeringDetails from "@/components/room/bass/BassEngineeringDetails";
-import BassResultCards from "@/components/room/bass/BassResultCards";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import BassTargetLevelControl from "@/components/room/bass/BassTargetLevelControl";
 import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 import { buildBassGraphSeries, detailedEqStatusText } from "@/components/room/bass/bassGraphDomainBuilder";
 import { usePublishBestSubLayoutInputs } from "@/components/room/bass/best-layout/usePublishBestSubLayoutInputs";
@@ -753,51 +751,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
 
       {!hideHeader && (
         <>
-          {/* 1. Bass Target Settings — always visible at the top (select P14 target before results are meaningful) */}
-          <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#FFFFFF", padding: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#1B1A1A", marginBottom: 8 }}>Bass Target Settings</div>
-            <BassTargetLevelControl disabled={detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"} />
-          </div>
-
+          {/* Informational badges only — no workflow actions. The Bass Design
+              Assistant owns the primary workflow (Calculate / Update / Recommend).
+              BassResponse is the technical inspection surface. */}
           <div className="flex flex-wrap gap-2 text-xs">
             <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Room: {dimsTxt}</Badge>
             <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Subs: {totalSubCount}</Badge>
             <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
           </div>
 
-          {/* Placement Preview banner — advisory-only room response while sub
-              positions are stale. Engineering layers are suppressed below. */}
+          {/* Placement Preview banner — informational only (no workflow prompt) */}
           {placementPreviewActive && (
             <div style={{ border: "1px solid #F59E0B", borderRadius: 10, background: "#FFFBEB", padding: "10px 14px", marginBottom: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E" }}>
                 Subwoofer positions changed. Previewing room response only.
               </div>
-              <div style={{ fontSize: 11, color: "#B45309", marginTop: 2 }}>
-                Press Update Bass Performance to recalculate the full engineering result.
-              </div>
-            </div>
-          )}
-
-          {/* Current authoritative results only. Stale values never read as current. */}
-          {hasCurrentBassResult ? (
-            <div style={{ transition: "opacity 0.3s", opacity: placementPreviewActive ? 0.45 : 1 }}>
-              {placementPreviewActive && (
-                <div style={{ fontSize: 10, fontWeight: 600, color: "#8B7F76", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
-                  Previous result — out of date
-                </div>
-              )}
-              <BassResultCards />
-            </div>
-          ) : (
-            <div className={`rounded-xl border px-4 py-4 ${bassAuthorityStatus === "STALE" ? "border-amber-200 bg-amber-50" : "border-[#DCDBD6] bg-white"}`}>
-              <div className="text-[13px] font-semibold text-[#1B1A1A]">
-                {bassAuthorityStatus === "STALE" ? "Bass result needs recalculation" : "No current bass result"}
-              </div>
-              <p className="mt-1 text-[11px] text-[#625143]">
-                {bassAuthorityStatus === "STALE"
-                  ? "The design changed after the last calculation. Previous values are excluded from the current RP22 score and report."
-                  : "Choose Calculate Performance when the layout is ready."}
-              </p>
             </div>
           )}
         </>
@@ -839,7 +807,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
       ) : !hasCurrentBassResult && effectiveVisibleSeries.length === 0 ? (
         <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#625143" }}>
-            {bassAuthorityStatus === "STALE" ? "Response needs recalculation" : "Optimise & Calculate"}
+            {bassAuthorityStatus === "STALE" ? "Response needs recalculation" : "No response data"}
           </div>
           <div style={{ fontSize: 12, color: "#8B7F76", marginTop: 4 }}>
             The authoritative response graph appears after the current design has been calculated.
