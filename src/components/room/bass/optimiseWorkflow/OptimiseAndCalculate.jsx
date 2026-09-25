@@ -19,6 +19,7 @@ import React, { useCallback, useEffect, useRef } from "react";
 import { useSyncExternalStore } from "react";
 import { Sparkles, CheckCircle2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useSharedBassResults } from "../bassResultsStore";
+import { capturePublicationTrace } from "../publicationTraceStore";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { getStage2State, subscribeStage2 } from "../stage2/stage2PlacementStore";
 import { useImproveBassV2State, requestCancel, resetImproveBassV2 } from "../improveBassV2/improveBassV2Store";
@@ -85,6 +86,37 @@ async function waitForCurrentPublication(sharedRef, phaseRef) {
       }
       noActiveJobSince ??= Date.now();
       if (Date.now() - noActiveJobSince > 30000) {
+        const contract = current?.contract;
+        capturePublicationTrace({
+          effectPhase: "publication-wait-expired",
+          firstGuard: "no active calculation and no current publication after 30s",
+          cacheKey: current?.cacheKey,
+          manualRequestFingerprint: null,
+          lifecycleStatus: current?.lifecycle?.status,
+          lifecycleResultFingerprint: current?.lifecycle?.resultFingerprint,
+          lifecycleCurrentJobFingerprint: current?.lifecycle?.currentJobFingerprint,
+          workerStatus: current?.lifecycle?.workerStatus,
+          activeJobId: current?.lifecycle?.activeJobId,
+          calculationInProgress: current?.calculationInProgress,
+          calculationOutcome: current?.calculationOutcome,
+          lastTerminalOutcome: current?.terminalMessage,
+          contractJobStatus: contract?.job?.status,
+          contractJobResultFingerprint: contract?.job?.resultFingerprint,
+          contractJobCurrentJobFingerprint: contract?.job?.currentJobFingerprint,
+          contractJobMetricSchemaVersion: contract?.job?.metricSchemaVersion,
+          contractVersion: contract?.version,
+          contractMetricSchemaVersion: contract?.metricSchemaVersion,
+          hasSelectedCandidate: !!contract?.selectedCandidate,
+          hasSelectedCandidateId: !!contract?.selectedCandidateId,
+          hasP14Parameter: !!contract?.productAnalysis?.parameters?.p14,
+          hasP18Parameter: !!contract?.productAnalysis?.parameters?.p18,
+          p19Status: contract?.productAnalysis?.parameters?.p19?.status,
+          p20Status: contract?.productAnalysis?.parameters?.p20?.status,
+          authorityStatus: current?.completedBassAuthority?.authorityStatus,
+          completedResultFingerprint: current?.completedBassAuthority?.contract?.job?.resultFingerprint,
+          publishRan: false,
+          syncRan: false,
+        });
         throw new Error("Bass calculation ended without publishing the current design. Retry the update.");
       }
     } else {
