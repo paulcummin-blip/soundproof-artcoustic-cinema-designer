@@ -22,3 +22,34 @@ export function subwooferDisplayLabel(model) {
   if (meta && !meta.notFound && meta.label) return meta.label;
   return String(model).trim().toUpperCase();
 }
+
+// User-facing system label for the configured subwoofer system.
+// Handles front-only, rear-only, both-same-model, and mixed-model cases
+// without showing empty sides (e.g. never "×0 + SUB2-12 ×2").
+export function formatSubwooferSystemLabel(frontModel, frontCount, rearModel, rearCount) {
+  const hasFront = Number(frontCount) > 0 && frontModel;
+  const hasRear = Number(rearCount) > 0 && rearModel;
+
+  if (!hasFront && !hasRear) return "";
+
+  const frontLabel = hasFront ? subwooferDisplayLabel(frontModel) : "";
+  const rearLabel = hasRear ? subwooferDisplayLabel(rearModel) : "";
+
+  // Both sides, same model — show total count
+  if (hasFront && hasRear && frontModel === rearModel) {
+    return `${frontLabel} ×${frontCount + rearCount}`;
+  }
+
+  // Both sides, different models
+  if (hasFront && hasRear) {
+    return `${frontLabel} ×${frontCount} + ${rearLabel} ×${rearCount}`;
+  }
+
+  // Front only
+  if (hasFront) {
+    return `${frontLabel} ×${frontCount}`;
+  }
+
+  // Rear only — prefix with "Rear" so the designer knows which side
+  return `Rear ${rearLabel} ×${rearCount}`;
+}

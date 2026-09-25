@@ -7,7 +7,7 @@
 
 import React from "react";
 import { Settings2 } from "lucide-react";
-import { subwooferDisplayLabel } from "@/components/utils/subwooferDisplayLabel";
+import { formatSubwooferSystemLabel } from "@/components/utils/subwooferDisplayLabel";
 
 export default function CurrentSystemSummary({ frontModel, frontCount, rearModel, rearCount, onChangeConfig }) {
   const hasFront = frontCount > 0 && frontModel;
@@ -29,13 +29,7 @@ export default function CurrentSystemSummary({ frontModel, frontCount, rearModel
     );
   }
 
-  const totalCount = (frontCount || 0) + (rearCount || 0);
-  const sameModel = frontModel === rearModel;
-  const modelLabel = subwooferDisplayLabel(frontModel);
-
-  const systemLabel = sameModel
-    ? `${modelLabel} ×${totalCount}`
-    : `${subwooferDisplayLabel(frontModel)} ×${frontCount}${hasRear ? ` + ${subwooferDisplayLabel(rearModel)} ×${rearCount}` : ""}`;
+  const systemLabel = formatSubwooferSystemLabel(frontModel, frontCount, rearModel, rearCount);
 
   return (
     <div className="rounded-lg border border-[#D9D5CE] bg-[#F8F7F4] px-4 py-3">

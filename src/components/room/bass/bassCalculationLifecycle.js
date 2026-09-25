@@ -161,7 +161,16 @@ export function resolveBassLifecycleState({
 
   // Terminal outcomes from lastTerminalOutcome
   if (calculationOutcome === "success") return BASS_LIFECYCLE_STATE.COMPLETE;
-  if (calculationOutcome === "cancelled") return BASS_LIFECYCLE_STATE.CANCELLED;
+  if (calculationOutcome === "cancelled") {
+    // Published Engineering Authority model: when a published result exists,
+    // a cancelled calculation restores the previous published result — show
+    // "Performance is current" or "Performance out of date" based on whether
+    // the visible design still differs from the published fingerprint.
+    // CANCELLED only shows when there is no published result to restore.
+    if (authorityStatus === "AUTHORITATIVE" || authorityStatus === "LIMITED") return BASS_LIFECYCLE_STATE.COMPLETE;
+    if (authorityStatus === "STALE") return BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION;
+    return BASS_LIFECYCLE_STATE.CANCELLED;
+  }
   if (calculationOutcome === "timeout") return BASS_LIFECYCLE_STATE.TIMED_OUT;
   if (calculationOutcome === "error") return BASS_LIFECYCLE_STATE.FAILED;
   if (calculationOutcome === "rejected") return BASS_LIFECYCLE_STATE.FAILED;

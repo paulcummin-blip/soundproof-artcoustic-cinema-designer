@@ -17,7 +17,7 @@
 
 import React, { useCallback, useEffect, useRef } from "react";
 import { useSyncExternalStore } from "react";
-import { Sparkles, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
+import { Sparkles, CheckCircle2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useSharedBassResults } from "../bassResultsStore";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { getStage2State, subscribeStage2 } from "../stage2/stage2PlacementStore";
@@ -165,6 +165,10 @@ export default function OptimiseAndCalculate({
   // Cancel visibility is owned solely by bassCalculationLifecycle.
   const canCancel = canCancelBassCalculation(bassLifecycleState, hasActiveJob);
   const isTimedOut = bassLifecycleState === BASS_LIFECYCLE_STATE.TIMED_OUT && !isCalculating;
+  // Stale: published result exists but the subwoofer design has changed.
+  // The designer must see "Update Bass Performance" — not be forced back to
+  // Choose Starting Layout.
+  const isStale = bassLifecycleState === BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION;
 
   // ── Main orchestration: triggered by the OPTIMISE & CALCULATE button ──
   const handleStart = useCallback(async () => {
@@ -433,6 +437,15 @@ export default function OptimiseAndCalculate({
     }
   }, [projectId, versionId]);
 
+  // Update Bass Performance — resets any terminal state from a previous
+  // cancelled/failed run, then starts the full optimise-and-calculate
+  // workflow. The previous published result remains visible until the
+  // new calculation completes and publishes atomically.
+  const handleUpdateBass = useCallback(() => {
+    handleReset();
+    setTimeout(() => handleStart(), 50);
+  }, [handleReset, handleStart]);
+
   // Expose a recalculate function via registerRecalculate so the compact
   // Recalculate control in the Performance header can trigger the full
   // optimise-and-calculate workflow without duplicating orchestration logic.
@@ -554,6 +567,19 @@ export default function OptimiseAndCalculate({
         </>
       )}
 
+      {/* ── Update Bass Performance (published result exists but design changed) ── */}
+      {!isCalculating && !isError && !isTimedOut && hasResults && isStale && (
+        <button
+          type="button"
+          onClick={handleUpdateBass}
+          disabled={bassActionDisabled}
+          className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity hover:bg-[#3E4349] disabled:cursor-not-allowed disabled:opacity-45 flex items-center justify-center gap-2"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Update Bass Performance
+        </button>
+      )}
+
       {/* ── Simplified progress display ── */}
       {isCalculating && (
         <div className="space-y-3">
@@ -665,8 +691,8 @@ export default function OptimiseAndCalculate({
         </div>
       )}
 
-      {/* ── Cancelled state ── */}
-      {isCancelledState && (
+      {/* ── Cancelled state (only when no published result to restore) ── */}
+      {isCancelledState && !hasResults && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-amber-700" />

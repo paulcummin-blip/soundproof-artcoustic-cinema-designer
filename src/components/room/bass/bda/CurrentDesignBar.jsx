@@ -15,7 +15,7 @@
 
 import React from "react";
 import { Settings2, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
-import { subwooferDisplayLabel } from "@/components/utils/subwooferDisplayLabel";
+import { formatSubwooferSystemLabel } from "@/components/utils/subwooferDisplayLabel";
 import { deriveBassDisplayStatus, BASS_DISPLAY_ICON, BASS_LIFECYCLE_STATE } from "../bassCalculationLifecycle";
 
 function LayoutThumbnail({ subwooferInstances, roomDims }) {
@@ -117,12 +117,7 @@ export default function CurrentDesignBar({
     );
   }
 
-  const totalCount = (frontCount || 0) + (rearCount || 0);
-  const sameModel = frontModel === rearModel;
-  const modelLabel = subwooferDisplayLabel(frontModel);
-  const systemLabel = sameModel
-    ? `${modelLabel} ×${totalCount}`
-    : `${subwooferDisplayLabel(frontModel)} ×${frontCount}${hasRear ? ` + ${subwooferDisplayLabel(rearModel)} ×${rearCount}` : ""}`;
+  const systemLabel = formatSubwooferSystemLabel(frontModel, frontCount, rearModel, rearCount);
 
   const layout = deriveLayoutLabel(subwooferInstances);
 
