@@ -37,7 +37,7 @@ export default function StorytellerExplanation({ focus }) {
     );
   }
 
-  const { title, subtitle, lines } = focus.explanation;
+  const { title, subtitle, lines, seatPillLabel, limitingFrequencyHz } = focus.explanation;
 
   return (
     <div
@@ -79,6 +79,64 @@ export default function StorytellerExplanation({ focus }) {
               }}
             >
               {subtitle}
+            </div>
+          )}
+          {seatPillLabel && (
+            <div
+              style={{
+                marginTop: 8,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                style={{
+                  minWidth: 52,
+                  height: 26,
+                  padding: "0 10px",
+                  border: "2px solid #213428",
+                  borderRadius: 9999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: "#213428",
+                  color: "#fff",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "Didact Gothic, sans-serif",
+                  flexShrink: 0,
+                }}
+              >
+                {seatPillLabel}
+              </span>
+              {limitingFrequencyHz != null && (
+                <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 600,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      color: "#625143",
+                      fontFamily: "Didact Gothic, sans-serif",
+                    }}
+                  >
+                    Limiting frequency
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: "#1B1A1A",
+                      fontFamily: "Didact Gothic, sans-serif",
+                    }}
+                  >
+                    {limitingFrequencyHz} Hz
+                  </span>
+                </div>
+              )}
             </div>
           )}
           {Array.isArray(lines) && lines.length > 0 && (

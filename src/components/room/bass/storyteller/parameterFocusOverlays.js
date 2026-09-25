@@ -336,6 +336,8 @@ function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, sm
     explanation: {
       title: "P19 — Response Fit vs Reference EQ",
       subtitle: "Maximum deviation between the selected seat's calibrated response and the RSP Reference EQ",
+      seatPillLabel: seatId ? formatSeatPillLabel(seatId) : null,
+      limitingFrequencyHz: worstFreq != null ? Math.round(worstFreq) : null,
       lines,
     },
   };
@@ -423,6 +425,8 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
     explanation: {
       title: "P20 — Seat-to-Seat Consistency",
       subtitle: "Maximum deviation between any seat and the RSP across the assessment band",
+      seatPillLabel: worstSeat ? formatSeatPillLabel(worstSeat.seatId) : null,
+      limitingFrequencyHz: worstFreq != null ? Math.round(worstFreq) : null,
       lines,
     },
   };
@@ -496,6 +500,8 @@ function buildSeatFocus({ selectedSeatId, rp22GraphMarkers, finalBassResponse, s
     explanation: {
       title: `Seat ${formatSeatPillLabel(selectedSeatId)} — Engineering Explanation`,
       subtitle: "Why this seat received its published grade",
+      seatPillLabel: formatSeatPillLabel(selectedSeatId),
+      limitingFrequencyHz: finite(worstFreq) ? Math.round(Number(worstFreq)) : null,
       lines,
     },
   };
