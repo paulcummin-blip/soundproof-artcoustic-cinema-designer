@@ -1803,7 +1803,12 @@ function RoomDesignerWithState() {
     // Review until the system has LCR, surrounds, and at least one subwoofer.
     // Clear any previously published snapshot so a partial system cannot leak.
     if (!minimumSystemMet) {
-      clearDesignReviewHandoff(handoffProjectId, appState?.activeVersionId || null);
+      const layoutIsRefreshing =
+        appState?.layoutRefreshPending === true ||
+        appState?.geometryReflowInProgress === true;
+      if (!layoutIsRefreshing) {
+        clearDesignReviewHandoff(handoffProjectId, appState?.activeVersionId || null);
+      }
       return;
     }
 
@@ -2022,11 +2027,23 @@ function RoomDesignerWithState() {
   React.useEffect(() => {
     const indicatorProjectId = resolvedProjectId || projectIdState || null;
     if (!indicatorProjectId) return;
-    publishAsdrUnavailableIndicator(indicatorProjectId, !minimumSystemMet);
+    const layoutIsRefreshing =
+      appState?.layoutRefreshPending === true ||
+      appState?.geometryReflowInProgress === true;
+    publishAsdrUnavailableIndicator(
+      indicatorProjectId,
+      !minimumSystemMet && !layoutIsRefreshing
+    );
     return () => {
       clearAsdrUnavailableIndicator(indicatorProjectId);
     };
-  }, [resolvedProjectId, projectIdState, minimumSystemMet]);
+  }, [
+    resolvedProjectId,
+    projectIdState,
+    minimumSystemMet,
+    appState?.layoutRefreshPending,
+    appState?.geometryReflowInProgress,
+  ]);
 
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {
