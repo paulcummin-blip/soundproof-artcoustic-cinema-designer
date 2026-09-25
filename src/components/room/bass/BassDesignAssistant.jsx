@@ -59,6 +59,7 @@ export default function BassDesignAssistant({
   const hasSubwoofers = subwooferInstances.some((s) => s?.enabled !== false);
   const hasResults = shared?.hasCurrentResult === true;
   const isCalculating = shared?.calculationInProgress === true;
+  const isPlacementPreview = shared?.placementPreviewActive === true;
   // Lifecycle state consumed from the sole authority — no independent derivation.
   const bassLifecycleState = shared?.bassLifecycleState || null;
 
@@ -138,6 +139,12 @@ export default function BassDesignAssistant({
         />
       )}
 
+      {layoutChosen && isPlacementPreview && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] font-semibold text-amber-900" role="status">
+          Subwoofer positions changed. Previewing room response only.
+        </div>
+      )}
+
       {/* ── Choose Layout (when no layout applied) ── */}
       {showLayoutCards && (
         <StartingLayoutCards
@@ -175,7 +182,9 @@ export default function BassDesignAssistant({
                 </div>
               )}
               {/* RP22 summary as graph header strip */}
-              <GraphHeaderPills />
+              <div className={isPlacementPreview ? "opacity-45" : ""}>
+                <GraphHeaderPills />
+              </div>
               {/* The graph — visual authority for every RP22 result */}
               {shared?.authoritative ? (
                 <BassResponse
@@ -191,7 +200,9 @@ export default function BassDesignAssistant({
             </div>
           </Suspense>
           {/* Per-seat P19/P20 detail below the graph */}
-          <PerSeatResults />
+          <div className={isPlacementPreview ? "opacity-45" : ""}>
+            <PerSeatResults />
+          </div>
         </div>
       )}
 
