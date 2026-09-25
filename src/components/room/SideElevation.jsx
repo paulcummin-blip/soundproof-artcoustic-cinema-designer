@@ -616,18 +616,13 @@ export default function SideElevation({
             const hasFL = allLcr.some(s => canon(s) === 'FL');
             const hasFR = allLcr.some(s => canon(s) === 'FR');
             const hasFC = allLcr.some(s => canon(s) === 'FC');
-            const isIntegrated = hasFC && !hasFL && !hasFR;
 
-            // Determine which roles to render for this wall view
+            // Side projection preserves the product's Y/Z position and cabinet depth/height.
+            // Always show FC when present, plus the main speaker on the viewed wall.
             const visibleRoles = new Set();
-            if (isIntegrated) {
-              visibleRoles.add('FC');
-            } else {
-              // Separate LCR or soundbar-override: show wall-appropriate main speaker only
-              // FC (centre) is hidden because it cannot be meaningfully shown in side profile
-              if (wall === 'right') visibleRoles.add('FR');
-              else visibleRoles.add('FL');
-            }
+            if (hasFC) visibleRoles.add('FC');
+            if (wall === 'right' && hasFR) visibleRoles.add('FR');
+            if (wall === 'left' && hasFL) visibleRoles.add('FL');
 
             const toRender = allLcr.filter(s => visibleRoles.has(canon(s)));
             if (!toRender.length) return null;
