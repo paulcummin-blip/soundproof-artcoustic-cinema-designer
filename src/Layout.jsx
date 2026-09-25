@@ -161,13 +161,16 @@ export default function Layout({ children, currentPageName }) {
       setEngineeringSummary(null);
       return undefined;
     }
+    setEngineeringSummary(null);
     const applyPublication = (snapshot) => {
       const published = snapshot || readDesignReviewHandoff(activeProjectId, activeVersionId);
-      setEngineeringSummary(
+      const nextSummary =
         published?.engineeringSummary
           ?? published?.rating?.engineeringSummary
-          ?? null
-      );
+          ?? null;
+      if (nextSummary) {
+        setEngineeringSummary(nextSummary);
+      }
     };
     applyPublication(readDesignReviewHandoff(activeProjectId, activeVersionId));
     return subscribeDesignReviewHandoff(activeProjectId, activeVersionId, (snapshot, fromStorage) => {
@@ -198,10 +201,6 @@ export default function Layout({ children, currentPageName }) {
       setP14TargetUnselected(readP14TargetUnselectedIndicator(activeProjectId));
       const unavailable = readAsdrUnavailableIndicator(activeProjectId);
       setAsdrUnavailable(unavailable);
-      if (unavailable) {
-        setEngineeringSummary(null);
-      }
-
       // Stale-scope detection: compare the published rating's seat-priority
       // fingerprint against the current live fingerprint. If they differ, the
       // published scoped rating was calculated from a different priority set
