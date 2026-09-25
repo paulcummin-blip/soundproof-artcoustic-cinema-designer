@@ -148,12 +148,17 @@ export default function BassGraphTooltip({
     : null;
 
   const isPlacementPreview = series.some((s) => s?.kind === "room-response-preview");
-  const hoveredPreviewSeries = isPlacementPreview
-    ? series.find((s) => `spl_${s.id}` === payload?.[0]?.dataKey)
+  // Recharts includes both preview curves in the tooltip payload, with the
+  // previous result first. Resolve the curve nearest the cursor instead.
+  const previewCurve = isPlacementPreview
+    ? series
+        .map((item) => ({ item, spl: row?.[`spl_${item.id}`] }))
+        .filter(({ spl }) => isFinite(spl))
+        .sort((a, b) => Math.abs(Number(a.spl) - cursorSpl) - Math.abs(Number(b.spl) - cursorSpl))[0]
     : null;
-  const finalEqSpl = authority?.responseSpl;
+  const finalEqSpl = isPlacementPreview ? previewCurve?.spl : authority?.responseSpl;
   const finalEqLabel = isPlacementPreview
-    ? (hoveredPreviewSeries?.label || "Room Response Preview")
+    ? (previewCurve?.item?.label || "Room Response Preview")
     : (authority?.activeCurveLabel || "FINAL EQ RESPONSE");
   const houseCurveValue = authority?.targetSpl;
   const diffFromTarget = authority?.delta;
