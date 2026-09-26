@@ -59,7 +59,6 @@ export default function P20SeatStrip() {
         publicationVerified={formatted.publicationVerified}
         authorityStatus={shared.completedBassAuthority?.authorityStatus}
         p14TargetUnselected={p14Selection.noP14TargetSelected}
-        showSeatLabel
       />
       <div className="flex items-center gap-2 text-[10px] font-medium text-[#625143]" aria-live="polite">
         {isStale && (
