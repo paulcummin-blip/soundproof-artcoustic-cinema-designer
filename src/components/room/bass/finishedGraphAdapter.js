@@ -71,7 +71,7 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
     canonicalPostEqRsp: postEqRspCurve,
     referenceEq,
     referenceEqSignature: buildCurveSignature(referenceEq),
-    p19TargetIdentity: "target-curve",
+    p19TargetIdentity: "house-curve-target",
     postEqPerSeatCurves: Array.isArray(gp.postEqPerSeatCurves) ? gp.postEqPerSeatCurves : [],
     maximumSplCurveAfterEq: Array.isArray(gp.maximumSplCurveAfterEq) ? gp.maximumSplCurveAfterEq : [],
     maximumSplSafetyMarginDb: Number.isFinite(gp.maximumSplSafetyMarginDb) ? gp.maximumSplSafetyMarginDb : 0,

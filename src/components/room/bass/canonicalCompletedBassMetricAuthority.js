@@ -490,7 +490,7 @@ export function buildCanonicalCompletedBassMetricAuthority({
     p19Input: {
       canonicalPostEqRsp: postEqRsp,
       referenceEq,
-      p19TargetIdentity: "target-curve",
+      p19TargetIdentity: "house-curve-target",
       assessmentBand: assessmentBand.valid
         ? { lowerHz: assessmentBand.lowerHz, upperHz: assessmentBand.upperHz }
         : { lowerHz: null, upperHz: null },
