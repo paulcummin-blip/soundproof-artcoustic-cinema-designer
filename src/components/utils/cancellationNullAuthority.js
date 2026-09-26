@@ -26,12 +26,20 @@
 //     3. Coherent efficiency at centre is substantially worse than shoulders
 //
 // SINGLE-SUB (1 source):
-//   The per-source complex transfer phase rotates through a modal cancellation
-//   node. A simple level deficit does not exhibit this phase signature.
+//   A single-source modal node is a transfer-function dip, NOT a destructive
+//   cancellation between sources. It IS correctable by EQ within headroom —
+//   boosting the source increases pressure at the listener proportionally.
 //
-//   A candidate is confirmed when the phase rotation from left shoulder through
-//   centre to right shoulder exceeds a conservative threshold AND the flat-source
-//   transfer magnitude collapses (confirming a room null, not product rolloff).
+//   Phase rotation through a modal null is normal transfer-function behaviour
+//   but does NOT prove destructive cancellation. Confirming cancellation
+//   requires field decomposition (direct vs. modal/reflected contributions)
+//   to show the direct and reflected fields are opposing. The authoritative
+//   engine only exposes the TOTAL per-source complex pressure — the direct/
+//   modal decomposition is not available without an engine modification.
+//
+//   Per the safe-fallback principle: phase rotation alone must NOT classify
+//   a region as uncorrectable. Single-sub candidates are NOT protected.
+//   They remain correctable within headroom/capability limits.
 //
 // SAFE FALLBACK:
 //   If complex evidence is unavailable, incomplete, or ambiguous, the candidate
@@ -55,10 +63,6 @@ const MULTI_SUB_COHERENT_EFFICIENCY_THRESHOLD = 0.4;  // centre < 0.4 (~8 dB can
 const MULTI_SUB_RELATIVE_SHOULDER_RATIO = 0.5;        // centre must be < 50% of shoulder efficiency
 const MULTI_SUB_CONSTITUENT_ENERGY_RATIO = 0.3;       // centre incoherent energy > 30% of shoulders
 
-// SINGLE-SUB: phase rotation through the null
-const SINGLE_SUB_PHASE_ROTATION_THRESHOLD_RAD = 2.0;  // ~115° (true null ≈ π ≈ 3.14 rad)
-const SINGLE_SUB_MAGNITUDE_RATIO_THRESHOLD = 0.5;     // centre magnitude < 50% of shoulder average
-
 const FREQUENCY_MATCH_TOLERANCE_HZ = 5.0;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -76,13 +80,6 @@ function findClosestComplexPoint(points, frequency) {
     }
   }
   return closest && minDelta <= FREQUENCY_MATCH_TOLERANCE_HZ ? closest : null;
-}
-
-function unwrapPhaseDelta(from, to) {
-  let delta = to - from;
-  while (delta > Math.PI) delta -= 2 * Math.PI;
-  while (delta < -Math.PI) delta += 2 * Math.PI;
-  return delta;
 }
 
 // Collect per-source complex values at a given frequency.
@@ -159,52 +156,6 @@ function verifyMultiSubCancellation(transfers, centreFreq, leftFreq, rightFreq) 
   };
 }
 
-// ── Single-sub verification ─────────────────────────────────────────────────
-
-function verifySingleSubCancellation(transfer, centreFreq, leftFreq, rightFreq) {
-  const points = transfer?.points || [];
-  const centrePoint = findClosestComplexPoint(points, centreFreq);
-  const leftPoint = findClosestComplexPoint(points, leftFreq);
-  const rightPoint = findClosestComplexPoint(points, rightFreq);
-
-  if (!centrePoint || !leftPoint || !rightPoint) {
-    return { isCancellation: false, reason: 'insufficient-complex-data' };
-  }
-
-  const centrePhase = Math.atan2(centrePoint.im, centrePoint.re);
-  const leftPhase = Math.atan2(leftPoint.im, leftPoint.re);
-  const rightPhase = Math.atan2(rightPoint.im, rightPoint.re);
-
-  const rotationLeftToCentre = Math.abs(unwrapPhaseDelta(leftPhase, centrePhase));
-  const rotationCentreToRight = Math.abs(unwrapPhaseDelta(centrePhase, rightPhase));
-  const totalRotation = rotationLeftToCentre + rotationCentreToRight;
-
-  const centreMag = Math.hypot(centrePoint.re, centrePoint.im);
-  const leftMag = Math.hypot(leftPoint.re, leftPoint.im);
-  const rightMag = Math.hypot(rightPoint.re, rightPoint.im);
-  const shoulderMagAvg = (leftMag + rightMag) / 2;
-  const magnitudeRatio = shoulderMagAvg > 0 ? centreMag / shoulderMagAvg : 0;
-
-  const isCancellation = totalRotation > SINGLE_SUB_PHASE_ROTATION_THRESHOLD_RAD
-    && magnitudeRatio < SINGLE_SUB_MAGNITUDE_RATIO_THRESHOLD;
-
-  return {
-    isCancellation,
-    reason: isCancellation ? 'single-sub-modal-cancellation' : 'no-cancellation-evidence',
-    totalPhaseRotationRad: totalRotation,
-    centrePhase,
-    leftPhase,
-    rightPhase,
-    magnitudeRatio,
-    centreMag,
-    shoulderMagAvg,
-    thresholds: {
-      phaseRotationThresholdRad: SINGLE_SUB_PHASE_ROTATION_THRESHOLD_RAD,
-      magnitudeRatioThreshold: SINGLE_SUB_MAGNITUDE_RATIO_THRESHOLD,
-    },
-  };
-}
-
 // ── Public API ─────────────────────────────────────────────────────────────
 
 /**
@@ -235,19 +186,21 @@ export function verifyCancellationNullRegions(candidateRegions, perSourceComplex
     let verification = null;
 
     if (sourceCount >= 2) {
+      // Multi-sub: use coherent efficiency to detect destructive cancellation.
       verification = verifyMultiSubCancellation(transfers, centreFreq, leftFreq, rightFreq);
-    } else if (sourceCount === 1) {
-      verification = verifySingleSubCancellation(transfers[0], centreFreq, leftFreq, rightFreq);
     }
+    // Single-sub (sourceCount === 1): NO protection. A single-source modal node
+    // is a transfer-function dip, correctable by EQ within headroom. Phase
+    // rotation alone is not sufficient evidence of destructive cancellation
+    // without field decomposition (direct vs. modal), which the engine does not
+    // expose. Safe fallback: NOT protected.
 
     if (verification && verification.isCancellation) {
       verified.push({
         ...candidate,
         protected: true,
         cancellationVerified: true,
-        verificationMethod: sourceCount >= 2
-          ? 'multi-sub-coherent-efficiency'
-          : 'single-sub-phase-rotation',
+        verificationMethod: 'multi-sub-coherent-efficiency',
         verificationEvidence: verification,
       });
     }
@@ -304,7 +257,11 @@ export function runCancellationNullValidation() {
     ],
   );
 
-  // CASE C — Single-sub modal node: phase flips through null
+  // CASE C — Single-sub modal node: phase flips through null.
+  // EXPECTED: NOT protected. Phase rotation alone is insufficient evidence of
+  // destructive cancellation without field decomposition (direct vs. modal).
+  // The engine only exposes the total per-source complex pressure. A single-sub
+  // modal node is a transfer-function dip, correctable by EQ within headroom.
   const caseC = verifyCancellationNullRegions(
     [makeCandidate(50, 40, 60, -15)],
     [
@@ -312,7 +269,7 @@ export function runCancellationNullValidation() {
     ],
   );
 
-  // CASE D — Multi-sub phase cancellation: strong individual, destructive combination
+  // CASE D — Multi-sub destructive cancellation: strong individual, destructive combination
   const caseD = verifyCancellationNullRegions(
     [makeCandidate(50, 40, 60, -12)],
     [
@@ -321,7 +278,9 @@ export function runCancellationNullValidation() {
     ],
   );
 
-  // CASE E — Deep correctable deficit (12 dB, no cancellation): two sources in phase, both very weak
+  // CASE E — Deep narrow correctable deficit (12 dB, no cancellation): two
+  // sources in phase, both very weak at centre. Candidate detector triggers
+  // (6 Hz / 10 dB) but complex contributions are coherent → NOT protected.
   const caseE = verifyCancellationNullRegions(
     [makeCandidate(50, 40, 60, -12)],
     [
@@ -330,8 +289,20 @@ export function runCancellationNullValidation() {
     ],
   );
 
-  // CASE F — Safe fallback: no complex data → no protection
+  // CASE F — False-positive protection test: 15 dB narrow dip with COHERENT
+  // sources (both in phase). The 6 Hz / 10 dB candidate detector triggers, but
+  // the complex contributions are substantially coherent (efficiency = 1.0).
+  // EXPECTED: NOT protected. This is the critical false-positive guard.
   const caseF = verifyCancellationNullRegions(
+    [makeCandidate(50, 40, 60, -15)],
+    [
+      { sourceIndex: 0, points: [{ frequency: 40, re: 1.0, im: 0 }, { frequency: 50, re: 0.18, im: 0 }, { frequency: 60, re: 1.0, im: 0 }] },
+      { sourceIndex: 1, points: [{ frequency: 40, re: 1.0, im: 0 }, { frequency: 50, re: 0.18, im: 0 }, { frequency: 60, re: 1.0, im: 0 }] },
+    ],
+  );
+
+  // CASE G — Safe fallback: no complex data → no protection
+  const caseG = verifyCancellationNullRegions(
     [makeCandidate(50, 40, 60, -15)],
     [],
   );
@@ -339,15 +310,16 @@ export function runCancellationNullValidation() {
   const checks = [
     { id: 'A', expected: 'correctable dip NOT protected', passed: caseA.length === 0 },
     { id: 'B', expected: 'headroom-limited dip NOT protected', passed: caseB.length === 0 },
-    { id: 'C', expected: 'single-sub modal node protected', passed: caseC.length === 1 },
-    { id: 'D', expected: 'multi-sub phase cancellation protected', passed: caseD.length === 1 },
-    { id: 'E', expected: 'deep correctable deficit NOT protected', passed: caseE.length === 0 },
-    { id: 'F', expected: 'no complex data → no protection (safe fallback)', passed: caseF.length === 0 },
+    { id: 'C', expected: 'single-sub modal node NOT protected (no field decomposition)', passed: caseC.length === 0 },
+    { id: 'D', expected: 'multi-sub destructive cancellation protected', passed: caseD.length === 1 },
+    { id: 'E', expected: 'deep narrow correctable deficit NOT protected', passed: caseE.length === 0 },
+    { id: 'F', expected: 'false-positive: coherent sources NOT protected', passed: caseF.length === 0 },
+    { id: 'G', expected: 'no complex data → no protection (safe fallback)', passed: caseG.length === 0 },
   ];
 
   return {
     checks,
     allPassed: checks.every((check) => check.passed),
-    caseA, caseB, caseC, caseD, caseE, caseF,
+    caseA, caseB, caseC, caseD, caseE, caseF, caseG,
   };
 }

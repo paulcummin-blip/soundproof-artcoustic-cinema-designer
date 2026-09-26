@@ -20,6 +20,6 @@
  */
 
 export const INSTANCE_AUTHORITY_VERSION = 4;
-export const BASS_ANALYSIS_CONTRACT_VERSION = 22;
+export const BASS_ANALYSIS_CONTRACT_VERSION = 23; // v23: physics-based cancellation null verification — 6 Hz / 10 dB is a candidate detector only; only complex-verified multi-sub destructive cancellations are protected. Single-sub nulls are correctable within headroom (no field decomposition available).
 export const COMPLETED_BASS_CACHE_VERSION = 14; // v14: compact graph authority persists the canonical correction curve required by the production graph gate.
 export const RP22_BASS_METRIC_SCHEMA_VERSION = 21; // v21: P19 is RSP-only (max|smoothedRspResponse − T(f)|). Per-seat P19 removed from RP22 authority — no per-seat P19 grades, no Primary/Secondary/Project P19 floors, no P19 FAIL seats. p19TargetIdentity corrected to "target-curve". Older completed authority is rejected and regenerated.
