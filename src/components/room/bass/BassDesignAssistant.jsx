@@ -35,7 +35,7 @@ import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/Optimi
 import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards";
 import ChooseDesignTarget from "@/components/room/bass/bda/ChooseDesignTarget";
 import CurrentDesignBar from "@/components/room/bass/bda/CurrentDesignBar";
-import GraphHeaderPills from "@/components/room/bass/bda/GraphHeaderPills";
+import BassPerformanceStrip from "@/components/room/bass/bda/BassPerformanceStrip";
 import PerSeatResults from "@/components/room/bass/bda/PerSeatResults";
 import RestorePreviousDesignBar from "@/components/room/bass/bda/RestorePreviousDesignBar";
 import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpointAuthority";
@@ -213,9 +213,9 @@ export default function BassDesignAssistant({
                   Analysing updated design…
                 </div>
               )}
-              {/* RP22 summary as graph header strip */}
+              {/* Authoritative P14/P18/P19/P20 performance result strip */}
               <div className={isPlacementPreview ? "opacity-45" : ""}>
-                <GraphHeaderPills />
+                <BassPerformanceStrip />
               </div>
               {/* The graph — visual authority for every RP22 result */}
               {shared?.authoritative ? (
