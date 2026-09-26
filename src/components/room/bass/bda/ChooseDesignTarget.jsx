@@ -154,13 +154,37 @@ export default function ChooseDesignTarget({ disabled }) {
         </div>
       </div>
 
-      {/* ── P18 — Bass Extension (row selection, all thresholds visible) ── */}
+      {/* ── P18 — Bass Extension (basis selector + reference thresholds) ── */}
       <div className="mt-3">
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center justify-between mb-1.5">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">P18 — Bass Extension</span>
           <span className="text-[9px] font-medium uppercase tracking-wide text-[#A89B8C]">Hz</span>
         </div>
-        <div className="grid items-center" style={{ gridTemplateColumns: "auto repeat(4, 1fr)", columnGap: "4px", rowGap: "2px" }}>
+
+        {/* P18 basis selector — the ONLY interactive P18 controls */}
+        <div className="flex gap-1.5 mb-2">
+          {BASES.map((basis) => {
+            const isSelected = selectedP18Basis === basis;
+            return (
+              <button
+                key={`p18-sel-${basis}`}
+                type="button"
+                onClick={() => handleP18Select(basis)}
+                disabled={disabled}
+                className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all border disabled:cursor-not-allowed
+                  ${isSelected
+                    ? "bg-[#213428] text-white border-[#213428]"
+                    : "bg-white text-[#625143] border-[#E5E1D8] hover:bg-[#F5F5F0] hover:border-[#D9D5CE]"}`}
+                aria-pressed={isSelected}
+              >
+                {basis === "minimum" ? "Minimum" : "Recommended"}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Reference threshold table — clean typography, NOT buttons */}
+        <div className="grid items-center" style={{ gridTemplateColumns: "auto repeat(4, 1fr)", columnGap: "4px", rowGap: "1px" }}>
           <div />
           {LEVELS.map((level) => (
             <div key={`p18-h-${level}`} className="text-center text-[10px] font-semibold text-[#8A7B6A] pb-0.5">L{level}</div>
@@ -170,24 +194,16 @@ export default function ChooseDesignTarget({ disabled }) {
             const thresholds = P18_THRESHOLDS_BY_BASIS[basis];
             return (
               <React.Fragment key={`p18-row-${basis}`}>
-                <button
-                  type="button"
-                  onClick={() => handleP18Select(basis)}
-                  disabled={disabled}
-                  className={`text-[10px] font-semibold pr-1.5 text-left rounded transition-all disabled:cursor-not-allowed
-                    ${isSelected ? "text-[#213428] font-bold" : "text-[#A89B8C] hover:text-[#625143]"}`}
-                  aria-pressed={isSelected}
-                  aria-label={`P18 ${basis} basis`}
-                >
+                <div className={`text-[10px] font-semibold pr-1.5 text-left ${isSelected ? "text-[#213428]" : "text-[#A89B8C]"}`}>
                   {BASIS_SHORT[basis]}
-                </button>
+                </div>
                 {LEVELS.map((level) => (
                   <div
                     key={`p18-${basis}-${level}`}
-                    className={`text-center text-[11px] font-semibold rounded-md px-1 py-1 border transition-all
+                    className={`text-center text-[11px] py-0.5 rounded
                       ${isSelected
-                        ? "bg-[#213428]/8 text-[#213428] border-[#213428]/20"
-                        : "text-[#A89B8C] border-transparent opacity-60"}`}
+                        ? "bg-[#F5F0E6] text-[#213428] font-bold"
+                        : "text-[#A89B8C] font-medium opacity-60"}`}
                   >
                     {thresholds[`L${level}`]}
                   </div>
