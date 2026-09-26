@@ -238,8 +238,8 @@ export function useAppDesignRating({
   const completedP19Results = completedBassAuthority?.contract?.bassResult?.seatResults?.P19 || [];
   const completedP20Results = completedBassPresentation?.perSeatP20Results || [];
 
-  // The single canonical P19 seat object. It preserves the engine-published
-  // grades from selectedCandidate.perSeatP19Results and owns all grouping.
+  // P19 is RSP-only — p19SeatAuthority returns empty seats/rows. The sole P19
+  // authority is parameters.p19 (RSP vs target curve).
   const p19SeatAuthority = useMemo(() => {
     const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(seats);
     return summariseAuthoritativeP19Seats({

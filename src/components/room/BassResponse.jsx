@@ -512,20 +512,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   // sees why the grade was awarded without manually selecting a seat.
   const explicitSeatId = graphInteraction?.selectedSeatId || selectedSeatIds[0] || null;
   const selectedSeatForMarkers = useMemo(() => {
-    if (graphInteraction?.selectedMetric === "p19" && (!explicitSeatId || explicitSeatId === "rsp")) {
-      const p19PerSeat = finalBassResponse?.finalSeatVariationData?.p19?.perSeatResults;
-      if (Array.isArray(p19PerSeat) && p19PerSeat.length > 0) {
-        let worst = null;
-        for (const seat of p19PerSeat) {
-          const v = Number(seat?.variationDbRaw);
-          if (!Number.isFinite(v)) continue;
-          if (!worst || v > Number(worst.variationDbRaw)) worst = seat;
-        }
-        if (worst) return worst.seatId;
-      }
-    }
+    // P19 is RSP-only — no per-seat P19 worst seat to select.
     return explicitSeatId;
-  }, [graphInteraction?.selectedMetric, explicitSeatId, finalBassResponse?.finalSeatVariationData?.p19?.perSeatResults]);
+  }, [explicitSeatId]);
   const rp22GraphMarkers = useMemo(
     () => buildRp22GraphMarkers(finalBassResponse, selectedSeatForMarkers),
     [finalBassResponse, selectedSeatForMarkers]
