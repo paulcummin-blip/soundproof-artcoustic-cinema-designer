@@ -171,7 +171,7 @@ export function buildAssessmentEnvelope(contract) {
     ? Number(worstP20.worstFrequencyHz)
     : null;
 
-  const p19TargetIdentity = finalResponse.p19TargetIdentity || "target-curve";
+  const p19TargetIdentity = finalResponse.p19TargetIdentity || "house-curve-target";
 
   return {
     achievedP18FrequencyHz,
@@ -265,7 +265,7 @@ export function validateAssessmentEnvelopeAuthority(contract) {
   if (!Number.isFinite(Number(envelope.assessmentEndHz)))
     return { valid: false, reason: "missing-assessment-end-hz" };
 
-  if (envelope.p19TargetIdentity !== "target-curve")
+  if (envelope.p19TargetIdentity !== "house-curve-target")
     return { valid: false, reason: `p19-target-identity-missing-or-invalid:${String(envelope.p19TargetIdentity)}` };
 
   // Four-way P18 authority parity: the selected candidate, envelope, assessment

@@ -364,29 +364,37 @@ export function evaluateCanonicalBassAuthority({
   const p19AssessmentStartHz = assessmentBand.valid ? assessmentBand.lowerHz : null;
   const p19AssessmentEndHz = assessmentBand.valid ? assessmentBand.upperHz : null;
 
-  // ── Practical Calibration Target T(f) ──
-  // P19 measures response smoothness against T(f), not the ideal H(f). T(f)
-  // follows the ideal house curve where the system can physically achieve it
-  // and rolls smoothly toward the broad LF capability envelope where it cannot.
+  // ── Target Identity Separation ──
   //
-  // The P18-intent-aware LF overlay is applied to the fallback rebuild so the
-  // target shape is deterministic for the selected target combination even
-  // when the persisted target is missing. The persisted target from the
-  // optimiser already carries the overlay (built with the correct Fd).
+  // H(f) = canonical house/design target — the predetermined target shown
+  //        on the bass graph. P19 is graded against H(f). This is the P19
+  //        REFERENCE authority.
+  //
+  // T(f) = practical calibration target — capability-shaped internal target
+  //        used by the predictor to decide what correction to attempt. T(f)
+  //        follows the house curve where the system can physically achieve it
+  //        and rolls toward the capability envelope where it cannot. T(f) is
+  //        NOT the P19 reference — grading against T(f) would hide the very
+  //        residual caused by insufficient capability.
+  //
+  // P19 = max|smoothedRspResponse(f) − H(f)| — the remaining miss between the
+  // final corrected response and the house curve. P14/headroom constrains the
+  // prediction; it does not redefine the P19 target after the fact.
   const idealHouseTarget = (Array.isArray(canonicalResult.canonicalTargetCurve) && canonicalResult.canonicalTargetCurve.length)
     ? canonicalResult.canonicalTargetCurve
     : [];
-  // P19 grading target = the SAME practical calibration target the predictor
-  // was asked to achieve. P18 is NOT used to construct the target — it is an
-  // achieved result graded afterward. The fallback rebuild mirrors the
-  // production path: capability-aware target with NO P18 LF overlay.
+  // T(f) remains as an internal prediction/optimisation guide. It is NOT the
+  // P19 grading target. Retained for diagnostic transparency and for any
+  // internal consumer that needs the capability-shaped target.
   const practicalCalibrationTarget = (Array.isArray(canonicalResult.practicalCalibrationTarget) && canonicalResult.practicalCalibrationTarget.length)
     ? canonicalResult.practicalCalibrationTarget
     : buildPracticalCalibrationTarget({
         idealTargetCurve: idealHouseTarget,
         capabilityEnvelope: buildSmoothCapabilityEnvelope(canonicalResult.maximumSplCurveAfterEq || canonicalResult.maximumSplCurveBeforeEq || []),
       });
-  const p19TargetCurve = practicalCalibrationTarget.length ? practicalCalibrationTarget : idealHouseTarget;
+  // P19 grading target = H(f), the canonical house target — the SAME target
+  // displayed on the bass graph. Never T(f).
+  const p19TargetCurve = idealHouseTarget;
 
   // When the assessment band is invalid (P14 passed but P18 F3 not achieved,
   // or transition not available), P19/P20 are NOT evaluated. No fallback to
@@ -454,10 +462,12 @@ export function evaluateCanonicalBassAuthority({
     ? applyGlobalBassTrimToSeatCurves(canonicalResult.canonicalPostEqSeatResponses, recommendedGlobalBassTrimDb)
     : canonicalResult.canonicalPostEqSeatResponses;
 
-  // ── Canonical P19 authority: corrected RSP response vs target curve ──
-  // P19 = max|smoothedRspResponse(f) − T(f)| over the assessment band.
-  // T(f) is the practical calibration target — the same target the optimiser
-  // was asked to achieve. P19 is RSP-only; there are no per-seat P19 results.
+  // ── Canonical P19 authority: corrected RSP response vs house target H(f) ──
+  // P19 = max|smoothedRspResponse(f) − H(f)| over the assessment band.
+  // H(f) is the canonical house/design target — the SAME target displayed on
+  // the bass graph. P19 is RSP-only; there are no per-seat P19 results.
+  // Protected nulls are NOT excluded — the final response retains any verified
+  // cancellation and P19 assesses that actual response.
   const referenceEq = alignedPostEqRsp;
   const p19 = computeCorrectableP19Diagnostic({
     rspPostEqCurve: alignedPostEqRsp,
@@ -552,7 +562,7 @@ export function evaluateCanonicalBassAuthority({
         }
       : null,
     referenceEq,
-    p19TargetIdentity: "target-curve",
+    p19TargetIdentity: "house-curve-target",
     referenceEqTargetFitVariationDb: globalLevelAlignment?.alignedP19Db ?? null,
     alignedPostEqRsp,
     alignedPostEqSeatResponses,

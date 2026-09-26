@@ -2,18 +2,31 @@
 //
 // P19 deviation primitives.
 //
-// Canonical RP22 P19 = max|smoothedRspResponse(f) − T(f)| over the assessment
-// band [P18 F3 → transition], where T(f) is the predetermined practical
-// calibration target curve. P19 is RSP-only — there are no per-seat P19
-// results.
+// Canonical RP22 P19 = max|smoothedRspResponse(f) − H(f)| over the assessment
+// band [P18 F3 → transition], where H(f) is the canonical house/design target
+// curve — the SAME target displayed on the bass graph. P19 is RSP-only —
+// there are no per-seat P19 results.
+//
+// TARGET AUTHORITY:
+//   P19 is graded against the canonical house target H(f), NOT the practical
+//   calibration target T(f). T(f) is capability-shaped and may hide the very
+//   residual caused by insufficient capability. P19 must measure the remaining
+//   miss between the final corrected response and the house curve.
+//
+// PROTECTED NULL POLICY:
+//   Verified cancellation nulls suppress positive EQ correction (no boost).
+//   They do NOT exclude frequencies from P19 scoring. The final corrected
+//   response retains the cancellation; P19 assesses that actual response
+//   against the house curve using normal 1/3-octave smoothing. RP22's required
+//   smoothing already determines how a narrow cancellation influences P19.
+//   No second exclusion is applied.
 //
 // What this helper does:
-//   1. Residual calculation: response(f) − T(f), where T(f) is the
-//      P14-anchored practical calibration target (absolute, not a floating
-//      shape).
+//   1. Residual calculation: response(f) − H(f), where H(f) is the canonical
+//      house target curve (absolute, not a floating shape).
 //   2. Interpolation against the absolute target via interpolateCanonicalTarget.
-//   3. Protected null region exclusion — narrow uncorrectable nulls that a
-//      calibrator would not equalise are excluded from the max-abs scan.
+//   3. Protected null regions are marked on residual points for diagnostic
+//      transparency but are NOT excluded from the max-abs scan.
 //   4. Maximum absolute deviation: max |residual(f)| over the assessment
 //      band [P18 F3 → transition].
 //   5. Returned diagnostic values: worst frequency, residual curve, level.
@@ -55,8 +68,11 @@ function resolveAbsoluteTargetDb(canonicalTargetCurve, frequency) {
   return Number.isFinite(shapeOffset) ? shapeOffset : null;
 }
 
-// Core scan: compute residual points, exclude protected nulls, find max abs
-// deviation. Returns { maxAbsDeviationDb, worstFrequencyHz, residualCurve }.
+// Core scan: compute residual points, mark protected nulls for diagnostics,
+// find max abs deviation over ALL frequencies (no exclusion). Protected nulls
+// suppress positive EQ correction but do NOT exclude frequencies from P19
+// scoring — the final response retains the cancellation and P19 assesses
+// that actual response. Returns { maxAbsDeviationDb, worstFrequencyHz, residualCurve }.
 function scanMaxAbsoluteDeviation(smoothedAssessedCurve, canonicalTargetCurve, protectedNullRegions) {
   let maxAbsDeviationDb = -Infinity;
   let worstFrequencyHz = null;
@@ -70,7 +86,9 @@ function scanMaxAbsoluteDeviation(smoothedAssessedCurve, canonicalTargetCurve, p
     if (!Number.isFinite(residualDb)) continue;
     const isProtected = hasProtectedNulls && isProtectedSmoothedFrequency(point.frequency, protectedNullRegions);
     residualCurve.push({ frequency: point.frequency, spl: point.spl, targetDb, residualDb, protected: isProtected });
-    if (isProtected) continue;
+    // No exclusion — protected nulls remain in the P19 scan. The final
+    // corrected response retains the cancellation; P19 assesses that actual
+    // response against the house curve using normal 1/3-octave smoothing.
     const absDeviationDb = Math.abs(residualDb);
     if (absDeviationDb > maxAbsDeviationDb) {
       maxAbsDeviationDb = absDeviationDb;
@@ -87,14 +105,20 @@ function scanMaxAbsoluteDeviation(smoothedAssessedCurve, canonicalTargetCurve, p
  *
  * This is the sole P19 authority evaluator — used by both the assessment
  * layer (canonicalBassAuthorityEvaluation) and the optimiser/house-curve
- * fitter. P19 = max|smoothedRspResponse(f) − T(f)| over the assessment band.
+ * fitter. P19 = max|smoothedRspResponse(f) − H(f)| over the assessment band,
+ * where H(f) is the canonical house/design target curve (the same target
+ * displayed on the bass graph).
+ *
+ * Protected null regions are marked on residual points for diagnostics but
+ * are NOT excluded from the max-abs scan. The final corrected response
+ * retains any verified cancellation; P19 assesses that actual response.
  *
  * @param {object} params
  * @param {Array}  params.rspPostEqCurve        - post-EQ RSP curve [{frequency, spl}]
- * @param {Array}  params.canonicalTargetCurve   - P14-anchored absolute target T(f)
+ * @param {Array}  params.canonicalTargetCurve   - canonical house target H(f) (absolute)
  * @param {number} params.assessmentStartHz      - assessment band lower bound (P18 F3)
  * @param {number} params.assessmentEndHz       - assessment band upper bound (transition)
- * @param {Array}  [params.protectedNullRegions] - protected null regions to exclude
+ * @param {Array}  [params.protectedNullRegions] - protected null regions (diagnostic marking only, NOT excluded)
  * @returns {object|null} P19 result or null when no valid points exist
  */
 export function evaluateP19AbsoluteTargetDeviation({
@@ -130,24 +154,25 @@ export function evaluateP19AbsoluteTargetDeviation({
  *
  * Used by the house-curve fitter's summarizeSeatMetrics, which already has
  * smoothed+assessed residual points with deviationDb pre-computed. This
- * function applies protected null exclusion and finds max |deviationDb|.
+ * function finds max |deviationDb| over ALL points (no exclusion).
  *
- * This guarantees the fitter's rspMaxDeviationDb and worstSeatMaxDeviationDb
- * use exactly the same exclusion + max-abs logic as the published P19.
+ * Protected nulls are NOT excluded — they suppress positive EQ correction
+ * but remain in the scoring scan, exactly as in the published P19. This
+ * guarantees the fitter's rspMaxDeviationDb and worstSeatMaxDeviationDb use
+ * the same max-abs logic as the published P19.
  *
  * @param {Array}  residualPoints              - pre-computed points [{frequency, deviationDb, ...}]
- * @param {Array}  [protectedNullRegions]      - protected null regions to exclude
+ * @param {Array}  [protectedNullRegions]      - (unused for exclusion; kept for API parity)
  * @returns {object|null} { maxAbsDeviationDb, worstFrequencyHz } or null
  */
 export function scanMaxAbsoluteDeviationFromResidualPoints(residualPoints, protectedNullRegions = []) {
   if (!Array.isArray(residualPoints) || !residualPoints.length) return null;
   let maxAbsDeviationDb = -Infinity;
   let worstFrequencyHz = null;
-  const hasProtectedNulls = Array.isArray(protectedNullRegions) && protectedNullRegions.length > 0;
 
   for (const point of residualPoints) {
     if (!finite(point?.frequency) || !finite(point?.deviationDb)) continue;
-    if (hasProtectedNulls && isProtectedSmoothedFrequency(point.frequency, protectedNullRegions)) continue;
+    // No protected-null exclusion — P19 includes all frequencies in its scan.
     const absDeviationDb = Math.abs(Number(point.deviationDb));
     if (absDeviationDb > maxAbsDeviationDb) {
       maxAbsDeviationDb = absDeviationDb;

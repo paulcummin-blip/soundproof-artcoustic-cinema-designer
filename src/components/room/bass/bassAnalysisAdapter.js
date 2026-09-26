@@ -356,7 +356,7 @@ export function adaptCurrentBassOptimisationResult({
   contract.idealHouseTarget = finalResponse?.canonicalTargetCurve || null;
   contract.practicalCalibrationTarget = finalResponse?.practicalCalibrationTarget || null;
   contract.referenceEq = finalResponse?.referenceEq || null;
-  contract.p19TargetIdentity = "target-curve";
+  contract.p19TargetIdentity = "house-curve-target";
   contract.achievedP14Db = selectedCandidate?.achievedP14Db ?? null;
   contract.achievedP14Level = selectedCandidate?.achievedP14Level ?? null;
   contract.achievedP18FrequencyHz = selectedCandidate?.achievedP18FrequencyHz ?? null;
