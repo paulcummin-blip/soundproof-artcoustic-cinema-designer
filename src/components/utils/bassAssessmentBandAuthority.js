@@ -3,16 +3,19 @@
 // Single authority for the P19/P20 assessment frequency band.
 //
 // The band is [achieved P18 F3 → room transition frequency], and is valid
-// ONLY when the selected P14 operating target is achieved (P14 PASS) AND a
-// legitimate sustained P18 F3 has been established.
+// when a legitimate sustained P18 F3 has been established AND a valid
+// transition frequency exists.
+//
+// P14 is an output-capability parameter. It constrains the predicted post-EQ
+// response through available headroom, but it does NOT determine whether
+// response shape and consistency can be assessed. P19 and P20 must be graded
+// even when P14 fails, provided the acoustic prerequisites (P18 F3 and
+// transition frequency) are valid. P14 retains its own separate authority.
 //
 // This is deliberately SEPARATE from the P18 plateau-reference band (60–200 Hz
 // median). The P18 reference band selects the SPL plateau for F3 calculation;
 // the P19/P20 assessment band selects the frequency range for deviation grading.
 // The two authorities must never be conflated.
-//
-// When P14 FAILS, the band is invalid and P19/P20 must NOT be graded — no
-// fallback to a different SPL, no substitute lower bound, no persisted grades.
 
 const isFiniteNum = (value) => value !== null && value !== undefined && typeof value !== "boolean" && Number.isFinite(Number(value));
 
@@ -20,15 +23,17 @@ const isFiniteNum = (value) => value !== null && value !== undefined && typeof v
  * Resolve the P19/P20 assessment band from the operating-point chain.
  *
  * @param {object} params
- * @param {boolean} params.p14Pass - whether the selected P14 operating target was achieved
+ * @param {boolean} [params.p14Pass] - retained for caller compatibility; no longer gates the band
  * @param {number|null} params.achievedP18Hz - achieved P18 -3 dB extension frequency (Hz)
  * @param {number|null} params.transitionHz - room transition / Schroeder frequency (Hz)
  * @returns {{ valid: boolean, lowerHz: number|null, upperHz: number|null, reason: string|null }}
  */
 export function resolveBassAssessmentBand({ p14Pass, achievedP18Hz, transitionHz } = {}) {
-  if (p14Pass !== true) {
-    return { valid: false, lowerHz: null, upperHz: null, reason: "p14-operating-point-not-achieved" };
-  }
+  // P14 pass is intentionally NOT a prerequisite. P14 is an output-capability
+  // parameter; it constrains the predicted post-EQ response through headroom
+  // but does not determine whether response shape/consistency can be graded.
+  // P19 and P20 are assessed whenever the acoustic prerequisites (P18 F3 and
+  // transition frequency) are valid, regardless of P14 grade.
   if (!isFiniteNum(achievedP18Hz) || Number(achievedP18Hz) <= 0) {
     return { valid: false, lowerHz: null, upperHz: null, reason: "p18-extension-not-achieved" };
   }

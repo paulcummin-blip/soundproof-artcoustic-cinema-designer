@@ -1185,13 +1185,14 @@ export function generateCanonicalCandidatePool({
     levelNormalisedRawCurve, domains.correctionStartHz, domains.correctionEndHz, verticalOffsetDb,
     activeSubs, usableLfHz, null, targetCurve,
   );
-  // Physical Recoverability Assessment is authoritative: when EQ is permitted
-  // (eqAllowed === true), protected null regions do not block boost. The
-  // frequency-domain identification remains for diagnostics; the decision
-  // about whether EQ is physically appropriate is owned by the correctability
-  // classifier, not this local check.
-  const eqAllowedByCorrectability = correctabilityAssessment?.eqAllowed === true;
-  const protectedNullRegions = eqAllowedByCorrectability ? [] : identifiedProtectedNullRegions;
+  // Protected null regions are an explicit no-boost policy authority. Once a
+  // region is classified as a protected narrow/deep null (≤ 6 Hz, ≥ 10 dB),
+  // positive EQ correction in that region is 0 dB regardless of whether general
+  // EQ correction is otherwise allowed. The correctability classifier governs
+  // broad correctability; it must NOT override the explicit protected-null
+  // policy. The wider response remains correctable; only the identified nulls
+  // are preserved.
+  const protectedNullRegions = identifiedProtectedNullRegions;
   // ── Iterative PEQ fitting: conditional on collectDiagnostics ──
   // The default production path skips the expensive Standard/Accuracy/House
   // iterative PEQ fitters. The production finalPostEqCurve is produced by
