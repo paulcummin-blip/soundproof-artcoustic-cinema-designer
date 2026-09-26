@@ -3,9 +3,9 @@
 // section. One visual implementation, one presentation authority.
 //
 // Layout: 4-column grid of titled cards, each with a standard RP22GradingPill
-// and supporting value underneath. P19/P20 are SEAT-scoped (pill shows "SEAT",
-// no supporting text). P14/P18 split "L2 · 112 dBC" into pill label "L2" and
-// supporting text "112 dBC".
+// and supporting value underneath. All four parameters split
+// "L2 · 112 dBC" into pill label "L2" and supporting text "112 dBC".
+// When stale, an "Out of date" badge appears beneath the pill.
 //
 // Publication-gated: only a canonically published completed result may be
 // presented as an official RP22 result. During calculation with a published
@@ -28,10 +28,8 @@ const CARD_TITLES = {
   p20: "P20 Seat Consistency",
 };
 
-const SEAT_SCOPED_KEYS = new Set(["p19", "p20"]);
-
 // Split "L2 · 112 dBC" into pill label "L2" and supporting text "112 dBC".
-// Non-ready states ("Calculating…", "FAIL", "SEAT", "Select Bass Target")
+// Non-ready states ("Calculating…", "FAIL", "Select Bass Target")
 // have no " · " separator — shown in the pill as-is with no supporting text.
 function splitPillContent(resultText) {
   const text = String(resultText || "");
@@ -78,10 +76,7 @@ export default function BassHeadlinePills({ nowMs }) {
   return (
     <div className={`grid grid-cols-2 gap-2 sm:grid-cols-4 transition-opacity duration-300 ${formatted.isCalculatingWithPublishedResult ? "opacity-80" : ""}`}>
       {Object.entries(formatted.pills).map(([key, pill]) => {
-        const isSeatScoped = SEAT_SCOPED_KEYS.has(key);
-        const { pillLabel, supportingText } = isSeatScoped
-          ? { pillLabel: pill.resultText, supportingText: null }
-          : splitPillContent(pill.resultText);
+        const { pillLabel, supportingText } = splitPillContent(pill.resultText);
         const isActive = activeMetric === key;
         return (
           <div
@@ -104,6 +99,9 @@ export default function BassHeadlinePills({ nowMs }) {
             {supportingText
               ? <div className="text-center text-[10px] text-[#625143]">{supportingText}</div>
               : null}
+            {pill.stale && (
+              <div className="text-[9px] font-semibold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">Out of date</div>
+            )}
           </div>
         );
       })}

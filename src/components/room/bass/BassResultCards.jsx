@@ -4,9 +4,8 @@
 // presented as an official RP22 result. During calculation with a published
 // result, the last published values remain visible (greyed) — only the
 // first-ever calculation (no published result) shows "Calculating…".
-// P19 and P20 are SEAT-scoped parameters: main pill always shows "SEAT" —
-// no RSP/aggregate headline. Expanded seat grids below show all seats with
-// Primary/Secondary distinction.
+// P19 headline shows the RSP level + deviation; P20 headline shows the
+// project level + deviation. P20 per-seat grid below shows individual seats.
 import React, { useEffect, useState } from "react";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";

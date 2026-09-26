@@ -18,14 +18,15 @@ const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
 export default function BassPermanentSeatResults() {
   const shared = useSharedBassResults();
   const authorityStatus = shared?.completedBassAuthority?.authorityStatus || "UNCALCULATED";
-  const isCalculating = shared?.calculationInProgress === true;
   const hasResult = shared?.hasCurrentResult === true;
-  const isStale = authorityStatus === "STALE";
   const p14Selection = resolveP14TargetSelectionState(shared?.authoritative?.requested);
   const noP14TargetSelected = p14Selection.noP14TargetSelected;
 
   const formatted = useMemo(() => {
-    if (noP14TargetSelected || isCalculating || isStale || !hasResult) return null;
+    // Stale state: retain the previous P20 per-seat results (marked "Out of
+    // date" in the headline pills). Only suppress when unselected or no
+    // result has ever existed.
+    if (noP14TargetSelected || !hasResult) return null;
     return formatOfficialBassResults(
       shared.completedBassAuthority,
       shared.lifecycle,
@@ -45,8 +46,6 @@ export default function BassPermanentSeatResults() {
     shared.seatingPositions,
     shared.p19SeatAuthority,
     hasResult,
-    isStale,
-    isCalculating,
     noP14TargetSelected,
   ]);
 

@@ -10,7 +10,7 @@
 // This component shows P20 per-seat results only.
 //
 // Rules preserved:
-//   - P20 headline = SEAT
+//   - P20 headline shows the project level + deviation (in the headline pills)
 //   - Actual seats displayed underneath, following real rows and left/right
 //     ordering
 //   - Primary seats distinguished by dark border, Secondary by light border

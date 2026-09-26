@@ -3,7 +3,6 @@ import { p19LowestSeat, p19RspResult } from "@/components/room/bass/p19SeatPrese
 import { buildP20SeatRows, p20WorstSeat, p20BestPrimarySeat } from "@/components/room/bass/p20SeatPresentation";
 import { formatP14Capability, formatP14BasisLabel, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
-import { seatScopeHeadlinePill } from "@/components/utils/rp22ParameterPresentation";
 import { formatBassParameterValue } from "@/components/room/bass/bassParameterValueFormatter";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, isBassLifecycleCalculating } from "./bassCalculationLifecycle";
 
@@ -108,12 +107,12 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
  * and the status shows "Calculating updated result…". Only when there is no
  * published result (first-ever calculation) do pills show "Calculating…".
  *
- * P19 headline is the canonical RSP result against stored Reference EQ.
- * Per-seat P19 diagnostics remain in the P19 — All Seats grid below.
- * P20 is a SEAT-scoped parameter:
- *   P20 main pill: "SEAT" — per-seat results in the P20 — All Seats grid below.
- *   Coverage summary ("Primary Seats L{X} · No seat lower than L{Y}") appears
- *   above the grid — no "worst seat" headline. Seat results are the only P20 results.
+ * P19 headline is the canonical RSP result: RP22 level + deviation value.
+ * P20 headline is the authoritative project P20 level + deviation value.
+ * Per-seat P20 results remain in the P20 — All Seats grid below.
+ * When stale (design changed, previous result exists), all four pills
+ * retain their previous values and carry a `stale: true` flag so the UI
+ * can mark them "OUT OF DATE".
  *
  * @param {object} completedBassAuthority - from useCompletedBassAuthority(scopeId)
  * @param {object} lifecycle - controller lifecycle snapshot
@@ -160,8 +159,8 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       pills: {
         p14: unselectedPill("P14 Bass SPL"),
         p18: unselectedPill("P18 Extension"),
-        p19: seatScopeHeadlinePill("P19 Response Fit"),
-        p20: seatScopeHeadlinePill("P20 Seat Consistency"),
+        p19: unselectedPill("P19 Response Fit"),
+        p20: unselectedPill("P20 Seat Consistency"),
       },
       statusText: "Select Bass Target",
       isReady: false,
@@ -255,6 +254,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
         text: "P14 Bass SPL FAIL",
         level: "FAIL",
         detail: detailParts.join(" · "),
+        stale: isStale,
       };
     } else {
       // P14 PASS — show the selected level and target dB.
@@ -268,6 +268,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
         text: `P14 Bass SPL ${resultText}`,
         level: valueText !== "—" ? levelText : "—",
         detail: detailParts.join(" · "),
+        stale: isStale,
       };
     }
   } else {
@@ -297,34 +298,72 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       text: `P18 Extension ${resultText}`,
       level: valueText ? levelText : "—",
       detail: formatP18TargetBasisDetail(activeP18Basis),
+      stale: isStale,
     };
   } else if (p14Failed) {
     // P14 FAIL (or LIMITED) → P18 FAIL. Internally P18 was not evaluated because
     // the selected P14 operating target is unattainable; the dealer-facing
     // pill shows strict FAIL, not "Not evaluated".
-    pills.p18 = { label: "P18 Extension", resultText: "FAIL", text: "P18 Extension FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null };
+    pills.p18 = { label: "P18 Extension", resultText: "FAIL", text: "P18 Extension FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null, stale: isStale };
   } else {
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  // P19 — SEAT-scoped parameter. The headline always displays "SEAT" — no
-  // RSP/aggregate headline. When calculating, show "Calculating…" — never
-  // old results. When P14 fails (or LIMITED), P19 is not evaluated.
-  pills.p19 = (isCalculating && !hasPublishedResult)
-    ? { label: "P19 Response Fit", resultText: "Calculating…", text: "P19 Response Fit Calculating…", level: "—" }
-    : p14Failed
-      ? { label: "P19 Response Fit", resultText: "FAIL", text: "P19 Response Fit FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
-      : seatScopeHeadlinePill("P19 Response Fit");
+  // P19 — RSP-only authoritative result. One canonical RSP deviation against
+  // the target curve. The headline shows the RP22 level and deviation value.
+  // Per-seat P19 is not published (P19 is RSP-only). When calculating with no
+  // published result, show "Calculating…". When P14 fails (or LIMITED), P19
+  // is not evaluated. When stale, the previous result is retained and marked.
+  if (resultsVisible) {
+    const p19Param = parameters.p19;
+    if (p19Param?.isAuthoritative && p19Param?.level && p19Param.level !== "—" && p19Param.valueText) {
+      const resultText = `${p19Param.level} · ${p19Param.valueText}`;
+      pills.p19 = {
+        label: "P19 Response Fit",
+        resultText,
+        text: `P19 Response Fit ${resultText}`,
+        level: p19Param.level,
+        detail: null,
+        stale: isStale,
+      };
+    } else {
+      pills.p19 = { label: "P19 Response Fit", resultText: "—", text: "P19 Response Fit —", level: "—", stale: isStale };
+    }
+  } else if (p14Failed) {
+    pills.p19 = { label: "P19 Response Fit", resultText: "FAIL", text: "P19 Response Fit FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null, stale: isStale };
+  } else if (isCalculating && !hasPublishedResult) {
+    pills.p19 = { label: "P19 Response Fit", resultText: "Calculating…", text: "P19 Response Fit Calculating…", level: "—" };
+  } else {
+    pills.p19 = { label: "P19 Response Fit", resultText: officialStateText(authorityStatus, isCalculating), text: `P19 Response Fit ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
+  }
 
-  // P20 — SEAT-scoped parameter. The headline always displays "SEAT" — no
-  // "worst seat" headline, no aggregate level. When calculating, show
-  // "Calculating…" — never old results. When P14 fails (or LIMITED), P20
-  // is not evaluated.
-  pills.p20 = (isCalculating && !hasPublishedResult)
-    ? { label: "P20 Seat Consistency", resultText: "Calculating…", text: "P20 Seat Consistency Calculating…", level: "—" }
-    : p14Failed
-      ? { label: "P20 Seat Consistency", resultText: "FAIL", text: "P20 Seat Consistency FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null }
-      : seatScopeHeadlinePill("P20 Seat Consistency");
+  // P20 — per-seat consistency. The headline shows the authoritative project
+  // P20 level and deviation. Individual seat results remain in the P20 — All
+  // Seats grid below. When calculating with no published result, show
+  // "Calculating…". When P14 fails (or LIMITED), P20 is not evaluated.
+  // When stale, the previous result is retained and marked.
+  if (resultsVisible) {
+    const p20Param = parameters.p20;
+    if (p20Param?.isAuthoritative && p20Param?.level && p20Param.level !== "—" && p20Param.valueText) {
+      const resultText = `${p20Param.level} · ${p20Param.valueText}`;
+      pills.p20 = {
+        label: "P20 Seat Consistency",
+        resultText,
+        text: `P20 Seat Consistency ${resultText}`,
+        level: p20Param.level,
+        detail: null,
+        stale: isStale,
+      };
+    } else {
+      pills.p20 = { label: "P20 Seat Consistency", resultText: "—", text: "P20 Seat Consistency —", level: "—", stale: isStale };
+    }
+  } else if (p14Failed) {
+    pills.p20 = { label: "P20 Seat Consistency", resultText: "FAIL", text: "P20 Seat Consistency FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null, stale: isStale };
+  } else if (isCalculating && !hasPublishedResult) {
+    pills.p20 = { label: "P20 Seat Consistency", resultText: "Calculating…", text: "P20 Seat Consistency Calculating…", level: "—" };
+  } else {
+    pills.p20 = { label: "P20 Seat Consistency", resultText: officialStateText(authorityStatus, isCalculating), text: `P20 Seat Consistency ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
+  }
 
   // Status text — lifecycle display comes from BASS_LIFECYCLE_COPY (sole
   // authority). Engineering-specific text (NOT VERIFIED, P14 capability

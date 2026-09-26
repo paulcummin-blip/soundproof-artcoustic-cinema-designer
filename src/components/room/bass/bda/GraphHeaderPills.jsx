@@ -23,7 +23,6 @@ import { useGraphInteraction, setGraphInteraction, clearGraphInteraction } from 
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 const PARAM_LABELS = { p14: "P14", p18: "P18", p19: "P19", p20: "P20" };
-const SEAT_SCOPED = new Set(["p20"]); // P19 is RSP-only — not seat-scoped.
 
 function splitPillContent(resultText) {
   const text = String(resultText || "");
@@ -75,10 +74,7 @@ export default function GraphHeaderPills() {
       {PARAM_KEYS.map((key) => {
         const pill = formatted.pills[key];
         if (!pill) return null;
-        const isSeatScoped = SEAT_SCOPED.has(key);
-        const { pillLabel, supportingText } = isSeatScoped
-          ? { pillLabel: pill.resultText, supportingText: null }
-          : splitPillContent(pill.resultText);
+        const { pillLabel, supportingText } = splitPillContent(pill.resultText);
         const isActive = interaction.selectedMetric === key;
 
         return (
@@ -100,6 +96,9 @@ export default function GraphHeaderPills() {
               </RP22GradingPill>
               {supportingText && (
                 <span className="text-[10px] text-[#625143]">{supportingText}</span>
+              )}
+              {pill.stale && (
+                <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1">Out of date</span>
               )}
             </button>
           </BassResultDetailTooltip>

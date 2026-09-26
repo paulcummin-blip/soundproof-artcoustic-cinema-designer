@@ -189,12 +189,18 @@ export default function CurrentDesignBar({
               <span className="flex items-center gap-1">
                 <span className="text-[10px] font-bold text-[#625143]">P19</span>
                 <RP22GradingPill level={p19Pill.level} compact>{p19Label}</RP22GradingPill>
+                {p19Pill.stale && (
+                  <span className="text-[8px] font-semibold uppercase tracking-wide text-amber-700">Out of date</span>
+                )}
               </span>
             )}
             {p20Pill && (
               <span className="flex items-center gap-1">
                 <span className="text-[10px] font-bold text-[#625143]">P20</span>
                 <RP22GradingPill level={p20Pill.level} compact>{p20Label}</RP22GradingPill>
+                {p20Pill.stale && (
+                  <span className="text-[8px] font-semibold uppercase tracking-wide text-amber-700">Out of date</span>
+                )}
               </span>
             )}
           </div>
