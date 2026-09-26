@@ -344,19 +344,18 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // When stale, the previous result is retained and marked.
   if (resultsVisible) {
     const p20Param = parameters.p20;
-    if (p20Param?.isAuthoritative && p20Param?.level && p20Param.level !== "—" && p20Param.valueText) {
-      const resultText = `${p20Param.level} · ${p20Param.valueText}`;
-      pills.p20 = {
-        label: "P20 Seat Consistency",
-        resultText,
-        text: `P20 Seat Consistency ${resultText}`,
-        level: p20Param.level,
-        detail: null,
-        stale: isStale,
-      };
-    } else {
-      pills.p20 = { label: "P20 Seat Consistency", resultText: "—", text: "P20 Seat Consistency —", level: "—", stale: isStale };
-    }
+    const hasP20 = p20Param?.isAuthoritative && p20Param?.level && p20Param.level !== "—" && p20Param.valueText;
+    // P20 headline shows "SEAT" — the aggregated level/deviation is NOT shown
+    // in the four-result strip. Individual P20 seat results remain in the
+    // P20 — All Seats grid below (p20Rows / perSeatP20Results).
+    pills.p20 = {
+      label: "P20 Seat Consistency",
+      resultText: hasP20 ? "SEAT" : "—",
+      text: `P20 Seat Consistency ${hasP20 ? "SEAT" : "—"}`,
+      level: hasP20 ? "SEAT" : "—",
+      detail: null,
+      stale: isStale,
+    };
   } else if (p14Failed) {
     pills.p20 = { label: "P20 Seat Consistency", resultText: "FAIL", text: "P20 Seat Consistency FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null, stale: isStale };
   } else if (isCalculating && !hasPublishedResult) {
