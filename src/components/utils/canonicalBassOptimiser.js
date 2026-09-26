@@ -12,6 +12,7 @@ import {
   resolveHouseCurveDomains,
 } from "@/components/utils/houseCurveTargetAuthority";
 import { identifyProtectedNullRegions, isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
+import { identifyVerifiedProtectedNullRegions } from "@/components/utils/cancellationNullAuthority";
 import { findAggregatePeakBoostViolations, setCorrectabilityGate, clearCorrectabilityGate } from "@/components/utils/designEqPhysicsAuthority";
 import { normaliseHouseCurveToP14Total, integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
 import { assessP14Capability, P14_EQ_ASSESSMENT_RANGE_HZ, P14_SAFETY_MARGIN_DB } from "@/components/utils/p14CapabilityAuthority";
@@ -1181,17 +1182,25 @@ export function generateCanonicalCandidatePool({
       spl: Number.isFinite(point.spl) ? point.spl + appliedOperatingLevelOffsetDb : point.spl,
     })),
   }));
-  const identifiedProtectedNullRegions = identifyProtectedNullRegions(
+  // Physics-based cancellation verification: the 6 Hz / 10 dB candidate
+  // detector identifies regions worth investigating; the complex cancellation
+  // verifier confirms whether each candidate is a genuine destructive
+  // cancellation (using per-source complex pressure evidence from the
+  // authoritative engine) or an ordinary correctable deficit. Only verified
+  // cancellation regions receive the protected-null behaviour (positive EQ =
+  // 0 dB). Unverified candidates remain fully correctable within headroom.
+  // Safe fallback: if complex evidence is unavailable, no region is protected.
+  const identifiedProtectedNullRegions = identifyVerifiedProtectedNullRegions(
     levelNormalisedRawCurve, domains.correctionStartHz, domains.correctionEndHz, verticalOffsetDb,
-    activeSubs, usableLfHz, null, targetCurve,
+    activeSubs, usableLfHz, null, targetCurve, perSourceComplexTransfers,
   );
   // Protected null regions are an explicit no-boost policy authority. Once a
-  // region is classified as a protected narrow/deep null (≤ 6 Hz, ≥ 10 dB),
-  // positive EQ correction in that region is 0 dB regardless of whether general
-  // EQ correction is otherwise allowed. The correctability classifier governs
-  // broad correctability; it must NOT override the explicit protected-null
-  // policy. The wider response remains correctable; only the identified nulls
-  // are preserved.
+  // region is verified as a destructive cancellation, positive EQ correction
+  // in that region is 0 dB regardless of whether general EQ correction is
+  // otherwise allowed. The correctability classifier governs broad
+  // correctability; it must NOT override the explicit protected-null policy.
+  // The wider response remains correctable; only the verified cancellation
+  // nulls are preserved.
   const protectedNullRegions = identifiedProtectedNullRegions;
   // ── Iterative PEQ fitting: conditional on collectDiagnostics ──
   // The default production path skips the expensive Standard/Accuracy/House
