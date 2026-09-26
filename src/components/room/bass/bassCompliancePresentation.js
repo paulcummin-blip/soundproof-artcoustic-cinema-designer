@@ -189,9 +189,8 @@ export function buildComplianceBassPresentation({ completedBassAuthority }, erro
   // per-seat L1/L2/L3/L4 results when the contract is canonically published.
   // When NOT_VERIFIED / UPDATING, return empty arrays so the UI shows a
   // consistent non-verified state — never mixed verified/unverified per-seat.
-  const perSeatP19Results = publicationVerified && Array.isArray(contract?.bassResult?.seatResults?.P19)
-    ? contract.bassResult.seatResults.P19
-    : [];
+  // P19 is RSP-only — no per-seat P19 results.
+  const perSeatP19Results = [];
   const perSeatP20Results = publicationVerified && Array.isArray(contract?.bassResult?.seatResults?.P20)
     ? contract.bassResult.seatResults.P20
     : [];

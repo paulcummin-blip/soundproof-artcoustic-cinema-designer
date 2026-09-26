@@ -61,12 +61,9 @@ function hasCanonicalSeatMetricAuthority(contract) {
   // Not-assessable P19/P20 is a terminal state with legitimately empty per-seat
   // results. Skip the per-seat count check when the parameter declares
   // notAssessable — the contract carries the failure reason instead.
+  // P19 is RSP-only — no per-seat P19 results to validate.
   const p19Param = contract?.productAnalysis?.parameters?.p19;
   const p19NotAssessable = p19Param?.notAssessable === true;
-  const p19Seats = contract?.selectedCandidate?.perSeatP19Results;
-  if (!p19NotAssessable && realSeatCount > 0 && (!Array.isArray(p19Seats)
-    || p19Seats.length !== realSeatCount
-    || p19Seats.some((seat) => !seat?.seatId || !Number.isFinite(seat?.variationDbRaw) || !Number.isFinite(seat?.level)))) return false;
   const p20Param = contract?.productAnalysis?.parameters?.p20;
   const p20NotAssessable = p20Param?.notAssessable === true;
   const p20Seats = contract?.selectedCandidate?.perSeatP20Results;
@@ -174,7 +171,7 @@ export function buildAssessmentEnvelope(contract) {
     ? Number(worstP20.worstFrequencyHz)
     : null;
 
-  const p19TargetIdentity = finalResponse.p19TargetIdentity || "reference-eq";
+  const p19TargetIdentity = finalResponse.p19TargetIdentity || "target-curve";
 
   return {
     achievedP18FrequencyHz,
@@ -268,7 +265,7 @@ export function validateAssessmentEnvelopeAuthority(contract) {
   if (!Number.isFinite(Number(envelope.assessmentEndHz)))
     return { valid: false, reason: "missing-assessment-end-hz" };
 
-  if (envelope.p19TargetIdentity !== "reference-eq")
+  if (envelope.p19TargetIdentity !== "target-curve")
     return { valid: false, reason: `p19-target-identity-missing-or-invalid:${String(envelope.p19TargetIdentity)}` };
 
   // Four-way P18 authority parity: the selected candidate, envelope, assessment
@@ -301,18 +298,7 @@ export function validateAssessmentEnvelopeAuthority(contract) {
     return { valid: false, reason: `p18-authority-split:${candidateP18}:${envelopeP18}:${envelopeStartHz}:${cardP18}` };
   }
 
-  // Validate per-seat P19 grades against current shared mapper
-  const p19Seats = contract?.selectedCandidate?.perSeatP19Results;
-  if (Array.isArray(p19Seats)) {
-    for (const seat of p19Seats) {
-      if (!Number.isFinite(Number(seat?.variationDbRaw))) continue;
-      const expectedLevel = gradeP19FromRaw(seat.variationDbRaw);
-      const storedLevel = Number(seat?.level);
-      if (expectedLevel != null && Number.isFinite(storedLevel) && expectedLevel !== storedLevel) {
-        return { valid: false, reason: `p19-grade-mismatch:seat:${seat.seatId}:stored:${storedLevel}:expected:${expectedLevel}` };
-      }
-    }
-  }
+  // P19 is RSP-only — no per-seat P19 grades to validate.
 
   // Validate per-seat P20 grades against current shared mapper
   const p20Seats = contract?.selectedCandidate?.perSeatP20Results;
@@ -415,7 +401,7 @@ export function compactCompletedBassContract(contract, { graphPayloadTimings = n
     selectedCandidate: {
       id: contract.selectedCandidate?.id || contract.selectedCandidateId,
       worstP20SeatId: contract.selectedCandidate?.worstP20SeatId || null,
-      perSeatP19Results: contract.selectedCandidate?.perSeatP19Results || [],
+      perSeatP19Results: [], // P19 is RSP-only — no per-seat P19 results.
       perSeatP20Results: contract.selectedCandidate?.perSeatP20Results || [],
       p14TargetBasis: contract.selectedCandidate?.p14TargetBasis || contract.productAnalysis?.parameters?.p14?.targetBasis || "minimum",
       achievedP18FrequencyHz: Number.isFinite(Number(contract.selectedCandidate?.achievedP18FrequencyHz))

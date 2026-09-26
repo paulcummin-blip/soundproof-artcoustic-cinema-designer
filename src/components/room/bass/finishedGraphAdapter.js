@@ -56,12 +56,10 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
   const perSeatP20Results = Array.isArray(compactContract.bassResult?.seatResults?.P20)
     ? compactContract.bassResult.seatResults.P20.map((seat) => ({ ...seat }))
     : [];
-  const perSeatP19Results = Array.isArray(compactContract.bassResult?.seatResults?.P19)
-    ? compactContract.bassResult.seatResults.P19.map((seat) => ({ ...seat }))
-    : [];
+  // P19 is RSP-only — no per-seat P19 results.
   const finalSeatVariationData = candidateId ? {
     p18: { candidateId, level: null, extensionHz: envelope?.achievedP18FrequencyHz ?? null, achievedExtensionBounded: envelope?.achievedP18Bounded === true, authority: null },
-    p19: { candidateId, level: null, variationDb: null, worstFrequencyHz: envelope?.officialP19WorstFrequencyHz ?? null, perSeatResults: perSeatP19Results },
+    p19: { candidateId, level: null, variationDb: null, worstFrequencyHz: envelope?.officialP19WorstFrequencyHz ?? null, perSeatResults: [] },
     p20: { candidateId, level: null, variationDb: null, worstSeatId: envelope?.p20WorstSeatId ?? null, perSeatResults: perSeatP20Results },
   } : null;
 
@@ -73,7 +71,7 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
     canonicalPostEqRsp: postEqRspCurve,
     referenceEq,
     referenceEqSignature: buildCurveSignature(referenceEq),
-    p19TargetIdentity: "reference-eq",
+    p19TargetIdentity: "target-curve",
     postEqPerSeatCurves: Array.isArray(gp.postEqPerSeatCurves) ? gp.postEqPerSeatCurves : [],
     maximumSplCurveAfterEq: Array.isArray(gp.maximumSplCurveAfterEq) ? gp.maximumSplCurveAfterEq : [],
     maximumSplSafetyMarginDb: Number.isFinite(gp.maximumSplSafetyMarginDb) ? gp.maximumSplSafetyMarginDb : 0,

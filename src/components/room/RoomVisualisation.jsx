@@ -1696,7 +1696,7 @@ const byId = useEntitiesById({
     rvWrapRef,
     computeAllSeatSplMetrics,
     officialP19Result: currentP19Result,
-    perSeatP19Results: currentP19Results,
+    perSeatP19Results: [], // P19 is RSP-only — no per-seat P19 results.
     perSeatP20Results: currentP20Results,
   });
 

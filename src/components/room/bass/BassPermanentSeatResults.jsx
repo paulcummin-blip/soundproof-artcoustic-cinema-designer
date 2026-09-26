@@ -1,10 +1,11 @@
-// BassPermanentSeatResults — permanently-visible P19/P20 per-seat results
-// in the Subwoofers panel. Uses the shared SharedP19P20SeatResults component
-// (same visual treatment as the Bass Simulation section).
+// BassPermanentSeatResults — permanently-visible P20 per-seat results
+// in the Subwoofers panel. Uses the shared SharedP19P20SeatResults component.
 //
-// PRESENTATION ONLY. Does NOT change P19/P20 calculations, grading, seat
+// P19 is RSP-only — there are no per-seat P19 results to display.
+//
+// PRESENTATION ONLY. Does NOT change P20 calculations, grading, seat
 // priority logic, or acoustic authority. Uses existing canonical seat-level
-// results (formatOfficialBassResults → p19Rows / p20Rows).
+// results (formatOfficialBassResults → p20Rows).
 
 import React, { useMemo } from "react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
@@ -52,7 +53,7 @@ export default function BassPermanentSeatResults() {
   return (
     <div
       className="mt-3"
-      aria-label="P19 and P20 per-seat results"
+      aria-label="P20 per-seat results"
       style={{
         borderRadius: 10,
         border: "1px solid #E7E4DF",
@@ -65,14 +66,12 @@ export default function BassPermanentSeatResults() {
           Seat Results
         </span>
         <span style={{ fontSize: 10, color: "#8A7B6A", fontFamily: BODY_FONT }}>
-          P19 · P20
+          P20
         </span>
       </div>
 
       <SharedP19P20SeatResults
-        p19Rows={formatted?.p19Rows || []}
         p20Rows={formatted?.p20Rows || []}
-        p19Summary={formatted?.p19SeatAuthority?.project?.coverageSummary || null}
         publicationVerified={formatted?.publicationVerified === true}
         authorityStatus={authorityStatus}
         p14TargetUnselected={noP14TargetSelected}

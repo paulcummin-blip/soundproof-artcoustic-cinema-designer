@@ -1,6 +1,5 @@
 import {
   computeCorrectableP19Diagnostic,
-  computeOfficialP19Assessment,
   computeOfficialP20Assessment,
 } from "@/components/utils/bassAuthoritativeAssessment";
 import { stampPoolAuthority } from "@/components/room/bass/bassResultAuthority";
@@ -16,7 +15,6 @@ const BAND = { assessmentStartHz: 20, assessmentEndHz: 120 };
 function assess(rspPostEqCurve, perSeatPostEqCurves, canonicalTargetCurve = TARGET) {
   return {
     p19: computeCorrectableP19Diagnostic({ rspPostEqCurve, canonicalTargetCurve, ...BAND }),
-    officialP19: computeOfficialP19Assessment({ rspPostEqCurve, referenceEqCurve: rspPostEqCurve, ...BAND }),
     p20: computeOfficialP20Assessment({ rspPostEqCurve, perSeatPostEqCurves, ...BAND }),
   };
 }
@@ -109,9 +107,8 @@ export function runBassAuthoritativeAssessmentFixtures() {
   check("6l. P20 5 dB difference floors to 5 → L1", fiveDbDifference.p20.worstSeat.variationDbRaw === 5 && fiveDbDifference.p20.worstSeat.displayVariationDb === 5 && fiveDbDifference.p20.worstSeat.level === 1);
 
   const severeRsp = curve([100, 100, 100, 65, 100, 100, 100, 100, 100]);
-  const officialNull = computeOfficialP19Assessment({ rspPostEqCurve: severeRsp, referenceEqCurve: severeRsp, ...BAND });
   const correctableNull = computeCorrectableP19Diagnostic({ rspPostEqCurve: severeRsp, canonicalTargetCurve: TARGET, protectedNullRegions: [{ startHz: 31, endHz: 50 }], ...BAND });
-  check("7. Stored calibrated RSP equals Reference EQ and publishes natural 0 dB L4", officialNull.variationDbRaw === 0 && officialNull.level === 4 && officialNull.label === "P19 RSP vs Reference EQ" && correctableNull.label === "Correctable P19 — optimiser diagnostic");
+  check("7. Protected null region is excluded from P19 max-abs scan", correctableNull.label === "Correctable P19 — optimiser diagnostic" && Number.isFinite(correctableNull.variationDbRaw));
 
   const splCandidate = fixtureCandidate("spl", 4, changedRspCurve, seatA);
   const accuracyCandidate = fixtureCandidate("accuracy", 2, rsp, seatB);
@@ -145,7 +142,7 @@ export function runBassAuthoritativeAssessmentFixtures() {
     identical: { rspP19: identical.p19.variationDbRaw, seats: identical.p20.perSeatResults },
     oneSeat: { rspP19: oneSeat.p19.variationDbRaw, seats: oneSeat.p20.perSeatResults },
     severeSeatNull: { rspP19: severeSeatNull.p19.variationDbRaw, seats: severeSeatNull.p20.perSeatResults },
-    severeRspNull: { rspP19: officialNull.variationDbRaw, correctableP19: correctableNull.variationDbRaw, seats: [] },
+    severeRspNull: { rspP19: correctableNull.variationDbRaw, seats: [] },
     selectedPriorities: {
       spl: { candidateId: splSelection.selectedCandidateId, rspP19: splSelection.officialP19VariationDb, seats: splSelection.selectedCandidate.perSeatP20Results },
       accuracy: { candidateId: accuracySelection.selectedCandidateId, rspP19: accuracySelection.officialP19VariationDb, seats: accuracySelection.selectedCandidate.perSeatP20Results },

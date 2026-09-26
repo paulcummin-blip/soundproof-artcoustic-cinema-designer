@@ -1,38 +1,29 @@
 /**
  * Passive proposal adapter for canonical P19 authority.
- * No seat grouping, floor calculation, or grading is permitted here.
+ *
+ * P19 is RSP-only: max|smoothedRspResponse(f) − T(f)| over the assessment
+ * band. There are no per-seat P19 grades, no Primary/Secondary/Project P19
+ * floors, and no P19 FAIL seats. The sole P19 authority is the RSP result
+ * in parameters.p19.
  */
 
 export function buildSnapshotP19(engineeringSummary) {
-  const authority = engineeringSummary?.p19SeatAuthority || null;
-  const perSeat = engineeringSummary?.project?.reportCounts?.seatResultsByParameter?.p19 || [];
-  if (!authority && perSeat.length === 0) {
-    return {
-      rsp: null,
-      primary_floor: null,
-      secondary_floor: null,
-      project_floor: null,
-      per_seat: [],
-      coverage_summary: "NOT CALCULATED",
-    };
-  }
+  const p19Param = engineeringSummary?.parameterSummaries?.project?.p19 ?? null;
+  const rsp = p19Param
+    ? {
+      level: p19Param.level ?? null,
+      raw_value: p19Param.value ?? null,
+      display_value: p19Param.valueFormatted ?? null,
+      worst_frequency_hz: p19Param.worstFrequencyHz ?? null,
+    }
+    : null;
   return {
-    rsp: null,
-    primary_floor: engineeringSummary?.parameterSummaries?.primary?.p19?.level ?? null,
-    secondary_floor: engineeringSummary?.parameterSummaries?.secondary?.p19?.level ?? null,
-    project_floor: engineeringSummary?.parameterSummaries?.project?.p19?.level ?? null,
-    per_seat: perSeat.map((seat) => ({
-      seat_id: seat.seatId,
-      priority: seat.priority,
-      row: seat.row,
-      column: seat.column,
-      grade: seat.level,
-      raw_value: seat.value,
-      display_value: seat.valueFormatted,
-      calculated: seat.status === "ok" || seat.level !== "—",
-    })),
-    coverage_summary: authority?.project?.coverageSummary
-      ?? engineeringSummary?.project?.coverage?.sentence
-      ?? "NOT CALCULATED",
+    rsp,
+    // Deprecated — P19 is RSP-only. Retained as null for snapshot compatibility.
+    primary_floor: null,
+    secondary_floor: null,
+    project_floor: null,
+    per_seat: [],
+    coverage_summary: rsp ? "RSP-only" : "NOT CALCULATED",
   };
 }

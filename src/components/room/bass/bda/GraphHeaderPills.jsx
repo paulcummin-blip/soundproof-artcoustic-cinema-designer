@@ -23,7 +23,7 @@ import { useGraphInteraction, setGraphInteraction, clearGraphInteraction } from 
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 const PARAM_LABELS = { p14: "P14", p18: "P18", p19: "P19", p20: "P20" };
-const SEAT_SCOPED = new Set(["p19", "p20"]);
+const SEAT_SCOPED = new Set(["p20"]); // P19 is RSP-only — not seat-scoped.
 
 function splitPillContent(resultText) {
   const text = String(resultText || "");

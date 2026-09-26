@@ -8,7 +8,7 @@ import {
   normalizeP14TargetBasis,
 } from "@/components/utils/p14CapabilityAuthority";
 import { integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
-import { computeOfficialP19Assessment, computeOfficialPerSeatP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
+import { computeCorrectableP19Diagnostic, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { buildPostEqBassCapabilityOutcome } from "@/components/utils/postEqBassCapabilityOutcome";
@@ -454,13 +454,14 @@ export function evaluateCanonicalBassAuthority({
     ? applyGlobalBassTrimToSeatCurves(canonicalResult.canonicalPostEqSeatResponses, recommendedGlobalBassTrimDb)
     : canonicalResult.canonicalPostEqSeatResponses;
 
-  // Canonical Sound Proof P19 authority: after every calibration stage has
-  // finished, the calibrated RSP response is stored as Reference EQ. Published
-  // RSP P19 compares that stored response with the exact same stored reference.
+  // ── Canonical P19 authority: corrected RSP response vs target curve ──
+  // P19 = max|smoothedRspResponse(f) − T(f)| over the assessment band.
+  // T(f) is the practical calibration target — the same target the optimiser
+  // was asked to achieve. P19 is RSP-only; there are no per-seat P19 results.
   const referenceEq = alignedPostEqRsp;
-  const p19 = computeOfficialP19Assessment({
-    rspPostEqCurve: referenceEq,
-    referenceEqCurve: referenceEq,
+  const p19 = computeCorrectableP19Diagnostic({
+    rspPostEqCurve: alignedPostEqRsp,
+    canonicalTargetCurve: p19TargetCurve,
     assessmentStartHz: p19AssessmentStartHz,
     assessmentEndHz: p19AssessmentEndHz,
     protectedNullRegions,
@@ -468,22 +469,15 @@ export function evaluateCanonicalBassAuthority({
   const officialP19VariationDb = p19?.variationDbRaw ?? null;
   const officialP19Level = p19?.level ?? null;
   const p19AssessmentReady = isCanonicalP19Ready({
-    canonicalPostEqRsp: referenceEq,
-    canonicalTargetCurve: referenceEq,
+    canonicalPostEqRsp: alignedPostEqRsp,
+    canonicalTargetCurve: p19TargetCurve,
     officialVariationDb: officialP19VariationDb,
     officialLevel: officialP19Level,
   });
   const achievedP19VariationDb = p19AssessmentReady ? officialP19VariationDb : null;
   const achievedP19Level = p19AssessmentReady ? officialP19Level : null;
-  const perSeatP19Results = p19AssessmentReady
-    ? computeOfficialPerSeatP19Assessment({
-        perSeatPostEqCurves: alignedPostEqSeatResponses,
-        referenceEqCurve: referenceEq,
-        assessmentStartHz: p19AssessmentStartHz,
-        assessmentEndHz: p19AssessmentEndHz,
-        protectedNullRegions,
-      })
-    : [];
+  // P19 is RSP-only — no per-seat P19 results.
+  const perSeatP19Results = [];
 
   // P20: final post-EQ real seats versus the final post-EQ RSP. The same
   // system-wide alignment trim is present on both sides and therefore cancels,
@@ -558,7 +552,7 @@ export function evaluateCanonicalBassAuthority({
         }
       : null,
     referenceEq,
-    p19TargetIdentity: "reference-eq",
+    p19TargetIdentity: "target-curve",
     referenceEqTargetFitVariationDb: globalLevelAlignment?.alignedP19Db ?? null,
     alignedPostEqRsp,
     alignedPostEqSeatResponses,

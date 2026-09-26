@@ -163,17 +163,8 @@ function buildCandidateRef(candidate, collectDiagnostics = false) {
     worstP20SeatId: candidate.worstP20SeatId ?? null,
     perSeatP20Results: Array.isArray(candidate.perSeatP20Results) ? candidate.perSeatP20Results.map((seat) => ({ ...seat })) : [],
     p20Available: !!candidate.p20Available,
-    // Canonical P19 seat authority is computed once by
-    // computeOfficialPerSeatP19Assessment. Do not recreate or halve it here.
-    perSeatP19Results: (Array.isArray(candidate.perSeatP19Results) ? candidate.perSeatP19Results : [])
-      .map((seat) => ({
-        seatId: seat?.seatId ?? null,
-        variationDbRaw: Number.isFinite(seat?.variationDbRaw) ? Number(seat.variationDbRaw) : null,
-        displayVariationDb: Number.isFinite(seat?.displayVariationDb) ? Number(seat.displayVariationDb) : null,
-        level: Number.isFinite(seat?.level) ? Number(seat.level) : null,
-        worstFrequencyHz: Number.isFinite(seat?.worstFrequencyHz) ? Number(seat.worstFrequencyHz) : null,
-      }))
-      .filter((seat) => seat.seatId && Number.isFinite(seat.variationDbRaw) && Number.isFinite(seat.level)),
+    // P19 is RSP-only — no per-seat P19 results.
+    perSeatP19Results: [],
     perSeatDiagnostics: (Array.isArray(candidate.perSeatMetrics) ? candidate.perSeatMetrics : []).map((seat) => ({
       seatId: seat?.seatId ?? null,
       maxAbsDeviationDb: Number.isFinite(seat?.maxAbsDeviationDb) ? seat.maxAbsDeviationDb : null,

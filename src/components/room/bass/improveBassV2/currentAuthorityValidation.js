@@ -15,7 +15,8 @@ export function attachCurrentCanonicalValidation(comparison, { authority, canoni
       !receipt?.postEqCurveSignature || canonical.postEqCurveSignature !== receipt.postEqCurveSignature ||
       canonical.physicalValidation?.passed !== true) return null;
   // A receipt match must also agree with the actual published seat values.
-  for (const [field, fullField] of [["perSeatP19", "perSeatP19Results"], ["perSeatP20", "perSeatP20Results"]]) {
+  // P19 is RSP-only — no per-seat P19 results to validate. Only validate perSeatP20.
+  for (const [field, fullField] of [["perSeatP20", "perSeatP20Results"]]) {
     const rows = canonical[fullField];
     if (!Array.isArray(rows) || rows.length !== comparison[field]?.length ||
         new Set(rows.map(s => s.seatId)).size !== rows.length ||

@@ -271,7 +271,7 @@ function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, sm
       id: "focus-reference-eq",
       kind: "reference-eq",
       label: "RSP (Reference EQ)",
-      tooltipLabel: "Reference EQ — the calibrated RSP response P19 measures against",
+      tooltipLabel: "Reference EQ — the calibrated RSP response (aligned post-EQ RSP)",
       color: "#2563EB",
       strokeWidth: 2.5,
       strokeDasharray: "8 4",
@@ -282,7 +282,7 @@ function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, sm
   const lines = [];
   if (seatId) {
     lines.push(`Selected Seat: ${formatSeatPillLabel(seatId)} (amber solid)`);
-    lines.push(`RSP Reference EQ: the calibrated RSP response (blue dashed)`);
+    lines.push(`Reference EQ: the calibrated RSP response (blue dashed)`);
   } else {
     lines.push("Seat: RSP (Reference Seat Position)");
     lines.push("RSP Reference EQ: the calibrated RSP response (blue dashed)");
@@ -466,9 +466,7 @@ function buildSeatFocus({ selectedSeatId, rp22GraphMarkers, finalBassResponse, s
 
   const lines = [];
   lines.push(`Seat: ${formatSeatPillLabel(selectedSeatId)}`);
-  if (seatP19) {
-    lines.push(`P19: ±${Number(seatP19.variationDbRaw).toFixed(1)} dB at ${Math.round(Number(seatP19.worstFrequencyHz))} Hz (${seatP19.level})`);
-  }
+  // P19 is RSP-only — no per-seat P19 tooltip.
   if (seatP20) {
     lines.push(`P20: ±${Number(seatP20.variationDbRaw).toFixed(1)} dB at ${Math.round(Number(seatP20.worstFrequencyHz))} Hz (${seatP20.level})`);
   }

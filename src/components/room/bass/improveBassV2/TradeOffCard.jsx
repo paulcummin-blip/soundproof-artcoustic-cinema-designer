@@ -143,18 +143,9 @@ function PracticalTuningSection({ result, currentInstances }) {
  * applied design — not the predicted values from the trade-off candidate.
  */
 function VerifiedAfterValues({ verifiedValues }) {
-  const { perSeatP19Results, perSeatP20Results, p14AchievedLevel, p18AchievedExtensionHz } = verifiedValues;
+  const { perSeatP20Results, p14AchievedLevel, p18AchievedExtensionHz } = verifiedValues;
 
-  // Summarise per-seat P19 levels
-  const p19Summary = useMemo(() => {
-    if (!Array.isArray(perSeatP19Results) || perSeatP19Results.length === 0) return null;
-    return perSeatP19Results.map((s) => {
-      const level = s.achievedLevel ?? s.p19Level ?? s.level;
-      const seatId = s.seatId || s.id || "?";
-      return { seatId, level };
-    });
-  }, [perSeatP19Results]);
-
+  // P19 is RSP-only — no per-seat P19 summary.
   // Summarise per-seat P20 deviation
   const p20Summary = useMemo(() => {
     if (!Array.isArray(perSeatP20Results) || perSeatP20Results.length === 0) return null;
@@ -186,12 +177,6 @@ function VerifiedAfterValues({ verifiedValues }) {
         {p18AchievedExtensionHz != null && (
           <div className="text-[10px] text-[#213428]">
             <span className="font-semibold">P18 extension:</span> {Number(p18AchievedExtensionHz).toFixed(1)} Hz
-          </div>
-        )}
-        {p19Summary && (
-          <div className="text-[10px] text-[#213428]">
-            <span className="font-semibold">P19 per-seat:</span>{" "}
-            {p19Summary.map((s) => `${s.seatId} ${levelText(s.level)}`).join(", ")}
           </div>
         )}
         {p20Summary && (

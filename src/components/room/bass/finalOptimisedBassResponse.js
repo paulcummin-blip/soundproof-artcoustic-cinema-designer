@@ -99,8 +99,7 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
         level: candidate.achievedP19Level ?? null,
         variationDb: candidate.achievedP19VariationDb ?? null,
         worstFrequencyHz: candidate.officialP19WorstFrequencyHz ?? null,
-        perSeatResults: (Array.isArray(candidate.perSeatP19Results) ? candidate.perSeatP19Results : [])
-          .map((seat) => ({ ...seat, candidateId: candidate.candidateId })),
+        perSeatResults: [], // P19 is RSP-only — no per-seat P19 results.
       },
       p20: {
         candidateId: candidate.candidateId,
@@ -202,8 +201,7 @@ export function applyAuthorityToCanonicalResult(canonicalResult, authorityBearin
         level: candidate.achievedP19Level ?? null,
         variationDb: candidate.achievedP19VariationDb ?? null,
         worstFrequencyHz: candidate.officialP19WorstFrequencyHz ?? null,
-        perSeatResults: (Array.isArray(candidate.perSeatP19Results) ? candidate.perSeatP19Results : [])
-          .map((seat) => ({ ...seat, candidateId: candidate.candidateId })),
+        perSeatResults: [], // P19 is RSP-only — no per-seat P19 results.
       },
       p20: {
         candidateId: candidate.candidateId,

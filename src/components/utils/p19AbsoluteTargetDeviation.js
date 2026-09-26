@@ -2,12 +2,10 @@
 //
 // P19 deviation primitives.
 //
-// Published Sound Proof P19 compares a calibrated response with the stored
-// final calibrated RSP response (Reference EQ). The RSP therefore compares
-// Reference EQ with the same Reference EQ and resolves naturally to 0 dB.
-//
-// The earlier practical target remains available only to the calibration
-// optimiser as a target-fit diagnostic. It is not a published P19 authority.
+// Canonical RP22 P19 = max|smoothedRspResponse(f) − T(f)| over the assessment
+// band [P18 F3 → transition], where T(f) is the predetermined practical
+// calibration target curve. P19 is RSP-only — there are no per-seat P19
+// results.
 //
 // What this helper does:
 //   1. Residual calculation: response(f) − T(f), where T(f) is the
@@ -85,10 +83,11 @@ function scanMaxAbsoluteDeviation(smoothedAssessedCurve, canonicalTargetCurve, p
 }
 
 /**
- * Full P19 evaluation: smooth, assess, scan, grade.
+ * Canonical P19 evaluation: smooth, assess, scan, grade.
  *
- * This is the calibration target-fit evaluator used by the optimiser and
- * house-curve fitter. Published P19 uses evaluateP19ReferenceEqDeviation.
+ * This is the sole P19 authority evaluator — used by both the assessment
+ * layer (canonicalBassAuthorityEvaluation) and the optimiser/house-curve
+ * fitter. P19 = max|smoothedRspResponse(f) − T(f)| over the assessment band.
  *
  * @param {object} params
  * @param {Array}  params.rspPostEqCurve        - post-EQ RSP curve [{frequency, spl}]
@@ -127,42 +126,6 @@ export function evaluateP19AbsoluteTargetDeviation({
 }
 
 /**
- * Published P19 evaluation against the stored Reference EQ.
- *
- * Both curves receive the same normalisation and 1/3-octave smoothing before
- * comparison. Equal stored curves therefore remain mathematically identical;
- * no RSP override or forced grade is needed.
- */
-export function evaluateP19ReferenceEqDeviation({
-  responseCurve,
-  referenceEqCurve,
-  assessmentStartHz,
-  assessmentEndHz,
-  protectedNullRegions = [],
-}) {
-  const smoothedResponse = normalizedSmoothedAssessedCurve(responseCurve, assessmentStartHz, assessmentEndHz);
-  const smoothedReferenceEq = normalizedSmoothedAssessedCurve(referenceEqCurve, assessmentStartHz, assessmentEndHz);
-  if (!smoothedResponse.length || !smoothedReferenceEq.length) return null;
-
-  const scan = scanMaxAbsoluteDeviation(smoothedResponse, smoothedReferenceEq, protectedNullRegions);
-  if (!scan) return null;
-
-  const { maxAbsDeviationDb, worstFrequencyHz, residualCurve } = scan;
-  const level = numericRp22Level(levelP19_lfResponse(maxAbsDeviationDb));
-  return {
-    variationDbRaw: maxAbsDeviationDb,
-    totalRspToTargetDifferenceDbRaw: maxAbsDeviationDb,
-    displayVariationDb: maxAbsDeviationDb,
-    level,
-    worstFrequencyHz,
-    maxAbsDeviationDb,
-    residualCurve,
-    sourceCurve: smoothedResponse,
-    referenceEqCurve: smoothedReferenceEq,
-  };
-}
-
-/**
  * Low-level max-abs scan from pre-computed residual points.
  *
  * Used by the house-curve fitter's summarizeSeatMetrics, which already has
@@ -195,4 +158,3 @@ export function scanMaxAbsoluteDeviationFromResidualPoints(residualPoints, prote
   if (!Number.isFinite(maxAbsDeviationDb)) return null;
   return { maxAbsDeviationDb, worstFrequencyHz };
 }
-

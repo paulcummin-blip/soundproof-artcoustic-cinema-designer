@@ -1,19 +1,21 @@
-// SharedP19P20SeatResults — unified P19/P20 per-seat presentation.
+// SharedP20SeatResults — P20 per-seat presentation.
 //
-// Design authority: the compact Bass Simulation version (P19SeatBlock /
-// P20SeatBlock). One shared visual treatment rendered in:
+// Design authority: the compact Bass Simulation version (P20SeatBlock).
+// One shared visual treatment rendered in:
 //   - Bass Simulation section (BassResultCards)
 //   - Subwoofers permanent result area (BassPermanentSeatResults)
 //   - Applied Recommended Layout card (AppliedLayoutPills, compact)
 //
+// P19 is RSP-only — there are no per-seat P19 results to display.
+// This component shows P20 per-seat results only.
+//
 // Rules preserved:
-//   - P19 headline = SEAT, P20 headline = SEAT (handled by the pill strip
-//     above this component in the recommendation card; here we show per-seat)
+//   - P20 headline = SEAT
 //   - Actual seats displayed underneath, following real rows and left/right
 //     ordering
 //   - Primary seats distinguished by dark border, Secondary by light border
 //   - No Primary/Secondary text
-//   - Uses actual canonical per-seat values (level pills from p19Rows/p20Rows)
+//   - Uses actual canonical per-seat values (level pills from p20Rows)
 //
 // PRESENTATION ONLY. Does not trigger or change any calculation.
 
@@ -90,7 +92,7 @@ function Panel({ title, paramKey, rows, publicationVerified, stateText, compact,
       {showSeats ? (
         <>
           {!compact && (
-            <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{authoritativeSummary || (paramKey === "p19" ? "NOT CALCULATED" : formatCoverageSummaryFromRows(rows))}</div>
+            <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{authoritativeSummary || formatCoverageSummaryFromRows(rows)}</div>
           )}
           <SeatGrid rows={rows} compact={compact} paramKey={paramKey} selectedSeatId={selectedSeatId} onSelectSeat={onSelectSeat} />
         </>
@@ -104,9 +106,7 @@ function Panel({ title, paramKey, rows, publicationVerified, stateText, compact,
 }
 
 export default function SharedP19P20SeatResults({
-  p19Rows = [],
   p20Rows = [],
-  p19Summary = null,
   publicationVerified = false,
   authorityStatus = null,
   p14TargetUnselected = false,
@@ -114,7 +114,6 @@ export default function SharedP19P20SeatResults({
 }) {
   const interaction = useGraphInteraction();
   const stateText = stateTextFor(authorityStatus, publicationVerified, p14TargetUnselected);
-  const gridClass = compact ? "grid gap-2 grid-cols-1" : "grid gap-2 grid-cols-1 sm:grid-cols-2";
 
   const handleSeatSelect = (paramKey) => (seatId) => {
     if (interaction.selectedSeatId === seatId && interaction.selectedMetric === paramKey) {
@@ -125,18 +124,7 @@ export default function SharedP19P20SeatResults({
   };
 
   return (
-    <div className={gridClass} aria-label="P19 and P20 per-seat results">
-      <Panel
-        title="P19 — All Seats"
-        paramKey="p19"
-        rows={p19Rows}
-        authoritativeSummary={p19Summary}
-        publicationVerified={publicationVerified}
-        stateText={stateText}
-        compact={compact}
-        selectedSeatId={interaction.selectedSeatId}
-        onSelectSeat={handleSeatSelect("p19")}
-      />
+    <div className="grid gap-2 grid-cols-1" aria-label="P20 per-seat results">
       <Panel
         title="P20 — All Seats"
         paramKey="p20"

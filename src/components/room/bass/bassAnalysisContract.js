@@ -273,7 +273,7 @@ export function createBassAnalysisResult() {
     bassAuthority: null,
     finalOptimisedBassResponse: null,
     referenceEq: null,
-    p19TargetIdentity: "reference-eq",
+    p19TargetIdentity: "target-curve",
     diagnosticIdentity: null,
     achievedP14Db: null,
     achievedP14Level: null,

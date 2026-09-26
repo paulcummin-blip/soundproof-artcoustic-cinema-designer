@@ -31,7 +31,7 @@ import { buildDealerAuthority } from './buildDealerAuthority';
 import { buildProposalMetadata } from './buildProposalMetadata';
 import { buildSnapshotViewing } from './snapshotViewing';
 
-export const ENGINEERING_AUTHORITY_VERSION = '1.0';
+export const ENGINEERING_AUTHORITY_VERSION = '1.1'; // v1.1: P19 is RSP-only (corrected RSP response vs target curve). Per-seat P19 removed from RP22 authority — no per-seat P19 grades, no Primary/Secondary/Project P19 floors, no P19 FAIL seats. Older engineering publications with per-seat P19 semantics are rejected.
 
 /**
  * Build a complete Engineering Authority object.
