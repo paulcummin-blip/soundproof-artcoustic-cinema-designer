@@ -25,6 +25,7 @@ import BassResultDetailTooltip from "@/components/room/bass/BassResultDetailTool
 import { PRIMARY } from "@/components/utils/seatPriorityAuthority";
 import { formatCoverageSummaryFromRows } from "@/components/utils/seatCoverageSummary";
 import { useGraphInteraction, setGraphInteraction, clearGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
+import { formatSeatPillLabel } from "@/components/utils/seatLabel";
 
 const PRIMARY_BORDER = "#1B1A1A";
 const SECONDARY_BORDER = "#C1B6AD";
@@ -39,7 +40,7 @@ function stateTextFor(authorityStatus, publicationVerified, p14TargetUnselected)
   return "—";
 }
 
-function SeatPill({ seat, compact, paramKey, isSelected, onSelect }) {
+function SeatPill({ seat, compact, paramKey, isSelected, onSelect, showSeatLabel }) {
   const isPrimary = seat.priority === PRIMARY;
   const borderColour = isSelected ? "#213428" : (isPrimary ? PRIMARY_BORDER : SECONDARY_BORDER);
   const borderWidth = isSelected ? "3px" : (isPrimary ? "2px" : "1px");
@@ -53,17 +54,24 @@ function SeatPill({ seat, compact, paramKey, isSelected, onSelect }) {
           padding: 2,
           background: isSelected ? "#F0EDE7" : "#FFFFFF",
           display: "inline-flex",
+          alignItems: "center",
+          gap: 3,
           cursor: "pointer",
           transition: "border-color 0.15s, background 0.15s",
         }}
       >
+        {showSeatLabel && (
+          <span style={{ fontSize: 9, fontWeight: 600, color: "#625143", letterSpacing: "0.02em" }}>
+            {formatSeatPillLabel(seat.seatId)}
+          </span>
+        )}
         <RP22GradingPill level={seat.level} compact={compact}>{seat.level}</RP22GradingPill>
       </div>
     </BassResultDetailTooltip>
   );
 }
 
-function SeatGrid({ rows, compact, paramKey, selectedSeatId, onSelectSeat }) {
+function SeatGrid({ rows, compact, paramKey, selectedSeatId, onSelectSeat, showSeatLabel }) {
   return (
     <div className="grid gap-1.5">
       {rows.map((row) => (
@@ -76,6 +84,7 @@ function SeatGrid({ rows, compact, paramKey, selectedSeatId, onSelectSeat }) {
               paramKey={paramKey}
               isSelected={selectedSeatId === seat.seatId}
               onSelect={() => onSelectSeat(seat.seatId)}
+              showSeatLabel={showSeatLabel}
             />
           ))}
         </div>
@@ -84,7 +93,7 @@ function SeatGrid({ rows, compact, paramKey, selectedSeatId, onSelectSeat }) {
   );
 }
 
-function Panel({ title, paramKey, rows, publicationVerified, stateText, compact, authoritativeSummary = null, selectedSeatId, onSelectSeat }) {
+function Panel({ title, paramKey, rows, publicationVerified, stateText, compact, authoritativeSummary = null, selectedSeatId, onSelectSeat, showSeatLabel }) {
   const showSeats = publicationVerified && rows.length > 0;
   return (
     <div className={`rounded-lg border border-[#DCDBD6] bg-white ${compact ? "p-2" : "p-3"}`}>
@@ -94,7 +103,7 @@ function Panel({ title, paramKey, rows, publicationVerified, stateText, compact,
           {!compact && (
             <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{authoritativeSummary || formatCoverageSummaryFromRows(rows)}</div>
           )}
-          <SeatGrid rows={rows} compact={compact} paramKey={paramKey} selectedSeatId={selectedSeatId} onSelectSeat={onSelectSeat} />
+          <SeatGrid rows={rows} compact={compact} paramKey={paramKey} selectedSeatId={selectedSeatId} onSelectSeat={onSelectSeat} showSeatLabel={showSeatLabel} />
         </>
       ) : (
         <div className="rounded-md border border-[#DCDBD6] bg-[#F8F8F7] px-3 py-2 text-[11px] text-[#625143]">
@@ -111,6 +120,7 @@ export default function SharedP19P20SeatResults({
   authorityStatus = null,
   p14TargetUnselected = false,
   compact = false,
+  showSeatLabel = false,
 }) {
   const interaction = useGraphInteraction();
   const stateText = stateTextFor(authorityStatus, publicationVerified, p14TargetUnselected);
@@ -132,6 +142,7 @@ export default function SharedP19P20SeatResults({
         publicationVerified={publicationVerified}
         stateText={stateText}
         compact={compact}
+        showSeatLabel={showSeatLabel}
         selectedSeatId={interaction.selectedSeatId}
         onSelectSeat={handleSeatSelect("p20")}
       />

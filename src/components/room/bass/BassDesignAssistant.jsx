@@ -36,7 +36,7 @@ import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards"
 import ChooseDesignTarget from "@/components/room/bass/bda/ChooseDesignTarget";
 import CurrentDesignBar from "@/components/room/bass/bda/CurrentDesignBar";
 import BassPerformanceStrip from "@/components/room/bass/bda/BassPerformanceStrip";
-import PerSeatResults from "@/components/room/bass/bda/PerSeatResults";
+import P20SeatStrip from "@/components/room/bass/bda/P20SeatStrip";
 import RestorePreviousDesignBar from "@/components/room/bass/bda/RestorePreviousDesignBar";
 import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpointAuthority";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -217,7 +217,12 @@ export default function BassDesignAssistant({
               <div className={isPlacementPreview ? "opacity-45" : ""}>
                 <BassPerformanceStrip />
               </div>
-              {/* The graph — visual authority for every RP22 result */}
+              {/* P20 individual seat-consistency results — directly below the
+                  strip. P20 is a seat-consistency parameter, so the headline
+                  and its constituent seat grades are one presentation. */}
+              <P20SeatStrip />
+              {/* The graph — visual authority for every RP22 result.
+                  Contains the RSP / All Seats / individual response selector. */}
               {shared?.authoritative ? (
                 <BassResponse
                   frontSubsCfg={frontSubsCfg}
@@ -231,10 +236,6 @@ export default function BassDesignAssistant({
               )}
             </div>
           </Suspense>
-          {/* Per-seat P19/P20 detail below the graph */}
-          <div className={isPlacementPreview ? "opacity-45" : ""}>
-            <PerSeatResults />
-          </div>
         </div>
       )}
 
