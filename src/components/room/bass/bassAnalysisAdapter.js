@@ -365,7 +365,7 @@ export function adaptCurrentBassOptimisationResult({
   contract.idealHouseTarget = finalResponse?.canonicalTargetCurve || null;
   contract.practicalCalibrationTarget = finalResponse?.practicalCalibrationTarget || null;
   contract.referenceEq = finalResponse?.referenceEq || null;
-  contract.p19TargetIdentity = "reference-eq";
+  contract.p19TargetIdentity = "target-curve";
   contract.achievedP14Db = selectedCandidate?.achievedP14Db ?? null;
   contract.achievedP14Level = selectedCandidate?.achievedP14Level ?? null;
   contract.achievedP18FrequencyHz = selectedCandidate?.achievedP18FrequencyHz ?? null;
@@ -574,11 +574,14 @@ export function adaptCurrentBassOptimisationResult({
       notAssessableReason: p19NotAssessableReason,
     };
   } else {
+    // P19 is RSP-only: max|smoothedRspResponse(f) − T(f)| over the assessment
+    // band. There are no per-seat P19 results to gate on. Readiness requires
+    // the canonical post-EQ RSP curve, the canonical target curve, and finite
+    // official values from the authoritative P19 assessment.
     const p19Ready = optimisationResult?.p19AssessmentReady === true
-      && hasCanonicalSeatResults(selectedCandidate?.perSeatP19Results, realSeatCount)
       && isCanonicalP19Ready({
-        canonicalPostEqRsp: finalResponse?.referenceEq,
-        canonicalTargetCurve: finalResponse?.referenceEq,
+        canonicalPostEqRsp: finalResponse?.canonicalPostEqRsp,
+        canonicalTargetCurve: finalResponse?.canonicalTargetCurve,
         officialVariationDb: authorityP19?.variationDb,
         officialLevel: authorityP19?.level,
       });

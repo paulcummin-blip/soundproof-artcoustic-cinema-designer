@@ -10,7 +10,7 @@ import {
   lowestBassLevel,
 } from "@/components/utils/rp22/bassGradingAuthority";
 
-export const CANONICAL_BASS_RESULT_VERSION = 3;
+export const CANONICAL_BASS_RESULT_VERSION = 4;
 
 function cloneRows(rows) {
   return (Array.isArray(rows) ? rows : []).map((row) => ({ ...row }));
@@ -49,7 +49,8 @@ export function buildCanonicalBassResult(contract, graphPayload = null) {
   const primarySeatIds = contract?.provenance?.primarySeatIds;
   if (!candidate || !parameters || !Array.isArray(primarySeatIds) || !primarySeatIds.length) return null;
 
-  const perSeatP19 = markPrimaryRows(candidate.perSeatP19Results, primarySeatIds);
+  // RP22 P19 is RSP-only. perSeatP19Results is empty — there are no per-seat
+  // P19 grades. The P19 authority is parameters.p19 (RSP vs target curve).
   const perSeatP20 = markPrimaryRows(candidate.perSeatP20Results, primarySeatIds);
   const p19 = parameters.p19 ? { ...parameters.p19 } : null;
   const p20 = primaryAggregate(parameters.p20, perSeatP20);
@@ -61,7 +62,7 @@ export function buildCanonicalBassResult(contract, graphPayload = null) {
     P19: p19,
     P20: p20,
     seatResults: Object.freeze({
-      P19: Object.freeze(perSeatP19),
+      P19: Object.freeze([]),
       P20: Object.freeze(perSeatP20),
     }),
     recommendation: candidate.recommendation || contract.recommendation || null,
@@ -100,9 +101,7 @@ export function validateCanonicalBassResult(contract) {
   if (String(result.candidateId || "") !== String(contract?.selectedCandidateId || "")) {
     return { valid: false, reason: "canonical-bass-result-candidate-mismatch" };
   }
-  if (!sameSeatRows(result?.seatResults?.P19, contract?.selectedCandidate?.perSeatP19Results)) {
-    return { valid: false, reason: "canonical-bass-result-p19-mismatch" };
-  }
+  // P19 is RSP-only — no per-seat P19 rows to validate.
   if (!sameSeatRows(result?.seatResults?.P20, contract?.selectedCandidate?.perSeatP20Results)) {
     return { valid: false, reason: "canonical-bass-result-p20-mismatch" };
   }

@@ -223,12 +223,12 @@ export function buildCanonicalCompletedBassMetricAuthority({
 
   diagnostics.metricPostEqCurveHash = postEqCurveHash;
   diagnostics.metricReferenceEqHash = referenceEqHash;
-  diagnostics.referenceEqParityValid = referenceEqHash === postEqCurveHash;
+  // referenceEq is an alias for canonicalPostEqRsp (the calibrated RSP response).
+  // P19 compares the RSP response against the target curve, not against itself.
+  // The former referenceEqParityValid lock enforced a tautology (referenceEq ===
+  // postEqRsp) and is no longer a rejection gate.
+  diagnostics.referenceEqParityValid = true;
   diagnostics.metricTargetCurveHash = targetCurveHash;
-  if (!diagnostics.referenceEqParityValid) {
-    diagnostics.rejectionReason = "reference-eq-calibrated-rsp-mismatch";
-    return { authority: null, diagnostics };
-  }
   diagnostics.metricCurvePointCount = postEqRsp.length;
   diagnostics.targetCurvePointCount = targetCurve.length;
   diagnostics.legacyMetricCurveDetected = postEqRsp.length === LEGACY_CURVE_LENGTH;
@@ -490,7 +490,7 @@ export function buildCanonicalCompletedBassMetricAuthority({
     p19Input: {
       canonicalPostEqRsp: postEqRsp,
       referenceEq,
-      p19TargetIdentity: "reference-eq",
+      p19TargetIdentity: "target-curve",
       assessmentBand: assessmentBand.valid
         ? { lowerHz: assessmentBand.lowerHz, upperHz: assessmentBand.upperHz }
         : { lowerHz: null, upperHz: null },

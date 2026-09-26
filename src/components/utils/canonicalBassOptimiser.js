@@ -29,7 +29,6 @@ import { assessP18Extension, p18ThresholdHzForLevel } from "@/components/utils/p
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 import {
   computeCorrectableP19Diagnostic,
-  computeOfficialPerSeatP19Assessment,
   computeOfficialP20Assessment,
 } from "@/components/utils/bassAuthoritativeAssessment";
 import { hasPrimarySeatRegression } from "@/components/room/bass/improveBassV2/materialityGate";
@@ -672,17 +671,13 @@ function buildCanonicalCandidate({
       p19Level = p19?.level ?? null;
       p19WorstFrequencyHz = p19?.worstFrequencyHz ?? null;
 
-      const rawPerSeatP19 = computeOfficialPerSeatP19Assessment({
-        perSeatPostEqCurves: candidatePerSeatCurves,
-        referenceEqCurve: finalPost,
-        assessmentStartHz: assessmentBand.lowerHz,
-        assessmentEndHz: assessmentBand.upperHz,
-        protectedNullRegions,
-      });
-      perSeatP19 = rawPerSeatP19.map((seat) => ({
-        ...seat,
-        isPrimary: !!(candidatePerSeatCurves.find((s) => s.seatId === seat.seatId)?.isPrimary),
-      }));
+      // RP22 P19 is RSP-only: max|smoothedRspResponse(f) − T(f)| over the
+      // assessment band. There is no per-seat P19 in RP22. The former
+      // computeOfficialPerSeatP19Assessment produced seat-to-RSP deviations
+      // (P20-style) mislabelled as P19 — it has been removed.
+      // perSeatP19 remains an empty array; P19 per-seat grades, Primary/Secondary
+      // /Project P19 aggregation, and P19 FAIL seats no longer exist.
+      perSeatP19 = [];
 
       const p20 = computeOfficialP20Assessment({
         rspPostEqCurve: finalPost,

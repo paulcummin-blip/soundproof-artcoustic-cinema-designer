@@ -20,6 +20,6 @@
  */
 
 export const INSTANCE_AUTHORITY_VERSION = 4;
-export const BASS_ANALYSIS_CONTRACT_VERSION = 21;
+export const BASS_ANALYSIS_CONTRACT_VERSION = 22;
 export const COMPLETED_BASS_CACHE_VERSION = 14; // v14: compact graph authority persists the canonical correction curve required by the production graph gate.
-export const RP22_BASS_METRIC_SCHEMA_VERSION = 20; // v20: published P19 uses stored Reference EQ. The calibrated RSP and Reference EQ must have identical curve authority; every seat is compared directly with that reference. Older completed authority is rejected and regenerated.
+export const RP22_BASS_METRIC_SCHEMA_VERSION = 21; // v21: P19 is RSP-only (max|smoothedRspResponse − T(f)|). Per-seat P19 removed from RP22 authority — no per-seat P19 grades, no Primary/Secondary/Project P19 floors, no P19 FAIL seats. p19TargetIdentity corrected to "target-curve". Older completed authority is rejected and regenerated.
