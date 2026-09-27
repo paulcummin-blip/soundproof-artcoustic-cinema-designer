@@ -29,11 +29,23 @@ const dirtyProjects = new Set();
 // Tracks the last persistence failure per project so callers/diagnostics can
 // detect that a completed target is NOT durably saved. Cleared on successful write.
 const persistenceFailures = new Map();
+// FIX 2 — Restore target bank lock. When Restore Previous Design restores the
+// 8/8 target bank, a restore lock protects the bank from being wiped by
+// transient baseDesignFingerprint transitions (legacy subwoofers sync) or
+// stale background workers from the moved design. The lock is released by
+// BassBackgroundAnalysisOwner when coherence is observed.
+const restoreLocks = new Map(); // key -> { baseDesignFingerprint, targetCount, bassFingerprint }
+let restoreLockRevision = 0;
 const TARGET_CACHE_WRITE_DEBOUNCE_MS = 2000;
 let cacheRevision = 0;
 
 function notify() {
   cacheRevision += 1;
+  listeners.forEach((l) => l());
+}
+
+function notifyRestoreLock() {
+  restoreLockRevision += 1;
   listeners.forEach((l) => l());
 }
 
@@ -45,6 +57,33 @@ function ensureCache(projectId, versionId) {
     cacheByProject.set(key, { metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, baseDesignFingerprint: null, targets: {} });
   }
   return cacheByProject.get(key);
+}
+
+// ── FIX 2: Restore target bank lock ──────────────────────────────────────
+// Set a restore lock that protects the restored target bank from being wiped
+// by transient baseDesignFingerprint transitions or stale background workers.
+// The lock is released by BassBackgroundAnalysisOwner when coherence is
+// observed (baseDesign matches, completed authority matches, effectiveContract
+// matches, target bank count matches).
+export function setRestoreLock(projectId, versionId, { baseDesignFingerprint, targetCount, bassFingerprint }) {
+  if (!projectId || !versionId || !baseDesignFingerprint) return;
+  const key = projectKey(projectId, versionId);
+  restoreLocks.set(key, { baseDesignFingerprint, targetCount, bassFingerprint });
+  notifyRestoreLock();
+}
+
+export function clearRestoreLock(projectId, versionId) {
+  if (!projectId || !versionId) return;
+  const key = projectKey(projectId, versionId);
+  if (restoreLocks.has(key)) {
+    restoreLocks.delete(key);
+    notifyRestoreLock();
+  }
+}
+
+export function getRestoreLock(projectId, versionId) {
+  if (!projectId || !versionId) return null;
+  return restoreLocks.get(projectKey(projectId, versionId)) || null;
 }
 
 /**
@@ -80,6 +119,12 @@ export function setLimitedTargetCacheEntry(projectId, versionId, baseDesignFinge
   if (!baseDesignFingerprint || !targetKey || !limitedContract) return false;
   if (!isValidLimitedP14Contract(limitedContract)) return false;
   const cache = ensureCache(projectId, versionId);
+  // FIX 2: Restore lock — if a restore lock is active and the incoming
+  // baseDesignFingerprint doesn't match the locked baseDesign, this is a stale
+  // worker from the moved design. Discard it so it cannot overwrite the
+  // restored bank.
+  const lock = getRestoreLock(projectId, versionId);
+  if (lock && lock.baseDesignFingerprint !== baseDesignFingerprint) return false;
   // FIX 1: Defense-in-depth — if the cache has a non-empty bank for a
   // different baseDesign, a stale background worker from a previous design
   // is trying to write. Reject the write instead of wiping the restored bank.
@@ -187,6 +232,12 @@ export function setTargetCacheEntry(projectId, versionId, baseDesignFingerprint,
   // canonical curves and a finite official result remains eligible to retry.
   if (!hasReadyCanonicalP19Contract(compactContract)) return false;
   const cache = ensureCache(projectId, versionId);
+  // FIX 2: Restore lock — if a restore lock is active and the incoming
+  // baseDesignFingerprint doesn't match the locked baseDesign, this is a stale
+  // worker from the moved design. Discard it so it cannot overwrite the
+  // restored bank.
+  const lock = getRestoreLock(projectId, versionId);
+  if (lock && lock.baseDesignFingerprint !== baseDesignFingerprint) return false;
   // FIX 1: Defense-in-depth — if the cache has a non-empty bank for a
   // different baseDesign, a stale background worker from a previous design
   // is trying to write. Reject the write instead of wiping the restored bank.
@@ -216,6 +267,11 @@ export function setTargetCacheEntry(projectId, versionId, baseDesignFingerprint,
  */
 export function clearTargetCacheForDesign(projectId, versionId, baseDesignFingerprint) {
   const cache = ensureCache(projectId, versionId);
+  // FIX 2: Restore lock — do not wipe a non-empty restored bank during a
+  // restore. The lock protects the 8/8 bank from transient baseDesignFingerprint
+  // transitions (legacy subwoofers sync) that would otherwise wipe it to 0/8.
+  const lock = getRestoreLock(projectId, versionId);
+  if (lock && Object.keys(cache.targets).length > 0) return;
   if (cache.metricSchemaVersion === RP22_BASS_METRIC_SCHEMA_VERSION
     && cache.baseDesignFingerprint === baseDesignFingerprint) return;
   cache.metricSchemaVersion = RP22_BASS_METRIC_SCHEMA_VERSION;
@@ -428,8 +484,20 @@ export function _resetTargetCacheForTest() {
   dirtyProjects.clear();
   persistenceFailures.clear();
   writeQueues.clear();
+  restoreLocks.clear();
   cacheRevision = 0;
+  restoreLockRevision = 0;
   notify();
+}
+
+// ── FIX 2: React hook for restore lock subscription ──────────────────────
+export function useRestoreLock(projectId, versionId) {
+  useSyncExternalStore(
+    (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
+    () => restoreLockRevision,
+    () => restoreLockRevision,
+  );
+  return getRestoreLock(projectId, versionId);
 }
 
 // ── React hook for reactive cache reads ──────────────────────────────────

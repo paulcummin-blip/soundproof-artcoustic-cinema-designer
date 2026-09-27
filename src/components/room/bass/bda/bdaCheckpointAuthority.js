@@ -29,6 +29,7 @@ import {
 import {
   getTargetBankSnapshot,
   restoreTargetBankSnapshot,
+  setRestoreLock,
 } from "@/components/room/bass/p14TargetCache";
 import { fireSubwooferDraftReset } from "./subwooferDraftResetStore";
 import {
@@ -132,10 +133,20 @@ export function captureBeforeApply(projectId, versionId, {
   if (!projectId || !versionId || !appState) return false;
 
   // Coherence check — only capture a known-good state.
-  if (!completedBassAuthority?.authoritative) return false;
+  // FIX 1: When the authority is STALE but captureEligible is true (cold-open
+  // with a valid cached target bank and matching baseDesign), allow the
+  // capture. The stale currentFingerprint is from a previous session's move
+  // that was returned; the contract is for the current physical design.
+  const isCaptureEligible = !!completedBassAuthority?.captureEligible;
+  if (!completedBassAuthority?.authoritative && !isCaptureEligible) return false;
   if (!completedBassAuthority?.contract?.job?.resultFingerprint) return false;
   const bassFp = completedBassAuthority.contract.job.resultFingerprint;
-  if (completedBassAuthority.currentFingerprint !== bassFp) return false;
+  // For an AUTHORITATIVE authority, the currentFingerprint must match the
+  // contract fingerprint (the authority is for the current physical design).
+  // For a captureEligible STALE authority, the currentFingerprint is expected
+  // to differ (that's what makes it STALE) — skip this check since the
+  // captureEligible flag already verified the contract's baseDesign matches.
+  if (completedBassAuthority.authoritative && completedBassAuthority.currentFingerprint !== bassFp) return false;
 
   const engineeringFingerprint = computeEngFingerprint(appState);
   if (!engineeringFingerprint) return false;
@@ -332,6 +343,16 @@ export async function restorePreviousDesign(projectId, versionId, {
       checkpoint.baseDesignFingerprint,
       checkpoint.targetBankSnapshot,
     );
+    // FIX 2: Set a restore lock that protects the restored bank from being
+    // wiped by transient baseDesignFingerprint transitions or stale background
+    // workers. The lock is released by BassBackgroundAnalysisOwner when
+    // coherence is observed (baseDesign matches, completed authority matches,
+    // effectiveContract matches, target bank count matches).
+    setRestoreLock(projectId, versionId, {
+      baseDesignFingerprint: checkpoint.baseDesignFingerprint,
+      targetCount: checkpoint.targetBankCount || 0,
+      bassFingerprint: checkpoint.bassFingerprint,
+    });
   }
 
   // STEP E — Verify coherence (FIX 5): the published authority must be

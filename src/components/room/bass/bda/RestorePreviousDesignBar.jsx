@@ -31,6 +31,7 @@ import React, { useState } from "react";
 import { History, Check, RefreshCw, Loader2 } from "lucide-react";
 import { usePreviousDesignCheckpoint, clearCheckpoint } from "./previousDesignCheckpoint";
 import { restorePreviousDesign } from "./bdaCheckpointAuthority";
+import { setRestoring } from "./restoreStateStore";
 
 export default function RestorePreviousDesignBar({
   projectId,
@@ -61,6 +62,10 @@ export default function RestorePreviousDesignBar({
   const handleRestore = async () => {
     if (restoring) return;
     setRestoring(true);
+    // FIX 3: Reflect restoring state into the shared store so
+    // BassBackgroundAnalysisOwner can gate the lifecycle status and suppress
+    // "Performance is current" during the restore operation.
+    setRestoring(projectId, versionId, true);
     setRestoreResult(null);
     try {
       const result = await restorePreviousDesign(projectId, versionId, {
@@ -73,6 +78,7 @@ export default function RestorePreviousDesignBar({
       }
     } finally {
       setRestoring(false);
+      setRestoring(projectId, versionId, false);
     }
   };
 
