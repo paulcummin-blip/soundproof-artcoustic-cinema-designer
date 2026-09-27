@@ -38,7 +38,8 @@ export function hasReadyCanonicalP19Contract(contract) {
         || response?.referenceEq
         || graph?.postEqRspCurve,
       canonicalTargetCurve: response?.canonicalTargetCurve
-        || graph?.canonicalTargetCurve,
+        || graph?.canonicalTargetCurve
+        || graph?.productionHouseCurveTarget,
       officialVariationDb: parameter?.value,
       officialLevel: parameter?.level,
     });

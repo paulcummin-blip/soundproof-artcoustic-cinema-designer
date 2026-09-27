@@ -1659,14 +1659,24 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // At this point cachedContract is null and completedContractMatches is
     // false (both returned early above), so hasPublishedContract means a
     // different-target published contract exists.
-    const hasPublishedDifferentTarget = hasPublishedContract;
+    // A "published different target" is eligible for automatic foreground
+    // calculation ONLY when the published result belongs to the SAME
+    // physical/base design. A physical sub move changes baseDesignFingerprint,
+    // so the old published contract must NOT trigger auto-calculate — that
+    // path belongs to placement preview until the user presses Update Bass
+    // Performance. Legacy contracts without fingerprints.baseDesign are
+    // treated conservatively (not same-design) to avoid reintroducing the
+    // physical-move auto-calculate bug.
+    const hasPublishedDifferentTarget = hasPublishedContract
+      && !!publishedBaseDesign
+      && publishedBaseDesign === baseDesignFingerprint;
     if (scheduler.hasActiveBatchWork() || hasPartialCache || hasPublishedDifferentTarget) {
       const result = onCalculate();
       if (result?.action === "queued") {
         autoCalculatedKeyRef.current = autoKey;
       }
     }
-  }, [isProjectHydrationReady, targetKey, canCalculate, manualAnalysisRequest, calculationInProgress, cachedContract, completedContractMatches, hasPublishedContract, targetFamilyProgress.resolved, targetFamilyProgress.total, baseDesignFingerprint, onCalculate]);
+  }, [isProjectHydrationReady, targetKey, canCalculate, manualAnalysisRequest, calculationInProgress, cachedContract, completedContractMatches, hasPublishedContract, publishedBaseDesign, baseDesignFingerprint, targetFamilyProgress.resolved, targetFamilyProgress.total, onCalculate]);
 
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target
