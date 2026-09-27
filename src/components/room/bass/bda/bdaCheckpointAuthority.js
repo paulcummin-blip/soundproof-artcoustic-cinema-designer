@@ -131,6 +131,7 @@ export function captureBeforeApply(projectId, versionId, {
   includesSeating = false,
 }) {
   // TEMP DIAG (CAPTURE-DIAG) — diagnostic only, no logic change. Remove after diagnosis.
+  const _eligibilityDebug = completedBassAuthority?.captureEligibilityDebug || null;
   const _diag = {
     projectIdPresent: !!projectId,
     versionIdPresent: !!versionId,
@@ -147,6 +148,7 @@ export function captureBeforeApply(projectId, versionId, {
       && completedBassAuthority.currentFingerprint === completedBassAuthority.contract.job.resultFingerprint,
     contractBaseDesign: completedBassAuthority?.contract?.fingerprints?.baseDesign || null,
     hasEngineeringFingerprint: false,
+    captureEligibilityDebug: _eligibilityDebug,
   };
 
   if (!projectId || !versionId || !appState) {
@@ -163,11 +165,24 @@ export function captureBeforeApply(projectId, versionId, {
   const isCaptureEligible = !!completedBassAuthority?.captureEligible;
   if (!completedBassAuthority?.authoritative && !isCaptureEligible) {
     _diag.reason = '!authoritative && !captureEligible';
+    _diag.failedGuard = 'captureEligible';
+    if (_eligibilityDebug) {
+      const failedConditions = [];
+      if (!_eligibilityDebug.visibleCachedContractExists) failedConditions.push('visibleCachedContractExists');
+      if (!_eligibilityDebug.visibleCachedContractAuthoritative) failedConditions.push('visibleCachedContractAuthoritative');
+      if (!_eligibilityDebug.resultFingerprintMatchesCacheKey) failedConditions.push('resultFingerprintMatchesCacheKey');
+      if (!_eligibilityDebug.baseDesignMatches) failedConditions.push('baseDesignMatches');
+      if (_eligibilityDebug.calculationInProgress) failedConditions.push('calculationInProgress');
+      if (_eligibilityDebug.manualAnalysisRequest) failedConditions.push('manualAnalysisRequest');
+      if (_eligibilityDebug.placementPreviewActive) failedConditions.push('placementPreviewActive');
+      _diag.failedConditions = failedConditions;
+    }
     if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
     return false;
   }
   if (!completedBassAuthority?.contract?.job?.resultFingerprint) {
     _diag.reason = 'no contract.job.resultFingerprint';
+    _diag.failedGuard = 'contract.resultFingerprint';
     if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
     return false;
   }
@@ -179,6 +194,7 @@ export function captureBeforeApply(projectId, versionId, {
   // captureEligible flag already verified the contract's baseDesign matches.
   if (completedBassAuthority.authoritative && completedBassAuthority.currentFingerprint !== bassFp) {
     _diag.reason = 'authoritative && currentFingerprint !== contractResultFingerprint';
+    _diag.failedGuard = 'authoritative.currentFingerprintMatch';
     if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
     return false;
   }
@@ -187,6 +203,7 @@ export function captureBeforeApply(projectId, versionId, {
   _diag.hasEngineeringFingerprint = !!engineeringFingerprint;
   if (!engineeringFingerprint) {
     _diag.reason = 'no engineeringFingerprint';
+    _diag.failedGuard = 'engineeringFingerprint';
     if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
     return false;
   }

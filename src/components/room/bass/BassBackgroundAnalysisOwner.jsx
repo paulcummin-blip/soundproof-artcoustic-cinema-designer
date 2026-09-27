@@ -2023,6 +2023,29 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && !manualAnalysisRequest
     && !placementPreviewActive;
   const captureEligible = cachedContractCaptureEligible || !!completedBassAuthority?.authoritative;
+  // TEMP DIAG (CAPTURE-DIAG) — diagnostic only, no logic change. Remove after diagnosis.
+  const captureEligibilityDebug = {
+    visibleCachedContractExists: !!visibleCachedContract,
+    visibleCachedContractAuthoritative: !!visibleCachedContract && isAuthoritativeBassContract(visibleCachedContract),
+    visibleCachedContractLimited: !!visibleCachedContract && isValidLimitedP14Contract(visibleCachedContract),
+    visibleCachedContractResultFingerprint: visibleCachedContract?.job?.resultFingerprint || null,
+    cacheKey: cacheKey || null,
+    resultFingerprintMatchesCacheKey: !!visibleCachedContract?.job?.resultFingerprint && !!cacheKey && visibleCachedContract.job.resultFingerprint === cacheKey,
+    visibleCachedContractBaseDesign: visibleCachedContract?.fingerprints?.baseDesign || null,
+    baseDesignFingerprint: baseDesignFingerprint || null,
+    baseDesignMatches: !!visibleCachedContract?.fingerprints?.baseDesign && !!baseDesignFingerprint && visibleCachedContract.fingerprints.baseDesign === baseDesignFingerprint,
+    calculationInProgress: !!calculationInProgress,
+    manualAnalysisRequest: !!manualAnalysisRequest,
+    placementPreviewActive: !!placementPreviewActive,
+    publishedContractIsStale: !!publishedContractIsStale,
+    publishedBaseDesign: publishedBaseDesign || null,
+    completedBassAuthorityAuthoritative: !!completedBassAuthority?.authoritative,
+    completedBassAuthorityStatus: completedBassAuthority?.authorityStatus || null,
+    completedBassAuthorityCurrentFingerprint: completedBassAuthority?.currentFingerprint || null,
+    completedBassAuthorityContractResultFingerprint: completedBassAuthority?.contract?.job?.resultFingerprint || null,
+    cachedContractCaptureEligible: !!cachedContractCaptureEligible,
+    captureEligible: !!captureEligible,
+  };
   // When capture eligibility is proven by the cached contract, supply the
   // matching contract and fingerprint so captureBeforeApply has a valid
   // resultFingerprint to checkpoint against — even if the raw authority is
@@ -2047,11 +2070,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         structurallyComplete: true,
         exportable: true,
         captureEligible,
+        captureEligibilityDebug,
       }
     : {
         ...completedBassAuthority,
         ...captureOverlay,
         captureEligible,
+        captureEligibilityDebug,
       };
   const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, placementPreviewActive, placementPreviewResult });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
