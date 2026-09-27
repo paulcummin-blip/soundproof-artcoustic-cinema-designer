@@ -247,6 +247,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     if (targetAchievable === false) {
       // P14 FAIL — strict: show FAIL, not a downgraded level. Available max
       // is shown so the designer knows what the system can actually achieve.
+      detailParts.push("Target not achieved");
       if (isFiniteNumber(availableCapabilityDb)) detailParts.push(`Available: ${formatP14Capability(availableCapabilityDb)}`);
       pills.p14 = {
         label: "P14 Bass SPL",
@@ -304,7 +305,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     // P14 FAIL (or LIMITED) → P18 FAIL. Internally P18 was not evaluated because
     // the selected P14 operating target is unattainable; the dealer-facing
     // pill shows strict FAIL, not "Not evaluated".
-    pills.p18 = { label: "P18 Extension", resultText: "FAIL", text: "P18 Extension FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null, stale: isStale };
+    pills.p18 = { label: "P18 Extension", resultText: "FAIL", text: "P18 Extension FAIL", level: "FAIL", detail: "P14 target not achieved", stale: isStale };
   } else {
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
@@ -330,7 +331,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       pills.p19 = { label: "P19 Response Fit", resultText: "—", text: "P19 Response Fit —", level: "—", stale: isStale };
     }
   } else if (p14Failed) {
-    pills.p19 = { label: "P19 Response Fit", resultText: "FAIL", text: "P19 Response Fit FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null, stale: isStale };
+    pills.p19 = { label: "P19 Response Fit", resultText: "FAIL", text: "P19 Response Fit FAIL", level: "FAIL", detail: "P14 target not achieved", stale: isStale };
   } else if (isCalculating && !hasPublishedResult) {
     pills.p19 = { label: "P19 Response Fit", resultText: "Calculating…", text: "P19 Response Fit Calculating…", level: "—" };
   } else {
@@ -357,7 +358,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       stale: isStale,
     };
   } else if (p14Failed) {
-    pills.p20 = { label: "P20 Seat Consistency", resultText: "FAIL", text: "P20 Seat Consistency FAIL", level: "FAIL", detail: isLimited ? "Not evaluated — P14 target unattainable" : null, stale: isStale };
+    pills.p20 = { label: "P20 Seat Consistency", resultText: "FAIL", text: "P20 Seat Consistency FAIL", level: "FAIL", detail: "P14 target not achieved", stale: isStale };
   } else if (isCalculating && !hasPublishedResult) {
     pills.p20 = { label: "P20 Seat Consistency", resultText: "Calculating…", text: "P20 Seat Consistency Calculating…", level: "—" };
   } else {
