@@ -239,13 +239,19 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const hasPublishedContract = isAuthoritativeBassContract(completedContract)
     && !!completedFingerprint
     && hasGraphPayload(completedContract);
-  // publishedContractIsStale: the live fingerprint differs from the published
-  // contract's fingerprint — the design changed and recalculation is needed.
-  // The published contract remains visible (restoration) until the new
-  // calculation replaces it.
+  // publishedContractIsStale: the PHYSICAL/base design changed and
+  // recalculation is needed. This must NOT fire merely because the P14 target
+  // changed — a target-only switch changes the calibration/result fingerprint
+  // but not the physical design. The published contract carries its
+  // baseDesign fingerprint at publication time; compare that against the
+  // current baseDesignFingerprint. Old contracts without baseDesign fall back
+  // to the target-specific comparison (preserves existing behaviour).
+  const publishedBaseDesign = completedContract?.fingerprints?.baseDesign || null;
   const publishedContractIsStale = hasPublishedContract
     && !!cacheKey
-    && completedFingerprint !== cacheKey;
+    && (publishedBaseDesign
+      ? publishedBaseDesign !== baseDesignFingerprint
+      : completedFingerprint !== cacheKey);
 
   // PASS 2: manualRequestMatchesCurrent no longer depends on the normalized
   // transfer fingerprint. The cacheKey (full calibration fingerprint) captures
@@ -462,12 +468,20 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       cancelBassHeavyAction(scopeId, versionId, "Design changed — request cancelled.");
     }
 
-    if (
-      bassAuthorityHydrationSettled
-      && cacheKey
-      && completedBassAuthority?.currentFingerprint
-      && completedBassAuthority.currentFingerprint !== cacheKey
-    ) {
+    // Physical-stale authority: mark stale ONLY when the physical/base design
+    // changed. A P14-only target change must NOT mark the authority stale —
+    // the previous result is for a different target but the same physical
+    // design. Compare the published contract's baseDesign fingerprint against
+    // the current baseDesignFingerprint. Old contracts without baseDesign fall
+    // back to the target-specific comparison (preserves existing behaviour).
+    const observedBaseDesign = completedBassAuthority?.contract?.fingerprints?.baseDesign || null;
+    const physicalDesignChanged = bassAuthorityHydrationSettled
+      && !!baseDesignFingerprint
+      && (observedBaseDesign
+        ? observedBaseDesign !== baseDesignFingerprint
+        : (!!completedBassAuthority?.currentFingerprint
+          && completedBassAuthority.currentFingerprint !== cacheKey));
+    if (physicalDesignChanged) {
       if (completedBassAuthority.contract) {
         markBassAuthorityStale(scopeId, versionId, cacheKey);
       } else {
@@ -1638,13 +1652,21 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // a. Scheduler is running OR b. partial cache on reopen
     const hasPartialCache = targetFamilyProgress.resolved > 0
       && targetFamilyProgress.resolved < targetFamilyProgress.total;
-    if (scheduler.hasActiveBatchWork() || hasPartialCache) {
+    // A published contract for a DIFFERENT target proves the physical design
+    // is calculable. When the selected target is missing (not cached, no
+    // matching completed contract), start a foreground calculation
+    // immediately — do not require a partial cache or an active scheduler.
+    // At this point cachedContract is null and completedContractMatches is
+    // false (both returned early above), so hasPublishedContract means a
+    // different-target published contract exists.
+    const hasPublishedDifferentTarget = hasPublishedContract;
+    if (scheduler.hasActiveBatchWork() || hasPartialCache || hasPublishedDifferentTarget) {
       const result = onCalculate();
       if (result?.action === "queued") {
         autoCalculatedKeyRef.current = autoKey;
       }
     }
-  }, [isProjectHydrationReady, targetKey, canCalculate, manualAnalysisRequest, calculationInProgress, cachedContract, completedContractMatches, targetFamilyProgress.resolved, targetFamilyProgress.total, baseDesignFingerprint, onCalculate]);
+  }, [isProjectHydrationReady, targetKey, canCalculate, manualAnalysisRequest, calculationInProgress, cachedContract, completedContractMatches, hasPublishedContract, targetFamilyProgress.resolved, targetFamilyProgress.total, baseDesignFingerprint, onCalculate]);
 
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target

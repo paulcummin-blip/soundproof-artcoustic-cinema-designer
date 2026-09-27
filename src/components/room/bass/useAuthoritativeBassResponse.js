@@ -7,6 +7,7 @@ import { simulateAuthoritativeBassResponse } from "./authoritativeBassResponseEn
 export { simulateAuthoritativeBassResponse } from "./authoritativeBassResponseEngine";
 import { ARTCOUSTIC_HOUSE_CURVE } from "@/components/utils/artcousticHouseCurve";
 import { computeCalibrationFingerprint, computeGeometryFingerprint, computeHouseCurveFingerprint, computeProductFingerprint } from "./bassAnalysisFingerprints";
+import { computeBaseDesignFingerprint } from "./p14TargetDefinitions";
 import { getCachedRoomPhysics, setCachedRoomPhysics } from "./roomPhysicsCache";
 import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import {
@@ -525,6 +526,11 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       geometry: computeGeometryFingerprint(fingerprintInputs),
       product: computeProductFingerprint(fingerprintInputs),
       calibration: computeCalibrationFingerprint(fingerprintInputs),
+      // Base design fingerprint excludes P14 target identity so all 8 targets
+      // share the same physical identity. Carried on the contract so placement
+      // preview and physical-stale authority compare physical design, not
+      // target-specific result identity.
+      baseDesign: computeBaseDesignFingerprint(fingerprintInputs),
     };
   }, [fingerprintInputs, analysisBlocked]);
   const payload = useMemo(() => ({ rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, perSeatRawCurves, selectedP14TargetDb: requested.selectedP14TargetDb, p14TargetBasis: requested.p14TargetBasis, p14TargetLevel: requested.requestedLevel, p18TargetBasis: requested.p18TargetBasis, selectedP18RequiredExtensionHz: requested.selectedP18RequiredExtensionHz }), [rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, perSeatRawCurves, requested.selectedP14TargetDb, requested.p14TargetBasis, requested.requestedLevel, requested.p18TargetBasis, requested.selectedP18RequiredExtensionHz]);

@@ -304,6 +304,11 @@ export function adaptCurrentBassOptimisationResult({
     if (isValidFingerprint(fingerprints.calibration)) {
       contract.fingerprints.calibration = fingerprints.calibration;
     }
+    // Base design fingerprint is a composite format (cal:v8:hash|rs:N) that
+    // isValidFingerprint rejects, so copy it as a plain non-empty string.
+    if (typeof fingerprints.baseDesign === "string" && fingerprints.baseDesign.length > 0) {
+      contract.fingerprints.baseDesign = fingerprints.baseDesign;
+    }
   }
 
   const hasResult = !!optimisationResult && !!optimisationResult.selectedCandidate;

@@ -187,6 +187,7 @@ export function createBassAnalysisResult() {
       geometry: null,
       product: null,
       calibration: null,
+      baseDesign: null,
     },
 
     job: {
