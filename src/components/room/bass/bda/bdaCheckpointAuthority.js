@@ -130,7 +130,30 @@ export function captureBeforeApply(projectId, versionId, {
   completedBassAuthority,
   includesSeating = false,
 }) {
-  if (!projectId || !versionId || !appState) return false;
+  // TEMP DIAG (CAPTURE-DIAG) — diagnostic only, no logic change. Remove after diagnosis.
+  const _diag = {
+    projectIdPresent: !!projectId,
+    versionIdPresent: !!versionId,
+    hasAppState: !!appState,
+    authoritative: !!completedBassAuthority?.authoritative,
+    captureEligible: !!completedBassAuthority?.captureEligible,
+    authorityStatus: completedBassAuthority?.authorityStatus || null,
+    hasContract: !!completedBassAuthority?.contract?.job?.resultFingerprint,
+    currentFingerprint: completedBassAuthority?.currentFingerprint || null,
+    contractResultFingerprint: completedBassAuthority?.contract?.job?.resultFingerprint || null,
+    currentFingerprintMatchesContract:
+      !!completedBassAuthority?.currentFingerprint
+      && !!completedBassAuthority?.contract?.job?.resultFingerprint
+      && completedBassAuthority.currentFingerprint === completedBassAuthority.contract.job.resultFingerprint,
+    contractBaseDesign: completedBassAuthority?.contract?.fingerprints?.baseDesign || null,
+    hasEngineeringFingerprint: false,
+  };
+
+  if (!projectId || !versionId || !appState) {
+    _diag.reason = 'missing projectId/versionId/appState';
+    if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
+    return false;
+  }
 
   // Coherence check — only capture a known-good state.
   // FIX 1: When the authority is STALE but captureEligible is true (cold-open
@@ -138,23 +161,40 @@ export function captureBeforeApply(projectId, versionId, {
   // capture. The stale currentFingerprint is from a previous session's move
   // that was returned; the contract is for the current physical design.
   const isCaptureEligible = !!completedBassAuthority?.captureEligible;
-  if (!completedBassAuthority?.authoritative && !isCaptureEligible) return false;
-  if (!completedBassAuthority?.contract?.job?.resultFingerprint) return false;
+  if (!completedBassAuthority?.authoritative && !isCaptureEligible) {
+    _diag.reason = '!authoritative && !captureEligible';
+    if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
+    return false;
+  }
+  if (!completedBassAuthority?.contract?.job?.resultFingerprint) {
+    _diag.reason = 'no contract.job.resultFingerprint';
+    if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
+    return false;
+  }
   const bassFp = completedBassAuthority.contract.job.resultFingerprint;
   // For an AUTHORITATIVE authority, the currentFingerprint must match the
   // contract fingerprint (the authority is for the current physical design).
   // For a captureEligible STALE authority, the currentFingerprint is expected
   // to differ (that's what makes it STALE) — skip this check since the
   // captureEligible flag already verified the contract's baseDesign matches.
-  if (completedBassAuthority.authoritative && completedBassAuthority.currentFingerprint !== bassFp) return false;
+  if (completedBassAuthority.authoritative && completedBassAuthority.currentFingerprint !== bassFp) {
+    _diag.reason = 'authoritative && currentFingerprint !== contractResultFingerprint';
+    if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
+    return false;
+  }
 
   const engineeringFingerprint = computeEngFingerprint(appState);
-  if (!engineeringFingerprint) return false;
+  _diag.hasEngineeringFingerprint = !!engineeringFingerprint;
+  if (!engineeringFingerprint) {
+    _diag.reason = 'no engineeringFingerprint';
+    if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
+    return false;
+  }
 
   // Fix 2: capture the target bank snapshot alongside the physical design so
   // restore can recover 8/8 targets without a full background recalculation.
   const targetBank = getTargetBankSnapshot(projectId, versionId);
-  return captureCheckpoint(projectId, versionId, {
+  const _captured = captureCheckpoint(projectId, versionId, {
     subwooferInstances: appState.subwooferInstances,
     seatingPositions: appState.seatingPositions,
     bassFingerprint: bassFp,
@@ -164,6 +204,10 @@ export function captureBeforeApply(projectId, versionId, {
     targetBankSnapshot: targetBank?.targets || null,
     targetBankCount: targetBank?.count || 0,
   });
+  if (typeof console !== 'undefined' && console.log) {
+    console.log('[CAPTURE-DIAG] success', { ..._diag, captured: !!_captured, targetBankCount: targetBank?.count || 0 });
+  }
+  return _captured;
 }
 
 // ── Restore ────────────────────────────────────────────────────────────────
