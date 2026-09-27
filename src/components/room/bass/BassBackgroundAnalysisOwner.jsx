@@ -12,7 +12,7 @@ import { resolveBassLifecycleState, BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, B
 import { useOptimiseWorkflowState } from "./optimiseWorkflow/optimiseWorkflowStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
-import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence, useRestoreLock, clearRestoreLock } from "./p14TargetCache";
+import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence, useRestoreLock, clearRestoreLock, getRestoreLock } from "./p14TargetCache";
 import { useIsRestoring, setRestoring } from "./bda/restoreStateStore";
 import { beginP14AnalysisJob, publishP14AnalysisProgress, getP14AnalysisProgress } from "./p14AnalysisProgressStore";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
@@ -1152,13 +1152,23 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         && completedBassAuthority?.authoritative
         && completedBassAuthority?.currentFingerprint === cacheKey
       ) {
-        const restoredContract = getCompletedBassContract(scopeId, versionId);
-        if (
-          restoredContract
-          && isAuthoritativeBassContract(restoredContract)
-          && bassContractMatchesRequestedP14(restoredContract, requested)
-        ) {
-          setTargetCacheEntry(scopeId, versionId, baseDesignFingerprint, targetKey, restoredContract, { immediate: true });
+        // FIX 2: Restore lock — do NOT seed a single foreground target over a
+        // restored 8/8 bank. When a restore lock is active, the restored bank
+        // is the authority; cachedContract may be transiently null during
+        // hydration/baseDesign settlement, but that is NOT permission to wipe
+        // the restored bank to 1/8. setTargetCacheEntry would wipe all targets
+        // if the cache's baseDesign differs from the current one, persisting
+        // 1/8 and destroying the restored 8/8.
+        const activeRestoreLock = getRestoreLock(scopeId, versionId);
+        if (!activeRestoreLock) {
+          const restoredContract = getCompletedBassContract(scopeId, versionId);
+          if (
+            restoredContract
+            && isAuthoritativeBassContract(restoredContract)
+            && bassContractMatchesRequestedP14(restoredContract, requested)
+          ) {
+            setTargetCacheEntry(scopeId, versionId, baseDesignFingerprint, targetKey, restoredContract, { immediate: true });
+          }
         }
       }
       return;
@@ -1971,20 +1981,19 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     ? BASS_LIFECYCLE_STATE.RESTORING
     : bassLifecycleStateRaw;
 
-  // FIX 4 — Clear the shared restoring state once the target bank becomes
-  // complete. This handles the edge case where Restore Previous Design could
-  // not restore the bank from snapshot or DB (bankRestored=false), leaving
-  // the restoring state active. When the background scheduler rebuilds the
-  // bank to full readiness, this effect clears the restoring state so the
-  // lifecycle transitions from "Restoring previous design…" to the normal
-  // state.
-  useEffect(() => {
-    if (!restoringActive) return;
-    if (targetFamilyProgress.total > 0
-      && targetFamilyProgress.ready >= targetFamilyProgress.total) {
-      setRestoring(scopeId, versionId, false);
-    }
-  }, [restoringActive, targetFamilyProgress.ready, targetFamilyProgress.total, scopeId, versionId]);
+  // FIX 3 — The restoring state is now cleared exclusively by the restore
+  // transaction owner (RestorePreviousDesignBar.handleRestore finally block)
+  // when restorePreviousDesign returns. The previous effect cleared
+  // restoringActive based solely on targetFamilyProgress.ready >= total,
+  // but restoreTargetBankSnapshot briefly makes progress 8/8 BEFORE
+  // restorePreviousDesign has finished (it is still awaiting hydrateTargetCache).
+  // That premature clear caused "Performance is current" to appear while
+  // "Restoring previous design…" was still visible. The transaction owner is
+  // the only authority that knows when the restore is truly complete.
+  // If the bank could not be restored (bankRestored=false), the owner keeps
+  // restoringActive active; the background scheduler will rebuild the bank
+  // and the normal lifecycle transitions will take over once coherence is
+  // observed via the restore-lock release effect.
   const terminalMessage = coldReloadRecovered && !calculationInProgress
     ? BASS_COLD_RELOAD_RECOVERY_COPY
     : bassLifecycleState === BASS_LIFECYCLE_STATE.TIMED_OUT

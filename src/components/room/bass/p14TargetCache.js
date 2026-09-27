@@ -347,6 +347,18 @@ export async function hydrateTargetCache(projectId, versionId) {
       notify();
       return;
     }
+    // FIX 1: Restore lock — do NOT overwrite the in-memory cache if a restore
+    // lock is active and the DB's baseDesignFingerprint doesn't match the
+    // locked baseDesign. restoreTargetBankSnapshot just wrote the restored
+    // 8/8 bank into memory; a stale DB bank (from a previous bridge-effect
+    // cycle or a moved design) must not win over the just-restored checkpoint
+    // bank. The restored in-memory 8/8 is the authority during the restore
+    // transaction; scheduleSync from restoreTargetBankSnapshot will update
+    // the DB to the restored 8/8.
+    const lock = getRestoreLock(projectId, versionId);
+    if (lock && lock.baseDesignFingerprint && stored.baseDesignFingerprint !== lock.baseDesignFingerprint) {
+      return;
+    }
     cacheByProject.set(key, {
       metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
       baseDesignFingerprint: stored.baseDesignFingerprint,
