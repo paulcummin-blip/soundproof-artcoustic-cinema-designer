@@ -259,14 +259,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // changed — a target-only switch changes the calibration/result fingerprint
   // but not the physical design. The published contract carries its
   // baseDesign fingerprint at publication time; compare that against the
-  // current baseDesignFingerprint. Old contracts without baseDesign fall back
-  // to the target-specific comparison (preserves existing behaviour).
+  // current baseDesignFingerprint. Legacy contracts without baseDesign fail
+  // safe — no placement preview is inferred from target-specific fingerprints.
   const publishedBaseDesign = completedContract?.fingerprints?.baseDesign || null;
   const publishedContractIsStale = hasPublishedContract
     && !!cacheKey
-    && (publishedBaseDesign
-      ? publishedBaseDesign !== baseDesignFingerprint
-      : completedFingerprint !== cacheKey);
+    && !!publishedBaseDesign
+    && !!baseDesignFingerprint
+    && publishedBaseDesign !== baseDesignFingerprint;
 
   // PASS 2: manualRequestMatchesCurrent no longer depends on the normalized
   // transfer fingerprint. The cacheKey (full calibration fingerprint) captures
