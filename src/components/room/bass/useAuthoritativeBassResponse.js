@@ -167,7 +167,7 @@ export function buildAuthoritativeResponseCurves(seatResponses) {
   };
 }
 
-export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubsLive, analysisRequestId = null, analysisRequestFingerprint = null }) {
+export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubsLive, analysisRequestId = null, analysisRequestFingerprint = null, backgroundPrepFingerprint = null }) {
   const roomDims = appState?.roomDims;
   const seatingPositions = appState?.seatingPositions || [];
   const frontSubsCfg = appState?.frontSubsCfg;
@@ -302,7 +302,16 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     // NOT invalidate room physics — only geometry changes do. The gate uses
     // the geometry fingerprint so that a P14-only change reuses the cached
     // room response and only re-runs the optimiser.
-    if (!analysisRequestId || !analysisRequestFingerprint || analysisRequestFingerprint !== fingerprints?.geometry) {
+    // Allow the authoritative room simulation to run for EITHER a manual
+    // calculation request (analysisRequestId + matching geometry fingerprint)
+    // OR a background physics-prep request (backgroundPrepFingerprint matching
+    // geometry). Background prep populates rspRawCurve / perSourceRspComplexTransfers
+    // on cold restore so the P14 target scheduler can resume without requiring
+    // the user to press Calculate. Room physics is geometry-dependent only —
+    // the flat 94 dB source means the transfer functions are model-independent.
+    const hasManualRequest = !!analysisRequestId && !!analysisRequestFingerprint && analysisRequestFingerprint === fingerprints?.geometry;
+    const hasBackgroundPrep = !!backgroundPrepFingerprint && backgroundPrepFingerprint === fingerprints?.geometry;
+    if (!hasManualRequest && !hasBackgroundPrep) {
       setSimulationState({ request: null, status: "idle", result: null, error: null });
       return undefined;
     }
@@ -443,7 +452,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       }
       // ── END INSTRUMENTATION ──────────────────────────────────────────────
     };
-  }, [analysisBlocked, simulationRequest, runSimulation, qStrategy, analysisRequestId, analysisRequestFingerprint]);
+  }, [analysisBlocked, simulationRequest, runSimulation, qStrategy, analysisRequestId, analysisRequestFingerprint, backgroundPrepFingerprint]);
   const simulationReady = simulationState.request === simulationRequest
     && simulationState.status === "complete"
     && !!simulationState.result;
@@ -540,10 +549,12 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     : simulationState.request === simulationRequest && simulationState.status === "error"
       ? simulationState.error || "authoritative_simulation_error"
       : null;
+  const hasManualRequest = !!analysisRequestId && !!analysisRequestFingerprint && analysisRequestFingerprint === fingerprints?.geometry;
+  const hasBackgroundPrep = !!backgroundPrepFingerprint && backgroundPrepFingerprint === fingerprints?.geometry;
   const responseStatus = analysisBlocked
     ? "blocked"
     : blockedReason ? "error"
-      : !analysisRequestId || analysisRequestFingerprint !== fingerprints?.geometry
+      : (!hasManualRequest && !hasBackgroundPrep)
         ? "idle"
         : simulationReady ? "ready" : "calculating";
 

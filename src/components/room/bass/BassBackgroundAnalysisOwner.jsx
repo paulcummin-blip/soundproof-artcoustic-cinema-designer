@@ -16,6 +16,7 @@ import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign,
 import { beginP14AnalysisJob, publishP14AnalysisProgress, getP14AnalysisProgress } from "./p14AnalysisProgressStore";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
 import { isBackgroundInputsReady } from "./backgroundInputReadiness";
+import { safeConsole } from "@/components/utils/safeConsole";
 import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from "@/components/room/rsp/screenGeometryResolver";
 import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 import { summariseAuthoritativeP19Seats } from "./p19SeatAuthority";
@@ -81,6 +82,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       window.removeEventListener("b44-bass-drag-end", onEnd);
     };
   }, []);
+  // Background room-physics preparation fingerprint. On cold restore, the
+  // authoritative simulation only runs for a manual calculation request, so
+  // rspRawCurve is empty and backgroundInputsReady is false — the P14 target
+  // scheduler never resumes. This state feeds a background-prep fingerprint
+  // back to useAuthoritativeBassResponse on the next render (one-render delay,
+  // same pattern as placementPreviewFp) so the hook prepares room physics
+  // without requiring the user to press Calculate. Set by the effect below.
+  const [backgroundPrepFingerprint, setBackgroundPrepFingerprint] = useState(null);
   const retainedController = controllerRef.current;
   if (!retainedController
     || typeof retainedController.ensureProtocolCompatibility !== "function"
@@ -106,6 +115,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // analysisRequestFingerprint === fingerprints.geometry, so a P14-only
     // change reuses the cached room response.
     analysisRequestFingerprint: manualAnalysisRequest?.geometryFingerprint || null,
+    // Background room-physics preparation: when set, the hook runs the
+    // authoritative simulation without a manual calculation request so
+    // rspRawCurve / perSourceRspComplexTransfers populate on cold restore.
+    backgroundPrepFingerprint,
   });
   const {
     roomDims, seatingPositions, rspPosition, sources, rspRawCurve, perSeatRawCurves,
@@ -1279,6 +1292,32 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       // If the contract was structurally complete but publication returned
       // false, it is NOT_VERIFIED — terminal rejected.
       if (jobComplete && isStructurallyCompleteBassContract(contract)) {
+        // DIAGNOSTIC: log the exact foreground publication rejection reason.
+        // The existing p14-cache-reject diagnostic only fires inside
+        // setTargetCacheEntry, which is never reached when publication fails
+        // before cache insertion. This diagnostic captures the rejection at
+        // the publication point. Diagnostic ONLY — does not bypass the
+        // rejection, does not change the publication result.
+        try {
+          const pub = contract?.metricPublication;
+          safeConsole.warn("p14-publish-reject", JSON.stringify({
+            projectId: scopeId,
+            versionId,
+            targetKey,
+            baseDesignFingerprint,
+            requestedP14Basis: requested.p14TargetBasis,
+            requestedP14Level: requested.requestedLevel,
+            requestedP14TargetDb: requested.selectedP14TargetDb,
+            mpValid: pub?.canonicalMetricPublicationValid ?? null,
+            mpAuthorityValid: pub?.canonicalMetricAuthorityValid ?? null,
+            mpGraphParityValid: pub?.graphMetricParityValid ?? null,
+            mpRejectionReason: pub?.publicationRejectionReason || null,
+            canonicalDiagRejectionReason: contract?.canonicalMetricDiagnostics?.rejectionReason || null,
+            workerFingerprint: matchingResult?.fingerprint || null,
+            calibrationFingerprint,
+            resultFingerprint: contract?.job?.resultFingerprint || null,
+          }));
+        } catch { /* diagnostic must never break the rejection path */ }
         if (timingTraceRef.current && timingTraceRef.current.trace.publicationMs === null) {
           timingTraceRef.current.mark("publicationMs");
         }
@@ -1476,6 +1515,42 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && !!completedBassAuthority?.authoritative
     && completedBassAuthority?.currentFingerprint === cacheKey;
   const foregroundReady = foregroundReadyPathA || foregroundReadyPathB;
+
+  // ── Background room-physics preparation ──────────────────────────────
+  // On cold restore, rspRawCurve is empty because the authoritative
+  // simulation only runs for a manual calculation request. The background
+  // scheduler needs rspRawCurve to start (backgroundInputsReady gate), so
+  // without preparation the scheduler never resumes and the target bank
+  // stays partial (e.g. 2/8).
+  //
+  // This effect requests background room-physics preparation from the
+  // authoritative hook when:
+  //   - the foreground target is ready (restored/cached result is valid)
+  //   - no manual calculation is in progress
+  //   - no higher-priority work is active (drag, heavy action, stage2, recs)
+  //   - the target bank is incomplete (missing targets exist)
+  //   - the design is not in placement preview (physical move)
+  //
+  // The hook reuses the existing room-physics cache and worker path — no
+  // second solver. The prepared rspRawCurve populates backgroundInputsReady
+  // and the existing background scheduler auto-starts for missing targets.
+  // One-render delay: backgroundPrepFingerprint is fed back to the hook on
+  // the next render (same pattern as placementPreviewFp). The hook compares
+  // it to its own fingerprints.geometry and runs the simulation if they match.
+  useEffect(() => {
+    const shouldPrep = foregroundReady
+      && !manualAnalysisRequest
+      && !isDragging
+      && !placementPreviewActive
+      && !heavyActionRunning
+      && !stage2Updating
+      && !recommendationsActive
+      && !!geometryFingerprint
+      && sources.length > 0
+      && targetFamilyProgress.total > 0
+      && targetFamilyProgress.resolved < targetFamilyProgress.total;
+    setBackgroundPrepFingerprint(shouldPrep ? geometryFingerprint : null);
+  }, [foregroundReady, manualAnalysisRequest, isDragging, placementPreviewActive, heavyActionRunning, stage2Updating, recommendationsActive, geometryFingerprint, sources.length, targetFamilyProgress.total, targetFamilyProgress.resolved]);
 
   // Publish one shared, non-acoustic lifecycle snapshot for the P14 selector
   // and Stage 2 gate. Counts come only from verified target-cache entries.
