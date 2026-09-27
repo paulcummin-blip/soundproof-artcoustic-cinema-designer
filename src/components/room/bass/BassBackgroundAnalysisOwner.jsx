@@ -1947,6 +1947,34 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const placementPreviewResult = placementPreviewActive && normalizedLive.status === "ready" && normalizedLive.result
     ? normalizedLive.result
     : null;
-  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, placementPreviewActive, placementPreviewResult });
+  // ── Presentation-only display authority overlay ──────────────────────
+  // On a cached P14 target switch, visibleCachedContract (and thus
+  // effectiveContract / the graph) updates synchronously, but
+  // completedBassAuthority.contract is updated asynchronously by the publish
+  // effect (publishCachedCompactBassContract). On the first render after the
+  // switch, completedBassAuthority can still hold the PREVIOUS target's
+  // contract, so the result strip (BassPerformanceStrip / BassHeadlinePills)
+  // lags behind the graph by one render. This overlay promotes the cached
+  // contract to the display authority used by live UI consumers so the result
+  // strip and graph update together. The persisted authority store is NOT
+  // changed — publishCachedCompactBassContract still runs in the effect and
+  // updates completedBassAuthority normally; reports / Design Rating read the
+  // persisted store, not this overlay.
+  const effectiveBassAuthority = (visibleCachedContract
+    && isAuthoritativeBassContract(visibleCachedContract)
+    && (!completedBassAuthority?.contract
+      || completedBassAuthority.contract.job?.resultFingerprint !== visibleCachedContract.job?.resultFingerprint))
+    ? {
+        ...completedBassAuthority,
+        contract: visibleCachedContract,
+        status: "complete",
+        authorityStatus: BASS_AUTHORITY_STATUS.AUTHORITATIVE,
+        currentFingerprint: visibleCachedContract.job?.resultFingerprint || null,
+        authoritative: true,
+        structurallyComplete: true,
+        exportable: true,
+      }
+    : completedBassAuthority;
+  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, placementPreviewActive, placementPreviewResult });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
