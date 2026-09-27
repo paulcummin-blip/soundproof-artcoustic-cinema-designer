@@ -34,6 +34,7 @@ export const BASS_LIFECYCLE_STATE = {
   TIMED_OUT: "timed_out",
   FAILED: "failed",
   STALE_NEEDS_RECALCULATION: "stale_needs_recalculation",
+  RESTORING: "restoring",
 };
 
 // User-facing copy for each state. Plain language, no implementation detail.
@@ -52,6 +53,7 @@ export const BASS_LIFECYCLE_COPY = {
   [BASS_LIFECYCLE_STATE.TIMED_OUT]: "Calculation timed out. No result was changed.",
   [BASS_LIFECYCLE_STATE.FAILED]: "Bass calculation could not be completed. Please try again.",
   [BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION]: "Needs recalculation",
+  [BASS_LIFECYCLE_STATE.RESTORING]: "Restoring previous design\u2026",
 };
 
 // Cold-reload recovery copy — shown when a persisted UPDATING state is found
@@ -88,6 +90,13 @@ export function deriveBassDisplayStatus(bassLifecycleState) {
         icon: BASS_DISPLAY_ICON.CHECK,
         color: "#4A7560",
         isCalculating: false,
+      };
+    case BASS_LIFECYCLE_STATE.RESTORING:
+      return {
+        text: BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.RESTORING],
+        icon: BASS_DISPLAY_ICON.LOADER,
+        color: "#625143",
+        isCalculating: true,
       };
     case BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION:
       return {

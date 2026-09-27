@@ -1788,8 +1788,16 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // result, remains visible during UPDATE) → non-authoritative live contract
   // (final fallback for lifecycle status only).
   const authoritativeLiveContract = isAuthoritativeBassContract(contract) ? contract : null;
+  // FIX 2: Only allow authoritativeLiveContract to win when it belongs to the
+  // current active calculation/request. When no calculation is in progress
+  // (e.g. after a Restore Previous Design), prefer the completed/restored
+  // contract over a stale live contract. This prevents the graph and P19
+  // from showing the moved design while the status says "Performance is current".
+  const liveContractEligible = (manualRequestMatchesCurrent || calculationInProgress)
+    ? authoritativeLiveContract
+    : null;
   const effectiveContract = isProjectHydrationReady
-    ? (visibleCachedContract || authoritativeLiveContract || (hasPublishedContract ? completedContract : null) || contract)
+    ? (visibleCachedContract || liveContractEligible || (hasPublishedContract ? completedContract : null) || contract)
     : null;
   // Restoration status: when the published contract is the effective contract
   // (no cached/live authoritative contract), show COMPLETE if the published
@@ -1799,7 +1807,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const showingPublishedContract = isProjectHydrationReady
     && !!effectiveContract
     && !visibleCachedContract
-    && !authoritativeLiveContract
+    && !liveContractEligible
     && hasPublishedContract;
   const effectiveDetailedStatus = showingPublishedContract
     ? (publishedContractIsStale ? "UPDATING" : "COMPLETE")
@@ -1914,13 +1922,25 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // Workflow status from optimiseWorkflowStore — feeds the PUBLISHING state
   // into the unified lifecycle so bassCalculationLifecycle owns it.
   const workflowStatus = useOptimiseWorkflowState(scopeId, versionId)?.status || "idle";
-  const bassLifecycleState = resolveBassLifecycleState({
+  const bassLifecycleStateRaw = resolveBassLifecycleState({
     calculationInProgress,
     calculationPhase,
     calculationOutcome,
     authorityStatus: completedBassAuthority?.authorityStatus,
     workflowStatus,
   });
+  // FIX 3: Coherence check — the visible graph/result authority must agree
+  // with the completed authority before showing "Performance is current".
+  // If effectiveContract's fingerprint differs from completedBassAuthority's
+  // contract fingerprint, the graph is showing a different design than the
+  // authority — show "Restoring previous design" instead of "Performance is current".
+  const effectiveContractFp = effectiveContract?.job?.resultFingerprint || null;
+  const completedContractFp = completedBassAuthority?.contract?.job?.resultFingerprint || null;
+  const authoritiesCoherent = !effectiveContractFp || !completedContractFp
+    || effectiveContractFp === completedContractFp;
+  const bassLifecycleState = (bassLifecycleStateRaw === BASS_LIFECYCLE_STATE.COMPLETE && !authoritiesCoherent)
+    ? BASS_LIFECYCLE_STATE.RESTORING
+    : bassLifecycleStateRaw;
   const terminalMessage = coldReloadRecovered && !calculationInProgress
     ? BASS_COLD_RELOAD_RECOVERY_COPY
     : bassLifecycleState === BASS_LIFECYCLE_STATE.TIMED_OUT

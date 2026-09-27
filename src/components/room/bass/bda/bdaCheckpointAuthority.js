@@ -34,7 +34,9 @@ import { fireSubwooferDraftReset } from "./subwooferDraftResetStore";
 import {
   publishCachedCompactBassContract,
   isAuthoritativeBassContract,
+  getCompletedBassAuthority,
 } from "@/components/room/bass/completedBassResultStore";
+import { getP14TargetBackgroundScheduler } from "@/components/room/bass/p14TargetBackgroundScheduler";
 import { ENGINEERING_AUTHORITY_VERSION } from "@/components/proposal/engineeringAuthority";
 import { ENGINEERING_SNAPSHOT_VERSION } from "@/components/proposal/engineeringAuthority/buildEngineeringSnapshot";
 import { ENGINEERING_SUMMARY_SCHEMA_VERSION } from "@/components/engineering/engineeringSummaryAuthority";
@@ -265,6 +267,15 @@ export async function restorePreviousDesign(projectId, versionId, {
   const checkpoint = getCheckpoint(projectId, versionId);
   if (!checkpoint) return { ok: false, reason: "no-checkpoint" };
 
+  // STEP 0 — Cancel the background P14 scheduler to prevent stale workers
+  // from the moved design from completing and overwriting the restored
+  // target bank (FIX 1). The scheduler will be re-scheduled by the normal
+  // effect after the restore, with the restored baseDesignFingerprint.
+  // Since the restored bank has 8/8 targets, the scheduler will skip all.
+  try {
+    getP14TargetBackgroundScheduler().cancel();
+  } catch { /* non-fatal — scheduler may not exist yet */ }
+
   // STEP A — Restore physical state
   try {
     if (typeof commitInstances === "function") {
@@ -321,6 +332,16 @@ export async function restorePreviousDesign(projectId, versionId, {
       checkpoint.baseDesignFingerprint,
       checkpoint.targetBankSnapshot,
     );
+  }
+
+  // STEP E — Verify coherence (FIX 5): the published authority must be
+  // AUTHORITATIVE and match the checkpoint's bass fingerprint. If not, keep
+  // the checkpoint so the designer can retry — do NOT show "Performance is
+  // current" over an incoherent state.
+  const authority = getCompletedBassAuthority(projectId, versionId);
+  if (!authority?.authoritative
+    || authority?.contract?.job?.resultFingerprint !== checkpoint.bassFingerprint) {
+    return { ok: false, reason: "authority-not-coherent", physicalRestored: true };
   }
 
   // STEP D — Restore engineering publication pointer

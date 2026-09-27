@@ -466,6 +466,17 @@ export function syncStaleBassAuthority(projectId, versionId, currentFingerprint)
 
   const queued = (writeQueues.get(key) || Promise.resolve()).then(async () => {
     try {
+      // FIX 4: Check the live in-memory authority BEFORE writing stale state
+      // to DB. If the authority has moved on (e.g. via publishCachedCompactBassContract
+      // during a Restore Previous Design), skip the stale DB write entirely.
+      // This prevents a stale DB state from overwriting a restored authoritative
+      // state, which would cause hydration after refresh to load STALE.
+      const liveBefore = memoryByProject.get(key);
+      if (liveBefore?.authorityStatus !== BASS_AUTHORITY_STATUS.STALE
+        || liveBefore?.currentFingerprint !== currentFingerprint) {
+        return liveBefore || null;
+      }
+
       const records = await base44.entities.ProjectAnalysisCache.filter(dbFilter, '-updated_date', 1);
       const record = Array.isArray(records) ? records[0] : null;
       const existing = record ? {
@@ -489,6 +500,16 @@ export function syncStaleBassAuthority(projectId, versionId, currentFingerprint)
         status: persisted.status,
         completed_by_fingerprint: persisted.completedByFingerprint,
       };
+
+      // FIX 4: Re-check the live authority AFTER the async DB read. If the
+      // authority changed during the await (e.g. a restore published an
+      // authoritative contract), skip the stale DB write.
+      const liveAfterRead = memoryByProject.get(key);
+      if (liveAfterRead?.authorityStatus !== BASS_AUTHORITY_STATUS.STALE
+        || liveAfterRead?.currentFingerprint !== currentFingerprint) {
+        return liveAfterRead || null;
+      }
+
       if (record?.id) await base44.entities.ProjectAnalysisCache.update(record.id, payload);
       else await base44.entities.ProjectAnalysisCache.create(payload);
 
