@@ -55,7 +55,7 @@ export function isStructurallyCompleteBassContract(contract) {
  * metricPublication receipt is NOT authoritative — its metrics must not be
  * published downstream.
  */
-function hasCanonicalSeatMetricAuthority(contract) {
+export function hasCanonicalSeatMetricAuthority(contract) {
   const realSeatCount = Number(contract?.provenance?.realSeatCount);
   if (!Number.isInteger(realSeatCount) || realSeatCount < 0) return false;
   // Not-assessable P19/P20 is a terminal state with legitimately empty per-seat

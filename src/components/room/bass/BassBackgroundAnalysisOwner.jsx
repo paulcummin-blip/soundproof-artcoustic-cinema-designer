@@ -1631,6 +1631,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       consumeCalculateAllTargetsRequest();
       scheduler.schedule({
         projectId: scopeId,
+        versionId,
         baseDesignFingerprint,
         foregroundTargetKey: targetKey,
         allTargets,
@@ -1688,12 +1689,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
 
     scheduler.schedule({
       projectId: scopeId,
+      versionId,
       baseDesignFingerprint,
       foregroundTargetKey: targetKey,
       allTargets,
       designContext: designContextRef.current,
     });
-  }, [scopeId, baseDesignFingerprint, targetKey, foregroundReady, backgroundInputsReady, manualAnalysisRequest, heavyActionRunning, stage2Updating, targetFamilyProgress.resolved, targetFamilyProgress.total, calcAllTargetsRequest, allTargets]);
+  }, [scopeId, versionId, baseDesignFingerprint, targetKey, foregroundReady, backgroundInputsReady, manualAnalysisRequest, heavyActionRunning, stage2Updating, targetFamilyProgress.resolved, targetFamilyProgress.total, calcAllTargetsRequest, allTargets]);
 
   // ── Auto-calculate missing target on P14 switch (foreground priority) ──
   // When the user switches to a missing (uncached) target:

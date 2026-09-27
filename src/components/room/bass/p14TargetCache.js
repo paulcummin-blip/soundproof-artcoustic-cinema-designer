@@ -12,7 +12,8 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
 import { COMPLETED_BASS_CACHE_VERSION, INSTANCE_AUTHORITY_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
-import { isAuthoritativeBassContract } from "./completedBassResultPersistence";
+import { isAuthoritativeBassContract, isStructurallyCompleteBassContract, hasCanonicalSeatMetricAuthority, validateAssessmentEnvelopeAuthority } from "./completedBassResultPersistence";
+import { validateCanonicalBassResult } from "./canonicalBassResult";
 import { hasGraphPayload } from "./finishedGraphAdapter";
 import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
@@ -144,11 +145,22 @@ export function setTargetCacheEntry(projectId, versionId, baseDesignFingerprint,
     // cache. Remove once the root cause is identified and fixed.
     try {
       const pub = compactContract?.metricPublication;
+      const envelopeResult = validateAssessmentEnvelopeAuthority(compactContract);
+      const canonicalResult = compactContract?.finalOptimisedBassResponse
+        ? { valid: "skipped-has-finalResponse", reason: null }
+        : validateCanonicalBassResult(compactContract);
       safeConsole.warn("p14-cache-reject", JSON.stringify({
         projectId,
         versionId,
         targetKey,
         baseDesignFingerprint,
+        sub_1_structural: isStructurallyCompleteBassContract(compactContract),
+        sub_2_seatMetric: hasCanonicalSeatMetricAuthority(compactContract),
+        sub_3_envelope_valid: envelopeResult.valid,
+        sub_3_envelope_reason: envelopeResult.reason || null,
+        sub_4_canonical_valid: canonicalResult.valid,
+        sub_4_canonical_reason: canonicalResult.reason || null,
+        sub_5_metricPub_valid: !!pub?.canonicalMetricPublicationValid,
         mpValid: pub?.canonicalMetricPublicationValid ?? null,
         mpAuthorityValid: pub?.canonicalMetricAuthorityValid ?? null,
         mpGraphParityValid: pub?.graphMetricParityValid ?? null,
