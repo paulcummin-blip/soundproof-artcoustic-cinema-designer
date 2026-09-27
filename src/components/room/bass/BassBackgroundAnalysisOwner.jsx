@@ -13,7 +13,7 @@ import { useOptimiseWorkflowState } from "./optimiseWorkflow/optimiseWorkflowSto
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
 import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence, useRestoreLock, clearRestoreLock } from "./p14TargetCache";
-import { useIsRestoring } from "./bda/restoreStateStore";
+import { useIsRestoring, setRestoring } from "./bda/restoreStateStore";
 import { beginP14AnalysisJob, publishP14AnalysisProgress, getP14AnalysisProgress } from "./p14AnalysisProgressStore";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
 import { isBackgroundInputsReady } from "./backgroundInputReadiness";
@@ -1970,6 +1970,21 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     || (bassLifecycleStateRaw === BASS_LIFECYCLE_STATE.COMPLETE && !authoritiesCoherent))
     ? BASS_LIFECYCLE_STATE.RESTORING
     : bassLifecycleStateRaw;
+
+  // FIX 4 — Clear the shared restoring state once the target bank becomes
+  // complete. This handles the edge case where Restore Previous Design could
+  // not restore the bank from snapshot or DB (bankRestored=false), leaving
+  // the restoring state active. When the background scheduler rebuilds the
+  // bank to full readiness, this effect clears the restoring state so the
+  // lifecycle transitions from "Restoring previous design…" to the normal
+  // state.
+  useEffect(() => {
+    if (!restoringActive) return;
+    if (targetFamilyProgress.total > 0
+      && targetFamilyProgress.ready >= targetFamilyProgress.total) {
+      setRestoring(scopeId, versionId, false);
+    }
+  }, [restoringActive, targetFamilyProgress.ready, targetFamilyProgress.total, scopeId, versionId]);
   const terminalMessage = coldReloadRecovered && !calculationInProgress
     ? BASS_COLD_RELOAD_RECOVERY_COPY
     : bassLifecycleState === BASS_LIFECYCLE_STATE.TIMED_OUT

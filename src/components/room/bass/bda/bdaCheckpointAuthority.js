@@ -30,6 +30,7 @@ import {
   getTargetBankSnapshot,
   restoreTargetBankSnapshot,
   setRestoreLock,
+  hydrateTargetCache,
 } from "@/components/room/bass/p14TargetCache";
 import { fireSubwooferDraftReset } from "./subwooferDraftResetStore";
 import {
@@ -398,23 +399,37 @@ export async function restorePreviousDesign(projectId, versionId, {
 
   // STEP C2 — Restore the target bank snapshot (Fix 2) so 8/8 targets are
   // immediately available without a full background recalculation.
-  if (checkpoint.targetBankSnapshot && checkpoint.baseDesignFingerprint) {
+  // FIX 1 + FIX 3: Only restore + lock when the checkpoint has a non-empty
+  // target bank. A 0-target snapshot must NOT overwrite the persisted 8/8 DB
+  // bank (empty object {} would pass the truthy guard). A 0-target restore
+  // lock is not useful and can block correct later writes.
+  const hasNonEmptySnapshot = checkpoint.targetBankCount > 0
+    && checkpoint.targetBankSnapshot
+    && typeof checkpoint.targetBankSnapshot === "object"
+    && Object.keys(checkpoint.targetBankSnapshot).length > 0;
+  if (hasNonEmptySnapshot && checkpoint.baseDesignFingerprint) {
     restoreTargetBankSnapshot(
       projectId, versionId,
       checkpoint.baseDesignFingerprint,
       checkpoint.targetBankSnapshot,
     );
-    // FIX 2: Set a restore lock that protects the restored bank from being
-    // wiped by transient baseDesignFingerprint transitions or stale background
-    // workers. The lock is released by BassBackgroundAnalysisOwner when
-    // coherence is observed (baseDesign matches, completed authority matches,
-    // effectiveContract matches, target bank count matches).
     setRestoreLock(projectId, versionId, {
       baseDesignFingerprint: checkpoint.baseDesignFingerprint,
       targetCount: checkpoint.targetBankCount || 0,
       bassFingerprint: checkpoint.bassFingerprint,
     });
   }
+
+  // FIX 2 — Re-hydrate the target cache from DB for the restored design.
+  // This reloads the persisted 8/8 target bank if the snapshot was empty (0/8)
+  // or if the DB has a more complete bank than the snapshot. The hydrate is
+  // awaited so the restoring state (Fix 4) stays active until the bank is
+  // available.
+  await hydrateTargetCache(projectId, versionId);
+
+  // FIX 4 — Verify the bank was restored (either from snapshot or from DB).
+  const restoredBank = getTargetBankSnapshot(projectId, versionId);
+  const bankRestored = !!(restoredBank && restoredBank.count > 0);
 
   // STEP E — Verify coherence (FIX 5): the published authority must be
   // AUTHORITATIVE and match the checkpoint's bass fingerprint. If not, keep
@@ -433,7 +448,7 @@ export async function restorePreviousDesign(projectId, versionId, {
 
   // Fix 4: full success — now clear the checkpoint.
   clearCheckpoint(projectId, versionId);
-  return { ok: true };
+  return { ok: true, bankRestored };
 }
 
 // ── Hook: checkpointed commit wrappers ────────────────────────────────────

@@ -67,6 +67,7 @@ export default function RestorePreviousDesignBar({
     // "Performance is current" during the restore operation.
     setRestoring(projectId, versionId, true);
     setRestoreResult(null);
+    let bankRestored = true;
     try {
       const result = await restorePreviousDesign(projectId, versionId, {
         commitInstances,
@@ -76,9 +77,18 @@ export default function RestorePreviousDesignBar({
       if (result && !result.ok) {
         setRestoreResult(result);
       }
+      // FIX 4: Only clear the shared restoring state if the target bank was
+      // restored (from snapshot or DB). If the bank is still 0/8, keep the
+      // shared restoring state active so the lifecycle shows
+      // "Restoring previous design…" instead of "Performance is current".
+      bankRestored = result?.bankRestored !== false;
+    } catch {
+      bankRestored = false;
     } finally {
       setRestoring(false);
-      setRestoring(projectId, versionId, false);
+      if (bankRestored) {
+        setRestoring(projectId, versionId, false);
+      }
     }
   };
 
