@@ -65,6 +65,12 @@ export function captureCheckpoint(projectId, versionId, payload) {
   if (!projectId || !versionId) return false;
   if (!payload?.bassFingerprint || !payload?.engineeringFingerprint) return false;
   const key = checkpointKey(projectId, versionId);
+  // Fix 2: capture the target bank snapshot so restore can recover 8/8 targets
+  // without a full background recalculation. Deep-clone the targets object so
+  // later in-memory cache mutations cannot corrupt the checkpoint.
+  const targetBankSnapshot = payload.targetBankSnapshot
+    ? JSON.parse(JSON.stringify(payload.targetBankSnapshot))
+    : null;
   checkpoints.set(key, {
     projectId,
     versionId,
@@ -73,6 +79,9 @@ export function captureCheckpoint(projectId, versionId, payload) {
     bassFingerprint: payload.bassFingerprint,
     engineeringFingerprint: payload.engineeringFingerprint,
     includesSeating: !!payload.includesSeating,
+    baseDesignFingerprint: payload.baseDesignFingerprint || null,
+    targetBankSnapshot,
+    targetBankCount: payload.targetBankCount || 0,
     capturedAt: Date.now(),
   });
   notify();

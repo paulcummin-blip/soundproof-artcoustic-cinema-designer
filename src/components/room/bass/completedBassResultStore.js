@@ -327,6 +327,9 @@ export function markBassAuthorityStale(projectId, versionId, currentFingerprint)
 
   // Published Engineering Authority model: the published contract remains
   // the authoritative contract. Only the authority status changes to STALE.
+  // Fix 1: a stale authority is NOT authoritative or exportable. Without this,
+  // the UI can report "Performance is current" while the published contract is
+  // for a different physical design than the live one.
   const next = setMemory(projectId, versionId, {
     ...previous,
     status: "stale",
@@ -334,6 +337,8 @@ export function markBassAuthorityStale(projectId, versionId, currentFingerprint)
     currentFingerprint: currentFingerprint || null,
     errorMessage: null,
     publicationRejectionReason: null,
+    authoritative: false,
+    exportable: false,
   });
   syncStaleBassAuthority(projectId, versionId, currentFingerprint || null);
   return next;

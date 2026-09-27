@@ -27,6 +27,11 @@ import {
   clearCheckpoint,
 } from "./previousDesignCheckpoint";
 import {
+  getTargetBankSnapshot,
+  restoreTargetBankSnapshot,
+} from "@/components/room/bass/p14TargetCache";
+import { fireSubwooferDraftReset } from "./subwooferDraftResetStore";
+import {
   publishCachedCompactBassContract,
   isAuthoritativeBassContract,
 } from "@/components/room/bass/completedBassResultStore";
@@ -133,12 +138,18 @@ export function captureBeforeApply(projectId, versionId, {
   const engineeringFingerprint = computeEngFingerprint(appState);
   if (!engineeringFingerprint) return false;
 
+  // Fix 2: capture the target bank snapshot alongside the physical design so
+  // restore can recover 8/8 targets without a full background recalculation.
+  const targetBank = getTargetBankSnapshot(projectId, versionId);
   return captureCheckpoint(projectId, versionId, {
     subwooferInstances: appState.subwooferInstances,
     seatingPositions: appState.seatingPositions,
     bassFingerprint: bassFp,
     engineeringFingerprint,
     includesSeating,
+    baseDesignFingerprint: targetBank?.baseDesignFingerprint || null,
+    targetBankSnapshot: targetBank?.targets || null,
+    targetBankCount: targetBank?.count || 0,
   });
 }
 
@@ -266,17 +277,23 @@ export async function restorePreviousDesign(projectId, versionId, {
       commitSeating(checkpoint.seatingPositions);
     }
   } catch {
+    // Fix 4: physical restore failed — KEEP the checkpoint so the designer
+    // can retry. Do not clear it.
     return { ok: false, reason: "physical-restore-failed" };
   }
 
-  // The checkpoint has served its primary purpose (physical restore).
-  // Clear it now — the physical design is restored; bass promotion + pointer
-  // repoint are consequences, not the checkpoint itself.
-  clearCheckpoint(projectId, versionId);
+  // Fix 5: clear stale draft/preview positions so the plan redraws from the
+  // restored canonical positions immediately.
+  fireSubwooferDraftReset(projectId, versionId);
 
-  // STEP B — Wait for the live bass fingerprint to match the checkpoint
+  // STEP B — Wait for the live bass fingerprint to match the checkpoint.
+  // Fix 4: the checkpoint is KEPT during this wait so a re-render or retry
+  // still has the restore point. It is only cleared on full success or when
+  // the physical design was restored but bass cannot be promoted (stale
+  // checkpoint that points to the now-current design).
   const fingerprintReady = await waitForBassFingerprint(sharedRef, checkpoint.bassFingerprint);
   if (!fingerprintReady) {
+    clearCheckpoint(projectId, versionId);
     return { ok: false, reason: "fingerprint-not-ready", physicalRestored: true };
   }
 
@@ -284,7 +301,7 @@ export async function restorePreviousDesign(projectId, versionId, {
   const cachedContract = await fetchCachedCompactContract(projectId, versionId, checkpoint.bassFingerprint);
   if (!cachedContract || !isAuthoritativeBassContract(cachedContract)) {
     // CACHE MISS — physical restored, bass authority is STALE.
-    // Do NOT fabricate the old result. Do NOT silently use Result B.
+    clearCheckpoint(projectId, versionId);
     return { ok: false, reason: "cache-miss", physicalRestored: true };
   }
 
@@ -292,7 +309,18 @@ export async function restorePreviousDesign(projectId, versionId, {
     projectId, versionId, cachedContract, checkpoint.bassFingerprint,
   );
   if (!promoted) {
+    clearCheckpoint(projectId, versionId);
     return { ok: false, reason: "promotion-failed", physicalRestored: true };
+  }
+
+  // STEP C2 — Restore the target bank snapshot (Fix 2) so 8/8 targets are
+  // immediately available without a full background recalculation.
+  if (checkpoint.targetBankSnapshot && checkpoint.baseDesignFingerprint) {
+    restoreTargetBankSnapshot(
+      projectId, versionId,
+      checkpoint.baseDesignFingerprint,
+      checkpoint.targetBankSnapshot,
+    );
   }
 
   // STEP D — Restore engineering publication pointer
@@ -300,6 +328,8 @@ export async function restorePreviousDesign(projectId, versionId, {
     projectId, versionId, checkpoint.engineeringFingerprint, checkpoint.bassFingerprint,
   );
 
+  // Fix 4: full success — now clear the checkpoint.
+  clearCheckpoint(projectId, versionId);
   return { ok: true };
 }
 

@@ -200,7 +200,57 @@ export function clearTargetCacheForDesign(projectId, versionId, baseDesignFinger
   cache.baseDesignFingerprint = baseDesignFingerprint;
   cache.targets = {};
   notify();
-  scheduleSync(projectId, versionId);
+  // Fix 3: Do NOT persist the empty bank during transient physical moves.
+  // A transient preview move (e.g. dragging a sub) changes the baseDesign
+  // fingerprint, which wipes the in-memory bank. Persisting that empty bank
+  // destroys the durable 8/8 target bank in the database. The bank is only
+  // re-persisted when a real completed result is stored via setTargetCacheEntry
+  // or restored via restoreTargetBankSnapshot.
+}
+
+/**
+ * Capture a deep-cloned snapshot of the current target bank for a project+
+ * version. Used by the Restore Previous Design checkpoint so the 8/8 target
+ * bank can be restored without a full background recalculation.
+ *
+ * Returns { baseDesignFingerprint, targets, count } or null if the cache is
+ * empty / has no baseDesignFingerprint.
+ */
+export function getTargetBankSnapshot(projectId, versionId) {
+  const cache = ensureCache(projectId, versionId);
+  if (!cache.baseDesignFingerprint) return null;
+  const targets = cache.targets || {};
+  const entries = Object.entries(targets);
+  let count = 0;
+  for (const [, entry] of entries) {
+    const isAuth = isAuthoritativeBassContract(entry) && hasGraphPayload(entry) && hasReadyCanonicalP19Contract(entry);
+    const isLim = isValidLimitedP14Contract(entry);
+    if (isAuth || isLim) count += 1;
+  }
+  return {
+    baseDesignFingerprint: cache.baseDesignFingerprint,
+    targets: JSON.parse(JSON.stringify(targets)),
+    count,
+  };
+}
+
+/**
+ * Restore a previously-captured target bank snapshot into the cache for the
+ * given baseDesignFingerprint. Used by Restore Previous Design (Fix 2) so the
+ * 8/8 target bank is immediately available after a restore without waiting for
+ * the background scheduler to recompute all targets.
+ *
+ * Persists immediately so the durable bank survives a page refresh.
+ */
+export function restoreTargetBankSnapshot(projectId, versionId, baseDesignFingerprint, targets) {
+  if (!baseDesignFingerprint || !targets || typeof targets !== "object") return false;
+  const cache = ensureCache(projectId, versionId);
+  cache.metricSchemaVersion = RP22_BASS_METRIC_SCHEMA_VERSION;
+  cache.baseDesignFingerprint = baseDesignFingerprint;
+  cache.targets = JSON.parse(JSON.stringify(targets));
+  notify();
+  scheduleSync(projectId, versionId, { immediate: true });
+  return true;
 }
 
 /**

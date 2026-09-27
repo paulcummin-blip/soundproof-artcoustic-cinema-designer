@@ -25,6 +25,7 @@ import RvDolbyZones from "@/components/room/rv/render/RvDolbyZones";
 import RvBaffleAndScreen from "@/components/room/rv/render/RvBaffleAndScreen";
 import RvSpeakerTooltip from "@/components/room/rv/render/RvSpeakerTooltip";
 import RvPlanCanvas from "@/components/room/rv/render/RvPlanCanvas";
+import { useSubwooferDraftResetSignal } from "@/components/room/bass/bda/subwooferDraftResetStore";
 import { useOverheadAutoPlacement } from "@/components/hooks/useOverheadAutoPlacement";
 import { useEnsureOverheadPairs } from "@/components/hooks/useEnsureOverheadPairs";
 import PlanMessages from "@/components/room/PlanMessages";
@@ -470,6 +471,19 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const isDraggingSpeakerRef = useRef(false);
   const isAnyDraggingRef = React.useRef(false);
   const dragOffsetRoomRef = useRef({ x: 0, y: 0 });
+
+  // Fix 5: when Restore Previous Design commits new canonical positions from
+  // outside the drag flow, clear the stale draft/last-valid refs so the plan
+  // redraws from the restored positions immediately instead of showing the
+  // moved position until a page refresh.
+  useSubwooferDraftResetSignal(_rvProjectId, _rvVersionId, () => {
+    draftFrontSubsRef.current = null;
+    draftRearSubsRef.current = null;
+    _lastValidDraftFrontSubsRef.current = null;
+    _lastValidDraftRearSubsRef.current = null;
+    setSubDragTick((t) => t + 1);
+  });
+
   const mlpDragActiveRef = useRef(false); // set synchronously in mousedown, never stale
   const seatDragStartRef = useRef(null);
   const draggedSubWallRef = useRef(null);

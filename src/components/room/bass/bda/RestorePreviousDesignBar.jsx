@@ -68,7 +68,7 @@ export default function RestorePreviousDesignBar({
         commitSeating,
         sharedRef,
       });
-      if (result && !result.ok && result.physicalRestored) {
+      if (result && !result.ok) {
         setRestoreResult(result);
       }
     } finally {
@@ -80,9 +80,33 @@ export default function RestorePreviousDesignBar({
     clearCheckpoint(projectId, versionId);
   };
 
+  // ── Restore failed (checkpoint kept for retry) ──
+  // Physical restore failed — the checkpoint is still intact so the designer
+  // can retry. (Fix 4)
+  if (checkpoint && restoreResult && !restoreResult.ok && !restoreResult.physicalRestored) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-semibold text-red-800">Restore failed</span>
+        </div>
+        <p className="text-[11px] text-red-700 leading-relaxed">
+          Could not restore the previous design. Try again.
+        </p>
+        <button
+          type="button"
+          onClick={() => setRestoreResult(null)}
+          className="inline-flex items-center gap-1.5 rounded-md bg-red-700 px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-red-800"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Retry restore
+        </button>
+      </div>
+    );
+  }
+
   // ── Cache-miss / restore-failed: physical restored, bass STALE ──
   // The checkpoint has been consumed. Show the message + Update action.
-  if (!checkpoint && restoreResult && !restoreResult.ok) {
+  if (!checkpoint && restoreResult && !restoreResult.ok && restoreResult.physicalRestored) {
     return (
       <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 space-y-2">
         <div className="flex items-center gap-2">
