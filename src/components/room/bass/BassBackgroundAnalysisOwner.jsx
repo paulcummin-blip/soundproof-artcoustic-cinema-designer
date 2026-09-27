@@ -2009,6 +2009,30 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // changed — publishCachedCompactBassContract still runs in the effect and
   // updates completedBassAuthority normally; reports / Design Rating read the
   // persisted store, not this overlay.
+  // ── Capture eligibility from valid cached contract ──────────────────
+  // A valid cached authoritative contract for the current physical design
+  // proves the current design is checkpoint-capturable, even when the raw
+  // completedBassAuthority is STALE or transiently non-authoritative (e.g.
+  // cold open from a previous session). This is a UI/capture overlay only —
+  // it does not write to DB or change the persisted authority store.
+  const cachedContractCaptureEligible = !!visibleCachedContract
+    && isAuthoritativeBassContract(visibleCachedContract)
+    && visibleCachedContract.job?.resultFingerprint === cacheKey
+    && visibleCachedContract.fingerprints?.baseDesign === baseDesignFingerprint
+    && !calculationInProgress
+    && !manualAnalysisRequest
+    && !placementPreviewActive;
+  const captureEligible = cachedContractCaptureEligible || !!completedBassAuthority?.authoritative;
+  // When capture eligibility is proven by the cached contract, supply the
+  // matching contract and fingerprint so captureBeforeApply has a valid
+  // resultFingerprint to checkpoint against — even if the raw authority is
+  // STALE and did not trigger the P14 target-switch overlay above.
+  const captureOverlay = cachedContractCaptureEligible
+    ? {
+        contract: visibleCachedContract,
+        currentFingerprint: visibleCachedContract.job?.resultFingerprint || null,
+      }
+    : {};
   const effectiveBassAuthority = (visibleCachedContract
     && isAuthoritativeBassContract(visibleCachedContract)
     && (!completedBassAuthority?.contract
@@ -2022,8 +2046,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         authoritative: true,
         structurallyComplete: true,
         exportable: true,
+        captureEligible,
       }
-    : completedBassAuthority;
+    : {
+        ...completedBassAuthority,
+        ...captureOverlay,
+        captureEligible,
+      };
   const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, placementPreviewActive, placementPreviewResult });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
