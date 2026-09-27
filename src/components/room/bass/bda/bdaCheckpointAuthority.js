@@ -509,5 +509,23 @@ export function useCheckpointedCommits({
     }
   }, [captureNow, commitSeating]);
 
-  return { checkpointedCommitInstances, checkpointedCommitSeating };
+  // Capture-before-drag: called at sub drag START (before the drag preview
+  // changes the live bass identity). At drag start, the accepted design is
+  // still coherent and the target bank is 8/8. Waiting until mouseup would
+  // fail because the drag preview has already changed the live bass identity
+  // / baseDesign state, so the old visible cached contract is no longer
+  // available.
+  //
+  // This reuses the same captureNow / captureBeforeApply path — it does NOT
+  // create a second restore system. The microtask lock prevents double-capture
+  // if commitInstances is called synchronously after drag start.
+  //
+  // If the design is already stale/out of date at drag start, captureBeforeApply
+  // is a no-op — the existing checkpoint is preserved (a failed experiment
+  // cannot destroy the last known-good restore point).
+  const captureBeforeSubDrag = useCallback(() => {
+    captureNow(false);
+  }, [captureNow]);
+
+  return { checkpointedCommitInstances, checkpointedCommitSeating, captureBeforeSubDrag };
 }

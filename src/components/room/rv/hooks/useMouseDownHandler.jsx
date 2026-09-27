@@ -47,6 +47,10 @@ export function useMouseDownHandler({
   isDraggingSpeakerDraftRef,
   // Full placedSpeakers array — needed to seed draftSpeakersRef on speaker drag start
   placedSpeakers,
+  // Restore Previous Design: capture checkpoint at sub drag START (before the
+  // drag preview changes the live bass identity). Passed from
+  // useCheckpointedCommits via RoomVisualisation.
+  captureBeforeSubDrag,
 }) {
   const handleMouseDown = useCallback(
     (e, id, type) => {
@@ -216,6 +220,16 @@ export function useMouseDownHandler({
         }
         if (isDraggingSeatRef) isDraggingSeatRef.current = true;
       } else if (type === "sub" && target.position) {
+        // Restore Previous Design — capture checkpoint at drag START, before
+        // the drag preview changes the live bass identity / baseDesign state.
+        // At drag start, the accepted design is still coherent and the target
+        // bank is 8/8. Waiting until mouseup would fail because the old visible
+        // cached contract is no longer available by then.
+        // captureBeforeApply is a no-op when the design is not coherent, so a
+        // stale/failed design does not overwrite the last known-good checkpoint.
+        if (typeof captureBeforeSubDrag === "function") {
+          captureBeforeSubDrag();
+        }
         // Detect wall first so we can align the Y offset with the first drag frame.
         // On front/rear walls, Y is pinned by useSubDragHandler (finalY = halfD+EPS or
         // lengthM-halfD-EPS), so the Y offset must be 0 to avoid a first-frame jump.
@@ -407,7 +421,7 @@ export function useMouseDownHandler({
         }
       }
     },
-    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef, roomElements, seatDragStartRef, seatingPositions, placedSpeakers, mlpDotX_m, mlpDotY_m]
+    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef, roomElements, seatDragStartRef, seatingPositions, placedSpeakers, mlpDotX_m, mlpDotY_m, captureBeforeSubDrag]
   );
 
   return { handleMouseDown };

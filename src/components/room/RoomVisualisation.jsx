@@ -226,7 +226,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const _activeProjectId = useActiveProjectId();
   const _rvProjectId = _activeProjectId || appState?.projectId || null;
   const _rvVersionId = appState?.activeVersionId || null;
-  const { checkpointedCommitInstances } = useCheckpointedCommits({
+  const { checkpointedCommitInstances, captureBeforeSubDrag } = useCheckpointedCommits({
     projectId: _rvProjectId,
     versionId: _rvVersionId,
     appState,
@@ -1087,6 +1087,7 @@ const byId = useEntitiesById({
     draftSpeakersRef,
     isDraggingSpeakerDraftRef,
     placedSpeakers,
+    captureBeforeSubDrag,
   });
 
   // Shared drag handler wrapper for all speakers (bed-layer and overhead)
