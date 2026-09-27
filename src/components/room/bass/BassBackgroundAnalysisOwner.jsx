@@ -12,7 +12,8 @@ import { resolveBassLifecycleState, BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, B
 import { useOptimiseWorkflowState } from "./optimiseWorkflow/optimiseWorkflowStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
-import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence } from "./p14TargetCache";
+import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence, useRestoreLock, clearRestoreLock } from "./p14TargetCache";
+import { useIsRestoring } from "./bda/restoreStateStore";
 import { beginP14AnalysisJob, publishP14AnalysisProgress, getP14AnalysisProgress } from "./p14AnalysisProgressStore";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
 import { isBackgroundInputsReady } from "./backgroundInputReadiness";
@@ -559,6 +560,27 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     manualRequestMatchesCurrent,
     OPTIMISER_VERSION_SIGNATURE,
   ]);
+
+  // FIX 2: Restore lock release — when coherence is observed after a restore
+  // (baseDesign matches, completed authority is authoritative, effectiveContract
+  // fingerprint matches, target bank count matches the lock), release the lock
+  // so normal cache operations resume. This is a read-only gate: it only clears
+  // the lock; it never touches bass calculations or authority validation.
+  const restoreLock = useRestoreLock(scopeId, versionId);
+  useEffect(() => {
+    if (!restoreLock) return;
+    const lockBaseDesign = restoreLock.baseDesignFingerprint;
+    const lockTargetCount = restoreLock.targetCount || 0;
+    const lockBassFp = restoreLock.bassFingerprint || null;
+    const baseDesignMatches = !!baseDesignFingerprint && lockBaseDesign === baseDesignFingerprint;
+    const authorityMatches = !!completedBassAuthority?.authoritative
+      && completedBassAuthority?.contract?.job?.resultFingerprint === lockBassFp;
+    const targetCount = targetFamilyProgress?.ready || 0;
+    const targetCountMatches = lockTargetCount === 0 || targetCount >= lockTargetCount;
+    if (baseDesignMatches && authorityMatches && targetCountMatches) {
+      clearRestoreLock(scopeId, versionId);
+    }
+  }, [restoreLock, baseDesignFingerprint, completedBassAuthority, targetFamilyProgress, scopeId, versionId]);
 
   // PASS 1 — Preparation watchdog: covers the entire preparation phase
   // (authoritative simulation) from request acceptance to optimiser dispatch.
@@ -1938,7 +1960,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const completedContractFp = completedBassAuthority?.contract?.job?.resultFingerprint || null;
   const authoritiesCoherent = !effectiveContractFp || !completedContractFp
     || effectiveContractFp === completedContractFp;
-  const bassLifecycleState = (bassLifecycleStateRaw === BASS_LIFECYCLE_STATE.COMPLETE && !authoritiesCoherent)
+  // FIX 3: Shared restoring flag — RestorePreviousDesignBar sets this via
+  // restoreStateStore so the lifecycle suppresses "Performance is current"
+  // for the entire restore transaction, even if the authorities briefly
+  // appear coherent mid-restore (e.g. after physical commit but before the
+  // cached contract is promoted).
+  const restoringActive = useIsRestoring(scopeId, versionId);
+  const bassLifecycleState = (restoringActive
+    || (bassLifecycleStateRaw === BASS_LIFECYCLE_STATE.COMPLETE && !authoritiesCoherent))
     ? BASS_LIFECYCLE_STATE.RESTORING
     : bassLifecycleStateRaw;
   const terminalMessage = coldReloadRecovered && !calculationInProgress
