@@ -137,7 +137,27 @@ export function getTargetCacheProgress(projectId, versionId, baseDesignFingerpri
  */
 export function setTargetCacheEntry(projectId, versionId, baseDesignFingerprint, targetKey, compactContract, { deferPersistence = false, immediate = false } = {}) {
   if (!baseDesignFingerprint || !targetKey || !compactContract) return false;
-  if (!isAuthoritativeBassContract(compactContract)) return false;
+  if (!isAuthoritativeBassContract(compactContract)) {
+    // TEMPORARY DIAGNOSTIC — capture the exact rejection reason for failed
+    // background target contracts. Diagnostic ONLY: does not bypass validation,
+    // does not change the return value, does not force the contract into the
+    // cache. Remove once the root cause is identified and fixed.
+    try {
+      const pub = compactContract?.metricPublication;
+      safeConsole.warn("p14-cache-reject", JSON.stringify({
+        projectId,
+        versionId,
+        targetKey,
+        baseDesignFingerprint,
+        mpValid: pub?.canonicalMetricPublicationValid ?? null,
+        mpAuthorityValid: pub?.canonicalMetricAuthorityValid ?? null,
+        mpGraphParityValid: pub?.graphMetricParityValid ?? null,
+        mpRejectionReason: pub?.publicationRejectionReason || null,
+        canonicalDiagRejectionReason: compactContract?.canonicalMetricDiagnostics?.rejectionReason || null,
+      }));
+    } catch { /* diagnostic must never break the rejection path */ }
+    return false;
+  }
   // Stage 3: reject contracts without the required finished graph payload.
   if (!hasGraphPayload(compactContract)) return false;
   // P19 readiness is part of completed-target reuse: a target without both
@@ -282,7 +302,7 @@ export function flushTargetCachePersistence(projectId, versionId) {
       });
       safeConsole.warn("p14-cache", `target_cache persistence FAILED for project ${key}: ${e?.message || e}. ${Object.keys(snapshot?.targets || {}).length} target(s) retained in memory; dirty marker set for retry.`);
     }
-    if (JSON.stringify(ensureCache(key)) !== persistedSignatures.get(key)) {
+    if (JSON.stringify(ensureCache(projectId, versionId)) !== persistedSignatures.get(key)) {
       dirtyProjects.add(key);
     }
   });
