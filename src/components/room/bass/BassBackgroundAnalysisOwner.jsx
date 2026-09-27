@@ -37,6 +37,8 @@ import { createManualBassTimingTrace } from "./manualBassTimingDiagnostics";
 import { consumeCalculateAllTargetsRequest, useCalculateAllTargetsRequest } from "./calculateAllTargetsStore";
 import { getStage2State, subscribeStage2 } from "./stage2/stage2PlacementStore";
 import { capturePublicationTrace, clearPublicationTrace, diagnoseStructuralCompleteness, diagnoseAuthoritative } from "./publicationTraceStore";
+import { hasCanonicalSeatMetricAuthority, validateAssessmentEnvelopeAuthority } from "./completedBassResultPersistence";
+import { validateCanonicalBassResult } from "./canonicalBassResult";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -1300,6 +1302,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         // rejection, does not change the publication result.
         try {
           const pub = contract?.metricPublication;
+          const envelopeResult = validateAssessmentEnvelopeAuthority(contract);
+          const canonicalResult = validateCanonicalBassResult(contract);
           safeConsole.warn("p14-publish-reject", JSON.stringify({
             projectId: scopeId,
             versionId,
@@ -1316,6 +1320,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
             workerFingerprint: matchingResult?.fingerprint || null,
             calibrationFingerprint,
             resultFingerprint: contract?.job?.resultFingerprint || null,
+            sub_1_structural: isStructurallyCompleteBassContract(contract),
+            sub_2_seatMetric: hasCanonicalSeatMetricAuthority(contract),
+            sub_3_envelope_valid: envelopeResult?.valid ?? null,
+            sub_3_envelope_reason: envelopeResult?.reason || null,
+            sub_4_canonical_valid: canonicalResult?.valid ?? null,
+            sub_4_canonical_reason: canonicalResult?.reason || null,
+            sub_5_metricPub_valid: !!pub?.canonicalMetricPublicationValid,
           }));
         } catch { /* diagnostic must never break the rejection path */ }
         if (timingTraceRef.current && timingTraceRef.current.trace.publicationMs === null) {

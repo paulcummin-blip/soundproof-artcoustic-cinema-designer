@@ -53,7 +53,28 @@ export function buildCanonicalBassResult(contract, graphPayload = null) {
   // P19 grades. The P19 authority is parameters.p19 (RSP vs target curve).
   const perSeatP20 = markPrimaryRows(candidate.perSeatP20Results, primarySeatIds);
   const p19 = parameters.p19 ? { ...parameters.p19 } : null;
-  const p20 = primaryAggregate(parameters.p20, perSeatP20);
+  // P20 not-assessable is a valid completed terminal state (e.g. when the
+  // selected P14 operating point is not achieved). primaryAggregate cannot
+  // produce an aggregate for empty perSeatP20Results, so represent the
+  // not-assessable terminal state directly. Preserve null value — do NOT
+  // use Number(parameters.p20.value) because Number(null) becomes 0.
+  const p20NotAssessable = parameters?.p20?.notAssessable === true;
+  const p20 = p20NotAssessable
+    ? {
+        level: Number.isFinite(Number(parameters.p20.level))
+          ? Number(parameters.p20.level)
+          : 0,
+        value: parameters.p20.value == null
+          ? null
+          : Number(parameters.p20.value),
+        seatId: null,
+        notAssessable: true,
+        notAssessableReason:
+          parameters.p20.notAssessableReason
+          || parameters.p20.reason
+          || null,
+      }
+    : primaryAggregate(parameters.p20, perSeatP20);
   if (!p19 || !p20) return null;
   return Object.freeze({
     version: CANONICAL_BASS_RESULT_VERSION,
