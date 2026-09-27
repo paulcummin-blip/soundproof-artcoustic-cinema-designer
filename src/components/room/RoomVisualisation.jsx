@@ -62,6 +62,8 @@ import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragU
 import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove";
 import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
+import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpointAuthority";
+import { useActiveProjectId } from "@/components/state/project-session";
 import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandler";
 import { useMlpDragHandler } from "@/components/room/rv/hooks/useMlpDragHandler";
 import RvMlpMarker from "@/components/room/rv/render/RvMlpMarker";
@@ -211,6 +213,26 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const appState = useAppState();
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
   const sharedBassResults = useOptionalSharedBassResults();
+  // ── Safe bass design experimentation: checkpoint capture for manual sub moves ──
+  // Manual subwoofer position changes (drag → mouseup → commitDraftSubPositions)
+  // must capture a Restore Previous Design checkpoint BEFORE the committed position
+  // change, using the SAME authority as BDA-applied recommendations. This reuses
+  // useCheckpointedCommits — it does NOT create a second restore system. The
+  // capture is a no-op when the current design is not coherent (stale/updating/
+  // failed), so a failed experiment cannot destroy the last known-good restore
+  // point, and repeated moves during a stale state do not overwrite the
+  // checkpoint.
+  const _activeProjectId = useActiveProjectId();
+  const _rvProjectId = _activeProjectId || appState?.projectId || null;
+  const _rvVersionId = appState?.activeVersionId || null;
+  const { checkpointedCommitInstances } = useCheckpointedCommits({
+    projectId: _rvProjectId,
+    versionId: _rvVersionId,
+    appState,
+    completedBassAuthority: sharedBassResults?.completedBassAuthority,
+    commitInstances: compat.commitInstances,
+    commitSeating: appState?.setSeatingPositions,
+  });
   const currentBassContract = sharedBassResults?.contract || null;
   const currentP19Result = currentBassContract?.productAnalysis?.parameters?.p19 || null;
   // ── Per-seat result seatId validation ──────────────────────────────────
@@ -1492,12 +1514,14 @@ const byId = useEntitiesById({
     if (!changed) return;
 
     // One canonical-first commit: instances once, then both CFG mirrors derived
-    // from the same next array.
-    compat.commitInstances(next, {
+    // from the same next array. Routed through checkpointedCommitInstances so a
+    // Restore Previous Design checkpoint is captured BEFORE the manual position
+    // change — same authority as BDA-applied recommendations.
+    checkpointedCommitInstances(next, {
       front: { placementMode: "manual", isManual: true },
       rear: { placementMode: "manual", isManual: true },
     });
-  }, [compat, appState?.subwooferInstances]);
+  }, [compat, checkpointedCommitInstances, appState?.subwooferInstances]);
 
   // Sub drag — delegated to hook (instantiated here so commitDraftSubPositions is in scope)
   const { handleSubDrag } = useSubDragHandler({
