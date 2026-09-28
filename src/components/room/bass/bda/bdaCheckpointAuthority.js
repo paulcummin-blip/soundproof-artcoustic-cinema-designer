@@ -393,11 +393,31 @@ export async function restorePreviousDesign(projectId, versionId, {
   }
 
   // STEP C — Find + promote cached bass result
-  const cachedContract = await fetchCachedCompactContract(projectId, versionId, checkpoint.bassFingerprint);
+  let cachedContract = await fetchCachedCompactContract(projectId, versionId, checkpoint.bassFingerprint);
   if (!cachedContract || !isAuthoritativeBassContract(cachedContract)) {
-    // CACHE MISS — physical restored, bass authority is STALE.
+    // The persistent cache can briefly miss while its write is still queued.
+    // Prefer an already-completed in-memory authority for this exact restored
+    // fingerprint before treating the restore as a cache miss.
+    const inMemoryAuthority = getCompletedBassAuthority(projectId, versionId);
+    const inMemoryContract = inMemoryAuthority?.contract || null;
+    const inMemoryMatchesCheckpoint = !!inMemoryAuthority?.authoritative
+      && inMemoryAuthority.currentFingerprint === checkpoint.bassFingerprint
+      && inMemoryContract?.job?.resultFingerprint === checkpoint.bassFingerprint
+      && isAuthoritativeBassContract(inMemoryContract);
+    if (inMemoryMatchesCheckpoint) cachedContract = inMemoryContract;
+  }
+  if (!cachedContract || !isAuthoritativeBassContract(cachedContract)) {
+    // CACHE MISS — physical restored, bass authority is STALE. Hydrate the
+    // target cache before returning so the restored design can reuse any
+    // durable target bank even though bass promotion was unavailable.
+    await hydrateTargetCache(projectId, versionId);
     clearCheckpoint(projectId, versionId);
-    return { ok: false, reason: "cache-miss", physicalRestored: true };
+    return {
+      ok: false,
+      reason: "cache-miss",
+      physicalRestored: true,
+      bankRestored: false,
+    };
   }
 
   const promoted = publishCachedCompactBassContract(
