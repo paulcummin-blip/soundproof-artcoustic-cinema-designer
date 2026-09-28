@@ -40,6 +40,7 @@ import P20SeatStrip from "@/components/room/bass/bda/P20SeatStrip";
 import RestorePreviousDesignBar from "@/components/room/bass/bda/RestorePreviousDesignBar";
 import BassGraphShellSkeleton from "@/components/room/bass/bda/BassGraphShellSkeleton";
 import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpointAuthority";
+import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
 
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
@@ -86,6 +87,13 @@ export default function BassDesignAssistant({
     : null;
   // Lifecycle state consumed from the sole authority — no independent derivation.
   const bassLifecycleState = shared?.bassLifecycleState || null;
+  // ── Global restore display override ──────────────────────────────────
+  // Subscribe to restoreStateStore so CurrentDesignBar sees RESTORING on the
+  // same synchronous tick that RestorePreviousDesignBar calls setRestoring(true)
+  // — before BassBackgroundAnalysisOwner republishes shared.bassLifecycleState.
+  const effectiveBassLifecycleState = useEffectiveBassLifecycleState(
+    bdaProjectId, bdaVersionId, bassLifecycleState,
+  );
 
   // ── Safe bass design experimentation ────────────────────────────────────
   // Wrap ALL physical Apply paths with checkpoint capture. One shared helper
@@ -191,7 +199,7 @@ export default function BassDesignAssistant({
           rearCount={compat.rearCount}
           subwooferInstances={subwooferInstances}
           roomDims={roomDims}
-          bassLifecycleState={bassLifecycleState}
+          bassLifecycleState={effectiveBassLifecycleState}
           statusText={isPlacementPreview ? "Subwoofer positions changed. Previewing room response only." : null}
           onChangeSpeakers={onChangeSpeakerConfig}
           onChangeLayout={() => setShowLayoutCards(true)}

@@ -20,6 +20,7 @@ import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPre
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { useGraphInteraction, setGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
+import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
 
 const CARD_TITLES = {
   p14: "P14 Bass SPL",
@@ -59,6 +60,13 @@ export default function BassHeadlinePills({ nowMs }) {
   }, [active, shared.lifecycle?.startedAtMs, shared.lifecycle?.queuedAtMs]);
 
   const p14Selection = resolveP14TargetSelectionState(shared.authoritative?.requested);
+  // ── Global restore display override ──────────────────────────────────
+  // Subscribe to restoreStateStore so the headline pills see RESTORING on the
+  // same synchronous tick as the restore click — before shared.bassLifecycleState
+  // catches up. Suppresses "Performance is current" during the restore window.
+  const effectiveLifecycle = useEffectiveBassLifecycleState(
+    shared.scopeId, shared.versionId, shared.bassLifecycleState,
+  );
   const formatted = formatOfficialBassResults(
     shared.completedBassAuthority,
     shared.lifecycle,
@@ -70,7 +78,7 @@ export default function BassHeadlinePills({ nowMs }) {
       p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
     },
     shared.p19SeatAuthority,
-    shared.bassLifecycleState,
+    effectiveLifecycle,
   );
 
   return (

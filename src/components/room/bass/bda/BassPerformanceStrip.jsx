@@ -26,6 +26,7 @@ import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPre
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { useGraphInteraction, setGraphInteraction, clearGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
+import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 const PARAM_LABELS = { p14: "P14", p18: "P18", p19: "P19", p20: "P20" };
@@ -53,6 +54,13 @@ export default function BassPerformanceStrip() {
   }, [active, shared.lifecycle?.startedAtMs, shared.lifecycle?.queuedAtMs]);
 
   const p14Selection = resolveP14TargetSelectionState(shared.authoritative?.requested);
+  // ── Global restore display override ──────────────────────────────────
+  // Subscribe to restoreStateStore so the strip sees RESTORING on the same
+  // synchronous tick as the restore click — before shared.bassLifecycleState
+  // catches up. Suppresses "Performance is current" during the restore window.
+  const effectiveLifecycle = useEffectiveBassLifecycleState(
+    shared.scopeId, shared.versionId, shared.bassLifecycleState,
+  );
   const formatted = formatOfficialBassResults(
     shared.completedBassAuthority,
     shared.lifecycle,
@@ -64,7 +72,7 @@ export default function BassPerformanceStrip() {
       p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
     },
     shared.p19SeatAuthority,
-    shared.bassLifecycleState,
+    effectiveLifecycle,
   );
 
   const handlePillClick = (key) => {

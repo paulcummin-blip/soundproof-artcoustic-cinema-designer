@@ -19,6 +19,7 @@ import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPre
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import SharedP19P20SeatResults from "@/components/room/bass/SharedP19P20SeatResults";
+import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
 
 export default function P20SeatStrip() {
   const shared = useSharedBassResults();
@@ -32,6 +33,13 @@ export default function P20SeatStrip() {
   }, [active, shared.lifecycle?.startedAtMs, shared.lifecycle?.queuedAtMs]);
 
   const p14Selection = resolveP14TargetSelectionState(shared.authoritative?.requested);
+  // ── Global restore display override ──────────────────────────────────
+  // Subscribe to restoreStateStore so P20 sees RESTORING on the same
+  // synchronous tick as the restore click — before shared.bassLifecycleState
+  // catches up. Suppresses "Performance is current" during the restore window.
+  const effectiveLifecycle = useEffectiveBassLifecycleState(
+    shared.scopeId, shared.versionId, shared.bassLifecycleState,
+  );
   const formatted = formatOfficialBassResults(
     shared.completedBassAuthority,
     shared.lifecycle,
@@ -43,10 +51,10 @@ export default function P20SeatStrip() {
       p18TargetBasis: shared.authoritative?.requested?.p18TargetBasis,
     },
     shared.p19SeatAuthority,
-    shared.bassLifecycleState,
+    effectiveLifecycle,
   );
 
-  const isStale = shared.bassLifecycleState === "stale_needs_recalculation";
+  const isStale = effectiveLifecycle === "stale_needs_recalculation";
   const isPlacementPreview = shared.placementPreviewActive === true;
   const hasSeats = (formatted.p20Rows || []).some((row) => row.seats.length > 0);
 
@@ -66,7 +74,7 @@ export default function P20SeatStrip() {
             Out of Date
           </span>
         )}
-        {shared.bassLifecycleState === "failed" && shared.onRetry
+        {effectiveLifecycle === "failed" && shared.onRetry
           ? <button type="button" onClick={shared.onRetry} className="font-semibold text-red-700 underline">{formatted.statusText}</button>
           : <span>{formatted.statusText}</span>}
       </div>
