@@ -368,16 +368,34 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // Status text — lifecycle display comes from BASS_LIFECYCLE_COPY (sole
   // authority). Engineering-specific text (NOT VERIFIED, P14 capability
   // below target) remains here as it is not a lifecycle state.
+  //
+  // RESTORING takes precedence over ALL other states — including
+  // AUTHORITATIVE / "Performance is current". During a restore transaction
+  // the authority may be AUTHORITATIVE (promoted from the in-memory or
+  // hydrated target bank), but the user must see "Restoring previous
+  // design…" — never "Performance is current" — until the restore settles.
   let statusText = "Waiting for complete design";
-  if (isCalculatingWithPublished) statusText = "Analysing updated design…";
-  else if (isCalculating) statusText = `Calculating… · ${elapsedSeconds} s`;
-  else if (isError) statusText = completedBassAuthority?.errorMessage || BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.FAILED];
-  else if (isStale) statusText = BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION];
-  else if (isNotVerified) statusText = "NOT VERIFIED";
-  else if (isBlocked) statusText = "Waiting for complete design";
-  else if (isLimited) statusText = "P14 capability below target";
-  else if (isAuthoritative) statusText = contract?.job?.message || (contract?.job?.cacheStatus === "hit" ? "Restored from cache" : BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.COMPLETE]);
-  else if (isUpdating) statusText = `Calculating… · ${elapsedSeconds} s`;
+  if (effectiveLifecycleState === BASS_LIFECYCLE_STATE.RESTORING) {
+    statusText = BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.RESTORING];
+  } else if (isCalculatingWithPublished) {
+    statusText = "Analysing updated design…";
+  } else if (isCalculating) {
+    statusText = `Calculating… · ${elapsedSeconds} s`;
+  } else if (isError) {
+    statusText = completedBassAuthority?.errorMessage || BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.FAILED];
+  } else if (isStale) {
+    statusText = BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION];
+  } else if (isNotVerified) {
+    statusText = "NOT VERIFIED";
+  } else if (isBlocked) {
+    statusText = "Waiting for complete design";
+  } else if (isLimited) {
+    statusText = "P14 capability below target";
+  } else if (isAuthoritative) {
+    statusText = contract?.job?.message || (contract?.job?.cacheStatus === "hit" ? "Restored from cache" : BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.COMPLETE]);
+  } else if (isUpdating) {
+    statusText = `Calculating… · ${elapsedSeconds} s`;
+  }
 
   return {
     pills,
