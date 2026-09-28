@@ -53,8 +53,9 @@ describe('ADI target-not-achieved messaging', () => {
   });
 
   test('2. problem.type CAPABILITY + no winner → TARGET_NOT_ACHIEVED', () => {
-    // Even if not all levels are 0, a CAPABILITY problem means target not achieved
+    // P14 achieved is below target (but non-zero) → isCapabilityLimited fires
     const baseline = makeBaseline({ rp22Levels: { p14: 0, p18: 2, p19: 2, p20: 2 } });
+    baseline.p14AchievedDb = 100; // below target of 117
     const decision = runEngineeringDecisionModel({
       optimiserResult: { winner: null, terminalOutcome: 'no-better-evaluated', confirmedResults: [] },
       currentResult: baseline,
@@ -65,15 +66,14 @@ describe('ADI target-not-achieved messaging', () => {
   });
 
   test('3. problem.type EXTENSION + no winner → TARGET_NOT_ACHIEVED', () => {
-    // P14 passes but P18 fails — extension-limited
+    // P14 passes but P18 fails — extension-limited (achieved 30 Hz vs target 35 Hz)
     const baseline = makeBaseline({ rp22Levels: { p14: 3, p18: 0, p19: 2, p20: 2 } });
-    // Override p14AchievedDb so capability check passes but extension fails
-    baseline.p14AchievedDb = 120;
-    baseline.achievedP18Hz = 30;
+    baseline.p14AchievedDb = 120;  // above target → capability passes
+    baseline.achievedP18Hz = 30;   // below target of 35 → extension fails
     const decision = runEngineeringDecisionModel({
       optimiserResult: { winner: null, terminalOutcome: 'no-better-evaluated', confirmedResults: [] },
       currentResult: baseline,
-      designObjectives: makeDesignObjectives({ p14TargetDb: 117, p18TargetHz: 22 }),
+      designObjectives: makeDesignObjectives({ p14TargetDb: 117, p18TargetHz: 35 }),
       context: { subwooferCount: 2, roomDims: { widthM: 4.5, lengthM: 6, heightM: 2.4 }, seatingPositions: [] },
     });
     assert.equal(decision.outcome, ADI_OUTCOME.TARGET_NOT_ACHIEVED);
