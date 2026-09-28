@@ -65,6 +65,7 @@ import {
   acceptRecommendation,
 } from "../recommendationAuthority/acceptTransition.js";
 import { runEngineeringDecisionModel } from "@/components/adi";
+import { buildAdiBassEvidence } from "@/components/adi/adiBassEvidenceBuilder";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -314,7 +315,12 @@ export default function OptimiseAndCalculate({
         const currentShared = sharedRef.current;
         const decision = runEngineeringDecisionModel({
           optimiserResult: getImproveBassV2State(projectId, versionId),
-          currentResult: currentShared?.completedBassAuthority?.result || currentShared?.completedBassAuthority,
+          // FIX 2: Use the SAME canonical evidence builder as the display path
+          // (AdiRecommendation). Previously this passed the authority wrapper,
+          // which does not have perSeatP20 / p14AchievedDb at the top level —
+          // causing identifyProblem to see "No engineering results available"
+          // even when P20 seat data existed in the contract.
+          currentResult: buildAdiBassEvidence(currentShared?.completedBassAuthority),
           designObjectives: {
             p14TargetDb: currentShared?.authoritative?.requested?.selectedP14TargetDb,
             p14Level: currentShared?.authoritative?.requested?.requestedLevel,

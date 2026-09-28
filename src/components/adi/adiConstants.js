@@ -20,4 +20,5 @@ export const ADI_OUTCOME = {
   TRADE_OFF: 'trade_off',
   NO_FURTHER_ENGINEERING: 'no_further_engineering',
   NO_FURTHER_EQ: 'no_further_eq',
+  INCOMPLETE: 'incomplete',
 };

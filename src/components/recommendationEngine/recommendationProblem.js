@@ -42,10 +42,16 @@ function worstSeatP20(result) {
   return worst;
 }
 
+// FIX 3: Seat-to-seat consistency spread MUST be derived from P20 (the
+// seat-consistency metric), NOT P19. P19 is RSP-only — perSeatP19 is always
+// empty in the canonical result, so a P19-derived spread is always 0 and
+// seat-consistency problems are never detected from the spread check.
+// P20 per-seat rows carry variationDbRaw per seat; their spread IS the
+// seat-to-seat variation.
 function seatVariationSpreadDb(result) {
-  const p19 = Array.isArray(result?.perSeatP19) ? result.perSeatP19 : [];
-  if (p19.length < 2) return 0;
-  const raws = p19.map((s) => Math.abs(Number(s?.variationDbRaw) || 0));
+  const p20 = Array.isArray(result?.perSeatP20) ? result.perSeatP20 : [];
+  if (p20.length < 2) return 0;
+  const raws = p20.map((s) => Math.abs(Number(s?.variationDbRaw) || 0));
   return Math.max(...raws) - Math.min(...raws);
 }
 

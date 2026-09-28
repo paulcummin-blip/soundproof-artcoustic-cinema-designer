@@ -48,6 +48,7 @@ import {
   buildRecommendation,
   buildNoFurtherEngineering,
   buildNoFurtherEq,
+  buildIncomplete,
 } from './recommendationBuilder';
 
 function leverClassToIntent(leverClass) {
@@ -109,10 +110,27 @@ export function runEngineeringDecisionModel(inputs) {
   const winner = selection?.winner || null;
   const noMaterialImprovement = selection?.noMaterialImprovement || (!winner && (selection?.terminalOutcome === 'no-better-evaluated' || selection?.terminalOutcome === 'below-materiality'));
 
+  // FIX 4: Detect incomplete evaluation — the optimiser has a terminal
+  // outcome of "incomplete", confirmedResults is 0, or no winner was selected
+  // AND there is no explicit "no-better-evaluated" / "below-materiality"
+  // terminal outcome. When bass evidence IS available (baseline exists with
+  // P20 seat data), this is NOT "no further engineering" — it is an
+  // incomplete evaluation that must be communicated visibly.
+  const terminalOutcome = selection?.terminalOutcome || null;
+  const confirmedResultsCount = Number(selection?.confirmedResults) || 0;
+  const isIncompleteEvaluation = !winner
+    && (terminalOutcome === 'incomplete'
+        || (confirmedResultsCount === 0 && terminalOutcome !== 'no-better-evaluated' && terminalOutcome !== 'below-materiality' && terminalOutcome !== 'safety-rejected'));
+  const hasP20Evidence = Array.isArray(baseline?.perSeatP20) && baseline.perSeatP20.length > 0;
+
   let outcome;
   let recommendation;
 
-  if (noMaterialImprovement || !winner) {
+  if (isIncompleteEvaluation && hasP20Evidence) {
+    // Bass evidence exists but the optimiser could not confirm an improvement.
+    outcome = ADI_OUTCOME.INCOMPLETE;
+    recommendation = buildIncomplete(problem, hasP20Evidence);
+  } else if (noMaterialImprovement || !winner) {
     // The optimiser found no material improvement.
     // Determine whether this is "no further EQ" or "no further engineering".
     if (correctability?.class === CORRECTABILITY_CLASS.ABSOLUTE_CANCELLATION) {

@@ -21,6 +21,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { CheckCircle2, ArrowRight, Loader2, Activity } from "lucide-react";
 import { runEngineeringDecisionModel } from "@/components/adi";
 import { buildAdiDecisionFromPersistedRecommendation } from "@/components/adi/persistedRecommendationAdapter";
+import { buildAdiBassEvidence } from "@/components/adi/adiBassEvidenceBuilder";
 import { RECOMMENDATION_INTENT } from "@/components/room/bass/recommendationAuthority/recommendationAuthority";
 import { ADI_OUTCOME } from "@/components/adi/adiConstants";
 import { buildOptimisedInstances } from "../improveBassV2/improveBassV2Apply";
@@ -129,24 +130,15 @@ export default function AdiRecommendation({
   // published bass authority contract so ADI restores from the same authority
   // as Graph and RP22 — never "No further engineering changes" when a valid
   // recommendation was published.
-  // FIX 4: Extract canonical bass evidence from the published contract, not
-  // the authority wrapper. The problem detector (identifyProblem) expects
-  // top-level perSeatP19, perSeatP20, achievedP18Hz, p14AchievedDb. These
-  // live inside completedBassAuthority.contract.bassResult — map them
-  // explicitly so ADI receives real engineering evidence.
-  const canonicalBassEvidence = useMemo(() => {
-    const contract = completedBassAuthority?.contract;
-    if (!contract) return null;
-    const bassResult = contract.bassResult || contract.finalOptimisedBassResponse || null;
-    if (!bassResult) return null;
-    const seatResults = bassResult.seatResults || {};
-    return {
-      perSeatP19: Array.isArray(seatResults.P19) ? seatResults.P19 : (Array.isArray(bassResult.perSeatP19) ? bassResult.perSeatP19 : []),
-      perSeatP20: Array.isArray(seatResults.P20) ? seatResults.P20 : (Array.isArray(bassResult.perSeatP20) ? bassResult.perSeatP20 : []),
-      achievedP18Hz: Number(bassResult.achievedP18Hz ?? contract.productAnalysis?.parameters?.p18?.achievedHz) || 0,
-      p14AchievedDb: Number(bassResult.p14AchievedDb ?? contract.productAnalysis?.parameters?.p14?.achievedDb) || 0,
-    };
-  }, [completedBassAuthority]);
+  // FIX 1 & 2: Use the ONE shared canonical evidence builder so the display
+  // path and the publication path never diverge. The builder extracts
+  // perSeatP20 from contract.bassResult.seatResults.P20 (the canonical
+  // seat-consistency source), synthesises perSeatP19 from the RSP aggregate,
+  // and maps p14AchievedDb / achievedP18Hz from the contract.
+  const canonicalBassEvidence = useMemo(
+    () => buildAdiBassEvidence(completedBassAuthority),
+    [completedBassAuthority],
+  );
 
   const adiDecision = useMemo(() => {
     let liveDecision = null;
@@ -303,6 +295,31 @@ export default function AdiRecommendation({
   // No improvement case — first-class outcomes
   const isNoEngineering = outcome === ADI_OUTCOME.NO_FURTHER_ENGINEERING;
   const isNoEq = outcome === ADI_OUTCOME.NO_FURTHER_EQ;
+  // FIX 4: Incomplete evaluation — bass evidence exists but the optimiser
+  // could not confirm an improvement. Must NOT show APPLIED or an Apply button.
+  const isIncomplete = outcome === ADI_OUTCOME.INCOMPLETE;
+
+  if (isIncomplete) {
+    return (
+      <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-[#625143]" />
+          <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
+          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#625143] px-2 py-0.5 text-[9px] font-semibold uppercase text-white">
+            Evaluation Incomplete
+          </span>
+        </div>
+        <div className="mt-2 text-[12px] text-[#3E4349] leading-relaxed">
+          {recommendation?.action || 'Bass evidence is available, but ADI could not confirm an improvement from the optimisation run.'}
+        </div>
+        {recommendation?.remainingLimitation && (
+          <div className="mt-1 text-[11px] text-[#625143] leading-relaxed">
+            {recommendation.remainingLimitation}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (isNoEngineering || isNoEq) {
     const noImprovementText = isNoEq

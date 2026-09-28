@@ -212,3 +212,28 @@ export function buildNoFurtherEq() {
     remainingLimitation: 'The remaining limitation requires a physical change.',
   };
 }
+
+/**
+ * Build an "Evaluation incomplete" recommendation.
+ *
+ * This is shown when bass evidence IS available (a completed contract exists
+ * with P20 seat data) but the optimiser could not confirm an improvement —
+ * terminalOutcome is "incomplete", confirmedResults is 0, or no winner was
+ * selected. The card must NOT show "APPLIED" or "Apply the recommended
+ * equalisation" in this state.
+ *
+ * @param {object} problem - the diagnosed problem (may be null)
+ * @param {boolean} hasP20Evidence - whether P20 seat data exists
+ */
+export function buildIncomplete(problem, hasP20Evidence) {
+  const seatConsistencyNote = hasP20Evidence
+    ? 'Seat-to-seat bass consistency remains the limiting factor.'
+    : null;
+  return {
+    assessment: 'Evaluation incomplete',
+    action: 'Bass evidence is available, but ADI could not confirm an improvement from the optimisation run.',
+    why: problem?.description || '',
+    rp22Evidence: [],
+    remainingLimitation: seatConsistencyNote || 'Run Update Bass Performance to complete the evaluation.',
+  };
+}
