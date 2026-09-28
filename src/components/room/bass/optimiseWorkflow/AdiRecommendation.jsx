@@ -129,12 +129,31 @@ export default function AdiRecommendation({
   // published bass authority contract so ADI restores from the same authority
   // as Graph and RP22 — never "No further engineering changes" when a valid
   // recommendation was published.
+  // FIX 4: Extract canonical bass evidence from the published contract, not
+  // the authority wrapper. The problem detector (identifyProblem) expects
+  // top-level perSeatP19, perSeatP20, achievedP18Hz, p14AchievedDb. These
+  // live inside completedBassAuthority.contract.bassResult — map them
+  // explicitly so ADI receives real engineering evidence.
+  const canonicalBassEvidence = useMemo(() => {
+    const contract = completedBassAuthority?.contract;
+    if (!contract) return null;
+    const bassResult = contract.bassResult || contract.finalOptimisedBassResponse || null;
+    if (!bassResult) return null;
+    const seatResults = bassResult.seatResults || {};
+    return {
+      perSeatP19: Array.isArray(seatResults.P19) ? seatResults.P19 : (Array.isArray(bassResult.perSeatP19) ? bassResult.perSeatP19 : []),
+      perSeatP20: Array.isArray(seatResults.P20) ? seatResults.P20 : (Array.isArray(bassResult.perSeatP20) ? bassResult.perSeatP20 : []),
+      achievedP18Hz: Number(bassResult.achievedP18Hz ?? contract.productAnalysis?.parameters?.p18?.achievedHz) || 0,
+      p14AchievedDb: Number(bassResult.p14AchievedDb ?? contract.productAnalysis?.parameters?.p14?.achievedDb) || 0,
+    };
+  }, [completedBassAuthority]);
+
   const adiDecision = useMemo(() => {
     let liveDecision = null;
     try {
       liveDecision = runEngineeringDecisionModel({
         optimiserResult: v2State,
-        currentResult: completedBassAuthority?.result || completedBassAuthority,
+        currentResult: canonicalBassEvidence,
         designObjectives: {
           p14TargetDb: shared?.authoritative?.requested?.selectedP14TargetDb,
           p14Level: shared?.authoritative?.requested?.requestedLevel,
@@ -155,7 +174,7 @@ export default function AdiRecommendation({
     const publishedDecision = persistedRecommendation?.publishedAdiDecision;
     if (publishedDecision?.recommendation) return publishedDecision;
     return buildAdiDecisionFromPersistedRecommendation(persistedRecommendation) || liveDecision;
-  }, [v2State, completedBassAuthority, shared, subwooferCount, roomDims, seatingPositions]);
+  }, [v2State, completedBassAuthority, canonicalBassEvidence, shared, subwooferCount, roomDims, seatingPositions]);
 
   // Determine the physical lever from the ADI decision
   const appropriateLever = adiDecision?.leverAssessment?.appropriateLever;

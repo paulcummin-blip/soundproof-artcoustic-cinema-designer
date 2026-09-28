@@ -63,10 +63,27 @@ export default function BassDesignAssistant({
   const hasResults = shared?.hasCurrentResult === true;
   const isCalculating = shared?.calculationInProgress === true;
   const isPlacementPreview = shared?.placementPreviewActive === true;
-  // True when the designer has moved subs (preview active) but the preview
-  // result curve is not ready yet. The graph shell must stay mounted and
-  // overlay "Preparing room-response preview…" during this interval.
-  const isPreparingPreview = isPlacementPreview && !shared?.placementPreviewResult;
+  // Preview worker live status — used to distinguish active preview work from
+  // idle/errored/stale preview states so "Preparing…" only shows while a
+  // worker is genuinely calculating.
+  const previewLive = shared?.authoritative?.normalizedLive || null;
+  const previewWorkerStatus = previewLive?.status || null;
+  const previewErrorMessage = previewLive?.errorMessage || null;
+  // True only when a preview worker is actively calculating. When the worker is
+  // idle, errored, or the result is ready, this is false — the UI shows a
+  // terminal/actionable message instead of an indefinite "Preparing…".
+  const isPreparingPreview = isPlacementPreview
+    && !shared?.placementPreviewResult
+    && previewWorkerStatus === "calculating";
+  // Terminal preview state — preview is active but the worker is not going to
+  // produce a result (error, or idle after fingerprint settled with no result).
+  const previewTerminalMessage = isPlacementPreview
+    && !shared?.placementPreviewResult
+    && previewWorkerStatus !== "calculating"
+    ? (previewErrorMessage
+      ? `Preview could not be generated — ${previewErrorMessage}`
+      : "Preview could not be generated. Update Bass Performance to calculate this layout.")
+    : null;
   // Lifecycle state consumed from the sole authority — no independent derivation.
   const bassLifecycleState = shared?.bassLifecycleState || null;
 
@@ -79,7 +96,7 @@ export default function BassDesignAssistant({
   // override to never see restoringActive=true.
   const bdaProjectId = shared?.scopeId || null;
   const bdaVersionId = shared?.versionId || null;
-  const { checkpointedCommitInstances, checkpointedCommitSeating } = useCheckpointedCommits({
+  const { checkpointedCommitInstances, checkpointedCommitSeating, captureBeforeSubDrag } = useCheckpointedCommits({
     projectId: bdaProjectId,
     versionId: bdaVersionId,
     appState,
@@ -87,6 +104,22 @@ export default function BassDesignAssistant({
     commitInstances: compat.commitInstances,
     commitSeating: appState?.setSeatingPositions,
   });
+
+  // Wire captureBeforeSubDrag into the b44-bass-drag-start window event so
+  // manual sub drag captures the pre-drag design checkpoint under the same
+  // scopeId/versionId key used by RestorePreviousDesignBar. This is the
+  // single capture point for manual drag — apply actions use the checkpointed
+  // commit wrappers above.
+  const captureBeforeSubDragRef = useRef(captureBeforeSubDrag);
+  captureBeforeSubDragRef.current = captureBeforeSubDrag;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = () => {
+      captureBeforeSubDragRef.current?.();
+    };
+    window.addEventListener("b44-bass-drag-start", handler);
+    return () => window.removeEventListener("b44-bass-drag-start", handler);
+  }, []);
 
   // Fix flash: initialize based on whether subs already exist at first render.
   // This prevents the one-frame flash of layout cards on projects that
@@ -220,6 +253,11 @@ export default function BassDesignAssistant({
                   {isPreparingPreview ? "Preparing room-response preview…" : "Analysing updated design…"}
                 </div>
               ) : null}
+              {previewTerminalMessage && (
+                <div className="absolute top-2 right-2 flex items-center gap-1.5 text-[10px] font-medium text-[#7A4F1A] bg-amber-50 px-2 py-1 rounded-md border border-amber-200" style={{ zIndex: 10, maxWidth: 320 }}>
+                  {previewTerminalMessage}
+                </div>
+              )}
               {/* Authoritative P14/P18/P19/P20 performance result strip */}
               <div className={isPlacementPreview ? "opacity-45" : ""}>
                 <BassPerformanceStrip />
@@ -239,6 +277,7 @@ export default function BassDesignAssistant({
                   engineeringDetailCollapsed={true}
                   isCalculating={isCalculating}
                   isPreparingPreview={isPreparingPreview}
+                  previewTerminalMessage={previewTerminalMessage}
                 />
               ) : (
                 <BassGraphShellSkeleton />

@@ -47,7 +47,7 @@ import { BASS_LIFECYCLE_STATE } from "@/components/room/bass/bassCalculationLife
 
 const IS_DEVELOPMENT_MODE = false;
 
-export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, hideHeader = false, engineeringDetailCollapsed = false, isCalculating = false, isPreparingPreview = false }) {
+export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, hideHeader = false, engineeringDetailCollapsed = false, isCalculating = false, isPreparingPreview = false, previewTerminalMessage = null }) {
   const appState = useAppState();
   const { setFrontSubsCfg, setRearSubsCfg, designEqEnabled, setDesignEqEnabled } = appState;
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
@@ -967,13 +967,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
             </>
           ) : (
             <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center", minHeight: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {isPreparingPreview
-                ? "Preparing room-response preview…"
-                : isCalculating
-                  ? "Recalculating…"
-                  : multiSeriesForGraph.length > 0
-                    ? "No graph layers selected. Turn on a layer above to inspect the response."
-                    : "No bass data yet. Add at least one subwoofer and one seat."}
+              {previewTerminalMessage
+                ? previewTerminalMessage
+                : isPreparingPreview
+                  ? "Preparing room-response preview…"
+                  : isCalculating
+                    ? "Recalculating…"
+                    : multiSeriesForGraph.length > 0
+                      ? "No graph layers selected. Turn on a layer above to inspect the response."
+                      : "No bass data yet. Add at least one subwoofer and one seat."}
             </div>
           )}
         </div>

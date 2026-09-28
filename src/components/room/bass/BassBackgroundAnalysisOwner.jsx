@@ -1277,6 +1277,16 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         canPersistCurrent: false,
         completedResultFingerprint: null,
       });
+      // FIX 3: Structural completeness guard rejected the contract. Set a
+      // terminal rejected outcome immediately so waitForCurrentPublication
+      // sees calculationOutcome = "rejected" and throws the real reason
+      // instead of waiting 30 seconds for the generic publication-wait timeout.
+      const rejectionReason = structuralDiagnosis?.reason
+        || authoritativeDiagnosis?.reason
+        || "Bass calculation could not be verified — the result was structurally incomplete.";
+      setLastTerminalOutcome({ outcome: "rejected", fingerprint: cacheKey, message: rejectionReason });
+      dispatchedManualRequestRef.current = null;
+      setManualAnalysisRequest(null);
       if (!hasAuthoritativeResult(scopeId, versionId, cacheKey)) {
         markBassAuthorityUpdating(scopeId, versionId, cacheKey);
       }
