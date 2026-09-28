@@ -12,7 +12,7 @@ import { resolveBassLifecycleState, BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, B
 import { useOptimiseWorkflowState } from "./optimiseWorkflow/optimiseWorkflowStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
-import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence, useRestoreLock, clearRestoreLock, getRestoreLock } from "./p14TargetCache";
+import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence, useRestoreLock, clearRestoreLock, getRestoreLock, getTargetBankSnapshot } from "./p14TargetCache";
 import { useIsRestoring, setRestoring } from "./bda/restoreStateStore";
 import { beginP14AnalysisJob, publishP14AnalysisProgress, getP14AnalysisProgress } from "./p14AnalysisProgressStore";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
@@ -1178,7 +1178,21 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
             && isAuthoritativeBassContract(restoredContract)
             && bassContractMatchesRequestedP14(restoredContract, requested)
           ) {
-            setTargetCacheEntry(scopeId, versionId, baseDesignFingerprint, targetKey, restoredContract, { immediate: true });
+            // FIX 1: Do not downgrade a non-empty bank for a different baseDesign.
+            // The bridge promotes an already-valid current authority into the
+            // target cache so cachedContract becomes non-null and the background
+            // scheduler starts. If the cache already holds a non-empty bank for a
+            // DIFFERENT baseDesign, seeding a single foreground target would
+            // wipe the entire bank (schema/version reset inside
+            // setTargetCacheEntry) and persist 1/8 — a downgrade. Let the normal
+            // foreground/background path handle the transition instead.
+            const bankSnapshot = getTargetBankSnapshot(scopeId, versionId);
+            const wouldDowngrade = bankSnapshot
+              && bankSnapshot.count > 0
+              && bankSnapshot.baseDesignFingerprint !== baseDesignFingerprint;
+            if (!wouldDowngrade) {
+              setTargetCacheEntry(scopeId, versionId, baseDesignFingerprint, targetKey, restoredContract, { immediate: true });
+            }
           }
         }
       }
@@ -1943,6 +1957,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // do not wait for the publish effect to promote the cached contract to the
   // live authority store. This prevents a transient "stale" / "idle" flash
   // when switching to a prepared target.
+  // FIX 2: restoringActive is computed BEFORE calculationOutcome so the
+  // status source (not only the displayed lifecycle) reflects the restore
+  // transaction. When restoringActive is true, calculationOutcome must not
+  // resolve to "success" — any component reading calculationOutcome sees
+  // "restoring" until restorePreviousDesign completes and all authorities
+  // are coherent.
+  const restoringActive = useIsRestoring(scopeId, versionId);
   const hasValidCachedContractForOutcome = !calculationInProgress
     && !!cachedContract
     && !manualAnalysisRequest
@@ -1951,14 +1972,15 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && (isAuthoritativeBassContract(cachedContract) || isValidLimitedP14Contract(cachedContract));
   const calculationOutcome = calculationInProgress
     ? calculationPhase  // "preparing" | "optimising" | "finalising"
-    : (hasValidCachedContractForOutcome ? "success"
+    : (restoringActive ? "restoring"
+      : (hasValidCachedContractForOutcome ? "success"
         : (completedBassAuthority?.authorityStatus === "STALE" ? "stale"
           : (lastTerminalOutcome?.outcome
             || (completedBassAuthority?.authorityStatus === "AUTHORITATIVE" ? "success"
               : completedBassAuthority?.authorityStatus === "LIMITED" ? "success"
               : completedBassAuthority?.authorityStatus === "ERROR" ? "error"
               : completedBassAuthority?.authorityStatus === "NOT_VERIFIED" ? "rejected"
-              : "idle"))));
+              : "idle")))));
   // Unified lifecycle state — the single lifecycle consumed by all visible
   // Bass surfaces. Maps the existing split-state model into one canonical
   // state with plain-language copy.
@@ -1986,7 +2008,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // for the entire restore transaction, even if the authorities briefly
   // appear coherent mid-restore (e.g. after physical commit but before the
   // cached contract is promoted).
-  const restoringActive = useIsRestoring(scopeId, versionId);
   const bassLifecycleState = (restoringActive
     || (bassLifecycleStateRaw === BASS_LIFECYCLE_STATE.COMPLETE && !authoritiesCoherent))
     ? BASS_LIFECYCLE_STATE.RESTORING
