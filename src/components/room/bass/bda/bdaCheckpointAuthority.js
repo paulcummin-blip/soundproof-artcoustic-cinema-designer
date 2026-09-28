@@ -126,14 +126,25 @@ function computeEngFingerprint(appState) {
  * If the current design is NOT coherent (stale/updating/failed), this is a
  * no-op. A failed experiment cannot destroy the last known-good restore point.
  */
+// TEMP DIAG (CAPTURE-DIAG) — diagnostic only, no logic change. Remove after diagnosis.
+let _captureCallCounter = 0;
+
 export function captureBeforeApply(projectId, versionId, {
   appState,
   completedBassAuthority,
   includesSeating = false,
+  invocationSource = null,
 }) {
-  // TEMP DIAG (CAPTURE-DIAG) — diagnostic only, no logic change. Remove after diagnosis.
+  _captureCallCounter += 1;
   const _eligibilityDebug = completedBassAuthority?.captureEligibilityDebug || null;
+  const _targetBankInMemory = (projectId && versionId)
+    ? getTargetBankSnapshot(projectId, versionId)
+    : null;
   const _diag = {
+    invocationSource,
+    timestamp: Date.now(),
+    callOrderCounter: _captureCallCounter,
+    targetBankInMemoryCount: _targetBankInMemory?.count ?? 0,
     projectIdPresent: !!projectId,
     versionIdPresent: !!versionId,
     hasAppState: !!appState,
@@ -478,7 +489,7 @@ export function useCheckpointedCommits({
   const authorityRef = useRef(completedBassAuthority);
   authorityRef.current = completedBassAuthority;
 
-  const captureNow = useCallback((includesSeating) => {
+  const captureNow = useCallback((includesSeating, invocationSource = null) => {
     if (captureLockRef.current) {
       if (includesSeating) markCheckpointIncludesSeating(projectId, versionId);
       return;
@@ -488,6 +499,7 @@ export function useCheckpointedCommits({
       appState: appStateRef.current,
       completedBassAuthority: authorityRef.current,
       includesSeating,
+      invocationSource,
     });
     // Release the lock at the end of the current microtask so a subsequent
     // commitSeating call in the same synchronous batch is recognised as part
@@ -496,14 +508,14 @@ export function useCheckpointedCommits({
   }, [projectId, versionId]);
 
   const checkpointedCommitInstances = useCallback((nextInstances, ...rest) => {
-    captureNow(false);
+    captureNow(false, "commit");
     if (typeof commitInstances === "function") {
       return commitInstances(nextInstances, ...rest);
     }
   }, [captureNow, commitInstances]);
 
   const checkpointedCommitSeating = useCallback((nextSeating, ...rest) => {
-    captureNow(true);
+    captureNow(true, "commit-seating");
     if (typeof commitSeating === "function") {
       return commitSeating(nextSeating, ...rest);
     }
@@ -524,7 +536,7 @@ export function useCheckpointedCommits({
   // is a no-op — the existing checkpoint is preserved (a failed experiment
   // cannot destroy the last known-good restore point).
   const captureBeforeSubDrag = useCallback(() => {
-    captureNow(false);
+    captureNow(false, "drag-start");
   }, [captureNow]);
 
   return { checkpointedCommitInstances, checkpointedCommitSeating, captureBeforeSubDrag };
