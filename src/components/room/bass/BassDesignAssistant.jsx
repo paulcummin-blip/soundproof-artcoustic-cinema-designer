@@ -39,7 +39,6 @@ import BassPerformanceStrip from "@/components/room/bass/bda/BassPerformanceStri
 import P20SeatStrip from "@/components/room/bass/bda/P20SeatStrip";
 import RestorePreviousDesignBar from "@/components/room/bass/bda/RestorePreviousDesignBar";
 import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpointAuthority";
-import { useActiveProjectId } from "@/components/state/project-session";
 
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
@@ -69,9 +68,12 @@ export default function BassDesignAssistant({
   // ── Safe bass design experimentation ────────────────────────────────────
   // Wrap ALL physical Apply paths with checkpoint capture. One shared helper
   // owns this — individual recommendation components do not duplicate it.
-  const activeProjectId = useActiveProjectId();
-  const bdaProjectId = activeProjectId || appState?.projectId || null;
-  const bdaVersionId = appState?.activeVersionId || null;
+  // Use the SAME scopeId/versionId the BassBackgroundAnalysisOwner uses for
+  // restoreStateStore keying — any fallback (activeProjectId || appState?.projectId)
+  // can diverge from the owner's resolvedProjectId, causing the shared restore
+  // override to never see restoringActive=true.
+  const bdaProjectId = shared?.scopeId || null;
+  const bdaVersionId = shared?.versionId || null;
   const { checkpointedCommitInstances, checkpointedCommitSeating } = useCheckpointedCommits({
     projectId: bdaProjectId,
     versionId: bdaVersionId,

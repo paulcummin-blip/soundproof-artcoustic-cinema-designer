@@ -100,7 +100,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     retainedController?.dispose?.();
     controllerRef.current = createBassBackgroundAnalysisStore();
   }
-  if (!scopeRef.current) scopeRef.current = createBassResultsScope(scopeId);
+  if (!scopeRef.current) scopeRef.current = createBassResultsScope(scopeId, versionId);
   const controller = controllerRef.current;
   const lifecycle = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const selectedPriorityMode = "balanced";
@@ -2008,8 +2008,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // for the entire restore transaction, even if the authorities briefly
   // appear coherent mid-restore (e.g. after physical commit but before the
   // cached contract is promoted).
-  const bassLifecycleState = (restoringActive
-    || (bassLifecycleStateRaw === BASS_LIFECYCLE_STATE.COMPLETE && !authoritiesCoherent))
+  const bassLifecycleState = restoringActive
     ? BASS_LIFECYCLE_STATE.RESTORING
     : bassLifecycleStateRaw;
 
@@ -2134,6 +2133,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         captureEligible,
         captureEligibilityDebug,
       };
-  const value = scopeRef.current.replace({ scopeId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, placementPreviewActive, placementPreviewResult });
+  const value = scopeRef.current.replace({ scopeId, versionId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, placementPreviewActive, placementPreviewResult });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

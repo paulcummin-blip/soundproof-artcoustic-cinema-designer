@@ -3,6 +3,7 @@ import { createBassAnalysisResult } from "./bassAnalysisContract";
 
 export const emptyBassResults = () => ({
   scopeId: null,
+  versionId: null,
   contract: createBassAnalysisResult(),
   lifecycle: null,
   selectedPriorityMode: "balanced",
@@ -33,12 +34,12 @@ export const emptyBassResults = () => ({
   placementPreviewResult: null,
 });
 
-export function createBassResultsScope(scopeId) {
-  let snapshot = { ...emptyBassResults(), scopeId };
+export function createBassResultsScope(scopeId, versionId) {
+  let snapshot = { ...emptyBassResults(), scopeId, versionId };
   return {
     getSnapshot: () => snapshot,
-    replace: (next) => (snapshot = { ...next, scopeId }),
-    clear: () => (snapshot = { ...emptyBassResults(), scopeId: null }),
+    replace: (next) => (snapshot = { ...next, scopeId, versionId }),
+    clear: () => (snapshot = { ...emptyBassResults(), scopeId: null, versionId: null }),
   };
 }
 
