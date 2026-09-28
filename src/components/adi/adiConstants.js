@@ -21,4 +21,5 @@ export const ADI_OUTCOME = {
   NO_FURTHER_ENGINEERING: 'no_further_engineering',
   NO_FURTHER_EQ: 'no_further_eq',
   INCOMPLETE: 'incomplete',
+  TARGET_NOT_ACHIEVED: 'target_not_achieved',
 };

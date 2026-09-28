@@ -150,6 +150,7 @@ export default function AdiRecommendation({
           p14TargetDb: shared?.authoritative?.requested?.selectedP14TargetDb,
           p14Level: shared?.authoritative?.requested?.requestedLevel,
           p18TargetBasis: shared?.authoritative?.requested?.p18TargetBasis,
+          p18TargetHz: shared?.authoritative?.requested?.selectedP18RequiredExtensionHz,
         },
         context: { subwooferCount, roomDims, seatingPositions },
       });
@@ -315,6 +316,59 @@ export default function AdiRecommendation({
         {recommendation?.remainingLimitation && (
           <div className="mt-1 text-[11px] text-[#625143] leading-relaxed">
             {recommendation.remainingLimitation}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Target not achieved — the selected bass target is not met and the optimiser
+  // found no winner. Must NOT show "No further engineering changes are
+  // recommended", APPLIED, or an Apply button. Explain the limiting factor and
+  // give practical options instead of reassuring closure.
+  const isTargetNotAchieved = outcome === ADI_OUTCOME.TARGET_NOT_ACHIEVED;
+
+  if (isTargetNotAchieved) {
+    return (
+      <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 space-y-3">
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-[#B91C1C]" />
+          <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
+          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#B91C1C] px-2 py-0.5 text-[9px] font-semibold uppercase text-white">
+            Target not achieved
+          </span>
+        </div>
+        {recommendation?.assessment && (
+          <div className="space-y-0.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+              Assessment
+            </div>
+            <div className="text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
+              {recommendation.assessment}
+            </div>
+          </div>
+        )}
+        <div className="text-[13px] font-semibold text-[#1B1A1A] leading-relaxed">
+          {recommendation?.action}
+        </div>
+        {recommendation?.why && (
+          <div className="space-y-0.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+              Why
+            </div>
+            <div className="text-[11px] text-[#3E4349] leading-relaxed">
+              {recommendation.why}
+            </div>
+          </div>
+        )}
+        {recommendation?.remainingLimitation && (
+          <div className="space-y-0.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+              Remaining Limitation
+            </div>
+            <div className="text-[11px] text-[#3E4349] leading-relaxed">
+              {recommendation.remainingLimitation}
+            </div>
           </div>
         )}
       </div>

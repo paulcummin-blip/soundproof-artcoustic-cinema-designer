@@ -214,6 +214,51 @@ export function buildNoFurtherEq() {
 }
 
 /**
+ * Build a "Target not achieved" recommendation.
+ *
+ * This is shown when the selected bass target is not achieved in the baseline
+ * (all relevant RP22 levels are 0/FAIL, or the diagnosed problem is a physical
+ * capability/extension limit) and the optimiser found no winner. The card must
+ * NOT show "No further engineering changes are recommended", "APPLIED", or an
+ * Apply button — it must explain the limiting factor and give practical options.
+ *
+ * @param {object} problem - the diagnosed problem (may be null)
+ * @param {object} physicalCause - the inferred physical cause (may be null)
+ * @param {object} designObjectives - P14/P18 design objectives (may be null)
+ */
+export function buildTargetNotAchieved(problem, physicalCause, designObjectives) {
+  return {
+    assessment: 'The selected bass target is not currently achieved.',
+    action: 'Try a lower target, additional sub capacity, different placement, or seating adjustment — or accept and document the limitation.',
+    why: physicalCause?.description || problem?.description || '',
+    rp22Evidence: [],
+    remainingLimitation: deriveTargetNotAchievedLimitation(problem),
+  };
+}
+
+function deriveTargetNotAchievedLimitation(problem) {
+  if (!problem) {
+    return 'The selected bass target is not currently achievable from the confirmed result.';
+  }
+  switch (problem.type) {
+    case PROBLEM_TYPE.CAPABILITY:
+      return 'The limiting factor is subwoofer output and headroom. The current subwoofer(s) cannot reach the target level.';
+    case PROBLEM_TYPE.EXTENSION:
+      return 'The limiting factor is low-frequency extension. The current subwoofer(s) cannot reach the target extension.';
+    case PROBLEM_TYPE.SEAT_CONSISTENCY:
+      return 'The limiting factor is seat-to-seat bass consistency across the seating area.';
+    case PROBLEM_TYPE.RESPONSE_SMOOTHNESS:
+      return 'The limiting factor is room response smoothness at the worst seat.';
+    case PROBLEM_TYPE.LOCAL_CANCELLATION:
+      return 'The limiting factor is a local cancellation (deep null) in the room response.';
+    case PROBLEM_TYPE.ROOM_MODE:
+      return 'The limiting factor is a room mode causing uneven bass response.';
+    default:
+      return 'The selected bass target is not currently achievable from the confirmed result.';
+  }
+}
+
+/**
  * Build an "Evaluation incomplete" recommendation.
  *
  * This is shown when bass evidence IS available (a completed contract exists

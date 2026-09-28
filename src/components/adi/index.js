@@ -25,6 +25,7 @@ export {
   buildRecommendation,
   buildNoFurtherEngineering,
   buildNoFurtherEq,
+  buildTargetNotAchieved,
 } from './recommendationBuilder';
 
 export { CORRECTABILITY_CLASS, ADI_OUTCOME } from './adiConstants';
