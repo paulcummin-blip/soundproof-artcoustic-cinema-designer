@@ -125,17 +125,6 @@ export function setLimitedTargetCacheEntry(projectId, versionId, baseDesignFinge
   // restored bank.
   const lock = getRestoreLock(projectId, versionId);
   if (lock && lock.baseDesignFingerprint !== baseDesignFingerprint) return false;
-  // FIX 1: Defense-in-depth — if the cache has a non-empty bank for a
-  // different baseDesign, a stale background worker from a previous design
-  // is trying to write. Reject the write instead of wiping the restored bank.
-  // The normal design-change flow clears targets via clearTargetCacheForDesign
-  // first, so this guard only blocks stale workers that arrive after a
-  // restoreTargetBankSnapshot.
-  if (cache.baseDesignFingerprint
-    && cache.baseDesignFingerprint !== baseDesignFingerprint
-    && Object.keys(cache.targets).length > 0) {
-    return false;
-  }
   if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION
     || cache.baseDesignFingerprint !== baseDesignFingerprint) {
     cache.metricSchemaVersion = RP22_BASS_METRIC_SCHEMA_VERSION;
@@ -238,17 +227,6 @@ export function setTargetCacheEntry(projectId, versionId, baseDesignFingerprint,
   // restored bank.
   const lock = getRestoreLock(projectId, versionId);
   if (lock && lock.baseDesignFingerprint !== baseDesignFingerprint) return false;
-  // FIX 1: Defense-in-depth — if the cache has a non-empty bank for a
-  // different baseDesign, a stale background worker from a previous design
-  // is trying to write. Reject the write instead of wiping the restored bank.
-  // The normal design-change flow clears targets via clearTargetCacheForDesign
-  // first, so this guard only blocks stale workers that arrive after a
-  // restoreTargetBankSnapshot.
-  if (cache.baseDesignFingerprint
-    && cache.baseDesignFingerprint !== baseDesignFingerprint
-    && Object.keys(cache.targets).length > 0) {
-    return false;
-  }
   if (cache.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION
     || cache.baseDesignFingerprint !== baseDesignFingerprint) {
     cache.metricSchemaVersion = RP22_BASS_METRIC_SCHEMA_VERSION;
