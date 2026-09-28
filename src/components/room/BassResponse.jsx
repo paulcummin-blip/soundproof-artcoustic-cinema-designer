@@ -47,7 +47,7 @@ import { BASS_LIFECYCLE_STATE } from "@/components/room/bass/bassCalculationLife
 
 const IS_DEVELOPMENT_MODE = false;
 
-export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, hideHeader = false, engineeringDetailCollapsed = false, isCalculating = false }) {
+export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, hideHeader = false, engineeringDetailCollapsed = false, isCalculating = false, isPreparingPreview = false }) {
   const appState = useAppState();
   const { setFrontSubsCfg, setRearSubsCfg, designEqEnabled, setDesignEqEnabled } = appState;
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
@@ -463,6 +463,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
       data: prevCurve,
       kind: "previous-result-faded",
       label: "Previous result — out of date",
+      strokeOpacity: 0.4,
     };
   }, [placementPreviewActive, multiSeriesForGraph]);
 
@@ -789,12 +790,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
 
       {/* Bass Response Graph — gated when P14 target unselected */}
       {p14Selection.noP14TargetSelected ? (
-        <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center" }}>
+        <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center", minHeight: 600, display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#625143" }}>Select Bass Target</div>
           <div style={{ fontSize: 12, color: "#8B7F76", marginTop: 4 }}>Choose a bass target to view the response graph</div>
         </div>
       ) : !hasCurrentBassResult && effectiveVisibleSeries.length === 0 ? (
-        <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center" }}>
+        <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center", minHeight: 600, display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#625143" }}>
             {bassAuthorityStatus === "STALE" ? "Response needs recalculation" : "No response data"}
           </div>
@@ -955,20 +956,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               highlightLabel={placementPreviewActive ? null : (highlightFromInteraction?.label ?? null)}
               parameterFocus={placementPreviewActive ? null : parameterFocus}
             />
-            {isCalculating && engineeringDetailCollapsed && (
+            {(isCalculating || isPreparingPreview) && engineeringDetailCollapsed && (
               <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(248, 247, 244, 0.6)", borderRadius: 8, pointerEvents: "none" }}>
                 <div className="flex items-center gap-2 text-[#625143]">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-[12px] font-semibold">Recalculating…</span>
+                  <span className="text-[12px] font-semibold">{isPreparingPreview ? "Preparing room-response preview…" : "Recalculating…"}</span>
                 </div>
               </div>
             )}
             </>
           ) : (
-            <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>
-              {multiSeriesForGraph.length > 0
-                ? "No graph layers selected. Turn on a layer above to inspect the response."
-                : "No bass data yet. Add at least one subwoofer and one seat."}
+            <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center", minHeight: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {isPreparingPreview
+                ? "Preparing room-response preview…"
+                : isCalculating
+                  ? "Recalculating…"
+                  : multiSeriesForGraph.length > 0
+                    ? "No graph layers selected. Turn on a layer above to inspect the response."
+                    : "No bass data yet. Add at least one subwoofer and one seat."}
             </div>
           )}
         </div>

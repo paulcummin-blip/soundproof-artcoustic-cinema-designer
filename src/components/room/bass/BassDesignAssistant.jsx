@@ -38,6 +38,7 @@ import CurrentDesignBar from "@/components/room/bass/bda/CurrentDesignBar";
 import BassPerformanceStrip from "@/components/room/bass/bda/BassPerformanceStrip";
 import P20SeatStrip from "@/components/room/bass/bda/P20SeatStrip";
 import RestorePreviousDesignBar from "@/components/room/bass/bda/RestorePreviousDesignBar";
+import BassGraphShellSkeleton from "@/components/room/bass/bda/BassGraphShellSkeleton";
 import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpointAuthority";
 
 const BassResponse = React.lazy(() =>
@@ -62,6 +63,10 @@ export default function BassDesignAssistant({
   const hasResults = shared?.hasCurrentResult === true;
   const isCalculating = shared?.calculationInProgress === true;
   const isPlacementPreview = shared?.placementPreviewActive === true;
+  // True when the designer has moved subs (preview active) but the preview
+  // result curve is not ready yet. The graph shell must stay mounted and
+  // overlay "Preparing room-response preview…" during this interval.
+  const isPreparingPreview = isPlacementPreview && !shared?.placementPreviewResult;
   // Lifecycle state consumed from the sole authority — no independent derivation.
   const bassLifecycleState = shared?.bassLifecycleState || null;
 
@@ -205,16 +210,16 @@ export default function BassDesignAssistant({
       {/* The graph is the primary workspace. P14/P18/P19/P20 are the graph
           header summary — not a separate panel. Click-to-highlight links the
           pills to the graph's limiting frequency. */}
-      {layoutChosen && hasResults && (
+      {layoutChosen && (
         <div className="space-y-3">
-          <Suspense fallback={<div className="text-[11px] text-[#8A7B6A]">Loading graph…</div>}>
+          <Suspense fallback={<BassGraphShellSkeleton />}>
             <div className="rounded-lg border border-[#DCDBD6] bg-white p-3 space-y-2 relative">
-              {isCalculating && hasResults && (
+              {(isCalculating && hasResults) || isPreparingPreview ? (
                 <div className="absolute top-2 right-2 flex items-center gap-1.5 text-[10px] font-medium text-[#625143] bg-[#F4F1EC] px-2 py-1 rounded-md border border-[#E0DCD5]" style={{ zIndex: 10 }}>
                   <span className="w-1.5 h-1.5 rounded-full bg-[#213428] animate-pulse" />
-                  Analysing updated design…
+                  {isPreparingPreview ? "Preparing room-response preview…" : "Analysing updated design…"}
                 </div>
-              )}
+              ) : null}
               {/* Authoritative P14/P18/P19/P20 performance result strip */}
               <div className={isPlacementPreview ? "opacity-45" : ""}>
                 <BassPerformanceStrip />
@@ -232,9 +237,11 @@ export default function BassDesignAssistant({
                   subWarnings={subWarnings}
                   hideHeader={true}
                   engineeringDetailCollapsed={true}
+                  isCalculating={isCalculating}
+                  isPreparingPreview={isPreparingPreview}
                 />
               ) : (
-                <div className="text-[11px] text-[#8A7B6A]">Loading graph…</div>
+                <BassGraphShellSkeleton />
               )}
             </div>
           </Suspense>
