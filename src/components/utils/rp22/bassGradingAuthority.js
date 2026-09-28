@@ -5,6 +5,10 @@
  * RP22 levels, or selects the lowest level from a set. It is dependency-free
  * so browser code, workers and persistence fixtures all use the same policy.
  *
+ * Sound Proof intentionally grades practical integer values. Lower-is-better
+ * values are floored; SPL/output values are ceiled. This is a product policy,
+ * not a raw lab-report comparison.
+ *
  * Policy: floor the full-precision value. Never round or ceil.
  */
 

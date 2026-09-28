@@ -11,10 +11,11 @@ export function runP14CapabilityFixtures() {
   const checks = [];
   const check = (name, expected, actual, passed, delta = 0) => checks.push({ name, expected, actual, delta, passed: !!passed });
 
-  [[108.999, 0], [109, 1], [112, 2], [115, 3], [118, 4]].forEach(([raw, level]) => {
+  // SPL capability is ceiled before grading: 108.999 → 109 → L1.
+  [[108.0, 0], [108.999, 1], [109, 1], [112, 2], [115, 3], [118, 4]].forEach(([raw, level]) => {
     check(`Minimum boundary ${raw}`, level, gradeP14Minimum(raw), gradeP14Minimum(raw) === level);
   });
-  [[113.999, 0], [114, 1], [117, 2], [120, 3], [123, 4]].forEach(([raw, level]) => {
+  [[113.0, 0], [113.999, 1], [114, 1], [117, 2], [120, 3], [123, 4]].forEach(([raw, level]) => {
     check(`Recommended boundary ${raw}`, level, gradeP14Recommended(raw), gradeP14Recommended(raw) === level);
   });
 

@@ -24,8 +24,9 @@ export function runP14TargetBasisFixtures() {
   const checks = [];
   const check = (test, expected, actual, passed, delta = 0) => checks.push({ test, expected, actual, delta, passed: !!passed });
 
-  const minimum = [[108.999, 0], [109, 1], [111.999, 1], [112, 2], [114.999, 2], [115, 3], [117.999, 3], [118, 4]];
-  const recommended = [[113.999, 0], [114, 1], [116.999, 1], [117, 2], [119.999, 2], [120, 3], [122.999, 3], [123, 4]];
+  // SPL capability is ceiled before grading: 108.999 → 109 → L1, 111.999 → 112 → L2.
+  const minimum = [[108.0, 0], [108.999, 1], [109, 1], [111.999, 2], [112, 2], [114.999, 3], [115, 3], [117.999, 4], [118, 4]];
+  const recommended = [[113.0, 0], [113.999, 1], [114, 1], [116.999, 2], [117, 2], [119.999, 3], [120, 3], [122.999, 4], [123, 4]];
   minimum.forEach(([raw, expected]) => check(`Minimum boundary ${raw}`, expected, gradeP14ForBasis(raw, "minimum"), gradeP14ForBasis(raw, "minimum") === expected));
   recommended.forEach(([raw, expected]) => check(`Recommended boundary ${raw}`, expected, gradeP14ForBasis(raw, "recommended"), gradeP14ForBasis(raw, "recommended") === expected));
 

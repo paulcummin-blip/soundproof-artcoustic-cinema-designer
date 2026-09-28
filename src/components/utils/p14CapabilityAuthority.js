@@ -4,12 +4,17 @@ import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 export const P14_MINIMUM_THRESHOLDS = Object.freeze({ L1: 109, L2: 112, L3: 115, L4: 118 });
 export const P14_RECOMMENDED_THRESHOLDS = Object.freeze({ L1: 114, L2: 117, L3: 120, L4: 123 });
 
+// Sound Proof intentionally grades practical integer values. Lower-is-better
+// values are floored; SPL/output values are ceiled. This is a product policy,
+// not a raw lab-report comparison. P14 is a higher-is-better SPL capability
+// value, so the fractional value is ceiled before threshold comparison.
 function gradeAtThresholds(value, thresholds) {
   if (!Number.isFinite(value)) return 0;
-  if (value >= thresholds.L4) return 4;
-  if (value >= thresholds.L3) return 3;
-  if (value >= thresholds.L2) return 2;
-  if (value >= thresholds.L1) return 1;
+  const ceiled = Math.ceil(value);
+  if (ceiled >= thresholds.L4) return 4;
+  if (ceiled >= thresholds.L3) return 3;
+  if (ceiled >= thresholds.L2) return 2;
+  if (ceiled >= thresholds.L1) return 1;
   return 0;
 }
 
