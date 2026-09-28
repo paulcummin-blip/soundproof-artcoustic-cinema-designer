@@ -274,6 +274,15 @@ export function clearTargetCacheForDesign(projectId, versionId, baseDesignFinger
   if (lock && Object.keys(cache.targets).length > 0) return;
   if (cache.metricSchemaVersion === RP22_BASS_METRIC_SCHEMA_VERSION
     && cache.baseDesignFingerprint === baseDesignFingerprint) return;
+  // FIX 1: Do not wipe a non-empty hydrated target bank during transient
+  // baseDesign changes. A baseDesign mismatch alone is insufficient to
+  // destroy the previous accepted design's 8/8 bank — useTargetCacheEntry
+  // already returns null for a mismatched baseDesign, so the old bank is
+  // never incorrectly treated as current for a moved preview design. The
+  // bank is only replaced when hydrateTargetCache loads a valid DB bank,
+  // setTargetCacheEntry stores a completed result for a confirmed/published
+  // design, or schema/metric invalidation explicitly requires reset.
+  if (Object.keys(cache.targets).length > 0) return;
   cache.metricSchemaVersion = RP22_BASS_METRIC_SCHEMA_VERSION;
   cache.baseDesignFingerprint = baseDesignFingerprint;
   cache.targets = {};

@@ -1159,6 +1159,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         && bassAuthorityHydrationSettled
         && completedBassAuthority?.authoritative
         && completedBassAuthority?.currentFingerprint === cacheKey
+        && completedBassAuthority?.contract?.fingerprints?.baseDesign === baseDesignFingerprint
+        && !placementPreviewActive
+        && !publishedContractIsStale
       ) {
         // FIX 2: Restore lock — do NOT seed a single foreground target over a
         // restored 8/8 bank. When a restore lock is active, the restored bank
@@ -1422,7 +1425,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       publishedContractTokensRef.current.add(publishedToken);
       recordDiagStage(publishedToken, "contract-published", { contractAnalysisId: contract?.analysisId || null, contractFingerprint: resultFingerprint });
     }
-  }, [scopeId, versionId, cacheKey, contract, fingerprints, cachedContract, manualRequestMatchesCurrent, isProjectHydrationReady, baseDesignFingerprint, targetKey, bassAuthorityHydrationSettled]);
+  }, [scopeId, versionId, cacheKey, contract, fingerprints, cachedContract, manualRequestMatchesCurrent, isProjectHydrationReady, baseDesignFingerprint, targetKey, bassAuthorityHydrationSettled, placementPreviewActive, publishedContractIsStale]);
 
   const publishedStagesRef = useRef(new Set());
   useEffect(() => {
