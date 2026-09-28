@@ -16,12 +16,56 @@ import assert from "node:assert/strict";
 import { setRestoring, isRestoring, useIsRestoring, _resetRestoreStateForTest } from "@/components/room/bass/bda/restoreStateStore";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, deriveBassDisplayStatus } from "@/components/room/bass/bassCalculationLifecycle";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
+import { BASS_ANALYSIS_CONTRACT_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
 
 const PID = "test-project-restore";
 const VID = "test-version-restore";
 
 function reset() {
   _resetRestoreStateForTest();
+}
+
+// Minimum realistic structurally-complete authority. Satisfies
+// isStructurallyCompleteBassContract (version, metricSchemaVersion, selected
+// candidate, fingerprint match) AND the publication gate (authoritative +
+// metricPublication.canonicalMetricPublicationValid) so publicationVerified
+// is true. P19/P20 read from contract.bassResult (not productAnalysis.parameters).
+function makeAuthoritativeAuthority({
+  fingerprint = "fp-test",
+  authorityStatus = "AUTHORITATIVE",
+  authoritative = true,
+  p20Level = 1,
+  p20Value = 5,
+} = {}) {
+  return {
+    authoritative,
+    authorityStatus,
+    contract: {
+      version: BASS_ANALYSIS_CONTRACT_VERSION,
+      metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
+      job: {
+        status: "complete",
+        resultFingerprint: fingerprint,
+        currentJobFingerprint: fingerprint,
+        metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
+      },
+      selectedCandidate: { id: "cand-1" },
+      selectedCandidateId: "cand-1",
+      metricPublication: { canonicalMetricPublicationValid: true },
+      productAnalysis: {
+        parameters: {
+          p14: { pass: true, level: 2, selectedLevel: 2, selectedTargetDb: 112, value: 112, targetBasis: "minimum", status: "complete" },
+          p18: { value: 26, level: 2, achievedExtensionBounded: false, status: "complete" },
+        },
+      },
+      bassResult: {
+        P19: { status: "complete", level: 4, value: 1.8 },
+        P20: { status: "complete", level: p20Level, value: p20Value },
+        seatResults: { P20: [] },
+      },
+      selectedMode: "balanced",
+    },
+  };
 }
 
 // ── 1. Imported shared setter cannot be shadowed by local state ─────────
@@ -81,26 +125,7 @@ test("3. formatOfficialBassResults with RESTORING lifecycle returns 'Restoring p
   // the in-memory or hydrated target bank contract is promoted during a
   // restore). The statusText must be "Restoring previous design…", not
   // "Performance is current".
-  const completedBassAuthority = {
-    authoritative: true,
-    authorityStatus: "AUTHORITATIVE",
-    contract: {
-      job: {
-        resultFingerprint: "fp-restore-test",
-        status: "complete",
-        cacheStatus: "hit",
-      },
-      productAnalysis: {
-        parameters: {
-          p14: { pass: true, level: 2, selectedLevel: 2, selectedTargetDb: 112, value: 112, targetBasis: "minimum" },
-          p18: { value: 26, level: 2, achievedExtensionBounded: false },
-          p19: { isAuthoritative: true, level: "L4", valueText: "±1.8 dB" },
-          p20: { isAuthoritative: true, level: "L1", valueText: "±5 dB" },
-        },
-      },
-      selectedMode: "balanced",
-    },
-  };
+  const completedBassAuthority = makeAuthoritativeAuthority({ fingerprint: "fp-restore-test" });
 
   const result = formatOfficialBassResults(
     completedBassAuthority,
@@ -118,22 +143,7 @@ test("3. formatOfficialBassResults with RESTORING lifecycle returns 'Restoring p
 });
 
 test("3a. formatOfficialBassResults with COMPLETE lifecycle and AUTHORITATIVE authority returns 'Performance is current'", () => {
-  const completedBassAuthority = {
-    authoritative: true,
-    authorityStatus: "AUTHORITATIVE",
-    contract: {
-      job: { resultFingerprint: "fp-complete", status: "complete" },
-      productAnalysis: {
-        parameters: {
-          p14: { pass: true, level: 2, selectedLevel: 2, selectedTargetDb: 112, value: 112, targetBasis: "minimum" },
-          p18: { value: 26, level: 2, achievedExtensionBounded: false },
-          p19: { isAuthoritative: true, level: "L4", valueText: "±1.8 dB" },
-          p20: { isAuthoritative: true, level: "L1", valueText: "±5 dB" },
-        },
-      },
-      selectedMode: "balanced",
-    },
-  };
+  const completedBassAuthority = makeAuthoritativeAuthority({ fingerprint: "fp-complete" });
 
   const result = formatOfficialBassResults(
     completedBassAuthority,
@@ -150,22 +160,7 @@ test("3a. formatOfficialBassResults with COMPLETE lifecycle and AUTHORITATIVE au
 });
 
 test("3b. P20 pill during RESTORING retains previous values (stale: false) — does not show 'Calculating…'", () => {
-  const completedBassAuthority = {
-    authoritative: true,
-    authorityStatus: "AUTHORITATIVE",
-    contract: {
-      job: { resultFingerprint: "fp-restore-p20", status: "complete" },
-      productAnalysis: {
-        parameters: {
-          p14: { pass: true, level: 2, selectedLevel: 2, selectedTargetDb: 112, value: 112, targetBasis: "minimum" },
-          p18: { value: 26, level: 2, achievedExtensionBounded: false },
-          p19: { isAuthoritative: true, level: "L4", valueText: "±1.8 dB" },
-          p20: { isAuthoritative: true, level: "L1", valueText: "±5 dB" },
-        },
-      },
-      selectedMode: "balanced",
-    },
-  };
+  const completedBassAuthority = makeAuthoritativeAuthority({ fingerprint: "fp-restore-p20" });
 
   const result = formatOfficialBassResults(
     completedBassAuthority,
@@ -293,22 +288,11 @@ test("5. when RESTORING is active, statusText is never 'Performance is current'"
   // Test with various authority statuses — RESTORING must always win.
   const authorityStatuses = ["AUTHORITATIVE", "STALE", "NOT_VERIFIED", "LIMITED", "BLOCKED", "UPDATING"];
   for (const as of authorityStatuses) {
-    const completedBassAuthority = {
-      authoritative: as === "AUTHORITATIVE",
+    const completedBassAuthority = makeAuthoritativeAuthority({
+      fingerprint: "fp",
       authorityStatus: as,
-      contract: {
-        job: { resultFingerprint: "fp", status: "complete" },
-        productAnalysis: {
-          parameters: {
-            p14: { pass: true, level: 2, selectedLevel: 2, selectedTargetDb: 112, value: 112, targetBasis: "minimum" },
-            p18: { value: 26, level: 2, achievedExtensionBounded: false },
-            p19: { isAuthoritative: true, level: "L4", valueText: "±1.8 dB" },
-            p20: { isAuthoritative: true, level: "L1", valueText: "±5 dB" },
-          },
-        },
-        selectedMode: "balanced",
-      },
-    };
+      authoritative: as === "AUTHORITATIVE",
+    });
     const result = formatOfficialBassResults(
       completedBassAuthority,
       { status: "idle" },
