@@ -8,6 +8,10 @@
  * simulations, graphs, and diagnostics. This helper produces the DESIGN VALUE
  * used for Performance Level grading, ASDR, recommendations, and report display.
  *
+ * Sound Proof intentionally grades practical integer values. Lower-is-better
+ * values are floored; SPL/output values are ceiled. This is a product policy,
+ * not a raw lab-report comparison.
+ *
  * Group A (whole-dB difference, lower is better):    P4, P6, P10    → Math.floor (1 dB)
  * Group B (whole-dB SPL capability, higher is better): P12, P13, P14 → Math.ceil  (1 dB)
  * Group C (±dB variance/deviation, lower is better):  P16, P17      → Math.floor(v*2)/2 (0.5 dB)

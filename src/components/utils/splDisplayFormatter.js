@@ -1,6 +1,10 @@
 // Shared designer/client-facing SPL presentation.
 // Display only: callers retain the original full-precision value for all maths,
-// grading, persistence, optimisation and acoustic authority.
+// persistence, optimisation and acoustic authority.
+//
+// Sound Proof intentionally grades practical integer values. Lower-is-better
+// values are floored; SPL/output values are ceiled. This is a product policy,
+// not a raw lab-report comparison.
 
 export function ceilSplDisplayValue(value) {
   if (value === null || value === undefined || value === "" || typeof value === "boolean") return null;

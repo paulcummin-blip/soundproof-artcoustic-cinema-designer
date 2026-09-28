@@ -173,6 +173,13 @@ export default function BassRp22ParameterTooltip({ parameterKey, children }) {
               <div className="text-[11px] font-semibold text-[#8A7B6A]">NOT CALCULATED</div>
             </div>
           )}
+
+          {/* 5. GRADING POLICY NOTE */}
+          <div className="mt-1.5 pt-1.5 border-t border-[#E6E4DD]">
+            <div className="text-[10px] leading-[1.4] text-[#8A7B6A] italic">
+              Sound Proof uses practical whole-number grading. Deviation values are rounded down; SPL capability is rounded up.
+            </div>
+          </div>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
