@@ -200,11 +200,19 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     hydrateTargetCache(scopeId, versionId).finally(() => setTargetCacheHydrated(true));
   }, [scopeId, versionId]);
 
-  // Clear stale cache after hydration if the design doesn't match
+  // Clear stale cache after hydration if the design doesn't match.
+  // Gate on isProjectHydrationReady so a transient pre-hydration
+  // baseDesignFingerprint (computed from default/empty sub state before
+  // the project record is hydrated) does NOT wipe the freshly hydrated 8/8
+  // bank. Without this gate, clearTargetCacheForDesign fires the instant
+  // targetCacheHydrated becomes true, compares the transient fingerprint
+  // against the hydrated bank's real baseDesignFingerprint, finds a
+  // mismatch, and wipes cache.targets to {} — leaving visibleCachedContract
+  // null even though the DB still holds 8/8.
   useEffect(() => {
-    if (!targetCacheHydrated || !baseDesignFingerprint) return;
+    if (!isProjectHydrationReady || !targetCacheHydrated || !baseDesignFingerprint) return;
     clearTargetCacheForDesign(scopeId, versionId, baseDesignFingerprint);
-  }, [targetCacheHydrated, baseDesignFingerprint, scopeId, versionId]);
+  }, [isProjectHydrationReady, targetCacheHydrated, baseDesignFingerprint, scopeId, versionId]);
 
   // ── Fallback: completed bass store contract ──────────────────────────
   // When the controller is idle (route return, authority-restored skip),
