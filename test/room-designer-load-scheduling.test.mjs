@@ -30,7 +30,7 @@ test("automatic recommendation candidates run one at a time only after interacti
   assert.match(recommendationEngine, /return activeCandidate && !baselineBassPending/);
   assert.match(recommendationEngine, /getIdleResumeDeadline\(\)/);
   assert.match(recommendationEngine, /!isUserInteracting\(\)/);
-  assert.match(recommendationEngine, /candidateReadyAfterRef\.current = Date\.now\(\) \+ 3000/);
+  assert.match(recommendationEngine, /candidateReadyAfterRef\.current = Date\.now\(\) \+ 10000/);
   assert.doesNotMatch(
     recommendationEngine,
     /!baselineBassPending && candidates\.map\(/,
@@ -43,7 +43,7 @@ test("a geometry or model change invalidates settled recommendation results", ()
   assert.match(recommendationEngine, /speakers: \(candidate\.placedSpeakers \|\| \[\]\)\.map/);
   assert.match(
     recommendationEngine,
-    /useEffect\(\(\) => \{\s*candidateReadyAfterRef\.current = Date\.now\(\) \+ 3000;\s*setResultsById\(\{\}\);\s*setActiveCandidateId\(null\);\s*\}, \[candidateSignature\]\);/
+    /useEffect\(\(\) => \{\s*candidateReadyAfterRef\.current = Date\.now\(\) \+ 10000;\s*setResultsById\(\{\}\);\s*setActiveCandidateId\(null\);\s*\}, \[candidateSignature\]\);/
   );
 });
 
