@@ -371,8 +371,19 @@ export class P14TargetBackgroundScheduler {
   }
 
   handleWorkerMessage(message, target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint) {
+    if (this.cancelled) { this.clearWorkerWatchdog(); this.terminateWorker(); return; }
+    // Only a TERMINAL message ends the worker's life. A progress/non-terminal
+    // message must NOT disarm the watchdog: doing so left a worker that then
+    // went silent permanently "in flight" (running=true, no timer), so the
+    // sweep froze and the owner never recovered it. Re-arm the watchdog on
+    // non-terminal messages instead, so a silent worker death is still caught
+    // at the timeout and pushed through the existing retry → fail lifecycle.
+    const isTerminal = message.type === "complete" || message.type === "error";
+    if (!isTerminal) {
+      this.armWorkerWatchdog(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint);
+      return;
+    }
     this.clearWorkerWatchdog();
-    if (this.cancelled) { this.terminateWorker(); return; }
     if (message.fingerprint !== fingerprint) {
       safeConsole.warn("p14-bg", `target ${target.key}: fingerprint mismatch (expected ${fingerprint?.substring(0, 24)}..., got ${message.fingerprint?.substring(0, 24)}...)`);
       this.handleTargetFailure(target, fingerprint, calibrationFingerprint, targetBaseDesignFingerprint, null, 'fingerprint-mismatch');

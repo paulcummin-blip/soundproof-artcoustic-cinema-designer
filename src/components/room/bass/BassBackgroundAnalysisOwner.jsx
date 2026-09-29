@@ -16,6 +16,7 @@ import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign,
 import { useIsRestoring, setRestoring } from "./bda/restoreStateStore";
 import { beginP14AnalysisJob, publishP14AnalysisProgress, getP14AnalysisProgress } from "./p14AnalysisProgressStore";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
+import { cancelP14SweepOnDesignChange } from "./p14SweepCancelAuthority";
 import { isBackgroundInputsReady } from "./backgroundInputReadiness";
 import { safeConsole } from "@/components/utils/safeConsole";
 import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from "@/components/room/rsp/screenGeometryResolver";
@@ -476,7 +477,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // debounce: a design change can cancel/invalidate work, but never schedules
   // an authoritative replacement.
   useEffect(() => {
-    getP14TargetBackgroundScheduler().cancel();
+    // Cancel the background target sweep ONLY when the physical base design
+    // actually changed. This effect re-runs on ordinary publication and
+    // notification traffic (completed authority updates, fingerprint/cacheKey
+    // changes, manual-request state) that does NOT change the design — an
+    // unconditional cancel() there emptied the queue mid-batch, cleared the
+    // timers and left the bank frozen at N/8 with no failed targets to report.
+    cancelP14SweepOnDesignChange(getP14TargetBackgroundScheduler(), baseDesignFingerprint);
     controller.ensureProtocolCompatibility(BASS_OPTIMISER_VERSIONS);
     controller.observeInputs({
       valid: !!fingerprints && !!cacheKey && !!targetKey,
@@ -562,6 +569,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     cacheKey,
     targetKey,
     fingerprints,
+    baseDesignFingerprint,
     bassAuthorityHydrationSettled,
     completedBassAuthority,
     manualAnalysisRequest,
