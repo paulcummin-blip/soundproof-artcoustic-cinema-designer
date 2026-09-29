@@ -16,8 +16,10 @@ import PublicationContentHtml from "@/components/publicationContent/PublicationC
 const BRAND_GREEN = "#213428";
 const TEXT_DARK = "#1B1A1A";
 
-const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
-const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
+import {
+  REPORT_FONT_HEADING as FONT_HEADING,
+  REPORT_FONT_BODY as FONT_BODY,
+} from '@/components/report/typography/reportTypography';
 
 export default function AboutSoundProofReportPage() {
   const { html, loading } = usePublicationContent("about_sound_proof");

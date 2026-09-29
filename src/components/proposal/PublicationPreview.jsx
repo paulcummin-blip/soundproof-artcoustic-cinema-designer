@@ -57,7 +57,7 @@ const PAGE_LABELS = {
   technical_appendix: 'Technical Appendix',
 };
 
-const FONT = "'Didact Gothic', sans-serif";
+import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
 
 function TextLines({ widths = ['100%', '92%', '96%', '70%'], color = '#E5E1D8', gap = '8%' }) {
   return (

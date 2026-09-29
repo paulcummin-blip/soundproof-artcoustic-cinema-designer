@@ -25,7 +25,7 @@ import {
 } from "@/components/recommendations/p12RecommendationPresentation";
 import { formatViewingRecommendationSummary } from "@/components/recommendations/viewingRecommendationPresentation";
 
-const FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
+import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
 const PRIMARY = "#213428";
 const BODY = "#3E4349";
 const MUTED = "#625143";

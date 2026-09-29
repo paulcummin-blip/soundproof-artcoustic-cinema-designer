@@ -26,8 +26,10 @@ import TechnicalLevelBadge from "./TechnicalLevelBadge";
 import TechnicalSeatGrid from "./TechnicalSeatGrid";
 import SeatScopeBadge from "../SeatScopeBadge";
 
-const HEADING_FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
-const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
+import {
+  REPORT_FONT_HEADING as HEADING_FONT,
+  REPORT_FONT_BODY as BODY_FONT,
+} from '@/components/report/typography/reportTypography';
 
 const fmtIneq = (dir) => {
   if (dir === ">=") return "≥";

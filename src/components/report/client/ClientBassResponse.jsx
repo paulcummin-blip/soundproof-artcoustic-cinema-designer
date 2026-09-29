@@ -28,8 +28,10 @@ import {
 } from "./seatMarkerGeometry";
 import { resolveCoordinate } from "./selectClientSpeakerBalance";
 
-const HEADING_FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
-const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
+import {
+  REPORT_FONT_HEADING as HEADING_FONT,
+  REPORT_FONT_BODY as BODY_FONT,
+} from '@/components/report/typography/reportTypography';
 
 const RSP_RING_R = 8;
 const RSP_DOT_R = 3;

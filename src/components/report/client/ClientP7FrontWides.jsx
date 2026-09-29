@@ -15,8 +15,10 @@ import React from "react";
 import { resolveGradeToken } from "@/components/utils/rp22Colors";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 
-const HEADING_FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
-const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
+import {
+  REPORT_FONT_HEADING as HEADING_FONT,
+  REPORT_FONT_BODY as BODY_FONT,
+} from '@/components/report/typography/reportTypography';
 
 const FL_FR_COLOR = "#3E4349";
 const LW_RW_COLOR = "#213428";

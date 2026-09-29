@@ -15,7 +15,7 @@ import React from "react";
 import ClientBassResponse from "../ClientBassResponse";
 import { isAssessedLevel } from "../visualReportSeatStyle";
 
-const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
+import { REPORT_FONT_BODY as BODY_FONT } from '@/components/report/typography/reportTypography';
 
 export default function PrintBassResponseContent({
   bassPerformance,

@@ -13,8 +13,10 @@
 import React from "react";
 import { getCategoryForParam } from "./technicalParameterMeta";
 
-const HEADING_FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
-const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
+import {
+  REPORT_FONT_HEADING as HEADING_FONT,
+  REPORT_FONT_BODY as BODY_FONT,
+} from '@/components/report/typography/reportTypography';
 
 export default function TechnicalParameterPage({ params, children, isFirst = false }) {
   const categories = [];

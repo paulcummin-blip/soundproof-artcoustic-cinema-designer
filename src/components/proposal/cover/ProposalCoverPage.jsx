@@ -31,9 +31,7 @@ import React from 'react';
 import { useBrandImage } from '@/components/account/useBrandImage';
 import { APPROVED_DEALER_BRANDING } from '@/components/account/defaultDealerBranding';
 import BrandLockup from '@/components/ui/BrandLockup';
-
-// The agreed brand font, with the app-wide fallback chain.
-const FONT = 'Didact Gothic, Century Gothic, sans-serif';
+import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
 
 const WHITE = '#FFFFFF';
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { REPORT_FONT_HEADING, reportRoleStyle } from '@/components/report/typography/reportTypography';
 
 export const LOGO_URL = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg';
 
@@ -21,7 +22,7 @@ export default function ReportCover({ variant = 'screen' }) {
                         letterSpacing: '0.12em',
                         textTransform: 'uppercase',
                         color: '#1B1A1A',
-                        fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                        fontFamily: REPORT_FONT_HEADING,
                         marginBottom: '2mm',
                     }}
                 >
@@ -34,14 +35,17 @@ export default function ReportCover({ variant = 'screen' }) {
                         letterSpacing: '0.08em',
                         textTransform: 'uppercase',
                         color: '#625143',
-                        fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                        fontFamily: REPORT_FONT_HEADING,
                         marginBottom: '6mm',
                     }}
                 >
                     Powered by Artcoustic Design Intelligence (ADI)
                 </div>
                 <div style={{ width: '30mm', height: 1, backgroundColor: '#C1B6AD', margin: '0 auto 6mm' }} />
-                <div style={{ fontSize: '30pt', fontWeight: 700, color: '#1B1A1A', lineHeight: 1.1, marginBottom: '7mm' }}>
+                {/* Document title — the shared typography title role
+                    (60pt, uppercase, tracking +100, Futura PT Light with a
+                    Century Gothic fallback). */}
+                <div style={{ ...reportRoleStyle('title'), color: '#1B1A1A', marginBottom: '7mm' }}>
                     RP22 Compliance Report
                 </div>
             </div>
@@ -58,7 +62,7 @@ export default function ReportCover({ variant = 'screen' }) {
                     letterSpacing: '0.12em',
                     textTransform: 'uppercase',
                     color: '#1B1A1A',
-                    fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                    fontFamily: REPORT_FONT_HEADING,
                 }}
             >
                 Professional Home Cinema Engineering
@@ -71,13 +75,13 @@ export default function ReportCover({ variant = 'screen' }) {
                     textTransform: 'uppercase',
                     color: '#625143',
                     marginTop: 4,
-                    fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                    fontFamily: REPORT_FONT_HEADING,
                 }}
             >
                 Powered by Artcoustic Design Intelligence (ADI)
             </div>
             <div style={{ width: 64, height: 1, backgroundColor: '#C1B6AD', marginTop: 14, marginBottom: 14 }} />
-            <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
+            <h1 className="text-3xl font-bold text-[#1B1A1A] font-report-heading">RP22 Compliance Report</h1>
         </div>
     );
 }

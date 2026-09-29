@@ -1,4 +1,5 @@
 import React from 'react';
+import { REPORT_FONT_HEADING } from '@/components/report/typography/reportTypography';
 
 /**
  * KeyPerformanceHighlightsTable
@@ -39,7 +40,7 @@ export default function KeyPerformanceHighlightsTable({ rows, className = '' }) 
               <th
                 key={column.key}
                 className="px-3 py-2 text-left text-xs font-semibold text-[#213428] bg-[#F5F4F0] border-b border-[#DCDBD6]"
-                style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+                style={{ fontFamily: REPORT_FONT_HEADING }}
               >
                 {column.label}
               </th>

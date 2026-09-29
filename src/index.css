@@ -1,3 +1,10 @@
+/* Shared report typography families. Body copy is Didact Gothic (loaded
+   below); headings are Futura PT Light, which falls through the stack to
+   Century Gothic whenever the face is not installed.
+   Every generated report consumes these tokens — see
+   src/components/report/typography/reportTypography.js */
+@import url('https://fonts.googleapis.com/css2?family=Didact+Gothic&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -103,6 +110,9 @@ button:focus-visible {
     --radius: 0.5rem;
     --brand-green: #213428;
     --brand-slate: #3E4349;
+    /* Report typography families (sizes live in the shared typography module) */
+    --font-report-heading: "Futura PT Light", "Futura PT", "Century Gothic", "Didact Gothic", sans-serif;
+    --font-report-body: "Didact Gothic", "Century Gothic", sans-serif;
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -145,6 +155,9 @@ button:focus-visible {
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Report typography families (reports are light-output only) */
+    --font-report-heading: "Futura PT Light", "Futura PT", "Century Gothic", "Didact Gothic", sans-serif;
+    --font-report-body: "Didact Gothic", "Century Gothic", sans-serif;
   }
 }
 

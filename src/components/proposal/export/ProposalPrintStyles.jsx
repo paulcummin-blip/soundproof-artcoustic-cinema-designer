@@ -13,6 +13,7 @@
  */
 
 import React from 'react';
+import { buildReportTypographyCss } from '@/components/report/typography/reportTypography';
 
 export default function ProposalPrintStyles() {
   return (
@@ -145,6 +146,61 @@ export default function ProposalPrintStyles() {
           break-inside: avoid;
           page-break-inside: avoid;
         }
+
+        /* ── Canonical report typography ────────────────────────────────
+           The exported proposal document consumes the shared typography
+           system, so the PDF matches the Visual and Technical Reports:
+           60pt title / 22pt header / 14pt subheader / 9pt body. */
+${buildReportTypographyCss({ scope: '.proposal-print-portal', profile: 'a4', prefix: 'body.proposal-export-mode ' })}
+
+        body.proposal-export-mode .proposal-print-portal .proposal-print-section__title {
+          font-family: var(--report-font-heading) !important;
+          font-size: var(--report-header-size);
+          font-weight: 300;
+          letter-spacing: var(--report-heading-tracking);
+          line-height: var(--report-heading-leading);
+          text-transform: uppercase;
+        }
+
+        body.proposal-export-mode .proposal-print-portal .proposal-print-section__body {
+          font-family: var(--report-font-body) !important;
+          font-size: var(--report-body-size);
+          letter-spacing: var(--report-body-tracking);
+          line-height: var(--report-body-leading);
+          text-transform: none;
+        }
+
+        body.proposal-export-mode .proposal-print-portal .proposal-print-section__body h2 {
+          font-family: var(--report-font-heading) !important;
+          font-size: var(--report-subheader-size);
+          font-weight: 300;
+          letter-spacing: var(--report-heading-tracking);
+          line-height: var(--report-heading-leading);
+          text-transform: uppercase;
+        }
+
+        body.proposal-export-mode .proposal-print-portal .proposal-print-section__body h3 {
+          font-family: var(--report-font-heading) !important;
+          font-size: 12pt;
+          font-weight: 300;
+          letter-spacing: var(--report-heading-tracking);
+          line-height: var(--report-heading-leading);
+          text-transform: uppercase;
+        }
+
+        body.proposal-export-mode .proposal-print-portal .kph-table {
+          font-family: var(--report-font-body) !important;
+          font-size: var(--report-body-size);
+          letter-spacing: var(--report-body-tracking);
+          line-height: var(--report-body-leading);
+        }
+      }
+
+      /* Screen preview of the proposal document uses the same system. */
+      .proposal-print-portal .proposal-print-section__title {
+        font-family: var(--report-font-heading, "Futura PT Light", "Century Gothic", sans-serif);
+        letter-spacing: var(--report-heading-tracking, 0.1em);
+        text-transform: uppercase;
       }
     `}</style>
   );

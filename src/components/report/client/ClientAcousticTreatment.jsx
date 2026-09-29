@@ -33,8 +33,10 @@ const COLORS = {
   zoneStroke: "#213428",
 };
 
-const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
-const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
+import {
+  REPORT_FONT_HEADING as FONT_HEADING,
+  REPORT_FONT_BODY as FONT_BODY,
+} from '@/components/report/typography/reportTypography';
 
 export default function ClientAcousticTreatment({
   roomDims,

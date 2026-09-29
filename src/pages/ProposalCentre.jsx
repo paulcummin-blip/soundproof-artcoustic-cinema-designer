@@ -32,6 +32,8 @@ const PLACEHOLDER_CONTENT = {
   },
 };
 
+import { REPORT_FONT_HEADING, REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
+
 export default function ProposalCentre() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -73,7 +75,7 @@ export default function ProposalCentre() {
             </div>
             <h1
               className="text-[40px] leading-none font-normal text-[#1B1A1A] tracking-tight"
-              style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+              style={{ fontFamily: REPORT_FONT_BODY }}
             >
               Proposal Centre
             </h1>
@@ -84,7 +86,7 @@ export default function ProposalCentre() {
           <button
             onClick={() => setShowWizard(true)}
             className="flex items-center gap-2 px-6 py-3 text-xs uppercase tracking-[0.14em] text-white shrink-0 mt-2 transition-colors hover:bg-[#3E4349]"
-            style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
+            style={{ backgroundColor: '#213428', fontFamily: REPORT_FONT_BODY }}
           >
             <Plus className="w-3.5 h-3.5" />
             Create Proposal
@@ -100,7 +102,7 @@ export default function ProposalCentre() {
               className={`relative pb-4 text-[13px] uppercase tracking-[0.12em] transition-colors ${
                 activeTab === key ? 'text-[#1B1A1A]' : 'text-[#A79E8C] hover:text-[#625143]'
               }`}
-              style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+              style={{ fontFamily: REPORT_FONT_BODY }}
             >
               {label}
               {activeTab === key && (

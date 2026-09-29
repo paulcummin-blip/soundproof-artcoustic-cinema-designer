@@ -13,7 +13,7 @@
 
 import React from "react";
 
-const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
+import { REPORT_FONT_BODY as FONT_BODY } from '@/components/report/typography/reportTypography';
 
 function renderSentenceWithBoldLevels(sentence) {
   return String(sentence)

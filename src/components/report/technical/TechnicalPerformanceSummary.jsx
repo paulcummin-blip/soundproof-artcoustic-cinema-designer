@@ -19,8 +19,10 @@ import React from "react";
 import TechnicalLevelBadge from "./TechnicalLevelBadge";
 import ScopedAsdrSummary from "./ScopedAsdrSummary";
 
-const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
-const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
+import {
+  REPORT_FONT_HEADING as FONT_HEADING,
+  REPORT_FONT_BODY as FONT_BODY,
+} from '@/components/report/typography/reportTypography';
 
 const COLORS = {
   bg: "#F1F0EE",

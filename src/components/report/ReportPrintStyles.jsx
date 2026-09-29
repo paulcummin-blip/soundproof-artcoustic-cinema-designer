@@ -1,12 +1,15 @@
 import React from 'react';
+import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 
 export default function ReportPrintStyles() {
     return (
         <style>{`
             @media print {
-                /* Global typography: Century Gothic everywhere */
+                /* Global typography: the shared report system sets the body
+                   face. Headings are set by the canonical block at the end of
+                   this stylesheet. */
                 * {
-                    font-family: 'Century Gothic', 'Futura PT Light', 'Didact Gothic', sans-serif !important;
+                    font-family: ${REPORT_FONT_BODY} !important;
                 }
                 
                 html, body {
@@ -842,10 +845,50 @@ export default function ReportPrintStyles() {
               .rp22-report .rp22-seat-card,
               .rp22-report .rp22-param-card *,
               .rp22-report .rp22-seat-card * {
-                overflow: visible !important;
-                max-height: none !important;
+                  overflow: visible !important;
+                  max-height: none !important;
               }
-            }
-        `}</style>
-    );
-}
+              }
+
+              /* ── Canonical report typography ──────────────────────────────
+                 The Technical Report consumes the shared typography system
+                 (mounted by the report root as <ReportTypographyStyles />).
+                 The page frames here are fixed-height, so where a frame
+                 cannot carry the canonical size it keeps a smaller size but
+                 the same family, tracking, case and hierarchy. */
+              .rp22-report .standard-drawing-page__title,
+              .rp22-report .tech-param-report-title {
+              font-family: var(--report-font-heading) !important;
+              font-weight: 300 !important;
+              letter-spacing: var(--report-heading-tracking) !important;
+              line-height: var(--report-heading-leading) !important;
+              text-transform: uppercase !important;
+              }
+
+              .rp22-report .standard-drawing-page__title {
+              font-size: var(--report-header-size) !important;
+              }
+
+              .rp22-report .tech-param-report-title {
+              font-size: var(--report-subheader-size) !important;
+              }
+
+              .rp22-report .tech-param-report-subtitle,
+              .rp22-report .standard-drawing-page__metadata span {
+              font-family: var(--report-font-body) !important;
+              letter-spacing: var(--report-heading-tracking) !important;
+              line-height: var(--report-heading-leading) !important;
+              text-transform: uppercase !important;
+              }
+
+              .rp22-report .rp22-param-subtitle,
+              .rp22-report .rp22-param-content,
+              .rp22-report .standard-drawing-page__project {
+              font-family: var(--report-font-body) !important;
+              letter-spacing: var(--report-body-tracking) !important;
+              line-height: var(--report-body-leading) !important;
+              text-transform: none !important;
+              }
+              `}</style>
+              );
+              }

@@ -13,8 +13,10 @@ import { isAssessedLevel } from "../visualReportSeatStyle";
 import { P18_THRESHOLDS_BY_BASIS } from "@/components/utils/p18ExtensionAuthority";
 import { Check } from "lucide-react";
 
-const HEADING_FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
-const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
+import {
+  REPORT_FONT_HEADING as HEADING_FONT,
+  REPORT_FONT_BODY as BODY_FONT,
+} from '@/components/report/typography/reportTypography';
 
 function levelToNumber(level) {
   if (level == null) return null;

@@ -16,8 +16,10 @@ import { resolveGradeToken } from "@/components/utils/rp22Colors";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 
-const HEADING_FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
-const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
+import {
+  REPORT_FONT_HEADING as HEADING_FONT,
+  REPORT_FONT_BODY as BODY_FONT,
+} from '@/components/report/typography/reportTypography';
 
 // Speaker role colours (brand-aligned, same as P12/P13 plan)
 const ROLE_COLORS = {

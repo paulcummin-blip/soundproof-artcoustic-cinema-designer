@@ -17,8 +17,10 @@ import { resolveCoordinate } from "./selectClientSpeakerBalance";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { Loader2 } from "lucide-react";
 
-const HEADING_FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
-const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
+import {
+  REPORT_FONT_HEADING as HEADING_FONT,
+  REPORT_FONT_BODY as BODY_FONT,
+} from '@/components/report/typography/reportTypography';
 
 // Diluted cell colours for the large spatial field (canonical tokens, faded)
 const HEATMAP_CELL_COLORS = {

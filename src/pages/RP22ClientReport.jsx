@@ -20,6 +20,7 @@ import ClientP9Overhead from "@/components/report/client/ClientP9Overhead";
 import { selectClientP9Overhead } from "@/components/report/client/selectClientP9Overhead";
 import ClientReportPage from "@/components/report/client/ClientReportPage";
 import ClientReportPrintStyles from "@/components/report/client/ClientReportPrintStyles";
+import ReportTypographyStyles from "@/components/report/typography/ReportTypographyStyles";
 import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
 import { selectClientDesignHighlights } from "@/components/report/client/selectClientDesignHighlights";
 import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
@@ -707,6 +708,12 @@ export default function RP22ClientReport() {
       background: "#F1F0EE",
       fontFamily: "Didact Gothic, Century Gothic, sans-serif",
     }}>
+      {/* Shared report typography system — the Visual Report preview and its
+          PDF export both read their type from this one source. The preview
+          keeps its own screen-adapted body sizes, so only the families,
+          custom properties and heading roles are applied here; the exported
+          PDF carries the full A4 set. */}
+      <ReportTypographyStyles scope=".client-report-root" profile="a4" includeBodyRole={false} />
       {/* ── Header ── */}
       <div className="client-report-screen-only" style={{
         padding: "20px 32px",

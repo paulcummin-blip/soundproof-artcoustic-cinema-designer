@@ -20,6 +20,7 @@
  */
 
 import React from "react";
+import { buildReportTypographyCss } from "@/components/report/typography/reportTypography";
 
 export default function ClientReportPrintStyles() {
   return (
@@ -553,6 +554,47 @@ export default function ClientReportPrintStyles() {
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
         }
+      }
+
+      /* ── Canonical report typography ─────────────────────────────────
+         Every family and type ratio in the Visual Report comes from the
+         shared typography system. This block is the last word on type:
+         it outranks the layout rules above on specificity, so headings
+         are Futura PT Light (Century Gothic fallback) and body copy is
+         Didact Gothic, at the fixed title / header / subheader / body
+         relationship. */
+${buildReportTypographyCss({ scope: ".client-report-page", profile: "a4", prefix: "body.client-report-printing " })}
+
+      body.client-report-printing .client-report-page .client-report-page__header-title,
+      body.client-report-printing .client-report-page .client-report-print-heading__title {
+        font-family: var(--report-font-heading) !important;
+        font-size: var(--report-header-size) !important;
+        font-weight: 300 !important;
+        letter-spacing: var(--report-heading-tracking) !important;
+        line-height: var(--report-heading-leading) !important;
+        text-transform: uppercase !important;
+        color: #213428 !important;
+      }
+
+      body.client-report-printing .client-report-page .client-report-print-result__label {
+        font-family: var(--report-font-heading) !important;
+        font-size: var(--report-subheader-size) !important;
+        font-weight: 300 !important;
+        letter-spacing: var(--report-heading-tracking) !important;
+        line-height: var(--report-heading-leading) !important;
+        text-transform: uppercase !important;
+        color: #213428 !important;
+      }
+
+      body.client-report-printing .client-report-page .client-report-print-heading__subtitle,
+      body.client-report-printing .client-report-page .client-report-page__header-meta,
+      body.client-report-printing .client-report-page .client-report-print-result__explanation,
+      body.client-report-printing .client-report-page .client-report-print-result__supporting {
+        font-family: var(--report-font-body) !important;
+        font-size: var(--report-body-size) !important;
+        letter-spacing: var(--report-body-tracking) !important;
+        line-height: var(--report-body-leading) !important;
+        text-transform: none !important;
       }
     `}</style>
   );

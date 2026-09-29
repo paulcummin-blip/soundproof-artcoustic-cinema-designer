@@ -27,6 +27,7 @@ import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from '@/component
 
 // Extracted child components
 import ReportPrintStyles from '../components/report/ReportPrintStyles';
+import ReportTypographyStyles from '@/components/report/typography/ReportTypographyStyles';
 import RP22ReportParameterGrid from '../components/report/RP22ReportParameterGrid';
 import ReportHeader from '../components/report/ReportHeader';
 import ReportCover from '../components/report/ReportCover';
@@ -1221,6 +1222,7 @@ function RP22ReportInner() {
             <div className="print-only print-keep-layout">
                 <div className="print-root" ref={printReportRef}>
                     <div className="print-container rp22-report">
+                        <ReportTypographyStyles scope=".rp22-report" profile="a4" />
                         <section id="pdf-cover">
                             {/* ── Page 1: Logo + title + RP22/RP23 explanations ── */}
                             <div className="print-summary report-page-block report-page-block--cover" data-report-block="cover" data-report-page-start="true">

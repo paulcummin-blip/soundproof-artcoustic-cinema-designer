@@ -13,7 +13,7 @@
 import React from 'react';
 import { FileText, SlidersHorizontal, Download, Loader2, AlertCircle } from 'lucide-react';
 
-const FONT = 'Didact Gothic, sans-serif';
+import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
 
 const SECONDARY_IDLE =
   'flex items-center gap-1.5 px-3 py-2 text-xs uppercase tracking-[0.12em] rounded-md border transition-colors border-[#DCDBD6] bg-white text-[#3E4349] hover:bg-[#F5F4F0]';

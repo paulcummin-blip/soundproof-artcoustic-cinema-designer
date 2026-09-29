@@ -11,7 +11,7 @@
 import React from "react";
 import ClientP7FrontWides from "../ClientP7FrontWides";
 
-const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
+import { REPORT_FONT_BODY as BODY_FONT } from '@/components/report/typography/reportTypography';
 
 export default function PrintP7Content({
   p7Data,
