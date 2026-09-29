@@ -536,7 +536,13 @@ export default function ProjectsPage() {
 
       if (!editingProject) {
         // CREATE NEW PROJECT
-        const newProject = await base44.entities.Project.create(projectData);
+        // The legacy dialog also uses the server-owned creation authority.
+        const response = await base44.functions.invoke('createProfessionalProject', projectData);
+        const result = response?.data || response;
+        if (result?.status !== 'SUCCESS' || !result?.project?.id) {
+          throw new Error(result?.message || 'Unable to create the project.');
+        }
+        const newProject = result.project;
 
         const p = {
           id: newProject.id,
