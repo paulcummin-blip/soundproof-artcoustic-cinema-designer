@@ -21,41 +21,88 @@ import { BASS_LIFECYCLE_STATE } from "./bassCalculationLifecycle";
 // Reason codes shared with callers/diagnostics.
 export const BANK_BASE_DESIGN_MISMATCH_REASON = "bank-base-design-mismatch";
 export const RESTORE_BANK_MISMATCH_REASON = "bank-snapshot-base-design-mismatch";
+export const AUTHORITY_BANK_MISMATCH_REASON = "authority-bank-base-design-mismatch";
+export const AUTHORITY_PHYSICAL_MISMATCH_REASON = "authority-physical-base-design-mismatch";
+export const BANK_IDENTITY_UNAVAILABLE_REASON = "bank-identity-unavailable";
+export const SELECTED_TARGET_NOT_PREPARED_REASON = "selected-target-not-prepared";
 
 function preparedCountOf(value) {
   return Number.isFinite(value) ? Number(value) : 0;
 }
 
 /**
- * Is the in-memory target bank coherent with the physical design?
+ * Is the in-memory target bank coherent with the authority being called
+ * current, and with the physical design?
  *
  * Coherent when:
  *   - the bank holds no prepared target (preparation explicitly incomplete), or
- *   - the bank's baseDesign identity equals the current physical design's.
+ *   - the bank belongs to the same design as the authority (when both carry an
+ *     identity) AND to the same design as the physical design (when that
+ *     identity exists) AND the currently selected target is prepared.
  *
- * A non-empty bank whose identity cannot be proven to belong to the current
- * design fails closed — it must never be presented as prepared.
+ * THREE identities are compared, not two: the authority's baseDesign, the
+ * bank's baseDesign and the physical design's baseDesign. The authority and the
+ * bank identities are both PERSISTED values, so their comparison is available
+ * even while the live physical identity is temporarily unavailable
+ * (hydration/reflow). A non-empty bank whose identity cannot be proven to
+ * belong to the current design fails closed — it must never be presented as
+ * prepared.
+ *
+ * @param {object} inputs
+ * @param {string|null} inputs.bankBaseDesignFingerprint
+ * @param {number} inputs.bankPreparedCount
+ * @param {string|null} inputs.baseDesignFingerprint - physical design identity
+ * @param {string|null} inputs.authorityBaseDesignFingerprint - published authority identity
+ * @param {boolean|null} inputs.selectedTargetAvailable - null = requirement not
+ *   applicable (no target selected, or bank preparation explicitly not required)
  */
 export function resolveBankIdentityCoherence({
   bankBaseDesignFingerprint = null,
   bankPreparedCount = 0,
   baseDesignFingerprint = null,
+  authorityBaseDesignFingerprint = null,
+  selectedTargetAvailable = null,
 } = {}) {
   const preparedCount = preparedCountOf(bankPreparedCount);
   if (preparedCount <= 0) {
     return { coherent: true, foreign: false, preparedCount, reason: "bank-not-prepared" };
   }
-  if (!baseDesignFingerprint) {
-    return { coherent: true, foreign: false, preparedCount, reason: "design-identity-unavailable" };
+
+  // 1. AUTHORITY ↔ BANK. A prepared bank belonging to another design than the
+  // authority being called "current" is never coherent, whatever the live
+  // physical identity says (or fails to say).
+  if (authorityBaseDesignFingerprint
+    && bankBaseDesignFingerprint
+    && authorityBaseDesignFingerprint !== bankBaseDesignFingerprint) {
+    return { coherent: false, foreign: true, preparedCount, reason: AUTHORITY_BANK_MISMATCH_REASON };
   }
-  const foreign = !bankBaseDesignFingerprint
-    || bankBaseDesignFingerprint !== baseDesignFingerprint;
-  return {
-    coherent: !foreign,
-    foreign,
-    preparedCount,
-    reason: foreign ? BANK_BASE_DESIGN_MISMATCH_REASON : "bank-matches-design",
-  };
+
+  if (baseDesignFingerprint) {
+    // 2a. PHYSICAL ↔ BANK.
+    if (!bankBaseDesignFingerprint || bankBaseDesignFingerprint !== baseDesignFingerprint) {
+      return { coherent: false, foreign: true, preparedCount, reason: BANK_BASE_DESIGN_MISMATCH_REASON };
+    }
+    // 2b. PHYSICAL ↔ AUTHORITY.
+    if (authorityBaseDesignFingerprint && authorityBaseDesignFingerprint !== baseDesignFingerprint) {
+      return { coherent: false, foreign: true, preparedCount, reason: AUTHORITY_PHYSICAL_MISMATCH_REASON };
+    }
+  } else if (!bankBaseDesignFingerprint) {
+    // Physical identity unavailable AND the bank cannot even be attributed to a
+    // design: prepared entries with no identity are not proof of preparation.
+    return { coherent: false, foreign: true, preparedCount, reason: BANK_IDENTITY_UNAVAILABLE_REASON };
+  }
+
+  // 3. SELECTED TARGET. A prepared family that does not contain the currently
+  // selected target cannot support "Performance is current" — switching to that
+  // target would have no prepared result.
+  if (selectedTargetAvailable === false) {
+    return { coherent: false, foreign: true, preparedCount, reason: SELECTED_TARGET_NOT_PREPARED_REASON };
+  }
+
+  const reason = (baseDesignFingerprint && bankBaseDesignFingerprint === baseDesignFingerprint)
+    ? "bank-matches-design"
+    : "authority-bank-agree";
+  return { coherent: true, foreign: false, preparedCount, reason };
 }
 
 /**

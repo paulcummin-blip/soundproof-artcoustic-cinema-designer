@@ -14,6 +14,7 @@ import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
 import { useTargetCacheEntry, useTargetCacheProgress, useTargetBankIdentity, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence, useRestoreLock, clearRestoreLock, getRestoreLock, getTargetBankSnapshot } from "./p14TargetCache";
 import { resolveBankIdentityCoherence, resolveLifecycleWithBankIdentity, shouldProtectBankFromSeed } from "./bankIdentityCoherence";
+import { resolveRestoredAuthorityRebuild } from "./bda/restoreRecoveryAuthority";
 import { useIsRestoring, setRestoring } from "./bda/restoreStateStore";
 import { beginP14AnalysisJob, publishP14AnalysisProgress, getP14AnalysisProgress } from "./p14AnalysisProgressStore";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
@@ -204,11 +205,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // legitimate (background preparation is explicitly incomplete) and must not
   // suppress the current status.
   const targetBankIdentity = useTargetBankIdentity(scopeId, versionId);
-  const bankIdentityCoherence = resolveBankIdentityCoherence({
-    bankBaseDesignFingerprint: targetBankIdentity.baseDesignFingerprint,
-    bankPreparedCount: targetBankIdentity.count,
-    baseDesignFingerprint,
-  });
+  // The coherence decision itself is computed below, once the published
+  // authority is known: it compares the AUTHORITY identity, the BANK identity
+  // and the PHYSICAL design identity (see "Current-status identity coherence").
 
   // Hydrate target cache from DB on mount / project change
   const [targetCacheHydrated, setTargetCacheHydrated] = useState(false);
@@ -293,6 +292,26 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && !!publishedBaseDesign
     && !!baseDesignFingerprint
     && publishedBaseDesign !== baseDesignFingerprint;
+
+  // ── Current-status identity coherence (sole gate for COMPLETE) ────────
+  // "Performance is current" requires the AUTHORITY, the PHYSICAL design and
+  // the prepared target BANK to agree — plus the currently selected target to
+  // be present in the bank. The authority and bank identities are both
+  // persisted, so they are comparable even while the live physical identity is
+  // temporarily unavailable (hydration / reflow). A LIMITED authority publishes
+  // its result without a prepared family entry by design, so the selected-target
+  // requirement is not applicable to it; with no P14 target selected the
+  // requirement is likewise not applicable.
+  const selectedTargetAvailableInBank = targetKey
+    ? (!!cachedContract || completedBassAuthority?.authorityStatus === BASS_AUTHORITY_STATUS.LIMITED)
+    : null;
+  const bankIdentityCoherence = resolveBankIdentityCoherence({
+    bankBaseDesignFingerprint: targetBankIdentity.baseDesignFingerprint,
+    bankPreparedCount: targetBankIdentity.count,
+    baseDesignFingerprint,
+    authorityBaseDesignFingerprint: completedBassAuthority?.contract?.fingerprints?.baseDesign || null,
+    selectedTargetAvailable: selectedTargetAvailableInBank,
+  });
 
   // PASS 2: manualRequestMatchesCurrent no longer depends on the normalized
   // transfer fingerprint. The cacheKey (full calibration fingerprint) captures
@@ -1625,7 +1644,60 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && completedContract.job.resultFingerprint === cacheKey
     && !!completedBassAuthority?.authoritative
     && completedBassAuthority?.currentFingerprint === cacheKey;
-  const foregroundReady = foregroundReadyPathA || foregroundReadyPathB;
+  // PATH C — RESTORED / PUBLISHED AUTHORITY REBUILD:
+  //   a coherent restored/published authority for the CURRENT design AND the
+  //   CURRENT selected target already proves the foreground target is reusable.
+  //   When the prepared bank is missing, empty, foreign or incomplete, that
+  //   authority alone is sufficient to rebuild the bank through the EXISTING
+  //   bridge seed + background scheduler — no fresh optimiser run and no manual
+  //   Update is required. Policy lives in restoreRecoveryAuthority (pure).
+  const restoredAuthorityRebuild = resolveRestoredAuthorityRebuild({
+    projectHydrationReady: isProjectHydrationReady,
+    authorityHydrationSettled: bassAuthorityHydrationSettled,
+    manualRequestActive: !!manualAnalysisRequest,
+    placementPreviewActive,
+    baseDesignFingerprint,
+    cacheKey,
+    contractAuthoritative: isAuthoritativeBassContract(completedContract),
+    contractGraphComplete: hasGraphPayload(completedContract),
+    contractResultFingerprint: completedContract?.job?.resultFingerprint || null,
+    contractBaseDesignFingerprint: completedContract?.fingerprints?.baseDesign || null,
+    contractMatchesRequestedTarget: !!completedContract && bassContractMatchesRequestedP14(completedContract, requested),
+    authorityAuthoritative: !!completedBassAuthority?.authoritative,
+    authorityCurrentFingerprint: completedBassAuthority?.currentFingerprint || null,
+    selectedTargetInBank: !!cachedContract,
+    bankCoherent: bankIdentityCoherence.coherent,
+    familyResolved: targetFamilyProgress.resolved,
+    familyTotal: targetFamilyProgress.total,
+  });
+  const foregroundReadyPathC = restoredAuthorityRebuild.eligible;
+  const foregroundReady = foregroundReadyPathA || foregroundReadyPathB || foregroundReadyPathC;
+
+  // ── Path C bridge seed — rebuild the bank from the restored authority ──
+  // When Path C is eligible the current target is NOT in the prepared bank, and
+  // the background scheduler skips the foreground target — so the verified
+  // target must be written into the bank first, exactly like the existing
+  // bridge seed. Same protection policy: a bank owned by the published
+  // authority's design is never downgraded. No maths, no fingerprint change.
+  useEffect(() => {
+    if (!restoredAuthorityRebuild.eligible) return;
+    const restoredContract = getCompletedBassContract(scopeId, versionId);
+    if (!restoredContract
+      || !isAuthoritativeBassContract(restoredContract)
+      || !hasGraphPayload(restoredContract)
+      || !bassContractMatchesRequestedP14(restoredContract, requested)) return;
+    if (restoredContract?.job?.resultFingerprint !== cacheKey) return;
+    if (restoredContract?.fingerprints?.baseDesign !== baseDesignFingerprint) return;
+    const bankSnapshot = getTargetBankSnapshot(scopeId, versionId);
+    const protectsPublishedAuthority = shouldProtectBankFromSeed({
+      bankBaseDesignFingerprint: bankSnapshot?.baseDesignFingerprint || null,
+      bankPreparedCount: bankSnapshot?.count || 0,
+      baseDesignFingerprint,
+      publishedAuthorityBaseDesignFingerprint: completedBassAuthority?.contract?.fingerprints?.baseDesign || null,
+    });
+    if (protectsPublishedAuthority) return;
+    setTargetCacheEntry(scopeId, versionId, baseDesignFingerprint, targetKey, restoredContract, { immediate: true });
+  }, [restoredAuthorityRebuild.eligible, scopeId, versionId, cacheKey, targetKey, baseDesignFingerprint, completedBassAuthority]);
 
   // ── Background room-physics preparation ──────────────────────────────
   // On cold restore, rspRawCurve is empty because the authoritative
@@ -2059,19 +2131,40 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     ? BASS_LIFECYCLE_STATE.RESTORING
     : resolveLifecycleWithBankIdentity(bassLifecycleStateRaw, bankIdentityCoherence);
 
-  // FIX 3 — The restoring state is now cleared exclusively by the restore
-  // transaction owner (RestorePreviousDesignBar.handleRestore finally block)
-  // when restorePreviousDesign returns. The previous effect cleared
-  // restoringActive based solely on targetFamilyProgress.ready >= total,
-  // but restoreTargetBankSnapshot briefly makes progress 8/8 BEFORE
-  // restorePreviousDesign has finished (it is still awaiting hydrateTargetCache).
-  // That premature clear caused "Performance is current" to appear while
-  // "Restoring previous design…" was still visible. The transaction owner is
-  // the only authority that knows when the restore is truly complete.
-  // If the bank could not be restored (bankRestored=false), the owner keeps
-  // restoringActive active; the background scheduler will rebuild the bank
-  // and the normal lifecycle transitions will take over once coherence is
-  // observed via the restore-lock release effect.
+  // FIX 4 — current-status identity diagnostic. One concise line, emitted only
+  // when the decision inputs change. Temporary; removable.
+  const statusAuthorityDiagRef = useRef(null);
+  useEffect(() => {
+    const signature = JSON.stringify({
+      physicalBaseDesign: baseDesignFingerprint || null,
+      authorityBaseDesign: completedBassAuthority?.contract?.fingerprints?.baseDesign || null,
+      bankBaseDesign: targetBankIdentity.baseDesignFingerprint || null,
+      bankPreparedCount: targetBankIdentity.count || 0,
+      familyProgress: `${targetFamilyProgress.resolved}/${targetFamilyProgress.total}`,
+      selectedTargetInBank: !!cachedContract,
+      ownerScopeId: scopeId,
+      ownerVersionId: versionId,
+      bankCoherent: bankIdentityCoherence.coherent,
+      coherenceReason: bankIdentityCoherence.reason,
+      rebuiltFromRestoredAuthority: restoredAuthorityRebuild.eligible,
+      lifecycleState: bassLifecycleState,
+    });
+    if (statusAuthorityDiagRef.current === signature) return;
+    statusAuthorityDiagRef.current = signature;
+    safeConsole.log("bass-status-authority", signature);
+  }, [baseDesignFingerprint, completedBassAuthority, targetBankIdentity.baseDesignFingerprint, targetBankIdentity.count, targetFamilyProgress.resolved, targetFamilyProgress.total, cachedContract, scopeId, versionId, bankIdentityCoherence.coherent, bankIdentityCoherence.reason, restoredAuthorityRebuild.eligible, bassLifecycleState]);
+
+  // FIX 2 — The restoring state is released by the restore transaction owner
+  // (RestorePreviousDesignBar.handleRestore) the moment restorePreviousDesign
+  // returns, whatever its outcome: cache-miss, unprovable/empty bank, promotion
+  // failure or physical failure. Restoring therefore ALWAYS has a terminal exit
+  // and can never outlive the transaction it represents. The lifecycle then
+  // reports Current (authority + bank + physical coherent) or the actionable
+  // "needs update / preparing target results" state from the restore bar.
+  // The bank-identity gate keeps the lifecycle off "Performance is current"
+  // while the prepared family does not belong to the restored design, and
+  // Path C (restoredAuthorityRebuild) lets the existing bridge seed +
+  // background scheduler rebuild the bank without a manual Update.
   const terminalMessage = coldReloadRecovered && !calculationInProgress
     ? BASS_COLD_RELOAD_RECOVERY_COPY
     : bassLifecycleState === BASS_LIFECYCLE_STATE.TIMED_OUT

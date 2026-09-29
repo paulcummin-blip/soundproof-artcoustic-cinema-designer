@@ -31,7 +31,9 @@ import React, { useState, useEffect } from "react";
 import { History, Check, RefreshCw, Loader2 } from "lucide-react";
 import { usePreviousDesignCheckpoint, clearCheckpoint } from "./previousDesignCheckpoint";
 import { restorePreviousDesign } from "./bdaCheckpointAuthority";
-import { setRestoring as setSharedRestoring, useIsRestoring } from "./restoreStateStore";
+import { setRestoring as setSharedRestoring } from "./restoreStateStore";
+import { resolveRestoreExit, RESTORE_OUTCOME } from "./restoreRecoveryAuthority";
+import { safeConsole } from "@/components/utils/safeConsole";
 
 export default function RestorePreviousDesignBar({
   projectId,
@@ -51,35 +53,31 @@ export default function RestorePreviousDesignBar({
 }) {
   const checkpoint = usePreviousDesignCheckpoint(projectId, versionId);
   const [restoring, setLocalRestoring] = useState(false);
-  // Transient restore result — shown after a cache-miss restore when the
-  // checkpoint has been consumed (cleared) but the bass result could not be
-  // promoted from cache. The physical design was restored; bass is STALE.
+  // Transient restore outcome — set when the transaction returns without a
+  // prepared family for the restored design (cache-miss, unprovable/empty bank,
+  // promotion failure, physical failure). Drives the actionable card below; it
+  // is cleared automatically once the restored authority is current and the
+  // target family has been rebuilt.
   const [restoreResult, setRestoreResult] = useState(null);
 
   // Shared restoring flag — the sole authority BassBackgroundAnalysisOwner
-  // reads to force bassLifecycleState = RESTORING. The local `restoring`
-  // state is NOT visible to the owner, so the shared store must be set
-  // FIRST (before the local state) to minimise the one-render race where
-  // the owner re-renders with a stale restoringActive snapshot.
-  const sharedRestoringActive = useIsRestoring(projectId, versionId);
+  // reads to force bassLifecycleState = RESTORING. It is set FIRST, before the
+  // local state, to minimise the one-render race where the owner re-renders
+  // with a stale restoringActive snapshot — and it is always released when the
+  // restore transaction returns (FIX 2), so Restoring never outlives it.
 
   const sharedRef = React.useRef(shared);
   sharedRef.current = shared;
 
-  // ── Coherence reconciliation for cache-miss restores ──
-  // A cache-miss restore returns { ok:false, reason:"cache-miss",
-  // physicalRestored:true, bankRestored:false }. The shared restoring state
-  // is intentionally kept active (finally block skips clearing it). The
-  // publish effect in BassBackgroundAnalysisOwner may subsequently promote
-  // the cached contract from the hydrated target bank, making the
-  // authority AUTHORITATIVE. When the authority is coherent AND the target
-  // family is complete (ready >= total), the restore has recovered — clear
-  // the stale cache-miss warning and the shared restoring state so the
-  // lifecycle transitions to COMPLETE without requiring another Update
-  // Bass Performance action.
+  // ── Coherence reconciliation after a restore ──
+  // Every restore outcome (cache-miss, unprovable/empty bank, promotion
+  // failure, fingerprint not ready) now exits Restoring immediately and shows
+  // the actionable card below. That card clears itself as soon as the restored
+  // authority is current for this design AND the prepared target family has
+  // been rebuilt — Path C rebuilds it automatically from the restored
+  // authority, so no further action is normally required.
   useEffect(() => {
     if (!restoreResult) return;
-    if (restoreResult.reason !== "cache-miss") return;
     const authority = shared?.completedBassAuthority;
     const progress = shared?.p14FamilyProgress;
     const coherent = !!authority?.authoritative
@@ -87,7 +85,7 @@ export default function RestorePreviousDesignBar({
       && authority.contract.job.resultFingerprint === shared?.cacheKey
       && !!progress
       && progress.total > 0
-      && progress.ready >= progress.total;
+      && progress.resolved >= progress.total;
     if (coherent) {
       setRestoreResult(null);
       setSharedRestoring(projectId, versionId, false);
@@ -102,37 +100,50 @@ export default function RestorePreviousDesignBar({
     setSharedRestoring(projectId, versionId, true);
     setLocalRestoring(true);
     setRestoreResult(null);
-    let bankRestored = true;
+
+    let result = null;
     try {
-      const result = await restorePreviousDesign(projectId, versionId, {
+      result = await restorePreviousDesign(projectId, versionId, {
         commitInstances,
         commitSeating,
         sharedRef,
       });
-      if (result && !result.ok) {
-        setRestoreResult(result);
-      }
-      // Only clear the shared restoring state if the target bank was
-      // restored (from snapshot or DB). If the bank is still 0/8, keep the
-      // shared restoring state active so the lifecycle shows
-      // "Restoring previous design…" instead of "Performance is current".
-      //
-      // A bank-identity mismatch means the prepared bank belongs to another
-      // physical design: the restore transaction itself is finished (physical
-      // design + authority + publication pointer restored) and the bank must be
-      // rebuilt for the restored design. Release the restoring state — the bank
-      // identity gate keeps the lifecycle off "Performance is current" until
-      // the bank matches the restored design.
-      const bankIdentityMismatch = result?.reason === "bank-snapshot-base-design-mismatch";
-      bankRestored = result?.bankRestored !== false || bankIdentityMismatch;
     } catch {
-      bankRestored = false;
+      result = { ok: false, reason: "restore-error", physicalRestored: false };
     } finally {
       setLocalRestoring(false);
-      if (bankRestored) {
-        setSharedRestoring(projectId, versionId, false);
-      }
+      // FIX 2 — Restoring ALWAYS ends when the restore transaction returns.
+      // The transaction is internally bounded (RESTORE_TIMEOUT_MS) and nothing
+      // else writes this flag, so holding it open here was what left the
+      // lifecycle stuck on "Restoring previous design…" with no checkpoint and
+      // no message. The lifecycle now reports Current, or the actionable card
+      // below reports "needs updating / preparing target results".
+      setSharedRestoring(projectId, versionId, false);
     }
+
+    // Map the returned transaction to the visible state (pure policy).
+    const exit = resolveRestoreExit(result);
+    if (exit.showNeedsUpdate || exit.showRetry) {
+      setRestoreResult({
+        ok: false,
+        reason: exit.reason,
+        physicalRestored: exit.outcome !== RESTORE_OUTCOME.RETRY,
+        bankRestored: false,
+        needsBankRebuild: exit.needsBankRebuild,
+        outcome: exit.outcome,
+      });
+    }
+
+    // FIX 4 — restore-return diagnostic. One concise line; removable.
+    safeConsole.log("bass-restore-return", JSON.stringify({
+      projectId,
+      versionId,
+      ok: result?.ok === true,
+      reason: result?.reason || null,
+      physicalRestored: result?.physicalRestored === true,
+      bankRestored: result?.bankRestored !== false,
+      outcome: exit.outcome,
+    }));
   };
 
   const handleKeep = () => {
@@ -163,13 +174,21 @@ export default function RestorePreviousDesignBar({
     );
   }
 
-  // ── Cache-miss / restore-failed: physical restored, bass STALE ──
-  // The checkpoint has been consumed. Show the message + Update action.
-  // SUPPRESS this warning while the shared restoring state is active —
-  // the main lifecycle (CurrentDesignBar / BassPerformanceStrip) already
-  // shows "Restoring previous design…" via bassLifecycleState = RESTORING.
-  // The cache-miss warning must not appear as a second top-level status.
-  if (!checkpoint && restoreResult && !restoreResult.ok && restoreResult.physicalRestored && !sharedRestoringActive) {
+  // ── Needs update / preparing: physical restored, prepared family not ──
+  // The checkpoint has been consumed or kept. This card is the ACTIONABLE state
+  // the restore exits into; it is deliberately NOT suppressed by the restoring
+  // flag (FIX 2) — that flag is cleared by the time the transaction returns.
+  // When the restored authority is already current, the family is rebuilt
+  // automatically (Path C), so the card reports "Preparing target results…"
+  // rather than implying action is required.
+  if (!checkpoint && restoreResult && !restoreResult.ok) {
+    const progress = shared?.p14FamilyProgress || {};
+    const familyTotal = Number(progress.total) || 0;
+    const familyResolved = Number(progress.resolved) || 0;
+    const authorityCurrent = !!shared?.completedBassAuthority?.authoritative
+      && shared?.completedBassAuthority?.contract?.job?.resultFingerprint === shared?.cacheKey;
+    const preparing = authorityCurrent && familyTotal > 0 && familyResolved < familyTotal;
+    const needsUpdate = restoreResult.physicalRestored !== false;
     return (
       <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 space-y-2">
         <div className="flex items-center gap-2">
@@ -177,8 +196,15 @@ export default function RestorePreviousDesignBar({
           <span className="text-[13px] font-semibold text-amber-800">Previous design restored</span>
         </div>
         <p className="text-[11px] text-amber-700 leading-relaxed">
-          Bass performance needs updating.
+          {!needsUpdate
+            ? "The previous design could not be restored. You can update bass performance for the current design."
+            : preparing ? "Preparing target results\u2026" : "Bass performance needs updating."}
         </p>
+        {preparing && (
+          <p className="text-[10px] text-amber-600">
+            Prepared {familyResolved} of {familyTotal} target results.
+          </p>
+        )}
         {typeof onUpdateBass === "function" && (
           <button
             type="button"
