@@ -108,6 +108,7 @@ export default async function(req) {
     const projectFields = {
       name: projectName,
       client_name: body.client_name || '',
+      project_reference: body.project_reference || '',
       project_status: body.project_status || 'Prospective',
       room_length: body.room_length ?? null,
       room_width: body.room_width ?? null,

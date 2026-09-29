@@ -19,7 +19,9 @@ import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 export default function ProposalPrintDocument({
   proposal,
   projectName,
-  clientName,
+  dealerName,
+  projectReference,
+  reportTitle,
   coverImageUrl,
   heroImageUrl,
   logoUrl,
@@ -35,8 +37,10 @@ export default function ProposalPrintDocument({
     <div className="proposal-print-portal">
       <div className="proposal-print-cover">
         <ProposalCoverPage
-          title={proposal?.title || projectName}
-          clientName={clientName}
+          projectName={projectName}
+          dealerName={dealerName}
+          projectReference={projectReference}
+          reportTitle={reportTitle}
           coverImageUrl={coverImageUrl}
           heroImageUrl={heroImageUrl}
           logoUrl={logoUrl}

@@ -10,6 +10,11 @@
       "type": "string",
       "description": "Client name"
     },
+    "project_reference": {
+      "type": "string",
+      "description": "Dealer-assigned project reference / job number, shown on client-facing report and proposal covers (e.g. 'AC-2026-014'). Free-form. Null or empty = no reference, and the cover omits the reference line entirely.",
+      "nullable": true
+    },
     "project_status": {
       "type": "string",
       "description": "Lifecycle status: Live, Prospective, Lost, Completed",

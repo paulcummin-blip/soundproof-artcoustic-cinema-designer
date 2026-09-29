@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Link, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { getSectionDef } from '@/components/proposal/proposalSections';
-import { getProposalType } from '@/components/proposal/proposalTypes';
+import { getProposalType, getProposalCoverTitle } from '@/components/proposal/proposalTypes';
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
@@ -44,7 +44,8 @@ export default function ProposalEditor() {
   const [restoring, setRestoring] = useState(false);
   const [projectContext, setProjectContext] = useState({
     projectName: null,
-    clientName: null,
+    dealerName: null,
+    projectReference: null,
     coverImageUrl: null,
     heroImageUrl: null,
     logoUrl: null,
@@ -53,7 +54,7 @@ export default function ProposalEditor() {
   // Proposal context — project/client/dealer metadata for the workspace toolbar
   // and the exported PDF cover. Read-only: it never changes proposal content.
   const loadProjectContext = useCallback(async (proposalRecord) => {
-    const [projectResult, brandResult, coverResult] = await Promise.allSettled([
+    const [projectResult, brandResult, coverResult, accountResult] = await Promise.allSettled([
       proposalRecord.project_id
         ? base44.entities.Project.filter({ id: proposalRecord.project_id })
         : Promise.resolve([]),
@@ -66,16 +67,28 @@ export default function ProposalEditor() {
             asset_type: 'cover_image',
           })
         : Promise.resolve([]),
+      proposalRecord.account_id
+        ? base44.entities.Account.filter({ id: proposalRecord.account_id })
+        : Promise.resolve([]),
     ]);
     const project = projectResult.status === 'fulfilled' ? projectResult.value?.[0] : null;
     const brand = brandResult.status === 'fulfilled' ? brandResult.value?.[0] : null;
     const cover = coverResult.status === 'fulfilled' ? coverResult.value?.[0] : null;
+    const account = accountResult.status === 'fulfilled' ? accountResult.value?.[0] : null;
     // Resolves the dealer's own hero/logo when set, otherwise the approved
     // Sound Proof / Artcoustic defaults — so the cover is always professional.
     const presentation = resolveDealerBrandPresentation(brand, proposalRecord.account_id);
+    // Dealer name: the dealer's own branding name, falling back to the account
+    // name. The approved Artcoustic default is deliberately NOT used here —
+    // Artcoustic is the partner brand in the lockup, not the dealer.
+    const dealerName = brand?.display_name_override?.trim()
+      || brand?.company_name?.trim()
+      || account?.name?.trim()
+      || null;
     setProjectContext({
       projectName: project?.name || null,
-      clientName: project?.client_name || null,
+      dealerName,
+      projectReference: project?.project_reference || null,
       coverImageUrl: cover?.file_url || null,
       heroImageUrl: presentation.heroBg,
       logoUrl: presentation.dealerLogo,
@@ -497,6 +510,8 @@ export default function ProposalEditor() {
 
   const visibleSections = sections.filter((s) => s.is_enabled !== false);
   const typeLabel = getProposalType(proposal?.proposal_type)?.label || 'Single Design Proposal';
+  // Client-facing cover title — derived from the proposal type.
+  const coverReportTitle = getProposalCoverTitle(proposal?.proposal_type);
   const hasUnsavedChanges = dirtySections.size > 0;
 
   return (
@@ -635,8 +650,10 @@ export default function ProposalEditor() {
                   <div>
                     <div className="rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: '4/5' }}>
                       <ProposalCoverPage
-                        title={proposal?.title || projectContext.projectName}
-                        clientName={projectContext.clientName}
+                        projectName={projectContext.projectName || proposal?.title}
+                        dealerName={projectContext.dealerName}
+                        projectReference={projectContext.projectReference}
+                        reportTitle={coverReportTitle}
                         coverImageUrl={projectContext.coverImageUrl}
                         heroImageUrl={projectContext.heroImageUrl}
                         logoUrl={projectContext.logoUrl}
@@ -768,8 +785,10 @@ export default function ProposalEditor() {
           screen and revealed only while the export body class is active. */}
       <ProposalPrintDocument
         proposal={proposal}
-        projectName={projectContext.projectName}
-        clientName={projectContext.clientName}
+        projectName={projectContext.projectName || proposal?.title}
+        dealerName={projectContext.dealerName}
+        projectReference={projectContext.projectReference}
+        reportTitle={coverReportTitle}
         coverImageUrl={projectContext.coverImageUrl}
         heroImageUrl={projectContext.heroImageUrl}
         logoUrl={projectContext.logoUrl}

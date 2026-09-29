@@ -46,6 +46,7 @@ export const splOptions = [
 const EMPTY_FORM = {
   name: "",
   client_name: "",
+  project_reference: "",
   project_status: "prospective",
   room_length: "",
   room_width: "",
@@ -73,6 +74,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
       setFormData({
         name: editProject.name || "",
         client_name: editProject.client || "",
+        project_reference: editProject.project_reference || "",
         project_status: normalizeStatusId(editProject.status || "prospective"),
         room_length: editProject.roomLength != null ? String(editProject.roomLength) : "",
         room_width: editProject.roomWidth != null ? String(editProject.roomWidth) : "",
@@ -101,6 +103,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
         const updated = await Project.update(editProject.id, {
           name: payload.name,
           client_name: payload.client_name,
+          project_reference: payload.project_reference,
           project_status: payload.project_status,
           room_length: payload.room_length,
           room_width: payload.room_width,
@@ -118,6 +121,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
           const res = await base44.functions.invoke('createProfessionalProject', {
             name: payload.name,
             client_name: payload.client_name,
+            project_reference: payload.project_reference,
             project_status: payload.project_status,
             room_length: payload.room_length,
             room_width: payload.room_width,
@@ -198,6 +202,16 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
                 onChange={(e) => setFormData({...formData, client_name: e.target.value})}
                 className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                 placeholder="Client name"
+              />
+            </div>
+
+            <div>
+              <Label className="text-[#3E4349]">Project Reference</Label>
+              <Input
+                value={formData.project_reference}
+                onChange={(e) => setFormData({...formData, project_reference: e.target.value})}
+                className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                placeholder="e.g. AC-2026-014"
               />
             </div>
 
