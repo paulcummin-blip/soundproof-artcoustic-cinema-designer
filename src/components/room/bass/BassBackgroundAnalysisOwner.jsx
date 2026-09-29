@@ -25,6 +25,12 @@ import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from "@/component
 import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 import { summariseAuthoritativeP19Seats } from "./p19SeatAuthority";
 import { getScopedSeatIds } from "@/components/utils/seatScopeAuthority";
+import {
+  subscribe as subscribeUserInteraction,
+  getLastInteractionAt,
+  getIdleResumeDeadline,
+  isUserInteracting,
+} from "@/components/state/userInteractionStore.js";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
@@ -51,6 +57,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const appState = useAppState();
   const recommendationsActive = useRecommendationGate();
   const calcAllTargetsRequest = useCalculateAllTargetsRequest();
+  const lastInteractionAt = useSyncExternalStore(
+    subscribeUserInteraction,
+    getLastInteractionAt,
+    getLastInteractionAt
+  );
+  const backgroundPrepReadyAfterRef = useRef(Date.now() + 10000);
   // FIX 5: Higher-priority work detection. The P14 background sweep must yield
   // to manual Calculate, Improve Bass Response / Stage 2, and recommendation
   // work. These reactive subscriptions ensure the auto-start useEffect re-runs
@@ -1732,8 +1744,52 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       && sources.length > 0
       && targetFamilyProgress.total > 0
       && targetFamilyProgress.resolved < targetFamilyProgress.total;
-    setBackgroundPrepFingerprint(shouldPrep ? geometryFingerprint : null);
-  }, [foregroundReady, manualAnalysisRequest, isDragging, placementPreviewActive, heavyActionRunning, stage2Updating, recommendationsActive, geometryFingerprint, sources.length, targetFamilyProgress.total, targetFamilyProgress.resolved]);
+
+    if (!shouldPrep) {
+      setBackgroundPrepFingerprint(null);
+      return undefined;
+    }
+
+    // Preparing the cold-restored room transfer is useful but not part of the
+    // interactive project-open path. Keep a full first-use window clear, then
+    // require the shared user-interaction quiet period before asking the
+    // authoritative hook to prepare room physics. Any click, key, wheel or
+    // drag cancels and reschedules this timer.
+    let cancelled = false;
+    let timeoutId = null;
+    const scheduleWhenQuiet = () => {
+      if (cancelled) return;
+      const quietAt = Math.max(
+        backgroundPrepReadyAfterRef.current,
+        getIdleResumeDeadline()
+      );
+      const waitMs = Math.max(0, quietAt - Date.now());
+      if (waitMs > 0 || isUserInteracting()) {
+        timeoutId = window.setTimeout(scheduleWhenQuiet, Math.max(40, waitMs + 20));
+        return;
+      }
+      setBackgroundPrepFingerprint(geometryFingerprint);
+    };
+
+    scheduleWhenQuiet();
+    return () => {
+      cancelled = true;
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+    };
+  }, [
+    foregroundReady,
+    manualAnalysisRequest,
+    isDragging,
+    placementPreviewActive,
+    heavyActionRunning,
+    stage2Updating,
+    recommendationsActive,
+    geometryFingerprint,
+    sources.length,
+    targetFamilyProgress.total,
+    targetFamilyProgress.resolved,
+    lastInteractionAt,
+  ]);
 
   // Publish one shared, non-acoustic lifecycle snapshot for the P14 selector
   // and Stage 2 gate. Counts come only from verified target-cache entries.
