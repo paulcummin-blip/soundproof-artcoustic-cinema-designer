@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { APPROVED_DEALER_BRANDING, resolveDealerBrandPresentation } from "@/components/account/defaultDealerBranding";
+import { useBrandImage } from "@/components/account/useBrandImage";
 import { loadDealerBrand } from "@/components/account/dealerBrandAuthority";
 
 // Opening brand treatment. It uses the same account-owned hero image and logo
@@ -200,12 +202,11 @@ export default function BrandIntroOverlay() {
     if (document.fonts?.ready) document.fonts.ready.then(measure);
   }, [show]);
 
-  const heroBg = brand?.hero_background_url || null;
-  const dealerName = brand?.display_name_override || brand?.company_name || null;
-  const dealerLogo = heroBg
-    ? (brand?.white_logo_url || brand?.dealer_logo_url || null)
-    : (brand?.dealer_logo_url || brand?.white_logo_url || null);
-  const hasDealer = !!(dealerLogo || dealerName);
+  const presentation = resolveDealerBrandPresentation(brand, accountId);
+  const heroBg = useBrandImage(presentation.heroBg, APPROVED_DEALER_BRANDING.hero_background_url);
+  const dealerLogo = useBrandImage(presentation.dealerLogo, APPROVED_DEALER_BRANDING.white_logo_url);
+  const dealerName = presentation.dealerName;
+  const hasDealer = true;
 
   useEffect(() => {
     setDealerNatural(null);
