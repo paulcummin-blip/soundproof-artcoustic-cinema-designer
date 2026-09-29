@@ -25,7 +25,12 @@ import { buildAdiBassEvidence } from "@/components/adi/adiBassEvidenceBuilder";
 import { RECOMMENDATION_INTENT } from "@/components/room/bass/recommendationAuthority/recommendationAuthority";
 import { ADI_OUTCOME } from "@/components/adi/adiConstants";
 import { buildOptimisedInstances } from "../improveBassV2/improveBassV2Apply";
-import { applyCalibrationTuning } from "../improveBassV2/improveBassV2ApplyCalibration";
+import { applyCalibrationTuning, isCalibrationApplied } from "../improveBassV2/improveBassV2ApplyCalibration";
+import {
+  computeAppliedCalibrationBasisFingerprint,
+  resolveAppliedCalibrationStatus,
+} from "../appliedCalibrationAuthority/appliedCalibrationAuthority";
+import { resolveAdiAppliedState, ADI_APPLIED_STATE } from "@/components/adi/adiAppliedStateAuthority";
 import { buildProvenance } from "../improveBassV2/appliedProvenance";
 import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Fingerprint";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
@@ -117,6 +122,29 @@ export default function AdiRecommendation({
     && Array.isArray(appliedCalibrationAuthority.values)
     && appliedCalibrationAuthority.values.length > 0
     && !appliedCalibrationAuthority.staleReason;
+
+  // Does the CURRENT design still reflect the persisted calibration? A stale
+  // authority (geometry changed since it was applied) or values that no longer
+  // match the instances means the design does NOT reflect an applied
+  // recommendation — APPLIED must not be claimed.
+  const appliedCalibrationIsStale = useMemo(() => {
+    if (!hasPersistedAppliedCalibration) return false;
+    const basisFingerprint = computeAppliedCalibrationBasisFingerprint({
+      subwooferInstances: currentInstances,
+      roomDims,
+      seatingPositions,
+      rspPosition: null,
+      selectedSubModel,
+    });
+    return resolveAppliedCalibrationStatus(appliedCalibrationAuthority, basisFingerprint).isStale === true;
+  }, [hasPersistedAppliedCalibration, appliedCalibrationAuthority, currentInstances, roomDims, seatingPositions, selectedSubModel]);
+
+  const appliedCalibrationIsInDesign = useMemo(
+    () => (hasPersistedAppliedCalibration
+      ? isCalibrationApplied(currentInstances, appliedCalibrationAuthority?.values || [])
+      : false),
+    [hasPersistedAppliedCalibration, currentInstances, appliedCalibrationAuthority],
+  );
 
   // Persistent visibility: during calculation with a published result,
   // the ADI recommendation stays visible (greyed) rather than disappearing.
@@ -419,11 +447,24 @@ export default function AdiRecommendation({
   const canApplySubPositions = isPhysical && isSubPositionLever && hasSubPositions && hasCanonicalInstances && !appliedStage;
   const canApplySeating = isPhysical && isSeatingLever && hasSeating && !appliedStage;
   const showApplyButton = canApplySubPositions || canApplySeating;
-  // APPLIED badge: derived from the transient workflow state OR the persisted
-  // Applied Calibration Authority so it is identical before and after refresh.
-  const showAppliedBadge = (isCalibration && (autoApplied || hasPersistedAppliedCalibration)) || appliedStage;
-
   const applyHandler = canApplySubPositions ? handleApplySubPositions : canApplySeating ? handleApplySeating : null;
+
+  // ── Applied state — ONE authority ──
+  // APPLIED requires a specific recommendation to have been applied, the design
+  // to still reflect it, no Apply action waiting, and a complete evaluation.
+  // It is therefore mutually exclusive with an available Apply action.
+  const adiAppliedState = resolveAdiAppliedState({
+    outcome,
+    hasRecommendation: !!recommendation,
+    recommendationAction: actionText,
+    applyActionAvailable: showApplyButton && !!applyHandler,
+    appliedStage,
+    workflowApplied: isCalibration ? autoApplied : null,
+    appliedCalibration: appliedCalibrationAuthority,
+    appliedCalibrationIsStale,
+    appliedCalibrationIsInDesign,
+  });
+  const showAppliedBadge = adiAppliedState.showAppliedBadge;
 
   return (
     <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 space-y-3">
@@ -431,10 +472,10 @@ export default function AdiRecommendation({
       <div className="flex items-center gap-2">
         <Activity className="h-4 w-4 text-[#213428]" />
         <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
-        {showAppliedBadge && (
-          <span className={`ml-auto inline-flex items-center gap-1 rounded-full bg-[#213428] px-2 py-0.5 text-[9px] font-semibold uppercase text-white transition-opacity duration-300 ${isCalculatingWithPublished ? "opacity-60" : ""}`}>
-            <CheckCircle2 className="h-2.5 w-2.5" />
-            Applied
+        {adiAppliedState.state !== ADI_APPLIED_STATE.NOT_APPLIED && (
+          <span className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase transition-opacity duration-300 ${isCalculatingWithPublished ? "opacity-60" : ""} ${showAppliedBadge ? "bg-[#213428] text-white" : "bg-[#E7E2DA] text-[#625143]"}`}>
+            {showAppliedBadge && <CheckCircle2 className="h-2.5 w-2.5" />}
+            {adiAppliedState.label}
           </span>
         )}
       </div>

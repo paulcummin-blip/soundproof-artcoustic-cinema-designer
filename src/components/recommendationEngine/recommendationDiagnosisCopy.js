@@ -89,13 +89,18 @@ function seatConsistencyCopy(problem, options) {
 
 // ── Reference-seat response (P19) ────────────────────────────────────────
 
-function responseSmoothnessCopy(problem) {
+function responseSmoothnessCopy(problem, options) {
   const deviation = problem?.metrics?.referenceSeatDeviationDb ?? problem?.severity?.responseSmoothness?.deviationDb;
+  const count = subwooferCountOf(problem, options);
   return {
     assessment: 'The reference-seat response is not currently controlled.',
     why: `Worst reference-seat deviation is ${formatDeviationDb(deviation)}. The current result does not meet L2 response smoothness.`,
-    action: 'Reposition the subwoofers, or adjust delay, polarity and gain, before applying EQ.',
-    remainingLimitation: 'The reference-seat response remains the limiting factor for this design.',
+    action: count <= 1
+      ? 'Reposition the subwoofer, or adjust delay, polarity or gain, before applying EQ.'
+      : 'Reposition the subwoofers, or adjust delay, polarity and gain, before applying EQ.',
+    remainingLimitation: count <= 1
+      ? 'The reference-seat response remains the limiting factor — try placement, delay, polarity, gain, or an alternative subwoofer position before applying EQ.'
+      : 'The reference-seat response remains the limiting factor for this design.',
   };
 }
 
@@ -149,7 +154,7 @@ export function buildDiagnosisCopy(problem, options = {}) {
 
   if (type === PROBLEM_TYPE.RESPONSE_SMOOTHNESS) {
     if (severity.responseSmoothness?.severe !== true) return null;
-    return responseSmoothnessCopy(problem);
+    return responseSmoothnessCopy(problem, options);
   }
 
   return null;
