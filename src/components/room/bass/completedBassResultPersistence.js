@@ -565,7 +565,18 @@ export function resolvePersistedBassAuthority(projectId, persisted) {
   // over a stale/updating parent flag; otherwise an already-complete result
   // remains visible in Bass Simulation but is withheld from Design Rating.
   // Invalid or incomplete matching children still follow the parent status.
-  const current = state.status === "complete"
+  //
+  // Status self-lock fix: a persisted parent status of "stale" is parent
+  // metadata written when the physical design changed. When the CURRENT
+  // fingerprint's own authoritative snapshot is present, the stale flag is
+  // contradicted by the snapshot itself — it must not permanently withhold a
+  // valid result. Promote the row to "complete" for every downstream
+  // readiness/publication decision below. A genuine design change makes the
+  // current fingerprint differ from the snapshot key, so matchingCurrent is
+  // null and the stale status still stands.
+  const stalePromoted = state.status === "stale" && isAuthoritativeBassContract(matchingCurrent);
+  const effectiveStatus = stalePromoted ? "complete" : state.status;
+  const current = effectiveStatus === "complete"
     ? matchingCurrent
     : (isAuthoritativeBassContract(matchingCurrent) ? matchingCurrent : null);
   // ── Single Published Engineering Contract ──
@@ -592,17 +603,17 @@ export function resolvePersistedBassAuthority(projectId, persisted) {
   // UPDATING/STALE, the contract is preserved for visibility but
   // authorityStatus reflects the lifecycle state — the contract is the last
   // published result, not the current authority.
-  const isCurrentAuthority = structurallyComplete && state.status === "complete" && contract === matchingCurrent;
+  const isCurrentAuthority = structurallyComplete && effectiveStatus === "complete" && contract === matchingCurrent;
   const authorityStatus = isCurrentAuthority
     ? (authoritative ? BASS_AUTHORITY_STATUS.AUTHORITATIVE : BASS_AUTHORITY_STATUS.NOT_VERIFIED)
-    : (state.status === "uncalculated" && !structurallyComplete
+    : (effectiveStatus === "uncalculated" && !structurallyComplete
       ? BASS_AUTHORITY_STATUS.UNCALCULATED
-      : state.status === "stale"
+      : effectiveStatus === "stale"
         ? BASS_AUTHORITY_STATUS.STALE
         : BASS_AUTHORITY_STATUS.UPDATING);
   return {
     projectId: String(projectId || "free"),
-    status: isCurrentAuthority ? "complete" : (state.status === "uncalculated" && !structurallyComplete ? "uncalculated" : state.status === "stale" ? "stale" : "updating"),
+    status: isCurrentAuthority ? "complete" : (effectiveStatus === "uncalculated" && !structurallyComplete ? "uncalculated" : effectiveStatus === "stale" ? "stale" : "updating"),
     authorityStatus,
     currentFingerprint,
     contract: structurallyComplete ? contract : null,

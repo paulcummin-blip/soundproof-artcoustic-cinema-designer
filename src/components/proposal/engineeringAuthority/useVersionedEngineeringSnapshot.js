@@ -1,39 +1,35 @@
 /**
- * Load version metadata and consume the Room Designer's published engineering
- * authority. This hook is intentionally read-only: it does not hydrate AppState
- * and does not mount a second RP22, bass, rating, grouping, or grading engine.
+ * Load version metadata and consume the ONE version-scoped engineering
+ * authority.
+ *
+ * This hook is intentionally read-only: it does not hydrate AppState and does
+ * not mount a second RP22, bass, rating, grouping, or grading engine.
+ *
+ * Authority order (see versionedEngineeringAuthority.js):
+ *   1. durable DB publication — ProjectVersion.published_fingerprint →
+ *      ProjectAnalysisCache.engineering_publications["eng:v1:…"]
+ *   2. same-window/ browser handoff — an optimisation only
+ *
+ * A cold load with empty site storage therefore still resolves the settled
+ * engineering result, so Proposal Centre no longer reports "not calculated"
+ * for a project that has been calculated.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { mergeProjectAndVersion } from '@/lib/versionAuthority';
-import {
-  readDesignReviewHandoff,
-  subscribeDesignReviewHandoff,
-} from '@/components/state/designReviewHandoff';
 import { useEngineeringSnapshot } from './useEngineeringSnapshot';
+import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
 
 export function useVersionedEngineeringSnapshot(projectId, versionId, options = {}) {
   const [loading, setLoading] = useState(!!projectId);
   const [error, setError] = useState(null);
   const [project, setProject] = useState(null);
   const [version, setVersion] = useState(null);
-  const [publishedEngineering, setPublishedEngineering] = useState(
-    () => (projectId && versionId ? readDesignReviewHandoff(projectId, versionId) : null),
-  );
 
-  useEffect(() => {
-    if (!projectId || !versionId) {
-      setPublishedEngineering(null);
-      return undefined;
-    }
-    setPublishedEngineering(readDesignReviewHandoff(projectId, versionId));
-    return subscribeDesignReviewHandoff(projectId, versionId, (snapshot, fromStorage) => {
-      setPublishedEngineering(
-        snapshot || (fromStorage ? readDesignReviewHandoff(projectId, versionId, { preferStored: true }) : null),
-      );
-    });
-  }, [projectId, versionId]);
+  // The single version-scoped engineering authority (durable first).
+  const authority = useVersionedEngineeringAuthority(projectId, versionId);
+  const publishedEngineering = authority.snapshot;
 
   useEffect(() => {
     let cancelled = false;
@@ -103,10 +99,12 @@ export function useVersionedEngineeringSnapshot(projectId, versionId, options = 
   const finalError = error || snapshotResult.error;
   return {
     snapshot: snapshotResult.snapshot,
-    loading: loading || snapshotResult.loading,
+    loading: loading || authority.loading || snapshotResult.loading,
     error: finalError,
     project,
     version,
+    authorityState: authority.state,
+    authoritySource: authority.source,
     isReady: !loading && !!snapshotResult.snapshot && !finalError,
   };
 }

@@ -26,6 +26,7 @@ import { useAppState } from "@/components/AppStateProvider";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { mergeProjectAndVersion } from "@/lib/versionAuthority";
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
+import { useVersionedEngineeringAuthority } from "@/components/engineering/useVersionedEngineeringAuthority";
 import { base44 } from "@/api/base44Client";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import ReportCover from "@/components/report/ReportCover";
@@ -62,7 +63,6 @@ export default function DesignReviewPage() {
     activeProjectId;
 
   const [projectDetails, setProjectDetails] = useState(null);
-  const [asdrData, setAsdrData] = useState(null);
   const [loadingProject, setLoadingProject] = useState(true);
   const priceData = asdrData?.priceData?.showPrices ? asdrData.priceData : null;
 
@@ -144,28 +144,16 @@ export default function DesignReviewPage() {
     return () => { cancelled = true; };
   }, [projectId]);
 
-  // Read the live same-window handoff first, then the project-scoped stored
-  // snapshot for direct/new-tab loads. Stored data is accepted only after the
-  // current Project record has loaded and passed the freshness check.
+  // The active version is resolved from the loaded Project record — the
+  // version-scoped authority and every consumer below read the same identity.
   const activeVersionId = projectDetails?.active_version_id || null;
 
-  useEffect(() => {
-    if (!projectId || !activeVersionId) {
-      setAsdrData(null);
-      return undefined;
-    }
-    const read = () => {
-      const shared = readDesignReviewHandoff(projectId, activeVersionId, {
-        allowStored: !loadingProject,
-      });
-      setAsdrData(shared);
-    };
-    read();
-    return subscribeDesignReviewHandoff(projectId, activeVersionId, (snapshot) => {
-      if (snapshot) setAsdrData(snapshot);
-      else read();
-    });
-  }, [projectId, activeVersionId, loadingProject]);
+  // ── Version-scoped engineering authority (durable first) ────────────────
+  // Design Review reads the settled result from the DB Published Engineering
+  // Authority for this version, with the same-window handoff overlaid as an
+  // optimisation. A direct/cold load no longer depends on browser storage.
+  const asdrAuthority = useVersionedEngineeringAuthority(projectId, activeVersionId);
+  const asdrData = asdrAuthority.snapshot;
 
   // Keep the persistent sidebar on the same project-scoped price snapshot,
   // including on a direct/new-tab Design Review load.

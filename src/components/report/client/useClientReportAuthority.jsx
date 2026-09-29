@@ -30,6 +30,7 @@ import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverhead
 import { useActiveProjectId } from "@/components/state/project-session";
 import { resolveEffectiveVisibleWidthInches, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
+import { useVersionedEngineeringAuthority } from "@/components/engineering/useVersionedEngineeringAuthority";
 
 // TV preset → viewable width in inches (matches RoomDesigner TV_KEY_TO_INCHES)
 const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
@@ -322,23 +323,14 @@ export function useClientReportAuthority(projectId) {
     dolbyPreset: reportDolbyLayout,
   });
 
-  // ── 5b) Published engineering authority ───────────────────────────────
+  // ── 5b) Published engineering authority (durable first) ────────────────
   // Visual reports are passive consumers. They never mount the RP22 engine or
-  // rebuild SPL metrics; every engineering result comes from the Room Designer
-  // publication for this project.
-  const [publishedEngineering, setPublishedEngineering] = useState(
-    () => (projectId && versionId) ? readDesignReviewHandoff(projectId, versionId) : null
-  );
-  useEffect(() => {
-    if (!projectId || !versionId) {
-      setPublishedEngineering(null);
-      return undefined;
-    }
-    setPublishedEngineering(readDesignReviewHandoff(projectId, versionId));
-    return subscribeDesignReviewHandoff(projectId, versionId, (snapshot) => {
-      setPublishedEngineering(snapshot || readDesignReviewHandoff(projectId, versionId, { preferStored: true }));
-    });
-  }, [projectId, versionId, hydratedProjectId, hydrating]);
+  // rebuild SPL metrics. Every engineering result comes from the DB Published
+  // Engineering Authority for this version; the same-window handoff overlays it
+  // as an optimisation, so a cold/direct load with empty site storage still
+  // restores the published report.
+  const engineeringAuthority = useVersionedEngineeringAuthority(projectId, versionId);
+  const publishedEngineering = engineeringAuthority.snapshot;
   const engineeringSummary = publishedEngineering?.engineeringSummary
     ?? publishedEngineering?.rating?.engineeringSummary
     ?? null;

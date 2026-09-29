@@ -83,6 +83,14 @@ export default async function(req) {
     const versionId = String(body?.version_id || '').trim();
     const fingerprint = String(body?.engineering_fingerprint || '').trim();
     const engineeringSummary = body?.engineering_summary;
+    // Optional presentation payload (analysisResult, priceData, seats,
+    // speakers, showAsdr). Stored alongside the immutable engineering summary so
+    // cold report/proposal loads can assemble from the durable authority
+    // instead of depending on a browser-only handoff. It carries no identity or
+    // metric authority — the engineering summary remains the sole metric source.
+    const reportSnapshot = (body?.report_snapshot && typeof body.report_snapshot === 'object')
+      ? body.report_snapshot
+      : null;
 
     if (!projectId || !versionId || !fingerprint) {
       return Response.json({ error: 'INVALID_REQUEST', message: 'project_id, version_id, and engineering_fingerprint are required.' }, { status: 400 });
@@ -123,6 +131,7 @@ export default async function(req) {
       // Build the immutable publication entry
       publication = {
         engineering_summary: engineeringSummary,
+        ...(reportSnapshot ? { report_snapshot: reportSnapshot } : {}),
         engineering_fingerprint: fingerprint,
         published_at: new Date().toISOString(),
         engine_version: String(body?.engine_version ?? 'unknown'),
@@ -165,7 +174,24 @@ export default async function(req) {
 
     if (existing) {
       // Idempotent hit — publication already exists, pointer already updated.
-      // No cache write needed.
+      //
+      // Additive enrichment only: a publication written before report_snapshot
+      // existed may gain that optional presentation payload ONCE, so cold
+      // report/proposal loads never depend on a browser-only store. The
+      // publication's identity, engineering_summary, version stamps and
+      // provenance are never modified.
+      if (reportSnapshot && !existing.report_snapshot) {
+        const enriched = { ...existing, report_snapshot: reportSnapshot };
+        const basePublications = (cacheRecord.engineering_publications
+          && typeof cacheRecord.engineering_publications === 'object')
+          ? cacheRecord.engineering_publications
+          : {};
+        cacheRecord = await service.entities.ProjectAnalysisCache.update(
+          cacheRecord.id,
+          { engineering_publications: { ...basePublications, [fingerprint]: enriched } },
+        );
+        publication = enriched;
+      }
     } else {
       const { publications } = upsertPublication(cacheRecord, fingerprint, publication);
       const updatePayload = {

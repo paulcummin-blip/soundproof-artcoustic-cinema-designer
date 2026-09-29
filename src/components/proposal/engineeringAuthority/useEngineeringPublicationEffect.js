@@ -22,6 +22,15 @@
  *     bass cache lookup, but the publication key is the full engineering
  *     fingerprint.
  *
+ * Cold-restore change:
+ *   - The publication also carries an optional `report_snapshot` presentation
+ *     payload (analysisResult, priceData, seating, placed speakers, showAsdr),
+ *     read from the SAME browser handoff snapshot the Room Designer publishes
+ *     above. It carries no identity and no metric authority — the engineering
+ *     summary remains the sole metric source. This is what lets reports and
+ *     Proposal Centre assemble a complete snapshot on a cold load without a
+ *     browser-only store.
+ *
  * Debounce: the publish is debounced by PUBLISH_DEBOUNCE_MS so intermediate
  * design states (while the user is still dragging, or bass is still settling)
  * do not hammer the backend. The publish fires once after the design settles.
@@ -42,8 +51,29 @@ import {
 import {
   computeEngineeringFingerprint,
 } from '@/components/proposal/engineeringAuthority/engineeringFingerprint';
+import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 
 const PUBLISH_DEBOUNCE_MS = 2000;
+
+/**
+ * Read the presentation payload for the publication from the browser handoff
+ * snapshot the Room Designer publishes for the SAME project + version. Nothing
+ * is recalculated; this is a verbatim copy of already-settled presentation
+ * state. The rating envelope is deliberately not copied — it is derived from
+ * the published engineering summary on read, so it is never duplicated.
+ */
+function buildReportSnapshot(projectId, versionId) {
+  if (!projectId || !versionId) return null;
+  const snapshot = readDesignReviewHandoff(projectId, versionId, { preferStored: false });
+  if (!snapshot) return null;
+  return {
+    analysisResult: snapshot.analysisResult || null,
+    priceData: snapshot.priceData || null,
+    seatingPositions: Array.isArray(snapshot.seatingPositions) ? snapshot.seatingPositions : null,
+    placedSpeakers: Array.isArray(snapshot.placedSpeakers) ? snapshot.placedSpeakers : null,
+    showAsdr: snapshot.showAsdr === true,
+  };
+}
 
 /**
  * @param {Object} params
@@ -107,11 +137,15 @@ export function useEngineeringPublicationEffect({
 
     debounceTimerRef.current = setTimeout(async () => {
       try {
+        // Read the presentation payload at fire time so it reflects the most
+        // recent settled handoff publication.
+        const reportSnapshot = buildReportSnapshot(projectId, versionId);
         await base44.functions.invoke('publishEngineering', {
           project_id: projectId,
           version_id: versionId,
           engineering_summary: engineeringSummary,
           engineering_fingerprint: engineeringFingerprint,
+          ...(reportSnapshot ? { report_snapshot: reportSnapshot } : {}),
           engine_version: ENGINEERING_AUTHORITY_VERSION,
           rp22_version: String(RP22_BASS_METRIC_SCHEMA_VERSION),
           algorithm_version: String(BASS_ANALYSIS_CONTRACT_VERSION),

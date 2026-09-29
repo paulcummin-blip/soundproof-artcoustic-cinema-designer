@@ -58,6 +58,7 @@ import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSenten
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
 import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReportPage';
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
+import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
 import { setAuthoritativeReadOnlyMode } from '@/components/state/authoritativeReadOnlyMode';
 import { useAutoPrintReadinessInstrumentation, logAutoPrintBlock } from '@/components/report/useAutoPrintReadinessInstrumentation';
 import useReportBlockPagination from '@/components/report/useReportBlockPagination';
@@ -134,31 +135,15 @@ function RP22ReportInner() {
     // browser tab updates the project while the report is already open.
     const reportVersionId = projectDetails?.active_version_id || null;
 
-    const [designReviewHandoff, setDesignReviewHandoff] = useState(
-        () => (explicitProjectId && reportVersionId) ? readDesignReviewHandoff(explicitProjectId, reportVersionId) : null
-    );
-    useEffect(() => {
-        if (!explicitProjectId || !reportVersionId) {
-            setDesignReviewHandoff(null);
-            return;
-        }
-        const read = (preferStored = false) => {
-            const shared = readDesignReviewHandoff(explicitProjectId, reportVersionId, {
-                allowStored: true,
-                preferStored,
-            });
-            setDesignReviewHandoff(shared);
-        };
-        // One-shot read — handles SPA navigation (window value) and direct
-        // load (localStorage fallback). Re-runs when projectDetails load.
-        read();
-        // Same-window and cross-tab publications push the exact canonical
-        // snapshot into every open consumer immediately.
-        return subscribeDesignReviewHandoff(explicitProjectId, reportVersionId, (snapshot, preferStored) => {
-            if (snapshot) setDesignReviewHandoff(snapshot);
-            else read(preferStored);
-        });
-    }, [explicitProjectId, reportVersionId]);
+    // ── Version-scoped engineering authority (durable first) ──────────────
+    // The Technical Report reads the settled engineering result from the DB
+    // Published Engineering Authority for this version, with the same-window
+    // handoff overlaid as an optimisation. A cold load with empty site storage
+    // therefore still restores the published report instead of reporting that
+    // no analysis exists. Still read-only: no engine, no recalculation.
+    const reportAuthority = useVersionedEngineeringAuthority(explicitProjectId, reportVersionId);
+    const designReviewHandoff = reportAuthority.snapshot;
+    const authorityResolving = reportAuthority.loading;
     const designRecommendations = designReviewHandoff?.recommendations ?? null;
 
     // One published engineering summary is the sole report authority.
@@ -638,7 +623,7 @@ function RP22ReportInner() {
     }, [app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.borderThicknessM, app?.screen]);
 
     // The report waits only for project hydration and the one published summary.
-    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending;
+    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || authorityResolving;
 
     // READ-ONLY: useAnalysisSpeakers, useAllSeatSplMetrics, and
     // useRP22AnalysisEngine are NOT called here. The authoritative RP22
@@ -912,7 +897,9 @@ function RP22ReportInner() {
         );
     }
 
-    if (!analysisResult || !analysisResult.gradedParameters) {
+    // The published analysisResult may still be resolving from the durable
+    // authority — wait rather than claiming no analysis exists.
+    if (!authorityResolving && (!analysisResult || !analysisResult.gradedParameters)) {
         if (isAutoPrintPreparing) {
             return (
                 <div className="min-h-screen bg-white flex items-center justify-center">

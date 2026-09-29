@@ -176,6 +176,11 @@ export function cleanPublicationForResponse(publication) {
   if (!publication) return null;
   return {
     engineering_summary: publication.engineering_summary ?? null,
+    // Optional presentation payload (rating envelope, seats, speakers,
+    // analysisResult, priceData). Written by the Room Designer alongside the
+    // immutable engineering summary so cold report/proposal loads can assemble
+    // without a browser handoff. Never carries identity or metric authority.
+    report_snapshot: publication.report_snapshot ?? null,
     engineering_fingerprint: publication.engineering_fingerprint ?? null,
     published_at: publication.published_at ?? null,
     engine_version: publication.engine_version ?? null,

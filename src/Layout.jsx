@@ -30,6 +30,7 @@ import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
 import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
 import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUnselectedIndicator, readSeatPriorityFingerprint, readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
+import { useVersionedEngineeringAuthority } from "@/components/engineering/useVersionedEngineeringAuthority";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
@@ -156,13 +157,22 @@ export default function Layout({ children, currentPageName }) {
   // authority as every report. It never rebuilds or polls a separate rating.
   const activeVersionId = activeProjectSummary?.active_version_id || null;
 
+  // Durable-first version-scoped authority: the DB Published Engineering
+  // Authority is the authority for "Performance is current"; the same-window
+  // handoff is overlaid as an optimisation. Without this the sidebar shows
+  // nothing for an already-calculated project on a cold load.
+  const versionAuthority = useVersionedEngineeringAuthority(activeProjectId, activeVersionId);
+  const durableAuthoritySnapshot = versionAuthority.snapshot;
+
   React.useEffect(() => {
     if (!activeProjectId || !activeVersionId) {
       setEngineeringSummary(null);
       return undefined;
     }
     const applyPublication = (snapshot) => {
-      const published = snapshot || readDesignReviewHandoff(activeProjectId, activeVersionId);
+      const published = snapshot
+        || readDesignReviewHandoff(activeProjectId, activeVersionId)
+        || durableAuthoritySnapshot;
       setEngineeringSummary(
         published?.engineeringSummary
           ?? published?.rating?.engineeringSummary
@@ -175,7 +185,7 @@ export default function Layout({ children, currentPageName }) {
         ? readDesignReviewHandoff(activeProjectId, activeVersionId, { preferStored: true })
         : null));
     });
-  }, [activeProjectId, activeVersionId]);
+  }, [activeProjectId, activeVersionId, durableAuthoritySnapshot]);
 
   // Listen for price and lightweight pending-indicator updates.
   React.useEffect(() => {

@@ -51,7 +51,9 @@ export function useEngineeringSnapshot({
       return {
         snapshot: null,
         loading: false,
-        error: 'No published engineering result is available for the selected version.',
+        // Both authorities were checked: the durable DB publication and this
+        // browser's handoff. Neither holds a settled result for this version.
+        error: 'No published engineering result was found for the selected version — checked the saved engineering publication and this browser. Open that version in Room Designer and calculate it first.',
       };
     }
 

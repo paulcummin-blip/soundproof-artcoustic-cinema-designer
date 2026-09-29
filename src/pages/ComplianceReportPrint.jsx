@@ -6,13 +6,13 @@ import SeatComplianceSummary from '@/components/report/SeatComplianceSummary';
 import { formatSeatLabel } from '@/components/utils/seatLabel';
 import { RP22_PRESENTATION_PARAMETERS, RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
+import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
 import { base44 } from '@/api/base44Client';
 
 export default function ComplianceReportPrint() {
   const [isReady, setIsReady] = useState(false);
   const reportScopeId = new URLSearchParams(window.location.search).get('projectId') || new URLSearchParams(window.location.search).get('id') || 'free';
   const [reportVersionId, setReportVersionId] = useState(null);
-  const [publishedEngineering, setPublishedEngineering] = useState(null);
 
   // Fetch the project record to resolve the active version ID. The handoff
   // is version-scoped; no project-only fallback is used.
@@ -32,16 +32,14 @@ export default function ComplianceReportPrint() {
     return () => { cancelled = true; };
   }, [reportScopeId]);
 
-  useEffect(() => {
-    if (!reportScopeId || !reportVersionId) {
-      setPublishedEngineering(null);
-      return undefined;
-    }
-    setPublishedEngineering(readDesignReviewHandoff(reportScopeId, reportVersionId));
-    return subscribeDesignReviewHandoff(reportScopeId, reportVersionId, (snapshot) => {
-      setPublishedEngineering(snapshot || readDesignReviewHandoff(reportScopeId, reportVersionId, { preferStored: true }));
-    });
-  }, [reportScopeId, reportVersionId]);
+  // Version-scoped engineering authority: the DB publication is the authority,
+  // the same-window handoff an optimisation. A cold print load no longer
+  // depends on browser storage.
+  const engineeringAuthority = useVersionedEngineeringAuthority(
+    reportScopeId === 'free' ? null : reportScopeId,
+    reportVersionId,
+  );
+  const publishedEngineering = engineeringAuthority.snapshot;
   const engineeringSummary = publishedEngineering?.engineeringSummary
     ?? publishedEngineering?.rating?.engineeringSummary
     ?? null;
