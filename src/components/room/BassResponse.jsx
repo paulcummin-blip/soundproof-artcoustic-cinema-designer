@@ -27,6 +27,7 @@ import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedN
 import ProtectedNullWarningSummary from "@/components/room/bass/ProtectedNullWarningSummary";
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
+import { formatSeatPillLabel } from "@/components/utils/seatLabel";
 import BassCurveVisibilityControls, { DEFAULT_BASS_CURVE_VISIBILITY } from "@/components/room/bass/BassCurveVisibilityControls";
 import BassSmoothingControl from "@/components/room/bass/BassSmoothingControl";
 import { buildRp22GraphMarkers } from "@/components/room/bass/rp22GraphMarkers";
@@ -437,16 +438,46 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   const placementPreviewActive = sharedBassResults?.placementPreviewActive === true;
   const placementPreviewResult = sharedBassResults?.placementPreviewResult || null;
 
+  // Seat-scoped preview. The preview engine already computes a curve for every
+  // listener (RSP + each seat) and returns them as seatCurves. When the designer
+  // selects a single real seat, draw THAT seat's preview curve instead of the RSP
+  // curve. Falls back to the RSP preview when no matching seat curve exists.
+  // Advisory only — no markers, grading or authority are enabled by this.
+  const previewSeatId = selectedSeatIds.length === 1 && selectedSeatIds[0] !== "rsp"
+    ? selectedSeatIds[0]
+    : null;
+
+  const previewSeatCurve = useMemo(() => {
+    if (!placementPreviewActive || !previewSeatId) return null;
+    const curves = placementPreviewResult?.seatCurves || [];
+    const byId = curves.find((curve) => curve.originalSeatId && curve.originalSeatId === previewSeatId);
+    if (byId?.responseData?.length) return byId;
+    // Fallback for seat sets that carry no ids: the engine stores the seat's
+    // index within the seating positions array it was given.
+    const index = Array.isArray(seatingPositions)
+      ? seatingPositions.findIndex((seat) => (seat.id || `${seat.x}-${seat.y}`) === previewSeatId)
+      : -1;
+    if (index < 0) return null;
+    const byIndex = curves.find((curve) => curve.seatIndex === index);
+    return byIndex?.responseData?.length ? byIndex : null;
+  }, [placementPreviewActive, previewSeatId, placementPreviewResult?.seatCurves, seatingPositions]);
+
   const placementPreviewSeries = useMemo(() => {
-    if (!placementPreviewActive || !placementPreviewResult?.rspCurve?.length) return null;
+    if (!placementPreviewActive) return null;
+    const data = previewSeatCurve?.responseData?.length
+      ? previewSeatCurve.responseData
+      : placementPreviewResult?.rspCurve;
+    if (!data?.length) return null;
     return {
       id: "placement-preview",
       color: "#16A34A",
-      data: placementPreviewResult.rspCurve,
+      data,
       kind: "room-response-preview",
-      label: "Room Response Preview",
+      label: previewSeatId
+        ? `Room Response Preview — ${formatSeatPillLabel(previewSeatId)}`
+        : "Room Response Preview",
     };
-  }, [placementPreviewActive, placementPreviewResult?.rspCurve]);
+  }, [placementPreviewActive, previewSeatCurve, previewSeatId, placementPreviewResult?.rspCurve]);
 
   const previousResultFadedSeries = useMemo(() => {
     if (!placementPreviewActive) return null;
@@ -925,7 +956,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
 
         <div className={engineeringDetailCollapsed ? "mt-2 flex-1 min-h-[400px] relative" : "mt-2"}>
           {placementPreviewActive && <div className="flex flex-wrap items-center gap-4 mb-2 text-[11px] font-semibold">
-            <span style={{ color: "#16A34A" }}>━━ Room Response Preview</span>
+            <span style={{ color: "#16A34A" }}>
+              ━━ Room Response Preview ({previewSeatId ? formatSeatPillLabel(previewSeatId) : "RSP"})
+            </span>
             {previousResultFadedSeries && <span style={{ color: "#6B7280" }}>━━ Previous result — out of date</span>}
           </div>}
           {effectiveVisibleSeries.length > 0 ? (
