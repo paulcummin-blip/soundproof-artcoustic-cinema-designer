@@ -38,7 +38,6 @@ export function buildDealerAuthority(brandAsset) {
         include_rp22_overview: true,
         include_technical_appendix: true,
       },
-      proposal_tone: 'luxury_residential',
     };
   }
 
@@ -72,6 +71,5 @@ export function buildDealerAuthority(brandAsset) {
       include_rp22_overview: brandAsset.include_rp22_overview ?? true,
       include_technical_appendix: brandAsset.include_technical_appendix ?? true,
     },
-    proposal_tone: brandAsset.proposal_tone || 'luxury_residential',
   };
 }

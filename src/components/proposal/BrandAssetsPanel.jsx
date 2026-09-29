@@ -39,7 +39,6 @@ const DEFAULTS = {
   include_product_gallery: true,
   include_rp22_overview: true,
   include_technical_appendix: true,
-  proposal_tone: 'luxury_residential',
 };
 
 const inputClasses = 'bg-transparent border-0 border-b border-[#E5E1D8] rounded-none px-0 text-[#1B1A1A] focus-visible:ring-0 focus-visible:border-[#213428] mt-1.5';

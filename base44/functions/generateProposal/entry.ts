@@ -310,12 +310,10 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
     ? `${subwoofers.length}x ${subwoofers[0]?.model || 'Subwoofer'}`
     : '';
   const companyName = brandAsset?.company_name || '';
-  const tone = brandAsset?.proposal_tone || 'luxury_residential';
   const briefText = (clientBrief || '').trim();
 
   return [
     `Narrative Goal: ${goalLabel}`,
-    `Tone: ${tone}`,
     `Company: ${companyName}`,
     `Project: ${project.name || ''}`,
     `Client: ${project.client_name || ''}`,

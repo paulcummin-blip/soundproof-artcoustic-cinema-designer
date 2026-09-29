@@ -32,7 +32,6 @@ const WRITABLE_FIELDS = new Set([
   "include_product_gallery",
   "include_rp22_overview",
   "include_technical_appendix",
-  "proposal_tone",
   "logo_scale",
   "logo_vertical_offset",
   "logo_type",

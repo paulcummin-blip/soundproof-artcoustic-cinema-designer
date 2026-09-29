@@ -180,11 +180,9 @@ function buildProjectContext(project, brandAsset) {
     ? `${subwoofers.length}x ${subwoofers[0]?.model || 'Subwoofer'}`
     : '';
   const companyName = brandAsset?.company_name || '';
-  const tone = brandAsset?.proposal_tone || 'luxury_residential';
 
   return [
     `Company: ${companyName}`,
-    `Tone: ${tone}`,
     `Project: ${project.name || ''}`,
     `Client: ${project.client_name || ''}`,
     `Room Dimensions: ${roomWidth}m x ${roomLength}m x ${roomHeight}m`,
