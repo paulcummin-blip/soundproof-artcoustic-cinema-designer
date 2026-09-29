@@ -53,6 +53,7 @@ import {
   clearCheckpoint,
 } from "@/components/room/bass/bda/previousDesignCheckpoint";
 import { _resetRestoreStateForTest } from "@/components/room/bass/bda/restoreStateStore";
+import { buildCanonicalBassResult } from "@/components/room/bass/canonicalBassResult";
 import {
   BASS_ANALYSIS_CONTRACT_VERSION,
   RP22_BASS_METRIC_SCHEMA_VERSION,
@@ -72,28 +73,31 @@ const TARGET_DB_MAP = {
 };
 
 // Minimal contract that passes the target-cache gates (structural + canonical
-// publication + envelope + graph payload + P19 readiness) and carries the
-// physical design identity in fingerprints.baseDesign.
+// publication + envelope authority + graph payload + P19 readiness) and carries
+// the physical design identity in fingerprints.baseDesign. The canonical
+// BassResult is produced by the real builder so it validates exactly.
 function makeContract({ fingerprint = "fp-cal-1", targetKey = "minimum-L2", baseDesign = DESIGN_TWO_SUB } = {}) {
   const basis = targetKey.split("-")[0];
   const level = parseInt(targetKey.split("-")[1].slice(1), 10);
   const db = TARGET_DB_MAP[targetKey] || 112;
-  return {
+  const curve = [{ freq: 20, db: 0 }, { freq: 30, db: -1 }];
+  const contract = {
     version: BASS_ANALYSIS_CONTRACT_VERSION,
     instanceAuthorityVersion: 4,
     metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
     selectedCandidateId: `cand-${targetKey}`,
     selectedCandidate: {
+      id: `cand-${targetKey}`,
       candidateId: `cand-${targetKey}`,
       achievedP18FrequencyHz: P18_HZ,
-      perSeatP19Results: [{ seatId: "seat-1", variationDbRaw: 2.5, level: 4 }],
+      perSeatP19Results: [],
       perSeatP20Results: [{ seatId: "seat-1", variationDbRaw: 2.5, level: 4 }],
     },
     selectedP14TargetDb: db,
     selectedP14TargetBasis: basis,
     selectedP14Level: level,
     fingerprints: { baseDesign },
-    provenance: { realSeatCount: 1 },
+    provenance: { realSeatCount: 1, primarySeatIds: ["seat-1"] },
     metricPublication: {
       canonicalMetricPublicationValid: true,
       publicationRejectionReason: null,
@@ -101,10 +105,10 @@ function makeContract({ fingerprint = "fp-cal-1", targetKey = "minimum-L2", base
     assessmentEnvelope: {
       achievedP18FrequencyHz: P18_HZ,
       achievedP18Bounded: true,
-      assessmentStartHz: 30,
+      assessmentStartHz: P18_HZ,
       assessmentEndHz: 120,
       officialP19WorstFrequencyHz: 35,
-      p19TargetIdentity: "practical-calibration-target",
+      p19TargetIdentity: "house-curve-target",
     },
     job: {
       status: "complete",
@@ -123,12 +127,17 @@ function makeContract({ fingerprint = "fp-cal-1", targetKey = "minimum-L2", base
       },
     },
     graphPayload: {
-      postEqRspCurve: [{ freq: 20, db: 0 }, { freq: 30, db: -1 }],
-      productionHouseCurveTarget: [{ freq: 20, db: 0 }, { freq: 30, db: -1 }],
+      postEqRspCurve: curve,
+      referenceEq: curve,
+      correctionCurve: [],
+      productionHouseCurveTarget: curve,
+      canonicalTargetCurve: curve,
       postEqPerSeatCurves: [[{ freq: 20, db: 0 }]],
       eqFilterBank: [{ freq: 25, gain: -2, q: 1 }],
     },
   };
+  contract.bassResult = buildCanonicalBassResult(contract);
+  return contract;
 }
 
 const APP_STATE_TWO_SUB = {
@@ -153,7 +162,7 @@ beforeEach(() => {
 test("1. crossed checkpoint: two-sub design + four-sub bank → checkpoint records the DESIGN identity and no bank", () => {
   // The in-memory bank belongs to the moved FOUR-sub design (non-empty).
   const fourSubContract = makeContract({ fingerprint: "fp-four-L2", targetKey: "minimum-L2", baseDesign: DESIGN_FOUR_SUB });
-  const seeded = setTargetCacheEntry(PROJECT_ID, DESIGN_FOUR_SUB, "minimum-L2", fourSubContract, { immediate: true });
+  const seeded = setTargetCacheEntry(PROJECT_ID, VERSION_ID, DESIGN_FOUR_SUB, "minimum-L2", fourSubContract, { immediate: true });
   assert.equal(seeded, true, "foreign bank must be non-empty for this test");
   assert.equal(getTargetBankIdentity(PROJECT_ID, VERSION_ID).baseDesignFingerprint, DESIGN_FOUR_SUB);
 
@@ -185,7 +194,7 @@ test("1. crossed checkpoint: two-sub design + four-sub bank → checkpoint recor
 
 test("1a. matching bank: checkpoint carries the bank snapshot for the same design", () => {
   const twoSubContract = makeContract({ fingerprint: "fp-two-L2", targetKey: "minimum-L2", baseDesign: DESIGN_TWO_SUB });
-  setTargetCacheEntry(PROJECT_ID, DESIGN_TWO_SUB, "minimum-L2", twoSubContract, { immediate: true });
+  setTargetCacheEntry(PROJECT_ID, VERSION_ID, DESIGN_TWO_SUB, "minimum-L2", twoSubContract, { immediate: true });
 
   captureBeforeApply(PROJECT_ID, VERSION_ID, {
     appState: APP_STATE_TWO_SUB,
@@ -363,7 +372,7 @@ test("2c. restore: matching checkpoint → bank snapshot reinstated and lock set
 test("3. foreign bank blocks COMPLETE — 'Performance is current' is never shown", () => {
   // Real cache read path: a non-empty bank for the four-sub design.
   const fourSubContract = makeContract({ fingerprint: "fp-four-L2", targetKey: "minimum-L2", baseDesign: DESIGN_FOUR_SUB });
-  setTargetCacheEntry(PROJECT_ID, DESIGN_FOUR_SUB, "minimum-L2", fourSubContract, { immediate: true });
+  setTargetCacheEntry(PROJECT_ID, VERSION_ID, DESIGN_FOUR_SUB, "minimum-L2", fourSubContract, { immediate: true });
   const identity = getTargetBankIdentity(PROJECT_ID, VERSION_ID);
   assert.equal(identity.baseDesignFingerprint, DESIGN_FOUR_SUB);
   assert.equal(identity.count, 1);
