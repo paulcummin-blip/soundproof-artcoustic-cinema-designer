@@ -23,6 +23,10 @@
 let _lastEngineFingerprint = null;
 let _lastSplFingerprint = null;
 
+function diagnosticsEnabled() {
+  return globalThis.__B44_RP22_RUNTIME_DIAGNOSTICS === true;
+}
+
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
 const safeRoles = (arr) => {
@@ -76,6 +80,7 @@ const buildSplFingerprint = (snap) => {
  * Only logs when the fingerprint has changed.
  */
 export function logRp22EngineDiagnostic(snapshot) {
+  if (!diagnosticsEnabled()) return;
   try {
     const fp = buildEngineFingerprint(snapshot);
     if (fp === _lastEngineFingerprint) return;
@@ -206,6 +211,7 @@ export function logRp22EngineDiagnostic(snapshot) {
  * Captures the actual `uppers` object keys for each seat.
  */
 export function logRp22SplDiagnostic(snapshot) {
+  if (!diagnosticsEnabled()) return;
   try {
     const fp = buildSplFingerprint(snapshot);
     if (fp === _lastSplFingerprint) return;
