@@ -1,7 +1,7 @@
 {
   "name": "ProposalSection",
   "type": "object",
-  "description": "An editable content block within a proposal (the Proposal Block entity). Fixed 10 section types \u2014 dealers can hide and reorder but cannot add custom sections. Each block has rich-text HTML body, dealer notes (invisible to client, fed to GPT on regeneration), lock state, and GPT/edit timestamps.",
+  "description": "An editable content block within a client-facing design report (the Proposal Block entity). The section set is fixed by report type \u2014 dealers can hide and reorder but cannot add custom sections. A proposal uses the 10 proposal sections; a System Design Summary uses its own 8 sections built around the three core RP22 design structures. Each block has rich-text HTML body, dealer notes (invisible to client, fed to GPT on regeneration), lock state, and GPT/edit timestamps.",
   "properties": {
     "proposal_id": {
       "type": "string",
@@ -23,13 +23,19 @@
         "products",
         "comparison",
         "conclusion",
-        "appendix"
+        "appendix",
+        "system_design_summary",
+        "spatial_resolution",
+        "dynamic_range",
+        "timbre_matching",
+        "key_performance_highlights",
+        "overall_design"
       ],
-      "description": "Fixed proposal section type. These 10 types are the same for every proposal \u2014 dealers can hide and reorder but cannot add custom sections. This gives Sound Proof proposals a recognisable, consistent structure."
+      "description": "Fixed report section type. A proposal uses cover, executive_summary, design_philosophy, system_overview, room_images, performance, products, comparison, conclusion, appendix. A System Design Summary uses cover, system_design_summary, spatial_resolution, dynamic_range, timbre_matching, key_performance_highlights, overall_design, room_images. Dealers can hide and reorder but cannot add custom sections. This gives Sound Proof reports a recognisable, consistent structure."
     },
     "section_key": {
       "type": "string",
-      "description": "Stable slug identifier for this block (e.g. 'executive_summary', 'system_overview'). Used as a stable reference even if the display title changes."
+      "description": "Stable slug identifier for this block (e.g. 'executive_summary', 'spatial_resolution'). Used as a stable reference even if the display title changes."
     },
     "title": {
       "type": "string",
@@ -74,8 +80,30 @@
     },
     "metadata": {
       "type": "object",
-      "description": "Block-specific configuration for GPT generation (e.g. prompt overrides, data bindings).",
-      "properties": {}
+      "description": "Block-specific configuration and calculated content. For the Key Performance Highlights section this holds { highlight_rows: [{ key, area, result, what_you_hear }] } \u2014 the calculated table rows rendered by the app. The Result values are read from calculated data; only what_you_hear is generated prose.",
+      "properties": {
+        "highlight_rows": {
+          "type": "array",
+          "description": "Calculated Key Performance Highlights table rows. area and result come from Sound Proof calculated data; what_you_hear is the generated client-facing description of that result.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "area": {
+                "type": "string"
+              },
+              "result": {
+                "type": "string"
+              },
+              "what_you_hear": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "required": [

@@ -28,6 +28,13 @@ export const PROPOSAL_TYPES = [
     minVersions: 2,
     maxVersions: null,
   },
+  {
+    value: 'system_summary',
+    label: 'System Design Summary',
+    description: 'A client-facing sales summary of the system design, built around Spatial Resolution, Dynamic Range and Timbre Matching.',
+    minVersions: 1,
+    maxVersions: 1,
+  },
 ];
 
 export function getProposalType(value) {

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, GripVertical } from 'lucide-react';
-import { PROPOSAL_SECTIONS } from '@/components/proposal/proposalSections';
+import { getSectionDef } from '@/components/proposal/proposalSections';
 
 /**
  * Left navigation panel for the Proposal Editor.
- * Lists the 10 fixed sections with visibility toggles and drag-to-reorder.
+ * Lists the report's sections with visibility toggles and drag-to-reorder.
  *
  * Props:
  * - sections: ProposalSection[] (with order_index and is_enabled)
@@ -41,7 +41,7 @@ export default function ProposalSectionNav({ sections, activeSectionKey, onSelec
         Sections
       </div>
       {sorted.map((section, index) => {
-        const def = PROPOSAL_SECTIONS.find((s) => s.type === section.section_type);
+        const def = getSectionDef(section.section_type);
         const isActive = section.section_key === activeSectionKey;
         const isVisible = section.is_enabled !== false;
         if (!def) return null;

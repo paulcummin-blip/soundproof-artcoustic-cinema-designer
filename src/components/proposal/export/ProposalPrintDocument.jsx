@@ -15,6 +15,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
+import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
 
 export default function ProposalPrintDocument({
   proposal,
@@ -53,6 +54,9 @@ export default function ProposalPrintDocument({
             className="proposal-print-section__body"
             dangerouslySetInnerHTML={{ __html: section.body || '' }}
           />
+          {section.section_type === 'key_performance_highlights' && (
+            <KeyPerformanceHighlightsTable rows={section.metadata?.highlight_rows} />
+          )}
         </section>
       ))}
     </div>,

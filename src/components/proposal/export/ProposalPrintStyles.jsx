@@ -116,6 +116,35 @@ export default function ProposalPrintStyles() {
         body.proposal-export-mode .proposal-print-section__body strong {
           color: #213428;
         }
+
+        /* ── Key Performance Highlights table ── */
+        body.proposal-export-mode .kph-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 4mm;
+          font-size: 10pt;
+        }
+
+        body.proposal-export-mode .kph-table th {
+          text-align: left;
+          padding: 2mm 3mm;
+          background: #F5F4F0;
+          color: #213428;
+          font-weight: 600;
+          border-bottom: 1px solid #DCDBD6;
+        }
+
+        body.proposal-export-mode .kph-table td {
+          padding: 2mm 3mm;
+          color: #3E4349;
+          border-bottom: 1px solid #EAE8E3;
+          vertical-align: top;
+        }
+
+        body.proposal-export-mode .kph-table tr {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
       }
     `}</style>
   );

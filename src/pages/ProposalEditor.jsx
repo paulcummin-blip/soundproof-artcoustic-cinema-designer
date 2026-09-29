@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Link, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { getSectionDef } from '@/components/proposal/proposalSections';
+import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
 import { getProposalType } from '@/components/proposal/proposalTypes';
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
@@ -676,6 +677,10 @@ export default function ProposalEditor() {
                       )}
                     </div>
                   </div>
+                )}
+
+                {section.section_type === 'key_performance_highlights' && (
+                  <KeyPerformanceHighlightsTable rows={section.metadata?.highlight_rows} className="mt-4" />
                 )}
 
                 {regenerating === section.id && (

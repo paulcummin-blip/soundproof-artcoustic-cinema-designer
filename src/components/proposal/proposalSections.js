@@ -17,6 +17,35 @@ export const PROPOSAL_SECTIONS = [
   { type: 'appendix', key: 'appendix', label: 'Appendix', defaultTitle: 'Appendix', canHide: true, canEditBody: true },
 ];
 
+/**
+ * Canonical section definitions for the System Design Summary.
+ * A client-facing sales summary of the system design, built around the three
+ * core RP22 design structures. It is not a general proposal document, so it
+ * does not use the proposal section set above.
+ */
+export const SYSTEM_SUMMARY_SECTIONS = [
+  { type: 'cover', key: 'cover', label: 'Cover', defaultTitle: 'Cover', canHide: false, canEditBody: false },
+  { type: 'system_design_summary', key: 'system_design_summary', label: 'System Design Summary', defaultTitle: 'System Design Summary', canHide: true, canEditBody: true },
+  { type: 'spatial_resolution', key: 'spatial_resolution', label: 'Spatial Resolution', defaultTitle: 'Spatial Resolution', canHide: true, canEditBody: true },
+  { type: 'dynamic_range', key: 'dynamic_range', label: 'Dynamic Range', defaultTitle: 'Dynamic Range', canHide: true, canEditBody: true },
+  { type: 'timbre_matching', key: 'timbre_matching', label: 'Timbre Matching', defaultTitle: 'Timbre Matching', canHide: true, canEditBody: true },
+  { type: 'key_performance_highlights', key: 'key_performance_highlights', label: 'Key Performance Highlights', defaultTitle: 'Key Performance Highlights', canHide: true, canEditBody: true },
+  { type: 'overall_design', key: 'overall_design', label: 'Overall Design', defaultTitle: 'Overall Design', canHide: true, canEditBody: true },
+  { type: 'room_images', key: 'room_images', label: 'Project Images', defaultTitle: 'Project Images', canHide: true, canEditBody: true },
+];
+
+/** Every section definition, from both report types. */
+export const ALL_SECTION_DEFS = [...PROPOSAL_SECTIONS, ...SYSTEM_SUMMARY_SECTIONS];
+
+/**
+ * The section set for a report type. Mirrors the section vocabulary the
+ * backend generators use, so the editor shows exactly the sections a report
+ * was generated with.
+ */
+export function getSectionsForProposalType(proposalType) {
+  return proposalType === 'system_summary' ? SYSTEM_SUMMARY_SECTIONS : PROPOSAL_SECTIONS;
+}
+
 export const NARRATIVE_GOALS = [
   { value: 'luxury_cinema', label: 'Luxury Cinema', description: 'Premium home cinema experience' },
   { value: 'family_media_room', label: 'Family Media Room', description: 'Accessible family entertainment' },
@@ -35,7 +64,7 @@ export const REGENERATION_ACTIONS = [
 ];
 
 export function getSectionDef(type) {
-  return PROPOSAL_SECTIONS.find((s) => s.type === type) || null;
+  return ALL_SECTION_DEFS.find((s) => s.type === type) || null;
 }
 
 export function getDefaultSections() {

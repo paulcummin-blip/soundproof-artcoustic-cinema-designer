@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
+import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 
 const SECTION_TITLES: Record<string, string> = {
   executive_summary: 'Executive Summary',
@@ -11,6 +12,13 @@ const SECTION_TITLES: Record<string, string> = {
   comparison: 'Comparison',
   conclusion: 'Conclusion',
   appendix: 'Appendix',
+  // System Design Summary sections
+  system_design_summary: 'System Design Summary',
+  spatial_resolution: 'Spatial Resolution',
+  dynamic_range: 'Dynamic Range',
+  timbre_matching: 'Timbre Matching',
+  key_performance_highlights: 'Key Performance Highlights',
+  overall_design: 'Overall Design',
 };
 
 const ACTION_INSTRUCTIONS: Record<string, string> = {
@@ -86,18 +94,28 @@ export default async function(req) {
 
     // ── Build authoritative project context ──
     const projectContext = buildProjectContext(project, brandAsset);
+    // The same frozen Engineering Snapshot the report was generated from, so a
+    // regenerated section can never drift away from the calculated results.
+    const evidence = buildEngineeringEvidence(proposal.engineering_snapshot);
 
     // ── Build the regeneration prompt ──
     const sectionTitle = SECTION_TITLES[section.section_type] || section.title || 'Section';
     const currentBody = stripHtml(section.body || '');
     const dealerNotes = section.dealer_notes || '';
     const briefText = effectiveBrief.trim();
+    // The Key Performance Highlights table is built by Sound Proof from
+    // calculated data. Only the introduction is written prose.
+    const sectionNote = section.section_type === 'key_performance_highlights'
+      ? 'This section introduces a performance table that Sound Proof builds from calculated data. Refine the introduction only. Do not write a table, and do not restate the table values.'
+      : '';
 
     const prompt = [
       `You are refining the "${sectionTitle}" section of a professional home cinema design proposal.`,
       '',
       '=== AUTHORITATIVE PROJECT DATA (never alter these results) ===',
       projectContext,
+      '',
+      evidence,
       '',
       '=== EMPHASIS NOTES / CLIENT BRIEF (narrative focus: guides emphasis only, never the facts) ===',
       briefText || 'No specific emphasis notes provided. Use a balanced professional narrative.',
@@ -110,6 +128,7 @@ export default async function(req) {
       '',
       '=== INSTRUCTION ===',
       actionInstruction,
+      sectionNote,
       '',
       '=== CONSTRAINT ===',
       'The Client Brief influences narrative emphasis, wording, and structure ONLY.',

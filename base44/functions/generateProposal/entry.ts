@@ -1,5 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
+import { SYSTEM_SUMMARY_SECTIONS, HIGHLIGHTS_SECTION_TYPE, getSystemSummarySectionPrompt } from '../../shared/systemDesignSummarySections.js';
+import { buildEngineeringEvidence, selectHighlightRows, mergeHighlightRows, buildHighlightsPrompt, HIGHLIGHTS_JSON_SCHEMA } from '../../shared/engineeringSnapshotEvidence.js';
 
 const SECTIONS = [
   { type: 'cover', key: 'cover', title: 'Cover', canEditBody: false },
@@ -13,6 +15,17 @@ const SECTIONS = [
   { type: 'conclusion', key: 'conclusion', title: 'Conclusion', canEditBody: true },
   { type: 'appendix', key: 'appendix', title: 'Appendix', canEditBody: true },
 ];
+
+/**
+ * The section set for a report type.
+ *
+ * A System Design Summary is a client-facing sales summary of the system
+ * design, built around the three core RP22 design structures. It is not a
+ * general proposal document, so it never uses the proposal section set.
+ */
+function resolveSections(proposalType) {
+  return proposalType === 'system_summary' ? SYSTEM_SUMMARY_SECTIONS : SECTIONS;
+}
 
 const GOAL_LABELS = {
   luxury_cinema: 'Luxury Cinema',
@@ -53,7 +66,8 @@ export default async function(req) {
     const existing = await base44.entities.Proposal.filter({ creation_request_id: request_id });
     if (existing?.[0]) {
       const existingSections = await base44.entities.ProposalSection.filter({ proposal_id: existing[0].id });
-      if (existing[0].status === 'generated' && existingSections.length === SECTIONS.length) {
+      const expectedSectionCount = resolveSections(existing[0].proposal_type || 'single').length;
+      if (existing[0].status === 'generated' && existingSections.length === expectedSectionCount) {
         return Response.json({
           proposal_id: existing[0].id,
           proposal: existing[0],
@@ -96,17 +110,17 @@ export default async function(req) {
       : version_id
         ? [version_id]
         : [];
-    if (!['single', 'comparison'].includes(resolvedType)) {
+    if (!['single', 'comparison', 'system_summary'].includes(resolvedType)) {
       return Response.json({ error: 'Unsupported proposal_type.' }, { status: 400 });
     }
-    const expectedVersionCountValid = resolvedType === 'single'
-      ? resolvedVersionIds.length === 1
-      : resolvedVersionIds.length >= 2;
+    const expectedVersionCountValid = resolvedType === 'comparison'
+      ? resolvedVersionIds.length >= 2
+      : resolvedVersionIds.length === 1;
     if (!expectedVersionCountValid) {
       return Response.json({
-        error: resolvedType === 'single'
-          ? 'Single proposals require exactly one version.'
-          : 'Comparison proposals require at least two versions.',
+        error: resolvedType === 'comparison'
+          ? 'Comparison reports require at least two versions.'
+          : 'This report type requires exactly one version.',
       }, { status: 400 });
     }
 
@@ -140,8 +154,9 @@ export default async function(req) {
     });
 
     // ── Create 10 ProposalSection records ──
+    const sectionDefs = resolveSections(resolvedType);
     sectionRecords = await base44.entities.ProposalSection.bulkCreate(
-      SECTIONS.map((s, i) => ({
+      sectionDefs.map((s, i) => ({
         proposal_id: proposal.id,
         account_id: effectiveAccountId,
         section_type: s.type,
@@ -156,27 +171,58 @@ export default async function(req) {
     );
 
     // ── Build project context for GPT ──
-    const projectContext = buildProjectContext(project, narrative_goal, brandAsset, client_brief);
+    const projectContext = buildProjectContext(project, narrative_goal, brandAsset, client_brief, engineering_snapshot);
+
+    // ── Key Performance Highlights rows ──
+    // Read straight out of the frozen Engineering Snapshot. The AI writes the
+    // "What you hear" cells only; it never sets or changes a Result value, and
+    // it never chooses which rows appear.
+    const highlightRows = resolvedType === 'system_summary' ? selectHighlightRows(engineering_snapshot) : [];
+    const isHighlightsSection = (section) => resolvedType === 'system_summary'
+      && section.section_type === HIGHLIGHTS_SECTION_TYPE
+      && highlightRows.length > 0;
 
     // ── Generate content for each editable section in parallel ──
     const editableIndices = sectionRecords
       .map((section, index) => ({ section, index }))
-      .filter(({ index }) => SECTIONS[index].canEditBody);
+      .filter(({ index }) => sectionDefs[index]?.canEditBody);
 
     const generationResults = await Promise.allSettled(
       editableIndices.map(({ section }) => {
-        const sectionDef = SECTIONS.find((s) => s.type === section.section_type);
-        const prompt = buildSectionPrompt(sectionDef, projectContext);
-        return base44.integrations.Core.InvokeLLM({ prompt });
+        const sectionDef = sectionDefs.find((s) => s.type === section.section_type);
+        if (isHighlightsSection(section)) {
+          return base44.integrations.Core.InvokeLLM({
+            prompt: `${buildHighlightsPrompt(projectContext, highlightRows)}\n\n${buildWritingStyleContract()}`,
+            response_json_schema: HIGHLIGHTS_JSON_SCHEMA,
+          });
+        }
+        return base44.integrations.Core.InvokeLLM({
+          prompt: buildSectionPrompt(sectionDef, projectContext, resolvedType),
+        });
       })
     );
 
     const generatedContent = editableIndices.map(({ section }, index) => {
       const result = generationResults[index];
+
+      if (isHighlightsSection(section)) {
+        const payload = result.status === 'fulfilled' ? result.value : null;
+        const intro = String(payload?.intro_html || '').trim();
+        const rows = mergeHighlightRows(highlightRows, payload?.rows);
+        return {
+          section,
+          html: intro,
+          metadata: { highlight_rows: rows },
+          failed: result.status === 'rejected'
+            || intro.length === 0
+            || rows.every((row) => !row.what_you_hear),
+        };
+      }
+
       const html = result.status === 'fulfilled'
         ? (typeof result.value === 'string' ? result.value : result.value?.content || '').trim()
         : '';
-      return { section, html, failed: result.status === 'rejected' || html.length === 0 };
+      return { section, html, metadata: null, failed: result.status === 'rejected' || html.length === 0 };
     });
     const failedSections = generatedContent.filter((item) => item.failed);
     if (failedSections.length > 0) {
@@ -185,9 +231,10 @@ export default async function(req) {
 
     // ── Update sections with generated content ──
     const generatedAt = new Date().toISOString();
-    await Promise.all(generatedContent.map(({ section, html }) =>
+    await Promise.all(generatedContent.map(({ section, html, metadata }) =>
       base44.entities.ProposalSection.update(section.id, {
         body: html,
+        ...(metadata ? { metadata } : {}),
         last_gpt_generated_at: generatedAt,
       })
     ));
@@ -245,8 +292,9 @@ async function rollbackCreatedProposal(base44, proposalId, knownSections = []) {
   }
 }
 
-function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief) {
+function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, engineeringSnapshot) {
   const goalLabel = GOAL_LABELS[narrativeGoal] || 'Luxury Cinema';
+  const evidence = buildEngineeringEvidence(engineeringSnapshot);
   const roomWidth = project.room_width || '';
   const roomLength = project.room_length || '';
   const roomHeight = project.room_height || '';
@@ -277,6 +325,8 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief) {
     speakerInfo ? `Speakers: ${speakerInfo}` : '',
     subInfo ? `Subwoofers: ${subInfo}` : '',
     '',
+    evidence,
+    '',
     '=== EMPHASIS NOTES / CLIENT BRIEF (narrative focus: guides emphasis only, never the facts) ===',
     briefText || 'No specific emphasis notes provided. Use a balanced professional narrative.',
     '',
@@ -287,8 +337,10 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief) {
   ].filter(Boolean).join('\n');
 }
 
-function buildSectionPrompt(sectionDef, projectContext) {
-  const sectionInstruction = SECTION_PROMPTS[sectionDef.type] || `Write the ${sectionDef.title} section. 2-3 paragraphs.`;
+function buildSectionPrompt(sectionDef, projectContext, proposalType) {
+  const sectionInstruction = proposalType === 'system_summary'
+    ? getSystemSummarySectionPrompt(sectionDef.type, sectionDef.title)
+    : SECTION_PROMPTS[sectionDef.type] || `Write the ${sectionDef.title} section. 2-3 paragraphs.`;
 
   return [
     projectContext,
