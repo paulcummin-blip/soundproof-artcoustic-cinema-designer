@@ -13,7 +13,8 @@
  *     → single click places RSP at current floating Y
  *     → LOCKED again
  *
- *   Short click / hold < 3 s → NO ACTION.
+ *   Short click / hold < 3 s → no RSP movement.
+ *   Double-click → the usual seat HUD, if a seat is underneath.
  *
  * State is explicit (LOCKED / LONG_PRESS_PENDING / GRABBED). The GRABBED state
  * is owned by the parent via the `grabbed` prop (backed by mlpGrabStore) so it
@@ -35,9 +36,11 @@ export default function RvMlpMarker({
   grabbed,
   onLongPressActivate,
   onPlaceClick,
+  onSeatDoubleClick,
 }) {
   const timerRef = useRef(null);
-  const pointerDownEventRef = useRef(null);
+  // Movement/placement gestures must never also toggle the seat HUD.
+  const movementGestureRef = useRef(false);
   const [holding, setHolding] = useState(false);
 
   // Cleanup timer on unmount
@@ -64,16 +67,18 @@ export default function RvMlpMarker({
 
     // While GRABBED, a pointer-down is a PLACE click, not a new hold.
     if (grabbed) {
+      movementGestureRef.current = true;
       if (typeof onPlaceClick === "function") onPlaceClick(e);
       return;
     }
 
     // LOCKED → start the 3 s long-press timer (LONG_PRESS_PENDING).
-    pointerDownEventRef.current = e;
+    movementGestureRef.current = false;
     setHolding(true);
 
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
+      movementGestureRef.current = true;
       setHolding(false);
       // Activate GRABBED — seed floating Y from the EXACT current canonical
       // RSP Y so the dot never jumps on activation.
@@ -92,6 +97,12 @@ export default function RvMlpMarker({
     // Short click / hold < 3 s before activation → cancel, no action.
     cancelHold();
   }, [grabbed, cancelHold]);
+
+  const handleDoubleClick = useCallback((e) => {
+    e.stopPropagation();
+    if (grabbed || movementGestureRef.current) return;
+    onSeatDoubleClick?.(e);
+  }, [grabbed, onSeatDoubleClick]);
 
   const handlePointerLeave = useCallback((_e) => {
     // Cancel hold if the pointer leaves the dot before the 3 s threshold.
@@ -133,6 +144,7 @@ export default function RvMlpMarker({
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
         onPointerCancel={handlePointerCancel}
+        onDoubleClick={handleDoubleClick}
       />
 
       {/* Pulse ring — drag affordance, intensity reflects hold/grab state */}
