@@ -392,7 +392,34 @@ export default function DesignRecommendationEngine({
   ]);
 
   const candidateSignature = useMemo(
-    () => candidates.map((candidate) => candidate.id).join("|"),
+    () => JSON.stringify(candidates.map((candidate) => ({
+      id: candidate.id,
+      dolbyLayout: candidate.dolbyLayout,
+      lcrPowerAfterW: candidate.lcrPowerAfterW ?? null,
+      aimingOverride: candidate.aimingOverride ?? null,
+      screen: {
+        visibleWidthInches: candidate.screen?.visibleWidthInches ?? null,
+        mountMode: candidate.screen?.mountMode ?? null,
+        floatDepthM: candidate.screen?.floatDepthM ?? null,
+      },
+      mlpPoint: candidate.mlpPoint
+        ? { x: candidate.mlpPoint.x ?? null, y: candidate.mlpPoint.y ?? null }
+        : null,
+      seats: (candidate.seats || []).map((seat) => ({
+        id: seat?.id ?? null,
+        x: seat?.x ?? null,
+        y: seat?.y ?? null,
+        isPrimary: seat?.isPrimary ?? null,
+      })),
+      speakers: (candidate.placedSpeakers || []).map((speaker) => ({
+        id: speaker?.id ?? null,
+        role: speaker?.role ?? null,
+        model: speaker?.model ?? null,
+        x: speaker?.position?.x ?? null,
+        y: speaker?.position?.y ?? null,
+        z: speaker?.position?.z ?? null,
+      })),
+    }))),
     [candidates]
   );
   const [resultsById, setResultsById] = useState({});
