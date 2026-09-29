@@ -78,8 +78,32 @@ export default function RvSeatLayer({
         );
       })}
 
-      {/* MLP marker renders after all seat hit targets so it sits above them in the SVG stack */}
-      {MLPMarker}
+      {/* Keep the RSP grab target above seats, but route its double-click to
+          the exact seat hit ellipse beneath the pointer (not the nearest seat).
+          Use the same SVG coordinates/radii as the visible seat layer so this
+          remains correct when the canvas is zoomed or resized. */}
+      {React.isValidElement(MLPMarker) ? React.cloneElement(MLPMarker, {
+        onSeatDoubleClick: (e) => {
+          const svg = e.currentTarget.ownerSVGElement;
+          const ctm = svg?.getScreenCTM();
+          if (!ctm || !(scale > 0)) return;
+          const point = svg.createSVGPoint();
+          point.x = e.clientX;
+          point.y = e.clientY;
+          const pointer = point.matrixTransform(ctm.inverse());
+          // Last rendered seat wins, matching normal SVG hit-target stacking.
+          const seat = [...seatingPositions].reverse().find((candidate) => {
+            const [cx, cy] = toPx(
+              Number(candidate.x ?? candidate.position?.x ?? 0),
+              Number(candidate.y ?? candidate.position?.y ?? 0)
+            );
+            const dx = (pointer.x - cx) / (RX_M * scale * 2);
+            const dy = (pointer.y - cy) / (RY_M * scale * 2);
+            return dx * dx + dy * dy <= 1;
+          });
+          if (seat) handleSeatClick(seat);
+        },
+      }) : MLPMarker}
 
       {/* Seat row labels extracted to component */}
       <RvSeatRowLabels
