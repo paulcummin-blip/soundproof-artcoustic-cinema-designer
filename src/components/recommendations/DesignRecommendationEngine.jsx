@@ -10,7 +10,7 @@
  * No RP22 thresholds or ASDR scoring rules are copied here.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { useAnalysisSpeakers } from "@/components/hooks/useAnalysisSpeakers";
 import { useAllSeatSplMetrics } from "@/components/hooks/useAllSeatSplMetrics";
@@ -23,6 +23,7 @@ import {
 } from "./designRecommendationCandidates";
 import { useProductPriceMap } from "@/components/pricing/useProductPriceMap";
 import { buildPerRowViewingData } from "@/components/utils/viewingAngleUtils";
+import { subscribe as subscribeUserInteraction, getLastInteractionAt, getIdleResumeDeadline, isUserInteracting } from "@/components/state/userInteractionStore.js";
 import {
   buildViewingPrioritySummary,
   normaliseViewingPriority,
@@ -424,6 +425,12 @@ export default function DesignRecommendationEngine({
   );
   const [resultsById, setResultsById] = useState({});
   const [activeCandidateId, setActiveCandidateId] = useState(null);
+  const candidateReadyAfterRef = useRef(0);
+  const lastInteractionAt = useSyncExternalStore(
+    subscribeUserInteraction,
+    getLastInteractionAt,
+    getLastInteractionAt
+  );
 
   const handleResult = useCallback((candidate, rating, metadata) => {
     setResultsById((previous) => {
@@ -482,6 +489,7 @@ export default function DesignRecommendationEngine({
   // per browser-idle slice. Settled candidates are unmounted; their immutable
   // result remains in resultsById for ranking.
   useEffect(() => {
+    candidateReadyAfterRef.current = Date.now() + 3000;
     setResultsById({});
     setActiveCandidateId(null);
   }, [candidateSignature]);
@@ -511,22 +519,39 @@ export default function DesignRecommendationEngine({
     if (!nextCandidate) return undefined;
 
     let cancelled = false;
+    let timeoutId = null;
+    let idleId = null;
+
     const beginNext = () => {
-      if (!cancelled) setActiveCandidateId(nextCandidate.id);
+      if (!cancelled && !isUserInteracting()) {
+        setActiveCandidateId(nextCandidate.id);
+      }
     };
 
-    if (typeof window.requestIdleCallback === "function") {
-      const idleId = window.requestIdleCallback(beginNext, { timeout: 1000 });
-      return () => {
-        cancelled = true;
-        window.cancelIdleCallback?.(idleId);
-      };
-    }
+    const scheduleWhenQuiet = () => {
+      if (cancelled) return;
+      const quietAt = Math.max(
+        candidateReadyAfterRef.current,
+        getIdleResumeDeadline()
+      );
+      const waitMs = Math.max(0, quietAt - Date.now());
+      if (waitMs > 0 || isUserInteracting()) {
+        timeoutId = window.setTimeout(scheduleWhenQuiet, Math.max(40, waitMs + 20));
+        return;
+      }
 
-    const timeoutId = window.setTimeout(beginNext, 120);
+      if (typeof window.requestIdleCallback === "function") {
+        idleId = window.requestIdleCallback(beginNext, { timeout: 1000 });
+      } else {
+        timeoutId = window.setTimeout(beginNext, 120);
+      }
+    };
+
+    scheduleWhenQuiet();
     return () => {
       cancelled = true;
-      window.clearTimeout(timeoutId);
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+      if (idleId != null) window.cancelIdleCallback?.(idleId);
     };
   }, [
     baselineBassPending,
@@ -536,6 +561,7 @@ export default function DesignRecommendationEngine({
     candidateSignature,
     candidates,
     resultsById,
+    lastInteractionAt,
   ]);
 
   const recommendations = useMemo(() => {
