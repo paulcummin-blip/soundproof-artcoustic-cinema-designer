@@ -179,7 +179,15 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
 
       {/* Step 3 — Client Brief & Narrative Focus */}
       {step === 3 && (
-        <ClientBriefStep value={clientBrief} onChange={handleClientBriefChange} />
+        <ClientBriefStep
+          value={clientBrief}
+          onChange={handleClientBriefChange}
+          projectId={selectedProjectId}
+          selectedVersionIds={selectedVersionIds}
+          proposalType={proposalType}
+          engineeringSnapshot={engineeringSnapshot}
+          snapshotLoading={snapshotLoading}
+        />
       )}
 
       {/* Step 4 — Review & Generate */}
