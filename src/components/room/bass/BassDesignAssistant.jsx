@@ -87,6 +87,14 @@ export default function BassDesignAssistant({
     : null;
   // Lifecycle state consumed from the sole authority — no independent derivation.
   const bassLifecycleState = shared?.bassLifecycleState || null;
+
+  // Use the SAME scopeId/versionId the BassBackgroundAnalysisOwner uses for
+  // restoreStateStore keying — any fallback (activeProjectId || appState?.projectId)
+  // can diverge from the owner's resolvedProjectId, causing the shared restore
+  // override to never see restoringActive=true.
+  const bdaProjectId = shared?.scopeId || null;
+  const bdaVersionId = shared?.versionId || null;
+
   // ── Global restore display override ──────────────────────────────────
   // Subscribe to restoreStateStore so CurrentDesignBar sees RESTORING on the
   // same synchronous tick that RestorePreviousDesignBar calls setRestoring(true)
@@ -98,12 +106,6 @@ export default function BassDesignAssistant({
   // ── Safe bass design experimentation ────────────────────────────────────
   // Wrap ALL physical Apply paths with checkpoint capture. One shared helper
   // owns this — individual recommendation components do not duplicate it.
-  // Use the SAME scopeId/versionId the BassBackgroundAnalysisOwner uses for
-  // restoreStateStore keying — any fallback (activeProjectId || appState?.projectId)
-  // can diverge from the owner's resolvedProjectId, causing the shared restore
-  // override to never see restoringActive=true.
-  const bdaProjectId = shared?.scopeId || null;
-  const bdaVersionId = shared?.versionId || null;
   const { checkpointedCommitInstances, checkpointedCommitSeating, captureBeforeSubDrag } = useCheckpointedCommits({
     projectId: bdaProjectId,
     versionId: bdaVersionId,
