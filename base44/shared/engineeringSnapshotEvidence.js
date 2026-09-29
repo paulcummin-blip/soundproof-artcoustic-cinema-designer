@@ -33,6 +33,16 @@ function isAssessed(level) {
   return level && level !== 'N/A' && level !== 'NONE';
 }
 
+/**
+ * Engineering Authority wraps some facts in { statement, confidence, source }.
+ * Read the statement itself; plain values pass through unchanged.
+ */
+function statement(value) {
+  if (value == null) return null;
+  if (typeof value === 'object') return value.statement ?? null;
+  return value;
+}
+
 function paramValue(parameter) {
   if (!parameter) return null;
   const value = parameter.formatted_value ?? parameter.raw_value;
@@ -54,9 +64,13 @@ function levelAndValue(level, value) {
 
 function indexText(scope) {
   if (!scope?.available) return null;
-  const percentage = scope.percentage != null ? `${scope.percentage}%` : null;
-  const index = scope.index != null ? String(scope.index) : null;
-  return compose(scope.designation, percentage, index ? `index ${index}` : null);
+  const percentage = Number.isFinite(Number(scope.percentage))
+    ? `${Math.round(Number(scope.percentage))}%`
+    : null;
+  const index = Number.isFinite(Number(scope.index))
+    ? `index ${Math.round(Number(scope.index))}`
+    : null;
+  return compose(scope.designation, percentage, index);
 }
 
 function spreadText(perSeat) {
@@ -82,7 +96,7 @@ export function buildEngineeringEvidence(snapshot) {
   // ── Room, screen, seating ──
   const room = snapshot.room || {};
   if (room.dimensions_text) {
-    lines.push(`Room: ${compose(room.dimensions_text, room.classification, room.volume_m3 ? `${room.volume_m3} m3` : null) || room.dimensions_text}`);
+    lines.push(`Room: ${compose(room.dimensions_text, statement(room.classification), room.volume_m3 ? `${room.volume_m3} m3` : null) || room.dimensions_text}`);
   }
   if (room.screen?.interpretation) lines.push(`Screen: ${room.screen.interpretation}`);
   if (room.seating?.interpretation) lines.push(`Seating: ${room.seating.interpretation}`);
@@ -169,7 +183,17 @@ export function buildEngineeringEvidence(snapshot) {
   if (basis) lines.push(`Assessment basis: P12 ${basis.p12_mode}, P13 ${basis.p13_mode}`);
 
   // ── Strongest and weakest parameters ──
-  const describe = (entry) => (entry?.parameter_id ? `P${entry.parameter_id} (${entry.achieved_level || 'N/A'})` : null);
+  // The ranked lists carry parameter ids; the achieved level is read from the
+  // parameter headlines so the prompt never states a level we cannot resolve.
+  const levelById = new Map(
+    parameterRows(snapshot).map((row) => [Number(row.parameter_id), row.achieved_level]),
+  );
+  const describe = (entry) => {
+    const id = Number(entry?.parameter_id);
+    if (!id) return null;
+    const level = levelById.get(id) || entry?.achieved_level || null;
+    return level ? `P${id} (${level})` : null;
+  };
   const strengths = (snapshot.rp22?.strengths || []).map(describe).filter(Boolean);
   const weaknesses = (snapshot.rp22?.weaknesses || []).map(describe).filter(Boolean);
   if (strengths.length > 0) lines.push('', `Strongest parameters: ${strengths.join(', ')}`);
