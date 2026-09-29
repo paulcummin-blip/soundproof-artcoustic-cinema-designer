@@ -54,8 +54,8 @@ const SP_MAX_FONT_SIZE = 80; // cap SP wordmark font size
  *
  * Fallbacks:
  *   - Dealer logo present:  SOUND PROOF × Dealer Logo
- *   - Dealer logo missing:  SOUND PROOF × Dealer Name (text)
- *   - No dealer at all:     SOUND PROOF centred
+ *   - Dealer logo missing:  SOUND PROOF × approved Artcoustic logo
+ *   - Hero missing/failed:  approved admin hero photograph
  */
 export default function DealerHero() {
   const { user } = useAuth();
@@ -190,9 +190,10 @@ export default function DealerHero() {
   const crossColor = heroBg ? "rgba(255,255,255,0.50)" : "rgba(27,26,26,0.30)";
 
   // Admin override fields from BrandAsset
-  const logoScale = (brand?.logo_scale || 100) / 100;
-  const logoVerticalOffset = brand?.logo_vertical_offset || 0;
-  const logoType = brand?.logo_type || LOGO_TYPES.AUTO;
+  const ownedBrand = accountId && brand?.account_id === accountId ? brand : null;
+  const logoScale = (ownedBrand?.logo_scale || 100) / 100;
+  const logoVerticalOffset = ownedBrand?.logo_vertical_offset || 0;
+  const logoType = ownedBrand?.logo_type || LOGO_TYPES.AUTO;
 
   // Logo lockup: SP wordmark is the anchor (sized from available width).
   // Partner logo is sized relative to SP width based on detected shape
