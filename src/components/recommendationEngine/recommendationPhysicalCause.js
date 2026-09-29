@@ -12,6 +12,7 @@
 // ---------------------------------------------------------------------------
 
 import { PROBLEM_TYPE } from './recommendationTypes.js';
+import { buildDiagnosisCause } from './recommendationDiagnosisCopy.js';
 
 /**
  * Infer the most likely physical cause for the identified problem.
@@ -24,6 +25,15 @@ import { PROBLEM_TYPE } from './recommendationTypes.js';
 export function inferPhysicalCause(problem, currentResult, context = {}) {
   if (!problem || problem.type === PROBLEM_TYPE.NONE) {
     return { description: 'No physical cause to identify.', inferred: false };
+  }
+
+  // Severity-driven limiting factors own their copy: the worst-seat deviation,
+  // the L2 requirement it misses, and the placement / timing / polarity / gain
+  // guidance ahead of EQ. Problems produced by the mild-detection heuristics
+  // carry no severity assessment and keep the copy below.
+  const diagnosisCause = buildDiagnosisCause(problem, context);
+  if (diagnosisCause) {
+    return { description: diagnosisCause, inferred: true };
   }
 
   const worstSeat = problem.worstSeat;
@@ -61,6 +71,19 @@ export function inferPhysicalCause(problem, currentResult, context = {}) {
       }
       return {
         description: `A cancellation at ${worstFreq.toFixed(0)} Hz is likely caused by the subwoofer's position relative to the room boundaries. The subwoofer is at a pressure minimum for this frequency.`,
+        inferred: true,
+      };
+    }
+
+    case PROBLEM_TYPE.MULTI_SUB_INTERACTION: {
+      if (subwooferCount === 2) {
+        return {
+          description: 'This pair placement is interacting poorly with the room. The result has more extension, but the reference response and seat consistency are worse. Try moving one sub, changing delay, polarity or gain before applying EQ.',
+          inferred: true,
+        };
+      }
+      return {
+        description: 'The subwoofer array is not yet optimised for seat-to-seat consistency — the front/rear arrival times, gain and polarity are interacting with the room across the seating area.',
         inferred: true,
       };
     }

@@ -33,7 +33,7 @@
 // This module is PURE: no React, no side effects, no stores.
 // ---------------------------------------------------------------------------
 
-import { identifyProblem } from '@/components/recommendationEngine/recommendationProblem';
+import { identifyLimitingFactor } from '@/components/recommendationEngine/bassLimitingFactorAuthority';
 import { inferPhysicalCause } from '@/components/recommendationEngine/recommendationPhysicalCause';
 import {
   identifyAvailableLevers,
@@ -123,8 +123,11 @@ export function runEngineeringDecisionModel(inputs) {
   const baseline = currentResult || optimiserResult?.currentResult || null;
   const selection = optimiserResult;
 
-  // ── Step 1: Diagnose Physical Problem ──
-  const problem = identifyProblem(baseline, designObjectives);
+  // ── Step 1: Diagnose the limiting factor ──
+  // ADI leads with the most professionally important unresolved limitation:
+  // capability → severe seat consistency → severe reference-seat response →
+  // extension (only when the selected P18 target is genuinely missed) → polish.
+  const problem = identifyLimitingFactor(baseline, designObjectives, context);
   const physicalCause = inferPhysicalCause(problem, baseline, context);
 
   // ── Step 2: Restate Optimiser's Physical Recoverability Assessment ──

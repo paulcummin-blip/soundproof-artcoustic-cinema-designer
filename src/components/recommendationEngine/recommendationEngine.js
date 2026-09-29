@@ -27,7 +27,7 @@
 
 import { RECOMMENDATION_SCHEMA_VERSION, RECOMMENDATION_TYPE } from './recommendationTypes.js';
 import { assessDesign, isGoodEnough } from './recommendationAssessment.js';
-import { identifyProblem } from './recommendationProblem.js';
+import { identifyLimitingFactor } from './bassLimitingFactorAuthority.js';
 import { inferPhysicalCause } from './recommendationPhysicalCause.js';
 import { identifyAvailableLevers, determineAppropriateLever, areAllLeversExhausted } from './recommendationLevers.js';
 import { buildRecommendedAction } from './recommendationAction.js';
@@ -69,7 +69,11 @@ export function generateRecommendation(selection, options = {}) {
   }
 
   // ── 4. Problem ────────────────────────────────────────────────────
-  const problem = identifyProblem(currentResult, context);
+  // The limiting factor follows ADI's priority order (capability → severe
+  // seat consistency → severe reference-seat response → genuinely missed
+  // extension → polish) so the persisted recommendation tells the same story
+  // as the live ADI diagnosis on cold load.
+  const problem = identifyLimitingFactor(currentResult, context, context);
 
   // ── 5. Physical Cause ─────────────────────────────────────────────
   const physicalCause = inferPhysicalCause(problem, currentResult, context);

@@ -61,6 +61,7 @@ const PROBLEM_STATEMENT = {
   [PROBLEM_TYPE.CAPABILITY]: 'Subwoofer capability is limiting performance.',
   [PROBLEM_TYPE.ROOM_MODE]: 'A room mode is limiting performance.',
   [PROBLEM_TYPE.LOCAL_CANCELLATION]: 'A bass cancellation is limiting performance.',
+  [PROBLEM_TYPE.MULTI_SUB_INTERACTION]: 'The subwoofer placement is interacting poorly with the room.',
 };
 
 function buildProblem(engineOutput) {

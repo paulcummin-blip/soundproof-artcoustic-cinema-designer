@@ -33,6 +33,9 @@ export const PROBLEM_TYPE = {
   CAPABILITY: 'capability',
   ROOM_MODE: 'room_mode',
   LOCAL_CANCELLATION: 'local_cancellation',
+  // Multiple subwoofers are interacting poorly with the room: the
+  // reference-seat response AND seat-to-seat consistency are both severe.
+  MULTI_SUB_INTERACTION: 'multi_sub_interaction',
   NONE: null,
 };
 

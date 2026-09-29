@@ -164,6 +164,29 @@ export function determineAppropriateLever(problem, physicalCause, availableLever
         reason: 'A room mode may be partially addressable through EQ, though physical positioning is preferred.',
       };
 
+    case PROBLEM_TYPE.MULTI_SUB_INTERACTION:
+      // Poor pair/array placement interaction → fix placement and timing
+      // BEFORE equalisation. EQ cannot correct a seat-to-seat arrival problem.
+      if (physicalAvailable && availableLevers.physical.includes(LEVER.MOVE_SUBWOOFER)) {
+        return {
+          class: LEVER_CLASS.PHYSICAL,
+          lever: LEVER.MOVE_SUBWOOFER,
+          reason: 'The multiple subwoofers are interacting poorly with the room. Repositioning the subwoofers is the primary lever, with delay, polarity and gain alignment before any equalisation.',
+        };
+      }
+      if (calibrationAvailable) {
+        return {
+          class: LEVER_CLASS.CALIBRATION,
+          lever: LEVER.DELAY,
+          reason: 'Placement and arrival times between the subwoofers must be corrected (delay, polarity, gain) before equalisation is considered.',
+        };
+      }
+      return {
+        class: LEVER_CLASS.SPECIFICATION,
+        lever: LEVER.ADDITIONAL_SUBWOOFER,
+        reason: 'The current subwoofer array cannot be aligned across the seating area. An additional or alternative subwoofer position is required.',
+      };
+
     case PROBLEM_TYPE.SEAT_CONSISTENCY:
       // Seat consistency → move subs or add subs
       if (physicalAvailable && availableLevers.physical.includes(LEVER.MOVE_SUBWOOFER)) {

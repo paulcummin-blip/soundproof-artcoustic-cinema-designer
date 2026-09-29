@@ -22,6 +22,7 @@
 
 import { RECOMMENDATION_INTENT } from '@/components/room/bass/recommendationAuthority/recommendationAuthority';
 import { LEVER_CLASS, PROBLEM_TYPE } from '@/components/recommendationEngine/recommendationTypes';
+import { buildDiagnosisCopy } from '@/components/recommendationEngine/recommendationDiagnosisCopy';
 import { CORRECTABILITY_CLASS, ADI_OUTCOME } from './adiConstants';
 
 function numericLevel(value) {
@@ -36,7 +37,11 @@ function levelText(level) {
 }
 
 // ── Assessment (what is happening) ──
-function deriveAssessment(problem) {
+function deriveAssessment(problem, diagnosisCopy) {
+  // A severity-driven limiting factor owns its assessment: it states the
+  // limiting factor plainly (seat consistency, reference-seat response,
+  // placement interaction) instead of a generic statement.
+  if (diagnosisCopy?.assessment) return diagnosisCopy.assessment;
   if (!problem) return '';
 
   switch (problem.type) {
@@ -58,7 +63,11 @@ function deriveAssessment(problem) {
 }
 
 // ── Recommendation (what to do) ──
-function summariseAction(dominant, appropriateLever) {
+function summariseAction(dominant, appropriateLever, diagnosisCopy) {
+  // A severity-driven limiting factor must never be closed with "Apply the
+  // recommended equalisation." — placement, delay, polarity and gain come
+  // first, EQ last.
+  if (diagnosisCopy?.action) return diagnosisCopy.action;
   if (!dominant || !appropriateLever) return '';
 
   const leverClass = appropriateLever.class;
@@ -131,7 +140,8 @@ function deriveRp22Evidence(dominant, currentResult) {
 }
 
 // ── Remaining Limitation ──
-function deriveRemainingLimitation(problem, correctability, candidateResult, designObjectives) {
+function deriveRemainingLimitation(problem, correctability, candidateResult, designObjectives, diagnosisCopy) {
+  if (diagnosisCopy?.remainingLimitation) return diagnosisCopy.remainingLimitation;
   if (!problem) return '';
 
   const freq = Number(problem.worstSeat?.worstFrequencyHz) || 0;
@@ -176,12 +186,16 @@ function deriveRemainingLimitation(problem, correctability, candidateResult, des
 export function buildRecommendation(params) {
   const { dominant, problem, physicalCause, correctability, appropriateLever, currentResult, designObjectives } = params;
 
+  // Severity-driven limiting-factor copy (seat consistency, reference-seat
+  // response, place/timing interaction). Null for every other problem type.
+  const diagnosisCopy = buildDiagnosisCopy(problem);
+
   return {
-    assessment: deriveAssessment(problem),
-    action: summariseAction(dominant, appropriateLever),
-    why: physicalCause?.description || '',
+    assessment: deriveAssessment(problem, diagnosisCopy),
+    action: summariseAction(dominant, appropriateLever, diagnosisCopy),
+    why: physicalCause?.description || diagnosisCopy?.why || '',
     rp22Evidence: deriveRp22Evidence(dominant, currentResult),
-    remainingLimitation: deriveRemainingLimitation(problem, correctability, dominant?.result, designObjectives),
+    remainingLimitation: deriveRemainingLimitation(problem, correctability, dominant?.result, designObjectives, diagnosisCopy),
   };
 }
 
