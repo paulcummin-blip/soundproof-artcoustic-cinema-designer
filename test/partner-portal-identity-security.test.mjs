@@ -91,7 +91,7 @@ test('browser identity provider has no persistent or URL-derived dealer identity
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\/\/.*$/gm, '');
 
-  assert.match(executableProvider, /invoke\("resolveDealerIdentity", \{\}\)/);
+  assert.match(executableProvider, /invoke\("associateDealerIdentity", \{\}\)/);
   assert.doesNotMatch(executableProvider, /localStorage|sessionStorage|URLSearchParams|location\.search|searchParams/);
   assert.doesNotMatch(executableProvider, /dealerAccountId:/);
 
