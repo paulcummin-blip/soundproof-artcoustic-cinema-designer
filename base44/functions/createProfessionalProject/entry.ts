@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { getAvailableCapacity, findActivationEntry } from '../../shared/capacityAuthority.js';
 import { findEffectivePromotion } from '../../shared/promotionAuthority.js';
 import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
+import { associateDealerIdentityCore } from '../../shared/dealerIdentityAssociation.js';
 
 /**
  * B3A Trusted backend authority for Professional Project creation.
@@ -29,6 +30,20 @@ export default async function(req) {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ status: 'ACCOUNT_NOT_LINKED', error: 'Unauthorized' }, { status: 401 });
+
+    // Revalidate the current provider access token, not just stored dealer
+    // fields, before any dealer project or capacity/promotion write.
+    // Central administrators retain the existing internal-project workflow.
+    if (user.role !== 'admin') {
+      const association = await associateDealerIdentityCore(base44, user.id);
+      if (association?.resolved !== true) {
+        return Response.json({
+          status: 'DEALER_NOT_LINKED',
+          reason: association?.reason || 'DEALER_IDENTITY_UNRESOLVED',
+          message: 'Unable to verify your Dealer Account. Please launch Sound Proof from your Partner Portal.'
+        }, { status: 403 });
+      }
+    }
 
     const accessContext = await resolveAccountAccess(base44, user);
     try {
