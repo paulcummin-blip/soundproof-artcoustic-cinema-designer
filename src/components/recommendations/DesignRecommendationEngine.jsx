@@ -396,6 +396,7 @@ export default function DesignRecommendationEngine({
     [candidates]
   );
   const [resultsById, setResultsById] = useState({});
+  const [activeCandidateId, setActiveCandidateId] = useState(null);
 
   const handleResult = useCallback((candidate, rating, metadata) => {
     setResultsById((previous) => {
@@ -447,6 +448,68 @@ export default function DesignRecommendationEngine({
   // baseline rating. The ranking and candidate evaluation wait until the
   // shared baseline bass authority is final.
   const baselineBassPending = baselineRating?.isPendingBass === true;
+
+  // A candidate is a complete RP22 + ASDR solve. Mounting every candidate at
+  // once turns project hydration into a burst of synchronous main-thread work.
+  // Reset when the candidate family changes, then evaluate exactly one candidate
+  // per browser-idle slice. Settled candidates are unmounted; their immutable
+  // result remains in resultsById for ranking.
+  useEffect(() => {
+    setResultsById({});
+    setActiveCandidateId(null);
+  }, [candidateSignature]);
+
+  const activeCandidate = useMemo(
+    () => candidates.find((candidate) => candidate.id === activeCandidateId) || null,
+    [candidates, activeCandidateId]
+  );
+
+  useEffect(() => {
+    if (
+      activeCandidateId &&
+      Object.prototype.hasOwnProperty.call(resultsById, activeCandidateId)
+    ) {
+      setActiveCandidateId(null);
+    }
+  }, [activeCandidateId, resultsById]);
+
+  useEffect(() => {
+    if (baselineBassPending || activeCandidateId || completedCount >= candidateCount) {
+      return undefined;
+    }
+
+    const nextCandidate = candidates.find(
+      (candidate) => !Object.prototype.hasOwnProperty.call(resultsById, candidate.id)
+    );
+    if (!nextCandidate) return undefined;
+
+    let cancelled = false;
+    const beginNext = () => {
+      if (!cancelled) setActiveCandidateId(nextCandidate.id);
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(beginNext, { timeout: 1000 });
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback?.(idleId);
+      };
+    }
+
+    const timeoutId = window.setTimeout(beginNext, 120);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    baselineBassPending,
+    activeCandidateId,
+    completedCount,
+    candidateCount,
+    candidateSignature,
+    candidates,
+    resultsById,
+  ]);
 
   const recommendations = useMemo(() => {
     if (baselineBassPending) {
@@ -511,23 +574,17 @@ export default function DesignRecommendationEngine({
     onRecommendationsChange?.(recommendations);
   }, [onRecommendationsChange, recommendations, recommendationPublicationSignature]);
 
-  // Do not mount candidate evaluators while the baseline bass authority is
-  // pending. Candidates share the same useCompletedBassAuthority(projectId),
-  // so their ratings would also be pending. Mounting them only after the
-  // baseline settles ensures every candidate uses the same verified bass
-  // result and no candidate is marked terminal by a bass-loading timeout.
-  return (
-    <>
-      {!baselineBassPending && candidates.map((candidate) => (
-        <CandidateRatingEvaluator
-          key={candidate.id}
-          candidate={candidate}
-          appState={appState}
-          dimensions={dimensions}
-          projectId={projectId}
-          onResult={handleResult}
-        />
-      ))}
-    </>
-  );
+  // Keep candidate evaluation off the critical interaction path. One active
+  // evaluator is enough to preserve the same canonical result set without
+  // allowing all what-if calculations to block room controls and dragging.
+  return activeCandidate && !baselineBassPending ? (
+    <CandidateRatingEvaluator
+      key={activeCandidate.id}
+      candidate={activeCandidate}
+      appState={appState}
+      dimensions={dimensions}
+      projectId={projectId}
+      onResult={handleResult}
+    />
+  ) : null;
 }
