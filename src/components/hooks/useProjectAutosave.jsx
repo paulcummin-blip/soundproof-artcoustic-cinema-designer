@@ -7,7 +7,8 @@ import { fetchApi } from "@/components/net/api";
  */
 
 /**
- * Debounced autosave for Project entity with create-once then update.
+ * Legacy update-only autosave. New projects must be created through the
+ * guarded New Project workflow; autosave must never create an unowned record.
  * @param {Object} opts
  * @param {string|null} opts.projectId
  * @param {string} opts.projectName
@@ -88,10 +89,7 @@ export function useProjectAutosave(opts) {
             ));
           }
         } else {
-          res = await (inflightRef.current = fetchApi(
-            `/entities/Project`,
-            { method: "POST", body: payload }
-          ));
+          throw new Error('Create the project through New Project before autosaving.');
         }
 
         inflightRef.current = null;
@@ -117,13 +115,11 @@ export function useProjectAutosave(opts) {
   // Flush on hide/unload (unchanged)
   useEffect(() => {
     const flush = async () => {
-      if (isHydrating) return;
+      if (isHydrating || !projectId) return;
       if (hash === lastHashRef.current) return;
       try {
-        const path = projectId
-          ? `/entities/Project/${encodeURIComponent(projectId)}`
-          : `/entities/Project`;
-        const method = projectId ? "PUT" : "POST";
+        const path = `/entities/Project/${encodeURIComponent(projectId)}`;
+        const method = "PUT";
         await fetchApi(path, { method, body: payload });
         lastHashRef.current = hash;
       } catch {
