@@ -58,7 +58,7 @@ export default function ClientBriefStep({ value, onChange }) {
       <textarea
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="e.g. The client is passionate about music and wants invisible loudspeakers. Emphasise timbre matching, controlled dispersion, and architectural integration."
+        placeholder="Example: Large screen, compact room with four seats, strong timbre matching, explain why the front row is the priority."
         rows={8}
         className="w-full p-4 text-sm text-[#1B1A1A] bg-white border border-[#DCDBD6] rounded-lg resize-y focus:outline-none focus:border-[#213428] focus:ring-1 focus:ring-[#213428] transition-colors"
         style={{ fontFamily: 'Inter, sans-serif', lineHeight: 1.6 }}

@@ -714,7 +714,7 @@ export default function ProposalEditor() {
             value={clientBrief}
             readOnly={archived}
             onChange={(e) => setClientBrief(e.target.value)}
-            placeholder="e.g. The client is passionate about music and wants invisible loudspeakers…"
+            placeholder="Example: Large screen, compact room with four seats, strong timbre matching, explain why the front row is the priority."
             rows={10}
             className="w-full p-3 text-xs text-[#1B1A1A] bg-[#F5F4F0] border border-[#DCDBD6] rounded-lg resize-y focus:outline-none focus:border-[#213428] focus:ring-1 focus:ring-[#213428] transition-colors"
             style={{ fontFamily: 'Inter, sans-serif', lineHeight: 1.6 }}

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
+import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
 
 const SECTIONS = [
   { type: 'cover', key: 'cover', title: 'Cover', canEditBody: false },
@@ -276,8 +277,8 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief) {
     speakerInfo ? `Speakers: ${speakerInfo}` : '',
     subInfo ? `Subwoofers: ${subInfo}` : '',
     '',
-    '=== CLIENT BRIEF & NARRATIVE FOCUS (guide the narrative emphasis only) ===',
-    briefText || 'No specific client brief provided. Use a balanced professional narrative.',
+    '=== EMPHASIS NOTES / CLIENT BRIEF (narrative focus: guides emphasis only, never the facts) ===',
+    briefText || 'No specific emphasis notes provided. Use a balanced professional narrative.',
     '',
     '=== CONSTRAINT ===',
     'The Client Brief influences narrative emphasis, wording, and structure ONLY.',
@@ -301,7 +302,8 @@ function buildSectionPrompt(sectionDef, projectContext) {
     'Format the response as HTML. Use <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em> tags.',
     'Do NOT include the section title — only the body content.',
     'Write in British English.',
-    'Tone: professional, confident, not overly technical unless the section demands it.',
     'Do not mention prices.',
+    '',
+    buildWritingStyleContract(),
   ].join('\n');
 }
