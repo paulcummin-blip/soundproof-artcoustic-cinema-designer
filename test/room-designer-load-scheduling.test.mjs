@@ -9,6 +9,7 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 
 const roomVisualisation = read("src/components/room/RoomVisualisation.jsx");
 const recommendationEngine = read("src/components/recommendations/DesignRecommendationEngine.jsx");
+const bassBackgroundOwner = read("src/components/room/bass/BassBackgroundAnalysisOwner.jsx");
 const runtimeDiagnostic = read("src/components/utils/rp22RuntimeDiagnostic.js");
 
 test("RoomVisualisation reuses the Room Designer RP22 authority", () => {
@@ -45,6 +46,13 @@ test("a geometry or model change invalidates settled recommendation results", ()
     recommendationEngine,
     /useEffect\(\(\) => \{\s*candidateReadyAfterRef\.current = Date\.now\(\) \+ 10000;\s*setResultsById\(\{\}\);\s*setActiveCandidateId\(null\);\s*\}, \[candidateSignature\]\);/
   );
+});
+
+test("cold-restored bass preparation waits for first-use and interaction quiet periods", () => {
+  assert.match(bassBackgroundOwner, /backgroundPrepReadyAfterRef = useRef\(Date\.now\(\) \+ 10000\)/);
+  assert.match(bassBackgroundOwner, /getIdleResumeDeadline\(\)/);
+  assert.match(bassBackgroundOwner, /if \(waitMs > 0 \|\| isUserInteracting\(\)\)/);
+  assert.match(bassBackgroundOwner, /lastInteractionAt,/);
 });
 
 test("temporary RP22 console diagnostics are opt-in, not production-default", () => {
