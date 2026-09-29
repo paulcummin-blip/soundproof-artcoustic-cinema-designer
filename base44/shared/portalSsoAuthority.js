@@ -244,6 +244,7 @@ function bindingMatches(binding, identity, mapping) {
 
 export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
   bridgeUrl,
+  associateDealerIdentity,
 } = {}) {
   const service = base44.asServiceRole;
   const binding = await callBridge(base44, base44User.id, {
@@ -275,6 +276,17 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
   const accounts = await uniqueRows(service.entities.Account, { id: link.account_id });
   if (accounts.length !== 1 || accounts[0]?.status !== 'active') {
     throw new Error('PORTAL_ACCOUNT_INACTIVE');
+  }
+
+  // Require a live access-token-backed dealer identity before claiming a
+  // membership or writing derived PortalIdentity data. The callback is a
+  // server-only dependency, never a client-supplied identity.
+  if (typeof associateDealerIdentity !== 'function') {
+    throw new Error('DEALER_ASSOCIATION_REQUIRED');
+  }
+  const association = await associateDealerIdentity();
+  if (association?.resolved !== true) {
+    throw new Error(association?.reason || 'DEALER_IDENTITY_UNRESOLVED');
   }
 
   // First successful portal launch may claim the one pre-created dealer-admin
