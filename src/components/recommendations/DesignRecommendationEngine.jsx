@@ -486,10 +486,13 @@ export default function DesignRecommendationEngine({
   // A candidate is a complete RP22 + ASDR solve. Mounting every candidate at
   // once turns project hydration into a burst of synchronous main-thread work.
   // Reset when the candidate family changes, then evaluate exactly one candidate
-  // per browser-idle slice. Settled candidates are unmounted; their immutable
-  // result remains in resultsById for ranking.
+  // per browser-idle slice. Keep the first-use window clear: this engine is
+  // non-critical, while opening panels and starting a drag are client-facing.
+  // Later interaction extends the same quiet deadline through the shared store.
+  // Settled candidates are unmounted; their immutable result remains in
+  // resultsById for ranking.
   useEffect(() => {
-    candidateReadyAfterRef.current = Date.now() + 3000;
+    candidateReadyAfterRef.current = Date.now() + 10000;
     setResultsById({});
     setActiveCandidateId(null);
   }, [candidateSignature]);
