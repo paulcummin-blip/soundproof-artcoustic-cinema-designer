@@ -2242,6 +2242,16 @@ function RoomDesignerWithState() {
             setFreeMoveLcr={setFreeMoveLcr}
             liveImpactMode={safeLiveImpactMode}
             setLiveImpactMode={safeSetLiveImpactMode}
+            seatingPositions={_seatingPositions}
+            onMoveRsp={(y) => {
+              if (!Number.isFinite(y)) return;
+              // Same committed manual-position authority as the plan's green dot.
+              // No seat, row-priority or screen geometry changes.
+              appState?.setManualRspY_m?.(y);
+              appState?.setManualRspX_m?.(null);
+              appState?.setRspMode?.("manual_position");
+              appState?.setDesignatedRspSeatId?.(null);
+            }}
           />}
 
           {/* Content area */}
