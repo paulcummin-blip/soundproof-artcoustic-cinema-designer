@@ -94,7 +94,7 @@ function projectHandler(base44, onAccess = () => {}) {
 
 const projectRequest = name => new Request('https://soundproof.example/functions/createProfessionalProject', {
   method: 'POST', headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ name, dealer_account_id: 'untrusted-browser-value', dealer_name: 'Untrusted name' }),
+  body: JSON.stringify({ name, account_id: 'foreign-tenant', dealer_account_id: 'untrusted-browser-value', dealer_name: 'Untrusted name' }),
 });
 
 test('missing provider access token never calls identity service or writes an association', async t => {
@@ -186,6 +186,7 @@ test('two guarded project creations use the same server-authoritative dealer sta
     const response = await projectHandler(base44)(projectRequest(name));
     assert.equal(response.status, 201);
     const result = await response.json();
+    assert.equal(result.project.account_id, PILOT_SOUND_PROOF_ACCOUNT_ID);
     assert.equal(result.project.dealer_account_id, DEALER_ID);
     assert.equal(result.project.dealer_name, 'Example Cinema');
   }
