@@ -62,6 +62,7 @@ export default function RoomDesignerPlanToolbar({
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
+        flexShrink: 0,
         gap: '8px 12px',
         padding: '6px 10px',
         borderBottom: '1px solid #DCDBD6',
