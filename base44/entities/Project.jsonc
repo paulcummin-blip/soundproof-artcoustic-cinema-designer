@@ -349,17 +349,38 @@
     },
     "account_id": {
       "type": "string",
-      "description": "ID of the Account this project belongs to"
+      "description": "ID of the Account this project belongs to",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "dealer_account_id": {
       "type": "string",
       "description": "Immutable Dealer Account UUID from the Partner Portal Dealer Identity Service. Stamped at project creation from the authenticated user's dealer_account_id. The permanent ownership model \u2014 every project belongs to exactly one dealer. Never overwritten automatically after creation. Null for admin-created internal projects.",
-      "nullable": true
+      "nullable": true,
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "dealer_name": {
       "type": "string",
       "description": "Dealer display name from the Partner Portal Dealer Identity Service. Stamped at project creation from the authenticated user's dealer_name.",
-      "nullable": true
+      "nullable": true,
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "active_version_id": {
       "type": "string",
@@ -568,42 +589,9 @@
       ]
     },
     "create": {
-      "$or": [
-        {
-          "$and": [
-            {
-              "data.account_id": "{{user.data.account_id}}"
-            },
-            {
-              "data.account_id": {
-                "$nin": [
-                  null,
-                  ""
-                ]
-              }
-            },
-            {
-              "$or": [
-                {
-                  "user_condition": {
-                    "data.access_level": "FULL_ACCESS"
-                  }
-                },
-                {
-                  "user_condition": {
-                    "data.access_level": "SOUND_PROOF_ONLY"
-                  }
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
+      "user_condition": {
+        "role": "admin"
+      }
     },
     "update": {
       "$or": [
