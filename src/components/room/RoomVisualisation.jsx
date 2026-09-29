@@ -102,7 +102,6 @@ import { computeAllSeatSplMetrics, getSeatSplMetrics, getMlpSeat } from "@/compo
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { buildSeatHudSnapshot } from "@/components/utils/buildSeatHudSnapshot";
 import { useTooltipData } from '@/components/room/hooks/useTooltipData';
-import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
 import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
 
@@ -1426,42 +1425,10 @@ const byId = useEntitiesById({
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
 
-  // ── Live RP22 analysis (always running) ──────────────────────────────────
-  const engineDimensions = useMemo(() => ({ widthM, lengthM, heightM }), [widthM, lengthM, heightM]);
-  const engineState = useMemo(() => ({
-    lcrAimMode: appState?.lcrAimMode,
-    globalModel: overheadGlobalModel,
-    frontOverride: overheadFrontOverride,
-    midOverride: overheadMidOverride,
-    rearOverride: overheadRearOverride,
-    useFrontGlobal, useMidGlobal, useRearGlobal,
-    aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP,
-    speakerSystem: appState?.speakerSystem,
-    getSpeakerVisibility,
-  }), [
-    appState?.lcrAimMode, appState?.speakerSystem,
-    overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride,
-    useFrontGlobal, useMidGlobal, useRearGlobal,
-    aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, getSpeakerVisibility,
-  ]);
-  const liveRp22 = useRP22AnalysisEngine({
-    diagnosticOwner: rp22DiagnosticOwner,
-    // Live impact uses the completed bass contract for P19/P20. Keep the
-    // geometry overlay pass free of the retired synchronous bass simulator.
-    includeBassAnalysis: false,
-    placedSpeakers,
-    seatingPositions,
-    dimensions: engineDimensions,
-    mlpBasis,
-    mlpPointOverride: mlpPoint,
-    seatSplMetrics: allSeatSplMetricsProp,
-    overheadState: engineState,
-    aimState: engineState,
-    assumedP15Level: appState?.assumedP15Level ?? null,
-    screen,
-    screenFrontPlaneM,
-    visiblePlanSpeakers,
-  });
+  // Live Impact consumes the already-computed Room Designer authority passed
+  // through analysisResult. Re-running the complete RP22 engine here duplicated
+  // the canonical calculation on every project load and geometry update.
+  const liveRp22 = analysisResult || {};
 
   const {
     baselineRp22,
