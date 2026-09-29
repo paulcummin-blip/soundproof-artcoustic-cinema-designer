@@ -29,6 +29,7 @@ import assert from "node:assert/strict";
 
 import { identifyLimitingFactor } from "@/components/recommendationEngine/bassLimitingFactorAuthority";
 import { buildDiagnosisCopy } from "@/components/recommendationEngine/recommendationDiagnosisCopy";
+import { buildIncomplete } from "@/components/adi/recommendationBuilder";
 import { PROBLEM_TYPE } from "@/components/recommendationEngine/recommendationTypes";
 import { inferPhysicalCause } from "@/components/recommendationEngine/recommendationPhysicalCause";
 import { ADI_OUTCOME } from "@/components/adi/adiConstants";
@@ -82,6 +83,24 @@ const FOUR_SUB = {
   ],
   p19Aggregate: { value: 2.4, level: "L3" },
   p20Aggregate: { value: 12.1, level: "L1" },
+};
+
+const LIVE_TWO_SUB = {
+  p14AchievedDb: 113.1,
+  achievedP18Hz: 26,
+  perSeatP19: [seat("R1S1", 9, "FAIL", true)],
+  perSeatP20: [seat("R1S1", 20, "L1", true)],
+  p19Aggregate: { value: 9, level: "FAIL" },
+  p20Aggregate: { value: 20, level: "L1" },
+};
+
+const LIVE_FOUR_SUB = {
+  p14AchievedDb: 119.2,
+  achievedP18Hz: 23,
+  perSeatP19: [seat("R1S1", 1, "L4", true)],
+  perSeatP20: [seat("R1S1", 8, "L1", true)],
+  p19Aggregate: { value: 1, level: "L4" },
+  p20Aggregate: { value: 8, level: "L1" },
 };
 
 const HEALTHY = {
@@ -190,6 +209,41 @@ test("four subs: a remaining seat-to-seat limitation is reported as array optimi
   assert.match(copy.action, /front\/rear timing, gain and polarity/);
   assert.match(copy.remainingLimitation, /strong output and extension/);
   assert.equal(text.includes(EQ_FIRST), false, "EQ is never the leading recommendation");
+});
+
+test("incomplete two-sub card keeps the live pair-interaction story and actions", () => {
+  const problem = identifyLimitingFactor(
+    LIVE_TWO_SUB,
+    { p14TargetDb: 112, p14Level: 2, p18TargetBasis: "recommended" },
+    { subwooferCount: 2 },
+  );
+  const recommendation = buildIncomplete(problem, true);
+  const displayed = [recommendation.action, recommendation.remainingLimitation].join(" | ");
+
+  assert.equal(problem.type, PROBLEM_TYPE.MULTI_SUB_INTERACTION);
+  assert.match(displayed, /pair placement is interacting poorly with the room/);
+  assert.match(displayed, /reference-seat response is not currently controlled \(9\.0 dB\)/);
+  assert.match(displayed, /Worst seat deviation is 20\.0 dB/);
+  assert.match(displayed, /moving one sub/);
+  assert.match(displayed, /delay, polarity or gain before applying EQ/);
+  assert.doesNotMatch(displayed, /extension is the limiting factor|cannot reach the target bass extension/i);
+});
+
+test("incomplete four-sub card keeps the live array-strength and P20 story", () => {
+  const problem = identifyLimitingFactor(
+    LIVE_FOUR_SUB,
+    { p14TargetDb: 112, p14Level: 2, p18TargetBasis: "recommended" },
+    { subwooferCount: 4 },
+  );
+  const recommendation = buildIncomplete(problem, true);
+  const displayed = [recommendation.action, recommendation.remainingLimitation].join(" | ");
+
+  assert.equal(problem.type, PROBLEM_TYPE.SEAT_CONSISTENCY);
+  assert.match(displayed, /Four subs have improved output, extension and reference-seat smoothness/);
+  assert.match(displayed, /not yet optimised for seat-to-seat consistency/);
+  assert.match(displayed, /strong output and extension/);
+  assert.match(displayed, /front\/rear timing, gain and polarity before final EQ/);
+  assert.doesNotMatch(displayed, /cannot reach the target bass extension|extension is the limiting factor/i);
 });
 
 // ── 5. NO FALSE EXTENSION DIAGNOSIS ──────────────────────────────────────
