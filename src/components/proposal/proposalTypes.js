@@ -33,20 +33,3 @@ export const PROPOSAL_TYPES = [
 export function getProposalType(value) {
   return PROPOSAL_TYPES.find((t) => t.value === value) || null;
 }
-
-/**
- * Cover report titles — the document title printed on the cover page.
- *
- * Deliberately separate from the wizard `label`, because the wizard label is
- * internal-facing ("Single Design Proposal") while the cover title is what the
- * client reads. 'System Design Summary' is reserved for a future
- * summary-type proposal.
- */
-const PROPOSAL_COVER_TITLES = {
-  single: 'Cinema Design Proposal',
-  comparison: 'System Design Comparison',
-};
-
-export function getProposalCoverTitle(value) {
-  return PROPOSAL_COVER_TITLES[value] || 'Cinema Design Proposal';
-}

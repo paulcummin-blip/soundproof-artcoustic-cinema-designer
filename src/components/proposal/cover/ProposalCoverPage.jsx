@@ -6,14 +6,18 @@
  * Used for BOTH the on-screen Proposal Editor cover and the exported PDF
  * cover, so the two are identical by construction.
  *
- * Cover hierarchy:
+ * Cover hierarchy (top → bottom):
  *   1. full-bleed background image, cropped to cover, with a dark overlay so
  *      white text stays readable
- *   2. the Sound Proof × Artcoustic main branding lockup
- *   3. dealer and project identity — dealer name, project name, project
- *      reference — placed BELOW the lockup with generous spacing
- *   4. the report title (Cinema Design Proposal / System Design Comparison)
- *   5. the bottom strap line and the generated date
+ *   2. top third — the stacked Sound Proof × partner lockup, using the same
+ *      brand hierarchy as the app header (see BrandLockup)
+ *   3. middle / lower-middle — dealer name (partner/dealer accounts only), then
+ *      the project name and project reference. Deliberately small: the project
+ *      name is identity, never the visual hero of the cover.
+ *   4. bottom — the generated date and the approved Sound Proof strap line
+ *
+ * The cover carries NO document title. The document type is metadata and lives
+ * in the workspace toolbar, not in a large generic headline on the page.
  *
  * Background priority:
  *   1. the project's selected cover image (ProposalAsset cover_image)
@@ -26,11 +30,11 @@
 import React from 'react';
 import { useBrandImage } from '@/components/account/useBrandImage';
 import { APPROVED_DEALER_BRANDING } from '@/components/account/defaultDealerBranding';
+import BrandLockup from '@/components/ui/BrandLockup';
 
 // The agreed brand font, with the app-wide fallback chain.
 const FONT = 'Didact Gothic, Century Gothic, sans-serif';
 
-const SP_WORDMARK = 'SOUND PROOF';
 const WHITE = '#FFFFFF';
 
 /** Cover date in UK format — DD/MM/YYYY. */
@@ -54,9 +58,9 @@ function IdentityValue({ label, value, valueSize = 26, valueSpacing = '0.02em' }
     <div>
       <div
         style={{
-          fontSize: 10,
+          fontSize: 9,
           fontWeight: 600,
-          letterSpacing: '0.30em',
+          letterSpacing: '0.26em',
           textTransform: 'uppercase',
           color: WHITE,
         }}
@@ -83,7 +87,6 @@ export default function ProposalCoverPage({
   projectName,
   dealerName,
   projectReference,
-  reportTitle,
   coverImageUrl,
   heroImageUrl,
   logoUrl,
@@ -123,53 +126,38 @@ export default function ProposalCoverPage({
       />
 
       <div className="relative h-full flex flex-col">
-        {/* ── 2. Main branding lockup — Sound Proof × Artcoustic ── */}
-        <div className="px-8 pt-10 flex items-center justify-center gap-4">
-          <span
-            style={{
-              fontSize: 30,
-              fontWeight: 300,
-              letterSpacing: '0.14em',
-              lineHeight: 1,
-              color: WHITE,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {SP_WORDMARK}
-          </span>
-          <span
-            style={{
-              fontSize: 17,
-              fontWeight: 300,
-              lineHeight: 1,
-              color: 'rgba(255,255,255,0.55)',
-              userSelect: 'none',
-            }}
-          >
-            ×
-          </span>
-          <img
-            src={logoSrc}
-            alt="Artcoustic"
-            style={{
-              maxHeight: 52,
-              maxWidth: 190,
-              width: 'auto',
-              height: 'auto',
-              objectFit: 'contain',
-            }}
-          />
+        {/* ── 2. Top third — stacked brand lockup ── */}
+        <div
+          style={{
+            flex: '1 1 0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '32px 32px 0',
+          }}
+        >
+          <BrandLockup spFontSize={34} partnerLogoUrl={logoSrc} />
         </div>
 
-        {/* ── 3. Dealer and project identity — below the lockup ── */}
-        <div className="px-8 text-center" style={{ marginTop: 46 }}>
+        {/* ── 3. Middle / lower-middle — project identity ── */}
+        <div
+          style={{
+            flex: '1 1 0',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            padding: '0 32px',
+          }}
+        >
           {dealerName && (
             <div
               style={{
-                fontSize: 23,
+                fontSize: 15,
                 fontWeight: 400,
-                letterSpacing: '0.07em',
-                lineHeight: 1.25,
+                letterSpacing: '0.08em',
+                lineHeight: 1.3,
                 color: WHITE,
               }}
             >
@@ -177,54 +165,28 @@ export default function ProposalCoverPage({
             </div>
           )}
 
-          <div style={{ marginTop: dealerName ? 38 : 0 }}>
+          <div style={{ marginTop: dealerName ? 28 : 0, width: '100%' }}>
             <IdentityValue
-              label="Project:"
+              label="Project"
               value={projectName}
-              valueSize={27}
+              valueSize={21}
               valueSpacing="0.02em"
             />
           </div>
 
           {hasReference && (
-            <div style={{ marginTop: 30 }}>
+            <div style={{ marginTop: 26, width: '100%' }}>
               <IdentityValue
-                label="Reference:"
+                label="Reference"
                 value={String(projectReference).trim()}
-                valueSize={15}
+                valueSize={12}
                 valueSpacing="0.10em"
               />
             </div>
           )}
         </div>
 
-        <div className="flex-1" />
-
-        {/* ── 4. Report title — lower third ── */}
-        <div className="px-8 text-center">
-          <div
-            style={{
-              fontSize: 20,
-              fontWeight: 300,
-              letterSpacing: '0.20em',
-              textTransform: 'uppercase',
-              lineHeight: 1.3,
-              color: WHITE,
-            }}
-          >
-            {reportTitle || 'Cinema Design Proposal'}
-          </div>
-          <div
-            style={{
-              width: 56,
-              height: 1,
-              backgroundColor: 'rgba(255,255,255,0.55)',
-              margin: '20px auto 0',
-            }}
-          />
-        </div>
-
-        {/* ── 5. Bottom strap line and generated date ── */}
+        {/* ── 4. Bottom — generated date and approved strap line ── */}
         <div
           className="px-8 py-4 flex items-center justify-between gap-6"
           style={{

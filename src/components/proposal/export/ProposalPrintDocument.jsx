@@ -21,7 +21,6 @@ export default function ProposalPrintDocument({
   projectName,
   dealerName,
   projectReference,
-  reportTitle,
   coverImageUrl,
   heroImageUrl,
   logoUrl,
@@ -40,7 +39,6 @@ export default function ProposalPrintDocument({
           projectName={projectName}
           dealerName={dealerName}
           projectReference={projectReference}
-          reportTitle={reportTitle}
           coverImageUrl={coverImageUrl}
           heroImageUrl={heroImageUrl}
           logoUrl={logoUrl}

@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Link, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { getSectionDef } from '@/components/proposal/proposalSections';
-import { getProposalType, getProposalCoverTitle } from '@/components/proposal/proposalTypes';
+import { getProposalType } from '@/components/proposal/proposalTypes';
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
 import ProposalSectionNav from '@/components/proposal/ProposalSectionNav';
 import { isArchived, getRestoreStatus } from '@/components/proposal/proposalLifecycle';
 import { resolveDealerBrandPresentation } from '@/components/account/defaultDealerBranding';
+import { resolveDealerIdentityName } from '@/components/account/dealerIdentityDisplay';
 import ProposalWorkspaceToolbar from '@/components/proposal/ProposalWorkspaceToolbar';
 import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
@@ -78,13 +79,12 @@ export default function ProposalEditor() {
     // Resolves the dealer's own hero/logo when set, otherwise the approved
     // Sound Proof / Artcoustic defaults — so the cover is always professional.
     const presentation = resolveDealerBrandPresentation(brand, proposalRecord.account_id);
-    // Dealer name: the dealer's own branding name, falling back to the account
-    // name. The approved Artcoustic default is deliberately NOT used here —
-    // Artcoustic is the partner brand in the lockup, not the dealer.
-    const dealerName = brand?.display_name_override?.trim()
-      || brand?.company_name?.trim()
-      || account?.name?.trim()
-      || null;
+    // Dealer identity is presented only for a partner/dealer account. Sound
+    // Proof's own admin and internal accounts are platform identities and must
+    // never appear as the dealer on a client-facing cover. The approved
+    // Artcoustic default name is not a fallback either — Artcoustic is the
+    // partner brand in the lockup, not the dealer.
+    const dealerName = resolveDealerIdentityName(account, brand);
     setProjectContext({
       projectName: project?.name || null,
       dealerName,
@@ -510,8 +510,6 @@ export default function ProposalEditor() {
 
   const visibleSections = sections.filter((s) => s.is_enabled !== false);
   const typeLabel = getProposalType(proposal?.proposal_type)?.label || 'Single Design Proposal';
-  // Client-facing cover title — derived from the proposal type.
-  const coverReportTitle = getProposalCoverTitle(proposal?.proposal_type);
   const hasUnsavedChanges = dirtySections.size > 0;
 
   return (
@@ -653,7 +651,6 @@ export default function ProposalEditor() {
                         projectName={projectContext.projectName || proposal?.title}
                         dealerName={projectContext.dealerName}
                         projectReference={projectContext.projectReference}
-                        reportTitle={coverReportTitle}
                         coverImageUrl={projectContext.coverImageUrl}
                         heroImageUrl={projectContext.heroImageUrl}
                         logoUrl={projectContext.logoUrl}
@@ -788,7 +785,6 @@ export default function ProposalEditor() {
         projectName={projectContext.projectName || proposal?.title}
         dealerName={projectContext.dealerName}
         projectReference={projectContext.projectReference}
-        reportTitle={coverReportTitle}
         coverImageUrl={projectContext.coverImageUrl}
         heroImageUrl={projectContext.heroImageUrl}
         logoUrl={projectContext.logoUrl}
