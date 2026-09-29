@@ -125,6 +125,10 @@ export default function DealerBrandingPanel({ accountId }) {
 
   return (
     <div className="max-w-2xl space-y-8">
+      <p className="text-sm text-[#8A8477]">
+        Your account starts with the approved Sound Proof hero and Artcoustic logo.
+        Uploads below personalise only your account. Removing an upload restores the default.
+      </p>
       {/* Company Logo */}
       <div className="space-y-2">
         <Label className={labelClasses}>Company Logo</Label>
@@ -245,7 +249,7 @@ export default function DealerBrandingPanel({ accountId }) {
       <div className="space-y-2">
         <Label className={labelClasses}>Company Display Name (optional)</Label>
         <p className="text-xs text-[#8A8477]">
-          Shown in the hero banner when no dealer logo is uploaded. Leave blank to use the company name from your Brand Assets.
+          Used as your company display name. The approved Artcoustic logo remains until you upload your own dealer logo. Leave blank to use the company name from your Brand Assets.
         </p>
         <Input
           value={form.display_name_override || ""}
