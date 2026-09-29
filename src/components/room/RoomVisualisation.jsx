@@ -2351,7 +2351,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         seatDragTick={seatDragTick}
         draftSpeakersRef={draftSpeakersRef}
         speakerDragTick={speakerDragTick}
-        dragImpact={{ baseline: baselineRp22, live: liveRp22, baselineP20Results, currentP20Results, isActive: !!dragging, cardVisible: showLiveImpactCard && liveImpactMode !== 'off' }}
+        dragImpact={{ baseline: baselineRp22, live: liveRp22, baselineP20Results, currentP20Results, isActive: !!dragging, cardVisible: liveImpactMode !== 'off' }}
         onAcceptBaseline={acceptBaseline}
         onDismissCard={dismissCard}
         isPostDrag={!dragging && showLiveImpactCard}

@@ -771,6 +771,7 @@ export default function RvPlanCanvas({
             currentP20Results={dragImpact.currentP20Results}
             mode={liveImpactMode}
             isPostDrag={isPostDrag}
+            isActive={!!dragImpact.isActive}
             onAccept={onAcceptBaseline}
             onDismiss={onDismissCard}
           />

@@ -330,12 +330,15 @@ function SummaryParamRow({ paramNum, summary, scope, isLast }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function SeatingDragImpactCard({ baseline, live, seatingPositions = [], baselineP20Results = [], currentP20Results = [], cardTitle, mode = "detailed", isPostDrag = false, onAccept, onDismiss }) {
-  if (!baseline || !live) return null;
+export default function SeatingDragImpactCard({ baseline, live, seatingPositions = [], baselineP20Results = [], currentP20Results = [], cardTitle, mode = "detailed", isPostDrag = false, isActive = false, onAccept, onDismiss }) {
+  // A comparison needs both the live canonical authority and a captured
+  // baseline. When either is missing, or when nothing changed, render an
+  // explicit state — never return nothing and leave the body blank.
+  const canCompare = !!baseline && !!live;
 
-  const paramData = buildAllParamData(baseline, live);
+  const paramData = canCompare ? buildAllParamData(baseline, live) : [];
   const p20Comparison = buildP20BeforeAfter(seatingPositions, baselineP20Results, currentP20Results);
-  if (p20Comparison.seatsAffected > 0) paramData.push({
+  if (canCompare && p20Comparison.seatsAffected > 0) paramData.push({
     paramNum: 20,
     baseLevels: p20Comparison.beforeRows.flatMap((row) => row.seats.map((seat) => seat.level)),
     liveLevels: p20Comparison.afterRows.flatMap((row) => row.seats.map((seat) => seat.level)),
@@ -344,10 +347,19 @@ export default function SeatingDragImpactCard({ baseline, live, seatingPositions
     summary: p20Comparison.summary,
     scope: 'seat',
   });
-  if (paramData.length === 0) return null;
-
   const visibleParams = paramData.slice(0, MAX_VISIBLE_ROWS);
   const hiddenCount = paramData.length - visibleParams.length;
+
+  // Stable state for the Live Impact body: the settled Room Designer authority
+  // does not change mid-drag, so a drag shows a recalculating state, and the
+  // real comparison appears once the drag commits.
+  const bodyState = !live
+    ? 'Live impact is not available for the current selection.'
+    : paramData.length > 0
+      ? null
+      : isActive
+        ? 'Recalculating live impact…'
+        : 'Move a seat, speaker or subwoofer to compare its live RP22 impact.';
 
   return (
     <div style={{
@@ -377,12 +389,18 @@ export default function SeatingDragImpactCard({ baseline, live, seatingPositions
         </div>
       </div>
 
-      {/* Parameter rows */}
-      {visibleParams.map((d, idx) => (
-        mode === "summary" && d.paramNum !== 20
-          ? <SummaryParamRow key={d.paramNum} paramNum={d.paramNum} summary={d.summary} scope={d.scope} isLast={idx === visibleParams.length - 1 && hiddenCount === 0} />
-          : <ParamRow key={d.paramNum} paramNum={d.paramNum} baseLevels={d.baseLevels} liveLevels={d.liveLevels} beforeRows={d.beforeRows} afterRows={d.afterRows} summaryOverride={d.summary} scope={d.scope} isLast={idx === visibleParams.length - 1 && hiddenCount === 0} />
-      ))}
+      {/* Parameter rows, or a stable state — never an empty body */}
+      {bodyState
+        ? (
+          <div style={{ fontSize: 11, color: '#6B7280', lineHeight: 1.5 }}>
+            {bodyState}
+          </div>
+        )
+        : visibleParams.map((d, idx) => (
+          mode === "summary" && d.paramNum !== 20
+            ? <SummaryParamRow key={d.paramNum} paramNum={d.paramNum} summary={d.summary} scope={d.scope} isLast={idx === visibleParams.length - 1 && hiddenCount === 0} />
+            : <ParamRow key={d.paramNum} paramNum={d.paramNum} baseLevels={d.baseLevels} liveLevels={d.liveLevels} beforeRows={d.beforeRows} afterRows={d.afterRows} summaryOverride={d.summary} scope={d.scope} isLast={idx === visibleParams.length - 1 && hiddenCount === 0} />
+        ))}
 
       {/* Overflow indicator */}
       {hiddenCount > 0 && (
