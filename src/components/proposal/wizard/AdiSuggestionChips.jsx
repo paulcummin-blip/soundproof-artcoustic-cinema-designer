@@ -33,7 +33,7 @@ const GENERIC_EXAMPLES = [
   'Highlight future expansion',
 ];
 
-const FALLBACK_MESSAGE = 'Calculate the project to get ADI suggestions based on the design.';
+const FALLBACK_MESSAGE = 'Calculate the project to get examples powered by Artcoustic Design Intelligence.';
 
 export default function AdiSuggestionChips({
   projectId,
@@ -98,7 +98,7 @@ export default function AdiSuggestionChips({
         <div className="flex items-center gap-2">
           <Lightbulb className="w-3.5 h-3.5 text-[#A79E8C]" />
           <span className="text-[11px] uppercase tracking-[0.12em] text-[#A79E8C]">
-            {'ADI Suggestions — Click to Add'}
+            {'Examples, powered by Artcoustic Design Intelligence'}
           </span>
         </div>
         {hasResults && !busy && (
@@ -108,14 +108,14 @@ export default function AdiSuggestionChips({
             className="flex items-center gap-1.5 text-[11px] text-[#625143] hover:text-[#213428] transition-colors"
           >
             <RefreshCw className="w-3 h-3" />
-            {'Refresh suggestions'}
+            {'Refresh examples'}
           </button>
         )}
       </div>
 
       {usingCalculatedResults && (
         <p className="text-[11px] text-[#8A8477] mb-3">
-          {"Suggestions are based on this project's design results."}
+          {"These examples are based on this project's calculated design results."}
         </p>
       )}
 
@@ -130,7 +130,7 @@ export default function AdiSuggestionChips({
       {!busy && !usingCalculatedResults && (
         <p className="text-[11px] text-[#8A8477] mb-3">
           {failedWithData
-            ? 'ADI suggestions could not be generated from this design — general examples shown.'
+            ? 'Examples could not be generated from this design — general examples shown.'
             : FALLBACK_MESSAGE}
         </p>
       )}

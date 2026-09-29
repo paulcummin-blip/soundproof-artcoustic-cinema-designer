@@ -15,7 +15,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 
-const FALLBACK_MESSAGE = 'Calculate the project to get ADI suggestions based on the design.';
+const FALLBACK_MESSAGE = 'Calculate the project to get examples powered by Artcoustic Design Intelligence.';
 
 const SUGGESTIONS_JSON_SCHEMA = {
   type: 'object',
