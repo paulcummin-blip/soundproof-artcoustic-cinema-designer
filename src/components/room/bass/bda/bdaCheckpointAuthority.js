@@ -32,6 +32,11 @@ import {
   setRestoreLock,
   hydrateTargetCache,
 } from "@/components/room/bass/p14TargetCache";
+import {
+  resolveCheckpointBankCarry,
+  resolveRestoreBankDecision,
+  RESTORE_BANK_MISMATCH_REASON,
+} from "@/components/room/bass/bankIdentityCoherence";
 import { fireSubwooferDraftReset } from "./subwooferDraftResetStore";
 import {
   publishCachedCompactBassContract,
@@ -134,6 +139,11 @@ export function captureBeforeApply(projectId, versionId, {
   completedBassAuthority,
   includesSeating = false,
   invocationSource = null,
+  // Optional fallback design identity (the live computed physical
+  // baseDesignFingerprint). Used ONLY when the coherent contract carries no
+  // fingerprints.baseDesign (legacy contracts) — never in place of the
+  // contract's own design identity.
+  baseDesignFingerprint: fallbackBaseDesignFingerprint = null,
 }) {
   _captureCallCounter += 1;
   const _eligibilityDebug = completedBassAuthority?.captureEligibilityDebug || null;
@@ -220,21 +230,48 @@ export function captureBeforeApply(projectId, versionId, {
     return false;
   }
 
+  // FIX 1 — the checkpoint's DESIGN identity must come from the physical
+  // design's authority: the coherent contract's baseDesign fingerprint (the
+  // guards above already prove it describes the current physical design). It
+  // must NEVER be copied from the in-memory target bank, which can lag the
+  // physical design (clearTargetCacheForDesign deliberately keeps a non-empty
+  // bank across a baseDesign change). Copying the bank's fingerprint produced
+  // crossed checkpoints: correct restored instances, foreign design identity,
+  // foreign bank snapshot.
+  const designBaseDesignFingerprint = completedBassAuthority?.contract?.fingerprints?.baseDesign
+    || fallbackBaseDesignFingerprint
+    || null;
+
   // Fix 2: capture the target bank snapshot alongside the physical design so
   // restore can recover 8/8 targets without a full background recalculation.
+  // FIX 1 (continued): the snapshot is carried ONLY when the bank belongs to
+  // the checkpointed design. Otherwise the checkpoint honestly records "no
+  // prepared bank for this design" (null / 0).
   const targetBank = getTargetBankSnapshot(projectId, versionId);
+  const bankCarry = resolveCheckpointBankCarry({
+    bankBaseDesignFingerprint: targetBank?.baseDesignFingerprint || null,
+    bankPreparedCount: targetBank?.count || 0,
+    designBaseDesignFingerprint,
+  });
   const _captured = captureCheckpoint(projectId, versionId, {
     subwooferInstances: appState.subwooferInstances,
     seatingPositions: appState.seatingPositions,
     bassFingerprint: bassFp,
     engineeringFingerprint,
     includesSeating,
-    baseDesignFingerprint: targetBank?.baseDesignFingerprint || null,
-    targetBankSnapshot: targetBank?.targets || null,
-    targetBankCount: targetBank?.count || 0,
+    baseDesignFingerprint: designBaseDesignFingerprint,
+    targetBankSnapshot: bankCarry.carriesBank ? (targetBank?.targets || null) : null,
+    targetBankCount: bankCarry.carriesBank ? (targetBank?.count || 0) : 0,
   });
   if (typeof console !== 'undefined' && console.log) {
-    console.log('[CAPTURE-DIAG] success', { ..._diag, captured: !!_captured, targetBankCount: targetBank?.count || 0 });
+    console.log('[CAPTURE-DIAG] success', {
+      ..._diag,
+      captured: !!_captured,
+      designBaseDesignFingerprint,
+      bankBaseDesignFingerprint: targetBank?.baseDesignFingerprint || null,
+      bankCarry: bankCarry.reason,
+      targetBankCount: bankCarry.carriesBank ? (targetBank?.count || 0) : 0,
+    });
   }
   return _captured;
 }
@@ -438,7 +475,17 @@ export async function restorePreviousDesign(projectId, versionId, {
     && checkpoint.targetBankSnapshot
     && typeof checkpoint.targetBankSnapshot === "object"
     && Object.keys(checkpoint.targetBankSnapshot).length > 0;
-  if (hasNonEmptySnapshot && checkpoint.baseDesignFingerprint) {
+  // FIX 2 — a bank snapshot may only be reinstated when it belongs to the SAME
+  // physical design as the checkpoint AND as the promoted authoritative
+  // contract for the restored design. Restoring (and locking) a foreign bank
+  // would pin another design's fingerprint into the in-memory bank and block
+  // preparation for the restored design.
+  const bankDecision = resolveRestoreBankDecision({
+    checkpointBaseDesignFingerprint: checkpoint.baseDesignFingerprint || null,
+    snapshotPreparedCount: hasNonEmptySnapshot ? (checkpoint.targetBankCount || 0) : 0,
+    contractBaseDesignFingerprint: cachedContract?.fingerprints?.baseDesign || null,
+  });
+  if (bankDecision.restoreBank) {
     restoreTargetBankSnapshot(
       projectId, versionId,
       checkpoint.baseDesignFingerprint,
@@ -448,6 +495,15 @@ export async function restorePreviousDesign(projectId, versionId, {
       baseDesignFingerprint: checkpoint.baseDesignFingerprint,
       targetCount: checkpoint.targetBankCount || 0,
       bassFingerprint: checkpoint.bassFingerprint,
+    });
+  }
+  if (bankDecision.reason === RESTORE_BANK_MISMATCH_REASON && typeof console !== 'undefined' && console.warn) {
+    console.warn('[RESTORE-BANK] snapshot rejected — base design mismatch', {
+      projectId,
+      versionId,
+      checkpointBaseDesign: checkpoint.baseDesignFingerprint || null,
+      contractBaseDesign: cachedContract?.fingerprints?.baseDesign || null,
+      snapshotTargetCount: checkpoint.targetBankCount || 0,
     });
   }
 
@@ -461,6 +517,14 @@ export async function restorePreviousDesign(projectId, versionId, {
   // FIX 4 — Verify the bank was restored (either from snapshot or from DB).
   const restoredBank = getTargetBankSnapshot(projectId, versionId);
   const bankRestored = !!(restoredBank && restoredBank.count > 0);
+  // The bank only BELONGS to the restored design when its identity matches the
+  // restored design's own identity — taken from the promoted authoritative
+  // contract, not from the checkpoint (a crossed checkpoint's identity is
+  // exactly what must not be trusted here).
+  const restoredDesignBaseDesign = cachedContract?.fingerprints?.baseDesign || null;
+  const bankDesignMatches = !!(restoredBank
+    && restoredDesignBaseDesign
+    && restoredBank.baseDesignFingerprint === restoredDesignBaseDesign);
 
   // STEP E — Verify coherence (FIX 5): the published authority must be
   // AUTHORITATIVE and match the checkpoint's bass fingerprint. If not, keep
@@ -477,9 +541,24 @@ export async function restorePreviousDesign(projectId, versionId, {
     projectId, versionId, checkpoint.engineeringFingerprint, checkpoint.bassFingerprint,
   );
 
+  // FIX 2 — A foreign bank snapshot was deliberately not reinstated. The
+  // physical design, the bass authority and the publication pointer are all
+  // restored, but the prepared bank is not this design's. Keep the checkpoint
+  // (retryable) and report the mismatch instead of silently claiming the bank
+  // was restored.
+  if (bankDecision.reason === RESTORE_BANK_MISMATCH_REASON && !bankDesignMatches) {
+    return {
+      ok: false,
+      reason: RESTORE_BANK_MISMATCH_REASON,
+      physicalRestored: true,
+      bankRestored: false,
+      bankDesignMatches: false,
+    };
+  }
+
   // Fix 4: full success — now clear the checkpoint.
   clearCheckpoint(projectId, versionId);
-  return { ok: true, bankRestored };
+  return { ok: true, bankRestored, bankDesignMatches };
 }
 
 // ── Hook: checkpointed commit wrappers ────────────────────────────────────
@@ -502,6 +581,7 @@ export function useCheckpointedCommits({
   completedBassAuthority,
   commitInstances,
   commitSeating,
+  baseDesignFingerprint = null,
 }) {
   const captureLockRef = useRef(false);
   const appStateRef = useRef(appState);
@@ -520,12 +600,13 @@ export function useCheckpointedCommits({
       completedBassAuthority: authorityRef.current,
       includesSeating,
       invocationSource,
+      baseDesignFingerprint,
     });
     // Release the lock at the end of the current microtask so a subsequent
     // commitSeating call in the same synchronous batch is recognised as part
     // of the same apply action.
     Promise.resolve().then(() => { captureLockRef.current = false; });
-  }, [projectId, versionId]);
+  }, [projectId, versionId, baseDesignFingerprint]);
 
   const checkpointedCommitInstances = useCallback((nextInstances, ...rest) => {
     captureNow(false, "commit");

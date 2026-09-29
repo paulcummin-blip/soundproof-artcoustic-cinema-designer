@@ -12,7 +12,8 @@ import { resolveBassLifecycleState, BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, B
 import { useOptimiseWorkflowState } from "./optimiseWorkflow/optimiseWorkflowStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
-import { useTargetCacheEntry, useTargetCacheProgress, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence, useRestoreLock, clearRestoreLock, getRestoreLock, getTargetBankSnapshot } from "./p14TargetCache";
+import { useTargetCacheEntry, useTargetCacheProgress, useTargetBankIdentity, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence, useRestoreLock, clearRestoreLock, getRestoreLock, getTargetBankSnapshot } from "./p14TargetCache";
+import { resolveBankIdentityCoherence, resolveLifecycleWithBankIdentity, shouldProtectBankFromSeed } from "./bankIdentityCoherence";
 import { useIsRestoring, setRestoring } from "./bda/restoreStateStore";
 import { beginP14AnalysisJob, publishP14AnalysisProgress, getP14AnalysisProgress } from "./p14AnalysisProgressStore";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
@@ -193,6 +194,21 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const cachedContract = useTargetCacheEntry(scopeId, versionId, baseDesignFingerprint, targetKey);
   const targetFamilyProgress = useTargetCacheProgress(scopeId, versionId, baseDesignFingerprint, allTargetKeys);
   const targetDurationSignature = targetFamilyProgress.completedDurationsMs.join("|");
+
+  // ── Bank identity coherence ───────────────────────────────────────────
+  // The prepared P14 family is keyed by the physical design's baseDesign
+  // fingerprint. A non-empty bank belonging to a DIFFERENT physical design must
+  // never be counted as prepared for the current design — that is what allowed
+  // "Performance is current" after a Restore Previous Design while the bank
+  // still carried the moved design's fingerprint. An empty or partial bank is
+  // legitimate (background preparation is explicitly incomplete) and must not
+  // suppress the current status.
+  const targetBankIdentity = useTargetBankIdentity(scopeId, versionId);
+  const bankIdentityCoherence = resolveBankIdentityCoherence({
+    bankBaseDesignFingerprint: targetBankIdentity.baseDesignFingerprint,
+    bankPreparedCount: targetBankIdentity.count,
+    baseDesignFingerprint,
+  });
 
   // Hydrate target cache from DB on mount / project change
   const [targetCacheHydrated, setTargetCacheHydrated] = useState(false);
@@ -1195,10 +1211,19 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
             // setTargetCacheEntry) and persist 1/8 — a downgrade. Let the normal
             // foreground/background path handle the transition instead.
             const bankSnapshot = getTargetBankSnapshot(scopeId, versionId);
-            const wouldDowngrade = bankSnapshot
-              && bankSnapshot.count > 0
-              && bankSnapshot.baseDesignFingerprint !== baseDesignFingerprint;
-            if (!wouldDowngrade) {
+            // FIX 4 — narrowed no-downgrade guard: only a bank belonging to the
+            // currently published authority's design is protected (it can still
+            // become current). A bank belonging to neither the current physical
+            // design nor the published authority is orphan/foreign and is
+            // replaceable by the verified foreground target — otherwise a
+            // restored design stays stuck behind the moved design's bank.
+            const protectsPublishedAuthority = shouldProtectBankFromSeed({
+              bankBaseDesignFingerprint: bankSnapshot?.baseDesignFingerprint || null,
+              bankPreparedCount: bankSnapshot?.count || 0,
+              baseDesignFingerprint,
+              publishedAuthorityBaseDesignFingerprint: completedBassAuthority?.contract?.fingerprints?.baseDesign || null,
+            });
+            if (!protectsPublishedAuthority) {
               setTargetCacheEntry(scopeId, versionId, baseDesignFingerprint, targetKey, restoredContract, { immediate: true });
             }
           }
@@ -2026,9 +2051,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // for the entire restore transaction, even if the authorities briefly
   // appear coherent mid-restore (e.g. after physical commit but before the
   // cached contract is promoted).
+  // Bank identity gate: a bank belonging to another physical design must never
+  // allow COMPLETE ("Performance is current"). Only the false COMPLETE is
+  // replaced (with the existing needs-recalculation state); active calculation
+  // states and genuine failures stay truthful.
   const bassLifecycleState = restoringActive
     ? BASS_LIFECYCLE_STATE.RESTORING
-    : bassLifecycleStateRaw;
+    : resolveLifecycleWithBankIdentity(bassLifecycleStateRaw, bankIdentityCoherence);
 
   // FIX 3 — The restoring state is now cleared exclusively by the restore
   // transaction owner (RestorePreviousDesignBar.handleRestore finally block)
@@ -2151,6 +2180,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         captureEligible,
         captureEligibilityDebug,
       };
-  const value = scopeRef.current.replace({ scopeId, versionId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, placementPreviewActive, placementPreviewResult });
+  const value = scopeRef.current.replace({ scopeId, versionId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, bankIdentityCoherent: bankIdentityCoherence.coherent, bankBaseDesignFingerprint: targetBankIdentity.baseDesignFingerprint, placementPreviewActive, placementPreviewResult });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

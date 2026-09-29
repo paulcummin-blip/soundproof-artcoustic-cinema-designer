@@ -4,7 +4,13 @@ import { transformSync } from 'esbuild';
 const srcDir = new URL('../src/', import.meta.url).pathname;
 function tryResolve(basePath) {
   const candidates = [basePath, basePath + '.js', basePath + '.jsx', basePath + '.json', basePath + '/index.js', basePath + '/index.jsx'];
-  for (const c of candidates) { try { if (fs.existsSync(c)) return c; } catch (e) {} }
+  // Only a FILE is a valid resolution — returning a bare directory made Node
+  // throw ERR_UNSUPPORTED_DIR_IMPORT for directory specifiers such as
+  // "@/components/proposal/engineeringAuthority" instead of falling through to
+  // that directory's index.js.
+  for (const c of candidates) {
+    try { if (fs.existsSync(c) && fs.statSync(c).isFile()) return c; } catch (e) {}
+  }
   return null;
 }
 export async function resolve(specifier, context, nextResolve) {

@@ -116,7 +116,15 @@ export default function RestorePreviousDesignBar({
       // restored (from snapshot or DB). If the bank is still 0/8, keep the
       // shared restoring state active so the lifecycle shows
       // "Restoring previous design…" instead of "Performance is current".
-      bankRestored = result?.bankRestored !== false;
+      //
+      // A bank-identity mismatch means the prepared bank belongs to another
+      // physical design: the restore transaction itself is finished (physical
+      // design + authority + publication pointer restored) and the bank must be
+      // rebuilt for the restored design. Release the restoring state — the bank
+      // identity gate keeps the lifecycle off "Performance is current" until
+      // the bank matches the restored design.
+      const bankIdentityMismatch = result?.reason === "bank-snapshot-base-design-mismatch";
+      bankRestored = result?.bankRestored !== false || bankIdentityMismatch;
     } catch {
       bankRestored = false;
     } finally {
