@@ -40,7 +40,8 @@ import { normaliseHouseCurveToP14Total, diagnoseHouseCurveP14Integration } from 
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
-import { useGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
+import { useGraphInteraction, setGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
+import { resolvePreviewSeatId, resolvePreviewCurve } from "@/components/room/bass/previewSeatCurveAuthority";
 import { buildParameterFocus } from "@/components/room/bass/storyteller/parameterFocusOverlays";
 import ParameterFocusBar from "@/components/room/bass/storyteller/ParameterFocusBar";
 import StorytellerExplanation from "@/components/room/bass/storyteller/StorytellerExplanation";
@@ -438,46 +439,43 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   const placementPreviewActive = sharedBassResults?.placementPreviewActive === true;
   const placementPreviewResult = sharedBassResults?.placementPreviewResult || null;
 
-  // Seat-scoped preview. The preview engine already computes a curve for every
-  // listener (RSP + each seat) and returns them as seatCurves. When the designer
-  // selects a single real seat, draw THAT seat's preview curve instead of the RSP
-  // curve. Falls back to the RSP preview when no matching seat curve exists.
-  // Advisory only — no markers, grading or authority are enabled by this.
-  const previewSeatId = selectedSeatIds.length === 1 && selectedSeatIds[0] !== "rsp"
-    ? selectedSeatIds[0]
-    : null;
+  // Graph interaction store — bidirectional pill ↔ graph ↔ seat selection.
+  // When a designer clicks a seat pill in PerSeatResults or a P20 seat pill,
+  // selectedSeatId drives the graph markers to that seat. Declared here because
+  // the preview scope below uses the same seat authority as the markers.
+  const graphInteraction = useGraphInteraction();
 
-  const previewSeatCurve = useMemo(() => {
-    if (!placementPreviewActive || !previewSeatId) return null;
-    const curves = placementPreviewResult?.seatCurves || [];
-    const byId = curves.find((curve) => curve.originalSeatId && curve.originalSeatId === previewSeatId);
-    if (byId?.responseData?.length) return byId;
-    // Fallback for seat sets that carry no ids: the engine stores the seat's
-    // index within the seating positions array it was given.
-    const index = Array.isArray(seatingPositions)
-      ? seatingPositions.findIndex((seat) => (seat.id || `${seat.x}-${seat.y}`) === previewSeatId)
-      : -1;
-    if (index < 0) return null;
-    const byIndex = curves.find((curve) => curve.seatIndex === index);
-    return byIndex?.responseData?.length ? byIndex : null;
-  }, [placementPreviewActive, previewSeatId, placementPreviewResult?.seatCurves, seatingPositions]);
+  // Seat-scoped preview (presentation only). The active scope uses the SAME seat
+  // authority as the graph markers, and the preview curve comes from the preview
+  // result's own seatCurves when the focused seat has one. See
+  // previewSeatCurveAuthority.js — no markers, grading or authority here.
+  const previewSeatId = resolvePreviewSeatId({
+    interactionSeatId: graphInteraction?.selectedSeatId,
+    selectedSeatIds,
+  });
+
+  const previewCurve = useMemo(() => resolvePreviewCurve({
+    previewResult: placementPreviewResult,
+    previewSeatId,
+    seatingPositions,
+  }), [placementPreviewResult, previewSeatId, seatingPositions]);
+
+  // A seat is focused but the preview carries no curve for it — the graph stays
+  // on the RSP preview and says so.
+  const previewSeatUnavailable = previewCurve.seatUnavailable;
 
   const placementPreviewSeries = useMemo(() => {
-    if (!placementPreviewActive) return null;
-    const data = previewSeatCurve?.responseData?.length
-      ? previewSeatCurve.responseData
-      : placementPreviewResult?.rspCurve;
-    if (!data?.length) return null;
+    if (!placementPreviewActive || !previewCurve.data?.length) return null;
     return {
       id: "placement-preview",
       color: "#16A34A",
-      data,
+      data: previewCurve.data,
       kind: "room-response-preview",
-      label: previewSeatId
-        ? `Room Response Preview — ${formatSeatPillLabel(previewSeatId)}`
+      label: previewSeatId && !previewSeatUnavailable
+        ? `Preview — ${formatSeatPillLabel(previewSeatId)}`
         : "Room Response Preview",
     };
-  }, [placementPreviewActive, previewSeatCurve, previewSeatId, placementPreviewResult?.rspCurve]);
+  }, [placementPreviewActive, previewCurve, previewSeatId, previewSeatUnavailable]);
 
   const previousResultFadedSeries = useMemo(() => {
     if (!placementPreviewActive) return null;
@@ -510,6 +508,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     ? (placementPreviewGraphSeries || [])
     : visibleMultiSeries;
 
+  // During preview only, an explicit pill choice must win over a seat focused
+  // earlier from a P20 pill, so the preview follows what the designer clicked.
+  // Outside preview the existing handlers are used untouched.
+  const previewAwareSelectSeat = (sid) => {
+    if (placementPreviewActive) setGraphInteraction({ selectedSeatId: sid });
+    selectSeat(sid);
+  };
+  const previewAwareSelectRsp = () => {
+    if (placementPreviewActive) setGraphInteraction({ selectedSeatId: null });
+    selectRsp();
+  };
+  const previewAwareSelectAllSeats = () => {
+    if (placementPreviewActive) setGraphInteraction({ selectedSeatId: null });
+    selectAllSeats();
+  };
+
   // Stage 5: Derive actual layer availability from the built graph series.
   // Selection (visibility) is separate from availability. A layer that has
   // no corresponding series in the built graph is unavailable — the control
@@ -526,11 +540,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     }
     return available;
   }, [multiSeriesForGraph]);
-
-  // Graph interaction store — bidirectional pill ↔ graph ↔ seat selection.
-  // When a designer clicks a seat pill in PerSeatResults, selectedSeatId
-  // drives the graph markers to that seat's worst frequency.
-  const graphInteraction = useGraphInteraction();
 
   // Pass the primary selected seat so P19/P20 markers reflect that seat's
   // worst frequency, not the RSP/overall worst. RSP selection uses the
@@ -908,9 +917,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               orderedSeats={orderedSeats}
               selectedSeatIds={selectedSeatIds}
               getSeatColor={getSeatColor}
-              onSelectRsp={selectRsp}
-              onSelectSeat={selectSeat}
-              onSelectAll={selectAllSeats}
+              onSelectRsp={previewAwareSelectRsp}
+              onSelectSeat={previewAwareSelectSeat}
+              onSelectAll={previewAwareSelectAllSeats}
               previewActive={placementPreviewActive}
             />
             <CollapsiblePanel title="Engineering Detail" defaultOpen={false}>
@@ -934,9 +943,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               orderedSeats={orderedSeats}
               selectedSeatIds={selectedSeatIds}
               getSeatColor={getSeatColor}
-              onSelectRsp={selectRsp}
-              onSelectSeat={selectSeat}
-              onSelectAll={selectAllSeats}
+              onSelectRsp={previewAwareSelectRsp}
+              onSelectSeat={previewAwareSelectSeat}
+              onSelectAll={previewAwareSelectAllSeats}
               previewActive={placementPreviewActive}
             />
 
@@ -957,8 +966,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         <div className={engineeringDetailCollapsed ? "mt-2 flex-1 min-h-[400px] relative" : "mt-2"}>
           {placementPreviewActive && <div className="flex flex-wrap items-center gap-4 mb-2 text-[11px] font-semibold">
             <span style={{ color: "#16A34A" }}>
-              ━━ Room Response Preview ({previewSeatId ? formatSeatPillLabel(previewSeatId) : "RSP"})
+              ━━ Preview — {previewSeatId && !previewSeatUnavailable ? formatSeatPillLabel(previewSeatId) : "RSP"}
             </span>
+            {previewSeatUnavailable && (
+              <span style={{ color: "#B45309" }}>Preview available at the RSP only.</span>
+            )}
             {previousResultFadedSeries && <span style={{ color: "#6B7280" }}>━━ Previous result — out of date</span>}
           </div>}
           {effectiveVisibleSeries.length > 0 ? (
