@@ -11,6 +11,7 @@ import {
 
 const BRIDGE_OPTIONS = {
   bridgeUrl: 'https://partner-config.example/functions/v1/soundproof-launch-service',
+  associateDealerIdentity: async () => ({ resolved: true }),
 };
 
 function matches(row, query) {
