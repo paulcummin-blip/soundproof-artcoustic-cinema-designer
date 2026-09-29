@@ -46,68 +46,15 @@ export default function ProposalPrintStyles() {
           font-family: "Didact Gothic", "Century Gothic", sans-serif !important;
         }
 
-        /* ── Cover ── */
+        /* ── Cover — one full page of imagery, bled to the paper edge ── */
         body.proposal-export-mode .proposal-print-cover {
+          margin: -18mm -18mm 18mm;
+          height: 296mm;
           break-after: page;
           page-break-after: always;
-          text-align: center;
-          padding-top: 30mm;
-        }
-
-        body.proposal-export-mode .proposal-print-cover__logo {
-          display: block;
-          height: 30mm;
-          width: auto;
-          object-fit: contain;
-          margin: 0 auto 6mm;
-        }
-
-        body.proposal-export-mode .proposal-print-cover__kicker {
-          font-size: 12pt;
-          font-weight: 600;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          color: #1B1A1A;
-          font-family: "Futura PT Light", "Century Gothic", sans-serif !important;
-        }
-
-        body.proposal-export-mode .proposal-print-cover__adi {
-          font-size: 10pt;
-          font-weight: 500;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: #625143;
-          margin-top: 2mm;
-        }
-
-        body.proposal-export-mode .proposal-print-cover__rule {
-          width: 30mm;
-          height: 1px;
-          background: #C1B6AD;
-          margin: 8mm auto;
-        }
-
-        body.proposal-export-mode .proposal-print-cover__title {
-          font-size: 28pt;
-          font-weight: 300;
-          line-height: 1.15;
-          color: #213428;
-          margin: 0 0 4mm;
-          font-family: "Futura PT Light", "Century Gothic", sans-serif !important;
-        }
-
-        body.proposal-export-mode .proposal-print-cover__type {
-          font-size: 10pt;
-          font-weight: 600;
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
-          color: #625143;
-        }
-
-        body.proposal-export-mode .proposal-print-cover__meta {
-          font-size: 10pt;
-          color: #625143;
-          margin-top: 10mm;
+          break-inside: avoid;
+          page-break-inside: avoid;
+          overflow: hidden;
         }
 
         /* ── Sections — flow content, never fixed-height ── */

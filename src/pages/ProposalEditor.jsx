@@ -8,7 +8,9 @@ import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
 import ProposalSectionNav from '@/components/proposal/ProposalSectionNav';
 import { isArchived, getRestoreStatus } from '@/components/proposal/proposalLifecycle';
+import { resolveDealerBrandPresentation } from '@/components/account/defaultDealerBranding';
 import ProposalWorkspaceToolbar from '@/components/proposal/ProposalWorkspaceToolbar';
+import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
 import ProposalPrintStyles from '@/components/proposal/export/ProposalPrintStyles';
 import { useProposalExport } from '@/components/proposal/export/useProposalExport';
@@ -43,26 +45,40 @@ export default function ProposalEditor() {
   const [projectContext, setProjectContext] = useState({
     projectName: null,
     clientName: null,
-    dealerCompanyName: null,
+    coverImageUrl: null,
+    heroImageUrl: null,
+    logoUrl: null,
   });
 
   // Proposal context — project/client/dealer metadata for the workspace toolbar
   // and the exported PDF cover. Read-only: it never changes proposal content.
   const loadProjectContext = useCallback(async (proposalRecord) => {
-    const [projectResult, brandResult] = await Promise.allSettled([
+    const [projectResult, brandResult, coverResult] = await Promise.allSettled([
       proposalRecord.project_id
         ? base44.entities.Project.filter({ id: proposalRecord.project_id })
         : Promise.resolve([]),
       proposalRecord.account_id
         ? base44.entities.BrandAsset.filter({ account_id: proposalRecord.account_id })
         : Promise.resolve([]),
+      proposalRecord.project_id
+        ? base44.entities.ProposalAsset.filter({
+            project_id: proposalRecord.project_id,
+            asset_type: 'cover_image',
+          })
+        : Promise.resolve([]),
     ]);
     const project = projectResult.status === 'fulfilled' ? projectResult.value?.[0] : null;
     const brand = brandResult.status === 'fulfilled' ? brandResult.value?.[0] : null;
+    const cover = coverResult.status === 'fulfilled' ? coverResult.value?.[0] : null;
+    // Resolves the dealer's own hero/logo when set, otherwise the approved
+    // Sound Proof / Artcoustic defaults — so the cover is always professional.
+    const presentation = resolveDealerBrandPresentation(brand, proposalRecord.account_id);
     setProjectContext({
       projectName: project?.name || null,
       clientName: project?.client_name || null,
-      dealerCompanyName: brand?.company_name || null,
+      coverImageUrl: cover?.file_url || null,
+      heroImageUrl: presentation.heroBg,
+      logoUrl: presentation.dealerLogo,
     });
   }, []);
 
@@ -616,8 +632,35 @@ export default function ProposalEditor() {
                     saveStatus={saveStatuses[section.id] || SAVE_STATUS.IDLE}
                   />
                 ) : (
-                  <div className="rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: '4/5' }}>
-                    <CoverSection proposal={proposal} />
+                  <div>
+                    <div className="rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: '4/5' }}>
+                      <ProposalCoverPage
+                        title={proposal?.title || projectContext.projectName}
+                        clientName={projectContext.clientName}
+                        coverImageUrl={projectContext.coverImageUrl}
+                        heroImageUrl={projectContext.heroImageUrl}
+                        logoUrl={projectContext.logoUrl}
+                        generatedDate={proposal?.proposal_date || proposal?.created_date}
+                      />
+                    </div>
+                    <div
+                      className="flex items-center justify-between gap-4 mt-2 text-[11px] text-[#625143]"
+                      style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+                    >
+                      <span>
+                        {projectContext.coverImageUrl
+                          ? 'Using the project cover image'
+                          : 'Using the default Sound Proof cover image'}
+                      </span>
+                      {proposal?.project_id && (
+                        <a
+                          href={`/ProjectProposalAssets?projectId=${proposal.project_id}`}
+                          className="underline underline-offset-2 hover:text-[#213428]"
+                        >
+                          Change cover image
+                        </a>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -727,44 +770,12 @@ export default function ProposalEditor() {
         proposal={proposal}
         projectName={projectContext.projectName}
         clientName={projectContext.clientName}
-        dealerCompanyName={projectContext.dealerCompanyName}
+        coverImageUrl={projectContext.coverImageUrl}
+        heroImageUrl={projectContext.heroImageUrl}
+        logoUrl={projectContext.logoUrl}
         sections={sections}
-        typeLabel={typeLabel}
       />
       <ProposalPrintStyles />
-    </div>
-  );
-}
-
-// ── Cover section component ──
-function CoverSection({ proposal }) {
-  return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: '#213428' }}>
-      <div className="p-8 flex items-center" style={{ minHeight: 56 }}>
-        <span
-          className="text-sm font-bold text-white"
-          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
-        >
-          Dealer Logo
-        </span>
-      </div>
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <div className="text-xs uppercase tracking-[0.25em] text-[#625143] mb-3">
-          Cinema Design Proposal
-        </div>
-        <div
-          className="text-3xl font-bold text-white"
-          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
-        >
-          {proposal?.title || 'Project Name'}
-        </div>
-      </div>
-      <div className="px-8 py-3 flex items-center justify-between" style={{ backgroundColor: '#3E4349' }}>
-        <span className="text-xs text-white/80">Dealer Name</span>
-        <span className="text-[10px] text-white/50 uppercase tracking-wider">
-          Powered by Sound Proof
-        </span>
-      </div>
     </div>
   );
 }

@@ -14,26 +14,16 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { LOGO_URL } from '@/components/report/ReportCover';
-
-function formatIssuedDate(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-}
+import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 
 export default function ProposalPrintDocument({
   proposal,
   projectName,
   clientName,
-  dealerCompanyName,
+  coverImageUrl,
+  heroImageUrl,
+  logoUrl,
   sections,
-  typeLabel,
 }) {
   if (typeof document === 'undefined') return null;
 
@@ -41,31 +31,18 @@ export default function ProposalPrintDocument({
   // The cover section record carries no body — the cover is composed here.
   const contentSections = enabled.filter((section) => section.section_type !== 'cover');
 
-  const metaLine = [
-    clientName ? `Prepared for ${clientName}` : null,
-    dealerCompanyName || null,
-    formatIssuedDate(proposal?.proposal_date || proposal?.created_date),
-  ]
-    .filter(Boolean)
-    .join('  ·  ');
-
   return createPortal(
     <div className="proposal-print-portal">
-      <header className="proposal-print-cover">
-        <img className="proposal-print-cover__logo" src={LOGO_URL} alt="Sound Proof" />
-        <div className="proposal-print-cover__kicker">
-          Professional Home Cinema Engineering
-        </div>
-        <div className="proposal-print-cover__adi">
-          Powered by Artcoustic Design Intelligence (ADI)
-        </div>
-        <div className="proposal-print-cover__rule" />
-        <h1 className="proposal-print-cover__title">
-          {proposal?.title || projectName || 'Cinema Design Proposal'}
-        </h1>
-        <div className="proposal-print-cover__type">{typeLabel}</div>
-        {metaLine && <div className="proposal-print-cover__meta">{metaLine}</div>}
-      </header>
+      <div className="proposal-print-cover">
+        <ProposalCoverPage
+          title={proposal?.title || projectName}
+          clientName={clientName}
+          coverImageUrl={coverImageUrl}
+          heroImageUrl={heroImageUrl}
+          logoUrl={logoUrl}
+          generatedDate={proposal?.proposal_date || proposal?.created_date}
+        />
+      </div>
 
       {contentSections.map((section) => (
         <section key={section.id} className="proposal-print-section">
