@@ -1,5 +1,8 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { ChevronDown, Crosshair } from "lucide-react";
+import { setMlpGrab } from "@/components/state/mlpGrabStore";
 
 export default function RoomDesignerPlanToolbar({
   allowExtraSurrounds,
@@ -14,7 +17,42 @@ export default function RoomDesignerPlanToolbar({
   setEnableFrontWides,
   liveImpactMode,
   setLiveImpactMode,
+  seatingPositions = [],
+  onMoveRsp,
 }) {
+  const [rspMenuOpen, setRspMenuOpen] = useState(false);
+  const rspOptions = useMemo(() => {
+    // Use the seats actually drawn, including any committed row moves.
+    const byRow = new Map();
+    seatingPositions.forEach((seat) => {
+      if (!Number.isFinite(seat?.y)) return;
+      const row = seat.rowNumber || 1;
+      const values = byRow.get(row) || [];
+      values.push(seat.y);
+      byRow.set(row, values);
+    });
+    const rows = [...byRow.values()]
+      .map((values) => values.reduce((sum, y) => sum + y, 0) / values.length)
+      .sort((a, b) => a - b);
+    const options = rows.map((y, index) => ({
+      key: `row-${index}`,
+      label: index === 0 ? 'Front row'
+        : index === rows.length - 1 ? 'Back row'
+        : rows.length === 3 ? 'Middle row' : `Row ${index + 1}`,
+      detail: 'Row centre',
+      y,
+    }));
+    if (rows.length > 1) {
+      options.push({
+        key: 'front-back-average',
+        label: 'Average between rows',
+        detail: '50% front row · 50% back row',
+        y: (rows[0] + rows[rows.length - 1]) / 2,
+      });
+    }
+    return options;
+  }, [seatingPositions]);
+
   return (
     <div
       className="plan-toolbar"
@@ -23,6 +61,8 @@ export default function RoomDesignerPlanToolbar({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '8px 12px',
         padding: '6px 10px',
         borderBottom: '1px solid #DCDBD6',
         background: '#FFFFFF',
@@ -98,6 +138,48 @@ export default function RoomDesignerPlanToolbar({
         }
       </div>
       
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+        <Popover open={rspMenuOpen} onOpenChange={setRspMenuOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="RSP positioning"
+              title="Move the reference seating position"
+              disabled={!rspOptions.length || typeof onMoveRsp !== 'function'}
+              className="inline-flex items-center gap-1.5 rounded border border-[#DCDBD6] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#213428] hover:bg-[#F4F3F0] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Crosshair size={14} aria-hidden="true" />
+              RSP
+              <ChevronDown size={12} aria-hidden="true" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" sideOffset={8} className="w-64 border-[#DCDBD6] bg-white p-2">
+            <div className="px-2 pt-1 pb-2 text-xs font-semibold text-[#213428]">Move RSP to</div>
+            {rspOptions.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                className="flex w-full items-center justify-between gap-3 rounded px-2 py-2 text-left hover:bg-[#F4F3F0] focus-visible:bg-[#F4F3F0] focus-visible:outline-none"
+                onClick={() => {
+                  // A shortcut is a one-off placement, not an automatic row binding.
+                  setMlpGrab(false);
+                  onMoveRsp(option.y);
+                  setRspMenuOpen(false);
+                }}
+              >
+                <span>
+                  <span className="block text-xs font-semibold text-[#213428]">{option.label}</span>
+                  <span className="block text-[10px] text-[#625143]">{option.detail}</span>
+                </span>
+                <span className="shrink-0 text-[10px] text-[#625143]">{option.y.toFixed(2)} m</span>
+              </button>
+            ))}
+            <p className="mt-1 border-t border-[#DCDBD6] px-2 pt-2 pb-1 text-[10px] leading-relaxed text-[#625143]">
+              Moves once; later seat changes leave RSP in place. Hold the green dot to position manually.
+            </p>
+          </PopoverContent>
+        </Popover>
+
       {/* Live Impact dropdown */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid #DCDBD6', paddingLeft: 12 }}>
         <span style={{ fontSize: 12, color: '#3E4349', fontWeight: 500 }}>Live Impact</span>
@@ -110,6 +192,7 @@ export default function RoomDesignerPlanToolbar({
           <option value="summary">Summary</option>
           <option value="detailed">Detailed</option>
         </select>
+      </div>
       </div>
 
       </div>
