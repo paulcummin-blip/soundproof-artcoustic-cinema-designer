@@ -8,7 +8,11 @@ import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
 import ProposalSectionNav from '@/components/proposal/ProposalSectionNav';
 import { isArchived, getRestoreStatus } from '@/components/proposal/proposalLifecycle';
-import { Loader2, FileText, Download, ChevronLeft, Archive, RotateCcw } from 'lucide-react';
+import ProposalWorkspaceToolbar from '@/components/proposal/ProposalWorkspaceToolbar';
+import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
+import ProposalPrintStyles from '@/components/proposal/export/ProposalPrintStyles';
+import { useProposalExport } from '@/components/proposal/export/useProposalExport';
+import { Loader2, ChevronLeft, Archive, RotateCcw } from 'lucide-react';
 
 const SAVE_STATUS = { IDLE: 'idle', SAVING: 'saving', SAVED: 'saved', FAILED: 'failed', UNSAVED: 'unsaved' };
 
@@ -36,6 +40,31 @@ export default function ProposalEditor() {
   const [showClientBrief, setShowClientBrief] = useState(false);
   const [savingBrief, setSavingBrief] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [projectContext, setProjectContext] = useState({
+    projectName: null,
+    clientName: null,
+    dealerCompanyName: null,
+  });
+
+  // Proposal context — project/client/dealer metadata for the workspace toolbar
+  // and the exported PDF cover. Read-only: it never changes proposal content.
+  const loadProjectContext = useCallback(async (proposalRecord) => {
+    const [projectResult, brandResult] = await Promise.allSettled([
+      proposalRecord.project_id
+        ? base44.entities.Project.filter({ id: proposalRecord.project_id })
+        : Promise.resolve([]),
+      proposalRecord.account_id
+        ? base44.entities.BrandAsset.filter({ account_id: proposalRecord.account_id })
+        : Promise.resolve([]),
+    ]);
+    const project = projectResult.status === 'fulfilled' ? projectResult.value?.[0] : null;
+    const brand = brandResult.status === 'fulfilled' ? brandResult.value?.[0] : null;
+    setProjectContext({
+      projectName: project?.name || null,
+      clientName: project?.client_name || null,
+      dealerCompanyName: brand?.company_name || null,
+    });
+  }, []);
 
   // ── Load proposal + sections by ID ──
   const load = useCallback(async () => {
@@ -49,6 +78,7 @@ export default function ProposalEditor() {
       setProposal(proposalRecord);
       if (proposalRecord) {
         setClientBrief(proposalRecord.client_brief || '');
+        await loadProjectContext(proposalRecord);
         const sectionResults = await base44.entities.ProposalSection.filter({
           proposal_id: proposalRecord.id,
         });
@@ -65,7 +95,7 @@ export default function ProposalEditor() {
     } finally {
       setLoading(false);
     }
-  }, [proposalId]);
+  }, [proposalId, loadProjectContext]);
 
   useEffect(() => {
     load();
@@ -407,6 +437,20 @@ export default function ProposalEditor() {
     }
   };
 
+  // ── Export — full proposal PDF ──
+  // Exports the whole proposal (every enabled section). Section-level export is
+  // not implemented, so it is deliberately not exposed.
+  const {
+    exporting,
+    error: exportError,
+    blockedReason: exportBlockedReason,
+    handleExport,
+  } = useProposalExport({
+    proposal,
+    sections,
+    projectName: projectContext.projectName,
+  });
+
   // ── Render ──
   if (loading) {
     return (
@@ -440,7 +484,22 @@ export default function ProposalEditor() {
   const hasUnsavedChanges = dirtySections.size > 0;
 
   return (
-    <div className="flex h-screen bg-[#F5F4F0] overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#F5F4F0] overflow-hidden">
+      <ProposalWorkspaceToolbar
+        title={proposal?.title || 'Proposal'}
+        projectName={projectContext.projectName}
+        typeLabel={typeLabel}
+        showClientBrief={showClientBrief}
+        onToggleClientBrief={() => setShowClientBrief((prev) => !prev)}
+        showProperties={showProperties}
+        onToggleProperties={() => setShowProperties((prev) => !prev)}
+        exporting={exporting}
+        onExport={handleExport}
+        blockedReason={exportBlockedReason}
+        error={exportError}
+      />
+
+      <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* ── Left: Section navigation ── */}
       <div className="w-56 border-r border-[#DCDBD6] bg-white flex flex-col overflow-hidden">
         <div className="p-4 border-b border-[#DCDBD6]">
@@ -451,16 +510,12 @@ export default function ProposalEditor() {
             <ChevronLeft className="w-3 h-3" />
             Proposal Centre
           </Link>
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[#213428]" />
-            <span
-              className="text-sm font-bold text-[#1B1A1A]"
-              style={{ fontFamily: 'Didact Gothic, sans-serif' }}
-            >
-              {proposal?.title || 'Proposal'}
-            </span>
+          <div
+            className="text-[10px] uppercase tracking-[0.16em] text-[#A79E8C] mt-2"
+            style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+          >
+            Sections
           </div>
-          <div className="text-xs text-[#625143] mt-1">{typeLabel}</div>
           <button
             onClick={() => setShowClientBrief(true)}
             className="text-xs text-[#625143] hover:text-[#213428] text-left mt-1"
@@ -663,32 +718,20 @@ export default function ProposalEditor() {
         </div>
       )}
 
-      {/* ── Top bar ── */}
-      <div className="fixed top-0 right-0 z-40 flex items-center gap-2 px-4 py-2">
-        <button
-          onClick={() => setShowClientBrief(!showClientBrief)}
-          className={`px-3 py-1.5 text-xs rounded-md border transition-colors ${
-            showClientBrief
-              ? 'bg-[#213428] text-white border-[#213428]'
-              : 'border-[#DCDBD6] bg-white text-[#3E4349] hover:bg-[#F5F4F0]'
-          }`}
-        >
-          Client Brief
-        </button>
-        <button
-          onClick={() => setShowProperties(!showProperties)}
-          className="px-3 py-1.5 text-xs rounded-md border border-[#DCDBD6] bg-white text-[#3E4349] hover:bg-[#F5F4F0]"
-        >
-          {showProperties ? 'Hide' : 'Show'} Properties
-        </button>
-        <button
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md text-white"
-          style={{ backgroundColor: '#213428' }}
-        >
-          <Download className="w-3.5 h-3.5" />
-          Export
-        </button>
       </div>
+
+      {/* Print-only proposal document. Mounted for the lifetime of the editor
+          so "Export Proposal PDF" prints without a render race; hidden on
+          screen and revealed only while the export body class is active. */}
+      <ProposalPrintDocument
+        proposal={proposal}
+        projectName={projectContext.projectName}
+        clientName={projectContext.clientName}
+        dealerCompanyName={projectContext.dealerCompanyName}
+        sections={sections}
+        typeLabel={typeLabel}
+      />
+      <ProposalPrintStyles />
     </div>
   );
 }
