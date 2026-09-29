@@ -285,6 +285,29 @@ function deriveTargetNotAchievedLimitation(problem) {
  * @param {boolean} hasP20Evidence - whether P20 seat data exists
  */
 export function buildIncomplete(problem, hasP20Evidence) {
+  const diagnosisCopy = buildDiagnosisCopy(problem);
+  const subwooferCount = Number(problem?.metrics?.subwooferCount) || 0;
+  const usePairStory = subwooferCount === 2
+    && problem?.type === PROBLEM_TYPE.MULTI_SUB_INTERACTION;
+  const useFourSubStory = subwooferCount >= 4
+    && problem?.type === PROBLEM_TYPE.SEAT_CONSISTENCY
+    && problem?.metrics?.outputAndExtensionMet === true;
+
+  // An incomplete optimisation run must not erase a specific diagnosis that
+  // is already proven by the published bass evidence. Keep the incomplete
+  // status, but show the pair/array story and its physical next action.
+  if (diagnosisCopy && (usePairStory || useFourSubStory)) {
+    return {
+      assessment: 'Evaluation incomplete',
+      action: diagnosisCopy.why,
+      why: diagnosisCopy.assessment,
+      rp22Evidence: [],
+      remainingLimitation: [diagnosisCopy.remainingLimitation, diagnosisCopy.action]
+        .filter(Boolean)
+        .join(' '),
+    };
+  }
+
   const seatConsistencyNote = hasP20Evidence
     ? 'Seat-to-seat bass consistency remains the limiting factor.'
     : null;
