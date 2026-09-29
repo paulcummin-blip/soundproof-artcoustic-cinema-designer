@@ -35,20 +35,9 @@ Deno.serve(async (req: Request) => {
       return json(403, { ok: false });
     }
 
-    const result = await consumePilotPortalLaunch(base44, user, body.launch_pass);
-
-    // After a successful Partner Portal launch (membership claimed +
-    // PortalIdentity created), associate the dealer identity onto the User
-    // record. This stamps the immutable dealer_account_id and dealer_name
-    // (first launch) or validates the existing association (future logins).
-    // A mismatch or NO_PORTAL_TOKEN here does not block the launch — the
-    // PartnerPortalIdentityProvider re-attempts on mount and surfaces the
-    // mismatch screen if needed.
-    try {
-      await associateDealerIdentityCore(base44, user.id);
-    } catch {
-      // Non-fatal: association will be re-attempted by the provider on mount.
-    }
+    const result = await consumePilotPortalLaunch(base44, user, body.launch_pass, {
+      associateDealerIdentity: () => associateDealerIdentityCore(base44, user.id),
+    });
 
     return json(200, result);
   } catch (error) {
