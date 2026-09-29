@@ -2,10 +2,12 @@
  * Core Dealer Identity association logic — the single implementation shared
  * by both call sites:
  *
- *   1. consumePortalLaunch  — invoked immediately after a successful Partner
- *      Portal launch (membership claimed, PortalIdentity created).
+ *   1. consumePortalLaunch — required before claiming membership or writing
+ *      PortalIdentity data for a verified Partner Portal launch.
  *   2. associateDealerIdentity — invoked on every app mount by the
  *      PartnerPortalIdentityProvider.
+ *   3. createProfessionalProject — revalidates the live provider token before
+ *      every dealer project creation, even when stored dealer fields exist.
  *
  * First launch (user has no stored dealer_account_id):
  *   - Resolve dealer identity from the Partner Portal Dealer Identity Service
