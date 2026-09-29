@@ -64,6 +64,21 @@ export default function DesignReviewPage() {
 
   const [projectDetails, setProjectDetails] = useState(null);
   const [loadingProject, setLoadingProject] = useState(true);
+
+  // The active version is resolved from the loaded Project record — the
+  // version-scoped authority and every consumer below read the same identity.
+  const activeVersionId = projectDetails?.active_version_id || null;
+
+  // ── Version-scoped engineering authority (durable first) ────────────────
+  // Design Review reads the settled result from the DB Published Engineering
+  // Authority for this version, with the same-window handoff overlaid as an
+  // optimisation. A direct/cold load no longer depends on browser storage.
+  //
+  // Declared above the seating memo and the price snapshot below, which both
+  // read from it.
+  const asdrAuthority = useVersionedEngineeringAuthority(projectId, activeVersionId);
+  const asdrData = asdrAuthority.snapshot;
+
   const priceData = asdrData?.priceData?.showPrices ? asdrData.priceData : null;
 
   // ── Resolved seating authority ──
@@ -143,17 +158,6 @@ export default function DesignReviewPage() {
     });
     return () => { cancelled = true; };
   }, [projectId]);
-
-  // The active version is resolved from the loaded Project record — the
-  // version-scoped authority and every consumer below read the same identity.
-  const activeVersionId = projectDetails?.active_version_id || null;
-
-  // ── Version-scoped engineering authority (durable first) ────────────────
-  // Design Review reads the settled result from the DB Published Engineering
-  // Authority for this version, with the same-window handoff overlaid as an
-  // optimisation. A direct/cold load no longer depends on browser storage.
-  const asdrAuthority = useVersionedEngineeringAuthority(projectId, activeVersionId);
-  const asdrData = asdrAuthority.snapshot;
 
   // Keep the persistent sidebar on the same project-scoped price snapshot,
   // including on a direct/new-tab Design Review load.
