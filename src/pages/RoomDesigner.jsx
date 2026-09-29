@@ -2210,11 +2210,13 @@ function RoomDesignerWithState() {
           style={{
             minWidth: 0,
             minHeight: 0,
-            height: "100%"
+            height: "100%",
+            display: "flex",
+            flexDirection: "column"
           }}>
 
           {/* View selector bar */}
-          <div style={{ display: 'flex', gap: 2, padding: '6px 10px', borderBottom: '1px solid #DCDBD6', background: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+          <div style={{ display: 'flex', flexShrink: 0, gap: 2, padding: '6px 10px', borderBottom: '1px solid #DCDBD6', background: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
             {[['plan', 'PLAN VIEW'], ['front', 'FRONT ELEVATION'], ['side', 'SIDE ELEVATION']].map(([key, label]) => (
               <button
                 key={key}
@@ -2255,7 +2257,7 @@ function RoomDesignerWithState() {
           />}
 
           {/* Content area */}
-          <div style={{ height: leftPanelView === 'plan' ? 'calc(100% - 76px)' : 'calc(100% - 44px)', overflow: 'auto' }}>
+          <div style={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto' }}>
             <ErrorBoundary name="RoomVisualisation">
               <Suspense fallback={<div className="p-4">Loading 3D View...</div>}>
                 {(() => {
