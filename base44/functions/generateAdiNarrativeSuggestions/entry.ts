@@ -55,7 +55,7 @@ function buildPrompt({ evidence, proposalType, versionCount, projectName }) {
     '',
     'Return 6 to 12 suggestions. Each suggestion is one short chip label (4 to 9 words, starting with a verb such as Highlight, Explain, Emphasise, Mention, Show or Suggest) plus a short reason naming the calculated fact it relies on.',
     '',
-    'Look at what the calculated data above actually shows: system layout, screen size and viewing angle, RP23, seats and rows, room size and compactness, channel count (P2), surround spacing (P5), front wides (P7), overhead spacing (P9), Dynamic Range (P12, P13, P14), timbre (P16, P17), bass (P18, P19, P20), the primary, secondary and all-seat Design Index, the strongest and weakest parameters, and whether the design is simple, mid-level or high performance.',
+    'Look at what the calculated data above actually shows: system layout, screen size and viewing angle, RP23, seats and rows, room size and compactness, channel count (P2), surround spacing (P5), front wides (P7), overhead spacing (P9), Dynamic Range (P12, P13, P14), timbre (P16, P17), bass (P18, P19, P20), the strongest and weakest parameters, and whether the design is simple, mid-level or high performance.',
     '',
     'RULES:',
     '- Every chip must be supported by a fact in the calculated data above. Never invent a result, value, level or seat count.',

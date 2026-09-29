@@ -27,8 +27,26 @@ const COLUMNS = [
 
 const CELL = 'px-3 py-2 align-top border-b border-[#EAE8E3]';
 
+/**
+ * Design Index rows are no longer selected for the client-facing table, but a
+ * report generated before that change still carries them in stored metadata.
+ * They are dropped here at render time, so the editor preview and the exported
+ * PDF both hide them without regenerating the report.
+ */
+const DESIGN_INDEX_KEY = /^dpi_/i;
+const DESIGN_INDEX_AREA = /design index/i;
+
+export function isClientVisibleHighlightRow(row) {
+  if (!row) return false;
+  if (DESIGN_INDEX_KEY.test(String(row.key || ''))) return false;
+  if (DESIGN_INDEX_AREA.test(String(row.area || ''))) return false;
+  return true;
+}
+
 export default function KeyPerformanceHighlightsTable({ rows, className = '' }) {
-  const list = (rows || []).filter((row) => row && (row.area || row.result));
+  const list = (rows || []).filter(
+    (row) => isClientVisibleHighlightRow(row) && (row.area || row.result),
+  );
   if (list.length === 0) return null;
 
   return (

@@ -7,6 +7,8 @@
  *   1. buildEngineeringEvidence() — a compact, deterministic text block of the
  *      Sound Proof calculated results, injected into every report prompt so
  *      the model writes about the real parameters, levels and values.
+ *      The Design Index is deliberately excluded: it is an internal score and
+ *      must never reach client-facing copy.
  *
  *   2. selectHighlightRows() — the Key Performance Highlights table rows.
  *      The Result column is read straight out of calculated data here, in the
@@ -60,17 +62,6 @@ function findParameter(snapshot, parameterId) {
 
 function levelAndValue(level, value) {
   return compose(isAssessed(level) ? level : null, isAssessed(level) ? value : value);
-}
-
-function indexText(scope) {
-  if (!scope?.available) return null;
-  const percentage = Number.isFinite(Number(scope.percentage))
-    ? `${Math.round(Number(scope.percentage))}%`
-    : null;
-  const index = Number.isFinite(Number(scope.index))
-    ? `index ${Math.round(Number(scope.index))}`
-    : null;
-  return compose(scope.designation, percentage, index);
 }
 
 function spreadText(perSeat) {
@@ -129,16 +120,9 @@ export function buildEngineeringEvidence(snapshot) {
     lines.push('', 'RP22 parameter results (achieved level · measured result):', ...parameters);
   }
 
-  // ── Design Index ──
-  const dpi = snapshot.rp22?.dpi || {};
-  const indexLines = [
-    ['Primary', indexText(dpi.primary)],
-    ['Secondary', indexText(dpi.secondary)],
-    ['All-seat', indexText(dpi.all_seat)],
-  ].filter(([, text]) => text);
-  if (indexLines.length > 0) {
-    lines.push('', `Design Index: ${indexLines.map(([label, text]) => `${label} ${text}`).join(' | ')}`);
-  }
+  // ── Design Index deliberately excluded ──
+  // The Design Index is an internal Sound Proof score. It is not a percentage
+  // and it is never supplied to a client-facing report writer.
 
   // ── Bass detail ──
   const bass = snapshot.bass || {};
@@ -277,12 +261,9 @@ export function selectHighlightRows(snapshot) {
     ));
   }
 
-  // Design Index
-  const dpi = snapshot.rp22?.dpi || {};
-  const pushIndex = (key, area, scope) => push(key, area, indexText(scope));
-  pushIndex('dpi_primary', 'Primary Design Index', dpi.primary);
-  pushIndex('dpi_secondary', 'Secondary Design Index', dpi.secondary);
-  pushIndex('dpi_all_seat', 'All-seat Design Index', dpi.all_seat);
+  // The Design Index is deliberately not a client-facing highlight row. Reports
+  // generated before that change may still carry rows keyed dpi_primary,
+  // dpi_secondary and dpi_all_seat; the client table filters them at render time.
 
   return rows;
 }

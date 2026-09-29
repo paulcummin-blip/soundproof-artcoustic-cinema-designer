@@ -53,45 +53,31 @@ Use the supplied Sound Proof calculated data wherever it applies, and never inve
 
   spatial_resolution: `Explain Spatial Resolution as a result of speaker count and speaker positions, and what that means for sound movement and immersion.
 
-Reference only the RP22 parameters that are present in the supplied Sound Proof calculated data, in this order where they exist:
-- P2 discrete channel count
-- P4 screen consistency
-- P5 horizontal spacing
-- P6 surround level consistency
-- P7 front wide position
-- P9 overhead spacing
-- P10 overhead level consistency
+Choose the two or three results that matter most for this room from the Spatial Resolution results present in the supplied Sound Proof calculated data, for example discrete channel count, screen consistency, surround spacing, surround level consistency, front wide position, overhead spacing and overhead level consistency. Do not work through them all.
 
-For each parameter you reference, state the achieved level and the measured result exactly as supplied, then explain in plain language what the client will hear because of it.
+Name each chosen result in plain language with its achieved level and measured value exactly as supplied, using no more than one parameter code in the section, and explain what the client will hear because of it.
 
-Put strengths first. Mention any clear limitation honestly and in client-friendly language, without undermining the design.
+Lead with the strongest area. Mention one clear limitation honestly, in client-friendly language, without undermining the design. Where the data supports it, note a sensible upgrade path.
 Do not list parameters mechanically and do not include a table.
 3 to 4 short paragraphs.`,
 
   dynamic_range: `Explain Dynamic Range as headroom rather than loudness: the ability to reproduce quiet detail and sudden peaks at the same time.
 
-Reference only the RP22 parameters that are present in the supplied Sound Proof calculated data:
-- P12 screen Dynamic Range
-- P13 non-screen Dynamic Range
-- P14 LFE and subwoofer output where relevant
+Choose the results that matter most for this room from the Dynamic Range results present in the supplied Sound Proof calculated data, for example screen dynamic range, non-screen dynamic range and the subwoofer system output. Do not work through them all, and use no more than one parameter code in the section.
 
-Include the dBC values and the RP22 levels exactly as supplied when they are available. Explain how that headroom benefits dialogue, music and film effects at the level the client will listen at.
+Use the dBC values and the RP22 levels exactly as supplied, and explain in plain language how that headroom benefits dialogue, music and film effects at the level the client will listen at.
 
-If the system is modest, describe the benefit honestly without overstating it. If the system is high performance, make that clear.
+If the system is modest, describe the benefit honestly without overstating it. If the system is high performance, make that clear. Where the data supports one, note a sensible upgrade path.
 3 to 4 short paragraphs, no table.`,
 
   timbre_matching: `Explain Timbre Matching as tonal consistency: the same voice, instrument or effect sounding the same as it moves around the room.
 
-Reference only the RP22 parameters that are present in the supplied Sound Proof calculated data:
-- P16 screen timbre and screen frequency response consistency
-- P17 surround and overhead timbre consistency
-- P18 bass extension where relevant
-- P19 bass response where relevant
-- P20 bass seat-to-seat consistency where relevant
+Choose the results that matter most for this room from the Timbre Matching results present in the supplied Sound Proof calculated data, for example screen timbre and frequency response consistency, surround and overhead timbre consistency, and the bass behaviour that shapes tonal balance. Do not work through them all, and use no more than one parameter code in the section.
 
-Explain why matched speaker families and consistent voicing matter to what the client hears, using the supplied speaker family data.
+Explain why matched speaker families and consistent voicing matter to what the client hears, using the supplied speaker family data, and say what the client will hear because of the results you chose.
 
-Keep the tone practical and client-facing. 3 to 4 short paragraphs, no table.`,
+Keep the tone practical and client-facing. Mention a clear limitation honestly where the data shows one, and note a sensible upgrade path where the data supports it.
+3 to 4 short paragraphs, no table.`,
 
   // Used only when a design has no calculated highlight rows to build the
   // table from. The table itself is built by Sound Proof, never by the model.
@@ -102,7 +88,7 @@ Keep the tone practical and client-facing. 3 to 4 short paragraphs, no table.`,
 Cover:
 - the main positives, leading with the strongest area of the design
 - how the system is balanced as a whole
-- where this system is strongest, using the Design Index values and RP22 levels supplied
+- where this system is strongest, using the supplied RP22 and RP23 levels and the project results that matter most for this room
 - any clear limitation, stated honestly without undermining the design
 - easy-win upgrade options, only where the supplied data supports them, for example additional overheads, rear surrounds, a larger subwoofer, or more capable screen speakers
 
