@@ -41,6 +41,7 @@ export default function RvMlpMarker({
   const timerRef = useRef(null);
   // Movement/placement gestures must never also toggle the seat HUD.
   const movementGestureRef = useRef(false);
+  const movementClickSequenceRef = useRef(false);
   const [holding, setHolding] = useState(false);
 
   // Cleanup timer on unmount
@@ -98,9 +99,15 @@ export default function RvMlpMarker({
     cancelHold();
   }, [grabbed, cancelHold]);
 
+  const handleClick = useCallback((e) => {
+    // A placement followed immediately by a second click is still the same
+    // double-click sequence, even though placement has already exited GRABBED.
+    if (e.detail === 1) movementClickSequenceRef.current = movementGestureRef.current;
+  }, []);
+
   const handleDoubleClick = useCallback((e) => {
     e.stopPropagation();
-    if (grabbed || movementGestureRef.current) return;
+    if (grabbed || movementGestureRef.current || movementClickSequenceRef.current) return;
     onSeatDoubleClick?.(e);
   }, [grabbed, onSeatDoubleClick]);
 
@@ -144,6 +151,7 @@ export default function RvMlpMarker({
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
         onPointerCancel={handlePointerCancel}
+        onClick={handleClick}
         onDoubleClick={handleDoubleClick}
       />
 
