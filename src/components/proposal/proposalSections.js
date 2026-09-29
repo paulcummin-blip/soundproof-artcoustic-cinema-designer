@@ -1,7 +1,10 @@
 /**
- * Canonical section definitions for the Proposal Editor.
- * Fixed 10 sections — every proposal, every time.
+ * Section definitions for the Proposal Editor.
  * Dealers can hide and reorder but cannot add custom sections.
+ *
+ * PROPOSAL_SECTIONS below is the legacy ten-section set. It is no longer
+ * offered for new reports, and is kept only so proposals saved before the two
+ * report types were merged still open correctly.
  */
 
 export const PROPOSAL_SECTIONS = [
@@ -18,10 +21,11 @@ export const PROPOSAL_SECTIONS = [
 ];
 
 /**
- * Canonical section definitions for the System Design Summary.
- * A client-facing sales summary of the system design, built around the three
- * core RP22 design structures. It is not a general proposal document, so it
- * does not use the proposal section set above.
+ * Canonical section definitions for both current report types — the System
+ * Design Summary and the System Design Comparison.
+ * These are client-facing reports built around the three core RP22 design
+ * structures. They are not general proposal documents, so they do not use the
+ * legacy proposal section set above.
  */
 export const SYSTEM_SUMMARY_SECTIONS = [
   { type: 'cover', key: 'cover', label: 'Cover', defaultTitle: 'Cover', canHide: false, canEditBody: false },
@@ -43,7 +47,9 @@ export const ALL_SECTION_DEFS = [...PROPOSAL_SECTIONS, ...SYSTEM_SUMMARY_SECTION
  * was generated with.
  */
 export function getSectionsForProposalType(proposalType) {
-  return proposalType === 'system_summary' ? SYSTEM_SUMMARY_SECTIONS : PROPOSAL_SECTIONS;
+  // Both current report types share the System Design structure. Only legacy
+  // 'single' proposals use the old ten-section set.
+  return proposalType === 'single' ? PROPOSAL_SECTIONS : SYSTEM_SUMMARY_SECTIONS;
 }
 
 export const NARRATIVE_GOALS = [
@@ -68,7 +74,7 @@ export function getSectionDef(type) {
 }
 
 export function getDefaultSections() {
-  return PROPOSAL_SECTIONS.map((s, i) => ({
+  return SYSTEM_SUMMARY_SECTIONS.map((s, i) => ({
     section_type: s.type,
     section_key: s.key,
     title: s.defaultTitle,

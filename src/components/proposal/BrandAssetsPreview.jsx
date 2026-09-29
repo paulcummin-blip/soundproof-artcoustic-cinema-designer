@@ -45,7 +45,7 @@ export default function BrandAssetsPreview({ form }) {
             className="text-[10px] uppercase tracking-[0.28em] mb-4"
             style={{ color: accent }}
           >
-            Cinema Design Proposal
+            System Design Summary
           </div>
           <div
             className="text-[26px] leading-tight font-normal"

@@ -3,7 +3,7 @@ import { useSearchParams, Link, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { getSectionDef } from '@/components/proposal/proposalSections';
 import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
-import { getProposalType } from '@/components/proposal/proposalTypes';
+import { getProposalTypeLabel } from '@/components/proposal/proposalTypes';
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
@@ -510,7 +510,7 @@ export default function ProposalEditor() {
   }
 
   const visibleSections = sections.filter((s) => s.is_enabled !== false);
-  const typeLabel = getProposalType(proposal?.proposal_type)?.label || 'Single Design Proposal';
+  const typeLabel = getProposalTypeLabel(proposal?.proposal_type);
   const hasUnsavedChanges = dirtySections.size > 0;
 
   return (

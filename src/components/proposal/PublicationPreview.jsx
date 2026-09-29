@@ -4,13 +4,13 @@ import React, { useState } from 'react';
  * PublicationPreview — a miniature multi-page publication preview.
  *
  * Replaces the former cover-only preview. Displays a stack of simplified
- * page thumbnails (Cover, Executive Summary, System, Performance, Products,
- * Conclusion) so the user immediately understands they are configuring a
- * professional publishing system, not just a cover.
+ * page thumbnails of a System Design report so the user immediately
+ * understands they are configuring a professional publishing system, not just
+ * a cover.
  *
- * The publication title is dynamic — a small selector lets the dealer see
- * how the cover reads for each publication type (Proposal, Comparison,
- * Executive Summary, Technical Report).
+ * The publication title is dynamic — a small selector lets the dealer see how
+ * the cover reads for each report type (System Design Summary, System Design
+ * Comparison, Technical Design Report).
  *
  * Brand colours are demonstrated naturally through the page elements
  * (headings, accent rules, labels) rather than displayed as separate swatches.
@@ -19,29 +19,41 @@ import React, { useState } from 'react';
  * - form: the brand assets form state object
  */
 const PUBLICATION_TYPES = [
-  { key: 'proposal', label: 'Cinema Design Proposal' },
-  { key: 'comparison', label: 'Cinema Design Comparison' },
-  { key: 'executive_summary', label: 'Executive Summary' },
+  { key: 'system_summary', label: 'System Design Summary' },
+  { key: 'comparison', label: 'System Design Comparison' },
   { key: 'technical_report', label: 'Technical Design Report' },
 ];
 
+// Both report types use the same report structure. The difference is one
+// version (summary) versus two or more versions (comparison).
+const REPORT_PAGES = [
+  'cover',
+  'system_design_summary',
+  'spatial_resolution',
+  'dynamic_range',
+  'timbre_matching',
+  'key_performance_highlights',
+  'overall_design',
+  'room_images',
+];
+
 const PAGE_SETS = {
-  proposal: ['cover', 'executive_summary', 'system_overview', 'performance', 'products', 'conclusion'],
-  comparison: ['cover', 'executive_summary', 'design_a', 'design_b', 'performance', 'conclusion'],
-  executive_summary: ['cover', 'executive_summary'],
+  system_summary: REPORT_PAGES,
+  comparison: REPORT_PAGES,
   technical_report: ['cover', 'project_overview', 'performance', 'technical_appendix'],
 };
 
 const PAGE_LABELS = {
   cover: 'Cover',
-  executive_summary: 'Executive Summary',
-  system_overview: 'System Overview',
-  performance: 'Performance',
-  products: 'Products',
-  conclusion: 'Conclusion',
-  design_a: 'Design A',
-  design_b: 'Design B',
+  system_design_summary: 'System Design Summary',
+  spatial_resolution: 'Spatial Resolution',
+  dynamic_range: 'Dynamic Range',
+  timbre_matching: 'Timbre Matching',
+  key_performance_highlights: 'Key Performance Highlights',
+  overall_design: 'Overall Design',
+  room_images: 'Project Images',
   project_overview: 'Project Overview',
+  performance: 'Performance',
   technical_appendix: 'Technical Appendix',
 };
 
@@ -123,14 +135,14 @@ function renderPage(pageKey, form, pubLabel) {
         </div>
       );
 
-    case 'executive_summary':
+    case 'system_design_summary':
       return (
         <div className="flex flex-col h-full">
           <div className="text-[8px] uppercase tracking-[0.18em] text-[#C9C3B4] mb-6" style={{ fontFamily: FONT }}>
             01
           </div>
           <div className="text-[13px] mb-3" style={{ color: primary, fontFamily: FONT }}>
-            Executive Summary
+            {PAGE_LABELS[pageKey]}
           </div>
           <div className="h-px w-8 mb-5" style={{ backgroundColor: accent }} />
           <TextLines widths={['100%', '94%', '88%', '60%']} />
@@ -140,7 +152,10 @@ function renderPage(pageKey, form, pubLabel) {
         </div>
       );
 
-    case 'system_overview':
+    case 'spatial_resolution':
+    case 'dynamic_range':
+    case 'timbre_matching':
+    case 'overall_design':
     case 'project_overview':
       return (
         <div className="flex flex-col h-full">
@@ -178,13 +193,11 @@ function renderPage(pageKey, form, pubLabel) {
         </div>
       );
 
-    case 'products':
-    case 'design_a':
-    case 'design_b':
+    case 'key_performance_highlights':
       return (
         <div className="flex flex-col h-full">
           <div className="text-[8px] uppercase tracking-[0.18em] text-[#C9C3B4] mb-6" style={{ fontFamily: FONT }}>
-            {pageKey === 'products' ? '04' : pageKey === 'design_a' ? '03' : '04'}
+            05
           </div>
           <div className="text-[13px] mb-3" style={{ color: primary, fontFamily: FONT }}>
             {PAGE_LABELS[pageKey]}
@@ -202,17 +215,18 @@ function renderPage(pageKey, form, pubLabel) {
         </div>
       );
 
-    case 'conclusion':
+    case 'room_images':
       return (
         <div className="flex flex-col h-full">
           <div className="text-[8px] uppercase tracking-[0.18em] text-[#C9C3B4] mb-6" style={{ fontFamily: FONT }}>
-            05
+            07
           </div>
           <div className="text-[13px] mb-3" style={{ color: primary, fontFamily: FONT }}>
-            Conclusion
+            {PAGE_LABELS[pageKey]}
           </div>
           <div className="h-px w-8 mb-5" style={{ backgroundColor: accent }} />
-          <TextLines widths={['100%', '96%', '90%', '84%', '50%']} />
+          <div className="mb-3" style={{ height: '34%', backgroundColor: softBlock }} />
+          <TextLines widths={['92%', '64%']} />
         </div>
       );
 
@@ -237,7 +251,7 @@ function renderPage(pageKey, form, pubLabel) {
 }
 
 export default function PublicationPreview({ form }) {
-  const [pubType, setPubType] = useState('proposal');
+  const [pubType, setPubType] = useState('system_summary');
   const pubLabel = PUBLICATION_TYPES.find((p) => p.key === pubType).label;
   const pages = PAGE_SETS[pubType];
 

@@ -3,15 +3,15 @@ import { FileText, GitCompare, Check } from 'lucide-react';
 import { PROPOSAL_TYPES } from '@/components/proposal/proposalTypes';
 
 const TYPE_ICONS = {
-  single: FileText,
+  system_summary: FileText,
   comparison: GitCompare,
 };
 
 /**
- * Step 2 — Choose Proposal Type.
- * Single Design Proposal or Design Comparison.
- * Renders dynamically from PROPOSAL_TYPES so new types can be added
- * to the config without changing this component.
+ * Step 2 — Choose Report Type.
+ * System Design Summary (one version) or System Design Comparison (two or
+ * more versions). Both use the same report structure and writing style.
+ * Renders from PROPOSAL_TYPES.
  */
 export default function ProposalTypeStep({ selectedType, onSelect }) {
   return (

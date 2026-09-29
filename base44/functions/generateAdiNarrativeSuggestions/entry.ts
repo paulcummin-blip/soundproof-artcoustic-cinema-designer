@@ -36,9 +36,9 @@ const SUGGESTIONS_JSON_SCHEMA = {
 };
 
 const REPORT_TYPE_LABELS = {
-  single: 'a proposal for one design version',
-  comparison: 'a comparison report covering more than one design version',
-  system_summary: 'a System Design Summary',
+  single: 'a client-facing report for one design version',
+  comparison: 'a System Design Comparison covering two or more design versions',
+  system_summary: 'a System Design Summary covering one design version',
 };
 
 function buildPrompt({ evidence, proposalType, versionCount, projectName }) {

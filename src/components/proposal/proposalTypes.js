@@ -15,28 +15,33 @@
 
 export const PROPOSAL_TYPES = [
   {
-    value: 'single',
-    label: 'Single Design Proposal',
-    description: 'A proposal for a single design version of the selected project.',
+    value: 'system_summary',
+    label: 'System Design Summary',
+    description: 'A client-facing sales summary for one design version, focused on Spatial Resolution, Dynamic Range and Timbre Matching.',
     minVersions: 1,
     maxVersions: 1,
   },
   {
     value: 'comparison',
-    label: 'Design Comparison',
-    description: 'A side-by-side comparison of two or more design versions for the same project.',
+    label: 'System Design Comparison',
+    description: 'A client-facing comparison of two or more design versions, using the same report style and the same engineering evidence.',
     minVersions: 2,
     maxVersions: null,
-  },
-  {
-    value: 'system_summary',
-    label: 'System Design Summary',
-    description: 'A client-facing sales summary of the system design, built around Spatial Resolution, Dynamic Range and Timbre Matching.',
-    minVersions: 1,
-    maxVersions: 1,
   },
 ];
 
 export function getProposalType(value) {
   return PROPOSAL_TYPES.find((t) => t.value === value) || null;
+}
+
+/**
+ * Display label for a saved proposal's report type. A type that is no longer
+ * offered in the wizard still has to read correctly on existing proposals.
+ */
+const LEGACY_TYPE_LABELS = {
+  single: 'Design Proposal',
+};
+
+export function getProposalTypeLabel(value) {
+  return getProposalType(value)?.label || LEGACY_TYPE_LABELS[value] || 'Design Report';
 }

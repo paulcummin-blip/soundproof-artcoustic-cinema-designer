@@ -24,8 +24,8 @@ const STEPS = [
  *
  * Steps:
  * 1. Select Project (any non-archived project for this dealer)
- * 2. Choose Proposal Type (single or comparison)
- * 3. Select Version(s) — one for single, two+ for comparison
+ * 2. Choose Report Type (System Design Summary or System Design Comparison)
+ * 3. Select Version(s) — one for a summary, two or more for a comparison
  * 4. Client Brief & Narrative Focus
  * 5. Generate (creates Proposal + blocks, invokes GPT, opens editor)
  *
@@ -38,7 +38,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
 
   const [step, setStep] = useState(0);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
-  const [proposalType, setProposalType] = useState('single');
+  const [proposalType, setProposalType] = useState(null);
   const [selectedVersionIds, setSelectedVersionIds] = useState([]);
   const [clientBrief, setClientBrief] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -196,7 +196,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
           <div className="mb-10">
             <ReviewRow label="Project" value={selectedProjectId ? 'Selected' : '—'} />
             <ReviewRow
-              label="Proposal Type"
+              label="Report Type"
               value={typeDef?.label || '—'}
             />
             <ReviewRow

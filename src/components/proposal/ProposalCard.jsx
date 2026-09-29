@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { FileText, Copy, Download, Archive, MoreVertical, Layers, Clock, Calendar, RotateCcw } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import ProposalStatusBadge from './ProposalStatusBadge';
-import { getProposalType } from './proposalTypes';
+import { getProposalTypeLabel } from './proposalTypes';
 import { isArchived } from './proposalLifecycle';
 
 /**
@@ -53,7 +53,7 @@ function ProposalCard({ proposal, projectName, versionLabel, sectionCount, onDup
   };
 
   const archived = isArchived(proposal.status);
-  const typeLabel = getProposalType(proposal.proposal_type)?.label || 'Single Design Proposal';
+  const typeLabel = getProposalTypeLabel(proposal.proposal_type);
   const createdDate = proposal.created_date ? new Date(proposal.created_date) : null;
   const updatedDate = proposal.updated_date ? new Date(proposal.updated_date) : null;
 

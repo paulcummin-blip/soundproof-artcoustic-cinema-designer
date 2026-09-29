@@ -19,12 +19,13 @@ const SECTIONS = [
 /**
  * The section set for a report type.
  *
- * A System Design Summary is a client-facing sales summary of the system
- * design, built around the three core RP22 design structures. It is not a
- * general proposal document, so it never uses the proposal section set.
+ * Both current report types are client-facing reports built around the three
+ * core RP22 design structures, so they share the System Design section set.
+ * The legacy proposal section set is kept only for 'single' reports saved
+ * before the two report types were merged.
  */
 function resolveSections(proposalType) {
-  return proposalType === 'system_summary' ? SYSTEM_SUMMARY_SECTIONS : SECTIONS;
+  return proposalType === 'single' ? SECTIONS : SYSTEM_SUMMARY_SECTIONS;
 }
 
 const GOAL_LABELS = {
@@ -171,14 +172,28 @@ export default async function(req) {
     );
 
     // ── Build project context for GPT ──
-    const projectContext = buildProjectContext(project, narrative_goal, brandAsset, client_brief, engineering_snapshot);
+    // Report identity: the versions this report covers, in selection order.
+    const reportVersions = resolvedVersionIds.map((id, index) => {
+      const record = (projectVersions || []).find((version) => version.id === id);
+      return `Version ${record?.version_number ?? index + 1} — ${record?.version_name || 'Untitled'}`;
+    });
+    const projectContext = buildProjectContext(
+      project,
+      narrative_goal,
+      brandAsset,
+      client_brief,
+      engineering_snapshot,
+      resolvedType,
+      reportVersions,
+    );
 
     // ── Key Performance Highlights rows ──
     // Read straight out of the frozen Engineering Snapshot. The AI writes the
     // "What you hear" cells only; it never sets or changes a Result value, and
     // it never chooses which rows appear.
-    const highlightRows = resolvedType === 'system_summary' ? selectHighlightRows(engineering_snapshot) : [];
-    const isHighlightsSection = (section) => resolvedType === 'system_summary'
+    const usesSystemStructure = resolvedType !== 'single';
+    const highlightRows = usesSystemStructure ? selectHighlightRows(engineering_snapshot) : [];
+    const isHighlightsSection = (section) => usesSystemStructure
       && section.section_type === HIGHLIGHTS_SECTION_TYPE
       && highlightRows.length > 0;
 
@@ -292,7 +307,7 @@ async function rollbackCreatedProposal(base44, proposalId, knownSections = []) {
   }
 }
 
-function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, engineeringSnapshot) {
+function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, engineeringSnapshot, reportType = 'system_summary', reportVersions = []) {
   const goalLabel = GOAL_LABELS[narrativeGoal] || 'Luxury Cinema';
   const evidence = buildEngineeringEvidence(engineeringSnapshot);
   const roomWidth = project.room_width || '';
@@ -312,7 +327,12 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
   const companyName = brandAsset?.company_name || '';
   const briefText = (clientBrief || '').trim();
 
+  const isComparison = reportType === 'comparison';
+
   return [
+    `Report Type: ${isComparison ? 'System Design Comparison' : 'System Design Summary'}`,
+    isComparison && reportVersions.length > 0 ? `Versions compared: ${reportVersions.join(' | ')}` : '',
+    isComparison && reportVersions.length > 0 ? `Calculated evidence supplied for: ${reportVersions[0]}` : '',
     `Narrative Goal: ${goalLabel}`,
     `Company: ${companyName}`,
     `Project: ${project.name || ''}`,
@@ -329,6 +349,9 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
     briefText || 'No specific emphasis notes provided. Use a balanced professional narrative.',
     '',
     '=== CONSTRAINT ===',
+    isComparison
+      ? 'Calculated Sound Proof evidence is supplied for one design version only. Compare the designs using that evidence and the supplied system descriptions. Never state or imply a measured result for a version that is not in that evidence.'
+      : '',
     'The Client Brief influences narrative emphasis, wording, and structure ONLY.',
     'It must NEVER alter, contradict, or override any engineering result, RP22 value,',
     'Design Rating, or recommendation. All measured values remain exactly as reported.',
@@ -336,7 +359,7 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
 }
 
 function buildSectionPrompt(sectionDef, projectContext, proposalType) {
-  const sectionInstruction = proposalType === 'system_summary'
+  const sectionInstruction = proposalType !== 'single'
     ? getSystemSummarySectionPrompt(sectionDef.type, sectionDef.title)
     : SECTION_PROMPTS[sectionDef.type] || `Write the ${sectionDef.title} section. 2-3 paragraphs.`;
 

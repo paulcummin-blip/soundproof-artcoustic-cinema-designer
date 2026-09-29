@@ -5,8 +5,8 @@ import { getProposalType } from '@/components/proposal/proposalTypes';
 
 /**
  * Step 3 — Select Version(s).
- * For 'single' proposals: radio selection of exactly one version.
- * For 'comparison' proposals: checkbox selection of two or more versions.
+ * System Design Summary: exactly one version.
+ * System Design Comparison: two or more versions.
  */
 export default function VersionSelectStep({
   projectId,
