@@ -113,8 +113,19 @@ test('short click never moves RSP; hold remains 3000ms; release/place never also
     assert.equal(placements.length, 1);
     act(() => renderer.update(React.createElement(Marker, props)));
     act(() => hit().onPointerUp(e));
+    act(() => hit().onClick({ ...e, detail: 1 }));
+    // The second click of a placement double-click must not open the HUD.
+    act(() => hit().onPointerDown(e));
+    act(() => hit().onPointerUp(e));
+    act(() => hit().onClick({ ...e, detail: 2 }));
     act(() => hit().onDoubleClick(e));
     assert.equal(selections.length, 1);
+    // A later, independent seat double-click is available again.
+    act(() => hit().onPointerDown(e));
+    act(() => hit().onPointerUp(e));
+    act(() => hit().onClick({ ...e, detail: 1 }));
+    act(() => hit().onDoubleClick(e));
+    assert.equal(selections.length, 2);
 
     act(() => hit().onPointerDown(e));
     act(() => hit().onPointerCancel(e));
