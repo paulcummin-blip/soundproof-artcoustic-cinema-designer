@@ -22,6 +22,7 @@ import { useOptionalSharedBassResults } from "@/components/room/bass/bassResults
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import { formatP14BasisLabel, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { normalizeP18TargetBasis, P18_THRESHOLDS_BY_BASIS } from "@/components/utils/p18ExtensionAuthority";
+import { formatP18CriterionRows } from "@/components/room/bass/p18SelectedTargetExplanation";
 import { formatBassParameterValue } from "@/components/room/bass/bassParameterValueFormatter";
 import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
@@ -113,6 +114,9 @@ function buildP18Lines(shared) {
 
   const lines = [];
   lines.push(["Displayed extension", (bounded ? "≤" : "") + formatBassParameterValue("p18", achievedValue)]);
+  // Which LFE output target the extension was measured at, and which branch
+  // limited it — derived from the authority's already-computed branch fields.
+  lines.push(...formatP18CriterionRows(source?.p18SelectedTarget));
   lines.push(["Grading basis", targetBasis === "recommended" ? "Recommended" : "Minimum"]);
 
   if (achievedLevel > 0) {

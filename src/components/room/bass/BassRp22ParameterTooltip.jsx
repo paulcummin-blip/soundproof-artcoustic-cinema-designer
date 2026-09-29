@@ -24,6 +24,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { formatP14Capability } from "@/components/utils/p14CapabilityAuthority";
 import { formatBassParameterValue } from "@/components/room/bass/bassParameterValueFormatter";
+import { formatP18CriterionLines } from "@/components/room/bass/p18SelectedTargetExplanation";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 
 const PARAMETER_NUMBERS = Object.freeze({ p14: 14, p18: 18, p19: 19, p20: 20 });
@@ -89,7 +90,10 @@ function buildDynamicDetailLines(parameterKey, shared) {
     const value = isFiniteNumber(source?.value) ? Number(source.value) : null;
     if (value !== null) {
       const bounded = source?.achievedExtensionBounded === true;
-      return [`Achieved -3 dB point: ${bounded ? "≤" : ""}${formatBassParameterValue("p18", value)}`];
+      return [
+        `Achieved -3 dB point: ${bounded ? "≤" : ""}${formatBassParameterValue("p18", value)}`,
+        ...formatP18CriterionLines(source?.p18SelectedTarget),
+      ];
     }
   }
 

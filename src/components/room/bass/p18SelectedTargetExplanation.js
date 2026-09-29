@@ -79,7 +79,7 @@ function resolvePublishedRow(authority) {
   return null;
 }
 
-function resolveBindingBasis(row, responseHz, capabilityHz, capabilityComputed, responseBounded, capabilityBounded) {
+function resolveBindingBasis(responseHz, capabilityHz, capabilityComputed, responseBounded, capabilityBounded) {
   if (!capabilityComputed) {
     return responseHz != null ? P18_BINDING_BASIS.RESPONSE : P18_BINDING_BASIS.UNRESOLVED;
   }
@@ -111,7 +111,7 @@ export function deriveP18SelectedTargetExplanation(authorityP18) {
   const capabilityBounded = row?.capabilityBounded === true;
 
   const bindingBasis = resolveBindingBasis(
-    row, responseHz, capabilityHz, capabilityComputed, responseBounded, capabilityBounded,
+    responseHz, capabilityHz, capabilityComputed, responseBounded, capabilityBounded,
   );
   const criterionMode = bindingBasis === P18_BINDING_BASIS.UNRESOLVED
     ? P18_CRITERION_MODE.UNRESOLVED

@@ -3,6 +3,7 @@ import { p19LowestSeat, p19RspResult } from "@/components/room/bass/p19SeatPrese
 import { buildP20SeatRows, p20WorstSeat, p20BestPrimarySeat } from "@/components/room/bass/p20SeatPresentation";
 import { formatP14Capability, formatP14BasisLabel, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
+import { formatP18TargetExplanationDetail } from "@/components/room/bass/p18SelectedTargetExplanation";
 import { formatBassParameterValue } from "@/components/room/bass/bassParameterValueFormatter";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, isBassLifecycleCalculating } from "./bassCalculationLifecycle";
 
@@ -293,12 +294,19 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       ? `${bounded ? "≤" : ""}${formatBassParameterValue("p18", achievedValue)}`
       : "";
     const resultText = valueText ? `${levelText} · ${valueText}` : "—";
+    // The extension is measured at a specific LFE output target, and the branch
+    // that limits it is part of the result. When the authority published that
+    // explanation, show it; otherwise keep the plain threshold table.
+    const explanationDetail = formatP18TargetExplanationDetail(
+      source?.p18SelectedTarget,
+      activeP18Basis === "recommended" ? "Recommended" : "Minimum",
+    );
     pills.p18 = {
       label: "P18 Extension",
       resultText,
       text: `P18 Extension ${resultText}`,
       level: valueText ? levelText : "—",
-      detail: formatP18TargetBasisDetail(activeP18Basis),
+      detail: explanationDetail || formatP18TargetBasisDetail(activeP18Basis),
       stale: isStale,
     };
   } else if (p14Failed) {

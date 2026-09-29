@@ -36,6 +36,7 @@ import {
 import { formatP14RecommendedDetail, formatP14TargetBasisDetail, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { buildBassTargetViews } from "@/components/room/bass/bassTargetViews";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
+import { deriveP18SelectedTargetExplanation } from "@/components/room/bass/p18SelectedTargetExplanation";
 import { isCanonicalP19Ready } from "@/components/room/bass/p19Readiness";
 
 // ---------------------------------------------------------------------------
@@ -542,6 +543,11 @@ export function adaptCurrentBassOptimisationResult({
     qualifiedAtSelectedP14Output: p18ResultAvailable,
     achievedExtensionBounded: authorityP18?.authority?.achievedExtensionBounded === true
       || authorityP18?.achievedExtensionBounded === true,
+    // Selected-target explanation (display only). Derived from the branch fields
+    // the P18 authority already computed — no physics, no grading, no value change.
+    p18SelectedTarget: deriveP18SelectedTargetExplanation(
+      authorityP18?.authority || selectedCandidate?.p18AchievedAuthority || authorityP18 || null,
+    ),
   };
 
   // P19 — publish only from the official assessment of the finished canonical

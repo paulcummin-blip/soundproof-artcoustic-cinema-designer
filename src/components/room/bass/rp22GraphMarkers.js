@@ -1,3 +1,5 @@
+import { deriveP18SelectedTargetExplanation, formatP18MarkerSuffix } from "@/components/room/bass/p18SelectedTargetExplanation";
+
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
 /**
@@ -75,6 +77,10 @@ export function buildRp22GraphMarkers(finalBassResponse, selectedSeatId = null) 
       ? Math.floor(Number(seatVariation.p18.extensionHz))
       : null,
     p18Bounded,
+    // Display-only explanation of the marker: the LFE output target it was
+    // measured at and the branch that limited it. Null when the payload has no
+    // branch data, in which case the marker keeps its existing wording.
+    p18Explanation: deriveP18SelectedTargetExplanation(seatVariation?.p18 || null),
     p19StartHz: finite(finalBassResponse?.assessmentStartHz)
       ? Number(finalBassResponse.assessmentStartHz)
       : null,
@@ -102,14 +108,24 @@ export function buildRp22GraphMarkers(finalBassResponse, selectedSeatId = null) 
 export function formatP18MarkerLabel(markers) {
   if (!finite(markers?.p18FrequencyHz)) return null;
   const p18Rp22Hz = Math.floor(Number(markers.p18FrequencyHz));
+  // Selected-target suffix: names the LFE output target the extension was
+  // measured at and the branch that limited it. Absent when the payload has no
+  // branch data, leaving the established wording untouched.
+  const suffix = formatP18MarkerSuffix(markers?.p18Explanation);
+  const clause = suffix ? ` · ${suffix}` : "";
   if (markers.p18Bounded) {
     return {
-      short: `P18 achieved extension · ≤${p18Rp22Hz} Hz`,
-      detail: `Exact -3 dB crossing is below the calculated range.`,
+      short: `P18 achieved extension · ≤${p18Rp22Hz} Hz${clause}`,
+      detail: suffix
+        ? `Exact -3 dB crossing is below the calculated range · response and capability both bounded at the validity floor.`
+        : `Exact -3 dB crossing is below the calculated range.`,
     };
   }
+  const measured = Number(markers.p18FrequencyHz).toFixed(1);
   return {
-    short: `P18 achieved extension · ${p18Rp22Hz} Hz RP22 (${Number(markers.p18FrequencyHz).toFixed(1)} Hz measured)`,
-    detail: null,
+    short: `P18 achieved extension · ${p18Rp22Hz} Hz RP22 (${measured} Hz measured)${clause}`,
+    detail: suffix
+      ? `Measured ${measured} Hz · response branch ${finite(markers?.p18Explanation?.responseTargetF3Hz) ? `${Math.round(Number(markers.p18Explanation.responseTargetF3Hz))} Hz` : "n/a"} · capability branch ${finite(markers?.p18Explanation?.capabilityTargetF3Hz) ? `${Math.round(Number(markers.p18Explanation.capabilityTargetF3Hz))} Hz` : "n/a"}.`
+      : null,
   };
 }
