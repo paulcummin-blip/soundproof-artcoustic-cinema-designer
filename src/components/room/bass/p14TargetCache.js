@@ -274,6 +274,21 @@ export function clearTargetCacheForDesign(projectId, versionId, baseDesignFinger
 }
 
 /**
+ * Count the prepared (verified) entries in a bank's targets object.
+ * AUTHORITATIVE requires structural validity + graph payload + P19 readiness;
+ * LIMITED contracts are terminal results and also count as prepared.
+ */
+function countPreparedTargetBankEntries(targets) {
+  let count = 0;
+  for (const [, entry] of Object.entries(targets || {})) {
+    const isAuth = isAuthoritativeBassContract(entry) && hasGraphPayload(entry) && hasReadyCanonicalP19Contract(entry);
+    const isLim = isValidLimitedP14Contract(entry);
+    if (isAuth || isLim) count += 1;
+  }
+  return count;
+}
+
+/**
  * Capture a deep-cloned snapshot of the current target bank for a project+
  * version. Used by the Restore Previous Design checkpoint so the 8/8 target
  * bank can be restored without a full background recalculation.
@@ -285,17 +300,26 @@ export function getTargetBankSnapshot(projectId, versionId) {
   const cache = ensureCache(projectId, versionId);
   if (!cache.baseDesignFingerprint) return null;
   const targets = cache.targets || {};
-  const entries = Object.entries(targets);
-  let count = 0;
-  for (const [, entry] of entries) {
-    const isAuth = isAuthoritativeBassContract(entry) && hasGraphPayload(entry) && hasReadyCanonicalP19Contract(entry);
-    const isLim = isValidLimitedP14Contract(entry);
-    if (isAuth || isLim) count += 1;
-  }
   return {
     baseDesignFingerprint: cache.baseDesignFingerprint,
     targets: JSON.parse(JSON.stringify(targets)),
-    count,
+    count: countPreparedTargetBankEntries(targets),
+  };
+}
+
+/**
+ * Bank identity — what the in-memory bank actually holds: its baseDesign
+ * fingerprint and its prepared-entry count. NOT design-aware: it reports the
+ * bank as it is, whether or not that bank belongs to the current physical
+ * design. Consumers compare this against the physical design's
+ * baseDesignFingerprint (see bankIdentityCoherence.js) so a bank belonging to
+ * another design is never treated as prepared for this one.
+ */
+export function getTargetBankIdentity(projectId, versionId) {
+  const cache = ensureCache(projectId, versionId);
+  return {
+    baseDesignFingerprint: cache.baseDesignFingerprint || null,
+    count: countPreparedTargetBankEntries(cache.targets),
   };
 }
 
@@ -516,6 +540,17 @@ export function useTargetCacheProgress(projectId, versionId, baseDesignFingerpri
     () => cacheRevision,
   );
   return getTargetCacheProgress(projectId, versionId, baseDesignFingerprint, allTargetKeys);
+}
+
+// Reactive bank identity read (fingerprint + prepared count). Subscribes to the
+// same cache revision as useTargetCacheProgress.
+export function useTargetBankIdentity(projectId, versionId) {
+  useSyncExternalStore(
+    (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
+    () => cacheRevision,
+    () => cacheRevision,
+  );
+  return getTargetBankIdentity(projectId, versionId);
 }
 
 export function useTargetCacheHydration(projectId, versionId) {
