@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AccountSuspendedScreen from '@/components/AccountSuspendedScreen';
 import AdminAccounts from './pages/AdminAccounts';
+import AdminAccountAccess from './pages/AdminAccountAccess';
 import AccountDashboard from './pages/AccountDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminSystemHealth from './pages/AdminSystemHealth';
@@ -122,6 +123,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin" element={<AccessGate masterAdmin><AdminDashboard /></AccessGate>} />
         <Route path="/admin/accounts" element={<AccessGate masterAdmin><AdminAccounts /></AccessGate>} />
         <Route path="/admin/accounts/:accountId" element={<AccessGate masterAdmin><AccountDashboard /></AccessGate>} />
+        <Route path="/admin/access" element={<AccessGate masterAdmin><AdminAccountAccess /></AccessGate>} />
         <Route path="/admin/system-health" element={<AccessGate masterAdmin><AdminSystemHealth /></AccessGate>} />
         <Route path="/admin/datasets" element={<AccessGate masterAdmin><AdminDatasetManager /></AccessGate>} />
         <Route path="/admin/project-licensing" element={<AccessGate masterAdmin><AdminProjectLicensing /></AccessGate>} />

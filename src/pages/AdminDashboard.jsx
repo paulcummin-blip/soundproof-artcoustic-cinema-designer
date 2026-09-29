@@ -64,6 +64,13 @@ export default function AdminDashboard() {
       href: "/admin/accounts",
     },
     {
+      title: "Account Access & Credits",
+      description: "Dealer access, logins, Sound Proof credits and account diagnostics in one grouped view.",
+      status: "Ready",
+      count: "Partner / Trade / Richer Sounds",
+      href: "/admin/access",
+    },
+    {
       title: "Engineering Database",
       description: "Read-only acoustic specifications and measured product data.",
       status: "Healthy",
