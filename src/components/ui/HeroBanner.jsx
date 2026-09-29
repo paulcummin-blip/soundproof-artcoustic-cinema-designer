@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { APPROVED_DEALER_BRANDING, resolveDealerBrandPresentation } from "@/components/account/defaultDealerBranding";
+import { useBrandImage } from "@/components/account/useBrandImage";
 import { DEALER_BRAND_UPDATED_EVENT, loadDealerBrand } from "@/components/account/dealerBrandAuthority";
 import { useNavigate } from "react-router-dom";
 import {
@@ -129,14 +131,13 @@ export default function DealerHero() {
     }
   }, []);
 
-  const heroBg = brand?.hero_background_url || null;
-  const dealerName = brand?.display_name_override || brand?.company_name || null;
-  const dealerLogo = heroBg
-    ? (brand?.white_logo_url || brand?.dealer_logo_url || null)
-    : (brand?.dealer_logo_url || brand?.white_logo_url || null);
-  const hasDealer = !!(dealerLogo || dealerName);
-  const hasCustomLogo = !!(brand?.dealer_logo_url || brand?.white_logo_url);
-  const hasCustomHero = !!brand?.hero_background_url;
+  const presentation = resolveDealerBrandPresentation(brand, accountId);
+  const heroBg = useBrandImage(presentation.heroBg, APPROVED_DEALER_BRANDING.hero_background_url);
+  const dealerLogo = useBrandImage(presentation.dealerLogo, APPROVED_DEALER_BRANDING.white_logo_url);
+  const dealerName = presentation.dealerName;
+  const hasDealer = true;
+  const hasCustomLogo = presentation.hasCustomLogo;
+  const hasCustomHero = presentation.hasCustomHero;
 
   const tooltipText = hoveredEl === "wordmark" ? "Sound Proof branding is fixed."
     : hoveredEl === "logo" ? (hasCustomLogo ? "Change your company logo" : "Personalise this logo with your own branding. Upload your company logo from Dealer Branding.")
