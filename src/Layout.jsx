@@ -34,6 +34,7 @@ import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUn
 import { useVersionedEngineeringAuthority } from "@/components/engineering/useVersionedEngineeringAuthority";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
+import ProjectIdentityLine from "@/components/projects/ProjectIdentityLine";
 import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
 import PriceSummary from "@/components/pricing/PriceSummary";
 import DesignRatingSummary from "@/components/pricing/DesignRatingSummary";
@@ -102,12 +103,22 @@ export default function Layout({ children, currentPageName }) {
   // source Project Images, reports and every global page read. The sidebar keeps
   // no project fetch of its own, so it cannot disagree with the rest of the app.
   const projectHydration = useCanonicalProject();
-  const activeProjectSummary = React.useMemo(() => ({
-    id: projectHydration.projectId,
-    name: projectHydration.identity?.name || null,
-    client_name: projectHydration.identity?.clientName || null,
-    active_version_id: projectHydration.identity?.activeVersionId || null,
-  }), [projectHydration.projectId, projectHydration.identity]);
+  const activeProjectSummary = React.useMemo(() => {
+    const identity = projectHydration.identity;
+    return {
+      id: projectHydration.projectId,
+      name: identity?.name || null,
+      client_name: identity?.clientName || null,
+      active_version_id: identity?.activeVersionId || null,
+      project_reference: identity?.projectReference || null,
+      dealer_name: identity?.dealerName || null,
+      // The owning account supplies a dealer name only when the project itself
+      // carries no stamped dealer name.
+      dealer_account: identity?.accountType
+        ? { name: identity?.accountName || null, account_type: identity.accountType }
+        : null,
+    };
+  }, [projectHydration.projectId, projectHydration.identity]);
 
   // The URL is only an entry point for "open this project": it sets the active
   // project id, which the shared provider then hydrates for the whole app.
@@ -400,11 +411,16 @@ export default function Layout({ children, currentPageName }) {
                       <div style={{ fontWeight: 600, fontSize: 18, color: "#213428" }}>
                         {activeProjectSummary.name || "Loading project…"}
                       </div>
-                      {activeProjectSummary.client_name && (
-                        <div style={{ fontSize: 14, color: "#625143", marginTop: 4 }}>
-                          Client: {activeProjectSummary.client_name}
-                        </div>
-                      )}
+                      <ProjectIdentityLine
+                        orientation="stacked"
+                        fontSize={14}
+                        color="#3E4349"
+                        style={{ marginTop: 6 }}
+                        client={activeProjectSummary.client_name}
+                        reference={activeProjectSummary.project_reference}
+                        dealerName={activeProjectSummary.dealer_name}
+                        account={activeProjectSummary.dealer_account}
+                      />
                     </>
                   ) : (
                     "No active project"

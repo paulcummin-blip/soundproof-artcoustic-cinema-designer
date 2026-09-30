@@ -233,6 +233,18 @@ export default function ProjectsPage() {
             }
           }
 
+          // Dealer identity: the name stamped on the project, resolved against
+          // its owning account when no name is stamped. Account reads are
+          // permission-scoped — a dealer sees only its own account, and a read
+          // failure simply leaves the dealer name unresolved.
+          let accountById = {};
+          try {
+            const accounts = await base44.entities.Account.list('-created_date', 200);
+            accountById = Object.fromEntries((accounts || []).map((a) => [a.id, a]));
+          } catch (accountErr) {
+            console.warn('[Projects] Account identity lookup failed:', accountErr);
+          }
+
           const mapped = updatedProjectList.map((rawP) => {
             try {
               // Merge with active version's design_state so the summary
@@ -247,6 +259,8 @@ export default function ProjectsPage() {
                 name: p.name || "Untitled Project",
                 client: p.client_name || "",
                 project_reference: p.project_reference || "",
+                dealer_name: rawP.dealer_name || null,
+                account: accountById[rawP.account_id] || null,
                 status: normalizeStatusId(p.project_status || "Prospective"),
                 active_version_id: rawP.active_version_id || null,
                 roomLength: p.room_length || null,
@@ -289,6 +303,8 @@ export default function ProjectsPage() {
                 id: rawP.id,
                 name: rawP.name || "Untitled Project",
                 client: rawP.client_name || "",
+                project_reference: rawP.project_reference || "",
+                dealer_name: rawP.dealer_name || null,
                 status: normalizeStatusId(rawP.project_status || "Prospective"),
                 createdAt: Date.now(),
               };
@@ -458,6 +474,8 @@ export default function ProjectsPage() {
       id: newProject.id,
       name: newProject.name || "Untitled Project",
       client: newProject.client_name || "",
+      project_reference: newProject.project_reference || "",
+      dealer_name: newProject.dealer_name || null,
       status: normalizeStatusId(newProject.project_status || "Prospective"),
       active_version_id: newProject.active_version_id || null,
       roomLength: newProject.room_length || null,
@@ -489,6 +507,7 @@ export default function ProjectsPage() {
               name: updated.name || p.name,
               client: updated.client_name || "",
               project_reference: updated.project_reference ?? p.project_reference,
+              dealer_name: updated.dealer_name ?? p.dealer_name,
               status: normalizeStatusId(updated.project_status || p.status),
               roomLength: updated.room_length ?? p.roomLength,
               roomWidth: updated.room_width ?? p.roomWidth,

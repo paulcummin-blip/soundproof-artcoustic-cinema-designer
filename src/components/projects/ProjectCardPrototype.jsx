@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { getAgeDays, formatAge } from "@/components/utils/projectAge";
 import { normalizeStatusId } from "@/components/projects/statusDefaults";
 import OpenVersionDropdown from "@/components/versions/OpenVersionDropdown";
+import ProjectIdentityLine from "@/components/projects/ProjectIdentityLine";
 
 // Refined prototype card — lighter, calmer, more architectural.
 // Only used for the "Bass Test" project to assess the design before rollout.
@@ -246,17 +247,18 @@ export default function ProjectCardPrototype({
             {p.name || "Untitled Project"}
           </div>
 
-          {/* 2. Client */}
-          <div
-            style={{
-              fontSize: 13,
-              color: BRAND.subtext,
-              marginTop: 4,
-              fontWeight: 400,
-            }}
-          >
-            Client: {p.client || "—"}
-          </div>
+          {/* 2. Client · Reference · Dealer — one identity block, same source
+              and wording as the sidebar and the Room Designer header. */}
+          <ProjectIdentityLine
+            orientation="stacked"
+            fontSize={13}
+            color={BRAND.subtext}
+            style={{ marginTop: 5 }}
+            client={p.client}
+            reference={p.project_reference}
+            dealerName={p.dealer_name}
+            account={p.account}
+          />
         </div>
 
         {/* 3. System summary */}

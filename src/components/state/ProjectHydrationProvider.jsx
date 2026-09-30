@@ -45,9 +45,33 @@ export default function ProjectHydrationProvider({ children }) {
         setProjectIdentity(activeProjectId, {
           name: project.name || null,
           clientName: project.client_name || null,
+          projectReference: project.project_reference || null,
+          // Dealer identity: the name stamped on the project at creation, and —
+          // only when that is absent — the owning account, so a real dealer
+          // account can still supply its name.
+          dealerName: project.dealer_name || null,
           accountId: project.account_id || null,
           activeVersionId: project.active_version_id || null,
         });
+
+        if (!project.dealer_name && project.account_id) {
+          try {
+            const accounts = await base44.entities.Account.filter({ id: project.account_id });
+            if (cancelled) return;
+            const account = Array.isArray(accounts) && accounts.length > 0 ? accounts[0] : null;
+            if (account) {
+              setProjectIdentity(activeProjectId, {
+                accountName: account.name || null,
+                accountType: account.account_type || null,
+              });
+            }
+          } catch (accountError) {
+            // The owning account is optional identity context: an account read
+            // this user is not permitted to make must never fail the project
+            // identity load. The stamped dealer name is still shown.
+            console.warn("[ProjectHydrationProvider] Account identity unavailable:", accountError?.message);
+          }
+        }
       } catch (error) {
         if (cancelled) return;
         failProjectHydration(

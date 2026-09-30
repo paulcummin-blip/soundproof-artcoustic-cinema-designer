@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { RotateCcw, FileText, Eye, ExternalLink, Edit2 } from "lucide-react";
 import { useProjectVersions } from "@/components/versions/useProjectVersions";
 import { VERSION_NAME_MAX_LENGTH, sanitiseVersionName } from "@/lib/versionAuthority";
+import { useCanonicalProject } from "@/components/state/projectHydrationStore";
+import ProjectIdentityLine from "@/components/projects/ProjectIdentityLine";
 
 // External resource — Artcoustic product CAD files (Dropbox folder).
 // Opens in a new tab; not a primary project action.
@@ -129,6 +131,11 @@ export default function RoomDesignerHeader({
 }) {
   const navigate = useNavigate();
 
+  // Project identity comes from the same canonical hydration source as the
+  // sidebar and every global page — the header never fetches its own copy.
+  const projectHydration = useCanonicalProject();
+  const identity = projectHydration.identity;
+
   const effectiveProjectId = activeProjectId || projectIdState || null;
 
   const handleDesignReviewClick = () => {
@@ -201,6 +208,18 @@ export default function RoomDesignerHeader({
           {autosaveStatus === "hydrating" && <span>Loading project data...</span>}
           {effectiveProjectId && (
             <VersionNameField projectId={effectiveProjectId} />
+          )}
+          {identity && (
+            <ProjectIdentityLine
+              client={identity.clientName}
+              reference={identity.projectReference}
+              dealerName={identity.dealerName}
+              account={identity.accountType
+                ? { name: identity.accountName || null, account_type: identity.accountType }
+                : null}
+              color="#3E4349"
+              fontSize={12}
+            />
           )}
           {projectIdState && (
             <span className="text-xs text-gray-400 ml-auto">ID: {projectIdState.slice(0, 12)}…</span>
