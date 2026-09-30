@@ -9,6 +9,7 @@
 // optimiser results. It only controls what the graph emphasises.
 
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
+import { formatP18FloorBoundedStatement } from "@/components/room/bass/p18SelectedTargetExplanation";
 import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 import { P14_EQ_ASSESSMENT_RANGE_HZ } from "@/components/utils/p14CapabilityAuthority";
 import { formatSeatPillLabel } from "@/components/utils/seatLabel";
@@ -161,9 +162,18 @@ function buildP18Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
 
   const lines = [];
   if (f3 != null) {
-    lines.push(`Achieved extension: ${bounded ? "≤" : ""}${Math.floor(f3)} Hz${bounded ? " (bounded by product validity floor)" : ""}`);
+    // The result is the calculated -3 dB point. Never a comparator: floor-bounded
+    // results carry their meaning on the separate detail line below.
+    lines.push(`Achieved extension: ${Math.floor(f3)} Hz`);
     lines.push(`Reference: ${refBandLabel}, -3 dB cutoff`);
     lines.push(`Frequencies below ${Math.floor(f3)} Hz fall outside the assessed extension`);
+    if (bounded) {
+      const floorHz = finite(rp22GraphMarkers?.p18Explanation?.floorHz)
+        ? Number(rp22GraphMarkers.p18Explanation.floorHz)
+        : Math.floor(f3);
+      const statement = formatP18FloorBoundedStatement(floorHz);
+      if (statement) lines.push(statement);
+    }
   } else {
     lines.push("P18 extension not achieved at the selected operating point");
   }
@@ -182,7 +192,7 @@ function buildP18Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
       strokeDasharray: "3 4",
       ifOverflow: "extendDomain",
       label: {
-        value: `P18 extension · ≤${Math.floor(f3)} Hz`,
+        value: `P18 extension · ${Math.floor(f3)} Hz`,
         position: "insideTop",
         fill: "#2563EB",
         fontSize: 10,

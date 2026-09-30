@@ -36,7 +36,7 @@ import {
 import { formatP14RecommendedDetail, formatP14TargetBasisDetail, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { buildBassTargetViews } from "@/components/room/bass/bassTargetViews";
 import { assessP18Extension, formatP18TargetBasisDetail, normalizeP18TargetBasis } from "@/components/utils/p18ExtensionAuthority";
-import { deriveP18SelectedTargetExplanation } from "@/components/room/bass/p18SelectedTargetExplanation";
+import { deriveP18SelectedTargetExplanation, P18_SELECTED_TARGET_SCHEMA_VERSION } from "@/components/room/bass/p18SelectedTargetExplanation";
 import { isCanonicalP19Ready } from "@/components/room/bass/p19Readiness";
 
 // ---------------------------------------------------------------------------
@@ -545,9 +545,13 @@ export function adaptCurrentBassOptimisationResult({
       || authorityP18?.achievedExtensionBounded === true,
     // Selected-target explanation (display only). Derived from the branch fields
     // the P18 authority already computed — no physics, no grading, no value change.
+    // The schema stamp lets a stored contract declare whether it carries the
+    // explanation at all, so an older contract is refreshed instead of silently
+    // presenting an unexplained P18 result.
     p18SelectedTarget: deriveP18SelectedTargetExplanation(
       authorityP18?.authority || selectedCandidate?.p18AchievedAuthority || authorityP18 || null,
     ),
+    p18SelectedTargetSchemaVersion: P18_SELECTED_TARGET_SCHEMA_VERSION,
   };
 
   // P19 — publish only from the official assessment of the finished canonical

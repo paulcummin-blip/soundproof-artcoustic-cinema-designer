@@ -14,6 +14,7 @@ import { base44 } from "@/api/base44Client";
 import { COMPLETED_BASS_CACHE_VERSION, INSTANCE_AUTHORITY_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
 import { isAuthoritativeBassContract, isStructurallyCompleteBassContract, hasCanonicalSeatMetricAuthority, validateAssessmentEnvelopeAuthority } from "./completedBassResultPersistence";
 import { validateCanonicalBassResult } from "./canonicalBassResult";
+import { hasP18SelectedTargetSchema } from "./p18SelectedTargetExplanation";
 import { hasGraphPayload } from "./finishedGraphAdapter";
 import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
@@ -91,6 +92,24 @@ export function getRestoreLock(projectId, versionId) {
  * Returns null if the cache doesn't match the current base design or the
  * target hasn't been cached yet.
  */
+/**
+ * AUTHORITATIVE target readiness: structurally complete + graph payload + P19
+ * ready + the current P18 selected-target presentation schema.
+ *
+ * The P18 presentation schema is part of the result schema: a contract stored
+ * before the selected-target explanation existed cannot state which LFE output
+ * target the extension was measured at, which branch limited it, or whether it
+ * is floor-bounded. Treating it as not-ready refreshes exactly that target
+ * through the existing engine. Physics, grading and published values are
+ * untouched — only the P18 presentation/result schema is invalidated.
+ */
+function isReadyTargetEntry(entry) {
+  return isAuthoritativeBassContract(entry)
+    && hasGraphPayload(entry)
+    && hasReadyCanonicalP19Contract(entry)
+    && hasP18SelectedTargetSchema(entry);
+}
+
 export function getTargetCacheEntry(projectId, versionId, baseDesignFingerprint, targetKey) {
   if (!baseDesignFingerprint || !targetKey) return null;
   const cache = ensureCache(projectId, versionId);
@@ -98,8 +117,8 @@ export function getTargetCacheEntry(projectId, versionId, baseDesignFingerprint,
   if (cache.baseDesignFingerprint !== baseDesignFingerprint) return null;
   const entry = cache.targets[targetKey];
   if (!entry) return null;
-  // AUTHORITATIVE: structurally complete + graph payload + P19 ready
-  if (isAuthoritativeBassContract(entry) && hasGraphPayload(entry) && hasReadyCanonicalP19Contract(entry)) {
+  // AUTHORITATIVE: structurally complete + graph payload + P19 ready + P18 explanation schema
+  if (isReadyTargetEntry(entry)) {
     return entry;
   }
   // LIMITED: a valid capability-limited P14 contract (terminal, no P19)
@@ -155,7 +174,7 @@ export function getTargetCacheProgress(projectId, versionId, baseDesignFingerpri
   keys.forEach((key) => {
     const entry = cache.targets[key];
     if (!entry) return;
-    const isAuthoritative = isAuthoritativeBassContract(entry) && hasGraphPayload(entry) && hasReadyCanonicalP19Contract(entry);
+    const isAuthoritative = isReadyTargetEntry(entry);
     const isLimited = isValidLimitedP14Contract(entry);
     if (isAuthoritative) {
       readyTargetKeys.push(key);
@@ -281,7 +300,7 @@ export function clearTargetCacheForDesign(projectId, versionId, baseDesignFinger
 function countPreparedTargetBankEntries(targets) {
   let count = 0;
   for (const [, entry] of Object.entries(targets || {})) {
-    const isAuth = isAuthoritativeBassContract(entry) && hasGraphPayload(entry) && hasReadyCanonicalP19Contract(entry);
+    const isAuth = isReadyTargetEntry(entry);
     const isLim = isValidLimitedP14Contract(entry);
     if (isAuth || isLim) count += 1;
   }

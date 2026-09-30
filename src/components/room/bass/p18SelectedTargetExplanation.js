@@ -42,6 +42,28 @@ export const P18_CRITERION_STATEMENT =
 export const P18_TARGET_LINK_STATEMENT =
   "Calculated at the selected P14 LFE output target.";
 
+// Presentation-only schema of the derived explanation. Stamped onto every new
+// contract so a stored result can state whether it carries the selected-target
+// explanation at all. A stored contract without this stamp predates the
+// explanation and is refreshed by the existing engine (see p14TargetCache).
+export const P18_SELECTED_TARGET_SCHEMA_VERSION = 1;
+
+/**
+ * Floor-bounded detail statement. Plain language, no comparator: the headline
+ * still states the calculated -3 dB point, this sentence carries the caveat.
+ */
+export function formatP18FloorBoundedStatement(floorHz) {
+  if (!finite(floorHz)) return null;
+  return `The response remains above the -3 dB criterion at the ${Math.round(Number(floorHz))} Hz `
+    + "product-validity floor, so the exact crossing lies below the validated calculation range.";
+}
+
+/** True when a stored contract carries the current explanation schema stamp. */
+export function hasP18SelectedTargetSchema(contract) {
+  return contract?.productAnalysis?.parameters?.p18?.p18SelectedTargetSchemaVersion
+    === P18_SELECTED_TARGET_SCHEMA_VERSION;
+}
+
 // Two branches within half a hertz of each other limit the result together.
 const BINDING_EQUALITY_HZ = 0.5;
 
@@ -171,8 +193,17 @@ export function formatP18TargetExplanationDetail(explanation, basisLabel = null)
   parts.push(P18_CRITERION_STATEMENT);
   const target = targetPhrase(explanation);
   if (target) parts.push(`${P18_TARGET_LINK_STATEMENT} (${target})`);
-  const phrase = BINDING_PHRASE[explanation.bindingBasis];
+  // Floor-bounded results carry the full caveat sentence instead of the short
+  // binding phrase, so the 22 Hz validity-floor plateau is explained in the
+  // detail line while the headline stays the plain calculated point.
+  const floorBounded = explanation.criterionMode === P18_CRITERION_MODE.FLOOR_BOUNDED
+    && finite(explanation.floorHz);
+  const phrase = floorBounded ? null : BINDING_PHRASE[explanation.bindingBasis];
   if (phrase) parts.push(phrase);
+  if (floorBounded) {
+    const statement = formatP18FloorBoundedStatement(explanation.floorHz);
+    if (statement) parts.push(statement);
+  }
   const responseHz = hz(explanation.responseTargetF3Hz);
   if (responseHz && explanation.bindingBasis !== P18_BINDING_BASIS.RESPONSE) {
     parts.push(`response reaches ${responseHz}`);

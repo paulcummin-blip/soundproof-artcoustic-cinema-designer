@@ -218,6 +218,10 @@ export default function RP22CompliancePanel({
   const p12Mode = engineeringSummary?.roomResultsByParameter?.[12]?.targetBasis || "minimum";
   const p13Mode = engineeringSummary?.roomResultsByParameter?.[13]?.targetBasis || "minimum";
   const p14Mode = engineeringSummary?.roomResultsByParameter?.[14]?.targetBasis || "minimum";
+  // P18 thresholds are basis-aware: the same p18ThresholdsForBasis authority the
+  // engine grades with. Omitting this mode would present the Minimum row for a
+  // Recommended-basis design.
+  const p18Mode = engineeringSummary?.roomResultsByParameter?.[18]?.targetBasis || "minimum";
 
   // RP23 range (50–65°)
   const rp23 = React.useMemo(() => {
@@ -321,7 +325,7 @@ export default function RP22CompliancePanel({
     const achievedValue = getHudValueForParam(p);
     const isSeatScope = String(p.scope || "").toLowerCase() === "seat";
     const resolvedParam = (p.id === 12 || p.id === 13 || p.id === 14)
-      ? { ...p, thresholds: resolveParamThresholds(p, p12Mode, p13Mode, p14Mode) }
+      ? { ...p, thresholds: resolveParamThresholds(p, p12Mode, p13Mode, p14Mode, p18Mode) }
       : p;
     const targetBasisNote =
       engineeringSummary?.roomResultsByParameter?.[p.id]?.targetBasisNote

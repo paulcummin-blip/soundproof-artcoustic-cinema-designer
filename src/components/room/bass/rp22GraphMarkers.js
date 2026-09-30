@@ -63,9 +63,11 @@ export function buildRp22GraphMarkers(finalBassResponse, selectedSeatId = null) 
   }
 
   // P18 bounded flag: when the response is still above the -3 dB cutoff at the
-  // product validity floor, the extension is bounded (≤ floor), not a measured
-  // crossing. The marker sits on the bound — not a fake exact point below valid
-  // product data. The authority payload retains the precise crossing when exact.
+  // product validity floor, the published point is the lowest valid frequency,
+  // not a measured crossing. The marker sits on that point — never a fake exact
+  // crossing below valid product data. Floor-bounded meaning is carried in the
+  // detail line, never as a comparator beside the result. The authority payload
+  // retains the precise crossing when it is exact.
   const p18Bounded = seatVariation?.p18?.authority?.achievedExtensionBounded === true
     || seatVariation?.p18?.achievedExtensionBounded === true;
 
