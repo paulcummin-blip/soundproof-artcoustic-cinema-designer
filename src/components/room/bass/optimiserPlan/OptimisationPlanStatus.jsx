@@ -250,10 +250,10 @@ export default function OptimisationPlanStatus({
       )}
 
       {view.baseline && (
-        <div className="mt-2 rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2">
-          <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">BASELINE (AS FOUND)</div>
+        <details className="mt-2 rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2">
+          <summary className="cursor-pointer text-[10px] font-semibold tracking-wide text-[#3E4349]">Current design details</summary>
           <ResultRows result={view.baseline} />
-        </div>
+        </details>
       )}
 
       {isStale && view.staleReason && (
@@ -293,10 +293,7 @@ export default function OptimisationPlanStatus({
             </div>
 
             {lever.evidenceLabel && (
-              <div className="mt-1 text-[10px] text-[#8B7F76]">
-                {lever.evidenceLabel}
-                {lever.sourceCandidateId ? ` · ${lever.sourceCandidateId}` : ""}
-              </div>
+              <div className="mt-1 text-[10px] text-[#8B7F76]">{lever.evidenceLabel}</div>
             )}
 
             {lever.notEvaluated && lever.notEvaluatedReason && (
@@ -349,8 +346,8 @@ export default function OptimisationPlanStatus({
       <LeverOutcome outcome={leverOutcome} />
 
       {view.combined && (
-        <div className="mt-2.5 rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2">
-          <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">COMBINED CANDIDATE</div>
+        <details className="mt-2.5 rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2">
+          <summary className="cursor-pointer text-[10px] font-semibold tracking-wide text-[#3E4349]">Combined candidate details</summary>
           {view.combined.candidateId && (
             <div className="mt-0.5 text-[10px] text-[#8B7F76]">
               {view.combined.candidateId}
@@ -373,12 +370,13 @@ export default function OptimisationPlanStatus({
           {view.combinedTradeOff?.reason && (
             <div className="mt-1 text-[11px] text-[#8A5A2B]">Trade-off: {view.combinedTradeOff.reason}</div>
           )}
-        </div>
+        </details>
       )}
 
-      {/* The families this plan cannot carry a result for — stated, never omitted. */}
-      <div className="mt-2.5 rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2">
-        <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">OTHER LEVERS CONSIDERED</div>
+      {/* The families this plan cannot carry a result for — stated, never omitted,
+          but kept out of the client-facing default view. */}
+      <details className="mt-2.5 rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2">
+        <summary className="cursor-pointer text-[10px] font-semibold tracking-wide text-[#3E4349]">Other options tested</summary>
         <div className="mt-1 space-y-0.5 text-[11px] leading-relaxed">
           {!view.levers.some((lever) => lever.key === OPTIMISER_LEVER.PLACEMENT) && (
             <div>
@@ -395,14 +393,17 @@ export default function OptimisationPlanStatus({
             </div>
           ))}
         </div>
-      </div>
+      </details>
 
       {view.notes.length > 0 && (
-        <div className="mt-2 space-y-0.5">
+        <details className="mt-2">
+          <summary className="cursor-pointer text-[10px] text-[#8B7F76]">Plan notes</summary>
+          <div className="mt-1 space-y-0.5">
           {view.notes.map((note) => (
             <div key={note} className="text-[10px] text-[#8B7F76]">{note}</div>
           ))}
-        </div>
+          </div>
+        </details>
       )}
     </div>
   );
