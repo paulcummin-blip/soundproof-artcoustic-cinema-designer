@@ -191,6 +191,16 @@ export default function OptimiserRunEvidenceBlock({ evidence = null, className =
         )}
       </div>
 
+      {evidence.candidatesEvaluated > 0 && (
+        <div className="mt-1.5 text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
+          ADI completed {evidence.candidatesEvaluated} confirmed design calculations
+          {evidence.candidatesEvaluatedBasis === "stage-confirmed-max"
+            ? " across the searched stages"
+            : ""}
+          .
+        </div>
+      )}
+
       {baselineFailed && (
         <div className="mt-1.5 text-[11px] text-[#8A5A2B] leading-relaxed">
           The current design could not be validated, so no candidate could be compared against it.

@@ -29,6 +29,7 @@ import {
 import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
 import OptimisationPlanStatus from "./OptimisationPlanStatus.jsx";
 import OptimiserRunEvidenceBlock from "./OptimiserRunEvidenceBlock.jsx";
+import OptimiserCalculationEstimateLine from "./OptimiserCalculationEstimateLine.jsx";
 
 const STATE_THEME = {
   [ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED]: {
@@ -152,6 +153,13 @@ export default function AdiOptimisationJourney({
   const showBlocked = !!journey.blockReason && !isRunning;
   const statusMessage = runStatus === "failed" && runError ? runError : journey.blockReason?.message;
 
+  // Before the run, the card states how many design calculations ADI will run.
+  // After the run, the actual confirmed count is stated instead (run evidence),
+  // so an estimate is never shown alongside real evidence.
+  const isPreRun = journey.state === ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED
+    || journey.state === ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED;
+  const showEstimate = isPreRun && !runEvidence;
+
   return (
     <div
       className={`rounded-lg border px-4 py-3 space-y-3 ${className}`}
@@ -176,6 +184,14 @@ export default function AdiOptimisationJourney({
       <div className="text-[13px] font-semibold text-[#1B1A1A] leading-relaxed">
         {journey.message}
       </div>
+
+      {/* How many design calculations ADI will run for this design. */}
+      {showEstimate && (
+        <OptimiserCalculationEstimateLine
+          instances={instances}
+          className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2"
+        />
+      )}
 
       {/* Why it matters — the ADI diagnosis behind the limitation */}
       {(assessment || why) && (

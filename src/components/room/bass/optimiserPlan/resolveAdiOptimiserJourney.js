@@ -71,14 +71,28 @@ export const ADI_OPTIMISER_COPY = Object.freeze({
   PLAN_AVAILABLE:
     "Sound Proof has evaluated the available improvement options for this design.",
   RUN_EXPLANATION:
-    "This will test delay, gain, polarity and placement options against the current design and show the predicted P20 benefit, P19 effect and any output/headroom trade-off.",
+    "ADI analyses the current subwoofer system to find practical ways to improve bass consistency across the seats. "
+    + "It checks electronic adjustments first — delay, gain, phase and polarity — because these can often improve "
+    + "the result without moving equipment. If electronic changes are not enough, ADI then assesses physical "
+    + "options such as subwoofer placement, alternative layouts, different subwoofer capability, and seating changes.",
   LEVER_EXPLANATION:
     "Sound Proof will evaluate each lever from the current design so it can separate individual effects from combined effects.",
   ELECTRONIC_FIRST:
     "Sound Proof will test electronic changes first because they are lower disruption than moving subwoofers or seats.",
   PHYSICAL_LAST:
     "Physical movement is only recommended when electronic changes cannot solve the seat-to-seat problem.",
-  WILL_EVALUATE: "Will evaluate: delay · gain · polarity · placement",
+  /** The commercial weight of the exercise, stated without over-claiming. */
+  SYSTEMATIC_NOTE:
+    "This is the kind of systematic optimisation that is difficult to do manually. ADI compares the options "
+    + "against the current design and looks for improvements to P20 seat-to-seat consistency while protecting "
+    + "P19 reference-seat smoothness, LFE output capability and available headroom.",
+  /** 80–150 Hz is inside the crossover region, not outside bass optimisation. */
+  PHASE_BAND_NOTE:
+    "Problems between 80 Hz and 150 Hz sit inside the crossover region, so they are treated as part of bass "
+    + "optimisation rather than as something placement alone has to solve.",
+  WILL_EVALUATE:
+    "Levers are checked least intrusive first: delay · gain · phase/crossover-region alignment · polarity · "
+    + "placement · alternative layouts · subwoofer option · seating.",
   WILL_COMPARE:
     "Will compare: individual lever benefit · combined benefit · P19 impact · output/headroom trade-off · worst seat and limiting frequency",
 });
@@ -291,9 +305,8 @@ export function resolveAdiOptimiserJourney({
     explanation: ADI_OPTIMISER_COPY.RUN_EXPLANATION,
     notes: [
       ADI_OPTIMISER_COPY.WILL_EVALUATE,
-      ADI_OPTIMISER_COPY.WILL_COMPARE,
-      ADI_OPTIMISER_COPY.ELECTRONIC_FIRST,
-      ADI_OPTIMISER_COPY.PHYSICAL_LAST,
+      ADI_OPTIMISER_COPY.SYSTEMATIC_NOTE,
+      ADI_OPTIMISER_COPY.PHASE_BAND_NOTE,
     ],
     action: ADI_OPTIMISER_ACTION.RUN,
   });
