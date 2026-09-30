@@ -81,7 +81,11 @@ export const ADI_OPTIMISER_COPY = Object.freeze({
     "Sound Proof will test electronic changes first because they are lower disruption than moving subwoofers or seats.",
   PHYSICAL_LAST:
     "Physical movement is only recommended when electronic changes cannot solve the seat-to-seat problem.",
-  /** The commercial weight of the exercise, stated without over-claiming. */
+  /**
+   * Long-form technical statements, retained as the technical detail that sits
+   * behind the pre-run disclosure. They are never rendered in the default
+   * pre-run card, which carries the count and the short summary only.
+   */
   SYSTEMATIC_NOTE:
     "This is the kind of systematic optimisation that is difficult to do manually. ADI compares the options "
     + "against the current design and looks for improvements to P20 seat-to-seat consistency while protecting "
@@ -95,6 +99,18 @@ export const ADI_OPTIMISER_COPY = Object.freeze({
     + "placement · alternative layouts · subwoofer option · seating.",
   WILL_COMPARE:
     "Will compare: individual lever benefit · combined benefit · P19 impact · output/headroom trade-off · worst seat and limiting frequency",
+  /** The short pre-run summary shown under the calculation count. */
+  PRE_RUN_SUMMARY:
+    "It checks delay, gain, phase and polarity before suggesting physical changes such as moving "
+    + "subwoofers or seats.",
+  /** The collapsed disclosure's title. */
+  DISCLOSURE_TITLE: "What ADI will test",
+  /** Label above the per-family estimate inside the disclosure. */
+  DISCLOSURE_ESTIMATE_LABEL: "Estimated calculations:",
+  /** What ADI compares every option against, stated inside the disclosure. */
+  DISCLOSURE_COMPARISON:
+    "ADI compares each option against the current design, looking for P20 improvement while protecting "
+    + "P19, LFE output and headroom.",
 });
 
 /**
@@ -293,8 +309,11 @@ export function resolveAdiOptimiserJourney({
   if (status === OPTIMISER_PLAN_STATUS.STALE) {
     return build(ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED, {
       message: withLead(ADI_OPTIMISER_COPY.STALE),
-      explanation: ADI_OPTIMISER_COPY.RUN_EXPLANATION,
-      notes: [ADI_OPTIMISER_COPY.WILL_EVALUATE, ADI_OPTIMISER_COPY.WILL_COMPARE],
+      // The pre-run card stays short and confident: the count and the
+      // electronic-first summary carry it, and the technical detail lives
+      // behind the disclosure.
+      explanation: null,
+      notes: [],
       action: ADI_OPTIMISER_ACTION.RERUN,
     });
   }
@@ -302,12 +321,10 @@ export function resolveAdiOptimiserJourney({
   // ── 1. No evaluated optimiser plan saved for this design ──
   return build(ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED, {
     message: withLead(ADI_OPTIMISER_COPY.NO_PLAN),
-    explanation: ADI_OPTIMISER_COPY.RUN_EXPLANATION,
-    notes: [
-      ADI_OPTIMISER_COPY.WILL_EVALUATE,
-      ADI_OPTIMISER_COPY.SYSTEMATIC_NOTE,
-      ADI_OPTIMISER_COPY.PHASE_BAND_NOTE,
-    ],
+    // Short and confident: the visible card is the count, the electronic-first
+    // summary and the button. Every technical detail is behind the disclosure.
+    explanation: null,
+    notes: [],
     action: ADI_OPTIMISER_ACTION.RUN,
   });
 }

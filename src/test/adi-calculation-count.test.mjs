@@ -54,7 +54,7 @@ describe('PRE-RUN ESTIMATED COUNT SHOWN', () => {
     expect(estimate.available).toBe(true);
     expect(estimate.total).toBeGreaterThan(100);
     expect(estimateSentence(estimate)).toBe(
-      `ADI will run approximately ${formatCalculationCount(estimate.total)} design calculations for this room.`,
+      `ADI will run approximately ${formatCalculationCount(estimate.total)} design calculations to improve bass consistency across the seats.`,
     );
   });
 
@@ -69,12 +69,13 @@ describe('PRE-RUN ESTIMATED COUNT SHOWN', () => {
 
     expect(estimate.available).toBe(false);
     expect(estimate.total).toBeNull();
-    expect(estimateSentence(estimate)).toBe('ADI will run a detailed optimisation sequence for this room.');
+    expect(estimateSentence(estimate))
+      .toBe('ADI will run a detailed optimisation sequence to improve bass consistency across the seats.');
   });
 
   it('states a detailed set below one hundred calculations', () => {
     expect(estimateSentence({ available: true, total: 42 }))
-      .toBe('ADI will run a detailed set of design calculations for this room.');
+      .toBe('ADI will run a detailed set of design calculations to improve bass consistency across the seats.');
   });
 });
 

@@ -160,10 +160,10 @@ export function formatCalculationCount(value) {
  */
 export function estimateSentence(estimate) {
   if (!estimate?.available || !(estimate.total > 0)) {
-    return "ADI will run a detailed optimisation sequence for this room.";
+    return "ADI will run a detailed optimisation sequence to improve bass consistency across the seats.";
   }
   if (estimate.total < 100) {
-    return "ADI will run a detailed set of design calculations for this room.";
+    return "ADI will run a detailed set of design calculations to improve bass consistency across the seats.";
   }
-  return `ADI will run approximately ${formatCalculationCount(estimate.total)} design calculations for this room.`;
+  return `ADI will run approximately ${formatCalculationCount(estimate.total)} design calculations to improve bass consistency across the seats.`;
 }

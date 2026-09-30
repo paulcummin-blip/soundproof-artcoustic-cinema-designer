@@ -30,6 +30,7 @@ import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationStat
 import OptimisationPlanStatus from "./OptimisationPlanStatus.jsx";
 import OptimiserRunEvidenceBlock from "./OptimiserRunEvidenceBlock.jsx";
 import OptimiserCalculationEstimateLine from "./OptimiserCalculationEstimateLine.jsx";
+import OptimiserCalculationDetail from "./OptimiserCalculationDetail.jsx";
 
 const STATE_THEME = {
   [ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED]: {
@@ -243,13 +244,18 @@ export default function AdiOptimisationJourney({
         <button
           type="button"
           onClick={onRunOptimisationPlan}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#3E4349]"
+          className="inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349]"
         >
           <Sparkles className="h-3.5 w-3.5" />
           {journey.actionLabel}
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
       )}
+
+      {/* Collapsed by default, and below the primary action. Every technical
+          detail — lever order, per-family counts, comparison and method — lives
+          here, never in the default card. */}
+      {showEstimate && <OptimiserCalculationDetail instances={instances} />}
 
       {/* Why the optimiser cannot run yet — always paired with the next step */}
       {showBlocked && (

@@ -78,8 +78,11 @@ describe("ADI optimiser journey — states", () => {
     expect(journey.action).toBe(ADI_OPTIMISER_ACTION.RUN);
     expect(journey.actionLabel).toBe("Run Optimisation Plan");
     expect(journey.message).toContain(LIMITING);
-    expect(journey.explanation).toBeTruthy();
-    expect(journey.notes.length).toBeGreaterThan(0);
+    // The pre-run card is deliberately short and sales-friendly: the calculation
+    // count and the electronic-first summary carry it, and every technical
+    // detail sits behind the collapsed disclosure instead of the default view.
+    expect(journey.explanation).toBeNull();
+    expect(journey.notes).toEqual([]);
   });
 
   test("saved plan from an earlier design → Re-evaluation required, offers Re-run", () => {

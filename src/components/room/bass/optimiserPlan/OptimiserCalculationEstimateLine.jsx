@@ -1,19 +1,18 @@
 // OptimiserCalculationEstimateLine.jsx
 // ---------------------------------------------------------------------------
-// The pre-run estimate line: how many design calculations ADI will run for this
-// design, stated from the optimiser's own declared search space.
+// The default pre-run message: the selling point, in two short lines.
 //
-// Read-only presentation. It renders the estimate sentence, the per-family
-// basis behind it, and the honest note that the figures are estimated from the
-// search space rather than measured. No calculation of the design is performed.
+//   1. how many design calculations ADI will run for this design
+//   2. what it checks before it suggests moving anything
+//
+// The per-family counts, the honesty notes and the lever order are technical
+// detail and belong in the disclosure (OptimiserCalculationDetail), not here.
+// Read-only presentation — no calculation of the design is performed.
 // ---------------------------------------------------------------------------
 
 import React from "react";
-import {
-  estimateOptimiserCalculations,
-  estimateSentence,
-  formatCalculationCount,
-} from "./optimiserCalculationEstimate.js";
+import { estimateOptimiserCalculations, estimateSentence } from "./optimiserCalculationEstimate.js";
+import { ADI_OPTIMISER_COPY } from "./resolveAdiOptimiserJourney.js";
 
 export default function OptimiserCalculationEstimateLine({ instances = [], className = "" }) {
   const estimate = estimateOptimiserCalculations({ instances });
@@ -22,19 +21,8 @@ export default function OptimiserCalculationEstimateLine({ instances = [], class
   return (
     <div className={className} data-adi-calculation-estimate={estimate.available ? "estimated" : "unavailable"}>
       <div className="text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">{sentence}</div>
-
-      {estimate.available && estimate.families.length > 0 && (
-        <div className="mt-0.5 text-[10px] text-[#8B7F76] leading-relaxed">
-          {estimate.families
-            .map((family) => `${family.label} ${formatCalculationCount(family.count)}`)
-            .join(" · ")}
-        </div>
-      )}
-
-      <div className="mt-0.5 text-[10px] text-[#8B7F76] leading-relaxed">
-        {estimate.available
-          ? `${estimate.basisNote} ${estimate.scopeNote}`
-          : `${estimate.reason} ${estimate.scopeNote}`}
+      <div className="mt-1 text-[11px] text-[#3E4349] leading-relaxed">
+        {ADI_OPTIMISER_COPY.PRE_RUN_SUMMARY}
       </div>
     </div>
   );
