@@ -618,4 +618,12 @@ describe('TEST 9: the card receives the run evidence', () => {
     expect(block).toMatch(/<summary[^>]*>Engineer details<\/summary>/);
     expect(block).toContain('No safe improvement was confirmed for this design.');
   });
+
+  it('keeps plan engineering detail out of the default result view', () => {
+    const status = read('components/room/bass/optimiserPlan/OptimisationPlanStatus.jsx');
+    expect(status).toContain('Current design details');
+    expect(status).toContain('Combined candidate details');
+    expect(status).toContain('Other options tested');
+    expect(status).not.toMatch(/\{lever\.sourceCandidateId \? ` · \$\{lever\.sourceCandidateId\}`/);
+  });
 });
