@@ -158,6 +158,23 @@ export function resolveOptimiserPresentationState({
     });
   }
 
+  // ── EVALUATION_INCOMPLETE (terminal) ── the run finished without a usable
+  // comparison. The saved reason is stated as recorded, never re-worded into a
+  // design conclusion, and the evidence the run produced is shown with a re-run.
+  if (status === OPTIMISER_PLAN_STATUS.INCOMPLETE) {
+    const recorded = Array.isArray(evidence?.rejectionReasons)
+      ? evidence.rejectionReasons.find((reason) => typeof reason === "string" && reason)
+      : null;
+    return build(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE, {
+      message: recorded || OPTIMISER_PRESENTATION_COPY.INCOMPLETE,
+      explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
+      evidence,
+      action: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      showApply: false,
+    });
+  }
+
   // ── PLAN_AVAILABLE ── only a genuinely evaluated, visible, applicable change.
   if (hasApplicableEvaluatedLever(planView)) {
     return build(OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE, {

@@ -88,6 +88,12 @@ export const OPTIMISER_PLAN_STATUS = Object.freeze({
   NO_USEFUL_IMPROVEMENT: "no_useful_improvement",
   /** The run itself failed. A technical failure, never a design statement. */
   FAILED: "failed",
+  /**
+   * The run finished without a usable comparison — most often because the
+   * current baseline itself could not be validated. The evidence is kept and
+   * stated as incomplete; nothing is offered for application.
+   */
+  INCOMPLETE: "incomplete",
 });
 
 /**

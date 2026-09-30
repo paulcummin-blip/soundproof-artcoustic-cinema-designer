@@ -125,7 +125,11 @@ export function resolveOptimiserPlanStatus({
       ? OPTIMISER_PLAN_STATUS.FAILED
       : terminalOutcome === OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT
         ? OPTIMISER_PLAN_STATUS.NO_USEFUL_IMPROVEMENT
-        : OPTIMISER_PLAN_STATUS.ABSENT;
+        : terminalOutcome === OPTIMISER_TERMINAL_OUTCOME.EVALUATION_INCOMPLETE
+          // An incomplete run is a first-class state, not an absent one: its
+          // evidence (and the reason it is incomplete) survives refresh/reopen.
+          ? OPTIMISER_PLAN_STATUS.INCOMPLETE
+          : OPTIMISER_PLAN_STATUS.ABSENT;
     return {
       status: terminalStatus,
       evidenceMessage: null,

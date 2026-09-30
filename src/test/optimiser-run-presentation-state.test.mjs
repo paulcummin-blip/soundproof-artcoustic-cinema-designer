@@ -51,10 +51,28 @@ const MARQUEE_RUN = {
   },
   diagnostics: {
     stages: [
-      { name: 'Placement', candidatesEvaluated: { confirmed: 9 }, significance: 'none' },
-      { name: 'Polarity', candidatesEvaluated: { confirmed: 0 }, significance: 'none' },
-      { name: 'Delay', candidatesEvaluated: { confirmed: 4 }, significance: 'none' },
-      { name: 'Gain', candidatesEvaluated: { confirmed: 4 }, significance: 'none' },
+      {
+        name: 'Placement',
+        candidatesEvaluated: { generated: 40, screened: 20, promotedToV2: 9, confirmed: 9 },
+        significance: 'none',
+        bestScoreAfter: { p19VariationDb: 4.1, p20VariationDb: 10.34, p20Level: 'L1' },
+        winningCandidate: { candidateId: 'stage2-provisional-1' },
+      },
+      { name: 'Polarity', candidatesEvaluated: { proxySearches: 12 }, significance: 'none' },
+      {
+        name: 'Delay',
+        candidatesEvaluated: { coarse: 6, fine: 4, retained: 4, confirmed: 4 },
+        significance: 'none',
+        bestScoreAfter: { p19VariationDb: 4.4, p20VariationDb: 11.02, p20Level: 'L1' },
+        winningCandidate: { candidateId: 'delay-candidate-1' },
+      },
+      {
+        name: 'Gain',
+        candidatesEvaluated: { coarse: 5, fine: 3, retained: 3, confirmed: 3 },
+        significance: 'none',
+        bestScoreAfter: { p19VariationDb: 4.6, p20VariationDb: 11.4, p20Level: 'L1' },
+        winningCandidate: { candidateId: 'gain-candidate-1' },
+      },
       { name: 'Phase', candidatesEvaluated: { confirmed: 0 }, significance: 'none' },
       { name: 'Final EQ', candidatesEvaluated: { confirmed: 17 }, significance: 'none' },
     ],
@@ -156,11 +174,39 @@ describe('TEST 2: completed run with no credible winner', () => {
 
     const evidence = state.evidence;
     expect(evidence).toBeTruthy();
-    expect(evidence.candidatesEvaluated).toBe(34);
+    // Honest count: the stage funnel counters overlap, so the headline is the
+    // number of confirmed candidates — never the sum of those counters.
+    expect(evidence.candidatesEvaluated).toBe(17);
+    expect(evidence.candidatesEvaluatedBasis).toBe('stage-confirmed-max');
     expect(evidence.resultsRetained).toBe(0);
+    // The canonical current P20, not a defaulted 0.00 dB.
+    expect(evidence.current.p20VariationDb).toBe(12.24);
+    expect(evidence.current.p20Source).toBe('canonical');
     expect(evidence.leversTested.map((lever) => lever.lever)).toContain(OPTIMISER_LEVER.PLACEMENT);
     expect(evidence.leversTested.map((lever) => lever.lever)).toContain(OPTIMISER_LEVER.DELAY);
     expect(evidence.leversTested.map((lever) => lever.lever)).toContain(OPTIMISER_LEVER.GAIN);
+
+    // Every family the optimiser can search is stated, with its best attempt.
+    const byFamily = Object.fromEntries(evidence.families.map((family) => [family.family, family]));
+    expect(Object.keys(byFamily)).toEqual([
+      'placement', 'delay', 'gain', 'polarity', 'combined', 'additional_positions', 'seat_movement',
+    ]);
+    expect(byFamily.placement.status).toBe('rejected');
+    expect(byFamily.placement.bestAttempt.p20VariationDb).toBe(10.34);
+    expect(byFamily.placement.bestAttempt.p20DeltaDb).toBe(-1.9);
+    expect(byFamily.placement.reason).toBeTruthy();
+    expect(byFamily.delay.bestAttempt.p20VariationDb).toBe(11.02);
+    expect(byFamily.gain.bestAttempt.p20VariationDb).toBe(11.4);
+    expect(byFamily.polarity.status).toBe('not_tested_separately');
+    expect(byFamily.polarity.reason).toMatch(/polarity-only evaluation/);
+    expect(byFamily.additional_positions.status).toBe('not_tested');
+    expect(byFamily.additional_positions.reason).toBeTruthy();
+    expect(byFamily.seat_movement.status).toBe('not_tested');
+    expect(evidence.families.every((family) => family.applicable === false && family.accepted === false)).toBe(true);
+
+    // Stage counters are reported as operations, never summed into a total.
+    expect(evidence.stageOperations.length).toBeGreaterThan(0);
+    expect(evidence.stageOperationsNote).toMatch(/never added together/);
     expect(evidence.bestAttempted.p20VariationDb).toBe(10.34);
     expect(evidence.bestAttempted.validationPassed).toBe(false);
     expect(evidence.bestAttempted.acceptedForApply).toBe(false);
@@ -205,11 +251,19 @@ describe('TEST 3: incomplete or unsaved run', () => {
 
   it('resolves an incomplete terminal run record to Evaluation incomplete with its evidence', () => {
     const record = buildOptimiserRunEvidence({
-      selection: { winner: null, confirmedResults: [], currentResult: null },
+      selection: {
+        winner: null,
+        confirmedResults: [],
+        currentResult: null,
+        // The run did not complete every search it started.
+        evaluationIncomplete: true,
+        evaluationIssues: [{ stage: 'calibration', error: 'The delay search did not finish.' }],
+      },
       diagnostics: { stages: [{ name: 'Placement', candidatesEvaluated: { confirmed: 3 } }] },
       identity: { projectId: 'p', versionId: 'v', designFingerprint: FINGERPRINT },
     });
     expect(record.terminalOutcome).toBe(OPTIMISER_TERMINAL_OUTCOME.EVALUATION_INCOMPLETE);
+    expect(record.run.rejectionReasons.join(' ')).toMatch(/delay search did not finish/);
 
     const state = resolveOptimiserPresentationState({
       planView: resolveOptimiserPlanStatus({ plan: record, currentDesignFingerprint: FINGERPRINT }),
@@ -218,6 +272,79 @@ describe('TEST 3: incomplete or unsaved run', () => {
     expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
     expect(state.evidence.candidatesEvaluated).toBe(3);
     expect(state.showApply).toBe(false);
+  });
+});
+
+describe('TEST 3B: baseline failure and unavailable metrics', () => {
+  it('keeps a baseline-validation failure as an incomplete run through refresh and reopen', () => {
+    const record = buildOptimiserRunEvidence({
+      selection: {
+        winner: null,
+        confirmedResults: [],
+        currentResult: null,
+        validationFailed: true,
+        baselineValidation: {
+          candidateId: 'current',
+          valid: false,
+          issues: ['P20 is required for every applicable seat'],
+          message: 'Evaluation incomplete — the current baseline could not be validated.',
+        },
+      },
+      diagnostics: {
+        stages: [{
+          name: 'Placement',
+          candidatesEvaluated: { confirmed: 3 },
+          bestScoreAfter: { p20VariationDb: 9.9, p19VariationDb: 4.2 },
+          winningCandidate: { candidateId: 'position-1' },
+        }],
+      },
+      identity: { projectId: 'marquee-home', versionId: 'v1', designFingerprint: FINGERPRINT },
+    });
+
+    expect(record.terminalOutcome).toBe(OPTIMISER_TERMINAL_OUTCOME.EVALUATION_INCOMPLETE);
+    expect(record.run.baselineValidation.valid).toBe(false);
+    expect(record.run.levers).toEqual({});
+    expect(record.run.actionablePlanProduced).toBe(false);
+
+    // Refresh / reopen: the same record is restored from the version's slot.
+    const restored = JSON.parse(JSON.stringify(serializeOptimiserPlan(record)));
+    const planView = resolveOptimiserPlanStatus({
+      plan: restored,
+      currentDesignFingerprint: FINGERPRINT,
+      instances: [],
+    });
+    expect(planView.status).toBe(OPTIMISER_PLAN_STATUS.INCOMPLETE);
+
+    const state = resolveOptimiserPresentationState({ planView, actionable: { available: true } });
+    expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
+    expect(state.statusLabel).toBe('Evaluation incomplete');
+    expect(state.message).toMatch(/baseline could not be validated/);
+    expect(state.showApply).toBe(false);
+    expect(state.evidence.candidatesEvaluated).toBe(3);
+    expect(state.evidence.families.find((family) => family.family === 'placement').bestAttempt.p20VariationDb).toBe(9.9);
+    expect(state.evidence.designUnchanged).toBe(true);
+  });
+
+  it('never reports an unpublished P20 as 0.00 dB', () => {
+    const record = buildOptimiserRunEvidence({
+      selection: {
+        winner: null,
+        confirmedResults: [],
+        // A seat exists at a level, but no variation was published for it.
+        currentResult: { candidateId: 'current', perSeatP20: [{ seatId: 'seat-r1-c2', level: 'L1' }] },
+      },
+      diagnostics: { stages: [], currentResult: null },
+      identity: { projectId: 'p', versionId: 'v', designFingerprint: FINGERPRINT },
+    });
+
+    expect(record.run.current.p20VariationDb).toBe(null);
+    expect(record.run.bestAttempted).toBe(null);
+    expect(record.run.candidatesEvaluated).toBe(0);
+
+    // The card states it as unavailable rather than printing a measured-looking 0.00.
+    const block = read('components/room/bass/optimiserPlan/OptimiserRunEvidenceBlock.jsx');
+    expect(block).toMatch(/Not published for this design/);
+    expect(block).toMatch(/const fmt = \(value, digits = 2, unit = ""\) => \{\n  if \(value === null \|\| value === undefined \|\| value === ""\) return null;/);
   });
 });
 
@@ -312,7 +439,7 @@ describe('TEST 7: persistence', () => {
       instances: [],
     });
     expect(planView.status).toBe(OPTIMISER_PLAN_STATUS.NO_USEFUL_IMPROVEMENT);
-    expect(planView.run.candidatesEvaluated).toBe(34);
+    expect(planView.run.candidatesEvaluated).toBe(17);
 
     const state = resolveOptimiserPresentationState({ planView, actionable: { available: false } });
     expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT);
