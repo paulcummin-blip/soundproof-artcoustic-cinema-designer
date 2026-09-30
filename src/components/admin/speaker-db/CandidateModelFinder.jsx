@@ -9,11 +9,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import ComparisonQualityBadges from "@/components/spl/ComparisonQualityBadges";
-import { Search, X, Loader2, ExternalLink, Link2 } from "lucide-react";
+import { Search, X, Loader2, ExternalLink, Link2, FileText } from "lucide-react";
 import {
   candidateReadiness,
   candidateBadgeLabel,
   candidateExtractRows,
+  candidateSourceIndicator,
+  candidateGapMessage,
   modelKey,
   ROLE_LABELS,
 } from "./candidateReview.js";
@@ -43,6 +45,8 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
   const [candidates, setCandidates] = useState([]);
   const [excluded, setExcluded] = useState([]);
   const [rejectedCount, setRejectedCount] = useState(0);
+  const [authority, setAuthority] = useState({ url: "", regional: "", allowed: [] });
+  const [documentStats, setDocumentStats] = useState({ deepChecked: 0, documentsUsed: 0, rejectedDocuments: 0 });
   const [domain, setDomain] = useState("");
   const [note, setNote] = useState("");
   const [existingKeys, setExistingKeys] = useState(new Set());
@@ -84,6 +88,16 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
         setExcluded(data.excluded || []);
         setRejectedCount((data.rejected || []).length);
         setDomain(data.searched_domain || "");
+        setAuthority({
+          url: data.authority_url || "",
+          regional: data.regional_preference || "",
+          allowed: data.allowed_domains || [],
+        });
+        setDocumentStats({
+          deepChecked: data.deep_checked_count || 0,
+          documentsUsed: data.documents_used_count || 0,
+          rejectedDocuments: (data.rejected_documents || []).length,
+        });
         setNote(data.note || "");
       } catch (err) {
         if (!cancelled) setError(err?.message || "Candidate discovery failed.");
@@ -103,6 +117,8 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
       candidate,
       readiness,
       extracts: candidateExtractRows(candidate),
+      source: candidateSourceIndicator(candidate),
+      gapMessage: candidateGapMessage(readiness, candidate),
       added: existingKeys.has(key),
       missing: readiness.missingCriticalLabels,
     };
@@ -152,6 +168,9 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
             <div className="text-sm mt-0.5" style={{ color: BRAND.subtext }}>
               {manufacturer.name} · official domain only {domain ? `(${domain})` : `(${manufacturer.website || "no website recorded"})`}
             </div>
+            {authority.regional && (
+              <div className="text-xs mt-1" style={{ color: BRAND.subtext }}>{authority.regional}</div>
+            )}
             <div className="text-xs mt-1" style={{ color: BRAND.subtext }}>
               Nothing is created until you select models. Added models are Draft specifications — not approved, not published.
             </div>
@@ -161,7 +180,7 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
 
         {loading && (
           <div className="flex items-center gap-2 p-6 text-sm" style={{ color: BRAND.subtext }}>
-            <Loader2 className="w-4 h-4 animate-spin" /> Searching the official manufacturer domain…
+            <Loader2 className="w-4 h-4 animate-spin" /> Searching the official domain, its product sheets, datasheets and manuals — this can take up to a minute…
           </div>
         )}
 
@@ -173,8 +192,16 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
           <>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-5 py-3 text-xs" style={{ color: BRAND.subtext, background: BRAND.soft, borderBottom: `1px solid ${BRAND.border}` }}>
               <span><strong>{rows.length}</strong> candidate model{rows.length === 1 ? "" : "s"} on the official domain</span>
+              {documentStats.deepChecked > 0 && (
+                <span>
+                  <strong>{documentStats.documentsUsed}</strong> of {documentStats.deepChecked} checked models backed by an official document
+                </span>
+              )}
               <span><strong>{excluded.length}</strong> excluded by the P12/P13 section rules{excludedReasons.length > 0 ? ` (${excludedReasons.join(", ")})` : ""}</span>
               {rejectedCount > 0 && <span><strong>{rejectedCount}</strong> discarded for not being on {domain}</span>}
+              {documentStats.rejectedDocuments > 0 && (
+                <span><strong>{documentStats.rejectedDocuments}</strong> document{documentStats.rejectedDocuments === 1 ? "" : "s"} discarded as not official</span>
+              )}
               {note && <span style={{ color: BRAND.warn }}>{note}</span>}
             </div>
 
@@ -223,6 +250,9 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
                           {row.candidate.is_discontinued && (
                             <div className="text-xs" style={{ color: BRAND.warn }}>Discontinued — no current option found</div>
                           )}
+                          {row.candidate.product_url_ok === false && (
+                            <div className="text-xs" style={{ color: BRAND.danger }}>Reported page address not found — verify before adding</div>
+                          )}
                           {row.added && <div className="text-xs" style={{ color: BRAND.green }}>Already in the Speaker Database</div>}
                           {row.candidate.discarded_values?.length > 0 && (
                             <div className="text-xs" style={{ color: BRAND.warn }}>
@@ -235,7 +265,12 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
                         <td className={CELL} style={{ color: BRAND.text }}>{row.extracts.impedance}</td>
                         <td className={CELL} style={{ color: BRAND.text }}>{row.extracts.power}</td>
                         <td className={CELL} style={{ color: BRAND.text }}>{row.extracts.maxSpl}</td>
-                        <td className={CELL} style={{ color: BRAND.text }}>{row.extracts.response}</td>
+                        <td className={CELL} style={{ color: BRAND.text }}>
+                          {row.extracts.response}
+                          {row.extracts.dispersion !== "—" && (
+                            <div className="text-xs" style={{ color: BRAND.subtext }}>{row.extracts.dispersion}</div>
+                          )}
+                        </td>
                         <td className={CELL} style={{ color: BRAND.subtext }}>{row.extracts.space}</td>
                         <td className={CELL}>
                           <ComparisonQualityBadges
@@ -244,21 +279,44 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
                             basis={row.readiness.capabilityBasis}
                             tone={row.readiness.tone}
                           />
+                          {row.gapMessage && (
+                            <div className="text-xs mt-1" style={{ color: BRAND.danger }}>{row.gapMessage}</div>
+                          )}
                         </td>
                         <td className={CELL} style={{ color: BRAND.subtext }}>
                           {row.missing.length === 0 ? "None" : row.missing.join(", ")}
                         </td>
                         <td className={CELL}>
                           <div className="flex flex-col gap-1">
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs"
+                              style={{ border: `1px solid ${BRAND.border}`, color: row.source.hasDocument ? BRAND.green : BRAND.subtext }}
+                              title={row.source.hasDocument ? "An official supporting document was found" : "Only the product page was available"}
+                            >
+                              <FileText className="w-3 h-3" /> {row.source.label}
+                            </span>
                             {row.candidate.product_url && (
                               <a href={row.candidate.product_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs underline" style={{ color: BRAND.green }}>
                                 <ExternalLink className="w-3 h-3" /> Product page
                               </a>
                             )}
-                            {row.candidate.datasheet_url && (
+                            {row.source.documentUrl && (
+                              <a href={row.source.documentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs underline" style={{ color: BRAND.green }}>
+                                <Link2 className="w-3 h-3" /> {row.source.label}
+                              </a>
+                            )}
+                            {row.source.linkedDocumentUrl && (
+                              <a href={row.source.linkedDocumentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs underline" style={{ color: BRAND.subtext }}>
+                                <Link2 className="w-3 h-3" /> {row.source.documentLabel} (linked from the page)
+                              </a>
+                            )}
+                            {!row.source.documentUrl && row.candidate.datasheet_url && (
                               <a href={row.candidate.datasheet_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs underline" style={{ color: BRAND.green }}>
                                 <Link2 className="w-3 h-3" /> Datasheet
                               </a>
+                            )}
+                            {!row.source.hasDocument && row.candidate.document_note && (
+                              <span className="text-xs" style={{ color: BRAND.warn }}>{row.candidate.document_note}</span>
                             )}
                           </div>
                         </td>

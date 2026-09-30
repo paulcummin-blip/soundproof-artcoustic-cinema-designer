@@ -74,12 +74,19 @@ export function candidateExtractRows(candidate) {
     ? `${show(spec.frequency_response_low_hz)}–${show(spec.frequency_response_high_hz)} Hz${spec.frequency_response_tolerance ? ` (${spec.frequency_response_tolerance})` : ""}`
     : "—";
 
+  const dispersion = [
+    spec.horizontal_dispersion_deg ? `H ${spec.horizontal_dispersion_deg}°` : null,
+    spec.vertical_dispersion_deg ? `V ${spec.vertical_dispersion_deg}°` : null,
+  ].filter(Boolean).join(" · ") || "—";
+
   return {
     sensitivity: `${show(spec.sensitivity_db, " dB")}${spec.sensitivity_db ? basis : ""}`,
     impedance: show(spec.nominal_impedance_ohm, " Ω"),
     power: power || "—",
     maxSpl: show(spec.max_continuous_spl_db, " dB"),
     response,
+    dispersion,
+    sourceDate: show(spec.source_date),
     space: show(spec.measurement_space),
   };
 }
@@ -94,7 +101,45 @@ export function candidateExtractionPayload(candidate, today) {
   return {
     reported,
     source_type: candidate?.spec_source_type === "Official PDF" ? "Official PDF" : "Official Product Page",
-    source_url: candidate?.datasheet_url || candidate?.product_url || "",
+    source_url: candidate?.document_url || candidate?.datasheet_url || candidate?.product_url || "",
     source_date: today,
   };
+}
+
+// --- Source indicator -------------------------------------------------------
+// What discovery actually read for this model. A blank column must never be
+// mistaken for a search that never happened: the review row says which official
+// source was found — the product page, or the product sheet / datasheet /
+// manual / installation guide behind it.
+const DOCUMENT_LABELS = {
+  "Product page": "Product page",
+  "Product sheet": "Product sheet",
+  Datasheet: "Datasheet",
+  Manual: "Manual",
+  "Installation guide": "Installation guide",
+  Brochure: "Brochure",
+  "Other document": "Document",
+};
+
+export function candidateSourceIndicator(candidate) {
+  const documentUrl = candidate?.document_url || "";
+  const documents = Array.isArray(candidate?.official_documents) ? candidate.official_documents : [];
+  const firstDocument = documents[0] || null;
+  const type = candidate?.document_type || (documentUrl ? "Other document" : "Product page");
+  return {
+    label: DOCUMENT_LABELS[type] || "Product page",
+    documentUrl,
+    documentLabel: DOCUMENT_LABELS[firstDocument?.document_type] || "Document",
+    linkedDocumentUrl: !documentUrl && firstDocument ? firstDocument.url : "",
+    hasDocument: Boolean(documentUrl) || documents.length > 0,
+    documentCount: documents.length,
+  };
+}
+
+/** Why a model is still ungradeable — what the search found, and nothing invented. */
+export function candidateGapMessage(readiness, candidate) {
+  if (!readiness || readiness.confidence !== "D") return "";
+  return candidateSourceIndicator(candidate).hasDocument
+    ? "Official source found, but critical engineering data not found"
+    : "No official specification document found";
 }

@@ -3,34 +3,51 @@
 // Candidate model discovery for one manufacturer — the review step BEFORE
 // anything reaches the Speaker Database.
 //
+// Three reporting passes, all restricted to the manufacturer's own hosts:
+//
+//   1. DISCOVERY  the cinema / custom-install ranges, searched twice (dedicated
+//                 cinema + custom-theatre ranges, and the wider architectural
+//                 portfolio) so a manufacturer's full range is covered
+//   2. DOCUMENTS  the P12/P13 values, read from the official product sheet /
+//                 datasheet / manual / installation guide that the product page
+//                 links to — the specification is rarely on the page itself
+//   3. SECOND CHANCE  models still missing sensitivity, impedance or a power
+//                 authority are searched again for their SERIES document
+//
 // Scope discipline (enforced in code, not only in the prompt):
-//   - one manufacturer, one official domain, discovered from that domain only
-//   - every candidate whose product URL is not on the official domain is dropped
-//   - cinema / architectural / in-wall / on-wall / LCR / surround / height /
-//     install / home-theatre products are preferred; headphones, wireless
-//     lifestyle speakers, soundbars, electronics, amplifiers, subwoofers,
-//     accessories and discontinued models are excluded (discontinued models are
-//     returned only when nothing current exists)
+//   - one manufacturer; every product and document URL is checked against the
+//     official hosts, so a dealer or distributor copy is never used as evidence
+//   - every number is re-checked by the deterministic guards, which discard an
+//     implausible or collapsed value and report exactly what was rejected
 //   - nothing is created, approved or published: this function performs no
 //     database writes at all. The admin selects the models to add.
-//   - every reported value must be published in the official source text. A
-//     value that is not stated stays null — never estimated, never inferred.
 // ---------------------------------------------------------------------------
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
-import { hostOf, normaliseDomain, isOfficialHost } from '../../shared/officialDomain.js';
+import { hostOf, resolveManufacturerAuthority, isOfficialUrl } from '../../shared/officialDomain.js';
+import { normaliseSpecification, buildSpecificationSchema, text } from '../../shared/speakerSpecGuards.js';
+import { DOCUMENT_TYPES, harvestOfficialDocuments, probeUrl, urlResponds } from '../../shared/officialDocumentHarvest.js';
+import {
+  buildDiscoveryPrompt,
+  discoverySchema,
+  buildExtractionPrompt,
+  extractionSchema,
+} from '../../shared/candidateDiscoveryPrompts.js';
 
 const MAX_CANDIDATES = 30;
+// How many leading candidates have their official documents fetched and read,
+// and how many of those get a second search for their series document.
+const DEEP_LIMIT = 24;
+const EXTRACTION_CHUNK = 8;
+const RETRY_LIMIT = 6;
+const MAX_DOCUMENTS_PER_MODEL = 6;
 
 const ROLE_GUESSES = ['LCR', 'Surround', 'Wide', 'Height', 'Flexible', 'Both', 'Unknown'];
 const CATEGORIES = ['On Wall', 'In Wall', 'Freestanding', 'Other'];
-const SENSITIVITY_BASES = ['1W/1m', '2.83V/1m', 'unknown'];
-const SPACES = ['half-space', 'free-space', 'in-room', 'unspecified'];
-const SPL_BASES = ['AES', 'IEC', 'continuous', 'peak', 'manufacturer unspecified', 'calculated', 'unknown'];
 
 // Exclusions for this P12/P13 speaker-capability section.
 const EXCLUSIONS = [
-  { reason: 'Subwoofer', test: /\bsub ?woofers?\b|\bsub[ -]?\d|\bsub\b/i },
+  { reason: 'Subwoofer', test: /\bsub ?woofers?\b|\bsub[ -]?\d|\bsub\b|\bsw\b|\bswm\b/i },
   { reason: 'Headphones', test: /headphone|headset|earphone|earbud|\bin-?ear\b/i },
   { reason: 'Soundbar', test: /sound ?bar/i },
   { reason: 'Wireless lifestyle speaker', test: /portable|bluetooth|wireless speaker|smart speaker|voice assistant/i },
@@ -40,173 +57,92 @@ const EXCLUSIONS = [
   { reason: 'Outdoor', test: /outdoor|landscape|marine/i },
 ];
 
-const SPEC_FIELDS = [
-  'sensitivity_db', 'sensitivity_basis', 'nominal_impedance_ohm', 'minimum_impedance_ohm',
-  'recommended_amp_min_w', 'recommended_amp_max_w', 'power_handling_continuous_w',
-  'long_term_iec_power_w', 'rated_iec_power_w', 'aes_power_w',
-  'max_continuous_spl_db', 'max_spl_basis', 'max_peak_spl_db',
-  'frequency_response_low_hz', 'frequency_response_high_hz', 'frequency_response_tolerance',
-  'measurement_space', 'cabinet_type', 'mounting_type',
-  'horizontal_dispersion_deg', 'vertical_dispersion_deg',
-  'woofer_count', 'woofer_size', 'midrange_count', 'midrange_size', 'tweeter_description',
-];
+// Models belonging to a cinema or custom-install range. They are searched first
+// in every pass: they are the ones a P12/P13 comparison is built from.
+const CINEMA_RANGE = /custom[-_ ]?(install|theatre|theater)|cinema|theatre|theater|\bct[ .-]?\d|\bctm\b|\blcrs?\b|screen|behind[-_ ]?screen|surround|overhead|in[-_ ]?wall|in[-_ ]?ceiling|\biw\b/i;
 
-const NUMERIC_SPEC_FIELDS = new Set([
-  'sensitivity_db', 'nominal_impedance_ohm', 'minimum_impedance_ohm',
-  'recommended_amp_min_w', 'recommended_amp_max_w', 'power_handling_continuous_w',
-  'long_term_iec_power_w', 'rated_iec_power_w', 'aes_power_w',
-  'max_continuous_spl_db', 'max_peak_spl_db',
-  'frequency_response_low_hz', 'frequency_response_high_hz',
-  'horizontal_dispersion_deg', 'vertical_dispersion_deg',
-  'woofer_count', 'midrange_count',
-]);
+const SPEC_SCHEMA = buildSpecificationSchema();
 
-// Plausibility guards. A value still has to be stated by the official source,
-// but a reporting pass can collapse a column — one figure landing in several
-// fields. An implausible figure is discarded rather than written, and every
-// discard is reported to the admin for review.
-const FIELD_LIMITS: Record<string, [number, number]> = {
-  sensitivity_db: [70, 110],
-  nominal_impedance_ohm: [1, 32],
-  minimum_impedance_ohm: [1, 32],
-  recommended_amp_min_w: [5, 5000],
-  recommended_amp_max_w: [5, 5000],
-  power_handling_continuous_w: [5, 5000],
-  long_term_iec_power_w: [5, 5000],
-  rated_iec_power_w: [5, 5000],
-  aes_power_w: [5, 5000],
-  max_continuous_spl_db: [80, 150],
-  max_peak_spl_db: [80, 160],
-  frequency_response_low_hz: [10, 500],
-  frequency_response_high_hz: [1000, 60000],
-  horizontal_dispersion_deg: [10, 360],
-  vertical_dispersion_deg: [10, 360],
-  woofer_count: [1, 12],
-  midrange_count: [1, 12],
-};
-
-const POWER_FIELDS = [
-  'power_handling_continuous_w',
-  'long_term_iec_power_w',
-  'rated_iec_power_w',
-  'aes_power_w',
-];
-
-const specProperties = {};
-for (const field of SPEC_FIELDS) {
-  if (field === 'sensitivity_basis') specProperties[field] = { type: 'string', enum: SENSITIVITY_BASES };
-  else if (field === 'measurement_space') specProperties[field] = { type: 'string', enum: SPACES };
-  else if (field === 'max_spl_basis') specProperties[field] = { type: 'string', enum: SPL_BASES };
-  else if (NUMERIC_SPEC_FIELDS.has(field)) specProperties[field] = { type: 'number' };
-  else specProperties[field] = { type: 'string' };
-}
-
-const RESPONSE_SCHEMA = {
-  type: 'object',
-  properties: {
-    candidates: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          model: { type: 'string' },
-          series: { type: 'string' },
-          role_guess: { type: 'string', enum: ROLE_GUESSES },
-          product_category: { type: 'string', enum: CATEGORIES },
-          product_url: { type: 'string' },
-          datasheet_url: { type: 'string' },
-          spec_source_type: { type: 'string', enum: ['Official Product Page', 'Official PDF'] },
-          is_discontinued: { type: 'boolean' },
-          source_quote: { type: 'string' },
-          specification: { type: 'object', properties: specProperties },
-        },
-      },
-    },
-  },
-};
-
-// Free-text values a reporting pass sometimes emits in place of a stated figure.
-const STRING_NOISE = new Set([
-  'null', 'undefined', 'n/a', 'na', 'none', '-', '—', 'unspecified',
-  'not specified', 'not stated', 'unknown', 'tbd',
-]);
-
-function text(value: any) {
-  return value === null || value === undefined ? '' : String(value).trim();
-}
-
-function numberOrNull(value: any) {
-  if (value === null || value === undefined || String(value).trim() === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function normaliseSpecification(raw: any) {
-  const source = raw && typeof raw === 'object' ? raw : {};
-  const spec: Record<string, any> = {};
-  const discarded: string[] = [];
-  for (const field of SPEC_FIELDS) {
-    const value = source[field];
-    if (value === null || value === undefined || String(value).trim() === '') continue;
-    if (NUMERIC_SPEC_FIELDS.has(field)) {
-      const parsed = numberOrNull(value);
-      if (parsed === null || parsed === 0) continue;
-      const limits = FIELD_LIMITS[field];
-      if (limits && (parsed < limits[0] || parsed > limits[1])) {
-        discarded.push(`${field} (${parsed})`);
-        continue;
-      }
-      spec[field] = parsed;
-      continue;
-    }
-    if (field === 'sensitivity_basis') {
-      const match = SENSITIVITY_BASES.find((option) => option.toLowerCase() === String(value).trim().toLowerCase());
-      spec[field] = match || 'unknown';
-      continue;
-    }
-    if (field === 'measurement_space') {
-      const match = SPACES.find((option) => option.toLowerCase() === String(value).trim().toLowerCase());
-      spec[field] = match || 'unspecified';
-      continue;
-    }
-    if (field === 'max_spl_basis') {
-      const match = SPL_BASES.find((option) => option.toLowerCase() === String(value).trim().toLowerCase());
-      spec[field] = match || 'unknown';
-      continue;
-    }
-    const cleaned = text(value);
-    if (STRING_NOISE.has(cleaned.toLowerCase())) continue;
-    spec[field] = cleaned;
-  }
-
-  // A published frequency band must be ordered.
-  if (spec.frequency_response_low_hz !== undefined && spec.frequency_response_high_hz !== undefined
-    && spec.frequency_response_low_hz >= spec.frequency_response_high_hz) {
-    discarded.push('frequency_response_low_hz / frequency_response_high_hz (band not ordered)');
-    delete spec.frequency_response_low_hz;
-    delete spec.frequency_response_high_hz;
-  }
-
-  // Column collapse: the same figure repeated across three or more power fields is
-  // one figure, not three ratings. Keep the authority the comparison uses and drop
-  // the repeats.
-  const presentPower = POWER_FIELDS.filter((field) => spec[field] !== undefined);
-  if (presentPower.length >= 3 && new Set(presentPower.map((field) => spec[field])).size === 1) {
-    for (const field of presentPower.slice(1)) {
-      discarded.push(`${field} (repeated ${spec[field]} W)`);
-      delete spec[field];
-    }
-  }
-
-  return { spec, discarded };
+function modelKey(value: any) {
+  return text(value).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 function exclusionFor(candidate: any) {
+  // "CT8 SW" carries no subwoofer keyword: the model suffix is the designation.
+  if (modelKey(candidate?.model).endsWith('sw')) return 'Subwoofer';
   const haystack = `${text(candidate?.model)} ${text(candidate?.series)}`;
   for (const rule of EXCLUSIONS) {
     if (rule.test.test(haystack)) return rule.reason;
   }
   return null;
+}
+
+/** The document kind reported for a candidate, restricted to the known set. */
+function documentTypeOf(value: any, hasDocument: boolean) {
+  const type = text(value);
+  if (!hasDocument) return 'Product page';
+  if (type === 'Product page' || !type) return 'Other document';
+  return DOCUMENT_TYPES.includes(type) ? type : 'Other document';
+}
+
+function hasPowerAuthority(spec: any) {
+  return spec.power_handling_continuous_w !== undefined
+    || spec.long_term_iec_power_w !== undefined
+    || spec.rated_iec_power_w !== undefined
+    || spec.aes_power_w !== undefined
+    || spec.recommended_amp_max_w !== undefined
+    || spec.max_continuous_spl_db !== undefined;
+}
+
+/**
+ * Fold one document-extraction result into a candidate: the document is the
+ * deeper source, so its stated values win over the product page, and the whole
+ * merged set is re-checked by the guards. A document that is not on the
+ * manufacturer's own hosts is never used and is reported instead.
+ * @returns {boolean} whether an official document backed this candidate
+ */
+function mergeDocumentResult({ candidate, document, allowedHosts, rejectedDocuments }: any) {
+  const reportedUrl = text(document?.document_url);
+  const officialDocument = isOfficialUrl(reportedUrl, allowedHosts) ? reportedUrl : '';
+  if (reportedUrl && !officialDocument) {
+    rejectedDocuments.push({
+      model: candidate.model,
+      url: reportedUrl,
+      reason: 'Not on the official domain — not used as evidence',
+    });
+  }
+
+  // Values are only read when they came from a source that exists.
+  if (candidate.product_url_ok === false && !officialDocument) {
+    candidate.specification = {};
+    candidate.discarded_values = [];
+    return false;
+  }
+
+  const merged: Record<string, any> = { ...(candidate.specification || {}) };
+  const documentSpec = document?.specification && typeof document.specification === 'object' ? document.specification : {};
+  for (const [field, value] of Object.entries(documentSpec)) {
+    if (value === null || value === undefined || String(value).trim() === '') continue;
+    merged[field] = value;
+  }
+
+  const guarded = normaliseSpecification(merged);
+  candidate.specification = guarded.spec;
+  candidate.discarded_values = guarded.discarded;
+
+  if (!officialDocument) {
+    candidate.document_note = text(document?.not_found_reason);
+    return false;
+  }
+
+  candidate.document_url = officialDocument;
+  candidate.document_type = documentTypeOf(document?.document_type, true);
+  candidate.document_note = '';
+  candidate.source_quote = text(document?.source_quote) || candidate.source_quote;
+  candidate.spec_source_type = 'Official PDF';
+  // The document that carried the values is the source of record.
+  candidate.datasheet_url = officialDocument;
+  return true;
 }
 
 export default async function (req: Request): Promise<Response> {
@@ -218,81 +154,102 @@ export default async function (req: Request): Promise<Response> {
 
     const body = await req.json().catch(() => ({}));
     const manufacturerName = text(body?.manufacturerName);
-    const domain = normaliseDomain(body?.manufacturerDomain || body?.website);
-
     if (!manufacturerName) {
       return Response.json({ error: 'Manufacturer is required' }, { status: 400 });
     }
-    if (!domain) {
+
+    // UK / regional entry point first; the recorded website stays the authority too.
+    const authority = resolveManufacturerAuthority({
+      manufacturerName,
+      website: body?.manufacturerDomain || body?.website,
+    });
+    if (!authority.primaryUrl) {
       return Response.json({
         error: 'This manufacturer has no official website recorded, so there is no authority domain to search. Add the website first.',
         candidates: [],
       }, { status: 400 });
     }
 
-    const prompt = [
-      `You are compiling a review list of loudspeaker models for a professional home cinema engineering database.`,
-      ``,
-      `Manufacturer: ${manufacturerName}`,
-      `Official manufacturer domain: ${domain}`,
-      ``,
-      `Find the manufacturer's current loudspeaker models for discrete home cinema and architectural install use.`,
-      ``,
-      `Rules you must follow exactly:`,
-      `1. Use ONLY pages on ${domain} (including its subdomains). Never use dealer, retailer, distributor, marketplace, forum or review sites — if a value is only published on such a site, leave it out.`,
-      `2. PREFER products described as cinema, home theatre, architectural, in-wall, on-wall, LCR, surround, wide, height, install or custom installation.`,
-      `3. EXCLUDE headphones, headsets, wireless or portable lifestyle speakers, smart speakers, soundbars, electronics, amplifiers, receivers, processors, subwoofers, accessories (brackets, mounts, grilles, back boxes), and complete packages/systems.`,
-      `4. Every specification value must be explicitly published in the official source text for THAT model. If a value is not stated, return null for it. NEVER estimate, NEVER infer a value from a sibling model, a series, or a similar product, and NEVER copy a value from another manufacturer.`,
-      `4a. Every number must be plausible for a loudspeaker and must belong to the field it is reported in: sensitivity 70-110 dB, impedance 1-32 ohms, power 5-5000 W, maximum SPL 80-150 dB, dispersion 10-360 degrees, driver counts 1-12. Never repeat one figure across several fields — when the source states a single power rating, report it once in the field the source names (continuous, AES, IEC, or recommended amplifier range) and leave the other power fields null.`,
-      `5. For each candidate give the exact model name as published, the series, the most likely role (one of ${ROLE_GUESSES.join(', ')}), the product_category (one of ${CATEGORIES.join(', ')}), the full absolute product URL, the official specification PDF URL when one exists (otherwise null), spec_source_type (Official PDF when the values came from the official PDF, otherwise Official Product Page), is_discontinued (true only when the manufacturer states it is discontinued), and source_quote: the exact sentence or short passage from the official page that carries the specification values (empty string when nothing was published).`,
-      `6. Specification fields — sensitivity_db and sensitivity_basis (1W/1m, 2.83V/1m or unknown exactly as published), nominal_impedance_ohm, minimum_impedance_ohm, recommended_amp_min_w, recommended_amp_max_w, power_handling_continuous_w, long_term_iec_power_w, rated_iec_power_w, aes_power_w, max_continuous_spl_db, max_spl_basis (AES, IEC, continuous, peak, manufacturer unspecified, calculated or unknown), max_peak_spl_db, frequency_response_low_hz, frequency_response_high_hz, frequency_response_tolerance, measurement_space (half-space, free-space, in-room or unspecified), cabinet_type, mounting_type, horizontal_dispersion_deg, vertical_dispersion_deg, woofer_count, woofer_size, midrange_count, midrange_size, tweeter_description.`,
-      `7. Return at most ${MAX_CANDIDATES} candidates. Do not return catalogue or category index pages as products, and do not return the same model twice.`,
-      ``,
-      `Return JSON only.`,
-    ].join('\n');
+    let authorityUrl = authority.primaryUrl;
+    let preferenceNote = authority.regionalUrl
+      ? `${authority.regionalLabel} pages preferred (${authority.regionalUrl})`
+      : '';
+    if (authority.preferRegional && !(await urlResponds(authority.primaryUrl))) {
+      authorityUrl = authority.storedDomain ? `https://${authority.storedDomain}` : authority.primaryUrl;
+      preferenceNote = 'The preferred regional entry point did not respond, so the recorded official domain was used.';
+    }
+    const allowedHosts = authority.hosts;
 
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt,
-      add_context_from_internet: true,
-      response_json_schema: RESPONSE_SCHEMA,
-    });
+    // ---- Pass 1: which models exist on the official domain -------------------
+    const search = async (focus: string) => {
+      try {
+        const result = await base44.integrations.Core.InvokeLLM({
+          prompt: buildDiscoveryPrompt({
+            manufacturerName,
+            authorityUrl,
+            allowedHosts,
+            regionalLabel: authority.regionalUrl ? authority.regionalLabel : '',
+            focus,
+            roleGuesses: ROLE_GUESSES,
+            categories: CATEGORIES,
+            maxCandidates: MAX_CANDIDATES,
+          }),
+          add_context_from_internet: true,
+          response_json_schema: discoverySchema(),
+        });
+        return Array.isArray(result?.candidates) ? result.candidates : [];
+      } catch {
+        // One failed search must not lose the models the other one found.
+        return [];
+      }
+    };
 
-    const raw = Array.isArray(result?.candidates) ? result.candidates : [];
+    const [cinemaModels, installModels, catalogueModels] = await Promise.all([
+      search('the manufacturer\'s dedicated custom-theatre / behind-screen cinema ranges — the models it sells specifically for cinema installations, which usually form their own series — and EVERY model in those series'),
+      search('the custom-installation and architectural ranges: every in-wall and in-ceiling model, every on-wall LCR, plus the surround, wide and height / overhead models used in home cinema'),
+      search('the manufacturer\'s loudspeaker range set out by series: first name every series, then list the individual models in each series that is used for home cinema or custom installation — do not stop at the flagship hi-fi range'),
+    ]);
+
+    const raw = [...cinemaModels, ...installModels, ...catalogueModels];
     const seen = new Set<string>();
-    const kept: any[] = [];
+    const current: any[] = [];
     const discontinued: any[] = [];
     const excluded: any[] = [];
     const rejected: any[] = [];
 
     for (const item of raw) {
       const productUrl = text(item?.product_url);
-      const host = hostOf(productUrl);
-      if (!isOfficialHost(host, domain)) {
-        if (productUrl) rejected.push({ model: text(item?.model), url: productUrl, reason: `Not on ${domain}` });
+      if (!isOfficialUrl(productUrl, allowedHosts)) {
+        if (productUrl) rejected.push({ model: text(item?.model), url: productUrl, reason: `Not on ${allowedHosts[0] || 'the official domain'}` });
         continue;
       }
 
       const model = text(item?.model);
-      if (!model) continue;
-
-      const key = model.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (!key || seen.has(key)) continue;
+      const key = modelKey(model);
+      if (!model || !key || seen.has(key)) continue;
       seen.add(key);
 
+      // Discovery is identity only: the engineering values arrive in the document pass.
       const datasheetUrl = text(item?.datasheet_url);
-      const { spec, discarded } = normaliseSpecification(item?.specification);
+
       const candidate = {
         model,
         series: text(item?.series),
         role_guess: ROLE_GUESSES.includes(text(item?.role_guess)) ? text(item?.role_guess) : 'Unknown',
         product_category: CATEGORIES.includes(text(item?.product_category)) ? text(item?.product_category) : 'Other',
         product_url: productUrl,
-        datasheet_url: isOfficialHost(hostOf(datasheetUrl), domain) ? datasheetUrl : '',
+        datasheet_url: isOfficialUrl(datasheetUrl, allowedHosts) ? datasheetUrl : '',
         spec_source_type: text(item?.spec_source_type) === 'Official PDF' ? 'Official PDF' : 'Official Product Page',
         source_quote: text(item?.source_quote),
         is_discontinued: item?.is_discontinued === true,
-        specification: spec,
-        discarded_values: discarded,
+        specification: {},
+        discarded_values: [],
+        // Filled by the document passes below.
+        product_url_ok: true,
+        document_url: '',
+        document_type: 'Product page',
+        document_note: '',
+        official_documents: [],
       };
 
       const exclusion = exclusionFor(candidate);
@@ -301,32 +258,155 @@ export default async function (req: Request): Promise<Response> {
         continue;
       }
 
-      if (candidate.is_discontinued) {
-        discontinued.push({ ...candidate, exclusion_note: 'Discontinued' });
-        continue;
-      }
-
-      kept.push(candidate);
+      if (candidate.is_discontinued) discontinued.push({ ...candidate, exclusion_note: 'Discontinued' });
+      else current.push(candidate);
     }
 
     // Discontinued models are offered only when no current option exists.
-    const noCurrentOptions = kept.length === 0 && discontinued.length > 0;
-    const candidates = (noCurrentOptions ? discontinued : kept)
-      .slice(0, MAX_CANDIDATES)
-      .map((candidate) => ({ ...candidate, is_discontinued: candidate.is_discontinued === true }));
+    const noCurrentOptions = current.length === 0 && discontinued.length > 0;
+    const shown = noCurrentOptions ? discontinued : current;
+
+    // The list is only worth reading if its addresses exist. A URL the search
+    // invented (or one the manufacturer has since removed) is flagged, and can
+    // never become the evidence behind a value.
+    const urlProbes = await Promise.all(shown.slice(0, MAX_CANDIDATES).map(async (candidate: any) => ({
+      candidate,
+      probe: await probeUrl(candidate.product_url),
+    })));
+    for (const { candidate, probe } of urlProbes) {
+      if (probe.notFound) {
+        candidate.product_url_ok = false;
+        candidate.document_note = 'No page found for this model at the address the search reported — not used as a source.';
+      }
+    }
+
+    // ---- Pass 2: read the official supporting documents ---------------------
+    // Each leading product page is fetched for its document links, and those
+    // documents are then read for the P12/P13 values.
+    const deepTargets = shown.slice(0, DEEP_LIMIT);
+    const harvest = await Promise.all(deepTargets.map(async (candidate: any) => {
+      const documents = candidate.product_url
+        ? await harvestOfficialDocuments(candidate.product_url, {
+          isAllowed: (url: string) => isOfficialUrl(url, allowedHosts),
+          limit: MAX_DOCUMENTS_PER_MODEL,
+        })
+        : [];
+      return { candidate, documents };
+    }));
+
+    const batches: any[][] = [];
+    for (let index = 0; index < harvest.length; index += EXTRACTION_CHUNK) {
+      batches.push(harvest.slice(index, index + EXTRACTION_CHUNK));
+    }
+
+    const readDocuments = async (models: any[], deepSearch = false) => {
+      const groups: any[][] = [];
+      for (let index = 0; index < models.length; index += EXTRACTION_CHUNK) {
+        groups.push(models.slice(index, index + EXTRACTION_CHUNK));
+      }
+      const results = await Promise.all(groups.map(async (group) => {
+        try {
+          const result = await base44.integrations.Core.InvokeLLM({
+            prompt: buildExtractionPrompt({ manufacturerName, authorityUrl, allowedHosts, models: group, deepSearch }),
+            add_context_from_internet: true,
+            response_json_schema: extractionSchema(SPEC_SCHEMA),
+          });
+          return Array.isArray(result?.items) ? result.items : [];
+        } catch {
+          // A failed document pass never discards the models already discovered.
+          return [];
+        }
+      }));
+      return results.flat();
+    };
+
+    // A reported source is only trusted when it actually exists: an address that
+    // returns 404 must never carry engineering values into the database.
+    const verifyDocuments = async (items: any[]) => Promise.all(items.map(async (item) => {
+      const url = text(item?.document_url);
+      if (!url || !(await probeUrl(url)).notFound) return item;
+      return {
+        ...item,
+        document_url: '',
+        specification: {},
+        not_found_reason: 'The source reported for this model could not be found at that address.',
+      };
+    }));
+
+    const extracted = await verifyDocuments(await readDocuments(batches.flat()));
+    const documentByKey = new Map<string, any>();
+    for (const item of extracted) {
+      const key = modelKey(item?.model);
+      if (key && !documentByKey.has(key)) documentByKey.set(key, item);
+    }
+
+    let documentsUsed = 0;
+    const rejectedDocuments: any[] = [];
+    const mergeContext = { allowedHosts, rejectedDocuments };
+
+    for (const entry of harvest) {
+      const { candidate, documents } = entry;
+      candidate.official_documents = documents;
+      const backed = mergeDocumentResult({
+        ...mergeContext,
+        candidate,
+        document: documentByKey.get(modelKey(candidate.model)),
+      });
+      if (backed) documentsUsed += 1;
+    }
+
+    // ---- Pass 3: second chance for models still missing key fields -----------
+    // A model's values are often in its SERIES document rather than its own page.
+    // The cinema and custom-install models are retried first — they are the ones
+    // the P12/P13 comparison is built from.
+    const cinemaScore = (candidate: any) =>
+      (CINEMA_RANGE.test(`${candidate.model} ${candidate.series}`) ? 2 : 0)
+      + (CINEMA_RANGE.test(candidate.product_url || '') ? 1 : 0);
+
+    const thin = deepTargets
+      .filter((candidate: any) => {
+        const spec = candidate.specification || {};
+        return !spec.sensitivity_db || !spec.nominal_impedance_ohm || !hasPowerAuthority(spec);
+      })
+      .sort((a: any, b: any) => cinemaScore(b) - cinemaScore(a))
+      .slice(0, RETRY_LIMIT);
+
+    if (thin.length > 0) {
+      const retryItems = await verifyDocuments(await readDocuments(thin.map((candidate: any) => ({
+        model: candidate.model,
+        series: candidate.series,
+        product_url: candidate.product_url,
+        documents: candidate.official_documents || [],
+      })), true));
+
+      for (const item of retryItems) {
+        const key = modelKey(item?.model);
+        const candidate = thin.find((entry: any) => modelKey(entry.model) === key);
+        if (!candidate) continue;
+        if (mergeDocumentResult({ ...mergeContext, candidate, document: item })) documentsUsed += 1;
+      }
+    }
+
+    const candidates = shown.slice(0, MAX_CANDIDATES);
 
     return Response.json({
       candidates,
       excluded,
       rejected,
-      searched_domain: domain,
+      rejected_documents: rejectedDocuments,
+      searched_domain: hostOf(authorityUrl) || allowedHosts[0] || '',
+      authority_url: authorityUrl,
+      allowed_domains: allowedHosts,
+      regional_preference: preferenceNote,
       official_only: true,
       no_current_options_found: noCurrentOptions,
       candidate_count: candidates.length,
       excluded_count: excluded.length,
+      deep_checked_count: deepTargets.length,
+      documents_used_count: documentsUsed,
       note: noCurrentOptions
         ? 'No current models were found on the official domain, so discontinued models are shown instead.'
-        : 'Nothing has been created. Select the models to add.',
+        : `Nothing has been created. Supporting official documents (product sheets, datasheets, manuals) and series documents were searched for the leading models; select the models to add.`,
     });
   } catch (error: any) {
     return Response.json({ error: error.message }, { status: 500 });
