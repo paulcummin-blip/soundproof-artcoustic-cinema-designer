@@ -205,7 +205,7 @@
         "C",
         "D"
       ],
-      "description": "Metadata: Confidence level. A=Published, B=Calculated, C=Estimated, D=Engineering Estimate. This is about DATA QUALITY, not approval."
+      "description": "Metadata: Confidence level. A=Published, B=Calculated, C=Estimated, D=Engineering Estimate. This is about DATA QUALITY, not approval. Values accepted from an admin-approved secondary document are held at C."
     },
     "evidence_quality": {
       "type": "string",
@@ -216,7 +216,7 @@
         "Unknown"
       ],
       "default": "Unknown",
-      "description": "Metadata: Quality of the evidence behind the specifications."
+      "description": "Metadata: Quality of the evidence behind the specifications. A specification whose values came from an admin-approved secondary document is recorded as Engineering Estimate, and its source is stated in secondary_evidence."
     },
     "last_verified": {
       "type": "string",
@@ -229,7 +229,7 @@
     },
     "field_authority": {
       "type": "object",
-      "description": "Per-field source authority. Maps specification field names to their source type (e.g. { \"sensitivity_db\": \"Official PDF\", \"max_continuous_spl_db\": \"Official Product Page\" }). Records where each individual value came from, enabling precise change tracking when the crawler later re-extracts. Keys are spec field names; values are one of: Official Product Page, Official PDF, Engineering Document, Support Article.",
+      "description": "Per-field source authority. Maps specification field names to their source type (e.g. { \"sensitivity_db\": \"Official PDF\", \"max_continuous_spl_db\": \"Official Product Page\" }). Records where each individual value came from, enabling precise change tracking when the crawler later re-extracts. Keys are spec field names; values are one of: Official Product Page, Official PDF, Engineering Document, Support Article, Secondary Evidence.",
       "properties": {}
     },
     "approval_status": {
@@ -242,7 +242,7 @@
         "Archived"
       ],
       "default": "Draft",
-      "description": "Approval workflow status. Draft = entered but not yet submitted for review. Awaiting Review = submitted, waiting for a reviewer. Approved = signed off by an approver. Superseded = replaced by a newer specification version (the data was not wrong, just outdated). Archived = retired from active use. SEPARATE from Confidence (data quality) and Import Status (pipeline origin). 'Rejected' is intentionally absent \u2014 in practice data is rarely wrong; it is superseded when newer data arrives."
+      "description": "Approval workflow status. Draft = entered but not yet submitted for review. Awaiting Review = submitted, waiting for a reviewer. Approved = signed off by an approver. Superseded = replaced by a newer specification version (the data was not wrong, just outdated). Archived = retired from active use. SEPARATE from Confidence (data quality) and Import Status (pipeline origin). 'Rejected' is intentionally absent \u2014 in practice data is rarely wrong; it is superseded when newer data arrives. Accepting secondary evidence never changes this."
     },
     "reviewed_by": {
       "type": "string",
@@ -272,6 +272,54 @@
       "format": "date-time",
       "nullable": true,
       "description": "Timestamp of the last publish to the RP22 comparison. Null = never published."
+    },
+    "secondary_evidence": {
+      "type": "object",
+      "nullable": true,
+      "description": "Admin-approved secondary evidence: an original manufacturer document (product sheet, manual, brochure) hosted outside the manufacturer's own domain, for legacy or high-end models whose live official page no longer states the engineering values. Present only when an admin explicitly accepted a specific URL; never inferred, never automatic, and it never approves the specification. While present the comparison is capped at confidence C, unless the host is an official manufacturer CDN or archive.",
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "description": "Always 'Secondary Evidence' \u2014 the source type recorded for these values."
+        },
+        "url": {
+          "type": "string",
+          "description": "The document or page the admin supplied and accepted."
+        },
+        "host": {
+          "type": "string",
+          "description": "Host the document was read from."
+        },
+        "document_type": {
+          "type": "string",
+          "description": "manufacturer_product_sheet, manufacturer_manual, manufacturer_brochure, dealer_page, distributor_page or unknown."
+        },
+        "is_official": {
+          "type": "boolean",
+          "description": "True only when the host belongs to the manufacturer (official CDN or archive), in which case no confidence cap applies."
+        },
+        "accepted_by": {
+          "type": "string",
+          "description": "Name of the admin who accepted this evidence."
+        },
+        "accepted_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the evidence was accepted."
+        },
+        "basis": {
+          "type": "string",
+          "description": "'ADI estimate from secondary manufacturer document' or 'Calculated from secondary published data'."
+        },
+        "confidence_cap_reason": {
+          "type": "string",
+          "description": "Why the confidence is held where it is."
+        },
+        "field_quotes": {
+          "type": "object",
+          "description": "Per-field source sentence each accepted value was read from, keyed by field name."
+        }
+      }
     }
   },
   "required": [

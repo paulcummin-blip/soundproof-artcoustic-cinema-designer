@@ -27,6 +27,7 @@ import { buildComparisonRow } from "@/components/admin/speaker-db/model-first/rp
 import { normalizeCompetitor, parseSensitivityBasis } from "@/components/utils/spl/competitorNormalization";
 import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
 import { RP22_EQ_HEADROOM_LABEL } from "@/components/utils/spl/rp22HeadroomPolicy";
+import { SECONDARY_BADGE_LABEL, SECONDARY_STATEMENT, documentTypeLabel } from "@/components/admin/speaker-db/secondaryEvidence/secondaryEvidencePolicy.js";
 
 export const COMPARISON_CLASSES = {
   A: {
@@ -156,6 +157,15 @@ export function buildCandidate({
   const manufacturer = withId.manufacturer || product?.manufacturer_name || "";
   const model = withId.model || product?.model || "";
 
+  // Admin-approved secondary evidence: the numbers are usable for comparison but
+  // the badge must say so, and never as published measured manufacturer evidence.
+  const secondary = withId.evidence_source === "secondary" || withId.secondary_evidence
+    ? (withId.secondary_evidence || {})
+    : null;
+  const secondaryCapped = Boolean(secondary) && secondary.is_official !== true;
+  const badgeLabel = secondaryCapped ? SECONDARY_BADGE_LABEL : klass.badgeLabel;
+  const basisLabel = secondaryCapped ? (secondary.basis || klass.basis) : klass.basis;
+
   return {
     id: candidateId,
     record: withId,
@@ -166,8 +176,8 @@ export function buildCandidate({
     classKey,
     confidence: klass.confidence,
     label: klass.label,
-    badgeLabel: klass.badgeLabel,
-    basisLabel: klass.basis,
+    badgeLabel,
+    basisLabel,
     pillLabel: klass.pill,
     tone: klass.tone,
     meaning: klass.meaning,
@@ -178,10 +188,17 @@ export function buildCandidate({
     valuesUsed: valuesUsedText(withId),
     comparable: eligible && classKey !== "D",
     parityNote: COMPARISON_PARITY_STATEMENT,
-    adiStatement: classKey === "C" ? ADI_ESTIMATE_STATEMENT : null,
+    adiStatement: classKey === "C" && !secondaryCapped ? ADI_ESTIMATE_STATEMENT : null,
+    secondaryEvidence: secondaryCapped
+      ? {
+        ...secondary,
+        document_type_label: documentTypeLabel(secondary.document_type),
+      }
+      : null,
+    secondaryStatement: secondaryCapped ? SECONDARY_STATEMENT : null,
     sourceUrl: withId.source_url || product?.official_product_url || "",
     datasheetUrl: withId.datasheet_url || product?.official_pdf_url || "",
-    optionLabel: `${manufacturer} · ${model} — ${statusLabel} · ${klass.badgeLabel}`,
+    optionLabel: `${manufacturer} · ${model} — ${statusLabel} · ${badgeLabel}`,
   };
 }
 

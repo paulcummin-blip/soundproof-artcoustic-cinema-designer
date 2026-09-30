@@ -348,6 +348,11 @@ export default function ModelFirstWizard() {
           onApprove={() => persist("approve")}
           onPublish={handlePublish}
           publishResult={publishResult}
+          onSecondaryEvidenceAccepted={async () => {
+            if (!specification?.id) return;
+            const fresh = await base44.entities.SpeakerSpecification.get(specification.id);
+            if (fresh) setSpecification(fresh);
+          }}
         />
       )}
 

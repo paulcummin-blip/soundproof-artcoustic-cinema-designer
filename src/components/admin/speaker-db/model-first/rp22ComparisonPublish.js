@@ -185,6 +185,10 @@ export function buildComparisonRow({ product, specification, manufacturerName })
     source_confidence: spec.confidence || "",
     source_evidence_quality: spec.evidence_quality || "",
     spec_version_label: spec.version_label || "",
+    // An admin-approved secondary source travels with the row, so the comparison
+    // reader can cap the confidence and say where the values came from.
+    evidence_source: spec.secondary_evidence ? "secondary" : "official",
+    secondary_evidence: spec.secondary_evidence || null,
   };
 }
 

@@ -124,12 +124,12 @@
     "capability_basis": {
       "type": "string",
       "nullable": true,
-      "description": "How the capability figure was obtained: 'Published' when a published continuous SPL is used, 'Calculated' when derived from sensitivity plus the power authority. Null when the row is ungradeable."
+      "description": "How the capability figure was obtained: 'Published' when a published continuous SPL is used, 'Calculated' when derived from sensitivity plus the power authority, or the secondary-evidence basis phrase when the values came from an admin-approved secondary document. Null when the row is ungradeable."
     },
     "evidence_quality": {
       "type": "string",
       "nullable": true,
-      "description": "Evidence quality behind the comparison row: 'Manufacturer Published' when capability rests on a published power rating, 'Manufacturer Calculated' when it is derived from the recommended amplifier maximum, 'Unknown' when the row is ungradeable."
+      "description": "Evidence quality behind the comparison row: 'Manufacturer Published' when capability rests on a published power rating, 'Manufacturer Calculated' when it is derived from the recommended amplifier maximum, 'Secondary Evidence' when it rests on an admin-approved secondary document, 'Unknown' when the row is ungradeable."
     },
     "p12_p13_eligible": {
       "type": "boolean"
@@ -236,6 +236,63 @@
       "type": "string",
       "nullable": true,
       "description": "Version label of the source specification at publish time, for audit between the review database and the comparison row."
+    },
+    "evidence_source": {
+      "type": "string",
+      "enum": [
+        "official",
+        "secondary"
+      ],
+      "nullable": true,
+      "description": "Where this row's values came from. 'official' = a live manufacturer source or a legacy import. 'secondary' = an admin-approved copy of a manufacturer document held outside the manufacturer's own domain. A secondary row is held at confidence C by the comparison reader and is never presented as published measured manufacturer evidence."
+    },
+    "secondary_evidence": {
+      "type": "object",
+      "nullable": true,
+      "description": "The admin-approved secondary evidence behind this row, present only when the live official source no longer states the engineering values. Set only after a master admin explicitly accepted a specific document; never inferred and never automatic. While present, the reader caps the row at confidence C unless the host is an official manufacturer CDN or archive.",
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "description": "Always 'Secondary Evidence' \u2014 the source type recorded for this row."
+        },
+        "url": {
+          "type": "string",
+          "description": "The exact document or page the admin supplied and accepted."
+        },
+        "host": {
+          "type": "string",
+          "description": "Host the document was read from, for example a dealer or distributor domain."
+        },
+        "document_type": {
+          "type": "string",
+          "description": "What the document appears to be: manufacturer_product_sheet, manufacturer_manual, manufacturer_brochure, dealer_page, distributor_page or unknown."
+        },
+        "is_official": {
+          "type": "boolean",
+          "description": "True only when the host belongs to the manufacturer (an official CDN or archive), in which case no confidence cap applies."
+        },
+        "accepted_by": {
+          "type": "string",
+          "description": "Name of the admin who accepted this evidence."
+        },
+        "accepted_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the evidence was accepted."
+        },
+        "basis": {
+          "type": "string",
+          "description": "'ADI estimate from secondary manufacturer document' or 'Calculated from secondary published data'."
+        },
+        "confidence_cap_reason": {
+          "type": "string",
+          "description": "Why the confidence is held where it is, stated verbatim in the comparison hover panel."
+        },
+        "field_quotes": {
+          "type": "object",
+          "description": "Per-field source sentence each accepted value was read from, keyed by field name."
+        }
+      }
     }
   },
   "required": [

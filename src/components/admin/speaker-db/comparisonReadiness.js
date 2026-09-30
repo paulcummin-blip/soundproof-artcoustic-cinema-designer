@@ -148,6 +148,8 @@ export function comparisonReadiness({ product, specification }) {
     powerAuthorityW: normalized.power_authority_w,
     capabilityBasis: normalized.capability_basis,
     evidenceQuality: normalized.evidence_quality,
+    secondaryEvidence: normalized.secondary_evidence || null,
+    secondaryCapped: normalized.evidence_source === "secondary" && normalized.secondary_evidence?.is_official !== true,
     splAuthority: normalized.spl_authority,
     warnings: normalized.normalization_warnings || [],
   };
@@ -177,6 +179,7 @@ export function powerBasisText(specification) {
 /** Where the numbers come from — shown in the Evidence column. */
 export function evidenceText(readiness) {
   if (!readiness) return "—";
+  if (readiness.secondaryCapped) return `${readiness.confidence} · secondary evidence`;
   if (readiness.confidence === "A") return "A · published capability";
   if (readiness.confidence === "B") return "B · calculated";
   if (readiness.confidence === "C") return "C · ADI estimate";

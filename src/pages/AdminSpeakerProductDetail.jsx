@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Save, Plus, Trash2, ExternalLink, Calculator } from "lucide-react";
 import { resolveFieldAuthority, setFieldAuthoritySource } from "@/components/admin/speaker-db/fieldAuthority";
+import SecondaryEvidenceButton from "@/components/admin/speaker-db/secondaryEvidence/SecondaryEvidenceButton.jsx";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -524,6 +525,24 @@ export default function AdminSpeakerProductDetail() {
                     : specData.approval_status === "Archived" ? "#625143"
                     : BRAND.subtext,
                 }}>{specData.approval_status}</span>
+              )}
+              {/* A manufacturer document the admin supplies and accepts explicitly,
+                  for models whose live official page no longer states the values. */}
+              {!isNew && (
+                <div className="ml-auto">
+                  <SecondaryEvidenceButton
+                    manufacturerName={product?.manufacturer_name || ""}
+                    model={product?.model || ""}
+                    manufacturerWebsite={(manufacturers || []).find((m) => m.id === product?.manufacturer_id)?.website || ""}
+                    productId={productId}
+                    specification={specData}
+                    onAccepted={async () => {
+                      if (!specId) return;
+                      const fresh = await base44.entities.SpeakerSpecification.get(specId);
+                      if (fresh) setSpecData(fresh);
+                    }}
+                  />
+                </div>
               )}
             </div>
             <div className="text-xs mb-4" style={{ color: BRAND.subtext }}>

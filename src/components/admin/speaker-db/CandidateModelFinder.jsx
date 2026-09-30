@@ -20,6 +20,8 @@ import {
   ROLE_LABELS,
 } from "./candidateReview.js";
 import { createDraftProductsFromCandidates, loadExistingModelKeys } from "./candidateImport.js";
+import SecondaryEvidenceButton from "./secondaryEvidence/SecondaryEvidenceButton.jsx";
+import { ensureCandidateProduct } from "./secondaryEvidence/secondaryEvidenceClient.js";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -318,6 +320,20 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
                             {!row.source.hasDocument && row.candidate.document_note && (
                               <span className="text-xs" style={{ color: BRAND.warn }}>{row.candidate.document_note}</span>
                             )}
+                            {/* When the manufacturer no longer publishes the values, an
+                                admin can supply the original document and accept it
+                                explicitly — recorded, capped at C, never automatic. */}
+                            <SecondaryEvidenceButton
+                              manufacturerName={manufacturer.name}
+                              model={row.candidate.model}
+                              manufacturerWebsite={manufacturer.website}
+                              ensureProduct={() => ensureCandidateProduct({ manufacturer, candidate: row.candidate, actorName })}
+                              onAccepted={async () => {
+                                setExistingKeys(await loadExistingModelKeys(manufacturer.id));
+                                onCreated?.();
+                              }}
+                              compact
+                            />
                           </div>
                         </td>
                       </tr>

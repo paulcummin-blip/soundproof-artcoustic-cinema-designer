@@ -144,6 +144,11 @@ function infoValue(value, suffix = "") {
 // is never presented as the same evidence as a published measurement.
 function evidenceStanding(record) {
   if (!record) return "—";
+  // An admin-approved secondary document is an estimate whatever class the values
+  // would otherwise reach — it is never published measured capability.
+  if (record.evidence_source === "secondary" || record.secondary_evidence) {
+    return "ADI estimate from an admin-approved secondary manufacturer document";
+  }
   if (record.data_confidence === "A") return "Published measured capability";
   if (record.data_confidence === "B") return "Calculated from published specifications";
   if (record.data_confidence === "C") return "ADI estimate based on available manufacturer data";
@@ -201,7 +206,16 @@ function competitorInfoRows(record, result = null, candidate = null) {
     !String(record.sensitivity_measurement_basis || "").trim() ? "Sensitivity measurement basis" : null,
     !String(record.max_spl_measurement_basis || "").trim() ? "Max SPL measurement basis" : null,
   ].filter(Boolean);
+  const secondary = candidate?.secondaryEvidence || record.secondary_evidence || null;
   return [
+    ...(secondary ? [
+      ["Official source status", secondary.is_official ? "Official manufacturer host" : "Not on the official manufacturer domain"],
+      ["Secondary evidence URL", secondary.url || "—"],
+      ["Secondary evidence host", secondary.host || "—"],
+      ["Secondary document type", secondary.document_type_label || secondary.document_type || "—"],
+      ["Accepted by", `${secondary.accepted_by || "—"}${secondary.accepted_date ? ` · ${new Date(secondary.accepted_date).toLocaleDateString("en-GB")}` : ""}`],
+      ["Confidence cap reason", secondary.confidence_cap_reason || "—"],
+    ] : []),
     ["Manufacturer", record.manufacturer],
     ["Model", record.model],
     ["Product type", record.product_type],
@@ -832,6 +846,11 @@ export default function SPLCalculatorPage() {
                     {candidate?.adiStatement && (
                       <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
                         {candidate.adiStatement}
+                      </div>
+                    )}
+                    {candidate?.secondaryStatement && (
+                      <div style={{ padding: "5px 16px", fontSize: 12, color: "#9A6E00" }}>
+                        {candidate.secondaryStatement}
                       </div>
                     )}
                     {candidate?.classKey === "D" && (

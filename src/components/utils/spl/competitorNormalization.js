@@ -163,12 +163,28 @@ export function normalizeCompetitor(record) {
   // is not a published power rating, so it can never reach confidence A.
   if (!powerIsPublishedRating && dataConfidence === 'A') dataConfidence = 'B';
 
+  // Admin-approved secondary evidence — a manufacturer document copied by a
+  // third-party host. It is usable for comparison but is never published measured
+  // manufacturer evidence, so A and B are held at C. A source sitting on the
+  // manufacturer's own CDN or archive is not capped.
+  const secondaryEvidence = record.secondary_evidence && typeof record.secondary_evidence === 'object'
+    ? record.secondary_evidence
+    : null;
+  const secondaryCapped = Boolean(secondaryEvidence) && secondaryEvidence.is_official !== true;
+  if (secondaryCapped && (dataConfidence === 'A' || dataConfidence === 'B')) dataConfidence = 'C';
+
   // How the capability figure was obtained, and the quality of the evidence
   // behind the power authority it rests on.
-  const capabilityBasis = continuous !== null ? 'Published' : 'Calculated';
-  const evidenceQuality = powerIsPublishedRating
+  let capabilityBasis = continuous !== null ? 'Published' : 'Calculated';
+  let evidenceQuality = powerIsPublishedRating
     ? 'Manufacturer Published'
     : power === null ? 'Unknown' : 'Manufacturer Calculated';
+
+  if (secondaryCapped) {
+    capabilityBasis = secondaryEvidence.basis
+      || (continuous !== null ? 'Calculated from secondary published data' : 'ADI estimate from secondary manufacturer document');
+    evidenceQuality = 'Secondary Evidence';
+  }
 
   return {
     ...record,
@@ -197,6 +213,12 @@ export function normalizeCompetitor(record) {
     power_authority_w: power,
     capability_basis: eligible ? capabilityBasis : null,
     evidence_quality: evidenceQuality,
+    // Secondary evidence travels with the row so the reader can label it and say
+    // why the confidence was held where it is.
+    evidence_source: secondaryEvidence ? 'secondary' : 'official',
+    secondary_evidence: secondaryEvidence,
+    secondary_evidence_url: secondaryEvidence?.url || '',
+    confidence_cap_reason: secondaryCapped ? (secondaryEvidence.confidence_cap_reason || '') : '',
     p12_p13_eligible: eligible,
     normalization_warnings: warnings,
   };

@@ -7,6 +7,7 @@ import { Loader2, AlertTriangle, CheckCircle2, Upload } from "lucide-react";
 import { SPEC_GROUPS } from "../add-speaker/specFieldDefinitions.js";
 import { SpecInput } from "../add-speaker/StepReview.jsx";
 import { resolveContinuousPower } from "./rp22ComparisonPublish.js";
+import SecondaryEvidenceButton from "../secondaryEvidence/SecondaryEvidenceButton.jsx";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -42,6 +43,7 @@ export default function StepSpecReview({
   onPublish,
   publishResult,
   refreshOnPublish = true,
+  onSecondaryEvidenceAccepted = null,
 }) {
   const approved = specification?.approval_status === "Approved";
   const power = resolveContinuousPower(specification);
@@ -140,6 +142,39 @@ export default function StepSpecReview({
           </div>
         </div>
       ))}
+
+      {/* Secondary evidence — an admin-approved copy of the manufacturer's own
+          document, for models whose live official page no longer states the values. */}
+      <div style={{ border: `1px solid ${specification?.secondary_evidence ? "#BEDCC5" : BRAND.border}`, background: specification?.secondary_evidence ? "#F1F8F3" : BRAND.bg, borderRadius: 10, padding: 12, display: "grid", gap: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.text }}>Secondary evidence</div>
+        {specification?.secondary_evidence ? (
+          <div style={{ fontSize: 12, color: BRAND.subtext, display: "grid", gap: 3 }}>
+            <div style={{ overflowWrap: "anywhere" }}>{specification.secondary_evidence.url}</div>
+            <div>
+              Host {specification.secondary_evidence.host || "—"} · {String(specification.secondary_evidence.document_type || "document").replace(/_/g, " ")}
+            </div>
+            <div>
+              Accepted by {specification.secondary_evidence.accepted_by || "—"}
+              {specification.secondary_evidence.accepted_date ? ` · ${new Date(specification.secondary_evidence.accepted_date).toLocaleDateString("en-GB")}` : ""}
+            </div>
+            <div>Basis: {specification.secondary_evidence.basis} · {specification.secondary_evidence.confidence_cap_reason}</div>
+          </div>
+        ) : (
+          <div style={{ fontSize: 12, color: BRAND.subtext }}>
+            The live official source states no engineering values for this model. An admin can supply the manufacturer's own document
+            from elsewhere and accept it explicitly: the values are recorded as secondary evidence and the comparison is capped at C.
+          </div>
+        )}
+        <div>
+          <SecondaryEvidenceButton
+            manufacturerName={product?.manufacturer_name || ""}
+            model={product?.model || ""}
+            productId={product?.id || null}
+            specification={specification}
+            onAccepted={onSecondaryEvidenceAccepted}
+          />
+        </div>
+      </div>
 
       <div style={{ border: `1px solid ${approved ? "#BEDCC5" : BRAND.border}`, background: approved ? "#F1F8F3" : BRAND.bg, borderRadius: 10, padding: 14, display: "grid", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

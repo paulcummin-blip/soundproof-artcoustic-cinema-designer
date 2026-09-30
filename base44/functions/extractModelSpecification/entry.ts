@@ -15,6 +15,7 @@
 // ---------------------------------------------------------------------------
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { buildExtractionRules, coerceSpecValue, readSource } from '../../shared/speakerSourceReading.js';
 
 const ALLOWED_FIELDS = [
   'cabinet_type', 'mounting_type', 'woofer_count', 'woofer_size', 'midrange_count', 'midrange_size',
@@ -63,138 +64,35 @@ const EXTRACTION_SCHEMA = {
   },
 };
 
-function htmlToText(html) {
-  return String(html || '')
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&quot;/gi, '"')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-async function readSource(url) {
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; SoundProofSpeakerDatabase/1.0)',
-        Accept: 'text/html,application/xhtml+xml,application/pdf',
-      },
-    });
-    if (!response.ok) return { ok: false, note: `The source returned ${response.status}.`, text: '' };
-    const body = await response.text();
-    const text = htmlToText(body);
-    if (text.length < 200) return { ok: false, note: 'The source contained no readable specification text.', text: '' };
-    // Specification tables usually sit low on the page, so keep the start and
-    // the end rather than truncating the tail away.
-    const prepared = text.length <= 60000
-      ? text
-      : `${text.slice(0, 25000)}\n…\n${text.slice(-35000)}`;
-    return { ok: true, note: '', text: prepared };
-  } catch (error) {
-    return { ok: false, note: `The source could not be read (${error.message}).`, text: '' };
-  }
-}
+// Reading one source (page text or PDF attachment) and the extraction rules
+// everyone shares live in ../../shared/speakerSourceReading.js, so an official
+// read and an admin-approved secondary read cannot drift apart.
 
 // Canonical enum matching. Manufacturers write the same basis many ways
 // ("2.83V1m", "2.83V/1m", "2.83 V / 1 m", "2.83V @ 1m", "2.83 volts/1m"), so both
 // the published value and the enum option are compacted before comparison. Only
 // spellings of a basis the source actually states are accepted — an unstated
 // basis still comes back blank rather than being assumed.
-function compactEnumValue(value) {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '')
-    .replace(/@/g, '/')
-    .replace(/per/g, '/')
-    .replace(/volts?/g, 'v')
-    .replace(/watts?/g, 'w')
-    .replace(/,/g, '.');
-}
-
-function matchEnum(field, raw) {
-  const compact = compactEnumValue(raw);
-  const exact = (ENUMS[field] || []).find((option) => compactEnumValue(option) === compact);
-  if (exact) return exact;
-
-  if (field === 'sensitivity_basis') {
-    if (/^2\.83v/.test(compact)) return '2.83V/1m';
-    if (/^1w/.test(compact)) return '1W/1m';
-    if (/unknown|notstated|notspecified|unspecified|none|n\/a/.test(compact)) return 'unknown';
-    return '';
-  }
-  if (field === 'measurement_space') {
-    if (/half/.test(compact)) return 'half-space';
-    if (/free|full|anechoic/.test(compact)) return 'free-space';
-    if (/inroom/.test(compact)) return 'in-room';
-    if (/unspecified|unknown|notstated|none/.test(compact)) return 'unspecified';
-    return '';
-  }
-  if (field === 'max_spl_basis') {
-    if (/^aes/.test(compact)) return 'AES';
-    if (/^iec/.test(compact)) return 'IEC';
-    if (/unspecified/.test(compact)) return 'manufacturer unspecified';
-    if (/^continuous/.test(compact)) return 'continuous';
-    if (/^peak/.test(compact)) return 'peak';
-    if (/^calculated/.test(compact)) return 'calculated';
-    if (/unknown|notstated|none/.test(compact)) return 'unknown';
-    return '';
-  }
-  return '';
-}
-
-function coerce(field, value, rawText) {
-  const raw = value === null || value === undefined ? '' : String(value).trim();
-  if (!raw) return '';
-  if (ENUMS[field]) {
-    return matchEnum(field, raw);
-  }
-  if (!NUMERIC_FIELDS.has(field)) return raw;
-
-  // Decode this field's own figure: comma decimals are read as published
-  // (7,9 → 7.9) and a line such as "303 x 266 x 142 mm" yields 303, not a
-  // concatenation of every number in the sentence.
-  const context = `${raw} ${rawText || ''}`.toLowerCase();
-  const normalised = raw.replace(/(\d),(\d)/g, '$1.$2');
-  const firstNumber = normalised.match(/-?\d+(?:\.\d+)?/);
-  if (!firstNumber) return '';
-  const numeric = Number(firstNumber[0]);
-  if (!Number.isFinite(numeric)) return '';
-  if (/_hz$/.test(field) && numeric < 1000) {
-    // kHz only applies to this field's own figure, never to a neighbour in the
-    // same sentence (77 Hz–20 kHz must not turn 77 into 77,000).
-    const khz = [...context.matchAll(/(\d+(?:[.,]\d+)?)\s*k\s*hz/gi)]
-      .map((match) => Number(match[1].replace(',', '.')));
-    if (khz.some((value) => value === numeric)) return Math.round(numeric * 1000);
-  }
-  return numeric;
-}
+// Value decoding (canonical enum matching and per-field number decoding) lives in
+// ../../shared/speakerSourceReading.js, so every reading pass decodes identically.
 
 function rulesFor(manufacturerName, model) {
-  return [
-    `You are extracting loudspeaker specification facts for ONE exact model.`,
-    ``,
-    `Manufacturer: ${manufacturerName}`,
-    `Exact model: "${model}"`,
-    ``,
-    `Hard rules:`,
-    `1. Report a value only if the source explicitly states it for "${model}".`,
-    `2. Mark a field "ambiguous" only when the source genuinely leaves it unclear for this model — for example the figure is given for a range of models, or the sentence is contradictory. When the source states the value plainly for this model, mark it "reported".`,
-    `3. If the source does not state the field, return status "not_found" with an EMPTY value. Never infer, never estimate, never borrow a value from a sibling model, another series, a predecessor, or your own general knowledge.`,
-    `4. Never convert or normalise. Copy the published figure as stated, e.g. "92 dB", "4 Ω", "200 W". Text fields such as tweeter_description must be copied word for word from the source.`,
-    `5. Answer sensitivity_basis, max_spl_basis and measurement_space only when the source states the basis/space; otherwise "unknown" or "unspecified" respectively. When the source states the sensitivity reference — "2.83V1m", "2.83 V / 1 m", "2.83V @ 1m", "1W/1m" — answer sensitivity_basis with the recognised equivalent "2.83V/1m" or "1W/1m".`,
-    `6. Use only these exact field names: ${ALLOWED_FIELDS.join(', ')}.`,
-    `7. Give the exact sentence or table cell the value came from in raw_text.`,
-    `8. model_confirmed must be true only if the source names this exact model.`,
-    `9. Look specifically for a technical specifications table, spec sheet, or "Specifications" section — that is where sensitivity, impedance, power handling, max SPL and dispersion normally appear.`,
-    `10. cabinet_type is the enclosure (sealed, ported, passive radiator) and mounting_type is how it is installed (on-wall, in-wall, in-ceiling, freestanding). A phrase like "On-Wall Speaker" describes mounting_type only, so leave cabinet_type not_found unless the enclosure itself is described.`,
-    ``,
-    `Return JSON only.`,
-  ].join('\n');
+  return buildExtractionRules({
+    manufacturerName,
+    model,
+    rules: [
+      `Report a value only if the source explicitly states it for "${model}".`,
+      `Mark a field "ambiguous" only when the source genuinely leaves it unclear for this model — for example the figure is given for a range of models, or the sentence is contradictory. When the source states the value plainly for this model, mark it "reported".`,
+      `If the source does not state the field, return status "not_found" with an EMPTY value. Never infer, never estimate, never borrow a value from a sibling model, another series, a predecessor, or your own general knowledge.`,
+      `Never convert or normalise. Copy the published figure as stated, e.g. "92 dB", "4 Ω", "200 W". Text fields such as tweeter_description must be copied word for word from the source.`,
+      `Answer sensitivity_basis, max_spl_basis and measurement_space only when the source states the basis/space; otherwise "unknown" or "unspecified" respectively. When the source states the sensitivity reference — "2.83V1m", "2.83 V / 1 m", "2.83V @ 1m", "1W/1m" — answer sensitivity_basis with the recognised equivalent "2.83V/1m" or "1W/1m".`,
+      `Use only these exact field names: ${ALLOWED_FIELDS.join(', ')}.`,
+      `Give the exact sentence or table cell the value came from in raw_text.`,
+      `model_confirmed must be true only if the source names this exact model.`,
+      `Look specifically for a technical specifications table, spec sheet, or "Specifications" section — that is where sensitivity, impedance, power handling, max SPL and dispersion normally appear.`,
+      `cabinet_type is the enclosure (sealed, ported, passive radiator) and mounting_type is how it is installed (on-wall, in-wall, in-ceiling, freestanding). A phrase like "On-Wall Speaker" describes mounting_type only, so leave cabinet_type not_found unless the enclosure itself is described.`,
+    ],
+  });
 }
 
 export default async function (req) {
@@ -268,7 +166,10 @@ export default async function (req) {
       const field = String(item?.field || '').trim();
       if (!ALLOWED_FIELDS.includes(field)) continue;
       const status = ['reported', 'ambiguous', 'not_found'].includes(item?.status) ? item.status : 'not_found';
-      const value = status === 'not_found' ? '' : coerce(field, item?.value, item?.raw_text);
+      const value = status === 'not_found' ? '' : coerceSpecValue(field, item?.value, item?.raw_text, {
+        numericFields: NUMERIC_FIELDS,
+        enums: ENUMS,
+      });
       if (status === 'reported' && value !== '') reported.push({ field, value, raw_text: String(item?.raw_text || '').trim() });
       else if (status === 'ambiguous' && value !== '') ambiguous.push({ field, value, raw_text: String(item?.raw_text || '').trim() });
       else notFound.push(field);
