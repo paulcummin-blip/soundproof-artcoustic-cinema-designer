@@ -414,9 +414,6 @@ export default function SPLCalculatorPage() {
   const [basis, setBasis] = useState("minimum");
   const [artId, setArtId] = useState("");
   const [competitorRows, setCompetitorRows] = useState([]);
-  // Rows with too little published data to grade P12/P13. Listed separately and
-  // never offered as a selectable comparison speaker.
-  const [incompleteCompetitors, setIncompleteCompetitors] = useState([]);
   const [selectedCompetitorIds, setSelectedCompetitorIds] = useState([]);
   const [adminOpen, setAdminOpen] = useState(false);
   const [importPreview, setImportPreview] = useState([]);
@@ -451,15 +448,16 @@ export default function SPLCalculatorPage() {
       );
 
       const normalized = comparable.map(normalizeCompetitor);
+      // Only rows that can produce a defensible P12/P13 result are offered as
+      // comparison candidates. Ungradeable rows are not surfaced on this page at
+      // all — they are cleaned up in the admin Speaker Database.
       setCompetitorRows(normalized.filter((r) => r.p12_p13_eligible === true));
-      setIncompleteCompetitors(normalized.filter((r) => r.p12_p13_eligible !== true));
       setSelectedCompetitorIds((prev) => prev.filter(
         (id) => normalized.some((r) => r.id === id && r.p12_p13_eligible === true),
       ));
     } catch (error) {
       console.warn("[RP22 Speaker Capability] competitor data unavailable", error);
       setCompetitorRows([]);
-      setIncompleteCompetitors([]);
     } finally {
       setLoadingCompetitors(false);
     }
@@ -795,7 +793,7 @@ export default function SPLCalculatorPage() {
           {loadingCompetitors ? (
             <div style={{ padding: 18, color: BRAND.subtext }}>Loading comparison data…</div>
           ) : selectedCompetitorIds.length === 0 ? (
-            <div style={{ border: `1px dashed ${BRAND.border}`, borderRadius: 12, padding: 18, color: BRAND.subtext, fontSize: 13 }}>No comparison speakers selected. {competitorRows.length === 0 ? (incompleteCompetitors.length > 0 ? "No comparison speaker has enough published data to grade yet — see Incomplete legacy data below." : "Upload the competitor spreadsheet below to populate the comparison library.") : "Choose Add speaker to begin."}</div>
+            <div style={{ border: `1px dashed ${BRAND.border}`, borderRadius: 12, padding: 18, color: BRAND.subtext, fontSize: 13 }}>No comparison speakers selected. {competitorRows.length === 0 ? "No comparison speaker has enough published data to grade P12/P13 yet — add and publish the model in the Speaker Database." : "Choose Add speaker to begin."}</div>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
               {selectedCompetitorIds.map((id, index) => {
@@ -835,37 +833,6 @@ export default function SPLCalculatorPage() {
             </div>
           )}
         </div>
-
-        {incompleteCompetitors.length > 0 && (
-          <div style={{ marginTop: 14, background: BRAND.panel, border: `1px dashed ${BRAND.border}`, borderRadius: 14, padding: 18 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.subtext }}>Incomplete legacy data</div>
-            <div style={{ fontSize: 12, color: BRAND.hint, marginTop: 3, marginBottom: 10, lineHeight: 1.45 }}>
-              These rows carry too little published data to grade P12/P13, so they are not offered as comparison speakers. They are kept so the missing data can be completed.
-            </div>
-            <div style={{ display: "grid", gap: 6 }}>
-              {incompleteCompetitors.map((r) => (
-                <div
-                  key={r.id}
-                  style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center", padding: "9px 11px", border: `1px solid ${BRAND.soft}`, borderRadius: 9, fontSize: 12 }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, color: BRAND.subtext }}>{r.manufacturer} · {r.model}</div>
-                    <div style={{ color: BRAND.hint, marginTop: 2 }}>
-                      Insufficient published data{(r.normalization_warnings || []).length > 0
-                        ? ` — ${r.normalization_warnings.join(" · ")}`
-                        : ""}
-                    </div>
-                  </div>
-                  <div style={{ color: BRAND.hint, fontSize: 11, whiteSpace: "nowrap" }}>
-                    {r.publish_source === "speaker_database"
-                      ? `Speaker Database · ${r.approval_status || "Approved"}`
-                      : "Spreadsheet import"}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div style={{ marginTop: 14, background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
