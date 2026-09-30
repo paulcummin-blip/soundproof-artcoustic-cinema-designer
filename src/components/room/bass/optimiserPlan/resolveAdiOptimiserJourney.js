@@ -168,7 +168,17 @@ export function resolveOptimisationPlanRunBlock({
       ? `${OPTIMISER_PLAN_RUN_BLOCK_MESSAGE[OPTIMISER_PLAN_RUN_BLOCK.WORKER_FAILED]} (${errorMessage})`
       : null);
   }
-  if (hasCurrentResult || canCalculate) return null;
+  // A current result is usable, and so is a design the engine can still
+  // calculate (the run calculates it first). The one case with no usable bass
+  // evidence to optimise is a result that exists but is not a valid authority
+  // and cannot be recalculated.
+  const invalidResult = authorityStatus === "NOT_VERIFIED" || authorityStatus === "LIMITED";
+  if (hasCurrentResult || canCalculate) {
+    if (invalidResult && !canCalculate) {
+      return block(OPTIMISER_PLAN_RUN_BLOCK.NO_VALID_BASS_RESULT);
+    }
+    return null;
+  }
   return block(OPTIMISER_PLAN_RUN_BLOCK.CALCULATION_REQUIRED);
 }
 
@@ -208,7 +218,8 @@ export function resolveAdiOptimiserJourney({
   // ── 4. A current plan with complete lever-level evidence ──
   if (status === OPTIMISER_PLAN_STATUS.CURRENT && isLeverLevelComplete(planView)) {
     return build(ADI_OPTIMISER_JOURNEY_STATE.PLAN_AVAILABLE, {
-      message: ADI_OPTIMISER_COPY.PLAN_AVAILABLE,
+      // ADI guidance leads here too: the diagnosis first, then the evidence.
+      message: withLead(ADI_OPTIMISER_COPY.PLAN_AVAILABLE),
       explanation: null,
       showPlan: true,
     });
@@ -223,10 +234,16 @@ export function resolveAdiOptimiserJourney({
       ? ADI_OPTIMISER_ACTION.COMPLETE
       : ADI_OPTIMISER_ACTION.RERUN;
     return build(ADI_OPTIMISER_JOURNEY_STATE.EVALUATION_INCOMPLETE, {
-      message: ADI_OPTIMISER_COPY.LEVER_DATA,
+      // ADI guidance leads every state: the diagnosis comes first, then what is
+      // still incomplete.
+      message: withLead(ADI_OPTIMISER_COPY.LEVER_DATA),
       explanation: ADI_OPTIMISER_COPY.LEVER_EXPLANATION,
       notes: [ADI_OPTIMISER_COPY.WILL_EVALUATE, ADI_OPTIMISER_COPY.ELECTRONIC_FIRST],
       action,
+      // A CURRENT plan is shown even while its lever-level evidence is being
+      // completed: running the optimiser must always leave visible, evaluated
+      // evidence on the card rather than an unexplained "incomplete".
+      showPlan: status === OPTIMISER_PLAN_STATUS.CURRENT,
     });
   }
 

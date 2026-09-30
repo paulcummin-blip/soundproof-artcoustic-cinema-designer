@@ -12,31 +12,30 @@
 //   TEST 6  levers whose subwoofers disappeared → No longer applicable
 //   TEST 7  only a combined candidate → the fact is persisted (rule 6)
 //   TEST 8  no individual effect is ever borrowed from the combined candidate
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { buildOptimiserPlan } from '../src/components/room/bass/optimiserPlan/buildOptimiserPlan.js';
-import { resolveOptimiserPlanStatus } from '../src/components/room/bass/optimiserPlan/resolveOptimiserPlanStatus.js';
+import { buildOptimiserPlan } from '../components/room/bass/optimiserPlan/buildOptimiserPlan.js';
+import { resolveOptimiserPlanStatus } from '../components/room/bass/optimiserPlan/resolveOptimiserPlanStatus.js';
 import {
   hydrateOptimiserPlan,
   readPublishedOptimiserPlan,
   serializeOptimiserPlan,
-} from '../src/components/room/bass/optimiserPlan/optimiserPlanPersistence.js';
+} from '../components/room/bass/optimiserPlan/optimiserPlanPersistence.js';
 import {
   getOptimiserPlanAuthority,
   resetOptimiserPlanAuthority,
   setOptimiserLeverDecision,
   setOptimiserPlanAuthority,
-} from '../src/components/room/bass/optimiserPlan/optimiserPlanStore.js';
+} from '../components/room/bass/optimiserPlan/optimiserPlanStore.js';
 import {
   OPTIMISER_LEVER,
   OPTIMISER_LEVER_STATE,
   OPTIMISER_PLAN_STATUS,
-} from '../src/components/room/bass/optimiserPlan/optimiserPlanConstants.js';
+} from '../components/room/bass/optimiserPlan/optimiserPlanConstants.js';
 
-let failures = 0;
-const check = (name, fn) => {
-  try { fn(); console.log(`PASS  ${name}`); }
-  catch (e) { failures += 1; console.error(`FAIL  ${name}\n      ${e.message}`); }
-};
+// Each check is reported as a real test, so the plan save → restore → resolve
+// contract is covered where the rest of the suite is run.
+const check = (name, fn) => test(name, fn);
 
 const DESIGN_FP = 'design:fp:aaa';
 const RESULT_FP = 'result:fp:bbb';
@@ -372,5 +371,4 @@ check('TEST 14 — unreadable evidence is reported, never reinterpreted', () => 
   assert.equal(absent.evidenceMessage, 'No evaluated optimiser changes are available. Re-run the optimiser.');
 });
 
-if (failures) { console.error(`\n${failures} failing`); process.exit(1); }
-console.log('\nAll optimiser plan persistence checks passed.');
+// Coverage ends here: every check above is a test.
