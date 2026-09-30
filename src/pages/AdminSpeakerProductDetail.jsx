@@ -11,6 +11,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Save, Plus, Trash2, ExternalLink, Calculator } from "lucide-react";
+import { resolveFieldAuthority, setFieldAuthoritySource } from "@/components/admin/speaker-db/fieldAuthority";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -228,16 +229,10 @@ export default function AdminSpeakerProductDetail() {
   };
 
   const handleFieldAuthorityChange = (fieldKey, authorityValue) => {
-    setSpecData((prev) => {
-      const currentAuthority = prev.field_authority || {};
-      const nextAuthority = { ...currentAuthority };
-      if (authorityValue) {
-        nextAuthority[fieldKey] = authorityValue;
-      } else {
-        delete nextAuthority[fieldKey];
-      }
-      return { ...prev, field_authority: nextAuthority };
-    });
+    setSpecData((prev) => ({
+      ...prev,
+      field_authority: setFieldAuthoritySource(prev.field_authority, fieldKey, authorityValue),
+    }));
   };
 
   const handleSave = async () => {
@@ -622,7 +617,9 @@ export default function AdminSpeakerProductDetail() {
               <h3 className="text-sm font-bold uppercase tracking-wide mb-4" style={{ color: BRAND.green }}>{group.label}</h3>
               <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
                 {group.fields.map((field) => {
-                  const authority = specData.field_authority?.[field.key];
+                  // Entries are stored either as a plain source string or as
+                  // { source, note } — resolve before rendering, never render the entry itself.
+                  const authority = resolveFieldAuthority(specData.field_authority, field.key);
                   return (
                   <div key={field.key}>
                     <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>{field.label}</label>
@@ -630,7 +627,7 @@ export default function AdminSpeakerProductDetail() {
                       <>
                         <SpecField field={field} value={specData[field.key]} onChange={handleSpecChange} />
                         <select
-                          value={authority || ""}
+                          value={authority.source}
                           onChange={(e) => handleFieldAuthorityChange(field.key, e.target.value)}
                           className="w-full mt-1 px-1.5 py-1 rounded text-xs outline-none"
                           style={inputStyle}
@@ -647,8 +644,10 @@ export default function AdminSpeakerProductDetail() {
                         <div className="px-2 py-1.5 text-sm rounded-md" style={{ background: "#F8F8F7", color: BRAND.text, minHeight: 34, display: "flex", alignItems: "center" }}>
                           {field.type === "boolean" ? (specData[field.key] ? "Yes" : "No") : (specData[field.key] != null && specData[field.key] !== "" ? String(specData[field.key]) : "—")}
                         </div>
-                        {authority && (
-                          <div className="text-xs mt-0.5" style={{ color: BRAND.subtext }}>↳ {authority}</div>
+                        {authority.source && (
+                          <div className="text-xs mt-0.5" style={{ color: BRAND.subtext }}>
+                            ↳ {authority.source}{authority.note ? ` · ${authority.note}` : ""}
+                          </div>
                         )}
                       </>
                     )}
