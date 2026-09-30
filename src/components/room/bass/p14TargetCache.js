@@ -103,11 +103,20 @@ export function getRestoreLock(projectId, versionId) {
  * through the existing engine. Physics, grading and published values are
  * untouched — only the P18 presentation/result schema is invalidated.
  */
+// A floor-bounded P18 result cannot be explained without the selected-target
+// metadata. Only that case is invalidated by a legacy contract: a result with
+// no floor bound explains itself and is never regenerated for this reason.
+function requiresP18ExplanationRefresh(entry) {
+  if (hasP18SelectedTargetSchema(entry)) return false;
+  return entry?.assessmentEnvelope?.achievedP18Bounded === true
+    || entry?.productAnalysis?.parameters?.p18?.achievedExtensionBounded === true;
+}
+
 function isReadyTargetEntry(entry) {
   return isAuthoritativeBassContract(entry)
     && hasGraphPayload(entry)
     && hasReadyCanonicalP19Contract(entry)
-    && hasP18SelectedTargetSchema(entry);
+    && !requiresP18ExplanationRefresh(entry);
 }
 
 export function getTargetCacheEntry(projectId, versionId, baseDesignFingerprint, targetKey) {

@@ -124,7 +124,7 @@ function makeAuthoritativeContract({ targetKey = "minimum-L2", fingerprint = "fp
     },
     productAnalysis: {
       parameters: {
-        p18: { status: "complete", value: 30 },
+        p18: { status: "complete", value: 30, p18SelectedTargetSchemaVersion: 1 },
         p19: { status: "complete", value: 2.5, level: 4 },
         p20: { status: "complete", value: 2.0, level: 4 },
       },

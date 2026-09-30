@@ -121,7 +121,7 @@ function makeContract({ fingerprint = "fp-cal-1", targetKey = "minimum-L2", base
     productAnalysis: {
       parameters: {
         p14: { status: "complete", pass: true, achievedCapabilityDb: db, requestedTargetDb: db, headroomOrShortfallDb: 0 },
-        p18: { status: "complete", value: P18_HZ },
+        p18: { status: "complete", value: P18_HZ, p18SelectedTargetSchemaVersion: 1 },
         p19: { status: "complete", value: 2.5, level: 4 },
         p20: { status: "complete", value: 2.5, level: 4 },
       },

@@ -84,7 +84,7 @@ function makeAuthoritativeContract({ fingerprint = 'fp-cal-1', targetKey = 'mini
     },
     productAnalysis: {
       parameters: {
-        p18: { status: 'complete', value: P18_HZ },
+        p18: { status: 'complete', value: P18_HZ, p18SelectedTargetSchemaVersion: 1 },
         p19: {
           status: 'complete',
           value: 2.5,
