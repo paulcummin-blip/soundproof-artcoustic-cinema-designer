@@ -59,7 +59,7 @@ function SourceDot({ status, source }) {
   return <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: BRAND.border, flexShrink: 0 }} />;
 }
 
-function SpecInput({ field, value, onChange }) {
+export function SpecInput({ field, value, onChange }) {
   const inputStyle = { border: `1px solid ${BRAND.border}`, color: BRAND.text, background: BRAND.bg };
 
   if (field.type === "boolean") {

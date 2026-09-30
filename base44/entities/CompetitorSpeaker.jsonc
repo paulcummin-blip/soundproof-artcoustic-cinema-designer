@@ -166,12 +166,63 @@
       "items": {
         "type": "string"
       }
+    },
+    "source_product_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "ID of the SpeakerProduct this row was published from. Set only by 'Publish to RP22 Comparison'. Null for legacy spreadsheet-imported rows. Used to protect database-published rows from being replaced by a spreadsheet import."
+    },
+    "source_specification_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "ID of the approved SpeakerSpecification this row was published from, so the comparison row is always traceable to its approval record."
+    },
+    "publish_source": {
+      "type": "string",
+      "enum": [
+        "speaker_database",
+        "spreadsheet"
+      ],
+      "nullable": true,
+      "description": "Where this comparison row came from. 'speaker_database' = published from an approved specification (source of truth, protected from spreadsheet replacement). 'spreadsheet' = legacy/master-admin spreadsheet import. Null = pre-provenance historical row."
+    },
+    "published": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this row is approved for RP22 comparison. Database-sourced rows appear on the RP22 page only when true; legacy rows without publish provenance remain visible as before."
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "Timestamp of the last publish or spreadsheet import that wrote this row."
+    },
+    "approval_status": {
+      "type": "string",
+      "nullable": true,
+      "description": "Approval status of the source specification at publish time (always 'Approved'). Shown in the comparison hover panel as the verification status. Null for legacy spreadsheet rows."
+    },
+    "source_confidence": {
+      "type": "string",
+      "nullable": true,
+      "description": "Confidence (A/B/C/D) of the source specification at publish time, so the comparison row states how well evidenced its data is."
+    },
+    "source_evidence_quality": {
+      "type": "string",
+      "nullable": true,
+      "description": "Evidence quality of the source specification at publish time (Manufacturer Published, Manufacturer Calculated, Engineering Estimate, Unknown)."
+    },
+    "spec_version_label": {
+      "type": "string",
+      "nullable": true,
+      "description": "Version label of the source specification at publish time, for audit between the review database and the comparison row."
     }
   },
   "required": [
     "manufacturer",
     "model"
   ],
+  "name": "CompetitorSpeaker",
   "rls": {
     "read": {
       "$or": [
@@ -202,6 +253,5 @@
         "role": "admin"
       }
     }
-  },
-  "name": "CompetitorSpeaker"
+  }
 }

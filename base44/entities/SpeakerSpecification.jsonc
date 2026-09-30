@@ -73,6 +73,16 @@
       "type": "number",
       "description": "Electrical: Sensitivity in dB (typically 1W/1m or 2.83V/1m). Valid range 75-105 dB."
     },
+    "sensitivity_basis": {
+      "type": "string",
+      "enum": [
+        "1W/1m",
+        "2.83V/1m",
+        "unknown"
+      ],
+      "default": "unknown",
+      "description": "RP22 comparison: the reference basis the published sensitivity was quoted on. Required for correct 1 W / 1 m normalisation. 'unknown' is honest \u2014 the comparison assumes half space and records an assumed-basis warning. Never guessed from the value itself."
+    },
     "nominal_impedance_ohm": {
       "type": "number",
       "description": "Electrical: Nominal impedance in ohms. Valid range 2-16 \u03a9."
@@ -105,6 +115,14 @@
       "type": "number",
       "description": "Electrical: Peak power handling in watts."
     },
+    "power_handling_continuous_w": {
+      "type": "number",
+      "description": "RP22 comparison: the single continuous power figure used for P12/P13 capability. Populated only when the manufacturer states a continuous rating; left blank rather than inferred from AES/peak figures."
+    },
+    "power_handling_peak_w": {
+      "type": "number",
+      "description": "RP22 comparison: the peak power figure when the manufacturer states one. Blank when not published."
+    },
     "frequency_response_low_hz": {
       "type": "number",
       "description": "Acoustic: Lowest frequency response in Hz. Valid range 10-200 Hz."
@@ -117,6 +135,10 @@
       "type": "string",
       "description": "Acoustic: Frequency response tolerance (e.g. '\u00b13dB', '-6dB')."
     },
+    "frequency_response_tolerance_db": {
+      "type": "number",
+      "description": "RP22 comparison: numeric tolerance in dB (e.g. 6 for '-6 dB'). Blank when the manufacturer states no tolerance."
+    },
     "max_continuous_spl_db": {
       "type": "number",
       "description": "Acoustic: Maximum continuous SPL in dB. Valid range 85-140 dB."
@@ -124,6 +146,31 @@
     "max_peak_spl_db": {
       "type": "number",
       "description": "Acoustic: Maximum peak SPL in dB."
+    },
+    "max_spl_basis": {
+      "type": "string",
+      "enum": [
+        "AES",
+        "IEC",
+        "continuous",
+        "peak",
+        "manufacturer unspecified",
+        "calculated",
+        "unknown"
+      ],
+      "default": "unknown",
+      "description": "RP22 comparison: the basis behind the published max SPL figure. Drives the comparison's max-SPL basis declaration and its confidence grading. Never inferred \u2014 'manufacturer unspecified' and 'unknown' are honest answers."
+    },
+    "measurement_space": {
+      "type": "string",
+      "enum": [
+        "free-space",
+        "half-space",
+        "in-room",
+        "unspecified"
+      ],
+      "default": "unspecified",
+      "description": "RP22 comparison: the acoustic space the published figures were measured in. free-space is converted once to the Artcoustic half-space reference; half-space is used as published; in-room and unspecified are treated as unspecified so the comparison records an assumed-basis warning instead of inventing a correction."
     },
     "horizontal_dispersion_deg": {
       "type": "number",
@@ -140,6 +187,15 @@
     "primary_source": {
       "type": "string",
       "description": "Metadata: Primary source reference for the specification data."
+    },
+    "source_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Metadata: date the source document or page was published or last checked. Carried into the RP22 comparison row so a dealer can see how current the competitor data is."
+    },
+    "datasheet_url": {
+      "type": "string",
+      "description": "Metadata: URL of the official datasheet used as the primary source, when it differs from the product page."
     },
     "confidence": {
       "type": "string",
@@ -166,6 +222,10 @@
       "type": "string",
       "format": "date",
       "description": "Metadata: Date the specifications were last verified against the source."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Metadata: free-text engineering notes for this specification. Carried into the RP22 comparison row notes so caveats travel with the data."
     },
     "field_authority": {
       "type": "object",
@@ -201,6 +261,17 @@
       "type": "string",
       "format": "date",
       "description": "Date the specification was approved."
+    },
+    "rp22_published_competitor_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "ID of the CompetitorSpeaker row this approved specification was published to. Null = never published to the RP22 comparison. Set by the 'Publish to RP22 Comparison' action, and re-pointed (never duplicated) when the same manufacturer + model is published again."
+    },
+    "rp22_published_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "Timestamp of the last publish to the RP22 comparison. Null = never published."
     }
   },
   "required": [

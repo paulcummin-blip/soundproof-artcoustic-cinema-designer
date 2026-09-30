@@ -60,6 +60,20 @@ export const SPEC_GROUPS = [
     ],
   },
   {
+    label: "RP22 Comparison Basis",
+    fields: [
+      { key: "sensitivity_basis", label: "Sensitivity Basis", type: "select", options: ["", "1W/1m", "2.83V/1m", "unknown"] },
+      { key: "power_handling_continuous_w", label: "Continuous Power (W)", type: "number", range: { min: 1, max: 2000 } },
+      { key: "power_handling_peak_w", label: "Peak Power (W)", type: "number", range: { min: 1, max: 10000 } },
+      { key: "max_spl_basis", label: "Max SPL Basis", type: "select", options: ["", "AES", "IEC", "continuous", "peak", "manufacturer unspecified", "calculated", "unknown"] },
+      { key: "measurement_space", label: "Measurement Space", type: "select", options: ["", "free-space", "half-space", "in-room", "unspecified"] },
+      { key: "frequency_response_tolerance_db", label: "Frequency Response Tolerance (dB)", type: "number", range: { min: 0.5, max: 20 } },
+      { key: "source_date", label: "Source Date", type: "date" },
+      { key: "datasheet_url", label: "Datasheet URL", type: "text" },
+      { key: "notes", label: "Notes", type: "text" },
+    ],
+  },
+  {
     label: "Metadata",
     fields: [
       { key: "primary_source", label: "Primary Source", type: "text" },

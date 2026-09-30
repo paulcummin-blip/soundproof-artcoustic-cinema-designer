@@ -186,6 +186,7 @@ function competitorInfoRows(record, result = null) {
     ["Final limiting factor", limitingFactor],
     ["SPL authority", record.spl_authority || "—"],
     ["Data confidence", record.data_confidence || "—"],
+    ["Verification status", record.approval_status || "Spreadsheet import"],
     ["Date checked", record.date_checked || "—"],
     ["Notes", record.notes || "—"],
   ];
@@ -386,7 +387,13 @@ export default function SPLCalculatorPage() {
     setLoadingCompetitors(true);
     try {
       const rows = await base44.entities.CompetitorSpeaker.list("manufacturer", 500);
-      setCompetitorRows((rows || []).filter((r) => r.active !== false).map(normalizeCompetitor));
+      // Only approved/published rows are comparable. Rows published from the
+      // Speaker Database appear here once approved and published; legacy
+      // spreadsheet rows carry no publish provenance and stay visible as before.
+      const comparable = (rows || [])
+        .filter((r) => r.active !== false)
+        .filter((r) => r.publish_source !== "speaker_database" || r.published === true);
+      setCompetitorRows(comparable.map(normalizeCompetitor));
     } catch (error) {
       console.warn("[RP22 Speaker Capability] competitor data unavailable", error);
       setCompetitorRows([]);
@@ -588,12 +595,25 @@ export default function SPLCalculatorPage() {
     setImportStatus("Applying import…");
     try {
       const existing = await base44.entities.CompetitorSpeaker.list("-created_date", 500);
-      await Promise.all((existing || []).map((r) => base44.entities.CompetitorSpeaker.delete(r.id)));
+      // Approved rows published from the Speaker Database are the source of
+      // truth and are never deleted or overwritten by a spreadsheet import.
+      const preserved = (existing || []).filter((r) => r.publish_source === "speaker_database");
+      const replaceable = (existing || []).filter((r) => r.publish_source !== "speaker_database");
+      await Promise.all(replaceable.map((r) => base44.entities.CompetitorSpeaker.delete(r.id)));
       const batch = new Date().toISOString();
       for (const row of validRows) {
-        await base44.entities.CompetitorSpeaker.create({ ...row.record, import_batch: batch });
+        await base44.entities.CompetitorSpeaker.create({
+          ...row.record,
+          import_batch: batch,
+          publish_source: "spreadsheet",
+          published: true,
+          published_at: batch,
+        });
       }
-      setImportStatus(`Applied ${validRows.length} competitor speakers from ${importFileName}`);
+      setImportStatus(
+        `Applied ${validRows.length} competitor speakers from ${importFileName}`
+        + (preserved.length ? ` · ${preserved.length} approved Speaker Database row${preserved.length === 1 ? "" : "s"} preserved` : ""),
+      );
       setImportPreview([]);
       setSelectedCompetitorIds([]);
       await loadCompetitors();

@@ -67,6 +67,12 @@ export default function AdminSpeakerDatabase() {
         <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
           A structured catalogue of loudspeaker specifications and sources. Capability is derived downstream by the RP22 engine.
         </div>
+        <a
+          href="/admin/speaker-database/model-first"
+          style={{ display: "inline-block", marginTop: 12, padding: "9px 14px", borderRadius: 10, background: BRAND.text, color: BRAND.btnText, fontSize: 13, fontWeight: 600, textDecoration: "none" }}
+        >
+          Add competitor model by name
+        </a>
       </div>
 
       <SpeakerDbNav active={section} onChange={setSection} />
