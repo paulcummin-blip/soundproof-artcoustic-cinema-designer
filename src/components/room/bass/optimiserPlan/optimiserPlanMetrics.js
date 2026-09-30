@@ -50,6 +50,49 @@ export function worstP19Seat(result) {
 }
 
 /**
+ * Compact per-seat P19/P20 rows, in the order the seats appear on the result.
+ * Only seats the result actually carries are written — a seat that was not
+ * evaluated is absent, never estimated.
+ */
+export function summariseSeats(result) {
+  const rows = [];
+  const byId = new Map();
+  const ensure = (seatId) => {
+    if (!seatId) return null;
+    if (!byId.has(seatId)) {
+      const row = {
+        seatId,
+        p19VariationDb: null,
+        p19Level: null,
+        p20VariationDb: null,
+        p20Level: null,
+        p20WorstFrequencyHz: null,
+      };
+      byId.set(seatId, row);
+      rows.push(row);
+    }
+    return byId.get(seatId);
+  };
+
+  (Array.isArray(result?.perSeatP20) ? result.perSeatP20 : []).forEach((seat) => {
+    const row = ensure(seat?.seatId);
+    if (!row) return;
+    row.p20VariationDb = num(seat?.variationDbRaw ?? seat?.wholeDbDeviation);
+    row.p20Level = num(seat?.level);
+    row.p20WorstFrequencyHz = num(seat?.worstFrequencyHz);
+  });
+
+  (Array.isArray(result?.perSeatP19) ? result.perSeatP19 : []).forEach((seat) => {
+    const row = ensure(seat?.seatId);
+    if (!row) return;
+    row.p19VariationDb = num(seat?.wholeDbDeviation ?? seat?.variationDbRaw);
+    row.p19Level = num(seat?.level);
+  });
+
+  return rows;
+}
+
+/**
  * Snapshot the P19/P20 headline of a candidate or baseline result.
  * Returns null when the result carries no authority metrics at all.
  */
@@ -69,8 +112,10 @@ export function summariseResult(result) {
     p14AchievedDb: num(result.p14AchievedDb),
     achievedP18Hz: num(result.achievedP18Hz),
     operatingOutputDb: num(result.operatingOutputDb),
+    seats: summariseSeats(result),
   };
-  const hasAny = Object.values(summary).some((value) => value != null);
+  const hasAny = Object.entries(summary)
+    .some(([key, value]) => (key === "seats" ? value.length > 0 : value != null));
   return hasAny ? summary : null;
 }
 

@@ -24,6 +24,33 @@ const signed = (value, unit) => {
   return `${Number(value) >= 0 ? "+" : "−"}${text} ${unit}`;
 };
 
+/** Persisted P14/P18/P19/P20 headline rows — read, never recalculated. */
+function ResultRows({ result }) {
+  if (!result) return null;
+  const rows = [];
+  if (result.p14AchievedDb != null) rows.push(`P14: ${fmt(result.p14AchievedDb)} dB`);
+  if (result.achievedP18Hz != null) rows.push(`P18: ${fmt(result.achievedP18Hz, 1)} Hz`);
+  if (result.p19VariationDb != null) {
+    rows.push(`P19: ${fmt(result.p19VariationDb)} dB${result.p19DeltaDb != null ? ` (${signed(result.p19DeltaDb, "dB")})` : ""}`);
+  }
+  if (result.p20VariationDb != null) {
+    rows.push(`P20: ${fmt(result.p20VariationDb)} dB${result.p20DeltaDb != null ? ` (${signed(result.p20DeltaDb, "dB")})` : ""}`);
+  }
+  if (result.worstSeatId) {
+    const hz = result.worstFrequencyHz != null ? ` · limiting ${fmt(result.worstFrequencyHz, 0)} Hz` : "";
+    rows.push(`Worst seat: ${result.worstSeatId}${hz}`);
+  }
+  if (result.outputDeltaDb != null && Math.abs(result.outputDeltaDb) >= 0.1) {
+    rows.push(`Available output: ${signed(result.outputDeltaDb, "dB")}`);
+  }
+  if (rows.length === 0) return null;
+  return (
+    <div className="mt-1 text-[11px] text-[#625143] space-y-0.5">
+      {rows.map((row) => <div key={row}>{row}</div>)}
+    </div>
+  );
+}
+
 function statePillStyle(state) {
   if (state === OPTIMISER_LEVER_STATE.APPLIED) return { background: "#E7F0E9", border: "#9DB8A4", color: "#213428" };
   if (state === OPTIMISER_LEVER_STATE.DISABLED) return { background: "#EFEFEC", border: "#CFCCC4", color: "#625143" };
@@ -91,7 +118,29 @@ export default function OptimisationPlanStatus({
     projectId, versionId, completedBassAuthority, currentDesignFingerprint, instances,
   });
 
-  if (view.status === OPTIMISER_PLAN_STATUS.ABSENT) return null;
+  // No evaluated evidence for this version (prose only): state the fact, offer
+  // no lever controls.
+  if (view.status === OPTIMISER_PLAN_STATUS.ABSENT) {
+    return (
+      <div className={`rounded-lg border border-[#E7E5E0] bg-[#FAFAF9] p-2.5 text-[11px] text-[#8B7F76] ${className}`}>
+        {view.evidenceMessage}
+      </div>
+    );
+  }
+
+  // Saved evidence exists but is unreadable (absent / older schema version).
+  // Never reinterpreted, never turned into fabricated levers.
+  if (view.status === OPTIMISER_PLAN_STATUS.UNSUPPORTED) {
+    return (
+      <div className={`rounded-lg border border-[#E0C48F] bg-[#FBF3E4] p-2.5 ${className}`}>
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-[#8A5A2B]" />
+          <span className="text-[12px] font-semibold text-[#1B1A1A]">Optimisation Plan</span>
+        </div>
+        <div className="mt-1 text-[11px] text-[#8A5A2B]">{view.evidenceMessage}</div>
+      </div>
+    );
+  }
 
   const isStale = view.status === OPTIMISER_PLAN_STATUS.STALE;
   const headerStyle = isStale
@@ -126,6 +175,13 @@ export default function OptimisationPlanStatus({
         {view.disabledCount > 0 && <span>{view.disabledCount} disabled</span>}
       </div>
 
+      {view.baseline && (
+        <div className="mt-2 rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2">
+          <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">BASELINE (AS FOUND)</div>
+          <ResultRows result={view.baseline} />
+        </div>
+      )}
+
       {isStale && view.staleReason && (
         <div className="mt-2 text-[11px] text-[#8A5A2B]">{view.staleReason}</div>
       )}
@@ -158,6 +214,17 @@ export default function OptimisationPlanStatus({
               ))}
             </div>
 
+            {lever.evidenceLabel && (
+              <div className="mt-1 text-[10px] text-[#8B7F76]">
+                {lever.evidenceLabel}
+                {lever.sourceCandidateId ? ` · ${lever.sourceCandidateId}` : ""}
+              </div>
+            )}
+
+            {lever.notEvaluated && lever.notEvaluatedReason && (
+              <div className="mt-1 text-[10px] text-[#8A5A2B]">{lever.notEvaluatedReason}</div>
+            )}
+
             {lever.reason && (
               <div className="mt-1.5 text-[11px] text-[#625143]">Reason: {lever.reason}</div>
             )}
@@ -173,20 +240,28 @@ export default function OptimisationPlanStatus({
         ))}
       </div>
 
-      {view.combinedEffect && (
+      {view.combined && (
         <div className="mt-2.5 rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2">
           <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">COMBINED CANDIDATE</div>
-          <div className="mt-1 text-[11px] text-[#625143]">
-            {view.combinedEffect.p20VariationDb != null && (
-              <div>P20: {fmt(view.combinedEffect.p20VariationDb)} dB{view.combinedEffect.p20DeltaDb != null ? ` (${signed(view.combinedEffect.p20DeltaDb, "dB")})` : ""}</div>
-            )}
-            {view.combinedEffect.p19VariationDb != null && (
-              <div>P19: {fmt(view.combinedEffect.p19VariationDb)} dB</div>
-            )}
-            {view.combinedEffect.worstSeatId && (
-              <div>Worst seat: {view.combinedEffect.worstSeatId}{view.combinedEffect.worstFrequencyHz != null ? ` · ${fmt(view.combinedEffect.worstFrequencyHz, 0)} Hz` : ""}</div>
-            )}
-          </div>
+          {view.combined.candidateId && (
+            <div className="mt-0.5 text-[10px] text-[#8B7F76]">
+              {view.combined.candidateId}
+              {view.combined.seats.length > 0 ? ` · ${view.combined.seats.length} seats evaluated` : ""}
+            </div>
+          )}
+          <ResultRows result={view.combined.effect} />
+          {view.combined.tuning.filter((row) => row.changed).length > 0 && (
+            <div className="mt-1.5 space-y-0.5">
+              {view.combined.tuning.filter((row) => row.changed).map((row) => (
+                <div key={row.subId} className="text-[11px] text-[#1B1A1A]">
+                  <span className="text-[#625143]">{row.label || row.subId}</span>
+                  {row.toDelayMs !== row.fromDelayMs && <span>{` — delay ${fmt(row.fromDelayMs)} → ${fmt(row.toDelayMs)} ms`}</span>}
+                  {row.toGainDb !== row.fromGainDb && <span>{` — gain ${fmt(row.fromGainDb)} → ${fmt(row.toGainDb)} dB`}</span>}
+                  {row.fromPolarity !== row.toPolarity && <span>{` — polarity ${row.fromLabel} → ${row.toLabel}`}</span>}
+                </div>
+              ))}
+            </div>
+          )}
           {view.combinedTradeOff?.reason && (
             <div className="mt-1 text-[11px] text-[#8A5A2B]">Trade-off: {view.combinedTradeOff.reason}</div>
           )}

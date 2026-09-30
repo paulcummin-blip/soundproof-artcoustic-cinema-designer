@@ -14,11 +14,15 @@
 
 import {
   INDIVIDUAL_EFFECT_NOT_EVALUATED,
+  NO_EVALUATED_OPTIMISER_CHANGES,
+  OPTIMISER_EVIDENCE_STATUS_LABEL,
+  OPTIMISER_EVIDENCE_UNAVAILABLE,
   OPTIMISER_LEVER_LABEL,
   OPTIMISER_LEVER_ORDER,
   OPTIMISER_LEVER_STATE,
   OPTIMISER_LEVER_STATE_LABEL,
   OPTIMISER_PLAN_STATUS,
+  OPTIMISER_PLAN_VERSION,
 } from "./optimiserPlanConstants.js";
 import { resolveLeverState } from "./optimiserPlanMatching.js";
 
@@ -37,9 +41,16 @@ export function resolveOptimiserPlanStatus({
   if (!plan) {
     return {
       status: OPTIMISER_PLAN_STATUS.ABSENT,
+      evidenceMessage: NO_EVALUATED_OPTIMISER_CHANGES,
+      planVersion: null,
+      projectId: null,
+      versionId: null,
+      target: null,
       staleReason: null,
       levers: [],
       individualEffectsEvaluated: false,
+      baseline: null,
+      combined: null,
       combinedEffect: null,
       combinedTradeOff: null,
       predicted: null,
@@ -49,6 +60,34 @@ export function resolveOptimiserPlanStatus({
       savedAt: null,
       candidateId: null,
       engineVersion: null,
+    };
+  }
+
+  // Schema guard: evidence saved without a version, or under an older one, is
+  // NOT reinterpreted. No lever is fabricated from evidence we cannot read.
+  const savedVersion = Number(plan.planVersion);
+  if (!Number.isFinite(savedVersion) || savedVersion < OPTIMISER_PLAN_VERSION) {
+    return {
+      status: OPTIMISER_PLAN_STATUS.UNSUPPORTED,
+      evidenceMessage: OPTIMISER_EVIDENCE_UNAVAILABLE,
+      planVersion: Number.isFinite(savedVersion) ? savedVersion : null,
+      projectId: plan.projectId || null,
+      versionId: plan.versionId || null,
+      target: plan.target || null,
+      staleReason: null,
+      levers: [],
+      individualEffectsEvaluated: false,
+      baseline: null,
+      combined: null,
+      combinedEffect: null,
+      combinedTradeOff: null,
+      predicted: null,
+      appliedCount: 0,
+      disabledCount: 0,
+      notes: [],
+      savedAt: plan.savedAt || null,
+      candidateId: plan.candidateId || null,
+      engineVersion: plan.engineVersion || null,
     };
   }
 
@@ -76,7 +115,14 @@ export function resolveOptimiserPlanStatus({
       return {
         key: leverKey,
         label: OPTIMISER_LEVER_LABEL[leverKey],
+        evidenceStatus: lever.evidenceStatus || null,
+        evidenceLabel: lever.evidenceStatus
+          ? OPTIMISER_EVIDENCE_STATUS_LABEL[lever.evidenceStatus] || null
+          : null,
         evaluated: lever.evaluated === true,
+        notEvaluated: lever.notEvaluated === true,
+        notEvaluatedReason: lever.notEvaluatedReason || null,
+        sourceCandidateId: lever.sourceCandidateId || null,
         effect: lever.effect || null,
         effectLabel: lever.effect ? null : INDIVIDUAL_EFFECT_NOT_EVALUATED,
         changes: Array.isArray(lever.changes) ? lever.changes : [],
@@ -93,9 +139,25 @@ export function resolveOptimiserPlanStatus({
 
   return {
     status,
+    evidenceMessage: null,
+    planVersion: savedVersion,
+    projectId: plan.projectId || null,
+    versionId: plan.versionId || null,
+    target: plan.target || null,
     staleReason,
     levers,
     individualEffectsEvaluated: plan.individualEffectsEvaluated === true,
+    baseline: plan.baseline || null,
+    combined: plan.combined
+      ? {
+        candidateId: plan.combined.candidateId || null,
+        coordinates: plan.combined.coordinates || null,
+        tuning: Array.isArray(plan.combined.tuning) ? plan.combined.tuning : [],
+        effect: plan.combined.effect || null,
+        seats: Array.isArray(plan.combined.seats) ? plan.combined.seats : [],
+        tradeOff: plan.combined.tradeOff || null,
+      }
+      : null,
     combinedEffect: plan.combined?.effect || null,
     combinedTradeOff: plan.combined?.tradeOff || null,
     predicted: plan.combined?.effect

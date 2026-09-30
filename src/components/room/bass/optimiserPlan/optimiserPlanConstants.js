@@ -7,8 +7,49 @@
 // optimiser, its scoring, the bass maths, RP22 grading, or any calculation.
 // ---------------------------------------------------------------------------
 
-/** Schema version of the persisted plan object. Bump when the shape changes. */
-export const OPTIMISER_PLAN_VERSION = 1;
+/**
+ * Schema version of the persisted optimiser evidence object.
+ *
+ * Bump whenever the persisted shape changes. Evidence saved without a version,
+ * or under an older one, is NEVER reinterpreted: the reader reports it as
+ * unavailable and asks for a re-run. It never crashes and never fabricates a
+ * lever from evidence it cannot read.
+ */
+export const OPTIMISER_PLAN_VERSION = 2;
+
+/**
+ * Evidence status of a single lever. This is the honest classification of what
+ * the optimiser actually evaluated — it is persisted, not inferred on read.
+ */
+export const OPTIMISER_LEVER_EVIDENCE = Object.freeze({
+  /** The lever has its own lever-only evaluation.
+   */
+  EVALUATED: "evaluated",
+  /** The lever's values exist only inside the combined candidate — no lever-only effect.
+   */
+  COMBINED_ONLY: "combined-only",
+  /** The lever was never evaluated in any form.
+   */
+  NOT_EVALUATED: "not-evaluated",
+});
+
+export const OPTIMISER_EVIDENCE_STATUS_LABEL = Object.freeze({
+  [OPTIMISER_LEVER_EVIDENCE.EVALUATED]: "Evaluated on its own",
+  [OPTIMISER_LEVER_EVIDENCE.COMBINED_ONLY]: "Combined candidate only — no individual evaluation",
+  [OPTIMISER_LEVER_EVIDENCE.NOT_EVALUATED]: "Not evaluated",
+});
+
+/** Recorded against polarity: its value comes from the combined candidate only. */
+export const POLARITY_NOT_EVALUATED_REASON =
+  "No polarity-only evaluation exists — the polarity value comes from the combined candidate. Re-run the optimiser with polarity isolated before applying it.";
+
+/** Shown when this version has no evaluated optimiser evidence at all (prose only). */
+export const NO_EVALUATED_OPTIMISER_CHANGES =
+  "No evaluated optimiser changes are available. Re-run the optimiser.";
+
+/** Shown when saved evidence is missing its schema version or predates the current one. */
+export const OPTIMISER_EVIDENCE_UNAVAILABLE =
+  "Optimiser evidence unavailable — re-run the optimiser.";
 
 /** The lever set in scope for the Optimisation Plan. */
 export const OPTIMISER_LEVER = Object.freeze({
@@ -38,6 +79,8 @@ export const OPTIMISER_PLAN_STATUS = Object.freeze({
   CURRENT: "current",
   STALE: "stale",
   ABSENT: "absent",
+  /** Saved evidence exists but is unreadable (missing / older schema version). */
+  UNSUPPORTED: "unsupported",
 });
 
 /** Per-lever state, resolved against the CURRENT design on every read. */

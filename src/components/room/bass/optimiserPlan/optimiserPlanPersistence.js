@@ -19,7 +19,6 @@
 // and reads.
 // ---------------------------------------------------------------------------
 
-import { OPTIMISER_PLAN_VERSION } from "./optimiserPlanConstants.js";
 import { setOptimiserPlanAuthority } from "./optimiserPlanStore.js";
 
 /**
@@ -30,10 +29,18 @@ import { setOptimiserPlanAuthority } from "./optimiserPlanStore.js";
 export function serializeOptimiserPlan(plan) {
   if (!plan || typeof plan !== "object") return null;
   return {
-    planVersion: Number(plan.planVersion) || OPTIMISER_PLAN_VERSION,
+    // Schema version of the persisted evidence. Absent/older versions are
+    // reported as unavailable by the reader, never reinterpreted.
+    planVersion: Number(plan.planVersion) || null,
     savedAt: plan.savedAt || null,
+    // --- source identity ---
+    projectId: plan.projectId || null,
+    versionId: plan.versionId || null,
+    baseDesignFingerprint: plan.baseDesignFingerprint || null,
     designFingerprint: plan.designFingerprint || null,
     resultFingerprint: plan.resultFingerprint || null,
+    cacheKey: plan.cacheKey || null,
+    target: plan.target || null,
     engineVersion: plan.engineVersion || null,
     candidateId: plan.candidateId || null,
     candidateKind: plan.candidateKind || null,

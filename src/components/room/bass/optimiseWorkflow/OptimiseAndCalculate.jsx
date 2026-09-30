@@ -346,8 +346,21 @@ export default function OptimiseAndCalculate({
           selection: result.selection,
           baseline: result.selection?.currentResult || null,
           identity: {
+            projectId,
+            versionId,
+            // The design fingerprint the plan belongs to (the quantity the reader
+            // compares against on reopen) plus this run's own result fingerprint.
             designFingerprint: currentShared?.cacheKey || null,
             resultFingerprint: fingerprint,
+            cacheKey: currentShared?.cacheKey || null,
+            // Only recorded when the authority actually carries one — never invented.
+            baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
+            target: {
+              p14TargetDb: currentShared?.authoritative?.requested?.selectedP14TargetDb
+                ?? currentShared?.completedBassAuthority?.p14TargetDb
+                ?? null,
+              targetKey: null,
+            },
             engineVersion: result.selection?.winner?.algorithmVersion || null,
           },
           instances: subInstancesRef.current || [],

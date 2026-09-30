@@ -16,10 +16,12 @@
 
 import {
   OPTIMISER_LEVER,
+  OPTIMISER_LEVER_EVIDENCE,
   OPTIMISER_LEVER_ORDER,
   OPTIMISER_PLAN_VERSION,
+  POLARITY_NOT_EVALUATED_REASON,
 } from "./optimiserPlanConstants.js";
-import { existingTradeOff, leverEffectFrom, summariseResult } from "./optimiserPlanMetrics.js";
+import { existingTradeOff, leverEffectFrom, summariseResult, summariseSeats } from "./optimiserPlanMetrics.js";
 import { activeInstances, instanceById, polarityLabel, resolveAppliedMap } from "./optimiserPlanMatching.js";
 
 const num = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
@@ -50,6 +52,45 @@ function pairTuning(tuning, instances) {
     rows.push({ instance, entry });
   });
   return rows;
+}
+
+/** Normalised polarity of a tuning entry or subwoofer instance. */
+function polarityOf(entry) {
+  return Number(entry?.polarity) < 0 || Number(entry?.polarity) === 180 ? -1 : 1;
+}
+
+/**
+ * The COMBINED candidate's own tuning, paired with the current instances.
+ * Every value here is the candidate's own evaluated value. `phaseControlDeg` is
+ * persisted only when the candidate states it, and is never exposed as a lever.
+ */
+function combinedTuning(result, instances) {
+  const rows = pairTuning(result?.appliedTuning || result?.tuning || [], instances);
+  return rows.map(({ instance, entry }) => {
+    const fromPolarity = polarityOf(instance);
+    const toPolarity = polarityOf(entry);
+    const fromDelayMs = num(instance.delayMs) ?? 0;
+    const toDelayMs = num(entry.delayMs) ?? 0;
+    const fromGainDb = num(instance.gainDb) ?? 0;
+    const toGainDb = num(entry.gainDb) ?? 0;
+    return {
+      subId: instance.id,
+      label: describeSub(instances, instance),
+      group: instance.legacyGroup || null,
+      fromDelayMs: round(fromDelayMs, 2),
+      toDelayMs: round(toDelayMs, 2),
+      fromGainDb: round(fromGainDb, 2),
+      toGainDb: round(toGainDb, 2),
+      fromPolarity,
+      toPolarity,
+      fromLabel: polarityLabel(fromPolarity),
+      toLabel: polarityLabel(toPolarity),
+      phaseControlDeg: num(entry.phaseControlDeg),
+      changed: fromPolarity !== toPolarity
+        || Math.abs(toDelayMs - fromDelayMs) >= 0.1
+        || Math.abs(toGainDb - fromGainDb) >= 0.1,
+    };
+  });
 }
 
 function placementChanges({ positionResult, instances }) {
@@ -187,7 +228,8 @@ function normaliseDecisions(decisions) {
  * @param {object} params
  * @param {object} params.selection - evaluated V2 selection
  * @param {object} [params.baseline] - baseline result (defaults to selection.currentResult)
- * @param {object} params.identity - { designFingerprint, resultFingerprint, engineVersion }
+ * @param {object} params.identity - { projectId, versionId, designFingerprint,
+ *   resultFingerprint, cacheKey, baseDesignFingerprint, target, engineVersion }
  * @param {Array} params.instances - current subwooferInstances
  * @param {object} [params.leverDecisions] - persisted designer decisions
  * @param {string[]} [params.notes] - extra factual notes
@@ -216,7 +258,11 @@ export function buildOptimiserPlan({
     if (changes.length > 0) {
       levers[OPTIMISER_LEVER.PLACEMENT] = {
         lever: OPTIMISER_LEVER.PLACEMENT,
+        evidenceStatus: OPTIMISER_LEVER_EVIDENCE.EVALUATED,
         evaluated: true,
+        notEvaluated: false,
+        notEvaluatedReason: null,
+        sourceCandidateId: positionResult?.candidateId || null,
         changes,
         effect: leverEffectFrom(positionResult, baselineResult),
         reason: selection?.positionOptimisation?.materialityReason
@@ -230,7 +276,14 @@ export function buildOptimiserPlan({
   if (polarity.length > 0) {
     levers[OPTIMISER_LEVER.POLARITY] = {
       lever: OPTIMISER_LEVER.POLARITY,
-      evaluated: false, // no polarity-only evaluation exists in the optimiser
+      // No polarity-only evaluation exists in the optimiser: this lever is
+      // recorded because the COMBINED candidate inverts it. The exact value is
+      // persisted, the effect is never claimed.
+      evidenceStatus: OPTIMISER_LEVER_EVIDENCE.COMBINED_ONLY,
+      evaluated: false,
+      notEvaluated: true,
+      notEvaluatedReason: POLARITY_NOT_EVALUATED_REASON,
+      sourceCandidateId: winner.candidateId || null,
       changes: polarity,
       effect: null,
       reason: null,
@@ -243,7 +296,11 @@ export function buildOptimiserPlan({
     if (changes.length > 0) {
       levers[OPTIMISER_LEVER.DELAY] = {
         lever: OPTIMISER_LEVER.DELAY,
+        evidenceStatus: OPTIMISER_LEVER_EVIDENCE.EVALUATED,
         evaluated: true,
+        notEvaluated: false,
+        notEvaluatedReason: null,
+        sourceCandidateId: selection.calibrationResult?.candidateId || null,
         changes,
         effect: leverEffectFrom(selection.calibrationResult, baselineResult),
         reason: selection?.calibrationMaterial?.reason || null,
@@ -257,7 +314,11 @@ export function buildOptimiserPlan({
     if (changes.length > 0) {
       levers[OPTIMISER_LEVER.GAIN] = {
         lever: OPTIMISER_LEVER.GAIN,
+        evidenceStatus: OPTIMISER_LEVER_EVIDENCE.EVALUATED,
         evaluated: true,
+        notEvaluated: false,
+        notEvaluatedReason: null,
+        sourceCandidateId: selection.gainResult?.candidateId || null,
         changes,
         effect: leverEffectFrom(selection.gainResult, baselineResult),
         reason: selection?.gainMaterial?.reason || null,
@@ -283,19 +344,40 @@ export function buildOptimiserPlan({
     );
   }
 
+  const combinedCoordinates = winner.positionCoordinates || winner.coordinates || null;
+
   return {
     planVersion: OPTIMISER_PLAN_VERSION,
     savedAt: new Date().toISOString(),
+    // --- 1. source identity ---
+    projectId: identity.projectId || null,
+    versionId: identity.versionId || null,
+    baseDesignFingerprint: identity.baseDesignFingerprint || null,
     designFingerprint: identity.designFingerprint || null,
     resultFingerprint: identity.resultFingerprint || null,
+    cacheKey: identity.cacheKey || identity.designFingerprint || null,
+    target: {
+      p14TargetDb: num(identity.target?.p14TargetDb),
+      targetKey: identity.target?.targetKey || null,
+    },
     engineVersion: identity.engineVersion || winner.algorithmVersion || null,
     candidateId: winner.candidateId || null,
     candidateKind: winner.candidateKind || (winner.isPositionCandidate ? "position" : null),
+    // --- 2. baseline result ---
     baseline: baselineSummary,
+    // --- 3. combined winning candidate ---
     combined: {
       evaluated: true,
       candidateId: winner.candidateId || null,
+      coordinates: Array.isArray(combinedCoordinates)
+        ? combinedCoordinates.map((coordinate) => ({
+          x: round(coordinate?.x),
+          y: round(coordinate?.y),
+        }))
+        : null,
+      tuning: combinedTuning(winner, instances),
       effect: leverEffectFrom(winner, baselineResult),
+      seats: summariseSeats(winner),
       tradeOff: existingTradeOff(winner),
     },
     levers,

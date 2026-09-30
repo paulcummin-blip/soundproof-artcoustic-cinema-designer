@@ -123,7 +123,9 @@ const combinedWinner = () => ({
   candidateId: 'combined:9',
   candidateKind: 'combined',
   coordinates: [{ x: 0.9, y: 0.4 }, { x: 3.6, y: 0.4 }, { x: 0.9, y: 5.6 }, { x: 3.6, y: 5.6 }],
-  appliedTuning: tuning(2.5, -2, -1),
+  appliedTuning: tuning(2.5, -2, -1).map((entry) => (entry.sourceId.startsWith('sub-rear')
+    ? { ...entry, phaseControlDeg: 15 }
+    : entry)),
   perSeatP20: [
     { seatId: 'seat-r1-c1', level: 3, variationDbRaw: 7.4, worstFrequencyHz: 88.0 },
     { seatId: 'seat-r2-c2', level: 3, variationDbRaw: 5.1, worstFrequencyHz: 53.45 },
@@ -148,7 +150,15 @@ const selection = () => ({
 
 const buildPlan = (overrides = {}) => buildOptimiserPlan({
   selection: selection(),
-  identity: { designFingerprint: DESIGN_FP, resultFingerprint: RESULT_FP },
+  identity: {
+    projectId: 'proj-marquee',
+    versionId: 'ver-1',
+    designFingerprint: DESIGN_FP,
+    resultFingerprint: RESULT_FP,
+    cacheKey: DESIGN_FP,
+    baseDesignFingerprint: 'base:fp:zzz',
+    target: { p14TargetDb: 115, targetKey: null },
+  },
   instances: instances(),
   ...overrides,
 });
@@ -277,6 +287,89 @@ check('TEST 9 — the published payload carries the same plan (proposal / histor
   const published = readPublishedOptimiserPlan(completedBassAuthority);
   assert.deepEqual(published, plan);
   assert.equal(readPublishedOptimiserPlan({ contract: {} }), null);
+});
+
+check('TEST 10 — source identity is persisted with the evidence', () => {
+  const plan = buildPlan();
+  assert.equal(plan.planVersion, 2, 'evidence schema version persisted');
+  assert.equal(plan.projectId, 'proj-marquee');
+  assert.equal(plan.versionId, 'ver-1');
+  assert.equal(plan.baseDesignFingerprint, 'base:fp:zzz');
+  assert.equal(plan.designFingerprint, DESIGN_FP);
+  assert.equal(plan.resultFingerprint, RESULT_FP);
+  assert.equal(plan.cacheKey, DESIGN_FP);
+  assert.equal(plan.target.p14TargetDb, 115);
+  assert.ok(!Number.isNaN(Date.parse(plan.savedAt)), 'createdAt persisted');
+  assert.equal(plan.engineVersion, 'house-curve-shape-fit-v41');
+});
+
+check('TEST 11 — baseline metrics are persisted', () => {
+  const baseline = buildPlan().baseline;
+  assert.equal(baseline.p14AchievedDb, 112);
+  assert.equal(baseline.achievedP18Hz, 22);
+  assert.equal(baseline.p19VariationDb, 0.56);
+  assert.equal(baseline.p19Level, 4);
+  assert.equal(baseline.p20VariationDb, 17.02);
+  assert.equal(baseline.p20Level, 1);
+  assert.equal(baseline.worstSeatId, 'seat-r1-c1', 'worst seat recorded');
+  assert.equal(baseline.worstFrequencyHz, 94.56, 'limiting frequency recorded');
+  assert.equal(baseline.seats.length, 2, 'per-seat P19/P20 rows recorded');
+  assert.equal(baseline.seats[0].p20VariationDb, 17.02);
+});
+
+check('TEST 12 — the combined candidate records coordinates, tuning and after-metrics', () => {
+  const combined = buildPlan().combined;
+  assert.equal(combined.candidateId, 'combined:9');
+  assert.equal(combined.coordinates.length, 4);
+  assert.equal(combined.coordinates[0].x, 0.9);
+  const rear = combined.tuning.find((row) => row.subId === 'sub-rear-1');
+  assert.equal(rear.fromDelayMs, 0);
+  assert.equal(rear.toDelayMs, 2.5);
+  assert.equal(rear.fromGainDb, 0);
+  assert.equal(rear.toGainDb, -2);
+  assert.equal(rear.fromLabel, 'Normal');
+  assert.equal(rear.toLabel, 'Inverted');
+  assert.equal(rear.phaseControlDeg, 15, 'phase control persisted when stated');
+  assert.equal(rear.changed, true);
+  assert.equal(combined.effect.p20VariationDb, 7.4);
+  assert.equal(combined.seats.length, 2, 'combined per-seat rows recorded');
+  assert.equal(combined.tuning.find((row) => row.subId === 'sub-front-1').changed, false);
+});
+
+check('TEST 13 — lever deltas persist values, evidence status and source candidate', () => {
+  const plan = buildPlan();
+  const delay = plan.levers[OPTIMISER_LEVER.DELAY];
+  assert.equal(delay.changes[0].fromMs, 0, 'current value persisted');
+  assert.equal(delay.changes[0].toMs, 2.5, 'recommended value persisted');
+  assert.equal(delay.changes[0].group, 'rear', 'affected group persisted');
+  assert.equal(delay.evidenceStatus, 'evaluated');
+  assert.equal(delay.evaluated, true);
+  assert.equal(delay.sourceCandidateId, 'calibration:2');
+
+  const polarity = plan.levers[OPTIMISER_LEVER.POLARITY];
+  assert.equal(polarity.evidenceStatus, 'combined-only');
+  assert.equal(polarity.evaluated, false);
+  assert.equal(polarity.notEvaluated, true);
+  assert.ok(/no polarity-only evaluation/i.test(polarity.notEvaluatedReason));
+  assert.equal(polarity.effect, null, 'polarity effect never fabricated');
+  assert.equal(polarity.changes[0].from, 1);
+  assert.equal(polarity.changes[0].to, -1, 'the combined candidate polarity value is recorded');
+});
+
+check('TEST 14 — unreadable evidence is reported, never reinterpreted', () => {
+  const plan = buildPlan();
+  const legacy = { ...plan, planVersion: undefined };
+  const unsupported = resolveOptimiserPlanStatus({ plan: legacy, currentDesignFingerprint: DESIGN_FP, instances: instances() });
+  assert.equal(unsupported.status, OPTIMISER_PLAN_STATUS.UNSUPPORTED);
+  assert.equal(unsupported.levers.length, 0, 'no lever fabricated from unreadable evidence');
+  assert.match(unsupported.evidenceMessage, /evidence unavailable/i);
+
+  const older = resolveOptimiserPlanStatus({ plan: { ...plan, planVersion: 1 }, currentDesignFingerprint: DESIGN_FP, instances: instances() });
+  assert.equal(older.status, OPTIMISER_PLAN_STATUS.UNSUPPORTED, 'older schema version is not reinterpreted');
+
+  const absent = resolveOptimiserPlanStatus({ plan: null });
+  assert.equal(absent.status, OPTIMISER_PLAN_STATUS.ABSENT);
+  assert.equal(absent.evidenceMessage, 'No evaluated optimiser changes are available. Re-run the optimiser.');
 });
 
 if (failures) { console.error(`\n${failures} failing`); process.exit(1); }
