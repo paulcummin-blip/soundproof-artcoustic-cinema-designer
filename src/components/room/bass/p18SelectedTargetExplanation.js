@@ -35,18 +35,40 @@ export const P18_CRITERION_MODE = Object.freeze({
 });
 
 // Required client-facing copy: P18 states the calculated -3 dB point itself,
-// never a greater-than / less-than threshold.
+// never a greater-than / less-than threshold. It also states the residual
+// headroom the extension carried, because that is what makes the point safe.
 export const P18_CRITERION_STATEMENT =
-  "Bass extension -3 dB point at the selected LFE output target.";
+  "Bass extension -3 dB point at the selected P14 LFE target, with 3 dB residual headroom.";
 
 export const P18_TARGET_LINK_STATEMENT =
   "Calculated at the selected P14 LFE output target.";
+
+/**
+ * Why the extension walk stopped, in the design engineer's own terms. The
+ * reasons are produced by the P18 authority; this module only states them.
+ */
+export const P18_LIMITING_REASON = Object.freeze({
+  PRODUCT_DATA_FLOOR: "product-data-floor",
+  OUTPUT_HEADROOM: "output-headroom",
+  ROOM_RESPONSE: "room-response",
+  UNRESOLVED: "unresolved",
+});
+
+export const P18_LIMITING_STATEMENT = Object.freeze({
+  "product-data-floor": "Limited by the validated product data floor.",
+  "output-headroom": "Limited by available output headroom.",
+  "room-response": "Limited by the room response.",
+  unresolved: null,
+});
+
+export const P18_RESIDUAL_HEADROOM_DB = 3;
 
 // Presentation-only schema of the derived explanation. Stamped onto every new
 // contract so a stored result can state whether it carries the selected-target
 // explanation at all. A stored contract without this stamp predates the
 // explanation and is refreshed by the existing engine (see p14TargetCache).
-export const P18_SELECTED_TARGET_SCHEMA_VERSION = 1;
+// v2 adds the residual-headroom criterion and the limiting reason.
+export const P18_SELECTED_TARGET_SCHEMA_VERSION = 2;
 
 /**
  * Floor-bounded detail statement. Plain language, no comparator: the headline
@@ -70,14 +92,30 @@ export function hasP18SelectedTargetSchema(contract) {
 // Two branches within half a hertz of each other limit the result together.
 const BINDING_EQUALITY_HZ = 0.5;
 
-// Short phrase for the pill detail line.
-const BINDING_PHRASE = Object.freeze({
-  response: "limited by the room response",
-  capability: "limited by product capability",
-  both: "limited by response and product capability",
-  "floor-bounded": "bounded at the product validity floor",
-  unresolved: "extension not resolved",
-});
+const KNOWN_LIMITING_REASONS = new Set(Object.values(P18_LIMITING_REASON));
+
+/**
+ * The authority stamps the limiting reason on every target row. Rows stored
+ * before that stamp existed are classified from the branch fields they do
+ * carry, so an older contract still explains itself and still names a reason.
+ */
+function resolveLimitingReason(row, bindingBasis) {
+  const stamped = row?.limitingReason;
+  if (typeof stamped === "string" && KNOWN_LIMITING_REASONS.has(stamped)) return stamped;
+  switch (bindingBasis) {
+    case P18_BINDING_BASIS.FLOOR_BOUNDED:
+      return P18_LIMITING_REASON.PRODUCT_DATA_FLOOR;
+    case P18_BINDING_BASIS.CAPABILITY:
+    case P18_BINDING_BASIS.BOTH:
+      return row?.capabilityBounded === true
+        ? P18_LIMITING_REASON.PRODUCT_DATA_FLOOR
+        : P18_LIMITING_REASON.OUTPUT_HEADROOM;
+    case P18_BINDING_BASIS.RESPONSE:
+      return P18_LIMITING_REASON.ROOM_RESPONSE;
+    default:
+      return P18_LIMITING_REASON.UNRESOLVED;
+  }
+}
 
 // Field value for the detailed rows.
 const BINDING_NAME = Object.freeze({
@@ -159,6 +197,12 @@ export function deriveP18SelectedTargetExplanation(authorityP18) {
     measuredAtLevel: num(row?.level),
     selectedP14TargetDb: num(row?.p14TargetDb) ?? num(row?.targetSplDb),
     cutoffPlaneDb: num(row?.cutoffDb),
+    // The capability criterion plane and the headroom it demands. Rows stored
+    // before this rule are given the current requirement so a legacy contract
+    // can never imply that P18 was claimed without headroom.
+    residualHeadroomDb: num(row?.residualHeadroomDb) ?? P18_RESIDUAL_HEADROOM_DB,
+    headroomCutoffPlaneDb: num(row?.headroomCutoffDb)
+      ?? (finite(row?.p14TargetDb) ? Number(row.p14TargetDb) + P18_RESIDUAL_HEADROOM_DB : null),
     requestedP18ExtensionHz: num(row?.limitHz),
     achievedExtensionHz: num(authorityP18?.extensionHz) ?? num(authority?.value),
     responseTargetF3Hz: responseHz,
@@ -168,6 +212,8 @@ export function deriveP18SelectedTargetExplanation(authorityP18) {
     floorHz: finite(floorHz) ? Number(floorHz) : null,
     bindingBasis,
     criterionMode,
+    limitingReason: resolveLimitingReason(row, bindingBasis),
+    limitingStatement: P18_LIMITING_STATEMENT[resolveLimitingReason(row, bindingBasis)] || null,
     targetBasis: typeof authority?.p14TargetBasis === "string" ? authority.p14TargetBasis : null,
     source: authority?.source || null,
   };
@@ -201,8 +247,9 @@ export function formatP18TargetExplanationDetail(explanation, basisLabel = null)
   // detail line while the headline stays the plain calculated point.
   const floorBounded = explanation.criterionMode === P18_CRITERION_MODE.FLOOR_BOUNDED
     && finite(explanation.floorHz);
-  const phrase = floorBounded ? null : BINDING_PHRASE[explanation.bindingBasis];
-  if (phrase) parts.push(phrase);
+  // The limiting reason is stated in plain language: the designer must be able
+  // to tell a data-floor stop from an output stop from a room-response stop.
+  if (explanation.limitingStatement) parts.push(explanation.limitingStatement);
   if (floorBounded) {
     // The published point IS the validity floor for a bounded result, so the
     // sentence states that same figure rather than a second, separately rounded one.
