@@ -8,6 +8,7 @@ import { SPEC_GROUPS } from "../add-speaker/specFieldDefinitions.js";
 import { SpecInput } from "../add-speaker/StepReview.jsx";
 import { resolveContinuousPower } from "./rp22ComparisonPublish.js";
 import SecondaryEvidenceButton from "../secondaryEvidence/SecondaryEvidenceButton.jsx";
+import { evidenceRowNote, evidenceStatement, isTrustedEvidence } from "../secondaryEvidence/secondaryEvidencePolicy.js";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -146,7 +147,9 @@ export default function StepSpecReview({
       {/* Secondary evidence — an admin-approved copy of the manufacturer's own
           document, for models whose live official page no longer states the values. */}
       <div style={{ border: `1px solid ${specification?.secondary_evidence ? "#BEDCC5" : BRAND.border}`, background: specification?.secondary_evidence ? "#F1F8F3" : BRAND.bg, borderRadius: 10, padding: 12, display: "grid", gap: 8 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.text }}>Secondary evidence</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.text }}>
+          {specification?.secondary_evidence ? evidenceRowNote(specification.secondary_evidence) : "Secondary evidence"}
+        </div>
         {specification?.secondary_evidence ? (
           <div style={{ fontSize: 12, color: BRAND.subtext, display: "grid", gap: 3 }}>
             <div style={{ overflowWrap: "anywhere" }}>{specification.secondary_evidence.url}</div>
@@ -158,6 +161,9 @@ export default function StepSpecReview({
               {specification.secondary_evidence.accepted_date ? ` · ${new Date(specification.secondary_evidence.accepted_date).toLocaleDateString("en-GB")}` : ""}
             </div>
             <div>Basis: {specification.secondary_evidence.basis} · {specification.secondary_evidence.confidence_cap_reason}</div>
+            {isTrustedEvidence(specification.secondary_evidence) && (
+              <div>{evidenceStatement(specification.secondary_evidence)}</div>
+            )}
           </div>
         ) : (
           <div style={{ fontSize: 12, color: BRAND.subtext }}>

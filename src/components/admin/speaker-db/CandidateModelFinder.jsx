@@ -13,8 +13,12 @@ import { Search, X, Loader2, ExternalLink, Link2, FileText } from "lucide-react"
 import {
   candidateReadiness,
   candidateBadgeLabel,
+  candidateConfidenceLabel,
   candidateExtractRows,
   candidateSourceIndicator,
+  candidateSourceType,
+  candidateTrustedProposal,
+  trustedProposalSummary,
   candidateGapMessage,
   modelKey,
   ROLE_LABELS,
@@ -120,6 +124,9 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
       readiness,
       extracts: candidateExtractRows(candidate),
       source: candidateSourceIndicator(candidate),
+      sourceType: candidateSourceType(candidate),
+      confidenceLabel: candidateConfidenceLabel(readiness),
+      trusted: candidateTrustedProposal(candidate),
       gapMessage: candidateGapMessage(readiness, candidate),
       added: existingKeys.has(key),
       missing: readiness.missingCriticalLabels,
@@ -129,6 +136,8 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
   const selectableRows = rows.filter((row) => !row.added);
   const allSelected = selectableRows.length > 0 && selectableRows.every((row) => selected.has(row.key));
   const excludedReasons = Array.from(new Set(excluded.map((item) => item.reason)));
+  const trustedRows = rows.filter((row) => row.trusted);
+  const trustedHosts = Array.from(new Set(trustedRows.map((row) => row.trusted.host).filter(Boolean)));
 
   const toggle = (key) => {
     setSelected((prev) => {
@@ -204,6 +213,12 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
               {documentStats.rejectedDocuments > 0 && (
                 <span><strong>{documentStats.rejectedDocuments}</strong> document{documentStats.rejectedDocuments === 1 ? "" : "s"} discarded as not official</span>
               )}
+              {trustedRows.length > 0 && (
+                <span style={{ color: BRAND.warn }}>
+                  <strong>{trustedRows.length}</strong> model{trustedRows.length === 1 ? "" : "s"} with trusted secondary distributor values proposed for review
+                  {trustedHosts.length > 0 ? ` (${trustedHosts.join(", ")})` : ""}
+                </span>
+              )}
               {note && <span style={{ color: BRAND.warn }}>{note}</span>}
             </div>
 
@@ -213,7 +228,7 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
               </div>
             ) : (
               <div className="overflow-auto" style={{ maxHeight: "62vh" }}>
-                <table className="w-full" style={{ minWidth: 1400, borderCollapse: "collapse" }}>
+                <table className="w-full" style={{ minWidth: 1580, borderCollapse: "collapse" }}>
                   <thead>
                     <tr>
                       <Th>
@@ -221,6 +236,7 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
                       </Th>
                       <Th>Model</Th>
                       <Th>Role</Th>
+                      <Th>Source type</Th>
                       <Th>Sensitivity</Th>
                       <Th>Impedance</Th>
                       <Th>Power / amp</Th>
@@ -263,6 +279,14 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
                           )}
                         </td>
                         <td className={CELL} style={{ color: BRAND.subtext }}>{ROLE_LABELS[row.candidate.role_guess] || "Unknown"}</td>
+                        <td className={CELL}>
+                          <div style={{ color: row.sourceType.trusted ? BRAND.warn : BRAND.text, fontWeight: 600, fontSize: 13 }}>
+                            {row.sourceType.label}
+                          </div>
+                          {row.sourceType.host && (
+                            <div className="text-xs" style={{ color: BRAND.subtext }}>{row.sourceType.host}</div>
+                          )}
+                        </td>
                         <td className={CELL} style={{ color: BRAND.text }}>{row.extracts.sensitivity}</td>
                         <td className={CELL} style={{ color: BRAND.text }}>{row.extracts.impedance}</td>
                         <td className={CELL} style={{ color: BRAND.text }}>{row.extracts.power}</td>
@@ -277,10 +301,11 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
                         <td className={CELL}>
                           <ComparisonQualityBadges
                             confidence={row.readiness.confidence}
-                            label={candidateBadgeLabel(row.readiness)}
+                            label={candidateBadgeLabel(row.readiness, row.sourceType)}
                             basis={row.readiness.capabilityBasis}
                             tone={row.readiness.tone}
                           />
+                          <div className="text-xs mt-1" style={{ color: BRAND.subtext }}>{row.confidenceLabel}</div>
                           {row.gapMessage && (
                             <div className="text-xs mt-1" style={{ color: BRAND.danger }}>{row.gapMessage}</div>
                           )}
@@ -323,10 +348,33 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
                             {/* When the manufacturer no longer publishes the values, an
                                 admin can supply the original document and accept it
                                 explicitly — recorded, capped at C, never automatic. */}
+                            {/* A trusted secondary distributor document proposed by
+                                discovery. It is never used automatically: the admin
+                                opens it, reads the sentences and accepts it explicitly. */}
+                            {row.trusted && (
+                              <div className="text-xs" style={{ color: BRAND.subtext, maxWidth: 360 }}>
+                                <a
+                                  href={row.trusted.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="underline"
+                                  style={{ color: BRAND.warn, fontWeight: 600 }}
+                                >
+                                  {row.trusted.sourceName || "Trusted distributor"} · {row.trusted.host}
+                                </a>
+                                <div style={{ color: BRAND.text }}>
+                                  {trustedProposalSummary(row.trusted) || "No P12/P13 value clearly stated in the proposed document."}
+                                </div>
+                                {row.trusted.sourceQuote && <div>“{row.trusted.sourceQuote}”</div>}
+                                <div>Review, then accept — capped at confidence C.</div>
+                              </div>
+                            )}
                             <SecondaryEvidenceButton
                               manufacturerName={manufacturer.name}
                               model={row.candidate.model}
                               manufacturerWebsite={manufacturer.website}
+                              initialUrl={row.trusted?.url || ""}
+                              label={row.trusted ? "Review & accept trusted source" : "Add secondary evidence URL"}
                               ensureProduct={() => ensureCandidateProduct({ manufacturer, candidate: row.candidate, actorName })}
                               onAccepted={async () => {
                                 setExistingKeys(await loadExistingModelKeys(manufacturer.id));
@@ -357,7 +405,7 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
 
         <div className="flex items-center justify-between gap-4 p-5" style={{ borderTop: `1px solid ${BRAND.border}` }}>
           <div className="text-xs" style={{ color: BRAND.subtext }}>
-            Values are shown only as published on the official domain. A value that is not stated stays empty and appears as a missing critical field.
+            Values are shown only as published on the official domain. Where the official sources carry no engineering data, a trusted secondary distributor document may be proposed for explicit review — never accepted automatically. A value that is not stated stays empty and appears as a missing critical field.
           </div>
           <div className="flex items-center gap-2">
             <button onClick={onClose} className="px-4 py-2 rounded-md text-sm" style={{ border: `1px solid ${BRAND.border}`, color: BRAND.text }}>Close</button>

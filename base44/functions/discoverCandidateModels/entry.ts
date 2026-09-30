@@ -13,6 +13,10 @@
 //                 links to — the specification is rarely on the page itself
 //   3. SECOND CHANCE  models still missing sensitivity, impedance or a power
 //                 authority are searched again for their SERIES document
+//   4. TRUSTED SECONDARY  models the official sources left incomplete are offered
+//                 the named trusted distributor documents (Habitech, CAVD, Pulse
+//                 Cinemas, AWE Europe). Those values are proposed for review and
+//                 capped at C — they are never written into the candidate.
 //
 // Scope discipline (enforced in code, not only in the prompt):
 //   - one manufacturer; every product and document URL is checked against the
@@ -32,7 +36,16 @@ import {
   discoverySchema,
   buildExtractionPrompt,
   extractionSchema,
+  buildTrustedSecondaryPrompt,
+  trustedSecondarySchema,
 } from '../../shared/candidateDiscoveryPrompts.js';
+import {
+  TRUSTED_SECONDARY_FIELDS,
+  TRUSTED_SECONDARY_SOURCES,
+  canonicalManufacturerName,
+  isFocusManufacturer,
+  trustedSecondarySource,
+} from '../../shared/trustedSecondarySources.js';
 
 const MAX_CANDIDATES = 30;
 // How many leading candidates have their official documents fetched and read,
@@ -41,6 +54,9 @@ const DEEP_LIMIT = 24;
 const EXTRACTION_CHUNK = 8;
 const RETRY_LIMIT = 6;
 const MAX_DOCUMENTS_PER_MODEL = 6;
+// Models whose official data is incomplete, retried against the trusted
+// secondary distributor hosts (Habitech, CAVD, Pulse Cinemas, AWE Europe).
+const TRUSTED_RETRY_LIMIT = 8;
 
 const ROLE_GUESSES = ['LCR', 'Surround', 'Wide', 'Height', 'Flexible', 'Both', 'Unknown'];
 const CATEGORIES = ['On Wall', 'In Wall', 'Freestanding', 'Other'];
@@ -153,10 +169,13 @@ export default async function (req: Request): Promise<Response> {
     if (user.role !== 'admin') return Response.json({ error: 'Forbidden' }, { status: 403 });
 
     const body = await req.json().catch(() => ({}));
-    const manufacturerName = text(body?.manufacturerName);
+    // The canonical spelling is searched ("Lyndorf Audio" → "Lyngdorf Audio"), so a
+    // misspelled record cannot send the search after a name that does not exist.
+    const manufacturerName = canonicalManufacturerName(text(body?.manufacturerName)) || text(body?.manufacturerName);
     if (!manufacturerName) {
       return Response.json({ error: 'Manufacturer is required' }, { status: 400 });
     }
+    const focusManufacturer = isFocusManufacturer(manufacturerName);
 
     // UK / regional entry point first; the recorded website stays the authority too.
     const authority = resolveManufacturerAuthority({
@@ -193,6 +212,7 @@ export default async function (req: Request): Promise<Response> {
             roleGuesses: ROLE_GUESSES,
             categories: CATEGORIES,
             maxCandidates: MAX_CANDIDATES,
+            isFocus: focusManufacturer,
           }),
           add_context_from_internet: true,
           response_json_schema: discoverySchema(),
@@ -376,6 +396,9 @@ export default async function (req: Request): Promise<Response> {
         model: candidate.model,
         series: candidate.series,
         product_url: candidate.product_url,
+        // An address that did not resolve is flagged for the retry: the search
+        // must find the model's current page or document, not repeat a dead one.
+        product_url_ok: candidate.product_url_ok,
         documents: candidate.official_documents || [],
       })), true));
 
@@ -384,6 +407,108 @@ export default async function (req: Request): Promise<Response> {
         const candidate = thin.find((entry: any) => modelKey(entry.model) === key);
         if (!candidate) continue;
         if (mergeDocumentResult({ ...mergeContext, candidate, document: item })) documentsUsed += 1;
+      }
+    }
+
+    // ---- Pass 4: trusted secondary distributor documents ---------------------
+    // ONLY for models the official sources left incomplete. Habitech, CAVD, Pulse
+    // Cinemas and AWE Europe are trusted enough to use for a P12/P13 estimate, but
+    // they are never primary: their values are proposed for review and are NOT
+    // written into the candidate's specification. The admin opens the document,
+    // reads the sentences and accepts it explicitly (capped at C).
+    const isThin = (candidate: any) => {
+      const spec = candidate?.specification || {};
+      return !spec.sensitivity_db || !spec.nominal_impedance_ohm || !hasPowerAuthority(spec);
+    };
+
+    const missingFieldsOf = (spec: any) => {
+      const fields: string[] = [];
+      if (!spec?.sensitivity_db) fields.push('sensitivity_db');
+      if (!spec?.nominal_impedance_ohm) fields.push('nominal_impedance_ohm');
+      if (!hasPowerAuthority(spec || {})) fields.push('power authority (AES/continuous rating or recommended amplifier range)');
+      if (!spec?.frequency_response_low_hz && !spec?.frequency_response_high_hz) fields.push('frequency_response');
+      return fields;
+    };
+
+    const stillThin = shown
+      .filter((candidate: any) => isThin(candidate))
+      .sort((a: any, b: any) => cinemaScore(b) - cinemaScore(a))
+      .slice(0, TRUSTED_RETRY_LIMIT);
+
+    let trustedProposals = 0;
+    if (stillThin.length > 0) {
+      const trustedGroups: any[][] = [];
+      for (let index = 0; index < stillThin.length; index += EXTRACTION_CHUNK) {
+        trustedGroups.push(stillThin.slice(index, index + EXTRACTION_CHUNK));
+      }
+
+      const found = await Promise.all(trustedGroups.map(async (group) => {
+        try {
+          const result = await base44.integrations.Core.InvokeLLM({
+            prompt: buildTrustedSecondaryPrompt({
+              manufacturerName,
+              models: group.map((candidate: any) => ({
+                model: candidate.model,
+                series: candidate.series,
+                product_url: candidate.product_url,
+                missing: missingFieldsOf(candidate.specification),
+              })),
+            }),
+            add_context_from_internet: true,
+            response_json_schema: trustedSecondarySchema(SPEC_SCHEMA),
+          });
+          return Array.isArray(result?.items) ? result.items : [];
+        } catch {
+          // A failed trusted-source pass never affects the official results.
+          return [];
+        }
+      }));
+
+      const proposedRows: any[] = [];
+      for (const item of found.flat()) {
+        const url = text(item?.url || item?.document_url);
+        // Deterministic host check: only the named trusted distributors count,
+        // whatever the search claims about a source.
+        const source = trustedSecondarySource(url) || trustedSecondarySource(text(item?.host));
+        const candidate = stillThin.find((entry: any) => modelKey(entry.model) === modelKey(item?.model));
+        if (!source || !url || !candidate) continue;
+
+        // Only P12/P13 fields, and only the ones the official read left empty.
+        const officialSpec = candidate.specification || {};
+        const proposed: Record<string, any> = {};
+        for (const [field, value] of Object.entries(item?.specification || {})) {
+          if (!TRUSTED_SECONDARY_FIELDS.includes(field) && field !== 'frequency_response_high_hz') continue;
+          if (value === null || value === undefined || String(value).trim() === '') continue;
+          if (officialSpec[field] !== undefined) continue;
+          proposed[field] = value;
+        }
+        const guarded = normaliseSpecification(proposed);
+        if (Object.keys(guarded.spec).length === 0) continue;
+
+        proposedRows.push({ item, url, source, candidate, specification: guarded.spec, discarded: guarded.discarded });
+      }
+
+      // The proposed document must exist: an address that 404s is never offered
+      // for review.
+      const trustedProbes = await Promise.all(proposedRows.map(async (row: any) => ({
+        row,
+        probe: await probeUrl(row.url),
+      })));
+
+      for (const { row, probe } of trustedProbes) {
+        if (probe.notFound) continue;
+        row.candidate.trusted_secondary = {
+          source_name: row.source.name,
+          host: row.source.host,
+          url: row.url,
+          document_type: text(row.item?.document_type),
+          source_date: text(row.item?.source_date),
+          source_quote: text(row.item?.source_quote).slice(0, 400),
+          specification: row.specification,
+          discarded_values: row.discarded,
+          note: 'Trusted secondary distributor source — review and accept explicitly. Capped at confidence C.',
+        };
+        trustedProposals += 1;
       }
     }
 
@@ -399,6 +524,10 @@ export default async function (req: Request): Promise<Response> {
       allowed_domains: allowedHosts,
       regional_preference: preferenceNote,
       official_only: true,
+      manufacturer_name_used: manufacturerName,
+      focus_manufacturer: focusManufacturer,
+      trusted_secondary_hosts: TRUSTED_SECONDARY_SOURCES.map((source) => source.host),
+      trusted_secondary_count: trustedProposals,
       no_current_options_found: noCurrentOptions,
       candidate_count: candidates.length,
       excluded_count: excluded.length,
@@ -406,7 +535,7 @@ export default async function (req: Request): Promise<Response> {
       documents_used_count: documentsUsed,
       note: noCurrentOptions
         ? 'No current models were found on the official domain, so discontinued models are shown instead.'
-        : `Nothing has been created. Supporting official documents (product sheets, datasheets, manuals) and series documents were searched for the leading models; select the models to add.`,
+        : `Nothing has been created. Supporting official documents (product sheets, datasheets, manuals) and series documents were searched for the leading models${trustedProposals > 0 ? `; ${trustedProposals} model${trustedProposals === 1 ? '' : 's'} also has a trusted secondary distributor document proposed for review` : ''}; select the models to add.`,
     });
   } catch (error: any) {
     return Response.json({ error: error.message }, { status: 500 });

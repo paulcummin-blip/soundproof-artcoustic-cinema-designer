@@ -18,6 +18,13 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { normaliseSpecification } from '../../shared/speakerSpecGuards.js';
 import { buildExtractionRules, coerceSpecValue, readSource } from '../../shared/speakerSourceReading.js';
 import { hostOf, isOfficialUrl, normaliseDomain } from '../../shared/officialDomain.js';
+import { probeUrl } from '../../shared/officialDocumentHarvest.js';
+import {
+  SOURCE_TYPE_LABELS,
+  TRUSTED_EVIDENCE_LABEL,
+  TRUSTED_HOST_WARNING,
+  trustedSecondarySource,
+} from '../../shared/trustedSecondarySources.js';
 
 // The fields a P12/P13 comparison consumes, plus the source's own date.
 const P12_P13_FIELDS = [
@@ -149,12 +156,27 @@ export default async function (req: any) {
     const host = hostOf(url);
     const domain = normaliseDomain(manufacturerWebsite);
     const isOfficial = isOfficialUrl(url, [domain].filter(Boolean));
+    // A named trusted distributor (Habitech, CAVD, Pulse Cinemas, AWE Europe) is
+    // trusted enough to use, but it is still secondary evidence — never official.
+    const trustedSource = trustedSecondarySource(host);
 
     const isPdf = /\.pdf(\?|#|$)/i.test(url);
-    const read = isPdf ? { ok: true, note: '', text: '' } : await readSource(url);
+    // A PDF is read by the model rather than fetched as text, so its address is
+    // probed separately: a document that does not exist is never read at all.
+    const pdfProbe = isPdf ? await probeUrl(url) : null;
+    const read = isPdf
+      ? { ok: !pdfProbe?.notFound, note: pdfProbe?.notFound ? 'The source returned 404.' : '', text: '' }
+      : await readSource(url);
+
+    // A page that does not exist cannot be evidence: nothing is extracted from an
+    // address that returned 404/410, so no value can ever come from a source
+    // nobody actually read.
+    const addressMissing = !read.ok && /\b(404|410)\b|not found/i.test(read.note || '');
 
     let raw: any = null;
-    if (read.ok && read.text) {
+    if (addressMissing) {
+      raw = null;
+    } else if (read.ok && read.text) {
       // The document text is supplied verbatim: no web search, no general knowledge.
       raw = await base44.integrations.Core.InvokeLLM({
         prompt: [
@@ -222,9 +244,9 @@ export default async function (req: any) {
 
     // What the address itself says, and — when the host refused our direct read —
     // what the reading pass found when it opened the document.
-    let documentType = classifyDocument(url, isOfficial, read.text);
+    let documentType = addressMissing ? 'unknown' : classifyDocument(url, isOfficial, read.text);
     const reportedKind = text(raw?.document_kind).toLowerCase();
-    if (documentType === 'unknown' && reportedKind) {
+    if (!addressMissing && documentType === 'unknown' && reportedKind) {
       if (/product sheet|spec/.test(reportedKind)) documentType = 'manufacturer_product_sheet';
       else if (/manual/.test(reportedKind)) documentType = 'manufacturer_manual';
       else if (/brochure/.test(reportedKind)) documentType = 'manufacturer_brochure';
@@ -240,16 +262,25 @@ export default async function (req: any) {
       document_type: documentType,
       document_type_label: DOCUMENT_LABELS[documentType] || DOCUMENT_LABELS.unknown,
       document_kind_reported: text(raw?.document_kind),
-      model_confirmed: raw?.model_confirmed === true,
+      address_missing: addressMissing,
+      model_confirmed: addressMissing ? false : raw?.model_confirmed === true,
       source_read: read.ok,
       source_read_note: read.note || '',
       fields,
       discarded: guarded.discarded,
       ambiguous_fields: ambiguousFields,
+      trusted: Boolean(trustedSource),
+      trusted_source_name: trustedSource?.name || '',
+      source_type_label: trustedSource
+        ? SOURCE_TYPE_LABELS.TRUSTED_SECONDARY
+        : (isOfficial ? SOURCE_TYPE_LABELS.OFFICIAL_DOCUMENT : SOURCE_TYPE_LABELS.ADMIN_APPROVED),
+      evidence_label: trustedSource ? TRUSTED_EVIDENCE_LABEL : 'Secondary evidence',
       warning: isOfficial
         ? ''
-        : 'This is not hosted on the official manufacturer domain.',
-      extraction_source: 'Admin-supplied secondary source — human review and explicit acceptance required',
+        : (trustedSource ? TRUSTED_HOST_WARNING : 'This is not hosted on the official manufacturer domain.'),
+      extraction_source: trustedSource
+        ? 'Trusted secondary distributor source — human review and explicit acceptance required'
+        : 'Admin-approved secondary source — human review and explicit acceptance required',
     });
   } catch (error: any) {
     return Response.json({ error: error.message }, { status: 500 });

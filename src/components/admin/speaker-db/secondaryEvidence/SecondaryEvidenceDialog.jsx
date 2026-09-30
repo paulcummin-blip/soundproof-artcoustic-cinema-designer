@@ -13,7 +13,12 @@
 import React, { useMemo, useState } from "react";
 import { Loader2, AlertTriangle, CheckCircle2, Link2 } from "lucide-react";
 import { ALL_SPEC_FIELDS } from "../add-speaker/specFieldDefinitions.js";
-import { SECONDARY_HOST_WARNING, SECONDARY_STATEMENT, documentTypeLabel } from "./secondaryEvidencePolicy.js";
+import {
+  SECONDARY_HOST_WARNING,
+  SECONDARY_STATEMENT,
+  documentTypeLabel,
+  evidenceStatement,
+} from "./secondaryEvidencePolicy.js";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -42,11 +47,12 @@ export default function SecondaryEvidenceDialog({
   manufacturerName,
   model,
   manufacturerWebsite,
+  initialUrl = "",
   onFetch,
   onConfirm,
   onClose,
 }) {
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl);
   const [status, setStatus] = useState("idle");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
@@ -143,8 +149,14 @@ export default function SecondaryEvidenceDialog({
               <div className="p-3 rounded-md" style={{ border: `1px solid ${BRAND.border}`, background: BRAND.soft }}>
                 <Row label="URL" value={result.url} href={result.url} />
                 <Row label="Detected host" value={result.host || "—"} />
+                <Row
+                  label="Source type"
+                  value={result.source_type_label
+                    || (result.trusted ? "Trusted secondary distributor" : "Admin-approved secondary")}
+                />
                 <Row label="Detected document type" value={result.document_type_label || documentTypeLabel(result.document_type)} />
                 <Row label="Official manufacturer domain" value={result.is_official ? `Yes — ${result.official_domain || result.host}` : "No"} />
+                <Row label="Evidence label" value={result.evidence_label || (result.is_official ? "Official" : "Secondary evidence")} />
                 <Row label="Model named in the document" value={result.model_confirmed ? "Yes" : "Not confirmed — check the snippets"} />
                 {result.source_read_note && <Row label="Reading note" value={result.source_read_note} />}
               </div>
@@ -153,10 +165,13 @@ export default function SecondaryEvidenceDialog({
                 <div className="flex items-start gap-2 p-3 rounded-md text-sm" style={{ background: "#FDF6E7", border: "1px solid #F0D9A8", color: "#7A5B12" }}>
                   <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                   <div>
-                    <strong>{SECONDARY_HOST_WARNING}</strong>
+                    <strong>{result.warning || SECONDARY_HOST_WARNING}</strong>
                     <div className="text-xs mt-1">
                       Accepting it records the host, who accepted it and when, and holds this model at confidence C. It is never presented as published measured manufacturer evidence.
                     </div>
+                    {result.trusted && (
+                      <div className="text-xs mt-1">{evidenceStatement(result)}</div>
+                    )}
                   </div>
                 </div>
               )}

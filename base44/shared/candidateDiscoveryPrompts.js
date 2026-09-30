@@ -17,6 +17,13 @@
 // ---------------------------------------------------------------------------
 
 import { DOCUMENT_TYPES } from './officialDocumentHarvest.js';
+import {
+  ALLOWED_C_ASSUMPTIONS,
+  DISALLOWED_ASSUMPTIONS,
+  FOCUS_MANUFACTURERS,
+  TRUSTED_SECONDARY_SEARCH_PATTERNS,
+  TRUSTED_SECONDARY_SOURCES,
+} from './trustedSecondarySources.js';
 
 // Supporting documentation searched per model — the places specification data
 // usually lives, rather than the marketing page.
@@ -26,6 +33,25 @@ export const SUPPORTING_DOCUMENTS = [
   'install guide', 'installation guide', 'owner manual', 'user guide', 'brochure',
   'downloads', 'PDF', 'info sheet', 'cut sheet', 'architectural specification',
   'CI specification', 'support', 'documents',
+];
+
+// The product types this capability database is built from, and the ones it is
+// explicitly not a crawler for.
+export const INCLUDE_TYPES = [
+  'in-wall LCR', 'in-wall cinema speakers', 'on-wall cinema speakers',
+  'behind-screen speakers', 'architectural LCR', 'custom install surround speakers',
+  'custom install height speakers', 'THX / cinema / theatre models',
+  'baffle-wall / screen-wall speakers',
+  'angled in-ceiling models where suitable for height or surround use',
+  'high-output architectural models',
+];
+
+export const EXCLUDE_TYPES = [
+  'freestanding hi-fi ranges unless clearly used for cinema LCR',
+  'bookshelf hi-fi speakers unless clearly relevant',
+  'wireless speakers', 'Bluetooth / lifestyle speakers', 'soundbars', 'headphones',
+  'electronics', 'amplifiers', 'accessories', 'packages',
+  'subwoofers (for this P12/P13 section)',
 ];
 
 // High-end cinema and custom-install products come first: these are the ranges a
@@ -57,7 +83,8 @@ const VALUE_RULES = [
 function officialHostsBlock({ authorityUrl, allowedHosts }) {
   return [
     `Preferred official entry point: ${authorityUrl}`,
-    `Official hosts (the ONLY acceptable sources): ${(allowedHosts || []).join(', ')}`,
+    `Official hosts (the ONLY acceptable sources): ${(allowedHosts || []).join(', ')}.`,
+    'Any subdomain of those domains is equally official and equally acceptable: a manufacturer\'s regional site (a country or language prefix such as us., eu., de., uk. or international. in front of the domain) is the same manufacturer, and so is its media / CDN subdomain. When the preferred regional address does not answer or does not carry the model, use another official subdomain rather than dropping the model.',
   ];
 }
 
@@ -73,6 +100,7 @@ export function buildDiscoveryPrompt({
   categories,
   maxCandidates,
   focus,
+  isFocus,
 }) {
   return [
     'You are compiling a review list of loudspeaker models for a professional home cinema engineering database.',
@@ -87,6 +115,11 @@ export function buildDiscoveryPrompt({
     'The cinema and custom-install ranges matter most here: when the manufacturer sells a dedicated cinema or theatre series (a range sold specifically for cinema installations, commonly named with a designation such as CT, CTM, CCM, CWM, IW, SC or THX), every model in it must appear in your list. Aim for at least eight models whenever the manufacturer publishes that many.',
     focus ? `This pass focuses on: ${focus}.` : '',
     `Prioritise: ${PRIORITY_PRODUCTS.join('; ')}.`,
+    `Include: ${INCLUDE_TYPES.join('; ')}.`,
+    `Exclude: ${EXCLUDE_TYPES.join('; ')}.`,
+    isFocus
+      ? `This manufacturer is one of the priority custom-install cinema names this database is built for (${FOCUS_MANUFACTURERS.join(', ')}): search its architectural, in-wall, on-wall and cinema ranges before anything else, and do not answer with its hi-fi or lifestyle lines.`
+      : '',
     'Always record the range or series name for each model in the series field (for example "CT800 Series", "Reference Series") — the series document is searched later when a model page carries no specification.',
     'Start from the manufacturer\'s own product listing and category pages (products, custom installation, architectural, cinema / theatre series overviews) and enumerate EVERY model listed there before you answer. The regional pages may be rendered by scripts, so the manufacturer\'s global official pages are equally acceptable — they usually carry the complete series list. When the manufacturer publishes a dedicated cinema or custom-theatre series, list every model in that series.',
     '',
@@ -138,7 +171,7 @@ export function buildExtractionPrompt({ manufacturerName, authorityUrl, allowedH
       .join('\n');
     return [
       `${index + 1}. ${entry.model}${entry.series ? ` (series: ${entry.series})` : ''}`,
-      `   product page: ${entry.product_url}`,
+      `   product page: ${entry.product_url}${entry.product_url_ok === false ? ' — THIS ADDRESS DID NOT RESOLVE, find the model\'s current official address instead of using it' : ''}`,
       documents ? `   official documents linked from that page:\n${documents}` : '   no document links were found on the product page',
     ].join('\n');
   }).join('\n');
@@ -162,7 +195,7 @@ export function buildExtractionPrompt({ manufacturerName, authorityUrl, allowedH
     modelBlock,
     '',
     deepSearch
-      ? 'THESE MODELS ARE STILL INCOMPLETE. The specification is most likely in a SERIES or RANGE document rather than a single-model page: read the range specification sheet, series brochure, installation manual, architectural/CI specification, or the downloads, support and archive pages for the model and its series. Official documents are often served from the manufacturer\'s media or CDN subdomains — any host ending in the official domains above is acceptable. Name the document you actually read.'
+      ? 'THESE MODELS ARE STILL INCOMPLETE. The specification is most likely in a SERIES or RANGE document rather than a single-model page: read the range specification sheet, series brochure, installation manual, architectural/CI specification, or the downloads, support and archive pages for the model and its series. Official documents are often served from the manufacturer\'s media or CDN subdomains — any host ending in the official domains above is acceptable. Where a model\'s reported address did not resolve, search the official domain for the exact model name and open the page or document you actually find — never repeat an address that could not be opened. Name the document you actually read.'
       : '',
     '',
     'Rules you must follow exactly:',
@@ -176,6 +209,73 @@ export function buildExtractionPrompt({ manufacturerName, authorityUrl, allowedH
     '',
     'Return JSON only.',
   ].join('\n');
+}
+
+/**
+ * Pass 4 — TRUSTED SECONDARY distributor documents, for the models the official
+ * sources left without engineering data. Habitech, CAVD, Pulse Cinemas and AWE
+ * Europe are trusted enough to use for a P12/P13 estimate; they are never
+ * primary, every value is labelled "Trusted secondary evidence", the row is
+ * capped at C, and nothing is stored until an admin reviews the document and
+ * accepts it explicitly.
+ */
+export function buildTrustedSecondaryPrompt({ manufacturerName, models }) {
+  const modelBlock = models.map((entry, index) => [
+    `${index + 1}. ${entry.model}${entry.series ? ` (series: ${entry.series})` : ''}`,
+    `   product page: ${entry.product_url || 'not stated'}`,
+    `   missing official values: ${(entry.missing || []).join(', ') || 'the engineering values'}`,
+  ].join('\n')).join('\n');
+
+  return [
+    'You are looking for a TRUSTED SECONDARY distributor document for a professional home cinema engineering record.',
+    '',
+    `Manufacturer: ${manufacturerName}`,
+    `Trusted secondary distributor hosts (the ONLY acceptable sources in this pass): ${TRUSTED_SECONDARY_SOURCES.map((source) => `${source.name} — ${source.host}`).join('; ')}.`,
+    'These are not primary sources. They are used only because the manufacturer\'s own site and its own documents carry no engineering values for the models below. The manufacturer remains the authority for everything they do publish.',
+    '',
+    'Search patterns to use:',
+    ...TRUSTED_SECONDARY_SEARCH_PATTERNS.map((pattern) => `  - ${pattern}`),
+    '',
+    'The document may be a manufacturer product sheet, datasheet, specification sheet, installation guide or manual hosted by one of those distributors — including a distributor-hosted copy of the manufacturer\'s own document.',
+    '',
+    'Models to find a document for:',
+    modelBlock,
+    '',
+    'Rules you must follow exactly:',
+    '1. Report a document only when its host is one of the trusted distributor hosts listed above. A dealer, retailer, marketplace, forum or review site is never acceptable, however good its numbers look.',
+    '2. The document must name this exact model. Read its specification table and report ONLY the fields listed as missing for that model; leave every other field out.',
+    '3. Report the document URL in url, its host in host, the distributor name in source_name, what the document is in document_type, and the exact sentence or table row every value came from in source_quote.',
+    ...ALLOWED_C_ASSUMPTIONS.map((line) => `4. Allowed assumption: ${line}`),
+    ...DISALLOWED_ASSUMPTIONS.map((line) => `5. NEVER: ${line}`),
+    '6. Report nothing at all for a model whose values no trusted distributor document states: return no item for it rather than an empty one.',
+    '',
+    'Return JSON only.',
+  ].join('\n');
+}
+
+/** JSON schema for the trusted-secondary pass. */
+export function trustedSecondarySchema(specificationProperties) {
+  return {
+    type: 'object',
+    properties: {
+      items: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            model: { type: 'string' },
+            url: { type: 'string' },
+            host: { type: 'string' },
+            source_name: { type: 'string' },
+            document_type: { type: 'string', enum: DOCUMENT_TYPES },
+            source_date: { type: 'string' },
+            source_quote: { type: 'string' },
+            specification: { type: 'object', properties: specificationProperties },
+          },
+        },
+      },
+    },
+  };
 }
 
 /** JSON schema for the document-extraction pass. */

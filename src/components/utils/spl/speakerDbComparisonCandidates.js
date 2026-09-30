@@ -27,7 +27,14 @@ import { buildComparisonRow } from "@/components/admin/speaker-db/model-first/rp
 import { normalizeCompetitor, parseSensitivityBasis } from "@/components/utils/spl/competitorNormalization";
 import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
 import { RP22_EQ_HEADROOM_LABEL } from "@/components/utils/spl/rp22HeadroomPolicy";
-import { SECONDARY_BADGE_LABEL, SECONDARY_STATEMENT, documentTypeLabel } from "@/components/admin/speaker-db/secondaryEvidence/secondaryEvidencePolicy.js";
+import {
+  documentTypeLabel,
+  evidenceBadgeLabel,
+  evidenceLabel,
+  evidenceStatement,
+  isTrustedEvidence,
+} from "@/components/admin/speaker-db/secondaryEvidence/secondaryEvidencePolicy.js";
+import { trustedSourceLine } from "@/components/utils/spl/trustedSecondarySources.js";
 
 export const COMPARISON_CLASSES = {
   A: {
@@ -163,8 +170,10 @@ export function buildCandidate({
     ? (withId.secondary_evidence || {})
     : null;
   const secondaryCapped = Boolean(secondary) && secondary.is_official !== true;
-  const badgeLabel = secondaryCapped ? SECONDARY_BADGE_LABEL : klass.badgeLabel;
+  const trustedSecondary = secondaryCapped && isTrustedEvidence(secondary);
+  const badgeLabel = secondaryCapped ? evidenceBadgeLabel(secondary) : klass.badgeLabel;
   const basisLabel = secondaryCapped ? (secondary.basis || klass.basis) : klass.basis;
+  const evidenceSourceLine = trustedSecondary ? trustedSourceLine(secondary.host || secondary.url) : "";
 
   return {
     id: candidateId,
@@ -192,10 +201,13 @@ export function buildCandidate({
     secondaryEvidence: secondaryCapped
       ? {
         ...secondary,
+        trusted: trustedSecondary,
+        evidence_label: evidenceLabel(secondary),
+        source_line: evidenceSourceLine,
         document_type_label: documentTypeLabel(secondary.document_type),
       }
       : null,
-    secondaryStatement: secondaryCapped ? SECONDARY_STATEMENT : null,
+    secondaryStatement: secondaryCapped ? evidenceStatement(secondary) : null,
     sourceUrl: withId.source_url || product?.official_product_url || "",
     datasheetUrl: withId.datasheet_url || product?.official_pdf_url || "",
     optionLabel: `${manufacturer} · ${model} — ${statusLabel} · ${badgeLabel}`,

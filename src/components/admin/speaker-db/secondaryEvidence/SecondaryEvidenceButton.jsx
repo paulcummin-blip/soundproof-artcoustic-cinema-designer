@@ -25,6 +25,7 @@ export default function SecondaryEvidenceButton({
   ensureProduct = null,
   onAccepted = null,
   label = "Add secondary evidence URL",
+  initialUrl = "",
   compact = false,
 }) {
   const { user } = useAuth();
@@ -74,6 +75,7 @@ export default function SecondaryEvidenceButton({
           manufacturerName={manufacturerName}
           model={model}
           manufacturerWebsite={manufacturerWebsite}
+          initialUrl={initialUrl}
           onFetch={(url) => fetchSecondaryEvidence({ url, manufacturerName, model, manufacturerWebsite })}
           onConfirm={handleConfirm}
           onClose={() => setOpen(false)}

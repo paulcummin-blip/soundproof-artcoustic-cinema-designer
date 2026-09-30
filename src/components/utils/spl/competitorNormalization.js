@@ -6,6 +6,12 @@
 //   Half Space  → 0 dB       (half_space_published)
 //   blank/Unknown/unstated → assume Half Space, 0 dB (half_space_assumed)
 // Unknown basis never blocks grading — it grades using the half-space assumption.
+import {
+  TRUSTED_EVIDENCE_LABEL,
+  TRUSTED_SECONDARY_BASIS,
+  trustedSecondarySource,
+} from './trustedSecondarySources.js';
+
 export const FULL_TO_HALF_SPACE_DB = 6;
 
 function num(value) {
@@ -173,6 +179,14 @@ export function normalizeCompetitor(record) {
   const secondaryCapped = Boolean(secondaryEvidence) && secondaryEvidence.is_official !== true;
   if (secondaryCapped && (dataConfidence === 'A' || dataConfidence === 'B')) dataConfidence = 'C';
 
+  // A trusted secondary distributor (Habitech, CAVD, Pulse Cinemas, AWE Europe)
+  // is secondary evidence like any other: usable for a P12/P13 estimate, always
+  // labelled "Trusted secondary evidence", and never allowed to appear as A.
+  const trustedSource = secondaryEvidence
+    ? (trustedSecondarySource(secondaryEvidence.host) || trustedSecondarySource(secondaryEvidence.url))
+    : null;
+  const trustedSecondary = Boolean(trustedSource);
+
   // How the capability figure was obtained, and the quality of the evidence
   // behind the power authority it rests on.
   let capabilityBasis = continuous !== null ? 'Published' : 'Calculated';
@@ -182,8 +196,10 @@ export function normalizeCompetitor(record) {
 
   if (secondaryCapped) {
     capabilityBasis = secondaryEvidence.basis
-      || (continuous !== null ? 'Calculated from secondary published data' : 'ADI estimate from secondary manufacturer document');
-    evidenceQuality = 'Secondary Evidence';
+      || (trustedSecondary
+        ? (continuous !== null ? TRUSTED_SECONDARY_BASIS.CALCULATED : TRUSTED_SECONDARY_BASIS.ESTIMATE)
+        : (continuous !== null ? 'Calculated from secondary published data' : 'ADI estimate from secondary manufacturer document'));
+    evidenceQuality = trustedSecondary ? TRUSTED_EVIDENCE_LABEL : 'Secondary Evidence';
   }
 
   return {
@@ -218,6 +234,8 @@ export function normalizeCompetitor(record) {
     evidence_source: secondaryEvidence ? 'secondary' : 'official',
     secondary_evidence: secondaryEvidence,
     secondary_evidence_url: secondaryEvidence?.url || '',
+    secondary_trusted: trustedSecondary,
+    secondary_source_name: trustedSource?.name || '',
     confidence_cap_reason: secondaryCapped ? (secondaryEvidence.confidence_cap_reason || '') : '',
     p12_p13_eligible: eligible,
     normalization_warnings: warnings,

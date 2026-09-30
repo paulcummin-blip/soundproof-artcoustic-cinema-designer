@@ -13,6 +13,7 @@ import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Save, Plus, Trash2, ExternalLink, Calculator } from "lucide-react";
 import { resolveFieldAuthority, setFieldAuthoritySource } from "@/components/admin/speaker-db/fieldAuthority";
 import SecondaryEvidenceButton from "@/components/admin/speaker-db/secondaryEvidence/SecondaryEvidenceButton.jsx";
+import { evidenceLabel, evidenceRowNote } from "@/components/admin/speaker-db/secondaryEvidence/secondaryEvidencePolicy.js";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -548,6 +549,18 @@ export default function AdminSpeakerProductDetail() {
             <div className="text-xs mb-4" style={{ color: BRAND.subtext }}>
               Product → <span style={{ color: BRAND.green, fontWeight: 600 }}>Current Specification</span> → Specification History. Older specifications remain archived.
             </div>
+
+            {/* The spec row states which evidence holds it: a trusted secondary
+                distributor document is named here, exactly as it is on RP22. */}
+            {specData.secondary_evidence && (
+              <div className="text-xs mb-4 px-3 py-2 rounded-md" style={{ background: "#F1F8F3", border: "1px solid #BEDCC5", color: BRAND.text }}>
+                <strong>{evidenceRowNote(specData.secondary_evidence)}</strong>
+                {" — "}
+                {evidenceLabel(specData.secondary_evidence)} from {specData.secondary_evidence.host || "a third-party host"}
+                {specData.secondary_evidence.accepted_by ? ` · accepted by ${specData.secondary_evidence.accepted_by}` : ""}
+                {specData.secondary_evidence.basis ? ` · basis: ${specData.secondary_evidence.basis}` : ""}
+              </div>
+            )}
             <div className="grid gap-4" style={{ gridTemplateColumns: "260px 1fr" }}>
               <div>
                 <label className="text-xs font-medium mb-1 block" style={{ color: BRAND.subtext }}>Version Label</label>

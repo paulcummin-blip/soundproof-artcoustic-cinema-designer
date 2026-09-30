@@ -11,6 +11,12 @@
 // ---------------------------------------------------------------------------
 
 import { comparisonReadiness } from "./comparisonReadiness.js";
+import {
+  CONFIDENCE_LABELS,
+  SOURCE_TYPE_LABELS,
+  hostOfUrl,
+  trustedSecondarySource,
+} from "@/components/utils/spl/trustedSecondarySources.js";
 
 export const ROLE_LABELS = {
   LCR: "LCR",
@@ -50,12 +56,20 @@ export function candidateReadiness(candidate, manufacturerName) {
 }
 
 /** Compact badge wording for the candidate list. */
-export function candidateBadgeLabel(readiness) {
+export function candidateBadgeLabel(readiness, sourceType = null) {
   if (!readiness) return "—";
   if (readiness.confidence === "A") return "Comparable";
   if (readiness.confidence === "B") return "Calculated";
-  if (readiness.confidence === "C") return "ADI estimate";
+  if (readiness.confidence === "C") return sourceType?.trusted ? "Trusted secondary" : "ADI estimate";
   return "Insufficient";
+}
+
+/** The A/B/C/D wording the review list shows for a candidate. */
+export function candidateConfidenceLabel(readiness) {
+  if (!readiness || readiness.confidence === "D") return CONFIDENCE_LABELS.D;
+  if (readiness.confidence === "A") return CONFIDENCE_LABELS.A;
+  if (readiness.confidence === "B") return CONFIDENCE_LABELS.B;
+  return CONFIDENCE_LABELS.C;
 }
 
 const show = (value, suffix = "") =>
@@ -142,4 +156,72 @@ export function candidateGapMessage(readiness, candidate) {
   return candidateSourceIndicator(candidate).hasDocument
     ? "Official source found, but critical engineering data not found"
     : "No official specification document found";
+}
+
+// --- Source type and trusted secondary proposals -----------------------------
+// Where a candidate's values came from, said plainly: official manufacturer,
+// official document, trusted secondary distributor, admin-approved secondary or
+// insufficient.
+export function candidateSourceType(candidate) {
+  const trusted = candidate?.trusted_secondary;
+  const trustedUrl = trusted?.url || "";
+  if (trustedUrl || trusted?.host) {
+    const source = trustedSecondarySource(trustedUrl) || trustedSecondarySource(trusted?.host);
+    return {
+      key: "TRUSTED_SECONDARY",
+      label: SOURCE_TYPE_LABELS.TRUSTED_SECONDARY,
+      host: source?.host || hostOfUrl(trustedUrl || trusted?.host),
+      sourceName: source?.name || trusted?.source_name || "",
+      url: trustedUrl,
+      trusted: true,
+    };
+  }
+  const documentUrl = candidate?.document_url || "";
+  if (documentUrl) {
+    return { key: "OFFICIAL_DOCUMENT", label: SOURCE_TYPE_LABELS.OFFICIAL_DOCUMENT, host: hostOfUrl(documentUrl), sourceName: "", url: documentUrl, trusted: false };
+  }
+  const productUrl = candidate?.product_url || "";
+  if (productUrl) {
+    return { key: "OFFICIAL_PAGE", label: SOURCE_TYPE_LABELS.OFFICIAL_PAGE, host: hostOfUrl(productUrl), sourceName: "", url: productUrl, trusted: false };
+  }
+  return { key: "INSUFFICIENT", label: SOURCE_TYPE_LABELS.INSUFFICIENT, host: "", sourceName: "", url: "", trusted: false };
+}
+
+const TRUSTED_FIELD_LABELS = {
+  sensitivity_db: "Sensitivity", sensitivity_basis: "Basis",
+  nominal_impedance_ohm: "Nominal impedance", minimum_impedance_ohm: "Minimum impedance",
+  recommended_amp_min_w: "Amp min", recommended_amp_max_w: "Amp max",
+  power_handling_continuous_w: "Continuous power", aes_power_w: "AES power",
+  max_continuous_spl_db: "Max SPL", max_spl_basis: "Max SPL basis",
+  frequency_response_low_hz: "LF", frequency_response_high_hz: "HF",
+  frequency_response_tolerance: "Tolerance", measurement_space: "Measurement space",
+  horizontal_dispersion_deg: "H dispersion", vertical_dispersion_deg: "V dispersion",
+};
+
+/**
+ * The trusted-secondary values discovery proposed for a model whose official
+ * sources carried no engineering data. Nothing here is stored: the admin opens
+ * the document, reads the sentences and accepts it explicitly.
+ */
+export function candidateTrustedProposal(candidate) {
+  const trusted = candidate?.trusted_secondary;
+  if (!trusted || !trusted.url) return null;
+  const source = trustedSecondarySource(trusted.url) || trustedSecondarySource(trusted.host);
+  return {
+    sourceName: source?.name || trusted.source_name || "",
+    host: source?.host || hostOfUrl(trusted.host || trusted.url),
+    url: trusted.url,
+    documentType: trusted.document_type || "",
+    sourceQuote: trusted.source_quote || "",
+    specification: trusted.specification || {},
+  };
+}
+
+/** "Sensitivity 93 dB · Nominal impedance 8 Ω · Amp max 1000 W" for the proposal. */
+export function trustedProposalSummary(proposal) {
+  if (!proposal) return "";
+  return Object.entries(proposal.specification || {})
+    .filter(([field, value]) => TRUSTED_FIELD_LABELS[field] && value !== null && value !== undefined && String(value).trim() !== "")
+    .map(([field, value]) => `${TRUSTED_FIELD_LABELS[field]} ${value}`)
+    .join(" · ");
 }
