@@ -14,6 +14,7 @@ import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 import { P14_EQ_ASSESSMENT_RANGE_HZ } from "@/components/utils/p14CapabilityAuthority";
 import { formatSeatPillLabel } from "@/components/utils/seatLabel";
 import { resolveP20SeatDisplay } from "@/components/room/bass/p20DisplayAuthority";
+import { formatP19P20DeviationText } from "@/components/utils/rp22/resolveRp22DesignValue";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
@@ -304,7 +305,8 @@ function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, sm
     lines.push(`Limiting frequency: ${Math.round(worstFreq)} Hz — where the deviation is greatest`);
   }
   if (variation != null) {
-    lines.push(`Max deviation: ±${variation.toFixed(1)} dB`);
+    // P19 deviation: whole number only in design-facing UI.
+    lines.push(`Max deviation: ${formatP19P20DeviationText(variation)}`);
   }
   if (level) {
     lines.push(`Grade: ${level}`);
@@ -388,7 +390,7 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
       id: "focus-worst-seat",
       kind: "focus-worst-seat",
       label: `Worst: ${formatSeatPillLabel(worstSeat.seatId)} (${worstDisplay?.displayVariationText ?? "—"})`,
-      tooltipLabel: `Worst seat — ${formatSeatPillLabel(worstSeat.seatId)} · ${worstDisplay?.displayVariationText ?? "—"} (exact ${worstDisplay?.exactVariationText ?? "—"})`,
+      tooltipLabel: `Worst seat — ${formatSeatPillLabel(worstSeat.seatId)} · ${worstDisplay?.displayVariationText ?? "—"}`,
       color: "#dc2626",
       strokeWidth: 2.5,
       data: applyBassSmoothing(curve.responseData, smoothingMode || "third"),
@@ -400,7 +402,7 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
       id: "focus-best-seat",
       kind: "focus-best-seat",
       label: `Best: ${formatSeatPillLabel(bestSeat.seatId)} (${bestDisplay?.displayVariationText ?? "—"})`,
-      tooltipLabel: `Best seat — ${formatSeatPillLabel(bestSeat.seatId)} · ${bestDisplay?.displayVariationText ?? "—"} (exact ${bestDisplay?.exactVariationText ?? "—"})`,
+      tooltipLabel: `Best seat — ${formatSeatPillLabel(bestSeat.seatId)} · ${bestDisplay?.displayVariationText ?? "—"}`,
       color: "#059669",
       strokeWidth: 2.5,
       data: applyBassSmoothing(curve.responseData, smoothingMode || "third"),
@@ -409,7 +411,7 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
 
   const lines = [];
   if (worstDisplay) {
-    lines.push(`Worst seat: ${worstDisplay.seatPillLabel} ${worstDisplay.displayVariationText} — exact ${worstDisplay.exactVariationText}, floored to whole dB`);
+    lines.push(`Worst seat: ${worstDisplay.seatPillLabel} ${worstDisplay.displayVariationText}`);
   }
   if (bestDisplay && bestDisplay.seatId !== worstDisplay?.seatId) {
     lines.push(`Best seat: ${bestDisplay.seatPillLabel} ${bestDisplay.displayVariationText}`);
@@ -488,7 +490,7 @@ function buildSeatFocus({ selectedSeatId, rp22GraphMarkers, finalBassResponse, s
   if (seatP20) {
     const seatDisplay = resolveP20SeatDisplay(seatP20, { selectedSeatId });
     if (seatDisplay) {
-      lines.push(`P20 (seat-to-seat): ${seatDisplay.displayVariationText} at ${seatDisplay.displayFrequencyText} (${seatDisplay.grade}) — exact ${seatDisplay.exactVariationText}, floored to whole dB`);
+      lines.push(`P20 (seat-to-seat): ${seatDisplay.displayVariationText} at ${seatDisplay.displayFrequencyText} (${seatDisplay.grade})`);
     }
   }
 

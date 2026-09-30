@@ -7,6 +7,7 @@
 // Seat deviation copy reads the canonical P20 display authority so improvement
 // wording, pills, tooltips and graph markers can never disagree about a seat.
 import { resolveP20SeatDisplay } from "@/components/room/bass/p20DisplayAuthority";
+import { formatP19P20DeviationText } from "@/components/utils/rp22/resolveRp22DesignValue";
 
 
 /**
@@ -112,7 +113,7 @@ export function buildRemainingLimitation(winner) {
     const p20Display = parameter === "P20" ? resolveP20SeatDisplay(worstSeat) : null;
     parts.push(p20Display
       ? `(${p20Display.displayVariationText} deviation)`
-      : `(${Math.abs(worstSeat.variationDbRaw).toFixed(1)} dB deviation)`);
+      : `(${formatP19P20DeviationText(worstSeat.variationDbRaw)} deviation)`);
   }
 
   return parts.join(" ");

@@ -45,3 +45,31 @@ export function resolveRp22DesignValue(paramId, rawValue) {
   // All other parameters: unchanged
   return rawValue;
 }
+
+/**
+ * P19/P20 deviation as a whole number, rounded down.
+ *
+ * Product rule: Sound Proof is a design assistant, not a maths exercise.
+ * User-facing design UI never shows a decimal dB for a P19/P20 deviation.
+ *   2.99 dB → 2      10.2 dB → 10      10.9 dB → 10
+ *
+ * P19 and P20 share the same Group D floor rule, so both route through the one
+ * policy above. Full precision is untouched internally — physics, grading,
+ * graphs, simulations and internal diagnostics keep the raw value.
+ *
+ * @returns {number|null} whole dB, or null when the value is not finite
+ */
+export function floorP19P20Deviation(value) {
+  const number = Math.abs(Number(value));
+  if (!Number.isFinite(number)) return null;
+  return resolveRp22DesignValue(19, number);
+}
+
+/**
+ * The only P19/P20 deviation text allowed in user-facing design UI: "±10 dB".
+ * Use this instead of formatting a P19/P20 deviation on the surface itself.
+ */
+export function formatP19P20DeviationText(value) {
+  const designValue = floorP19P20Deviation(value);
+  return designValue === null ? null : `±${designValue} dB`;
+}

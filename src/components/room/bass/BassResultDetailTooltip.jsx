@@ -150,11 +150,10 @@ function buildSeatLines(paramKey, seatData, shared) {
     : (seatData.displayVariationDb && seatData.displayVariationDb !== "—" ? seatData.displayVariationDb : null);
   lines.push(["Published Result", displayValue ? `${seatData.level} · ${displayValue}` : seatData.level]);
 
-  if (p20Display?.displayDiffersFromExact) {
-    lines.push(["Exact (labelled)", `${p20Display.exactVariationText} — floored to ${p20Display.displayVariationText} for display`]);
-  }
   if (p20Display) {
-    lines.push(["Metric", "P20 seat-to-seat: max |seat − RSP|, 1/3-octave smoothed, below transition"]);
+    // Whole-number story only. The exact decimal deviation and any rounding
+    // explanation stay out of the user-facing tooltip.
+    lines.push(["Metric", "Seat-to-seat response relative to RSP, 1/3-octave smoothed, below transition"]);
   }
 
   const limitingText = p20Display?.displayFrequencyText

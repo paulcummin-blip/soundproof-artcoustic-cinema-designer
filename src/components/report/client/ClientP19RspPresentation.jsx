@@ -14,6 +14,7 @@
  */
 
 import React from "react";
+import { formatP19P20DeviationText } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { resolveCoordinate } from "./selectClientSpeakerBalance";
 import { getSeatGradeColors, PRIORITY_LEGEND } from "./visualReportSeatStyle";
@@ -133,8 +134,9 @@ export default function ClientP19RspPresentation({
 
   const grade = getSeatGradeColors(result.level);
   const interpretation = LEVEL_INTERPRETATION[result.level] || null;
+  // P19 deviation shown to the client is a whole number, rounded down.
   const deviationText = result.displayedValue
-    || (result.deviationDb != null ? `±${Math.abs(result.deviationDb).toFixed(1)} dB` : null);
+    || (result.deviationDb != null ? formatP19P20DeviationText(result.deviationDb) : null);
 
   const showDrawing = !print || printPart !== "result";
   const showResult = !print || printPart !== "drawing";
