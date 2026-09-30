@@ -5,28 +5,14 @@
  * only and never re-grades RP23.
  */
 
+import { computeProjectorLumens } from "@/components/report/projectorLumenRecommendation";
+
 function levelToKey(level) {
   return level ? String(level).toLowerCase() : "below-l1";
 }
 
 function levelToLabel(level) {
   return level || "Below L1";
-}
-
-function parseAspectRatio(arStr) {
-  const str = (arStr || "16:9").toString();
-  const parts = str.includes(":") ? str.split(":").map(Number) : [16, 9];
-  const [arW, arH] = parts;
-  return (Number.isFinite(arW) && Number.isFinite(arH) && arW > 0 && arH > 0)
-    ? arW / arH
-    : 16 / 9;
-}
-
-function computeProjectorLumens(screenWidthM, aspectRatio) {
-  const width = Number(screenWidthM);
-  if (!width || width <= 0) return null;
-  const visibleHeightM = width / parseAspectRatio(aspectRatio);
-  return Math.round(((108 * Math.PI * width * visibleHeightM) / 0.6) / 10) * 10;
 }
 
 function buildExplanation(seats) {

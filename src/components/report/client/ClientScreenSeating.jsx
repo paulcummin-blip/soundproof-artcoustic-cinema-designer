@@ -21,6 +21,7 @@ import { computeHaloRadiusPx, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry"
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { RP22_GRADE_TOKENS } from "@/components/utils/rp22Colors";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
+import { PROJECTOR_BASIS_COPY } from "@/components/report/projectorLumenRecommendation";
 
 const LEGEND_LEVELS = ["L1", "L2", "L3", "L4"];
 
@@ -422,11 +423,11 @@ export default function ClientScreenSeating({
               textAlign: "center",
             }}
           >
-            Minimum calibrated output for 108 nits:{" "}
+            Minimum calibrated output:{" "}
             {projectorLumens.toLocaleString("en-GB")} lumens
           </div>
           <div style={{ fontSize: print ? 8.5 : 10, color: "#625143" }}>
-            0.6 screen gain
+            {PROJECTOR_BASIS_COPY}
           </div>
         </div>
       )}
