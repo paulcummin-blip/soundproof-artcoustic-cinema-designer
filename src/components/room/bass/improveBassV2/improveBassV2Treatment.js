@@ -3,6 +3,11 @@
 // Only provides advisory guidance when geometry/tuning optimisation has
 // failed to solve a persistent modal issue. Never prescribes exact treatment
 // thickness, guarantees a grade improvement, or claims an exact dB improvement.
+//
+// Seat deviation copy reads the canonical P20 display authority so improvement
+// wording, pills, tooltips and graph markers can never disagree about a seat.
+import { resolveP20SeatDisplay } from "@/components/room/bass/p20DisplayAuthority";
+
 
 /**
  * Build a treatment advisory based on the winner's remaining limitations.
@@ -101,7 +106,13 @@ export function buildRemainingLimitation(winner) {
     parts.push(`at ${worstFreq.toFixed(0)} Hz`);
   }
   if (Number.isFinite(worstSeat.variationDbRaw)) {
-    parts.push(`(${Math.abs(worstSeat.variationDbRaw).toFixed(1)} dB deviation)`);
+    // A P20 deviation is displayed through the canonical P20 display authority,
+    // so this copy can never disagree with the pill, the tooltip or the marker
+    // about the same seat. A P19-limited seat keeps its established wording.
+    const p20Display = parameter === "P20" ? resolveP20SeatDisplay(worstSeat) : null;
+    parts.push(p20Display
+      ? `(${p20Display.displayVariationText} deviation)`
+      : `(${Math.abs(worstSeat.variationDbRaw).toFixed(1)} dB deviation)`);
   }
 
   return parts.join(" ");

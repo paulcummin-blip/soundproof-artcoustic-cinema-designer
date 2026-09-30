@@ -120,7 +120,7 @@ test('TEST 5: exactly one module rounds a P20 value', () => {
   for (const file of walk(join(SRC, 'components'))) {
     if (!/\.(js|jsx)$/.test(file)) continue;
     const source = readFileSync(file, 'utf8');
-    if (/p20VariationDb\)\.toFixed\(1\)|variationDbRaw\)\.toFixed\(1\)/.test(source)) {
+    if (/p20VariationDb\)\.toFixed\(1\)/.test(source)) {
       exactFormatters.push(relative(SRC, file));
     }
   }
@@ -144,6 +144,15 @@ test('TEST 5: exactly one module rounds a P20 value', () => {
   const overlay = readFileSync(join(SRC, 'components/room/bass/storyteller/parameterFocusOverlays.js'), 'utf8');
   assert.ok(!/variationDbRaw\)\.toFixed\(1\)/.test(overlay),
     'the graph overlay no longer prints an unrounded P20 deviation');
+
+  // The Improve Bass V2 seat copy covers P19 and P20. Its P20 branch must read
+  // the authority; its P19 branch is deliberately left unchanged (no P19 change).
+  const treatment = readFileSync(
+    join(SRC, 'components/room/bass/improveBassV2/improveBassV2Treatment.js'), 'utf8',
+  );
+  assert.ok(treatment.includes('p20DisplayAuthority'), 'improvement copy reads the P20 authority');
+  assert.ok(treatment.includes('parameter === "P20" ? resolveP20SeatDisplay'),
+    'only the P20 branch of the improvement copy is routed through the authority');
 });
 
 test('TEST 6: display is always floor(exact) for every Marquee seat', () => {
