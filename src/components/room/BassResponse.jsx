@@ -430,7 +430,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     if (series.kind === "maximum-spl") return curveVisibility.combined;
     if (series.kind === "house-curve" || series.kind === "normalized-target") return curveVisibility.house;
     if (series.kind === "post-eq" || series.kind === "real-seat-overlay") return curveVisibility.finalEq;
-    if (series.kind === "raw") return false;
+    // Raw / before-EQ response — the engine's physical series, used unchanged.
+    // Exposed through Expert Curve View; hidden in the default ADI presentation
+    // until the designer turns it on.
+    if (series.kind === "raw") return curveVisibility.raw === true;
     return true;
   }), [multiSeriesForGraph, curveVisibility]);
 
@@ -542,6 +545,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
       else if (series.kind === "maximum-spl") available.combined = true;
       else if (series.kind === "house-curve" || series.kind === "normalized-target") available.house = true;
       else if (series.kind === "post-eq" || series.kind === "real-seat-overlay") available.finalEq = true;
+      else if (series.kind === "raw") available.raw = true;
     }
     return available;
   }, [multiSeriesForGraph]);
@@ -927,19 +931,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               onSelectAll={previewAwareSelectAllSeats}
               previewActive={placementPreviewActive}
             />
-            {engineeringMode && (
-            <CollapsiblePanel title="Technical Evidence" defaultOpen={false}>
-              <div className="space-y-3 pt-2">
-                <BassCurveVisibilityControls
-                  visibility={curveVisibility}
-                  availability={layerAvailability}
-                  onChange={setCurveVisibility}
-                />
-                <BassSmoothingControl value={bassSmoothingMode} onChange={setBassSmoothingMode} />
-                <Rp22GraphMarkerKey markers={rp22GraphMarkers} />
-              </div>
-            </CollapsiblePanel>
-            )}
+            {/* Expert Curve View — the graph's own validation disclosure.
+                Always reachable here: expert curve controls no longer depend on
+                the global Options → Expert View toggle. Closed by default, so
+                the simple ADI presentation is unchanged. */}
+            <ExpertCurveView
+              curveVisibility={curveVisibility}
+              onCurveVisibilityChange={setCurveVisibility}
+              layerAvailability={layerAvailability}
+              smoothingMode={bassSmoothingMode}
+              onSmoothingModeChange={setBassSmoothingMode}
+              markers={rp22GraphMarkers}
+              placementPreviewActive={placementPreviewActive}
+              previousResultFaded={!!previousResultFadedSeries}
+            />
           </>
         ) : (
           <>

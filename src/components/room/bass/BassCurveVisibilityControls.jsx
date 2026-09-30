@@ -1,6 +1,11 @@
 import React from "react";
 
+// Curve comparison only: "which response curves am I comparing?".
+// Independent of seat scope (which listening position) and of graph focus
+// (which RP22 parameter). Turning a curve on or off is presentation only —
+// it never recalculates, transforms or saves anything.
 export const DEFAULT_BASS_CURVE_VISIBILITY = Object.freeze({
+  raw: false,
   room: false,
   product: false,
   combined: true,
@@ -9,11 +14,14 @@ export const DEFAULT_BASS_CURVE_VISIBILITY = Object.freeze({
 });
 
 const CURVES = Object.freeze([
-  { key: "room", label: "Room response", color: "#7C3AED", dash: "5 4" },
+  // Raw / before EQ is the physical response as built by the engine, before any
+  // correction is applied. It is an expert validation layer, off by default.
+  { key: "raw", label: "Raw / before EQ", color: "#64748B", dash: "6 4" },
+  { key: "room", label: "Room / layout response", color: "#7C3AED", dash: "5 4" },
   { key: "product", label: "Subwoofer maximum", color: "#2563EB", dash: "8 4" },
   { key: "combined", label: "Product + room maximum", color: "#B45309", dash: "2 4" },
   { key: "house", label: "House target", color: "#625143", dash: "10 5" },
-  { key: "finalEq", label: "Final EQ response", color: "#16A34A", dash: null },
+  { key: "finalEq", label: "Predicted / post-EQ response", color: "#16A34A", dash: null },
 ]);
 
 export default function BassCurveVisibilityControls({ visibility, availability, onChange }) {
@@ -36,7 +44,7 @@ export default function BassCurveVisibilityControls({ visibility, availability, 
       }}
     >
       <legend style={{ padding: "0 6px", fontSize: 10, fontWeight: 700, color: "#625143" }}>
-        Graph layers
+        Response curves
       </legend>
       {CURVES.map((curve) => {
         const isAvailable = availability?.[curve.key] === true;
