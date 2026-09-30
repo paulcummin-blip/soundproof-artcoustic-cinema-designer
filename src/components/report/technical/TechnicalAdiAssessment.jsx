@@ -43,6 +43,7 @@
 
 import React from "react";
 import { buildAdiAssessment } from "./adiAssessmentBuilder";
+import AdiDesignGuidanceBlock from "@/components/adi/designGuidance/AdiDesignGuidanceBlock";
 
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
@@ -67,6 +68,10 @@ export default function TechnicalAdiAssessment({ publishedAuthority }) {
   if (!assessment) return null;
 
   const { highlights, improvements, overallAssessment, footer } = assessment;
+  const engineeringSummary =
+    publishedAuthority?.engineeringSummary
+    ?? publishedAuthority?.rating?.engineeringSummary
+    ?? null;
 
   return (
     <div
@@ -108,6 +113,11 @@ export default function TechnicalAdiAssessment({ publishedAuthority }) {
         >
           Engineering Assessment
         </div>
+      </div>
+
+      {/* ── ADI Design Guidance — the limiting factor leads every surface ── */}
+      <div style={{ marginBottom: "5mm" }}>
+        <AdiDesignGuidanceBlock engineeringSummary={engineeringSummary} />
       </div>
 
       {/* ── Highlights ── */}

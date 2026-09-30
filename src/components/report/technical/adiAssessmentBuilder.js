@@ -61,6 +61,7 @@
  */
 
 import { getRoomDesignRatingDesignation } from "./designRatingPresentation";
+import { buildAdiDesignGuidance } from "@/components/adi/designGuidance/adiDesignGuidanceEngine";
 
 const LEVEL_RANK = { L1: 1, L2: 2, L3: 3, L4: 4 };
 
@@ -195,7 +196,10 @@ function buildConfidenceSentence({ meetsObjective, primaryHasFail }) {
  *   content.
  * @returns {{ highlights: string[], improvements: Array<{action, why, benefit}>, overallAssessment: string, designation: string|null, footer: string } | null}
  */
-export function buildAdiAssessment(publishedAuthority, { audience = "technical" } = {}) {
+export function buildAdiAssessment(
+  publishedAuthority,
+  { audience = "technical", seats, geometry, system } = {},
+) {
   if (!publishedAuthority) return null;
 
   const engineeringSummary = resolveEngineeringSummary(publishedAuthority);
@@ -280,6 +284,19 @@ export function buildAdiAssessment(publishedAuthority, { audience = "technical" 
     });
   }
 
+  // ── ADI Design Guidance — the canonical limiting factor ─────────────
+  // The guidance leads every ADI surface. Where it names a first action, that
+  // action becomes the LEADING improvement, so a generic recommendation can
+  // never outrank the weakest credible parameter of the design.
+  const guidance = buildAdiDesignGuidance(engineeringSummary, { seats, geometry, system });
+  if (guidance?.changeFirst) {
+    improvements.unshift({
+      action: guidance.changeFirst,
+      why: guidance.whyItIsHappening,
+      benefit: guidance.expectedImprovement,
+    });
+  }
+
   // ── Overall Assessment — fixed four-sentence structure ───────────────
   // 1. Design strength
   // 2. Primary achievement
@@ -296,6 +313,7 @@ export function buildAdiAssessment(publishedAuthority, { audience = "technical" 
   return {
     highlights,
     improvements,
+    guidance,
     overallAssessment,
     designation,
     footer: ADI_FOOTER,

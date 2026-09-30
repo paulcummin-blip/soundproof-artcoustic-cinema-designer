@@ -61,6 +61,13 @@ export const ADI_LEVEL_SEVERITY = Object.freeze({
  *  area / rear-row geometry is the cause, not the speaker model. */
 export const ADI_SPATIAL_KEYS = Object.freeze(["p5", "p9", "p4", "p6", "p10", "p16", "p17"]);
 
+/** Of those, the angle-coverage parameters. A listening area that is too deep
+ *  shows up here first — the level-balance and timbre spreads at the rear row
+ *  follow from the geometry. Where both families collapse, ADI leads with the
+ *  angle parameter, because that is the one that responds to listening-area
+ *  depth and the guidance must name the real cause. */
+export const ADI_ANGLE_KEYS = Object.freeze(["p5", "p9"]);
+
 /** A row-to-row collapse of two or more performance levels. */
 export const ADI_ROW_COLLAPSE_LEVELS = 2;
 
@@ -112,7 +119,7 @@ function isFailing(level) {
 
 /** A front-to-rear collapse on one seat-scope parameter. */
 function findRowCollapse(parameters) {
-  let best = null;
+  const collapses = [];
   for (const key of ADI_SPATIAL_KEYS) {
     const parameter = parameters[key];
     if (!parameter || parameter.state !== "scored") continue;
@@ -124,11 +131,12 @@ function findRowCollapse(parameters) {
     const drop = front.worstRank - rear.worstRank;
     if (drop < ADI_ROW_COLLAPSE_LEVELS) continue;
     const score = drop * consequenceOf(key) * severityOf(rear.worstLevel);
-    if (!best || score > best.score) {
-      best = { key, parameter, frontRow: front, rearRow: rear, drop, score };
-    }
+    collapses.push({ key, parameter, frontRow: front, rearRow: rear, drop, score });
   }
-  return best;
+  if (!collapses.length) return null;
+  const angleCollapses = collapses.filter((entry) => ADI_ANGLE_KEYS.includes(entry.key));
+  const pool = angleCollapses.length ? angleCollapses : collapses;
+  return pool.slice().sort((a, b) => b.score - a.score)[0];
 }
 
 /** Rank every assessable parameter ADI may lead with. */
@@ -268,7 +276,22 @@ export function selectAdiLimitingFactor(evidence) {
     };
   }
 
-  // ── 7. Nothing below L2. ──────────────────────────────────────────
+  // ── 7. Nothing settled is failing, but the bass evaluation has not
+  //      published. Bass carries the highest consequence of any category, so
+  //      ADI must not call the design balanced while it is unknown: it names
+  //      what is missing and the action that settles it.
+  if (evidence?.evaluation?.bassIncomplete === true) {
+    return {
+      kind: ADI_FACTOR_KIND.INCOMPLETE,
+      key: null,
+      candidate: null,
+      runnerUp: candidates[0] || null,
+      candidates,
+      evidence,
+    };
+  }
+
+  // ── 8. Nothing below L2. ──────────────────────────────────────────
   return {
     kind: ADI_FACTOR_KIND.BALANCED,
     key: candidates[0]?.key || null,

@@ -332,6 +332,74 @@ function incompleteCopy({ evidence, signal }) {
   return { whatIsWrong: what, whyItIsHappening: why, changeFirst, expectedImprovement: expected, remainingLimitation: remaining, lowerValueChanges: lower };
 }
 
+// ── Front-to-rear collapse — listening-area depth ───────────────────────
+
+function metricValue(key, value) {
+  const magnitude = Math.abs(Number(value) || 0);
+  if (key === "p5" || key === "p9") return deg(magnitude);
+  return db(magnitude);
+}
+
+function collapseFamily(key) {
+  if (key === "p5") {
+    return {
+      label: "Surround angle coverage",
+      fix: "Bring the rear rows forward so the whole listening area sits inside one surround window, or add a second pair of side surrounds positioned for the rear seats.",
+    };
+  }
+  if (key === "p9") {
+    return {
+      label: "Height speaker angle coverage",
+      fix: "Either bring the rear rows forward so one row of overhead speakers serves the whole area, or add a second row of overheads aligned to the rear seats.",
+    };
+  }
+  if (key === "p4" || key === "p6" || key === "p10") {
+    return {
+      label: "Level balance across the listening area",
+      fix: "Even the seat-to-speaker distances at the rear rows — re-position or re-aim the speakers that serve them — before any other change.",
+    };
+  }
+  return {
+    label: "Timbre consistency across the listening area",
+    fix: "Hold one model family across the channels serving the rear rows and re-aim them so every row sits at a similar off-axis angle.",
+  };
+}
+
+function rowCollapseCopy({ candidate, evidence, collapse }) {
+  const key = candidate?.key || collapse?.key || null;
+  const parameter = candidate?.parameter || collapse?.parameter || null;
+  const family = collapseFamily(key);
+  const rows = (parameter?.byRow || []).filter((row) => row.assessedCount > 0);
+  const profile = rows
+    .map((row) => `row ${row.row} ${levelPhrase(row.worstLevel)}${row.meanValue != null ? ` (${metricValue(key, row.meanValue)})` : ""}`)
+    .join(" · ");
+  const front = collapse?.frontRow || rows[0] || null;
+  const rear = collapse?.rearRow || rows[rows.length - 1] || null;
+  const roomDepth = metres(evidence?.geometry?.roomDims?.lengthM);
+  const rowCount = rows.length;
+
+  const what = `${family.label} collapses from the front of the listening area to the rear. ${profile ? `By row: ${profile}.` : ""} The rear row is ${levelPhrase(rear?.worstLevel)} while the front row is ${levelPhrase(front?.worstLevel)}${collapse?.drop ? ` — ${collapse.drop} performance levels lost across ${rowCount} rows` : ""}. This is a listening-area geometry result, not an equipment result.`;
+
+  const why = `The rows do not see the same thing. ${key === "p5" || key === "p9"
+    ? "The angle between adjacent speakers is measured from the seat, so the same speaker positions that give the front row a wide, well-filled arc give the rear row a much narrower one."
+    : "The seat-to-speaker distances and the off-axis angles both change row by row, so each row receives a different balance and a different response shape."} ${roomDepth
+    ? `At ${roomDepth} of room depth, the listening area is deeper than a single row of speakers can cover evenly`
+    : `The listening area is deeper than the speaker layout can cover evenly`}, which is why the loss accumulates toward the back rather than appearing at one seat.`;
+
+  const changeFirst = `${family.fix}${roomDepth && rowCount >= 3
+    ? " If the room is too shallow to separate the rows, reduce to two rows: at this depth the depth of the listening area is itself the constraint, and removing a row buys more than any equipment change."
+    : " Confirm the improvement on the rear row before changing anything else."}`;
+
+  const expected = `The rear-row result should move toward the front row's figure — P${candidate?.number} recovering from ${levelPhrase(rear?.worstLevel)} to L2 or better — and the level-balance and timbre results at the rear row usually recover with it, because the same geometry is driving them.`;
+
+  const remaining = `If every row has to stay where it is, the rear row remains the weakest position: aiming can recover a few degrees of the angle and calibration can even the levels, but neither changes the geometry the rear seats sit in. Treat the front rows as the reference seats.`;
+
+  const alternative = runnerUpText(evidence?.runnerUpCandidate, evidence);
+  const lower = `Changing the speaker model, adding amplifier power or re-aiming the existing speakers cannot change the angle or the distance measured from the rear row — that is fixed by where the speakers and the seats are.${alternative ? ` ${alternative} is the next result to address once the listening-area layout is settled.` : ""}`;
+
+  return { whatIsWrong: what, whyItIsHappening: why, changeFirst, expectedImprovement: expected, remainingLimitation: remaining, lowerValueChanges: lower };
+}
+
 function balancedCopy({ evidence }) {
   const candidate = evidence?.balancedCandidate || null;
   const what = `No limiting factor stands out. Every settled parameter currently reaches L2 or better${candidate ? `, and the lowest remaining result is ${candidate.area} at ${levelPhrase(candidate.level)}` : ""}.`;
@@ -368,6 +436,13 @@ export function buildAdiGuidanceCopy(selection) {
   }
   if (kind === ADI_FACTOR_KIND.BALANCED) {
     return balancedCopy({ evidence: { ...(evidence || {}), balancedCandidate: selection?.candidates?.[0] || null } });
+  }
+  if (kind === ADI_FACTOR_KIND.ROW_COLLAPSE) {
+    return rowCollapseCopy({
+      candidate,
+      evidence: evidence || {},
+      collapse: selection?.collapse || null,
+    });
   }
 
   const builder = BUILDERS[key || candidate?.key];
