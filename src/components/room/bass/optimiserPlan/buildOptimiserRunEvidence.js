@@ -258,7 +258,9 @@ export function buildOptimiserRunEvidence({
     run: {
       completedAt: savedAt,
       outcome,
-      canonicalJobsRun: num(diagnostics?.canonicalJobsRun ?? diagnostics?.runtimeMetrics?.canonicalJobsRun),
+      canonicalJobsRun: num(selection?.canonicalJobsRun
+        ?? diagnostics?.canonicalJobsRun
+        ?? diagnostics?.runtimeMetrics?.canonicalJobsRun),
       candidatesEvaluated,
       candidatesEvaluatedBasis: evaluated.basis,
       resultsRetained,
