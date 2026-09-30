@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { hostOf, normaliseDomain, isOfficialHost } from '../../shared/officialDomain.js';
 
 const CANDIDATE_SCHEMA = {
   type: 'object',
@@ -31,23 +32,6 @@ const CANDIDATE_SCHEMA = {
 };
 
 const ALLOWED_SOURCE_TYPES = ['Official Product Page', 'Official PDF', 'Engineering Document', 'Support Article'];
-
-function hostOf(url) {
-  try {
-    return new URL(url).hostname.replace(/^www\./i, '').toLowerCase();
-  } catch {
-    return '';
-  }
-}
-
-// The manufacturer's stored website is the authority for what counts as official.
-function normaliseDomain(value) {
-  if (!value) return '';
-  const raw = String(value).trim().toLowerCase();
-  if (!raw) return '';
-  const withScheme = raw.startsWith('http') ? raw : `https://${raw}`;
-  return hostOf(withScheme);
-}
 
 export default async function (req) {
   try {
@@ -103,7 +87,7 @@ export default async function (req) {
     for (const item of raw) {
       const url = String(item?.url || '').trim();
       const host = hostOf(url);
-      if (!host || (host !== domain && !host.endsWith(`.${domain}`))) {
+      if (!isOfficialHost(host, domain)) {
         if (url) rejected.push({ url, reason: 'Not on the manufacturer domain' });
         continue;
       }

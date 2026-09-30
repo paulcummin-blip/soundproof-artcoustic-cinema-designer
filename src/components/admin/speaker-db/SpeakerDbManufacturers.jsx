@@ -6,7 +6,8 @@
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import SpeakerDbTable from "@/components/admin/speaker-db/SpeakerDbTable";
-import { Plus, Edit2, Trash2, X, SlidersHorizontal } from "lucide-react";
+import { Plus, Edit2, Trash2, X, SlidersHorizontal, Ban, CheckCircle2, Search } from "lucide-react";
+import CandidateModelFinder from "@/components/admin/speaker-db/CandidateModelFinder";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -31,8 +32,27 @@ function StatusBadge({ status }) {
   );
 }
 
+// The stored website is the authority domain — shown here so it can be checked
+// before any discovery runs against it.
+function domainOf(website) {
+  if (!website) return "—";
+  try {
+    const url = new URL(String(website).includes("://") ? website : `https://${website}`);
+    return url.hostname.replace(/^www\./i, "");
+  } catch {
+    return "—";
+  }
+}
+
+function truncate(text, max = 92) {
+  const value = String(text || "");
+  if (!value) return "—";
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+
 export default function SpeakerDbManufacturers() {
   const [rows, setRows] = useState([]);
+  const [finderManufacturer, setFinderManufacturer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // null | {} for new | existing record
   const [formData, setFormData] = useState({ name: "", website: "", status: "Active", notes: "" });
@@ -99,6 +119,16 @@ export default function SpeakerDbManufacturers() {
     }
   };
 
+  const handleToggleStatus = async (row) => {
+    const next = row.status === "Inactive" ? "Active" : "Inactive";
+    try {
+      await base44.entities.SpeakerManufacturer.update(row.id, { status: next });
+      await loadData();
+    } catch (err) {
+      console.error("[SpeakerDbManufacturers] Status change failed:", err);
+    }
+  };
+
   const handleEditRules = async (row) => {
     setRulesEditing(row);
     setRulesSaving(false);
@@ -159,14 +189,29 @@ export default function SpeakerDbManufacturers() {
   };
 
   const columns = [
-    { key: "name", label: "Name", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
-    { key: "website", label: "Website", sortable: true, render: (r) => r.website ? <a href={r.website} target="_blank" rel="noopener noreferrer" className="text-sm underline" style={{ color: BRAND.green }}>{r.website}</a> : "—" },
+    { key: "name", label: "Manufacturer", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
+    { key: "website", label: "Official website", sortable: true, render: (r) => r.website ? <a href={r.website} target="_blank" rel="noopener noreferrer" className="text-sm underline" style={{ color: BRAND.green }}>{r.website}</a> : <span className="text-sm" style={{ color: BRAND.danger }}>Not set — no discovery domain</span> },
+    { key: "domain", label: "Domain", render: (r) => <span className="text-sm" style={{ color: BRAND.subtext }}>{domainOf(r.website)}</span> },
     { key: "status", label: "Status", sortable: true, render: (r) => <StatusBadge status={r.status} /> },
+    { key: "notes", label: "Notes", render: (r) => <span className="text-xs" style={{ color: BRAND.subtext }}>{truncate(r.notes)}</span> },
     {
-      key: "actions", label: "", width: "130px", render: (r) => (
-        <div className="flex items-center gap-2">
+      key: "actions", label: "", width: "230px", render: (r) => (
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={(e) => { e.stopPropagation(); setFinderManufacturer(r); }}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
+            style={{ border: `1px solid ${BRAND.border}`, color: BRAND.green }}
+            title="Find candidate models"
+          >
+            <Search className="w-3.5 h-3.5" /> Find models
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); handleEdit(r); }} className="p-1 rounded hover:bg-gray-100" title="Edit website"><Edit2 className="w-3.5 h-3.5" style={{ color: BRAND.subtext }} /></button>
+          <button onClick={(e) => { e.stopPropagation(); handleToggleStatus(r); }} className="p-1 rounded hover:bg-gray-100" title={r.status === "Inactive" ? "Enable manufacturer" : "Disable manufacturer"}>
+            {r.status === "Inactive"
+              ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color: BRAND.green }} />
+              : <Ban className="w-3.5 h-3.5" style={{ color: BRAND.subtext }} />}
+          </button>
           <button onClick={(e) => { e.stopPropagation(); handleEditRules(r); }} className="p-1 rounded hover:bg-gray-100" title="Manufacturer rules"><SlidersHorizontal className="w-3.5 h-3.5" style={{ color: BRAND.green }} /></button>
-          <button onClick={(e) => { e.stopPropagation(); handleEdit(r); }} className="p-1 rounded hover:bg-gray-100" title="Edit manufacturer"><Edit2 className="w-3.5 h-3.5" style={{ color: BRAND.subtext }} /></button>
           <button onClick={(e) => { e.stopPropagation(); handleDelete(r); }} className="p-1 rounded hover:bg-red-50" title="Delete manufacturer"><Trash2 className="w-3.5 h-3.5" style={{ color: BRAND.danger, opacity: 0.6 }} /></button>
         </div>
       ),
@@ -354,6 +399,14 @@ export default function SpeakerDbManufacturers() {
             </div>
           </div>
         </div>
+      )}
+
+      {finderManufacturer && (
+        <CandidateModelFinder
+          manufacturer={finderManufacturer}
+          onClose={() => setFinderManufacturer(null)}
+          onCreated={loadData}
+        />
       )}
     </div>
   );
