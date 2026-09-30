@@ -303,7 +303,7 @@ describe('TEST 3B: baseline failure and unavailable metrics', () => {
 
     expect(record.terminalOutcome).toBe(OPTIMISER_TERMINAL_OUTCOME.EVALUATION_INCOMPLETE);
     expect(record.run.baselineValidation.valid).toBe(false);
-    expect(record.run.levers).toEqual({});
+    expect(record.levers).toEqual({});
     expect(record.run.actionablePlanProduced).toBe(false);
 
     // Refresh / reopen: the same record is restored from the version's slot.
