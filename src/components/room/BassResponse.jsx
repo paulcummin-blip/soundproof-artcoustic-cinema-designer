@@ -33,6 +33,7 @@ import BassCurveVisibilityControls, { DEFAULT_BASS_CURVE_VISIBILITY } from "@/co
 import BassSmoothingControl from "@/components/room/bass/BassSmoothingControl";
 import { buildRp22GraphMarkers } from "@/components/room/bass/rp22GraphMarkers";
 import Rp22GraphMarkerKey from "@/components/room/bass/Rp22GraphMarkerKey";
+import ExpertCurveView from "@/components/room/bass/ExpertCurveView";
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
 import CopyEqForensicTraceButton from "@/components/room/bass/CopyEqForensicTraceButton";
 import EqDiscoveryAuditPanel from "@/components/room/bass/EqDiscoveryAuditPanel";
