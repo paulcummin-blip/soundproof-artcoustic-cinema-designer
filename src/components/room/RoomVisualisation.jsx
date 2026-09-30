@@ -37,6 +37,8 @@ import RvRenderSubwoofers from "@/components/room/rv/render/RvRenderSubwoofers";
 import RvMlpRuler from "@/components/room/rv/render/RvMlpRuler";
 import { SURROUND_WALL_GAP_M, sideWallX, rearWallY, fixedSideX, OVERHEAD_PAIR_MAP, floorDeg, mirrorX, clampToSegment, resolveSymmetricLCR, computeMinimumScreenDepthM } from "@/components/room/rv/utils/rvGeometry";
 import { getAimingYawDeg, getPlanAimDeg, getYawForObject } from "@/components/room/rv/utils/rvAiming";
+import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
+import { useProjectorThrowWarning } from "@/components/room/rv/hooks/useProjectorThrowWarning";
 import { useMlpCalculation } from "@/components/room/rv/hooks/useMlpCalculation";
 import { useSpeakersByRole } from "@/components/room/rv/hooks/useSpeakersByRole";
 import { useEntitiesById } from "@/components/room/rv/hooks/useEntitiesById";
@@ -868,6 +870,21 @@ const byId = useEntitiesById({
   const screenFrontPlaneM = Number.isFinite(Number(screenPlaneY))
     ? Number(screenPlaneY)
     : Number(appState?.screenFrontPlaneM ?? 0);
+
+  // Generic throw-ratio caution. Lens position (canonical projector resolver),
+  // screen plane and the resolved screen image width are all already known here,
+  // so the implied throw ratio is checked against a broad 1.30–2.80 sanity range.
+  // Product-agnostic: no projector model, lens range or throw calculator is involved.
+  const projectorPosition = useMemo(
+    () => resolveProjectorPosition(roomElements, { widthM, lengthM }),
+    [roomElements, widthM, lengthM]
+  );
+  const projectorThrowWarning = useProjectorThrowWarning({
+    lensY: projectorPosition?.lensY,
+    screenPlaneY: screenFrontPlaneM,
+    screenWidthM: resolveRspScreenWidthM(screen),
+    dragging: dragging && dragType === "projector",
+  });
 
   // ZONE_DEPTH_M: derived from screenPlaneY (matches useScreenPlane's internal computation)
   const ZONE_DEPTH_M = useMemo(() => {
@@ -2358,6 +2375,11 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         liveImpactMode={liveImpactMode}
         roomElementDragInfo={roomElementDragInfo}
         projectorDragInfo={projectorDragInfo}
+        projectorThrowWarning={{
+          ...projectorThrowWarning,
+          lensX: projectorPosition?.lensX ?? null,
+          lensY: projectorPosition?.lensY ?? null,
+        }}
         seatDragInfo={seatDragInfo}
         mlpDragInfo={mlpDragInfo}
         dragType={dragType}

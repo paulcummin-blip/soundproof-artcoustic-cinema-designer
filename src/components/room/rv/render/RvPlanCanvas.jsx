@@ -20,6 +20,7 @@ import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 import RvRoomElementDragDims from "@/components/room/rv/render/RvRoomElementDragDims";
 import RvMlpDragDims from "@/components/room/rv/render/RvMlpDragDims";
 import RvProjectorDragDims from "@/components/room/rv/render/RvProjectorDragDims";
+import RvProjectorThrowWarning from "@/components/room/rv/render/RvProjectorThrowWarning";
 import RvSubSymmetryGuide from "@/components/room/rv/render/RvSubSymmetryGuide";
 import RvSubCoordinateGuide from "@/components/room/rv/render/RvSubCoordinateGuide";
 import { getSubRotationDeg } from "@/components/room/rv/utils/subWallOrientation";
@@ -163,6 +164,7 @@ export default function RvPlanCanvas({
   isPostDrag = false,
   roomElementDragInfo,
   projectorDragInfo,
+  projectorThrowWarning,
   seatDragInfo,
   mlpDragInfo,
   dragType,
@@ -716,6 +718,17 @@ export default function RvPlanCanvas({
                 svgH={svgHSafe}
               />
             )}
+
+            {/* Generic throw-ratio caution near the projector — shown live during a
+                projector drag and for 10 s after release, then faded away. Rendered
+                outside RvZoomGroup so the clipPath cannot clip the pill. */}
+            <RvProjectorThrowWarning
+              warning={projectorThrowWarning}
+              meterToCanvasX={meterToCanvasX}
+              meterToCanvasY={meterToCanvasY}
+              svgW={svgWSafe}
+              svgH={svgHSafe}
+            />
 
             {/* Seat drag dimensions — nearest side wall + nearest front/back wall */}
             {dragType === 'seat' && seatDragInfo?.visible && (
