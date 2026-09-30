@@ -22,6 +22,8 @@ import {
 import { checkDestructiveSave } from "@/components/state/destructiveSaveTripwire";
 import { useAppliedCalibrationAuthority } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { serializeAppliedCalibration } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationPersistence.js";
+import { useOptimiserPlanAuthority } from "@/components/room/bass/optimiserPlan/optimiserPlanStore.js";
+import { serializeOptimiserPlan } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
 
 // Hook to encapsulate project loading, saving, and state management
 export function useProjectLoader(
@@ -132,6 +134,14 @@ appState, // Pass appState directly for setters
     appState?.activeVersionId || null,
   );
 
+  // The saved ADI Optimisation Plan (evaluated optimiser result) is persisted
+  // on the same per-version basis, so the optimisation plan returns on reopen
+  // and is never recomputed to recreate the recommendation.
+  const optimiserPlanAuthority = useOptimiserPlanAuthority(
+    activeProjectId || projectIdState || null,
+    appState?.activeVersionId || null,
+  );
+
   // SHARED PAYLOAD BUILDER — single source of truth for both autosave and manual save.
   // Both paths must use this function so their signatures are always identical.
   const buildSharedProjectPayload = useCallback(() => {
@@ -195,6 +205,7 @@ appState, // Pass appState directly for setters
       p21EarlyReflectionPreset: appState?.p21EarlyReflectionPreset,
       existingRoomDimensionsEdited: loadedRoomDimensionsEditedRef.current,
       appliedCalibration: serializeAppliedCalibration(appliedCalAuthority),
+      optimiserPlan: serializeOptimiserPlan(optimiserPlanAuthority),
     });
     return projectData;
   }, [
@@ -209,6 +220,7 @@ appState, // Pass appState directly for setters
     appState?.abfuserQtySource, appState?.legacyAbfuserAutoQty,
     appState?.aimFrontWidesAtMLP, appState?.aimSideSurroundsAtMLP, appState?.aimRearSurroundsAtMLP,
     appliedCalAuthority,
+    optimiserPlanAuthority,
   ]);
 
   const parseMaybe = useCallback((val, fallback) => {
@@ -442,6 +454,7 @@ appState, // Pass appState directly for setters
           existingRoomDimensionsEdited: mergedP?.room_dimensions_edited === true,
           linkEarPlatformHeights: typeof mergedP?.link_ear_platform_heights === "boolean" ? mergedP.link_ear_platform_heights : true,
           appliedCalibration: mergedP?.applied_calibration ?? null,
+          optimiserPlan: mergedP?.optimiser_plan ?? null,
         });
         delete loadedProjectData.name;
         delete loadedProjectData.client_name;
@@ -839,7 +852,8 @@ appState, // Pass appState directly for setters
   appState?.p15ConstructionLevel,
   appState?.p21EarlyReflectionPreset,
   appState?.linkEarPlatformHeights,
-    appliedCalAuthority]
+    appliedCalAuthority,
+    optimiserPlanAuthority]
   );
 
   // Boot logic: run when hydrated or target changes – either load a project or initialise defaults

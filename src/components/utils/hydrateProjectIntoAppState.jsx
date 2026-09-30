@@ -21,6 +21,7 @@ import {
   hydrateAppliedCalibration,
   migrateLegacyAppliedCalibration,
 } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationPersistence";
+import { hydrateOptimiserPlan } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -786,5 +787,13 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
         migrateLegacyAppliedCalibration(_hydrateProjectId, _hydrateVersionId, _instancesForMigration, null);
       }
     }
+  }
+
+  // 13) ADI OPTIMISATION PLAN — restore the evaluated optimiser result.
+  // Read-only: restoring the saved plan never triggers recalculation (rule 1).
+  // Staleness is resolved against the current design fingerprint at read time;
+  // the saved plan is never rewritten or dropped on load.
+  if (_hydrateProjectId && _hydrateVersionId) {
+    hydrateOptimiserPlan(_hydrateProjectId, _hydrateVersionId, p?.optimiser_plan ?? null);
   }
 }

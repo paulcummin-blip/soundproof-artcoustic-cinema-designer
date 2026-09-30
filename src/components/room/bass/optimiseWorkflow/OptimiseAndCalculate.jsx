@@ -66,6 +66,11 @@ import {
 } from "../recommendationAuthority/acceptTransition.js";
 import { runEngineeringDecisionModel } from "@/components/adi";
 import { buildAdiBassEvidence } from "@/components/adi/adiBassEvidenceBuilder";
+import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
+import {
+  getOptimiserPlanAuthority,
+  setOptimiserPlanAuthority,
+} from "@/components/room/bass/optimiserPlan/optimiserPlanStore.js";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -332,8 +337,27 @@ export default function OptimiseAndCalculate({
             seatingPositions,
           },
         });
+        // The evaluated optimiser result is saved with the design version (so the
+        // plan returns on reopen) and with the published recommendation (so a
+        // proposal, its history and duplicated proposals restore the SAME plan
+        // with the fingerprint it belongs to). Built only from confirmed
+        // candidate values — never recomputed on reopen.
+        const optimiserPlan = buildOptimiserPlan({
+          selection: result.selection,
+          baseline: result.selection?.currentResult || null,
+          identity: {
+            designFingerprint: currentShared?.cacheKey || null,
+            resultFingerprint: fingerprint,
+            engineVersion: result.selection?.winner?.algorithmVersion || null,
+          },
+          instances: subInstancesRef.current || [],
+          leverDecisions: getOptimiserPlanAuthority(projectId, versionId)?.leverDecisions || {},
+        });
+        if (optimiserPlan) setOptimiserPlanAuthority(projectId, versionId, optimiserPlan);
+
         const recommendationForPublication = {
           ...result.recommendation,
+          optimiserPlan: optimiserPlan || undefined,
           publishedAdiDecision: decision?.recommendation ? {
             outcome: decision.outcome,
             intent: decision.intent,

@@ -36,6 +36,7 @@ import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Finger
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useAppliedCalibrationAuthority } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore";
+import OptimisationPlanStatus from "@/components/room/bass/optimiserPlan/OptimisationPlanStatus.jsx";
 
 // ── Displacement helpers ──
 
@@ -539,6 +540,16 @@ export default function AdiRecommendation({
           </div>
         </div>
       )}
+
+      {/* Optimisation Plan — the SAVED evaluated optimiser result, restored from
+          the design version (or the published result) and never recomputed */}
+      <OptimisationPlanStatus
+        projectId={projectId}
+        versionId={versionId}
+        completedBassAuthority={completedBassAuthority}
+        currentDesignFingerprint={shared?.cacheKey || null}
+        instances={currentInstances}
+      />
 
       {/* Apply button */}
       {showApplyButton && applyHandler && (

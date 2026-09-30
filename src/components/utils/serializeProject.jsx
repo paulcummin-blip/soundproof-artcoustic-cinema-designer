@@ -143,6 +143,11 @@ export function serializeProject(input = {}) {
     // accepted calibration survives page refresh, application restart, and
     // project reopen. Null = no calibration applied.
     appliedCalibration = null,
+
+    // ADI Optimisation Plan — the evaluated optimiser result, persisted
+    // per-version so the optimisation plan is restored on reopen without
+    // recomputation. Null = no evaluated optimiser result saved.
+    optimiserPlan = null,
   } = input;
 
   // Normalised room dims (support legacy dimensions as a fallback)
@@ -370,5 +375,6 @@ export function serializeProject(input = {}) {
     // Applied Calibration Authority — persisted inside design_state (per-version).
     // The authority store is in-memory; this field makes it durable.
     applied_calibration: appliedCalibration || null,
+    optimiser_plan: optimiserPlan || null,
   };
 }
