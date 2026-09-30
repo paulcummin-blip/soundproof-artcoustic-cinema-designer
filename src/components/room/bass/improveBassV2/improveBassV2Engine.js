@@ -661,8 +661,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     }
 
     try {
-      setStageVerdict(projectId, versionId, "phase_polarity", "skipped");
-      setStageVerdict(projectId, versionId, "gain", "skipped");
+      // A stage verdict is published only once that stage's own search has
+      // reported its outcome. Pre-seeding "skipped" here published a terminal
+      // "not applicable" claim for levers that had not run yet.
       onProgress("calibrating", "Preparing grouped phase search", 0, 1);
       const currentFinalist = buildCurrentFinalist(subwooferInstances, roomDims);
       if (currentFinalist) {
@@ -826,6 +827,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         calibrationDiagnostics.status=calibrationSearch?.status==="skipped"?"skipped":calibrationDiagnostics.valid?"completed-shortlist":"incomplete";
         onProgress("calibrating", "Grouped delay confirmation complete", retained.length, retained.length);
 
+      } else {
+        // No Current finalist means no calibration lever could be judged.
+        // Report incomplete — never "not applicable".
+        setStageVerdict(projectId, versionId, "phase_polarity", "incomplete");
+        setStageVerdict(projectId, versionId, "gain", "incomplete");
       }
     } catch (err) {
       if (isFatalLifecycleError(err)) throw err;
@@ -845,7 +851,6 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     // Search grouped gain with the same raw transfer and effective baseline
     // as the delay search. Delays and polarities are held fixed at the
     // effective baseline; only gain is adjusted.
-    setStageVerdict(projectId, versionId, "gain", "skipped");
     if (savedCurrentRawTransfer && savedEffectiveBaseline && existingAuthority) {
       try {
         onProgress("calibrating", "Testing grouped gain adjustments", 0, 1);
@@ -863,6 +868,10 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           retained: gainRetained.length,
           options: gainRetained.map(f => ({candidateId: f.id, tuning: f.tuning, proxy: f.proxy})),
           status: gainSearch?.status || "incomplete",
+          groupingStatus: gainSearch?.status || null,
+          reason: gainSearch?.status === "skipped" || gainSearch?.status === "ambiguous"
+            ? (gainSearch?.grouping?.reason || null)
+            : null,
         });
         const gainCandidates = [];
         for (let gi = 0; gi < gainRetained.length; gi++) {
@@ -904,12 +913,26 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         }
         const gainVerdict = gainMaterial?.material ? "improvement" :
           gainDiagnostics.invalid || gainDiagnostics.error || !gainDiagnostics.valid ? "incomplete" : "no_improvement";
+        if (!gainMaterial?.material && !gainDiagnostics.reason) {
+          // Gain was searched and produced no material improvement. That is a
+          // tested lever with a result to report — never "not applicable".
+          gainDiagnostics.reason = gainDiagnostics.valid > 0
+            ? `No useful improvement found${gainMaterial?.reason ? ": " + gainMaterial.reason : "."}`
+            : (gainDiagnostics.error || "Tested, but no confirmed gain candidate passed validation.");
+        }
         setStageVerdict(projectId, versionId, "gain", gainDiagnostics.status === "skipped" ? "skipped" : gainVerdict);
       } catch (err) {
         if (isFatalLifecycleError(err)) throw err;
         gainDiagnostics.error = err.message;
         setStageVerdict(projectId, versionId, "gain", "incomplete");
       }
+    } else {
+      // Gain is a valid lever wherever sources are independently adjustable.
+      // No comparison baseline is a technical reason for not running it, so it
+      // must never be published as "not applicable".
+      gainDiagnostics.status = "not_run";
+      gainDiagnostics.reason = "Gain available but not run: no validated Current baseline was available for comparison in this run.";
+      setStageVerdict(projectId, versionId, "gain", "incomplete");
     }
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot };

@@ -407,6 +407,9 @@ export function buildOptimisationDiagnosticsReport(selection, context = {}) {
   const gainDiag = selection.gainDiagnostics || {};
   const gainStage = {
     name: "Gain",
+    // The run's own reason for the gain outcome, when it recorded one, so the
+    // family ledger states what actually happened instead of a generic line.
+    reason: typeof gainDiag.reason === "string" ? gainDiag.reason : null,
     candidatesEvaluated: {
       coarse: num(gainDiag.coarseCount) ?? 0,
       fine: num(gainDiag.fineCount) ?? 0,

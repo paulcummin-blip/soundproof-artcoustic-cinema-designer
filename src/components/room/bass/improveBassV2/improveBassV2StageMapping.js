@@ -132,13 +132,14 @@ export function buildStageDisplay(state) {
   const phaseSearchActive = phase === 'calibrating' && /phase/i.test(phaseLabel);
   const gainSearchActive = phase === 'calibrating' && /gain/i.test(phaseLabel);
   const groupedDelayOnly = stageVerdicts.phase_polarity === 'skipped' && stageVerdicts.gain === 'skipped';
+  // The running stage is read from the engine's own phase label, never inferred
+  // from other stages' verdicts: a lever that has not run yet carries no verdict
+  // and must not be labelled from another lever's outcome.
   const activeStageKey = phaseSearchActive
     ? 'phase_polarity'
     : gainSearchActive
       ? 'gain'
-      : phase === 'calibrating' && groupedDelayOnly
-        ? 'delays'
-        : PHASE_TO_ACTIVE_STAGE[phase] ?? null;
+      : PHASE_TO_ACTIVE_STAGE[phase] ?? null;
 
   const stages = STAGE_KEYS.map((key) => {
     let stageStatus = 'pending';

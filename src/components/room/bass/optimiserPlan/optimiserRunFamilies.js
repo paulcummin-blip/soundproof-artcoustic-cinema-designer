@@ -95,6 +95,11 @@ function issueText(issue) {
   return list.length ? list.join(" · ") : "The evaluation did not complete.";
 }
 
+/** The reason the run itself recorded for a stage, when it recorded one. */
+function stageReason(stage) {
+  return typeof stage?.reason === "string" && stage.reason.trim() ? stage.reason : null;
+}
+
 /** Score fields of a family's best evaluated attempt, with nulls preserved. */
 function attemptScore(score) {
   if (!score) return null;
@@ -183,7 +188,7 @@ function leverFamily({ key, stageName, selection, diagnostics, current }) {
       key,
       status: OPTIMISER_FAMILY_STATUS.EVALUATED,
       candidatesEvaluated: confirmedCount(stage),
-      reason: "Evaluated, but the run retained no attempt value for this search.",
+      reason: stageReason(stage) || "Evaluated, but the run retained no attempt value for this search.",
       current,
     });
   }
@@ -191,7 +196,7 @@ function leverFamily({ key, stageName, selection, diagnostics, current }) {
     key,
     status: OPTIMISER_FAMILY_STATUS.NOT_TESTED,
     candidatesEvaluated: confirmedCount(stage),
-    reason: OPTIMISER_FAMILY_NOT_TESTED_REASON,
+    reason: stageReason(stage) || OPTIMISER_FAMILY_NOT_TESTED_REASON,
     current,
   });
 }
