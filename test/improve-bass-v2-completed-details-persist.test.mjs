@@ -140,8 +140,9 @@ describe("C — No material recommendation: stage details computed", () => {
   it("buildStageDetails shows P19 before→after for best candidate", () => {
     const selection = makeSelection();
     const details = buildStageDetails(selection);
-    assert.ok(details.delays.includes("4.8"), "should mention before P19");
-    assert.ok(details.delays.includes("4.4"), "should mention after P19");
+    // P19 deviation is displayed as a whole number, rounded down: 4.8 → 4, 4.4 → 4.
+    assert.match(details.delays, /P19: 4 dB L4 → 4 dB L4/, "should show whole-number P19 before→after");
+    assert.doesNotMatch(details.delays, /\d+\.\d+\s*dB/, "no decimal dB in the stage detail");
   });
 });
 
@@ -158,10 +159,12 @@ describe("D — Material recommendation: numerical results in detail", () => {
     });
     const details = buildStageDetails(selection);
     assert.ok(details.delays, "delays detail should exist");
-    assert.ok(details.delays.includes("0.40"), "should show after P19");
-    assert.ok(details.delays.includes("0.23"), "should show after P20");
     assert.ok(details.delays.includes("P19"), "should mention P19");
     assert.ok(details.delays.includes("P20"), "should mention P20");
+    // Whole numbers, rounded down: P19 4.8 → 0.4 shows as 4 → 0; P20 3.0 → 0.23 shows as 3 → 0.
+    assert.match(details.delays, /P19 4 → 0 dB/, "P19 before→after is whole-number");
+    assert.match(details.delays, /P20 3 → 0 dB/, "P20 before→after is whole-number");
+    assert.doesNotMatch(details.delays, /\d+\.\d+\s*dB/, "no decimal dB in the stage detail");
   });
 });
 

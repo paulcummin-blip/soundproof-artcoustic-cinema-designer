@@ -1,5 +1,6 @@
 import { validateSeatResults, canonicalLevel } from "./confirmedCandidateValidity.js";
 import { countFailingSeats, hasNewFailingSeats } from "./zeroFailOptimiser.js";
+import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 // materialityGate.js
 // Canonical user-facing materiality assessment for calibration-only improvements.
 //
@@ -177,7 +178,7 @@ export function isMaterialImprovement(currentResult, candidateResult) {
     const candidateWorst = worstPrimarySeatDeviation(candidateResult);
     const improvement = currentWorst - candidateWorst;
     if (improvement >= WITHIN_LEVEL_THRESHOLD_DB) {
-      return { material: true, reason: `Worst-seat deviation improved by ${improvement.toFixed(1)} dB`, details: { currentWorst, candidateWorst, improvement } };
+      return { material: true, reason: `Worst-seat deviation improved by ${floorP19P20Deviation(improvement)} dB`, details: { currentWorst, candidateWorst, improvement } };
     }
   }
 
@@ -186,7 +187,7 @@ export function isMaterialImprovement(currentResult, candidateResult) {
   const candidateWorstAll = worstSeatDeviation(candidateResult);
   const nullReduction = currentWorstAll - candidateWorstAll;
   if (nullReduction >= SEVERE_NULL_THRESHOLD_DB && !hasNewSignificantProblem(currentResult, candidateResult)) {
-    return { material: true, reason: `Severe null reduced by ${nullReduction.toFixed(1)} dB`, details: { currentWorstAll, candidateWorstAll, nullReduction } };
+    return { material: true, reason: `Severe null reduced by ${floorP19P20Deviation(nullReduction)} dB`, details: { currentWorstAll, candidateWorstAll, nullReduction } };
   }
 
   // D. Headroom is NOT an independent user-facing materiality qualifier.

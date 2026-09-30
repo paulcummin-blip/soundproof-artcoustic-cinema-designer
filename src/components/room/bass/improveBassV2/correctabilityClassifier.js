@@ -47,6 +47,7 @@
 // ---------------------------------------------------------------------------
 
 import { PROBLEM_TYPE } from '@/components/recommendationEngine/recommendationTypes';
+import { floorP19P20Deviation } from '@/components/utils/rp22/resolveRp22DesignValue';
 
 // ── Physical Recoverability Classes ───────────────────────────────────────
 // Owned by the optimiser (Layer 1). Re-exported by adiConstants for ADI to restate.
@@ -177,7 +178,7 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
   if (p14TargetDb > 0 && p14Headroom < deviation + t.capabilityHeadroomMarginDb) {
     return {
       class: CORRECTABILITY_CLASS.CAPABILITY_LIMITED,
-      description: `Physically recoverable but capability-limited — correcting the ${deviation.toFixed(1)} dB deviation would require boost that consumes P14 headroom (only ${p14Headroom.toFixed(1)} dB remaining above target). The correction would compromise the selected capability objective.`,
+      description: `Physically recoverable but capability-limited — correcting the ${floorP19P20Deviation(deviation)} dB deviation would require boost that consumes P14 headroom (only ${p14Headroom.toFixed(1)} dB remaining above target). The correction would compromise the selected capability objective.`,
       eqAllowed: false,
       physicalRecommended: false,
     };

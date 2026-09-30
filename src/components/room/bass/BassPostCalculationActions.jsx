@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useSyncExternalStore } from "react";
+import { formatP19P20DeltaText } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { Button } from "@/components/ui/button";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
@@ -87,7 +88,7 @@ function improvementText(currentLayout, recommendation) {
   }
   const parts = [];
   if (levelGain > 0) parts.push(`raises the weakest placement grade by ${levelGain} level${levelGain === 1 ? "" : "s"}`);
-  if (variationGain >= 0.5) parts.push(`reduces worst-seat variation by about ${variationGain.toFixed(1)} dB`);
+  if (variationGain >= 0.5) parts.push(`reduces worst-seat variation by about ${formatP19P20DeltaText(variationGain)}`);
   return `The searched layout ${parts.join(" and ")}.`;
 }
 

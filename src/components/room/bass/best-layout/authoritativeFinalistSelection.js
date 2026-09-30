@@ -16,6 +16,8 @@
 
 // Small tolerance so differences of only a few hundredths of a dB do not
 // determine the winner. Matches the user's "small equality tolerance" spec.
+import { floorP19P20Delta, floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
+
 const PARETO_TOLERANCE_DB = 0.05;
 
 // A sub is "effectively muted" when its gain is at or below this threshold.
@@ -248,12 +250,12 @@ export function classifyVersusCurrent(candidateMetrics, currentMetrics) {
       type: "improvement",
       p19Delta,
       p20Delta,
-      description: `Improves P19 by ${p19Delta.toFixed(2)} dB and P20 by ${p20Delta.toFixed(2)} dB versus current.`,
+      description: `Improves P19 by ${floorP19P20Delta(p19Delta)} dB and P20 by ${floorP19P20Delta(p20Delta)} dB versus current.`,
     };
   }
   if ((p19Improves && p20Worsens) || (p20Improves && p19Worsens)) {
-    const p19Label = p19Improves ? `+${p19Delta.toFixed(2)} dB P19` : `${p19Delta.toFixed(2)} dB P19`;
-    const p20Label = p20Improves ? `+${p20Delta.toFixed(2)} dB P20` : `${p20Delta.toFixed(2)} dB P20`;
+    const p19Label = p19Improves ? `+${floorP19P20Deviation(p19Delta)} dB P19` : `${floorP19P20Deviation(p19Delta)} dB P19`;
+    const p20Label = p20Improves ? `+${floorP19P20Deviation(p20Delta)} dB P20` : `${floorP19P20Deviation(p20Delta)} dB P20`;
     return {
       type: "trade-off",
       p19Delta,
@@ -268,7 +270,7 @@ export function classifyVersusCurrent(candidateMetrics, currentMetrics) {
       type: "improvement",
       p19Delta,
       p20Delta,
-      description: `Improves ${improving} by ${Math.abs(p19Delta > 0 ? p19Delta : p20Delta).toFixed(2)} dB; the other metric is unchanged.`,
+      description: `Improves ${improving} by ${floorP19P20Deviation(p19Delta > 0 ? p19Delta : p20Delta)} dB; the other metric is unchanged.`,
     };
   }
   return {

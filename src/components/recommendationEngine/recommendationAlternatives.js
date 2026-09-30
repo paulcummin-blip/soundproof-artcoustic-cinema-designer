@@ -13,6 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import { WHY_LOST, INTERVENTION_TYPE } from './recommendationTypes.js';
+import { floorP19P20Deviation } from '@/components/utils/rp22/resolveRp22DesignValue';
 import { compareZeroFailFirst, countFailingSeats } from '@/components/room/bass/improveBassV2/zeroFailOptimiser.js';
 
 function numericLevel(value) {
@@ -82,7 +83,7 @@ function describeEngineeringDifference(currentResult, candidateResult) {
   const worstAfter = Math.max(...(candidateResult.perSeatP19 || []).map((s) => Math.abs(Number(s.variationDbRaw) || 0)), 0);
   if (Math.abs(worstBefore - worstAfter) > 0.1) {
     const better = worstAfter < worstBefore;
-    parts.push(`Worst seat deviation ${worstBefore.toFixed(1)} → ${worstAfter.toFixed(1)} dB${better ? ' (improved)' : ' (worse)'}`);
+    parts.push(`Worst seat deviation ${floorP19P20Deviation(worstBefore)} → ${floorP19P20Deviation(worstAfter)} dB${better ? ' (improved)' : ' (worse)'}`);
   }
 
   return parts.length > 0 ? parts.join('. ') : 'No significant engineering difference.';

@@ -13,6 +13,7 @@
 
 import React from "react";
 import { AlertTriangle, FlaskConical, CheckCircle2 } from "lucide-react";
+import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { buildTreatmentAdvisory, buildRemainingLimitation } from "./improveBassV2Treatment";
 import { isOptimisedApplied } from "./improveBassV2Apply";
@@ -209,7 +210,7 @@ function deriveMaterialityExplanation(currentResult, winner, seatingPositions) {
   if (primaryRegressed > 0) return null; // primary seats regressed — don't explain
 
   const parts = [];
-  parts.push(`Seat-to-seat bass consistency improves materially. Worst-seat P20 reduces from ${worstBefore.toFixed(1)} dB to ${worstAfter.toFixed(1)} dB`);
+  parts.push(`Seat-to-seat bass consistency improves materially. Worst-seat P20 reduces from ${floorP19P20Deviation(worstBefore)} dB to ${floorP19P20Deviation(worstAfter)} dB`);
   if (primaryImproved > 0 && primarySame > 0) {
     parts.push(`while ${primaryImproved} primary seat${primaryImproved > 1 ? "s" : ""} also improve${primaryImproved > 1 ? "" : "s"}`);
   } else if (primaryImproved > 0) {
@@ -276,7 +277,7 @@ function MaterialityExplanation({ reason, currentResult, winner, seatingPosition
         <div className="mt-1.5 space-y-0.5">
           {tradeOffs.map((t, i) => (
             <div key={i} className="text-[9px] text-[#625143]">
-              Primary seat {t.seatId}: {t.parameter} {t.beforeRaw.toFixed(1)} → {t.afterRaw.toFixed(1)} dB; remains L{t.afterLevel}
+              Primary seat {t.seatId}: {t.parameter} {floorP19P20Deviation(t.beforeRaw)} → {floorP19P20Deviation(t.afterRaw)} dB; remains L{t.afterLevel}
             </div>
           ))}
         </div>

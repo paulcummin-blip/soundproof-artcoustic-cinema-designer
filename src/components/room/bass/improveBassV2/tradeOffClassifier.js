@@ -30,6 +30,7 @@
 // ---------------------------------------------------------------------------
 
 import { countFailingSeats } from "./zeroFailOptimiser.js";
+import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 
 const MATERIAL_RAW_THRESHOLD_DB = 1.0;  // material raw improvement or worsening
 const PRIMARY_RAW_WORSENING_THRESHOLD_DB = 1.0;  // same as materialityGate
@@ -291,9 +292,9 @@ function buildNeutralTradeOffText(improvement, worsening) {
     if (imp.isLevelChange) {
       return `${levelText(imp.beforeLevel)} → ${levelText(imp.afterLevel)}`;
     }
-    return `${imp.beforeRaw.toFixed(1)} → ${imp.afterRaw.toFixed(1)} dB`;
+    return `${floorP19P20Deviation(imp.beforeRaw)} → ${floorP19P20Deviation(imp.afterRaw)} dB`;
   };
-  const worseningLabel = (w) => `${w.beforeRaw.toFixed(1)} → ${w.afterRaw.toFixed(1)} dB`;
+  const worseningLabel = (w) => `${floorP19P20Deviation(w.beforeRaw)} → ${floorP19P20Deviation(w.afterRaw)} dB`;
 
   return `Improves ${objectiveLabel(improvement.parameter)}, but reduces ${objectiveLabel(worsening.parameter)}. ` +
     `Choose based on whether the primary listening position or overall seating consistency is more important for this project. ` +
@@ -310,13 +311,13 @@ export function buildTradeOffSummary(improvement, worsening) {
     if (imp.isLevelChange) {
       return `${levelText(imp.beforeLevel)} → ${levelText(imp.afterLevel)}`;
     }
-    return `${imp.beforeRaw.toFixed(1)} → ${imp.afterRaw.toFixed(1)} dB`;
+    return `${floorP19P20Deviation(imp.beforeRaw)} → ${floorP19P20Deviation(imp.afterRaw)} dB`;
   };
   return {
     improvesLabel: objectiveLabel(improvement.parameter),
     improvesText: improvementText(improvement),
     reducesLabel: objectiveLabel(worsening.parameter),
-    reducesText: `${worsening.beforeRaw.toFixed(1)} → ${worsening.afterRaw.toFixed(1)} dB`,
+    reducesText: `${floorP19P20Deviation(worsening.beforeRaw)} → ${floorP19P20Deviation(worsening.afterRaw)} dB`,
   };
 }
 

@@ -12,6 +12,8 @@
 // Before/after values always refer to the SAME seat, matched by seatId.
 // ---------------------------------------------------------------------------
 
+import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
+
 function numericLevel(value) {
   if (Number.isFinite(Number(value))) return Math.max(0, Math.min(4, Number(value)));
   const match = String(value || "").match(/^L([1-4])$/i);
@@ -25,7 +27,8 @@ function levelText(level) {
 
 function fmtDb1(raw) {
   if (!Number.isFinite(Number(raw))) return "—";
-  return Math.abs(Number(raw)).toFixed(1);
+  // P19/P20 deviation: whole number, rounded down.
+  return String(floorP19P20Deviation(raw));
 }
 
 function primarySeatMetric(perSeatArray) {

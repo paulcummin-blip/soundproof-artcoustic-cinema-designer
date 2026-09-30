@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { Button } from "@/components/ui/button";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import Rp22RecommendationCard from "@/components/room/bass/best-layout/Rp22RecommendationCard";
@@ -255,8 +256,8 @@ function FourSubFamilyComparisonNote({ comparison }) {
       <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">25/75 vs 33/67 · four-sub comparison</div>
       <p className="mt-1 text-[11px] leading-relaxed text-[#1B1A1A]">{explanation}</p>
       <div className="mt-1.5 grid grid-cols-2 gap-2 text-[10px] text-[#625143]">
-        <span>25/75 worst primary-seat P20: {Number(quarter.worstPrimaryP20Db).toFixed(0)} dB</span>
-        <span>33/67 worst primary-seat P20: {Number(third.worstPrimaryP20Db).toFixed(0)} dB</span>
+        <span>25/75 worst primary-seat P20: {floorP19P20Deviation(quarter.worstPrimaryP20Db)} dB</span>
+        <span>33/67 worst primary-seat P20: {floorP19P20Deviation(third.worstPrimaryP20Db)} dB</span>
       </div>
       {winnerLabel && (
         <div className="mt-1 text-[10px] font-medium text-[#213428]">

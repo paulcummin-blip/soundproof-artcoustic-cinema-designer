@@ -73,3 +73,25 @@ export function formatP19P20DeviationText(value) {
   const designValue = floorP19P20Deviation(value);
   return designValue === null ? null : `±${designValue} dB`;
 }
+
+/**
+ * P19/P20 change (improvement / worsening) as a whole number, keeping its sign.
+ * Magnitude is rounded down so an improvement is never overstated.
+ *   2.34 → 2      -1.21 → -1      0.4 → 0
+ * For copy where a sub-1 dB change must stay visible, use the string form.
+ */
+export function floorP19P20Delta(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.sign(number) * Math.floor(Math.abs(number));
+}
+
+/**
+ * Text for a P19/P20 change, with no decimal in any case:
+ *   "2 dB"   "-1 dB"   "under 1 dB" (when the change floors to zero)
+ */
+export function formatP19P20DeltaText(value) {
+  const whole = floorP19P20Delta(value);
+  if (whole === null) return null;
+  return whole === 0 ? "under 1 dB" : `${whole} dB`;
+}

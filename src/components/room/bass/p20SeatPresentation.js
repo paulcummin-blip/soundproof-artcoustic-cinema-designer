@@ -97,7 +97,7 @@ export function p20WorstSeat(rows = []) {
 /**
  * The OVERALL worst all-seat P20, always stated explicitly so a selected seat
  * can never be mistaken for the project's worst seat.
- * e.g. "Worst all-seat P20: R1S2 ±12.2 dB at 73 Hz"
+ * e.g. "Worst all-seat P20: R1S2 ±12 dB at 73 Hz"
  */
 export function formatWorstAllSeatP20Line(rows = []) {
   const worst = p20WorstSeat(rows);
@@ -110,7 +110,7 @@ export function formatWorstAllSeatP20Line(rows = []) {
 /**
  * The selected seat's own P20 result, labelled as a selection so it is never
  * presented as the overall worst seat.
- * e.g. "Selected seat: R2S4 ±10.2 dB at 45 Hz"
+ * e.g. "Selected seat: R2S4 ±10 dB at 45 Hz"
  */
 export function formatSelectedSeatP20Line(rows = [], selectedSeatId = null) {
   if (!selectedSeatId) return null;

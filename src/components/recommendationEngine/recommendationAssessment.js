@@ -12,6 +12,7 @@
 // ---------------------------------------------------------------------------
 
 import { ASSESSMENT_RATING } from './recommendationTypes.js';
+import { floorP19P20Deviation } from '@/components/utils/rp22/resolveRp22DesignValue';
 
 function numericLevel(value) {
   if (Number.isFinite(Number(value))) return Math.max(0, Math.min(4, Number(value)));
@@ -113,26 +114,26 @@ export function assessDesign(currentResult, context = {}) {
     rating = ASSESSMENT_RATING.POOR;
     summary = failingSeats >= 2
       ? `${failingSeats} seats fail P19 or P20. The bass response requires significant engineering attention.`
-      : `Worst seat deviation is ${worstAll.toFixed(1)} dB. The bass response has severe response issues.`;
+      : `Worst seat deviation is ${floorP19P20Deviation(worstAll)} dB. The bass response has severe response issues.`;
   } else if (failingSeats >= 1 || worstAll > 5 || (p18TargetHz > 0 && p18Hz < p18TargetHz - 2)) {
     rating = ASSESSMENT_RATING.LIMITED;
     const parts = [];
     if (failingSeats >= 1) parts.push(`${failingSeats} seat${failingSeats > 1 ? 's' : ''} fail P19 or P20`);
-    if (worstAll > 5) parts.push(`worst seat deviation ${worstAll.toFixed(1)} dB`);
+    if (worstAll > 5) parts.push(`worst seat deviation ${floorP19P20Deviation(worstAll)} dB`);
     if (p18TargetHz > 0 && p18Hz < p18TargetHz - 2) parts.push(`extension below target (${p18Hz.toFixed(0)} Hz vs ${p18TargetHz.toFixed(0)} Hz)`);
     summary = `${parts.join(', ')}. The bass response is limited and would benefit from engineering attention.`;
   } else if (worstAll > 3 || variationSpread > 2) {
     rating = ASSESSMENT_RATING.ACCEPTABLE;
     const parts = [];
-    if (worstAll > 3) parts.push(`worst seat deviation ${worstAll.toFixed(1)} dB`);
-    if (variationSpread > 2) parts.push(`seat-to-seat variation ${variationSpread.toFixed(1)} dB`);
+    if (worstAll > 3) parts.push(`worst seat deviation ${floorP19P20Deviation(worstAll)} dB`);
+    if (variationSpread > 2) parts.push(`seat-to-seat variation ${floorP19P20Deviation(variationSpread)} dB`);
     summary = `${parts.join(', ')}. The bass response is acceptable but has room for improvement.`;
   } else if (worstAll > 2 || variationSpread > 1) {
     rating = ASSESSMENT_RATING.GOOD;
-    summary = `Worst seat deviation ${worstAll.toFixed(1)} dB, seat-to-seat variation ${variationSpread.toFixed(1)} dB. The bass response is well-optimised with minor refinement possible.`;
+    summary = `Worst seat deviation ${floorP19P20Deviation(worstAll)} dB, seat-to-seat variation ${floorP19P20Deviation(variationSpread)} dB. The bass response is well-optimised with minor refinement possible.`;
   } else {
     rating = ASSESSMENT_RATING.EXCELLENT;
-    summary = `Worst seat deviation ${worstAll.toFixed(1)} dB, seat-to-seat variation ${variationSpread.toFixed(1)} dB. The bass response is excellent.`;
+    summary = `Worst seat deviation ${floorP19P20Deviation(worstAll)} dB, seat-to-seat variation ${floorP19P20Deviation(variationSpread)} dB. The bass response is excellent.`;
   }
 
   return { rating, summary, metrics };

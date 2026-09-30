@@ -15,6 +15,7 @@
 // or animations. The stage mapping is in improveBassV2StageMapping.js.
 
 import React, { useState, useEffect } from "react";
+import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { Button } from "@/components/ui/button";
 import { Loader2, X, CheckCircle2, Circle, Minus, Lock, Clock, TrendingDown, AlertCircle } from "lucide-react";
 import { buildStageDisplay, formatStageVerdict } from "./improveBassV2StageMapping.js";
@@ -130,13 +131,13 @@ function BestSoFarBar({ summary }) {
         {p19VariationDb != null && Number.isFinite(p19VariationDb) && (
           <div className="text-[10px]">
             <span className="text-[#8A7B6A]">P19: </span>
-            <span className="font-semibold text-[#213428]">{p19VariationDb.toFixed(2)} dB</span>
+            <span className="font-semibold text-[#213428]">{floorP19P20Deviation(p19VariationDb)} dB</span>
           </div>
         )}
         {p20VariationDb != null && Number.isFinite(p20VariationDb) && (
           <div className="text-[10px]">
             <span className="text-[#8A7B6A]">P20: </span>
-            <span className="font-semibold text-[#213428]">{p20VariationDb.toFixed(2)} dB</span>
+            <span className="font-semibold text-[#213428]">{floorP19P20Deviation(p20VariationDb)} dB</span>
           </div>
         )}
       </div>

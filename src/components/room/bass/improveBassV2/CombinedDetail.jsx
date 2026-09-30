@@ -12,6 +12,7 @@
 
 import React from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
+import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { countFailingSeats } from "./zeroFailOptimiser";
 import { buildWhatChanged } from "./improveBassV2WhatChanged";
 
@@ -23,7 +24,8 @@ function numericLevel(value) {
 
 function fmtDb(raw) {
   if (!Number.isFinite(Number(raw))) return "—";
-  return Math.abs(Number(raw)).toFixed(2);
+  // P19/P20 deviation: whole number, rounded down.
+  return String(floorP19P20Deviation(raw));
 }
 
 function primarySeatMetric(perSeatArray) {

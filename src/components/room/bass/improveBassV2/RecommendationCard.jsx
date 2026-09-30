@@ -14,6 +14,7 @@ import V2SeatBeforeAfterGrid from "./V2SeatBeforeAfterGrid.jsx";
 // preserve the canonical winner authority and the explicit-Apply safety.
 
 import React, { useState } from "react";
+import { formatP19P20DeltaText } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Wrench, Settings, MapPin, Sliders, CheckCircle2 } from "lucide-react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
@@ -56,7 +57,7 @@ function RawImprovementText({ rec }) {
   if (rec.rawImprovement < 0.1) return null;
   return (
     <div className="text-[10px] text-[#625143]">
-      P19/P20 deviation reduced by {rec.rawImprovement.toFixed(1)} dB
+      P19/P20 deviation reduced by {formatP19P20DeltaText(rec.rawImprovement)}
     </div>
   );
 }

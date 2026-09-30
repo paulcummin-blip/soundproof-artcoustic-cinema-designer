@@ -35,7 +35,11 @@ function formatCategoryFloors(floors) {
 function formatBassSeatResults(perSeat) {
   return Object.entries(perSeat || {})
     .map(([seatId, seat]) => {
-      const raw = Number.isFinite(Number(seat?.value)) ? `, ±${Number(seat.value).toFixed(1)} dB` : "";
+      // P19/P20 deviation handed to the writer is a whole number, rounded down,
+      // so a decimal can never reappear in the client-facing summary.
+      const raw = Number.isFinite(Number(seat?.value))
+        ? `, ±${Math.floor(Math.abs(Number(seat.value)))} dB`
+        : "";
       return `${seatId}: ${seat?.level || "—"}${raw}`;
     })
     .join("; ");

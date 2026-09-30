@@ -1,4 +1,5 @@
 import React from "react";
+import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 
 export default function BestSubLayoutCard({ recommendation, rank, familyComparison }) {
   const m = recommendation.metrics;
@@ -11,7 +12,7 @@ export default function BestSubLayoutCard({ recommendation, rank, familyComparis
       </div>
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs md:grid-cols-4">
         <Metric label="Layout" value={m.placementFamily} /><Metric label="Placement mode" value={recommendation.placementMode} />
-        <Metric label="Quantity" value={`${m.sourceCount} ${m.sourceCount === 1 ? "sub" : "subs"}`} /><Metric label="Seat variation" value={`${m.worstSeatVariationDb.toFixed(1)} dB`} />
+        <Metric label="Quantity" value={`${m.sourceCount} ${m.sourceCount === 1 ? "sub" : "subs"}`} /><Metric label="Seat variation" value={`${floorP19P20Deviation(m.worstSeatVariationDb)} dB`} />
         <Metric label="Major nulls" value={m.destructiveBroadNullCount} /><Metric label="Normalized depth" value={`${m.lowestReliableNormalizedFrequencyHz.toFixed(1)} Hz`} />
         <Metric label="Transfer efficiency" value={m.transferEfficiencyClass} /><Metric label="Seats assessed" value={m.rspOnly ? "RSP-only" : m.realSeatsAssessed} />
       </div>
@@ -21,8 +22,8 @@ export default function BestSubLayoutCard({ recommendation, rank, familyComparis
           <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Four-sub family comparison</div>
           <p className="mt-1 text-[11px] leading-relaxed text-[#1B1A1A]">{familyComparison.explanation}</p>
           <div className="mt-1.5 grid grid-cols-2 gap-2 text-[10px] text-[#625143]">
-            <span>25/75 worst seat: {familyComparison.quarter.worstSeatVariationDb.toFixed(2)} dB</span>
-            <span>33/67 worst seat: {familyComparison.third.worstSeatVariationDb.toFixed(2)} dB</span>
+            <span>25/75 worst seat: {floorP19P20Deviation(familyComparison.quarter.worstSeatVariationDb)} dB</span>
+            <span>33/67 worst seat: {floorP19P20Deviation(familyComparison.third.worstSeatVariationDb)} dB</span>
           </div>
         </div>
       )}

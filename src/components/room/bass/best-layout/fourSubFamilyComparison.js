@@ -13,6 +13,7 @@
 // primary seat-consistency signal. No new scoring formula is invented.
 
 import { FAMILY_IDS } from "../stage1/stage1FamilyRegistry";
+import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 
 const FAMILY_QUARTER = FAMILY_IDS.RP22_C;
 const FAMILY_THIRD = FAMILY_IDS.FOUR_THIRD_PAIRS;
@@ -97,9 +98,9 @@ export function buildFourSubFamilyComparison(fourSubResult) {
 
   const explanation = winnerFamily
     ? (nearEquivalent
-      ? `${winnerLabel} and ${loserLabel} are near-equivalent in this room; ${winnerLabel} is numerically better by ${Math.abs(deltaDb).toFixed(2)} dB at the worst primary seat.`
-      : `${winnerLabel} improves worst primary-seat consistency by ${Math.abs(deltaDb).toFixed(2)} dB versus ${loserLabel} in this room.`)
-    : `25/75 and 33/67 are effectively similar in this room (worst primary-seat difference ${Math.abs(deltaDb).toFixed(2)} dB).`;
+      ? `${winnerLabel} and ${loserLabel} are near-equivalent in this room; ${winnerLabel} is numerically better by ${floorP19P20Deviation(deltaDb)} dB at the worst primary seat.`
+      : `${winnerLabel} improves worst primary-seat consistency by ${floorP19P20Deviation(deltaDb)} dB versus ${loserLabel} in this room.`)
+    : `25/75 and 33/67 are effectively similar in this room (worst primary-seat difference ${floorP19P20Deviation(deltaDb)} dB).`;
 
   return {
     quarter: { familyId: FAMILY_QUARTER, worstPrimaryP20Db: quarterP20, worstPrimaryP19Db: quarterP19 },

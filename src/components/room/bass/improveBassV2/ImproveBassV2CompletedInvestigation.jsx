@@ -15,6 +15,7 @@
 
 import React from "react";
 import { CheckCircle2, AlertCircle, AlertTriangle, Minus, Circle } from "lucide-react";
+import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { buildStageDisplay, formatStageVerdict } from "./improveBassV2StageMapping.js";
 import { delayMsToAcousticDistance } from "./acousticDistance";
 import { isCalibrationApplied } from "./improveBassV2ApplyCalibration.js";
@@ -84,7 +85,8 @@ export function findBestCalibrationOption(calibrationDiagnostics) {
 
 function fmtDb(raw) {
   if (!Number.isFinite(Number(raw))) return "—";
-  return Math.abs(Number(raw)).toFixed(2);
+  // P19/P20 deviation: whole number, rounded down.
+  return String(floorP19P20Deviation(raw));
 }
 
 /**

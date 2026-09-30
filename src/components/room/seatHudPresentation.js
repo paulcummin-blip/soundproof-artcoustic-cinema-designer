@@ -1,6 +1,7 @@
 import { RP22_SEAT_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import { formatAuthoritativeP20Result, p20LevelText } from "@/components/room/bass/p20SeatPresentation";
 import { formatBassParameterValue } from "@/components/room/bass/bassResultsPresentation";
+import { formatP19P20DeviationText } from "@/components/utils/rp22/resolveRp22DesignValue";
 
 const normalizeLevel = (level) => {
   if (typeof level === "number" && level >= 0 && level <= 4) return level === 0 ? "FAIL" : `L${level}`;
@@ -21,7 +22,8 @@ const formatFallback = (value, unit) => {
   if (!Number.isFinite(value)) return "—";
   if (unit === "m") return `${value.toFixed(2)}m`;
   if (unit === "°") return `${Math.round(value)}°`;
-  if (unit === "± dB") return `±${Math.abs(value).toFixed(1)} dB`;
+  // "± dB" is the P19/P20 deviation unit — whole number, rounded down.
+  if (unit === "± dB") return formatP19P20DeviationText(value);
   if (unit === "dB") return `${value.toFixed(1)} dB`;
   return String(value);
 };
