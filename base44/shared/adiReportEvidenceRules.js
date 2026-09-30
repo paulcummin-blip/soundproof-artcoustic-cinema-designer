@@ -31,10 +31,10 @@ export const REPORT_STRUCTURES = Object.freeze([
  * snapshot contains. Each carries the reason so the exclusion is auditable.
  */
 export const EXCLUDED_PARAMETERS = Object.freeze({
-  8: 'Not useful in a client-facing summary.',
-  15: 'Assumed, not a measured or design-derived result.',
-  20: 'Excluded from this report type.',
-  21: 'Not part of the sales summary style.',
+  8: 'not used',
+  15: 'not used',
+  20: 'not used in this client summary',
+  21: 'not used',
 });
 
 /**
@@ -79,11 +79,15 @@ export const PARAMETER_PLAIN_LANGUAGE = Object.freeze({
   11: 'Surround speaker placement',
   12: 'Screen Dynamic Range',
   13: 'Non-screen Dynamic Range',
+  8: 'Upfiring speaker allowance',
   14: 'LFE and subwoofer Dynamic Range',
+  15: 'Background noise assumption',
   16: 'Screen timbre',
   17: 'Surround timbre',
   18: 'Bass extension',
   19: 'Bass response',
+  20: 'Bass seat-to-seat consistency',
+  21: 'Early reflection assumption',
 });
 
 /**
@@ -184,7 +188,9 @@ export function splitParameterEvidence(snapshot) {
     const label = row.title || plainLanguageName(id);
 
     if (EXCLUDED_PARAMETERS[id]) {
-      omitted.push({ parameter_id: id, label, reason: EXCLUDED_PARAMETERS[id] });
+      // Plain language only: an excluded result is never named by its
+      // parameter code in anything the writer reads.
+      omitted.push({ parameter_id: id, label: plainLanguageName(id, label), reason: EXCLUDED_PARAMETERS[id] });
       continue;
     }
     const structure = structureForParameter(id);

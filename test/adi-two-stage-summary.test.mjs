@@ -369,8 +369,13 @@ describe("Evidence rules", () => {
     }
     // Stated as not used, with the reason, so the writer cannot reach for them.
     expect(referenceEvidence).toMatch(/Not used in this report \(never reference these\)/);
-    expect(referenceEvidence).toMatch(/Background noise floor \(P15\) - Assumed/);
-    expect(referenceEvidence).toMatch(/Excluded from this report type/);
+    // Readable, decision-oriented labels, and no parameter code for the writer
+    // to echo into client-facing text.
+    expect(referenceEvidence).toMatch(/Upfiring speaker allowance - not used/);
+    expect(referenceEvidence).toMatch(/Background noise assumption - not used/);
+    expect(referenceEvidence).toMatch(/Bass seat-to-seat consistency - not used in this client summary/);
+    expect(referenceEvidence).toMatch(/Early reflection assumption - not used/);
+    expect(referenceEvidence).not.toMatch(/\(P8\)|\(P15\)|\(P20\)|\(P21\)/);
     expect(simpleEvidence).toMatch(/Assumed parameters, never referenced in this report/);
 
     const excludedIds = interpretationFor(REFERENCE_ROOM).excluded_or_unreliable_evidence.map((entry) => entry.parameter_id);
@@ -451,12 +456,19 @@ describe("Stage 2 and the audit trail", () => {
 
   test("the writer is given the design story ahead of the evidence", () => {
     const source = fs.readFileSync(new URL("../base44/functions/generateProposal/entry.ts", import.meta.url), "utf8");
-    const order = [
-      source.indexOf("interpretationBlock,\n    '',\n    projectContext,"),
-      source.indexOf("buildWritingStyleContract(),"),
-    ];
-    expect(order[0]).toBeGreaterThan(-1);
-    expect(order[1]).toBeGreaterThan(order[0]);
+    // Compare the two points inside the SECTION PROMPT itself: the story block
+    // leads, the evidence follows, and the style contract is read last. (An
+    // earlier version of this check compared a contract call from the
+    // highlights prompt with a position inside this function.)
+    // Match the actual array entries, not the parameter list: inside the return
+    // array the story block is immediately followed by the evidence context.
+    const body = source.slice(source.indexOf("function buildSectionPrompt("));
+    const story = body.indexOf("interpretationBlock,\n    '',\n    projectContext,");
+    const contract = body.indexOf("buildWritingStyleContract(),");
+    expect(story).toBeGreaterThan(-1);
+    expect(contract).toBeGreaterThan(story);
+    // The highlights prompt leads with the story too.
+    expect(source).toMatch(/\[\s*interpretationBlock,\s*buildHighlightsPrompt/);
     expect(source).toMatch(/buildProjectInterpretation\(\{/);
     expect(source).toMatch(/COMPARISON_STRUCTURE_INSTRUCTION/);
   });

@@ -27,6 +27,7 @@
 import {
   REPORT_STRUCTURES,
   EXCLUDED_PARAMETERS,
+  plainLanguageName,
   isReliableResult,
   readReliableResult,
   splitParameterEvidence,
@@ -109,9 +110,10 @@ function hasModelMatching(productRoles, pattern) {
 
 function deriveRoomType({ volumeM3, rowCount, totalSeats, projection, tv }) {
   if (tv) return 'TV-based cinema room';
-  if (rowCount >= 3) return 'Multi-row cinema';
-  if (volumeM3 != null && volumeM3 >= 60) return 'Dedicated cinema';
+  // More than one seating row defines the room's nature, so multi-row wins over
+  // the generic dedicated-cinema classification.
   if (rowCount >= 2) return 'Multi-row cinema';
+  if (volumeM3 != null && volumeM3 >= 60) return 'Dedicated cinema';
   if (projection && totalSeats <= 4 && volumeM3 != null && volumeM3 < 40) return 'Compact cinema';
   if (totalSeats > 0 && totalSeats <= 3 && volumeM3 != null && volumeM3 < 30) return 'Media room';
   return projection ? 'Dedicated cinema' : 'Media room';
@@ -290,7 +292,15 @@ export function buildProjectInterpretation(params = {}) {
   }
 
   const assumed = rp22.assumed || {};
+  // The rule list leads, so its canonical plain-language wording wins the
+  // de-duplication below. All four are stated whether or not the result is
+  // present, because they are excluded by report design, not by missing data.
   const excluded = [
+    ...Object.entries(EXCLUDED_PARAMETERS).map(([id, reason]) => ({
+      parameter_id: Number(id),
+      label: plainLanguageName(Number(id)),
+      reason,
+    })),
     ...parameterEvidence.omitted.map((entry) => ({
       parameter_id: entry.parameter_id,
       label: entry.label,
@@ -302,15 +312,6 @@ export function buildProjectInterpretation(params = {}) {
       reason: entry.reason,
     })),
   ];
-  for (const id of Object.keys(EXCLUDED_PARAMETERS)) {
-    const parameterId = Number(id);
-    if (parameterId === 15 && assumed.p15_noise_floor) {
-      excluded.push({ parameter_id: 15, label: 'Background noise floor', reason: EXCLUDED_PARAMETERS[id] });
-    }
-    if (parameterId === 21 && assumed.p21_early_reflections) {
-      excluded.push({ parameter_id: 21, label: 'Early reflections', reason: EXCLUDED_PARAMETERS[id] });
-    }
-  }
   const uniqueExcluded = [];
   for (const entry of excluded) {
     if (!uniqueExcluded.some((existing) => existing.parameter_id === entry.parameter_id)) uniqueExcluded.push(entry);
@@ -461,7 +462,9 @@ export function formatInterpretationForPrompt(interpretation) {
     `  Viewing: ${evidence.viewing?.summary ? `${evidence.viewing.summary} (Primary ${evidence.viewing.primary_floor || 'not assessed'}, Secondary ${evidence.viewing.secondary_floor || 'not assessed'})` : 'Not available'}`,
     '',
     NOT_USED_HEADING + ':',
-    listOrNone((interpretation.excluded_or_unreliable_evidence || []).map((entry) => `${entry.label}${entry.parameter_id ? ` (P${entry.parameter_id})` : ''} - ${entry.reason}`)),
+    // Plain language, no parameter codes: the writer is never handed a code it
+    // could echo into client-facing text.
+    listOrNone((interpretation.excluded_or_unreliable_evidence || []).map((entry) => `${entry.label} - ${entry.reason}`)),
     '',
     'Designer emphasis notes (emphasis only, never a change to the engineering results):',
     interpretation.designer_emphasis || 'None provided. Use a balanced professional narrative.',

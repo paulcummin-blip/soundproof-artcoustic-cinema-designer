@@ -142,17 +142,20 @@ export function buildEngineeringEvidence(snapshot) {
     if (notUsed.some((existing) => existing.parameter_id === entry.parameter_id)) return;
     notUsed.push(entry);
   };
-  for (const entry of parameterEvidence.omitted) addNotUsed(entry);
-  for (const entry of bassEvidence.omitted) addNotUsed(entry);
+  // The rule list goes first so its canonical plain-language wording is kept.
   for (const [id, reason] of Object.entries(EXCLUDED_PARAMETERS)) {
     const parameterId = Number(id);
     addNotUsed({ parameter_id: parameterId, label: plainLanguageName(parameterId), reason });
   }
+  for (const entry of parameterEvidence.omitted) addNotUsed(entry);
+  for (const entry of bassEvidence.omitted) addNotUsed(entry);
   if (notUsed.length > 0) {
+    // Plain language, no parameter codes: the writer never sees a code it could
+    // echo into client-facing text.
     lines.push(
       '',
       'Not used in this report (never reference these):',
-      ...notUsed.map((entry) => `  ${entry.label}${entry.parameter_id ? ` (P${entry.parameter_id})` : ''} - ${entry.reason}`),
+      ...notUsed.map((entry) => `  ${entry.label} - ${entry.reason}`),
     );
   }
 
@@ -179,8 +182,8 @@ export function buildEngineeringEvidence(snapshot) {
   // appear in the "not used" list above.
   const assumed = snapshot.rp22?.assumed || {};
   const assumedNames = [
-    assumed.p15_noise_floor ? 'background noise floor (P15)' : null,
-    assumed.p21_early_reflections ? 'early reflections (P21)' : null,
+    assumed.p15_noise_floor ? 'background noise assumption' : null,
+    assumed.p21_early_reflections ? 'early reflection assumption' : null,
   ].filter(Boolean);
   if (assumedNames.length > 0) {
     lines.push(`Assumed parameters, never referenced in this report: ${assumedNames.join(', ')}.`);
