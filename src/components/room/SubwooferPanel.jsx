@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
@@ -9,6 +9,11 @@ import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { subwooferModelKey, subwooferDisplayLabel } from '@/components/utils/subwooferDisplayLabel';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { useSubwooferCompatibilityActions } from '@/components/hooks/useSubwooferCompatibilityActions';
+import {
+  ModelSelectLabel,
+  ModelSelectTrigger,
+  ModelValueText,
+} from '@/components/speakers/SpeakerModelField';
 
 function rectsOverlap(a, b) {
   return a.left < b.right && a.right > b.left && a.bottom < b.top && a.top > b.bottom;
@@ -68,8 +73,8 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
           <div className="col-span-12 md:col-span-6">
             <h4 className="text-[15px] font-semibold text-[#1B1A1A] mb-2">Front Subwoofers</h4>
             <div className="grid grid-cols-12 items-end gap-x-3 gap-y-2">
-              <label className="col-span-7 text-[12px] text-[#625143]">Model</label>
-              <label className="col-span-5 text-[12px] text-[#625143]">Quantity</label>
+              <ModelSelectLabel className="col-span-7">Model</ModelSelectLabel>
+              <ModelSelectLabel className="col-span-5">Quantity</ModelSelectLabel>
 
               <div className="col-span-7">
                 <Select
@@ -80,11 +85,13 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                     compat.setFrontSubModel(model);
                   }}
                 >
-                  <SelectTrigger className="h-10 w-full px-3 justify-between bg-white border-[#DCDBD6]">
-                    <SelectValue placeholder="Select subwoofer model" className="text-2xl font-semibold" style={{ color: "#213428" }}>
-                      {compat.frontModelDisplay ? (compat.frontModelDisplay === "__mixed__" ? "Mixed" : subwooferDisplayLabel(compat.frontModelDisplay)) : undefined}
-                    </SelectValue>
-                  </SelectTrigger>
+                  <ModelSelectTrigger>
+                    <ModelValueText muted={!compat.frontModelDisplay}>
+                      {compat.frontModelDisplay
+                        ? (compat.frontModelDisplay === "__mixed__" ? "Mixed" : subwooferDisplayLabel(compat.frontModelDisplay))
+                        : "Select subwoofer model"}
+                    </ModelValueText>
+                  </ModelSelectTrigger>
                   <SelectContent>
                     <SelectItem value="__mixed__" disabled>Mixed</SelectItem>
                     <SelectItem value="sub2-12">{subwooferDisplayLabel("sub2-12")}</SelectItem>
@@ -102,9 +109,11 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                     compat.setFrontSubCount(Number(v));
                   }}
                 >
-                  <SelectTrigger className="h-10 w-[90px] px-3 justify-between bg-white border-[#DCDBD6]">
-                    <SelectValue placeholder="0" className="text-2xl font-semibold" style={{ color: "#213428" }} />
-                  </SelectTrigger>
+                  <ModelSelectTrigger className="w-[90px]">
+                    <ModelValueText>
+                      <SelectValue placeholder="0" />
+                    </ModelValueText>
+                  </ModelSelectTrigger>
                   <SelectContent>
                     <SelectItem value="0">0</SelectItem>
                     <SelectItem value="1">1</SelectItem>
@@ -200,8 +209,8 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
           <div className="col-span-12 md:col-span-6">
             <h4 className="text-[15px] font-semibold text-[#1B1A1A] mb-2">Rear Subwoofers</h4>
             <div className="grid grid-cols-12 items-end gap-x-3 gap-y-2">
-              <label className="col-span-7 text-[12px] text-[#625143]">Model</label>
-              <label className="col-span-5 text-[12px] text-[#625143]">Quantity</label>
+              <ModelSelectLabel className="col-span-7">Model</ModelSelectLabel>
+              <ModelSelectLabel className="col-span-5">Quantity</ModelSelectLabel>
 
               <div className="col-span-7">
                 <Select
@@ -212,11 +221,13 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                     compat.setRearSubModel(model);
                   }}
                 >
-                  <SelectTrigger className="h-10 w-full px-3 justify-between bg-white border-[#DCDBD6]">
-                    <SelectValue placeholder="Select subwoofer model" className="text-2xl font-semibold" style={{ color: "#213428" }}>
-                      {compat.rearModelDisplay ? (compat.rearModelDisplay === "__mixed__" ? "Mixed" : subwooferDisplayLabel(compat.rearModelDisplay)) : undefined}
-                    </SelectValue>
-                  </SelectTrigger>
+                  <ModelSelectTrigger>
+                    <ModelValueText muted={!compat.rearModelDisplay}>
+                      {compat.rearModelDisplay
+                        ? (compat.rearModelDisplay === "__mixed__" ? "Mixed" : subwooferDisplayLabel(compat.rearModelDisplay))
+                        : "Select subwoofer model"}
+                    </ModelValueText>
+                  </ModelSelectTrigger>
                   <SelectContent>
                     <SelectItem value="__mixed__" disabled>Mixed</SelectItem>
                     <SelectItem value="sub2-12">{subwooferDisplayLabel("sub2-12")}</SelectItem>
@@ -234,9 +245,11 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                     compat.setRearSubCount(Number(v));
                   }}
                 >
-                  <SelectTrigger className="h-10 w-[90px] px-3 justify-between bg-white border-[#DCDBD6]">
-                    <SelectValue placeholder="0" className="text-2xl font-semibold" style={{ color: "#213428" }} />
-                  </SelectTrigger>
+                  <ModelSelectTrigger className="w-[90px]">
+                    <ModelValueText>
+                      <SelectValue placeholder="0" />
+                    </ModelValueText>
+                  </ModelSelectTrigger>
                   <SelectContent align="end" className="w-[64px]">
                     <SelectItem value="0">0</SelectItem>
                     <SelectItem value="1">1</SelectItem>

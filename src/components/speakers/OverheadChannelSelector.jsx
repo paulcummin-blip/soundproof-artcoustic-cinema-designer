@@ -5,6 +5,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { useProductRoleOptions } from '@/components/products/useProductMaster';
 import { PRODUCT_ROLES } from '@/components/products/productMaster';
+import {
+  ModelSelectLabel,
+  ModelSelectTrigger,
+  ModelValueText,
+} from '@/components/speakers/SpeakerModelField';
 
 export default function OverheadChannelSelector({
   overheadCount,
@@ -61,17 +66,17 @@ export default function OverheadChannelSelector({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label className="text-sm font-medium text-[#3E4349]">Overhead Model (All)</Label>
+        <ModelSelectLabel>Overhead Model (All)</ModelSelectLabel>
         <Select
           value={globalModel || 'OFF'}
           onValueChange={(val) => onGlobalModelChange(val === 'OFF' ? null : val)}
           disabled={disabled}
         >
-          <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-            <span className="text-2xl font-semibold" style={{ color: isOff ? '#9B9890' : "#213428" }}>
+          <ModelSelectTrigger>
+            <ModelValueText muted={isOff}>
               {isOff ? 'Select overhead model' : getModelLabel(globalModel)}
-            </span>
-          </SelectTrigger>
+            </ModelValueText>
+          </ModelSelectTrigger>
           <SelectContent className="bg-white border-[#DCDBD6]">
             <SelectItem value="OFF" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: "#213428" }}>
               OFF — (no overheads active)
