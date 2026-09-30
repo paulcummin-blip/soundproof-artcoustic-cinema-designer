@@ -108,8 +108,8 @@ function makeSummary({ seatParams = {}, roomParams = {}, provisionalSeatParams =
     };
   };
 
-  for (const [key, rows] of Object.entries(seatParams)) buildSeatEntry(key, rows);
-  for (const [key, rows] of Object.entries(provisionalSeatParams)) buildSeatEntry(key, rows, { provisional: true });
+  for (const [key, entry] of Object.entries(seatParams)) buildSeatEntry(key, entry.rows);
+  for (const [key, entry] of Object.entries(provisionalSeatParams)) buildSeatEntry(key, entry.rows, { provisional: true });
 
   for (const [key, [level, value]] of Object.entries(roomParams)) {
     const number = Number(key.replace("p", ""));
