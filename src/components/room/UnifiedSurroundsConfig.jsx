@@ -78,7 +78,8 @@ export default function UnifiedSurroundsConfig({
       [...sideModels, ...rearModels, ...wideModels].map((item) => item.key)
     );
     for (const speaker of (Array.isArray(placedSpeakers) ? placedSpeakers : [])) {
-      const historicalKey = normaliseModelKey(speaker?.model || '');
+      // Canonical base key: a legacy "_s" placement still matches its base choice.
+      const historicalKey = stripSurroundSuffix(normaliseModelKey(speaker?.model || ''));
       if (historicalKey) surroundChoiceKeys.add(historicalKey);
     }
 
@@ -88,8 +89,10 @@ export default function UnifiedSurroundsConfig({
       if (!normalized || lower === 'off' || lower === 'none') return null;
       if (surroundChoiceKeys.has(normalized)) return normalized;
 
-      const fallbackKey = `${stripSurroundSuffix(normalized)}_s`;
-      return surroundChoiceKeys.has(fallbackKey) ? fallbackKey : null;
+      // Product identity is canonical: a legacy role-encoded "_s" id resolves to
+      // its base product rather than the suffix being re-added.
+      const baseKey = stripSurroundSuffix(normalized);
+      return surroundChoiceKeys.has(baseKey) ? baseKey : null;
     };
 
     let restoredMaster = normalizeSurroundChoiceModel(app?.globalSurroundModel);

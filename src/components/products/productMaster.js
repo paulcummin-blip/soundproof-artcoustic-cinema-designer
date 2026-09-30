@@ -90,15 +90,23 @@ export function productEngineeringKey(product) {
 }
 
 export function productSelectorKey(product, role = null) {
-  const sku = normaliseModelKey(String(product?.sku || '').split(':')[0]);
-  if (sku.endsWith('_s')) return sku;
+  // Product identity is role-independent. A speaker's role/placement is carried by
+  // its role, never by a role-encoded "_s" product id: the Product Master publishes
+  // one row per model (e.g. 'evolve-2-1'), and that model already carries the
+  // surround / rear-surround / front-wide roles at the same price. So a surround
+  // resolves to the same catalogue product as the front stage.
+  return productEngineeringKey(product);
+}
 
-  const engineeringKey = productEngineeringKey(product);
-  if (ALL_SURROUND_ROLES.includes(role)) {
-    const surroundKey = engineeringKey.endsWith('_s') ? engineeringKey : `${engineeringKey}_s`;
-    if (MODELS.some((model) => model.key === surroundKey)) return surroundKey;
-  }
-  return engineeringKey;
+/**
+ * Legacy role-encoded "_s" rows are read-only aliases, never catalogue products.
+ * Every active base model already carries the surround roles at an identical
+ * price, so an "_s" row must never appear in a selector, be written to a design,
+ * be used as current product identity, or become a separate catalogue product —
+ * even if one is ever reactivated.
+ */
+export function isLegacySurroundAlias(product) {
+  return normaliseModelKey(String(product?.sku || '').split(':')[0]).endsWith('_s');
 }
 
 export function legacyRolesForProduct(product) {
@@ -327,6 +335,8 @@ function productDisplayLabel(product, meta) {
 export function buildProductRoleOptions(products, role) {
   const candidates = (Array.isArray(products) ? products : [])
     .filter((product) => product?.active !== false)
+    // Legacy "_s" rows are read-only aliases, never selectable catalogue products.
+    .filter((product) => !isLegacySurroundAlias(product))
     .filter((product) => effectiveProductRoles(product).includes(role))
     .sort((a, b) => {
       const keyA = productSelectorKey(a, role);
