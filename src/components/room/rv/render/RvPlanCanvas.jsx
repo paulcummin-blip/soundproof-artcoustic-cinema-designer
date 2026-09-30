@@ -4,6 +4,7 @@ import RvSpeakerLayer from "@/components/room/rv/render/RvSpeakerLayer";
 import SvgDefs from "@/components/room/SvgDefs";
 import RvZoomGroup from "@/components/room/rv/render/RvZoomGroup";
 import { rvZoomTransform } from "@/components/room/rv/utils/rvPointerToRoom";
+import { buildLiveSpeakerPositionMap, applyLiveSpeakerPositions } from "@/components/room/rv/utils/liveSpeakerPositions";
 import RvRoomBaseLayers from "@/components/room/rv/render/RvRoomBaseLayers";
 import RvBaffleAndScreen from "@/components/room/rv/render/RvBaffleAndScreen";
 import RvZonesAndOverlays from "@/components/room/rv/render/RvZonesAndOverlays";
@@ -148,6 +149,9 @@ export default function RvPlanCanvas({
   // Speaker draft (transient positions during speaker drag)
   draftSpeakersRef,
   speakerDragTick,
+  // Canonical live draft lookup owned by the parent — the single effective
+  // speaker position source used by the visual, overlays, angles and HUD.
+  liveSpeakerPositions,
   // Speaker layer props
   aimAtMLP,
   aimFrontWidesAtMLP,
@@ -227,24 +231,25 @@ export default function RvPlanCanvas({
     return seatingPositions;
   }, [dragging, draftSeatsRef, seatingPositions, seatDragTick]);
 
-  // Draft-aware speakers: merge draft positions into visiblePlanSpeakers during drag
-  const speakersLive = useMemo(() => {
-    if (!dragging || !Array.isArray(draftSpeakersRef?.current) || !Array.isArray(visiblePlanSpeakers)) {
-      return visiblePlanSpeakers;
-    }
-    const draftMap = new Map(draftSpeakersRef.current.map(p => [p.id, p]));
-    return visiblePlanSpeakers.map(s => {
-      const draft = draftMap.get(s.id);
-      if (!draft) return s;
-      return {
-        ...s,
-        position: draft.position,
-        ...(draft.meta !== undefined ? { meta: draft.meta } : {}),
-        ...(draft.positionSource !== undefined ? { positionSource: draft.positionSource } : {}),
-        ...(draft.isOnRearWall !== undefined ? { isOnRearWall: draft.isOnRearWall } : {}),
-      };
-    });
-  }, [dragging, draftSpeakersRef, visiblePlanSpeakers, speakerDragTick]);
+  // Draft-aware speakers: ONE effective position source for the whole canvas.
+  // The parent owns the live draft lookup; when it is not supplied (static /
+  // export canvases) fall back to building it here from the draft ref.
+  const liveById = liveSpeakerPositions !== undefined
+    ? liveSpeakerPositions
+    : buildLiveSpeakerPositionMap(draftSpeakersRef?.current, !!dragging);
+
+  // Speakers actually drawn as icons, at their effective (live) positions
+  const speakersLive = useMemo(
+    () => applyLiveSpeakerPositions(visiblePlanSpeakers, liveById),
+    [visiblePlanSpeakers, liveById]
+  );
+
+  // Every placed speaker at its effective (live) position — used by the overlays
+  // that draw speaker-derived geometry (angle lines, labels, position readouts)
+  const placedLive = useMemo(
+    () => applyLiveSpeakerPositions(placedSpeakers, liveById),
+    [placedSpeakers, liveById]
+  );
 
   // C3.28B — overhead lateral compromise warning (uses canonical lateralMode metadata)
   const overheadLateralMode = overheadZones?.lateralMode || null;

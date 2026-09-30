@@ -38,6 +38,7 @@ import RvMlpRuler from "@/components/room/rv/render/RvMlpRuler";
 import { SURROUND_WALL_GAP_M, sideWallX, rearWallY, fixedSideX, OVERHEAD_PAIR_MAP, floorDeg, mirrorX, clampToSegment, resolveSymmetricLCR, computeMinimumScreenDepthM } from "@/components/room/rv/utils/rvGeometry";
 import { getAimingYawDeg, getPlanAimDeg, getYawForObject } from "@/components/room/rv/utils/rvAiming";
 import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
+import { buildLiveSpeakerPositionMap, applyLiveSpeakerPositions } from "@/components/room/rv/utils/liveSpeakerPositions";
 import { useProjectorThrowWarning } from "@/components/room/rv/hooks/useProjectorThrowWarning";
 import { useMlpCalculation } from "@/components/room/rv/hooks/useMlpCalculation";
 import { useSpeakersByRole } from "@/components/room/rv/hooks/useSpeakersByRole";
@@ -1441,8 +1442,23 @@ const byId = useEntitiesById({
     );
   }, [onSetRoomElements, roomElements, lengthM, widthM, screenFrontPlaneM]);
 
+  // ── ONE effective speaker position source ─────────────────────────────────
+  // While a speaker is being dragged, its transient draft position IS the
+  // effective position for every consumer (speaker visual, angle lines and
+  // labels, pinned seat HUD, P5 / RP23 preview). Committed state is only
+  // written on pointer-up, so no autosave or recalculation fires during drag.
+  const liveSpeakerPositions = useMemo(
+    () => buildLiveSpeakerPositionMap(draftSpeakersRef.current, dragType === 'speaker'),
+    [dragType, speakerDragTick]
+  );
+
+  const effectivePlacedSpeakers = useMemo(
+    () => applyLiveSpeakerPositions(placedSpeakers, liveSpeakerPositions),
+    [placedSpeakers, liveSpeakerPositions]
+  );
+
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
-  const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
+  const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers: effectivePlacedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
 
   // Live Impact consumes the already-computed Room Designer authority passed
   // through analysisResult. Re-running the complete RP22 engine here duplicated
@@ -1706,7 +1722,8 @@ const byId = useEntitiesById({
     appState,
     hudPinnedSeatId,
     setHudPinnedSeatId,
-    placedSpeakers,
+    placedSpeakers: effectivePlacedSpeakers,
+    suspendCacheWrites: !!liveSpeakerPositions,
     widthM,
     lengthM,
     heightM,
@@ -2376,6 +2393,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         seatDragTick={seatDragTick}
         draftSpeakersRef={draftSpeakersRef}
         speakerDragTick={speakerDragTick}
+        liveSpeakerPositions={liveSpeakerPositions}
         dragImpact={{ baseline: baselineRp22, live: liveRp22, baselineP20Results, currentP20Results, isActive: !!dragging, cardVisible: liveImpactMode !== 'off' }}
         onAcceptBaseline={acceptBaseline}
         onDismissCard={dismissCard}
