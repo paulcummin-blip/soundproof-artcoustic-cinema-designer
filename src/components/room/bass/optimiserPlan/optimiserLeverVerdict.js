@@ -36,8 +36,8 @@ export const OPTIMISER_LEVER_VERDICT_LABEL = Object.freeze({
   [OPTIMISER_LEVER_VERDICT.NOT_APPLICABLE]: "Not independently evaluated",
 });
 
-/** A change smaller than this is not a change: it is stated as "no meaningful change". */
-const MATERIAL_DB = 0.5;
+/** A change smaller than 1 dB is not a meaningful user-facing change. */
+const MATERIAL_DB = 1;
 
 const num = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -72,8 +72,8 @@ export function resolveLimitingMetric(baseline = null) {
   return { key: "p20", label: "seat-to-seat consistency (P20)" };
 }
 
-const worsening = (delta) => delta != null && delta > MATERIAL_DB;
-const improving = (delta) => delta != null && delta < -MATERIAL_DB;
+const worsening = (delta) => delta != null && delta >= MATERIAL_DB;
+const improving = (delta) => delta != null && delta <= -MATERIAL_DB;
 
 /** Human name of a metric, for trade-off copy. */
 const metricName = (key) => (key === "p19" ? "P19 consistency" : "P20 consistency");
