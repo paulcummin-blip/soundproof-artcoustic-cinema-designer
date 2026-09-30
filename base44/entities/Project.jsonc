@@ -477,21 +477,27 @@
     "acoustic_treatment_enabled": {
       "type": "boolean",
       "default": false,
-      "description": "Whether acoustic treatment (Artcoustic Abfuser) is enabled for this project."
+      "description": "Whether acoustic treatment (Artcoustic Abfuser) is enabled for this project. When enabled, the Visual Report shows the ADI acoustic treatment recommendation page."
     },
     "selected_abfuser_qty": {
       "type": "number",
       "default": 0,
-      "description": "Designer-selected Abfuser quantity. Drives System Price and RP22 Products Selected. 0 when acoustic treatment is off."
+      "description": "Designer-selected (included) Abfuser quantity. This is the ONLY quantity that drives System Price and RP22 Products Selected. 0 = nothing selected: the ADI recommendation has not been accepted, so no Abfuser is priced or included. Never written automatically from the recommendation."
     },
     "abfuser_qty_source": {
       "type": "string",
       "enum": [
+        "none",
         "recommended",
         "user"
       ],
-      "default": "recommended",
-      "description": "Whether selected_abfuser_qty was auto-seeded from the recommendation ('recommended') or manually set by the designer ('user'). When 'recommended', the selected quantity auto-follows recommendation changes."
+      "default": "none",
+      "description": "How selected_abfuser_qty was set. 'none' = nothing selected (the ADI recommendation has not been accepted). 'user' = set by the designer (typed, or accepted via 'Use ADI recommendation'). There is NO auto-follow: the ADI recommendation is guidance only and never becomes a priced selection by itself."
+    },
+    "legacy_abfuser_auto_qty": {
+      "type": "number",
+      "default": 0,
+      "description": "Retired automatic Abfuser quantity from the previous surface-area percentage model. Retained for transparency and audit only \u2014 it is never treated as a designer selection, never priced, and never displayed as a designer choice. Migration sets selected_abfuser_qty to 0 and records the old automatic value here."
     },
     "assumed_p15_level": {
       "type": "string",

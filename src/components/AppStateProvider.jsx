@@ -728,10 +728,19 @@ function useDesignerState() {
     const n = Math.max(0, Math.floor(Number(v) || 0));
     _setSelectedAbfuserQty(n);
   }, []);
+  // Source of the selected quantity: "none" (not accepted), "recommended"
+  // (ADI recommendation accepted by the designer) or "user" (manual entry).
   const [abfuserQtySource, setAbfuserQtySource] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.abfuserQtySource === "string")
       ? __autosavePayload.abfuserQtySource
-      : "recommended"
+      : "none"
+  ));
+  // Retired automatic quantity from the previous recommendation model. Kept for
+  // transparency only — it is never treated as a designer selection.
+  const [legacyAbfuserAutoQty, setLegacyAbfuserAutoQty] = useState(() => (
+    (__autosavePayload && Number.isFinite(Number(__autosavePayload.legacyAbfuserAutoQty)))
+      ? Number(__autosavePayload.legacyAbfuserAutoQty)
+      : 0
   ));
   // ── END ACOUSTIC TREATMENT ────────────────────────────────────────────────
 
@@ -1514,6 +1523,7 @@ function useDesignerState() {
       acousticTreatmentEnabled,
       selectedAbfuserQty,
       abfuserQtySource,
+      legacyAbfuserAutoQty,
       // screenFrontPlaneM, mlpY_m, rowCentersM intentionally excluded — always recalculated from live inputs
       roomElements: normaliseRoomElements(roomElements),
       };
@@ -1588,6 +1598,7 @@ function useDesignerState() {
     acousticTreatmentEnabled,
     selectedAbfuserQty,
     abfuserQtySource,
+    legacyAbfuserAutoQty,
     ]);
 
   const restoreAutosave = useCallback(() => {
@@ -1914,12 +1925,13 @@ function useDesignerState() {
     // Design EQ defaults to On for a new/reset project
     setDesignEqEnabled(true);
 
-    // Acoustic treatment defaults to ON for every new project.
-    // The auto-follow effect in RoomDesigner will seed selectedAbfuserQty
-    // from the calculated recommendation once room dimensions are available.
+    // Acoustic treatment defaults to ON for every new project. The ADI
+    // recommendation is guidance only: nothing is selected or priced until the
+    // designer accepts it.
     setAcousticTreatmentEnabled(true);
     setSelectedAbfuserQty(0);
-    setAbfuserQtySource("recommended");
+    setAbfuserQtySource("none");
+    setLegacyAbfuserAutoQty(0);
 
     // Per-seat metrics
     setPerSeatMetrics({});
@@ -2172,6 +2184,8 @@ function useDesignerState() {
     setSelectedAbfuserQty,
     abfuserQtySource,
     setAbfuserQtySource,
+    legacyAbfuserAutoQty,
+    setLegacyAbfuserAutoQty,
     activeVersionId,
     setActiveVersionId,
     };
@@ -2293,6 +2307,8 @@ function useDesignerState() {
     setSelectedAbfuserQty,
     abfuserQtySource,
     setAbfuserQtySource,
+    legacyAbfuserAutoQty,
+    setLegacyAbfuserAutoQty,
     activeVersionId,
     setActiveVersionId,
     ]);

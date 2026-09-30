@@ -141,7 +141,7 @@ export default function RoomDesignerControlsPanel({
   setAcousticTreatmentEnabled,
   selectedAbfuserQty,
   setSelectedAbfuserQty,
-  recommendedAbfuserQty,
+  abfuserRecommendation,
 }) {
   const [speakersOpen, setSpeakersOpen] = useState(false);
   return (
@@ -416,7 +416,7 @@ export default function RoomDesignerControlsPanel({
             setAcousticTreatmentEnabled={setAcousticTreatmentEnabled}
             selectedAbfuserQty={selectedAbfuserQty}
             setSelectedAbfuserQty={setSelectedAbfuserQty}
-            recommendedAbfuserQty={recommendedAbfuserQty}
+            abfuserRecommendation={abfuserRecommendation}
           />
         </CollapsiblePanel>
       </div>

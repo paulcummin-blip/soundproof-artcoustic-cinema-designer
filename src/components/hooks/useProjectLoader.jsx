@@ -4,6 +4,7 @@ import { Project } from "@/entities/Project";
 import { base44 } from "@/api/base44Client";
 import { mergeProjectAndVersion, buildDesignState, buildSharedUpdate } from "@/lib/versionAuthority";
 import { serializeProject } from "@/components/utils/serializeProject";
+import { resolveAbfuserQuantityFromProject } from "@/components/utils/abfuserQuantityMigration";
 import { readPersistedScreenPlaneM } from "@/components/utils/screenPlanePersistence";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
 // Stage 1: subwooferInstances is the new canonical authority for bass analysis.
@@ -183,6 +184,8 @@ appState, // Pass appState directly for setters
       viewingPriority: appState?.viewingPriority,
       acousticTreatmentEnabled: appState?.acousticTreatmentEnabled,
       selectedAbfuserQty: appState?.selectedAbfuserQty,
+      abfuserQtySource: appState?.abfuserQtySource,
+      legacyAbfuserAutoQty: appState?.legacyAbfuserAutoQty,
       p15ConstructionLevel: appState?.p15ConstructionLevel,
       p21EarlyReflectionPreset: appState?.p21EarlyReflectionPreset,
       existingRoomDimensionsEdited: loadedRoomDimensionsEditedRef.current,
@@ -198,6 +201,7 @@ appState, // Pass appState directly for setters
     overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride,
     useFrontGlobal, useMidGlobal, useRearGlobal,
     appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty,
+    appState?.abfuserQtySource, appState?.legacyAbfuserAutoQty,
     appState?.aimFrontWidesAtMLP, appState?.aimSideSurroundsAtMLP, appState?.aimRearSurroundsAtMLP,
     appliedCalAuthority,
   ]);
@@ -414,7 +418,12 @@ appState, // Pass appState directly for setters
           manualRspX_m: (() => { const v = Number(mergedP?.manual_rsp_x_m); return Number.isFinite(v) ? v : null; })(),
           designatedRspSeatId: typeof mergedP?.designated_rsp_seat_id === "string" ? mergedP.designated_rsp_seat_id : null,
           acousticTreatmentEnabled: !!mergedP?.acoustic_treatment_enabled,
-          selectedAbfuserQty: (() => { const v = Number(mergedP?.selected_abfuser_qty); return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0; })(),
+          // Legacy automatic quantities migrate to legacyAutoQuantity and are not
+          // restored as the selected quantity — nothing is priced unless the
+          // designer accepted it.
+          selectedAbfuserQty: resolveAbfuserQuantityFromProject(mergedP).selectedQuantity,
+          abfuserQtySource: resolveAbfuserQuantityFromProject(mergedP).quantitySource,
+          legacyAbfuserAutoQty: resolveAbfuserQuantityFromProject(mergedP).legacyAutoQuantity,
           p15ConstructionLevel: mergedP?.p15_construction_level || "purpose-built",
           p21EarlyReflectionPreset: mergedP?.p21_early_reflection_preset || "l3",
           existingRoomDimensionsEdited: mergedP?.room_dimensions_edited === true,

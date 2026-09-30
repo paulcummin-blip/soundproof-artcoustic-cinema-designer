@@ -2,19 +2,18 @@
 // ---------------------------
 // Client-facing Visual Report page: Acoustic Treatment.
 //
-// Simple RP22-backed wall-zone visual:
-//   - LEFT/RIGHT side reflection zones (narrow wall-hugging bands)
-//   - REAR treatment zone (narrow wall-hugging band)
-// Zones are derived from actual speaker/seating geometry (image-source method).
-// No individual Abfuser markers. No ceiling zone.
+// Restored positions page. Shows:
+//   - plan view of the room
+//   - Abfuser markers on the recommended treatment zones
+//     (left / right first reflection, rear wall, optional ceiling)
+//   - quantity by zone, total recommended quantity, total treatment area (m²)
+//   - the designer-selected (included) quantity, shown separately
 //
-// QUANTITY CONSISTENCY:
-//   The "WHY [X] ABFUSERS?" heading and the result card ALWAYS refer to the
-//   SAME number — the designer's selected quantity. When selected equals
-//   recommended, the card reads "RECOMMENDED ACOUSTIC TREATMENT". When the
-//   designer has overridden the quantity, the card reads "SELECTED ACOUSTIC
-//   TREATMENT" and the explanation describes the selected allocation without
-//   claiming it is the full Sound Proof recommendation.
+// QUANTITY AUTHORITY:
+//   Recommended quantity = ADI strategic reflection control.
+//   Selected quantity = the designer's decision, and the only quantity that is
+//   priced. The two are never conflated: the recommendation is never presented
+//   as a designer selection.
 
 import React from "react";
 import { selectClientAcousticTreatment } from "./selectClientAcousticTreatment";
@@ -29,8 +28,11 @@ const COLORS = {
   roomStroke: "#3E4349",
   seatFill: "#625143",
   rspFill: "#213428",
-  zoneFill: "rgba(33, 52, 40, 0.22)",
+  zoneFill: "rgba(33, 52, 40, 0.10)",
   zoneStroke: "#213428",
+  markerFill: "#213428",
+  advisoryFill: "rgba(98, 81, 67, 0.16)",
+  advisoryStroke: "#625143",
 };
 
 import {
@@ -45,6 +47,7 @@ export default function ClientAcousticTreatment({
   rsp,
   acousticTreatmentEnabled = false,
   selectedAbfuserQty = 0,
+  legacyAutoQuantity = 0,
 }) {
   const data = selectClientAcousticTreatment({
     roomDims,
@@ -53,12 +56,14 @@ export default function ClientAcousticTreatment({
     rsp,
     acousticTreatmentEnabled,
     selectedAbfuserQty,
+    legacyAutoQuantity,
   });
 
   if (!data.hasAny) return null;
 
-  const widthM = Number(roomDims?.widthM) || 4.5;
-  const lengthM = Number(roomDims?.lengthM) || 6.0;
+  const { roomPlan, recommendation, quantityBreakdown: qb, inclusion } = data;
+  const widthM = roomPlan?.widthM || 4.5;
+  const lengthM = roomPlan?.lengthM || 6.0;
 
   const padding = 0.5;
   const viewBoxW = widthM + padding * 2;
@@ -66,21 +71,13 @@ export default function ClientAcousticTreatment({
   const toX = (m) => m + padding;
   const toY = (m) => m + padding;
 
-  const qb = data.quantityBreakdown || {};
+  const recommendedQty = data.recommendedQty;
   const selectedQty = data.selectedQty;
-  const recommendedQty = qb.recommendedQty || 0;
-  const isSelectedOverride = selectedQty !== recommendedQty;
-  const surfaceArea = qb.treatmentSurfaceArea ? qb.treatmentSurfaceArea.toFixed(1) : null;
+  const surfaceArea = Number(qb?.treatmentSurfaceArea || 0).toFixed(2);
+  const countedZones = data.zones.filter((z) => !z.advisory);
+  const advisoryZones = data.zones.filter((z) => z.advisory);
 
-  // ONE QUANTITY AUTHORITY PER BLOCK:
-  // The "WHY X?" heading, allocation table, surface area, and result card
-  // ALWAYS refer to the Sound Proof RECOMMENDED quantity. When the designer
-  // has overridden the quantity, a separate "DESIGNER SELECTED" block shows
-  // the selected quantity without inventing a selected-allocation breakdown.
-  const whyHeading = `WHY ${recommendedQty} ABFUSERS?`;
-  const sideWord = (qb.leftPanels || 1) >= 2 ? "two Abfusers" : "one Abfuser";
-  const rearWord = (qb.rearPanels || 2) >= 4 ? "two pairs" : "a pair";
-  const whyBody = `This room has ${(qb.leftPanels || 1) >= 2 ? "extended first-reflection areas" : "first-reflection areas"} along both side walls, so ${sideWord} ${((qb.leftPanels || 1) >= 2) ? "are" : "is"} recommended for each side to provide useful coverage without treating the entire wall. A further ${rearWord} ${((qb.rearPanels || 2) >= 4) ? "are" : "is"} recommended across the rear treatment zone to help manage returning reflections while preserving a natural, immersive soundfield.`;
+  const inclusionColor = inclusion.state === "ABOVE_RECOMMENDATION" ? "#8A5A2B" : COLORS.primary;
 
   return (
     <div style={{ fontFamily: FONT_BODY, color: COLORS.body }}>
@@ -91,7 +88,7 @@ export default function ClientAcousticTreatment({
         </div>
       </div>
 
-      {/* ── Room plan with wall-hugging treatment zones ── */}
+      {/* ── Room plan with recommended Abfuser positions ── */}
       <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4mm", marginBottom: "4mm" }}>
         <svg viewBox={`0 0 ${viewBoxW} ${viewBoxH}`} style={{ width: "100%", height: "auto", display: "block" }}>
           {/* Room outline */}
@@ -101,17 +98,39 @@ export default function ClientAcousticTreatment({
           <rect x={toX(widthM * 0.2)} y={toY(0)} width={widthM * 0.6} height={0.04} fill={COLORS.primary} />
           <text x={toX(widthM / 2)} y={toY(0) - 0.1} textAnchor="middle" fontSize={0.13} fill={COLORS.label} fontFamily={FONT_BODY}>SCREEN</text>
 
-          {/* ── Wall-hugging treatment zones ── */}
-          {data.zones.map((zone) => (
+          {/* Treatment zone extents */}
+          {countedZones.map((zone) => (
             <rect
               key={zone.id}
               x={toX(zone.x)} y={toY(zone.y)}
               width={zone.width} height={zone.height}
-              fill={COLORS.zoneFill} stroke={COLORS.zoneStroke} strokeWidth={0.02}
+              fill={COLORS.zoneFill} stroke={COLORS.zoneStroke} strokeWidth={0.012}
             />
           ))}
 
-          {/* ── Seating ── */}
+          {/* Advisory (optional) ceiling zones — dashed, never counted */}
+          {advisoryZones.map((zone) => (
+            <rect
+              key={zone.id}
+              x={toX(zone.x)} y={toY(zone.y)}
+              width={zone.width} height={zone.height}
+              fill={COLORS.advisoryFill} stroke={COLORS.advisoryStroke}
+              strokeWidth={0.014} strokeDasharray="0.18 0.12"
+            />
+          ))}
+
+          {/* Recommended Abfuser markers */}
+          {data.markers.map((marker) => (
+            <rect
+              key={marker.key}
+              x={toX(marker.x)} y={toY(marker.y)}
+              width={marker.width} height={marker.height}
+              fill={marker.advisory ? COLORS.advisoryStroke : COLORS.markerFill}
+              opacity={marker.advisory ? 0.75 : 1}
+            />
+          ))}
+
+          {/* Seating */}
           {seatingPositions.map((seat, i) => {
             const sx = Number(seat?.x);
             const sy = Number(seat?.y);
@@ -122,39 +141,63 @@ export default function ClientAcousticTreatment({
             );
           })}
 
-          {/* ── RSP ── */}
+          {/* RSP */}
           {Number.isFinite(rsp?.x) && Number.isFinite(rsp?.y) && (
             <circle cx={toX(rsp.x)} cy={toY(rsp.y)} r={0.07} fill={COLORS.rspFill} stroke="#FFFFFF" strokeWidth={0.02} />
           )}
 
-          {/* ── Zone labels ── */}
-          {data.zones.filter((z) => z.wall === "left").map((z) => {
+          {/* Zone labels */}
+          {countedZones.filter((z) => z.wall === "left").map((z) => {
             const midY = z.y + z.height / 2;
             return (
               <text
                 key={`lbl-${z.id}`}
-                x={toX(0.22)} y={toY(midY)}
+                x={toX(0.30)} y={toY(midY)}
                 textAnchor="middle" fontSize={0.1}
                 fill={COLORS.primary} fontFamily={FONT_BODY} fontWeight={600}
-                transform={`rotate(-90 ${toX(0.22)} ${toY(midY)})`}
+                transform={`rotate(-90 ${toX(0.30)} ${toY(midY)})`}
               >
-                PRIMARY REFLECTION TREATMENT
+                {`LEFT FIRST REFLECTION (${z.panels})`}
               </text>
             );
           })}
-          {data.zones.filter((z) => z.wall === "rear").map((z) => {
+          {countedZones.filter((z) => z.wall === "right").map((z) => {
+            const midY = z.y + z.height / 2;
+            return (
+              <text
+                key={`lbl-${z.id}`}
+                x={toX(widthM - 0.30)} y={toY(midY)}
+                textAnchor="middle" fontSize={0.1}
+                fill={COLORS.primary} fontFamily={FONT_BODY} fontWeight={600}
+                transform={`rotate(-90 ${toX(widthM - 0.30)} ${toY(midY)})`}
+              >
+                {`RIGHT FIRST REFLECTION (${z.panels})`}
+              </text>
+            );
+          })}
+          {countedZones.filter((z) => z.wall === "rear").map((z) => {
             const midX = z.x + z.width / 2;
             return (
               <text
                 key={`lbl-${z.id}`}
-                x={toX(midX)} y={toY(lengthM - 0.22)}
+                x={toX(midX)} y={toY(lengthM - 0.30)}
                 textAnchor="middle" fontSize={0.1}
                 fill={COLORS.primary} fontFamily={FONT_BODY} fontWeight={600}
               >
-                REAR SOUND CONTROL
+                {`REAR WALL (${z.panels})`}
               </text>
             );
           })}
+          {advisoryZones.map((z) => (
+            <text
+              key={`lbl-${z.id}`}
+              x={toX(z.x + z.width / 2)} y={toY(z.y + z.height / 2)}
+              textAnchor="middle" fontSize={0.1}
+              fill={COLORS.advisoryStroke} fontFamily={FONT_BODY} fontWeight={600}
+            >
+              {`OPTIONAL CEILING (${z.panels})`}
+            </text>
+          ))}
 
           {/* Dimensions */}
           <text x={toX(widthM / 2)} y={toY(lengthM) + 0.28} textAnchor="middle" fontSize={0.11} fill={COLORS.label} fontFamily={FONT_BODY}>{widthM.toFixed(1)} m</text>
@@ -165,12 +208,67 @@ export default function ClientAcousticTreatment({
         <div style={{ display: "flex", flexWrap: "wrap", gap: "4mm", marginTop: "3mm", fontSize: "8pt", color: COLORS.secondary }}>
           <span style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
             <span style={{ display: "inline-block", width: 12, height: 6, background: COLORS.zoneFill, border: `1px solid ${COLORS.zoneStroke}`, borderRadius: 1 }} />
-            Treatment zone (on wall)
+            Treatment zone
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
+            <span style={{ display: "inline-block", width: 5, height: 11, background: COLORS.markerFill, borderRadius: 1 }} />
+            Abfuser panel
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
             <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: COLORS.seatFill, opacity: 0.5 }} />
             Listening position
           </span>
+        </div>
+      </div>
+
+      {/* ── ADI recommendation summary ── */}
+      <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5mm 6mm", marginBottom: "4mm" }}>
+        <div style={{ fontSize: "8pt", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: COLORS.primary, marginBottom: "2mm", fontFamily: FONT_BODY }}>
+          ADI ACOUSTIC TREATMENT RECOMMENDATION
+        </div>
+
+        <div style={{ fontFamily: FONT_HEADING, fontSize: "16pt", fontWeight: 400, color: COLORS.primary, lineHeight: 1.2 }}>
+          Recommended: {recommendedQty} Abfusers
+        </div>
+        <div style={{ fontSize: "10pt", color: COLORS.secondary, marginTop: "1mm", fontFamily: FONT_BODY }}>
+          Total treatment area: {surfaceArea} m²
+        </div>
+
+        <p style={{ margin: "3mm 0 0 0", fontSize: "10pt", lineHeight: 1.5, color: COLORS.body, fontFamily: FONT_BODY }}>
+          {data.wording.paragraph}
+        </p>
+
+        {/* Positions — quantity by zone */}
+        <div style={{ marginTop: "4mm" }}>
+          <div style={{ fontSize: "8pt", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: COLORS.label, marginBottom: "1.5mm", fontFamily: FONT_BODY }}>
+            Positions
+          </div>
+          {countedZones.map((zone) => (
+            <div key={`qty-${zone.id}`} style={{ fontSize: "9pt", color: COLORS.body, fontFamily: FONT_BODY, lineHeight: 1.6 }}>
+              {zone.panels} {zone.shortLabel.toLowerCase()}
+            </div>
+          ))}
+          {advisoryZones.map((zone) => (
+            <div key={`qty-${zone.id}`} style={{ fontSize: "9pt", color: COLORS.secondary, fontFamily: FONT_BODY, lineHeight: 1.6 }}>
+              {zone.panels} optional ceiling pair — advisory only, not counted in the recommendation
+            </div>
+          ))}
+          <div style={{ marginTop: "1.5mm", paddingTop: "1.5mm", borderTop: `1px solid ${COLORS.border}`, fontSize: "9pt", fontWeight: 700, color: COLORS.primary, fontFamily: FONT_BODY }}>
+            Total recommended: {recommendedQty} Abfusers ({surfaceArea} m²)
+          </div>
+        </div>
+
+        {/* Included quantity — separate authority from the recommendation */}
+        <div style={{ marginTop: "4mm", background: "#F8F8F7", border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "3mm 4mm" }}>
+          <div style={{ fontSize: "8pt", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: COLORS.secondary, marginBottom: "1mm", fontFamily: FONT_BODY }}>
+            INCLUDED IN PROPOSAL
+          </div>
+          <div style={{ fontFamily: FONT_HEADING, fontSize: "12pt", color: inclusionColor, lineHeight: 1.2 }}>
+            {selectedQty} / {recommendedQty} Abfusers
+          </div>
+          <div style={{ fontSize: "9pt", color: inclusionColor, marginTop: "1mm", fontFamily: FONT_BODY, lineHeight: 1.5 }}>
+            {inclusion.message}
+          </div>
         </div>
       </div>
 
@@ -180,7 +278,10 @@ export default function ClientAcousticTreatment({
           WHY THESE AREAS?
         </div>
         <p style={{ margin: 0, fontSize: "10pt", lineHeight: 1.5, color: COLORS.body, fontFamily: FONT_BODY }}>
-          RP22 identifies the first lateral reflection areas from the front soundstage as useful treatment locations in high-channel-count cinema systems. It also recommends managed absorption, diffusion and scattering toward the rear of the room to preserve clarity while supporting an immersive soundfield. The panel quantity is Sound Proof practical guidance, not an RP22 specification.
+          The marked areas are the first lateral reflection points between the front loudspeakers and the
+          listening positions, plus the rear wall where returning reflection energy is controlled. Each
+          position is derived from this room's geometry and seating layout rather than a fixed percentage
+          of the room's surface area.
         </p>
         <p style={{ margin: "2mm 0 0 0", fontSize: "9pt", lineHeight: 1.4, color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
           The goal is to control reflections — not eliminate them all.
@@ -193,69 +294,30 @@ export default function ClientAcousticTreatment({
           WHY ABFUSER?
         </div>
         <p style={{ margin: 0, fontSize: "10pt", lineHeight: 1.5, color: COLORS.body, fontFamily: FONT_BODY }}>
-          Artcoustic Abfuser combines absorption and diffusion. Its absorption coefficient reaches 0.85 at 500 Hz and approximately 0.95 from 1–4 kHz, for controlling reflections that affect dialogue clarity and localisation.
+          Artcoustic Abfuser combines absorption and diffusion. Its absorption coefficient reaches 0.85 at
+          500 Hz and approximately 0.95 from 1–4 kHz, for controlling reflections that affect dialogue
+          clarity and localisation.
+        </p>
+        <p style={{ margin: "2mm 0 0 0", fontSize: "9pt", lineHeight: 1.4, color: COLORS.secondary, fontFamily: FONT_BODY }}>
+          {recommendation?.estimatedEffect?.bassNote || ""}
         </p>
       </div>
 
-      {/* ── WHY [recommendedQty] ABFUSERS? ── */}
-      {recommendedQty > 0 && (
-        <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5mm 6mm", marginBottom: "4mm" }}>
-          <div style={{ fontSize: "8pt", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: COLORS.primary, marginBottom: "2mm", fontFamily: FONT_BODY }}>
-            {whyHeading}
-          </div>
-          <p style={{ margin: 0, fontSize: "10pt", lineHeight: 1.5, color: COLORS.body, fontFamily: FONT_BODY }}>
-            {whyBody}
-          </p>
-          {/* Compact allocation table (recommended) */}
-          <div style={{ marginTop: "3mm", fontSize: "8pt", color: COLORS.secondary, fontFamily: FONT_BODY, lineHeight: 1.6 }}>
-            Left reflection zone      {qb.leftPanels || 1}
-          </div>
-          <div style={{ fontSize: "8pt", color: COLORS.secondary, fontFamily: FONT_BODY, lineHeight: 1.6 }}>
-            Right reflection zone     {qb.rightPanels || 1}
-          </div>
-          <div style={{ fontSize: "8pt", color: COLORS.secondary, fontFamily: FONT_BODY, lineHeight: 1.6 }}>
-            Rear sound control        {qb.rearPanels || 2}
-          </div>
-          <div style={{ marginTop: "1mm", paddingTop: "1mm", borderTop: `1px solid ${COLORS.border}`, fontSize: "8pt", fontWeight: 700, color: COLORS.primary, fontFamily: FONT_BODY, lineHeight: 1.6 }}>
-            Total                     {recommendedQty}
-          </div>
-          {surfaceArea && (
-            <div style={{ marginTop: "1.5mm", fontSize: "8pt", color: COLORS.secondary, fontFamily: FONT_BODY, lineHeight: 1.6 }}>
-              Together, the panels provide approximately {surfaceArea} m² of acoustic treatment surface.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Result card: RECOMMENDED (always uses recommendedQty) ── */}
+      {/* ── Result card ── */}
       <div style={{ background: COLORS.primary, color: "#FFFFFF", borderRadius: 6, padding: "5mm 6mm" }}>
         <div style={{ fontSize: "8pt", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.7, marginBottom: "2mm", fontFamily: FONT_BODY }}>
-          RECOMMENDED ACOUSTIC TREATMENT
+          {inclusion.state === "NOT_INCLUDED" ? "RECOMMENDED ACOUSTIC TREATMENT" : "ACOUSTIC TREATMENT"}
         </div>
         <div style={{ fontFamily: FONT_HEADING, fontSize: "16pt", fontWeight: 400, lineHeight: 1.2, marginBottom: "2mm" }}>
           {recommendedQty} × Artcoustic Abfuser
         </div>
-        <div style={{ fontSize: "9pt", opacity: 0.8, lineHeight: 1.4, fontFamily: FONT_BODY }}>
-          Recommended for the highlighted wall zones identified from this room and seating layout.
+        <div style={{ fontSize: "9pt", opacity: 0.85, lineHeight: 1.4, fontFamily: FONT_BODY }}>
+          {data.wording.recommendationSentence}
         </div>
-        {surfaceArea && (
-          <div style={{ fontSize: "8pt", opacity: 0.6, lineHeight: 1.4, fontFamily: FONT_BODY, marginTop: "1.5mm" }}>
-            Approximate treatment surface: {surfaceArea} m²
-          </div>
-        )}
+        <div style={{ fontSize: "8pt", opacity: 0.7, lineHeight: 1.4, fontFamily: FONT_BODY, marginTop: "2mm" }}>
+          Approximate treatment surface: {surfaceArea} m² · Included in proposal: {selectedQty} panel{selectedQty === 1 ? "" : "s"}
+        </div>
       </div>
-
-      {/* ── Designer selected (only when quantity has been overridden) ── */}
-      {isSelectedOverride && (
-        <div style={{ marginTop: "3mm", background: "#FFFFFF", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4mm 5mm" }}>
-          <div style={{ fontSize: "7.5pt", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: COLORS.secondary, marginBottom: "1.5mm", fontFamily: FONT_BODY }}>
-            DESIGNER SELECTED
-          </div>
-          <div style={{ fontFamily: FONT_HEADING, fontSize: "13pt", fontWeight: 400, lineHeight: 1.2, color: COLORS.primary }}>
-            {selectedQty} × Artcoustic Abfuser
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@
 // Do not add logic here; keep it a pure pass-through to existing setters.
 
 import { readPersistedScreenPlaneM } from "@/components/utils/screenPlanePersistence";
+import { resolveAbfuserQuantityFromProject } from "@/components/utils/abfuserQuantityMigration";
 import { parseProjectJson } from "@/components/roomdesigner/RoomDesignerHelpers";
 import { normaliseSeatPriorities } from "@/components/utils/seatScopeAuthority";
 import {
@@ -687,13 +688,18 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   if (typeof appState?.setAimRearSurroundsAtMLP === "function") {
     appState.setAimRearSurroundsAtMLP(!!p?.aim_rear_surrounds_at_mlp);
   }
+  // Migration: a legacy automatic quantity is retained as legacyAutoQuantity and
+  // is NOT restored as the included quantity. Only an explicit designer value is
+  // restored as the selection.
+  const abfuserQuantity = resolveAbfuserQuantityFromProject(p);
   if (typeof appState?.setSelectedAbfuserQty === "function") {
-    const qty = Number(p?.selected_abfuser_qty);
-    appState.setSelectedAbfuserQty(Number.isFinite(qty) && qty > 0 ? Math.floor(qty) : 0);
+    appState.setSelectedAbfuserQty(abfuserQuantity.selectedQuantity);
   }
   if (typeof appState?.setAbfuserQtySource === "function") {
-    const src = p?.abfuser_qty_source;
-    appState.setAbfuserQtySource(src === "user" ? "user" : "recommended");
+    appState.setAbfuserQtySource(abfuserQuantity.quantitySource);
+  }
+  if (typeof appState?.setLegacyAbfuserAutoQty === "function") {
+    appState.setLegacyAbfuserAutoQty(abfuserQuantity.legacyAutoQuantity);
   }
 
   // 11) PLACED SPEAKERS

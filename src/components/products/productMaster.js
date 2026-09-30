@@ -4,6 +4,8 @@ export { getModelDisplayOrder };
 import { artcousticSpeakers } from '@/components/data/speakerData';
 import { SUBWOOFER_BASS_CAPABILITIES } from '@/components/data/subwooferBassCapabilities';
 import { normaliseModelKey } from '@/components/utils/modelKeyNormaliser';
+import { ABFUSER_PRODUCT, ABFUSER_SKU, ABFUSER_LABEL } from '@/components/utils/adiAbfuserProduct';
+import { ABFUSER_AUTHORITY } from '@/components/utils/adiAbfuserRecommendation';
 
 export const PRODUCT_ROLES = Object.freeze({
   LCR: 'lcr',
@@ -47,6 +49,28 @@ export const PRODUCT_ENGINEERING_OPTIONS = MODELS
     application: ENGINEERING_CATEGORY_LABELS[model.category] || model.category,
     category: model.category,
   }));
+
+// ── ACOUSTIC TREATMENT PRODUCTS ───────────────────────────────────────────
+// The Abfuser is a room-treatment product, not a loudspeaker. It is used by the
+// Room Designer for ADI acoustic treatment recommendations (strategic
+// reflection control) and is never automatically selected or priced: it enters a
+// design, and its price, only when the designer accepts the ADI recommendation
+// or sets a quantity.
+export const ACOUSTIC_TREATMENT_PRODUCTS = Object.freeze({
+  [ABFUSER_SKU]: Object.freeze({
+    sku: ABFUSER_SKU,
+    label: ABFUSER_LABEL,
+    role: 'acoustic_treatment',
+    widthMm: ABFUSER_PRODUCT.widthMm,
+    heightMm: ABFUSER_PRODUCT.heightMm,
+    areaM2: ABFUSER_PRODUCT.areaM2,
+    absorption: ABFUSER_PRODUCT.absorption,
+    useCase: ABFUSER_PRODUCT.useCase,
+    recommendationAuthority: ABFUSER_AUTHORITY,
+    automaticSelection: false,
+    pricedWhenAccepted: true,
+  }),
+});
 
 export function defaultProductRolesForEngineeringKey(engineeringKey) {
   const key = normaliseModelKey(engineeringKey);

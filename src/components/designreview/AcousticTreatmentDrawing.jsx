@@ -64,7 +64,10 @@ export default function AcousticTreatmentDrawing({
   const rx = (m) => PADDING + (m / widthM) * drawW;
   const ry = (m) => PADDING + LABEL_TOP + (m / lengthM) * drawH;
 
-  if (!acousticTreatmentEnabled || selectedAbfuserQty <= 0) {
+  // The page follows the Acoustic Treatment toggle, not the included quantity:
+  // the ADI recommendation is guidance and is shown even when nothing has been
+  // accepted into pricing yet.
+  if (!acousticTreatmentEnabled) {
     return (
       <div style={{
         padding: "24px 16px",
@@ -79,7 +82,10 @@ export default function AcousticTreatmentDrawing({
   }
 
   const zones = treatmentData?.zones || [];
+  const markers = treatmentData?.markers || [];
   const qtyBreakdown = treatmentData?.quantityBreakdown;
+  const selectedQty = treatmentData?.selectedQty ?? 0;
+  const inclusion = treatmentData?.inclusion;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -119,6 +125,19 @@ export default function AcousticTreatmentDrawing({
               stroke={COLORS.zoneStroke}
               strokeWidth={1}
               strokeDasharray="3 2"
+            />
+          ))}
+
+          {/* Recommended Abfuser markers */}
+          {markers.map((marker) => (
+            <rect
+              key={marker.key}
+              x={rx(marker.x)}
+              y={ry(marker.y)}
+              width={Math.max(2, (marker.width / widthM) * drawW)}
+              height={Math.max(2, (marker.height / lengthM) * drawH)}
+              fill={marker.advisory ? COLORS.secondary : COLORS.primary}
+              opacity={marker.advisory ? 0.7 : 1}
             />
           ))}
 
@@ -188,6 +207,9 @@ export default function AcousticTreatmentDrawing({
               <span>Left: {qtyBreakdown.leftPanels}</span>
               <span>Right: {qtyBreakdown.rightPanels}</span>
               <span>Rear: {qtyBreakdown.rearPanels}</span>
+              {qtyBreakdown.ceilingAdvisoryPanels > 0 && (
+                <span>Ceiling (optional): {qtyBreakdown.ceilingAdvisoryPanels}</span>
+              )}
             </div>
             {Number.isFinite(qtyBreakdown.treatmentSurfaceArea) && (
               <div style={{
@@ -198,6 +220,28 @@ export default function AcousticTreatmentDrawing({
                 lineHeight: 1.5,
               }}>
                 Approximate treatment surface: {qtyBreakdown.treatmentSurfaceArea.toFixed(1)} m²
+              </div>
+            )}
+            <div style={{
+              marginTop: 8,
+              paddingTop: 8,
+              borderTop: `1px solid ${COLORS.border}`,
+              fontSize: 12,
+              fontWeight: 600,
+              color: COLORS.primary,
+              fontFamily: FONT_BODY,
+            }}>
+              Included in proposal: {selectedQty} / {qtyBreakdown?.recommendedQty ?? 0}
+            </div>
+            {inclusion?.message && (
+              <div style={{
+                fontSize: 11,
+                color: inclusion.state === "ABOVE_RECOMMENDATION" ? "#8A5A2B" : COLORS.secondary,
+                fontFamily: FONT_BODY,
+                marginTop: 4,
+                lineHeight: 1.5,
+              }}>
+                {inclusion.message}
               </div>
             )}
           </>

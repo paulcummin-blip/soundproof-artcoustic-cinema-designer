@@ -1,38 +1,20 @@
 // abfuserTreatmentZones.js
 // --------------------------------
-// Shared utility: derives Abfuser treatment zones from actual room geometry,
-// speaker positions, and seating positions using the image-source method.
+// GEOMETRY ONLY: derives WHERE Abfuser panels can usefully be placed from actual
+// room geometry, speaker positions and seating positions (image-source method).
 //
-// QUANTITY AUTHORITY: Simple strategic baseline, not zone-length coverage.
-//   Base: 1 left + 1 right + 2 rear = 4 Abfusers
-//   Side escalation: +1 per side when listening area is deep (>= 2.8 m)
-//   Rear escalation: +2 rear when listening area is wide (>= 3.5 m)
+// There is no quantity authority in this module. How many panels are
+// recommended is decided by the ADI strategic engine
+// (adiAbfuserRecommendation.js), which is the only recommendation authority.
 //
-// A treatment zone represents WHERE a panel can usefully be positioned,
-// not an instruction to cover the full zone continuously.
+// A treatment zone represents the extent of wall where panels can usefully sit,
+// not an instruction to cover the entire zone continuously.
 
-export const ABFUSER_SKU = "500027";
-export const ABFUSER_LABEL = "Artcoustic Abfuser, Black";
-
-export const ABFUSER_PANEL_LENGTH_M = 1.10;
-export const ABFUSER_PANEL_WIDTH_M = 0.70;
-export const ABFUSER_PANEL_AREA_M2 = ABFUSER_PANEL_WIDTH_M * ABFUSER_PANEL_LENGTH_M; // 0.77
-
-// Visual wall-band depth (plan-view thickness only — makes the zone visible)
-export const ZONE_DEPTH_M = 0.12;
-// Padding added to each end of a derived zone
-const ZONE_PADDING_M = 0.20;
-// Margin outside the seating envelope for the rear zone
-const REAR_MARGIN_M = 0.20;
-
-// Sound Proof practical coverage guidance (NOT an RP22 percentage).
-// RP22 establishes the treatment-region intent; Sound Proof converts the
-// zone extent into a practical Artcoustic product quantity.
-const COVERAGE_RATIO = 0.40;
-// Normal portrait wall mounting: 700 mm along-wall coverage dimension.
-const ABFUSER_LINEAR_COVERAGE_M = 0.70;
-// Rear panels are counted in pairs (2 × 0.70 m = 1.40 m).
-const REAR_PAIR_COVERAGE_M = 2 * ABFUSER_LINEAR_COVERAGE_M;
+export const ZONE_DEPTH_M = 0.12; // plan-view band thickness (visual only)
+const ZONE_PADDING_M = 0.20; // padding added to each end of a derived zone
+const REAR_MARGIN_M = 0.20; // margin outside the seating envelope for the rear zone
+const ROW_CLUSTER_TOLERANCE_M = 0.8; // seat-Y grouping tolerance when rows are unnamed
+export const REAR_NEAR_DISTANCE_M = 1.5; // "normal domestic cinema distance" to the rear wall
 
 function getFrontSpeakers(placedSpeakers) {
   if (!Array.isArray(placedSpeakers)) return [];
@@ -60,7 +42,7 @@ function getSpeakerPos(s) {
 
 /**
  * Image-source side-wall reflection Y.
- * Mirrors the source across the wall, finds where mirror→listener crosses the wall.
+ * Mirrors the source across the wall and finds where mirror→listener crosses it.
  * Returns null if the reflection is not between source and listener.
  */
 function sideWallReflectionY(src, listener, wallX, isLeftWall) {
@@ -73,13 +55,36 @@ function sideWallReflectionY(src, listener, wallX, isLeftWall) {
 }
 
 /**
- * Compute treatment zones and recommended quantity from actual geometry.
+ * Number of seating rows: explicit rowNumber when present, otherwise derived by
+ * clustering seat Y positions. Always at least 1 when seats exist.
+ */
+export function deriveSeatRowCount(seatingPositions) {
+  const seats = getSeats(seatingPositions);
+  if (seats.length === 0) return 0;
+
+  const explicit = new Set();
+  for (const seat of Array.isArray(seatingPositions) ? seatingPositions : []) {
+    const row = Number(seat?.rowNumber);
+    if (Number.isFinite(row) && row > 0) explicit.add(Math.round(row));
+  }
+  if (explicit.size > 0) return explicit.size;
+
+  const ys = seats.map((s) => s.y).sort((a, b) => a - b);
+  let rows = 1;
+  for (let i = 1; i < ys.length; i += 1) {
+    if (Math.abs(ys[i] - ys[i - 1]) > ROW_CLUSTER_TOLERANCE_M) rows += 1;
+  }
+  return rows;
+}
+
+/**
+ * Compute the wall treatment zone extents from actual geometry.
  *
  * @param {Object} params
  * @param {Object} params.roomDims - { widthM, lengthM }
  * @param {Array}  params.placedSpeakers - speaker objects with role + position
  * @param {Array}  params.seatingPositions - seat objects with x, y
- * @returns {Object|null} zone data or null if room is invalid
+ * @returns {Object|null} zone geometry, or null if the room is invalid
  */
 export function computeAbfuserTreatmentZones({ roomDims, placedSpeakers, seatingPositions }) {
   const widthM = Number(roomDims?.widthM);
@@ -123,7 +128,8 @@ export function computeAbfuserTreatmentZones({ roomDims, placedSpeakers, seating
   const rightLength = Math.max(0, rightEnd - rightStart);
 
   // ── Rear zone (from seating X envelope) ──
-  let rearMinX, rearMaxX;
+  let rearMinX;
+  let rearMaxX;
   if (seats.length > 0) {
     const seatXs = seats.map((s) => s.x);
     rearMinX = Math.max(0, Math.min(...seatXs) - REAR_MARGIN_M);
@@ -134,40 +140,27 @@ export function computeAbfuserTreatmentZones({ roomDims, placedSpeakers, seating
   }
   const rearWidth = Math.max(0, rearMaxX - rearMinX);
 
-  // ── Listening area dimensions (from actual seat envelope) ──
+  // ── Listening area and rear clearance ──
   let listeningAreaWidth = 0;
   let listeningAreaDepth = 0;
+  let rearClearanceM = null;
   if (seats.length > 0) {
     const seatXs = seats.map((s) => s.x);
     const seatYs = seats.map((s) => s.y);
     listeningAreaWidth = Math.max(...seatXs) - Math.min(...seatXs);
     listeningAreaDepth = Math.max(...seatYs) - Math.min(...seatYs);
+    rearClearanceM = Math.max(0, lengthM - Math.max(...seatYs));
   }
-
-  // ── Quantity from actual treatment-zone extent (40% linear coverage) ──
-  // Side walls: scale independently from each side's reflection-zone length.
-  const leftPanels = Math.max(1, Math.ceil((leftLength * COVERAGE_RATIO) / ABFUSER_LINEAR_COVERAGE_M));
-  const rightPanels = Math.max(1, Math.ceil((rightLength * COVERAGE_RATIO) / ABFUSER_LINEAR_COVERAGE_M));
-  // Rear wall: scale from rear-zone width, rounded to PAIRS (never odd).
-  const rearPairs = Math.max(1, Math.ceil((rearWidth * COVERAGE_RATIO) / REAR_PAIR_COVERAGE_M));
-  const rearPanels = rearPairs * 2;
-  const recommendedQty = leftPanels + rightPanels + rearPanels;
-
-  const treatmentSurfaceArea = recommendedQty * ABFUSER_PANEL_AREA_M2;
 
   return {
     leftZone: { start: leftStart, end: leftEnd, length: leftLength },
     rightZone: { start: rightStart, end: rightEnd, length: rightLength },
     rearZone: { minX: rearMinX, maxX: rearMaxX, width: rearWidth },
     zoneDepth: ZONE_DEPTH_M,
-    leftPanels,
-    rightPanels,
-    rearPanels,
-    recommendedQty,
-    treatmentSurfaceArea,
-    panelArea: ABFUSER_PANEL_AREA_M2,
     listeningAreaWidth,
     listeningAreaDepth,
+    rearClearanceM,
+    seatRowCount: deriveSeatRowCount(seatingPositions),
     usedFallback: useFallbackSide,
   };
 }

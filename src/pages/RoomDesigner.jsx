@@ -47,7 +47,7 @@ import { useStage2PlacementOptimiser } from '@/components/room/bass/stage2/useSt
 import { useBassHeavyAction, markBassHeavyActionRunning, markBassHeavyActionComplete, markBassHeavyActionError } from '@/components/room/bass/bassHeavyActionStore';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
-import { calculateTreatmentRecommendation } from "@/components/utils/acousticTreatmentRecommendation";
+import { calculateAbfuserRecommendation } from "@/components/utils/adiAbfuserRecommendation";
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
@@ -272,29 +272,23 @@ function RoomDesignerWithState() {
   const [soundbarSelections, setSoundbarSelections] = useState({});
   const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
-  const treatmentRecommendation = useMemo(
-    () => calculateTreatmentRecommendation({
-      roomDims: appState?.roomDims,
-      screen: appState?.screen,
-      roomElements: appState?.roomElements,
-    }),
-    [appState?.roomDims?.widthM, appState?.roomDims?.lengthM, appState?.roomDims?.heightM, appState?.screen, appState?.roomElements]
-  );
-  const recommendedAbfuserQty = treatmentRecommendation?.recommendedQty ?? 0;
-
-  // Auto-follow: when source is "recommended" and treatment is enabled,
-  // selectedAbfuserQty automatically tracks the recommended qty so the
-  // recommendation is "calculated automatically" and the system price
-  // updates as room dimensions change. When the user manually overrides
-  // the quantity (source becomes "user"), auto-follow stops. Toggling
-  // treatment OFF preserves the qty; toggling back ON with source still
-  // "recommended" restores the calculated recommendation.
-  useEffect(() => {
-    if (appState?.abfuserQtySource === "recommended" && appState?.acousticTreatmentEnabled && recommendedAbfuserQty > 0) {
-      appState?.setSelectedAbfuserQty?.(recommendedAbfuserQty);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appState?.abfuserQtySource, appState?.acousticTreatmentEnabled, recommendedAbfuserQty]);
+  // ADI strategic reflection control — the single Abfuser recommendation
+  // authority. Geometry-aware (speakers, seating, reflection zones, room size,
+  // rows). There is NO auto-follow: the selected quantity changes only when the
+  // designer accepts the recommendation or edits it, and only it is priced.
+  const abfuserRecommendation = useMemo(() => calculateAbfuserRecommendation({
+    room: appState?.roomDims,
+    speakers: appState?.speakerSystem?.placedSpeakers || [],
+    seating: appState?.seatingPositions,
+    screen: appState?.screen,
+    acousticTreatmentSettings: {
+      enabled: appState?.acousticTreatmentEnabled,
+      selectedQuantity: appState?.selectedAbfuserQty,
+      quantitySource: appState?.abfuserQtySource,
+      legacyAutoQuantity: appState?.legacyAbfuserAutoQty,
+    },
+  }), [appState?.roomDims, appState?.speakerSystem?.placedSpeakers, appState?.seatingPositions, appState?.screen, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, appState?.abfuserQtySource, appState?.legacyAbfuserAutoQty]);
+  const recommendedAbfuserQty = abfuserRecommendation?.recommendedQuantity ?? 0;
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [localLiveImpactMode, setLocalLiveImpactMode] = React.useState("off");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -2509,8 +2503,7 @@ function RoomDesignerWithState() {
             setAcousticTreatmentEnabled={appState?.setAcousticTreatmentEnabled}
             selectedAbfuserQty={appState?.selectedAbfuserQty ?? 0}
             setSelectedAbfuserQty={appState?.setSelectedAbfuserQty}
-            recommendedAbfuserQty={recommendedAbfuserQty}
-            treatmentRecommendation={treatmentRecommendation}
+            abfuserRecommendation={abfuserRecommendation}
           />
         )}
       />

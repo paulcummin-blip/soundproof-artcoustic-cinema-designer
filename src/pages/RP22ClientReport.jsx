@@ -628,28 +628,25 @@ export default function RP22ClientReport() {
         },
       });
     }
-    // Acoustic Treatment (only when enabled)
-    if (appState?.acousticTreatmentEnabled && Number(appState?.selectedAbfuserQty) > 0) {
+    // Acoustic Treatment — shown whenever treatment is enabled. The page carries
+    // the ADI recommendation and the separate included quantity, so it does not
+    // depend on a quantity having been accepted into pricing.
+    if (appState?.acousticTreatmentEnabled) {
+      const acousticTreatmentProps = {
+        roomDims,
+        seatingPositions,
+        placedSpeakers,
+        rsp,
+        acousticTreatmentEnabled: true,
+        selectedAbfuserQty: Number(appState?.selectedAbfuserQty) || 0,
+        legacyAutoQuantity: Number(appState?.legacyAbfuserAutoQty) || 0,
+      };
       pages.push({
         id: "acoustic-treatment",
-        visual: (
-          <ClientAcousticTreatment
-            roomDims={roomDims}
-            seatingPositions={seatingPositions}
-            placedSpeakers={placedSpeakers}
-            rsp={rsp}
-            acousticTreatmentEnabled={!!appState?.acousticTreatmentEnabled}
-            selectedAbfuserQty={Number(appState?.selectedAbfuserQty) || 0}
-          />
-        ),
+        visual: <ClientAcousticTreatment {...acousticTreatmentProps} />,
         printData: {
           type: "acoustic-treatment",
-          roomDims,
-          seatingPositions,
-          placedSpeakers,
-          rsp,
-          acousticTreatmentEnabled: !!appState?.acousticTreatmentEnabled,
-          selectedAbfuserQty: Number(appState?.selectedAbfuserQty) || 0,
+          ...acousticTreatmentProps,
         },
       });
     }

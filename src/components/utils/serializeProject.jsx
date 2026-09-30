@@ -119,7 +119,8 @@ export function serializeProject(input = {}) {
     // Acoustic treatment (Abfuser product selection)
     acousticTreatmentEnabled = false,
     selectedAbfuserQty = 0,
-    abfuserQtySource = "recommended",
+    abfuserQtySource = "none",
+    legacyAbfuserAutoQty = 0,
 
     // P15/P21 assumed design levels — persisted on the Project entity.
     assumedP15Level = null,
@@ -335,10 +336,14 @@ export function serializeProject(input = {}) {
       )
     ),
 
-    // Acoustic treatment (Abfuser product selection)
+    // Acoustic treatment (Abfuser product selection).
+    // Only the designer's decision is stored as the selected quantity — the ADI
+    // recommendation is recalculated from geometry and is never persisted as a
+    // selection. legacy_abfuser_auto_qty retains any retired automatic value.
     acoustic_treatment_enabled: !!acousticTreatmentEnabled,
     selected_abfuser_qty: acousticTreatmentEnabled ? (Math.max(0, Math.floor(Number(selectedAbfuserQty) || 0))) : 0,
-    abfuser_qty_source: acousticTreatmentEnabled ? (abfuserQtySource || "recommended") : "recommended",
+    abfuser_qty_source: acousticTreatmentEnabled ? (abfuserQtySource || "none") : "none",
+    legacy_abfuser_auto_qty: Math.max(0, Math.floor(Number(legacyAbfuserAutoQty) || 0)),
 
     // P15/P21 assumed design levels (null = not yet assumed; effective default is L2)
     assumed_p15_level: assumedP15Level || null,

@@ -3,6 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useAppState } from "@/components/AppStateProvider";
 import { useEngineeringMode } from "@/components/state/useEngineeringMode";
+import { describeAbfuserInclusion, ABFUSER_STATUS } from "@/components/utils/adiAbfuserRecommendation";
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(value || 0));
@@ -52,8 +53,7 @@ export default function OptionsPanel({
   setAcousticTreatmentEnabled = () => {},
   selectedAbfuserQty = 0,
   setSelectedAbfuserQty = () => {},
-  recommendedAbfuserQty = 0,
-  treatmentRecommendation = null,
+  abfuserRecommendation = null,
 }) {
   const [showDifficultyRating, setShowDifficultyRating] = React.useState(false);
   const [showInactiveItems, setShowInactiveItems] = React.useState(false);
@@ -65,21 +65,29 @@ export default function OptionsPanel({
   // Source authority from app state — distinguishes recommendation-applied
   // ("recommended") from designer-manually-set ("user"). The recommendation
   // is display-only; quantity only changes via explicit Apply or manual entry.
-  const { abfuserQtySource, setAbfuserQtySource } = useAppState() || {};
+  const { abfuserQtySource, setAbfuserQtySource, legacyAbfuserAutoQty } = useAppState() || {};
+
+  // ADI strategic reflection control is guidance only. The recommendation and
+  // the included (selected) quantity are separate authorities, and only the
+  // selected quantity is priced.
+  const recommendation = abfuserRecommendation || null;
+  const recommendedQuantity = recommendation?.recommendedQuantity ?? 0;
+  const selectedQuantity = Number(selectedAbfuserQty) || 0;
+  const inclusion = describeAbfuserInclusion({ recommendedQuantity, selectedQuantity });
+  const isNotCalculated = !recommendation || recommendation.status === ABFUSER_STATUS.NOT_CALCULATED;
+  const fullDesignRequired = recommendation?.status === ABFUSER_STATUS.FULL_DESIGN_REQUIRED;
+  const byZone = recommendation?.quantityByZone || {};
+  const legacyAuto = Math.max(0, Math.floor(Number(legacyAbfuserAutoQty) || 0));
 
   const handleAcousticTreatmentToggle = (nextEnabled) => {
     setAcousticTreatmentEnabled(nextEnabled);
   };
 
-  // "Reset to Recommended" re-enables auto-follow (source → "recommended")
-  // so the quantity automatically tracks future room-size changes. The
-  // auto-follow effect in RoomDesigner confirms the qty on next render.
-  // With auto-follow, there is nothing to "apply" — the recommendation is
-  // already applied. This button only restores the calculated value after
-  // a manual override.
-  const resetToRecommended = () => {
-    if (recommendedAbfuserQty > 0) {
-      setSelectedAbfuserQty(recommendedAbfuserQty);
+  // The ONLY way the recommendation becomes a priced selection. It never
+  // happens automatically, and it never overwrites a manual selection.
+  const useAdiRecommendation = () => {
+    if (recommendedQuantity > 0) {
+      setSelectedAbfuserQty(recommendedQuantity);
     }
     setAbfuserQtySource("recommended");
   };
@@ -120,52 +128,83 @@ export default function OptionsPanel({
         </div>
         {acousticTreatmentEnabled ? (
           <div className="mt-3 space-y-3">
-            {treatmentRecommendation && (
-              <div className="rounded-md bg-[#F8F8F7] border border-[#EEEDEA] p-3 space-y-1">
-                <div className="text-xs font-semibold text-[#213428]">
-                  Recommended: {recommendedAbfuserQty} × Artcoustic Abfuser
-                </div>
-                <div className="text-xs text-[#625143]">
-                  Effective treatment: {treatmentRecommendation.effectiveTreatmentArea.toFixed(1)} m²
-                </div>
-                <div className="text-xs text-[#625143]">
-                  Remaining reflective area: {treatmentRecommendation.remainingReflectiveArea.toFixed(1)} m²
-                </div>
-                <div className="text-xs text-[#625143]">
-                  Treats {treatmentRecommendation.percentageTreated.toFixed(0)}% of equivalent reflective area
-                </div>
+            {isNotCalculated ? (
+              <div className="text-xs text-[#8B7F76]">
+                Enter room dimensions to calculate the ADI acoustic treatment recommendation.
               </div>
-            )}
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="abfuser-qty" className="text-xs font-medium text-[#3E4349] whitespace-nowrap">Quantity</Label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={resetToRecommended}
-                  disabled={abfuserQtySource === "recommended" || recommendedAbfuserQty <= 0}
-                  className="text-xs px-2 py-1 rounded border border-[#DCDBD6] bg-white text-[#213428] hover:bg-[#F8F8F7] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                  title="Reset to calculated recommendation"
+            ) : (
+              <>
+                <div className="rounded-md bg-[#F8F8F7] border border-[#EEEDEA] p-3 space-y-1">
+                  <div className="text-xs font-semibold text-[#213428]">
+                    ADI recommends {recommendedQuantity} × Artcoustic Abfuser
+                  </div>
+                  <div className="text-xs text-[#625143]">
+                    Total treatment area: {(recommendation?.totalRecommendedAreaM2 ?? 0).toFixed(2)} m²
+                  </div>
+                  <div className="text-[11px] text-[#625143]">
+                    {byZone.left || 0} left first reflection · {byZone.right || 0} right first reflection · {byZone.rear || 0} rear wall
+                    {(byZone.ceilingAdvisory || 0) > 0 ? ` · ${byZone.ceilingAdvisory} optional ceiling` : ""}
+                  </div>
+                  {fullDesignRequired && (
+                    <div className="text-[11px] font-semibold text-amber-800 pt-1">
+                      Full acoustic treatment design required — the quantity above the automatic limit is not added to the product selection or pricing.
+                    </div>
+                  )}
+                  <div className="text-[10px] text-[#8B7F76]">{recommendation?.estimatedEffect?.bassNote}</div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="abfuser-qty" className="text-xs font-medium text-[#3E4349] whitespace-nowrap">Included quantity</Label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={useAdiRecommendation}
+                      disabled={abfuserQtySource === "recommended" || recommendedQuantity <= 0}
+                      className="text-xs px-2 py-1 rounded border border-[#DCDBD6] bg-white text-[#213428] hover:bg-[#F8F8F7] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      title="Accept the ADI recommendation into the design and pricing"
+                    >
+                      Use ADI recommendation
+                    </button>
+                    <input
+                      id="abfuser-qty"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={selectedAbfuserQty}
+                      onChange={(e) => {
+                        setSelectedAbfuserQty(parseInt(e.target.value, 10) || 0);
+                        setAbfuserQtySource("user");
+                      }}
+                      className="w-20 px-2 py-1 border border-[#DCDBD6] rounded text-xs bg-white text-[#1B1A1A] focus:outline-none focus:ring-1 focus:ring-[#213428]"
+                    />
+                  </div>
+                </div>
+
+                <div
+                  className="text-[11px]"
+                  style={{ color: inclusion.state === "ABOVE_RECOMMENDATION" ? "#8A5A2B" : "#625143" }}
                 >
-                  Reset to Recommended
-                </button>
-                <input
-                  id="abfuser-qty"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={selectedAbfuserQty}
-                  onChange={(e) => {
-                    setSelectedAbfuserQty(parseInt(e.target.value, 10) || 0);
-                    setAbfuserQtySource("user");
-                  }}
-                  className="w-20 px-2 py-1 border border-[#DCDBD6] rounded text-xs bg-white text-[#1B1A1A] focus:outline-none focus:ring-1 focus:ring-[#213428]"
-                />
-              </div>
-            </div>
-            {abfuserQtySource === "user" && (
-              <div className="text-[10px] text-[#8B7F76]">
-                Manually overridden — click "Reset to Recommended" to recalculate from room size
-              </div>
+                  {inclusion.message}
+                </div>
+
+                {abfuserQtySource === "recommended" && (
+                  <div className="text-[10px] text-[#8B7F76]">
+                    ADI recommendation accepted — the included quantity follows the recommendation.
+                  </div>
+                )}
+
+                {abfuserQtySource === "user" && (
+                  <div className="text-[10px] text-[#8B7F76]">
+                    Manually set by the designer. Click "Use ADI recommendation" to accept the ADI quantity.
+                  </div>
+                )}
+
+                {abfuserQtySource !== "recommended" && legacyAuto > 0 && (
+                  <div className="text-[10px] text-[#8B7F76]">
+                    Previous automatic quantity: {legacyAuto} × Abfuser (retired, no longer treated as a designer selection).
+                  </div>
+                )}
+              </>
             )}
           </div>
         ) : (
