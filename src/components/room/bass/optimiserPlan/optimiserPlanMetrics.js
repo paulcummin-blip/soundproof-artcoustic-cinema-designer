@@ -154,6 +154,25 @@ export function leverEffectFrom(result, baseline) {
   };
 }
 
+/**
+ * The authoritative P20 headline published for a design, read from the completed
+ * bass authority. Read only — never recalculated, never estimated. Used to show
+ * the MEASURED before/after after a lever is applied.
+ */
+export function readAuthoritativeP20Headline(completedBassAuthority) {
+  const parameters = completedBassAuthority?.contract?.productAnalysis?.parameters || {};
+  const p20 = parameters.p20 || null;
+  const variation = num(p20?.variationDbRaw ?? p20?.value);
+  if (variation == null) return null;
+  return {
+    variationDb: variation,
+    level: num(p20?.level),
+    worstSeatId: p20?.worstSeatId ?? null,
+    worstFrequencyHz: num(p20?.worstFrequencyHz),
+    fingerprint: completedBassAuthority?.contract?.job?.resultFingerprint || null,
+  };
+}
+
 /** The verified trade-off already classified for a candidate, or null. */
 export function existingTradeOff(result) {
   const tradeOff = result?.tradeOff;

@@ -21,13 +21,32 @@ import {
 } from "../stage1/stage1FamilyRegistry.js";
 
 /**
+ * P19 credibility of a result.
+ *
+ * P19 is ONE authoritative RSP result, so it is read from the aggregate
+ * `achievedP19Level`. A per-seat P19 array is obsolete evidence: it is used ONLY
+ * when it actually exists, and its absence is never a failure and is never
+ * converted into Level 0.
+ *
+ * @returns {boolean}
+ */
+function passesP19Credibility(result) {
+  const aggregate = Number(result?.achievedP19Level);
+  if (Number.isFinite(aggregate)) return aggregate >= 2;
+  const legacyPrimary = (Array.isArray(result?.perSeatP19) ? result.perSeatP19 : [])
+    .filter((seat) => seat?.isPrimary);
+  if (legacyPrimary.length === 0) return false; // no P19 evidence at all
+  return legacyPrimary.every((seat) => (seat.level || 0) >= 2);
+}
+
+/**
  * Check if a Stage 2 result passes the credibility gate.
  *
  * Credibility gate:
  * - selected P14 target achieved
  * - valid achieved P18
- * - every Primary seat P19 >= L2
- * - every Primary seat P20 >= L2
+ * - aggregate RSP P19 >= L2 (per-seat P19 is obsolete and never required)
+ * - every Primary seat P20 >= L2 (P20 is the per-seat consistency result)
  */
 export function passesCredibilityGate(result) {
   if (!result) return false;
@@ -36,14 +55,14 @@ export function passesCredibilityGate(result) {
   // Valid P18
   if (result.p18Limited) return false;
   if (!Number.isFinite(result.achievedP18Hz) || result.achievedP18Hz === null) return false;
-  // Every Primary seat P19 >= L2 and P20 >= L2
-  const primaryP19 = (result.perSeatP19 || []).filter((s) => s.isPrimary);
-  if (primaryP19.length === 0) return false;
-  const p20BySeat = new Map((result.perSeatP20 || []).map((s) => [String(s.seatId), s]));
-  for (const seat of primaryP19) {
+  // P19 — one authoritative RSP aggregate
+  if (!passesP19Credibility(result)) return false;
+  // P20 — per-seat consistency, Primary seats only
+  const primaryP20 = (Array.isArray(result.perSeatP20) ? result.perSeatP20 : [])
+    .filter((seat) => seat?.isPrimary);
+  if (primaryP20.length === 0) return false;
+  for (const seat of primaryP20) {
     if ((seat.level || 0) < 2) return false;
-    const p20 = p20BySeat.get(String(seat.seatId));
-    if (!p20 || (p20.level || 0) < 2) return false;
   }
   return true;
 }
@@ -52,14 +71,21 @@ function describeCredibilityFailure(result) {
   if (!result) return "no_result";
   if (result.p14Limited) return "p14_not_achieved";
   if (result.p18Limited) return "p18_invalid";
-  const primarySeats = (result.perSeatP19 || []).filter((s) => s.isPrimary);
-  if (primarySeats.length === 0) return "no_primary_seats";
-  const p20BySeat = new Map((result.perSeatP20 || []).map((s) => [String(s.seatId), s]));
-  for (const seat of primarySeats) {
-    if ((seat.level || 0) < 2) return `primary_p19_below_l2:${seat.seatId}`;
-    const p20 = p20BySeat.get(String(seat.seatId));
-    if (!p20 || (p20.level || 0) < 2) return `primary_p20_below_l2:${seat.seatId}`;
+  const aggregateP19 = Number(result.achievedP19Level);
+  if (Number.isFinite(aggregateP19)) {
+    if (aggregateP19 < 2) return "rsp_p19_below_l2";
+  } else {
+    const legacyPrimary = (Array.isArray(result.perSeatP19) ? result.perSeatP19 : [])
+      .filter((seat) => seat?.isPrimary);
+    if (legacyPrimary.length === 0) return "no_p19_evidence";
+    const below = legacyPrimary.find((seat) => (seat.level || 0) < 2);
+    if (below) return `primary_p19_below_l2:${below.seatId}`;
   }
+  const primaryP20 = (Array.isArray(result.perSeatP20) ? result.perSeatP20 : [])
+    .filter((seat) => seat?.isPrimary);
+  if (primaryP20.length === 0) return "no_primary_p20_evidence";
+  const p20Below = primaryP20.find((seat) => (seat.level || 0) < 2);
+  if (p20Below) return `primary_p20_below_l2:${p20Below.seatId}`;
   return "unknown";
 }
 

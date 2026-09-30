@@ -26,6 +26,10 @@ import { PRIMARY } from "@/components/utils/seatPriorityAuthority";
 import { formatCoverageSummaryFromRows } from "@/components/utils/seatCoverageSummary";
 import { useGraphInteraction, setGraphInteraction, clearGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
 import { formatSeatPillLabel } from "@/components/utils/seatLabel";
+import {
+  formatWorstAllSeatP20Line,
+  formatSelectedSeatP20Line,
+} from "@/components/room/bass/p20SeatPresentation";
 
 const PRIMARY_BORDER = "#1B1A1A";
 const SECONDARY_BORDER = "#C1B6AD";
@@ -93,7 +97,7 @@ function SeatGrid({ rows, compact, paramKey, selectedSeatId, onSelectSeat, showS
   );
 }
 
-function Panel({ title, paramKey, rows, publicationVerified, stateText, compact, authoritativeSummary = null, selectedSeatId, onSelectSeat, showSeatLabel }) {
+function Panel({ title, paramKey, rows, publicationVerified, stateText, compact, authoritativeSummary = null, selectedSeatId, onSelectSeat, showSeatLabel, overallLine = null, selectedLine = null }) {
   const showSeats = publicationVerified && rows.length > 0;
   return (
     <div className={`rounded-lg border border-[#DCDBD6] bg-white ${compact ? "p-2" : "p-3"}`}>
@@ -102,6 +106,14 @@ function Panel({ title, paramKey, rows, publicationVerified, stateText, compact,
         <>
           {!compact && (
             <div className="mb-1.5 text-[10px] font-medium text-[#625143]">{authoritativeSummary || formatCoverageSummaryFromRows(rows)}</div>
+          )}
+          {/* The OVERALL result is always stated, and a selected seat is labelled
+              as a selection — never presented as the worst seat. */}
+          {overallLine && (
+            <div className={`text-[#3E4349] font-semibold ${compact ? "mb-1 text-[9px]" : "mb-1 text-[10px]"}`}>{overallLine}</div>
+          )}
+          {selectedLine && (
+            <div className={`text-[#625143] ${compact ? "mb-1 text-[9px]" : "mb-1.5 text-[10px]"}`}>{selectedLine}</div>
           )}
           <SeatGrid rows={rows} compact={compact} paramKey={paramKey} selectedSeatId={selectedSeatId} onSelectSeat={onSelectSeat} showSeatLabel={showSeatLabel} />
         </>
@@ -124,6 +136,10 @@ export default function SharedP19P20SeatResults({
 }) {
   const interaction = useGraphInteraction();
   const stateText = stateTextFor(authorityStatus, publicationVerified, p14TargetUnselected);
+  const overallLine = publicationVerified ? formatWorstAllSeatP20Line(p20Rows) : null;
+  const selectedLine = publicationVerified
+    ? formatSelectedSeatP20Line(p20Rows, interaction.selectedSeatId)
+    : null;
 
   const handleSeatSelect = (paramKey) => (seatId) => {
     if (interaction.selectedSeatId === seatId && interaction.selectedMetric === paramKey) {
@@ -143,6 +159,8 @@ export default function SharedP19P20SeatResults({
         stateText={stateText}
         compact={compact}
         showSeatLabel={showSeatLabel}
+        overallLine={overallLine}
+        selectedLine={selectedLine}
         selectedSeatId={interaction.selectedSeatId}
         onSelectSeat={handleSeatSelect("p20")}
       />

@@ -14,6 +14,7 @@ import {
   compareStage2Results,
   meetsStopCondition,
 } from "./stage2Ranking.js";
+import { betterOverallBest } from "./stage2OverallBestSelection.js";
 import { shouldEvaluateThirdFinalist } from "./stage2FinalistPromotion.js";
 import { evaluateBEligibility, generateBFinalist } from "./stage2BLastResort.js";
 import { isBFamily, isProhibitedFamily } from "../stage1/stage1FamilyRegistry.js";
@@ -973,8 +974,11 @@ export class Stage2PlacementController {
         bestFinalist: best,
         finalistCount: ranked.length,
       };
-      // Track overall best (first non-null per quantity, preferring lower quantity)
-      if (!overallBest) overallBest = { quantity: qty, ...best };
+      // overall_best is the best-RANKED candidate across ALL quantities (the
+      // documented rule lives in stage2OverallBestSelection.js). It is never
+      // "the first quantity that happened to be processed": a one-sub candidate
+      // must not be labelled overall best merely because it was ranked first.
+      overallBest = betterOverallBest(overallBest, { quantity: qty, ...best });
     }
 
     snapshot.overall_best = overallBest;

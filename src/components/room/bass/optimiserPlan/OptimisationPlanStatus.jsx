@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import React from "react";
-import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { OPTIMISER_LEVER, OPTIMISER_LEVER_STATE, OPTIMISER_PLAN_STATUS } from "./optimiserPlanConstants.js";
 import { useOptimiserPlanView } from "./useOptimiserPlanView.js";
 
@@ -106,12 +106,43 @@ function EffectBlock({ lever }) {
   );
 }
 
+/** The MEASURED before/after of the last applied lever. Never the prediction. */
+function LeverOutcome({ outcome }) {
+  if (!outcome) return null;
+  const p20Text = (headline) => (headline?.variationDb != null
+    ? `±${Math.abs(Number(headline.variationDb)).toFixed(1)} dB`
+    : null);
+  const seatText = (headline) => {
+    const seat = headline?.worstSeatId ? ` · ${headline.worstSeatId}` : "";
+    const hz = headline?.worstFrequencyHz != null ? ` at ${Math.round(Number(headline.worstFrequencyHz))} Hz` : "";
+    return `${seat}${hz}`;
+  };
+  const before = p20Text(outcome.before);
+  const after = p20Text(outcome.after);
+  const line = after
+    ? `${outcome.label} applied — measured P20 ${after}${seatText(outcome.after)}${before ? ` (was ${before}${seatText(outcome.before)})` : ""}`
+    : `${outcome.label} applied — recalculating the authoritative result…`;
+  return (
+    <div className="mt-2 rounded-md border border-[#CFDCCF] bg-[#F4F7F4] p-2">
+      <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">AFTER APPLY — MEASURED</div>
+      <div className="mt-0.5 text-[11px] text-[#3E4349]">{line}</div>
+      <div className="mt-0.5 text-[10px] text-[#8B7F76]">
+        The predicted improvement is not claimed as achieved — this is the recalculated authoritative result.
+      </div>
+    </div>
+  );
+}
+
 export default function OptimisationPlanStatus({
   projectId = null,
   versionId = null,
   completedBassAuthority = null,
   currentDesignFingerprint = null,
   instances = [],
+  onApplyLever = null,
+  onUndoLever = null,
+  leverApplyBusy = null,
+  leverOutcome = null,
   className = "",
 }) {
   const view = useOptimiserPlanView({
@@ -236,9 +267,39 @@ export default function OptimisationPlanStatus({
             {lever.tradeOff?.reason && (
               <div className="mt-1 text-[11px] text-[#8A5A2B]">Trade-off: {lever.tradeOff.reason}</div>
             )}
+
+            {/* Individual Apply / Undo — this lever only. Blocked states state why. */}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {lever.canApply && onApplyLever && (
+                <button
+                  type="button"
+                  onClick={() => onApplyLever(lever)}
+                  disabled={leverApplyBusy === lever.key}
+                  className="inline-flex items-center gap-1 rounded-md bg-[#213428] px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-[#3E4349] disabled:opacity-50"
+                >
+                  {leverApplyBusy === lever.key && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {lever.applyLabel || "Apply"}
+                </button>
+              )}
+              {lever.canUndo && onUndoLever && (
+                <button
+                  type="button"
+                  onClick={() => onUndoLever(lever)}
+                  disabled={leverApplyBusy === lever.key}
+                  className="inline-flex items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#3E4349] transition-colors hover:border-[#1B1A1A] disabled:opacity-50"
+                >
+                  {lever.undoLabel || "Undo"}
+                </button>
+              )}
+              {!lever.canApply && lever.applyBlockedReason && (
+                <span className="text-[10px] text-[#8B7F76]">{lever.applyBlockedReason}</span>
+              )}
+            </div>
           </div>
         ))}
       </div>
+
+      <LeverOutcome outcome={leverOutcome} />
 
       {view.combined && (
         <div className="mt-2.5 rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2">

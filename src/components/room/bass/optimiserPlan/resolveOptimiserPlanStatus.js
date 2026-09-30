@@ -25,6 +25,7 @@ import {
   OPTIMISER_PLAN_VERSION,
 } from "./optimiserPlanConstants.js";
 import { resolveLeverState } from "./optimiserPlanMatching.js";
+import { resolveLeverApplyMap } from "./optimiserPlanLeverApply.js";
 
 /**
  * @param {object} params
@@ -133,6 +134,23 @@ export function resolveOptimiserPlanStatus({
         stateLabel: OPTIMISER_LEVER_STATE_LABEL[state] || state,
       };
     });
+
+  // Individual apply/undo availability, resolved against the CURRENT design for
+  // every lever. A lever is only applyable on its own when its own effect was
+  // evaluated and the plan still belongs to this design.
+  const applyLevers = {};
+  for (const [leverKey, lever] of Object.entries(plan.levers || {})) {
+    applyLevers[leverKey] = { ...lever, disabled: decisions[leverKey]?.disabled === true };
+  }
+  const leverApplyMap = resolveLeverApplyMap({ levers: applyLevers, planStatus: status, instances });
+  for (const lever of levers) {
+    const applyState = leverApplyMap[lever.key] || null;
+    lever.canApply = applyState?.canApply === true;
+    lever.applyLabel = applyState?.applyLabel || null;
+    lever.applyBlockedReason = applyState?.applyBlockedReason || null;
+    lever.canUndo = applyState?.canUndo === true;
+    lever.undoLabel = applyState?.undoLabel || null;
+  }
 
   const appliedCount = levers.filter((lever) => lever.state === OPTIMISER_LEVER_STATE.APPLIED).length;
   const disabledCount = levers.filter((lever) => lever.state === OPTIMISER_LEVER_STATE.DISABLED).length;

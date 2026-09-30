@@ -25,6 +25,12 @@ import { buildAdiBassEvidence } from "@/components/adi/adiBassEvidenceBuilder";
 import { RECOMMENDATION_INTENT } from "@/components/room/bass/recommendationAuthority/recommendationAuthority";
 import { ADI_OUTCOME } from "@/components/adi/adiConstants";
 import { buildOptimisedInstances } from "../improveBassV2/improveBassV2Apply";
+import {
+  buildLeverApplyInstances,
+  buildLeverUndoInstances,
+} from "../optimiserPlan/optimiserPlanLeverApply.js";
+import { readAuthoritativeP20Headline } from "../optimiserPlan/optimiserPlanMetrics.js";
+import { OPTIMISER_LEVER } from "../optimiserPlan/optimiserPlanConstants.js";
 import { applyCalibrationTuning, isCalibrationApplied } from "../improveBassV2/improveBassV2ApplyCalibration";
 import {
   computeAppliedCalibrationBasisFingerprint,
@@ -261,6 +267,61 @@ export default function AdiRecommendation({
     }
   }, [hasSubPositions, commitInstances, hasCanonicalInstances, selection, subPositionWinner, currentInstances, roomDims, selectedSubModel, shared, onRecalculate]);
 
+  // ── Individual lever apply / undo ──
+  // One lever at a time, through the SAME commit + recalculation path every
+  // other apply uses. Only that lever's own field is written; the plan object is
+  // left intact (it becomes stale because the design changed, which is what
+  // disables the other levers until the plan is re-run).
+  const [leverApplyBusy, setLeverApplyBusy] = useState(null);
+  const [leverOutcome, setLeverOutcome] = useState(null);
+
+  const commitLeverChange = useCallback((lever, build) => {
+    if (!commitInstances || !lever?.key) return;
+    const result = build({ leverKey: lever.key, lever, instances: currentInstances });
+    if (!result.ok) return;
+    const before = readAuthoritativeP20Headline(completedBassAuthority);
+    commitInstances(
+      result.instances,
+      lever.key === OPTIMISER_LEVER.PLACEMENT
+        ? { front: { placementMode: "manual", isManual: true }, rear: { placementMode: "manual", isManual: true } }
+        : undefined,
+    );
+    setLeverOutcome({ leverKey: lever.key, label: lever.label || lever.key, before, after: null });
+    if (typeof onRecalculate === "function") {
+      onRecalculate({ previousCacheKey: shared?.cacheKey || null });
+    }
+  }, [commitInstances, currentInstances, completedBassAuthority, onRecalculate, shared]);
+
+  const handleApplyLever = useCallback((lever) => {
+    setLeverApplyBusy(lever?.key || null);
+    try {
+      commitLeverChange(lever, buildLeverApplyInstances);
+    } finally {
+      setLeverApplyBusy(null);
+    }
+  }, [commitLeverChange]);
+
+  const handleUndoLever = useCallback((lever) => {
+    setLeverApplyBusy(lever?.key || null);
+    try {
+      commitLeverChange(lever, buildLeverUndoInstances);
+    } finally {
+      setLeverApplyBusy(null);
+    }
+  }, [commitLeverChange]);
+
+  // The MEASURED after value is only reported once a DIFFERENT authoritative
+  // result has been published. Until then the card states that recalculation is
+  // running — the predicted improvement is never presented as achieved.
+  const leverOutcomeResolved = useMemo(() => {
+    if (!leverOutcome) return null;
+    if (leverOutcome.after) return leverOutcome;
+    const current = readAuthoritativeP20Headline(completedBassAuthority);
+    if (!current?.fingerprint) return leverOutcome;
+    if (leverOutcome.before?.fingerprint === current.fingerprint) return leverOutcome;
+    return { ...leverOutcome, after: current };
+  }, [leverOutcome, completedBassAuthority]);
+
   const handleApplySeating = useCallback(() => {
     if (!hasSeating || !commitSeating || !selection) return;
     const winner = seatingWinner;
@@ -359,6 +420,10 @@ export default function AdiRecommendation({
         runStatus={optimisationRunStatus || "idle"}
         runError={optimisationRunError || null}
         onRunOptimisationPlan={onRunOptimisationPlan}
+        onApplyLever={handleApplyLever}
+        onUndoLever={handleUndoLever}
+        leverApplyBusy={leverApplyBusy}
+        leverOutcome={leverOutcomeResolved}
         why={recommendation?.why || null}
       />
     );
@@ -562,6 +627,10 @@ export default function AdiRecommendation({
         completedBassAuthority={completedBassAuthority}
         currentDesignFingerprint={shared?.cacheKey || null}
         instances={currentInstances}
+        onApplyLever={handleApplyLever}
+        onUndoLever={handleUndoLever}
+        leverApplyBusy={leverApplyBusy}
+        leverOutcome={leverOutcomeResolved}
       />
 
       {/* Apply button */}

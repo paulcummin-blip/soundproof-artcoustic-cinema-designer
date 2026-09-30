@@ -70,6 +70,10 @@ export default function AdiOptimisationJourney({
   runStatus = "idle",
   runError = null,
   onRunOptimisationPlan = null,
+  onApplyLever = null,
+  onUndoLever = null,
+  leverApplyBusy = null,
+  leverOutcome = null,
   assessment = null,
   why = null,
   className = "",
@@ -146,6 +150,10 @@ export default function AdiOptimisationJourney({
           completedBassAuthority={completedBassAuthority}
           currentDesignFingerprint={currentDesignFingerprint}
           instances={instances}
+          onApplyLever={onApplyLever}
+          onUndoLever={onUndoLever}
+          leverApplyBusy={leverApplyBusy}
+          leverOutcome={leverOutcome}
         />
       )}
 

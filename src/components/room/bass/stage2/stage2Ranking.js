@@ -31,6 +31,11 @@ import { countFailingSeats, countParameterFails } from "../improveBassV2/zeroFai
  * @private
  */
 function buildSeatSummary(perSeatP19, perSeatP20, seatPriorityMap) {
+  // Per-seat P19 is OBSOLETE evidence: P19 is now one authoritative RSP result.
+  // When a result carries no per-seat P19 rows, a seat's P19 dimension is
+  // ABSENT — never an implied Level 0, which would distort ranking and can
+  // wrongly unlock the last-resort path.
+  const hasPerSeatP19 = Array.isArray(perSeatP19) && perSeatP19.length > 0;
   const p19BySeat = new Map((perSeatP19 || []).map((s) => [String(s.seatId), s]));
   const p20BySeat = new Map((perSeatP20 || []).map((s) => [String(s.seatId), s]));
 
@@ -44,7 +49,7 @@ function buildSeatSummary(perSeatP19, perSeatP20, seatPriorityMap) {
     const seatData = {
       seatId,
       isPrimary: priority === "primary",
-      p19Level: p19?.level ?? 0,
+      p19Level: hasPerSeatP19 ? (p19?.level ?? 0) : null,
       p19VariationDb: p19?.variationDbRaw ?? null,
       p19WorstFrequencyHz: p19?.worstFrequencyHz ?? null,
       p20Level: p20?.level ?? 0,
@@ -59,6 +64,16 @@ function buildSeatSummary(perSeatP19, perSeatP20, seatPriorityMap) {
 }
 
 /**
+ * A seat's P19 grading dimension. Per-seat P19 rows are obsolete evidence: when
+ * a result carries none, the seat is graded on its P20 consistency level rather
+ * than on an implied Level 0.
+ * @private
+ */
+function p19ForGrading(seat) {
+  return seat?.p19Level != null ? seat.p19Level : (seat?.p20Level ?? 0);
+}
+
+/**
  * Compute the worst Primary combined P19/P20 level.
  * For each Primary seat: combinedLevel = min(p19Level, p20Level).
  * Worst = min across all Primary seats.
@@ -66,7 +81,7 @@ function buildSeatSummary(perSeatP19, perSeatP20, seatPriorityMap) {
  */
 function worstPrimaryCombinedLevel(primarySeats) {
   if (!primarySeats.length) return 0;
-  return Math.min(...primarySeats.map((s) => Math.min(s.p19Level || 0, s.p20Level || 0)));
+  return Math.min(...primarySeats.map((s) => Math.min(p19ForGrading(s), s.p20Level || 0)));
 }
 
 /**
@@ -77,7 +92,7 @@ function worstPrimaryCombinedLevel(primarySeats) {
  */
 function worstSecondaryCombinedLevel(secondarySeats) {
   if (!secondarySeats.length) return 0;
-  return Math.min(...secondarySeats.map((s) => Math.min(s.p19Level || 0, s.p20Level || 0)));
+  return Math.min(...secondarySeats.map((s) => Math.min(p19ForGrading(s), s.p20Level || 0)));
 }
 
 /**
@@ -104,11 +119,11 @@ export function buildStage2RankingTuple(result, seatPriorityMap) {
   );
 
   // Primary metrics
-  const primaryP19BelowL2 = primarySeats.filter((s) => (s.p19Level || 0) < 2).length;
+  const primaryP19BelowL2 = primarySeats.filter((s) => p19ForGrading(s) < 2).length;
   const primaryP20BelowL2 = primarySeats.filter((s) => (s.p20Level || 0) < 2).length;
   const worstPrimaryCombined = worstPrimaryCombinedLevel(primarySeats);
-  const primaryL4Count = primarySeats.filter((s) => (s.p19Level || 0) >= 4 && (s.p20Level || 0) >= 4).length;
-  const primaryL3PlusCount = primarySeats.filter((s) => (s.p19Level || 0) >= 3 && (s.p20Level || 0) >= 3).length;
+  const primaryL4Count = primarySeats.filter((s) => p19ForGrading(s) >= 4 && (s.p20Level || 0) >= 4).length;
+  const primaryL3PlusCount = primarySeats.filter((s) => p19ForGrading(s) >= 3 && (s.p20Level || 0) >= 3).length;
   // Whole-dB (floored) deviations — raw fractional deviations remain as
   // diagnostics on the seat summary but are NOT ranking fields. This prevents
   // fractional raw differences from overriding whole-dB grading authority.
@@ -122,8 +137,8 @@ export function buildStage2RankingTuple(result, seatPriorityMap) {
 
   // Secondary metrics — full hierarchy matching primary
   const worstSecondaryCombined = worstSecondaryCombinedLevel(secondarySeats);
-  const secondaryL4Count = secondarySeats.filter((s) => (s.p19Level || 0) >= 4 && (s.p20Level || 0) >= 4).length;
-  const secondaryL3PlusCount = secondarySeats.filter((s) => (s.p19Level || 0) >= 3 && (s.p20Level || 0) >= 3).length;
+  const secondaryL4Count = secondarySeats.filter((s) => p19ForGrading(s) >= 4 && (s.p20Level || 0) >= 4).length;
+  const secondaryL3PlusCount = secondarySeats.filter((s) => p19ForGrading(s) >= 3 && (s.p20Level || 0) >= 3).length;
   const worstSecondaryP19Deviation = secondarySeats.length
     ? Math.floor(Math.max(...secondarySeats.map((s) => Math.abs(s.p19VariationDb ?? 0))))
     : 0;
@@ -131,9 +146,9 @@ export function buildStage2RankingTuple(result, seatPriorityMap) {
     ? Math.floor(Math.max(...secondarySeats.map((s) => Math.abs(s.p20VariationDb ?? 0))))
     : 0;
   const secondaryRowVariation = rowP19Variation(secondarySeats);
-  const secondaryP19Fail = secondarySeats.filter((s) => (s.p19Level || 0) === 0).length;
-  const secondaryL2Plus = secondarySeats.filter((s) => (s.p19Level || 0) >= 2 && (s.p20Level || 0) >= 2).length;
-  const secondaryL1Plus = secondarySeats.filter((s) => (s.p19Level || 0) >= 1 && (s.p20Level || 0) >= 1).length;
+  const secondaryP19Fail = secondarySeats.filter((s) => s.p19Level === 0).length;
+  const secondaryL2Plus = secondarySeats.filter((s) => p19ForGrading(s) >= 2 && (s.p20Level || 0) >= 2).length;
+  const secondaryL1Plus = secondarySeats.filter((s) => p19ForGrading(s) >= 1 && (s.p20Level || 0) >= 1).length;
 
   // Overall P19/P20 metrics (quaternary objective)
   const overallP19Variation = Number.isFinite(Number(result.achievedP19VariationDb))
@@ -278,15 +293,15 @@ export function meetsStopCondition(rankingData) {
   if (!primary || !secondary) return false;
 
   const allPrimaryL4 = primary.seats.length > 0
-    && primary.seats.every((s) => (s.p19Level || 0) >= 4 && (s.p20Level || 0) >= 4);
+    && primary.seats.every((s) => p19ForGrading(s) >= 4 && (s.p20Level || 0) >= 4);
   const allSecondaryL2 = secondary.seats.length === 0
-    || secondary.seats.every((s) => (s.p19Level || 0) >= 2 && (s.p20Level || 0) >= 2);
+    || secondary.seats.every((s) => p19ForGrading(s) >= 2 && (s.p20Level || 0) >= 2);
   if (allPrimaryL4 && allSecondaryL2) return true;
 
   const allPrimaryL3 = primary.seats.length > 0
-    && primary.seats.every((s) => (s.p19Level || 0) >= 3 && (s.p20Level || 0) >= 3);
+    && primary.seats.every((s) => p19ForGrading(s) >= 3 && (s.p20Level || 0) >= 3);
   const noSecondaryP19Fail = secondary.p19Fail === 0;
   const allSecondaryL2Alt = secondary.seats.length === 0
-    || secondary.seats.every((s) => (s.p19Level || 0) >= 2 && (s.p20Level || 0) >= 2);
+    || secondary.seats.every((s) => p19ForGrading(s) >= 2 && (s.p20Level || 0) >= 2);
   return allPrimaryL3 && noSecondaryP19Fail && allSecondaryL2Alt;
 }

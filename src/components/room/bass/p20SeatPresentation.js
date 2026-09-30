@@ -94,6 +94,31 @@ export function p20WorstSeat(rows = []) {
       || Math.abs(b.variationDbRaw) - Math.abs(a.variationDbRaw))[0] || null;
 }
 
+/**
+ * The OVERALL worst all-seat P20, always stated explicitly so a selected seat
+ * can never be mistaken for the project's worst seat.
+ * e.g. "Worst all-seat P20: R1S2 ±12.2 dB at 73 Hz"
+ */
+export function formatWorstAllSeatP20Line(rows = []) {
+  const worst = p20WorstSeat(rows);
+  if (!worst) return null;
+  const hz = worst.worstFrequencyHz != null ? ` at ${Math.round(Number(worst.worstFrequencyHz))} Hz` : "";
+  return `Worst all-seat P20: ${worst.seatId} ${worst.displayVariationDb}${hz}`;
+}
+
+/**
+ * The selected seat's own P20 result, labelled as a selection so it is never
+ * presented as the overall worst seat.
+ * e.g. "Selected seat: R2S4 ±10.2 dB at 45 Hz"
+ */
+export function formatSelectedSeatP20Line(rows = [], selectedSeatId = null) {
+  if (!selectedSeatId) return null;
+  const seat = rows.flatMap((row) => row.seats).find((entry) => entry.seatId === selectedSeatId);
+  if (!seat || seat.variationDbRaw == null) return null;
+  const hz = seat.worstFrequencyHz != null ? ` at ${Math.round(Number(seat.worstFrequencyHz))} Hz` : "";
+  return `Selected seat: ${seat.seatId} ${seat.displayVariationDb}${hz}`;
+}
+
 export function p20SummaryFromResults(perSeatP20Results = []) {
   const seats = (Array.isArray(perSeatP20Results) ? perSeatP20Results : []).filter(isRealP20Seat)
     .map((result, index) => ({ id: result.seatId, row: 1, column: index + 1 }));
