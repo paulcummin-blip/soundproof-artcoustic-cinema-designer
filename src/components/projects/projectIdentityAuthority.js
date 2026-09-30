@@ -5,6 +5,10 @@
  * surface that describes a project (Projects card, Active Project sidebar,
  * Room Designer header) reads its labels from here, so they can never disagree.
  *
+ * Product rule: those three surfaces surface the project, the client and the
+ * project reference only. Dealer identity belongs elsewhere (dealer branding,
+ * the Partner Portal) and is not shown in this block.
+ *
  * Authoritative sources (traced 2026-09-30, Marquee Home):
  *   project name       → Project.name
  *   client name        → Project.client_name
@@ -14,7 +18,8 @@
  *                        stamped, the owning Account's name is used only if that
  *                        account is a dealer identity account — Sound Proof's own
  *                        admin/internal accounts are platform identities and
- *                        must never be presented as a dealer.
+ *                        must never be presented as a dealer. Retained for the
+ *                        dealer surfaces; not displayed by ProjectIdentityLine.
  *   version name       → ProjectVersion.version_name (active version)
  *
  * Pure module: no React, no I/O, no storage.
@@ -55,12 +60,13 @@ export function resolveDealerIdentity({ dealerName = null, account = null } = {}
  * Resolve every identity label shown for a project.
  *
  * @returns {{
- *   client: string, reference: string, hasReference: boolean,
- *   dealer: string, dealerSource: string|null, dealerMissing: boolean,
- *   version: string|null
+ *   project: string|null, client: string, reference: string,
+ *   hasReference: boolean, dealer: string, dealerSource: string|null,
+ *   dealerMissing: boolean, version: string|null
  * }}
  */
 export function resolveIdentityFields({
+  projectName = null,
   client = null,
   reference = null,
   dealerName = null,
@@ -71,6 +77,7 @@ export function resolveIdentityFields({
   const dealer = resolveDealerIdentity({ dealerName, account });
 
   return {
+    project: clean(projectName) || null,
     client: clean(client) || IDENTITY_NOT_SPECIFIED,
     reference: referenceValue || IDENTITY_NOT_SPECIFIED,
     hasReference: Boolean(referenceValue),

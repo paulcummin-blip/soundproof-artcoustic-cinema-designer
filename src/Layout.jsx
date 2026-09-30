@@ -418,8 +418,6 @@ export default function Layout({ children, currentPageName }) {
                         style={{ marginTop: 6 }}
                         client={activeProjectSummary.client_name}
                         reference={activeProjectSummary.project_reference}
-                        dealerName={activeProjectSummary.dealer_name}
-                        account={activeProjectSummary.dealer_account}
                       />
                     </>
                   ) : (

@@ -247,8 +247,9 @@ export default function ProjectCardPrototype({
             {p.name || "Untitled Project"}
           </div>
 
-          {/* 2. Client · Reference · Dealer — one identity block, same source
-              and wording as the sidebar and the Room Designer header. */}
+          {/* 2. Client · Reference — one identity block, same source and wording
+              as the sidebar and the Room Designer header. The project name is
+              the heading above, so no Project row is repeated here. */}
           <ProjectIdentityLine
             orientation="stacked"
             fontSize={13}
@@ -256,8 +257,6 @@ export default function ProjectCardPrototype({
             style={{ marginTop: 5 }}
             client={p.client}
             reference={p.project_reference}
-            dealerName={p.dealer_name}
-            account={p.account}
           />
         </div>
 

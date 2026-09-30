@@ -5,22 +5,31 @@ import { resolveIdentityFields } from "@/components/projects/projectIdentityAuth
  * One project identity, shown the same way everywhere.
  *
  * Used by the Projects card, the Active Project sidebar and the Room Designer
- * header. All three pass the same authoritative fields, so the client, project
- * reference and dealer can never disagree between surfaces.
+ * header. All three pass the same authoritative fields, so the project, client
+ * and reference can never disagree between surfaces.
+ *
+ * Product rule: this block surfaces the project, the client and the project
+ * reference only. Dealer identity is not shown here.
  *
  * Props:
- *   client, reference, dealerName, account, versionName — source values
+ *   projectName, client, reference, versionName — source values
+ *   showProject — add the project name as a row. Off by default, because the
+ *                 Projects card and the sidebar already show the project name
+ *                 as the heading directly above this block.
  *   orientation — "inline" (one compact line) or "stacked" (one row per field)
  *   showVersion — include the version name as a row (off by default; the Room
  *                 Designer header already shows an editable version field)
  *   color, fontSize, style, className — presentation only
+ *
+ * A project with no reference omits the Reference row entirely — the same
+ * convention the report cover uses — rather than printing a dash.
  */
 export default function ProjectIdentityLine({
+  projectName = null,
   client = null,
   reference = null,
-  dealerName = null,
-  account = null,
   versionName = null,
+  showProject = false,
   orientation = "inline",
   showVersion = false,
   color = "#625143",
@@ -29,22 +38,25 @@ export default function ProjectIdentityLine({
   className = "",
 }) {
   const fields = resolveIdentityFields({
+    projectName,
     client,
     reference,
-    dealerName,
-    account,
     versionName,
   });
 
   const stacked = orientation === "stacked";
 
-  const rows = [
-    { key: "client", label: "Client", value: fields.client },
-    // The full word is used only where the row has room for it; the compact
-    // single-line form uses the abbreviated label.
-    { key: "reference", label: stacked ? "Reference" : "Ref", value: fields.reference },
-    { key: "dealer", label: "Dealer", value: fields.dealer },
-  ];
+  const rows = [];
+
+  if (showProject && fields.project) {
+    rows.push({ key: "project", label: "Project", value: fields.project });
+  }
+
+  rows.push({ key: "client", label: "Client", value: fields.client });
+
+  if (fields.hasReference) {
+    rows.push({ key: "reference", label: "Reference", value: fields.reference });
+  }
 
   if (showVersion && fields.version) {
     rows.push({ key: "version", label: "Version", value: fields.version });

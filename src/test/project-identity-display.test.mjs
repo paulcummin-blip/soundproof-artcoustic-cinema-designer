@@ -3,11 +3,14 @@
 // Regression tests for project identity display.
 //
 // Product rule: wherever a project's identity is shown (Projects card, Active
-// Project sidebar, Room Designer header) it shows the client, the project
-// reference and the dealer, from the authoritative fields only — the stamped
-// Project.dealer_name, falling back to the owning account when that account is
-// a dealer identity account. An admin/internal account is never presented as a
-// dealer: the name reads "Not assigned" instead.
+// Project sidebar, Room Designer header) it shows the project, the client and
+// the project reference — and nothing else. Dealer identity is deliberately not
+// surfaced in this block. A project with no reference omits the Reference row
+// rather than printing a dash.
+//
+// The dealer identity authority itself is unchanged and still resolves the
+// stamped Project.dealer_name against the owning account for the dealer
+// surfaces; it is simply not consumed by the identity block.
 //
 // Display only: no project data model, ownership, pricing or report changes.
 // ---------------------------------------------------------------------------
@@ -66,6 +69,16 @@ describe('PROJECT FIELDS TRACED', () => {
     expect(fields.reference).toBe(IDENTITY_NOT_SPECIFIED);
     expect(fields.hasReference).toBe(false);
   });
+
+  it('resolves the project name for surfaces without a heading', () => {
+    expect(resolveIdentityFields({ projectName: ' Marquee Home ' }).project).toBe('Marquee Home');
+    expect(resolveIdentityFields({}).project).toBeNull();
+  });
+
+  it('never prints a dash for a blank reference', () => {
+    const line = read('components/projects/ProjectIdentityLine.jsx');
+    expect(line).toMatch(/if \(fields\.hasReference\)/);
+  });
 });
 
 describe('DEALER FIELD TRACED', () => {
@@ -116,26 +129,41 @@ describe('DEALER FIELD TRACED', () => {
 
 describe('ACCEPTANCE PROJECT — MARQUEE HOME', () => {
   const fields = resolveIdentityFields({
+    projectName: MARQUEE_HOME_PROJECT.name,
     client: MARQUEE_HOME_PROJECT.client_name,
     reference: MARQUEE_HOME_PROJECT.project_reference,
-    dealerName: MARQUEE_HOME_PROJECT.dealer_name,
-    account: MARQUEE_HOME_ACCOUNT,
   });
 
-  it('shows client, reference and an honest dealer state', () => {
+  it('shows the project, its client and its reference', () => {
+    expect(fields.project).toBe('Marquee Home');
     expect(fields.client).toBe('34 AR');
     expect(fields.reference).toBe('34 AR');
-    expect(fields.dealer).toBe(DEALER_NOT_ASSIGNED);
+  });
+
+  it('adds no dealer field to the display contract', () => {
+    const line = read('components/projects/ProjectIdentityLine.jsx');
+    expect(line).not.toMatch(/label: "Dealer"/);
+    expect(line).not.toMatch(/dealerName|account=\{/);
   });
 });
 
 describe('PROJECT CARD SHOWS IDENTITY', () => {
-  it('renders client, reference and dealer on the card', () => {
+  it('shows the project name as the card heading', () => {
+    const card = read('components/projects/ProjectCardPrototype.jsx');
+    expect(card).toMatch(/\{p\.name \|\| "Untitled Project"\}/);
+  });
+
+  it('renders the client and reference identity block', () => {
     const card = read('components/projects/ProjectCardPrototype.jsx');
     expect(card).toMatch(/<ProjectIdentityLine/);
+    expect(card).toMatch(/client=\{p\.client\}/);
     expect(card).toMatch(/reference=\{p\.project_reference\}/);
-    expect(card).toMatch(/dealerName=\{p\.dealer_name\}/);
-    expect(card).toMatch(/account=\{p\.account\}/);
+  });
+
+  it('renders no dealer field on the card', () => {
+    const card = read('components/projects/ProjectCardPrototype.jsx');
+    expect(card).not.toMatch(/dealerName=\{p\.dealer_name\}/);
+    expect(card).not.toMatch(/account=\{p\.account\}/);
   });
 
   it('keeps the configuration, target SPL, age and status on the card', () => {
@@ -146,28 +174,38 @@ describe('PROJECT CARD SHOWS IDENTITY', () => {
     expect(card).toMatch(/handleStatusChange/);
   });
 
-  it('supplies the dealer fields to the card from the project list', () => {
+  it('supplies the identity fields to the card from the project list', () => {
     const page = read('pages/Projects.jsx');
-    expect(page).toMatch(/dealer_name: rawP\.dealer_name \|\| null/);
-    expect(page).toMatch(/account: accountById\[rawP\.account_id\] \|\| null/);
     expect(page).toMatch(/project_reference: p\.project_reference \|\| ""/);
+    expect(page).toMatch(/client: p\.client_name \|\| ""/);
   });
 });
 
 describe('ACTIVE SIDEBAR SHOWS IDENTITY', () => {
-  it('renders the identity block from the canonical hydration identity', () => {
+  it('shows the project name as the sidebar heading', () => {
+    const layout = read('Layout.jsx');
+    expect(layout).toMatch(/\{activeProjectSummary\.name \|\| "Loading project…"\}/);
+  });
+
+  it('renders the client and reference identity block from the canonical hydration identity', () => {
     const layout = read('Layout.jsx');
     expect(layout).toMatch(/<ProjectIdentityLine/);
     expect(layout).toMatch(/orientation="stacked"/);
-    expect(layout).toMatch(/project_reference: identity\?\.projectReference \|\| null/);
-    expect(layout).toMatch(/dealer_name: identity\?\.dealerName \|\| null/);
+    expect(layout).toMatch(/client=\{activeProjectSummary\.client_name\}/);
+    expect(layout).toMatch(/reference=\{activeProjectSummary\.project_reference\}/);
   });
 
-  it('publishes reference and dealer from the authoritative project record', () => {
+  it('renders no dealer field beside the active project', () => {
+    const layout = read('Layout.jsx');
+    expect(layout).not.toMatch(/dealerName=\{activeProjectSummary/);
+    expect(layout).not.toMatch(/account=\{activeProjectSummary\.dealer_account\}/);
+  });
+
+  it('publishes project, client and reference from the authoritative record', () => {
     const provider = read('components/state/ProjectHydrationProvider.jsx');
     expect(provider).toMatch(/projectReference: project\.project_reference \|\| null/);
-    expect(provider).toMatch(/dealerName: project\.dealer_name \|\| null/);
-    expect(provider).toMatch(/accountType: account\.account_type \|\| null/);
+    expect(provider).toMatch(/name: project\.name/);
+    expect(provider).toMatch(/clientName: project\.client_name/);
   });
 });
 
@@ -176,8 +214,20 @@ describe('ROOM DESIGNER HEADER SHOWS IDENTITY', () => {
     const header = read('components/roomdesigner/RoomDesignerHeader.jsx');
     expect(header).toMatch(/useCanonicalProject/);
     expect(header).toMatch(/<ProjectIdentityLine/);
+    expect(header).toMatch(/projectName=\{identity\.name\}/);
+    expect(header).toMatch(/client=\{identity\.clientName\}/);
     expect(header).toMatch(/reference=\{identity\.projectReference\}/);
-    expect(header).toMatch(/dealerName=\{identity\.dealerName\}/);
+  });
+
+  it('states the project on the header, which has no project heading', () => {
+    const header = read('components/roomdesigner/RoomDesignerHeader.jsx');
+    expect(header).toMatch(/showProject/);
+  });
+
+  it('renders no dealer field in the header', () => {
+    const header = read('components/roomdesigner/RoomDesignerHeader.jsx');
+    expect(header).not.toMatch(/dealerName=\{identity\.dealerName\}/);
+    expect(header).not.toMatch(/accountType/);
   });
 
   it('keeps the editable version field as the single version display', () => {
@@ -214,7 +264,7 @@ describe('NO LAYOUT OVERFLOW', () => {
     expect(line).toMatch(/flexDirection: "column"/);
   });
 
-  it('does not truncate the client, reference or dealer values', () => {
+  it('does not truncate the project, client or reference values', () => {
     const line = read('components/projects/ProjectIdentityLine.jsx');
     expect(line).not.toMatch(/textOverflow|ellipsis|truncate/);
   });

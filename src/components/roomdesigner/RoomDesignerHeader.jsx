@@ -210,13 +210,13 @@ export default function RoomDesignerHeader({
             <VersionNameField projectId={effectiveProjectId} />
           )}
           {identity && (
+            /* The header carries no project heading of its own, so the identity
+               block states the project, its client and its reference. */
             <ProjectIdentityLine
+              showProject
+              projectName={identity.name}
               client={identity.clientName}
               reference={identity.projectReference}
-              dealerName={identity.dealerName}
-              account={identity.accountType
-                ? { name: identity.accountName || null, account_type: identity.accountType }
-                : null}
               color="#3E4349"
               fontSize={12}
             />
