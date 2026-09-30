@@ -37,18 +37,18 @@ export const STAGE_LABELS = {
   sub_positions: 'Subwoofer positions',
   seating_positions: 'Seating positions',
   combining_best: 'Combining best options',
-  confirming_finalists: 'Confirming finalists',
+  confirming_finalists: 'Confirming best options',
   preparing: 'Preparing recommendations',
 };
 
 export const STAGE_SUPPORTING_TEXT = {
-  phase_polarity: 'Testing a unity-gain all-pass phase control in 5-degree steps at 80 Hz.',
-  delays: 'Testing grouped timing alignment between subwoofers.',
-  gain: 'Testing grouped level balance between subwoofers.',
+  phase_polarity: 'Testing phase alignment between subwoofers in 5-degree steps.',
+  delays: 'Testing timing alignment between subwoofers.',
+  gain: 'Testing level balance between subwoofers.',
   sub_positions: 'Testing practical placement changes.',
   seating_positions: 'Testing whether small seating changes could improve bass consistency.',
   combining_best: 'Retuning delay, polarity and gain on the best placement.',
-  confirming_finalists: 'Canonical confirmation of combined finalists.',
+  confirming_finalists: 'Confirming the best combined settings.',
   preparing: 'Preparing final recommendations.',
 };
 
@@ -295,8 +295,8 @@ export function buildStageDisplay(state) {
 export function formatStageVerdict(verdict) {
   if (verdict === 'improvement') return 'improvement found';
   if (verdict === 'no_improvement') return 'no improvement';
-  if (verdict === 'done') return 'done';
-  if (verdict === 'incomplete') return 'evaluation incomplete';
-  if (verdict === 'not_available') return 'not available yet';
+  if (verdict === 'done') return 'reviewed';
+  if (verdict === 'incomplete') return 'not yet settled';
+  if (verdict === 'not_available') return 'not applicable';
   return null;
 }

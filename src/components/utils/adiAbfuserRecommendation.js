@@ -143,7 +143,7 @@ export function calculateAbfuserRecommendation({
     return {
       ...shared,
       status: ABFUSER_STATUS.NOT_CALCULATED,
-      statusMessage: "Room geometry is not available yet.",
+      statusMessage: "Room geometry has not been entered yet, so ADI cannot place treatment.",
       band: null,
     };
   }

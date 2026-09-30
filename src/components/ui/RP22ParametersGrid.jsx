@@ -64,7 +64,7 @@ export default function RP22ParametersGrid({ rp22 }) {
     return (
       <div style={cardStyle}>
         <div style={{ color: "#625143", fontSize: 12, fontFamily: 'Didact Gothic, sans-serif' }}>
-          RP22 analysis not available yet.
+          RP22 analysis has not been run for this design.
         </div>
       </div>
     );

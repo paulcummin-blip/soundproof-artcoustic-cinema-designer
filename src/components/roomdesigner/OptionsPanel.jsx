@@ -58,8 +58,8 @@ export default function OptionsPanel({
   const [showDifficultyRating, setShowDifficultyRating] = React.useState(false);
   const [showInactiveItems, setShowInactiveItems] = React.useState(false);
 
-  // Engineering Mode is a global toggle — reveals advanced engineering
-  // workflows across the app (e.g. the full Improve Bass Response V2 panel).
+  // Expert View is a global toggle — reveals the technical evidence behind
+  // ADI's recommendations across the app. Off by default.
   const { engineeringMode, setEngineeringMode } = useEngineeringMode();
 
   // Source authority from app state — distinguishes recommendation-applied
@@ -435,33 +435,19 @@ export default function OptionsPanel({
         </SectionCard>
       )}
 
-      {/* PROPOSAL & PRICE LIST — future integration placeholder (disabled) */}
-      <div className="rounded-lg border border-dashed border-[#DCDBD6] bg-[#F8F8F7] px-4 py-3">
-        <div className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#625143]">Proposal &amp; Price List</div>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <div className="text-xs text-[#8B7F76]">Send this Sound Proof system to the dealer proposal tool.</div>
-          <button
-            type="button"
-            disabled
-            className="text-xs px-3 py-1.5 rounded border border-[#DCDBD6] bg-white text-[#8B7F76] cursor-not-allowed opacity-70"
-          >
-            Send to Proposal
-          </button>
-        </div>
-      </div>
-
-      {/* DEVELOPER SETTINGS — Engineering Mode reveals advanced workflows */}
-      <SectionCard title="Developer Settings">
+      {/* EXPERT VIEW — off by default. Reveals the technical evidence behind
+          ADI's recommendations; never the default dealer workflow. */}
+      <SectionCard title="Expert View">
         <div className="divide-y divide-[#EEEDEA]">
           <ToggleRow
-            id="engineering-mode"
-            label="Engineering Mode"
+            id="expert-view"
+            label="Technical Evidence"
             checked={engineeringMode}
             onChange={setEngineeringMode}
           />
         </div>
         <div className="mt-2 text-xs text-[#8B7F76]">
-          Reveals advanced engineering workflows (e.g. full Improve Bass Response diagnostics) across the app.
+          Show technical evidence behind ADI recommendations. View the calculations, tested options and constraints used by ADI.
         </div>
       </SectionCard>
     </div>

@@ -160,7 +160,7 @@ function StageRow({ stage }) {
       <div className="flex items-start gap-2">
         <Lock className="h-3.5 w-3.5 text-[#8A7B6A] mt-0.5 flex-shrink-0" />
         <div className="min-w-0">
-          <div className="text-[11px] text-[#8A7B6A]">{label} — Not available yet</div>
+          <div className="text-[11px] text-[#8A7B6A]">{label} — Not applicable</div>
           {supportingText && (
             <div className="text-[10px] text-[#B0A89B] mt-0.5">{supportingText}</div>
           )}
@@ -187,7 +187,7 @@ function StageRow({ stage }) {
         <CheckCircle2 className="h-3.5 w-3.5 text-[#213428] mt-0.5 flex-shrink-0" />
         <div className="min-w-0">
           <div className="text-[11px] text-[#213428] font-medium">
-            {label.replace('Checking ', '')} checked
+            {label.replace('Checking ', '')} reviewed
             {verdictText && (
               <span className="font-normal text-[#8A7B6A]"> — {verdictText}</span>
             )}

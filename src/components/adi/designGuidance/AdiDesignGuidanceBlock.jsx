@@ -41,13 +41,15 @@ const SEVERITY_STYLE = {
   NONE: { background: "#F0EFEA", color: COLORS.secondary, border: COLORS.border },
 };
 
+// The ADI decision sequence, in order. Every label names the decision the
+// dealer is making — never an implementation step.
 const GUIDANCE_LABELS = [
-  ["whatIsWrong", "What is wrong:"],
-  ["whyItIsHappening", "Why it is happening:"],
-  ["changeFirst", "Change first:"],
-  ["expectedImprovement", "Expected improvement:"],
-  ["remainingLimitation", "Remaining limitation:"],
-  ["lowerValueChanges", "Lower-value changes:"],
+  ["whatIsWrong", "Current limiting factor"],
+  ["whyItIsHappening", "Why it matters"],
+  ["changeFirst", "Best first change"],
+  ["expectedImprovement", "Expected improvement"],
+  ["remainingLimitation", "What remains limited"],
+  ["lowerValueChanges", "Why other changes are lower value"],
 ];
 
 function AdiMark() {
@@ -186,6 +188,18 @@ export default function AdiDesignGuidanceBlock({
         </div>
         {guidance.evidenceLines.length > 0 && (
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+            <div
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: COLORS.label,
+                marginBottom: 2,
+              }}
+            >
+              Evidence
+            </div>
             {guidance.evidenceLines.map((line, index) => (
               <div
                 key={index}

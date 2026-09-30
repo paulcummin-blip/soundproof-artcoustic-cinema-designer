@@ -74,7 +74,7 @@ function StageVerdictBadge({ verdict }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-md bg-[#F5F4F1] border border-[#D9D5CE] px-2 py-0.5">
         <Lock className="h-3 w-3 text-[#8A7B6A]" />
-        <span className="text-[10px] font-medium text-[#625143]">Not available yet</span>
+        <span className="text-[10px] font-medium text-[#625143]">Not applicable</span>
       </span>
     );
   }
@@ -274,6 +274,16 @@ export default function ImproveBassV2StageRow({
 }) {
   const { verdict, result, reason } = stage;
 
+  // Interventions are ranked the way a dealer chooses between them: the
+  // combined result is the best first move, a tested improvement is worth
+  // testing, a tested non-improvement is lower priority, and anything not
+  // evaluated is not recommended yet.
+  const rankLabel = verdict === "improvement"
+    ? "Worth testing"
+    : verdict === "no_improvement"
+      ? "Lower priority"
+      : "Not recommended yet";
+
   return (
     <div
       data-stage-key={stageKey}
@@ -290,8 +300,10 @@ export default function ImproveBassV2StageRow({
       <div className="flex items-center justify-between gap-2">
         <div className="flex flex-col">
           <span className="text-[11px] font-bold text-[#1B1A1A] tracking-wide">{label}</span>
-          {stageKey !== "combined" && (
-            <span className="text-[9px] font-medium text-[#8A7B6A]">Individual option</span>
+          {stageKey !== "combined" ? (
+            <span className="text-[9px] font-medium text-[#8A7B6A]">{rankLabel}</span>
+          ) : (
+            <span className="text-[9px] font-semibold text-[#213428]">Best first move</span>
           )}
         </div>
         <div className="flex items-center gap-1.5">
