@@ -204,7 +204,7 @@ function LayoutCard({ quantity, layout, roomDims, isSelected, onSelect, isApplie
     <button
       type="button"
       onClick={() => onSelect(quantity)}
-      className={`text-left rounded-lg border p-4 transition-all ${
+      className={`w-full min-w-0 text-left rounded-lg border p-4 transition-all ${
         isSelected || isApplied
           ? "border-2 border-[#213428] bg-[#F3F1EC]"
           : "border border-[#D9D5CE] bg-white hover:border-[#BFB9AE]"
@@ -328,9 +328,12 @@ export default function StartingLayoutCards({
       </div>
 
       {/* Two-column: room plan (40%) + gutter (20%) + decision cards (40%) */}
-      <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-start">
-        {/* Left: Room & Seating — 40% width */}
-        <div className="space-y-2 md:w-[40%] md:max-w-[420px]">
+      {/* Container-driven two-column: each panel asks for 320px of real space,
+          so the cards stack whenever the hosting panel is actually narrow — a
+          viewport media query cannot know how wide this panel is. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        {/* Left: Room & Seating — 40% width when the panel has room for it */}
+        <div className="min-w-0 flex-1 basis-[320px] max-w-[420px] space-y-2">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Room and Seating</div>
             <div className="text-[11px] text-[#8A7B6A]">
@@ -358,8 +361,8 @@ export default function StartingLayoutCards({
           />
         </div>
 
-        {/* Right: Decision cards — 40% width */}
-        <div className="space-y-2 md:w-[40%] md:max-w-[420px]">
+        {/* Right: Decision cards — 40% width when the panel has room for it */}
+        <div className="min-w-0 flex-1 basis-[320px] max-w-[420px] space-y-2">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Starting Layouts</div>
             <div className="text-[11px] text-[#8A7B6A]">Choose a physical arrangement</div>
