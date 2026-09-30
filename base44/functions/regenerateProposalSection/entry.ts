@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
+import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 
 const SECTION_TITLES: Record<string, string> = {
   executive_summary: 'Executive Summary',
@@ -98,6 +99,22 @@ export default async function(req) {
     // regenerated section can never drift away from the calculated results.
     const evidence = buildEngineeringEvidence(proposal.engineering_snapshot);
 
+    // ── Stage 1: the ADI project interpretation ──
+    // Reuse the interpretation saved with the report, so a refined section
+    // still tells the same design story as the rest of the report. Only when a
+    // report predates the two-stage process is it derived now, from the same
+    // frozen snapshot.
+    const savedInterpretation = proposal.metadata?.project_interpretation || null;
+    const interpretation = savedInterpretation
+      || buildProjectInterpretation({
+        snapshot: proposal.engineering_snapshot,
+        reportType: proposal.proposal_type,
+        clientBrief: effectiveBrief,
+        reportLabel: proposal.title || null,
+      });
+    const interpretationBlock = formatInterpretationForPrompt(interpretation);
+    console.log(`[regenerateProposalSection] ADI stage 1 interpretation | ${formatInterpretationForLog(interpretation)}`);
+
     // ── Build the regeneration prompt ──
     const sectionTitle = SECTION_TITLES[section.section_type] || section.title || 'Section';
     const currentBody = stripHtml(section.body || '');
@@ -110,6 +127,9 @@ export default async function(req) {
       : '';
 
     const prompt = [
+      // Stage 1 leads: the design story, then the authoritative data.
+      interpretationBlock,
+      '',
       `You are refining the "${sectionTitle}" section of a professional home cinema design proposal.`,
       '',
       '=== AUTHORITATIVE PROJECT DATA (never alter these results) ===',

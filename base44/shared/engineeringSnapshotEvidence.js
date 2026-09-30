@@ -21,18 +21,32 @@
  * Reads the snapshot passively. Never calculates, grades, regroups or
  * re-interprets an engineering result.
  *
+ * Evidence rules (see adiReportEvidenceRules.js):
+ *   - Results are grouped under the three design structures the report is
+ *     written around: Spatial Resolution, Dynamic Range, Timbre Matching.
+ *   - Parameters excluded from client-facing reports (P8, P15, P20, P21) are
+ *     never offered to the writer, and neither is any result that is not
+ *     reliable: unreliable results are listed as not used instead.
+ *   - The Design Index stays internal and is never supplied as a value.
+ *
  * Pure: no React, no side effects, no runtime-specific APIs.
  */
+
+import {
+  REPORT_STRUCTURES,
+  HIGHLIGHT_ROW_LIMIT,
+  EXCLUDED_PARAMETERS,
+  orderHighlightRows,
+  plainLanguageName,
+  resolveBassEvidence,
+  splitParameterEvidence,
+} from './adiReportEvidenceRules.js';
 
 function compose(...parts) {
   const clean = parts
     .map((part) => (part == null ? '' : String(part).trim()))
     .filter(Boolean);
   return clean.length === 0 ? null : clean.join(' · ');
-}
-
-function isAssessed(level) {
-  return level && level !== 'N/A' && level !== 'NONE';
 }
 
 /**
@@ -43,33 +57,6 @@ function statement(value) {
   if (value == null) return null;
   if (typeof value === 'object') return value.statement ?? null;
   return value;
-}
-
-function paramValue(parameter) {
-  if (!parameter) return null;
-  const value = parameter.formatted_value ?? parameter.raw_value;
-  return value == null ? null : value;
-}
-
-function parameterRows(snapshot) {
-  const list = snapshot?.rp22?.parameter_headlines;
-  return Array.isArray(list) ? list.filter((row) => row && row.parameter_id != null) : [];
-}
-
-function findParameter(snapshot, parameterId) {
-  return parameterRows(snapshot).find((row) => Number(row.parameter_id) === Number(parameterId)) || null;
-}
-
-function levelAndValue(level, value) {
-  return compose(isAssessed(level) ? level : null, isAssessed(level) ? value : value);
-}
-
-function spreadText(perSeat) {
-  if (!Array.isArray(perSeat) || perSeat.length < 2) return null;
-  const values = perSeat.map((seat) => Number(seat?.raw_value)).filter(Number.isFinite);
-  if (values.length < 2) return null;
-  const spread = Math.max(...values) - Math.min(...values);
-  return `${spread.toFixed(1)} dB spread across ${values.length} assessed seats`;
 }
 
 /**
@@ -109,45 +96,76 @@ export function buildEngineeringEvidence(snapshot) {
   if (system.amplification?.specified) lines.push(`Amplification: ${system.amplification.text}`);
   if (snapshot.product_coherence?.text) lines.push(`Speaker families: ${snapshot.product_coherence.text}`);
 
-  // ── RP22 parameter results ──
-  const parameters = parameterRows(snapshot)
-    .map((row) => {
-      const result = compose(isAssessed(row.achieved_level) ? row.achieved_level : null, paramValue(row));
-      return result ? `  P${row.parameter_id} ${row.title || ''}: ${result}`.trim() : null;
-    })
-    .filter(Boolean);
-  if (parameters.length > 0) {
-    lines.push('', 'RP22 parameter results (achieved level · measured result):', ...parameters);
+  // ── The three design structures the report is written around ──
+  const primaryCategories = snapshot.rp22?.categories?.primary?.available
+    ? snapshot.rp22.categories.primary.categories
+    : snapshot.rp22?.categories?.all_seat?.categories;
+  const structureFloors = (Array.isArray(primaryCategories) ? primaryCategories : [])
+    .filter((category) => category?.label && category?.floor)
+    .map((category) => `${category.label}: ${category.floor}`);
+  if (structureFloors.length > 0) {
+    lines.push('', `Design structures (write around these, not around the parameters): ${structureFloors.join(' | ')}`);
+  }
+
+  // ── RP22 results, grouped under those structures ──
+  // Reliable bass results sit inside the structure they support: P14 under
+  // Dynamic Range, P18 and P19 under Timbre Matching.
+  const parameterEvidence = splitParameterEvidence(snapshot);
+  const bassEvidence = resolveBassEvidence(snapshot);
+  const bassByStructure = {
+    'Dynamic Range': [bassEvidence.p14].filter(Boolean),
+    'Timbre Matching': [bassEvidence.p18, bassEvidence.p19].filter(Boolean),
+  };
+  const structureLines = [];
+  for (const structure of REPORT_STRUCTURES) {
+    const rows = [
+      ...(parameterEvidence.byStructure[structure] || []),
+      ...(bassByStructure[structure] || []),
+    ];
+    if (rows.length === 0) continue;
+    structureLines.push(`  ${structure}:`);
+    for (const row of rows) {
+      structureLines.push(`    ${row.label} (P${row.parameter_id}): ${row.text}`);
+    }
+  }
+  if (structureLines.length > 0) {
+    lines.push('', 'RP22 evidence inside those structures (achieved level · measured result):', ...structureLines);
+  } else {
+    lines.push('', 'RP22 evidence: no result was assessed reliably for this design.');
+  }
+
+  // Every result the report must not use, so the writer cannot reach for it:
+  // the rule list is stated whether or not the result is present in the data.
+  const notUsed = [];
+  const addNotUsed = (entry) => {
+    if (!entry) return;
+    if (notUsed.some((existing) => existing.parameter_id === entry.parameter_id)) return;
+    notUsed.push(entry);
+  };
+  for (const entry of parameterEvidence.omitted) addNotUsed(entry);
+  for (const entry of bassEvidence.omitted) addNotUsed(entry);
+  for (const [id, reason] of Object.entries(EXCLUDED_PARAMETERS)) {
+    const parameterId = Number(id);
+    addNotUsed({ parameter_id: parameterId, label: plainLanguageName(parameterId), reason });
+  }
+  if (notUsed.length > 0) {
+    lines.push(
+      '',
+      'Not used in this report (never reference these):',
+      ...notUsed.map((entry) => `  ${entry.label}${entry.parameter_id ? ` (P${entry.parameter_id})` : ''} - ${entry.reason}`),
+    );
   }
 
   // ── Design Index deliberately excluded ──
   // The Design Index is an internal Sound Proof score. It is not a percentage
   // and it is never supplied to a client-facing report writer.
 
-  // ── Bass detail ──
-  const bass = snapshot.bass || {};
-  const bassLines = [];
-  const bassRow = (label, entry) => {
-    const result = compose(isAssessed(entry?.achieved_level) ? entry.achieved_level : null, entry?.formatted_value ?? entry?.raw_value);
-    if (result) bassLines.push(`  ${label}: ${result}`);
-  };
-  bassRow('P14 LFE and subwoofer output', bass.p14);
-  bassRow('P18 bass extension', bass.p18);
-  if (bass.p19?.rsp) {
-    const result = compose(
-      isAssessed(bass.p19.rsp.level) ? bass.p19.rsp.level : null,
-      bass.p19.rsp.display_value ?? bass.p19.rsp.raw_value,
-    );
-    if (result) bassLines.push(`  P19 bass response at the reference seat: ${result}`);
+  // ── Bass availability ──
+  // When nothing reliable exists the writer is told so, rather than being left
+  // to fill the gap with a claim.
+  if (bassEvidence.usable.length === 0) {
+    lines.push('', 'Bass results: no reliable bass result for this design. Do not describe bass performance, bass extension, bass consistency or subwoofer output.');
   }
-  if (bass.p20) {
-    const result = compose(
-      isAssessed(bass.p20.project_floor) ? bass.p20.project_floor : null,
-      spreadText(bass.p20.per_seat),
-    );
-    if (result) bassLines.push(`  P20 bass consistency seat to seat: ${result}`);
-  }
-  if (bassLines.length > 0) lines.push('', 'Bass results:', ...bassLines);
 
   // ── Viewing / RP23 ──
   const viewing = snapshot.viewing || {};
@@ -155,13 +173,18 @@ export function buildEngineeringEvidence(snapshot) {
     lines.push('', `RP23 viewing: ${compose(viewing.summary, viewing.primary_floor ? `primary floor ${viewing.primary_floor}` : null) || viewing.summary}`);
   }
 
-  // ── Assumed parameters and assessment basis ──
+  // ── Assumed parameters ──
+  // A client-facing report never references an assumed parameter. The facts are
+  // recorded here only so the writer knows they must not be used, and they also
+  // appear in the "not used" list above.
   const assumed = snapshot.rp22?.assumed || {};
-  const assumedLines = [
-    assumed.p15_noise_floor ? `P15 noise floor: ${compose(assumed.p15_noise_floor.level, assumed.p15_noise_floor.formatted ?? assumed.p15_noise_floor.value)}` : null,
-    assumed.p21_early_reflections ? `P21 early reflections: ${compose(assumed.p21_early_reflections.level, assumed.p21_early_reflections.formatted ?? assumed.p21_early_reflections.value)}` : null,
+  const assumedNames = [
+    assumed.p15_noise_floor ? 'background noise floor (P15)' : null,
+    assumed.p21_early_reflections ? 'early reflections (P21)' : null,
   ].filter(Boolean);
-  if (assumedLines.length > 0) lines.push('', 'Assumed parameters:', ...assumedLines);
+  if (assumedNames.length > 0) {
+    lines.push(`Assumed parameters, never referenced in this report: ${assumedNames.join(', ')}.`);
+  }
 
   const basis = snapshot.rp22?.assessment_basis;
   if (basis) lines.push(`Assessment basis: P12 ${basis.p12_mode}, P13 ${basis.p13_mode}`);
@@ -170,13 +193,16 @@ export function buildEngineeringEvidence(snapshot) {
   // The ranked lists carry parameter ids; the achieved level is read from the
   // parameter headlines so the prompt never states a level we cannot resolve.
   const levelById = new Map(
-    parameterRows(snapshot).map((row) => [Number(row.parameter_id), row.achieved_level]),
+    parameterEvidence.used.map((row) => [row.parameter_id, { level: row.level, label: row.label }]),
   );
   const describe = (entry) => {
     const id = Number(entry?.parameter_id);
     if (!id) return null;
-    const level = levelById.get(id) || entry?.achieved_level || null;
-    return level ? `P${id} (${level})` : null;
+    const known = levelById.get(id);
+    // An excluded or unreliable result is never described to the client,
+    // whatever the ranking in the snapshot says.
+    if (!known) return null;
+    return `${known.label} (P${id}, ${known.level || entry?.achieved_level || 'assessed'})`;
   };
   const strengths = (snapshot.rp22?.strengths || []).map(describe).filter(Boolean);
   const weaknesses = (snapshot.rp22?.weaknesses || []).map(describe).filter(Boolean);
@@ -200,21 +226,28 @@ export function buildEngineeringEvidence(snapshot) {
 export function selectHighlightRows(snapshot) {
   if (!snapshot || snapshot.available !== true) return [];
 
-  const rows = [];
+  const byId = new Map();
+  const { byStructure } = splitParameterEvidence(snapshot);
+  for (const rows of Object.values(byStructure)) {
+    for (const row of rows) byId.set(row.parameter_id, row);
+  }
+  for (const entry of resolveBassEvidence(snapshot).usable) byId.set(entry.parameter_id, entry);
+
+  const candidates = [];
   const push = (key, area, result) => {
     const text = compose(result);
-    if (text) rows.push({ key, area, result: text });
+    if (text) candidates.push({ key, area, result: text });
   };
-  const pushParameter = (parameterId, area) => {
-    const parameter = findParameter(snapshot, parameterId);
-    if (!parameter) return;
-    push(`p${parameterId}`, area, levelAndValue(parameter.achieved_level, paramValue(parameter)));
+  const pushParameter = (parameterId) => {
+    const entry = byId.get(Number(parameterId));
+    if (!entry) return;
+    push(`p${parameterId}`, entry.label, entry.text);
   };
 
-  // Screen and viewing
+  // Screen, viewing and layout describe the room the client is buying.
   const screen = snapshot.room?.screen;
   if (screen) {
-    push('screen_size', 'Screen size', screen.manual_dimensions
+    push('screen_size', 'Screen', screen.manual_dimensions
       ? compose(screen.manual_width_m ? `${screen.manual_width_m}m` : null, screen.manual_height_m ? `${screen.manual_height_m}m` : null, 'manual')
       : (screen.size_inches ? `${screen.size_inches}" ${screen.aspect_ratio || ''}` : null));
   }
@@ -222,50 +255,22 @@ export function selectHighlightRows(snapshot) {
   if (viewing?.available && viewing.summary && !/not calculated/i.test(viewing.summary)) {
     push('rp23_viewing', 'RP23 viewing', viewing.summary);
   }
-
-  // Layout
   if (snapshot.system?.configuration?.text) {
     push('system_layout', 'System layout', snapshot.system.configuration.text);
   }
 
-  // Spatial Resolution
-  pushParameter(2, 'Main channels / P2 discrete channel count');
-  pushParameter(4, 'Screen consistency / P4');
-  pushParameter(5, 'Surround spacing / P5');
-  pushParameter(6, 'Surround level consistency / P6');
-  pushParameter(7, 'Front wide position / P7');
-  pushParameter(9, 'Overhead spacing / P9');
-  pushParameter(10, 'Overhead level consistency / P10');
+  // Evidence inside the three structures, in client usefulness order. Excluded
+  // parameters (P8, P15, P20, P21) and unreliable results are absent from byId,
+  // so they can never reach the table.
+  const EVIDENCE_ORDER = [2, 4, 5, 7, 9, 12, 13, 14, 16, 17, 18, 19, 6, 10];
+  for (const parameterId of EVIDENCE_ORDER) pushParameter(parameterId);
 
-  // Dynamic Range
-  pushParameter(12, 'Screen Dynamic Range / P12');
-  pushParameter(13, 'Non-screen Dynamic Range / P13');
-  const bass = snapshot.bass || {};
-  const pushBass = (key, area, entry) => {
-    if (!entry) return;
-    push(key, area, levelAndValue(entry.achieved_level, entry.formatted_value ?? entry.raw_value));
-  };
-  pushBass('p14', 'LFE and subwoofer Dynamic Range / P14', bass.p14);
-
-  // Timbre Matching and bass
-  pushParameter(16, 'Screen timbre / P16');
-  pushParameter(17, 'Surround and overhead timbre / P17');
-  pushBass('p18', 'Bass extension / P18', bass.p18);
-  if (bass.p19?.rsp) {
-    push('p19', 'Bass response / P19', levelAndValue(bass.p19.rsp.level, bass.p19.rsp.display_value ?? bass.p19.rsp.raw_value));
-  }
-  if (bass.p20) {
-    push('p20', 'Bass consistency seat to seat / P20', compose(
-      isAssessed(bass.p20.project_floor) ? bass.p20.project_floor : null,
-      spreadText(bass.p20.per_seat),
-    ));
-  }
-
-  // The Design Index is deliberately not a client-facing highlight row. Reports
-  // generated before that change may still carry rows keyed dpi_primary,
-  // dpi_secondary and dpi_all_seat; the client table filters them at render time.
-
-  return rows;
+  // Only the most useful results are carried, and the Result column is read
+  // from calculated data. The Design Index is deliberately not a client-facing
+  // row: reports generated before that decision may still carry rows keyed
+  // dpi_primary, dpi_secondary and dpi_all_seat, which the table filters at
+  // render time.
+  return orderHighlightRows(candidates).slice(0, HIGHLIGHT_ROW_LIMIT);
 }
 
 /** JSON schema for the highlights prose response. */
@@ -316,7 +321,8 @@ export function buildHighlightsPrompt(evidence, rows) {
     'RULES:',
     '- Never change, reorder, add or remove a row. The Result values are calculated by Sound Proof and are already final.',
     '- Never invent a value. If a row needs numbers, use only the numbers shown in that row.',
-    '- Reference only the RP22 parameters present in the Sound Proof calculated data.',
+    '- Reference only the results shown in the table above. Do not mention a parameter, a level or a measurement that is not in it.',
+    '- Say what the result means for the client, not what the parameter is called. The Result column already states the number.',
   ].join('\n');
 }
 

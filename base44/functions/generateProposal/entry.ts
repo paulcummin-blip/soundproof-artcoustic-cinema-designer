@@ -2,6 +2,14 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
 import { SYSTEM_SUMMARY_SECTIONS, HIGHLIGHTS_SECTION_TYPE, getSystemSummarySectionPrompt } from '../../shared/systemDesignSummarySections.js';
 import { buildEngineeringEvidence, selectHighlightRows, mergeHighlightRows, buildHighlightsPrompt, HIGHLIGHTS_JSON_SCHEMA } from '../../shared/engineeringSnapshotEvidence.js';
+import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
+import { compareInterpretations, formatComparisonInterpretationForPrompt } from '../../shared/adiReportComparison.js';
+
+const COMPARISON_STRUCTURE_INSTRUCTION = [
+  'This is a comparison report. Use the same voice as a single system report.',
+  'First explain what stays the same between the versions, then what changes, then what the client gains from the change.',
+  'Do not turn the comparison into an equipment table. Where one version is clearly stronger, explain why, without attacking the alternative.',
+].join('\n');
 
 const SECTIONS = [
   { type: 'cover', key: 'cover', title: 'Cover', canEditBody: false },
@@ -59,7 +67,7 @@ export default async function(req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { request_id, project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, engineering_snapshot } = body;
+    const { request_id, project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, engineering_snapshot, engineering_snapshots } = body;
 
     if (!request_id) return Response.json({ error: 'request_id required' }, { status: 400 });
     if (!project_id) return Response.json({ error: 'project_id required' }, { status: 400 });
@@ -135,6 +143,52 @@ export default async function(req) {
     // For backward compatibility, version_id = first selected version.
     const legacyVersionId = resolvedVersionIds[0] || null;
 
+    // ── STAGE 1: ADI project interpretation ──
+    // Before any client-facing text is written, ADI reads the selected version
+    // data and states the design story: what this room is, what the design is
+    // trying to achieve, where it is strongest, what limits it, and which
+    // results are reliable enough to be used as evidence.
+    //
+    // STAGE 2 (the section writer below) then uses the results only as evidence
+    // inside that story. Engineering data -> design interpretation -> narrative.
+    //
+    // The interpretation is saved with the report and logged, so the story a
+    // report was written from can be audited later.
+    const suppliedSnapshots = Array.isArray(engineering_snapshots) && engineering_snapshots.length > 0
+      ? engineering_snapshots
+      : [{ version_id: legacyVersionId, snapshot: engineering_snapshot || null }];
+    const versionLabelById = new Map(
+      resolvedVersionIds.map((id, index) => {
+        const record = (projectVersions || []).find((version) => version.id === id);
+        return [id, `Version ${record?.version_number ?? index + 1} - ${record?.version_name || 'Untitled'}`];
+      }),
+    );
+    const interpretations = suppliedSnapshots.map((entry) => {
+      const versionId = entry?.version_id || entry?.versionId || null;
+      return {
+        label: entry?.label || versionLabelById.get(versionId) || null,
+        interpretation: buildProjectInterpretation({
+          snapshot: entry?.snapshot || null,
+          project,
+          clientBrief: client_brief,
+          reportType: resolvedType,
+          versions: resolvedVersionIds.map((id) => ({ id, label: versionLabelById.get(id) || null })),
+          reportLabel: versionLabelById.get(versionId) || null,
+        }),
+      };
+    });
+    const primaryInterpretation = interpretations[0]?.interpretation || null;
+    const comparisonReading = resolvedType === 'comparison' ? compareInterpretations(interpretations) : null;
+    const comparisonBlock = comparisonReading
+      && (comparisonReading.shared.length > 0 || comparisonReading.changes.length > 0)
+      ? formatComparisonInterpretationForPrompt(comparisonReading)
+      : '';
+    const interpretationBlock = [
+      formatInterpretationForPrompt(primaryInterpretation),
+      comparisonBlock,
+    ].filter(Boolean).join('\n\n');
+    console.log(`[generateProposal] ADI stage 1 interpretation | ${formatInterpretationForLog(primaryInterpretation)}`);
+
     // ── Create Proposal record ──
     proposal = await base44.entities.Proposal.create({
       project_id,
@@ -147,11 +201,16 @@ export default async function(req) {
       status: 'generating',
       narrative_goal: narrative_goal || 'luxury_cinema',
       client_brief: client_brief || '',
-      // Stage 2A: store the frozen Engineering Snapshot assembled by the frontend.
-      // The snapshot is frozen at generation time — later Room Designer edits do
-      // NOT silently change an existing proposal. The AI does NOT consume this
-      // snapshot yet (Stage 2A proves the snapshot itself first).
+      // The frozen Engineering Snapshot assembled by the frontend. The snapshot
+      // is frozen at generation time, so later Room Designer edits do NOT
+      // silently change an existing proposal.
       engineering_snapshot: engineering_snapshot || null,
+      // The Stage 1 ADI project interpretation is saved with the report, so the
+      // design story a report was written from can be audited later.
+      metadata: {
+        project_interpretation: primaryInterpretation,
+        ...(comparisonReading ? { comparison_reading: comparisonReading } : {}),
+      },
     });
 
     // ── Create 10 ProposalSection records ──
@@ -207,12 +266,16 @@ export default async function(req) {
         const sectionDef = sectionDefs.find((s) => s.type === section.section_type);
         if (isHighlightsSection(section)) {
           return base44.integrations.Core.InvokeLLM({
-            prompt: `${buildHighlightsPrompt(projectContext, highlightRows)}\n\n${buildWritingStyleContract()}`,
+            prompt: [
+              interpretationBlock,
+              buildHighlightsPrompt(projectContext, highlightRows),
+              buildWritingStyleContract(),
+            ].filter(Boolean).join('\n\n'),
             response_json_schema: HIGHLIGHTS_JSON_SCHEMA,
           });
         }
         return base44.integrations.Core.InvokeLLM({
-          prompt: buildSectionPrompt(sectionDef, projectContext, resolvedType),
+          prompt: buildSectionPrompt(sectionDef, projectContext, resolvedType, interpretationBlock),
         });
       })
     );
@@ -358,12 +421,17 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
   ].filter(Boolean).join('\n');
 }
 
-function buildSectionPrompt(sectionDef, projectContext, proposalType) {
+function buildSectionPrompt(sectionDef, projectContext, proposalType, interpretationBlock = '') {
   const sectionInstruction = proposalType !== 'single'
     ? getSystemSummarySectionPrompt(sectionDef.type, sectionDef.title)
     : SECTION_PROMPTS[sectionDef.type] || `Write the ${sectionDef.title} section. 2-3 paragraphs.`;
 
   return [
+    // Stage 1 leads: the design story first, then the engineering evidence that
+    // supports it, then this section's instruction, with the style contract
+    // last so it is the final thing the model reads.
+    interpretationBlock,
+    '',
     projectContext,
     '',
     '---',
@@ -371,6 +439,7 @@ function buildSectionPrompt(sectionDef, projectContext, proposalType) {
     `You are writing the "${sectionDef.title}" section of a professional home cinema design proposal.`,
     '',
     sectionInstruction,
+    proposalType === 'comparison' ? COMPARISON_STRUCTURE_INSTRUCTION : '',
     '',
     'Format the response as HTML. Use <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em> tags.',
     'Do NOT include the section title — only the body content.',

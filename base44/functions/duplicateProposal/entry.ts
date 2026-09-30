@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 
 const TRANSIENT_METADATA_KEY = /(autosave|dirty|pending|save_status|unsaved|in_flight)/i;
-const SAFE_PROPOSAL_METADATA_KEYS = ['audience', 'word_count', 'language', 'tone'];
+const SAFE_PROPOSAL_METADATA_KEYS = ['audience', 'word_count', 'language', 'tone', 'project_interpretation', 'comparison_reading'];
 
 export default async function(req) {
   let base44 = null;
