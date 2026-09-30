@@ -35,7 +35,10 @@ export function useSubDragHandler({
   // idleCommitTimerRef and commitDraftSubPositions intentionally omitted:
   // config is committed once on mouseup via useMouseUpHandler, not during drag.
 }) {
-  const handleSubDrag = useCallback((subId, newCanvasPos) => {
+  // targetRoomPos is the canonical final target in room metres: the shared move
+  // handler has already converted the pointer and applied the grab offset ONCE.
+  // This handler must never convert back to canvas, nor re-apply the offset.
+  const handleSubDrag = useCallback((subId, targetRoomPos) => {
     // subId is the sub's stable canonical id (or a generated front-sub-N/rear-sub-N
     // id when seeding from CFG fallback). Resolve the dragged draft entry by exact
     // stable id, not group index.
@@ -51,14 +54,10 @@ export function useSubDragHandler({
     }
     if (!sub || !draftArray) return;
 
-    const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
-
-    // Apply pointer-to-sub offset captured at drag start so the sub moves
-    // relative to where it was clicked, not snapping its centre to the pointer.
-    const offsetX = dragOffsetRoomRef?.current?.x ?? 0;
-    const offsetY = dragOffsetRoomRef?.current?.y ?? 0;
-    const anchoredX = rawX + offsetX;
-    const anchoredY = rawY + offsetY;
+    // Canonical room-space target, offset already applied upstream.
+    const anchoredX = Number(targetRoomPos?.x);
+    const anchoredY = Number(targetRoomPos?.y);
+    if (!Number.isFinite(anchoredX) || !Number.isFinite(anchoredY)) return;
 
     // Robust dimension resolution with safe defaults
     const dims = getModelDimsM(sub.model);
@@ -195,7 +194,7 @@ export function useSubDragHandler({
 
     // No config commit during mousemove — draft refs are the live render source.
     // commitDraftSubPositions() is called once on mouseup via useMouseUpHandler.
-  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, scale,
+  }, [byId, widthM, lengthM, getModelDimsM, scale,
       draggedSubTypeRef, draftFrontSubsRef, draftRearSubsRef,
       setSubDragTick, setSubSnapState]);
 

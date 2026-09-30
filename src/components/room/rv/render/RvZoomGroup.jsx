@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { rvZoomTransform } from "@/components/room/rv/utils/rvPointerToRoom";
 
 export default function RvZoomGroup(props) {
   const {
@@ -20,7 +21,8 @@ export default function RvZoomGroup(props) {
   return (
     <g
       clipPath={`url(#${idsClip})`}
-      transform={`translate(${panX + viewOffsetPx.x}, ${panY + viewOffsetPx.y}) scale(${zoom})`}
+      data-rv-zoom-group="true"
+      transform={rvZoomTransform({ panX, panY, viewOffsetPx, zoom })}
     >
       {/* Background hit area for pan (must be FIRST child, behind everything) */}
       {Number.isFinite(roomRect?.x) && Number.isFinite(roomRect?.y) && (

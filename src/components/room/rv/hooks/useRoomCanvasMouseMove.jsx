@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { clientToRoom, computeDragTargetRoom } from "@/components/room/rv/utils/rvPointerToRoom";
 
 /**
  * useRoomCanvasMouseMove
@@ -18,6 +19,10 @@ export function useRoomCanvasMouseMove({
   svgRef,
   canvasToRoom,
   roomToCanvas,
+  // Canonical pointer conversion inputs — the same pan/view-offset/zoom the
+  // draggable zoom group renders with.
+  scale,
+  viewOffsetPx,
   dragOffsetRoomRef,
   roomRect,
   placedSpeakers,
@@ -39,22 +44,26 @@ export function useRoomCanvasMouseMove({
 
     if (!svgRef.current) return;
     const svgElement = svgRef.current;
-    const point = svgElement.createSVGPoint();
-    point.x = e.clientX;
-    point.y = e.clientY;
-    const ctm = svgElement.getScreenCTM();
-    if (!ctm) return;
-    const inverseCTM = ctm.inverse();
-    const svgPoint = point.matrixTransform(inverseCTM);
 
-    // Convert cursor to room coords and apply stored offset
-    const cursorRoom = canvasToRoom({ x: svgPoint.x, y: svgPoint.y });
-    const targetRoomPos = {
-      x: cursorRoom.x + dragOffsetRoomRef.current.x,
-      y: cursorRoom.y + dragOffsetRoomRef.current.y
-    };
+    // ONE canonical conversion: screen pixels -> zoom-group-local -> room metres.
+    const pointerRoom = clientToRoom({
+      svgElement,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      roomRect,
+      scale,
+      viewOffsetPx,
+    });
+    if (!pointerRoom) return;
 
-    // Convert back to canvas for existing logic
+    // The pointer-to-object offset is applied exactly ONCE, here, so a 1 px
+    // pointer move produces a 1 px object move at any zoom.
+    const targetRoomPos = computeDragTargetRoom({
+      pointerRoom,
+      dragOffsetRoom: dragOffsetRoomRef.current,
+    });
+
+    // Canvas round-trip for the handlers that still work in canvas space.
     const targetCanvasPos = roomToCanvas(targetRoomPos);
 
     if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!placedSpeakers.find(s => s.id === draggedItemId) });
@@ -71,16 +80,19 @@ export function useRoomCanvasMouseMove({
     } else if (dragType === 'seat') {
       handleSeatDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     } else if (dragType === 'sub') {
-      handleSubDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
+      // Room metres, offset already applied. Never converted back and never
+      // offset again inside the handler.
+      handleSubDrag(draggedItemId, targetRoomPos);
       setDragState(s => (s && s.dragging ? { ...s } : s));
     } else if (dragType === 'projector') {
-      handleProjectorDrag?.(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
+      handleProjectorDrag?.(draggedItemId, targetRoomPos);
     } else if (dragType === 'roomElement') {
-      handleRoomElementDrag?.(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
+      handleRoomElementDrag?.(draggedItemId, targetRoomPos);
     }
   }, [
     dragging, draggedItemId, dragType, dragState,
     setDragWarning, svgRef, canvasToRoom, roomToCanvas,
+    scale, viewOffsetPx,
     dragOffsetRoomRef, roomRect, placedSpeakers,
     handleSpeakerDrag, handleSeatDrag, handleSubDrag, handleProjectorDrag,
     handleRoomElementDrag, handleMlpDrag, setDragState, mlpDragActiveRef,

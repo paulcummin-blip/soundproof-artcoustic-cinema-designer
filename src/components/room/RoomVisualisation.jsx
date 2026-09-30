@@ -1086,6 +1086,7 @@ const byId = useEntitiesById({
   const { handleMouseDown } = useMouseDownHandler({
     byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole,
     widthM, lengthM, canvasToRoom, svgRef,
+    roomRect, scale, viewOffsetPx,
     isAnyDraggingRef, isDraggingSpeakerRef, isDraggingRearRef, isDraggingFW,
     isDraggingSubRef, dragOffsetRoomRef, draggedSubWallRef, draggedSubTypeRef,
     draftFrontSubsRef, draftRearSubsRef, idleCommitTimerRef,
@@ -1363,9 +1364,10 @@ const byId = useEntitiesById({
   }, [seatDragTick, dragType, draggedItemId, widthM, lengthM, draftSeatsRef]);
 
   // Room Element drag — wall-constrained movement, updates pos_m + drag info live
-  const handleRoomElementDrag = useCallback((elementId, canvasPos) => {
-    if (!onSetRoomElements || !canvasToRoom) return;
-    const roomPos = canvasToRoom(canvasPos);
+  // Receives the canonical room-space target from the shared move handler: the
+  // pointer was converted once and the grab offset applied once, upstream.
+  const handleRoomElementDrag = useCallback((elementId, roomPos) => {
+    if (!onSetRoomElements) return;
     const el = Array.isArray(roomElements)
       ? roomElements.find(re => String(re?.id) === String(elementId))
       : null;
@@ -1374,9 +1376,8 @@ const byId = useEntitiesById({
     const isFrontRear = wall === 'front' || wall === 'rear';
     const elLen = Number(el?.length_m) || 0.9;
     const wallLength = isFrontRear ? widthM : lengthM;
-    const raw = isFrontRear
-      ? (roomPos.x + dragOffsetRoomRef.current.x)
-      : (roomPos.y + dragOffsetRoomRef.current.y);
+    // The drag guide and the written pos_m both come from this one room point.
+    const raw = isFrontRear ? roomPos.x : roomPos.y;
     const clamped = Math.max(0, Math.min(wallLength - elLen, raw - elLen / 2));
     const distA = clamped;
     const distB = Math.max(0, wallLength - elLen - clamped);
@@ -1393,13 +1394,14 @@ const byId = useEntitiesById({
           : re
       )
     );
-  }, [onSetRoomElements, canvasToRoom, roomElements, widthM, lengthM, dragOffsetRoomRef]);
+  }, [onSetRoomElements, roomElements, widthM, lengthM]);
 
   // Projector drag — Y-axis only, clamped to room bounds
-  const handleProjectorDrag = useCallback((projectorId, canvasPos) => {
-    if (!onSetRoomElements || !canvasToRoom) return;
-    const roomPos = canvasToRoom(canvasPos);
-    const rawY = roomPos.y + dragOffsetRoomRef.current.y;
+  // Receives the canonical room-space target from the shared move handler.
+  // Y-axis only. The grab offset is already applied upstream, never here.
+  const handleProjectorDrag = useCallback((projectorId, roomPos) => {
+    if (!onSetRoomElements) return;
+    const rawY = roomPos.y;
     const projEl = Array.isArray(roomElements)
       ? roomElements.find(e => e?.type === 'projector')
       : null;
@@ -1437,7 +1439,7 @@ const byId = useEntitiesById({
         el?.type === 'projector' ? { ...el, y_lens_m: clampedY } : el
       )
     );
-  }, [onSetRoomElements, canvasToRoom, roomElements, lengthM, widthM, screenFrontPlaneM]);
+  }, [onSetRoomElements, roomElements, lengthM, widthM, screenFrontPlaneM]);
 
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
@@ -1603,6 +1605,8 @@ const byId = useEntitiesById({
     svgRef,
     canvasToRoom,
     roomToCanvas,
+    scale,
+    viewOffsetPx,
     dragOffsetRoomRef,
     roomRect,
     placedSpeakers,
@@ -1670,9 +1674,13 @@ const byId = useEntitiesById({
     };
     window.addEventListener('mouseup', onWindowMouseUp);
     window.addEventListener('blur', onWindowBlur);
+    // Pointer-cancel parity for every drag type: a cancelled pointer ends the
+    // drag exactly like a release, so no object is left in a half-dragged state.
+    window.addEventListener('pointercancel', onWindowMouseUp);
     return () => {
       window.removeEventListener('mouseup', onWindowMouseUp);
       window.removeEventListener('blur', onWindowBlur);
+      window.removeEventListener('pointercancel', onWindowMouseUp);
     };
   }, [handleMouseUp, clearSeatSnap, clearSeatDragBaseline]);
 

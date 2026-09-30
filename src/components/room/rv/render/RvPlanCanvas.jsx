@@ -3,6 +3,7 @@ import { hasPos } from "@/components/room/rv/RenderPrimitives";
 import RvSpeakerLayer from "@/components/room/rv/render/RvSpeakerLayer";
 import SvgDefs from "@/components/room/SvgDefs";
 import RvZoomGroup from "@/components/room/rv/render/RvZoomGroup";
+import { rvZoomTransform } from "@/components/room/rv/utils/rvPointerToRoom";
 import RvRoomBaseLayers from "@/components/room/rv/render/RvRoomBaseLayers";
 import RvBaffleAndScreen from "@/components/room/rv/render/RvBaffleAndScreen";
 import RvZonesAndOverlays from "@/components/room/rv/render/RvZonesAndOverlays";
@@ -692,8 +693,12 @@ export default function RvPlanCanvas({
 
             </RvZoomGroup>
 
-            {/* Room Element drag dimensions — rendered OUTSIDE RvZoomGroup so the
-                clipPath on the zoom group cannot clip annotation text near wall edges */}
+            {/* Drag guide layers — kept OUTSIDE the clipped zoom group so its
+                clipPath cannot trim annotation text near wall edges, but wrapped
+                in a group carrying the EXACT same pan/view-offset/zoom transform,
+                so every guide stays attached to the geometry it annotates. */}
+            <g data-rv-guide-layer="true" transform={rvZoomTransform({ panX, panY, viewOffsetPx, zoom })}>
+            {/* Room Element drag dimensions */}
             {dragType === 'roomElement' && roomElementDragInfo?.visible && (
               <RvRoomElementDragDims
                 dragInfo={roomElementDragInfo}
@@ -753,6 +758,7 @@ export default function RvPlanCanvas({
                 svgH={svgHSafe}
               />
             )}
+            </g>
             </>
           )}
         </svg>

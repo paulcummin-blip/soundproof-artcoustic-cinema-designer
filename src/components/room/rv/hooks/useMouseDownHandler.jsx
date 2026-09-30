@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { clientToRoom } from "@/components/room/rv/utils/rvPointerToRoom";
 
 export function useMouseDownHandler({
   byId,
@@ -12,6 +13,10 @@ export function useMouseDownHandler({
   widthM,
   lengthM,
   canvasToRoom,
+  // Canonical pointer conversion inputs (same basis as the zoom group)
+  roomRect,
+  scale,
+  viewOffsetPx,
   svgRef,
   isAnyDraggingRef,
   isDraggingSpeakerRef,
@@ -60,14 +65,19 @@ export function useMouseDownHandler({
       // Shared cursor calculation — must come first so all branches can use cursorRoom
       if (!svgRef.current) return;
       const svgElement = svgRef.current;
-      const point = svgElement.createSVGPoint();
-      point.x = e.clientX;
-      point.y = e.clientY;
-      const ctm = svgElement.getScreenCTM();
-      if (!ctm) return;
-      const inverseCTM = ctm.inverse();
-      const svgPoint = point.matrixTransform(inverseCTM);
-      const cursorRoom = canvasToRoom({ x: svgPoint.x, y: svgPoint.y });
+
+      // ONE canonical conversion, shared by every drag: screen pixels -> the
+      // draggable zoom group's local coordinates -> room metres, in the same
+      // basis as stored object centres and room dimensions.
+      const cursorRoom = clientToRoom({
+        svgElement,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        roomRect,
+        scale,
+        viewOffsetPx,
+      });
+      if (!cursorRoom) return;
 
       let target = byId.get(id);
 
@@ -138,6 +148,15 @@ export function useMouseDownHandler({
         setDragState({ dragging: true, draggedItemId: id, dragType: 'projector' });
         setDragWarning({ show: false });
         rsDragLockRef.current = null;
+        // Pointer capture, equivalent to speaker and sub drags: leaving the
+        // visible projector body must not cancel the drag.
+        try {
+          if (e.target && typeof e.target.setPointerCapture === 'function') {
+            e.target.setPointerCapture(e.pointerId);
+          }
+        } catch (err) {
+          // Ignore capture errors
+        }
         return;
       }
 
@@ -421,7 +440,7 @@ export function useMouseDownHandler({
         }
       }
     },
-    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef, roomElements, seatDragStartRef, seatingPositions, placedSpeakers, mlpDotX_m, mlpDotY_m, captureBeforeSubDrag]
+    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef, roomRect, scale, viewOffsetPx, roomElements, seatDragStartRef, seatingPositions, placedSpeakers, mlpDotX_m, mlpDotY_m, captureBeforeSubDrag]
   );
 
   return { handleMouseDown };
