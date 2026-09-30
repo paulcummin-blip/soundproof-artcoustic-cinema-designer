@@ -54,7 +54,10 @@ export const P18_SELECTED_TARGET_SCHEMA_VERSION = 1;
  */
 export function formatP18FloorBoundedStatement(floorHz) {
   if (!finite(floorHz)) return null;
-  return `The response remains above the -3 dB criterion at the ${Math.round(Number(floorHz))} Hz `
+  // Whole-Hz presentation follows the same favourable flooring rule as every
+  // other P18 display, so the caveat sentence can never disagree with the
+  // headline figure it explains.
+  return `The response remains above the -3 dB criterion at the ${Math.floor(Number(floorHz))} Hz `
     + "product-validity floor, so the exact crossing lies below the validated calculation range.";
 }
 
@@ -201,7 +204,11 @@ export function formatP18TargetExplanationDetail(explanation, basisLabel = null)
   const phrase = floorBounded ? null : BINDING_PHRASE[explanation.bindingBasis];
   if (phrase) parts.push(phrase);
   if (floorBounded) {
-    const statement = formatP18FloorBoundedStatement(explanation.floorHz);
+    // The published point IS the validity floor for a bounded result, so the
+    // sentence states that same figure rather than a second, separately rounded one.
+    const statement = formatP18FloorBoundedStatement(
+      finite(explanation.achievedExtensionHz) ? explanation.achievedExtensionHz : explanation.floorHz,
+    );
     if (statement) parts.push(statement);
   }
   const responseHz = hz(explanation.responseTargetF3Hz);
@@ -224,7 +231,7 @@ export function formatP18CriterionRows(explanation) {
     rows.push(["Criterion", `selected target −3 dB (${Math.round(Number(explanation.cutoffPlaneDb))} dB plane)`]);
   }
   if (explanation.criterionMode === P18_CRITERION_MODE.FLOOR_BOUNDED && finite(explanation.floorHz)) {
-    rows.push(["Floor", `${Math.round(Number(explanation.floorHz))} Hz — no -3 dB crossing above the validity floor`]);
+    rows.push(["Floor", `${Math.floor(Number(explanation.floorHz))} Hz — no -3 dB crossing above the validity floor`]);
   }
   if (finite(explanation.responseTargetF3Hz)) {
     rows.push(["Response branch", `${hz(explanation.responseTargetF3Hz)}`]);

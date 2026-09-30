@@ -168,10 +168,9 @@ function buildP18Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
     lines.push(`Reference: ${refBandLabel}, -3 dB cutoff`);
     lines.push(`Frequencies below ${Math.floor(f3)} Hz fall outside the assessed extension`);
     if (bounded) {
-      const floorHz = finite(rp22GraphMarkers?.p18Explanation?.floorHz)
-        ? Number(rp22GraphMarkers.p18Explanation.floorHz)
-        : Math.floor(f3);
-      const statement = formatP18FloorBoundedStatement(floorHz);
+      // The marker already carries the published whole-Hz point — the caveat
+      // states that same figure, never a second rounded one.
+      const statement = formatP18FloorBoundedStatement(Math.floor(f3));
       if (statement) lines.push(statement);
     }
   } else {
