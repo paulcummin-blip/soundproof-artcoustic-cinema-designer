@@ -9,7 +9,6 @@ import { getModelsByCategoryOrdered, normaliseModelKey } from "@/components/mode
 import { computeSpeakerCapabilityAtDistance } from "@/components/utils/spl/centralSplEngine";
 import { resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import { normalizeCompetitor, competitorMetaForComparison, parseRecommendedAmpRange } from "@/components/utils/spl/competitorNormalization";
-import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
 import { RP22_EQ_HEADROOM_RESERVE_DB, RP22_EQ_HEADROOM_LABEL } from "@/components/utils/spl/rp22HeadroomPolicy";
 import { getLevelColors } from "@/components/utils/rp22Colors";
 import { resolveSpeakerSplMeta } from "@/components/utils/spl/speakerSplMeta";
@@ -17,6 +16,8 @@ import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22Desig
 import { useAuth } from "@/lib/AuthContext";
 import { isMasterAdmin } from "@/lib/accountAccess";
 import { shouldShowDataWarning, shouldShowOpenBackWarning } from "@/components/spl/ComparisonWarnings";
+import ComparisonQualityBadges from "@/components/spl/ComparisonQualityBadges";
+import { loadComparisonCandidates } from "@/components/utils/spl/speakerDbComparisonCandidates";
 
 const BRAND = {
   bg: "#F8F8F7",
@@ -70,7 +71,7 @@ function gradeFromSpl(spl, basis) {
   };
 }
 
-function Rp22Pill({ parameter, level }) {
+function Rp22Pill({ parameter, level, subLabel = null }) {
   const normalized = /^L[1-4]$/.test(String(level))
     ? String(level)
     : level === "FAIL"
@@ -95,6 +96,9 @@ function Rp22Pill({ parameter, level }) {
       }}
     >
       {parameter} · {normalized || "—"}
+      {subLabel && (
+        <div style={{ fontSize: 9, fontWeight: 600, marginTop: 3, opacity: 0.85 }}>{subLabel}</div>
+      )}
     </div>
   );
 }
@@ -146,7 +150,8 @@ function evidenceStanding(record) {
   return "Insufficient published data";
 }
 
-const ADI_ESTIMATE_NOTICE = "ADI estimate based on available manufacturer data — estimated, not a published measured result.";
+// The C-class comparison statement is defined once, alongside the confidence
+// classes, in speakerDbComparisonCandidates (ADI_ESTIMATE_STATEMENT).
 
 function artcousticInfoRows(speaker, price, result = null) {
   if (!speaker) return [];
@@ -175,7 +180,7 @@ function artcousticInfoRows(speaker, price, result = null) {
   ];
 }
 
-function competitorInfoRows(record, result = null) {
+function competitorInfoRows(record, result = null, candidate = null) {
   if (!record) return [];
   const debug = result?.debug || null;
   const recAmpRange = (record.recommended_amp_min_w != null || record.recommended_amp_max_w != null)
@@ -214,6 +219,15 @@ function competitorInfoRows(record, result = null) {
     ["Capability basis", record.capability_basis || "—"],
     ["Evidence quality", record.source_evidence_quality || record.evidence_quality || "—"],
     ["Evidence standing", evidenceStanding(record)],
+    ["Confidence class", candidate ? `${candidate.confidence} · ${candidate.label}` : "—"],
+    ["Basis", candidate ? candidate.basisLabel : "—"],
+    ["Approval status", candidate?.statusLabel || record.approval_status || "—"],
+    ["Values used", candidate?.valuesUsed || "—"],
+    ["Values assumed", candidate && candidate.assumptions.length > 0 ? candidate.assumptions.join(" · ") : "None — published values only"],
+    ["Comparable to Artcoustic", candidate?.comparable
+      ? `Yes — ${candidate.parityNote}`
+      : "No — insufficient published data for a P12/P13 estimate"],
+    ["Source URL", record.source_url || "—"],
     ["Fields used", record.data_confidence === "A"
       ? "Published max SPL, power authority, sensitivity, impedance, measurement space"
       : record.data_confidence === "C"
@@ -428,40 +442,19 @@ export default function SPLCalculatorPage() {
   const loadCompetitors = useCallback(async () => {
     setLoadingCompetitors(true);
     try {
-      const rows = await base44.entities.CompetitorSpeaker.list("manufacturer", 500);
-      // Only approved/published rows are comparable. Rows published from the
-      // Speaker Database appear here once approved and published; legacy
-      // spreadsheet rows carry no publish provenance and stay visible as before.
-      const live = (rows || [])
-        .filter((r) => r.active !== false)
-        .filter((r) => r.publish_source !== "speaker_database" || r.published === true);
-
-      // An approved Speaker Database row supersedes any legacy row for the same
-      // manufacturer + model, however the manufacturer was spelled.
-      const publishedKeys = new Set(
-        live
-          .filter((r) => r.publish_source === "speaker_database")
-          .map((r) => competitorIdentityKey(r)),
-      );
-      const comparable = live.filter(
-        (r) => r.publish_source === "speaker_database" || !publishedKeys.has(competitorIdentityKey(r)),
-      );
-
-      const normalized = comparable.map(normalizeCompetitor);
-      // Only rows that can produce a defensible P12/P13 result are offered as
-      // comparison candidates. Ungradeable rows are not surfaced on this page at
-      // all — they are cleaned up in the admin Speaker Database.
-      setCompetitorRows(normalized.filter((r) => r.p12_p13_eligible === true));
-      setSelectedCompetitorIds((prev) => prev.filter(
-        (id) => normalized.some((r) => r.id === id && r.p12_p13_eligible === true),
-      ));
+      // The comparison list is built from the admin Speaker Database — the source
+      // of truth. Each candidate is mapped and normalised with the same code the
+      // RP22 engine consumes, so the options can never disagree with the grades.
+      const candidates = await loadComparisonCandidates({ includeUnpublished: canManageCompetitors });
+      setCompetitorRows(candidates);
+      setSelectedCompetitorIds((prev) => prev.filter((id) => candidates.some((c) => c.id === id)));
     } catch (error) {
-      console.warn("[RP22 Speaker Capability] competitor data unavailable", error);
+      console.warn("[RP22 Speaker Capability] comparison candidates unavailable", error);
       setCompetitorRows([]);
     } finally {
       setLoadingCompetitors(false);
     }
-  }, []);
+  }, [canManageCompetitors]);
 
   useEffect(() => { loadCompetitors(); }, [loadCompetitors]);
 
@@ -566,7 +559,7 @@ export default function SPLCalculatorPage() {
   const artWarningRecord = buildArtcousticWarningRecord(art);
   const artShowDataNote = artWarningRecord && (shouldShowDataWarning(artWarningRecord) || shouldShowOpenBackWarning(artWarningRecord));
 
-  const competitorById = useMemo(() => new Map(competitorRows.map((r) => [r.id, r])), [competitorRows]);
+  const candidateById = useMemo(() => new Map(competitorRows.map((c) => [c.id, c])), [competitorRows]);
 
   const competitorResultFor = useCallback((record) => {
     if (!record || !Number.isFinite(d) || !Number.isFinite(p)) {
@@ -598,8 +591,8 @@ export default function SPLCalculatorPage() {
   }, [d, p, roomVolumeM3, basis]);
 
   const selectedCompetitors = useMemo(
-    () => selectedCompetitorIds.map((id) => competitorById.get(id)).filter(Boolean),
-    [selectedCompetitorIds, competitorById],
+    () => selectedCompetitorIds.map((id) => candidateById.get(id)?.record).filter(Boolean),
+    [selectedCompetitorIds, candidateById],
   );
 
   const competitorResults = useMemo(
@@ -793,38 +786,57 @@ export default function SPLCalculatorPage() {
           {loadingCompetitors ? (
             <div style={{ padding: 18, color: BRAND.subtext }}>Loading comparison data…</div>
           ) : selectedCompetitorIds.length === 0 ? (
-            <div style={{ border: `1px dashed ${BRAND.border}`, borderRadius: 12, padding: 18, color: BRAND.subtext, fontSize: 13 }}>No comparison speakers selected. {competitorRows.length === 0 ? "No comparison speaker has enough published data to grade P12/P13 yet — add and publish the model in the Speaker Database." : "Choose Add speaker to begin."}</div>
+            <div style={{ border: `1px dashed ${BRAND.border}`, borderRadius: 12, padding: 18, color: BRAND.subtext, fontSize: 13 }}>No comparison speakers selected. {competitorRows.length === 0 ? "No comparison speaker is available yet — add the model in the Speaker Database." : "Choose Add speaker to begin."}</div>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
               {selectedCompetitorIds.map((id, index) => {
-                const record = competitorById.get(id);
+                const candidate = candidateById.get(id);
+                const record = candidate?.record;
                 const item = competitorResults.find((x) => x.record.id === id);
                 const compShowDataNote = record && (shouldShowDataWarning(record) || shouldShowOpenBackWarning(record));
                 return (
                   <div key={`${id}-${index}`}>
                     <div style={{ display: "grid", gridTemplateColumns: ROW_GRID, gridTemplateRows: compShowDataNote ? "auto auto" : "auto", gap: "8px 12px", alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}>
-                      <select value={id} onChange={(e) => updateSelectedCompetitor(index, e.target.value)} style={{ border: 0, background: "transparent", fontSize: 15, fontWeight: 700, color: id ? BRAND.text : BRAND.subtext, minWidth: 0 }}>
-                        <option value="">Choose alternative speaker</option>
-                        {competitorRows.map((r) => <option key={r.id} value={r.id}>{r.manufacturer} · {r.model}</option>)}
-                      </select>
+                      <div style={{ minWidth: 0 }}>
+                        <select value={id} onChange={(e) => updateSelectedCompetitor(index, e.target.value)} style={{ width: "100%", border: 0, background: "transparent", fontSize: 15, fontWeight: 700, color: id ? BRAND.text : BRAND.subtext, minWidth: 0 }}>
+                          <option value="">Choose alternative speaker</option>
+                          {competitorRows.map((c) => <option key={c.id} value={c.id}>{c.optionLabel}</option>)}
+                        </select>
+                        {candidate && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                            <ComparisonQualityBadges confidence={candidate.confidence} label={candidate.badgeLabel} basis={candidate.basisLabel} tone={candidate.tone} />
+                            <span style={{ fontSize: 11, color: BRAND.hint }}>{candidate.statusLabel}</span>
+                          </div>
+                        )}
+                      </div>
                       <div />
                       <div style={{ fontWeight: 600, textAlign: "right" }}>{record ? formatPrice(numeric(record?.retail_price_inc_vat)) : "—"}</div>
-                      <Rp22Pill parameter="P12" level={item?.result?.grades?.p12} />
-                      <Rp22Pill parameter="P13" level={item?.result?.grades?.p13} />
+                      <Rp22Pill parameter="P12" level={item?.result?.grades?.p12} subLabel={candidate?.pillLabel} />
+                      <Rp22Pill parameter="P13" level={item?.result?.grades?.p13} subLabel={candidate?.pillLabel} />
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
-                        {record && <SpeakerInfo rows={competitorInfoRows(record, item?.result)} sourceUrl={record.source_url} datasheetUrl={record.datasheet_url} />}
+                        {record && <SpeakerInfo rows={competitorInfoRows(record, item?.result, candidate)} sourceUrl={candidate?.sourceUrl || record.source_url} datasheetUrl={candidate?.datasheetUrl || record.datasheet_url} />}
                         <button type="button" onClick={() => setSelectedCompetitorIds((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>
                       </div>
                       {compShowDataNote && <DataNote record={record} />}
                     </div>
+                    {candidate?.assumptions?.length > 0 && (
+                      <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
+                        Assumed: {candidate.assumptions.join(" · ")}
+                      </div>
+                    )}
                     {record?.normalization_warnings?.length > 0 && (
                       <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
                         Speaker specification needs confirmation
                       </div>
                     )}
-                    {record?.data_confidence === "C" && (
+                    {candidate?.adiStatement && (
                       <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
-                        {ADI_ESTIMATE_NOTICE}
+                        {candidate.adiStatement}
+                      </div>
+                    )}
+                    {candidate?.classKey === "D" && (
+                      <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
+                        Insufficient published data — no P12/P13 grade is produced for this speaker.
                       </div>
                     )}
                   </div>
@@ -908,7 +920,7 @@ export default function SPLCalculatorPage() {
                   ))}
                 </div>
               )}
-              <div style={{ marginTop: 10, fontSize: 12, color: BRAND.hint }}>The spreadsheet remains the source of truth. Applying an import replaces the current competitor library after preview. Raw published values are retained alongside normalized 1 W / 1 m fields.</div>
+              <div style={{ marginTop: 10, fontSize: 12, color: BRAND.hint }}>Legacy spreadsheet import — the admin Speaker Database is the source of truth for comparison speakers, so imported rows are not offered on this page. Applying an import replaces the legacy library after preview; rows published from the Speaker Database are never deleted or overwritten.</div>
             </div>
           )}
         </div>
