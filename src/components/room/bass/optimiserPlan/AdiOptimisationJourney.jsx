@@ -159,11 +159,13 @@ export default function AdiOptimisationJourney({
       data-adi-optimiser-journey={journeyStateKey}
     >
       {/* Header — status */}
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4" style={{ color: theme.iconColor }} />
-        <span className="text-[13px] font-semibold text-[#1B1A1A]">Bass Optimisation</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <Icon className="h-4 w-4 shrink-0" style={{ color: theme.iconColor }} />
+        <span className="min-w-0 text-[13px] font-semibold text-[#1B1A1A]">
+          Bass Optimisation — Powered by ADI
+        </span>
         <span
-          className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase"
+          className="ml-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase"
           style={theme.pill}
         >
           {journey.statusLabel}
