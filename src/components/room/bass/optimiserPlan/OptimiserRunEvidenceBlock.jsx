@@ -160,6 +160,7 @@ export default function OptimiserRunEvidenceBlock({ evidence = null, className =
   const bestP20 = deviationText(best?.p20VariationDb);
   const bestLevel = levelText(best?.p20Level);
   const delta = deltaText(best?.p20DeltaDb);
+  const calculationCount = evidence.canonicalJobsRun ?? evidence.candidatesEvaluated ?? null;
 
   const headlineRows = [];
   if (evidence.canonicalJobsRun != null) headlineRows.push(["Optimiser jobs run", `${evidence.canonicalJobsRun}`]);
@@ -174,9 +175,30 @@ export default function OptimiserRunEvidenceBlock({ evidence = null, className =
 
   return (
     <div className={`rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2.5 ${className}`}>
-      <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">RUN EVIDENCE</div>
+      <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">BASS OPTIMISATION RESULT</div>
 
-      <div className="mt-1 space-y-0.5 text-[11px] text-[#625143]">
+      <div className="mt-1 text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
+        {calculationCount != null
+          ? `ADI tested ${calculationCount} design calculations.`
+          : "ADI completed the optimisation search."}
+      </div>
+      <div className="mt-0.5 text-[11px] text-[#3E4349] leading-relaxed">
+        {baselineFailed || evidence.outcome === "evaluation_incomplete"
+          ? "No usable recommendation was confirmed because the evaluation did not complete."
+          : "No safe improvement was confirmed for this design."}
+      </div>
+      {best && (
+        <div className="mt-1 text-[11px] text-[#1B1A1A] leading-relaxed">
+          <span className="text-[#8B7F76]">Best attempt (not applied): </span>
+          P20 {bestP20 || UNAVAILABLE}
+          {bestLevel ? ` · ${bestLevel}` : ""}
+          {delta ? <span className="text-[#8B7F76]"> ({delta} vs current)</span> : null}
+        </div>
+      )}
+
+      <details className="mt-2">
+        <summary className="cursor-pointer text-[11px] font-semibold text-[#625143]">Engineer details</summary>
+        <div className="mt-1 space-y-0.5 text-[11px] text-[#625143]">
         {headlineRows.map(([label, value]) => (
           <div key={label}>
             <span className="text-[#8B7F76]">{label}: </span>
@@ -257,11 +279,12 @@ export default function OptimiserRunEvidenceBlock({ evidence = null, className =
         </div>
       )}
 
-      {evidence.rejectionReasons?.length > 0 && (
-        <div className="mt-1.5 text-[11px] text-[#8A5A2B] leading-relaxed">
-          {evidence.rejectionReasons.map((reason) => <div key={reason}>{reason}</div>)}
-        </div>
-      )}
+        {evidence.rejectionReasons?.length > 0 && (
+          <div className="mt-1.5 text-[11px] text-[#8A5A2B] leading-relaxed">
+            {evidence.rejectionReasons.map((reason) => <div key={reason}>{reason}</div>)}
+          </div>
+        )}
+      </details>
 
       <div className="mt-1.5 text-[10px] text-[#8B7F76] leading-relaxed">
         {evidence.designUnchanged
