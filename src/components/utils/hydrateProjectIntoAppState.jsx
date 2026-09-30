@@ -22,6 +22,7 @@ import {
   migrateLegacyAppliedCalibration,
 } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationPersistence";
 import { hydrateOptimiserPlan } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
+import { canonicalProductId, canonicaliseRoleModelMap } from "@/components/utils/modelKeyNormaliser";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -498,7 +499,10 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
 
   // 9) SPEAKER ROLES + SPL NODES
   if (typeof setSelectedSpeakersByRole === "function") {
-    setSelectedSpeakersByRole(parseMaybe(p?.selected_speakers_by_role, {}));
+    // Legacy migration: product identity is canonical. A stored "_s" id is a
+    // role-encoded identity, not a product, so it is normalised to the base
+    // product on hydrate while every role key is preserved.
+    setSelectedSpeakersByRole(canonicaliseRoleModelMap(parseMaybe(p?.selected_speakers_by_role, {})));
   }
 
   // Parse spl_speaker_nodes once — used both for setSpeakerNodes and position merge below.
@@ -770,6 +774,16 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
         })
       : [];
 
+    // Legacy migration: normalise a stored "_s" product id to its base product.
+    // Role, id, position, positionSource and aiming metadata are untouched, and
+    // the values are acoustically identical, so no acoustic result moves. This
+    // is idempotent, so it does not make the project perpetually dirty.
+    const canonicalSpeakers = mergedSpeakers.map((spk) => (
+      spk && typeof spk === 'object' && spk.model
+        ? { ...spk, model: canonicalProductId(spk.model) }
+        : spk
+    ));
+
     console.log('[HYDRATE speakers]', {
       extra_surround_count: p?.extra_surround_count,
       global_surround_model: p?.global_surround_model,
@@ -777,7 +791,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     });
     setSpeakerSystem((prev) => ({
       ...(prev || {}),
-      placedSpeakers: mergedSpeakers,
+      placedSpeakers: canonicalSpeakers,
     }));
   }
 

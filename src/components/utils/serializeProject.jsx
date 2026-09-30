@@ -10,6 +10,7 @@ import { readPersistedScreenPlaneM } from "@/components/utils/screenPlanePersist
 import { migrateP12Mode } from "@/components/utils/p12ModeAuthority";
 import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuthority";
 import { resolveRoomDimensionsEdited } from "@/components/utils/roomDimensionsEditedAuthority";
+import { canonicalProductId, canonicaliseRoleModelMap } from "@/components/utils/modelKeyNormaliser";
 
 // Helper: safely parse JSON strings or return native types unchanged
 function safeParseJson(value) {
@@ -264,7 +265,10 @@ export function serializeProject(input = {}) {
         ...spk,
         id: spk.id ?? spk.role ?? '',
         role: spk.role ?? '',
-        model: spk.model ?? '',
+        // Product identity is the canonical base model. A surround is stored as
+        // its base product plus its role — a legacy "_s" product id is never
+        // written back into design_state.
+        model: canonicalProductId(spk.model ?? ''),
         position: {
           ...pos,
           x: typeof pos.x === 'number' ? pos.x : 0,
@@ -273,7 +277,7 @@ export function serializeProject(input = {}) {
         },
       };
     }),
-    selected_speakers_by_role: asObject(selectedSpeakersByRole),
+    selected_speakers_by_role: canonicaliseRoleModelMap(asObject(selectedSpeakersByRole)),
     spl_speaker_nodes: asArray(speakerNodes),
     room_elements: asArray(roomElements),
     subwoofers: asArray(subwoofers),

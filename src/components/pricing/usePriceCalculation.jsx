@@ -1,6 +1,7 @@
 // components/pricing/usePriceCalculation.jsx
 import { useMemo } from 'react';
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
+import { canonicalProductId } from "@/components/utils/modelKeyNormaliser";
 import { useAuth } from "@/lib/AuthContext";
 import { DEFAULT_TERRITORY, getTerritoryConfig } from "./territoryConfig";
 import { useProductPriceMap } from "./useProductPriceMap";
@@ -21,7 +22,11 @@ function getModelLabel(modelKey) {
 }
 
 export function getCommercialPrice(modelKey, soundbarSelections = {}, priceMap = null, soundbarOptions = null) {
-  const key = normaliseModelKey(modelKey);
+  // Pricing is keyed on product identity, never on role. Canonicalising here
+  // means a surround placed from a legacy "_s" id still resolves to its real
+  // product, instead of falling through to an inactive legacy alias and
+  // producing no price line.
+  const key = canonicalProductId(modelKey);
   const options = (soundbarOptions || {})[key];
 
   if (options) {

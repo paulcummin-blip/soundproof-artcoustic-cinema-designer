@@ -1,5 +1,6 @@
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { debug } from "@/components/utils/consolePolyfill";
+import { canonicalProductId } from "@/components/utils/modelKeyNormaliser";
 
 const SURROUND_ROLES = new Set([
   "SL", "SR", "SBL", "SBR", 
@@ -46,20 +47,14 @@ export function resolveSurroundModel(baseModel, role) {
     return modelKey;
   }
 
-  // If it's a surround role and the key doesn't already have the suffix, add it.
-  if (isSurroundRole(canonicalRole) && !modelKey.endsWith('_s')) {
-    const surroundKey = `${modelKey}_s`;
-    
-    // Check if the surround variant actually exists in the registry.
-    // If not, it's safer to return the original key than a non-existent one.
-    const meta = getSpeakerModelMeta(surroundKey);
-    if (!meta.notFound) {
-      debug(`[resolver] Mapped surround role ${canonicalRole} model from "${modelKey}" to "${surroundKey}"`);
-      return surroundKey;
-    } else {
-      debug(`[resolver] WARN: Surround variant "${surroundKey}" not found for role ${canonicalRole}. Falling back to "${modelKey}".`);
-    }
+  // Product identity never encodes role: a surround is the base product plus a
+  // surround role, not a separate "_s" product. The registry keeps its legacy
+  // "_s" rows as aliases that are acoustically identical to their base model, so
+  // returning the canonical base key leaves acoustic, RP22 and SPL results
+  // unchanged while keeping role-encoded ids out of stored and commercial state.
+  const canonical = canonicalProductId(modelKey);
+  if (isSurroundRole(canonicalRole)) {
+    debug(`[resolver] Surround role ${canonicalRole} resolves to canonical product "${canonical}"`);
   }
-
-  return modelKey;
+  return canonical;
 }
