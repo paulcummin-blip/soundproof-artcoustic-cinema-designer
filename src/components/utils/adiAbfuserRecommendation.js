@@ -370,24 +370,27 @@ export function describeAbfuserRecommendationParagraph(recommendation) {
  * Selected-versus-recommended status. Pricing and product inclusion follow the
  * selected quantity only.
  */
-export function describeAbfuserInclusion({ recommendedQuantity, selectedQuantity }) {
+export function describeAbfuserInclusion({ recommendedQuantity, selectedQuantity, enabled = true }) {
   const recommended = Math.max(0, Math.floor(Number(recommendedQuantity) || 0));
   const selected = Math.max(0, Math.floor(Number(selectedQuantity) || 0));
 
-  if (selected <= 0) {
-    return { state: "NOT_INCLUDED", message: "Not currently included in pricing." };
-  }
-  if (selected === recommended) {
-    return { state: "INCLUDED", message: "Included in proposal." };
-  }
-  if (selected > recommended) {
+  if (enabled === false) {
     return {
-      state: "ABOVE_RECOMMENDATION",
-      message: "Designer selected quantity is above the ADI recommendation. Confirm this reflects a deliberate acoustic design choice.",
+      state: "NOT_INCLUDED",
+      message: "ADI acoustic treatment recommendation not included in proposal.",
     };
   }
+  if (selected <= 0 && recommended <= 0) {
+    return {
+      state: "NOT_INCLUDED",
+      message: "ADI acoustic treatment recommendation not included in proposal.",
+    };
+  }
+  if (selected === recommended) {
+    return { state: "INCLUDED", message: "ADI recommendation included in proposal." };
+  }
   return {
-    state: "BELOW_RECOMMENDATION",
-    message: `Included in proposal at ${selected} of the ${recommended} recommended Abfusers.`,
+    state: selected > recommended ? "ABOVE_RECOMMENDATION" : "BELOW_RECOMMENDATION",
+    message: "Designer selected quantity differs from the ADI recommendation.",
   };
 }

@@ -76,6 +76,7 @@ export function selectClientAcousticTreatment({
   const inclusion = describeAbfuserInclusion({
     recommendedQuantity: recommendedQty,
     selectedQuantity: selectedQty,
+    enabled: !!acousticTreatmentEnabled,
   });
 
   if (recommendation.status === ABFUSER_STATUS.NOT_CALCULATED) {

@@ -4,6 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAppState } from "@/components/AppStateProvider";
 import { useEngineeringMode } from "@/components/state/useEngineeringMode";
 import { describeAbfuserInclusion, ABFUSER_STATUS } from "@/components/utils/adiAbfuserRecommendation";
+import { isManualAbfuserOverride } from "@/components/utils/abfuserInclusionAuthority";
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(value || 0));
@@ -73,11 +74,16 @@ export default function OptionsPanel({
   const recommendation = abfuserRecommendation || null;
   const recommendedQuantity = recommendation?.recommendedQuantity ?? 0;
   const selectedQuantity = Number(selectedAbfuserQty) || 0;
-  const inclusion = describeAbfuserInclusion({ recommendedQuantity, selectedQuantity });
+  const inclusion = describeAbfuserInclusion({ recommendedQuantity, selectedQuantity, enabled: acousticTreatmentEnabled });
   const isNotCalculated = !recommendation || recommendation.status === ABFUSER_STATUS.NOT_CALCULATED;
   const fullDesignRequired = recommendation?.status === ABFUSER_STATUS.FULL_DESIGN_REQUIRED;
   const byZone = recommendation?.quantityByZone || {};
   const legacyAuto = Math.max(0, Math.floor(Number(legacyAbfuserAutoQty) || 0));
+
+  // The ADI recommendation is the default included quantity, so the quantity only
+  // needs re-accepting when a manual override differs from the recommendation.
+  const isManualOverride = isManualAbfuserOverride(abfuserQtySource);
+  const overrideDiffers = isManualOverride && selectedQuantity !== recommendedQuantity;
 
   const handleAcousticTreatmentToggle = (nextEnabled) => {
     setAcousticTreatmentEnabled(nextEnabled);
@@ -156,15 +162,16 @@ export default function OptionsPanel({
                 <div className="flex items-center justify-between gap-2">
                   <Label htmlFor="abfuser-qty" className="text-xs font-medium text-[#3E4349] whitespace-nowrap">Included quantity</Label>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={useAdiRecommendation}
-                      disabled={abfuserQtySource === "recommended" || recommendedQuantity <= 0}
-                      className="text-xs px-2 py-1 rounded border border-[#DCDBD6] bg-white text-[#213428] hover:bg-[#F8F8F7] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                      title="Accept the ADI recommendation into the design and pricing"
-                    >
-                      Use ADI recommendation
-                    </button>
+                    {overrideDiffers && (
+                      <button
+                        type="button"
+                        onClick={useAdiRecommendation}
+                        className="text-xs px-2 py-1 rounded border border-[#DCDBD6] bg-white text-[#213428] hover:bg-[#F8F8F7] whitespace-nowrap"
+                        title="Return the included quantity to the ADI recommendation"
+                      >
+                        Use ADI recommendation
+                      </button>
+                    )}
                     <input
                       id="abfuser-qty"
                       type="number"
@@ -187,19 +194,13 @@ export default function OptionsPanel({
                   {inclusion.message}
                 </div>
 
-                {abfuserQtySource === "recommended" && (
+                {isManualOverride && (
                   <div className="text-[10px] text-[#8B7F76]">
-                    ADI recommendation accepted — the included quantity follows the recommendation.
+                    Manual quantity override
                   </div>
                 )}
 
-                {abfuserQtySource === "user" && (
-                  <div className="text-[10px] text-[#8B7F76]">
-                    Manually set by the designer. Click "Use ADI recommendation" to accept the ADI quantity.
-                  </div>
-                )}
-
-                {abfuserQtySource !== "recommended" && legacyAuto > 0 && (
+                {!isManualOverride && legacyAuto > 0 && (
                   <div className="text-[10px] text-[#8B7F76]">
                     Previous automatic quantity: {legacyAuto} × Abfuser (retired, no longer treated as a designer selection).
                   </div>
@@ -208,7 +209,7 @@ export default function OptionsPanel({
             )}
           </div>
         ) : (
-          <div className="mt-3 text-xs text-[#8B7F76]">Not included</div>
+          <div className="mt-3 text-xs text-[#8B7F76]">{inclusion.message}</div>
         )}
       </SectionCard>
 

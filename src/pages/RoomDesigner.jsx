@@ -4,16 +4,7 @@ import { Ruler, Speaker } from "lucide-react";
 import { SidebarInset } from "@/components/ui/sidebar"; // NEW: Import SidebarInset
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import ResizableTwoColumnLayout from "@/components/ui/ResizableTwoColumnLayout";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import ResetDesignerDialog from "@/components/roomdesigner/ResetDesignerDialog";
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -47,7 +38,7 @@ import { useStage2PlacementOptimiser } from '@/components/room/bass/stage2/useSt
 import { useBassHeavyAction, markBassHeavyActionRunning, markBassHeavyActionComplete, markBassHeavyActionError } from '@/components/room/bass/bassHeavyActionStore';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
-import { calculateAbfuserRecommendation } from "@/components/utils/adiAbfuserRecommendation";
+import { useAbfuserInclusion } from "@/components/roomdesigner/useAbfuserInclusion";
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
@@ -69,7 +60,7 @@ import { useInRoomDepths } from "@/components/hooks/useInRoomDepths";
 import RoomDesignerHeader from "@/components/roomdesigner/RoomDesignerHeader";
 import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanToolbar";
 import ViewModeLayout from "@/components/roomdesigner/ViewModeLayout";
-import ViewModeToggle from "@/components/roomdesigner/ViewModeToggle";
+import WorkspaceViewSelector from "@/components/roomdesigner/WorkspaceViewSelector";
 import AimLoudspeakerControls from "@/components/roomdesigner/AimLoudspeakerControls";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import RoomDesignerControlsPanel from "@/components/roomdesigner/RoomDesignerControlsPanel";
@@ -272,23 +263,10 @@ function RoomDesignerWithState() {
   const [soundbarSelections, setSoundbarSelections] = useState({});
   const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
-  // ADI strategic reflection control — the single Abfuser recommendation
-  // authority. Geometry-aware (speakers, seating, reflection zones, room size,
-  // rows). There is NO auto-follow: the selected quantity changes only when the
-  // designer accepts the recommendation or edits it, and only it is priced.
-  const abfuserRecommendation = useMemo(() => calculateAbfuserRecommendation({
-    room: appState?.roomDims,
-    speakers: appState?.speakerSystem?.placedSpeakers || [],
-    seating: appState?.seatingPositions,
-    screen: appState?.screen,
-    acousticTreatmentSettings: {
-      enabled: appState?.acousticTreatmentEnabled,
-      selectedQuantity: appState?.selectedAbfuserQty,
-      quantitySource: appState?.abfuserQtySource,
-      legacyAutoQuantity: appState?.legacyAbfuserAutoQty,
-    },
-  }), [appState?.roomDims, appState?.speakerSystem?.placedSpeakers, appState?.seatingPositions, appState?.screen, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, appState?.abfuserQtySource, appState?.legacyAbfuserAutoQty]);
-  const recommendedAbfuserQty = abfuserRecommendation?.recommendedQuantity ?? 0;
+  // Abfuser authority: the ADI recommendation plus the included (priced)
+  // quantity. The recommendation is the default inclusion, a manual override is
+  // preserved, and Acoustic Treatment off includes nothing.
+  const { abfuserRecommendation, includedAbfuserQty } = useAbfuserInclusion(appState);
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [localLiveImpactMode, setLocalLiveImpactMode] = React.useState("off");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -1043,7 +1021,7 @@ function RoomDesignerWithState() {
     manualExtras,
     soundbarSelections,
     acousticTreatmentEnabled: appState?.acousticTreatmentEnabled ?? false,
-    selectedAbfuserQty: appState?.selectedAbfuserQty ?? 0,
+    selectedAbfuserQty: includedAbfuserQty,
   });
 
   const publishedPriceData = useMemo(() => ({
@@ -2109,22 +2087,11 @@ function RoomDesignerWithState() {
 
   return (
     <>
-      <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reset Room Designer?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will reset room, seating, screen, speakers and subs back to defaults. This can't be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleResetPositions} className="bg-red-600 hover:bg-red-700">
-              Reset
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ResetDesignerDialog
+        open={showResetConfirm}
+        onOpenChange={setShowResetConfirm}
+        onConfirm={handleResetPositions}
+      />
 
       <BassBackgroundAnalysisOwner key={resolvedProjectId || "free"} scopeId={resolvedProjectId || "free"} versionId={appState?.activeVersionId || "free"}>
       {showAsdr && minimumSystemMet && (
@@ -2166,30 +2133,8 @@ function RoomDesignerWithState() {
         isProjectMode={isProjectMode}
       />
 
-      {/* Persistent Workspace View selector — always visible across all three
-          modes (Split / Plan / Technical). Mounted here, above ViewModeLayout,
-          so it is never removed when the right-hand content panel hides in
-          Plan View. One shared authority: viewMode state at the top of this
-          component. Pure presentation — does not affect calculations. */}
-      <div
-        role="group"
-        aria-label="Workspace view"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: 10,
-          padding: "8px 16px",
-          borderBottom: "1px solid #DCDBD6",
-          background: "#FAFAF8",
-          flex: "0 0 auto",
-        }}
-      >
-        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#625143" }}>
-          Workspace View
-        </span>
-        <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
-      </div>
+      {/* Persistent Workspace View selector — always visible across all three modes. */}
+      <WorkspaceViewSelector viewMode={viewMode} onViewModeChange={setViewMode} />
 
       <ViewModeLayout
         viewMode={viewMode}
@@ -2501,7 +2446,7 @@ function RoomDesignerWithState() {
             onLinkEarPlatformHeightsChange={appState?.setLinkEarPlatformHeights}
             acousticTreatmentEnabled={appState?.acousticTreatmentEnabled ?? false}
             setAcousticTreatmentEnabled={appState?.setAcousticTreatmentEnabled}
-            selectedAbfuserQty={appState?.selectedAbfuserQty ?? 0}
+            selectedAbfuserQty={includedAbfuserQty}
             setSelectedAbfuserQty={appState?.setSelectedAbfuserQty}
             abfuserRecommendation={abfuserRecommendation}
           />
