@@ -17,6 +17,7 @@
 
 import React from "react";
 import { selectClientAcousticTreatment } from "./selectClientAcousticTreatment";
+import { resolveReportQuantity } from "@/components/report/reportPricedQuantities";
 
 const COLORS = {
   cardBg: "#FFFFFF",
@@ -48,6 +49,9 @@ export default function ClientAcousticTreatment({
   acousticTreatmentEnabled = false,
   selectedAbfuserQty = 0,
   legacyAutoQuantity = 0,
+  pricedAbfuserQty = null,
+  priceSummary = null,
+  projectId = null,
 }) {
   const data = selectClientAcousticTreatment({
     roomDims,
@@ -73,6 +77,19 @@ export default function ClientAcousticTreatment({
 
   const recommendedQty = data.recommendedQty;
   const selectedQty = data.selectedQty;
+
+  // QUANTITY CONSISTENCY: the report shows the same quantity the priced
+  // schedule uses — the canonical selection, never the ADI recommendation.
+  // When no quantity is priced, the report states that plainly instead of
+  // showing a contradictory product number.
+  const pricedQuantity = resolveReportQuantity({
+    label: "Abfuser",
+    selectedQuantity: pricedAbfuserQty ?? selectedQty,
+    priceSummary,
+    projectId,
+  });
+  const pricedQty = pricedQuantity.quantity;
+  const displayQty = pricedQty != null ? pricedQty : recommendedQty;
   const surfaceArea = Number(qb?.treatmentSurfaceArea || 0).toFixed(2);
   const countedZones = data.zones.filter((z) => !z.advisory);
   const advisoryZones = data.zones.filter((z) => z.advisory);
@@ -261,13 +278,13 @@ export default function ClientAcousticTreatment({
         {/* Included quantity — separate authority from the recommendation */}
         <div style={{ marginTop: "4mm", background: "#F8F8F7", border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "3mm 4mm" }}>
           <div style={{ fontSize: "8pt", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: COLORS.secondary, marginBottom: "1mm", fontFamily: FONT_BODY }}>
-            INCLUDED IN PROPOSAL
+            INCLUDED IN THE PRICED SCHEDULE
           </div>
           <div style={{ fontFamily: FONT_HEADING, fontSize: "12pt", color: inclusionColor, lineHeight: 1.2 }}>
-            {selectedQty} / {recommendedQty} Abfusers
+            {pricedQty != null ? `${pricedQty} Abfuser${pricedQty === 1 ? "" : "s"}` : "Not included"}
           </div>
           <div style={{ fontSize: "9pt", color: inclusionColor, marginTop: "1mm", fontFamily: FONT_BODY, lineHeight: 1.5 }}>
-            {inclusion.message}
+            {pricedQuantity.warning || inclusion.message}
           </div>
         </div>
       </div>
@@ -306,16 +323,29 @@ export default function ClientAcousticTreatment({
       {/* ── Result card ── */}
       <div style={{ background: COLORS.primary, color: "#FFFFFF", borderRadius: 6, padding: "5mm 6mm" }}>
         <div style={{ fontSize: "8pt", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.7, marginBottom: "2mm", fontFamily: FONT_BODY }}>
-          {inclusion.state === "NOT_INCLUDED" ? "RECOMMENDED ACOUSTIC TREATMENT" : "ACOUSTIC TREATMENT"}
+          {pricedQty != null ? "ACOUSTIC TREATMENT — INCLUDED" : "ADI ACOUSTIC TREATMENT RECOMMENDATION"}
         </div>
         <div style={{ fontFamily: FONT_HEADING, fontSize: "16pt", fontWeight: 400, lineHeight: 1.2, marginBottom: "2mm" }}>
-          {recommendedQty} × Artcoustic Abfuser
+          {displayQty} × Artcoustic Abfuser
         </div>
         <div style={{ fontSize: "9pt", opacity: 0.85, lineHeight: 1.4, fontFamily: FONT_BODY }}>
           {data.wording.recommendationSentence}
         </div>
+        {pricedQuantity.warning && (
+          <div style={{
+            fontSize: "8pt",
+            opacity: 0.85,
+            lineHeight: 1.45,
+            fontFamily: FONT_BODY,
+            marginTop: "2mm",
+            paddingTop: "2mm",
+            borderTop: "1px solid rgba(255, 255, 255, 0.25)",
+          }}>
+            {pricedQuantity.warning}
+          </div>
+        )}
         <div style={{ fontSize: "8pt", opacity: 0.7, lineHeight: 1.4, fontFamily: FONT_BODY, marginTop: "2mm" }}>
-          Approximate treatment surface: {surfaceArea} m² · Included in proposal: {selectedQty} panel{selectedQty === 1 ? "" : "s"}
+          Approximate treatment surface: {surfaceArea} m²
         </div>
       </div>
     </div>

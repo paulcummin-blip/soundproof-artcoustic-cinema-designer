@@ -21,8 +21,12 @@ import {
   REPORT_FONT_BODY as FONT_BODY,
 } from '@/components/report/typography/reportTypography';
 
-export default function AboutSoundProofReportPage() {
+export default function AboutSoundProofReportPage({ variant = "full" }) {
   const { html, loading } = usePublicationContent("about_sound_proof");
+  // compact = the Visual Report's short brand closing section. It keeps the
+  // heading, logo and published copy, laid out in two columns so the section
+  // stays within roughly half a page and never dominates the end of the report.
+  const compact = variant === "compact";
 
   return (
     <div
@@ -33,7 +37,7 @@ export default function AboutSoundProofReportPage() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "flex-start",
-        padding: "10mm 14mm",
+        padding: compact ? "0 0 4mm 0" : "10mm 14mm",
         boxSizing: "border-box",
         background: "#FFFFFF",
         fontFamily: FONT_BODY,
@@ -46,22 +50,22 @@ export default function AboutSoundProofReportPage() {
         src={LOGO_URL}
         alt="Sound Proof"
         style={{
-          maxWidth: "170mm",
-          width: "55%",
+          maxWidth: compact ? "110mm" : "170mm",
+          width: compact ? "42%" : "55%",
           height: "auto",
-          maxHeight: "22mm",
+          maxHeight: compact ? "14mm" : "22mm",
           objectFit: "contain",
-          marginBottom: "6mm",
+          marginBottom: compact ? "3mm" : "6mm",
         }}
       />
 
       {/* Thin brand-colour line */}
       <div
         style={{
-          width: "55mm",
+          width: compact ? "40mm" : "55mm",
           height: "1.5px",
           background: BRAND_GREEN,
-          marginBottom: "8mm",
+          marginBottom: compact ? "4mm" : "8mm",
         }}
       />
 
@@ -69,12 +73,12 @@ export default function AboutSoundProofReportPage() {
       <h1
         style={{
           fontFamily: FONT_HEADING,
-          fontSize: "17pt",
+          fontSize: compact ? "14pt" : "17pt",
           fontWeight: 400,
           color: TEXT_DARK,
           letterSpacing: "0.02em",
-          margin: "0 0 8mm 0",
-          textAlign: "center",
+          margin: compact ? "0 0 4mm 0" : "0 0 8mm 0",
+          textAlign: compact ? "left" : "center",
         }}
       >
         About Sound Proof
@@ -83,6 +87,18 @@ export default function AboutSoundProofReportPage() {
       {/* Body copy — canonical published content */}
       {loading ? (
         <div style={{ fontSize: "10pt", color: "#625143" }}>Loading…</div>
+      ) : compact ? (
+        <div
+          style={{
+            columnCount: 2,
+            columnGap: "8mm",
+            maxWidth: "165mm",
+            width: "100%",
+            fontSize: "9pt",
+          }}
+        >
+          <PublicationContentHtml html={html} variant="print" style={{ width: "100%" }} />
+        </div>
       ) : (
         <PublicationContentHtml
           html={html}

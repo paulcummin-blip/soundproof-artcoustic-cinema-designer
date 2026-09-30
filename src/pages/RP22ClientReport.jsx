@@ -39,7 +39,8 @@ import { selectClientScreenSeating } from "@/components/report/client/selectClie
 import ClientAcousticTreatment from "@/components/report/client/ClientAcousticTreatment";
 import ClientBassCapability from "@/components/report/client/ClientBassCapability";
 import ClientBassResponse from "@/components/report/client/ClientBassResponse";
-import ClientP19HeatMap from "@/components/report/client/ClientP19HeatMap";
+import ClientP19RspPresentation from "@/components/report/client/ClientP19RspPresentation";
+import ClientAdiDesignSummary from "@/components/report/client/ClientAdiDesignSummary";
 import { selectClientBassPerformance } from "@/components/report/client/selectClientBassPerformance";
 import ClientP2SystemArchitecture from "@/components/report/client/ClientP2SystemArchitecture";
 import { selectClientP2SystemArchitecture } from "@/components/report/client/selectClientP2SystemArchitecture";
@@ -50,7 +51,8 @@ import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReport
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
-import ReportDependencyChecker from "@/components/report/ReportDependencyChecker";
+import ReportStatePanel from "@/components/report/ReportStatePanel";
+import { deriveReportReadiness, REPORT_STATE } from "@/components/report/reportReadinessAuthority";
 import { useAppState } from "@/components/AppStateProvider";
 import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
@@ -95,9 +97,8 @@ export default function RP22ClientReport() {
     versionName,
   } = authority;
 
-  // A report is ready only when the one canonical publication is available.
-  // No secondary bass-store lifecycle may override or reinterpret it.
-  const reportPending = hydrating || !engineeringSummary;
+  // The report's canonical readiness state is derived below, once the
+  // published bass authority has resolved. One state governs the whole report.
 
   // ── Design Summary (static intro + canonical design assumptions) ──
   const highlights = useMemo(() => selectClientDesignHighlights(), []);
@@ -253,13 +254,46 @@ export default function RP22ClientReport() {
     return selectClientBassPerformance(engineeringSummary, seatingPositions);
   }, [hydrating, engineeringSummary, seatingPositions]);
 
-  // ── Active pages collection — drives both screen and PDF rendering order ──
+  // Published geometry/system context for the ADI Design Summary. Read from
+  // the saved project, so ADI receives the same inputs here as everywhere else.
+  const reportGeometry = useMemo(() => {
+    const lengthM = Number(roomDims?.lengthM) || 0;
+    const seatYs = (Array.isArray(seatingPositions) ? seatingPositions : [])
+      .map((seat) => Number(seat?.y ?? seat?.position?.y))
+      .filter((value) => Number.isFinite(value));
+    return {
+      roomDims: {
+        widthM: Number(roomDims?.widthM) || 0,
+        lengthM,
+        heightM: Number(roomDims?.heightM) || 0,
+      },
+      rearWallDistanceM: lengthM > 0 && seatYs.length > 0
+        ? Math.max(0, lengthM - Math.max(...seatYs))
+        : null,
+    };
+  }, [roomDims, seatingPositions]);
+
+  const reportSystem = useMemo(() => ({
+    subwooferCount: (Array.isArray(subwooferInstances) ? subwooferInstances : [])
+      .filter((sub) => sub && sub.enabled !== false).length,
+  }), [subwooferInstances]);
+
+  // ── Active pages — one coherent client story ────────────────────────────
+  // 1 Project overview · 2 Key performance highlights · 3 ADI Design Summary
+  // 4 Dynamic Range · 5 Spatial Resolution · 6 Timbre Matching
+  // 7 Practical limitations and upgrades · 8 Short About Sound Proof
   const activePages = useMemo(() => {
-    const pages = [];
+    const overviewPages = [];
+    const dynamicPages = [];
+    const spatialPages = [];
+    const timbrePages = [];
+    const bassPages = [];
+    const closingPages = [];
     // Design Summary — always first (intro page)
     if (highlights.length > 0) {
-      pages.push({
+      overviewPages.push({
         id: "design-summary",
+        category: "Design Summary",
         visual: (
           <ClientDesignHighlights
             highlights={highlights}
@@ -277,10 +311,27 @@ export default function RP22ClientReport() {
         },
       });
     }
-    // RP23 Screen Size / Seating — after Design Summary, before RP22 pages
+    // ADI Design Summary — what Artcoustic Design Intelligence contributes:
+    // the project's genuine strengths, the main limiting factor and the
+    // practical next actions. Immediately after the performance highlights.
+    overviewPages.push({
+      id: "adi-design-summary",
+      category: "ADI Design Summary",
+      visual: (
+        <ClientAdiDesignSummary
+          engineeringSummary={engineeringSummary}
+          seats={seatingPositions}
+          geometry={reportGeometry}
+          system={reportSystem}
+        />
+      ),
+      printData: { type: "adi-design-summary" },
+    });
+    // RP23 Screen Size / Seating — project overview page
     if (screenSeating.hasAny) {
-      pages.push({
+      overviewPages.push({
         id: "screen-seating",
+        category: "Viewing Experience",
         visual: (
           <ClientScreenSeating
             roomDims={roomDims}
@@ -308,8 +359,9 @@ export default function RP22ClientReport() {
     }
     // P2 System Architecture — after Viewing Experience, before P5
     if (p2SystemArchitecture) {
-      pages.push({
+      spatialPages.push({
         id: "p2-system-architecture",
+        category: "Spatial Resolution",
         visual: (
           <ClientP2SystemArchitecture
             p2Data={p2SystemArchitecture}
@@ -336,8 +388,9 @@ export default function RP22ClientReport() {
       });
     }
     if (p5Snapshot && isAssessedLevel(p5Snapshot.level)) {
-      pages.push({
+      spatialPages.push({
         id: "p5-spatial-resolution",
+        category: "Spatial Resolution",
         visual: (
           <ClientSoundAroundListener
             p5Snapshot={p5Snapshot}
@@ -357,8 +410,9 @@ export default function RP22ClientReport() {
     }
     // P7 Front Wides — only when front wides are present
     if (p7FrontWides) {
-      pages.push({
+      spatialPages.push({
         id: "p7-front-wides",
+        category: "Spatial Resolution",
         visual: (
           <ClientP7FrontWides
             p7Data={p7FrontWides}
@@ -379,8 +433,9 @@ export default function RP22ClientReport() {
     // P9 only when at least one seat has a genuine assessed result (L1-L4 or FAIL).
     // Excludes N/A / Not assessed / Not calculated (e.g. single overhead row).
     if (p9Overhead.hasAnyValidResult) {
-      pages.push({
+      spatialPages.push({
         id: "p9-spatial-resolution",
+        category: "Spatial Resolution",
         visual: (
           <ClientP9Overhead
             roomDims={roomDims}
@@ -406,8 +461,9 @@ export default function RP22ClientReport() {
     }
     // Best Listening Area — only when at least one seat has a genuine assessed result
     if (bestListeningArea.hasAnyValidResult) {
-      pages.push({
+      spatialPages.push({
         id: "best-listening-area",
+        category: "Spatial Resolution",
         visual: (
           <ClientBestListeningArea
             roomDims={roomDims}
@@ -433,8 +489,9 @@ export default function RP22ClientReport() {
     }
     // Timbre Consistency (after Best Listening Area, before Design Highlights)
     if (timbreConsistency.hasAnyValidResult) {
-      pages.push({
+      timbrePages.push({
         id: "timbre-consistency",
+        category: "Timbre Matching",
         visual: (
           <ClientTimbreConsistency
             roomDims={roomDims}
@@ -458,8 +515,9 @@ export default function RP22ClientReport() {
     }
     // Front Soundstage Dynamic Range (after Timbre Consistency, before Design Highlights)
     if (frontSoundstage.hasAny) {
-      pages.push({
+      dynamicPages.push({
         id: "front-soundstage-dynamic-range",
+        category: "Dynamic Range",
         visual: (
           <ClientFrontSoundstageDynamicRange
             roomDims={roomDims}
@@ -503,8 +561,9 @@ export default function RP22ClientReport() {
     }
     // Non-Screen Dynamic Range (after Front Soundstage, before Design Highlights)
     if (nonScreenSoundstage.hasAny) {
-      pages.push({
+      dynamicPages.push({
         id: "non-screen-dynamic-range",
+        category: "Dynamic Range",
         visual: (
           <ClientNonScreenDynamicRange
             roomDims={roomDims}
@@ -544,8 +603,9 @@ export default function RP22ClientReport() {
     // Both consume the same canonical bass authority. Only included when at
     // least one genuine assessed bass result exists.
     if (bassPerformance) {
-      pages.push({
+      bassPages.push({
         id: "bass-capability",
+        category: "Bass Performance",
         visual: (
           <ClientBassCapability bassPerformance={bassPerformance} />
         ),
@@ -554,8 +614,9 @@ export default function RP22ClientReport() {
           bassPerformance,
         },
       });
-      pages.push({
+      bassPages.push({
         id: "bass-response",
+        category: "Bass Performance",
         visual: (
           <ClientBassResponse
             bassPerformance={bassPerformance}
@@ -576,11 +637,14 @@ export default function RP22ClientReport() {
           screenWidthM,
         },
       });
-      // P19 Heat Map — dedicated spatial response-quality page
-      pages.push({
-        id: "p19-heatmap",
+      // P19 — Bass Response at RSP. P19 is assessed at the reference seating
+      // position only, so it is presented as a single RSP result. Seat-to-seat
+      // consistency is the P20 page above; no all-seat P19 grid is ever drawn.
+      bassPages.push({
+        id: "p19-rsp",
+        category: "Bass Performance",
         visual: (
-          <ClientP19HeatMap
+          <ClientP19RspPresentation
             bassPerformance={bassPerformance}
             roomDims={roomDims}
             seatingPositions={seatingPositions}
@@ -591,7 +655,7 @@ export default function RP22ClientReport() {
           />
         ),
         printData: {
-          type: "p19-heatmap",
+          type: "p19-rsp",
           bassPerformance,
           roomDims,
           seatingPositions,
@@ -604,8 +668,9 @@ export default function RP22ClientReport() {
     }
     // Recommended Seating Position (only when valid geometry + seats + RSP)
     if (hasSeatingPosition) {
-      pages.push({
+      bassPages.push({
         id: "recommended-seating-position",
+        category: "Spatial Resolution",
         visual: (
           <ClientRecommendedSeatingPosition
             roomDims={roomDims}
@@ -632,6 +697,12 @@ export default function RP22ClientReport() {
     // the ADI recommendation and the separate included quantity, so it does not
     // depend on a quantity having been accepted into pricing.
     if (appState?.acousticTreatmentEnabled) {
+      const reportPriceSummary = (() => {
+        const summary = typeof window !== "undefined" ? window.__ROOM_DESIGNER_PRICE__ : null;
+        return summary && projectId && String(summary.projectId || "") === String(projectId)
+          ? summary
+          : null;
+      })();
       const acousticTreatmentProps = {
         roomDims,
         seatingPositions,
@@ -640,9 +711,15 @@ export default function RP22ClientReport() {
         acousticTreatmentEnabled: true,
         selectedAbfuserQty: Number(appState?.selectedAbfuserQty) || 0,
         legacyAutoQuantity: Number(appState?.legacyAbfuserAutoQty) || 0,
+        // Quantity consistency: the report reads the same canonical quantity the
+        // priced schedule uses, and warns rather than contradicting it.
+        pricedAbfuserQty: Number(appState?.selectedAbfuserQty) || 0,
+        priceSummary: reportPriceSummary,
+        projectId,
       };
-      pages.push({
+      closingPages.push({
         id: "acoustic-treatment",
+        category: "Acoustic Treatment",
         visual: <ClientAcousticTreatment {...acousticTreatmentProps} />,
         printData: {
           type: "acoustic-treatment",
@@ -650,39 +727,116 @@ export default function RP22ClientReport() {
         },
       });
     }
-    // About Sound Proof — always the final page (fixed brand closing page)
-    pages.push({
+    // About Sound Proof — the short brand closing section, always last.
+    closingPages.push({
       id: "about-sound-proof",
+      category: "About Sound Proof",
       visual: (
         <div style={{
           background: "#FFFFFF",
           borderRadius: 16,
-          padding: "48px 40px",
-          minHeight: 400,
+          padding: "28px 32px",
           boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
           border: "1px solid #DCDBD6",
         }}>
-          <AboutSoundProofReportPage />
+          <AboutSoundProofReportPage variant="compact" />
         </div>
       ),
       printData: { type: "about-sound-proof" },
     });
-    return pages;
-  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, designAssumptions, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence]);
 
-  // The report requires bass simulation to be complete. When bass has never
-  // been calculated (or is actively running), the dependency checker explains
-  // exactly what is missing instead of showing a generic loading message.
-  const bassMissing = !hydrating && !!engineeringSummary && !bassPerformance;
-  const showDependencyChecker = reportPending || bassMissing;
+    return [
+      ...overviewPages,
+      ...dynamicPages,
+      ...spatialPages,
+      ...timbrePages,
+      ...bassPages,
+      ...closingPages,
+    ];
+  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, designAssumptions, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence, reportGeometry, reportSystem, projectId]);
+
+  // Each category heading is printed once. The first page of a category keeps
+  // its heading; continuation pages never repeat the major category heading.
+  const orderedPages = useMemo(() => {
+    const seen = new Set();
+    return activePages.map((page) => {
+      const firstOfCategory = !seen.has(page.category);
+      seen.add(page.category);
+      return {
+        ...page,
+        printData: { ...page.printData, categoryFirst: firstOfCategory },
+      };
+    });
+  }, [activePages]);
+
+  // ── Canonical report state ──────────────────────────────────────────────
+  // One authority decides whether this report is Not Ready, Preparing, Ready
+  // or Failed. PDF export is enabled only in the Ready state, and Preparing is
+  // bounded: it always resolves to a definite state instead of waiting
+  // indefinitely.
+  const [stateSeconds, setStateSeconds] = React.useState(0);
+
+  React.useEffect(() => {
+    const interval = setInterval(() => setStateSeconds((seconds) => seconds + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const windowPriceSummary = typeof window !== "undefined" ? window.__ROOM_DESIGNER_PRICE__ : null;
+  const priceSummary = windowPriceSummary
+    && projectId
+    && String(windowPriceSummary.projectId || "") === String(projectId)
+    ? windowPriceSummary
+    : null;
+
+  // Pricing is only reported as incomplete when it genuinely is — an absent
+  // price summary for this project is treated as unknown, never as a blocker.
+  const pricingStatus = priceSummary
+    ? (Number(priceSummary.incompletePriceCount) > 0 ? "incomplete" : "ok")
+    : "unknown";
+
+  const readinessBase = deriveReportReadiness({
+    hydrating,
+    roomDims,
+    placedSpeakers,
+    engineeringSummary,
+    bassPerformance,
+    pricingStatus,
+    elapsedSeconds: stateSeconds,
+  });
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
-    activePageCount: showDependencyChecker ? 0 : activePages.length,
+    activePageCount: readinessBase.state === REPORT_STATE.READY ? activePages.length : 0,
     projectName: projectDetails?.name,
     logoUrl: LOGO_URL,
     versionNumber,
     versionName,
   });
+
+  // A failed export resolves the report to the canonical Failed state.
+  const readiness = exportError
+    ? {
+        state: REPORT_STATE.FAILED,
+        missing: [],
+        nextAction: "Retry the report, or return to the project.",
+        reason: exportError,
+        canExport: false,
+      }
+    : readinessBase;
+
+  const reportReady = readiness.state === REPORT_STATE.READY;
+
+  const progressItems = [
+    { key: "project", label: "Project loaded", done: !hydrating && !!projectDetails },
+    { key: "room", label: "Room geometry", done: Number(roomDims?.widthM) > 0 && Number(roomDims?.lengthM) > 0 },
+    { key: "speakers", label: "Speaker layout", done: Array.isArray(placedSpeakers) && placedSpeakers.length > 0 },
+    { key: "rp22", label: "RP22 assessment", done: !!engineeringSummary },
+    {
+      key: "bass",
+      label: "Bass assessment",
+      done: !!bassPerformance,
+      running: hydrating || (!bassPerformance && !!engineeringSummary),
+    },
+  ];
 
   const handleBackToProject = () => {
     if (!projectId) return;
@@ -778,7 +932,7 @@ export default function RP22ClientReport() {
           <Button
             type="button"
             onClick={handleExport}
-            disabled={showDependencyChecker || activePages.length === 0 || exporting}
+            disabled={!reportReady || activePages.length === 0 || exporting}
             className="client-report-screen-only"
             style={{
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",
@@ -802,20 +956,7 @@ export default function RP22ClientReport() {
         maxWidth: 900,
         margin: "0 auto",
       }}>
-        {showDependencyChecker ? (
-          <div className="client-report-screen-only">
-            <ReportDependencyChecker
-              projectId={projectId}
-              hydrating={hydrating}
-              projectDetails={projectDetails}
-              roomDims={roomDims}
-              placedSpeakers={placedSpeakers}
-              engineeringSummary={engineeringSummary}
-              bassPerformance={bassPerformance}
-              onOpenBassSimulation={handleOpenBassSimulation}
-            />
-          </div>
-        ) : !projectId ? (
+        {!projectId ? (
           <div className="client-report-screen-only" style={{
             background: "#FFFFFF",
             borderRadius: 16,
@@ -828,7 +969,21 @@ export default function RP22ClientReport() {
           }}>
             Open a project from the Room Designer to view its Visual Report.
           </div>
-        ) : activePages.length === 0 ? (
+        ) : !reportReady ? (
+          <div className="client-report-screen-only">
+            <ReportStatePanel
+              state={readiness.state}
+              reportLabel="Visual Report"
+              missing={readiness.missing}
+              nextAction={readiness.nextAction}
+              reason={readiness.reason}
+              progressItems={progressItems}
+              elapsedSeconds={stateSeconds}
+              onReturn={handleBackToProject}
+              onRetry={exportError ? handleExport : undefined}
+            />
+          </div>
+        ) : orderedPages.length === 0 ? (
           <div className="client-report-screen-only" style={{
             background: "#FFFFFF",
             borderRadius: 16,
@@ -842,12 +997,12 @@ export default function RP22ClientReport() {
             No active report pages.
           </div>
         ) : (
-          activePages.map((page, i) => (
+          orderedPages.map((page, i) => (
             <ClientReportPage
               key={page.id}
               pageId={page.id}
               isFirst={i === 0}
-              isLast={i === activePages.length - 1}
+              isLast={i === orderedPages.length - 1}
               projectDetails={projectDetails}
               logoUrl={LOGO_URL}
               printData={page.printData}

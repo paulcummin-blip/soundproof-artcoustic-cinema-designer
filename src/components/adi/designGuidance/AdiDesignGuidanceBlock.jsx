@@ -42,12 +42,12 @@ const SEVERITY_STYLE = {
 };
 
 const GUIDANCE_LABELS = [
-  ["whatIsWrong", "What is wrong"],
-  ["whyItIsHappening", "Why it is happening"],
-  ["changeFirst", "Change first"],
-  ["expectedImprovement", "Expected improvement"],
-  ["remainingLimitation", "Remaining limitation"],
-  ["lowerValueChanges", "Lower-value changes"],
+  ["whatIsWrong", "What is wrong:"],
+  ["whyItIsHappening", "Why it is happening:"],
+  ["changeFirst", "Change first:"],
+  ["expectedImprovement", "Expected improvement:"],
+  ["remainingLimitation", "Remaining limitation:"],
+  ["lowerValueChanges", "Lower-value changes:"],
 ];
 
 function AdiMark() {
@@ -172,7 +172,7 @@ export default function AdiDesignGuidanceBlock({
             marginBottom: 4,
           }}
         >
-          ADI has identified
+          ADI has identified:
         </div>
         <div
           style={{

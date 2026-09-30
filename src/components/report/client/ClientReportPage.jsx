@@ -16,7 +16,7 @@ import PrintP5Content from "@/components/report/client/print/PrintP5Content";
 import PrintP9Content from "@/components/report/client/print/PrintP9Content";
 import PrintBassCapabilityContent from "@/components/report/client/print/PrintBassCapabilityContent";
 import PrintBassResponseContent from "@/components/report/client/print/PrintBassResponseContent";
-import ClientP19HeatMap from "@/components/report/client/ClientP19HeatMap";
+import ClientP19RspPresentation from "@/components/report/client/ClientP19RspPresentation";
 import PrintP2Content from "@/components/report/client/print/PrintP2Content";
 import PrintP7Content from "@/components/report/client/print/PrintP7Content";
 import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
@@ -59,8 +59,20 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
     }
   }
 
+  const categoryFirst = printData?.categoryFirst !== false;
+
   return (
-    <div className={`client-report-page print-avoid-break${isFirst ? " client-report-page--first" : ""}`} data-page-id={pageId}>
+    <div
+      className={`client-report-page print-avoid-break${isFirst ? " client-report-page--first" : ""}`}
+      data-page-id={pageId}
+      data-category-first={categoryFirst ? "true" : "false"}
+    >
+      {/* Each report category heading is printed once. Continuation pages keep
+          their own subtitle but never repeat the major category heading. */}
+      <style>{`
+        .client-report-page[data-category-first="false"] .client-report-print-heading__title { display: none; }
+        .client-report-page[data-category-first="false"] .client-report-print-heading { margin-bottom: 2mm; }
+      `}</style>
       {/* Print-only header (first page) */}
       {isFirst && (
         <div className="client-report-page__header client-report-print-only">
@@ -386,14 +398,14 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             screenWidthM={printData.screenWidthM}
           />
         )}
-        {printData?.type === "p19-heatmap" && (
+        {printData?.type === "p19-rsp" && (
           <>
             <div className="client-report-print-heading">
               <h1 className="client-report-print-heading__title">Bass Performance</h1>
-              <p className="client-report-print-heading__subtitle">RP22 Parameter 19 — Response Quality Across the Room</p>
+              <p className="client-report-print-heading__subtitle">RP22 Parameter 19 — Bass Response at the Reference Seating Position</p>
             </div>
             <div className="client-report-print-drawing">
-              <ClientP19HeatMap
+              <ClientP19RspPresentation
                 bassPerformance={printData.bassPerformance}
                 roomDims={printData.roomDims}
                 seatingPositions={printData.seatingPositions}
@@ -402,6 +414,20 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 screenWidthM={printData.screenWidthM}
                 subwooferInstances={printData.subwooferInstances}
                 print
+                printPart="drawing"
+              />
+            </div>
+            <div className="client-report-print-support">
+              <ClientP19RspPresentation
+                bassPerformance={printData.bassPerformance}
+                roomDims={printData.roomDims}
+                seatingPositions={printData.seatingPositions}
+                rsp={printData.rsp}
+                screenFrontPlaneM={printData.screenFrontPlaneM}
+                screenWidthM={printData.screenWidthM}
+                subwooferInstances={printData.subwooferInstances}
+                print
+                printPart="result"
               />
             </div>
           </>

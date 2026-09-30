@@ -654,6 +654,10 @@ function RP22ReportInner() {
     const roomDesignRating = showDesignRating
         ? (engineeringSummary?.project?.rating ?? null)
         : null;
+    // A report that states the design is not assessed must not offer an enabled
+    // PDF export. Only an explicit NOT_ASSESSED rating blocks it — a hidden
+    // rating display preference never blocks the export.
+    const designAssessmentComplete = !(showDesignRating && roomDesignRating?.status === "NOT_ASSESSED");
     const scopedRatings = engineeringSummary?.designRating?.scopedRatings ?? null;
     const seatDesignRatings = engineeringSummary?.designRating?.seatDesignRatings ?? null;
 
@@ -1018,6 +1022,28 @@ function RP22ReportInner() {
         <div className="min-h-screen bg-[#F9F8F6] p-6">
             <ReportPrintStyles />
 
+            {/* Assessment gate — the report says the design is not assessed, so
+                the PDF export is disabled and the reason is stated plainly. */}
+            {!designAssessmentComplete && (
+                <div
+                    className="max-w-7xl mx-auto mb-4"
+                    style={{
+                        background: "#F7F1E6",
+                        border: "1px solid #E2D7BE",
+                        borderRadius: 8,
+                        padding: "12px 16px",
+                        color: "#7A6640",
+                        fontSize: 13,
+                        lineHeight: 1.55,
+                        fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif",
+                    }}
+                >
+                    <strong style={{ color: "#213428" }}>This design has not been assessed.</strong>{" "}
+                    Complete the RP22 assessment in the Room Designer to enable PDF export.
+                    The report can still be viewed here.
+                </div>
+            )}
+
             {/* READ-ONLY: DesignRecommendationEngine is NOT mounted here.
                 The report reads already-settled recommendations from the
                 Design Review handoff published by the Room Designer. */}
@@ -1069,8 +1095,8 @@ function RP22ReportInner() {
                         setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
-                        exportDisabled={reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || recommendationsPending}
-                        exportDisabledMessage={authorityReportPending ? "Engineering summary loading" : (recommendationsPending ? "Recommendations evaluating" : "Report loading")}
+                        exportDisabled={reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || recommendationsPending || !designAssessmentComplete}
+                        exportDisabledMessage={!designAssessmentComplete ? "Complete assessment to export PDF" : (authorityReportPending ? "Engineering summary loading" : (recommendationsPending ? "Recommendations evaluating" : "Report loading"))}
                         includeAdiAssessment={includeAdiAssessment}
                         onToggleAdiAssessment={showDesignRating ? setIncludeAdiAssessment : null}
                         lcrAngleInfo={(() => {

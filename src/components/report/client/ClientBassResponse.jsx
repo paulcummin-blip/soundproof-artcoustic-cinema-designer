@@ -21,8 +21,6 @@ import { getSeatGradeColors, PRIORITY_LEGEND, isAssessedLevel } from "./visualRe
 import SeatMarker from "./SeatMarker";
 import {
   computeHaloRadiusPx,
-  BASS_TWO_SEGMENT_LAYOUT,
-  BASS_TWO_SEGMENT_LEGEND,
   PRIMARY_STROKE_WIDTH,
   buildRingSegmentPath,
 } from "./seatMarkerGeometry";
@@ -99,7 +97,7 @@ function buildBassSeats(seatingPositions, p19PerSeat, p20PerSeat) {
 // ── Summary sentence ──
 
 function buildSummarySentence(seats) {
-  const assessed = seats.filter((s) => s.p19Level || s.p20Level);
+  const assessed = seats.filter((s) => s.p20Level);
   if (assessed.length === 0) return null;
 
   const primarySeats = assessed.filter((s) => s.isPrimary);
@@ -109,30 +107,24 @@ function buildSummarySentence(seats) {
     return "Bass response is assessed at the reference seating position.";
   }
 
-  // Compare primary vs secondary P19 levels
-  const primaryP19Levels = primarySeats.map((s) => s.p19Level).filter(Boolean);
-  const secondaryP19Levels = secondarySeats.map((s) => s.p19Level).filter(Boolean);
+  // P20 is the seat-to-seat parameter: compare primary and secondary seats.
+  const primaryLevels = primarySeats.map((s) => s.p20Level).filter(Boolean);
+  const secondaryLevels = secondarySeats.map((s) => s.p20Level).filter(Boolean);
 
-  if (primaryP19Levels.length > 0 && secondaryP19Levels.length > 0) {
-    const primaryBest = primaryP19Levels.every((l) => l === "L4" || l === "L3");
-    const secondaryWorse = secondaryP19Levels.some((l) => l === "L1" || l === "L2" || l === "FAIL");
+  if (primaryLevels.length > 0 && secondaryLevels.length > 0) {
+    const primaryBest = primaryLevels.every((l) => l === "L4" || l === "L3");
+    const secondaryWorse = secondaryLevels.some((l) => l === "L1" || l === "L2" || l === "FAIL");
     if (primaryBest && secondaryWorse) {
-      return "Bass response is most consistent around the reference seating area, with greater variation toward the outer seats.";
+      return "Seat-to-seat bass consistency is strongest around the reference seating area, with greater variation toward the outer seats.";
     }
   }
 
-  // Check if all seats are similar
-  const allP19 = assessed.map((s) => s.p19Level).filter(Boolean);
   const allP20 = assessed.map((s) => s.p20Level).filter(Boolean);
-  if (allP19.length > 0 && allP20.length > 0) {
-    const p19Set = new Set(allP19);
-    const p20Set = new Set(allP20);
-    if (p19Set.size <= 1 && p20Set.size <= 1) {
-      return "Bass response remains consistent across the seating area.";
-    }
+  if (allP20.length > 0 && new Set(allP20).size <= 1) {
+    return "Bass consistency remains uniform across the seating area.";
   }
 
-  return "Bass response varies across the seating area as shown above.";
+  return "Seat-to-seat bass consistency varies across the seating area as shown above.";
 }
 
 // ── Per-seat level badge ──
@@ -182,9 +174,12 @@ export default function ClientBassResponse({
   // NOT CALCULATED guard — screen only. In print mode, the print content
   // component (PrintBassResponseContent) handles the NOT CALCULATED state
   // at the page level to avoid duplicate headings.
+  // P20 (seat-to-seat consistency) is the parameter this page presents. P19 is
+  // assessed at the reference seating position alone and has its own page, so
+  // this page never renders a per-seat P19 row or a grid of dashes.
   const hasP19 = p19 && isAssessedLevel(p19.achievedLevel);
   const hasP20 = p20 && isAssessedLevel(p20.achievedLevel);
-  if (!hasP19 && !hasP20 && !print) {
+  if (!hasP20 && !print) {
     return (
       <div style={{
         background: "#FFFFFF",
@@ -213,7 +208,7 @@ export default function ClientBassResponse({
           textTransform: "uppercase",
           textAlign: "center",
         }}>
-          RP22 Parameters 19 &amp; 20 — Response Quality and Seat Consistency
+          RP22 Parameter 20 — Seat-to-Seat Bass Consistency
         </p>
         <div style={{
           fontSize: 16,
@@ -228,8 +223,8 @@ export default function ClientBassResponse({
       </div>
     );
   }
-  // Print mode with no assessed P19/P20 — return null (print content handles it)
-  if (!hasP19 && !hasP20 && print) return null;
+  // Print mode with no assessed P20 — return null (print content handles it)
+  if (!hasP20 && print) return null;
 
   const seats = buildBassSeats(
     seatingPositions,
@@ -392,15 +387,11 @@ export default function ClientBassResponse({
             SCREEN
           </text>
 
-          {/* Seat markers — two-segment halo: UPPER = P19, LOWER = P20 */}
+          {/* Seat markers — single halo: P20 seat-to-seat consistency only.
+              P19 is assessed at the reference seating position alone, so it is
+              never drawn per seat. */}
           {seats.map((seat) => {
             const sp = toPx(seat.x, seat.y);
-            const segments = BASS_TWO_SEGMENT_LAYOUT.map((seg) => ({
-              key: seg.key,
-              level: seat[`${seg.key}Level`],
-              startAngle: seg.startAngle,
-              endAngle: seg.endAngle,
-            }));
             return (
               <SeatMarker
                 key={seat.id}
@@ -408,7 +399,7 @@ export default function ClientBassResponse({
                 cy={sp.py}
                 haloRadius={haloRadius}
                 isPrimary={seat.isPrimary}
-                segments={segments}
+                singleLevel={seat.p20Level}
               />
             );
           })}
@@ -489,8 +480,8 @@ export default function ClientBassResponse({
             <div style={{ height: 1, background: "#DCDBD6", width: "100%" }} />
             {/* Segment position key */}
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 14 }}>
-              {BASS_TWO_SEGMENT_LEGEND.map((entry) => {
-                const seg = BASS_TWO_SEGMENT_LAYOUT.find((s) => s.key === entry.key);
+              {[{ key: "p20", label: "Halo — P20 seat consistency" }].map((entry) => {
+                const seg = { key: "p20", startAngle: 0, endAngle: 359.9 };
                 return (
                   <div key={entry.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <svg width={18} height={18} viewBox="0 0 20 20">
@@ -512,7 +503,21 @@ export default function ClientBassResponse({
             </div>
           </div>
 
-          {/* ── Per-seat P19/P20 levels ── */}
+          {/* ── Per-seat P20 levels — seat-to-seat bass consistency ──
+              P19 is assessed at the reference seating position alone and is
+              presented on its own page, so it is never shown as an all-seat
+              row here. */}
+          <p style={{
+            margin: 0,
+            fontSize: 11,
+            color: "#8A7B6A",
+            fontFamily: BODY_FONT,
+            lineHeight: 1.55,
+            maxWidth: print ? "100%" : 600,
+          }}>
+            P19 is assessed at the Reference Seating Position only and is shown on its own page.
+            Seat-to-seat bass consistency is assessed at every seat under P20.
+          </p>
           {matrixRows.length > 0 && (
             <div style={{
               width: "100%",
@@ -555,21 +560,6 @@ export default function ClientBassResponse({
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td style={{ padding: "4px 6px", color: "#625143", fontSize: 11, letterSpacing: "0.02em" }}>
-                          P19 Response
-                        </td>
-                        {row.seats.map((seat) => (
-                          <td key={seat.id} style={{ padding: "4px 6px", textAlign: "center", borderBottom: "1px solid #DCDBD6" }}>
-                            <SeatLevelBadge level={seat.p19Level} strong={seat.isPrimary} />
-                            {seat.p19VariationDb != null && (
-                              <div style={{ fontSize: 9, color: "#8A7B6A", marginTop: 2 }}>
-                                ±{Math.abs(seat.p19VariationDb).toFixed(1)} dB
-                              </div>
-                            )}
-                          </td>
-                        ))}
-                      </tr>
                       <tr>
                         <td style={{ padding: "4px 6px", color: "#625143", fontSize: 11, letterSpacing: "0.02em" }}>
                           P20 Consistency
