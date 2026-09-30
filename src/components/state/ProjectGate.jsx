@@ -92,7 +92,7 @@ export default function ProjectGate({ children, requiresDesign = true }) {
     return (
       <Shell
         title="Project could not be loaded"
-        message={hydration.error || "The saved project data could not be hydrated."}
+        message={hydration.error || "The saved design for this project could not be loaded."}
       >
         <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 18 }}>
           <button
@@ -137,9 +137,18 @@ export default function ProjectGate({ children, requiresDesign = true }) {
     return children;
   }
 
-  // The saved design state is hydrated by the shared hydrator (the same
-  // canonical path the pages use). The page is mounted only once it is loaded,
-  // so no page can render a default room/system as if it were this project.
+  // Design-dependent pages: the saved design state is hydrated, so mount the
+  // real page. Without this branch the gate would fall through to the loading
+  // shell even after the hydrator reported the project loaded, and no design
+  // page could ever mount.
+  if (hydration.status === "loaded") {
+    return children;
+  }
+
+  // Only a project that is still loading (or whose identity is not yet known)
+  // reaches the shell. The saved design state is hydrated by the shared
+  // hydrator (the same canonical path the pages use), so no page can render a
+  // default room/system as if it were this project.
   return (
     <>
       <ProjectDesignHydrator projectId={hydration.projectId} />

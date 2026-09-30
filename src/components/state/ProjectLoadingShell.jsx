@@ -27,13 +27,11 @@ function Bar({ width = "100%", height = 12 }) {
 export default function ProjectLoadingShell({
   projectName = null,
   projectClientName = null,
-  label = "Loading project…",
+  label = "Your project",
   compact = false,
 }) {
   const heading = projectName ? projectName : label;
-  const subheading = projectName
-    ? "Loading saved project state…"
-    : "Waiting for the selected project…";
+  const clientLine = projectClientName ? `Client: ${projectClientName}` : null;
 
   return (
     <div
@@ -66,14 +64,16 @@ export default function ProjectLoadingShell({
         }}
       >
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#625143" }}>
-          {projectName ? "Opening project" : "Project loading"}
+          Opening project
         </div>
         <div style={{ fontSize: 20, fontWeight: 700, color: "#1B1A1A", marginTop: 6, lineHeight: 1.25 }}>
           {heading}
         </div>
-        <div style={{ fontSize: 13, color: "#625143", marginTop: 4 }}>
-          {projectClientName ? `Client: ${projectClientName} · ${subheading}` : subheading}
-        </div>
+        {clientLine && (
+          <div style={{ fontSize: 13, color: "#625143", marginTop: 4 }}>
+            {clientLine}
+          </div>
+        )}
 
         <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 12 }}>
           <Bar width="70%" height={14} />
@@ -91,9 +91,8 @@ export default function ProjectLoadingShell({
             color: "#8B7F76",
           }}
         >
-          Saved design data is being hydrated. Room dimensions, speaker layouts,
-          performance results and prices will appear once the project has loaded —
-          nothing is shown from placeholder data.
+          Loading the saved design for this project. The room, speaker layout,
+          performance results and pricing will appear when ready.
         </div>
       </div>
     </div>
