@@ -134,7 +134,7 @@ function infoValue(value, suffix = "") {
   return `${value}${suffix}`;
 }
 
-function artcousticInfoRows(speaker, price) {
+function artcousticInfoRows(speaker, price, result = null) {
   if (!speaker) return [];
   const key = speaker.p12Key || speaker.p13Key || speaker.id;
   const meta = resolveSpeakerSplMeta(key);
@@ -153,6 +153,9 @@ function artcousticInfoRows(speaker, price) {
     ["Peak SPL @ 1 m · Anechoic", infoValue(meta?.max_spl_peak_db_cf6_1m_anechoic, " dB")],
     ["Usable LF response (-6 dB)", infoValue(meta?.usable_lf_hz_minus6db, " Hz")],
     ["Measurement basis", "Artcoustic published Half Space authority"],
+    ["Raw SPL at RSP (pre-headroom)", infoValue(result?.rawSpl, " dB")],
+    [`Design SPL at RSP (after ${RP22_EQ_HEADROOM_LABEL} headroom)`, infoValue(result?.designSpl, " dB")],
+    ["Graded from", "Design SPL (post-headroom), whole dB"],
     ["Source", "Canonical Sound Proof speaker registry"],
   ];
 }
@@ -491,16 +494,21 @@ export default function SPLCalculatorPage() {
   }, [priceMap]);
 
   const calculateArtResult = useCallback((speaker) => {
-    if (!speaker || !Number.isFinite(d) || !Number.isFinite(p)) return { spl: null, grades: { p12: "—", p13: "—" } };
+    if (!speaker || !Number.isFinite(d) || !Number.isFinite(p)) {
+      return { spl: null, rawSpl: null, designSpl: null, grades: { p12: "—", p13: "—" } };
+    }
 
     const runForKey = (modelKey) => {
       if (!modelKey) return null;
+      // The Artcoustic row takes the same design headroom reserve as every
+      // competitor row, so the two columns are graded in the same units.
       return computeSpeakerCapabilityAtDistance({
         speakerModelId: modelKey,
         speakerMeta: resolveSpeakerSplMeta(modelKey),
         distance_m: d,
         powerW: p,
         roomVolumeM3,
+        eqHeadroom_dB: RP22_EQ_HEADROOM_RESERVE_DB,
       });
     };
 
@@ -513,8 +521,12 @@ export default function SPLCalculatorPage() {
       ? gradeFromSpl(p13Capability?.spl, basis).p13
       : "N/A";
 
+    const designSpl = p12Capability?.spl ?? p13Capability?.spl ?? null;
+
     return {
-      spl: p12Capability?.spl ?? p13Capability?.spl ?? null,
+      spl: designSpl,
+      designSpl,
+      rawSpl: Number.isFinite(designSpl) ? designSpl + RP22_EQ_HEADROOM_RESERVE_DB : null,
       p12Capability,
       p13Capability,
       grades: { p12: p12Grade, p13: p13Grade },
@@ -719,7 +731,7 @@ export default function SPLCalculatorPage() {
               <Rp22Pill parameter="P12" level={artResult?.grades?.p12} />
               <Rp22Pill parameter="P13" level={artResult?.grades?.p13} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
-                <SpeakerInfo rows={artcousticInfoRows(art, artPrice(art))} />
+                <SpeakerInfo rows={artcousticInfoRows(art, artPrice(art), artResult)} />
               </div>
               {artShowDataNote && <DataNote record={artWarningRecord} />}
             </div>
@@ -735,7 +747,7 @@ export default function SPLCalculatorPage() {
                 accent
                 note="Lowest-priced Artcoustic option that matches or exceeds the strongest selected comparison result."
                 dataNoteRecord={buildArtcousticWarningRecord(suggestedArt?.speaker)}
-                infoRows={artcousticInfoRows(suggestedArt.speaker, suggestedArt.price)}
+                infoRows={artcousticInfoRows(suggestedArt.speaker, suggestedArt.price, suggestedArt.result)}
               />
             </div>
           )}
@@ -804,7 +816,9 @@ export default function SPLCalculatorPage() {
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700, color: BRAND.subtext }}>{r.manufacturer} · {r.model}</div>
                     <div style={{ color: BRAND.hint, marginTop: 2 }}>
-                      {(r.normalization_warnings || []).join(" · ") || "Insufficient published data"}
+                      Insufficient published data{(r.normalization_warnings || []).length > 0
+                        ? ` — ${r.normalization_warnings.join(" · ")}`
+                        : ""}
                     </div>
                   </div>
                   <div style={{ color: BRAND.hint, fontSize: 11, whiteSpace: "nowrap" }}>
