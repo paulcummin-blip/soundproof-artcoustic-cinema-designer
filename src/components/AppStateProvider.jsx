@@ -4,6 +4,7 @@ import { safeTable } from '@/components/utils/safeLog';
 import { SHOW_DEBUG_LOGS } from '@/components/utils/diagnostics';
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { loadAutosave, saveAutosave, clearAutosave as clearAutosaveStorage, getAutosaveMeta, isAutosavePayloadValid } from "@/components/utils/sessionAutosave";
+import { useCommercialSelections } from "@/components/state/useCommercialSelections";
 import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
@@ -713,36 +714,21 @@ function useDesignerState() {
   }, [viewingPriorityRowCount]);
   // ── END VIEWING PRIORITY ───────────────────────────────────────────────────
 
-  // ── ACOUSTIC TREATMENT (Abfuser product selection) ──────────────────────
-  const [acousticTreatmentEnabled, setAcousticTreatmentEnabled] = useState(() => (
-    (__autosavePayload && typeof __autosavePayload.acousticTreatmentEnabled === "boolean")
-      ? __autosavePayload.acousticTreatmentEnabled
-      : false
-  ));
-  const [selectedAbfuserQty, _setSelectedAbfuserQty] = useState(() => (
-    (__autosavePayload && Number.isFinite(Number(__autosavePayload.selectedAbfuserQty)))
-      ? Number(__autosavePayload.selectedAbfuserQty)
-      : 0
-  ));
-  const setSelectedAbfuserQty = useCallback((v) => {
-    const n = Math.max(0, Math.floor(Number(v) || 0));
-    _setSelectedAbfuserQty(n);
-  }, []);
-  // Source of the selected quantity: "none" (not accepted), "recommended"
-  // (ADI recommendation accepted by the designer) or "user" (manual entry).
-  const [abfuserQtySource, setAbfuserQtySource] = useState(() => (
-    (__autosavePayload && typeof __autosavePayload.abfuserQtySource === "string")
-      ? __autosavePayload.abfuserQtySource
-      : "none"
-  ));
-  // Retired automatic quantity from the previous recommendation model. Kept for
-  // transparency only — it is never treated as a designer selection.
-  const [legacyAbfuserAutoQty, setLegacyAbfuserAutoQty] = useState(() => (
-    (__autosavePayload && Number.isFinite(Number(__autosavePayload.legacyAbfuserAutoQty)))
-      ? Number(__autosavePayload.legacyAbfuserAutoQty)
-      : 0
-  ));
-  // ── END ACOUSTIC TREATMENT ────────────────────────────────────────────────
+  // ── PRICED SELECTIONS (Abfuser treatment, manual extras, price basis) ────
+  // Owned by useCommercialSelections — extracted so this file stays within its
+  // size budget. State, setters and working-copy restore are unchanged.
+  const {
+    acousticTreatmentEnabled, setAcousticTreatmentEnabled,
+    selectedAbfuserQty, setSelectedAbfuserQty,
+    abfuserQtySource, setAbfuserQtySource,
+    legacyAbfuserAutoQty, setLegacyAbfuserAutoQty,
+    manualExtras, setManualExtras,
+    priceMode, setPriceMode,
+    showPrices, setShowPrices,
+    difficultyMultiplier, setDifficultyMultiplier,
+  } = useCommercialSelections(__autosavePayload);
+  // ── END PRICED SELECTIONS ────────────────────────────────────────────────
+
 
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
@@ -1524,6 +1510,10 @@ function useDesignerState() {
       selectedAbfuserQty,
       abfuserQtySource,
       legacyAbfuserAutoQty,
+      manualExtras,
+      priceMode,
+      showPrices,
+      difficultyMultiplier,
       // screenFrontPlaneM, mlpY_m, rowCentersM intentionally excluded — always recalculated from live inputs
       roomElements: normaliseRoomElements(roomElements),
       };
@@ -1599,6 +1589,10 @@ function useDesignerState() {
     selectedAbfuserQty,
     abfuserQtySource,
     legacyAbfuserAutoQty,
+    manualExtras,
+    priceMode,
+    showPrices,
+    difficultyMultiplier,
     ]);
 
   const restoreAutosave = useCallback(() => {
@@ -1752,7 +1746,11 @@ function useDesignerState() {
       useMidGlobal,
       useRearGlobal,
       splConfig,
-      p12Mode
+      p12Mode,
+      manualExtras,
+      priceMode,
+      showPrices,
+      difficultyMultiplier
     };
     try {
       const vid = activeVersionIdRef.current;
@@ -1767,7 +1765,7 @@ function useDesignerState() {
     } catch (e) {
       console.warn("Autosave failed:", e);
     }
-  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, screenHeight, seatingRows, seatsPerRow, seatsPerRowByRow, seatSpacing, rowSpacingM, mlpBasis, autoSeatByRP23, seatingBlockOffset, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, globalSurroundModel, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal, splConfig, p12Mode, subwooferInstances, subwooferInstancesStatus]);
+  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, screenHeight, seatingRows, seatsPerRow, seatsPerRowByRow, seatSpacing, rowSpacingM, mlpBasis, autoSeatByRP23, seatingBlockOffset, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, globalSurroundModel, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal, splConfig, p12Mode, manualExtras, priceMode, showPrices, difficultyMultiplier, subwooferInstances, subwooferInstancesStatus]);
 
   const clearWorkingCopy = useCallback(() => {
     try {
@@ -1932,6 +1930,8 @@ function useDesignerState() {
     setSelectedAbfuserQty(0);
     setAbfuserQtySource("none");
     setLegacyAbfuserAutoQty(0);
+    // Manual extras are priced selections too: a full reset clears them.
+    setManualExtras([]);
 
     // Per-seat metrics
     setPerSeatMetrics({});
@@ -2186,6 +2186,14 @@ function useDesignerState() {
     setAbfuserQtySource,
     legacyAbfuserAutoQty,
     setLegacyAbfuserAutoQty,
+    manualExtras,
+    setManualExtras,
+    priceMode,
+    setPriceMode,
+    showPrices,
+    setShowPrices,
+    difficultyMultiplier,
+    setDifficultyMultiplier,
     activeVersionId,
     setActiveVersionId,
     };
@@ -2309,6 +2317,10 @@ function useDesignerState() {
     setAbfuserQtySource,
     legacyAbfuserAutoQty,
     setLegacyAbfuserAutoQty,
+    manualExtras,
+    priceMode,
+    showPrices,
+    difficultyMultiplier,
     activeVersionId,
     setActiveVersionId,
     ]);

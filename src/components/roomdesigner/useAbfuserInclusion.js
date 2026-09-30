@@ -19,7 +19,7 @@ import {
  *
  * Returns { abfuserRecommendation, recommendedAbfuserQty, includedAbfuserQty }.
  */
-export function useAbfuserInclusion(appState) {
+export function useAbfuserInclusion(appState, { hydrated = true } = {}) {
   const abfuserRecommendation = useMemo(() => calculateAbfuserRecommendation({
     room: appState?.roomDims,
     speakers: appState?.speakerSystem?.placedSpeakers || [],
@@ -45,11 +45,17 @@ export function useAbfuserInclusion(appState) {
   // Keep the stored quantity on the followed value so pricing, the product
   // breakdown, the engineering snapshots and the reports all agree.
   useEffect(() => {
+    // Never patch the stored quantity while the project is still loading: the
+    // recommendation is computed from geometry that has not arrived yet, so a
+    // transient value must not be written into the priced selection (which the
+    // next autosave would then persist).
+    if (hydrated !== true) return;
     if (appState?.acousticTreatmentEnabled !== true) return;
     if (isManualAbfuserOverride(appState?.abfuserQtySource)) return;
     if ((Number(appState?.selectedAbfuserQty) || 0) === includedAbfuserQty) return;
     appState?.setSelectedAbfuserQty?.(includedAbfuserQty);
   }, [
+    hydrated,
     appState?.acousticTreatmentEnabled,
     appState?.abfuserQtySource,
     appState?.selectedAbfuserQty,

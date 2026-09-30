@@ -80,15 +80,31 @@ check('migration preserves an explicit designer quantity', () => {
   assert.equal(included({ quantitySource: migrated.quantitySource, selectedQuantity: migrated.selectedQuantity, recommendedQuantity: 6 }), 4);
 });
 
-check('migration: a stored value inside the current automatic range merely follows the recommendation', () => {
+check('migration: a stored value inside the current automatic range is preserved', () => {
+  // A stored quantity that is already priced must never be zeroed during
+  // hydration. Zeroing it dropped the selection, and the next autosave then
+  // persisted 0 over a populated project (Marquee Home regression).
   const migrated = resolveAbfuserQuantityFromProject({
     selected_abfuser_qty: 6,
     abfuser_qty_source: '',
     legacy_abfuser_auto_qty: 0,
   });
-  assert.equal(migrated.selectedQuantity, 0);
+  assert.equal(migrated.selectedQuantity, 6);
+  assert.equal(migrated.quantitySource, ABFUSER_QTY_SOURCE.NONE);
   assert.equal(migrated.legacyAutoQuantity, 0); // not misreported as retired legacy
-  assert.equal(included({ recommendedQuantity: 6 }), 6);
+  assert.equal(migrated.migrated, false);
+  // Pricing is unchanged: with no manual override, the included quantity still
+  // follows the live ADI recommendation.
+  assert.equal(included({
+    quantitySource: migrated.quantitySource,
+    selectedQuantity: migrated.selectedQuantity,
+    recommendedQuantity: 6,
+  }), 6);
+  assert.equal(included({
+    quantitySource: migrated.quantitySource,
+    selectedQuantity: migrated.selectedQuantity,
+    recommendedQuantity: 8,
+  }), 8);
 });
 
 check('report wording follows the three states', () => {

@@ -24,6 +24,16 @@ import { useAppliedCalibrationAuthority } from "@/components/room/bass/appliedCa
 import { serializeAppliedCalibration } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationPersistence.js";
 import { useOptimiserPlanAuthority } from "@/components/room/bass/optimiserPlan/optimiserPlanStore.js";
 import { serializeOptimiserPlan } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
+import {
+  COMMERCIAL_BLOCK_REASON,
+  clearCommercialEdits,
+  createCommercialAuthority,
+  guardCommercialSave,
+  markCommercialHydrated,
+  normaliseCommercialSelections,
+  setActiveCommercialAuthority,
+  summariseCommercialSelections,
+} from "@/components/state/commercialHydrationAuthority";
 
 // Hook to encapsulate project loading, saving, and state management
 export function useProjectLoader(
@@ -112,6 +122,11 @@ appState, // Pass appState directly for setters
   // Set during loadProject, used by autosave/manual save to write design_state
   // to the correct ProjectVersion record.
   const activeVersionIdRef = useRef(null);
+  // Commercial-collection hydration gate. A database write is refused until the
+  // priced selections of this exact project + version — manual extras, acoustic
+  // treatment, price-display basis — have finished loading, and a populated
+  // selection may not collapse to a default without a real designer edit.
+  const commercialAuthorityRef = useRef(null);
 
   // Active Project ID — resolved from URL params / props. Declared early so
   // hooks below (e.g. useAppliedCalibrationAuthority) can reference it
@@ -206,6 +221,12 @@ appState, // Pass appState directly for setters
       existingRoomDimensionsEdited: loadedRoomDimensionsEditedRef.current,
       appliedCalibration: serializeAppliedCalibration(appliedCalAuthority),
       optimiserPlan: serializeOptimiserPlan(optimiserPlanAuthority),
+      // Commercial selections (per-version). Read from hydrated app state, so a
+      // save can never invent a default for a value that failed to load.
+      manualExtras: appState?.manualExtras,
+      priceMode: appState?.priceMode,
+      showPrices: appState?.showPrices,
+      difficultyMultiplier: appState?.difficultyMultiplier,
     });
     return projectData;
   }, [
@@ -218,6 +239,8 @@ appState, // Pass appState directly for setters
     useFrontGlobal, useMidGlobal, useRearGlobal,
     appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty,
     appState?.abfuserQtySource, appState?.legacyAbfuserAutoQty,
+    appState?.manualExtras, appState?.priceMode,
+    appState?.showPrices, appState?.difficultyMultiplier,
     appState?.aimFrontWidesAtMLP, appState?.aimSideSurroundsAtMLP, appState?.aimRearSurroundsAtMLP,
     appliedCalAuthority,
     optimiserPlanAuthority,
@@ -284,6 +307,16 @@ appState, // Pass appState directly for setters
     if (!id) return;
     appState?.setProjectHydrationReady?.(false);
     hydrationAuthorityRef.current = createAuthority(id, loadGenerationRef.current);
+    // Commercial hydration restarts with the project: no commercial write is
+    // permitted until the priced selections below have loaded, and edits
+    // recorded for a previous project or version must not leak into this one.
+    commercialAuthorityRef.current = createCommercialAuthority({
+      projectId: id,
+      versionId: null,
+      loadGenerationId: loadGenerationRef.current,
+    });
+    setActiveCommercialAuthority(commercialAuthorityRef.current);
+    clearCommercialEdits();
     setLoadState({ phase: "loading", error: null, name: null });
     // Publish the canonical hydration state so no surface renders this project's
     // placeholder data while the saved design state is still loading.
@@ -335,6 +368,17 @@ appState, // Pass appState directly for setters
       // Only enable saving after successful same-project hydration.
       hydrationAuthorityRef.current = markLoaded(hydrationAuthorityRef.current);
       appState?.setProjectHydrationReady?.(true);
+      // Commercial hydration complete: this version's priced selections are
+      // loaded, so autosave may now write them.
+      commercialAuthorityRef.current = markCommercialHydrated(
+        createCommercialAuthority({
+          projectId: id,
+          versionId: activeVersionIdRef.current,
+          loadGenerationId: loadGenerationRef.current,
+        }),
+        normaliseCommercialSelections(mergedP),
+      );
+      setActiveCommercialAuthority(commercialAuthorityRef.current);
       // Snapshot structural counts for the destructive-save tripwire.
       const _parseArr = (v) => { if (Array.isArray(v)) return v; if (typeof v === "string") { try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; } } return []; };
       hydratedStructuralCountsRef.current = {
@@ -400,6 +444,9 @@ appState, // Pass appState directly for setters
         };
         const loadedFrontSubsCfg = _parseMaybe(mergedP?.front_subs_cfg ?? mergedP?.frontSubsCfg, null);
         const loadedRearSubsCfg  = _parseMaybe(mergedP?.rear_subs_cfg  ?? mergedP?.rearSubsCfg,  null);
+        // The commercial baseline uses the SAME normaliser as hydration, so a
+        // freshly loaded project can never be marked dirty by a commercial field.
+        const loadedCommercial = normaliseCommercialSelections(mergedP);
         const loadedProjectData = serializeProject({
           name: mergedP?.name || "Untitled Room",
           roomDims: loadedRoomDims,
@@ -455,6 +502,10 @@ appState, // Pass appState directly for setters
           linkEarPlatformHeights: typeof mergedP?.link_ear_platform_heights === "boolean" ? mergedP.link_ear_platform_heights : true,
           appliedCalibration: mergedP?.applied_calibration ?? null,
           optimiserPlan: mergedP?.optimiser_plan ?? null,
+          manualExtras: loadedCommercial.manualExtras,
+          priceMode: loadedCommercial.priceMode,
+          showPrices: loadedCommercial.showPrices,
+          difficultyMultiplier: loadedCommercial.difficultyMultiplier,
         });
         delete loadedProjectData.name;
         delete loadedProjectData.client_name;
@@ -681,6 +732,40 @@ appState, // Pass appState directly for setters
           return;
         }
 
+        // Commercial hydration gate: a project's priced selections must not be
+        // written from defaults, and a populated selection must not collapse
+        // because a report route or render cycle has not finished.
+        const commercialGuard = guardCommercialSave({
+          authority: commercialAuthorityRef.current,
+          projectId: effectiveProjectId,
+          versionId: activeVersionIdRef.current,
+          outgoing: data,
+        });
+        if (commercialGuard.blocked) {
+          const hydrationIncomplete = commercialGuard.reason === COMMERCIAL_BLOCK_REASON.HYDRATION_INCOMPLETE;
+          setAutosaveStatus(hydrationIncomplete ? "idle" : "error");
+          if (globalThis.__B44_LOGS) console.error("[RoomDesigner] COMMERCIAL_SAVE_BLOCKED (autosave):", commercialGuard.reason, commercialGuard.detail);
+          logSaveEvent({
+            projectId: effectiveProjectId,
+            source: "autosave",
+            hydrationGenerationId: loadGenerationRef.current,
+            hydrationStatus: commercialAuthorityRef.current?.status || "unknown",
+            payloadHash: sig.slice(0, 64),
+            structuralCounts: {
+              seats: Array.isArray(data.seating_positions) ? data.seating_positions.length : 0,
+              speakers: Array.isArray(data.selected_speakers) ? data.selected_speakers.length : 0,
+              subs: Array.isArray(data.subwooferInstances) ? data.subwooferInstances.length : 0,
+              roomElements: Array.isArray(data.room_elements) ? data.room_elements.length : 0,
+            },
+            systemFormat: data.dolby_config,
+            commercial: summariseCommercialSelections(data),
+            blocked: true,
+            blockReason: commercialGuard.reason,
+          });
+          r.inFlight = false;
+          return;
+        }
+
         // Capture generation before the await so we can detect stale completions
         // if the project switches while we are waiting for the DB response.
         const myGeneration = loadGenerationRef.current;
@@ -883,6 +968,10 @@ appState, // Pass appState directly for setters
       loadGenerationRef.current += 1;
       hydrationAuthorityRef.current = null;
       hydratedStructuralCountsRef.current = null;
+      // Commercial hydration is void for the new project until it loads.
+      commercialAuthorityRef.current = null;
+      setActiveCommercialAuthority(null);
+      clearCommercialEdits();
       // Cancel any pending autosave timers for the previous project.
       const prevProjectId = autosaveProjectIdRef.current;
       if (prevProjectId) {
@@ -989,6 +1078,24 @@ appState, // Pass appState directly for setters
           });
           rMS.inFlight = false;
           return { success: false, error: `Save blocked: ${tripwireResult.reason}. If this is intentional, use the reset function.` };
+        }
+
+        // Commercial hydration gate — identical rule to autosave. A manual save
+        // must never write defaults over a populated priced selection.
+        const commercialGuardMS = guardCommercialSave({
+          authority: commercialAuthorityRef.current,
+          projectId: effectiveProjectId,
+          versionId: activeVersionIdRef.current,
+          outgoing: projectData,
+        });
+        if (commercialGuardMS.blocked) {
+          const hydrationIncompleteMS = commercialGuardMS.reason === COMMERCIAL_BLOCK_REASON.HYDRATION_INCOMPLETE;
+          setAutosaveStatus(hydrationIncompleteMS ? "idle" : "error");
+          rMS.inFlight = false;
+          return {
+            success: false,
+            error: `Save blocked: ${commercialGuardMS.reason}. ${commercialGuardMS.detail || ""}`.trim(),
+          };
         }
 
         // Capture generation before the await.

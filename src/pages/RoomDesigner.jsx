@@ -39,6 +39,7 @@ import { useBassHeavyAction, markBassHeavyActionRunning, markBassHeavyActionComp
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 import { useAbfuserInclusion } from "@/components/roomdesigner/useAbfuserInclusion";
+import { useRoomDesignerCommercialSelections } from "@/components/roomdesigner/useRoomDesignerCommercialSelections";
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
@@ -256,17 +257,26 @@ function RoomDesignerWithState() {
   const [lcrAngleDeg, setLcrAngleDeg] = useState(0); // Live angle readout
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
 
-  // NEW: Options panel state
-  const [showPrices, setShowPrices] = useState(true);
-  const [priceMode, setPriceMode] = useState('incVat');
-  const [manualExtras, setManualExtras] = useState([]);
+  // Commercial selections (manual extras, price-display basis, difficulty) are
+  // app state, hydrated from the loaded version: report navigation, refresh and
+  // reopen cannot reset a priced selection to its default.
+  const {
+    manualExtras, setManualExtras,
+    priceMode, setPriceMode,
+    showPrices, setShowPrices,
+    difficultyMultiplier, setDifficultyMultiplier,
+  } = useRoomDesignerCommercialSelections(appState);
   const [soundbarSelections, setSoundbarSelections] = useState({});
   const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
-  const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
   // Abfuser authority: the ADI recommendation plus the included (priced)
   // quantity. The recommendation is the default inclusion, a manual override is
   // preserved, and Acoustic Treatment off includes nothing.
-  const { abfuserRecommendation, includedAbfuserQty } = useAbfuserInclusion(appState);
+  // The included quantity may only be written back once the project has finished
+  // loading, so a transient pre-hydration recommendation can never become the
+  // stored (priced) selection.
+  const { abfuserRecommendation, includedAbfuserQty } = useAbfuserInclusion(appState, {
+    hydrated: appState?.isProjectHydrationReady === true,
+  });
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [localLiveImpactMode, setLocalLiveImpactMode] = React.useState("off");
   const [showResetConfirm, setShowResetConfirm] = useState(false);

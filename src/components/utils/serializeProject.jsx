@@ -116,6 +116,14 @@ export function serializeProject(input = {}) {
     // Viewing priority (multi-row viewing intent)
     viewingPriority = "balanced",
 
+    // Commercial selections — the priced state of this design version. Persisted
+    // in design_state so report navigation, refresh and reopen cannot silently
+    // reset a manual extra or the price-display basis to its default.
+    manualExtras = [],
+    priceMode = "incVat",
+    showPrices = true,
+    difficultyMultiplier = 1,
+
     // Acoustic treatment (Abfuser product selection)
     acousticTreatmentEnabled = false,
     selectedAbfuserQty = 0,
@@ -340,6 +348,15 @@ export function serializeProject(input = {}) {
         ...asArray(seatingPositions).map((seat) => Number(seat?.rowNumber) || 1)
       )
     ),
+
+    // Commercial selections (per-version design_state). Manual extras are stored
+    // verbatim — no row is dropped or coalesced here.
+    manual_extras: asArray(manualExtras),
+    price_mode: priceMode === "exVat" ? "exVat" : "incVat",
+    show_prices: showPrices !== false,
+    difficulty_multiplier: Number.isFinite(Number(difficultyMultiplier))
+      ? Number(difficultyMultiplier)
+      : 1,
 
     // Acoustic treatment (Abfuser product selection).
     // Only the designer's decision is stored as the selected quantity — the ADI

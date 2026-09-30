@@ -4,7 +4,7 @@
 // Do not add logic here; keep it a pure pass-through to existing setters.
 
 import { readPersistedScreenPlaneM } from "@/components/utils/screenPlanePersistence";
-import { resolveAbfuserQuantityFromProject } from "@/components/utils/abfuserQuantityMigration";
+import { normaliseCommercialSelections } from "@/components/state/commercialHydrationAuthority";
 import { parseProjectJson } from "@/components/roomdesigner/RoomDesignerHelpers";
 import { normaliseSeatPriorities } from "@/components/utils/seatScopeAuthority";
 import {
@@ -673,9 +673,27 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   appState?.setAssumedP15LevelSafe?.("L2");
   appState?.setAssumedP21LevelSafe?.("L2");
 
+  // 10c) COMMERCIAL SELECTIONS (manual extras + price-display basis)
+  // Hydrated from the loaded version before anything can render a default, so a
+  // populated selection is never replaced by an empty one. Both hydration and
+  // the autosave baseline read these fields through the same normaliser.
+  const commercialSelections = normaliseCommercialSelections(p);
+  if (typeof appState?.setManualExtras === "function") {
+    appState.setManualExtras(commercialSelections.manualExtras);
+  }
+  if (typeof appState?.setPriceMode === "function") {
+    appState.setPriceMode(commercialSelections.priceMode);
+  }
+  if (typeof appState?.setShowPrices === "function") {
+    appState.setShowPrices(commercialSelections.showPrices);
+  }
+  if (typeof appState?.setDifficultyMultiplier === "function") {
+    appState.setDifficultyMultiplier(commercialSelections.difficultyMultiplier);
+  }
+
   // 10f) ACOUSTIC TREATMENT (Abfuser product selection)
   if (typeof appState?.setAcousticTreatmentEnabled === "function") {
-    appState.setAcousticTreatmentEnabled(!!p?.acoustic_treatment_enabled);
+    appState.setAcousticTreatmentEnabled(commercialSelections.acousticTreatment.enabled);
   }
 
   // 10g) SURROUND / WIDE AIM-AT-MLP TOGGLES — persisted per-version so speaker
@@ -692,7 +710,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   // Migration: a legacy automatic quantity is retained as legacyAutoQuantity and
   // is NOT restored as the included quantity. Only an explicit designer value is
   // restored as the selection.
-  const abfuserQuantity = resolveAbfuserQuantityFromProject(p);
+  const abfuserQuantity = commercialSelections.acousticTreatment;
   if (typeof appState?.setSelectedAbfuserQty === "function") {
     appState.setSelectedAbfuserQty(abfuserQuantity.selectedQuantity);
   }
