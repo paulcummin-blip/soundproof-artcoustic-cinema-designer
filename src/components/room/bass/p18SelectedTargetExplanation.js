@@ -34,8 +34,13 @@ export const P18_CRITERION_MODE = Object.freeze({
   UNRESOLVED: "unresolved",
 });
 
-export const P18_TARGET_RATIONALE =
-  "P18 is measured at the selected LFE output target: the system may play lower at reduced output, but at this target the extension point is where it can sustain the required level.";
+// Required client-facing copy: P18 states the calculated -3 dB point itself,
+// never a greater-than / less-than threshold.
+export const P18_CRITERION_STATEMENT =
+  "Bass extension -3 dB point at the selected LFE output target.";
+
+export const P18_TARGET_LINK_STATEMENT =
+  "Calculated at the selected P14 LFE output target.";
 
 // Two branches within half a hertz of each other limit the result together.
 const BINDING_EQUALITY_HZ = 0.5;
@@ -154,21 +159,23 @@ function targetPhrase(explanation) {
 
 /**
  * Pill detail line — the selected-target story in one reading.
- * Example: "Recommended · L3 · 120 dBC target · limited by product capability ·
- * response reaches ≤15 Hz". Returns null when no explanation is available, so
+ * Example: "Recommended · Bass extension -3 dB point at the selected LFE output
+ * target. · limited by product capability · response reaches 15 Hz".
+ * Returns null when no explanation is available, so
  * callers keep their existing fallback text.
  */
 export function formatP18TargetExplanationDetail(explanation, basisLabel = null) {
   if (!explanation?.available) return null;
   const parts = [];
   if (basisLabel) parts.push(basisLabel);
+  parts.push(P18_CRITERION_STATEMENT);
   const target = targetPhrase(explanation);
-  if (target) parts.push(target);
+  if (target) parts.push(`${P18_TARGET_LINK_STATEMENT} (${target})`);
   const phrase = BINDING_PHRASE[explanation.bindingBasis];
   if (phrase) parts.push(phrase);
   const responseHz = hz(explanation.responseTargetF3Hz);
   if (responseHz && explanation.bindingBasis !== P18_BINDING_BASIS.RESPONSE) {
-    parts.push(`response reaches ${explanation.responseBounded ? "≤" : ""}${responseHz}`);
+    parts.push(`response reaches ${responseHz}`);
   }
   return parts.length ? parts.join(" · ") : null;
 }
@@ -186,15 +193,15 @@ export function formatP18CriterionRows(explanation) {
     rows.push(["Criterion", `selected target −3 dB (${Math.round(Number(explanation.cutoffPlaneDb))} dB plane)`]);
   }
   if (explanation.criterionMode === P18_CRITERION_MODE.FLOOR_BOUNDED && finite(explanation.floorHz)) {
-    rows.push(["Floor", `≤${Math.round(Number(explanation.floorHz))} Hz — no crossing above the validity floor`]);
+    rows.push(["Floor", `${Math.round(Number(explanation.floorHz))} Hz — no -3 dB crossing above the validity floor`]);
   }
   if (finite(explanation.responseTargetF3Hz)) {
-    rows.push(["Response branch", `${explanation.responseBounded ? "≤" : ""}${hz(explanation.responseTargetF3Hz)}`]);
+    rows.push(["Response branch", `${hz(explanation.responseTargetF3Hz)}`]);
   }
   if (finite(explanation.capabilityTargetF3Hz)) {
     rows.push([
       "Capability branch",
-      `${explanation.capabilityBounded ? "≤" : ""}${hz(explanation.capabilityTargetF3Hz)} (product limit −3 dB reserve)`,
+      `${hz(explanation.capabilityTargetF3Hz)} (product limit −3 dB reserve)`,
     ]);
   }
   if (explanation.bindingBasis) rows.push(["Binding branch", BINDING_NAME[explanation.bindingBasis] || null]);
@@ -204,11 +211,15 @@ export function formatP18CriterionRows(explanation) {
   return rows.filter(([, value]) => !!value);
 }
 
-/** Criterion rows as plain lines, with the selected-target rationale first. */
+/** Criterion rows as plain lines, with the -3 dB point statement first. */
 export function formatP18CriterionLines(explanation) {
   const rows = formatP18CriterionRows(explanation);
   if (!rows.length) return [];
-  return [P18_TARGET_RATIONALE, ...rows.map(([label, value]) => `${label}: ${value}`)];
+  const lines = [P18_CRITERION_STATEMENT];
+  if (finite(explanation?.selectedP14TargetDb) || finite(explanation?.measuredAtLevel)) {
+    lines.push(P18_TARGET_LINK_STATEMENT);
+  }
+  return [...lines, ...rows.map(([label, value]) => `${label}: ${value}`)];
 }
 
 /**

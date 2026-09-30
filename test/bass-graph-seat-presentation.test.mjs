@@ -7,7 +7,7 @@
 //   Defect 2: Raw per-seat response curves persist and hydrate
 //   Defect 3: Selected-seat P19 marker
 //   Defect 4: Selected-seat P20 marker
-//   Defect 5: P18 bounded result wording (≤15 Hz, never "15 Hz measured")
+//   Defect 5: P18 result wording (calculated -3 dB point, never "15 Hz measured")
 //
 // No calculations, thresholds, EQ, physics, or grading are changed.
 import test from "node:test";
@@ -626,7 +626,7 @@ test("Defect 4: R1S2 selected → R1S2 P20 worst frequency (not R1S1's)", () => 
 // Defect 5: P18 bounded result wording
 // ---------------------------------------------------------------------------
 
-test("Defect 5: bounded P18 (≤15 Hz) — label shows ≤, never 'measured'", () => {
+test("Defect 5: bounded P18 (15 Hz) — label shows the -3 dB point, never 'measured'", () => {
   const markers = {
     p18FrequencyHz: 15,
     p18Bounded: true,
@@ -639,7 +639,8 @@ test("Defect 5: bounded P18 (≤15 Hz) — label shows ≤, never 'measured'", (
 
   const label = formatP18MarkerLabel(markers);
   assert.ok(label, "label produced");
-  assert.ok(label.short.includes("≤15 Hz"), "short label contains ≤15 Hz");
+  assert.ok(label.short.includes("15 Hz"), "short label states the calculated -3 dB point");
+  assert.ok(!label.short.includes("≤"), "short label carries no greater-than / less-than wording");
   assert.ok(!label.short.includes("measured"), "short label does NOT contain 'measured'");
   assert.equal(label.detail, "Exact -3 dB crossing is below the calculated range.", "detail explains bounded result");
 });
@@ -677,7 +678,8 @@ test("Defect 5: bounded P18 at 15 Hz — never displays '15 Hz measured'", () =>
   const label = formatP18MarkerLabel(markers);
   // The critical assertion: "measured" must NEVER appear in the bounded label
   assert.ok(!label.short.includes("measured"), "bounded label never says 'measured'");
-  assert.ok(label.short.includes("≤15 Hz"), "bounded label says ≤15 Hz");
+  assert.ok(!label.short.includes("≤"), "bounded label carries no ≤ glyph");
+  assert.ok(label.short.includes("15 Hz"), "bounded label states the calculated -3 dB point");
 });
 
 test("Defect 5: buildRp22GraphMarkers sets p18Bounded from finalSeatVariationData", () => {

@@ -281,17 +281,18 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
 
   // P18 — dynamically regrade the achieved extension for the current display
   // basis without changing fingerprints, workers, authority or cached curves.
-  // A bounded result (response still above -3 dB at the product validity floor)
-  // is displayed as "≤{floor} Hz" — not a fake exact crossing below valid data.
+  // The strip states the calculated -3 dB point itself: no greater-than or
+  // less-than wording. When the authority flags the result as floor-bounded
+  // (response still above -3 dB at the validity floor) the detail line and the
+  // graph marker say so in plain language, so nothing is overstated.
   // LIMITED contracts have no P18 data (P14 failed → P18 not evaluated).
   if (resultsVisible) {
     const source = contract?.productAnalysis?.parameters?.p18;
     const achievedValue = isFiniteNumber(source?.value) ? Number(source.value) : null;
-    const bounded = source?.achievedExtensionBounded === true;
     const assessment = assessP18Extension(achievedValue, activeP18Basis);
     const levelText = assessment.levelLabel || "FAIL";
     const valueText = isFiniteNumber(achievedValue)
-      ? `${bounded ? "≤" : ""}${formatBassParameterValue("p18", achievedValue)}`
+      ? formatBassParameterValue("p18", achievedValue)
       : "";
     const resultText = valueText ? `${levelText} · ${valueText}` : "—";
     // The extension is measured at a specific LFE output target, and the branch

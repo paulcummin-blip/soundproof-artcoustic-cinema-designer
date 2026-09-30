@@ -101,7 +101,6 @@ function buildP18Lines(shared) {
   const achievedValue = isFiniteNumber(source?.value) ? Number(source.value) : null;
   if (achievedValue === null) return null;
 
-  const bounded = source?.achievedExtensionBounded === true;
   const targetBasis = normalizeP18TargetBasis(source?.targetBasis);
   const thresholds = P18_THRESHOLDS_BY_BASIS[targetBasis];
 
@@ -113,7 +112,7 @@ function buildP18Lines(shared) {
   else if (designHz <= thresholds.L1) achievedLevel = 1;
 
   const lines = [];
-  lines.push(["Displayed extension", (bounded ? "≤" : "") + formatBassParameterValue("p18", achievedValue)]);
+  lines.push(["Bass extension -3 dB point", formatBassParameterValue("p18", achievedValue)]);
   // Which LFE output target the extension was measured at, and which branch
   // limited it — derived from the authority's already-computed branch fields.
   lines.push(...formatP18CriterionRows(source?.p18SelectedTarget));

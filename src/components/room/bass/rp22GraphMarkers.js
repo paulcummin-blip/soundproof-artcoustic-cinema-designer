@@ -96,11 +96,12 @@ export function buildRp22GraphMarkers(finalBassResponse, selectedSeatId = null) 
 /**
  * Format the P18 marker label for the graph legend.
  *
- * When the response is still above the -3 dB cutoff at the lower analysis
- * boundary (bounded), the label shows "≤{floor} Hz" — not a fake exact
- * crossing below valid data. When the -3 dB crossing genuinely occurs
- * inside the calculated frequency array, the normal measured crossing
- * presentation is preserved.
+ * The label states the calculated -3 dB point with no greater-than or
+ * less-than wording. When the response is still above the -3 dB cutoff at the
+ * lower analysis boundary (bounded), the detail line states that the exact
+ * crossing sits below the calculated range — never a fake measured point.
+ * When the -3 dB crossing genuinely occurs inside the calculated frequency
+ * array, the normal measured crossing presentation is preserved.
  *
  * @param {object} markers - output of buildRp22GraphMarkers
  * @returns {{short: string, detail: string|null}|null}
@@ -115,7 +116,7 @@ export function formatP18MarkerLabel(markers) {
   const clause = suffix ? ` · ${suffix}` : "";
   if (markers.p18Bounded) {
     return {
-      short: `P18 achieved extension · ≤${p18Rp22Hz} Hz${clause}`,
+      short: `P18 achieved extension · ${p18Rp22Hz} Hz${clause}`,
       detail: suffix
         ? `Exact -3 dB crossing is below the calculated range · response and capability both bounded at the validity floor.`
         : `Exact -3 dB crossing is below the calculated range.`,

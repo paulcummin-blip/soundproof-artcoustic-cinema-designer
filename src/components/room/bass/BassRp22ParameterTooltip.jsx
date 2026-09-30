@@ -89,9 +89,8 @@ function buildDynamicDetailLines(parameterKey, shared) {
     const source = parameters.p18;
     const value = isFiniteNumber(source?.value) ? Number(source.value) : null;
     if (value !== null) {
-      const bounded = source?.achievedExtensionBounded === true;
       return [
-        `Achieved -3 dB point: ${bounded ? "≤" : ""}${formatBassParameterValue("p18", value)}`,
+        `Achieved -3 dB point: ${formatBassParameterValue("p18", value)}`,
         ...formatP18CriterionLines(source?.p18SelectedTarget),
       ];
     }

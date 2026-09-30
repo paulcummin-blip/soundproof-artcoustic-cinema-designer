@@ -87,9 +87,7 @@ export default function RP22ParametersGrid({ rp22 }) {
               ? targets.map((t) => {
                   const extText = !t.achievable || t.extensionHz == null
                     ? "Not achievable"
-                    : t.bounded
-                      ? `≤ ${Math.round(t.extensionHz)} Hz`
-                      : `${Math.round(t.extensionHz)} Hz`;
+                    : `${Math.round(t.extensionHz)} Hz`;
                   const passes = t.achievable && t.extensionHz != null && t.passesFrequency;
                   return (
                     <div key={t.level} style={{
