@@ -98,7 +98,7 @@ export default function StepProductUrl({ manufacturer, productUrl, onProductUrlC
               style={{ color: BRAND.green }}
             >
               <Search className="w-3.5 h-3.5" />
-              Back to M&K Discovery
+              Back to model lookup
             </button>
           </div>
         )}

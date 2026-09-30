@@ -4,10 +4,13 @@
 // Clicking a row navigates to the product detail page.
 // Specifications are loaded from SpeakerSpecification and merged for display.
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import SpeakerDbTable from "@/components/admin/speaker-db/SpeakerDbTable";
+import ProductRowActions from "@/components/admin/speaker-db/ProductRowActions.jsx";
+import { CompletenessCell, EvidenceCell, ReadinessCell, TextCell } from "@/components/admin/speaker-db/ProductComparisonCells.jsx";
+import { comparisonReadiness, evidenceText, powerBasisText, sensitivityText } from "@/components/admin/speaker-db/comparisonReadiness.js";
 import { Plus, UserPlus } from "lucide-react";
 
 const BRAND = {
@@ -70,42 +73,54 @@ export default function SpeakerDbProducts({ drillFilter, onClearDrillFilter }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [products, specs] = await Promise.all([
-          base44.entities.SpeakerProduct.list("-updated_date", 500),
-          base44.entities.SpeakerSpecification.list("-created_date", 500),
-        ]);
+  // Each row carries its own product and current specification so the
+  // comparison-readiness classification is derived exactly the way the RP22
+  // Speaker Capability page derives the grades a dealer sees.
+  const loadProducts = useCallback(async () => {
+    try {
+      const [products, specs] = await Promise.all([
+        base44.entities.SpeakerProduct.list("-updated_date", 500),
+        base44.entities.SpeakerSpecification.list("-created_date", 500),
+      ]);
 
-        // Build a map of product_id → current specification
-        const specMap = {};
-        (specs || []).forEach((s) => {
-          if (!specMap[s.product_id] || s.is_current) {
-            specMap[s.product_id] = s;
-          }
-        });
+      // Build a map of product_id → current specification
+      const specMap = {};
+      (specs || []).forEach((s) => {
+        if (!specMap[s.product_id] || s.is_current) {
+          specMap[s.product_id] = s;
+        }
+      });
 
-        // Merge product + spec for display
-        const merged = (products || []).map((p) => ({
+      const merged = (products || []).map((p) => {
+        const spec = specMap[p.id] || null;
+        const readiness = comparisonReadiness({ product: p, specification: spec });
+        return {
           ...p,
-          sensitivity_db: specMap[p.id]?.sensitivity_db ?? null,
-          max_continuous_spl_db: specMap[p.id]?.max_continuous_spl_db ?? null,
-          confidence: specMap[p.id]?.confidence ?? null,
-          frequency_response_low_hz: specMap[p.id]?.frequency_response_low_hz ?? null,
-          frequency_response_high_hz: specMap[p.id]?.frequency_response_high_hz ?? null,
-          nominal_impedance_ohm: specMap[p.id]?.nominal_impedance_ohm ?? null,
-          approval_status: specMap[p.id]?.approval_status ?? null,
-        }));
+          product: p,
+          spec,
+          sensitivity_db: spec?.sensitivity_db ?? null,
+          max_continuous_spl_db: spec?.max_continuous_spl_db ?? null,
+          confidence: spec?.confidence ?? null,
+          frequency_response_low_hz: spec?.frequency_response_low_hz ?? null,
+          frequency_response_high_hz: spec?.frequency_response_high_hz ?? null,
+          nominal_impedance_ohm: spec?.nominal_impedance_ohm ?? null,
+          approval_status: spec?.approval_status ?? null,
+          readiness,
+          readiness_label: readiness.label,
+          readiness_rank: { A: 1, B: 2, C: 3, D: 4 }[readiness.confidence] || 5,
+          completeness_rank: readiness.presentCount,
+        };
+      });
 
-        setRows(merged);
-      } catch (err) {
-        console.error("[SpeakerDbProducts] Load failed:", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
+      setRows(merged);
+    } catch (err) {
+      console.error("[SpeakerDbProducts] Load failed:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { loadProducts(); }, [loadProducts]);
 
   // Drill-in filter from Manufacturer Health page
   const KEY_SPEC_FIELDS = ["sensitivity_db", "frequency_response_low_hz", "frequency_response_high_hz", "max_continuous_spl_db", "nominal_impedance_ohm"];
@@ -119,15 +134,16 @@ export default function SpeakerDbProducts({ drillFilter, onClearDrillFilter }) {
   };
 
   const columns = [
-    { key: "manufacturer_name", label: "Manufacturer", sortable: true, width: "160px", render: (r) => <span className="font-medium">{r.manufacturer_name || "—"}</span> },
+    { key: "manufacturer_name", label: "Manufacturer", sortable: true, width: "140px", render: (r) => <span className="font-medium">{r.manufacturer_name || "—"}</span> },
     { key: "full_product_name", label: "Product", sortable: true, render: (r) => <span className="font-medium">{r.full_product_name || r.model}</span> },
-    { key: "category", label: "Category", sortable: true, width: "110px", render: (r) => r.category || "—" },
     { key: "role", label: "Role", sortable: true, width: "90px", render: (r) => <RoleBadge role={r.role} /> },
-    { key: "status", label: "Status", sortable: true, width: "120px", render: (r) => <StatusBadge status={r.status} /> },
-    { key: "sensitivity_db", label: "Sensitivity", sortable: true, width: "100px", render: (r) => r.sensitivity_db != null ? `${r.sensitivity_db} dB` : "—" },
-    { key: "max_continuous_spl_db", label: "Max SPL", sortable: true, width: "90px", render: (r) => r.max_continuous_spl_db != null ? `${r.max_continuous_spl_db} dB` : "—" },
-    { key: "confidence", label: "Conf.", sortable: true, width: "60px", render: (r) => <ConfidenceBadge confidence={r.confidence} /> },
-    { key: "approval_status", label: "Approval", sortable: true, width: "100px", render: (r) => <ApprovalBadge status={r.approval_status} /> },
+    { key: "sensitivity_db", label: "Sensitivity", sortable: true, width: "120px", render: (r) => <TextCell value={sensitivityText(r.spec)} /> },
+    { key: "power_basis", label: "Power / Max SPL basis", width: "170px", render: (r) => <TextCell value={powerBasisText(r.spec)} /> },
+    { key: "completeness_rank", label: "Completeness", sortable: true, width: "100px", render: (r) => <CompletenessCell readiness={r.readiness} /> },
+    { key: "readiness_rank", label: "RP22 Readiness", sortable: true, width: "185px", render: (r) => <ReadinessCell readiness={r.readiness} /> },
+    { key: "confidence", label: "Evidence", sortable: true, width: "155px", render: (r) => <EvidenceCell readiness={r.readiness} text={evidenceText(r.readiness)} /> },
+    { key: "approval_status", label: "Approval", sortable: true, width: "115px", render: (r) => <ApprovalBadge status={r.approval_status} /> },
+    { key: "actions", label: "Actions", width: "215px", render: (r) => <ProductRowActions row={r} onChanged={loadProducts} /> },
   ];
 
   return (
@@ -143,6 +159,9 @@ export default function SpeakerDbProducts({ drillFilter, onClearDrillFilter }) {
       <div className="flex items-center justify-between mb-4">
         <div className="text-sm" style={{ color: BRAND.subtext }}>
           {filteredRows.length} product{filteredRows.length !== 1 ? "s" : ""}
+          <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 2 }}>
+            Readiness is measured against the fields the RP22 engine consumes — the same ones every Artcoustic row supplies.
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -168,13 +187,13 @@ export default function SpeakerDbProducts({ drillFilter, onClearDrillFilter }) {
         <SpeakerDbTable
           columns={columns}
           rows={filteredRows}
-          searchableKeys={["manufacturer_name", "full_product_name", "model", "series"]}
+          searchableKeys={["manufacturer_name", "full_product_name", "model", "series", "readiness_label"]}
           filters={[
-            { key: "category", label: "Categories", options: [
-              { value: "On Wall", label: "On Wall" },
-              { value: "In Wall", label: "In Wall" },
-              { value: "Freestanding", label: "Freestanding" },
-              { value: "Other", label: "Other" },
+            { key: "readiness_label", label: "RP22 readiness", options: [
+              { value: "Comparable", label: "Comparable" },
+              { value: "Partially Comparable", label: "Partially Comparable" },
+              { value: "ADI Estimate", label: "ADI Estimate" },
+              { value: "Insufficient Data", label: "Insufficient Data" },
             ]},
             { key: "role", label: "Role", options: [
               { value: "LCR", label: "LCR" },
@@ -184,13 +203,12 @@ export default function SpeakerDbProducts({ drillFilter, onClearDrillFilter }) {
               { value: "Height", label: "Height" },
               { value: "Flexible", label: "Flexible" },
             ]},
-            { key: "status", label: "Status", options: [
-              { value: "Current", label: "Current" },
-              { value: "Discontinued", label: "Discontinued" },
-              { value: "Coming Soon", label: "Coming Soon" },
-              { value: "Hidden", label: "Hidden" },
+            { key: "approval_status", label: "Approval", options: [
+              { value: "Draft", label: "Draft" },
+              { value: "Awaiting Review", label: "Awaiting Review" },
+              { value: "Approved", label: "Approved" },
+              { value: "Superseded", label: "Superseded" },
               { value: "Archived", label: "Archived" },
-              { value: "Unknown", label: "Unknown" },
             ]},
           ]}
           rowKey={(r) => r.id}

@@ -134,6 +134,20 @@ function infoValue(value, suffix = "") {
   return `${value}${suffix}`;
 }
 
+// What each column's comparison actually rests on. An Artcoustic row is
+// published measured capability; a competitor row is calculated from published
+// specifications; a C row is an ADI estimate from partial manufacturer data and
+// is never presented as the same evidence as a published measurement.
+function evidenceStanding(record) {
+  if (!record) return "—";
+  if (record.data_confidence === "A") return "Published measured capability";
+  if (record.data_confidence === "B") return "Calculated from published specifications";
+  if (record.data_confidence === "C") return "ADI estimate based on available manufacturer data";
+  return "Insufficient published data";
+}
+
+const ADI_ESTIMATE_NOTICE = "ADI estimate based on available manufacturer data — estimated, not a published measured result.";
+
 function artcousticInfoRows(speaker, price, result = null) {
   if (!speaker) return [];
   const key = speaker.p12Key || speaker.p13Key || speaker.id;
@@ -153,6 +167,7 @@ function artcousticInfoRows(speaker, price, result = null) {
     ["Peak SPL @ 1 m · Anechoic", infoValue(meta?.max_spl_peak_db_cf6_1m_anechoic, " dB")],
     ["Usable LF response (-6 dB)", infoValue(meta?.usable_lf_hz_minus6db, " Hz")],
     ["Measurement basis", "Artcoustic published Half Space authority"],
+    ["Evidence standing", "Published measured capability (Artcoustic registry)"],
     ["Raw SPL at RSP (pre-headroom)", infoValue(result?.rawSpl, " dB")],
     [`Design SPL at RSP (after ${RP22_EQ_HEADROOM_LABEL} headroom)`, infoValue(result?.designSpl, " dB")],
     ["Graded from", "Design SPL (post-headroom), whole dB"],
@@ -173,6 +188,14 @@ function competitorInfoRows(record, result = null) {
         ? "Power limited (continuous/rec amp)"
         : "Amplifier power")
     : "—";
+  // What this comparison is still missing, stated rather than implied.
+  const missingFields = [
+    ...(record.normalization_warnings || []),
+    !numeric(record.continuous_power_w) ? "Published power rating" : null,
+    !numeric(record.published_max_continuous_spl_db_1m) ? "Published max SPL" : null,
+    !String(record.sensitivity_measurement_basis || "").trim() ? "Sensitivity measurement basis" : null,
+    !String(record.max_spl_measurement_basis || "").trim() ? "Max SPL measurement basis" : null,
+  ].filter(Boolean);
   return [
     ["Manufacturer", record.manufacturer],
     ["Model", record.model],
@@ -190,6 +213,13 @@ function competitorInfoRows(record, result = null) {
     ["Power authority figure", infoValue(record.power_authority_w, " W")],
     ["Capability basis", record.capability_basis || "—"],
     ["Evidence quality", record.source_evidence_quality || record.evidence_quality || "—"],
+    ["Evidence standing", evidenceStanding(record)],
+    ["Fields used", record.data_confidence === "A"
+      ? "Published max SPL, power authority, sensitivity, impedance, measurement space"
+      : record.data_confidence === "C"
+        ? "Published sensitivity and stated power authority only — partial manufacturer data"
+        : "Published sensitivity, impedance and power authority"],
+    ["Fields missing", missingFields.join(" · ") || "None recorded"],
     ["Raw SPL at RSP (pre-headroom)", infoValue(result?.rawSpl, " dB")],
     [`Design SPL at RSP (after ${RP22_EQ_HEADROOM_LABEL} headroom)`, infoValue(result?.designSpl, " dB")],
     ["Graded from", "Design SPL (post-headroom), whole dB"],
@@ -792,6 +822,11 @@ export default function SPLCalculatorPage() {
                     {record?.normalization_warnings?.length > 0 && (
                       <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
                         Speaker specification needs confirmation
+                      </div>
+                    )}
+                    {record?.data_confidence === "C" && (
+                      <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
+                        {ADI_ESTIMATE_NOTICE}
                       </div>
                     )}
                   </div>

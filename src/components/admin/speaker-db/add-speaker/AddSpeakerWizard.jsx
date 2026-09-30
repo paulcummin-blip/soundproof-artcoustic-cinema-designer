@@ -15,7 +15,7 @@ import { useAuth } from "@/lib/AuthContext";
 
 import StepManufacturer from "./StepManufacturer.jsx";
 import StepProductUrl from "./StepProductUrl.jsx";
-import StepDiscoverMk from "./StepDiscoverMk.jsx";
+import StepModelLookup from "./StepModelLookup.jsx";
 import StepDocuments from "./StepDocuments.jsx";
 import StepExtract from "./StepExtract.jsx";
 import StepReview from "./StepReview.jsx";
@@ -35,21 +35,12 @@ const BRAND = {
 
 const STEPS = [
   { key: "manufacturer", label: "Manufacturer" },
-  { key: "url", label: "Product URL" },
+  { key: "url", label: "Find Model Data" },
   { key: "documents", label: "Documents" },
   { key: "extract", label: "Raw Extraction" },
   { key: "review", label: "Review" },
   { key: "approve", label: "Approve" },
 ];
-
-// M&K Sound detection — when selected, Step 2 becomes dynamic product discovery
-// instead of manual URL entry. Matches by manufacturer name or website domain.
-function isMkManufacturer(manufacturer) {
-  if (!manufacturer) return false;
-  const name = (manufacturer.name || "").toLowerCase();
-  const website = (manufacturer.website || "").toLowerCase();
-  return name.includes("m&k") || name.includes("mk sound") || website.includes("mksound");
-}
 
 export default function AddSpeakerWizard() {
   const navigate = useNavigate();
@@ -176,7 +167,7 @@ export default function AddSpeakerWizard() {
                 >
                   {isComplete ? "✓" : i + 1}
                 </span>
-                <span className="text-sm font-medium">{i === 1 && isMkManufacturer(selectedManufacturer) && !useManualUrl ? "Discover Products" : s.label}</span>
+                <span className="text-sm font-medium">{i === 1 && useManualUrl ? "Product URL" : s.label}</span>
               </button>
               {i < STEPS.length - 1 && (
                 <div style={{ width: 24, height: 2, background: isComplete ? BRAND.green : BRAND.border, flexShrink: 0 }} />
@@ -196,25 +187,22 @@ export default function AddSpeakerWizard() {
               onSelect={setSelectedManufacturer}
             />
           )}
-          {/* M&K Discovery — kept mounted (hidden when manual URL is active) so
-              the discovered products list and selection are preserved when the
-              user switches to Manual URL and back. targetModel is also preserved
-              across the switch — the model selected in Discovery carries over to
-              the manual URL input, and any manual edits carry back to Discovery. */}
-          {step === 1 && isMkManufacturer(selectedManufacturer) && (
-            <div style={{ display: useManualUrl ? "none" : "block" }}>
-              <StepDiscoverMk
-                manufacturer={selectedManufacturer}
-                productUrl={productUrl}
-                onProductUrlChange={setProductUrl}
-                onPdfUrlChange={setPdfUrl}
-                onTargetModelChange={setTargetModel}
-                onUseManualUrl={() => { setUseManualUrl(true); setUrlValid(false); }}
-                onValidationResult={({ valid }) => setUrlValid(valid)}
-              />
-            </div>
+          {/* Model-first lookup: one manufacturer, one model, official sources
+              only. No catalogue is crawled and no other product is imported.
+              Manual URL entry stays available as the fallback. */}
+          {step === 1 && !useManualUrl && (
+            <StepModelLookup
+              manufacturer={selectedManufacturer}
+              onApplySource={({ productUrl: url, pdfUrl: pdf, model }) => {
+                setProductUrl(url);
+                setPdfUrl(pdf || "");
+                setTargetModel(model || "");
+                setUrlValid(!!url);
+              }}
+              onUseManualUrl={() => { setUseManualUrl(true); setUrlValid(false); }}
+            />
           )}
-          {step === 1 && (useManualUrl || !isMkManufacturer(selectedManufacturer)) && (
+          {step === 1 && useManualUrl && (
             <StepProductUrl
               manufacturer={selectedManufacturer}
               productUrl={productUrl}
@@ -222,7 +210,7 @@ export default function AddSpeakerWizard() {
               onTargetModelChange={setTargetModel}
               targetModel={targetModel}
               onValidationResult={({ valid }) => setUrlValid(valid)}
-              showBackToDiscovery={isMkManufacturer(selectedManufacturer)}
+              showBackToDiscovery
               onBackToDiscovery={() => { setUseManualUrl(false); setUrlValid(false); }}
             />
           )}
