@@ -80,7 +80,7 @@
     },
     "recommended_amp_max_w": {
       "type": "number",
-      "description": "Upper bound of the manufacturer recommended amplifier power range, in watts. Used as a ceiling on effective amplifier power for SPL capability calculations. Null when not specified."
+      "description": "Upper bound of the manufacturer recommended amplifier power range, in watts. Used as a ceiling on effective amplifier power for SPL capability calculations, and as the stated power authority when the manufacturer publishes no power rating. Null when not specified."
     },
     "source_url": {
       "type": "string"
@@ -110,6 +110,26 @@
     },
     "data_confidence": {
       "type": "string"
+    },
+    "power_authority": {
+      "type": "string",
+      "nullable": true,
+      "description": "Where the comparison's capability power came from: a published rating label (Continuous, Long term IEC, Rated IEC, AES) or 'Manufacturer recommended amplifier maximum' when the manufacturer publishes no power rating. Null when neither exists and the row is ungradeable. Never inferred."
+    },
+    "power_authority_w": {
+      "type": "number",
+      "nullable": true,
+      "description": "The watt figure actually used for the P12/P13 capability calculation: the published continuous/AES-style rating when stated, otherwise the manufacturer's recommended amplifier maximum. Null when neither is published."
+    },
+    "capability_basis": {
+      "type": "string",
+      "nullable": true,
+      "description": "How the capability figure was obtained: 'Published' when a published continuous SPL is used, 'Calculated' when derived from sensitivity plus the power authority. Null when the row is ungradeable."
+    },
+    "evidence_quality": {
+      "type": "string",
+      "nullable": true,
+      "description": "Evidence quality behind the comparison row: 'Manufacturer Published' when capability rests on a published power rating, 'Manufacturer Calculated' when it is derived from the recommended amplifier maximum, 'Unknown' when the row is ungradeable."
     },
     "p12_p13_eligible": {
       "type": "boolean"

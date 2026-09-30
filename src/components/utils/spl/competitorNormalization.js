@@ -14,6 +14,27 @@ function num(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Sensitivity basis — the reference the manufacturer quoted sensitivity against.
+// Sources write the same reference many ways ("2.83V1m", "2.83V/1m",
+// "2.83 V / 1 m", "2.83V @ 1m", "2.83 volts/1m") and they all mean 2.83 V at 1 m.
+// Anything that is not a recognised reference returns null, so the row is
+// reported as needing confirmation rather than being assumed to be 1 W.
+export function parseSensitivityBasis(raw) {
+  const compact = String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/@/g, '/')
+    .replace(/per/g, '/')
+    .replace(/volts?/g, 'v')
+    .replace(/watts?/g, 'w')
+    .replace(/,/g, '.');
+  if (!compact) return null;
+  if (/^2\.83v/.test(compact)) return '2.83V/1m';
+  if (/^1w/.test(compact)) return '1W/1m';
+  return null;
+}
+
 // Resolve a single measurement-basis declaration to { correctionDb, provenance }.
 function resolveSpaceBasis(rawBasis) {
   const normalized = String(rawBasis ?? '').trim().toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ');
@@ -64,10 +85,14 @@ export function normalizeCompetitor(record) {
   const maxSplBasis = resolveSpaceBasis(maxSplBasisRaw);
 
   const sensitivity = num(record.sensitivity_value_db);
-  const reference = String(record.sensitivity_reference ?? '').toLowerCase().replace(/\s+/g, '');
   const impedance = num(record.sensitivity_impedance_used_ohm) ?? num(record.rated_impedance_ohm);
-  const isWatts = ['1w/1m', '1w@1m'].includes(reference);
-  const isVolts = ['2.83v/1m', '2,83v/1m', '2.83v@1m'].includes(reference);
+  const reference = parseSensitivityBasis(record.sensitivity_reference);
+  const isWatts = reference === '1W/1m';
+  const isVolts = reference === '2.83V/1m';
+  // 2.83 V into a non-8 Ω load is not 1 W, so convert once, from the published
+  // figure and the impedance the manufacturer quoted it at:
+  //   sensitivity_1w = sensitivity_2.83V - 10·log10(2.83² / impedance)
+  // (90 dB @ 2.83V/1m into 4 Ω → 86.99 dB @ 1W/1m.)
   const voltageDb = isWatts ? 0 : isVolts && impedance > 0 ? -10 * Math.log10(2.83 ** 2 / impedance) : null;
 
   // 1 W normalisation in the raw published space (space correction applied separately)
@@ -75,14 +100,26 @@ export function normalizeCompetitor(record) {
   // Half-space sensitivity: apply sensitivity space correction once
   const halfSensitivity = oneW !== null ? oneW + sensitivityBasis.correctionDb : null;
 
-  const rawPower = num(record.continuous_power_w);
-  const power = rawPower > 0 ? rawPower : null;
   const rawContinuous = num(record.published_max_continuous_spl_db_1m);
   const rawPeak = num(record.published_max_peak_spl_db_1m);
 
   // Recommended amplifier range — prefer dedicated min/max fields, fall back to legacy single value
   const recAmpMin = num(record.recommended_amp_min_w);
   const recAmpMax = num(record.recommended_amp_max_w) ?? num(record.recommended_amplifier_power_w);
+
+  // Power authority. A published continuous/AES-style rating is preferred. Many
+  // manufacturers publish only a recommended amplifier range, so in that case the
+  // recommended amplifier maximum is the stated authority. Nothing is inferred and
+  // nothing is invented: an absent figure stays absent and the row stays ungradeable.
+  const publishedRating = num(record.continuous_power_w);
+  const ratingLabel = String(record.power_rating_type ?? '').trim();
+  const powerFromRating = publishedRating > 0 ? publishedRating : null;
+  const powerFromAmpRecommendation = recAmpMax > 0 ? recAmpMax : null;
+  const power = powerFromRating ?? powerFromAmpRecommendation;
+  const powerIsPublishedRating = powerFromRating !== null;
+  const powerAuthority = powerIsPublishedRating
+    ? (ratingLabel || 'Continuous')
+    : powerFromAmpRecommendation !== null ? 'Manufacturer recommended amplifier maximum' : null;
 
   // Published SPL values get the max-SPL space correction applied once (independently)
   const continuous = rawContinuous !== null ? rawContinuous + maxSplBasis.correctionDb : null;
@@ -92,10 +129,16 @@ export function normalizeCompetitor(record) {
   const rawCalculated = oneW !== null && power !== null ? oneW + 10 * Math.log10(power) : null;
   const calculated = halfSensitivity !== null && power !== null ? halfSensitivity + 10 * Math.log10(power) : null;
 
+  // Gradeable when either a published continuous SPL exists, or the capability can
+  // be calculated from sensitivity plus a stated power authority. A row with
+  // neither a power rating nor a recommended amplifier maximum — and no published
+  // SPL — stays ungradeable rather than being estimated.
   const warnings = [
-    sensitivity === null ? 'Missing sensitivity' : null,
-    voltageDb === null ? 'Sensitivity reference or impedance needs confirmation' : null,
-    power === null ? 'Missing continuous/RMS/AES power' : null,
+    sensitivity === null && continuous === null ? 'Missing sensitivity' : null,
+    voltageDb === null && continuous === null ? 'Sensitivity reference or impedance needs confirmation' : null,
+    power === null && continuous === null
+      ? 'Missing continuous/AES power and recommended amplifier maximum'
+      : null,
   ].filter(Boolean);
 
   const eligible = warnings.length === 0;
@@ -116,6 +159,16 @@ export function normalizeCompetitor(record) {
   } else {
     dataConfidence = 'C';
   }
+  // Capability resting on a recommended amplifier maximum is sound engineering but
+  // is not a published power rating, so it can never reach confidence A.
+  if (!powerIsPublishedRating && dataConfidence === 'A') dataConfidence = 'B';
+
+  // How the capability figure was obtained, and the quality of the evidence
+  // behind the power authority it rests on.
+  const capabilityBasis = continuous !== null ? 'Published' : 'Calculated';
+  const evidenceQuality = powerIsPublishedRating
+    ? 'Manufacturer Published'
+    : power === null ? 'Unknown' : 'Manufacturer Calculated';
 
   return {
     ...record,
@@ -129,7 +182,7 @@ export function normalizeCompetitor(record) {
     space_correction_db: Math.max(sensitivityBasis.correctionDb, maxSplBasis.correctionDb),
     measurement_basis_status: 'Resolved',
     halfspace_sensitivity_db_1w_1m: halfSensitivity,
-    normalized_continuous_power_w: power,
+    normalized_continuous_power_w: powerFromRating,
     recommended_amp_min_w: recAmpMin,
     recommended_amp_max_w: recAmpMax,
     calculated_max_continuous_spl_db_1m: rawCalculated,
@@ -138,6 +191,12 @@ export function normalizeCompetitor(record) {
     halfspace_calculated_max_continuous_spl_db_1m: calculated,
     spl_authority: !eligible ? 'Incomplete' : continuous !== null ? 'Published continuous SPL' : 'Calculated from sensitivity + power',
     data_confidence: dataConfidence,
+    // Power authority behind the capability figure (published rating, or the
+    // manufacturer's recommended amplifier maximum) and how it was obtained.
+    power_authority: powerAuthority,
+    power_authority_w: power,
+    capability_basis: eligible ? capabilityBasis : null,
+    evidence_quality: evidenceQuality,
     p12_p13_eligible: eligible,
     normalization_warnings: warnings,
   };
@@ -150,7 +209,9 @@ export function competitorMetaForComparison(record) {
     id: `competitor:${record.id}`,
     model: `${record.manufacturer} ${record.model}`,
     sensitivity_db_1w_1m: n.halfspace_sensitivity_db_1w_1m,
-    power_handling_w: n.normalized_continuous_power_w,
+    // The stated power authority — published rating preferred, recommended
+    // amplifier maximum otherwise. Never an inferred figure.
+    power_handling_w: n.power_authority_w,
     max_spl_cont_db_1m_halfspace: n.halfspace_published_max_continuous_spl_db_1m ?? n.halfspace_calculated_max_continuous_spl_db_1m,
     recommended_amp_max_w: n.recommended_amp_max_w,
     isLineSource: false,

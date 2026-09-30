@@ -10,13 +10,14 @@
 // ---------------------------------------------------------------------------
 
 import { base44 } from "@/api/base44Client";
+import { sameCompetitorIdentity } from "@/components/utils/spl/manufacturerIdentity";
 
 // Fields without which the RP22 comparison cannot grade P12/P13 for the model.
 export const RP22_CRITICAL_FIELDS = [
   { key: "sensitivity_db", label: "Sensitivity (dB)" },
   { key: "sensitivity_basis", label: "Sensitivity basis" },
   { key: "nominal_impedance_ohm", label: "Nominal impedance" },
-  { key: "power", label: "Continuous power handling" },
+  { key: "power", label: "Continuous power handling (or recommended amplifier maximum)" },
   { key: "max_spl", label: "Max continuous SPL (published or calculable)" },
   { key: "max_spl_basis", label: "Max SPL basis" },
   { key: "measurement_space", label: "Measurement space" },
@@ -53,6 +54,29 @@ export function resolveContinuousPower(spec) {
   return { value: null, label: "" };
 }
 
+/**
+ * The power figure the comparison is allowed to use, and where it came from.
+ * A published continuous/AES-style rating is preferred. When the manufacturer
+ * publishes no power rating — many publish only a recommended amplifier range —
+ * the recommended amplifier maximum is the stated authority. Nothing is inferred:
+ * when neither exists the row stays ungradeable.
+ * @returns {object} { value, label, source }
+ */
+export function resolvePowerAuthority(spec) {
+  const rating = resolveContinuousPower(spec);
+  if (rating.value !== null) {
+    return { value: rating.value, label: rating.label, source: "power_rating" };
+  }
+  if (present(spec.recommended_amp_max_w)) {
+    return {
+      value: spec.recommended_amp_max_w,
+      label: "Manufacturer recommended amplifier maximum",
+      source: "recommended_amp_max",
+    };
+  }
+  return { value: null, label: "", source: null };
+}
+
 export function resolvePeakPower(spec) {
   if (!spec) return null;
   if (present(spec.power_handling_peak_w)) return spec.power_handling_peak_w;
@@ -70,12 +94,12 @@ export function findRp22Gaps(specification) {
 
   for (const field of RP22_CRITICAL_FIELDS) {
     if (field.key === "power") {
-      if (resolveContinuousPower(spec).value === null) critical.push(field);
+      if (resolvePowerAuthority(spec).value === null) critical.push(field);
       continue;
     }
     if (field.key === "max_spl") {
       const published = present(spec.max_continuous_spl_db);
-      const calculable = present(spec.sensitivity_db) && resolveContinuousPower(spec).value !== null;
+      const calculable = present(spec.sensitivity_db) && resolvePowerAuthority(spec).value !== null;
       if (!published && !calculable) critical.push(field);
       continue;
     }
@@ -165,21 +189,40 @@ export function buildComparisonRow({ product, specification, manufacturerName })
 }
 
 /**
+ * Every comparison row for this manufacturer + model.
+ * Matching uses the normalised identity key, so "M&K Sound", "MK Sound",
+ * "M and K Sound" and "M.K. Sound" are recognised as the same manufacturer and
+ * "MP150" / "MP-150" as the same model. The model is queried first (the common
+ * case) and the comparison library is scanned when the stored spelling differs.
+ */
+async function findIdentityMatches({ manufacturer, model }) {
+  const matches = (rows) => (Array.isArray(rows) ? rows : [])
+    .filter((row) => sameCompetitorIdentity(row, { manufacturer, model }));
+
+  const page = await base44.entities.CompetitorSpeaker.filter({ model }, { limit: 50 });
+  const direct = matches(Array.isArray(page?.items) ? page.items : page);
+  if (direct.length > 0) return direct;
+
+  const library = await base44.entities.CompetitorSpeaker.list("-created_date", 500);
+  return matches(Array.isArray(library?.items) ? library.items : library);
+}
+
+/**
  * Create or UPDATE the comparison row for this manufacturer + model.
  * An existing row keeps its identity (its id, retail price and manual fields);
- * a second publish never creates a duplicate.
+ * a second publish never creates a duplicate. Where an approved Speaker Database
+ * row already exists it is the authority for the product, and any other row for
+ * the same manufacturer + model is superseded rather than left selectable.
  */
 export async function publishSpecificationToRp22({ product, specification, manufacturerName, actorName }) {
   const record = buildComparisonRow({ product, specification, manufacturerName });
-  const manufacturerKey = String(record.manufacturer || "").trim().toLowerCase();
-  const modelKey = String(record.model || "").trim().toLowerCase();
+  const identity = { manufacturer: record.manufacturer, model: record.model };
 
-  const page = await base44.entities.CompetitorSpeaker.filter({ model: record.model }, { limit: 50 });
-  const candidates = Array.isArray(page?.items) ? page.items : Array.isArray(page) ? page : [];
-  const existing = candidates.find(
-    (row) => String(row.manufacturer || "").trim().toLowerCase() === manufacturerKey
-      && String(row.model || "").trim().toLowerCase() === modelKey,
-  );
+  const identityMatches = await findIdentityMatches(identity);
+  const publishedRow = identityMatches.find((row) => row.publish_source === "speaker_database");
+  const existing = publishedRow
+    || [...identityMatches].sort((a, b) => String(a.created_date || "").localeCompare(String(b.created_date || "")))[0]
+    || null;
 
   let competitorId;
   let created;
@@ -192,6 +235,19 @@ export async function publishSpecificationToRp22({ product, specification, manuf
     const createdRow = await base44.entities.CompetitorSpeaker.create(record);
     competitorId = createdRow?.id || null;
     created = true;
+  }
+
+  // Any other row for the same manufacturer + model is now superseded. It is kept
+  // for audit but deactivated, so the product can never appear twice in the
+  // comparison list.
+  const superseded = identityMatches.filter((row) => row.id !== competitorId);
+  for (const row of superseded) {
+    await base44.entities.CompetitorSpeaker.update(row.id, {
+      active: false,
+      notes: [row.notes, `Superseded by the approved Speaker Database row for ${identity.manufacturer} ${identity.model}.`]
+        .filter(Boolean)
+        .join(" · "),
+    });
   }
 
   const publishedAt = record.published_at;
@@ -210,5 +266,5 @@ export async function publishSpecificationToRp22({ product, specification, manuf
     change_reason: "Administrative",
   });
 
-  return { competitorId, created, record };
+  return { competitorId, created, record, supersededIds: superseded.map((row) => row.id) };
 }

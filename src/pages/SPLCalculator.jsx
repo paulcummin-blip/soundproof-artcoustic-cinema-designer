@@ -9,6 +9,8 @@ import { getModelsByCategoryOrdered, normaliseModelKey } from "@/components/mode
 import { computeSpeakerCapabilityAtDistance } from "@/components/utils/spl/centralSplEngine";
 import { resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import { normalizeCompetitor, competitorMetaForComparison, parseRecommendedAmpRange } from "@/components/utils/spl/competitorNormalization";
+import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
+import { RP22_EQ_HEADROOM_RESERVE_DB, RP22_EQ_HEADROOM_LABEL } from "@/components/utils/spl/rp22HeadroomPolicy";
 import { getLevelColors } from "@/components/utils/rp22Colors";
 import { resolveSpeakerSplMeta } from "@/components/utils/spl/speakerSplMeta";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
@@ -36,7 +38,7 @@ function DataNote({ record }) {
   if (!showData && !showOpenBack) return null;
   return (
     <div style={{ gridColumn: "4 / 6", fontSize: 11, color: "#7A5C00", lineHeight: 1.4, paddingTop: 2 }}>
-      {showData && <div>Estimated from incomplete published manufacturer data.</div>}
+      {showData && <div>Capability calculated from published data — the source panel shows the power authority behind it.</div>}
       {showOpenBack && <div>Open-back design — subject to inconsistent installed results.</div>}
     </div>
   );
@@ -181,6 +183,13 @@ function competitorInfoRows(record, result = null) {
     ["Published continuous SPL", infoValue(record.published_max_continuous_spl_db_1m, " dB")],
     ["Published SPL source basis", record.max_spl_measurement_basis || "Unstated → assumed Half Space"],
     ["Normalised continuous SPL (half-space)", infoValue(record.halfspace_published_max_continuous_spl_db_1m ?? record.halfspace_calculated_max_continuous_spl_db_1m, " dB")],
+    ["Power authority", record.power_authority || "—"],
+    ["Power authority figure", infoValue(record.power_authority_w, " W")],
+    ["Capability basis", record.capability_basis || "—"],
+    ["Evidence quality", record.source_evidence_quality || record.evidence_quality || "—"],
+    ["Raw SPL at RSP (pre-headroom)", infoValue(result?.rawSpl, " dB")],
+    [`Design SPL at RSP (after ${RP22_EQ_HEADROOM_LABEL} headroom)`, infoValue(result?.designSpl, " dB")],
+    ["Graded from", "Design SPL (post-headroom), whole dB"],
     ["User amplifier", debug ? `${Math.round(debug.ampPowerW)} W` : "—"],
     ["Effective amplifier used", debug ? `${Math.round(debug.availablePowerW)} W` : "—"],
     ["Final limiting factor", limitingFactor],
@@ -372,6 +381,9 @@ export default function SPLCalculatorPage() {
   const [basis, setBasis] = useState("minimum");
   const [artId, setArtId] = useState("");
   const [competitorRows, setCompetitorRows] = useState([]);
+  // Rows with too little published data to grade P12/P13. Listed separately and
+  // never offered as a selectable comparison speaker.
+  const [incompleteCompetitors, setIncompleteCompetitors] = useState([]);
   const [selectedCompetitorIds, setSelectedCompetitorIds] = useState([]);
   const [adminOpen, setAdminOpen] = useState(false);
   const [importPreview, setImportPreview] = useState([]);
@@ -390,13 +402,31 @@ export default function SPLCalculatorPage() {
       // Only approved/published rows are comparable. Rows published from the
       // Speaker Database appear here once approved and published; legacy
       // spreadsheet rows carry no publish provenance and stay visible as before.
-      const comparable = (rows || [])
+      const live = (rows || [])
         .filter((r) => r.active !== false)
         .filter((r) => r.publish_source !== "speaker_database" || r.published === true);
-      setCompetitorRows(comparable.map(normalizeCompetitor));
+
+      // An approved Speaker Database row supersedes any legacy row for the same
+      // manufacturer + model, however the manufacturer was spelled.
+      const publishedKeys = new Set(
+        live
+          .filter((r) => r.publish_source === "speaker_database")
+          .map((r) => competitorIdentityKey(r)),
+      );
+      const comparable = live.filter(
+        (r) => r.publish_source === "speaker_database" || !publishedKeys.has(competitorIdentityKey(r)),
+      );
+
+      const normalized = comparable.map(normalizeCompetitor);
+      setCompetitorRows(normalized.filter((r) => r.p12_p13_eligible === true));
+      setIncompleteCompetitors(normalized.filter((r) => r.p12_p13_eligible !== true));
+      setSelectedCompetitorIds((prev) => prev.filter(
+        (id) => normalized.some((r) => r.id === id && r.p12_p13_eligible === true),
+      ));
     } catch (error) {
       console.warn("[RP22 Speaker Capability] competitor data unavailable", error);
       setCompetitorRows([]);
+      setIncompleteCompetitors([]);
     } finally {
       setLoadingCompetitors(false);
     }
@@ -499,17 +529,32 @@ export default function SPLCalculatorPage() {
   const competitorById = useMemo(() => new Map(competitorRows.map((r) => [r.id, r])), [competitorRows]);
 
   const competitorResultFor = useCallback((record) => {
-    if (!record || !Number.isFinite(d) || !Number.isFinite(p)) return { spl: null, grades: { p12: "—", p13: "—" } };
+    if (!record || !Number.isFinite(d) || !Number.isFinite(p)) {
+      return { spl: null, rawSpl: null, designSpl: null, grades: { p12: "—", p13: "—" } };
+    }
     const speakerMeta = competitorMetaForComparison(record);
-    if (!speakerMeta) return { spl: null, grades: { p12: "—", p13: "—" } };
+    if (!speakerMeta) return { spl: null, rawSpl: null, designSpl: null, grades: { p12: "—", p13: "—" } };
+    // Competitors are graded from the DESIGN SPL: raw capability less the Sound
+    // Proof design headroom, exactly as the Artcoustic rows are graded from their
+    // published, headroom-inclusive authority. The engine takes the reserve as a
+    // positive loss term.
     const capability = computeSpeakerCapabilityAtDistance({
       speakerModelId: `competitor:${record.id}`,
       distance_m: d,
       powerW: p,
       roomVolumeM3,
       speakerMeta,
+      eqHeadroom_dB: RP22_EQ_HEADROOM_RESERVE_DB,
     });
-    return { ...capability, grades: gradeFromSpl(capability.spl, basis) };
+    const rawSpl = Number.isFinite(capability.spl)
+      ? capability.spl + RP22_EQ_HEADROOM_RESERVE_DB
+      : null;
+    return {
+      ...capability,
+      rawSpl,
+      designSpl: capability.spl,
+      grades: gradeFromSpl(capability.spl, basis),
+    };
   }, [d, p, roomVolumeM3, basis]);
 
   const selectedCompetitors = useMemo(
@@ -700,7 +745,7 @@ export default function SPLCalculatorPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <div>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Other speakers</div>
-              <div style={{ fontSize: 12, color: BRAND.subtext }}>Up to five speakers, all assessed at the same distance, power and RP22 basis.</div>
+              <div style={{ fontSize: 12, color: BRAND.subtext }}>Up to five speakers, all assessed at the same distance, power and RP22 basis, graded from design SPL after the Sound Proof {RP22_EQ_HEADROOM_LABEL} headroom.</div>
             </div>
             <button type="button" onClick={addCompetitor} disabled={selectedCompetitorIds.length >= 5 || competitorRows.length === 0} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 11px", borderRadius: 9, border: `1px solid ${BRAND.border}`, background: "#FFF", color: BRAND.text, cursor: competitorRows.length ? "pointer" : "not-allowed", opacity: selectedCompetitorIds.length >= 5 || competitorRows.length === 0 ? 0.45 : 1 }}><Plus size={15} /> Add speaker</button>
           </div>
@@ -708,7 +753,7 @@ export default function SPLCalculatorPage() {
           {loadingCompetitors ? (
             <div style={{ padding: 18, color: BRAND.subtext }}>Loading comparison data…</div>
           ) : selectedCompetitorIds.length === 0 ? (
-            <div style={{ border: `1px dashed ${BRAND.border}`, borderRadius: 12, padding: 18, color: BRAND.subtext, fontSize: 13 }}>No comparison speakers selected. {competitorRows.length === 0 ? "Upload the competitor spreadsheet below to populate the comparison library." : "Choose Add speaker to begin."}</div>
+            <div style={{ border: `1px dashed ${BRAND.border}`, borderRadius: 12, padding: 18, color: BRAND.subtext, fontSize: 13 }}>No comparison speakers selected. {competitorRows.length === 0 ? (incompleteCompetitors.length > 0 ? "No comparison speaker has enough published data to grade yet — see Incomplete legacy data below." : "Upload the competitor spreadsheet below to populate the comparison library.") : "Choose Add speaker to begin."}</div>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
               {selectedCompetitorIds.map((id, index) => {
@@ -743,6 +788,35 @@ export default function SPLCalculatorPage() {
             </div>
           )}
         </div>
+
+        {incompleteCompetitors.length > 0 && (
+          <div style={{ marginTop: 14, background: BRAND.panel, border: `1px dashed ${BRAND.border}`, borderRadius: 14, padding: 18 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.subtext }}>Incomplete legacy data</div>
+            <div style={{ fontSize: 12, color: BRAND.hint, marginTop: 3, marginBottom: 10, lineHeight: 1.45 }}>
+              These rows carry too little published data to grade P12/P13, so they are not offered as comparison speakers. They are kept so the missing data can be completed.
+            </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {incompleteCompetitors.map((r) => (
+                <div
+                  key={r.id}
+                  style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center", padding: "9px 11px", border: `1px solid ${BRAND.soft}`, borderRadius: 9, fontSize: 12 }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: BRAND.subtext }}>{r.manufacturer} · {r.model}</div>
+                    <div style={{ color: BRAND.hint, marginTop: 2 }}>
+                      {(r.normalization_warnings || []).join(" · ") || "Insufficient published data"}
+                    </div>
+                  </div>
+                  <div style={{ color: BRAND.hint, fontSize: 11, whiteSpace: "nowrap" }}>
+                    {r.publish_source === "speaker_database"
+                      ? `Speaker Database · ${r.approval_status || "Approved"}`
+                      : "Spreadsheet import"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ marginTop: 14, background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
