@@ -19,14 +19,16 @@
 // ---------------------------------------------------------------------------
 
 import React from "react";
-import { Activity, AlertTriangle, ArrowRight, Loader2, Sparkles } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { useOptimiserPlanView } from "./useOptimiserPlanView.js";
 import {
   ADI_OPTIMISER_ACTION,
   ADI_OPTIMISER_JOURNEY_STATE,
   resolveAdiOptimiserJourney,
 } from "./resolveAdiOptimiserJourney.js";
+import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
 import OptimisationPlanStatus from "./OptimisationPlanStatus.jsx";
+import OptimiserRunEvidenceBlock from "./OptimiserRunEvidenceBlock.jsx";
 
 const STATE_THEME = {
   [ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED]: {
@@ -57,7 +59,35 @@ const STATE_THEME = {
     icon: Activity,
     iconColor: "#213428",
   },
+  [ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT]: {
+    pill: { background: "#625143", color: "#FFFFFF" },
+    border: "#E0DCD5",
+    background: "#F4F1EC",
+    icon: CheckCircle2,
+    iconColor: "#625143",
+  },
+  [ADI_OPTIMISER_JOURNEY_STATE.FAILED]: {
+    pill: { background: "#B91C1C", color: "#FFFFFF" },
+    border: "#F0C9C9",
+    background: "#FDF2F2",
+    icon: AlertTriangle,
+    iconColor: "#B91C1C",
+  },
 };
+
+/**
+ * The canonical presentation state and the journey state share one theme: the
+ * theme is a presentation concern, the copy comes from the resolver.
+ */
+const PRESENTATION_THEME_KEY = Object.freeze({
+  [OPTIMISER_PRESENTATION_STATE.NO_RUN]: ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED,
+  [OPTIMISER_PRESENTATION_STATE.RUNNING]: ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED,
+  [OPTIMISER_PRESENTATION_STATE.STALE]: ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED,
+  [OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE]: ADI_OPTIMISER_JOURNEY_STATE.PLAN_AVAILABLE,
+  [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: ADI_OPTIMISER_JOURNEY_STATE.EVALUATION_INCOMPLETE,
+  [OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT]: ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT,
+  [OPTIMISER_PRESENTATION_STATE.FAILED]: ADI_OPTIMISER_JOURNEY_STATE.FAILED,
+});
 
 export default function AdiOptimisationJourney({
   projectId = null,
@@ -76,6 +106,7 @@ export default function AdiOptimisationJourney({
   leverOutcome = null,
   assessment = null,
   why = null,
+  presentation = null,
   className = "",
 }) {
   const planView = useOptimiserPlanView({
@@ -86,13 +117,35 @@ export default function AdiOptimisationJourney({
     instances,
   });
 
-  const journey = resolveAdiOptimiserJourney({
+  const resolved = resolveAdiOptimiserJourney({
     planView,
     limitingFactorSentence,
     blockReason: runBlockReason,
   });
-  const theme = STATE_THEME[journey.state];
+
+  // The canonical presentation state owns the pill, the headline, the
+  // explanation, the evidence, the Apply visibility and the action. When it is
+  // supplied, this card states exactly what it resolved, so the status and the
+  // body can never disagree. Without it, the journey copy is used unchanged.
+  const journey = presentation
+    ? {
+      ...resolved,
+      state: PRESENTATION_THEME_KEY[presentation.state] || resolved.state,
+      statusLabel: presentation.statusLabel,
+      message: presentation.message,
+      explanation: presentation.explanation || resolved.explanation,
+      notes: presentation.notes.length ? presentation.notes : resolved.notes,
+      action: presentation.action || resolved.action,
+      actionLabel: presentation.actionLabel || resolved.actionLabel,
+      canRun: presentation.runBlocked ? false : resolved.canRun,
+      showPlan: presentation.showPlan,
+    }
+    : resolved;
+
+  const theme = STATE_THEME[journey.state] || STATE_THEME[resolved.state];
   const Icon = theme.icon;
+  const runEvidence = presentation?.evidence || null;
+  const journeyStateKey = presentation?.state || resolved.state;
 
   const isRunning = runStatus === "running";
   const showAction = !!journey.action && journey.canRun && !isRunning;
@@ -103,7 +156,7 @@ export default function AdiOptimisationJourney({
     <div
       className={`rounded-lg border px-4 py-3 space-y-3 ${className}`}
       style={{ borderColor: theme.border, background: theme.background }}
-      data-adi-optimiser-journey={journey.state}
+      data-adi-optimiser-journey={journeyStateKey}
     >
       {/* Header — status */}
       <div className="flex items-center gap-2">
@@ -141,6 +194,9 @@ export default function AdiOptimisationJourney({
           {journey.notes.map((note) => <div key={note}>{note}</div>)}
         </div>
       )}
+
+      {/* What the completed run evaluated, when it produced no actionable plan */}
+      <OptimiserRunEvidenceBlock evidence={runEvidence} />
 
       {/* The read-only evaluated plan, when a current plan exists */}
       {journey.showPlan && (

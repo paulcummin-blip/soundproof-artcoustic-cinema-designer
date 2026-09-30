@@ -45,6 +45,11 @@ import { useAppliedCalibrationAuthority } from "../appliedCalibrationAuthority/a
 import OptimisationPlanStatus from "@/components/room/bass/optimiserPlan/OptimisationPlanStatus.jsx";
 import AdiOptimisationJourney from "@/components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx";
 import { firstSentence } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
+import { useOptimiserPlanView } from "@/components/room/bass/optimiserPlan/useOptimiserPlanView.js";
+import {
+  OPTIMISER_PRESENTATION_STATE,
+  resolveOptimiserPresentationState,
+} from "@/components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
 
 // ── Displacement helpers ──
 
@@ -240,6 +245,17 @@ export default function AdiRecommendation({
     [adiDecision],
   );
 
+  // ── The optimiser evidence for THIS design version ──
+  // Read through the same plan/run-evidence store every other surface uses.
+  // No calculation, no re-run, no mutation: a read of what was saved.
+  const optimiserPlanView = useOptimiserPlanView({
+    projectId,
+    versionId,
+    completedBassAuthority,
+    currentDesignFingerprint: shared?.cacheKey || null,
+    instances: currentInstances,
+  });
+
   // ── Apply handlers (preserved from FurtherImprovements) ──
 
   const selection = v2State?.winner;
@@ -403,6 +419,33 @@ export default function AdiRecommendation({
   // could not confirm an improvement. Must NOT show APPLIED or an Apply button.
   const isIncomplete = outcome === ADI_OUTCOME.INCOMPLETE;
 
+  // The evaluated, applicable action — the ONLY path by which anything becomes
+  // available. It requires a confirmed winner whose current and proposed values
+  // are known and whose Apply action is usable. Generic diagnosis text is never
+  // an available recommendation.
+  const actionableSubPositions = intent === RECOMMENDATION_INTENT.DESIGN
+    && isSubPositionLever && hasSubPositions && hasCanonicalInstances && !appliedStage;
+  const actionableSeating = intent === RECOMMENDATION_INTENT.DESIGN
+    && isSeatingLever && hasSeating && !appliedStage;
+  const actionableEvaluation = {
+    available: actionableSubPositions || actionableSeating,
+    summary: actionableSubPositions && subDisplacement
+      ? `Move the subwoofers ${subDisplacement.distanceMm} mm ${subDisplacement.direction}.`
+      : null,
+    reason: recommendation?.why || null,
+  };
+
+  // ── ONE presentation state for the whole card ──
+  // Status pill, headline, explanation, lever rows, Apply controls, re-run
+  // control, candidate evidence and rejection reason all come from this.
+  const optimiserPresentation = resolveOptimiserPresentationState({
+    planView: optimiserPlanView,
+    runStatus: optimisationRunStatus || "idle",
+    runError: optimisationRunError || null,
+    actionable: actionableEvaluation,
+    runBlocked: !!optimisationRunBlockReason,
+  });
+
   // FIX 4 (revised): an incomplete evaluation is never a dead end. The card
   // states the limiting factor, what is incomplete, the next action and what
   // that action will evaluate — resolved from the saved Optimisation Plan by
@@ -425,6 +468,7 @@ export default function AdiRecommendation({
         leverApplyBusy={leverApplyBusy}
         leverOutcome={leverOutcomeResolved}
         why={recommendation?.why || null}
+        presentation={optimiserPresentation}
       />
     );
   }
@@ -507,6 +551,35 @@ export default function AdiRecommendation({
     );
   }
 
+  // ── The canonical optimiser state owns the card ──
+  // Whenever the resolved state is not an available, evaluated, applicable
+  // change, the card is rendered from that state alone: one pill, one headline,
+  // the run evidence, and no Apply action. Generic ADI diagnosis is shown as
+  // diagnosis — it can never produce an available recommendation.
+  if (optimiserPresentation.state !== OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE) {
+    return (
+      <AdiOptimisationJourney
+        projectId={projectId}
+        versionId={versionId}
+        completedBassAuthority={completedBassAuthority}
+        currentDesignFingerprint={shared?.cacheKey || null}
+        instances={currentInstances}
+        limitingFactorSentence={limitingFactorSentence}
+        runBlockReason={optimisationRunBlockReason || null}
+        runStatus={optimisationRunStatus || "idle"}
+        runError={optimisationRunError || null}
+        onRunOptimisationPlan={onRunOptimisationPlan}
+        onApplyLever={handleApplyLever}
+        onUndoLever={handleUndoLever}
+        leverApplyBusy={leverApplyBusy}
+        leverOutcome={leverOutcomeResolved}
+        assessment={recommendation?.assessment || null}
+        why={recommendation?.why || null}
+        presentation={optimiserPresentation}
+      />
+    );
+  }
+
   // Determine the specific action text
   let actionText = recommendation.action;
   if (isSubPositionLever && subDisplacement) {
@@ -523,9 +596,11 @@ export default function AdiRecommendation({
   const isPhysical = intent === RECOMMENDATION_INTENT.DESIGN;
   const isSpecification = intent === RECOMMENDATION_INTENT.SPECIFICATION;
 
-  const canApplySubPositions = isPhysical && isSubPositionLever && hasSubPositions && hasCanonicalInstances && !appliedStage;
-  const canApplySeating = isPhysical && isSeatingLever && hasSeating && !appliedStage;
-  const showApplyButton = canApplySubPositions || canApplySeating;
+  const canApplySubPositions = actionableSubPositions;
+  const canApplySeating = actionableSeating;
+  // The Apply action exists only where the canonical presentation state says an
+  // evaluated change is available and applicable.
+  const showApplyButton = optimiserPresentation.showApply && (canApplySubPositions || canApplySeating);
   const applyHandler = canApplySubPositions ? handleApplySubPositions : canApplySeating ? handleApplySeating : null;
 
   // ── Applied state — ONE authority ──

@@ -23,6 +23,8 @@ import {
   OPTIMISER_LEVER_STATE_LABEL,
   OPTIMISER_PLAN_STATUS,
   OPTIMISER_PLAN_VERSION,
+  OPTIMISER_RECORD_KIND,
+  OPTIMISER_TERMINAL_OUTCOME,
 } from "./optimiserPlanConstants.js";
 import { resolveLeverState } from "./optimiserPlanMatching.js";
 import { resolveLeverApplyMap } from "./optimiserPlanLeverApply.js";
@@ -43,6 +45,9 @@ export function resolveOptimiserPlanStatus({
     return {
       status: OPTIMISER_PLAN_STATUS.ABSENT,
       evidenceMessage: NO_EVALUATED_OPTIMISER_CHANGES,
+      recordKind: null,
+      terminalOutcome: null,
+      run: null,
       planVersion: null,
       projectId: null,
       versionId: null,
@@ -71,6 +76,9 @@ export function resolveOptimiserPlanStatus({
     return {
       status: OPTIMISER_PLAN_STATUS.UNSUPPORTED,
       evidenceMessage: OPTIMISER_EVIDENCE_UNAVAILABLE,
+      recordKind: plan.recordKind || null,
+      terminalOutcome: plan.terminalOutcome || null,
+      run: plan.run || null,
       planVersion: Number.isFinite(savedVersion) ? savedVersion : null,
       projectId: plan.projectId || null,
       versionId: plan.versionId || null,
@@ -105,6 +113,47 @@ export function resolveOptimiserPlanStatus({
   }
 
   const planStale = status === OPTIMISER_PLAN_STATUS.STALE;
+
+  // ── A run that completed WITHOUT an actionable plan ──
+  // The terminal outcome is a first-class status, never "no evidence": the run
+  // evidence is stated as read, the levers stay empty, and no change is offered
+  // for application. A design change still decides staleness first, so a
+  // terminal record belonging to another design state asks for re-evaluation.
+  const terminalOutcome = plan.terminalOutcome || null;
+  if (!planStale && terminalOutcome) {
+    const terminalStatus = terminalOutcome === OPTIMISER_TERMINAL_OUTCOME.FAILED
+      ? OPTIMISER_PLAN_STATUS.FAILED
+      : terminalOutcome === OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT
+        ? OPTIMISER_PLAN_STATUS.NO_USEFUL_IMPROVEMENT
+        : OPTIMISER_PLAN_STATUS.ABSENT;
+    return {
+      status: terminalStatus,
+      evidenceMessage: null,
+      recordKind: plan.recordKind || null,
+      terminalOutcome,
+      run: plan.run || null,
+      planVersion: savedVersion,
+      projectId: plan.projectId || null,
+      versionId: plan.versionId || null,
+      target: plan.target || null,
+      staleReason: null,
+      // No levers: a rejected candidate is never presented as an available change.
+      levers: [],
+      individualEffectsEvaluated: false,
+      baseline: plan.baseline || null,
+      combined: null,
+      combinedEffect: null,
+      combinedTradeOff: null,
+      predicted: null,
+      appliedCount: 0,
+      disabledCount: 0,
+      notes: Array.isArray(plan.notes) ? plan.notes : [],
+      savedAt: plan.savedAt || null,
+      candidateId: plan.candidateId || null,
+      engineVersion: plan.engineVersion || null,
+    };
+  }
+
   const decisions = plan.leverDecisions || {};
 
   const levers = OPTIMISER_LEVER_ORDER
@@ -158,6 +207,9 @@ export function resolveOptimiserPlanStatus({
   return {
     status,
     evidenceMessage: null,
+    recordKind: plan.recordKind || OPTIMISER_RECORD_KIND.PLAN,
+    terminalOutcome: null,
+    run: plan.run || null,
     planVersion: savedVersion,
     projectId: plan.projectId || null,
     versionId: plan.versionId || null,

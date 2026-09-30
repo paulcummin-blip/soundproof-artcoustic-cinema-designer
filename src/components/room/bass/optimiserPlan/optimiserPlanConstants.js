@@ -81,7 +81,41 @@ export const OPTIMISER_PLAN_STATUS = Object.freeze({
   ABSENT: "absent",
   /** Saved evidence exists but is unreadable (missing / older schema version). */
   UNSUPPORTED: "unsupported",
+  /**
+   * A completed run whose every credible candidate was rejected: the evidence
+   * is complete and trustworthy, but there is nothing worth applying.
+   */
+  NO_USEFUL_IMPROVEMENT: "no_useful_improvement",
+  /** The run itself failed. A technical failure, never a design statement. */
+  FAILED: "failed",
 });
+
+/**
+ * What a completed run ended as. Stored with the run evidence so a reopened
+ * project states the same terminal outcome without re-running anything.
+ */
+export const OPTIMISER_TERMINAL_OUTCOME = Object.freeze({
+  NO_USEFUL_IMPROVEMENT: "no_useful_improvement",
+  EVALUATION_INCOMPLETE: "evaluation_incomplete",
+  FAILED: "failed",
+});
+
+/** What the design version's optimiser slot holds. */
+export const OPTIMISER_RECORD_KIND = Object.freeze({
+  PLAN: "plan",
+  RUN_EVIDENCE: "run_evidence",
+});
+
+/**
+ * Why a run can finish with no winner. Stated with the evidence rather than
+ * presented as an available recommendation.
+ */
+export const OPTIMISER_NO_WINNER_REASON =
+  "No candidate was confirmed as a winner: every evaluated candidate was rejected before a winner could be established.";
+
+/** Stated with every terminal no-winner record. */
+export const OPTIMISER_DESIGN_UNCHANGED =
+  "The current design has not been changed — no placement, delay, gain or polarity value was applied.";
 
 /** Per-lever state, resolved against the CURRENT design on every read. */
 export const OPTIMISER_LEVER_STATE = Object.freeze({

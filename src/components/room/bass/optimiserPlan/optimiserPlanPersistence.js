@@ -33,6 +33,11 @@ export function serializeOptimiserPlan(plan) {
     // reported as unavailable by the reader, never reinterpreted.
     planVersion: Number(plan.planVersion) || null,
     savedAt: plan.savedAt || null,
+    // 'plan' for an actionable plan, 'run_evidence' for a completed run that
+    // produced none. Both survive refresh and reopen through this same slot.
+    recordKind: plan.recordKind || null,
+    terminalOutcome: plan.terminalOutcome || null,
+    run: plan.run || null,
     // --- source identity ---
     projectId: plan.projectId || null,
     versionId: plan.versionId || null,

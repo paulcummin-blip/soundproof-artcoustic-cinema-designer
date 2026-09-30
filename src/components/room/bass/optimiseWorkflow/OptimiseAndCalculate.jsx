@@ -68,6 +68,7 @@ import {
 import { runEngineeringDecisionModel } from "@/components/adi";
 import { buildAdiBassEvidence } from "@/components/adi/adiBassEvidenceBuilder";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
+import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
 import {
   getOptimiserPlanAuthority,
   setOptimiserPlanAuthority,
@@ -415,7 +416,28 @@ export default function OptimiseAndCalculate({
           instances: subInstancesRef.current || [],
           leverDecisions: getOptimiserPlanAuthority(projectId, versionId)?.leverDecisions || {},
         });
-        if (optimiserPlan) setOptimiserPlanAuthority(projectId, versionId, optimiserPlan);
+        if (optimiserPlan) {
+          setOptimiserPlanAuthority(projectId, versionId, optimiserPlan);
+        } else {
+          // A run that produced no actionable plan keeps its terminal evidence:
+          // the same slot holds what the run evaluated, so the card states the
+          // outcome after refresh and reopen instead of discarding everything.
+          const runEvidence = buildOptimiserRunEvidence({
+            selection: result.selection,
+            diagnostics: result.optimisationDiagnostics || null,
+            identity: {
+              projectId,
+              versionId,
+              designFingerprint: currentShared?.cacheKey || null,
+              resultFingerprint: fingerprint,
+              cacheKey: currentShared?.cacheKey || null,
+              baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
+              engineVersion: result.selection?.winner?.algorithmVersion || null,
+            },
+            currentPolarity: (subInstancesRef.current || []).map((instance) => instance?.polarity ?? 1),
+          });
+          if (runEvidence) setOptimiserPlanAuthority(projectId, versionId, runEvidence);
+        }
 
         const recommendationForPublication = {
           ...result.recommendation,

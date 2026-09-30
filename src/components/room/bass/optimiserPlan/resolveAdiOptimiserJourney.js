@@ -32,6 +32,10 @@ export const ADI_OPTIMISER_JOURNEY_STATE = Object.freeze({
   REEVALUATION_REQUIRED: "reevaluation_required",
   EVALUATION_INCOMPLETE: "evaluation_incomplete",
   PLAN_AVAILABLE: "plan_available",
+  /** Evaluation finished, evidence is complete, no candidate was worth applying. */
+  NO_USEFUL_IMPROVEMENT: "no_useful_improvement",
+  /** The run itself failed. A technical failure, never a design statement. */
+  FAILED: "failed",
 });
 
 /** The primary action offered for each state. */
@@ -52,6 +56,8 @@ export const ADI_OPTIMISER_STATUS_LABEL = Object.freeze({
   [ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED]: "Re-evaluation required",
   [ADI_OPTIMISER_JOURNEY_STATE.EVALUATION_INCOMPLETE]: "Evaluation incomplete",
   [ADI_OPTIMISER_JOURNEY_STATE.PLAN_AVAILABLE]: "Optimisation plan available",
+  [ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT]: "No useful improvement found",
+  [ADI_OPTIMISER_JOURNEY_STATE.FAILED]: "Optimisation failed",
 });
 
 /** Canonical journey copy. Plain professional language, every line actionable. */
@@ -222,6 +228,28 @@ export function resolveAdiOptimiserJourney({
       message: withLead(ADI_OPTIMISER_COPY.PLAN_AVAILABLE),
       explanation: null,
       showPlan: true,
+    });
+  }
+
+  // ── 4b. Evaluation finished with no candidate worth applying ──
+  // Complete, trustworthy evidence: the best attempted result is stated as
+  // rejected evidence. Nothing is offered for application.
+  if (status === OPTIMISER_PLAN_STATUS.NO_USEFUL_IMPROVEMENT) {
+    return build(ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT, {
+      message: withLead("The optimiser completed its search without confirming a candidate worth applying."),
+      explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
+      action: ADI_OPTIMISER_ACTION.RERUN,
+      showPlan: false,
+    });
+  }
+
+  // ── 4c. The run failed ──
+  if (status === OPTIMISER_PLAN_STATUS.FAILED) {
+    return build(ADI_OPTIMISER_JOURNEY_STATE.FAILED, {
+      message: withLead("The optimiser run did not complete."),
+      explanation: ADI_OPTIMISER_COPY.RUN_EXPLANATION,
+      action: ADI_OPTIMISER_ACTION.RERUN,
+      showPlan: false,
     });
   }
 

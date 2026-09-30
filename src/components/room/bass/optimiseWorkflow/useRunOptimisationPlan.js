@@ -28,6 +28,7 @@ import { useCallback, useRef, useState } from "react";
 import { runOptimisation } from "./optimiseWorkflowOrchestrator";
 import { publishRecommendation } from "@/components/recommendationEngine";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
+import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
 import {
   getOptimiserPlanAuthority,
   setOptimiserPlanAuthority,
@@ -106,36 +107,53 @@ export default function useRunOptimisationPlan({
         || currentShared?.currentFingerprint
         || null;
 
+      const planIdentity = {
+        projectId,
+        versionId,
+        designFingerprint: currentShared?.cacheKey || null,
+        resultFingerprint: fingerprint,
+        cacheKey: currentShared?.cacheKey || null,
+        baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
+        target: {
+          p14TargetDb: currentShared?.authoritative?.requested?.selectedP14TargetDb
+            ?? currentShared?.completedBassAuthority?.p14TargetDb
+            ?? null,
+          targetKey: null,
+        },
+        engineVersion: result.selection?.winner?.algorithmVersion || null,
+      };
+
       const optimiserPlan = buildOptimiserPlan({
         selection: result.selection,
         baseline: result.selection?.currentResult || null,
-        identity: {
-          projectId,
-          versionId,
-          designFingerprint: currentShared?.cacheKey || null,
-          resultFingerprint: fingerprint,
-          cacheKey: currentShared?.cacheKey || null,
-          baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
-          target: {
-            p14TargetDb: currentShared?.authoritative?.requested?.selectedP14TargetDb
-              ?? currentShared?.completedBassAuthority?.p14TargetDb
-              ?? null,
-            targetKey: null,
-          },
-          engineVersion: result.selection?.winner?.algorithmVersion || null,
-        },
+        identity: planIdentity,
         instances: subInstancesRef.current || [],
         leverDecisions: getOptimiserPlanAuthority(projectId, versionId)?.leverDecisions || {},
       });
 
-      if (!optimiserPlan) {
+      // A completed run that produced NO actionable plan keeps its evidence: what
+      // was evaluated, which controls were tested, the best attempted result and
+      // why no candidate was accepted. It is saved in the same slot, so the card
+      // can state the outcome after a refresh or a reopen instead of reporting
+      // "no plan". The design is not touched by any of this.
+      const runEvidence = optimiserPlan ? null : buildOptimiserRunEvidence({
+        selection: result.selection,
+        diagnostics: result.optimisationDiagnostics || null,
+        identity: planIdentity,
+        currentPolarity: (subInstancesRef.current || []).map((instance) => instance?.polarity ?? 1),
+      });
+
+      if (!optimiserPlan && !runEvidence) {
         setStatus("failed");
-        setError("The optimiser returned no evaluated plan for this design. Re-run the Optimisation Plan.");
+        setError("The optimiser returned no usable result for this design. Re-run the Optimisation Plan.");
         return;
       }
 
-      setOptimiserPlanAuthority(projectId, versionId, optimiserPlan);
-      if (fingerprint && result.recommendation) {
+      setOptimiserPlanAuthority(projectId, versionId, optimiserPlan || runEvidence);
+
+      // Only an actionable plan is published with the recommendation. A rejected
+      // candidate is never published as an available recommendation.
+      if (optimiserPlan && fingerprint && result.recommendation) {
         await publishRecommendation(
           projectId,
           versionId,
