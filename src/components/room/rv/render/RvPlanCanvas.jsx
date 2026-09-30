@@ -669,12 +669,14 @@ export default function RvPlanCanvas({
 
 
             {/* RP22 Surround Angles Overlay */}
-            {exportMode !== 'clean' && <RvRp22AnglesOverlay hasRoomRect={hasRoomRect} scale={scale} effectiveHoveredSeat={effectiveHoveredSeat} visiblePlanSpeakers={visiblePlanSpeakers} getCanonicalRole={getCanonicalRole} toPx={toPx} floorDeg={floorDeg} />}
+            {/* RP22 Surround Angles Overlay — fed the live effective positions so the
+                angle lines and angle labels (P5) track the dragged speaker */}
+            {exportMode !== 'clean' && <RvRp22AnglesOverlay hasRoomRect={hasRoomRect} scale={scale} effectiveHoveredSeat={effectiveHoveredSeat} visiblePlanSpeakers={speakersLive} getCanonicalRole={getCanonicalRole} toPx={toPx} floorDeg={floorDeg} />}
 
-            {/* Speaker Positions Overlay */}
+            {/* Speaker Positions Overlay — live effective positions */}
             {exportMode !== 'clean' && (
               <SpeakerPositionsOverlay
-                speakers={placedSpeakers}
+                speakers={placedLive}
                 seatingPositions={seatingPositions}
                 dimensions={{ width: widthM, length: lengthM }}
                 view={speakerPositionsView}

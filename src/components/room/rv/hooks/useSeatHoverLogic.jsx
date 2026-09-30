@@ -9,6 +9,10 @@ export function useSeatHoverLogic({
   hudPinnedSeatId,
   setHudPinnedSeatId,
   placedSpeakers,
+  // While a speaker is being dragged the HUD reads live effective positions.
+  // Cache writes are suspended for the duration of the drag and resume on
+  // release, so a pointer move never triggers a metrics write.
+  suspendCacheWrites = false,
   widthM,
   lengthM,
   heightM,
@@ -174,6 +178,10 @@ export function useSeatHoverLogic({
   const lastHudWriteRef = useRef({});
 
   useEffect(() => {
+    // No cache writes during a speaker drag — the live preview is display-only
+    // and the final committed snapshot is written once, on release.
+    if (suspendCacheWrites) return;
+
     const seat = effectiveHoveredSeat;
     if (!seat?.id) return;
 
@@ -230,6 +238,7 @@ export function useSeatHoverLogic({
     tooltipData,
     effectiveHoveredSeat,
     seatingPositions,
+    suspendCacheWrites,
     appState?.setSeatSnapshotBySeatId,
     appState?.setSeatMetricsById,
   ]);
