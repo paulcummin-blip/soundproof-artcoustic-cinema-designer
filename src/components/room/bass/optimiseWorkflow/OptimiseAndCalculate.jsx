@@ -47,6 +47,7 @@ import { publishRecommendation } from "@/components/recommendationEngine";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import AdiRecommendation from "./AdiRecommendation";
+import useRunOptimisationPlan from "./useRunOptimisationPlan";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, canCancelBassCalculation } from "../bassCalculationLifecycle";
 import {
   computeAppliedCalibrationBasisFingerprint,
@@ -71,6 +72,8 @@ import {
   getOptimiserPlanAuthority,
   setOptimiserPlanAuthority,
 } from "@/components/room/bass/optimiserPlan/optimiserPlanStore.js";
+import { resolveOptimisationPlanRunBlock } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
+import { resolveP14TargetSelectionState } from "../p14TargetSelectionState";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -184,6 +187,9 @@ export default function OptimiseAndCalculate({
 
   const runningRef = useRef(false);
   const phaseRef = useRef("idle"); // tracks which phase we're in to avoid double-trigger
+  // Optimisation Plan runs are evidence-only and tracked separately from the
+  // full auto-applying workflow, so the two never share a busy flag.
+  // (Owned by useRunOptimisationPlan below.)
   const adiDecisionRef = useRef(null); // ADI reasoning output for the completed optimisation
 
   // Refs for live values that must be read during the async orchestration.
@@ -217,6 +223,49 @@ export default function OptimiseAndCalculate({
   // be visible whenever a real active job exists.
   const isCalculating = isBusy || shared?.calculationInProgress === true;
   const bassLifecycleState = shared?.bassLifecycleState || BASS_LIFECYCLE_STATE.IDLE;
+
+  // Why the ADI Optimisation Plan cannot run against the current design.
+  // null = it can run. Every reason carries its own next step, so the journey
+  // card is never a dead end.
+  const optimisationRunBlockReason = React.useMemo(() => {
+    const p14Selection = resolveP14TargetSelectionState(appState?.splConfig || null);
+    return resolveOptimisationPlanRunBlock({
+      hasActiveSubModel,
+      hasCanonicalInstances,
+      // A published result proves a target was selected; only an uncalculated
+      // design can be missing its target.
+      targetSelected: shared?.hasCurrentResult === true ? true : !p14Selection.noP14TargetSelected,
+      authorityStatus: shared?.completedBassAuthority?.authorityStatus || null,
+      needsRecalculation: bassLifecycleState === BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION,
+      calculationInProgress: shared?.calculationInProgress === true,
+      lastOutcome: shared?.calculationOutcome || null,
+      errorMessage: shared?.terminalMessage || null,
+      canCalculate: shared?.canCalculate === true,
+      hasCurrentResult: shared?.hasCurrentResult === true,
+    });
+  }, [
+    hasActiveSubModel, hasCanonicalInstances, appState?.splConfig,
+    shared?.hasCurrentResult, shared?.completedBassAuthority?.authorityStatus,
+    bassLifecycleState, shared?.calculationInProgress, shared?.calculationOutcome,
+    shared?.terminalMessage, shared?.canCalculate,
+  ]);
+
+  // The ADI journey action — evidence only, never applies a lever.
+  const { runOptimisationPlan, planRunStatus, planRunError } = useRunOptimisationPlan({
+    projectId,
+    versionId,
+    sharedRef,
+    subInstancesRef,
+    phaseRef,
+    roomDims,
+    seatingPositions,
+    frontSubsCfg,
+    rearSubsCfg,
+    amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
+    appState,
+    hasCanonicalInstances,
+    waitForCurrentPublication,
+  });
   // hasActiveJob: composite of independent job-tracking signals (not an alias
   // of isBusy or calculationInProgress). Observes whether ANY real cancellable
   // job exists right now — background calculation, V2 optimiser, or heavy action.
@@ -817,6 +866,10 @@ export default function OptimiseAndCalculate({
             appState={appState}
             amplifierPowerPerSubW={resolvedAmplifierPowerPerSubW}
             onRecalculate={handlePhysicalRecalculate}
+            optimisationRunBlockReason={optimisationRunBlockReason}
+            optimisationRunStatus={planRunStatus}
+            optimisationRunError={planRunError}
+            onRunOptimisationPlan={runOptimisationPlan}
           />
         </div>
       )}

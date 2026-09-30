@@ -37,6 +37,8 @@ import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useAppliedCalibrationAuthority } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore";
 import OptimisationPlanStatus from "@/components/room/bass/optimiserPlan/OptimisationPlanStatus.jsx";
+import AdiOptimisationJourney from "@/components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx";
+import { firstSentence } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
 
 // ── Displacement helpers ──
 
@@ -108,6 +110,10 @@ export default function AdiRecommendation({
   appState,
   amplifierPowerPerSubW,
   onRecalculate,
+  optimisationRunBlockReason,
+  optimisationRunStatus,
+  optimisationRunError,
+  onRunOptimisationPlan,
 }) {
   const [applying, setApplying] = useState(false);
   const [appliedStage, setAppliedStage] = useState(null);
@@ -221,6 +227,13 @@ export default function AdiRecommendation({
     return computeSeatingDisplacement(seatingPositions, seatingWinner?.seatingPositions);
   }, [isSeatingLever, hasSeating, seatingPositions, seatingWinner]);
 
+  // The limiting factor in one plain sentence — ADI's own diagnosis, never
+  // re-derived. Shown as the lead of the optimiser journey card.
+  const limitingFactorSentence = useMemo(
+    () => firstSentence(adiDecision?.diagnosis?.problem?.description),
+    [adiDecision],
+  );
+
   // ── Apply handlers (preserved from FurtherImprovements) ──
 
   const selection = v2State?.winner;
@@ -329,25 +342,25 @@ export default function AdiRecommendation({
   // could not confirm an improvement. Must NOT show APPLIED or an Apply button.
   const isIncomplete = outcome === ADI_OUTCOME.INCOMPLETE;
 
+  // FIX 4 (revised): an incomplete evaluation is never a dead end. The card
+  // states the limiting factor, what is incomplete, the next action and what
+  // that action will evaluate — resolved from the saved Optimisation Plan by
+  // the ADI optimiser journey authority. It still shows no Apply button.
   if (isIncomplete) {
     return (
-      <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-[#625143]" />
-          <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
-          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#625143] px-2 py-0.5 text-[9px] font-semibold uppercase text-white">
-            Evaluation Incomplete
-          </span>
-        </div>
-        <div className="mt-2 text-[12px] text-[#3E4349] leading-relaxed">
-          {recommendation?.action || 'Bass evidence is available, but ADI could not confirm an improvement from the optimisation run.'}
-        </div>
-        {recommendation?.remainingLimitation && (
-          <div className="mt-1 text-[11px] text-[#625143] leading-relaxed">
-            {recommendation.remainingLimitation}
-          </div>
-        )}
-      </div>
+      <AdiOptimisationJourney
+        projectId={projectId}
+        versionId={versionId}
+        completedBassAuthority={completedBassAuthority}
+        currentDesignFingerprint={shared?.cacheKey || null}
+        instances={currentInstances}
+        limitingFactorSentence={limitingFactorSentence}
+        runBlockReason={optimisationRunBlockReason || null}
+        runStatus={optimisationRunStatus || "idle"}
+        runError={optimisationRunError || null}
+        onRunOptimisationPlan={onRunOptimisationPlan}
+        why={recommendation?.why || null}
+      />
     );
   }
 
