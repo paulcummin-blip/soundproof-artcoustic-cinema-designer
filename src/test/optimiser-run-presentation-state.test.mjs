@@ -22,6 +22,7 @@ import {
 } from '../components/room/bass/optimiserPlan/optimiserPlanConstants.js';
 import { resolveOptimiserPlanStatus } from '../components/room/bass/optimiserPlan/resolveOptimiserPlanStatus.js';
 import { buildOptimiserRunEvidence } from '../components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js';
+import { resolveLeverVerdict } from '../components/room/bass/optimiserPlan/optimiserLeverVerdict.js';
 import { serializeOptimiserPlan } from '../components/room/bass/optimiserPlan/optimiserPlanPersistence.js';
 import {
   OPTIMISER_PRESENTATION_STATE,
@@ -41,6 +42,7 @@ const GENERIC_ADVICE =
 const MARQUEE_RUN = {
   selection: {
     winner: null,
+    canonicalJobsRun: 22,
     confirmedResults: [],
     currentResult: {
       candidateId: 'current',
@@ -546,6 +548,7 @@ describe('TEST 9: the card receives the run evidence', () => {
     expect(polarity.reason).toContain('combined');
 
     // Honest counts: confirmed candidates, not the sum of overlapping counters.
+    expect(evidence.canonicalJobsRun).toBe(22);
     expect(evidence.candidatesEvaluated).toBe(17);
     expect(evidence.current.p20VariationDb).toBe(12.24);
     expect(evidence.bestAttempted.p20VariationDb).toBe(10.34);
@@ -585,5 +588,34 @@ describe('TEST 9: the card receives the run evidence', () => {
     // Polarity's number is proxy searches, never presented as confirmed candidates.
     expect(block).toMatch(/\[OPTIMISER_RUN_FAMILY\.POLARITY\]: "proxy searches"/);
     expect(block).toMatch(/\{familyCountUnit\(family\.family\)\}/);
+  });
+
+  it('does not offer Apply for a sub-1 dB change', () => {
+    const baseline = { p20Level: 'L1', p19Level: 'L4' };
+    const small = resolveLeverVerdict({ effect: { p20DeltaDb: -0.6, p19DeltaDb: 0 }, baseline });
+    expect(small.verdict).toBe('no_improvement');
+    expect(small.applyAllowed).toBe(false);
+
+    const useful = resolveLeverVerdict({ effect: { p20DeltaDb: -1, p19DeltaDb: 0 }, baseline });
+    expect(useful.verdict).toBe('recommended');
+    expect(useful.applyAllowed).toBe(true);
+
+    const worse = resolveLeverVerdict({ effect: { p20DeltaDb: 1, p19DeltaDb: 0 }, baseline });
+    expect(worse.verdict).toBe('rejected');
+    expect(worse.applyAllowed).toBe(false);
+  });
+
+  it('renders the saved baseline to candidate result without adding the delta twice', () => {
+    const status = read('components/room/bass/optimiserPlan/OptimisationPlanStatus.jsx');
+    expect(status).toMatch(/deviationText\(baseline\?\.p20VariationDb\)/);
+    expect(status).toMatch(/deviationText\(effect\.p20VariationDb\)/);
+    expect(status).not.toMatch(/effect\.p20VariationDb \+ effect\.p20DeltaDb/);
+    expect(status).toMatch(/<EffectBlock lever=\{lever\} baseline=\{view\.baseline\} \/>/);
+  });
+
+  it('keeps engineering evidence collapsed by default', () => {
+    const block = read('components/room/bass/optimiserPlan/OptimiserRunEvidenceBlock.jsx');
+    expect(block).toMatch(/<summary[^>]*>Engineer details<\/summary>/);
+    expect(block).toContain('No safe improvement was confirmed for this design.');
   });
 });
