@@ -1532,6 +1532,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     selection.phaseDiagnostics=phaseDiagnostics;
     selection.calibrationDiagnostics=calibrationDiagnostics;
     selection.evaluationIssues=evaluationIssues;
+    // Preserve the exact Stage 2 canonical-job count with the completed run so
+    // the saved ADI evidence can state a truthful calculation count after reopen.
+    selection.canonicalJobsRun=Number.isFinite(Number(stage2Result?.canonicalJobsRun))
+      ? Number(stage2Result.canonicalJobsRun)
+      : null;
     selection.gainResult=gainResult;
     selection.gainMaterial=gainMaterial;
     selection.gainDiagnostics=gainDiagnostics;
