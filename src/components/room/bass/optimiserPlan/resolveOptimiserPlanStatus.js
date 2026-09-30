@@ -28,6 +28,8 @@ import {
 } from "./optimiserPlanConstants.js";
 import { resolveLeverState } from "./optimiserPlanMatching.js";
 import { resolveLeverApplyMap } from "./optimiserPlanLeverApply.js";
+import { leverLabel, leverTitle } from "./optimiserLeverOrder.js";
+import { resolveLeverVerdict } from "./optimiserLeverVerdict.js";
 
 /**
  * @param {object} params
@@ -168,7 +170,8 @@ export function resolveOptimiserPlanStatus({
       const state = resolveLeverState({ lever, leverKey, instances, disabled, planStale });
       return {
         key: leverKey,
-        label: OPTIMISER_LEVER_LABEL[leverKey],
+        label: leverLabel(leverKey) || OPTIMISER_LEVER_LABEL[leverKey],
+        title: leverTitle(leverKey),
         evidenceStatus: lever.evidenceStatus || null,
         evidenceLabel: lever.evidenceStatus
           ? OPTIMISER_EVIDENCE_STATUS_LABEL[lever.evidenceStatus] || null
@@ -198,9 +201,24 @@ export function resolveOptimiserPlanStatus({
   const leverApplyMap = resolveLeverApplyMap({ levers: applyLevers, planStatus: status, instances });
   for (const lever of levers) {
     const applyState = leverApplyMap[lever.key] || null;
-    lever.canApply = applyState?.canApply === true;
+    // A lever that makes the limiting result worse is never applyable, whatever
+    // the apply map says. The verdict is the only authority for that gate.
+    const verdict = resolveLeverVerdict({
+      effect: lever.effect || null,
+      baseline: plan.baseline || null,
+      tested: lever.evaluated === true,
+      notTestedReason: lever.notEvaluatedReason || null,
+    });
+    lever.verdict = verdict.verdict;
+    lever.verdictLabel = verdict.label;
+    lever.verdictSummary = verdict.summary;
+    lever.limitingMetric = verdict.limitingKey;
+    const applyBlockedByVerdict = applyState?.canApply === true && !verdict.applyAllowed;
+    lever.canApply = applyState?.canApply === true && verdict.applyAllowed === true;
     lever.applyLabel = applyState?.applyLabel || null;
-    lever.applyBlockedReason = applyState?.applyBlockedReason || null;
+    lever.applyBlockedReason = applyBlockedByVerdict
+      ? verdict.summary
+      : (applyState?.applyBlockedReason || null);
     lever.canUndo = applyState?.canUndo === true;
     lever.undoLabel = applyState?.undoLabel || null;
   }

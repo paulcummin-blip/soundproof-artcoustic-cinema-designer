@@ -186,11 +186,16 @@ describe('TEST 2: completed run with no credible winner', () => {
     expect(evidence.leversTested.map((lever) => lever.lever)).toContain(OPTIMISER_LEVER.DELAY);
     expect(evidence.leversTested.map((lever) => lever.lever)).toContain(OPTIMISER_LEVER.GAIN);
 
-    // Every family the optimiser can search is stated, with its best attempt.
+    // Every family the optimiser can search is stated, with its best attempt,
+    // in least-intrusive order: electronic levers before physical ones.
     const byFamily = Object.fromEntries(evidence.families.map((family) => [family.family, family]));
     expect(Object.keys(byFamily)).toEqual([
-      'placement', 'delay', 'gain', 'polarity', 'combined', 'additional_positions', 'seat_movement',
+      'delay', 'gain', 'phase', 'polarity', 'placement', 'additional_positions', 'subwoofer_option', 'seat_movement', 'combined',
     ]);
+    // A family that was never searched is stated, never hidden.
+    expect(byFamily.subwoofer_option.status).toBe('not_tested');
+    expect(byFamily.subwoofer_option.reason).toMatch(/model and quantity/);
+    expect(byFamily.subwoofer_option.tested).toBe(false);
     expect(byFamily.placement.status).toBe('rejected');
     expect(byFamily.placement.bestAttempt.p20VariationDb).toBe(10.34);
     expect(byFamily.placement.bestAttempt.p20DeltaDb).toBe(-1.9);
@@ -341,10 +346,13 @@ describe('TEST 3B: baseline failure and unavailable metrics', () => {
     expect(record.run.bestAttempted).toBe(null);
     expect(record.run.candidatesEvaluated).toBe(0);
 
-    // The card states it as unavailable rather than printing a measured-looking 0.00.
+    // The card states it as unavailable rather than printing a measured-looking
+    // 0.00, and every dB it prints comes from the whole-number policy.
     const block = read('components/room/bass/optimiserPlan/OptimiserRunEvidenceBlock.jsx');
     expect(block).toMatch(/Not published for this design/);
-    expect(block).toMatch(/const fmt = \(value, digits = 2, unit = ""\) => \{\n  if \(value === null \|\| value === undefined \|\| value === ""\) return null;/);
+    expect(block).toMatch(/deviationText\(current\?\.p20VariationDb\)/);
+    expect(block).toMatch(/deviationText\(best\?\.p20VariationDb\)/);
+    expect(block).not.toMatch(/toFixed/);
   });
 });
 
@@ -518,9 +526,10 @@ describe('TEST 9: the card receives the run evidence', () => {
       expect(evidence[field], `presentation.evidence.${field} must reach the card`).not.toBeUndefined();
     }
 
-    // Family evidence: what was tested, the best attempt, and why not.
+    // Family evidence: what was tested, the best attempt, and why not — in
+    // least-intrusive order.
     expect(evidence.families.map((family) => family.family)).toEqual([
-      'placement', 'delay', 'gain', 'polarity', 'combined', 'additional_positions', 'seat_movement',
+      'delay', 'gain', 'phase', 'polarity', 'placement', 'additional_positions', 'subwoofer_option', 'seat_movement', 'combined',
     ]);
     const delay = evidence.families.find((family) => family.family === 'delay');
     expect(delay.label).toBe('Delay');

@@ -59,12 +59,21 @@ export const OPTIMISER_LEVER = Object.freeze({
   GAIN: "gain",
 });
 
-/** Stable display order — also the recommended practical apply sequence. */
+/**
+ * Stable display order — the least-intrusive-first sequence ADI presents:
+ * delay, gain, then polarity, then physical placement. Electronic alignment is
+ * exhausted before moving subwoofers.
+ *
+ * Phase/crossover-region alignment is a real lever in the engine's search
+ * (grouped all-pass), but it has no independent evaluation or apply path, so it
+ * is presented as a stated family rather than a plan lever. See
+ * optimiserLeverOrder.js for the full eight-family presentation order.
+ */
 export const OPTIMISER_LEVER_ORDER = Object.freeze([
-  OPTIMISER_LEVER.PLACEMENT,
-  OPTIMISER_LEVER.POLARITY,
   OPTIMISER_LEVER.DELAY,
   OPTIMISER_LEVER.GAIN,
+  OPTIMISER_LEVER.POLARITY,
+  OPTIMISER_LEVER.PLACEMENT,
 ]);
 
 export const OPTIMISER_LEVER_LABEL = Object.freeze({

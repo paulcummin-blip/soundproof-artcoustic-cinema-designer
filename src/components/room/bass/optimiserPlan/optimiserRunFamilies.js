@@ -13,15 +13,18 @@
 // ---------------------------------------------------------------------------
 
 import { POLARITY_NOT_EVALUATED_REASON } from "./optimiserPlanConstants.js";
+import { sortFamiliesLeastIntrusive } from "./optimiserLeverOrder.js";
 
 /** The optimiser families a run can test. */
 export const OPTIMISER_RUN_FAMILY = Object.freeze({
   PLACEMENT: "placement",
   DELAY: "delay",
   GAIN: "gain",
+  PHASE: "phase",
   POLARITY: "polarity",
   COMBINED: "combined",
   ADDITIONAL_POSITIONS: "additional_positions",
+  SUBWOOFER_OPTION: "subwoofer_option",
   SEAT_MOVEMENT: "seat_movement",
 });
 
@@ -29,11 +32,21 @@ export const OPTIMISER_FAMILY_LABEL = Object.freeze({
   [OPTIMISER_RUN_FAMILY.PLACEMENT]: "Placement",
   [OPTIMISER_RUN_FAMILY.DELAY]: "Delay",
   [OPTIMISER_RUN_FAMILY.GAIN]: "Gain",
+  [OPTIMISER_RUN_FAMILY.PHASE]: "Phase",
   [OPTIMISER_RUN_FAMILY.POLARITY]: "Polarity",
-  [OPTIMISER_RUN_FAMILY.COMBINED]: "Combined",
-  [OPTIMISER_RUN_FAMILY.ADDITIONAL_POSITIONS]: "Additional / alternative positions",
-  [OPTIMISER_RUN_FAMILY.SEAT_MOVEMENT]: "Seat movement",
+  [OPTIMISER_RUN_FAMILY.COMBINED]: "Combined candidate search",
+  [OPTIMISER_RUN_FAMILY.ADDITIONAL_POSITIONS]: "Layout",
+  [OPTIMISER_RUN_FAMILY.SUBWOOFER_OPTION]: "Subwoofer option",
+  [OPTIMISER_RUN_FAMILY.SEAT_MOVEMENT]: "Seating",
 });
+
+/**
+ * Stated for the subwoofer-model family. The optimiser searches placement,
+ * timing, level, phase and polarity — it does not search a different subwoofer
+ * model or quantity, so that option is stated rather than silently omitted.
+ */
+export const SUBWOOFER_OPTION_NOT_SEARCHED_REASON =
+  "Not searched by the optimiser — subwoofer model and quantity are a design decision, not an optimisation lever.";
 
 /** What happened to a family, stated plainly. */
 export const OPTIMISER_FAMILY_STATUS = Object.freeze({
@@ -147,19 +160,36 @@ function family({
           ? round2(bestAttempt.p20VariationDb - current.p20VariationDb) : null,
         p19DeltaDb: current?.p19VariationDb != null && bestAttempt.p19VariationDb != null
           ? round2(bestAttempt.p19VariationDb - current.p19VariationDb) : null,
+        p14DeltaDb: current?.p14AchievedDb != null && bestAttempt.p14Db != null
+          ? round2(bestAttempt.p14Db - current.p14AchievedDb) : null,
       }
       : null,
     reason,
+    // Whether this family was actually evaluated in the run. A family that was
+    // never started (or only explored inside another search) is never presented
+    // as an evaluated lever.
+    tested: status === OPTIMISER_FAMILY_STATUS.REJECTED
+      || status === OPTIMISER_FAMILY_STATUS.EVALUATED
+      || status === OPTIMISER_FAMILY_STATUS.FAILED
+      || status === OPTIMISER_FAMILY_STATUS.INCOMPLETE,
     // Nothing a run produced can be applied until a winner is confirmed.
     accepted,
     applicable: false,
   };
 }
 
-/** A lever-shaped family (placement / delay / gain). */
-function leverFamily({ key, stageName, selection, diagnostics, current }) {
+/** A lever-shaped family (placement / delay / gain / phase). */
+function leverFamily({
+  key,
+  stageName,
+  selection,
+  diagnostics,
+  current,
+  issueStages = [stageName.toLowerCase(), "calibration", "global"],
+  reasonFallback = null,
+}) {
   const stage = stageByName(diagnostics, stageName);
-  const issue = issueFor(selection, [stageName.toLowerCase(), "calibration", "global"]);
+  const issue = issueFor(selection, issueStages);
   const attempted = confirmedCount(stage) != null ? confirmedCount(stage) > 0 : !!stage?.winningCandidate;
   const best = bestFromStage(stage);
 
@@ -188,7 +218,8 @@ function leverFamily({ key, stageName, selection, diagnostics, current }) {
       key,
       status: OPTIMISER_FAMILY_STATUS.EVALUATED,
       candidatesEvaluated: confirmedCount(stage),
-      reason: stageReason(stage) || "Evaluated, but the run retained no attempt value for this search.",
+      reason: stageReason(stage) || reasonFallback
+        || "Evaluated, but the run retained no attempt value for this search.",
       current,
     });
   }
@@ -196,7 +227,7 @@ function leverFamily({ key, stageName, selection, diagnostics, current }) {
     key,
     status: OPTIMISER_FAMILY_STATUS.NOT_TESTED,
     candidatesEvaluated: confirmedCount(stage),
-    reason: stageReason(stage) || OPTIMISER_FAMILY_NOT_TESTED_REASON,
+    reason: stageReason(stage) || reasonFallback || OPTIMISER_FAMILY_NOT_TESTED_REASON,
     current,
   });
 }
@@ -233,6 +264,21 @@ export function buildFamilyLedger({ selection = null, diagnostics = null, curren
     selection,
     diagnostics,
     current,
+  }));
+
+  // ── Phase ── the grouped all-pass phase (crossover-region) search. A real
+  // lever in the engine: it is reported with its own tested count and best
+  // attempt, or with the run's own reason for not searching it.
+  families.push(leverFamily({
+    key: OPTIMISER_RUN_FAMILY.PHASE,
+    stageName: "Phase",
+    selection,
+    diagnostics,
+    current,
+    issueStages: ["phase"],
+    reasonFallback: typeof selection?.phaseDiagnostics?.grouping?.reason === "string"
+      ? selection.phaseDiagnostics.grouping.reason
+      : null,
   }));
 
   // ── Polarity ── explored inside the per-candidate delay/polarity/trim proxy
@@ -296,7 +342,18 @@ export function buildFamilyLedger({ selection = null, diagnostics = null, curren
     current,
   }));
 
-  // ── Seat movement ── the seating-position search.
+  // ── Subwoofer model / quantity ── never searched by the optimiser. Stated so
+  // a dealer can see the option was considered and left to the designer.
+  families.push(family({
+    key: OPTIMISER_RUN_FAMILY.SUBWOOFER_OPTION,
+    status: OPTIMISER_FAMILY_STATUS.NOT_TESTED,
+    candidatesEvaluated: null,
+    bestAttempt: null,
+    reason: SUBWOOFER_OPTION_NOT_SEARCHED_REASON,
+    current,
+  }));
+
+  // ── Seat movement ── the seating-position search, always last resort.
   const seatingIssue = issueFor(selection, ["seating"]);
   const seatingResult = selection?.seatingResult || null;
   const seatingAttempt = seatingResult
@@ -325,9 +382,14 @@ export function buildFamilyLedger({ selection = null, diagnostics = null, curren
     reason: seatingIssue
       ? issueText(seatingIssue)
       : (seatingAttempt ? OPTIMISER_FAMILY_NO_WINNER_REASON
-        : (seatingTested ? "Evaluated, but the run retained no attempt value for this search." : OPTIMISER_FAMILY_NOT_TESTED_REASON)),
+        : (seatingTested
+          ? "Evaluated, but the run retained no attempt value for this search."
+          : "Not searched — listener movement is a last resort, tried only once the electronic and placement options are exhausted.")),
     current,
   }));
 
-  return families;
+  // Least-intrusive first: delay, gain, phase, polarity, placement, layout,
+  // subwoofer option, seating. Searches that are not a lever (the combined
+  // candidate) are reported last.
+  return sortFamiliesLeastIntrusive(families);
 }

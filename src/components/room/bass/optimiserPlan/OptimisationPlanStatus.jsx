@@ -16,32 +16,71 @@ import React from "react";
 import { AlertTriangle, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { OPTIMISER_LEVER, OPTIMISER_LEVER_STATE, OPTIMISER_PLAN_STATUS } from "./optimiserPlanConstants.js";
 import { useOptimiserPlanView } from "./useOptimiserPlanView.js";
+import {
+  LEAST_INTRUSIVE_NOTE,
+  PLAN_FAMILY_STATEMENTS,
+  leverLabel,
+} from "./optimiserLeverOrder.js";
+import { OPTIMISER_LEVER_VERDICT } from "./optimiserLeverVerdict.js";
+import {
+  deltaText,
+  deviationText,
+  frequencyText,
+  levelText,
+  p14DbText,
+  p18HzText,
+} from "./optimiserWholeNumberDb.js";
 
+// Lever set-points (delay ms, gain dB). P19/P20/P14/P18 values never go through
+// here — they are printed by the whole-number policy helpers below.
 const fmt = (value, digits = 1) => (Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : null);
-const signed = (value, unit) => {
-  const text = fmt(Math.abs(Number(value)));
+const whole = (value) => (Number.isFinite(Number(value)) ? String(Math.round(Number(value))) : null);
+const signedWhole = (value, unit) => {
+  const text = whole(Math.abs(Number(value)));
   if (text == null) return null;
   return `${Number(value) >= 0 ? "+" : "−"}${text} ${unit}`;
 };
+/** Millisecond set-points (timing, not a dB metric). */
+const signedMs = (value) => {
+  const text = fmt(Math.abs(Number(value)));
+  if (text == null) return null;
+  return `${Number(value) >= 0 ? "+" : "−"}${text} ms`;
+};
+
+/** A verdict pill: a rejected lever must never look actionable. */
+function verdictPillStyle(verdict) {
+  if (verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED) return { background: "#E7F0E9", border: "#9DB8A4", color: "#213428" };
+  if (verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF) return { background: "#FBF3E4", border: "#E0C48F", color: "#8A5A2B" };
+  if (verdict === OPTIMISER_LEVER_VERDICT.REJECTED) return { background: "#FBEAEA", border: "#E0A9A9", color: "#B91C1C" };
+  return { background: "#FFFFFF", border: "#DCDBD6", color: "#3E4349" };
+}
 
 /** Persisted P14/P18/P19/P20 headline rows — read, never recalculated. */
 function ResultRows({ result }) {
   if (!result) return null;
   const rows = [];
-  if (result.p14AchievedDb != null) rows.push(`P14: ${fmt(result.p14AchievedDb)} dB`);
-  if (result.achievedP18Hz != null) rows.push(`P18: ${fmt(result.achievedP18Hz, 1)} Hz`);
-  if (result.p19VariationDb != null) {
-    rows.push(`P19: ${fmt(result.p19VariationDb)} dB${result.p19DeltaDb != null ? ` (${signed(result.p19DeltaDb, "dB")})` : ""}`);
+  const p14 = p14DbText(result.p14AchievedDb);
+  if (p14) rows.push(`P14: ${p14}`);
+  const p18 = p18HzText(result.achievedP18Hz);
+  if (p18) rows.push(`P18: ${p18}`);
+  const p19 = deviationText(result.p19VariationDb);
+  if (p19) {
+    const level = levelText(result.p19Level);
+    const delta = deltaText(result.p19DeltaDb);
+    rows.push(`P19: ${p19}${level ? ` · ${level}` : ""}${delta ? ` (${delta})` : ""}`);
   }
-  if (result.p20VariationDb != null) {
-    rows.push(`P20: ${fmt(result.p20VariationDb)} dB${result.p20DeltaDb != null ? ` (${signed(result.p20DeltaDb, "dB")})` : ""}`);
+  const p20 = deviationText(result.p20VariationDb);
+  if (p20) {
+    const level = levelText(result.p20Level);
+    const delta = deltaText(result.p20DeltaDb);
+    rows.push(`P20: ${p20}${level ? ` · ${level}` : ""}${delta ? ` (${delta})` : ""}`);
   }
   if (result.worstSeatId) {
-    const hz = result.worstFrequencyHz != null ? ` · limiting ${fmt(result.worstFrequencyHz, 0)} Hz` : "";
-    rows.push(`Worst seat: ${result.worstSeatId}${hz}`);
+    const hz = frequencyText(result.worstFrequencyHz);
+    rows.push(`Worst seat: ${result.worstSeatId}${hz ? ` · limiting ${hz}` : ""}`);
   }
-  if (result.outputDeltaDb != null && Math.abs(result.outputDeltaDb) >= 0.1) {
-    rows.push(`Available output: ${signed(result.outputDeltaDb, "dB")}`);
+  if (result.outputDeltaDb != null && Math.abs(result.outputDeltaDb) >= 1) {
+    rows.push(`Available output: ${signedWhole(result.outputDeltaDb, "dB")}`);
   }
   if (rows.length === 0) return null;
   return (
@@ -51,23 +90,15 @@ function ResultRows({ result }) {
   );
 }
 
-function statePillStyle(state) {
-  if (state === OPTIMISER_LEVER_STATE.APPLIED) return { background: "#E7F0E9", border: "#9DB8A4", color: "#213428" };
-  if (state === OPTIMISER_LEVER_STATE.DISABLED) return { background: "#EFEFEC", border: "#CFCCC4", color: "#625143" };
-  if (state === OPTIMISER_LEVER_STATE.NEEDS_REEVALUATION) return { background: "#FBF3E4", border: "#E0C48F", color: "#8A5A2B" };
-  if (state === OPTIMISER_LEVER_STATE.NO_LONGER_APPLICABLE) return { background: "#F6EFEA", border: "#D8C3B4", color: "#7A5B4A" };
-  return { background: "#FFFFFF", border: "#DCDBD6", color: "#3E4349" };
-}
-
 function changeText(change) {
   if (change.lever === OPTIMISER_LEVER.PLACEMENT) {
     return `${change.fromX?.toFixed(2)}, ${change.fromY?.toFixed(2)} m → ${change.toX?.toFixed(2)}, ${change.toY?.toFixed(2)} m`;
   }
   if (change.lever === OPTIMISER_LEVER.DELAY) {
-    return `${fmt(change.fromMs)} ms → ${signed(change.toMs - change.fromMs, "ms")} (total ${fmt(change.toMs)} ms)`;
+    return `${fmt(change.fromMs)} ms → ${signedMs(change.toMs - change.fromMs)} (total ${fmt(change.toMs)} ms)`;
   }
   if (change.lever === OPTIMISER_LEVER.GAIN) {
-    return `${fmt(change.fromDb)} dB → ${signed(change.toDb - change.fromDb, "dB")} (total ${fmt(change.toDb)} dB)`;
+    return `${whole(change.fromDb)} dB → ${signedWhole(change.toDb - change.fromDb, "dB")} (total ${whole(change.toDb)} dB)`;
   }
   if (change.lever === OPTIMISER_LEVER.POLARITY) {
     return `${change.fromLabel} → ${change.toLabel}`;
@@ -81,23 +112,31 @@ function EffectBlock({ lever }) {
     return <div className="text-[11px] text-[#8B7F76] italic">{lever.effectLabel}</div>;
   }
   const rows = [];
-  if (effect.p20DeltaDb != null) {
-    rows.push(`P20: ${fmt(effect.p20VariationDb)} dB → ${fmt(effect.p20VariationDb + effect.p20DeltaDb)} dB (${signed(effect.p20DeltaDb, "dB")})`);
-  } else if (effect.p20VariationDb != null) {
-    rows.push(`P20: ${fmt(effect.p20VariationDb)} dB`);
+  // Both endpoints are printed by the whole-number policy, so the change the
+  // dealer reads is the change the two endpoints show.
+  const p20Before = deviationText(effect.p20VariationDb);
+  const p20After = effect.p20DeltaDb != null && effect.p20VariationDb != null
+    ? deviationText(effect.p20VariationDb + effect.p20DeltaDb)
+    : null;
+  if (p20Before) {
+    rows.push(p20After && p20After !== p20Before ? `P20: ${p20Before} → ${p20After}` : `P20: ${p20Before}`);
   }
-  if (effect.p19DeltaDb != null) {
-    rows.push(`P19: ${signed(effect.p19DeltaDb, "dB")}`);
+  const p19Before = deviationText(effect.p19VariationDb);
+  const p19After = effect.p19DeltaDb != null && effect.p19VariationDb != null
+    ? deviationText(effect.p19VariationDb + effect.p19DeltaDb)
+    : null;
+  if (p19Before) {
+    rows.push(p19After && p19After !== p19Before ? `P19: ${p19Before} → ${p19After}` : `P19: ${p19Before}`);
   }
   if (effect.worstSeatId) {
-    const hz = effect.worstFrequencyHz != null ? ` · ${fmt(effect.worstFrequencyHz, 0)} Hz` : "";
-    rows.push(`Worst seat: ${effect.worstSeatId}${hz}`);
+    const hz = frequencyText(effect.worstFrequencyHz);
+    rows.push(`Worst seat: ${effect.worstSeatId}${hz ? ` · ${hz}` : ""}`);
   }
-  if (effect.p14DeltaDb != null && Math.abs(effect.p14DeltaDb) >= 0.1) {
-    rows.push(`P14 change: ${signed(effect.p14DeltaDb, "dB")}`);
+  if (effect.p14DeltaDb != null && Math.abs(effect.p14DeltaDb) >= 1) {
+    rows.push(`P14 change: ${signedWhole(effect.p14DeltaDb, "dB")}`);
   }
-  if (effect.outputDeltaDb != null && Math.abs(effect.outputDeltaDb) >= 0.1) {
-    rows.push(`Available output: ${signed(effect.outputDeltaDb, "dB")}`);
+  if (effect.outputDeltaDb != null && Math.abs(effect.outputDeltaDb) >= 1) {
+    rows.push(`Available output: ${signedWhole(effect.outputDeltaDb, "dB")}`);
   }
   return (
     <div className="text-[11px] text-[#625143] space-y-0.5">
@@ -109,9 +148,7 @@ function EffectBlock({ lever }) {
 /** The MEASURED before/after of the last applied lever. Never the prediction. */
 function LeverOutcome({ outcome }) {
   if (!outcome) return null;
-  const p20Text = (headline) => (headline?.variationDb != null
-    ? `±${Math.abs(Number(headline.variationDb)).toFixed(1)} dB`
-    : null);
+  const p20Text = (headline) => deviationText(headline?.variationDb);
   const seatText = (headline) => {
     const seat = headline?.worstSeatId ? ` · ${headline.worstSeatId}` : "";
     const hz = headline?.worstFrequencyHz != null ? ` at ${Math.round(Number(headline.worstFrequencyHz))} Hz` : "";
@@ -194,17 +231,27 @@ export default function OptimisationPlanStatus({
       </div>
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-[#8B7F76]">
-        {view.candidateId && <span>Candidate: {view.candidateId}</span>}
-        {view.engineVersion && <span>Engine: {view.engineVersion}</span>}
         {view.savedAt && (
           <span className="inline-flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            Saved {new Date(view.savedAt).toLocaleString("en-GB")}
+            Evaluated {new Date(view.savedAt).toLocaleString("en-GB")}
           </span>
         )}
         {view.appliedCount > 0 && <span>{view.appliedCount} applied</span>}
         {view.disabledCount > 0 && <span>{view.disabledCount} disabled</span>}
       </div>
+
+      <div className="mt-1 text-[11px] text-[#625143] leading-relaxed">{LEAST_INTRUSIVE_NOTE}</div>
+
+      {(view.candidateId || view.engineVersion) && (
+        <details className="mt-1">
+          <summary className="cursor-pointer text-[10px] text-[#8B7F76]">Technical details</summary>
+          <div className="mt-0.5 flex flex-wrap gap-x-3 text-[10px] text-[#8B7F76]">
+            {view.candidateId && <span>Winning candidate: {view.candidateId}</span>}
+            {view.engineVersion && <span>Engine: {view.engineVersion}</span>}
+          </div>
+        </details>
+      )}
 
       {view.baseline && (
         <div className="mt-2 rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2">
@@ -220,15 +267,19 @@ export default function OptimisationPlanStatus({
       <div className="mt-2.5 space-y-2">
         {view.levers.map((lever) => (
           <div key={lever.key} className="rounded-md border border-[#E7E5E0] p-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-semibold tracking-wide text-[#3E4349]">{lever.label}</span>
+            <div className="flex items-start justify-between gap-2">
+              <span className="text-[11px] font-semibold text-[#1B1A1A]">{lever.title || lever.label}</span>
               <span
                 className="text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap"
-                style={statePillStyle(lever.state)}
+                style={verdictPillStyle(lever.verdict)}
               >
-                {lever.stateLabel}
+                {lever.verdictLabel}
               </span>
             </div>
+            <div className="mt-0.5 text-[10px] text-[#8B7F76]">{lever.stateLabel}</div>
+            {lever.verdictSummary && (
+              <div className="mt-0.5 text-[11px] text-[#625143] leading-relaxed">{lever.verdictSummary}</div>
+            )}
 
             <div className="mt-1.5 space-y-1">
               {lever.changes.map((change) => (
@@ -328,6 +379,27 @@ export default function OptimisationPlanStatus({
           )}
         </div>
       )}
+
+      {/* The families this plan cannot carry a result for — stated, never omitted. */}
+      <div className="mt-2.5 rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2">
+        <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">OTHER LEVERS CONSIDERED</div>
+        <div className="mt-1 space-y-0.5 text-[11px] leading-relaxed">
+          {!view.levers.some((lever) => lever.key === OPTIMISER_LEVER.PLACEMENT) && (
+            <div>
+              <span className="font-semibold text-[#1B1A1A]">Placement — move subwoofers</span>
+              <span className="text-[#625143]">
+                {" — no alternative sub position was retained for this design."}
+              </span>
+            </div>
+          )}
+          {PLAN_FAMILY_STATEMENTS.map((entry) => (
+            <div key={entry.key}>
+              <span className="font-semibold text-[#1B1A1A]">{leverLabel(entry.key)}</span>
+              <span className="text-[#625143]"> — {entry.statement}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {view.notes.length > 0 && (
         <div className="mt-2 space-y-0.5">

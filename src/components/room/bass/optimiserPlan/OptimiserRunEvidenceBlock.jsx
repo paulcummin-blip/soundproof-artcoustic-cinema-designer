@@ -13,6 +13,9 @@
 
 import React from "react";
 import { OPTIMISER_FAMILY_STATUS, OPTIMISER_RUN_FAMILY } from "./optimiserRunFamilies.js";
+import { LEAST_INTRUSIVE_NOTE, leverTitle } from "./optimiserLeverOrder.js";
+import { OPTIMISER_LEVER_VERDICT, resolveLeverVerdict } from "./optimiserLeverVerdict.js";
+import { deltaText, deviationText, frequencyText, levelText } from "./optimiserWholeNumberDb.js";
 
 /**
  * What a family's counter actually counts. Polarity is explored inside the
@@ -25,14 +28,22 @@ const FAMILY_COUNT_UNIT = Object.freeze({
 
 const familyCountUnit = (familyKey) => FAMILY_COUNT_UNIT[familyKey] || "confirmed";
 
-/** A published number, or null. Never turns an unavailable metric into 0.00. */
-const fmt = (value, digits = 2, unit = "") => {
-  if (value === null || value === undefined || value === "") return null;
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? `${numeric.toFixed(digits)}${unit}` : null;
-};
-
 const UNAVAILABLE = "Not published for this design";
+
+/** Verdicts worth a pill — the reason this lever is not being offered. */
+const PILL_VERDICTS = new Set([
+  OPTIMISER_LEVER_VERDICT.RECOMMENDED,
+  OPTIMISER_LEVER_VERDICT.TRADE_OFF,
+  OPTIMISER_LEVER_VERDICT.REJECTED,
+  OPTIMISER_LEVER_VERDICT.NO_IMPROVEMENT,
+]);
+
+function verdictPillStyle(verdict) {
+  if (verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED) return { background: "#E7F0E9", border: "#9DB8A4", color: "#213428" };
+  if (verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF) return { background: "#FBF3E4", border: "#E0C48F", color: "#8A5A2B" };
+  if (verdict === OPTIMISER_LEVER_VERDICT.REJECTED) return { background: "#FBEAEA", border: "#E0A9A9", color: "#B91C1C" };
+  return { background: "#FFFFFF", border: "#DCDBD6", color: "#3E4349" };
+}
 
 const COUNTER_LABEL = Object.freeze({
   generated: "generated",
@@ -57,18 +68,26 @@ const statusColor = (status) => {
   return "#8B7F76";
 };
 
-function FamilyRow({ family }) {
+function FamilyRow({ family, current }) {
   const best = family.bestAttempt || null;
-  const p20 = fmt(best?.p20VariationDb, 2, " dB");
-  const p19 = fmt(best?.p19VariationDb, 2, " dB");
-  const delta = best?.p20DeltaDb != null
-    ? ` (${best.p20DeltaDb < 0 ? "−" : "+"}${Math.abs(best.p20DeltaDb).toFixed(2)} dB vs current)`
-    : "";
+  const title = leverTitle(family.family) || family.label;
+  const p20 = deviationText(best?.p20VariationDb);
+  const p20Level = levelText(best?.p20Level);
+  const p19 = deviationText(best?.p19VariationDb);
+  const delta = deltaText(best?.p20DeltaDb);
+  const verdict = resolveLeverVerdict({
+    effect: best
+      ? { p19DeltaDb: best.p19DeltaDb, p20DeltaDb: best.p20DeltaDb, p14DeltaDb: best.p14DeltaDb }
+      : null,
+    baseline: current,
+    tested: family.tested === true,
+    notTestedReason: family.reason || null,
+  });
 
   return (
     <div className="border-t border-[#EFEDE8] pt-1 first:border-t-0 first:pt-0">
-      <div className="flex items-baseline gap-1.5">
-        <span className="font-semibold text-[#1B1A1A]">{family.label}</span>
+      <div className="flex flex-wrap items-baseline gap-1.5">
+        <span className="font-semibold text-[#1B1A1A]">{title}</span>
         <span style={{ color: statusColor(family.status) }}>— {family.statusLabel}</span>
         {family.candidatesEvaluated != null && (
           <span className="text-[#8B7F76]">
@@ -76,19 +95,45 @@ function FamilyRow({ family }) {
           </span>
         )}
       </div>
+
       {best && (
         <div className="text-[#1B1A1A]">
           <span className="text-[#8B7F76]">Best attempt: </span>
-          {best.candidateId ? `${best.candidateId} · ` : ""}
           P20 {p20 || UNAVAILABLE}
-          {best.p20Level ? ` · L${best.p20Level}` : ""}
+          {p20Level ? ` · ${p20Level}` : ""}
           {p19 ? ` · P19 ${p19}` : ""}
-          {delta ? <span className="text-[#8B7F76]">{delta}</span> : null}
+          {delta ? <span className="text-[#8B7F76]"> ({delta} vs current)</span> : null}
         </div>
       )}
-      {family.reason && <div className="text-[#625143]">{family.reason}</div>}
-      {!family.applicable && (
-        <div className="text-[#8B7F76]">Not applicable — no confirmed winner.</div>
+
+      {/* The verdict is what the dealer acts on: recommended, trade-off,
+          rejected, or no useful improvement. */}
+      {PILL_VERDICTS.has(verdict.verdict) ? (
+        <div className="mt-0.5 flex flex-wrap items-baseline gap-1.5">
+          <span
+            className="text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap"
+            style={verdictPillStyle(verdict.verdict)}
+          >
+            {verdict.label}
+          </span>
+          <span className="text-[#625143]">{verdict.summary}</span>
+        </div>
+      ) : (
+        family.reason && <div className="text-[#625143]">{family.reason}</div>
+      )}
+
+      {family.reason && best && (
+        <details className="mt-0.5">
+          <summary className="cursor-pointer text-[10px] text-[#8B7F76]">Technical details</summary>
+          <div className="mt-0.5 text-[10px] text-[#8B7F76] leading-relaxed">
+            {family.reason}
+            {best.candidateId ? ` · candidate ${best.candidateId}` : ""}
+          </div>
+        </details>
+      )}
+
+      {!family.applicable && family.tested !== true && (
+        <div className="text-[#8B7F76]">Nothing from this family can be applied.</div>
       )}
     </div>
   );
@@ -102,11 +147,10 @@ export default function OptimiserRunEvidenceBlock({ evidence = null, className =
   const stageOperations = Array.isArray(evidence.stageOperations) ? evidence.stageOperations : [];
   const baselineFailed = evidence.baselineValidation?.valid === false;
 
-  const currentP20 = fmt(current?.p20VariationDb, 2, " dB");
-  const bestP20 = fmt(best?.p20VariationDb, 2, " dB");
-  const delta = best?.p20DeltaDb != null
-    ? `${best.p20DeltaDb < 0 ? "−" : "+"}${Math.abs(best.p20DeltaDb).toFixed(2)} dB`
-    : null;
+  const currentP20 = deviationText(current?.p20VariationDb);
+  const bestP20 = deviationText(best?.p20VariationDb);
+  const bestLevel = levelText(best?.p20Level);
+  const delta = deltaText(best?.p20DeltaDb);
 
   const headlineRows = [];
   if (evidence.canonicalJobsRun != null) headlineRows.push(["Optimiser jobs run", `${evidence.canonicalJobsRun}`]);
@@ -153,9 +197,9 @@ export default function OptimiserRunEvidenceBlock({ evidence = null, className =
         </div>
         {best && (
           <div className="text-[#1B1A1A]">
-            <span className="text-[#8B7F76]">Best attempted (rejected): </span>
-            {best.candidateId ? `${best.candidateId} · ` : ""}P20 {bestP20 || UNAVAILABLE}
-            {best.p20Level ? ` · L${best.p20Level}` : ""}
+            <span className="text-[#8B7F76]">Best attempted (not applied): </span>
+            P20 {bestP20 || UNAVAILABLE}
+            {bestLevel ? ` · ${bestLevel}` : ""}
             {delta ? <span className="text-[#8B7F76]"> ({delta} vs current)</span> : null}
           </div>
         )}
@@ -164,10 +208,11 @@ export default function OptimiserRunEvidenceBlock({ evidence = null, className =
       {families.length > 0 && (
         <div className="mt-2">
           <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">
-            EVERY FAMILY THE OPTIMISER CAN SEARCH
+            EVERY LEVER THE OPTIMISER CAN SEARCH — LEAST INTRUSIVE FIRST
           </div>
+          <div className="mt-0.5 text-[10px] text-[#8B7F76] leading-relaxed">{LEAST_INTRUSIVE_NOTE}</div>
           <div className="mt-1 space-y-1 text-[11px] leading-relaxed">
-            {families.map((family) => <FamilyRow key={family.family} family={family} />)}
+            {families.map((family) => <FamilyRow key={family.family} family={family} current={current} />)}
           </div>
         </div>
       )}
