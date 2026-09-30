@@ -21,6 +21,7 @@ import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rew
 import { buildBassGraphSeries, detailedEqStatusText } from "@/components/room/bass/bassGraphDomainBuilder";
 import { usePublishBestSubLayoutInputs } from "@/components/room/bass/best-layout/usePublishBestSubLayoutInputs";
 import { useActiveProjectId } from "@/components/state/project-session";
+import { useEngineeringMode } from "@/components/state/useEngineeringMode";
 import { resolveBestSubLayoutContextId } from "@/components/room/bass/best-layout/bestSubLayoutContext";
 import { buildVisibleRoomModeMarkers } from "@/components/room/bass/roomModePresentation";
 import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedNullPresentation";
@@ -50,6 +51,10 @@ import { BASS_LIFECYCLE_STATE } from "@/components/room/bass/bassCalculationLife
 const IS_DEVELOPMENT_MODE = false;
 
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, hideHeader = false, engineeringDetailCollapsed = false, isCalculating = false, isPreparingPreview = false, previewTerminalMessage = null }) {
+  // Expert View ("Technical Evidence") owns every deeper diagnostic surface.
+  // The default dealer view never shows internal parity flags, raw field names
+  // or option counts — evidence appears only when Expert View is switched on.
+  const { engineeringMode } = useEngineeringMode();
   const appState = useAppState();
   const { setFrontSubsCfg, setRearSubsCfg, designEqEnabled, setDesignEqEnabled } = appState;
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
@@ -811,7 +816,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
       )}
 
       {/* ── Active Test Engine Banner ── */}
-      {includeDiagnostics && activeTestEngine && (
+      {engineeringMode && includeDiagnostics && activeTestEngine && (
         <div style={{ border: '2px solid #059669', borderRadius: 8, background: '#f0fdf4', padding: '8px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
           <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#065f46', fontWeight: 700 }}>
             🧪 Production Test Engine Active: {activeTestEngine.label}
@@ -894,7 +899,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
                 canonical P19/P20 assessment authority. "None" is raw diagnostic
                 detail and is flagged as such. */}
             <BassSmoothingControl value={bassSmoothingMode} onChange={setBassSmoothingMode} />
-            {includeDiagnostics && (
+            {engineeringMode && includeDiagnostics && (
               <>
                 {designEqEnabled && Array.isArray(seatingPositions) && seatingPositions.length > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -922,7 +927,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               onSelectAll={previewAwareSelectAllSeats}
               previewActive={placementPreviewActive}
             />
-            <CollapsiblePanel title="Engineering Detail" defaultOpen={false}>
+            {engineeringMode && (
+            <CollapsiblePanel title="Technical Evidence" defaultOpen={false}>
               <div className="space-y-3 pt-2">
                 <BassCurveVisibilityControls
                   visibility={curveVisibility}
@@ -933,6 +939,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
                 <Rp22GraphMarkerKey markers={rp22GraphMarkers} />
               </div>
             </CollapsiblePanel>
+            )}
           </>
         ) : (
           <>
@@ -1041,7 +1048,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           </>
         )}
         {/* P14 target inline summary removed — target is shown in Bass Target Settings above */}
-        {includeDiagnostics && p14IntegrationDiagnostic && p14IntegrationDiagnostic.integratedCWeightedDb != null && (() => {
+        {engineeringMode && includeDiagnostics && p14IntegrationDiagnostic && p14IntegrationDiagnostic.integratedCWeightedDb != null && (() => {
           const err = Math.abs(p14IntegrationDiagnostic.errorDb || 0);
           const pass = err <= 0.05;
           return (
@@ -1050,7 +1057,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
             </div>
           );
         })()}
-        {includeDiagnostics && optimisationResult?.canonicalMetricDiagnostics && (() => {
+        {engineeringMode && includeDiagnostics && optimisationResult?.canonicalMetricDiagnostics && (() => {
           const d = optimisationResult.canonicalMetricDiagnostics;
           const g = graphMetricParity;
           const pub = canonicalMetricPublication;
@@ -1135,7 +1142,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           );
         })()}
         <BassEngineeringDetails
-          enabled={includeDiagnostics}
+          enabled={engineeringMode && includeDiagnostics}
           designEqEnabled={designEqEnabled}
           result={optimisationResult}
           rspPosition={rspPosition}
@@ -1165,7 +1172,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         )}
 
         {/* ── Temporary overlay toggle for the REW-style Absorption Authority candidate ── */}
-        {includeDiagnostics && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+        {engineeringMode && includeDiagnostics && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
           <input
             type="checkbox"
             id="overlay-production-toggle"
@@ -1223,10 +1230,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
       {/* Bass Target Settings moved to the top of the section — always visible */}
 
       {/* ── EQ Discovery Audit — engineering-only, below the Bass Response graph ── */}
-      {includeDiagnostics && <EqDiscoveryAuditPanel />}
+      {engineeringMode && includeDiagnostics && <EqDiscoveryAuditPanel />}
 
       {/* ── TEST 11 — Gentle Peak-Cut Runtime Validation — engineering-only, read-only ── */}
-      {includeDiagnostics && <Test11GentlePeakCutValidation />}
+      {engineeringMode && includeDiagnostics && <Test11GentlePeakCutValidation />}
 
       {/* ── Active Q Strategy Label (debug mode only) ── */}
       {IS_DEVELOPMENT_MODE && qStrategy === 'freq_dependent_cap' && (
@@ -1256,13 +1263,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
       )}
 
       {/* ── Null Depth Audit Badge ── */}
-      {includeDiagnostics && multiSeries.length > 0 && multiSeries[0]?.data?.length > 0 && (
+      {engineeringMode && includeDiagnostics && multiSeries.length > 0 && multiSeries[0]?.data?.length > 0 && (
         <NullDepthAuditBadge rawData={multiSeries[0].data} smoothingMode={bassSmoothingMode} />
       )}
 
       {/* Historical/retired investigations are loaded only on explicit request.
           Current EQ receipts remain available above without mounting this archive. */}
-      {includeDiagnostics && (
+      {engineeringMode && includeDiagnostics && (
         <div style={{ marginBottom: 8 }}>
           <button
             type="button"
@@ -1379,7 +1386,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
       </CollapsiblePanel>
 
       {/* Advanced Subwoofer Tuning — expert/calibration only, hidden from the normal designer view */}
-      {includeDiagnostics && <CollapsiblePanel title="Advanced Subwoofer Tuning" defaultOpen={false}>
+      {engineeringMode && includeDiagnostics && <CollapsiblePanel title="Advanced Subwoofer Tuning" defaultOpen={false}>
         <div className="pt-3 space-y-4">
           <p className="text-[11px] text-[#625143]">For calibration review only. Sound Proof automatically time-aligns subwoofers for the design simulation.</p>
           {totalSubCount > 0 && (

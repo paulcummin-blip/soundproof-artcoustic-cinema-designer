@@ -178,7 +178,7 @@ export default function ImproveDesignCard({ appState, commitInstances }) {
         {isStale && (
           <div className="mb-2 flex items-center gap-2 rounded border border-amber-300 bg-amber-100 px-2 py-1.5">
             <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />
-            <p className="text-[10px] text-amber-800">Recommendation is stale. Re-optimise required.</p>
+            <p className="text-[10px] text-amber-800">The design changed since this recommendation — recalculate to confirm it still applies.</p>
           </div>
         )}
         <div className="space-y-1.5">

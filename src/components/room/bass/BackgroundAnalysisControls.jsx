@@ -13,7 +13,7 @@ export default function BackgroundAnalysisControls({ lifecycle, onRecalculate, d
       </button>
       <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#625143", fontFamily: "monospace", cursor: "pointer" }}>
         <input type="checkbox" checked={includeDiagnostics} onChange={(event) => { recordCheckboxClick(event.target.checked); onDiagnosticsChange(event.target.checked); }} />
-        Include engineering diagnostics
+        Show technical evidence
       </label>
     </div>
   );

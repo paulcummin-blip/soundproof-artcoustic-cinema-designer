@@ -317,6 +317,18 @@ export default function ImproveBassV2StageRow({
         </div>
       </div>
 
+      {/* Provenance — what this apply actually changed. Reports reference the
+          same wording, so it always names the change, never an internal id. */}
+      {isApplied && (
+        <p className="mt-1 text-[10px] leading-relaxed text-[#213428]">
+          {stageKey === "seating"
+            ? `Applied from ADI recommendation: move seating ${Math.abs(Number(result?.seatingOffsetMm) || 0)} mm ${Number(result?.seatingOffsetMm) < 0 ? "towards the screen" : "away from the screen"}.`
+            : stageKey === "combined"
+              ? "Applied from ADI recommendation: the combined configuration below."
+              : `Applied from ADI recommendation: ${label}.`}
+        </p>
+      )}
+
       {/* Supporting line for combined stage */}
       {stageKey === "combined" && verdict === "improvement" && (
         <p className="mt-1 text-[10px] leading-relaxed text-[#213428] font-medium">
