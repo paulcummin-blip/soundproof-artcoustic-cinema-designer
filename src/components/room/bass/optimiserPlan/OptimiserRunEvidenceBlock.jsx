@@ -12,7 +12,18 @@
 // ---------------------------------------------------------------------------
 
 import React from "react";
-import { OPTIMISER_FAMILY_STATUS } from "./optimiserRunFamilies.js";
+import { OPTIMISER_FAMILY_STATUS, OPTIMISER_RUN_FAMILY } from "./optimiserRunFamilies.js";
+
+/**
+ * What a family's counter actually counts. Polarity is explored inside the
+ * per-candidate proxy search, so its number is proxy searches — never presented
+ * as confirmed candidates.
+ */
+const FAMILY_COUNT_UNIT = Object.freeze({
+  [OPTIMISER_RUN_FAMILY.POLARITY]: "proxy searches",
+});
+
+const familyCountUnit = (familyKey) => FAMILY_COUNT_UNIT[familyKey] || "confirmed";
 
 /** A published number, or null. Never turns an unavailable metric into 0.00. */
 const fmt = (value, digits = 2, unit = "") => {
@@ -60,7 +71,9 @@ function FamilyRow({ family }) {
         <span className="font-semibold text-[#1B1A1A]">{family.label}</span>
         <span style={{ color: statusColor(family.status) }}>— {family.statusLabel}</span>
         {family.candidatesEvaluated != null && (
-          <span className="text-[#8B7F76]">· {family.candidatesEvaluated} confirmed</span>
+          <span className="text-[#8B7F76]">
+            · {family.candidatesEvaluated} {familyCountUnit(family.family)}
+          </span>
         )}
       </div>
       {best && (

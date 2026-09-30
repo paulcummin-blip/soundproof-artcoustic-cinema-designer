@@ -486,3 +486,95 @@ describe('TEST 8: no mutation during evaluation', () => {
     expect(planStatus).toMatch(/onClick=\{\(\) => onUndoLever\(lever\)\}/);
   });
 });
+
+describe('TEST 9: the card receives the run evidence', () => {
+  // Every field the evidence block renders, asserted on the payload the CARD is
+  // handed (presentation.evidence) rather than on the saved record — the handoff
+  // is what these tests exist to protect.
+  const BLOCK_FIELDS = [
+    'candidatesEvaluated',
+    'resultsRetained',
+    'outcome',
+    'completedAt',
+    'baselineValidation',
+    'current',
+    'bestAttempted',
+    'families',
+    'stageOperations',
+    'stageOperationsNote',
+    'rejectionReasons',
+    'designUnchanged',
+  ];
+
+  it('hands the resolved presentation the complete evidence payload', () => {
+    const state = resolveOptimiserPresentationState({
+      planView: marqueePlanView(),
+      actionable: { available: false },
+    });
+    const evidence = state.evidence;
+
+    expect(evidence).not.toBeNull();
+    for (const field of BLOCK_FIELDS) {
+      expect(evidence[field], `presentation.evidence.${field} must reach the card`).not.toBeUndefined();
+    }
+
+    // Family evidence: what was tested, the best attempt, and why not.
+    expect(evidence.families.map((family) => family.family)).toEqual([
+      'placement', 'delay', 'gain', 'polarity', 'combined', 'additional_positions', 'seat_movement',
+    ]);
+    const delay = evidence.families.find((family) => family.family === 'delay');
+    expect(delay.label).toBe('Delay');
+    expect(delay.statusLabel).toBe('Tested — best attempt rejected');
+    expect(delay.candidatesEvaluated).toBe(4);
+    expect(delay.bestAttempt.p20VariationDb).toBe(11.02);
+    expect(delay.bestAttempt.p20DeltaDb).toBe(-1.22);
+    expect(delay.reason).toBe('Evaluated, but no candidate from this family was confirmed as a winner.');
+    expect(delay.applicable).toBe(false);
+
+    // Polarity states its own case instead of disappearing.
+    const polarity = evidence.families.find((family) => family.family === 'polarity');
+    expect(polarity.statusLabel).toBe('Not tested separately');
+    expect(polarity.reason).toContain('combined');
+
+    // Honest counts: confirmed candidates, not the sum of overlapping counters.
+    expect(evidence.candidatesEvaluated).toBe(17);
+    expect(evidence.current.p20VariationDb).toBe(12.24);
+    expect(evidence.bestAttempted.p20VariationDb).toBe(10.34);
+
+    // Why no winner, at run level and per family.
+    expect(evidence.rejectionReasons.length).toBeGreaterThan(0);
+    expect(evidence.designUnchanged).toBe(true);
+    expect(state.showApply).toBe(false);
+  });
+
+  it('reaches the card through the journey and the terminal branches', () => {
+    const journey = read('components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx');
+    expect(journey).toMatch(/presentation\?\.evidence/);
+    expect(journey).toMatch(/<OptimiserRunEvidenceBlock evidence=\{runEvidence\} \/>/);
+
+    const card = read('components/room/bass/optimiseWorkflow/AdiRecommendation.jsx');
+    // The resolved presentation is handed to the journey card...
+    expect((card.match(/presentation=\{optimiserPresentation\}/g) || []).length).toBe(2);
+    // ...and the two terminal cards that resolve their own copy still show what
+    // the run evaluated, so no no-winner outcome hides the evidence.
+    expect((card.match(/<OptimiserRunEvidenceBlock evidence=\{optimiserPresentation\.evidence\} \/>/g) || []).length)
+      .toBeGreaterThanOrEqual(2);
+    expect(card).toMatch(/const optimiserPresentation = resolveOptimiserPresentationState\(\{/);
+    expect(card).toMatch(/planView: optimiserPlanView/);
+  });
+
+  it('offers nothing to apply from the evidence', () => {
+    const block = read('components/room/bass/optimiserPlan/OptimiserRunEvidenceBlock.jsx');
+    for (const applyHook of ['onApplyLever', 'onUndoLever', 'commitInstances', 'canApply', '<button']) {
+      expect(block.includes(applyHook), `${applyHook} must not exist in the evidence block`).toBe(false);
+    }
+    expect(block).toMatch(/cannot be applied/);
+  });
+
+  it('labels each family counter for what it counts', () => {
+    const block = read('components/room/bass/optimiserPlan/OptimiserRunEvidenceBlock.jsx');
+    // Polarity's number is proxy searches, never presented as confirmed candidates.
+    expect(block).toMatch(/\[OPTIMISER_RUN_FAMILY\.POLARITY\]: "proxy searches"/);
+    expect(block).toMatch(/\{familyCountUnit\(family\.family\)\}/);
+  });
+});

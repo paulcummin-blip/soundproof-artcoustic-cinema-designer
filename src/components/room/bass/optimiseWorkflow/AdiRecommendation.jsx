@@ -44,6 +44,7 @@ import { useActiveProjectId } from "@/components/state/project-session";
 import { useAppliedCalibrationAuthority } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore";
 import OptimisationPlanStatus from "@/components/room/bass/optimiserPlan/OptimisationPlanStatus.jsx";
 import AdiOptimisationJourney from "@/components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx";
+import OptimiserRunEvidenceBlock from "@/components/room/bass/optimiserPlan/OptimiserRunEvidenceBlock.jsx";
 import { firstSentence } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
 import { useOptimiserPlanView } from "@/components/room/bass/optimiserPlan/useOptimiserPlanView.js";
 import {
@@ -522,6 +523,8 @@ export default function AdiRecommendation({
             </div>
           </div>
         )}
+        {/* What the run actually evaluated, saved with this design version. */}
+        <OptimiserRunEvidenceBlock evidence={optimiserPresentation.evidence} />
       </div>
     );
   }
@@ -547,6 +550,8 @@ export default function AdiRecommendation({
             {remainingText}
           </div>
         )}
+        {/* A run that found no improvement still states what it tested. */}
+        <OptimiserRunEvidenceBlock evidence={optimiserPresentation.evidence} />
       </div>
     );
   }
