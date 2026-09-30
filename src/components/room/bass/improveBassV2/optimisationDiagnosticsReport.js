@@ -27,7 +27,10 @@ const SIGNIFICANCE = {
   NONE: "none",
 };
 
+// null / undefined / "" stay UNAVAILABLE. Number(null) is 0 and Number("") is 0,
+// so a missing metric must never be reported as a real 0 dB reading.
 function num(value) {
+  if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }

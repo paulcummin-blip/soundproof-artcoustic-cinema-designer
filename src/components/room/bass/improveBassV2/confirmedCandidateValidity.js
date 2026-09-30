@@ -16,29 +16,80 @@ export function requiredSeats(seats) {
     isPrimary: s.priority != null ? s.priority !== "secondary" : s.isPrimary !== false,
   }));
 }
+/**
+ * Integrity of ONE seat-metric collection.
+ *
+ * `required: true` — the metric must cover every applicable seat (P20, the
+ * per-seat metric). `required: false` — the collection is optional: when a
+ * result carries none, that is valid, no seat is failed for the absence and no
+ * row is fabricated. Rows that DO exist are validated as written.
+ */
+function seatRowIssues(result, field, ids, grade, { required }) {
+  const rows = Array.isArray(result?.[field]) ? result[field] : [];
+  const issues = [];
+  if (!rows.length) {
+    if (required) issues.push(field + ": missing required seats");
+    return issues;
+  }
+  if (rows.length !== ids.length) {
+    issues.push(field + ": missing required seats");
+    return issues;
+  }
+  const seen = new Set();
+  for (const row of rows) {
+    const id = String(row?.seatId ?? "");
+    if (!ids.includes(id) || seen.has(id)) issues.push(field + ": unexpected or duplicate seat " + id);
+    seen.add(id);
+    if (!finite(row?.variationDbRaw) || row.variationDbRaw < 0) issues.push(field + ": invalid raw value for " + id);
+    const level = canonicalLevel(row?.level);
+    if (level == null || (finite(row?.variationDbRaw) && level !== canonicalLevel(grade(row.variationDbRaw)))) issues.push(field + ": invalid canonical grade for " + id);
+  }
+  for (const id of ids) if (!seen.has(id)) issues.push(field + ": missing " + id);
+  return issues;
+}
+
+/**
+ * Seat-level validation.
+ *
+ * P20 is the per-seat metric — every applicable seat must carry a graded row.
+ * P19 is an AGGREGATE RSP result in this model, so per-seat P19 rows are
+ * optional: an empty per-seat P19 collection is valid and is never treated as
+ * a failed seat, a Level 0 seat, or a reason to reject the result.
+ */
 export function validateSeatResults(result, seats) {
   const required = requiredSeats(seats);
   const ids = required.map(s => s.id);
   const issues = [];
   if (!ids.length || ids.some(id => !id) || new Set(ids).size !== ids.length) issues.push("Invalid applicable seat set");
-  for (const [field, grade] of [["perSeatP19", gradeP19FromRaw], ["perSeatP20", gradeP20FromRaw]]) {
-    const rows = result?.[field];
-    if (!Array.isArray(rows) || rows.length !== ids.length || !rows.length) { issues.push(field + ": missing required seats"); continue; }
-    const seen = new Set();
-    for (const row of rows) {
-      const id = String(row?.seatId ?? "");
-      if (!ids.includes(id) || seen.has(id)) issues.push(field + ": unexpected or duplicate seat " + id);
-      seen.add(id);
-      if (!finite(row?.variationDbRaw) || row.variationDbRaw < 0) issues.push(field + ": invalid raw value for " + id);
-      const level = canonicalLevel(row?.level);
-      if (level == null || (finite(row?.variationDbRaw) && level !== canonicalLevel(grade(row.variationDbRaw)))) issues.push(field + ": invalid canonical grade for " + id);
-    }
-    for (const id of ids) if (!seen.has(id)) issues.push(field + ": missing " + id);
-  }
+  issues.push(...seatRowIssues(result, "perSeatP20", ids, gradeP20FromRaw, { required: true }));
+  issues.push(...seatRowIssues(result, "perSeatP19", ids, gradeP19FromRaw, { required: false }));
   return { valid: issues.length === 0, issues };
 }
+
+/**
+ * The aggregate RSP P19 headline — validated on its own, exactly once, because
+ * this model holds no per-seat P19. A missing or ungradeable aggregate P19 is a
+ * genuine validation failure.
+ */
+export function validateAggregateP19(result) {
+  const issues = [];
+  if (!finite(result?.achievedP19VariationDb)) issues.push("P19: missing aggregate RSP deviation");
+  if (canonicalLevel(result?.achievedP19Level) == null) issues.push("P19: missing aggregate RSP level");
+  return { valid: issues.length === 0, issues };
+}
+
+/** The applicable seat set of a result, taken from its validated per-seat P20. */
+export function applicableSeatsFromResult(result) {
+  const rows = Array.isArray(result?.perSeatP20) ? result.perSeatP20 : [];
+  return rows.map(row => ({ id: String(row?.seatId ?? ""), isPrimary: row?.isPrimary !== false }));
+}
 export function validateConfirmedCandidate(result, context = {}) {
-  const issues = validateSeatResults(result, context.seats).issues;
+  // Per-seat P20 (required), the aggregate RSP P19 headline (required), and any
+  // genuine per-seat P19 rows the result happens to carry.
+  const issues = [
+    ...validateSeatResults(result, context.seats).issues,
+    ...validateAggregateP19(result).issues,
+  ];
   if (!finite(result?.assessmentStartHz) || !finite(result?.assessmentEndHz) ||
       result.assessmentStartHz <= 0 || result.assessmentEndHz <= result.assessmentStartHz) issues.push("Invalid assessment band");
   if (!finite(result?.achievedP18Hz) || result.achievedP18Hz <= 0 || canonicalLevel(result?.p18AchievedLevel) == null) issues.push("Invalid P18");

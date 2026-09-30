@@ -193,16 +193,33 @@ export function isCurrentAuthorityNonStale(currentAuthority, liveCacheKey) {
 
   const contract = currentAuthority.contract;
 
-  // Required per-seat metric authority: P19/P20 per-seat data must exist
-  // in the REAL production contract structure.
+  // Required metric authority in the REAL production contract structure:
+  //   - per-seat P20 rows (the per-seat metric) must exist
+  //   - the aggregate RSP P19 headline must exist
+  // Per-seat P19 rows are OPTIONAL: P19 is an aggregate RSP result in this
+  // model, so an empty per-seat P19 collection never invalidates the authority.
   const selectedCandidate = contract.selectedCandidate || {};
-  const perSeatP19Results = Array.isArray(selectedCandidate.perSeatP19Results)
-    ? selectedCandidate.perSeatP19Results
-    : [];
   const perSeatP20Results = Array.isArray(selectedCandidate.perSeatP20Results)
     ? selectedCandidate.perSeatP20Results
     : [];
-  if (perSeatP19Results.length === 0 || perSeatP20Results.length === 0) return false;
+  if (perSeatP20Results.length === 0) return false;
+
+  const p19Param = contract.productAnalysis?.parameters?.p19 || null;
+  if (!hasAggregateP19Headline(p19Param)) return false;
 
   return true;
+}
+
+/**
+ * Is the aggregate RSP P19 headline present and gradeable?
+ * Both the deviation and a canonical level must exist; a partial headline is
+ * not a usable P19 authority.
+ */
+export function hasAggregateP19Headline(p19Param) {
+  if (!p19Param) return false;
+  const raw = p19Param.variationDbRaw ?? p19Param.value;
+  if (!Number.isFinite(Number(raw))) return false;
+  const level = p19Param.level;
+  if (Number.isInteger(level) && level >= 0 && level <= 4) return true;
+  return typeof level === "string" && /^L[1-4]$/.test(level);
 }

@@ -1,4 +1,5 @@
 import { validateConfirmedCandidate, effectiveConfigurationKey } from "./confirmedCandidateValidity.js";
+import { extractAuthorityForComparison } from "./currentAuthorityComparison.js";
 import { selectConfirmedRecommendations } from "./confirmedRecommendationSelection.js";
 import { bindTuningToSourceIds } from "./improveBassV2ApplyCalibration.js";
 import { buildAuthoritativeAutoAlignDelays } from "../useAuthoritativeBassResponse.js";
@@ -1601,88 +1602,4 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     }
     try { worker.terminate(); } catch { /* idempotent on already-terminated worker */ }
   }
-}
-
-/**
- * Extract the relevant fields from the completed bass authority contract
- * for use as the Current control in winner selection (BLOCKER 1).
- *
- * BLOCKER 1 FIX: Reads from the REAL production contract structure:
- *   - Per-seat: contract.selectedCandidate.perSeatP19Results / perSeatP20Results
- *   - Headline: contract.productAnalysis.parameters.p19/p20/p18/p14
- *
- * Maps perSeatP19Results → perSeatP19 (and perSeatP20Results → perSeatP20)
- * so hasPrimarySeatRegression can consume them with its existing field names.
- *
- * Returns null if the contract lacks the required per-seat data.
- */
-function extractAuthorityForComparison(currentAuthority) {
-  if (!currentAuthority?.contract) return null;
-  const contract = currentAuthority.contract;
-  const selectedCandidate = contract.selectedCandidate || {};
-
-  // BLOCKER 1: Read per-seat from the REAL production structure
-  const perSeatP19Results = Array.isArray(selectedCandidate.perSeatP19Results)
-    ? selectedCandidate.perSeatP19Results
-    : [];
-  const perSeatP20Results = Array.isArray(selectedCandidate.perSeatP20Results)
-    ? selectedCandidate.perSeatP20Results
-    : [];
-  if (perSeatP19Results.length === 0 || perSeatP20Results.length === 0) return null;
-
-  // Map perSeatP19Results → perSeatP19 (field names are compatible:
-  // both have seatId, isPrimary, level, variationDbRaw)
-  const perSeatP19 = perSeatP19Results.map((s) => ({
-    seatId: s.seatId,
-    isPrimary: s.isPrimary || false,
-    level: s.level,
-    variationDbRaw: s.variationDbRaw,
-    worstFrequencyHz: s.worstFrequencyHz,
-  }));
-  const perSeatP20 = perSeatP20Results.map((s) => ({
-    seatId: s.seatId,
-    isPrimary: s.isPrimary || false,
-    level: s.level,
-    variationDbRaw: s.variationDbRaw,
-    worstFrequencyHz: s.worstFrequencyHz,
-  }));
-
-  // Extract headline metrics from productAnalysis.parameters
-  const params = contract.productAnalysis?.parameters || {};
-  const p19Param = params.p19 || {};
-  const p20Param = params.p20 || {};
-  const p18Param = params.p18 || {};
-
-  // P14 achieved capability: read from selectedCandidate (full contract) or
-  // from productAnalysis.parameters.p14 (compact contract). In the compact
-  // contract, selectedCandidate.achievedP14Db/Level are stripped during
-  // compaction, but productAnalysis.parameters.p14 preserves the achieved
-  // data in achievedCapabilityDb and achievedLevel (NOT in .value/.level
-  // which carry the designer-selected TARGET semantics after buildBassTargetViews).
-  const p14Param = contract.productAnalysis?.parameters?.p14 || {};
-  const p14AchievedLevel = selectedCandidate.achievedP14Level
-    ?? contract.achievedP14Level
-    ?? p14Param.achievedLevel
-    ?? null;
-  const p14AchievedDbRaw = selectedCandidate.achievedP14Db
-    ?? contract.achievedP14Db
-    ?? p14Param.achievedCapabilityDb
-    ?? p14Param.availableCapabilityDb
-    ?? null;
-  const p14AchievedDb = Number.isFinite(Number(p14AchievedDbRaw)) ? Number(p14AchievedDbRaw) : null;
-
-  return {
-    perSeatP19,
-    perSeatP20,
-    achievedP19VariationDb: Number.isFinite(Number(p19Param.value)) ? Number(p19Param.value) : null,
-    achievedP19Level: p19Param.level ?? null,
-    achievedP20VariationDb: Number.isFinite(Number(p20Param.value)) ? Number(p20Param.value) : null,
-    achievedP20Level: p20Param.level ?? null,
-    p18AchievedLevel: p18Param.level ?? null,
-    achievedP18Hz: Number.isFinite(Number(selectedCandidate.achievedP18FrequencyHz))
-      ? Number(selectedCandidate.achievedP18FrequencyHz)
-      : (Number.isFinite(Number(p18Param.value)) ? Number(p18Param.value) : null),
-    p14AchievedLevel,
-    p14AchievedDb,
-  };
 }

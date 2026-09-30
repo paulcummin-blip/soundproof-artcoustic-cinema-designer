@@ -8,7 +8,14 @@
 // recalculates, re-grades, or estimates a value that is not already present.
 // ---------------------------------------------------------------------------
 
-const num = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
+// null / undefined / "" stay UNAVAILABLE. Number(null) is 0 and Number("") is 0,
+// so a plain Number.isFinite(Number(value)) check would silently publish a
+// missing metric as a real 0.00 dB reading.
+const num = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
 
 /** Worst P20 seat of a candidate result: highest seat variation. */
 export function worstP20Seat(result) {

@@ -1,4 +1,4 @@
-import { validateSeatResults, canonicalLevel } from "./confirmedCandidateValidity.js";
+import { validateSeatResults, canonicalLevel, applicableSeatsFromResult } from "./confirmedCandidateValidity.js";
 import { countFailingSeats, hasNewFailingSeats } from "./zeroFailOptimiser.js";
 import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 // materialityGate.js
@@ -134,7 +134,9 @@ export function isMaterialImprovement(currentResult, candidateResult) {
     return { material: false, reason: "Missing result data" };
   }
 
-  const seats = (currentResult.perSeatP19 || []).map(s=>({id:s.seatId,isPrimary:s.isPrimary}));
+  // The applicable seat set comes from the per-seat metric (P20). P19 is an
+  // aggregate RSP result here, so it can never define the seat set.
+  const seats = applicableSeatsFromResult(currentResult);
   const baseline = validateSeatResults(currentResult,seats), candidate = validateSeatResults(candidateResult,seats);
   if (!baseline.valid || !candidate.valid) return {material:false,valid:false,reason:"Invalid or incomplete canonical seat data",details:{baseline,candidate}};
 
@@ -164,9 +166,9 @@ export function isMaterialImprovement(currentResult, candidateResult) {
 
   // Same fail count, no moved fails -- check for level / deviation / null
   // improvements. Use the actual matched seats. The P19/P20 headline remains SEAT.
-  const pairs = ["perSeatP19","perSeatP20"].flatMap(field=>candidateResult[field].map(seat=>({
+  const pairs = ["perSeatP19","perSeatP20"].flatMap(field=>(candidateResult[field]||[]).map(seat=>({
     parameter:field==="perSeatP19"?"P19":"P20",seatId:seat.seatId,
-    before:currentResult[field].find(s=>String(s.seatId)===String(seat.seatId)),after:seat,
+    before:(currentResult[field]||[]).find(s=>String(s.seatId)===String(seat.seatId)),after:seat,
   })));
   const improvements=pairs.filter(p=>canonicalLevel(p.after.level)>canonicalLevel(p.before.level));
   if(improvements.length) return {material:true,reason:"Level improvement: "+improvements.map(p=>p.seatId+" "+p.parameter+" L"+canonicalLevel(p.before.level)+" -> L"+canonicalLevel(p.after.level)).join(", "),details:{seats:improvements}};
