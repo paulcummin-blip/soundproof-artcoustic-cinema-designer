@@ -98,7 +98,9 @@ export const PLAN_FAMILY_STATEMENTS = Object.freeze([
   {
     key: "phase",
     statement:
-      "Searched only inside the combined candidate — no phase-only result is saved with this plan, so it is not offered for separate application.",
+      "Crossover-region phase is not yet evaluated. The optimiser does not model phase between "
+      + "the main speakers and subwoofers through the 80–150 Hz crossover region, so no phase "
+      + "change is offered for separate application.",
   },
   {
     key: "layout",

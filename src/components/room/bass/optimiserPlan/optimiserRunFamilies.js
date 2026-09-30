@@ -14,6 +14,10 @@
 
 import { POLARITY_NOT_EVALUATED_REASON } from "./optimiserPlanConstants.js";
 import { sortFamiliesLeastIntrusive } from "./optimiserLeverOrder.js";
+import {
+  PHASE_CROSSOVER_REGION_TITLE,
+  resolveCrossoverRegionPhaseRow,
+} from "./crossoverRegionPhaseAuthority.js";
 
 /** The optimiser families a run can test. */
 export const OPTIMISER_RUN_FAMILY = Object.freeze({
@@ -266,20 +270,36 @@ export function buildFamilyLedger({ selection = null, diagnostics = null, curren
     current,
   }));
 
-  // ── Phase ── the grouped all-pass phase (crossover-region) search. A real
-  // lever in the engine: it is reported with its own tested count and best
-  // attempt, or with the run's own reason for not searching it.
-  families.push(leverFamily({
-    key: OPTIMISER_RUN_FAMILY.PHASE,
-    stageName: "Phase",
-    selection,
-    diagnostics,
-    current,
-    issueStages: ["phase"],
-    reasonFallback: typeof selection?.phaseDiagnostics?.grouping?.reason === "string"
-      ? selection.phaseDiagnostics.grouping.reason
-      : null,
-  }));
+  // ── Phase / crossover-region alignment ── lever 3.
+  // The engine's phase search is a subwoofer-only all-pass referenced at 80 Hz,
+  // so the speaker/sub crossover region itself is NOT evaluated. The row states
+  // that plainly and keeps the sub-only attempt as evidence, labelled as exactly
+  // what it is — it is never presented as crossover-region alignment.
+  const phaseStage = stageByName(diagnostics, "Phase");
+  const phaseIssue = issueFor(selection, ["phase"]);
+  const phaseBest = bestFromStage(phaseStage);
+  const phaseCount = confirmedCount(phaseStage);
+  const phaseAttempted = phaseCount != null ? phaseCount > 0 : !!phaseStage?.winningCandidate;
+  const crossoverRegion = resolveCrossoverRegionPhaseRow({ subPhaseTested: phaseAttempted });
+  families.push({
+    ...family({
+      key: OPTIMISER_RUN_FAMILY.PHASE,
+      status: phaseIssue
+        ? OPTIMISER_FAMILY_STATUS.FAILED
+        : OPTIMISER_FAMILY_STATUS.NOT_TESTED,
+      candidatesEvaluated: phaseCount,
+      bestAttempt: phaseBest,
+      reason: phaseIssue ? issueText(phaseIssue) : crossoverRegion.reason,
+      current,
+    }),
+    label: PHASE_CROSSOVER_REGION_TITLE,
+    statusLabel: phaseIssue
+      ? OPTIMISER_FAMILY_STATUS_LABEL[OPTIMISER_FAMILY_STATUS.FAILED]
+      : crossoverRegion.stateLabel,
+    // A retained attempt here is subwoofer-only phase, never crossover alignment.
+    bestAttemptScope: phaseBest ? "subwoofer_phase_only" : null,
+    crossoverRegion,
+  });
 
   // ── Polarity ── explored inside the per-candidate delay/polarity/trim proxy
   // search. No standalone polarity-only evaluation exists, and that is stated

@@ -16,6 +16,7 @@ import { OPTIMISER_FAMILY_STATUS, OPTIMISER_RUN_FAMILY } from "./optimiserRunFam
 import { LEAST_INTRUSIVE_NOTE, leverTitle } from "./optimiserLeverOrder.js";
 import { OPTIMISER_LEVER_VERDICT, resolveLeverVerdict } from "./optimiserLeverVerdict.js";
 import { deltaText, deviationText, frequencyText, levelText } from "./optimiserWholeNumberDb.js";
+import CrossoverRegionPhaseEvidence from "./CrossoverRegionPhaseEvidence.jsx";
 
 /**
  * What a family's counter actually counts. Polarity is explored inside the
@@ -98,7 +99,11 @@ function FamilyRow({ family, current }) {
 
       {best && (
         <div className="text-[#1B1A1A]">
-          <span className="text-[#8B7F76]">Best attempt: </span>
+          <span className="text-[#8B7F76]">
+            {family.bestAttemptScope === "subwoofer_phase_only"
+              ? "Subwoofer phase only — best attempt: "
+              : "Best attempt: "}
+          </span>
           P20 {p20 || UNAVAILABLE}
           {p20Level ? ` · ${p20Level}` : ""}
           {p19 ? ` · P19 ${p19}` : ""}
@@ -121,6 +126,10 @@ function FamilyRow({ family, current }) {
       ) : (
         family.reason && <div className="text-[#625143]">{family.reason}</div>
       )}
+
+      {/* Phase / crossover-region alignment states its band, its purpose and
+          whether the region is evaluated at all. */}
+      <CrossoverRegionPhaseEvidence region={family.crossoverRegion} />
 
       {family.reason && best && (
         <details className="mt-0.5">
