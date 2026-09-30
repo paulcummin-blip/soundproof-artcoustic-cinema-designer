@@ -106,27 +106,23 @@ function changeText(change) {
   return null;
 }
 
-function EffectBlock({ lever }) {
+function EffectBlock({ lever, baseline = null }) {
   const effect = lever.effect;
   if (!effect) {
     return <div className="text-[11px] text-[#8B7F76] italic">{lever.effectLabel}</div>;
   }
   const rows = [];
-  // Both endpoints are printed by the whole-number policy, so the change the
-  // dealer reads is the change the two endpoints show.
-  const p20Before = deviationText(effect.p20VariationDb);
-  const p20After = effect.p20DeltaDb != null && effect.p20VariationDb != null
-    ? deviationText(effect.p20VariationDb + effect.p20DeltaDb)
-    : null;
-  if (p20Before) {
-    rows.push(p20After && p20After !== p20Before ? `P20: ${p20Before} → ${p20After}` : `P20: ${p20Before}`);
+  // The persisted effect is already the candidate's AFTER result. Compare it
+  // with the persisted baseline; never add the delta to the after value again.
+  const p20Before = deviationText(baseline?.p20VariationDb);
+  const p20After = deviationText(effect.p20VariationDb);
+  if (p20After) {
+    rows.push(p20Before && p20After !== p20Before ? `P20: ${p20Before} → ${p20After}` : `P20: ${p20After}`);
   }
-  const p19Before = deviationText(effect.p19VariationDb);
-  const p19After = effect.p19DeltaDb != null && effect.p19VariationDb != null
-    ? deviationText(effect.p19VariationDb + effect.p19DeltaDb)
-    : null;
-  if (p19Before) {
-    rows.push(p19After && p19After !== p19Before ? `P19: ${p19Before} → ${p19After}` : `P19: ${p19Before}`);
+  const p19Before = deviationText(baseline?.p19VariationDb);
+  const p19After = deviationText(effect.p19VariationDb);
+  if (p19After) {
+    rows.push(p19Before && p19After !== p19Before ? `P19: ${p19Before} → ${p19After}` : `P19: ${p19After}`);
   }
   if (effect.worstSeatId) {
     const hz = frequencyText(effect.worstFrequencyHz);
@@ -312,7 +308,7 @@ export default function OptimisationPlanStatus({
             )}
 
             <div className="mt-1.5">
-              <EffectBlock lever={lever} />
+              <EffectBlock lever={lever} baseline={view.baseline} />
             </div>
 
             {lever.tradeOff?.reason && (
