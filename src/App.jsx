@@ -38,6 +38,19 @@ import AccessGate from '@/components/AccessGate';
 import AccessDeniedScreen from '@/components/AccessDeniedScreen';
 import AdminOnlyRoute from '@/components/AdminOnlyRoute';
 import { defaultPathForUser } from '@/lib/accountAccess';
+import ProjectHydrationProvider from '@/components/state/ProjectHydrationProvider';
+import ProjectGate from '@/components/state/ProjectGate';
+
+// Pages that render saved project design state. They are gated on the canonical
+// project hydration state, so placeholder or previous-project data can never be
+// displayed as the current project.
+const DESIGN_DEPENDENT_PAGES = new Set(['RoomDesigner', 'RP22Report']);
+
+const withProjectGate = (path, Page) => (
+  DESIGN_DEPENDENT_PAGES.has(path)
+    ? <ProjectGate><Page /></ProjectGate>
+    : <Page />
+);
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -104,15 +117,15 @@ const AuthenticatedApp = () => {
             <Route
               key={path}
               path={`/${path}`}
-              element={<AccessGate capability="soundProof"><Page /></AccessGate>}
+              element={<AccessGate capability="soundProof">{withProjectGate(path, Page)}</AccessGate>}
             />
           ))}
         <Route path="/SPLCalculator" element={<AccessGate capability="soundProof"><Pages.SPLCalculator /></AccessGate>} />
         <Route path="/SPLCalculatorV2" element={<AdminOnlyRoute redirectTo="/Projects"><Pages.SPLCalculatorV2 /></AdminOnlyRoute>} />
-        <Route path="/RP22ClientReport" element={<AccessGate capability="soundProof"><RP22ClientReport /></AccessGate>} />
-        <Route path="/DesignReview" element={<AccessGate capability="soundProof"><DesignReviewPage /></AccessGate>} />
+        <Route path="/RP22ClientReport" element={<AccessGate capability="soundProof"><ProjectGate><RP22ClientReport /></ProjectGate></AccessGate>} />
+        <Route path="/DesignReview" element={<AccessGate capability="soundProof"><ProjectGate><DesignReviewPage /></ProjectGate></AccessGate>} />
         <Route path="/ProposalCentre" element={<AccessGate capability="soundProof"><ProposalCentre /></AccessGate>} />
-        <Route path="/ProjectProposalAssets" element={<AccessGate capability="soundProof"><ProjectProposalAssets /></AccessGate>} />
+        <Route path="/ProjectProposalAssets" element={<AccessGate capability="soundProof"><ProjectGate requiresDesign={false}><ProjectProposalAssets /></ProjectGate></AccessGate>} />
         <Route path="/ProposalEditor" element={<AccessGate capability="soundProof"><ProposalEditor /></AccessGate>} />
         <Route path="/proposal/:proposalId" element={<AccessGate capability="soundProof"><ProposalDirectLink /></AccessGate>} />
         <Route path="/PurchaseProjects" element={<AccessGate capability="commercial"><PurchaseProjects /></AccessGate>} />
@@ -151,7 +164,9 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <NavigationTracker />
-          <AuthenticatedApp />
+          <ProjectHydrationProvider>
+            <AuthenticatedApp />
+          </ProjectHydrationProvider>
         </Router>
         <Toaster />
         <VisualEditAgent />

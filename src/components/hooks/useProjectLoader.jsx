@@ -14,6 +14,11 @@ import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectInt
 import { INSTANCE_STATUS, MIGRATION_STATE } from "@/components/utils/subwooferInstanceCompatibility";
 import { canSave as hydrationCanSave, markLoaded, markError, createAuthority } from "@/components/state/hydrationAuthority";
 import { logSaveEvent } from "@/components/state/saveAuditLog";
+import {
+  beginDesignHydration,
+  completeDesignHydration,
+  failDesignHydration,
+} from "@/components/state/projectHydrationStore";
 import { checkDestructiveSave } from "@/components/state/destructiveSaveTripwire";
 import { useAppliedCalibrationAuthority } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { serializeAppliedCalibration } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationPersistence.js";
@@ -268,6 +273,9 @@ appState, // Pass appState directly for setters
     appState?.setProjectHydrationReady?.(false);
     hydrationAuthorityRef.current = createAuthority(id, loadGenerationRef.current);
     setLoadState({ phase: "loading", error: null, name: null });
+    // Publish the canonical hydration state so no surface renders this project's
+    // placeholder data while the saved design state is still loading.
+    beginDesignHydration(id);
     try {
       // AbortController signal is not directly supported by the SDK, but the operation is fast.
       const projects = await Project.filter({ id }, '-updated_date', 1);
@@ -307,6 +315,11 @@ appState, // Pass appState directly for setters
       // never resets it to false. Defaults to false for pre-feature projects.
       loadedRoomDimensionsEditedRef.current = mergedP?.room_dimensions_edited === true;
       setLoadState({ phase: "loaded", error: null, name: mergedP?.name || "Project" });
+      completeDesignHydration(id, {
+        name: mergedP?.name || null,
+        clientName: mergedP?.client_name || null,
+        activeVersionId: mergedP?.active_version_id || null,
+      });
       // Only enable saving after successful same-project hydration.
       hydrationAuthorityRef.current = markLoaded(hydrationAuthorityRef.current);
       appState?.setProjectHydrationReady?.(true);
@@ -447,6 +460,7 @@ appState, // Pass appState directly for setters
         hydrationAuthorityRef.current = markError(hydrationAuthorityRef.current);
         appState?.setProjectHydrationReady?.(false);
         setLoadState({ phase: "error", error: "Project not found", name: null });
+        failDesignHydration(id, "Project not found");
       }
     } catch (err) {
       const errMsg = String(err?.message || err || '');
@@ -463,6 +477,7 @@ appState, // Pass appState directly for setters
         hydrationAuthorityRef.current = markError(hydrationAuthorityRef.current);
         appState?.setProjectHydrationReady?.(false);
         setLoadState({ phase: "error", error: errMsg, name: null });
+        failDesignHydration(id, errMsg);
         return;
       }
 
@@ -473,6 +488,7 @@ appState, // Pass appState directly for setters
       hydrationAuthorityRef.current = markError(hydrationAuthorityRef.current);
       appState?.setProjectHydrationReady?.(false);
       setLoadState({ phase: "error", error: errMsg, name: null });
+      failDesignHydration(id, errMsg);
     }
     // NO finally block — saving is enabled ONLY on successful load, never on failure.
   }, [projectIdState, hydrateFromProject, setProjectNameState]);

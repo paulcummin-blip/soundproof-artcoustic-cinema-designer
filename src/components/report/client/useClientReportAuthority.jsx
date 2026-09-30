@@ -31,6 +31,11 @@ import { useActiveProjectId } from "@/components/state/project-session";
 import { resolveEffectiveVisibleWidthInches, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 import { useVersionedEngineeringAuthority } from "@/components/engineering/useVersionedEngineeringAuthority";
+import {
+  beginDesignHydration,
+  completeDesignHydration,
+  failDesignHydration,
+} from "@/components/state/projectHydrationStore";
 
 // TV preset → viewable width in inches (matches RoomDesigner TV_KEY_TO_INCHES)
 const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
@@ -112,6 +117,8 @@ export function useClientReportAuthority(projectId) {
     if (sharedProviderReady) {
       setHydrating(false);
       setHydratedProjectId(projectId);
+      // Shared app state already holds this project's saved design state.
+      completeDesignHydration(projectId);
       base44.entities.Project.filter({ id: projectId }).then((results) => {
         if (cancelled) return;
         const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
@@ -130,6 +137,7 @@ export function useClientReportAuthority(projectId) {
     if (hydratedProjectId === projectId && !hydrating) return;
 
     setHydrating(true);
+    beginDesignHydration(projectId);
 
     base44.entities.Project.filter({ id: projectId }).then(async (results) => {
       if (cancelled) return;
@@ -139,6 +147,7 @@ export function useClientReportAuthority(projectId) {
         setHydrating(false);
         setHydratedProjectId(null);
         setVersionId(null);
+        failDesignHydration(projectId, "Project not found");
         return;
       }
       setProjectDetails({
@@ -205,11 +214,17 @@ export function useClientReportAuthority(projectId) {
       });
       setHydratedProjectId(p.id);
       setHydrating(false);
-    }).catch(() => {
+      completeDesignHydration(projectId, {
+        name: p.name || null,
+        clientName: p.client_name || null,
+        activeVersionId: p.active_version_id || null,
+      });
+    }).catch((error) => {
       if (cancelled) return;
       setProjectDetails(null);
       setHydrating(false);
       setHydratedProjectId(null);
+      failDesignHydration(projectId, error?.message || "Project could not be loaded");
     });
 
     return () => { cancelled = true; };

@@ -29,6 +29,7 @@ import BrandIntroOverlay from "@/components/ui/BrandIntroOverlay";
 import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
 import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
+import { useCanonicalProject } from "@/components/state/projectHydrationStore";
 import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUnselectedIndicator, readSeatPriorityFingerprint, readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 import { useVersionedEngineeringAuthority } from "@/components/engineering/useVersionedEngineeringAuthority";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
@@ -97,17 +98,20 @@ export default function Layout({ children, currentPageName }) {
   const [p14TargetUnselected, setP14TargetUnselected] = React.useState(false);
   const [staleScope, setStaleScope] = React.useState(false);
 
-  // Active project meta for sidebar (name + client)
-  const [activeProjectSummary, setActiveProjectSummary] = React.useState({
-    id: null,
-    name: null,
-    client_name: null,
-    active_version_id: null,
-  });
+  // Active project identity comes from the canonical hydration source — the same
+  // source Project Images, reports and every global page read. The sidebar keeps
+  // no project fetch of its own, so it cannot disagree with the rest of the app.
+  const projectHydration = useCanonicalProject();
+  const activeProjectSummary = React.useMemo(() => ({
+    id: projectHydration.projectId,
+    name: projectHydration.identity?.name || null,
+    client_name: projectHydration.identity?.clientName || null,
+    active_version_id: projectHydration.identity?.activeVersionId || null,
+  }), [projectHydration.projectId, projectHydration.identity]);
 
+  // The URL is only an entry point for "open this project": it sets the active
+  // project id, which the shared provider then hydrates for the whole app.
   React.useEffect(() => {
-    let cancelled = false;
-
     try {
       const url = new URL(window.location.href);
       // Extract project id from URL: ?projectId=, ?id=, or UUID in pathname
@@ -116,41 +120,10 @@ export default function Layout({ children, currentPageName }) {
         const uuidMatch = url.pathname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
         if (uuidMatch) projectId = uuidMatch[0];
       }
-      if (projectId) {
-        setActiveProjectId(projectId);
-      } else {
-        setActiveProjectSummary({ id: null, name: null, client_name: null, active_version_id: null });
-        return;
-      }
-
-      (async () => {
-        try {
-          const projects = await base44.entities.Project.filter({ id: projectId });
-          const project = Array.isArray(projects) && projects.length > 0 ? projects[0] : null;
-          
-          if (!cancelled) {
-            setActiveProjectSummary({
-              id: projectId,
-              name: project?.name || "Untitled Project",
-              client_name: project?.client_name || "",
-              active_version_id: project?.active_version_id || null,
-            });
-          }
-        } catch (err) {
-          console.error("[Layout] Failed to load active project:", err);
-          if (!cancelled) {
-            setActiveProjectSummary({ id: null, name: null, client_name: null });
-          }
-        }
-      })();
+      if (projectId) setActiveProjectId(projectId);
     } catch (e) {
       console.error("[Layout] Failed to parse URL for active project:", e);
-      setActiveProjectSummary({ id: null, name: null, client_name: null, active_version_id: null });
     }
-
-    return () => {
-      cancelled = true;
-    };
   }, [currentPageName]);
   
   // The sidebar is a direct subscriber to the same published engineering
@@ -425,7 +398,7 @@ export default function Layout({ children, currentPageName }) {
                   {activeProjectSummary.id ? (
                     <>
                       <div style={{ fontWeight: 600, fontSize: 18, color: "#213428" }}>
-                        {activeProjectSummary.name}
+                        {activeProjectSummary.name || "Loading project…"}
                       </div>
                       {activeProjectSummary.client_name && (
                         <div style={{ fontSize: 14, color: "#625143", marginTop: 4 }}>
