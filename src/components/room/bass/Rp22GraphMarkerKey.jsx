@@ -1,5 +1,6 @@
 import React from "react";
 import { formatP18MarkerLabel } from "@/components/room/bass/rp22GraphMarkers";
+import { formatP20MarkerLabel } from "@/components/room/bass/p20DisplayAuthority";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
@@ -74,7 +75,8 @@ export default function Rp22GraphMarkerKey({ markers }) {
       )}
       {hasP20Worst && (
         <MarkerItem color="#7C3AED" dash="3 4">
-          P20 worst point{markers.p20WorstSeatId ? ` · ${markers.p20WorstSeatId}` : ""} · {Number(markers.p20WorstFrequencyHz).toFixed(0)} Hz
+          {formatP20MarkerLabel(markers?.p20WorstDisplay, { prefix: markers?.p20WorstDisplay?.scope === "selected-seat" ? "P20 point (selected seat)" : "P20 worst point" })
+            || `P20 worst point${markers.p20WorstSeatId ? ` · ${markers.p20WorstSeatId}` : ""} · ${Number(markers.p20WorstFrequencyHz).toFixed(0)} Hz`}
         </MarkerItem>
       )}
     </div>

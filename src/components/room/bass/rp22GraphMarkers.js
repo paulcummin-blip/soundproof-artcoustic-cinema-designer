@@ -1,4 +1,5 @@
 import { deriveP18SelectedTargetExplanation, formatP18MarkerSuffix } from "@/components/room/bass/p18SelectedTargetExplanation";
+import { resolveP20SeatDisplay } from "@/components/room/bass/p20DisplayAuthority";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
@@ -41,11 +42,13 @@ export function buildRp22GraphMarkers(finalBassResponse, selectedSeatId = null) 
   // ── P20 worst frequency: selected seat or overall worst (RSP) ──
   let p20WorstFrequencyHz = null;
   let p20WorstSeatId = null;
+  let p20WorstSeat = null;
   if (selectedSeatId && selectedSeatId !== "rsp") {
     const seatP20 = p20Results.find((seat) => String(seat?.seatId) === String(selectedSeatId));
     if (seatP20 && finite(seatP20.worstFrequencyHz)) {
       p20WorstFrequencyHz = Number(seatP20.worstFrequencyHz);
       p20WorstSeatId = seatP20.seatId;
+      p20WorstSeat = seatP20;
     }
   } else {
     // RSP: established presentation — overall worst seat P20 marker.
@@ -60,7 +63,14 @@ export function buildRp22GraphMarkers(finalBassResponse, selectedSeatId = null) 
       ? Number(worstP20.worstFrequencyHz)
       : null;
     p20WorstSeatId = worstP20?.seatId ?? worstSeatId;
+    p20WorstSeat = worstP20 ?? null;
   }
+  // Canonical display for the marked seat. The marker, the pill and the tooltip
+  // all state this same floored value — the marker never formats its own.
+  const p20Display = resolveP20SeatDisplay(p20WorstSeat, {
+    selectedSeatId,
+    isAllSeatWorst: !(selectedSeatId && selectedSeatId !== "rsp"),
+  });
 
   // P18 bounded flag: when the response is still above the -3 dB cutoff at the
   // product validity floor, the published point is the lowest valid frequency,
@@ -92,6 +102,10 @@ export function buildRp22GraphMarkers(finalBassResponse, selectedSeatId = null) 
     p19WorstFrequencyHz,
     p20WorstFrequencyHz,
     p20WorstSeatId,
+    // The canonical display object for the marked seat (exact value, floored
+    // display value, grade, limiting frequency, scope). Every P20 surface reads
+    // it, so the marker can never disagree with the pill or the tooltip.
+    p20WorstDisplay: p20Display,
   };
 }
 

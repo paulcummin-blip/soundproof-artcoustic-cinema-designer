@@ -17,6 +17,9 @@
 
 import React from "react";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
+// The client report reads the same canonical P20 display value as the pill,
+// the tooltip and the graph marker — one value, one rounding policy.
+import { resolveP20SeatDisplay } from "@/components/room/bass/p20DisplayAuthority";
 import { getSeatGradeColors, PRIORITY_LEGEND, isAssessedLevel } from "./visualReportSeatStyle";
 import SeatMarker from "./SeatMarker";
 import {
@@ -569,7 +572,11 @@ export default function ClientBassResponse({
                             <SeatLevelBadge level={seat.p20Level} strong={seat.isPrimary} />
                             {seat.p20VariationDb != null && (
                               <div style={{ fontSize: 9, color: "#8A7B6A", marginTop: 2 }}>
-                                ±{Math.abs(seat.p20VariationDb).toFixed(1)} dB
+                                {resolveP20SeatDisplay({
+                                  seatId: seat.id,
+                                  variationDbRaw: seat.p20VariationDb,
+                                  level: seat.p20Level,
+                                })?.displayVariationText ?? "—"}
                               </div>
                             )}
                           </td>

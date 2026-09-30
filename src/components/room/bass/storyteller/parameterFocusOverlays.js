@@ -13,6 +13,7 @@ import { formatP18FloorBoundedStatement } from "@/components/room/bass/p18Select
 import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 import { P14_EQ_ASSESSMENT_RANGE_HZ } from "@/components/utils/p14CapabilityAuthority";
 import { formatSeatPillLabel } from "@/components/utils/seatLabel";
+import { resolveP20SeatDisplay } from "@/components/room/bass/p20DisplayAuthority";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
@@ -370,6 +371,12 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
     if (!bestSeat || Number(seat.variationDbRaw) < Number(bestSeat.variationDbRaw)) bestSeat = seat;
   }
 
+  // Canonical display objects. The overlay states the same floored value as the
+  // pill, the tooltip and the graph marker — it never rounds a P20 deviation
+  // itself, and it never invents a second P20 number.
+  const worstDisplay = resolveP20SeatDisplay(worstSeat, { isAllSeatWorst: true });
+  const bestDisplay = resolveP20SeatDisplay(bestSeat);
+
   // Add worst and best seat curves as additional series
   const postEqPerSeat = finalBassResponse?.postEqPerSeatCurves || finalBassResponse?.canonicalPostEqSeatResponses || [];
   const seatCurveById = new Map(postEqPerSeat.map((s) => [String(s?.seatId), s]));
@@ -380,8 +387,8 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
     additionalSeries.push({
       id: "focus-worst-seat",
       kind: "focus-worst-seat",
-      label: `Worst: ${formatSeatPillLabel(worstSeat.seatId)} (±${Number(worstSeat.variationDbRaw).toFixed(1)} dB)`,
-      tooltipLabel: `Worst seat — ${formatSeatPillLabel(worstSeat.seatId)} · ±${Number(worstSeat.variationDbRaw).toFixed(1)} dB`,
+      label: `Worst: ${formatSeatPillLabel(worstSeat.seatId)} (${worstDisplay?.displayVariationText ?? "—"})`,
+      tooltipLabel: `Worst seat — ${formatSeatPillLabel(worstSeat.seatId)} · ${worstDisplay?.displayVariationText ?? "—"} (exact ${worstDisplay?.exactVariationText ?? "—"})`,
       color: "#dc2626",
       strokeWidth: 2.5,
       data: applyBassSmoothing(curve.responseData, smoothingMode || "third"),
@@ -392,8 +399,8 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
     additionalSeries.push({
       id: "focus-best-seat",
       kind: "focus-best-seat",
-      label: `Best: ${formatSeatPillLabel(bestSeat.seatId)} (±${Number(bestSeat.variationDbRaw).toFixed(1)} dB)`,
-      tooltipLabel: `Best seat — ${formatSeatPillLabel(bestSeat.seatId)} · ±${Number(bestSeat.variationDbRaw).toFixed(1)} dB`,
+      label: `Best: ${formatSeatPillLabel(bestSeat.seatId)} (${bestDisplay?.displayVariationText ?? "—"})`,
+      tooltipLabel: `Best seat — ${formatSeatPillLabel(bestSeat.seatId)} · ${bestDisplay?.displayVariationText ?? "—"} (exact ${bestDisplay?.exactVariationText ?? "—"})`,
       color: "#059669",
       strokeWidth: 2.5,
       data: applyBassSmoothing(curve.responseData, smoothingMode || "third"),
@@ -401,19 +408,21 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
   }
 
   const lines = [];
-  if (worstSeat) {
-    lines.push(`Worst seat: ${formatSeatPillLabel(worstSeat.seatId)} (±${Number(worstSeat.variationDbRaw).toFixed(1)} dB)`);
+  if (worstDisplay) {
+    lines.push(`Worst seat: ${worstDisplay.seatPillLabel} ${worstDisplay.displayVariationText} — exact ${worstDisplay.exactVariationText}, floored to whole dB`);
   }
-  if (bestSeat && bestSeat.seatId !== worstSeat?.seatId) {
-    lines.push(`Best seat: ${formatSeatPillLabel(bestSeat.seatId)} (±${Number(bestSeat.variationDbRaw).toFixed(1)} dB)`);
+  if (bestDisplay && bestDisplay.seatId !== worstDisplay?.seatId) {
+    lines.push(`Best seat: ${bestDisplay.seatPillLabel} ${bestDisplay.displayVariationText}`);
   }
-  if (worstFreq != null) {
-    lines.push(`Limiting frequency: ${Math.round(worstFreq)} Hz`);
+  if (worstDisplay?.displayFrequencyText) {
+    lines.push(`Limiting frequency: ${worstDisplay.displayFrequencyText}`);
   }
-  if (worstSeat?.level) {
-    lines.push(`Grade: ${worstSeat.level}`);
+  if (worstDisplay?.grade && worstDisplay.grade !== "—") {
+    lines.push(`Grade: ${worstDisplay.grade}`);
   }
+  lines.push("Scope: project worst all-seat P20 (not the selected seat)");
   lines.push("Variation = max |seat − RSP| across the assessment band");
+  lines.push("Not response-vs-target: that relationship is P19, measured against the house target");
   lines.push("Best and worst seat curves shown directly — the graph displays seat consistency");
 
   return {
@@ -425,8 +434,8 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
       strokeWidth: 2.5,
       strokeDasharray: "4 3",
       seatPillLabel: worstSeat ? formatSeatPillLabel(worstSeat.seatId) : null,
-      limitingFrequencyHz: Math.round(worstFreq),
-      label: `P20 worst · ${Math.round(worstFreq)} Hz`,
+      limitingFrequencyHz: worstDisplay?.displayFrequencyHz ?? null,
+      label: `P20 worst · ${worstDisplay?.displayFrequencyText ?? ""} · ${worstDisplay?.displayVariationText ?? ""}`.trim(),
       labelPosition: "top",
       ifOverflow: "extendDomain",
     }] : [],
@@ -477,7 +486,10 @@ function buildSeatFocus({ selectedSeatId, rp22GraphMarkers, finalBassResponse, s
   lines.push(`Seat: ${formatSeatPillLabel(selectedSeatId)}`);
   // P19 is RSP-only — no per-seat P19 tooltip.
   if (seatP20) {
-    lines.push(`P20: ±${Number(seatP20.variationDbRaw).toFixed(1)} dB at ${Math.round(Number(seatP20.worstFrequencyHz))} Hz (${seatP20.level})`);
+    const seatDisplay = resolveP20SeatDisplay(seatP20, { selectedSeatId });
+    if (seatDisplay) {
+      lines.push(`P20 (seat-to-seat): ${seatDisplay.displayVariationText} at ${seatDisplay.displayFrequencyText} (${seatDisplay.grade}) — exact ${seatDisplay.exactVariationText}, floored to whole dB`);
+    }
   }
 
   // Determine which parameter limits this seat

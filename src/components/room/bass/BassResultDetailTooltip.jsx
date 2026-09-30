@@ -20,6 +20,7 @@ import React from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
+import { resolveP20SeatDisplay } from "@/components/room/bass/p20DisplayAuthority";
 import { formatP14BasisLabel, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { normalizeP18TargetBasis, P18_THRESHOLDS_BY_BASIS } from "@/components/utils/p18ExtensionAuthority";
 import { formatP18CriterionRows } from "@/components/room/bass/p18SelectedTargetExplanation";
@@ -138,13 +139,28 @@ function buildSeatLines(paramKey, seatData, shared) {
 
   const lines = [];
   lines.push(["Seat", formatSeatLabel(seatData.seatId)]);
-  const displayValue = seatData.displayVariationDb && seatData.displayVariationDb !== "—"
-    ? seatData.displayVariationDb
+  // P20 reads its value from the canonical display authority, so the pill, the
+  // marker and this tooltip always state the same floored figure. The exact
+  // value is shown too, but explicitly labelled exact.
+  const p20Display = paramKey === "p20"
+    ? (seatData.p20Display || resolveP20SeatDisplay(seatData))
     : null;
+  const displayValue = p20Display
+    ? p20Display.displayVariationText
+    : (seatData.displayVariationDb && seatData.displayVariationDb !== "—" ? seatData.displayVariationDb : null);
   lines.push(["Published Result", displayValue ? `${seatData.level} · ${displayValue}` : seatData.level]);
 
-  if (isFiniteNumber(seatData.worstFrequencyHz)) {
-    lines.push(["Limiting frequency", Math.round(Number(seatData.worstFrequencyHz)) + " Hz"]);
+  if (p20Display?.displayDiffersFromExact) {
+    lines.push(["Exact (labelled)", `${p20Display.exactVariationText} — floored to ${p20Display.displayVariationText} for display`]);
+  }
+  if (p20Display) {
+    lines.push(["Metric", "P20 seat-to-seat: max |seat − RSP|, 1/3-octave smoothed, below transition"]);
+  }
+
+  const limitingText = p20Display?.displayFrequencyText
+    || (isFiniteNumber(seatData.worstFrequencyHz) ? Math.round(Number(seatData.worstFrequencyHz)) + " Hz" : null);
+  if (limitingText) {
+    lines.push(["Limiting frequency", limitingText]);
   }
 
   if (paramKey === "p19") {

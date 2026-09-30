@@ -9,13 +9,9 @@ export function isRealP20Seat(seat) {
 }
 
 export function p20LevelText(level) {
-  // RP22 P20 does not define Level 1, but Sound Proof grades >4 dB as L1
-  // (not FAIL) because P20 is not applicable at Level 1. Only level 0
-  // (genuine failure / not computed) displays as "FAIL".
-  const upper = String(level ?? "").toUpperCase();
-  if (level === 0 || upper === "FAIL") return "FAIL";
-  const match = upper.match(/^L?([1-4])$/);
-  return match ? `L${match[1]}` : "—";
+  // Grading text is owned by the canonical P20 display authority so the pill,
+  // tooltip, marker and reports can never disagree about a level.
+  return p20GradeText(level);
 }
 
 function rowNumber(seat) {
@@ -32,13 +28,14 @@ function columnNumber(seat, fallback) {
   return Number.isFinite(x) ? x : fallback;
 }
 
-import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { p20GradeText, resolveP20SeatDisplay } from "@/components/room/bass/p20DisplayAuthority";
 import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
 
 export function formatAuthoritativeP20Result(result) {
-  if (!finite(result?.variationDbRaw)) return "—";
-  const designVal = resolveRp22DesignValue(20, Math.abs(Number(result.variationDbRaw)));
-  return `±${designVal} dB`;
+  // Single source of truth: the canonical P20 display authority owns the
+  // Integer Floor Policy rounding. This function exists only so existing
+  // consumers keep their import surface.
+  return resolveP20SeatDisplay(result)?.displayVariationText ?? "—";
 }
 
 export function buildP20SeatRows(seatingPositions = [], perSeatP20Results = []) {
@@ -50,16 +47,19 @@ export function buildP20SeatRows(seatingPositions = [], perSeatP20Results = []) 
     if (!rows.has(row)) rows.set(row, []);
     const id = seatId(seat.id ?? seat.seatId);
     const result = resultMap.get(id) || null;
+    // One display object per seat: every surface reads this, never its own rounding.
+    const display = result ? resolveP20SeatDisplay(result, { seatingPosition: seat }) : null;
     rows.get(row).push({
       seatId: id,
       row,
       column: columnNumber(seat, index + 1),
       priority: resolveSeatPriority(seat),
-      level: result && finite(result.variationDbRaw) ? p20LevelText(result.level) : "—",
-      variationDbRaw: result && finite(result.variationDbRaw) ? Number(result.variationDbRaw) : null,
-      displayVariationDb: result && finite(result.variationDbRaw) ? formatAuthoritativeP20Result(result) : "—",
-      worstFrequencyHz: result && finite(result.worstFrequencyHz) ? Number(result.worstFrequencyHz) : null,
+      level: display ? display.grade : "—",
+      variationDbRaw: display ? display.exactDeviationDb : null,
+      displayVariationDb: display ? display.displayVariationText : "—",
+      worstFrequencyHz: display ? display.limitingFrequencyHz : null,
       comparisonPointCount: result && finite(result.comparisonPointCount) ? Number(result.comparisonPointCount) : null,
+      p20Display: display,
       source: result,
     });
   });
@@ -102,8 +102,9 @@ export function p20WorstSeat(rows = []) {
 export function formatWorstAllSeatP20Line(rows = []) {
   const worst = p20WorstSeat(rows);
   if (!worst) return null;
-  const hz = worst.worstFrequencyHz != null ? ` at ${Math.round(Number(worst.worstFrequencyHz))} Hz` : "";
-  return `Worst all-seat P20: ${worst.seatId} ${worst.displayVariationDb}${hz}`;
+  const display = worst.p20Display || resolveP20SeatDisplay(worst.source || worst, { isAllSeatWorst: true });
+  const hz = display?.displayFrequencyText ? ` at ${display.displayFrequencyText}` : "";
+  return `Worst all-seat P20: ${display?.seatId || worst.seatId} ${display?.displayVariationText || worst.displayVariationDb}${hz}`;
 }
 
 /**
@@ -115,8 +116,9 @@ export function formatSelectedSeatP20Line(rows = [], selectedSeatId = null) {
   if (!selectedSeatId) return null;
   const seat = rows.flatMap((row) => row.seats).find((entry) => entry.seatId === selectedSeatId);
   if (!seat || seat.variationDbRaw == null) return null;
-  const hz = seat.worstFrequencyHz != null ? ` at ${Math.round(Number(seat.worstFrequencyHz))} Hz` : "";
-  return `Selected seat: ${seat.seatId} ${seat.displayVariationDb}${hz}`;
+  const display = seat.p20Display || resolveP20SeatDisplay(seat.source || seat, { selectedSeatId });
+  const hz = display?.displayFrequencyText ? ` at ${display.displayFrequencyText}` : "";
+  return `Selected seat: ${seat.seatId} ${display?.displayVariationText || seat.displayVariationDb}${hz}`;
 }
 
 export function p20SummaryFromResults(perSeatP20Results = []) {
