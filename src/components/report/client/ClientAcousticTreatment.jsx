@@ -3,11 +3,13 @@
 // Client-facing Visual Report page: Acoustic Treatment.
 //
 // Restored positions page. Shows:
-//   - plan view of the room
-//   - Abfuser markers on the recommended treatment zones
-//     (left / right first reflection, rear wall, optional ceiling)
+//   - plan view of the room, with one scaled 700 × 18 mm Abfuser rect per
+//     recommended panel and treatment zones as pale guides only
 //   - quantity by zone, total recommended quantity, total treatment area (m²)
 //   - the designer-selected (included) quantity, shown separately
+//
+// The page is the client-facing summary: the plan carries the count, the block
+// beneath it carries the distribution and total, and nothing is said twice.
 //
 // QUANTITY AUTHORITY:
 //   Recommended quantity = ADI strategic reflection control.
@@ -87,6 +89,12 @@ export default function ClientAcousticTreatment({
   const countedZones = data.zones.filter((z) => !z.advisory);
   const advisoryZones = data.zones.filter((z) => z.advisory);
 
+  // When the priced schedule and the ADI recommendation differ, the page states
+  // it in one plain sentence instead of leaving two numbers to be reconciled.
+  const scheduleNote = pricedQty != null && pricedQty !== recommendedQty
+    ? `Priced schedule currently includes ${pricedQty} Abfuser${pricedQty === 1 ? "" : "s"}. ADI recommendation is ${recommendedQty}.`
+    : null;
+
   const inclusionColor = inclusion.state === "ABOVE_RECOMMENDATION" ? "#8A5A2B" : COLORS.primary;
 
   return (
@@ -124,10 +132,6 @@ export default function ClientAcousticTreatment({
           Total treatment area: {surfaceArea} m²
         </div>
 
-        <p style={{ margin: "3mm 0 0 0", fontSize: "10pt", lineHeight: 1.5, color: COLORS.body, fontFamily: FONT_BODY }}>
-          {data.wording.paragraph}
-        </p>
-
         {/* Positions — quantity by zone */}
         <div style={{ marginTop: "4mm" }}>
           <div style={{ fontSize: "8pt", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: COLORS.label, marginBottom: "1.5mm", fontFamily: FONT_BODY }}>
@@ -157,7 +161,7 @@ export default function ClientAcousticTreatment({
             {pricedQty != null ? `${pricedQty} Abfuser${pricedQty === 1 ? "" : "s"}` : "Not included"}
           </div>
           <div style={{ fontSize: "9pt", color: inclusionColor, marginTop: "1mm", fontFamily: FONT_BODY, lineHeight: 1.5 }}>
-            {pricedQuantity.warning || inclusion.message}
+            {scheduleNote || pricedQuantity.warning || inclusion.message}
           </div>
         </div>
       </div>
@@ -217,9 +221,6 @@ export default function ClientAcousticTreatment({
             {pricedQuantity.warning}
           </div>
         )}
-        <div style={{ fontSize: "8pt", opacity: 0.7, lineHeight: 1.4, fontFamily: FONT_BODY, marginTop: "2mm" }}>
-          Approximate treatment surface: {surfaceArea} m²
-        </div>
       </div>
     </div>
   );

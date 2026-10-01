@@ -17,6 +17,10 @@
  *   tickR        — half-length of the crosshair ticks
  *   color        — stroke/fill colour
  *   strokeWidth  — ring stroke width
+ *   tickStrokeWidth — crosshair tick stroke width. Defaults to 1 for the px-space
+ *                     seat maps. A diagram drawn in METRES must pass a metre
+ *                     value (e.g. 0.01), otherwise the ticks are drawn one metre
+ *                     thick and the marker becomes a large black cross.
  */
 
 import React from "react";
@@ -34,12 +38,13 @@ export default function RspReferenceMarker({
   tickR = RSP_TICK_R,
   color = RSP_COLOR,
   strokeWidth = 2.5,
+  tickStrokeWidth = 1,
 }) {
   return (
     <g>
       {/* Survey ticks — the signal that this is a reference point, not a seat. */}
-      <line x1={cx - tickR} y1={cy} x2={cx + tickR} y2={cy} stroke={color} strokeWidth={1} />
-      <line x1={cx} y1={cy - tickR} x2={cx} y2={cy + tickR} stroke={color} strokeWidth={1} />
+      <line x1={cx - tickR} y1={cy} x2={cx + tickR} y2={cy} stroke={color} strokeWidth={tickStrokeWidth} />
+      <line x1={cx} y1={cy - tickR} x2={cx} y2={cy + tickR} stroke={color} strokeWidth={tickStrokeWidth} />
       <circle cx={cx} cy={cy} r={ringR} fill="none" stroke={color} strokeWidth={strokeWidth} />
       <circle cx={cx} cy={cy} r={dotR} fill={color} />
     </g>

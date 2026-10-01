@@ -26,34 +26,50 @@ const ABFUSER_ALONG_WALL_M = Number(ABFUSER_PRODUCT.widthMm) / 1000; // 0.70 m
 const ABFUSER_DEPTH_M = Number(ABFUSER_PRODUCT.depthMm) / 1000; // 0.018 m
 const PANEL_SIZE_AVAILABLE = ABFUSER_ALONG_WALL_M > 0 && ABFUSER_DEPTH_M > 0;
 
-// Panels are installed edge-to-edge on a 700 mm pitch. A 10 mm visual joint is
-// drawn between adjacent panels so each panel reads as a separate panel rather
-// than one bar; it changes the drawing only, never the panel size or the pitch.
-const PANEL_JOINT_M = 0.01;
+// Panels are installed butted together, so the real installation pitch is the
+// 700 mm panel itself. A DRAWING JOINT is left between adjacent panels — 50 mm
+// — so each panel reads as a separate 700 mm product instead of one continuous
+// bar. It is a drawing convention only: it never changes the panel size, the
+// recommendation or the pricing. Both the plan and its legend say so.
+const PANEL_JOINT_M = 0.05;
 
-// Panels are placed edge-to-edge, centred within their treatment zone.
-function markerRun(zoneStart, zoneEnd, panels, alongWallM = ABFUSER_ALONG_WALL_M) {
+// Panels are placed on the wall, centred within their treatment zone, each one
+// drawn at its true 700 × 18 mm plan footprint with the drawing joint between.
+function markerRun(zoneStart, zoneEnd, panels, options = {}) {
+  const {
+    alongWallM = ABFUSER_ALONG_WALL_M,
+    jointM = PANEL_JOINT_M,
+    limitM = null,
+  } = options;
+
   const count = Math.max(0, Math.floor(panels || 0));
   if (count === 0) return [];
+
   const zoneLength = Math.max(0, zoneEnd - zoneStart);
+  const joint = count > 1 ? Math.max(0, jointM) : 0;
   // Real 0.70 m panel width. If the product data carries no usable width the
   // run is divided evenly across the zone so the count is still shown — the
   // report labels that drawing as schematic.
-  const panelWidth = alongWallM > 0 ? alongWallM : zoneLength / count;
-  const span = count * panelWidth;
-  const centre = (zoneStart + zoneEnd) / 2;
-  let cursor = centre - span / 2;
+  const panelWidth = alongWallM > 0
+    ? alongWallM
+    : Math.max(0, (zoneLength - joint * (count - 1)) / count);
+  const span = count * panelWidth + joint * (count - 1);
+  let cursor = (zoneStart + zoneEnd) / 2 - span / 2;
 
   // Keep the run inside the zone where the zone is long enough; otherwise
   // centre it on the zone.
   if (span <= zoneLength) {
     cursor = Math.max(zoneStart, Math.min(cursor, zoneEnd - span));
   }
+  // A panel never leaves the room, however long the run is.
+  if (Number.isFinite(limitM)) {
+    cursor = Math.max(0, Math.min(cursor, limitM - span));
+  }
 
   const runs = [];
   for (let i = 0; i < count; i += 1) {
-    runs.push({ start: cursor, length: panelWidth });
-    cursor += panelWidth;
+    runs.push({ start: cursor, length: panelWidth, joint });
+    cursor += panelWidth + joint;
   }
   return runs;
 }
@@ -101,7 +117,6 @@ export function selectClientAcousticTreatment({
     jointM: PANEL_SIZE_AVAILABLE ? PANEL_JOINT_M : 0,
     sizeAvailable: PANEL_SIZE_AVAILABLE,
   };
-
   if (recommendation.status === ABFUSER_STATUS.NOT_CALCULATED) {
     return {
       hasAny: false,
@@ -142,12 +157,11 @@ export function selectClientAcousticTreatment({
     });
 
     if (zone.wall === "left" || zone.wall === "right") {
-      // Panels sit against the wall face at their real size: 700 mm along the
+      // Panels sit against the wall face at their true size: 700 mm along the
       // wall × 18 mm thick. The zone is a pale guide area, not the coverage —
       // panels are never stretched to fill it.
       const depthM = PANEL_SIZE_AVAILABLE ? ABFUSER_DEPTH_M : rect.width;
-      const jointM = PANEL_SIZE_AVAILABLE ? PANEL_JOINT_M : 0;
-      const runs = markerRun(rect.y, rect.y + rect.height, zone.panels);
+      const runs = markerRun(rect.y, rect.y + rect.height, zone.panels, { limitM: lengthM });
       runs.forEach((run, index) => {
         markers.push({
           key: `${zone.id}-${index}`,
@@ -155,24 +169,23 @@ export function selectClientAcousticTreatment({
           wall: zone.wall,
           advisory: zone.advisory,
           x: zone.wall === "left" ? 0 : widthM - depthM,
-          y: run.start + jointM / 2,
+          y: run.start,
           width: depthM,
-          height: Math.max(jointM, Number((run.length - jointM).toFixed(3))),
+          height: run.length,
         });
       });
     } else if (zone.wall === "rear") {
       const depthM = PANEL_SIZE_AVAILABLE ? ABFUSER_DEPTH_M : rect.height;
-      const jointM = PANEL_SIZE_AVAILABLE ? PANEL_JOINT_M : 0;
-      const runs = markerRun(rect.x, rect.x + rect.width, zone.panels);
+      const runs = markerRun(rect.x, rect.x + rect.width, zone.panels, { limitM: widthM });
       runs.forEach((run, index) => {
         markers.push({
           key: `${zone.id}-${index}`,
           zoneId: zone.id,
           wall: zone.wall,
           advisory: zone.advisory,
-          x: run.start + jointM / 2,
+          x: run.start,
           y: lengthM - depthM,
-          width: Math.max(jointM, Number((run.length - jointM).toFixed(3))),
+          width: run.length,
           height: depthM,
         });
       });

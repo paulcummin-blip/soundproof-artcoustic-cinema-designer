@@ -103,28 +103,28 @@ test('eight panels are drawn as eight panels', () => {
 });
 
 test('panels are drawn to scale from the product data', () => {
-  // Real product footprint: 700 mm along the wall × 18 mm thick.
+  // Real product footprint: 700 mm along the wall × 18 mm thick, drawn once per
+  // panel — never shortened, never stretched.
   assert.equal(ABFUSER_PRODUCT.widthMm, 700);
   assert.equal(ABFUSER_PRODUCT.depthMm, 18);
   const alongWallM = ABFUSER_PRODUCT.widthMm / 1000;
   const depthM = ABFUSER_PRODUCT.depthMm / 1000;
-  const jointM = 0.01;
 
   for (const panel of PANELS) {
     if (panel.wall === 'left' || panel.wall === 'right') {
       assert.equal(panel.width, depthM, 'side panel is 18 mm off the wall');
-      assert.equal(panel.height, alongWallM - jointM, 'side panel is 700 mm along the wall');
+      assert.equal(panel.height, alongWallM, 'side panel is drawn its full 700 mm length');
     } else {
       assert.equal(panel.height, depthM, 'rear panel is 18 mm off the wall');
-      assert.equal(panel.width, alongWallM - jointM, 'rear panel is 700 mm along the wall');
+      assert.equal(panel.width, alongWallM, 'rear panel is drawn its full 700 mm length');
     }
   }
   // The drawing itself carries those scaled sizes — 6 side panels and 2 rear.
   // The leading space keeps stroke-width out of the match.
   assert.equal(countOf(PLAN_SVG, ' width="0.018"'), 6, 'six side panels drawn 18 mm thick');
   assert.equal(countOf(PLAN_SVG, ' height="0.018"'), 2, 'two rear panels drawn 18 mm thick');
-  assert.equal(countOf(PLAN_SVG, ' height="0.69"'), 6, 'six side panels drawn 690 mm long');
-  assert.equal(countOf(PLAN_SVG, ' width="0.69"'), 2, 'two rear panels drawn 690 mm long');
+  assert.equal(countOf(PLAN_SVG, ' height="0.7"'), 6, 'six side panels drawn 700 mm long');
+  assert.equal(countOf(PLAN_SVG, ' width="0.7"'), 2, 'two rear panels drawn 700 mm long');
 });
 
 test('panels are positioned on the room scale, against the wall face', () => {
@@ -137,13 +137,21 @@ test('panels are positioned on the room scale, against the wall face', () => {
   for (const panel of panelsOfZone('rear')) {
     assert.equal(panel.y, roomDims.lengthM - 0.018, 'rear panels sit on the rear wall face');
   }
-  // Panels are inside their zone's wall extent along the run.
+  // Panels are inside their zone's wall extent along the run, on the real
+  // 700 mm panel pitch plus the drawn joint that keeps them reading separately.
   for (const zone of selection.zones) {
     const zonePanels = PANELS.filter((p) => p.zoneId === zone.id);
     const starts = zonePanels.map((p) => (zone.wall === 'rear' ? p.x : p.y)).sort((a, b) => a - b);
     if (starts.length > 1) {
       const pitch = starts[1] - starts[0];
-      assert.ok(Math.abs(pitch - 0.7) < 1e-9, 'panels are mounted on the real 700 mm pitch');
+      assert.ok(Math.abs(pitch - (0.7 + selection.panel.jointM)) < 1e-9, 'one 700 mm panel plus one visible joint');
+      assert.ok(selection.panel.jointM > 0, 'the drawn joint is visible, never zero');
+    }
+    // No panel leaves the room.
+    for (const panel of zonePanels) {
+      const start = zone.wall === 'rear' ? panel.x : panel.y;
+      const length = zone.wall === 'rear' ? panel.width : panel.height;
+      assert.ok(start >= 0 && start + length <= (zone.wall === 'rear' ? roomDims.widthM : roomDims.lengthM), 'the panel stays inside the room');
     }
   }
 });
@@ -157,16 +165,26 @@ test('panels are never stretched to fill the treatment zone', () => {
     assert.notEqual(acrossWall, ZONE_DEPTH_M, 'the panel never uses the schematic zone band');
   }
   // The pale zone band is still drawn, so zone and panel stay distinguishable.
-  const zoneRects = countOf(PLAN_SVG, 'fill="rgba(33, 52, 40, 0.10)"');
+  const zoneRects = countOf(PLAN_SVG, 'fill="rgba(33, 52, 40, 0.06)"');
   assert.equal(zoneRects, 3, 'three pale treatment zones are drawn');
+  assert.ok(PLAN_SVG.includes('stroke-dasharray="0.06 0.05"'), 'zones are pale guide outlines, not solid blocks');
   assert.ok(planSource.includes('Treatment zone'), 'the legend names the zone');
+  // The optional ceiling zone is a ceiling area with no plan footprint: it is
+  // stated in the page copy and never drawn as a centre-room block.
+  assert.ok(!planSource.includes('advisoryZones'), 'the plan never draws a centre-room ceiling block');
 });
 
 test('every zone carries its panel count, and the total is stated', () => {
-  assert.ok(PAGE_TEXT.includes('LEFT FIRST REFLECTION — 3 PANELS'), 'left zone is counted');
-  assert.ok(PAGE_TEXT.includes('RIGHT FIRST REFLECTION — 3 PANELS'), 'right zone is counted');
-  assert.ok(PAGE_TEXT.includes('REAR WALL — 2 PANELS'), 'rear zone is counted');
-  assert.equal(countOf(PAGE_TEXT, 'PANELS'), 3, 'each counted zone states its own panel count');
+  // Each wall is labelled with its location and its count, in horizontal text
+  // next to the wall it describes — never rotated through the wall.
+  assert.ok(PAGE_TEXT.includes('LEFT FIRST REFLECTION'), 'left zone is named');
+  assert.ok(PAGE_TEXT.includes('RIGHT FIRST REFLECTION'), 'right zone is named');
+  assert.ok(PAGE_TEXT.includes('REAR WALL'), 'rear zone is named');
+  assert.equal(countOf(PAGE_TEXT, '3 PANELS'), 2, 'each side wall states its own count');
+  assert.equal(countOf(PAGE_TEXT, '2 PANELS'), 1, 'the rear wall states its count');
+  assert.equal(countOf(PAGE_TEXT, 'PANELS'), 3, 'exactly one count label per counted zone');
+  // The only rotated text left is the room length dimension outside the room.
+  assert.equal(countOf(PLAN_SVG, 'rotate(-90'), 1, 'no zone label is rotated through a wall');
   // The total is stated with the drawing, not only in the copy.
   assert.ok(PAGE_TEXT.includes('Total: 8 Abfuser panels'), 'the drawing states the total');
   // No unlabelled dark block: every panel belongs to a labelled zone.
@@ -176,14 +194,46 @@ test('every zone carries its panel count, and the total is stated', () => {
 });
 
 test('the legend distinguishes zone / panel / seat / reference position', () => {
+  assert.ok(
+    PAGE_TEXT.includes('Individual Abfuser panel — 700 × 18 mm'),
+    'the legend states the real panel size',
+  );
   for (const entry of ['Treatment zone', 'Listening position', 'Reference position (RSP)']) {
     assert.ok(PAGE_TEXT.includes(entry), `the legend names ${entry}`);
   }
-  assert.ok(
-    PAGE_TEXT.includes('Individual Abfuser panel — 700 × 18 mm, drawn to scale'),
-    'the legend states the real panel size and that it is scaled',
-  );
+  // The one convention the drawing uses is declared, not hidden.
+  assert.ok(PAGE_TEXT.includes('The joints between panels are widened so every panel reads separately'), 'the drawn joint is declared');
   assert.ok(planSource.includes('<RspReferenceMarker'), 'the reference position has its own glyph');
+});
+
+test('the reference position is a small marker, never a large cross', () => {
+  // The crosshair used to stroke at 1 user unit, which in a metres viewBox is a
+  // one-metre-thick black cross that dominated the drawing.
+  assert.ok(!PLAN_SVG.includes('stroke-width="1"'), 'no 1-unit crosshair stroke in the plan');
+  assert.equal(countOf(PLAN_SVG, 'stroke-width="0.01"'), 2, 'both crosshair ticks are drawn at plan scale');
+  assert.ok(PLAN_SVG.includes('r="0.05"'), 'the ring is 50 mm, not a dominant disc');
+  assert.ok(PLAN_SVG.includes('r="0.012"'), 'the centre dot is 12 mm');
+  assert.ok(!PLAN_SVG.includes('r="0.025"'), 'the old heavy dot is gone');
+  assert.ok(PLAN_SVG.includes('>RSP<'), 'the marker is labelled RSP');
+});
+
+test('a differing priced schedule is stated, not left to be reconciled', () => {
+  assert.ok(
+    PAGE_TEXT.includes('Priced schedule currently includes 6 Abfusers. ADI recommendation is 8.'),
+    'the page says exactly how the priced schedule differs from the recommendation',
+  );
+  const agreed = renderToStaticMarkup(
+    React.createElement(ClientAcousticTreatment, { ...selectionArgs, pricedAbfuserQty: RECOMMENDED }),
+  );
+  assert.ok(!textOf(agreed).includes('Priced schedule currently includes'), 'no mismatch sentence when the two agree');
+});
+
+test('the page does not repeat its own explanation', () => {
+  // The long recommendation paragraph is gone: the heading, the distribution and
+  // the WHY cards already carry it.
+  assert.ok(!PAGE_TEXT.includes('ADI recommends 8 Abfusers for this room'), 'the duplicated paragraph is removed');
+  assert.equal(countOf(PAGE_TEXT, 'ADI recommends 8 Abfusers'), 1, 'the recommendation is stated once');
+  assert.ok(!PAGE_TEXT.includes('Approximate treatment surface'), 'the treated area is stated once, not twice more');
 });
 
 test('the page copy states the recommended total and the distribution', () => {
