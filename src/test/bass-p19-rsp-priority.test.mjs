@@ -20,7 +20,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import ClientP19RspPresentation from '../components/report/client/ClientP19RspPresentation.jsx';
-import { normalizeSeat } from '../components/report/client/useClientReportAuthority.jsx';
+import { normalizeSeat } from '../components/report/client/reportSeatNormalisation.js';
 import { resolveSeatPriority } from '../components/utils/seatPriorityAuthority.js';
 
 const SOURCE = fs.readFileSync('src/components/report/client/ClientP19RspPresentation.jsx', 'utf8');

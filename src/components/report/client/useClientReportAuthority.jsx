@@ -26,7 +26,7 @@ import { computeSurroundRingGaps } from "@/components/utils/p5SurroundGaps";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat } from "@/components/utils/rp22UpperSeatMetrics";
-import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
+import { normalizeSeat } from "@/components/report/client/reportSeatNormalisation";
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { resolveEffectiveVisibleWidthInches, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
@@ -58,27 +58,6 @@ function resolveScreenVisibleWidthInches(screen) {
     return (mh * ar) / 0.0254;
   }
   return 120;
-}
-
-export function normalizeSeat(seat) {
-  if (!seat) return null;
-  const x = Number(seat.x ?? seat.position?.x);
-  const y = Number(seat.y ?? seat.position?.y);
-  const z = Number(seat.z ?? seat.position?.z ?? seat.earHeightM ?? seat.ear_h ?? 1.2);
-  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
-  return {
-    id: seat.id || `seat-${x.toFixed(2)}-${y.toFixed(2)}`,
-    x,
-    y,
-    z,
-    // Seat PRIORITY (the designer's Primary/Secondary classification) must
-    // survive report serialisation: a report page that loses it can only fall
-    // back to the internal isPrimary flag — the RSP / MLP marker carried by a
-    // single seat — and would present the reference seat as the only primary
-    // seat. The two facts are independent and both are carried here.
-    priority: resolveSeatPriority(seat),
-    isPrimary: seat.isPrimary === true,
-  };
 }
 
 export function useClientReportAuthority(projectId) {
