@@ -25,6 +25,7 @@
 
 import { buildComparisonRow, resolvePowerAuthority } from "./model-first/rp22ComparisonPublish.js";
 import { normalizeCompetitor } from "@/components/utils/spl/competitorNormalization.js";
+import { applySensitivityBasisAssumption } from "@/components/utils/spl/sensitivityBasisAssumption.js";
 
 const present = (value) =>
   value !== null && value !== undefined && value !== "" && value !== "unknown" && value !== "unspecified";
