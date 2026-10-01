@@ -34,6 +34,7 @@ import OptimiserCalculationDetail from "./OptimiserCalculationDetail.jsx";
 import AdiTestedOptionsTable from "./AdiTestedOptionsTable.jsx";
 import AdiDesignerActionBar from "./AdiDesignerActionBar.jsx";
 import { ADI_ENGINEER_DETAILS_TITLE, buildAdiDesignerSummary } from "./adiDesignerSummary.js";
+import { readAuthoritativeP20Headline } from "./optimiserPlanMetrics.js";
 
 const STATE_THEME = {
   [ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED]: {
@@ -158,17 +159,18 @@ export default function AdiOptimisationJourney({
   // what is recommended and whether it can be applied. Every technical detail —
   // ids, coordinates, stage counts, proxy searches, rejection reasons — lives
   // inside the collapsed Engineer details disclosure.
-  const currentP20Deviation = completedBassAuthority?.worstP20Deviation
-    ?? completedBassAuthority?.p20Deviation
-    ?? completedBassAuthority?.rating?.worstP20Deviation
-    ?? null;
+  // The measured P20 headline and the limiting frequency come from the same
+  // published authority the reports read — never recalculated here.
+  const p20Headline = readAuthoritativeP20Headline(completedBassAuthority);
   const summary = buildAdiDesignerSummary({
     planView,
     presentation,
     instances,
     seatCount,
-    currentP20Deviation,
-    appliedLever: leverOutcome?.appliedLever || null,
+    currentP20Deviation: p20Headline?.variationDb ?? null,
+    currentP20Level: p20Headline?.level ?? null,
+    limitingFrequencyHz: p20Headline?.worstFrequencyHz ?? null,
+    appliedLever: leverOutcome?.appliedLever ?? null,
   });
   const handleApplyRecommended = summary.actions.canApply && typeof onApplyLever === "function"
     ? () => onApplyLever(summary.recommendedLever)
@@ -248,6 +250,19 @@ export default function AdiOptimisationJourney({
       )}
 
       <AdiTestedOptionsTable summary={summary} />
+
+      {/* Low-frequency absorption — ninth in the fixed order, after every
+          practical lever. It is design advice: there is no Apply action, and it
+          is never stated as a requirement or as a calculated result. */}
+      {summary.absorption && (
+        <div className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2 space-y-1">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+            {summary.absorption.label}
+          </div>
+          <div className="text-[11px] text-[#3E4349] leading-relaxed">{summary.absorption.headline}</div>
+          <div className="text-[11px] text-[#625143] leading-relaxed">{summary.absorption.location}</div>
+        </div>
+      )}
 
       <AdiDesignerActionBar
         summary={summary}
@@ -330,6 +345,31 @@ export default function AdiOptimisationJourney({
               leverApplyBusy={leverApplyBusy}
               leverOutcome={leverOutcome}
             />
+          )}
+
+          {/* Absorption evidence — the frequency, how many seats share it, and
+              which levers were evaluated without becoming the recommendation. */}
+          {summary.absorption && (
+            <div className="space-y-0.5 text-[11px] text-[#3E4349] leading-relaxed">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+                Low-frequency absorption evidence
+              </div>
+              {summary.absorption.frequencyText && (
+                <div>Limiting frequency: {summary.absorption.frequencyText}</div>
+              )}
+              {summary.absorption.affectedSeatCount > 0 && (
+                <div>Seats sharing this frequency: {summary.absorption.affectedSeatCount}</div>
+              )}
+              <div>Advice status: {summary.absorption.status}</div>
+              <div>
+                Placement already evaluated: {summary.absorption.placementEvaluated ? "yes" : "no"}
+                {" · "}
+                Seat-to-seat trade-off found: {summary.absorption.tradedOff ? "yes" : "no"}
+              </div>
+              {summary.attemptsWithoutGain.length > 0 && (
+                <div>Evaluated without becoming the recommendation: {summary.attemptsWithoutGain.join(", ")}</div>
+              )}
+            </div>
           )}
 
           {showEstimate && <OptimiserCalculationDetail instances={instances} seatCount={seatCount} />}

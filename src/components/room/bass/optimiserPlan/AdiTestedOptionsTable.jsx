@@ -10,7 +10,7 @@
 import React from "react";
 import { ADI_TESTED_TITLE } from "./adiDesignerSummary.js";
 
-const COLUMN = "grid grid-cols-[92px_112px_1fr_auto] items-baseline gap-x-3";
+const COLUMN = "grid grid-cols-[92px_112px_1fr_200px] items-baseline gap-x-3";
 
 export default function AdiTestedOptionsTable({ summary = null, className = "" }) {
   const rows = Array.isArray(summary?.rows) ? summary.rows : [];
@@ -36,8 +36,9 @@ export default function AdiTestedOptionsTable({ summary = null, className = "" }
               <span className="text-[#3E4349]">
                 {row.outcome || "—"}
               </span>
-              <span className="justify-self-end text-[10px] font-semibold uppercase tracking-wide text-[#213428]">
-                {row.action === "apply" ? "Apply" : "—"}
+              {/* Advice rows state what to review — never an Apply action. */}
+              <span className={`justify-self-end text-right text-[10px] font-semibold leading-snug ${row.advice ? "text-[#625143]" : "uppercase tracking-wide text-[#213428]"}`}>
+                {row.actionText || (row.action === "apply" ? "Apply" : "—")}
               </span>
             </div>
           );

@@ -20,14 +20,14 @@
 // ---------------------------------------------------------------------------
 
 import {
-  OPTIMISER_LEVER_ORDER,
   OPTIMISER_EVIDENCE_STATUS_LABEL,
   OPTIMISER_LEVER_STATE_LABEL,
 } from "./optimiserPlanConstants.js";
-import { leverLabel } from "./optimiserLeverOrder.js";
+import { leverLabel, OPTIMISER_FAMILY_SEQUENCE } from "./optimiserLeverOrder.js";
 import { describeLeverEffect, resolveLimitingMetric } from "./optimiserLeverVerdict.js";
-import { deviationText } from "./optimiserWholeNumberDb.js";
+import { deviationText, levelText } from "./optimiserWholeNumberDb.js";
 import { estimateOptimiserCalculations, resultSentence } from "./optimiserCalculationEstimate.js";
+import { resolveAbsorptionAdvice } from "./absorptionAdviceAuthority.js";
 import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
 
 export const ADI_TESTED_TITLE = "What ADI tested";
@@ -59,12 +59,25 @@ export const ADI_ROW_OUTCOME = Object.freeze({
   COMPARE_SEPARATELY: "Compare separately",
   NOT_REQUIRED_YET: "Not required yet",
   UNAVAILABLE: "Not available",
+  PHASE_UNAVAILABLE: "Crossover-region model not available",
 });
 
-const LABEL_OVERRIDE = Object.freeze({ "Sub model": "Sub option", "Subwoofer model": "Sub option" });
+const LABEL_OVERRIDE = Object.freeze({
+  "Subwoofer option": "Sub option",
+  "Sub model": "Sub option",
+  "Subwoofer model": "Sub option",
+});
 
-/** Order of the eight levers, always the least-intrusive order. */
-const leverOrder = () => (Array.isArray(OPTIMISER_LEVER_ORDER) ? OPTIMISER_LEVER_ORDER : []);
+/**
+ * The eight levers ADI reports on, always in the fixed least-intrusive order:
+ * delay, gain, phase, polarity, placement, layout, subwoofer option, seating.
+ * Low-frequency absorption advice is appended as the ninth step afterwards.
+ */
+const leverOrder = () => (
+  Array.isArray(OPTIMISER_FAMILY_SEQUENCE) && OPTIMISER_FAMILY_SEQUENCE.length
+    ? OPTIMISER_FAMILY_SEQUENCE
+    : []
+);
 
 function leverKeyOf(row) {
   return row?.lever ?? row?.leverKey ?? row?.key ?? null;
@@ -99,10 +112,23 @@ function wholeNumberDeviation(value) {
   return deviationText(number);
 }
 
-/** The P20 headline the card states, or null when no authority supplies one. */
-function p20Line(value) {
-  const text = wholeNumberDeviation(value);
-  return text ? `P20: ${text}` : null;
+/** "L1" — the published level, or the value as stated when it is already one. */
+function levelPhrase(value) {
+  if (value == null) return null;
+  const number = Number(value);
+  if (Number.isFinite(number)) return levelText(number);
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
+/** The P20 headline: level and whole-number deviation, or whichever exists. */
+function p20Line(level, deviation) {
+  const levelPart = levelPhrase(level);
+  const deviationPart = wholeNumberDeviation(deviation);
+  if (levelPart && deviationPart) return `P20: ${levelPart} · ${deviationPart}`;
+  if (deviationPart) return `P20: ${deviationPart}`;
+  if (levelPart) return `P20: ${levelPart}`;
+  return null;
 }
 
 /** The recommended lever: evaluated, with an evaluated effect, and applicable. */
@@ -157,7 +183,7 @@ export function buildTestedOptionRows(planView, { recommendedLever = null, appli
         shortPhrase(row?.notEvaluatedReason)
         || OPTIMISER_LEVER_STATE_LABEL?.[row?.state]
         || OPTIMISER_EVIDENCE_STATUS_LABEL?.[row?.evidenceStatus]
-        || null;
+        || (/phase/i.test(key) ? ADI_ROW_OUTCOME.PHASE_UNAVAILABLE : null);
       const layout = /layout/i.test(key);
       const sub = /sub/i.test(key);
       return {
@@ -213,7 +239,7 @@ export function resolveApplyPermission({ planView, presentation, recommendedLeve
 
   const limiting = String(resolveLimitingMetric(planView?.baseline) || "");
   if (limiting.includes("20")) {
-    const improvement = Number(row?.effect?.p20Delta ?? row?.effect?.p20ImprovementDb ?? NaN);
+    const improvement = Number(row?.effect?.p20DeltaDb ?? NaN);
     if (Number.isFinite(improvement) && Math.abs(improvement) < 1) {
       return { allowed: false, reason: "below_materiality" };
     }
@@ -240,6 +266,8 @@ export function buildAdiDesignerSummary({
   instances = [],
   seatCount = null,
   currentP20Deviation = null,
+  currentP20Level = null,
+  limitingFrequencyHz = null,
   appliedLever = null,
 } = {}) {
   const state = presentation?.state || null;
@@ -258,19 +286,50 @@ export function buildAdiDesignerSummary({
   const recommendedLever = resolveRecommendedLever(planView);
   const apply = resolveApplyPermission({ planView, presentation, recommendedLever });
   const undo = resolveUndoPermission({ planView, appliedLever });
-  const rows = buildTestedOptionRows(planView, { recommendedLever, appliedLever });
+  const leverRows = buildTestedOptionRows(planView, { recommendedLever, appliedLever });
 
-  const baseline = wholeNumberDeviation(
-    planView?.baseline?.p20Deviation ?? planView?.baseline?.p20 ?? null,
-  );
+  const baselineDeviation = wholeNumberDeviation(planView?.baseline?.p20VariationDb ?? null);
+  const baselineLevel = planView?.baseline?.p20Level ?? null;
   const recommendedRow = recommendedLever ? findLeverRow(planView, recommendedLever) : null;
-  const recommendedP20 = wholeNumberDeviation(
-    recommendedRow?.result?.p20Deviation
-    ?? recommendedRow?.predicted?.p20Deviation
-    ?? planView?.predicted?.p20Deviation
-    ?? planView?.combined?.p20Deviation
-    ?? null,
-  );
+  const recommendedDeviation = wholeNumberDeviation(recommendedRow?.effect?.p20VariationDb ?? null);
+  const recommendedLevel = recommendedRow?.effect?.p20Level ?? null;
+  const recommendedP20 = p20Line(recommendedLevel, recommendedRow?.effect?.p20VariationDb);
+
+  // ── Low-frequency absorption ──
+  // Ninth in the fixed order, after every practical lever. Advice only: it never
+  // carries an Apply action. It is judged on what the design looks like AFTER
+  // the recommended practical change, so a recommendation that already reaches
+  // L2 does not attract absorption advice.
+  const absorption = resolveAbsorptionAdvice({
+    p20Level: recommendedLevel ?? currentP20Level ?? baselineLevel,
+    p20DeviationDb: recommendedRow?.effect?.p20VariationDb
+      ?? currentP20Deviation
+      ?? planView?.baseline?.p20VariationDb
+      ?? null,
+    seats: planView?.baseline?.seats,
+    leverRows: planView?.levers,
+    limitingFrequencyHz,
+  });
+  const rows = absorption
+    ? [
+      ...leverRows,
+      {
+        key: absorption.key,
+        label: absorption.label,
+        status: absorption.status,
+        outcome: absorption.reason,
+        action: null,
+        actionText: absorption.actionText,
+        advice: true,
+      },
+    ]
+    : leverRows;
+
+  // Levers that were evaluated without becoming the recommendation: the failed
+  // electronic and placement attempts, named for Engineer details only.
+  const attemptsWithoutGain = leverRows
+    .filter((row) => row.status === ADI_ROW_STATUS.TESTED)
+    .map((row) => row.label);
 
   return {
     state,
@@ -279,13 +338,15 @@ export function buildAdiDesignerSummary({
     statusLabel: presentation?.statusLabel || null,
     staleCopy: stale ? ADI_STALE_COPY : null,
     testedSentence,
-    currentP20: p20Line(currentP20Deviation),
-    recommendedP20: p20Line(recommendedP20),
+    currentP20: p20Line(currentP20Level, currentP20Deviation),
+    recommendedP20,
     previousBest: stale && recommendedP20
-      ? `${ADI_STALE_COPY.PREVIOUS_LABEL} P20: ${baseline || ADI_ACTION_NONE} → ${recommendedP20}`
-      : stale && recommendedP20 === null && baseline
-        ? `${ADI_STALE_COPY.PREVIOUS_LABEL} P20: ${baseline}`
+      ? `${ADI_STALE_COPY.PREVIOUS_LABEL} P20: ${baselineDeviation || ADI_ACTION_NONE} → ${recommendedDeviation || ADI_ACTION_NONE}`
+      : stale && baselineDeviation
+        ? `${ADI_STALE_COPY.PREVIOUS_LABEL} P20: ${baselineDeviation}`
         : null,
+    absorption,
+    attemptsWithoutGain,
     recommendation: recommendedLever
       ? shortPhrase(recommendedRow?.reason) || describeLeverEffect(recommendedRow?.effect) || null
       : null,
