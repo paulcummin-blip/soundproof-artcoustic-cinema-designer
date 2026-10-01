@@ -39,6 +39,7 @@ import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
 import { OPTIMISER_LEVER } from "./optimiserPlanConstants.js";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
 import { ADI_ENGINEER_DETAILS_TITLE, buildAdiDesignerSummary } from "./adiDesignerSummary.js";
+import { FUTURE_CAPABILITY_TITLE } from "./optimiserLiveFamilies.js";
 import { readAuthoritativeP20Headline } from "./optimiserPlanMetrics.js";
 
 const STATE_THEME = {
@@ -441,6 +442,22 @@ export default function AdiOptimisationJourney({
           {journey.notes.length > 0 && (
             <div className="space-y-0.5 text-[11px] text-[#625143] leading-relaxed">
               {journey.notes.map((note) => <div key={note}>{note}</div>)}
+            </div>
+          )}
+
+          {/* Capabilities ADI does not evaluate yet. They are stated HERE, once,
+              and never as a row of the tested table: a designer must never read
+              a lever as something ADI tested for them when the model cannot. */}
+          {summary.futureCapability?.length > 0 && (
+            <div className="space-y-0.5 text-[11px] text-[#3E4349] leading-relaxed">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+                {FUTURE_CAPABILITY_TITLE}
+              </div>
+              {summary.futureCapability.map((note) => (
+                <div key={note.key} data-adi-future-capability={note.key}>
+                  {note.label}: {note.statement}
+                </div>
+              ))}
             </div>
           )}
 

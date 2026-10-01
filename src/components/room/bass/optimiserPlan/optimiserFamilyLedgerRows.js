@@ -13,7 +13,10 @@
 //
 // The evidence is the per-family ledger the completed run already wrote
 // (run.families — see optimiserRunFamilies.js). This module reads it, applies
-// the designer-facing vocabulary and returns one row per family.
+// the designer-facing vocabulary and returns one row per LIVE family — a family
+// ADI does not evaluate is never a tested-table row (optimiserLiveFamilies.js).
+// The run's own record of that family still exists: it is read by the Engineer
+// details evidence block, which has to state what the model does and does not do.
 //
 // READ-ONLY: it evaluates nothing, scores nothing, recalculates nothing and
 // changes no bass maths, no optimiser scoring and no RP22 grading.
@@ -26,6 +29,7 @@ import {
 } from "./optimiserRunFamilies.js";
 import { OPTIMISER_LEVER_VERDICT, resolveLeverVerdict } from "./optimiserLeverVerdict.js";
 import { deltaText } from "./optimiserWholeNumberDb.js";
+import { liveFamilyKeys } from "./optimiserLiveFamilies.js";
 
 /**
  * The action column's own words. A change that cannot be applied says what to do
@@ -287,9 +291,13 @@ function rowFor(key, entry, families, baseline) {
       };
     }
     const evaluated = tested || Number(entry?.candidatesEvaluated) > 0;
+    // Polarity is a LIVE lever: the engine tests it inside the grouped
+    // phase/polarity search and the combined candidate. It is therefore never
+    // stated as a capability the optimiser lacks — only as an evaluation with no
+    // standalone result of its own.
     return evaluated
       ? { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_SAFE_STANDALONE }
-      : { status: ADI_ROW_STATUS.NOT_YET_SUPPORTED, outcome: ADI_ROW_OUTCOME.NO_STANDALONE_SEARCH };
+      : { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_STANDALONE_SEARCH };
   }
 
   // ── Subwoofer option ── never a searched lever: a design decision.
@@ -321,9 +329,12 @@ function rowFor(key, entry, families, baseline) {
         outcome: familyReason(entry) || ADI_ROW_OUTCOME.GAIN_NOT_ADJUSTABLE,
       };
     }
+    // Gain IS a live lever wherever the groups can be trimmed: a saved run that
+    // kept no gain attempt is a statement about THAT RUN, never about the
+    // optimiser's capability.
     if (entry?.gainAdjustable === true) {
       return {
-        status: ADI_ROW_STATUS.NOT_YET_SUPPORTED,
+        status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
         outcome: ADI_ROW_OUTCOME.GAIN_NOT_EVALUATED,
         actionText: ADI_ROW_ACTION.RERUN_ADI,
       };
@@ -332,7 +343,7 @@ function rowFor(key, entry, families, baseline) {
     // reason when it kept one, otherwise the one action that answers it.
     const kept = familyReason(entry);
     return {
-      status: ADI_ROW_STATUS.NOT_YET_SUPPORTED,
+      status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
       outcome: kept || ADI_ROW_OUTCOME.GAIN_NOT_EVALUATED,
       actionText: kept ? null : ADI_ROW_ACTION.RERUN_ADI,
     };
@@ -357,7 +368,11 @@ function rowFor(key, entry, families, baseline) {
 }
 
 /**
- * The eight ledger rows' status and outcome, read from the saved run evidence.
+ * The tested-table rows' status and outcome, read from the saved run evidence.
+ *
+ * Only the families ADI evaluates are iterated: a capability that is not live
+ * (crossover-region phase, subwoofer model/quantity) can never become a row of
+ * the designer's tested table, whatever the run ledger records about it.
  *
  * @param {object} params
  * @param {Array|null} params.families - run.families from the saved plan/evidence
@@ -371,7 +386,7 @@ export function buildFamilyLedgerRows({ families = null, baseline = null } = {})
 
   const rows = {};
   let recognised = 0;
-  for (const key of Object.keys(ROW_FAMILY)) {
+  for (const key of liveFamilyKeys(Object.keys(ROW_FAMILY))) {
     const entry = familyOf(families, key);
     if (!entry) {
       rows[key] = null;
@@ -383,7 +398,7 @@ export function buildFamilyLedgerRows({ families = null, baseline = null } = {})
   return recognised > 0 ? rows : null;
 }
 
-/** The row keys this ledger can state, in the fixed least-intrusive order. */
+/** The row keys this ledger states, in the fixed least-intrusive order. */
 export const ADI_LEDGER_FAMILY_KEYS = Object.freeze(
-  OPTIMISER_FAMILY_SEQUENCE.filter((key) => !!ROW_FAMILY[key]),
+  liveFamilyKeys(OPTIMISER_FAMILY_SEQUENCE).filter((key) => !!ROW_FAMILY[key]),
 );

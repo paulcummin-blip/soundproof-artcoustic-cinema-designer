@@ -44,6 +44,7 @@ import { ADI_BASS_OPTIMISER_LABEL } from "./resolveAdiOptimiserJourney.js";
 import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
 import { resolveOptimiserCurrentP20 } from "./optimiserCurrentP20.js";
 import { parityBlocksApply } from "./optimiserBaselineAuthority.js";
+import { buildFutureCapabilityNotes, liveFamilyKeys } from "./optimiserLiveFamilies.js";
 
 export const ADI_TESTED_TITLE = "What ADI tested";
 export const ADI_ENGINEER_DETAILS_TITLE = "Engineer details";
@@ -67,13 +68,17 @@ const LABEL_OVERRIDE = Object.freeze({
 });
 
 /**
- * The eight levers ADI reports on, always in the fixed least-intrusive order:
- * delay, gain, phase, polarity, placement, layout, subwoofer option, seating.
- * Low-frequency absorption advice is appended as the ninth step afterwards.
+ * The levers ADI reports on, always in the fixed least-intrusive order, and only
+ * the ones it genuinely evaluates in the current run: delay, gain, polarity,
+ * placement, layout, seating. Low-frequency absorption advice is appended as the
+ * final step afterwards.
+ *
+ * A capability that is not live yet is never a row here: it is stated once, as a
+ * future capability, in the collapsed Engineer details.
  */
 const leverOrder = () => (
   Array.isArray(OPTIMISER_FAMILY_SEQUENCE) && OPTIMISER_FAMILY_SEQUENCE.length
-    ? OPTIMISER_FAMILY_SEQUENCE
+    ? liveFamilyKeys(OPTIMISER_FAMILY_SEQUENCE)
     : []
 );
 
@@ -180,8 +185,9 @@ function seatingRecommendationDetail({ row, baseline = null, currentP20 = null }
 }
 
 /**
- * The "What ADI tested" rows, in the fixed order.
- * Every lever is always present: an unevaluated lever states why in one phrase.
+ * The "What ADI tested" rows, in the fixed order, restricted to the families ADI
+ * evaluates. Every live lever is always present: an unevaluated one states why
+ * in one phrase. A capability the model does not have is never a row here.
  *
  * While a run is in progress the rows come from the engine's own live progress
  * (`liveRows`): every family is Waiting, Testing, Tested, or clearly marked as a
@@ -603,6 +609,9 @@ export function buildAdiDesignerSummary({
         ? `${ADI_STALE_COPY.PREVIOUS_LABEL} P20: ${baselineDeviation}`
         : null,
     absorption,
+    // Capabilities the optimiser does not evaluate yet, stated once for the
+    // collapsed Engineer details. Never a tested-table row.
+    futureCapability: buildFutureCapabilityNotes(),
     attemptsWithoutGain,
     recommendation: recommendedLever
       ? shortPhrase(recommendedRow?.reason) || describeLeverEffect(recommendedRow?.effect) || null

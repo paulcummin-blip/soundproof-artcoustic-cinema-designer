@@ -6,10 +6,11 @@
 // What is verified here:
 //   • a family the run evaluated is never shown as "Not evaluated"
 //   • delay, gain and placement state the run's real outcome
-//   • phase states the crossover-region model is not available
+//   • phase and the subwoofer option are never tested-table rows: a capability
+//     the optimiser does not evaluate is stated once, for Engineer details
 //   • polarity distinguishes combined-only evidence from a standalone result
 //   • layout is reported as checked in the placement search
-//   • sub option and seating state what they are, not "Not evaluated"
+//   • seating states the last-resort policy that governs it, not "Not evaluated"
 //   • a plan's own lever evidence wins over the family ledger
 //   • the summary and Engineer details read the same evidence
 //   • a zero, missing or invalid limiting frequency is never printed as "0 Hz"
@@ -173,12 +174,15 @@ test('the saved run evidence carries a per-family ledger', () => {
 
   const ledger = buildFamilyLedgerRows({ families, baseline: planView.baseline });
   assert.ok(ledger, 'the ledger rows resolve from the run evidence');
-  assert.ok(Object.values(ledger).every(Boolean), 'every reported family has a row');
+  assert.deepEqual(Object.keys(ledger), [
+    'delay', 'gain', 'polarity', 'placement', 'layout', 'seating',
+  ], 'only the families ADI evaluates become tested-table rows');
+  assert.ok(Object.values(ledger).every(Boolean), 'every evaluated family has a row');
 });
 
 test('no row states "Not tested", "Not evaluated" or "Not available"', () => {
   const summary = summaryFor(terminalPlanView());
-  assert.equal(summary.rows.length, 9, 'eight families plus absorption');
+  assert.equal(summary.rows.length, 7, 'six evaluated families plus absorption advice');
   assert.ok(
     !summary.rows.some((row) => BANNED_COPY.test(`${row.status} ${row.outcome || ''}`)),
     'no row carries banned copy after a run',
@@ -273,18 +277,27 @@ test('a lever that worsens the result is rejected, in whole numbers', () => {
   assert.ok(!BANNED_COPY.test(`${row.status} ${row.outcome}`), 'no banned copy');
 });
 
-test('phase states that the crossover region is not modelled', () => {
-  const row = rowFor(summaryFor(terminalPlanView()), 'Phase');
-  assert.equal(row.status, ADI_ROW_STATUS.NOT_YET_SUPPORTED);
-  assert.equal(row.outcome, ADI_ROW_OUTCOME.PHASE_NOT_MODELLED);
-  assert.match(row.outcome, /crossover/i);
+test('phase is never a tested-table row, and the run evidence still says why', () => {
+  const planView = terminalPlanView();
+  // Not a row: the designer must never read phase as something ADI tested.
+  assert.equal(rowFor(summaryFor(planView), 'Phase'), null,
+    'phase is not in the default tested table');
+  assert.equal(rowFor(summaryFor(planView), 'Sub option'), null,
+    'the subwoofer option is not in the default tested table');
+
+  // The evidence is still recorded, so Engineer details can state the truth.
+  const phase = (planView.run?.families || []).find((entry) => entry.family === 'phase');
+  assert.ok(phase, 'the run evidence records the phase family');
+  assert.equal(phase.tested, false, 'phase is not recorded as tested');
+  assert.match(phase.reason, /does not model crossover-region phase between the main speakers and subwoofers/);
 });
 
 test('polarity states where its value came from', () => {
   // No proxy searches were recorded for this run, so there is no standalone
-  // polarity search to apply: the row says exactly that.
+  // polarity search to apply: the row says exactly that — and, because polarity
+  // IS a live lever, it is never stated as a capability the optimiser lacks.
   const row = rowFor(summaryFor(terminalPlanView()), 'Polarity');
-  assert.equal(row.status, ADI_ROW_STATUS.NOT_YET_SUPPORTED);
+  assert.equal(row.status, ADI_ROW_STATUS.TESTED);
   assert.equal(row.outcome, ADI_ROW_OUTCOME.NO_STANDALONE_SEARCH);
   assert.match(row.outcome, /combined candidate/i);
 });
@@ -295,16 +308,25 @@ test('layout is reported as checked inside the placement search', () => {
   assert.equal(row.outcome, ADI_ROW_OUTCOME.NO_BETTER_LAYOUT);
 });
 
-test('sub option and seating state what they are', () => {
-  const summary = summaryFor(terminalPlanView());
-  const sub = rowFor(summary, 'Sub option');
-  assert.equal(sub.status, ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN);
-  assert.equal(sub.outcome, ADI_ROW_OUTCOME.COMPARE_SEPARATELY);
-  assert.match(sub.outcome, /compare subwoofer models/i);
-
-  const seating = rowFor(summary, 'Seating');
+test('seating states the policy that governs it', () => {
+  const seating = rowFor(summaryFor(terminalPlanView()), 'Seating');
   assert.equal(seating.status, ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN);
   assert.equal(seating.outcome, ADI_ROW_OUTCOME.SEATING_LAST_RESORT);
+});
+
+test('no tested-table row claims a capability the optimiser does not have', () => {
+  const summary = summaryFor(terminalPlanView());
+  assert.ok(
+    !summary.rows.some((row) => /not yet supported|not currently/i
+      .test(`${row.status} ${row.outcome || ''}`)),
+    'no row states an unsupported capability in the designer view',
+  );
+  // The capabilities are stated, once, for the collapsed Engineer details.
+  assert.deepEqual(summary.futureCapability.map((note) => note.key), ['phase', 'subwoofer_option']);
+  assert.match(summary.futureCapability[0].statement,
+    /not currently evaluated\. This requires modelling main speaker and subwoofer summation through the crossover region\./);
+  assert.match(summary.futureCapability[1].statement,
+    /not currently part of this optimisation run\./);
 });
 
 test('seating reports a tested outcome once the seating search ran', () => {
@@ -471,5 +493,5 @@ test('absorption advice still requires poor P20', () => {
     currentP20Deviation: -12,
   });
   assert.equal(summary.absorption, null, 'L2-or-better attracts no absorption advice');
-  assert.equal(summary.rows.length, 8, 'only the practical families are listed');
+  assert.equal(summary.rows.length, 6, 'only the evaluated families are listed');
 });

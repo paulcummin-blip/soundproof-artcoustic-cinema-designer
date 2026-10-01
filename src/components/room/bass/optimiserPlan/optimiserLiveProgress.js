@@ -1,12 +1,13 @@
 // optimiserLiveProgress.js
 // ---------------------------------------------------------------------------
-// The nine "What ADI tested" rows WHILE a run is in progress.
+// The "What ADI tested" rows WHILE a run is in progress.
 //
 // Product rule this exists to satisfy: the card must prove ADI is working
-// through the full engineering sequence. Every family is either Waiting,
-// Testing, Tested, or — for the two capabilities the engine genuinely cannot
-// evaluate (crossover-region phase, subwoofer model/quantity) — Not yet
-// supported. No family is ever shown as "Not tested" here.
+// through the full engineering sequence. Every family shown is Waiting, Testing
+// or Tested. Only the families ADI genuinely evaluates appear here at all (see
+// optimiserLiveFamilies.js): a capability that is not live yet is stated once as
+// a future capability in the collapsed Engineer details, never as a row of its
+// own here and never as "Not yet supported" in the tested table.
 //
 // The evidence is the engine's OWN live progress, published by
 // improveBassV2Store while it runs:
@@ -21,6 +22,7 @@
 
 import { LEVER_PRESENTATION, OPTIMISER_FAMILY_SEQUENCE } from "./optimiserLeverOrder.js";
 import { ADI_ROW_OUTCOME } from "./optimiserFamilyLedgerRows.js";
+import { liveFamilyKeys } from "./optimiserLiveFamilies.js";
 
 /** What a family can be while a run is in progress. */
 export const ADI_LIVE_STATUS = Object.freeze({
@@ -31,15 +33,9 @@ export const ADI_LIVE_STATUS = Object.freeze({
   NOT_YET_SUPPORTED_IN_RUN: "Not yet supported in this run",
 });
 
-/**
- * Stated for crossover-region phase alignment. The engine's phase search is
- * subwoofer-only, so the speaker/sub crossover region is not modelled.
- */
-export const PHASE_NOT_SUPPORTED_OUTCOME =
-  "Crossover-region phase between the main speakers and subwoofers is not currently modelled.";
-
-/** Stated for the subwoofer model / quantity family. */
-export const SUB_OPTION_NOT_SUPPORTED_OUTCOME = "Compare subwoofer models separately.";
+// Crossover-region phase and subwoofer model / quantity are NOT rows here: the
+// optimiser does not evaluate them, so they are stated once as future
+// capabilities in the collapsed Engineer details (optimiserLiveFamilies.js).
 
 /** The absorption row is advice, and is only resolved after the run. */
 export const ABSORPTION_ROW_KEY = "absorption";
@@ -62,11 +58,15 @@ function verdictOf(stageVerdicts, key) {
   return typeof verdict === "string" && verdict ? verdict : null;
 }
 
-/** The first row of the fixed order, ready to render. */
-function row(key, status, outcome = null) {
+/**
+ * One row of the fixed order, ready to render. The absorption advice row carries
+ * no lever entry, so its own label is passed in — the row keeps the same name
+ * before and after a run.
+ */
+function row(key, status, outcome = null, label = null) {
   return {
     key,
-    label: LEVER_PRESENTATION[key]?.label || key,
+    label: label || LEVER_PRESENTATION[key]?.label || key,
     status,
     outcome,
     action: null,
@@ -74,8 +74,9 @@ function row(key, status, outcome = null) {
 }
 
 /**
- * Build the nine live rows, in the fixed least-intrusive order: delay, gain,
- * phase, polarity, placement, layout, sub option, seating, absorption.
+ * Build the live rows, in the fixed least-intrusive order, restricted to the
+ * families ADI evaluates: delay, gain, polarity, placement, layout, seating —
+ * then the absorption advice row. A capability that is not live is not a row.
  *
  * @param {object} live - improveBassV2 store state plus { running }
  * @returns {Array<{key,label,status,outcome,action}>}
@@ -135,31 +136,28 @@ export function buildLiveFamilyRows(live = {}) {
       ? testingOutcome(DELAY_LABEL) : null),
     row("gain", gainStatus, gainStatus === ADI_LIVE_STATUS.TESTING
       ? testingOutcome(GAIN_LABEL) : null),
-    // The crossover region itself is not modelled, at any point in the run.
-    row("phase", ADI_LIVE_STATUS.NOT_YET_SUPPORTED, PHASE_NOT_SUPPORTED_OUTCOME),
     row("polarity", polarityStatus, null),
     row("placement", placementStatus, null),
     // An alternative layout is searched inside the placement pool, so it moves
     // with placement rather than having a search of its own.
     row("layout", placementStatus, null),
-    row("subwoofer_option", ADI_LIVE_STATUS.NOT_YET_SUPPORTED_IN_RUN, SUB_OPTION_NOT_SUPPORTED_OUTCOME),
     row("seating", seatingStatus, seatingVerdict === SKIPPED && !seatingRunning
       ? ADI_ROW_OUTCOME.SEATING_LAST_RESORT : null),
     // Advice only, and only once the practical options have been evaluated.
-    row(ABSORPTION_ROW_KEY, ADI_LIVE_STATUS.WAITING, null),
+    row(ABSORPTION_ROW_KEY, ADI_LIVE_STATUS.WAITING, null, ABSORPTION_ROW_LABEL),
   ];
 
   // The fixed order is the authority: nothing this function returns may reorder
-  // the eight reported families.
-  const order = OPTIMISER_FAMILY_SEQUENCE;
+  // the families, and only the live ones are stated at all.
+  const order = liveFamilyKeys(OPTIMISER_FAMILY_SEQUENCE);
   const ordered = order
     .map((key) => rows.find((entry) => entry.key === key))
     .filter(Boolean);
   return [...ordered, rows[rows.length - 1]];
 }
 
-/** The nine row keys this module states, in the fixed order. */
+/** The row keys this module states, in the fixed order. */
 export const ADI_LIVE_ROW_KEYS = Object.freeze([
-  ...OPTIMISER_FAMILY_SEQUENCE,
+  ...liveFamilyKeys(OPTIMISER_FAMILY_SEQUENCE),
   ABSORPTION_ROW_KEY,
 ]);
