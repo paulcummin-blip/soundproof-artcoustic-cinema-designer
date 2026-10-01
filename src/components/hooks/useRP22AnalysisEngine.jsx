@@ -28,6 +28,7 @@ import {
 } from "@/components/utils/rp22BassMetrics";
 import { evaluateCanonicalP2 } from "@/components/utils/rp22/canonicalP2Authority";
 import { computeP10RspNormalisedSpread } from "@/components/utils/rp22/p10RspNormalisation";
+import { p7WholeDegrees } from "@/components/utils/rp22/p7DisplayAuthority";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 import { gradeP1Distance } from "@/components/utils/rp22/p1LevelAuthority";
@@ -264,20 +265,24 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
           const validDevs = [devLW, devRW].filter(v => isNum(v));
           if (validDevs.length > 0) {
             const maxDev = Math.max(...validDevs);
+            // P7 states whole degrees and rounds down (6.99° → 6°): the graded
+            // design value is the whole degree, while `deviation` keeps the exact
+            // measurement for diagnostics.
+            const wholeDev = p7WholeDegrees(maxDev);
             
             // Grade using RP22 thresholds
             const p7CatalogEntry = RP22_CATALOG["7"];
             const lvlP7 = p7CatalogEntry.levels;
             let level7 = 1;
-            if (lvlP7.L4 != null && maxDev <= lvlP7.L4) level7 = 4;
-            else if (lvlP7.L3 != null && maxDev <= lvlP7.L3) level7 = 3;
-            else if (lvlP7.L2 != null && maxDev <= lvlP7.L2) level7 = 2;
+            if (lvlP7.L4 != null && wholeDev <= lvlP7.L4) level7 = 4;
+            else if (lvlP7.L3 != null && wholeDev <= lvlP7.L3) level7 = 3;
+            else if (lvlP7.L2 != null && wholeDev <= lvlP7.L2) level7 = 2;
             
             return {
               number: 7,
               title: p7CatalogEntry.title,
               level: level7,
-              value: Number(maxDev.toFixed(1)),
+              value: wholeDev,
               unit: p7CatalogEntry.unit,
               overlay: null,
               note: "Deviation from RP22 median (overlay truth)",
@@ -362,16 +367,18 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
 
   const p7CatalogEntry = RP22_CATALOG["7"];
   const lvlP7 = p7CatalogEntry.levels;
+  // Whole degrees, rounded down — the same rule as the primary path.
+  const wholeDev = p7WholeDegrees(avgDev);
   let level7 = 1;
-  if (lvlP7.L4 != null && avgDev <= lvlP7.L4) level7 = 4;
-  else if (lvlP7.L3 != null && avgDev <= lvlP7.L3) level7 = 3;
-  else if (lvlP7.L2 != null && avgDev <= lvlP7.L2) level7 = 2;
+  if (lvlP7.L4 != null && wholeDev <= lvlP7.L4) level7 = 4;
+  else if (lvlP7.L3 != null && wholeDev <= lvlP7.L3) level7 = 3;
+  else if (lvlP7.L2 != null && wholeDev <= lvlP7.L2) level7 = 2;
 
   return {
     number: 7,
     title: p7CatalogEntry.title,
     level: level7,
-    value: isNum(avgDev) ? Number(avgDev.toFixed(1)) : null,
+    value: wholeDev,
     unit: p7CatalogEntry.unit,
     overlay: null,
     note: "Front Wide angular deviation from bisector (fallback)",

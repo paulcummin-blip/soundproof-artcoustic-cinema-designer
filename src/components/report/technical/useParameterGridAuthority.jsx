@@ -8,6 +8,7 @@
 
 import React from "react";
 import { resolveParamThresholds } from "@/components/report/technical/roomParameterLevelAuthority";
+import { formatP7Degrees, isP7Number } from "@/components/utils/rp22/p7DisplayAuthority";
 
 function roomResultFor(engineeringSummary, paramId) {
   return engineeringSummary?.roomResultsByParameter?.[Number(paramId)] || null;
@@ -88,7 +89,15 @@ export function useParameterGridAuthority({
     const id = Number(param?.id);
     const key = `p${id}`;
     const room = roomResultFor(engineeringSummary, id);
-    if (room) return room.formatted || room.hudLabel || (room.value ?? "—");
+    if (room) {
+      // P7 states whole degrees only (6.99° → 6°), whatever value the published
+      // result carries. Every other parameter is stated exactly as published.
+      if (isP7Number(id)) {
+        const wholeDegrees = formatP7Degrees(room.value ?? room.deviation ?? room.formatted);
+        if (wholeDegrees != null) return wholeDegrees;
+      }
+      return room.formatted || room.hudLabel || (room.value ?? "—");
+    }
 
     if (id === 19) {
       return engineeringSummary?.p19SeatAuthority?.project?.coverageSummary
