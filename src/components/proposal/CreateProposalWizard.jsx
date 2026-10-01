@@ -9,6 +9,8 @@ import VersionSelectStep from '@/components/proposal/wizard/VersionSelectStep';
 import ClientBriefStep from '@/components/proposal/wizard/ClientBriefStep';
 import GenerateStep from '@/components/proposal/wizard/GenerateStep';
 import { useVersionedEngineeringSnapshot } from '@/components/proposal/engineeringAuthority/useVersionedEngineeringSnapshot';
+import ProposalSourcePanel from '@/components/proposal/sourceAuthority/ProposalSourcePanel';
+import { useProposalSourceStatus } from '@/components/proposal/sourceAuthority/useProposalSourceStatus';
 
 const STEPS = [
   { key: 'project', label: 'Project' },
@@ -56,7 +58,20 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
     snapshot: engineeringSnapshot,
     loading: snapshotLoading,
     error: snapshotError,
+    version: selectedVersion,
   } = useVersionedEngineeringSnapshot(selectedProjectId, snapshotVersionId);
+
+  // ── Proposal Source Data ──
+  // The proposal is downstream of the generated Visual and Technical Reports.
+  // Generation is blocked until a current report source exists for the version.
+  const { status: sourceStatus, loading: sourceLoading } = useProposalSourceStatus({
+    projectId: selectedProjectId,
+    versionId: snapshotVersionId,
+    version: selectedVersion,
+    engineeringSnapshot,
+    loading: snapshotLoading,
+  });
+  const sourceReady = sourceStatus?.ready === true;
 
   const handleSelectProject = useCallback((projectId) => {
     setSelectedProjectId(projectId);
@@ -82,6 +97,11 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
 
   const handleGenerate = async () => {
     if (generationInFlightRef.current || !selectedProjectId || selectedVersionIds.length === 0) return;
+    // Source authority: no current reports, no proposal.
+    if (!sourceReady) {
+      setError(sourceStatus?.message || snapshotError || null);
+      return;
+    }
     if (!engineeringSnapshot) {
       setError(snapshotError || 'Open the selected version in Room Designer and calculate its engineering results before generating the proposal.');
       return;
@@ -193,6 +213,8 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
       {/* Step 4 — Review & Generate */}
       {step === 4 && (
         <div>
+          {/* Source status — the proposal is built from these reports only. */}
+          <ProposalSourcePanel status={sourceStatus} loading={sourceLoading} className="mb-8" />
           <div className="mb-10">
             <ReviewRow label="Project" value={selectedProjectId ? 'Selected' : '—'} />
             <ReviewRow
@@ -211,7 +233,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
           </div>
           <p className="text-sm text-[#8A8477] mb-4 leading-relaxed">
             Generate to create the proposal and open the editor. A complete first draft will be
-            written using the selected project, design versions and proposal objectives.
+            written from the current Visual and Technical Report data for the selected version.
           </p>
           {snapshotLoading && (
             <p className="text-sm text-[#8A8477] mb-6">Reading the published engineering result…</p>
@@ -248,7 +270,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
         {step === STEPS.length - 1 && (
           <button
             onClick={handleGenerate}
-            disabled={!canProceed[0] || !canProceed[2] || !canProceed[3] || snapshotLoading || !engineeringSnapshot}
+            disabled={!canProceed[0] || !canProceed[2] || !canProceed[3] || snapshotLoading || !engineeringSnapshot || !sourceReady}
             className="px-6 py-2.5 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
             style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
           >

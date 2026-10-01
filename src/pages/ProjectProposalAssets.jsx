@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useActiveProjectId } from '@/components/state/project-session';
 import ProposalAssetsPanel from '@/components/proposal/ProposalAssetsPanel';
+import ProjectVersionIdentityLine from '@/components/projects/ProjectVersionIdentityLine';
 
 /**
  * Project-scoped Proposal Assets page.
@@ -26,6 +27,8 @@ export default function ProjectProposalAssets() {
           <p className="text-sm text-[#625143] mt-1">
             Upload a cover image and up to 10 project images for reports and proposals.
           </p>
+          {/* Confirms which project and version these images belong to. */}
+          <ProjectVersionIdentityLine className="mt-3" />
         </div>
         <ProposalAssetsPanel projectId={activeProjectId} accountId={accountId} />
       </div>

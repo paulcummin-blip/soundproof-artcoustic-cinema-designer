@@ -4,6 +4,14 @@ import { SYSTEM_SUMMARY_SECTIONS, HIGHLIGHTS_SECTION_TYPE, getSystemSummarySecti
 import { buildEngineeringEvidence, selectHighlightRows, mergeHighlightRows, buildHighlightsPrompt, HIGHLIGHTS_JSON_SCHEMA } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { compareInterpretations, formatComparisonInterpretationForPrompt } from '../../shared/adiReportComparison.js';
+import { loadCacheRecord, findPublication } from '../../shared/publishedEngineeringAuthority.js';
+
+// The blocking rule, worded identically to the client authority
+// (src/components/proposal/sourceAuthority/proposalSourceAuthority.js). The
+// frontend cannot import from base44/ and vice versa, so the sentence lives in
+// both places and a test asserts they match.
+const PROPOSAL_SOURCE_REQUIRED_MESSAGE =
+  'Generate the Visual and Technical Reports before creating a proposal. This ensures the proposal uses the current project data and RP22 results.';
 
 const COMPARISON_STRUCTURE_INSTRUCTION = [
   'This is a comparison report. Use the same voice as a single system report.',
@@ -163,6 +171,46 @@ export default async function(req) {
         return [id, `Version ${record?.version_number ?? index + 1} - ${record?.version_name || 'Untitled'}`];
       }),
     );
+
+    // ── SOURCE AUTHORITY: no current reports, no proposal ──
+    // A proposal is downstream of the generated Visual and Technical Reports.
+    // Both are rendered from the version's current Published Engineering result,
+    // so that publication is the gate: without it there is nothing to interpret,
+    // and with a dangling pointer the report no longer matches the design.
+    const versionPublicationById = new Map();
+    const sourceBlockers = [];
+    for (const versionId of resolvedVersionIds) {
+      const versionRecord = (projectVersions || []).find((version) => version.id === versionId);
+      const pointer = String(versionRecord?.published_fingerprint || '').trim();
+      const cacheRecord = pointer ? await loadCacheRecord(base44, project_id, versionId) : null;
+      const publication = pointer && cacheRecord ? findPublication(cacheRecord, pointer) : null;
+      if (publication) {
+        versionPublicationById.set(versionId, publication);
+      } else {
+        sourceBlockers.push({
+          version_id: versionId,
+          version_label: versionLabelById.get(versionId) || null,
+          reason: pointer ? 'stale' : 'missing',
+        });
+      }
+    }
+    if (sourceBlockers.length > 0) {
+      return Response.json({
+        error: PROPOSAL_SOURCE_REQUIRED_MESSAGE,
+        source_blockers: sourceBlockers,
+      }, { status: 409 });
+    }
+
+    // The report identity carried into the prompt: the current publication for
+    // the primary version. Proves every project fact came from a report.
+    const primaryPublication = versionPublicationById.get(legacyVersionId) || null;
+    const sourceIdentity = {
+      project_id,
+      version_id: legacyVersionId,
+      version_label: versionLabelById.get(legacyVersionId) || null,
+      engineering_fingerprint: primaryPublication?.engineering_fingerprint || null,
+      published_at: primaryPublication?.published_at || null,
+    };
     const interpretations = suppliedSnapshots.map((entry) => {
       const versionId = entry?.version_id || entry?.versionId || null;
       return {
@@ -244,6 +292,7 @@ export default async function(req) {
       engineering_snapshot,
       resolvedType,
       reportVersions,
+      sourceIdentity,
     );
 
     // ── Key Performance Highlights rows ──
@@ -370,15 +419,23 @@ async function rollbackCreatedProposal(base44, proposalId, knownSections = []) {
   }
 }
 
-function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, engineeringSnapshot, reportType = 'system_summary', reportVersions = []) {
+function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, engineeringSnapshot, reportType = 'system_summary', reportVersions = [], sourceIdentity = null) {
   const goalLabel = GOAL_LABELS[narrativeGoal] || 'Luxury Cinema';
   const evidence = buildEngineeringEvidence(engineeringSnapshot);
-  const roomWidth = project.room_width || '';
-  const roomLength = project.room_length || '';
-  const roomHeight = project.room_height || '';
-  const screenSize = project.screen_size || '';
-  const aspectRatio = project.aspect_ratio || '';
-  const dolbyConfig = project.dolby_config || '';
+  // Project facts are read from the REPORT — the frozen snapshot built from the
+  // current version — never from the legacy project row, so a proposal can
+  // never describe another version's screen, room or layout. The project row is
+  // only a last-resort fallback when the report carries no value at all.
+  const snapshotRoom = engineeringSnapshot?.room || {};
+  const snapshotSystem = engineeringSnapshot?.system || {};
+  const legacyRoom = [project.room_width, project.room_length, project.room_height]
+    .filter((value) => value !== null && value !== undefined && value !== '')
+    .join(' × ');
+  const roomDimensions = snapshotRoom.dimensions_text
+    || (legacyRoom ? `${legacyRoom} m` : 'Not specified');
+  const screenSize = snapshotRoom.size_inches ?? project.screen_size ?? '';
+  const aspectRatio = snapshotRoom.aspect_ratio || project.aspect_ratio || '';
+  const dolbyConfig = snapshotSystem.channel_layout?.configuration_text || project.dolby_config || '';
   const speakersByRole = project.selected_speakers_by_role || {};
   const speakerInfo = Object.entries(speakersByRole)
     .map(([role, model]) => `${role}: ${model}`)
@@ -400,7 +457,13 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
     `Company: ${companyName}`,
     `Project: ${project.name || ''}`,
     `Client: ${project.client_name || ''}`,
-    `Room Dimensions: ${roomWidth}m x ${roomLength}m x ${roomHeight}m`,
+    // Report identity: which report, for which version, was written from.
+    `Report project id: ${sourceIdentity?.project_id || ''}`,
+    `Report version id: ${sourceIdentity?.version_id || ''}`,
+    `Report version: ${sourceIdentity?.version_label || ''}`,
+    `Report fingerprint: ${sourceIdentity?.engineering_fingerprint || ''}`,
+    `Reports generated: ${sourceIdentity?.published_at || ''}`,
+    `Room Dimensions: ${roomDimensions}`,
     `Screen: ${screenSize}" ${aspectRatio}`,
     `Speaker Configuration: ${dolbyConfig}`,
     speakerInfo ? `Speakers: ${speakerInfo}` : '',
@@ -412,6 +475,11 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
     briefText || 'No specific emphasis notes provided. Use a balanced professional narrative.',
     '',
     '=== CONSTRAINT ===',
+    'Use only the supplied report data for project facts.',
+    'Never invent, infer, or carry over a project fact — screen size, aspect ratio,',
+    'room dimensions, seating, speaker layout, subwoofer layout, RP22 results,',
+    'viewing results, SPL capability, bass results, limitations, or recommendations —',
+    'from any other project, version, or earlier design.',
     isComparison
       ? 'Calculated Sound Proof evidence is supplied for one design version only. Compare the designs using that evidence and the supplied system descriptions. Never state or imply a measured result for a version that is not in that evidence.'
       : '',

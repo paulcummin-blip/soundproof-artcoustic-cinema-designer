@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { useActiveProjectId } from '@/components/state/project-session';
+import { useVersionedEngineeringSnapshot } from '@/components/proposal/engineeringAuthority/useVersionedEngineeringSnapshot';
+import { useProposalSourceStatus } from '@/components/proposal/sourceAuthority/useProposalSourceStatus';
+import ProposalSourcePanel from '@/components/proposal/sourceAuthority/ProposalSourcePanel';
 import BrandAssetsPanel from '@/components/proposal/BrandAssetsPanel';
 import PlaceholderTab from '@/components/proposal/PlaceholderTab';
 import CreateProposalWizard from '@/components/proposal/CreateProposalWizard';
@@ -40,6 +44,25 @@ export default function ProposalCentre() {
   const [activeTab, setActiveTab] = useState('brand');
   const [showWizard, setShowWizard] = useState(false);
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
+
+  // ── Proposal Source Data ──
+  // The report source status for the active project. A proposal is downstream
+  // of the generated Visual and Technical Reports, so this is the same status
+  // the proposal builder enforces before it will generate anything.
+  const activeProjectId = useActiveProjectId();
+  const {
+    snapshot: activeSnapshot,
+    loading: activeSnapshotLoading,
+    project: activeProject,
+    version: activeVersion,
+  } = useVersionedEngineeringSnapshot(activeProjectId, null);
+  const { status: sourceStatus, loading: sourceLoading } = useProposalSourceStatus({
+    projectId: activeProjectId,
+    versionId: activeProject?.active_version_id || null,
+    version: activeVersion,
+    engineeringSnapshot: activeSnapshot,
+    loading: activeSnapshotLoading,
+  });
 
   const handleCreated = (proposalId) => {
     navigate(`/ProposalEditor?proposalId=${proposalId}`);
@@ -92,6 +115,11 @@ export default function ProposalCentre() {
             Create Proposal
           </button>
         </div>
+
+        {/* ── Proposal source status for the active project ── */}
+        {activeProjectId && (
+          <ProposalSourcePanel status={sourceStatus} loading={sourceLoading} className="mb-12" />
+        )}
 
         {/* ── Editorial tab navigation ── */}
         <div className="flex gap-10 border-b border-[#E5E1D8] mb-12">
