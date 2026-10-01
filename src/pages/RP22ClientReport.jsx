@@ -50,7 +50,6 @@ import { planSeatRowPages } from "@/components/report/client/perSeatCardLayout";
 import { selectClientPerSeatPerformance } from "@/components/report/client/selectClientPerSeatPerformance";
 import ClientP7FrontWides from "@/components/report/client/ClientP7FrontWides";
 import { selectClientP7FrontWides } from "@/components/report/client/selectClientP7FrontWides";
-import ClientRecommendationFooter from "@/components/report/client/ClientRecommendationFooter";
 import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
@@ -115,24 +114,6 @@ export default function RP22ClientReport() {
   // published by the Room Designer's canonical engineering summary.
   const coverageResult = engineeringSummary?.project?.coverage || null;
   const coverageSentence = coverageResult?.statement || null;
-
-  // ── Published recommendations (from Room Designer ASDR engine) ──
-  // Read from the shared window store populated by DesignRecommendationEngine.
-  // The footer renders only when recommendations are settled and available.
-  const [publishedRecommendations, setPublishedRecommendations] = React.useState(null);
-  React.useEffect(() => {
-    let cancelled = false;
-    const read = () => {
-      if (cancelled) return;
-      const recs = typeof window !== "undefined" ? window.__ROOM_DESIGNER_ASDR__?.recommendations : null;
-      if (recs && recs.isSettled !== false) {
-        setPublishedRecommendations(recs);
-      }
-    };
-    read();
-    const interval = setInterval(read, 1000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [projectId]);
 
   // ── RP23 Screen Size / Seating (uses existing RP23 viewing-angle authority) ──
   const screenSeating = useMemo(() => {
@@ -311,13 +292,11 @@ export default function RP22ClientReport() {
           <ClientDesignHighlights
             highlights={highlights}
             coverageSentence={coverageSentence}
-            recommendationFooter={<ClientRecommendationFooter recommendations={publishedRecommendations} />}
           />
         ),
         printData: {
           type: "highlights",
           highlights,
-          recommendations: publishedRecommendations,
           coverageSentence,
         },
       });
@@ -797,7 +776,7 @@ export default function RP22ClientReport() {
       ...summaryPages,
       ...closingPages,
     ];
-  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, projectId]);
+  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, projectId]);
 
   // Each category heading is printed once. The first page of a category keeps
   // its heading; continuation pages never repeat the major category heading.
