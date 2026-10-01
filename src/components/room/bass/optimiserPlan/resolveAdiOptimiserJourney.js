@@ -141,7 +141,7 @@ export const OPTIMISER_PLAN_RUN_BLOCK_MESSAGE = Object.freeze({
   [OPTIMISER_PLAN_RUN_BLOCK.WORKER_FAILED]:
     "The last bass calculation did not complete. Retry Calculate Performance, then run the Optimisation Plan.",
   [OPTIMISER_PLAN_RUN_BLOCK.CALCULATION_REQUIRED]:
-    "This design has no current bass result. Calculate Performance, then run the Optimisation Plan.",
+    "Calculation required before optimisation. Calculate Performance, then run the Optimisation Plan.",
   [OPTIMISER_PLAN_RUN_BLOCK.NO_VALID_BASS_RESULT]:
     "No valid bass result is available for this design. Calculate Performance, then run the Optimisation Plan.",
 });

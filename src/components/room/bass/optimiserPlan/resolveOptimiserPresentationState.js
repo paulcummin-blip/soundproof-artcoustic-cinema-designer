@@ -165,8 +165,16 @@ export function resolveOptimiserPresentationState({
     const recorded = Array.isArray(evidence?.rejectionReasons)
       ? evidence.rejectionReasons.find((reason) => typeof reason === "string" && reason)
       : null;
+    // A run-level statement about the baseline is never the headline while the
+    // card itself displays a current P20 result: if P20 is visible, ADI had a
+    // baseline, and the levers below are what the run actually evaluated. The
+    // recorded baseline detail stays in Engineer details, unchanged.
+    const p20Visible = Number.isFinite(Number(evidence?.current?.p20VariationDb));
+    const baselineStatement = /baseline|could not be validated/i.test(String(recorded || ""));
     return build(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE, {
-      message: recorded || OPTIMISER_PRESENTATION_COPY.INCOMPLETE,
+      message: (recorded && !(baselineStatement && p20Visible))
+        ? recorded
+        : OPTIMISER_PRESENTATION_COPY.INCOMPLETE,
       explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
       evidence,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,

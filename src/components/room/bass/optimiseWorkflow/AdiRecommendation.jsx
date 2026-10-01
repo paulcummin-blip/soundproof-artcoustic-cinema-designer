@@ -429,7 +429,11 @@ export default function AdiRecommendation({
 
   // ── Render ──
 
-  if (!adiDecision?.recommendation) {
+  // While a run is in progress the journey card owns the surface: it shows ADI's
+  // live progress through the fixed sequence, whatever the previous outcome was.
+  const isOptimisationRunning = (optimisationRunStatus || "idle") === "running";
+
+  if (!adiDecision?.recommendation && !isOptimisationRunning) {
     return (
       <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3">
         <div className="flex items-center gap-2">
@@ -514,7 +518,7 @@ export default function AdiRecommendation({
   // give practical options instead of reassuring closure.
   const isTargetNotAchieved = outcome === ADI_OUTCOME.TARGET_NOT_ACHIEVED;
 
-  if (isTargetNotAchieved) {
+  if (isTargetNotAchieved && !isOptimisationRunning) {
     return (
       <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 space-y-3">
         <div className="flex items-center gap-2">
@@ -567,7 +571,7 @@ export default function AdiRecommendation({
     );
   }
 
-  if (isNoEngineering || isNoEq) {
+  if ((isNoEngineering || isNoEq) && !isOptimisationRunning) {
     const noImprovementText = isNoEq
       ? recommendation?.action || "No further EQ is recommended."
       : "No further engineering changes are recommended.";

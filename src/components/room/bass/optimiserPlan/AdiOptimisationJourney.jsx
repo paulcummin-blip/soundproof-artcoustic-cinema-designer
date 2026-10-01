@@ -21,6 +21,7 @@
 import React from "react";
 import { Activity, AlertTriangle, ArrowRight, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { useOptimiserPlanView } from "./useOptimiserPlanView.js";
+import { useImproveBassV2State } from "../improveBassV2/improveBassV2Store.js";
 import {
   ADI_OPTIMISER_ACTION,
   ADI_OPTIMISER_JOURNEY_STATE,
@@ -163,10 +164,16 @@ export default function AdiOptimisationJourney({
   // inside the collapsed Engineer details disclosure.
   // The measured P20 headline and the limiting frequency come from the same
   // published authority the reports read — never recalculated here.
+  // While ADI is working, the rows are its live progress through the fixed
+  // sequence. The store is the engine's own published progress — phase,
+  // phase label and stage verdicts — so nothing here is inferred.
+  const isRunning = runStatus === "running";
+  const liveState = useImproveBassV2State(projectId, versionId);
   const p20Headline = readAuthoritativeP20Headline(completedBassAuthority);
   const summary = buildAdiDesignerSummary({
     planView,
     presentation,
+    liveProgress: isRunning ? { ...liveState, running: true } : null,
     instances,
     seatCount,
     currentP20Deviation: p20Headline?.variationDb ?? null,
@@ -181,7 +188,6 @@ export default function AdiOptimisationJourney({
     ? () => onUndoLever(summary.actions.undoLever || summary.recommendedLever)
     : null;
 
-  const isRunning = runStatus === "running";
   const showAction = !!journey.action && journey.canRun && !isRunning;
   const showBlocked = !!journey.blockReason && !isRunning;
   const statusMessage = runStatus === "failed" && runError ? runError : journey.blockReason?.message;

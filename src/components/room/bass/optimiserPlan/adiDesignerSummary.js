@@ -19,10 +19,7 @@
 // Engineer Details disclosure reads the raw plan and evidence directly.
 // ---------------------------------------------------------------------------
 
-import {
-  OPTIMISER_EVIDENCE_STATUS_LABEL,
-  OPTIMISER_LEVER_STATE_LABEL,
-} from "./optimiserPlanConstants.js";
+import { OPTIMISER_EVIDENCE_STATUS_LABEL } from "./optimiserPlanConstants.js";
 import { leverLabel, OPTIMISER_FAMILY_SEQUENCE } from "./optimiserLeverOrder.js";
 import { describeLeverEffect, resolveLimitingMetric } from "./optimiserLeverVerdict.js";
 import { deltaText, deviationText, frequencyText, levelText } from "./optimiserWholeNumberDb.js";
@@ -34,6 +31,7 @@ import {
   ADI_ROW_STATUS,
   buildFamilyLedgerRows,
 } from "./optimiserFamilyLedgerRows.js";
+import { buildLiveFamilyRows } from "./optimiserLiveProgress.js";
 import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
 
 export const ADI_TESTED_TITLE = "What ADI tested";
@@ -165,10 +163,19 @@ function seatingRecommendationDetail({ row, baseline = null } = {}) {
 }
 
 /**
- * The eight "What ADI tested" rows, in the fixed order.
+ * The "What ADI tested" rows, in the fixed order.
  * Every lever is always present: an unevaluated lever states why in one phrase.
+ *
+ * While a run is in progress the rows come from the engine's own live progress
+ * (`liveRows`): every family is Waiting, Testing, Tested, or clearly marked as a
+ * capability the model does not have. Nothing is read from the previous run's
+ * evidence during a run, so the card can never look idle while ADI is working.
  */
-export function buildTestedOptionRows(planView, { recommendedLever = null, appliedLever = null } = {}) {
+export function buildTestedOptionRows(
+  planView,
+  { recommendedLever = null, appliedLever = null, liveRows = null } = {},
+) {
+  if (Array.isArray(liveRows) && liveRows.length) return liveRows;
   const lastKey = leverOrder()[leverOrder().length - 1] || null;
   // The run's own per-family evidence: what each family actually did. Null for a
   // saved record that carries no family ledger (an older plan), in which case
@@ -218,35 +225,66 @@ export function buildTestedOptionRows(planView, { recommendedLever = null, appli
       };
     }
 
-    // The last lever in the order is the last resort: not required is a real
-    // state, and it is only stated when the run did not evaluate it.
-    if (isLast && !evaluated) {
-      return {
-        key,
-        label,
-        status: ADI_ROW_STATUS.LAST_RESORT,
-        outcome: ADI_ROW_OUTCOME.NOT_REQUIRED_YET,
-        action: null,
-      };
-    }
-
+    // ── Not evaluated by this plan ──
+    // Stated in the fixed vocabulary. A family the model cannot evaluate says
+    // so; a family this evaluation did not search says that, and never the
+    // vague "Not tested", "Not evaluated" or "Not available".
     if (!evaluated) {
-      const reason =
-        shortPhrase(row?.notEvaluatedReason)
-        || OPTIMISER_LEVER_STATE_LABEL?.[row?.state]
+      // The crossover region is not modelled at all.
+      if (/phase/i.test(key)) {
+        return {
+          key,
+          label,
+          status: ADI_ROW_STATUS.NOT_YET_SUPPORTED,
+          outcome: ADI_ROW_OUTCOME.PHASE_NOT_MODELLED,
+          action: null,
+        };
+      }
+      // A different subwoofer model or quantity is a design decision, not a
+      // search — it is never silently omitted.
+      if (/sub/i.test(key)) {
+        return {
+          key,
+          label,
+          status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+          outcome: ADI_ROW_OUTCOME.COMPARE_SEPARATELY,
+          action: null,
+        };
+      }
+      // An alternative layout is searched inside the placement pool. When the
+      // placement search ran, it found no better layout.
+      if (/layout/i.test(key)) {
+        const placement = findLeverRow(planView, "placement");
+        const placementTested = placement?.evaluated === true
+          || buildFamilyLedgerRows({ families: planView?.run?.families })?.["placement"]?.status === ADI_ROW_STATUS.TESTED;
+        return {
+          key,
+          label,
+          status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+          outcome: placementTested ? ADI_ROW_OUTCOME.NO_BETTER_LAYOUT : ADI_ROW_OUTCOME.NOT_SEARCHED_IN_RUN,
+          action: null,
+        };
+      }
+      // The last family in the order is the last resort: it is searched only
+      // once the practical options are exhausted, so an untouched seating
+      // search is a policy state rather than a gap.
+      if (isLast) {
+        return {
+          key,
+          label,
+          status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+          outcome: ADI_ROW_OUTCOME.SEATING_LAST_RESORT,
+          action: null,
+        };
+      }
+      const reason = shortPhrase(row?.notEvaluatedReason)
         || OPTIMISER_EVIDENCE_STATUS_LABEL?.[row?.evidenceStatus]
-        || (/phase/i.test(key) ? ADI_ROW_OUTCOME.PHASE_UNAVAILABLE : null);
-      const layout = /layout/i.test(key);
-      const sub = /sub/i.test(key);
+        || null;
       return {
         key,
         label,
-        status: layout ? ADI_ROW_STATUS.NOT_RETAINED : sub ? ADI_ROW_STATUS.NOT_TESTED : ADI_ROW_STATUS.NOT_EVALUATED,
-        outcome: reason || (layout
-          ? ADI_ROW_OUTCOME.NO_BETTER_LAYOUT
-          : sub
-            ? ADI_ROW_OUTCOME.COMPARE_SEPARATELY
-            : ADI_ROW_OUTCOME.UNAVAILABLE),
+        status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+        outcome: reason && !/baseline/i.test(reason) ? reason : ADI_ROW_OUTCOME.NOT_SEARCHED_IN_RUN,
         action: null,
       };
     }
@@ -329,6 +367,7 @@ function absorptionLeverRows(planView) {
 export function buildAdiDesignerSummary({
   planView = null,
   presentation = null,
+  liveProgress = null,
   instances = [],
   seatCount = null,
   currentP20Deviation = null,
@@ -339,6 +378,9 @@ export function buildAdiDesignerSummary({
   const state = presentation?.state || null;
   const stale = state === OPTIMISER_PRESENTATION_STATE.STALE;
   const noRun = state === OPTIMISER_PRESENTATION_STATE.NO_RUN;
+  // While ADI is working, the rows are its live progress through the fixed
+  // sequence — never the previous run's evidence.
+  const running = state === OPTIMISER_PRESENTATION_STATE.RUNNING || liveProgress?.running === true;
 
   // The estimate authority states the design options ADI evaluates and the
   // acoustic work underneath them. The sentence is produced by that authority,
@@ -352,7 +394,8 @@ export function buildAdiDesignerSummary({
   const recommendedLever = resolveRecommendedLever(planView);
   const apply = resolveApplyPermission({ planView, presentation, recommendedLever });
   const undo = resolveUndoPermission({ planView, appliedLever });
-  const leverRows = buildTestedOptionRows(planView, { recommendedLever, appliedLever });
+  const liveRows = running ? buildLiveFamilyRows(liveProgress) : null;
+  const leverRows = buildTestedOptionRows(planView, { recommendedLever, appliedLever, liveRows });
 
   const baselineDeviation = wholeNumberDeviation(planView?.baseline?.p20VariationDb ?? null);
   const baselineLevel = planView?.baseline?.p20Level ?? null;
@@ -365,8 +408,9 @@ export function buildAdiDesignerSummary({
   // Ninth in the fixed order, after every practical lever. Advice only: it never
   // carries an Apply action. It is judged on what the design looks like AFTER
   // the recommended practical change, so a recommendation that already reaches
-  // L2 does not attract absorption advice.
-  const absorption = resolveAbsorptionAdvice({
+  // L2 does not attract absorption advice. While ADI is still working there is
+  // no advice yet: the row stands as Waiting.
+  const absorption = running ? null : resolveAbsorptionAdvice({
     p20Level: recommendedLevel ?? currentP20Level ?? baselineLevel,
     p20DeviationDb: recommendedRow?.effect?.p20VariationDb
       ?? currentP20Deviation
