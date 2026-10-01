@@ -192,11 +192,11 @@ const RAW = [
     id: 19,
     number: 19,
     name: "Frequency response below room’s transition frequency at RSP (“The Result”)",
-    description: "Relative to target curve (1/3 oct smoothing).",
+    description: "RSP after EQ vs house target below transition.",
     unit: "± dB",
     thresholds: { L1: 5, L2: 4, L3: 3, L4: 2 },
     metric: "Max.",
-    scope: "Room"
+    scope: "RSP"
   },
   {
     id: 20,

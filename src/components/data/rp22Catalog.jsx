@@ -224,11 +224,11 @@ export const RP22_CATALOG = deepFreeze({
     title: "Frequency response below the room's transition frequency at the RSP relative to target curve (1/3 octave smoothing). \"The Result\"",
     metric: "FR vs target below transition (RSP)",
     unit: "± dB",
-    scope: "Seat",
+    scope: "RSP",
     direction: "±max",
     levels: { L1: 5, L2: 4, L3: 3, L4: 2 },
     notes:
-      "Predicts a smooth response at the RSP, relative to a predetermined target curve."
+      "RSP after EQ vs house target below transition. One RSP result — never a per-seat metric."
   },
   "20": {
     number: 20,

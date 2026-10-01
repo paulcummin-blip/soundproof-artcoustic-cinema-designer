@@ -1,9 +1,25 @@
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 
+/**
+ * Catalog scope → presentation scope.
+ *
+ *   "seat" / "per seat"  → Seat  (each seat is evaluated independently)
+ *   "rsp"                → RSP   (one reference-position result: P19)
+ *   anything else        → Room
+ *
+ * RSP is deliberately its own scope and is NEVER seat scope. P19 is the RSP
+ * result — the corrected RSP response against the house target below the
+ * transition frequency — so it carries no per-seat result, no seat map and no
+ * place in any seat-parameter count. P20 remains the seat-to-seat parameter.
+ */
 export const isCatalogSeatScope = (scope) => {
   const normalized = String(scope || "").trim().toLowerCase();
   return normalized === "seat" || normalized === "per seat";
 };
+
+export const isCatalogRspScope = (scope) => (
+  String(scope || "").trim().toLowerCase() === "rsp"
+);
 
 const displayUnit = (unit) => {
   const normalized = String(unit || "");
@@ -27,7 +43,9 @@ export const RP22_PRESENTATION_PARAMETERS = Object.values(RP22_CATALOG)
     id: parameter.number,
     number: parameter.number,
     title: parameter.title,
-    scope: isCatalogSeatScope(parameter.scope) ? "Seat" : "Room",
+    scope: isCatalogSeatScope(parameter.scope)
+      ? "Seat"
+      : (isCatalogRspScope(parameter.scope) ? "RSP" : "Room"),
     short: parameter.notes,
     unit: displayUnit(parameter.unit),
     thresholds: { direction: displayDirection(parameter), ...parameter.levels },
