@@ -103,11 +103,13 @@ export function generateGroupedGainCoarseCandidates(grouping, baseline) {
       groupedIds.some((id) => !baseline.some((t) => t.sourceId === id)))
     throw Error("Group membership does not match effective source identities");
   for (const group of grouping.groups)
-    for (let adj = GAIN_MIN_DB; adj <= GAIN_MAX_DB + 1e-9; adj += GAIN_STEP_DB) {
-      // 0 dB is the frozen Current control, already in the list.
-      if (Math.abs(adj) < 1e-9) continue;
+    // Every step from 0 down to −6 dB for each group in turn. Only the trimming
+    // direction is generated: cutting one group while the other is frozen spans
+    // the full ±6 dB relative balance range, so a boost step would only
+    // duplicate the opposite group's cut. 0 dB is the frozen Current control,
+    // already in the list.
+    for (let adj = GAIN_MIN_DB; adj <= -GAIN_STEP_DB + 1e-9; adj += GAIN_STEP_DB)
       rows.push(createGroupedGainCandidate(grouping, baseline, group.id, round(adj)));
-    }
   return rows;
 }
 

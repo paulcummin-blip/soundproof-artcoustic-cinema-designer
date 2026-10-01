@@ -241,7 +241,7 @@ test('a measured improvement states the value and the one action that offers it'
   });
   assert.equal(row.status, ADI_ROW_STATUS.TESTED);
   // The mandated sentence comes first, verbatim; the measured value follows it.
-  assert.match(row.outcome, /^Previous placement improvement found\. Re-run ADI on the current design before applying\./,
+  assert.match(row.outcome, /^Previous result found a possible improvement\. Re-run ADI on the current design before applying any change\./,
     'the mandated copy is stated verbatim');
   assert.match(row.outcome, /P20 better by 3 dB/, 'in whole numbers, never overstated');
   assert.equal(row.actionText, null, 'the placement panel carries the re-run, not the row');

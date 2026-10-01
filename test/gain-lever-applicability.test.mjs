@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import {
   defineGainGroups,
   generateGroupedGainCoarseCandidates,
+  planGroupedGainRefinement,
 } from '../src/components/room/bass/improveBassV2/groupedGainSearch.js';
 import { buildStageDisplay } from '../src/components/room/bass/improveBassV2/improveBassV2StageMapping.js';
 import {
@@ -64,14 +65,37 @@ describe('grouped gain applicability — Marquee Home', () => {
     expect(neutral.every((row) => row.tuning.every((tuning) => tuning.gainDb === 0))).toBe(true);
     for (const direction of ['A', 'B']) {
       const trims = rows.filter((row) => row.direction === direction && row.adjustmentDb !== 0);
-      expect(trims.length).toBeGreaterThan(1);
-      // Relative trims are real, non-zero adjustments.
-      expect(trims.every((row) => row.adjustmentDb < 0)).toBe(true);
-      // Each candidate moves only its own group.
+      // The mandated sweep: every 0.5 dB step from 0 down to −6 dB, for each
+      // group in turn. Trimming one group while the other is frozen spans the
+      // full ±6 dB relative balance range in both directions.
+      expect(trims.map((row) => row.adjustmentDb))
+        .toEqual([-6, -5.5, -5, -4.5, -4, -3.5, -3, -2.5, -2, -1.5, -1, -0.5]);
+      // Each candidate moves only its own group, and nothing else.
       const sample = trims[0];
       const moved = sample.tuning.filter((tuning) => tuning.gainDb !== 0).map((tuning) => tuning.sourceId);
       expect(moved).toEqual(grouping.groups.find((group) => group.id === direction).sourceIds);
+      expect(sample.tuning.every((tuning) => tuning.delayMs === 0 && tuning.polarity === 1)).toBe(true);
     }
+  });
+
+  it('retains the best step of the sweep for confirmation', () => {
+    const grouping = defineGainGroups(MARQUEE_SUBS, MARQUEE_ROOM);
+    // Deterministic stand-in for the fast proxy: the real planner must retain
+    // the best step per group and metric — never discard the best attempt.
+    const scored = generateGroupedGainCoarseCandidates(grouping, marqueeBaseline()).map((row) => ({
+      ...row,
+      proxy: {
+        primaryRangeDb: row.adjustmentDb === -3 ? 2 : 5,
+        allSeatRangeDb: row.adjustmentDb === -3 ? 3 : 6,
+      },
+    }));
+    const plan = planGroupedGainRefinement(scored);
+    const retained = scored.filter((row) => plan.retainedIds.includes(row.id));
+    // One retained step per group (the two metrics agree on it), and the frozen
+    // Current control is never among them.
+    expect(retained.length).toBe(2);
+    expect(retained.every((row) => row.adjustmentDb === -3)).toBe(true);
+    expect(retained.every((row) => row.isCurrent === false)).toBe(true);
   });
 
   it('keeps gain "not applicable" only for layouts with no independent gain', () => {
@@ -115,12 +139,19 @@ describe('gain verdict never claims "not applicable" before it is judged', () =>
     expect(stageOf(display, 'gain').status).toBe('not_tested');
   });
 
-  it('publishes no gain verdict before its search reports one', () => {
+  it('publishes a gain verdict only from the search that ran', () => {
     const engine = read('src/components/room/bass/improveBassV2/improveBassV2Engine.js');
     // The only "skipped" gain verdict left is the grouping-reported one.
     expect(engine).not.toMatch(/"gain",\s*"skipped"/);
-    expect(engine).toMatch(/gainDiagnostics\.status === "skipped" \? "skipped" : gainVerdict/);
-    expect(engine).toMatch(/Gain available but not run/);
+    expect(engine.includes('const gainNotAdjustable = gainDiagnostics.status === "skipped" || gainDiagnostics.status === "ambiguous";')).toBe(true);
+    // A sweep that ran reports a result — never "not applicable".
+    expect(engine.includes(': gainNotAdjustable ? "skipped"')).toBe(true);
+    expect(engine.includes(': "no_improvement";')).toBe(true);
+    // Whether this design can be trimmed is recorded from the run itself.
+    expect(engine.includes('gainAdjustable: gainSearch?.status === "eligible",')).toBe(true);
+    // The best evaluated attempt is kept as evidence whether or not it won.
+    expect(engine.includes('const bestGainPair = pickBestGainAttempt(gainConfirmedPairs);')).toBe(true);
+    expect(engine.includes('gainDiagnostics.bestAttempt = {')).toBe(true);
   });
 });
 

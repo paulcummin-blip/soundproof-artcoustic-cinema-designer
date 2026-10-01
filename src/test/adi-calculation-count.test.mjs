@@ -219,8 +219,8 @@ describe('PLACEMENT FIFTH', () => {
 });
 
 describe('COPY AND BUTTON', () => {
-  it('uses the pre-run copy and the Run Optimisation Plan button', () => {
-    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RUN]).toBe('Run Optimisation Plan');
+  it('uses the pre-run copy and the one Re-run Optimisation Plan control', () => {
+    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RUN]).toBe('Re-run Optimisation Plan');
     expect(ADI_OPTIMISER_COPY.RUN_EXPLANATION).toMatch(/checks electronic adjustments first/);
     expect(ADI_OPTIMISER_COPY.RUN_EXPLANATION).toMatch(/subwoofer placement, alternative layouts, different subwoofer capability, and seating changes/);
     expect(ADI_OPTIMISER_COPY.SYSTEMATIC_NOTE).toMatch(/P20 seat-to-seat consistency/);

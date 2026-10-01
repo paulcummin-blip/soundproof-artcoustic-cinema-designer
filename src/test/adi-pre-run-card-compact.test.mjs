@@ -146,9 +146,10 @@ describe('BUTTON PROMINENT', () => {
     expect(card).toMatch(/bg-\[#213428\]/);
   });
 
-  it('labels the button Run Optimisation Plan', () => {
-    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RUN]).toBe('Run Optimisation Plan');
-    expect(noPlan().actionLabel).toBe('Run Optimisation Plan');
+  it('labels the one re-run control Re-run Optimisation Plan', () => {
+    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RUN]).toBe('Re-run Optimisation Plan');
+    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RERUN]).toBe('Re-run Optimisation Plan');
+    expect(noPlan().actionLabel).toBe('Re-run Optimisation Plan');
   });
 });
 

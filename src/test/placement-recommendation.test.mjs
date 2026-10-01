@@ -403,7 +403,7 @@ describe("a placement improvement saved without its positions", () => {
     });
     expect(panel.kind).toBe("previous");
     expect(panel.notice).toBe(PLACEMENT_PREVIOUS_FOUND);
-    expect(panel.notice).toBe("Previous placement improvement found. Re-run ADI on the current design before applying.");
+    expect(panel.notice).toBe("Previous result found a possible improvement. Re-run ADI on the current design before applying any change.");
     expect(panel.canApply).toBe(false);
     expect(panel.canRerun).toBe(true);
     const p20 = panel.expected.find((row) => row.label === "P20");

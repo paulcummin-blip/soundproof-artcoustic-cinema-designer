@@ -89,7 +89,7 @@ describe("the fixed lever outcome vocabulary", () => {
     const row = placementRow(MARQUEE_PLACEMENT_ATTEMPT);
     expect(row.status).toBe(ADI_ROW_STATUS.TESTED);
     // The mandated sentence comes first, verbatim, then the measured value.
-    expect(row.outcome).toContain("Previous placement improvement found. Re-run ADI on the current design before applying.");
+    expect(row.outcome).toContain("Previous result found a possible improvement. Re-run ADI on the current design before applying any change.");
     expect(row.outcome).toMatch(/P20 better by 3 dB/);
     // The action column carries no "Re-run to apply": the placement panel states
     // the re-run, so the row does not.
@@ -146,7 +146,7 @@ describe("the saved Marquee Home run, through the card's own row builder", () =>
   it("states the placement outcome without withholding it", () => {
     const row = rowFor("placement");
     expect(row.status).toBe(ADI_ROW_STATUS.TESTED);
-    expect(row.outcome).toContain("Previous placement improvement found. Re-run ADI on the current design before applying.");
+    expect(row.outcome).toContain("Previous result found a possible improvement. Re-run ADI on the current design before applying any change.");
     expect(row.outcome).toMatch(/P20 better by 3 dB/);
     expect(row.actionText).toBe(null);
   });

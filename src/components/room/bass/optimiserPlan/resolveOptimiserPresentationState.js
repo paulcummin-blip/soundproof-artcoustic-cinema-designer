@@ -42,7 +42,9 @@ export const OPTIMISER_PRESENTATION_LABEL = Object.freeze({
 
 /** Action offered by each state. */
 export const OPTIMISER_PRESENTATION_ACTION = Object.freeze({
-  RUN: "Run Optimisation Plan",
+  // ONE re-run wording everywhere, including the never-run state: there is only
+  // ever a single re-run control, and never a "Re-run to apply".
+  RUN: "Re-run Optimisation Plan",
   RERUN: "Re-run Optimisation Plan",
   COMPLETE: "Complete Optimisation Plan",
 });
