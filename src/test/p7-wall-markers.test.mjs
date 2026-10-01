@@ -61,6 +61,9 @@ const p7Data = {
   srPos: { x: 4.4, y: 4.0 },
   medianPoint: { x: 2.25, y: 3.2 },
   rsp: { x: 2.5, y: 4.2 },
+  // The ideal median positions, as the app's front-wide geometry authority resolves
+  // them. The drawing marks these points; it never projects an angle of its own.
+  idealPoints: { LW: { x: 0.1, y: 2.2 }, RW: { x: 4.4, y: 2.2 } },
 };
 
 const baseProps = {
@@ -211,7 +214,8 @@ test('no large arcs, no dashed off-room rays, no construction geometry', () => {
   assert.ok(!DRAWING_BODY.includes('stroke-dasharray="6 4"'), 'the dashed median ray is gone');
   assert.ok(!source.includes('arcPath'), 'the arc construction is gone from the page');
   assert.ok(!source.includes('polarToSvg'), 'no polar projection outside the room remains');
-  assert.ok(source.includes('projectToWall'), 'the ideal position is projected onto the wall');
+  assert.ok(!source.includes('projectToWall'), 'the report no longer projects an angle of its own');
+  assert.ok(source.includes('idealPoints[side.key]'), 'the ideal position comes from the app geometry authority');
 });
 
 test('the copy is short — no angle tables, no measurement explanation', () => {
@@ -311,10 +315,15 @@ const LIVE_PLACED = [
   { role: 'RW', position: { x: 3.9, y: 3.2 } },
   { role: 'FL', position: { x: 1.2, y: 0.4 } },
   { role: 'FR', position: { x: 3.3, y: 0.4 } },
-  { role: 'SL', position: { x: 0.1, y: 4.0 } },
-  { role: 'SR', position: { x: 4.4, y: 4.0 } },
+  // Side surrounds mounted on the side walls — the placement the shared front-wide
+  // geometry authority requires in order to resolve the zones.
+  { role: 'SL', position: { x: 0.041, y: 4.0 } },
+  { role: 'SR', position: { x: 4.459, y: 4.0 } },
 ];
-const liveSelected = selectClientP7FrontWides(LIVE_SUMMARY, LIVE_PLACED, { x: 2.5, y: 4.2 }, LIVE_ANALYSIS);
+const liveSelected = selectClientP7FrontWides(
+  LIVE_SUMMARY, LIVE_PLACED, { x: 2.5, y: 4.2 }, LIVE_ANALYSIS,
+  { widthM: ROOM_WIDTH_M, lengthM: ROOM_LENGTH_M },
+);
 const LIVE_SCREEN = renderToStaticMarkup(
   React.createElement(ClientP7FrontWides, { ...baseProps, p7Data: liveSelected }),
 );
@@ -327,7 +336,7 @@ const LIVE_DRAWING = drawingOf(LIVE_SCREEN);
 test('with only the engine median detail published, the ideal is still drawn on the wall', () => {
   assert.equal(liveSelected.level, 'L2');
   assert.equal(liveSelected.maxDeviation, 6.1);
-  assert.equal(liveSelected.idealSource, 'engine_median');
+  assert.equal(liveSelected.idealSource, 'app_front_wide_zones');
   assert.equal(liveSelected.ideal.LW.targetAngle, LIVE_ANALYSIS.p7Details.LW.targetAngle);
   assert.equal(liveSelected.ideal.LW.deviation, undefined, 'the engine per-side deviation is not carried across');
 

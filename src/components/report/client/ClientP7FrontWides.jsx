@@ -18,7 +18,6 @@ import {
   parameterResultHeading,
   parameterResultDescription,
 } from "./parameterResultCopy";
-import { toPlanTheta } from "./p7IdealAngles";
 import P7PlacementGuidance from "./P7PlacementGuidance";
 
 import {
@@ -66,7 +65,6 @@ export default function ClientP7FrontWides({
     rsp,
     ideal,
     idealPoints,
-    geometryOrigin,
     slPos,
     srPos,
   } = p7Data;
@@ -116,14 +114,14 @@ export default function ClientP7FrontWides({
   const frPx = frPos ? toPx(frPos.x, frPos.y) : null;
 
   // ── Ideal median position vs the actual front wide position ────────────────
-  // Both positions come from the app, not from the report. The engine publishes,
-  // with the P7 result, the ideal median POSITION of each front wide — the median
-  // between that screen speaker and its adjacent side surround, which is the same
-  // authority the Room Designer draws and the same geometry the result was graded
-  // against. The report marks those two points with the plan's one room-to-drawing
-  // transform, exactly as it marks every speaker, and joins them with a short line
-  // along the wall. Drawing only: no angle is measured, nothing is projected
-  // outside the room and no construction geometry is drawn.
+  // The ideal median position is the app's own. The selector resolves it with the
+  // single front-wide geometry authority the Room Designer's plan draws from (the
+  // median between each screen speaker and its adjacent side surround), so this
+  // drawing marks that exact point through the plan's one room-to-drawing
+  // transform — as it marks every speaker — and joins it to the installed wide with
+  // a short line along the wall. Drawing only: no angle is projected, nothing is
+  // inferred and no construction geometry is drawn, so the page can never disagree
+  // with the app.
 
   // Which wall the front wide is mounted on — the nearest room boundary.
   const wallOfPoint = (x, y) => [
@@ -133,78 +131,37 @@ export default function ClientP7FrontWides({
     { axis: "y", value: L, distance: L - y },
   ].reduce((nearest, candidate) => (candidate.distance < nearest.distance ? candidate : nearest));
 
-  // Where the ideal median direction meets that wall. Kept inside the room, so
-  // no marker can ever be drawn outside the plan.
-  const projectToWall = (pos, thetaDeg, originOverride = null) => {
-    // The ray is cast from the origin the engine measured the angle from — the
-    // published one when it exists, so angle and origin always belong together.
-    const rayOrigin = Number.isFinite(originOverride?.x) && Number.isFinite(originOverride?.y)
-      ? originOverride
-      : rsp;
-    if (!rayOrigin) return null;
-    const rad = (thetaDeg - 90) * (Math.PI / 180);
-    const dx = Math.cos(rad);
-    const dy = Math.sin(rad);
-    const wall = wallOfPoint(pos.x, pos.y);
-    let x = pos.x;
-    let y = pos.y;
-    if (wall.axis === "x") {
-      if (Math.abs(dx) < 1e-6) return null;
-      const t = (wall.value - rayOrigin.x) / dx;
-      if (!(t > 0)) return null;
-      x = wall.value;
-      y = rayOrigin.y + t * dy;
-    } else {
-      if (Math.abs(dy) < 1e-6) return null;
-      const t = (wall.value - rayOrigin.y) / dy;
-      if (!(t > 0)) return null;
-      y = wall.value;
-      x = rayOrigin.x + t * dx;
-    }
-    const margin = 0.08;
-    return {
-      x: Math.min(Math.max(x, margin), W - margin),
-      y: Math.min(Math.max(y, margin), L - margin),
-      wall,
-    };
-  };
-
   const publishedDeviations = [ideal?.LW?.deviation, ideal?.RW?.deviation]
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value));
   const worstDeviation = publishedDeviations.length ? Math.max(...publishedDeviations) : null;
 
+  // A side is drawn whenever the app geometry resolves its ideal median position.
+  // The published per-side angles are reference values only: they refine which side
+  // carries the figure, they never gate the marker.
   const placementSides = [
-    { key: "LW", pos: lwPos, ideal: ideal?.LW },
-    { key: "RW", pos: rwPos, ideal: ideal?.RW },
+    { key: "LW", pos: lwPos, published: ideal?.LW },
+    { key: "RW", pos: rwPos, published: ideal?.RW },
   ]
-    .filter((side) => side.ideal && side.pos && rsp)
+    .filter((side) => side.pos && idealPoints?.[side.key])
     .map((side) => {
-      // The ideal median position as the app published it. When the engine
-      // published the graded geometry, that point IS the authority — the position
-      // the Room Designer draws and the geometry the result was measured against —
-      // so it is marked directly. Snapshots that carry only angles fall back to
-      // the projection, cast from the engine's own origin.
-      const publishedIdeal = idealPoints?.[side.key];
-      const idealM = publishedIdeal
-        ? {
-            x: publishedIdeal.x,
-            y: publishedIdeal.y,
-            wall: wallOfPoint(publishedIdeal.x, publishedIdeal.y),
-          }
-        : (() => {
-            const idealTheta = toPlanTheta(side.ideal.targetAngle);
-            if (idealTheta == null) return null;
-            return projectToWall(side.pos, idealTheta, geometryOrigin);
-          })();
-      if (!idealM) return null;
+      // The app's own ideal median position for this side — resolved by the shared
+      // front-wide geometry authority and marked here exactly as published. No
+      // projection, no report-only fallback: if the authority cannot resolve it,
+      // no ideal marker is drawn at all.
+      const appIdeal = idealPoints[side.key];
+      const idealM = {
+        x: appIdeal.x,
+        y: appIdeal.y,
+        wall: wallOfPoint(appIdeal.x, appIdeal.y),
+      };
       const actualPx = toPx(side.pos.x, side.pos.y);
       const idealPx = toPx(idealM.x, idealM.y);
       // Labels sit just inside the room, off the wall.
       const labelOffset = idealM.wall.axis === "x"
         ? { x: idealM.wall.value === 0 ? 13 : -13, y: 0 }
         : { x: 0, y: idealM.wall.value === 0 ? 14 : -14 };
-      const deviation = Number(side.ideal.deviation);
+      const deviation = Number(side.published?.deviation);
       return {
         key: side.key,
         actualPx,

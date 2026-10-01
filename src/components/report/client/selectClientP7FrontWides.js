@@ -1,11 +1,15 @@
 /**
  * Passive P7 Visual Report selector.
  *
- * P7 engineering values come only from the published summary, and the ideal
- * median POSITION comes only from the geometry the engine published alongside
- * that result. Speaker positions are descriptive drawing geometry.
+ * P7 engineering values come only from the published summary. The ideal median
+ * POSITION comes only from the app's one front-wide geometry authority — the same
+ * computeFrontWideZonesStrict call the Room Designer's plan draws from and the
+ * geometry P7 is graded against. The report therefore carries no report-only
+ * geometry path of its own: it marks the app's points, it never projects an angle.
  */
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
+import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
+import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 
 function getSpeakerPos(speaker) {
   if (!speaker) return null;
@@ -14,19 +18,11 @@ function getSpeakerPos(speaker) {
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
-/** A published room-coordinate point, or absent — never a guess. */
-function readPoint(point) {
-  if (!point) return null;
-  const x = Number(point.x);
-  const y = Number(point.y);
-  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
-}
-
 /**
- * The published ideal-median authority for one front wide. The engine publishes,
- * per side, the ideal (median) angle, the actual angle and the deviation between
- * them — read verbatim, never re-derived. The angles stay in the engine's own
- * azimuth frame; the report converts them for drawing and copy.
+ * The published ideal-median authority for one front wide: the ideal (median)
+ * angle, the actual angle and the deviation between them — read verbatim, never
+ * re-derived. These angles are reference copy only; the drawn position comes from
+ * the app geometry below.
  */
 function readIdealSide(side) {
   if (!side) return null;
@@ -55,7 +51,34 @@ function readMedianDetail(detail) {
   return { targetAngle, actualAngle };
 }
 
-export function selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp, analysisResult = null) {
+/**
+ * The ideal median position per side, resolved by the app's own front-wide
+ * geometry authority — the single function the Room Designer's plan draws and P7
+ * grading uses. Returns null, never a guess, when an older snapshot cannot support
+ * it (no room dimensions, no RSP, or the screen/surround speakers absent), so the
+ * page simply draws no ideal marker rather than inventing one.
+ */
+function resolveIdealPoints(placedSpeakers, rsp, roomDims) {
+  const zones = computeFrontWideZonesStrict({
+    mlpPoint: rsp,
+    dimensions: { width: Number(roomDims?.widthM), length: Number(roomDims?.lengthM) },
+    placedSpeakers,
+    getModelDimsM,
+  });
+  if (zones?.status !== "ok") return null;
+  return {
+    LW: { x: zones.left.xWall, y: zones.left.medianY },
+    RW: { x: zones.right.xWall, y: zones.right.medianY },
+  };
+}
+
+export function selectClientP7FrontWides(
+  engineeringSummary,
+  placedSpeakers,
+  rsp,
+  analysisResult = null,
+  roomDims = null,
+) {
   if (!engineeringSummary || !Array.isArray(placedSpeakers)) return null;
 
   const find = (role) => placedSpeakers.find((speaker) => getCanonicalRole(speaker?.role) === role);
@@ -66,14 +89,9 @@ export function selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp
   const p7Param = engineeringSummary?.roomResultsByParameter?.[7];
   if (!p7Param || p7Param.status !== "scored") return null;
 
-  // The ideal median position per side — where each front wide aims to be.
-  //
-  // Read from the published P7 result's own per-side angles when the engine
-  // publishes them. When it does not, the engine's median detail travels in the
-  // report snapshot (analysisResult.p7Details): the median between each screen
-  // speaker and its adjacent surround, which is the ideal position this page
-  // describes. Both are published authority — the report reads an angle, it never
-  // measures one.
+  // The published per-side angles, when the engine states them; otherwise the
+  // engine's median detail travels in the report snapshot. Either way these are
+  // published reference values — never measured here.
   const publishedPerSide = {
     LW: readIdealSide(p7Param.perSide?.LW),
     RW: readIdealSide(p7Param.perSide?.RW),
@@ -83,23 +101,12 @@ export function selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp
     LW: readMedianDetail(analysisResult?.p7Details?.LW),
     RW: readMedianDetail(analysisResult?.p7Details?.RW),
   };
-  // The ideal median POSITION, exactly as the engine published it with the
-  // result. The engine computes it from the authority the Room Designer draws
-  // (the median between each screen speaker and its adjacent side surround) and
-  // grades this very result against it, so the report marks these points instead
-  // of projecting its own. Snapshots written before the geometry was published
-  // still carry angles only: those fall back to the angle projection, cast from
-  // the same origin the engine measured from.
-  const geometry = analysisResult?.p7Geometry || null;
-  const idealPoints = {
-    LW: readPoint(geometry?.LW?.ideal),
-    RW: readPoint(geometry?.RW?.ideal),
-  };
-  const hasIdealPoints = Boolean(idealPoints.LW || idealPoints.RW);
 
+  // The drawn ideal median position: the app's geometry, not a projection.
+  const idealPoints = resolveIdealPoints(placedSpeakers, rsp, roomDims);
   const ideal = hasPublishedPerSide ? publishedPerSide : medianDetail;
-  const idealSource = hasIdealPoints
-    ? "p7_geometry"
+  const idealSource = idealPoints
+    ? "app_front_wide_zones"
     : hasPublishedPerSide
     ? "p7_result"
     : medianDetail.LW || medianDetail.RW
@@ -115,7 +122,6 @@ export function selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp
     ideal,
     idealSource,
     idealPoints,
-    geometryOrigin: readPoint(geometry?.origin),
     lwPos,
     rwPos,
     flPos: getSpeakerPos(find("FL")),
