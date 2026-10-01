@@ -179,6 +179,10 @@ export function resolveOptimiserPresentationState({
   if (hasApplicableEvaluatedLever(planView)) {
     return build(OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE, {
       message: "Sound Proof has evaluated the available improvement options for this design.",
+      // A winning plan must carry the same completed-run evidence as terminal
+      // outcomes. The plan card owns Apply; this read-only block owns the
+      // calculation count and the tested-family audit trail.
+      evidence,
       showPlan: true,
       showApply: true,
     });
