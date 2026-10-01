@@ -110,7 +110,6 @@ export default function TechnicalParameterCard({
   humanTitle,
   seatGridData,
   targetBasisNote,
-  rspLabel,
   asdrFooter = null,
   variant = "print",
   assumed = false,
@@ -261,11 +260,6 @@ export default function TechnicalParameterCard({
           <span>
             <strong style={{ fontWeight: 600 }}>TARGET BASIS:</strong>{" "}
             {targetBasisNote}
-          </span>
-        )}
-        {isSeatScope && rspLabel && (
-          <span>
-            <strong style={{ fontWeight: 600 }}>RSP:</strong> {rspLabel}
           </span>
         )}
       </div>

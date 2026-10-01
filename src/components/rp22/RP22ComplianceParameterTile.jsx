@@ -4,8 +4,7 @@ import React from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 import SeatScopeBadge from "@/components/report/SeatScopeBadge";
-import { formatSeatLabel } from "@/components/utils/seatLabel";
-import { normalizeLevelForDisplay } from "@/components/utils/rp22LevelDisplay";
+import SeatResultMap from "@/components/report/SeatResultMap";
 
 /* ---------- Shared style tokens (mirrored from RP22CompliancePanel) ---------- */
 const card  = { border: "1px solid #DCDBD6", background: "#fff", borderRadius: 8 };
@@ -85,33 +84,13 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
         </div>
       </div>
 
-      {/* ── Section 2b: Per-seat detail (seat-scoped only, always visible) ── */}
+      {/* ── Section 2b: Seat-layout result map (seat-scoped only, always visible) ──
+          Results are laid out in the shape of the seating plan — one band per row,
+          seats in their physical left-to-right order — rather than a linear
+          "Row 1 - Seat 3" table. */}
       {isSeatScope && seatGridData && (
         <div style={{ padding: "8px 12px 0 12px" }}>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-[#E6E4DD]">
-                <th className="text-left py-1 text-[#625143] font-medium">Seat</th>
-                <th className="text-right py-1 text-[#625143] font-medium">Result</th>
-                <th className="text-right py-1 text-[#625143] font-medium">Level</th>
-              </tr>
-            </thead>
-            <tbody>
-              {seatGridData.flatMap(rowObj =>
-                rowObj.seats.map((seat) => (
-                  <tr key={seat.id} className="border-b border-[#F0EFEA]">
-                    <td className="py-1 text-[#1B1A1A]">
-                      {formatSeatLabel(seat.id)}{seat.isPrimary ? " (RSP)" : ""}
-                    </td>
-                    <td className="py-1 text-right text-[#3E4349]">{seat.value || "—"}</td>
-                    <td className="py-1 text-right">
-                      <RP22GradingPill level={normalizeLevelForDisplay(seat.level)} compact />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <SeatResultMap rows={seatGridData} />
         </div>
       )}
 

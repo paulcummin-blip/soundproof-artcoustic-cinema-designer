@@ -14,7 +14,6 @@
  */
 
 import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
-import { formatSeatLabel } from "@/components/utils/seatLabel";
 
 /** The published per-seat viewing authority, keyed by seat id. */
 function viewingBySeatId(engineeringSummary) {
@@ -30,13 +29,13 @@ function hudRp23For(engineeringSummary, seatId) {
 }
 
 /**
- * A friendly representative-seat label, e.g. "Row 1 - Seat 2". Falls back to
- * stating the row when the seat id is not in the standard pattern.
+ * The representative position is stated positionally — it is the seat nearest the
+ * room centreline in that row, so the row reads "centre seat" rather than a seat
+ * identifier. Seat identifiers belong to engineer-level traceability, not to the
+ * report's default view.
  */
-function representativeSeatLabel(seat, rowNumber) {
-  const labelled = formatSeatLabel(seat?.id);
-  if (labelled && labelled !== seat?.id) return labelled;
-  return `Row ${rowNumber} centre seat`;
+function representativeSeatLabel() {
+  return "centre seat";
 }
 
 /**
@@ -77,7 +76,7 @@ export function resolveTechnicalViewingRows({ representativeSeats, engineeringSu
     return {
       rowNumber,
       seatId: seat.id ?? null,
-      seatLabel: representativeSeatLabel(seat, rowNumber),
+      seatLabel: representativeSeatLabel(),
       angleDeg,
       angleFormatted: angleDeg != null ? `${angleDeg.toFixed(1)}°` : "—",
       level,

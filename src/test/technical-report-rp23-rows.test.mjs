@@ -85,16 +85,17 @@ test('TEST 2 — the values are the published viewing authority', () => {
   assert.ok(TEXT.includes('L3'), 'the row 2 level pill is on screen');
 });
 
-test('TEST 3 — the representative seat for each row is stated', () => {
+test('TEST 3 — the representative position for each row is stated, without a seat id', () => {
   const { rows } = resolveTechnicalViewingRows({
     representativeSeats: SEATS,
     engineeringSummary: SUMMARY,
   });
-  assert.equal(rows[0].seatLabel, 'Row 1 - Seat 2');
-  assert.equal(rows[1].seatLabel, 'Row 2 - Seat 2');
-  assert.ok(TEXT.includes('Representative seat: Row 1 - Seat 2'), 'row 1 representative seat is stated');
-  assert.ok(TEXT.includes('Representative seat: Row 2 - Seat 2'), 'row 2 representative seat is stated');
-  assert.ok(TEXT.includes('centre seat of each row'), 'the block says which seat represents a row');
+  assert.equal(rows[0].seatLabel, 'centre seat');
+  assert.equal(rows[1].seatLabel, 'centre seat');
+  assert.equal(rows[0].seatId, 'seat-r1-c2', 'the seat id is still carried for traceability');
+  assert.ok(TEXT.includes('centre seat'), 'the representative position is stated');
+  assert.ok(!TEXT.includes('Seat 2'), 'no seat identifier is printed');
+  assert.ok(TEXT.includes('Representative seat per row'), 'the block says which position represents a row');
 });
 
 test('TEST 4 — the RP23 thresholds are preserved', () => {

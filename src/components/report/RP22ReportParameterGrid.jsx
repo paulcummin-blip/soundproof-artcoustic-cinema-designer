@@ -7,7 +7,6 @@ import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPr
 import TechnicalParameterCard from "@/components/report/technical/TechnicalParameterCard";
 import TechnicalParameterPage from "@/components/report/technical/TechnicalParameterPage";
 import { getCategoryForParam, getHumanTitleForParam } from "@/components/report/technical/technicalParameterMeta";
-import { formatSeatLabel } from "@/components/utils/seatLabel";
 import { useParameterGridAuthority } from "@/components/report/technical/useParameterGridAuthority.jsx";
 import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl";
 
@@ -41,6 +40,7 @@ export default function RP22ReportParameterGrid({
   const authority = useParameterGridAuthority({
     engineeringSummary,
     contributionsByKey,
+    seatingPositions,
   });
 
   const {
@@ -54,13 +54,25 @@ export default function RP22ReportParameterGrid({
     buildP6Presentation,
   } = authority;
 
+  /**
+   * Seat results for a parameter, arranged as a seat-layout map.
+   *
+   * Seat-scoped parameters show their results in the shape of the seating plan.
+   * P19 is seat-scoped in the catalog but is a room-level bass result: it is
+   * never presented as a per-seat map.
+   */
+  const seatMapFor = (param) => (
+    String(param?.scope || "").toLowerCase() === "seat" && Number(param?.id) !== 19
+      ? buildSeatGridData(param.id)
+      : null
+  );
+
   /* ----- Render a single compliance tile (screen variant) ----- */
   const renderCard = (param) => {
     const resolvedThresholds = resolveThresholds(param);
     const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14 || param.id === 18)
       ? { ...param, thresholds: resolvedThresholds }
       : param;
-    const isSeatScope = String(param.scope || "").toLowerCase() === "seat";
     const targetBasisNote =
       engineeringSummary?.roomResultsByParameter?.[param.id]?.targetBasisNote
       ?? engineeringSummary?.roomResultsByParameter?.[param.id]?.detail
@@ -72,7 +84,7 @@ export default function RP22ReportParameterGrid({
           param={resolvedParam}
           achievedValue={getHudValueForParam(param, { isPrintVariant })}
           lvl={getHudLevelForParam(param)}
-          seatGridData={isSeatScope ? buildSeatGridData(param.id) : null}
+          seatGridData={seatMapFor(param)}
           targetBasisNote={targetBasisNote}
         />
         {isP15P21 && (
@@ -95,15 +107,13 @@ export default function RP22ReportParameterGrid({
       engineeringSummary?.roomResultsByParameter?.[param.id]?.targetBasisNote
       ?? engineeringSummary?.roomResultsByParameter?.[param.id]?.detail
       ?? null;
-    const isSeatScope = String(param.scope || "").toLowerCase() === "seat";
-    const seatGridData = isSeatScope ? buildSeatGridData(param.id) : null;
+    const seatGridData = seatMapFor(param);
     const humanTitle = getHumanTitleForParam(param.id);
     const category = getCategoryForParam(param.id);
     const asdrFooter = buildAsdrFooter(param.id);
 
     const achievedValue = getHudValueForParam(param, { isPrintVariant });
     const lvl = getHudLevelForParam(param);
-    const rspLabel = authority.lockedSeatId ? formatSeatLabel(authority.lockedSeatId) : null;
 
     const isP15P21 = param.id === 15 || param.id === 21;
     return (
@@ -116,7 +126,6 @@ export default function RP22ReportParameterGrid({
           humanTitle={humanTitle}
           seatGridData={seatGridData}
           targetBasisNote={targetBasisNote}
-          rspLabel={rspLabel}
           asdrFooter={asdrFooter}
           assumed={engineeringSummary?.roomResultsByParameter?.[param.id]?.assumed === true}
         />

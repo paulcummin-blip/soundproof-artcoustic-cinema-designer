@@ -22,24 +22,45 @@ function formatAsdrInteger(value) {
   return Number.isFinite(numeric) ? String(Math.round(numeric)) : null;
 }
 
-function adaptSeatRows(rows) {
+/**
+ * Adapt the published per-seat rows onto the seat-layout map's shape, carrying
+ * each seat's room position so the map can lay the row out in its physical order
+ * (the map itself does that ordering). No value, level or priority is altered.
+ */
+function adaptSeatRows(rows, positionsById) {
   return rows.map((row) => ({
     row: row.row,
-    seats: (row.seats || []).map((seat) => ({
-      id: seat.seatId,
-      indexInRow: seat.column,
-      level: seat.level,
-      value: seat.valueFormatted,
-      isPrimary: seat.isPrimary,
-      priority: seat.priority,
-    })),
+    seats: (row.seats || []).map((seat) => {
+      const placed = positionsById?.get(String(seat.seatId)) || null;
+      const x = Number(placed?.x);
+      return {
+        id: seat.seatId,
+        indexInRow: seat.column,
+        level: seat.level,
+        value: seat.valueFormatted,
+        isPrimary: seat.isPrimary,
+        priority: seat.priority,
+        x: Number.isFinite(x) ? x : null,
+      };
+    }),
   }));
 }
 
 export function useParameterGridAuthority({
   engineeringSummary,
   contributionsByKey = null,
+  seatingPositions = null,
 }) {
+  // Physical seat positions, so a seat-layout result map can place each seat
+  // where it actually is in the room instead of in seat-id order.
+  const positionsById = React.useMemo(() => {
+    const map = new Map();
+    for (const seat of (Array.isArray(seatingPositions) ? seatingPositions : [])) {
+      if (seat?.id) map.set(String(seat.id), seat);
+    }
+    return map;
+  }, [seatingPositions]);
+
   const primarySeatId = engineeringSummary?.primary?.seatIds?.[0]
     ?? engineeringSummary?.project?.seatIds?.[0]
     ?? "";
@@ -81,8 +102,8 @@ export function useParameterGridAuthority({
   }, [engineeringSummary, reportCounts, primarySeatId]);
 
   const buildSeatGridData = React.useCallback((paramId) => {
-    return adaptSeatRows(seatRowsFor(engineeringSummary, paramId));
-  }, [engineeringSummary]);
+    return adaptSeatRows(seatRowsFor(engineeringSummary, paramId), positionsById);
+  }, [engineeringSummary, positionsById]);
 
   const buildAsdrFooter = React.useCallback((paramId) => {
     const key = paramId === "screen" ? "screen" : `p${paramId}`;

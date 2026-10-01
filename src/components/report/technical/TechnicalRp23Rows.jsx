@@ -50,8 +50,8 @@ export default function TechnicalRp23Rows({ representativeSeats, engineeringSumm
               className="flex items-center justify-between gap-3 py-1.5 border-b border-[#F0EFEA] last:border-0"
             >
               <span className="text-sm text-[#3E4349] font-medium whitespace-nowrap">Row {row.rowNumber}</span>
-              <span className="text-xs text-[#625143] flex-1 truncate" title={`Representative seat: ${row.seatLabel}`}>
-                Representative seat: {row.seatLabel}
+              <span className="text-xs text-[#625143] flex-1 truncate">
+                {row.seatLabel}
               </span>
               <div className="flex items-center gap-3 whitespace-nowrap">
                 <span className="text-sm font-bold text-[#1B1A1A]">{row.angleFormatted}</span>
